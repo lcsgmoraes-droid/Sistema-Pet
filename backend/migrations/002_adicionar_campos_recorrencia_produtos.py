@@ -45,7 +45,7 @@ def adicionar_campos_recorrencia():
             result = conn.execute(text("PRAGMA table_info(produtos)"))
             colunas_finais = [row[1] for row in result]
             
-            logger.info(f"\n✅ Migração concluída!")
+            logger.info("\n✅ Migração concluída!")
             logger.info(f"Total de colunas na tabela produtos: {len(colunas_finais)}")
             
             # Verificar se todos os campos foram adicionados

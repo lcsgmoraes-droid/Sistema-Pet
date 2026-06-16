@@ -29,7 +29,7 @@ except ImportError:
 # Adicionar o diretório raiz ao PYTHONPATH
 sys.path.insert(0, os.path.dirname(__file__))
 
-from sqlalchemy import create_engine, text, select
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from app.produtos_models import Produto
 
@@ -81,14 +81,14 @@ def main():
         produtos_pai = session.query(
             Produto
         ).filter(
-            (Produto.tipo_produto == 'PAI') | (Produto.is_parent == True)
+            (Produto.tipo_produto == 'PAI') | (Produto.is_parent)
         ).all()
         
         # Query: Produtos VARIAÇÃO
         produtos_variacao = session.query(
             Produto
         ).filter(
-            (Produto.tipo_produto == 'VARIACAO') | (Produto.produto_pai_id != None)
+            (Produto.tipo_produto == 'VARIACAO') | (Produto.produto_pai_id.is_not(None))
         ).all()
         
         # Remover duplicatas (um produto pode ser PAI e já estar em variação)
@@ -98,17 +98,17 @@ def main():
         total_variacao = len(produtos_variacao)
         total_com_codigo = sum(1 for p in produtos_pai + produtos_variacao if p.codigo_barras)
         
-        print(f"\n📊 RELATÓRIO:")
+        print("\n📊 RELATÓRIO:")
         print(f"   Produtos PAI encontrados:        {total_pai}")
         print(f"   Produtos VARIAÇÃO encontrados:   {total_variacao}")
         print(f"   Total para processar:             {total_pai + total_variacao}")
         print(f"   Com código de barras atualmente:  {total_com_codigo}")
         
         if args.visualizar:
-            print(f"\n📋 MODO VISUALIZAR - Nenhuma mudança será feita")
+            print("\n📋 MODO VISUALIZAR - Nenhuma mudança será feita")
             
             if produtos_pai:
-                print(f"\n🔴 Produtos PAI que perderão código de barras:")
+                print("\n🔴 Produtos PAI que perderão código de barras:")
                 for p in produtos_pai[:10]:  # Mostrar apenas primeiros 10
                     if p.codigo_barras:
                         print(f"   [{p.id}] {p.codigo} - {p.nome}: '{p.codigo_barras}'")
@@ -116,17 +116,17 @@ def main():
                     print(f"   ... e mais {total_pai - 10}")
             
             if produtos_variacao:
-                print(f"\n🟡 Produtos VARIAÇÃO que perderão código de barras:")
+                print("\n🟡 Produtos VARIAÇÃO que perderão código de barras:")
                 for p in produtos_variacao[:10]:  # Mostrar apenas primeiros 10
                     if p.codigo_barras:
                         print(f"   [{p.id}] {p.codigo} - {p.nome}: '{p.codigo_barras}'")
                 if total_variacao > 10:
                     print(f"   ... e mais {total_variacao - 10}")
             
-            print(f"\n✅ Use --executar para realmente fazer as mudanças")
+            print("\n✅ Use --executar para realmente fazer as mudanças")
         
         elif args.executar:
-            print(f"\n⏳ MODO EXECUÇÃO - Preparando limpeza segura...")
+            print("\n⏳ MODO EXECUÇÃO - Preparando limpeza segura...")
             
             # Criar backup JSON com todos os dados antes da mudança
             backup_data = {
@@ -168,7 +168,7 @@ def main():
             print(f"💾 Backup criado: {backup_file}")
             
             # Confirmação final
-            print(f"\n⚠️  CONFIRMAÇÃO FINAL:")
+            print("\n⚠️  CONFIRMAÇÃO FINAL:")
             print(f"    Vou limpar {total_com_codigo} código(s) de barras")
             print(f"    PAI: {sum(1 for p in produtos_pai if p.codigo_barras)}")
             print(f"    VARIAÇÕES: {sum(1 for p in produtos_variacao if p.codigo_barras)}")
@@ -179,7 +179,7 @@ def main():
                 sys.exit(0)
             
             # EXECUTAR A LIMPEZA
-            print(f"\n🧹 Limpando códigos de barras...")
+            print("\n🧹 Limpando códigos de barras...")
             
             count_pai = 0
             for produto in produtos_pai:
@@ -196,15 +196,15 @@ def main():
             # Commit
             try:
                 session.commit()
-                print(f"\n✅ SUCESSO!")
+                print("\n✅ SUCESSO!")
                 print(f"   ✓ {count_pai} código(s) de barras removido(s) de produtos PAI")
                 print(f"   ✓ {count_variacao} código(s) de barras removido(s) de VARIAÇÕES")
                 print(f"   ✓ Total: {count_pai + count_variacao} registros atualizados")
                 print(f"\n📌 Backup disponível em: {backup_file}")
-                print(f"   Use este arquivo para auditoria ou reversão se necessário")
+                print("   Use este arquivo para auditoria ou reversão se necessário")
             except Exception as e:
                 session.rollback()
-                print(f"\n❌ ERRO durante execução!")
+                print("\n❌ ERRO durante execução!")
                 print(f"   {str(e)}")
                 sys.exit(1)
 

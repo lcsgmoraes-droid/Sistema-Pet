@@ -6,7 +6,7 @@ from app.db import SessionLocal
 from app.models import Cliente
 from app.produtos_models import Produto
 from app.vendas_models import Venda
-from sqlalchemy import func, text
+from sqlalchemy import func
 
 db = SessionLocal()
 
@@ -25,7 +25,7 @@ for cod, nome, vezes in duplicados[:10]:
 print("\n=== 2. TELEFONES VAZIOS ===")
 total_clientes = db.query(func.count(Cliente.id)).scalar()
 com_telefone = db.query(func.count(Cliente.id)).filter(
-    (Cliente.telefone != None) | (Cliente.celular != None)
+    (Cliente.telefone.is_not(None)) | (Cliente.celular.is_not(None))
 ).scalar()
 print(f"Total clientes: {total_clientes}")
 print(f"Com telefone/celular: {com_telefone}")
@@ -42,7 +42,7 @@ print("\n=== 3. PRODUTOS - MARCA/FORNECEDOR ===")
 # Verificar estrutura de produtos
 produto = db.query(Produto).first()
 if produto:
-    print(f"Campos do modelo Produto:")
+    print("Campos do modelo Produto:")
     for col in produto.__table__.columns:
         val = getattr(produto, col.name, None)
         print(f"  {col.name}: {val}")

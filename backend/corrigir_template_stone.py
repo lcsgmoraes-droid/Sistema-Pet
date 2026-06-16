@@ -75,19 +75,19 @@ try:
     )
     
     conn.commit()
-    print(f"✅ Template Stone atualizado com sucesso!")
-    print(f"   Campo 'parcela' → 'parcelas' (transformação: inteiro)")
+    print("✅ Template Stone atualizado com sucesso!")
+    print("   Campo 'parcela' → 'parcelas' (transformação: inteiro)")
     
     # Verificar
     cur.execute("SELECT mapeamento FROM adquirentes_templates WHERE nome = 'STONE'")
     result = cur.fetchone()
     if result:
-        print(f"\n🔍 Mapeamento atual:")
+        print("\n🔍 Mapeamento atual:")
         mapeamento_db = result[0]
         if 'parcelas' in mapeamento_db:
             print(f"   ✅ Campo 'parcelas': {mapeamento_db['parcelas']}")
         else:
-            print(f"   ❌ Campo 'parcelas' não encontrado!")
+            print("   ❌ Campo 'parcelas' não encontrado!")
             
 except Exception as e:
     print(f"❌ Erro: {e}")

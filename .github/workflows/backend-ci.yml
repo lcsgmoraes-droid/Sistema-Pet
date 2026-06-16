@@ -343,6 +343,10 @@ jobs:
         run: |
           ruff check scripts
 
+      - name: Backend global lint (blocking)
+        run: |
+          ruff check .
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

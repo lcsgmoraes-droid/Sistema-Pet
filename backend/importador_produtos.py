@@ -6,11 +6,9 @@ Versão de Produção com validação, logging e anti-duplicação
 """
 
 import sys
-import os
 import csv
 import logging
 from datetime import datetime
-from decimal import Decimal
 from typing import Optional, Dict, Any
 from dataclasses import dataclass
 from pathlib import Path
@@ -132,7 +130,7 @@ class ImportadorProdutos:
         
         try:
             return float(str(valor).replace(',', '.'))
-        except:
+        except Exception:
             return 0.0
     
     def obter_ou_criar_marca(self, nome_marca: str, session) -> Optional[int]:
@@ -450,7 +448,7 @@ class ImportadorProdutos:
         self.log("="*80)
         self.log("RELATÓRIO FINAL DE IMPORTAÇÃO")
         self.log("="*80)
-        self.log(f"\nPRODUTOS:")
+        self.log("\nPRODUTOS:")
         self.log(f"  Total processados: {self.stats.total}")
         percentual = (self.stats.validos/self.stats.total*100) if self.stats.total > 0 else 0
         self.log(f"  Válidos:          {self.stats.validos} ({percentual:.1f}%)")

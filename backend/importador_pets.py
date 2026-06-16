@@ -44,8 +44,6 @@ USO:
   python importador_pets.py
 """
 
-import os
-import sys
 import csv
 import argparse
 import json
@@ -56,7 +54,6 @@ from dataclasses import dataclass, asdict
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.exc import IntegrityError
 
 # =====================
 # CONFIGURAÇÕES
@@ -218,7 +215,7 @@ class ImportadorPets:
             # Formato: 2012-06-08 ou 2012-06-08 10:30:15
             dt = datetime.strptime(data_str.split()[0], '%Y-%m-%d')
             return dt.strftime('%Y-%m-%d')
-        except:
+        except Exception:
             return None
     
     def validar_pet(self, row: dict, session) -> ResultadoValidacao:
@@ -305,7 +302,7 @@ class ImportadorPets:
         if peso_str:
             try:
                 peso = float(peso_str.replace(',', '.'))
-            except:
+            except Exception:
                 avisos.append(f'Peso inválido: {peso_str}')
         
         # Foto

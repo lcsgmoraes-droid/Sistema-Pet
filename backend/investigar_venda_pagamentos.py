@@ -60,7 +60,6 @@ for pag in pagamentos:
     # Calcular taxa correta
     if pag[7] and pag[3]:
         import json
-        from decimal import Decimal
         taxas_json = json.loads(pag[7])
         taxa_parcela = taxas_json.get(str(pag[3]))
         if taxa_parcela:

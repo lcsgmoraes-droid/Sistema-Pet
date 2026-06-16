@@ -1,6 +1,5 @@
 # Script para seed de produção
 import psycopg2
-from datetime import datetime
 
 print("\n🔗 Conectando nos bancos...")
 
@@ -47,7 +46,7 @@ try:
                 "INSERT INTO dre_categorias (nome, tipo, descricao, ativo, tenant_id) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
                 cat
             )
-        except:
+        except Exception:
             pass
     conn_prod.commit()
     print(f"    ✅ {len(categorias)} categorias DRE copiadas")
@@ -66,7 +65,7 @@ try:
                 "INSERT INTO formas_pagamento (nome, tipo, dias_recebimento, requer_fatura, tenant_id) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
                 forma
             )
-        except:
+        except Exception:
             pass
     conn_prod.commit()
     print(f"    ✅ {len(formas)} formas de pagamento copiadas")
@@ -85,7 +84,7 @@ try:
                 "INSERT INTO contas_bancarias (nome, tipo, saldo, ativo, tenant_id) VALUES (%s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
                 banco
             )
-        except:
+        except Exception:
             pass
     conn_prod.commit()
     print(f"    ✅ {len(bancos)} bancos copiados")
@@ -104,7 +103,7 @@ try:
                 "INSERT INTO formas_pagamento_taxas (forma_pagamento_id, bandeira, tipo_taxa, percentual, valor_fixo, tenant_id) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT DO NOTHING",
                 taxa
             )
-        except:
+        except Exception:
             pass
     conn_prod.commit()
     print(f"    ✅ {len(taxas)} taxas copiadas")

@@ -2,8 +2,6 @@
 Script para atualizar template Stone com colunas corretas do CSV
 """
 import os
-import sys
-import json
 import psycopg2
 from psycopg2.extras import Json
 
@@ -118,9 +116,9 @@ def atualizar_template_stone():
         
         print("\n✅ Template Stone atualizado com sucesso!")
         print("\n📋 Mapeamento NSU atualizado:")
-        print(f"   Coluna: NSU -> STONE ID")
-        print(f"   Data Venda: Data Transação -> DATA DA VENDA")
-        print(f"   Valor Líquido: Valor Líquido -> VALOR LIQUIDO")
+        print("   Coluna: NSU -> STONE ID")
+        print("   Data Venda: Data Transação -> DATA DA VENDA")
+        print("   Valor Líquido: Valor Líquido -> VALOR LIQUIDO")
         
         cur.close()
         

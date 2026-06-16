@@ -31,11 +31,9 @@ Criar um banco de dados LIMPO para iniciar o piloto na loja.
 ============================================================================
 """
 
-import sys
 import os
 import time
 import subprocess
-from pathlib import Path
 
 # Cores para terminal
 VERDE = '\033[92m'

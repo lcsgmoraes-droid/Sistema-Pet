@@ -7,7 +7,6 @@ sys.path.insert(0, r"c:\Users\Lucas\OneDrive\Área de Trabalho\Programa\Sistema 
 
 from app.db import SessionLocal
 from sqlalchemy import text
-from decimal import Decimal
 
 db = SessionLocal()
 
@@ -57,7 +56,7 @@ print(f"   Status: {venda[17]}")
 venda_id = venda[0]
 
 # 2. Buscar itens da venda
-print(f"\n[2] ITENS DA VENDA:")
+print("\n[2] ITENS DA VENDA:")
 itens = db.execute(text("""
     SELECT 
         vi.id, vi.produto_id, p.nome, vi.quantidade, 
@@ -72,7 +71,7 @@ for item in itens:
     print(f"   - {item[2]}: {item[3]} x R$ {item[4]} = R$ {item[5]} (custo: R$ {item[6]})")
 
 # 3. Buscar pagamentos
-print(f"\n[3] FORMAS DE PAGAMENTO:")
+print("\n[3] FORMAS DE PAGAMENTO:")
 pagamentos = db.execute(text("""
     SELECT 
         id, forma_pagamento, valor, numero_parcelas,
@@ -91,7 +90,7 @@ for pag in pagamentos:
     print(f"     Bandeira: {pag[6]}")
 
 # 4. Buscar comissões
-print(f"\n[4] COMISSÕES DA VENDA:")
+print("\n[4] COMISSÕES DA VENDA:")
 try:
     comissoes = db.execute(text("""
         SELECT 
@@ -108,13 +107,13 @@ try:
         print(f"     Valor Comissão: R$ {com[3]}")
         print(f"     Percentual: {com[4]}%")
         print(f"     Status: {com[5]}")
-except Exception as e:
-    print(f"   ⚠️ Erro ao buscar comissões: Tabela não existe no banco")
+except Exception:
+    print("   ⚠️ Erro ao buscar comissões: Tabela não existe no banco")
     db.rollback()  # Rollback para continuar
 
 # 5. Buscar dados do entregador (se houver)
 if venda[16]:  # entregador_id
-    print(f"\n[5] DADOS DO ENTREGADOR:")
+    print("\n[5] DADOS DO ENTREGADOR:")
     entregador = db.execute(text("""
         SELECT 
             id, nome, taxa_fixa_entrega
@@ -130,7 +129,7 @@ if venda[16]:  # entregador_id
         print("   ❌ Entregador não encontrado")
 
 # 6. Buscar configuração fiscal
-print(f"\n[6] CONFIGURAÇÃO FISCAL:")
+print("\n[6] CONFIGURAÇÃO FISCAL:")
 config_fiscal = db.execute(text("""
     SELECT 
         id, simples_ativo, simples_anexo, aliquota_simples_vigente
@@ -147,7 +146,7 @@ else:
     print("   ❌ Configuração fiscal não encontrada")
 
 # 7. Buscar operadoras de cartão (se houver taxa_percentual nos pagamentos)
-print(f"\n[7] OPERADORAS DE CARTÃO:")
+print("\n[7] OPERADORAS DE CARTÃO:")
 operadoras = db.execute(text("""
     SELECT 
         id, nome, taxa_debito, taxa_credito_vista, taxa_credito_parcelado

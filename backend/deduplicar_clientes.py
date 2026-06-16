@@ -83,12 +83,12 @@ def deduplicar_clientes():
                 total_removidos += 1
         
         # 4. Commit das mudanças
-        print(f"\n[3/4] Salvando alterações...")
+        print("\n[3/4] Salvando alterações...")
         db.commit()
         print(f"   ✓ {total_removidos} registros duplicados removidos")
         
         # 5. Verificar resultado
-        print(f"\n[4/4] Verificando resultado...")
+        print("\n[4/4] Verificando resultado...")
         duplicados_final = db.execute(text("""
             SELECT codigo, COUNT(*) as total
             FROM clientes
@@ -105,7 +105,7 @@ def deduplicar_clientes():
         # Estatísticas finais
         total_clientes = db.query(func.count(Cliente.id)).scalar()
         com_telefone = db.query(func.count(Cliente.id)).filter(
-            (Cliente.telefone != None) | (Cliente.celular != None)
+            (Cliente.telefone.is_not(None)) | (Cliente.celular.is_not(None))
         ).scalar()
         
         print("\n" + "="*70)

@@ -2,13 +2,10 @@
 Script para criar alertas retroativos para produtos com estoque negativo
 """
 import sys
-import os
 sys.path.append('/app')
 
-from sqlalchemy.orm import Session
 from app.db import get_session
 from app.produtos_models import Produto
-from app.models import Tenant
 from app.estoque_models import AlertaEstoqueNegativo
 
 def criar_alertas_retroativos():
@@ -29,7 +26,7 @@ def criar_alertas_retroativos():
             # Verificar se já existe alerta ativo para este produto
             alerta_existente = db.query(AlertaEstoqueNegativo).filter(
                 AlertaEstoqueNegativo.produto_id == produto.id,
-                AlertaEstoqueNegativo.resolvido == False
+                AlertaEstoqueNegativo.resolvido.is_(False),
             ).first()
             
             if alerta_existente:

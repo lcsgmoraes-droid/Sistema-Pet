@@ -3,9 +3,8 @@ Teste rápido - Importar os próximos clientes (pulando os primeiros 20)
 """
 from pathlib import Path
 import csv
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime
 
 DATABASE_URL = "postgresql://postgres:postgres@localhost:5433/petshop_dev"
 SIMPLESVET_PATH = Path(r"c:\Users\Lucas\OneDrive\Área de Trabalho\Programa\Sistema Pet\simplesvet\banco")
@@ -35,6 +34,6 @@ else:
     estado = None
 
 print(f"- Estado (processado): '{estado}'")
-print(f"\nTodos os campos do CSV:")
+print("\nTodos os campos do CSV:")
 for k, v in list(cliente.items())[:10]:
     print(f"  {k}: {v}")

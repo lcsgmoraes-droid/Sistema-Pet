@@ -51,7 +51,7 @@ def adicionar_campos_doses():
                 else:
                     logger.info(f"ℹ️  Coluna {campo_nome} já existe em lembretes")
             
-            logger.info(f"\n✅ Migração de controle de doses concluída!")
+            logger.info("\n✅ Migração de controle de doses concluída!")
         
         return True
             
