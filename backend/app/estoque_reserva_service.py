@@ -45,7 +45,9 @@ class EstoqueReservaService:
         )
 
     @staticmethod
-    def _produtos_por_sku(db: Session, tenant_id, skus: list[str]) -> dict[str, Produto]:
+    def _produtos_por_sku(
+        db: Session, tenant_id, skus: list[str]
+    ) -> dict[str, Produto]:
         skus_limpos = [str(sku or "").strip() for sku in skus if str(sku or "").strip()]
         if not skus_limpos:
             return {}
@@ -54,7 +56,10 @@ class EstoqueReservaService:
             db.query(Produto)
             .filter(
                 Produto.tenant_id == tenant_id,
-                or_(Produto.codigo.in_(skus_limpos), Produto.codigo_barras.in_(skus_limpos)),
+                or_(
+                    Produto.codigo.in_(skus_limpos),
+                    Produto.codigo_barras.in_(skus_limpos),
+                ),
             )
             .all()
         )
@@ -66,7 +71,9 @@ class EstoqueReservaService:
         return mapa
 
     @staticmethod
-    def _componentes_por_kit(db: Session, kit_ids: list[int]) -> dict[int, list[ProdutoKitComponente]]:
+    def _componentes_por_kit(
+        db: Session, kit_ids: list[int]
+    ) -> dict[int, list[ProdutoKitComponente]]:
         ids = [int(kit_id) for kit_id in kit_ids if kit_id]
         if not ids:
             return {}
@@ -116,7 +123,8 @@ class EstoqueReservaService:
             dict.fromkeys(
                 int(produto.id)
                 for produto in produtos_por_sku.values()
-                if getattr(produto, "id", None) and EstoqueReservaService._usa_composicao_virtual(produto)
+                if getattr(produto, "id", None)
+                and EstoqueReservaService._usa_composicao_virtual(produto)
             )
         )
         componentes_por_kit = EstoqueReservaService._componentes_por_kit(db, kit_ids)
@@ -140,7 +148,9 @@ class EstoqueReservaService:
                 for componente in componentes_por_kit.get(int(produto.id), []):
                     if not componente.produto_componente_id:
                         continue
-                    reservas[int(componente.produto_componente_id)] += quantidade_item * float(componente.quantidade or 0)
+                    reservas[int(componente.produto_componente_id)] += (
+                        quantidade_item * float(componente.quantidade or 0)
+                    )
                 continue
 
             reservas[int(produto.id)] += quantidade_item
@@ -148,11 +158,15 @@ class EstoqueReservaService:
         return dict(reservas)
 
     @staticmethod
-    def quantidade_reservada_produto(db: Session, tenant_id, produto: Produto | None) -> float:
+    def quantidade_reservada_produto(
+        db: Session, tenant_id, produto: Produto | None
+    ) -> float:
         if not produto or not getattr(produto, "id", None):
             return 0.0
         return float(
-            EstoqueReservaService.mapa_reservas_ativas_por_produto(db, tenant_id).get(int(produto.id), 0.0)
+            EstoqueReservaService.mapa_reservas_ativas_por_produto(db, tenant_id).get(
+                int(produto.id), 0.0
+            )
         )
 
     @staticmethod
@@ -169,10 +183,14 @@ class EstoqueReservaService:
         if not produto:
             raise ValueError(f"Produto com SKU {item.sku} nao encontrado")
 
-        reservas_ativas = EstoqueReservaService.mapa_reservas_ativas_por_produto(db, item.tenant_id)
+        reservas_ativas = EstoqueReservaService.mapa_reservas_ativas_por_produto(
+            db, item.tenant_id
+        )
 
         if EstoqueReservaService._usa_composicao_virtual(produto):
-            componentes = EstoqueReservaService._componentes_por_kit(db, [int(produto.id)]).get(int(produto.id), [])
+            componentes = EstoqueReservaService._componentes_por_kit(
+                db, [int(produto.id)]
+            ).get(int(produto.id), [])
             if not componentes:
                 import logging
 
@@ -197,7 +215,9 @@ class EstoqueReservaService:
                     )
 
                 reservado = float(reservas_ativas.get(int(produto_componente.id), 0.0))
-                necessario = float(item.quantidade or 0) * float(componente.quantidade or 0)
+                necessario = float(item.quantidade or 0) * float(
+                    componente.quantidade or 0
+                )
                 disponivel = float(produto_componente.estoque_atual or 0) - reservado
 
                 if disponivel < necessario:

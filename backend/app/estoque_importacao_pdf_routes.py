@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 import re
@@ -9,36 +8,31 @@ from app.database.session import get_db
 from app.estoque_transferencia_service import EstoqueTransferenciaService
 from app.local_estoque_models import LocalEstoque
 
-router = APIRouter(
-    prefix="/estoque/importacao",
-    tags=["Estoque - Importação PDF"]
-)
+router = APIRouter(prefix="/estoque/importacao", tags=["Estoque - Importação PDF"])
 
 SKU_REGEX = re.compile(r"SKU[:\s]+([A-Z0-9\-_.]+)", re.IGNORECASE)
 QTD_REGEX = re.compile(r"(QTD|QUANTIDADE)[:\s]+(\d+)", re.IGNORECASE)
+
 
 @router.post("/pdf")
 async def importar_pdf(
     file: UploadFile = File(...),
     local_destino_id: str = None,
-    db: Session = next(get_db())
+    db: Session = next(get_db()),
 ):
     if not local_destino_id:
         raise HTTPException(status_code=400, detail="Local de destino obrigatório")
 
-    origem = db.query(LocalEstoque).filter(
-        LocalEstoque.origem_padrao.is_(True)
-    ).first()
+    origem = db.query(LocalEstoque).filter(LocalEstoque.origem_padrao.is_(True)).first()
 
     if not origem:
-        raise HTTPException(status_code=400, detail="Local de origem padrão não configurado")
+        raise HTTPException(
+            status_code=400, detail="Local de origem padrão não configurado"
+        )
 
     pdf_bytes = await file.read()
 
-    resultados = {
-        "sucesso": [],
-        "erros": []
-    }
+    resultados = {"sucesso": [], "erros": []}
 
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
         texto = ""
@@ -68,15 +62,17 @@ async def importar_pdf(
                     local_destino_id=local_destino_id,
                     quantidade=atual["quantidade"],
                     documento="PDF_FULL",
-                    observacao="Importação PDF"
+                    observacao="Importação PDF",
                 )
                 resultados["sucesso"].append(resultado)
             except Exception as e:
-                resultados["erros"].append({
-                    "sku": atual["sku"],
-                    "quantidade": atual["quantidade"],
-                    "erro": str(e)
-                })
+                resultados["erros"].append(
+                    {
+                        "sku": atual["sku"],
+                        "quantidade": atual["quantidade"],
+                        "erro": str(e),
+                    }
+                )
             atual = {}
 
     return resultados

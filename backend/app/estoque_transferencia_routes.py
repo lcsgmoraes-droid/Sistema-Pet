@@ -51,7 +51,9 @@ def transferencia_estoque(
     )
 
     if transf.estoque_origem == transf.estoque_destino:
-        raise HTTPException(status_code=400, detail="Origem e destino não podem ser iguais")
+        raise HTTPException(
+            status_code=400, detail="Origem e destino não podem ser iguais"
+        )
 
     produto = (
         db.query(Produto)

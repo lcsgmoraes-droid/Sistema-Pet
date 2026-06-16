@@ -26,10 +26,15 @@ def _buscar_tenant(db: Session, tenant_id: str) -> Tenant:
     return tenant
 
 
-def _buscar_bloqueio(db: Session, tenant_id: str, bloqueio_id: int) -> EstoqueValidadeBloqueio:
+def _buscar_bloqueio(
+    db: Session, tenant_id: str, bloqueio_id: int
+) -> EstoqueValidadeBloqueio:
     item = (
         db.query(EstoqueValidadeBloqueio)
-        .options(joinedload(EstoqueValidadeBloqueio.produto), joinedload(EstoqueValidadeBloqueio.lote))
+        .options(
+            joinedload(EstoqueValidadeBloqueio.produto),
+            joinedload(EstoqueValidadeBloqueio.lote),
+        )
         .filter(
             EstoqueValidadeBloqueio.id == bloqueio_id,
             EstoqueValidadeBloqueio.tenant_id == tenant_id,
@@ -37,7 +42,9 @@ def _buscar_bloqueio(db: Session, tenant_id: str, bloqueio_id: int) -> EstoqueVa
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Bloqueio de validade nao encontrado")
+        raise HTTPException(
+            status_code=404, detail="Bloqueio de validade nao encontrado"
+        )
     return item
 
 
@@ -89,7 +96,10 @@ def listar_pendencias(
     _current_user, tenant_id = user_and_tenant
     itens = (
         db.query(EstoqueValidadeBloqueio)
-        .options(joinedload(EstoqueValidadeBloqueio.produto), joinedload(EstoqueValidadeBloqueio.lote))
+        .options(
+            joinedload(EstoqueValidadeBloqueio.produto),
+            joinedload(EstoqueValidadeBloqueio.lote),
+        )
         .filter(
             EstoqueValidadeBloqueio.tenant_id == tenant_id,
             EstoqueValidadeBloqueio.status == "pendente",
@@ -172,7 +182,10 @@ def alertas_pdv(
 
     itens = (
         db.query(EstoqueValidadeBloqueio)
-        .options(joinedload(EstoqueValidadeBloqueio.produto), joinedload(EstoqueValidadeBloqueio.lote))
+        .options(
+            joinedload(EstoqueValidadeBloqueio.produto),
+            joinedload(EstoqueValidadeBloqueio.lote),
+        )
         .filter(
             EstoqueValidadeBloqueio.tenant_id == tenant_id,
             EstoqueValidadeBloqueio.status == "pendente",
@@ -195,7 +208,10 @@ def relatorio_perdas(
     _current_user, tenant_id = user_and_tenant
     query = (
         db.query(EstoqueValidadeBloqueio)
-        .options(joinedload(EstoqueValidadeBloqueio.produto), joinedload(EstoqueValidadeBloqueio.lote))
+        .options(
+            joinedload(EstoqueValidadeBloqueio.produto),
+            joinedload(EstoqueValidadeBloqueio.lote),
+        )
         .filter(
             EstoqueValidadeBloqueio.tenant_id == tenant_id,
         )
@@ -214,5 +230,13 @@ def relatorio_perdas(
         query = query.filter(EstoqueValidadeBloqueio.created_at <= data_fim)
 
     itens = query.order_by(EstoqueValidadeBloqueio.created_at.desc()).all()
-    perda_total = sum(float(item.custo_total_estimado or 0) for item in itens if item.status == "descartado")
-    return {"total": len(itens), "perda_total": perda_total, "items": [_serializar(item) for item in itens]}
+    perda_total = sum(
+        float(item.custo_total_estimado or 0)
+        for item in itens
+        if item.status == "descartado"
+    )
+    return {
+        "total": len(itens),
+        "perda_total": perda_total,
+        "items": [_serializar(item) for item in itens],
+    }

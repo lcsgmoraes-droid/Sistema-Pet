@@ -149,7 +149,10 @@ def listar_alertas_preco_granel(
         granel = vinculo.produto_granel
         if not origem or not granel:
             continue
-        if getattr(origem, "ativo", True) is False or getattr(granel, "ativo", True) is False:
+        if (
+            getattr(origem, "ativo", True) is False
+            or getattr(granel, "ativo", True) is False
+        ):
             continue
 
         peso_kg = float(getattr(origem, "peso_embalagem", 0) or 0)
@@ -192,10 +195,14 @@ def listar_alertas_preco_granel(
                 "preco_venda_granel": round(preco_venda_granel, 2),
                 "preco_minimo_granel": round(preco_minimo_granel, 2),
                 "diferenca_valor": round(diferenca, 2),
-                "diferenca_percentual": round((diferenca / preco_minimo_granel) * 100, 2)
+                "diferenca_percentual": round(
+                    (diferenca / preco_minimo_granel) * 100, 2
+                )
                 if preco_minimo_granel > 0
                 else 0,
-                "margem_minima_percentual": round(float(margem_minima_percentual or 0), 2),
+                "margem_minima_percentual": round(
+                    float(margem_minima_percentual or 0), 2
+                ),
                 "margem_atual_sobre_venda_kg": round(margem_atual_sobre_venda_kg, 2),
                 "margem_atual_sobre_custo_kg": round(margem_atual_sobre_custo_kg, 2)
                 if margem_atual_sobre_custo_kg is not None
@@ -206,7 +213,12 @@ def listar_alertas_preco_granel(
             }
         )
 
-    alertas.sort(key=lambda item: (0 if item["criticidade"] == "CRITICO" else 1, -item["diferenca_valor"]))
+    alertas.sort(
+        key=lambda item: (
+            0 if item["criticidade"] == "CRITICO" else 1,
+            -item["diferenca_valor"],
+        )
+    )
     total_alertas = len(alertas)
     alertas = alertas[:limite]
     return {
@@ -245,7 +257,9 @@ def criar_vinculo_granel(
     if not produto_granel:
         raise HTTPException(status_code=404, detail="Produto granel nao encontrado")
     if not _produto_e_granel(produto_granel):
-        raise HTTPException(status_code=400, detail="Produto informado nao esta marcado como granel")
+        raise HTTPException(
+            status_code=400, detail="Produto informado nao esta marcado como granel"
+        )
     _normalizar_produto_granel(produto_granel)
 
     vinculo = _obter_ou_criar_vinculo_granel(
@@ -306,7 +320,9 @@ def converter_estoque_granel(
     if not produto_granel:
         raise HTTPException(status_code=404, detail="Produto granel nao encontrado")
     if not _produto_e_granel(produto_granel):
-        raise HTTPException(status_code=400, detail="Produto informado nao esta marcado como granel")
+        raise HTTPException(
+            status_code=400, detail="Produto informado nao esta marcado como granel"
+        )
 
     peso_pacote_kg = _validar_produto_origem_granel(produto_base)
     _normalizar_produto_granel(produto_granel)
@@ -344,7 +360,8 @@ def converter_estoque_granel(
     produto_granel.estoque_atual = estoque_granel_anterior + quantidade_kg
     if produto_granel.estoque_atual > 0:
         produto_granel.preco_custo = (
-            (estoque_granel_anterior * custo_granel_anterior) + (quantidade_kg * custo_kg)
+            (estoque_granel_anterior * custo_granel_anterior)
+            + (quantidade_kg * custo_kg)
         ) / produto_granel.estoque_atual
     if preco_venda_granel_atualizado:
         produto_granel.preco_venda = float(payload.preco_venda_granel or 0)
@@ -405,10 +422,16 @@ def converter_estoque_granel(
     db.commit()
 
     try:
-        sincronizar_bling_background(produto_base.id, produto_base.estoque_atual, "conversao_granel_saida")
-        sincronizar_bling_background(produto_granel.id, produto_granel.estoque_atual, "conversao_granel_entrada")
+        sincronizar_bling_background(
+            produto_base.id, produto_base.estoque_atual, "conversao_granel_saida"
+        )
+        sincronizar_bling_background(
+            produto_granel.id, produto_granel.estoque_atual, "conversao_granel_entrada"
+        )
     except Exception as e_sync:
-        logger.warning(f"[BLING-SYNC] Erro ao agendar sync (conversao granel): {e_sync}")
+        logger.warning(
+            f"[BLING-SYNC] Erro ao agendar sync (conversao granel): {e_sync}"
+        )
 
     return {
         "id": conversao.id,

@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
@@ -137,4 +138,4 @@ def test_fifo_de_lotes_consumiveis_usa_apenas_status_ativo():
 
     source = inspect.getsource(EstoqueService._consumir_lotes_fifo)
 
-    assert "ProdutoLote.status == 'ativo'" in source
+    assert re.search(r"ProdutoLote\.status\s*==\s*['\"]ativo['\"]", source)

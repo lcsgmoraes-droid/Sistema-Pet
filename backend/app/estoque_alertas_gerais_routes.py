@@ -39,39 +39,59 @@ def alertas_estoque(
     hoje = datetime.now().date()
     daqui_30_dias = hoje + timedelta(days=30)
 
-    zerados = db.query(Produto).filter(
-        or_(
-            Produto.estoque_atual == 0,
-            Produto.estoque_atual.is_(None),
-        ),
-        Produto.tipo == "produto",
-        Produto.status == "ativo",
-        Produto.tenant_id == tenant_id,
-    ).all()
+    zerados = (
+        db.query(Produto)
+        .filter(
+            or_(
+                Produto.estoque_atual == 0,
+                Produto.estoque_atual.is_(None),
+            ),
+            Produto.tipo == "produto",
+            Produto.status == "ativo",
+            Produto.tenant_id == tenant_id,
+        )
+        .all()
+    )
 
-    abaixo_minimo = db.query(Produto).filter(
-        Produto.estoque_atual <= Produto.estoque_minimo,
-        Produto.estoque_atual > 0,
-        Produto.estoque_minimo > 0,
-        Produto.tipo == "produto",
-        Produto.status == "ativo",
-        Produto.tenant_id == tenant_id,
-    ).all()
+    abaixo_minimo = (
+        db.query(Produto)
+        .filter(
+            Produto.estoque_atual <= Produto.estoque_minimo,
+            Produto.estoque_atual > 0,
+            Produto.estoque_minimo > 0,
+            Produto.tipo == "produto",
+            Produto.status == "ativo",
+            Produto.tenant_id == tenant_id,
+        )
+        .all()
+    )
 
-    lotes_vencendo = db.query(ProdutoLote).join(Produto).filter(
-        ProdutoLote.data_validade.between(hoje, daqui_30_dias),
-        ProdutoLote.quantidade > 0,
-        ProdutoLote.status == "disponivel",
-        Produto.status == "ativo",
-        Produto.tenant_id == tenant_id,
-    ).options(joinedload(ProdutoLote.produto)).all()
+    lotes_vencendo = (
+        db.query(ProdutoLote)
+        .join(Produto)
+        .filter(
+            ProdutoLote.data_validade.between(hoje, daqui_30_dias),
+            ProdutoLote.quantidade > 0,
+            ProdutoLote.status == "disponivel",
+            Produto.status == "ativo",
+            Produto.tenant_id == tenant_id,
+        )
+        .options(joinedload(ProdutoLote.produto))
+        .all()
+    )
 
-    lotes_vencidos = db.query(ProdutoLote).join(Produto).filter(
-        ProdutoLote.data_validade < hoje,
-        ProdutoLote.quantidade > 0,
-        Produto.status == "ativo",
-        Produto.tenant_id == tenant_id,
-    ).options(joinedload(ProdutoLote.produto)).all()
+    lotes_vencidos = (
+        db.query(ProdutoLote)
+        .join(Produto)
+        .filter(
+            ProdutoLote.data_validade < hoje,
+            ProdutoLote.quantidade > 0,
+            Produto.status == "ativo",
+            Produto.tenant_id == tenant_id,
+        )
+        .options(joinedload(ProdutoLote.produto))
+        .all()
+    )
 
     return {
         "zerados": {
