@@ -10,12 +10,10 @@ from io import BytesIO
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from datetime import datetime
-from typing import List, Dict, Any
 import logging
 
 from app.db import get_session
-from app.auth import get_current_user, get_current_user_and_tenant
-from app.models import User
+from app.auth import get_current_user_and_tenant
 from app.produtos_models import Produto, Categoria, Marca
 from app.services.produto_service import normalizar_sku_produto
 
