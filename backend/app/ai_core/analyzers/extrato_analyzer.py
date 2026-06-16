@@ -1,4 +1,3 @@
-"""
 """ExtratoAnalyzer - Categorização de extratos com Framework Global de Confiança
 """
 from typing import Optional, List, Dict, Any

@@ -7,10 +7,10 @@ Responsável por:
 - Fornecer métricas agregadas
 - Calcular tendências
 """
-from typing import Optional, List, Dict, Any
-from datetime import datetime, date, timedelta
+from typing import Optional, List
+from datetime import date, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, case
+from sqlalchemy import and_
 import logging
 
 from ..domain.metrics import (
@@ -80,7 +80,7 @@ class MetricsService:
         
         if not snapshot:
             # Snapshot não existe, calcular sob demanda
-            logger.info(f"Snapshot não encontrado, calculando métricas sob demanda...")
+            logger.info("Snapshot não encontrado, calculando métricas sob demanda...")
             return self.calculate_metrics_realtime(
                 tenant_id=tenant_id,
                 decision_type=decision_type,
@@ -247,7 +247,7 @@ class MetricsService:
         ).limit(2).all()
         
         if len(snapshots) < 2:
-            logger.warning(f"Não há dados suficientes para calcular tendências")
+            logger.warning("Não há dados suficientes para calcular tendências")
             return []
         
         current = snapshots[0]

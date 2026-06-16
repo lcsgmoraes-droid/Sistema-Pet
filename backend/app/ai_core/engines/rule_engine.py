@@ -2,8 +2,7 @@
 RuleEngine - Motor de regras determinísticas
 Adaptado da lógica existente em extrato_nlp.py e extrato_ia.py
 """
-from typing import Optional, List, Dict, Any
-import re
+from typing import Optional, List, Dict
 import time
 from .base import DecisionEngine
 from ..domain.context import DecisionContext, DecisionType

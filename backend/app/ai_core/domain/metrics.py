@@ -3,7 +3,7 @@ AI Trust & Performance Metrics - Domain Models
 
 Métricas de confiança e qualidade para governança de IA.
 """
-from typing import Dict, Any, Optional, List
+from typing import Optional, List
 from datetime import datetime, date
 from enum import Enum
 from pydantic import BaseModel, Field, computed_field

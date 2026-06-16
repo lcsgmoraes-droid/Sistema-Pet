@@ -7,6 +7,7 @@ Responsável por:
 - Sugerir ajustes de política
 - Identificar riscos e oportunidades
 """
+from datetime import datetime
 from typing import Optional, List
 from sqlalchemy.orm import Session
 import logging

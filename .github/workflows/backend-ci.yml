@@ -95,6 +95,10 @@ jobs:
         run: |
           ruff check app/ai
 
+      - name: AI Core lint (blocking)
+        run: |
+          ruff check app/ai_core
+
       - name: Fiscal models lint (blocking)
         run: |
           ruff check app/fiscal_models

@@ -436,3 +436,10 @@ def test_backend_ci_has_blocking_ai_lint_step():
 
     assert "AI lint (blocking)" in source
     assert "ruff check app/ai" in source
+
+
+def test_backend_ci_has_blocking_ai_core_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "AI Core lint (blocking)" in source
+    assert "ruff check app/ai_core" in source

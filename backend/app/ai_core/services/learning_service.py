@@ -5,7 +5,6 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from datetime import datetime
 from ..models.decision_log import DecisionLog, FeedbackLog, LearningPatternModel
-from ..domain.feedback import FeedbackType
 from ..domain.events import DecisionReviewedEvent
 import logging
 
@@ -95,7 +94,7 @@ class LearningService:
         )
         
         self.db.commit()
-        logger.info(f"  ✅ Feedback processado e padrões atualizados")
+        logger.info("  ✅ Feedback processado e padrões atualizados")
     
     async def _learn_from_feedback(
         self,
@@ -205,7 +204,7 @@ class LearningService:
         patterns = self.db.query(LearningPatternModel).filter(
             LearningPatternModel.user_id == user_id,
             LearningPatternModel.pattern_type == pattern_type,
-            LearningPatternModel.is_active == True
+            LearningPatternModel.is_active.is_(True)
         ).all()
         
         # Calcular similaridade
@@ -369,7 +368,7 @@ class LearningService:
         - Incrementa success_rate
         - Reforça o padrão para uso futuro
         """
-        logger.info(f"  ✅ Aprovado - IA acertou")
+        logger.info("  ✅ Aprovado - IA acertou")
         
         input_data = decision_log.input_data.get("primary_data", {})
         input_signature = self._create_input_signature(
@@ -421,7 +420,7 @@ class LearningService:
         - Ajusta success_rate
         - Se padrão não existe, cria com decisão correta
         """
-        logger.info(f"  🔧 Corrigido - IA errou")
+        logger.info("  🔧 Corrigido - IA errou")
         
         input_data = decision_log.input_data.get("primary_data", {})
         input_signature = self._create_input_signature(
@@ -482,7 +481,7 @@ class LearningService:
         - Não atualiza output (não sabemos o correto)
         - Se rejeições recorrentes, desativa padrão
         """
-        logger.info(f"  ❌ Rejeitado - decisão inadequada")
+        logger.info("  ❌ Rejeitado - decisão inadequada")
         
         input_data = decision_log.input_data.get("primary_data", {})
         input_signature = self._create_input_signature(
