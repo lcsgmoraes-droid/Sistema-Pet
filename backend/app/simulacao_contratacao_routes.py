@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import date
 
-from app.auth.core import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.services.simulacao_contratacao_service import simular_contratacao
 

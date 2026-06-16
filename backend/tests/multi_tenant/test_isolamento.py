@@ -11,7 +11,6 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.db import Base
 from app.tenancy.context import set_current_tenant, clear_current_tenant
 from app.models import Cliente
 from app.produtos_models import Produto

@@ -2,7 +2,6 @@
 Model para Rotas de Entrega - ETAPA 9.3
 """
 from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, Text, ForeignKey
-from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.base_models import BaseTenantModel
 

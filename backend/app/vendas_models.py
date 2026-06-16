@@ -3,11 +3,10 @@
 Models para o módulo de Vendas (PDV)
 """
 
-from sqlalchemy import Column, Integer, BigInteger, String, Float, Boolean, DateTime, Text, ForeignKey, DECIMAL, Identity, Enum, JSON, Index
+from sqlalchemy import Column, Integer, BigInteger, String, Boolean, DateTime, Text, ForeignKey, DECIMAL, Enum, JSON, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
-from app.db import Base
 from app.base_models import BaseTenantModel
 from app.utils.serialization import safe_decimal_to_float, safe_datetime_to_iso
 from app.services.product_image_storage import build_product_thumbnail_url
@@ -143,7 +142,7 @@ class Venda(BaseTenantModel):
                 if isinstance(self.cliente.enderecos_adicionais, str):
                     try:
                         enderecos_adicionais = json.loads(self.cliente.enderecos_adicionais)
-                    except:
+                    except json.JSONDecodeError:
                         enderecos_adicionais = None
                 else:
                     enderecos_adicionais = self.cliente.enderecos_adicionais
@@ -276,7 +275,6 @@ class VendaItem(BaseTenantModel):
     # variation = relationship("ProductVariation", backref="vendas_itens")
     
     def to_dict(self):
-        from sqlalchemy.orm import Session
         from sqlalchemy import inspect
         
         result = {
@@ -346,7 +344,7 @@ class VendaItem(BaseTenantModel):
                         ]
                     else:
                         result['composicao_kit'] = []
-                except Exception as e:
+                except Exception:
                     # Se der erro, retornar lista vazia
                     result['composicao_kit'] = []
             else:

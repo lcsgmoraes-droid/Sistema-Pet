@@ -4,7 +4,7 @@ Rotas para Auditoria de Provisões
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import List, Dict
+from typing import List
 from pydantic import BaseModel
 
 from app.auth.dependencies import get_current_user_and_tenant

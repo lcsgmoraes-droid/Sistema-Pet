@@ -5,14 +5,12 @@ Endpoints para gerenciamento de lembretes de produtos recorrentes (medicamentos,
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from typing import List, Optional
 import logging
 
 from .db import get_session
 from .auth import get_current_user_and_tenant
-from .models import User, Cliente, Pet
+from .models import Cliente, Pet
 from .produtos_models import Produto, Lembrete
-from .vendas_models import Venda
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/lembretes", tags=["lembretes"])
@@ -145,18 +143,20 @@ async def listar_lembretes_pendentes(
             "total": len(lembretes),
             "lembretes": [
                 {
-                    "id": l.id,
-                    "pet_nome": l.pet.nome,
-                    "produto_nome": l.produto.nome,
-                    "data_proxima_dose": l.data_proxima_dose.isoformat(),
-                    "dias_restantes": (l.data_proxima_dose.date() - datetime.utcnow().date()).days,
-                    "status": l.status,
-                    "quantidade": l.quantidade_recomendada,
-                    "preco_estimado": l.preco_estimado,
-                    "dose_atual": l.dose_atual,
-                    "dose_total": l.dose_total
+                    "id": lembrete.id,
+                    "pet_nome": lembrete.pet.nome,
+                    "produto_nome": lembrete.produto.nome,
+                    "data_proxima_dose": lembrete.data_proxima_dose.isoformat(),
+                    "dias_restantes": (
+                        lembrete.data_proxima_dose.date() - datetime.utcnow().date()
+                    ).days,
+                    "status": lembrete.status,
+                    "quantidade": lembrete.quantidade_recomendada,
+                    "preco_estimado": lembrete.preco_estimado,
+                    "dose_atual": lembrete.dose_atual,
+                    "dose_total": lembrete.dose_total
                 }
-                for l in lembretes
+                for lembrete in lembretes
             ]
         }
         
@@ -180,7 +180,7 @@ async def listar_lembretes_para_notificar(
         lembretes = db.query(Lembrete).filter(
             Lembrete.tenant_id == tenant_id,
             Lembrete.status == 'pendente',
-            Lembrete.notificacao_enviada == False,
+            Lembrete.notificacao_enviada.is_(False),
             Lembrete.data_notificacao_7_dias <= agora
         ).all()
         
@@ -188,17 +188,17 @@ async def listar_lembretes_para_notificar(
             "total": len(lembretes),
             "lembretes": [
                 {
-                    "id": l.id,
-                    "cliente_id": l.cliente_id,
-                    "cliente_nome": l.cliente.nome,
-                    "telefone": l.cliente.telefone,
-                    "email": l.cliente.email,
-                    "pet_nome": l.pet.nome,
-                    "produto_nome": l.produto.nome,
-                    "data_proxima_dose": l.data_proxima_dose.isoformat(),
-                    "metodo_notificacao": l.metodo_notificacao
+                    "id": lembrete.id,
+                    "cliente_id": lembrete.cliente_id,
+                    "cliente_nome": lembrete.cliente.nome,
+                    "telefone": lembrete.cliente.telefone,
+                    "email": lembrete.cliente.email,
+                    "pet_nome": lembrete.pet.nome,
+                    "produto_nome": lembrete.produto.nome,
+                    "data_proxima_dose": lembrete.data_proxima_dose.isoformat(),
+                    "metodo_notificacao": lembrete.metodo_notificacao
                 }
-                for l in lembretes
+                for lembrete in lembretes
             ]
         }
         

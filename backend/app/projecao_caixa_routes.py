@@ -4,10 +4,8 @@ Rotas de Projeção de Caixa
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import List
 
 from app.db import get_session
-from app.auth.core import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.services.projecao_caixa_service import projetar_caixa, obter_resumo_projecao
 

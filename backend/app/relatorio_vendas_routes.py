@@ -6,7 +6,7 @@ Similar ao SimplesVet com abas: Resumo, Totais por produto, Lista de Vendas
 from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, and_, or_
 from datetime import datetime, date
 from typing import Optional
@@ -18,7 +18,7 @@ from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
 from .vendas_models import Venda, VendaItem, VendaPagamento
 from .produtos_models import Produto, EstoqueMovimentacao
-from .models import User, Cliente
+from .models import Cliente
 from .comissoes_models import ComissaoItem
 from .empresa_config_fiscal_models import EmpresaConfigFiscal
 from .financeiro_models import FormaPagamento
@@ -385,7 +385,7 @@ async def obter_relatorio_vendas(
     formas_pagamento_map = {}
     try:
         formas_pag_list = db.query(FormaPagamento).filter(
-            and_(FormaPagamento.ativo == True, FormaPagamento.tenant_id == tenant_id)
+            and_(FormaPagamento.ativo.is_(True), FormaPagamento.tenant_id == tenant_id)
         ).all()
         for fp in formas_pag_list:
             formas_pagamento_map[fp.nome.lower().strip()] = fp
@@ -538,23 +538,6 @@ async def obter_relatorio_vendas(
     # ==============================================
     # FORMAS DE RECEBIMENTO
     # ==============================================
-    # Mapeamento de códigos para descrições legíveis
-    FORMAS_PAGAMENTO_MAP = {
-        '1': 'Dinheiro',
-        '2': 'PIX',
-        '3': 'Cartão Débito',
-        '4': 'Cartão Crédito',
-        '5': 'Cartão Crédito',
-        'dinheiro': 'Dinheiro',
-        'pix': 'PIX',
-        'debito': 'Cartão Débito',
-        'cartao_debito': 'Cartão Débito',
-        'credito': 'Cartão Crédito',
-        'cartao_credito': 'Cartão Crédito',
-        'credito_parcelado': 'Cartão Crédito',
-        'credito_cliente': 'Crédito do Cliente'
-    }
-
     formas_recebimento = {}
     for venda in vendas:
         # OTIMIZAÇÃO: usar pagamentos já carregados
@@ -1094,7 +1077,7 @@ async def exportar_vendas_pdf(
         from reportlab.lib.units import mm
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_RIGHT, TA_CENTER
+        from reportlab.lib.enums import TA_CENTER
     except ImportError as e:
         logger.error(f"Erro ao importar reportlab: {str(e)}")
         raise HTTPException(
