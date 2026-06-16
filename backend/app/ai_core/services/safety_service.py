@@ -13,11 +13,9 @@ from sqlalchemy.orm import Session
 
 from app.ai_core.domain.guardrails import (
     AIGuardrails,
-    GuardrailSeverity,
-    SafetyViolation
+    GuardrailSeverity
 )
 from app.ai_core.domain.events import AIAlertEvent
-from app.ai_core.domain.metrics import AIPerformanceMetrics
 from app.ai_core.models.safety_log import AIGuardrailViolationLog
 from app.ai_core.services.circuit_breaker import AICircuitBreaker
 from app.ai_core.services.metrics_service import MetricsService
@@ -283,7 +281,7 @@ class SafetyService:
         """
         query = self.db.query(AIGuardrailViolationLog).filter(
             AIGuardrailViolationLog.tenant_id == tenant_id,
-            AIGuardrailViolationLog.resolved == False
+            AIGuardrailViolationLog.resolved.is_(False)
         )
         
         if decision_type:

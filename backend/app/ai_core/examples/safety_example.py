@@ -5,7 +5,6 @@ Exemplo: AI Guardrails & Safety Framework
 Demonstra sistema completo de proteção contra regressão de IA.
 """
 
-from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.ai_core.services.metrics_service import MetricsService
@@ -65,7 +64,7 @@ class SafetyExample:
         CENÁRIO 2: Verificar estado do circuit breaker.
         """
         logger.info(f"\n{'='*60}")
-        logger.info(f"CIRCUIT BREAKER STATUS")
+        logger.info("CIRCUIT BREAKER STATUS")
         logger.info(f"{'='*60}\n")
         
         circuit = self.safety_service.get_circuit_breaker(
@@ -90,7 +89,7 @@ class SafetyExample:
         CENÁRIO 3: Simular regressão de IA e ver proteções acionando.
         """
         logger.info(f"\n{'='*60}")
-        logger.info(f"SIMULAÇÃO: Regressão de IA detectada")
+        logger.info("SIMULAÇÃO: Regressão de IA detectada")
         logger.info(f"{'='*60}\n")
         
         # Métricas ruins (simuladas)
@@ -137,7 +136,7 @@ class SafetyExample:
         CENÁRIO 4: Decisão com circuit breaker aberto.
         """
         logger.info(f"\n{'='*60}")
-        logger.info(f"DECISÃO COM CIRCUIT BREAKER ABERTO")
+        logger.info("DECISÃO COM CIRCUIT BREAKER ABERTO")
         logger.info(f"{'='*60}\n")
         
         # Criar policy com safety
@@ -213,7 +212,7 @@ class SafetyExample:
         CENÁRIO 6: Recuperação gradual após regressão.
         """
         logger.info(f"\n{'='*60}")
-        logger.info(f"RECUPERAÇÃO GRADUAL (HALF-OPEN)")
+        logger.info("RECUPERAÇÃO GRADUAL (HALF-OPEN)")
         logger.info(f"{'='*60}\n")
         
         circuit = AICircuitBreaker(

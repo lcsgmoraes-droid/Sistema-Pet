@@ -17,7 +17,6 @@ from datetime import datetime
 from app.ai_core.services.decision_service import DecisionService
 from app.ai_core.services.review_service import ReviewService
 from app.ai_core.services.learning_service import LearningService
-from app.ai_core.analyzers.extrato_analyzer import ExtratoAnalyzer
 from app.ai_core.domain.context import DecisionContext
 from app.ai_core.domain.types import DecisionType
 from app.ai_core.domain.review import HumanReviewFeedback, DecisionReviewStatus
@@ -197,14 +196,9 @@ class ExtratoReviewFlowExample:
         
         # 5. Aplicar decisão ao lançamento (se aprovado/corrigido)
         if action in ["approve", "correct"]:
-            final_categoria_id = (
-                corrected_categoria_id 
-                if action == "correct" 
-                else event.original_decision.get("categoria_id")
-            )
-            
-            # TODO: Aplicar ao lançamento real
-            # await self._aplicar_categoria(lancamento_id, final_categoria_id)
+            # TODO: Aplicar ao lançamento real usando a categoria corrigida
+            # ou a categoria original aprovada.
+            pass
         
         return {
             "success": True,
@@ -258,7 +252,7 @@ async def exemplo_fluxo_completo():
         
         if pendentes:
             primeira = pendentes[0]
-            logger.info(f"\\nPrimeira da fila:")
+            logger.info("\\nPrimeira da fila:")
             logger.info(f"  ID: {primeira['id']}")
             logger.info(f"  Resumo: {primeira['summary']}")
             logger.info(f"  Sugestão IA: {primeira['ai_suggestion']}")

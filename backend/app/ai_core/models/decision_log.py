@@ -1,4 +1,3 @@
-from app.base_models import BaseTenantModel
 """
 Models de persistência do AI Core
 """
@@ -6,7 +5,8 @@ from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, 
 import sqlalchemy as sa
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
-from app.db import Base
+
+from app.base_models import BaseTenantModel
 
 
 class DecisionLog(BaseTenantModel):

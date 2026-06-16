@@ -1,7 +1,7 @@
 """
 DecisionService - Orquestrador de decisões com Framework Global de Confiança
 """
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 from sqlalchemy.orm import Session
 from ..domain.context import DecisionContext
 from ..domain.decision import DecisionResult
@@ -12,7 +12,6 @@ from ..utils.confidence_calculator import ConfidenceCalculator
 from .decision_policy import DecisionPolicy, PolicyDecision
 from .review_service import ReviewService
 import logging
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -147,7 +146,7 @@ class DecisionService:
             LearningPatternModel.user_id == user_id,
             LearningPatternModel.pattern_type == pattern_type,
             LearningPatternModel.success_rate >= 70.0,  # Apenas padrões confiáveis
-            LearningPatternModel.is_active == True
+            LearningPatternModel.is_active.is_(True)
         ).order_by(
             LearningPatternModel.occurrences.desc()
         ).limit(10).all()

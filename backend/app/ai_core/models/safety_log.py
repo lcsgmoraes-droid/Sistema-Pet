@@ -1,4 +1,3 @@
-from app.base_models import BaseTenantModel
 """
 Safety Log - Registro de violações e circuit breakers
 ======================================================
@@ -8,7 +7,8 @@ Logs de segurança para auditoria e rastreabilidade.
 
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, JSON, Text
 from sqlalchemy.sql import func
-from app.models import Base
+
+from app.base_models import BaseTenantModel
 
 
 class AIGuardrailViolationLog(BaseTenantModel):

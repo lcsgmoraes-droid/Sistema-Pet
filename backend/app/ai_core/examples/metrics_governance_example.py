@@ -9,13 +9,12 @@ Demonstra o fluxo completo de métricas e governança adaptativa:
 5. Automação aumenta ou diminui baseado em performance
 """
 from sqlalchemy.orm import Session
-from datetime import datetime
 from typing import Dict, Any
 
 from app.ai_core.services.metrics_service import MetricsService
 from app.ai_core.services.trust_service import TrustService
 from app.ai_core.services.decision_policy import DecisionPolicy
-from app.ai_core.domain.metrics import MetricPeriod, AIMaturityLevel
+from app.ai_core.domain.metrics import MetricPeriod
 from app.utils.logger import logger
 
 
@@ -206,19 +205,19 @@ class AIGovernanceExample:
         logger.info(f"  Decisões revisadas: {metrics.decisions_reviewed} ({metrics.review_pressure:.1f}%)")
         logger.info(f"  Automatizadas: {metrics.decisions_auto_executed} ({metrics.automation_rate:.1f}%)")
         print()
-        logger.info(f"  📊 Distribuição por confiança:")
+        logger.info("  📊 Distribuição por confiança:")
         logger.info(f"     VERY_HIGH (90-100): {metrics.decisions_very_high}")
         logger.info(f"     HIGH (80-89): {metrics.decisions_high}")
         logger.info(f"     MEDIUM (60-79): {metrics.decisions_medium}")
         logger.info(f"     LOW (40-59): {metrics.decisions_low}")
         logger.info(f"     VERY_LOW (0-39): {metrics.decisions_very_low}")
         print()
-        logger.info(f"  📈 Performance:")
+        logger.info("  📈 Performance:")
         logger.info(f"     Approval rate: {metrics.approval_rate:.1f}%")
         logger.info(f"     Correction rate: {metrics.correction_rate:.1f}%")
         logger.info(f"     Rejection rate: {metrics.rejection_rate:.1f}%")
         print()
-        logger.info(f"  🎯 Calibração:")
+        logger.info("  🎯 Calibração:")
         logger.info(f"     Confiança média: {metrics.avg_confidence_all:.1f}")
         logger.info(f"     Gap confiança-acurácia: {metrics.confidence_accuracy_gap:.1f}")
         print()
@@ -291,7 +290,7 @@ async def exemplo_politica_adaptativa():
     )
     
     # Usar no DecisionService
-    decision_service = DecisionService(
+    DecisionService(
         db=db,
         engines=[],  # Engines configurados
         decision_policy=adaptive_policy
