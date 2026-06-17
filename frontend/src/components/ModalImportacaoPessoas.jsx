@@ -6,11 +6,7 @@ import api from "../api";
 import { getAccessToken } from "../auth/tokenStorage";
 import toast from "react-hot-toast";
 
-export default function ModalImportacaoPessoas({
-  isOpen,
-  onClose,
-  onSuccess,
-}) {
+export default function ModalImportacaoPessoas({ isOpen, onClose, onSuccess }) {
   const [arquivo, setArquivo] = useState(null);
   const [importando, setImportando] = useState(false);
   const [resultado, setResultado] = useState(null);
@@ -75,8 +71,7 @@ export default function ModalImportacaoPessoas({
       setEtapa("resultado");
 
       const totalSucesso =
-        (response.data.criados?.length || 0) +
-        (response.data.atualizados?.length || 0);
+        (response.data.criados?.length || 0) + (response.data.atualizados?.length || 0);
 
       if (totalSucesso > 0) {
         toast.success(`${totalSucesso} pessoas processadas com sucesso!`);
@@ -128,20 +123,10 @@ export default function ModalImportacaoPessoas({
                 d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
               />
             </svg>
-            <h2 className="text-xl font-bold text-white">
-              Importacao de Pessoas em Lote
-            </h2>
+            <h2 className="text-xl font-bold text-white">Importacao de Pessoas em Lote</h2>
           </div>
-          <button
-            onClick={fechar}
-            className="text-white transition-colors hover:text-gray-200"
-          >
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
+          <button onClick={fechar} className="text-white transition-colors hover:text-gray-200">
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -157,12 +142,7 @@ export default function ModalImportacaoPessoas({
             <>
               <div className="mb-6 rounded-lg border border-purple-200 bg-purple-50 p-4">
                 <h3 className="mb-2 flex items-center gap-2 font-semibold text-purple-900">
-                  <svg
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -174,14 +154,11 @@ export default function ModalImportacaoPessoas({
                 </h3>
                 <ul className="ml-7 space-y-1 text-sm text-purple-800">
                   <li>1. Baixe o template Excel clicando no botao abaixo</li>
-                  <li>
-                    2. Preencha os dados das pessoas (clientes, fornecedores,
-                    veterinarios)
-                  </li>
+                  <li>2. Preencha os dados das pessoas (clientes, fornecedores, veterinarios)</li>
                   <li>3. Salve o arquivo e faca o upload aqui</li>
                   <li>
-                    4. Pessoas novas serao criadas, existentes serao atualizadas
-                    (baseado no CPF/CNPJ)
+                    4. Pessoas novas serao criadas, existentes serao atualizadas (baseado no
+                    CPF/CNPJ)
                   </li>
                 </ul>
               </div>
@@ -191,12 +168,7 @@ export default function ModalImportacaoPessoas({
                   onClick={baixarTemplate}
                   className="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 font-medium text-white transition-colors hover:bg-green-700"
                 >
-                  <svg
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -229,14 +201,10 @@ export default function ModalImportacaoPessoas({
                         />
                       </svg>
                       <p className="mb-2 text-sm text-gray-500">
-                        <span className="font-semibold">
-                          Clique para selecionar
-                        </span>{" "}
-                        ou arraste o arquivo
+                        <span className="font-semibold">Clique para selecionar</span> ou arraste o
+                        arquivo
                       </p>
-                      <p className="text-xs text-gray-500">
-                        Apenas arquivos Excel (.xlsx, .xls)
-                      </p>
+                      <p className="text-xs text-gray-500">Apenas arquivos Excel (.xlsx, .xls)</p>
 
                       {arquivo && (
                         <div className="mt-4 flex items-center gap-2 text-purple-600">
@@ -273,9 +241,7 @@ export default function ModalImportacaoPessoas({
             <div className="flex flex-col items-center justify-center py-12">
               <div className="mb-4 h-16 w-16 animate-spin rounded-full border-b-2 border-purple-600" />
               <p className="text-lg text-gray-700">Processando planilha...</p>
-              <p className="mt-2 text-sm text-gray-500">
-                Isso pode levar alguns segundos
-              </p>
+              <p className="mt-2 text-sm text-gray-500">Isso pode levar alguns segundos</p>
             </div>
           )}
 
@@ -286,9 +252,7 @@ export default function ModalImportacaoPessoas({
                   <div className="text-3xl font-bold text-blue-600">
                     {resultado.total_processados || 0}
                   </div>
-                  <div className="mt-1 text-sm text-blue-800">
-                    Total Processado
-                  </div>
+                  <div className="mt-1 text-sm text-blue-800">Total Processado</div>
                 </div>
                 <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-center">
                   <div className="text-3xl font-bold text-green-600">
@@ -300,9 +264,7 @@ export default function ModalImportacaoPessoas({
                   <div className="text-3xl font-bold text-yellow-600">
                     {resultado.atualizados?.length || 0}
                   </div>
-                  <div className="mt-1 text-sm text-yellow-800">
-                    Atualizados
-                  </div>
+                  <div className="mt-1 text-sm text-yellow-800">Atualizados</div>
                 </div>
                 <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center">
                   <div className="text-3xl font-bold text-red-600">
@@ -315,12 +277,7 @@ export default function ModalImportacaoPessoas({
               {resultado.criados && resultado.criados.length > 0 && (
                 <div className="rounded-lg border border-green-200 bg-green-50 p-4">
                   <h4 className="mb-3 flex items-center gap-2 font-semibold text-green-900">
-                    <svg
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -334,8 +291,7 @@ export default function ModalImportacaoPessoas({
                     <ul className="space-y-1 text-sm">
                       {resultado.criados.map((item, idx) => (
                         <li key={idx} className="text-green-800">
-                          Linha {item.linha}:{" "}
-                          <span className="font-medium">{item.nome}</span> (
+                          Linha {item.linha}: <span className="font-medium">{item.nome}</span> (
                           {item.tipo})
                         </li>
                       ))}
@@ -347,12 +303,7 @@ export default function ModalImportacaoPessoas({
               {resultado.atualizados && resultado.atualizados.length > 0 && (
                 <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
                   <h4 className="mb-3 flex items-center gap-2 font-semibold text-yellow-900">
-                    <svg
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -366,8 +317,7 @@ export default function ModalImportacaoPessoas({
                     <ul className="space-y-1 text-sm">
                       {resultado.atualizados.map((item, idx) => (
                         <li key={idx} className="text-yellow-800">
-                          Linha {item.linha}:{" "}
-                          <span className="font-medium">{item.nome}</span> (
+                          Linha {item.linha}: <span className="font-medium">{item.nome}</span> (
                           {item.tipo})
                         </li>
                       ))}
@@ -379,12 +329,7 @@ export default function ModalImportacaoPessoas({
               {resultado.erros && resultado.erros.length > 0 && (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-4">
                   <h4 className="mb-3 flex items-center gap-2 font-semibold text-red-900">
-                    <svg
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -398,8 +343,7 @@ export default function ModalImportacaoPessoas({
                     <ul className="space-y-2 text-sm">
                       {resultado.erros.map((item, idx) => (
                         <li key={idx} className="text-red-800">
-                          <strong>Linha {item.linha}</strong> (
-                          {item.nome || "?"}): {item.erro}
+                          <strong>Linha {item.linha}</strong> ({item.nome || "?"}): {item.erro}
                         </li>
                       ))}
                     </ul>
@@ -431,12 +375,7 @@ export default function ModalImportacaoPessoas({
                   </>
                 ) : (
                   <>
-                    <svg
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"

@@ -72,10 +72,7 @@ test("calcula dados auxiliares da venda sem depender do modal", () => {
   );
 
   const venda = { id: 10, total: 100, desconto_valor: 5 };
-  assert.equal(
-    montarVendaParaPersistirComCupom({ venda, cupomParaFinalizar: null }),
-    venda,
-  );
+  assert.equal(montarVendaParaPersistirComCupom({ venda, cupomParaFinalizar: null }), venda);
   assert.deepEqual(
     montarVendaParaPersistirComCupom({
       venda,
@@ -140,10 +137,7 @@ test("nao libera Stone POS mesmo para venda sem pagamentos manuais", () => {
 });
 
 test("extrai cor de margem do retorno do backend", () => {
-  assert.equal(
-    extrairCorIndicadorMargem({ resultado: { cor_indicador: "vermelho" } }),
-    "vermelho",
-  );
+  assert.equal(extrairCorIndicadorMargem({ resultado: { cor_indicador: "vermelho" } }), "vermelho");
   assert.equal(extrairCorIndicadorMargem({ resultado: {} }), null);
   assert.equal(extrairCorIndicadorMargem(null), null);
 });
@@ -388,10 +382,7 @@ test("monta pagamento simulado e normaliza retorno da margem por parcela", () =>
     { cor: "amarelo", classificacao: "amarelo" },
   );
 
-  assert.equal(
-    normalizarResultadoSimulacaoParcelamento({ resultado: {} }),
-    null,
-  );
+  assert.equal(normalizarResultadoSimulacaoParcelamento({ resultado: {} }), null);
 
   assert.deepEqual(montarFallbackSimulacaoParcelamento(), {
     cor: null,
@@ -501,10 +492,7 @@ test("descreve cupom somente quando ha codigo e desconto", () => {
     (valor) => `R$ ${valor.toFixed(2)}`,
   );
 
-  assert.equal(
-    texto,
-    "A margem ficou baixa por conta do cupom RECOMPRA10 (R$ 12.50 de desconto).",
-  );
+  assert.equal(texto, "A margem ficou baixa por conta do cupom RECOMPRA10 (R$ 12.50 de desconto).");
   assert.equal(descreverCupomMargem(null), "");
 });
 
@@ -656,12 +644,8 @@ test("monta pagamentos de margem ignorando cashback novo", () => {
 
 test("monta formas de pagamento para analise da venda com restante em dinheiro", () => {
   const formas = montarFormasPagamentoAnalise({
-    pagamentos: [
-      { forma_id: 4, valor: 60, parcelas: 2 },
-    ],
-    formasPagamento: [
-      { id: 1, tipo: "dinheiro", nome: "Dinheiro" },
-    ],
+    pagamentos: [{ forma_id: 4, valor: 60, parcelas: 2 }],
+    formasPagamento: [{ id: 1, tipo: "dinheiro", nome: "Dinheiro" }],
     valorTotal: 100,
   });
 

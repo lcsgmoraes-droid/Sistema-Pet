@@ -1,36 +1,29 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from "react";
 import {
   DollarSign,
   TrendingUp,
   TrendingDown,
   Receipt,
-  ArrowRightLeft,
   Clock,
   X,
   ChevronDown,
   RotateCcw,
   List,
   Eye,
-  EyeOff
-} from 'lucide-react';
-import { obterCaixaAberto, obterResumoCaixa } from '../api/caixa';
-import { ModalSuprimento, ModalSangria, ModalDespesa } from './ModaisCaixa';
-import ModalFecharCaixa from './ModalFecharCaixa';
-import ModalDevolucao from './ModalDevolucao';
-import ModalMovimentacoesCaixa from './ModalMovimentacoesCaixa';
-import {
-  getNumeroVendaParaExibicao,
-  podeAbrirDevolucaoVenda,
-} from '../utils/pdvReturnEligibility';
+  EyeOff,
+} from "lucide-react";
+import { obterCaixaAberto, obterResumoCaixa } from "../api/caixa";
+import { ModalSuprimento, ModalSangria, ModalDespesa } from "./ModaisCaixa";
+import ModalFecharCaixa from "./ModalFecharCaixa";
+import ModalDevolucao from "./ModalDevolucao";
+import ModalMovimentacoesCaixa from "./ModalMovimentacoesCaixa";
+import { getNumeroVendaParaExibicao, podeAbrirDevolucaoVenda } from "../utils/pdvReturnEligibility";
 
-const CAIXA_SYNC_EVENT_KEY = 'petshop_caixa_sync_event';
+const CAIXA_SYNC_EVENT_KEY = "petshop_caixa_sync_event";
 
 const publicarEventoCaixa = (tipo) => {
   try {
-    localStorage.setItem(
-      CAIXA_SYNC_EVENT_KEY,
-      JSON.stringify({ tipo, timestamp: Date.now() })
-    );
+    localStorage.setItem(CAIXA_SYNC_EVENT_KEY, JSON.stringify({ tipo, timestamp: Date.now() }));
   } catch {
     // Se storage falhar, mantém comportamento normal do menu.
   }
@@ -62,13 +55,13 @@ export default function MenuCaixa({
     }
 
     ultimoSignalDevolucaoRef.current = abrirDevolucaoSignal;
-    setModalAtivo('devolucao');
+    setModalAtivo("devolucao");
     setMenuAberto(false);
   }, [abrirDevolucaoSignal, caixaAberto]);
 
   useEffect(() => {
     carregarCaixa({ force: true });
-    
+
     // Atualizar em segundo plano sem sobrepor chamadas.
     const interval = setInterval(carregarCaixa, 60000);
     return () => clearInterval(interval);
@@ -84,17 +77,17 @@ export default function MenuCaixa({
     };
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === "visible") {
         carregarCaixa({ force: true });
       }
     };
 
-    window.addEventListener('storage', handleStorage);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener("storage", handleStorage);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      window.removeEventListener('storage', handleStorage);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener("storage", handleStorage);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
@@ -103,10 +96,10 @@ export default function MenuCaixa({
     const handleMouseUp = () => {
       setMostrarSaldoTopo(false);
     };
-    
+
     if (mostrarSaldoTopo) {
-      document.addEventListener('mouseup', handleMouseUp);
-      return () => document.removeEventListener('mouseup', handleMouseUp);
+      document.addEventListener("mouseup", handleMouseUp);
+      return () => document.removeEventListener("mouseup", handleMouseUp);
     }
   }, [mostrarSaldoTopo]);
 
@@ -119,19 +112,19 @@ export default function MenuCaixa({
 
   const carregarCaixa = async ({ force = false } = {}) => {
     if (carregandoCaixaRef.current) return;
-    if (!force && document.visibilityState === 'hidden') return;
+    if (!force && document.visibilityState === "hidden") return;
 
     carregandoCaixaRef.current = true;
     try {
       const caixa = await obterCaixaAberto();
       setCaixaAberto(caixa);
-      
+
       if (caixa) {
         const res = await obterResumoCaixa(caixa.id);
         setResumo(res);
       }
     } catch (error) {
-      console.error('Erro ao carregar caixa:', error);
+      console.error("Erro ao carregar caixa:", error);
     } finally {
       setLoading(false);
       carregandoCaixaRef.current = false;
@@ -140,13 +133,13 @@ export default function MenuCaixa({
 
   const handleOperacaoSucesso = () => {
     setModalAtivo(null);
-    publicarEventoCaixa('movimentacao');
+    publicarEventoCaixa("movimentacao");
     carregarCaixa({ force: true });
   };
 
   const handleCaixaAberto = async () => {
     await onAbrirCaixa();
-    publicarEventoCaixa('abertura');
+    publicarEventoCaixa("abertura");
     // Aguardar um pouco e recarregar
     setTimeout(() => carregarCaixa({ force: true }), 500);
   };
@@ -180,20 +173,17 @@ export default function MenuCaixa({
         >
           <div className="flex items-center gap-2">
             <div className="h-2.5 w-2.5 rounded-full bg-green-500"></div>
-            <span className="font-semibold text-gray-900">
-              Caixa #{caixaAberto.numero_caixa}
-            </span>
+            <span className="font-semibold text-gray-900">Caixa #{caixaAberto.numero_caixa}</span>
           </div>
-          <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${menuAberto ? 'rotate-180' : ''}`} />
+          <ChevronDown
+            className={`h-4 w-4 text-gray-400 transition-transform ${menuAberto ? "rotate-180" : ""}`}
+          />
         </button>
 
         {menuAberto && (
           <>
             {/* Overlay para fechar ao clicar fora */}
-            <div
-              className="fixed inset-0 z-40"
-              onClick={handleFecharMenu}
-            />
+            <div className="fixed inset-0 z-40" onClick={handleFecharMenu} />
 
             {/* Menu Dropdown */}
             <div className="absolute right-0 z-50 mt-2 w-[calc(100vw-2rem)] max-w-80 rounded-lg border border-gray-200 bg-white shadow-xl">
@@ -217,20 +207,25 @@ export default function MenuCaixa({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center text-xs text-gray-500">
                     <Clock className="w-4 h-4 mr-1" />
-                    Aberto em {new Date(caixaAberto.data_abertura).toLocaleString('pt-BR', { 
-                      day: '2-digit', 
-                      month: '2-digit', 
-                      hour: '2-digit', 
-                      minute: '2-digit' 
+                    Aberto em{" "}
+                    {new Date(caixaAberto.data_abertura).toLocaleString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
                     })}
                   </div>
-                  
+
                   {/* Saldo Atual com olho press-to-reveal */}
                   <div className="flex items-center space-x-2">
                     <div className="text-right">
                       <div className="text-xs text-gray-500">Saldo Atual</div>
-                      <div className={`text-sm font-bold ${mostrarSaldoTopo ? 'text-green-600' : 'text-gray-400'}`}>
-                        {mostrarSaldoTopo ? `R$ ${resumo?.totais?.saldo_atual?.toFixed(2) || '0,00'}` : '••••••'}
+                      <div
+                        className={`text-sm font-bold ${mostrarSaldoTopo ? "text-green-600" : "text-gray-400"}`}
+                      >
+                        {mostrarSaldoTopo
+                          ? `R$ ${resumo?.totais?.saldo_atual?.toFixed(2) || "0,00"}`
+                          : "••••••"}
                       </div>
                     </div>
                     <button
@@ -266,32 +261,42 @@ export default function MenuCaixa({
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <div className="text-gray-600">Abertura</div>
-                      <div className={`font-semibold ${mostrarValores ? 'text-gray-900' : 'text-gray-300'}`}>
-                        {mostrarValores ? `R$ ${caixaAberto.valor_abertura.toFixed(2)}` : '••••••'}
+                      <div
+                        className={`font-semibold ${mostrarValores ? "text-gray-900" : "text-gray-300"}`}
+                      >
+                        {mostrarValores ? `R$ ${caixaAberto.valor_abertura.toFixed(2)}` : "••••••"}
                       </div>
                     </div>
                     <div>
                       <div className="text-gray-600">Entradas</div>
-                      <div className={`font-semibold ${mostrarValores ? 'text-green-600' : 'text-green-300'}`}>
-                        {mostrarValores ? `+ R$ ${resumo.totais.vendas.toFixed(2)}` : '••••••'}
+                      <div
+                        className={`font-semibold ${mostrarValores ? "text-green-600" : "text-green-300"}`}
+                      >
+                        {mostrarValores ? `+ R$ ${resumo.totais.vendas.toFixed(2)}` : "••••••"}
                       </div>
                     </div>
                     <div>
                       <div className="text-gray-600">Suprimentos</div>
-                      <div className={`font-semibold ${mostrarValores ? 'text-green-600' : 'text-green-300'}`}>
-                        {mostrarValores ? `+ R$ ${resumo.totais.suprimentos.toFixed(2)}` : '••••••'}
+                      <div
+                        className={`font-semibold ${mostrarValores ? "text-green-600" : "text-green-300"}`}
+                      >
+                        {mostrarValores ? `+ R$ ${resumo.totais.suprimentos.toFixed(2)}` : "••••••"}
                       </div>
                     </div>
                     <div>
                       <div className="text-gray-600">Sangrias</div>
-                      <div className={`font-semibold ${mostrarValores ? 'text-orange-600' : 'text-orange-300'}`}>
-                        {mostrarValores ? `- R$ ${resumo.totais.sangrias.toFixed(2)}` : '••••••'}
+                      <div
+                        className={`font-semibold ${mostrarValores ? "text-orange-600" : "text-orange-300"}`}
+                      >
+                        {mostrarValores ? `- R$ ${resumo.totais.sangrias.toFixed(2)}` : "••••••"}
                       </div>
                     </div>
                     <div>
                       <div className="text-gray-600">Despesas</div>
-                      <div className={`font-semibold ${mostrarValores ? 'text-red-600' : 'text-red-300'}`}>
-                        {mostrarValores ? `- R$ ${resumo.totais.despesas.toFixed(2)}` : '••••••'}
+                      <div
+                        className={`font-semibold ${mostrarValores ? "text-red-600" : "text-red-300"}`}
+                      >
+                        {mostrarValores ? `- R$ ${resumo.totais.despesas.toFixed(2)}` : "••••••"}
                       </div>
                     </div>
                   </div>
@@ -302,7 +307,7 @@ export default function MenuCaixa({
               <div className="p-2">
                 <button
                   onClick={() => {
-                    setModalAtivo('suprimento');
+                    setModalAtivo("suprimento");
                     setMenuAberto(false);
                   }}
                   className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-green-50 rounded-lg transition-colors text-left"
@@ -318,7 +323,7 @@ export default function MenuCaixa({
 
                 <button
                   onClick={() => {
-                    setModalAtivo('sangria');
+                    setModalAtivo("sangria");
                     setMenuAberto(false);
                   }}
                   className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-orange-50 rounded-lg transition-colors text-left"
@@ -334,7 +339,7 @@ export default function MenuCaixa({
 
                 <button
                   onClick={() => {
-                    setModalAtivo('despesa');
+                    setModalAtivo("despesa");
                     setMenuAberto(false);
                   }}
                   className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-red-50 rounded-lg transition-colors text-left"
@@ -350,7 +355,7 @@ export default function MenuCaixa({
 
                 <button
                   onClick={() => {
-                    setModalAtivo('devolucao');
+                    setModalAtivo("devolucao");
                     setMenuAberto(false);
                   }}
                   className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-purple-50 rounded-lg transition-colors text-left"
@@ -363,14 +368,14 @@ export default function MenuCaixa({
                     <div className="text-xs text-gray-500">
                       {vendaAtualPodeAbrirDevolucao
                         ? `Abrir venda #${getNumeroVendaParaExibicao(vendaParaDevolucao)}`
-                        : 'Pesquisar venda e devolver ao estoque'}
+                        : "Pesquisar venda e devolver ao estoque"}
                     </div>
                   </div>
                 </button>
 
                 <button
                   onClick={() => {
-                    setModalAtivo('movimentacoes');
+                    setModalAtivo("movimentacoes");
                     setMenuAberto(false);
                   }}
                   className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-blue-50 rounded-lg transition-colors text-left"
@@ -389,7 +394,7 @@ export default function MenuCaixa({
               <div className="p-4 border-t">
                 <button
                   onClick={() => {
-                    setModalAtivo('fechar');
+                    setModalAtivo("fechar");
                     setMenuAberto(false);
                   }}
                   className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
@@ -403,7 +408,7 @@ export default function MenuCaixa({
       </div>
 
       {/* Modais de Operações */}
-      {modalAtivo === 'suprimento' && (
+      {modalAtivo === "suprimento" && (
         <ModalSuprimento
           caixaId={caixaAberto.id}
           onClose={() => setModalAtivo(null)}
@@ -411,7 +416,7 @@ export default function MenuCaixa({
         />
       )}
 
-      {modalAtivo === 'sangria' && (
+      {modalAtivo === "sangria" && (
         <ModalSangria
           caixaId={caixaAberto.id}
           saldoAtual={resumo?.totais?.saldo_atual || 0}
@@ -420,7 +425,7 @@ export default function MenuCaixa({
         />
       )}
 
-      {modalAtivo === 'despesa' && (
+      {modalAtivo === "despesa" && (
         <ModalDespesa
           caixaId={caixaAberto.id}
           onClose={() => setModalAtivo(null)}
@@ -428,19 +433,19 @@ export default function MenuCaixa({
         />
       )}
 
-      {modalAtivo === 'fechar' && caixaAberto && (
+      {modalAtivo === "fechar" && caixaAberto && (
         <ModalFecharCaixa
           caixaId={caixaAberto.id}
           onClose={() => setModalAtivo(null)}
           onSuccess={() => {
             setModalAtivo(null);
-            publicarEventoCaixa('fechamento');
+            publicarEventoCaixa("fechamento");
             carregarCaixa(); // Recarrega para mostrar que não há mais caixa aberto
           }}
         />
       )}
 
-      {modalAtivo === 'devolucao' && caixaAberto && (
+      {modalAtivo === "devolucao" && caixaAberto && (
         <ModalDevolucao
           caixaId={caixaAberto.id}
           vendaInicial={vendaAtualPodeAbrirDevolucao ? vendaParaDevolucao : null}
@@ -449,11 +454,8 @@ export default function MenuCaixa({
         />
       )}
 
-      {modalAtivo === 'movimentacoes' && caixaAberto && (
-        <ModalMovimentacoesCaixa
-          caixaId={caixaAberto.id}
-          onClose={() => setModalAtivo(null)}
-        />
+      {modalAtivo === "movimentacoes" && caixaAberto && (
+        <ModalMovimentacoesCaixa caixaId={caixaAberto.id} onClose={() => setModalAtivo(null)} />
       )}
     </>
   );

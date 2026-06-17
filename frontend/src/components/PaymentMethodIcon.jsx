@@ -1,11 +1,4 @@
-import {
-  ArrowLeftRight,
-  Banknote,
-  CreditCard,
-  QrCode,
-  Receipt,
-  Wallet,
-} from "lucide-react";
+import { ArrowLeftRight, Banknote, CreditCard, QrCode, Receipt, Wallet } from "lucide-react";
 
 import { identificarIconeFormaPagamento } from "./modalPagamentoUtils";
 
@@ -19,9 +12,7 @@ const ICONES_FORMA_PAGAMENTO = {
 };
 
 export default function PaymentMethodIcon({ icone, nome, className = "w-6 h-6" }) {
-  const Icone =
-    ICONES_FORMA_PAGAMENTO[identificarIconeFormaPagamento(icone, nome)] ||
-    CreditCard;
+  const Icone = ICONES_FORMA_PAGAMENTO[identificarIconeFormaPagamento(icone, nome)] || CreditCard;
 
   return <Icone className={className} />;
 }

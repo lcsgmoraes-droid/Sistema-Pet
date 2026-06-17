@@ -1,13 +1,6 @@
 import { CalendarDays, FlaskConical, Stethoscope, Syringe } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import {
-  FiCreditCard,
-  FiFileText,
-  FiHelpCircle,
-  FiLogOut,
-  FiMenu,
-  FiX,
-} from "react-icons/fi";
+import { FiCreditCard, FiFileText, FiHelpCircle, FiLogOut, FiMenu, FiX } from "react-icons/fi";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useModulos } from "../contexts/ModulosContext";
@@ -68,13 +61,7 @@ const Layout = () => {
     if (!user) return false;
 
     // Admins têm acesso a tudo (qualquer variação do nome do role admin)
-    const adminRoles = [
-      "admin",
-      "Admin",
-      "Administrador",
-      "administrador",
-      "ADMIN",
-    ];
+    const adminRoles = ["admin", "Admin", "Administrador", "administrador", "ADMIN"];
     if (adminRoles.includes(user.role?.name)) {
       return true;
     }
@@ -147,18 +134,11 @@ const Layout = () => {
 
   const ehOverlayTelaCheia = (elementoOverlay) => {
     const estilo = window.getComputedStyle(elementoOverlay);
-    const larguraTelaCheia =
-      elementoOverlay.offsetWidth >= window.innerWidth - 8;
-    const alturaTelaCheia =
-      elementoOverlay.offsetHeight >= window.innerHeight - 8;
+    const larguraTelaCheia = elementoOverlay.offsetWidth >= window.innerWidth - 8;
+    const alturaTelaCheia = elementoOverlay.offsetHeight >= window.innerHeight - 8;
     const zIndex = Number.parseInt(estilo.zIndex || "0", 10);
 
-    return (
-      estilo.position === "fixed" &&
-      larguraTelaCheia &&
-      alturaTelaCheia &&
-      zIndex >= 40
-    );
+    return estilo.position === "fixed" && larguraTelaCheia && alturaTelaCheia && zIndex >= 40;
   };
 
   const encontrarOverlaysOrfaos = () => {
@@ -184,9 +164,7 @@ const Layout = () => {
 
       const modalBackdropFor = elementoOverlay.getAttribute("data-modal-backdrop-for");
       if (modalBackdropFor) {
-        const painelModalAtivo = Array.from(
-          document.querySelectorAll("[data-modal-panel]"),
-        ).some(
+        const painelModalAtivo = Array.from(document.querySelectorAll("[data-modal-panel]")).some(
           (painel) => painel.getAttribute("data-modal-panel") === modalBackdropFor,
         );
 
@@ -196,19 +174,15 @@ const Layout = () => {
       }
 
       const estilo = window.getComputedStyle(elementoOverlay);
-      const visivel =
-        estilo.display !== "none" && estilo.visibility !== "hidden";
+      const visivel = estilo.display !== "none" && estilo.visibility !== "hidden";
       const bloqueiaClique = estilo.pointerEvents !== "none";
       const fundoAtivo =
         estilo.backgroundColor &&
         estilo.backgroundColor !== "rgba(0, 0, 0, 0)" &&
         estilo.backgroundColor !== "transparent";
-      const possuiSpinner = Boolean(
-        elementoOverlay.querySelector(".animate-spin"),
-      );
+      const possuiSpinner = Boolean(elementoOverlay.querySelector(".animate-spin"));
       const overlayCalculadora =
-        elementoOverlay.getAttribute("data-overlay-type") ===
-        "calculadora-universal";
+        elementoOverlay.getAttribute("data-overlay-type") === "calculadora-universal";
 
       if (!visivel || !bloqueiaClique) {
         return false;
@@ -230,9 +204,7 @@ const Layout = () => {
 
   const neutralizarOverlaysOrfaos = () => {
     const overlaysOrfaos = encontrarOverlaysOrfaos();
-    overlaysOrfaos.forEach((elementoOverlay) =>
-      neutralizarOverlay(elementoOverlay),
-    );
+    overlaysOrfaos.forEach((elementoOverlay) => neutralizarOverlay(elementoOverlay));
     overlaySuspeitoDesdeRef.current.clear();
   };
 
@@ -312,8 +284,7 @@ const Layout = () => {
         mapeamentoAtual.set(elementoOverlay, vistoDesde);
 
         const overlayCalculadora =
-          elementoOverlay.getAttribute("data-overlay-type") ===
-          "calculadora-universal";
+          elementoOverlay.getAttribute("data-overlay-type") === "calculadora-universal";
         const limiteMs = overlayCalculadora ? 900 : 1800;
 
         if (agora - vistoDesde >= limiteMs) {
@@ -348,7 +319,8 @@ const Layout = () => {
       lembretesPollingRef.current = true;
       try {
         const pendentesResp = await api.get("/lembretes/pendentes");
-        const blingAtivoConfirmado = Boolean(user) && Array.isArray(modulosAtivos) && moduloAtivo("bling");
+        const blingAtivoConfirmado =
+          Boolean(user) && Array.isArray(modulosAtivos) && moduloAtivo("bling");
         const autoResp = blingAtivoConfirmado
           ? await api.get("/integracoes/bling/nf/autocadastros-recentes", {
               params: { horas: 24, resumo: true },
@@ -357,8 +329,8 @@ const Layout = () => {
 
         const pendentesPayload = pendentesResp?.data || {};
         const pendentes = Number(
-          pendentesPayload?.total
-            ?? (Array.isArray(pendentesPayload?.lembretes) ? pendentesPayload.lembretes.length : 0),
+          pendentesPayload?.total ??
+            (Array.isArray(pendentesPayload?.lembretes) ? pendentesPayload.lembretes.length : 0),
         );
         const autocadastros24h = Number(autoResp?.data?.total || 0);
 
@@ -427,10 +399,7 @@ const Layout = () => {
 
         // Autoabre apenas na primeira vez para a rota ativa.
         // Se o usuario fechou manualmente, respeitamos esse estado.
-        if (
-          possuiRotaAtiva &&
-          typeof proximo[item.path] === "undefined"
-        ) {
+        if (possuiRotaAtiva && typeof proximo[item.path] === "undefined") {
           proximo[item.path] = true;
           mudou = true;
         }
@@ -531,9 +500,7 @@ const Layout = () => {
             {/* Botão Fechar (mobile) ou Patinha (desktop) */}
             {(isMobile || sidebarOpen) && (
               <button
-                onClick={() =>
-                  isMobile ? setSidebarOpen(false) : setSidebarVisible(false)
-                }
+                onClick={() => (isMobile ? setSidebarOpen(false) : setSidebarVisible(false))}
                 className="p-2 hover:bg-[#d8eee9] rounded-lg transition-colors"
                 title={isMobile ? "Fechar menu" : "Esconder menu completamente"}
               >
@@ -568,9 +535,7 @@ const Layout = () => {
               title={!sidebarOpen ? "Meu Plano" : ""}
             >
               <FiCreditCard className="text-lg flex-shrink-0" />
-              {sidebarOpen && (
-                <span className="font-medium text-sm">Meu Plano</span>
-              )}
+              {sidebarOpen && <span className="font-medium text-sm">Meu Plano</span>}
             </Link>
             <Link
               to="/ajuda"
@@ -579,9 +544,7 @@ const Layout = () => {
               title={!sidebarOpen ? "Ajuda & Planos" : ""}
             >
               <FiHelpCircle className="text-lg flex-shrink-0" />
-              {sidebarOpen && (
-                <span className="font-medium text-sm">Ajuda & Planos</span>
-              )}
+              {sidebarOpen && <span className="font-medium text-sm">Ajuda & Planos</span>}
             </Link>
             <button
               onClick={logout}
@@ -637,32 +600,31 @@ const Layout = () => {
           {/* User Info */}
           <div className="flex items-center gap-2 md:gap-3 ml-auto">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-gray-900">
-                {user?.nome || user?.email}
-              </p>
+              <p className="text-sm font-medium text-gray-900">{user?.nome || user?.email}</p>
               <p className="text-xs text-gray-500">{user?.email}</p>
             </div>
             <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#0f5f63] flex items-center justify-center text-white font-bold text-sm md:text-base">
-              {user?.nome?.[0]?.toUpperCase() ||
-                user?.email?.[0]?.toUpperCase()}
+              {user?.nome?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
             </div>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className={`erp-page-content flex-1 overflow-y-auto ${isBradescoOrganizerRoute ? "p-0" : `p-3 md:p-6 ${exibirAtalhosVetMobile ? "pb-24" : ""}`}`}>
+        <main
+          className={`erp-page-content flex-1 overflow-y-auto ${isBradescoOrganizerRoute ? "p-0" : `p-3 md:p-6 ${exibirAtalhosVetMobile ? "pb-24" : ""}`}`}
+        >
           <Outlet />
         </main>
       </div>
 
       {/* Botão flutuante da calculadora */}
       {!exibirAtalhosVetMobile && (
-      <FloatingCalculatorButton
-        onClick={() => {
-          console.log("🎯 Layout: Abrindo calculadora...");
-          setCalculadoraAberta(true);
-        }}
-      />
+        <FloatingCalculatorButton
+          onClick={() => {
+            console.log("🎯 Layout: Abrindo calculadora...");
+            setCalculadoraAberta(true);
+          }}
+        />
       )}
 
       {exibirAtalhosVetMobile && (

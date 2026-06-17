@@ -9,7 +9,10 @@ import FornecedorIdentity from "./ui/FornecedorIdentity";
 
 const STATUS_META = {
   aberta: { label: "Aberta", cls: "bg-blue-50 text-blue-700 border-blue-200" },
-  aguardando_fornecedor: { label: "Aguardando fornecedor", cls: "bg-amber-50 text-amber-700 border-amber-200" },
+  aguardando_fornecedor: {
+    label: "Aguardando fornecedor",
+    cls: "bg-amber-50 text-amber-700 border-amber-200",
+  },
   em_tratativa: { label: "Em tratativa", cls: "bg-purple-50 text-purple-700 border-purple-200" },
   resolvida: { label: "Resolvida", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   cancelada: { label: "Cancelada", cls: "bg-slate-100 text-slate-600 border-slate-200" },
@@ -105,7 +108,7 @@ export default function ComprasPendencias() {
     try {
       const { data } = await api.get("/compras-pendencias/envio/status");
       setEmailConfigurado(Boolean(data?.email_configurado));
-    } catch (error) {
+    } catch {
       setEmailConfigurado(false);
     }
   }
@@ -214,7 +217,6 @@ export default function ComprasPendencias() {
   useEffect(() => {
     carregarStatusEnvio();
     carregarPendencias();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFiltro]);
 
   const statusOptions = [
@@ -238,7 +240,13 @@ export default function ComprasPendencias() {
               Acompanhe divergencias de NF, contato com fornecedor e resolucao.
             </p>
           </div>
-          <ActionButton icon={RefreshCw} intent="edit" tone="soft" onClick={carregarPendencias} loading={carregando}>
+          <ActionButton
+            icon={RefreshCw}
+            intent="edit"
+            tone="soft"
+            onClick={carregarPendencias}
+            loading={carregando}
+          >
             Atualizar
           </ActionButton>
         </div>
@@ -254,7 +262,9 @@ export default function ComprasPendencias() {
           </div>
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
             <p className="text-xs font-semibold uppercase text-emerald-700">Valor estimado</p>
-            <p className="mt-1 text-2xl font-bold text-emerald-800">{formatarMoeda(resumo.valor)}</p>
+            <p className="mt-1 text-2xl font-bold text-emerald-800">
+              {formatarMoeda(resumo.valor)}
+            </p>
           </div>
         </section>
 
@@ -289,7 +299,9 @@ export default function ComprasPendencias() {
                 }}
                 onSelect={(fornecedor) => setFornecedorFiltro(getFornecedorNome(fornecedor))}
                 onClear={() => setFornecedorFiltro("")}
-                onFornecedorCriado={(fornecedor) => setFornecedorFiltro(getFornecedorNome(fornecedor))}
+                onFornecedorCriado={(fornecedor) =>
+                  setFornecedorFiltro(getFornecedorNome(fornecedor))
+                }
               />
               <ActionButton intent="edit" tone="soft" onClick={carregarPendencias}>
                 Filtrar
@@ -317,9 +329,13 @@ export default function ComprasPendencias() {
                   return (
                     <tr key={item.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-slate-900">{item.codigo || `#${item.id}`}</div>
+                        <div className="font-semibold text-slate-900">
+                          {item.codigo || `#${item.id}`}
+                        </div>
                         <div className="text-xs text-slate-500">{item.titulo}</div>
-                        <div className="mt-1 text-xs text-slate-400">Criada em {formatarData(item.created_at, true)}</div>
+                        <div className="mt-1 text-xs text-slate-400">
+                          Criada em {formatarData(item.created_at, true)}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <FornecedorIdentity
@@ -330,25 +346,41 @@ export default function ComprasPendencias() {
                       </td>
                       <td className="px-4 py-3">
                         <div>NF {item.numero_nota || "-"}</div>
-                        <div className="text-xs text-slate-500">Pedido {item.numero_pedido || "-"}</div>
+                        <div className="text-xs text-slate-500">
+                          Pedido {item.numero_pedido || "-"}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="font-semibold text-slate-900">{formatarMoeda(item.resumo_numerico?.valor_estimado)}</div>
+                        <div className="font-semibold text-slate-900">
+                          {formatarMoeda(item.resumo_numerico?.valor_estimado)}
+                        </div>
                         <div className="text-xs text-slate-500">
-                          {formatarQtd(item.resumo_numerico?.faltante)} falta / {formatarQtd(item.resumo_numerico?.avariada)} avaria
+                          {formatarQtd(item.resumo_numerico?.faltante)} falta /{" "}
+                          {formatarQtd(item.resumo_numerico?.avariada)} avaria
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${meta.cls}`}>
+                        <span
+                          className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${meta.cls}`}
+                        >
                           {meta.label}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-2">
-                          <ExportActionButton type="pdf" tone="soft" onClick={() => baixarPdf(item)}>
+                          <ExportActionButton
+                            type="pdf"
+                            tone="soft"
+                            onClick={() => baixarPdf(item)}
+                          >
                             PDF
                           </ExportActionButton>
-                          <ActionButton intent="edit" tone="soft" onClick={() => abrirDetalhe(item.id)} loading={carregandoDetalhe}>
+                          <ActionButton
+                            intent="edit"
+                            tone="soft"
+                            onClick={() => abrirDetalhe(item.id)}
+                            loading={carregandoDetalhe}
+                          >
                             Abrir
                           </ActionButton>
                         </div>
@@ -374,7 +406,9 @@ export default function ComprasPendencias() {
           <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-xl bg-white shadow-xl">
             <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">{detalhe.codigo}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
+                  {detalhe.codigo}
+                </p>
                 <h2 className="text-xl font-bold text-slate-900">{detalhe.titulo}</h2>
                 <p className="text-sm text-slate-600">
                   NF {detalhe.numero_nota || "-"} | Pedido {detalhe.numero_pedido || "-"} |{" "}
@@ -399,19 +433,27 @@ export default function ComprasPendencias() {
               <div className="grid gap-3 md:grid-cols-4">
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <p className="text-xs font-semibold uppercase text-slate-500">Status</p>
-                  <p className="mt-1 font-bold text-slate-900">{STATUS_META[detalhe.status]?.label || detalhe.status}</p>
+                  <p className="mt-1 font-bold text-slate-900">
+                    {STATUS_META[detalhe.status]?.label || detalhe.status}
+                  </p>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <p className="text-xs font-semibold uppercase text-slate-500">Prazo</p>
-                  <p className="mt-1 font-bold text-slate-900">{formatarData(detalhe.prazo_previsto)}</p>
+                  <p className="mt-1 font-bold text-slate-900">
+                    {formatarData(detalhe.prazo_previsto)}
+                  </p>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <p className="text-xs font-semibold uppercase text-slate-500">Email enviado</p>
-                  <p className="mt-1 font-bold text-slate-900">{formatarData(detalhe.email_enviado_em, true)}</p>
+                  <p className="mt-1 font-bold text-slate-900">
+                    {formatarData(detalhe.email_enviado_em, true)}
+                  </p>
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <p className="text-xs font-semibold uppercase text-slate-500">Valor estimado</p>
-                  <p className="mt-1 font-bold text-slate-900">{formatarMoeda(detalhe.resumo_numerico?.valor_estimado)}</p>
+                  <p className="mt-1 font-bold text-slate-900">
+                    {formatarMoeda(detalhe.resumo_numerico?.valor_estimado)}
+                  </p>
                 </div>
               </div>
 
@@ -427,21 +469,39 @@ export default function ComprasPendencias() {
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                           <div>
                             <div className="font-semibold text-slate-900">{item.descricao}</div>
-                            <div className="text-xs text-slate-500">Codigo: {item.codigo_produto || "-"}</div>
+                            <div className="text-xs text-slate-500">
+                              Codigo: {item.codigo_produto || "-"}
+                            </div>
                           </div>
                           <span className="rounded-full bg-orange-50 px-2 py-1 text-xs font-semibold text-orange-700">
                             {item.status_conferencia}
                           </span>
                         </div>
                         <div className="mt-3 grid gap-2 text-sm sm:grid-cols-5">
-                          <div>NF: <b>{formatarQtd(item.quantidade_nf)}</b></div>
-                          <div>Recebida: <b>{formatarQtd(item.quantidade_recebida)}</b></div>
-                          <div>Falta: <b className="text-red-600">{formatarQtd(item.quantidade_faltante)}</b></div>
-                          <div>Avaria: <b className="text-orange-600">{formatarQtd(item.quantidade_avariada)}</b></div>
-                          <div>Valor: <b>{formatarMoeda(item.valor_total_divergente)}</b></div>
+                          <div>
+                            NF: <b>{formatarQtd(item.quantidade_nf)}</b>
+                          </div>
+                          <div>
+                            Recebida: <b>{formatarQtd(item.quantidade_recebida)}</b>
+                          </div>
+                          <div>
+                            Falta:{" "}
+                            <b className="text-red-600">{formatarQtd(item.quantidade_faltante)}</b>
+                          </div>
+                          <div>
+                            Avaria:{" "}
+                            <b className="text-orange-600">
+                              {formatarQtd(item.quantidade_avariada)}
+                            </b>
+                          </div>
+                          <div>
+                            Valor: <b>{formatarMoeda(item.valor_total_divergente)}</b>
+                          </div>
                         </div>
                         {item.observacao && (
-                          <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">{item.observacao}</p>
+                          <p className="mt-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                            {item.observacao}
+                          </p>
                         )}
                       </div>
                     ))}
@@ -451,26 +511,43 @@ export default function ComprasPendencias() {
                 <section className="space-y-4">
                   <div className="rounded-lg border border-slate-200 p-4">
                     <h3 className="font-bold text-slate-900">Contato com fornecedor</h3>
-                    <label className="mt-3 block text-xs font-semibold uppercase text-slate-500">Destinatario</label>
+                    <label className="mt-3 block text-xs font-semibold uppercase text-slate-500">
+                      Destinatario
+                    </label>
                     <input
                       value={emailForm.email_destinatario}
-                      onChange={(event) => setEmailForm((prev) => ({ ...prev, email_destinatario: event.target.value }))}
+                      onChange={(event) =>
+                        setEmailForm((prev) => ({
+                          ...prev,
+                          email_destinatario: event.target.value,
+                        }))
+                      }
                       className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                       placeholder="email@fornecedor.com"
                     />
-                    <label className="mt-3 block text-xs font-semibold uppercase text-slate-500">Assunto</label>
+                    <label className="mt-3 block text-xs font-semibold uppercase text-slate-500">
+                      Assunto
+                    </label>
                     <input
                       value={emailForm.email_assunto}
-                      onChange={(event) => setEmailForm((prev) => ({ ...prev, email_assunto: event.target.value }))}
+                      onChange={(event) =>
+                        setEmailForm((prev) => ({ ...prev, email_assunto: event.target.value }))
+                      }
                       className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                     />
-                    <label className="mt-3 block text-xs font-semibold uppercase text-slate-500">Mensagem</label>
+                    <label className="mt-3 block text-xs font-semibold uppercase text-slate-500">
+                      Mensagem
+                    </label>
                     <textarea
                       value={emailForm.email_mensagem}
-                      onChange={(event) => setEmailForm((prev) => ({ ...prev, email_mensagem: event.target.value }))}
+                      onChange={(event) =>
+                        setEmailForm((prev) => ({ ...prev, email_mensagem: event.target.value }))
+                      }
                       className="mt-1 h-48 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                     />
-                    <label className="mt-3 block text-xs font-semibold uppercase text-slate-500">Observacao / retorno</label>
+                    <label className="mt-3 block text-xs font-semibold uppercase text-slate-500">
+                      Observacao / retorno
+                    </label>
                     <textarea
                       value={observacao}
                       onChange={(event) => setObservacao(event.target.value)}
@@ -488,20 +565,30 @@ export default function ComprasPendencias() {
                         onClick={enviarEmail}
                         loading={salvando}
                         disabled={!emailConfigurado}
-                        title={emailConfigurado ? "Enviar e-mail com PDF anexado" : "Configure SMTP para envio automatico"}
+                        title={
+                          emailConfigurado
+                            ? "Enviar e-mail com PDF anexado"
+                            : "Configure SMTP para envio automatico"
+                        }
                       >
                         Enviar e-mail
                       </ActionButton>
                       <ActionButton icon={Mail} intent="edit" tone="soft" onClick={copiarMensagem}>
                         Copiar texto
                       </ActionButton>
-                      <ActionButton icon={Clock} intent="edit" onClick={registrarEmail} loading={salvando}>
+                      <ActionButton
+                        icon={Clock}
+                        intent="edit"
+                        onClick={registrarEmail}
+                        loading={salvando}
+                      >
                         Registrar manual
                       </ActionButton>
                     </div>
                     {!emailConfigurado && (
                       <p className="mt-2 text-xs text-slate-500">
-                        Envio automatico indisponivel. Use Copiar texto e Registrar manual ate configurar SMTP.
+                        Envio automatico indisponivel. Use Copiar texto e Registrar manual ate
+                        configurar SMTP.
                       </p>
                     )}
                   </div>
@@ -509,13 +596,28 @@ export default function ComprasPendencias() {
                   <div className="rounded-lg border border-slate-200 p-4">
                     <h3 className="font-bold text-slate-900">Resolucao</h3>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <ActionButton icon={Clock} intent="edit" tone="soft" onClick={() => atualizarStatus("em_tratativa")}>
+                      <ActionButton
+                        icon={Clock}
+                        intent="edit"
+                        tone="soft"
+                        onClick={() => atualizarStatus("em_tratativa")}
+                      >
                         Em tratativa
                       </ActionButton>
-                      <ActionButton icon={CheckCircle2} intent="create" onClick={() => atualizarStatus("resolvida", observacao)} loading={salvando}>
+                      <ActionButton
+                        icon={CheckCircle2}
+                        intent="create"
+                        onClick={() => atualizarStatus("resolvida", observacao)}
+                        loading={salvando}
+                      >
                         Marcar resolvida
                       </ActionButton>
-                      <ActionButton intent="delete" tone="soft" onClick={() => atualizarStatus("cancelada")} loading={salvando}>
+                      <ActionButton
+                        intent="delete"
+                        tone="soft"
+                        onClick={() => atualizarStatus("cancelada")}
+                        loading={salvando}
+                      >
                         Cancelar
                       </ActionButton>
                     </div>
@@ -528,9 +630,13 @@ export default function ComprasPendencias() {
                         <div key={item.id} className="rounded-md bg-slate-50 p-3 text-sm">
                           <div className="flex items-center justify-between gap-2">
                             <span className="font-semibold text-slate-900">{item.tipo}</span>
-                            <span className="text-xs text-slate-500">{formatarData(item.created_at, true)}</span>
+                            <span className="text-xs text-slate-500">
+                              {formatarData(item.created_at, true)}
+                            </span>
                           </div>
-                          {item.observacao && <p className="mt-1 text-slate-600">{item.observacao}</p>}
+                          {item.observacao && (
+                            <p className="mt-1 text-slate-600">{item.observacao}</p>
+                          )}
                           {item.status_novo && (
                             <p className="mt-1 text-xs text-slate-500">
                               {item.status_anterior || "-"} {"->"} {item.status_novo}

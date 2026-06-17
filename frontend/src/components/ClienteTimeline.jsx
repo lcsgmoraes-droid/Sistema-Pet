@@ -1,11 +1,17 @@
-import { useState, useEffect } from 'react';
-import PropTypes from 'prop-types';
-import api from '../api';
-import { 
-  FiShoppingCart, FiDollarSign, FiCalendar, FiAlertCircle,
-  FiCheck, FiClock, FiX, FiPackage, FiTruck, FiMessageCircle
-} from 'react-icons/fi';
-import { PawPrint } from 'lucide-react';
+import { useState, useEffect } from "react";
+import PropTypes from "prop-types";
+import api from "../api";
+import {
+  FiShoppingCart,
+  FiDollarSign,
+  FiCalendar,
+  FiAlertCircle,
+  FiClock,
+  FiPackage,
+  FiTruck,
+  FiMessageCircle,
+} from "react-icons/fi";
+import { PawPrint } from "lucide-react";
 
 // Mapeamento de ícones por tipo de evento
 const ICONES_EVENTO = {
@@ -18,35 +24,36 @@ const ICONES_EVENTO = {
   recebimento: FiTruck,
   vacina: FiCalendar,
   consulta: FiCalendar,
-  whatsapp: FiMessageCircle
+  whatsapp: FiMessageCircle,
 };
 
 // Mapeamento de cores por badge
 const CORES_BADGE = {
-  green: 'bg-green-100 text-green-700 border-green-300',
-  yellow: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-  red: 'bg-red-100 text-red-700 border-red-300',
-  blue: 'bg-blue-100 text-blue-700 border-blue-300',
-  purple: 'bg-purple-100 text-purple-700 border-purple-300',
-  gray: 'bg-gray-100 text-gray-700 border-gray-300'
+  green: "bg-green-100 text-green-700 border-green-300",
+  yellow: "bg-yellow-100 text-yellow-700 border-yellow-300",
+  red: "bg-red-100 text-red-700 border-red-300",
+  blue: "bg-blue-100 text-blue-700 border-blue-300",
+  purple: "bg-purple-100 text-purple-700 border-purple-300",
+  gray: "bg-gray-100 text-gray-700 border-gray-300",
 };
 
-const ClienteTimeline = ({ 
-  clienteId, 
+const ClienteTimeline = ({
+  clienteId,
   fornecedorId,
-  tipo = 'cliente', // 'cliente' ou 'fornecedor'
-  limit = 5, 
-  showHeader = true, 
-  onVerMais 
+  tipo = "cliente", // 'cliente' ou 'fornecedor'
+  limit = 5,
+  showHeader = true,
+  onVerMais,
 }) => {
   const [eventos, setEventos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  
-  const entityId = tipo === 'fornecedor' ? fornecedorId : clienteId;
-  const endpoint = tipo === 'fornecedor' 
-    ? `/clientes/fornecedor/${entityId}/timeline`
-    : `/clientes/${entityId}/timeline`;
+  const [error, setError] = useState("");
+
+  const entityId = tipo === "fornecedor" ? fornecedorId : clienteId;
+  const endpoint =
+    tipo === "fornecedor"
+      ? `/clientes/fornecedor/${entityId}/timeline`
+      : `/clientes/${entityId}/timeline`;
 
   useEffect(() => {
     if (entityId) {
@@ -57,18 +64,18 @@ const ClienteTimeline = ({
   const loadTimeline = async () => {
     try {
       setLoading(true);
-      setError('');
+      setError("");
       const response = await api.get(`${endpoint}?limit=${limit}`);
       setEventos(response.data);
     } catch (err) {
       // Silenciar erros 500 (VIEW ainda não criada) e 404 (endpoint não existe)
       if (err.response?.status === 500 || err.response?.status === 404) {
-        console.warn('Timeline não disponível:', err.response?.status);
+        console.warn("Timeline não disponível:", err.response?.status);
         setEventos([]);
-        setError(''); // Não mostrar erro ao usuário
+        setError(""); // Não mostrar erro ao usuário
       } else {
-        console.error('Erro ao carregar timeline:', err);
-        setError('Erro ao carregar timeline');
+        console.error("Erro ao carregar timeline:", err);
+        setError("Erro ao carregar timeline");
       }
     } finally {
       setLoading(false);
@@ -83,27 +90,27 @@ const ClienteTimeline = ({
 
     // Se for hoje
     if (date.toDateString() === hoje.toDateString()) {
-      return `Hoje às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+      return `Hoje às ${date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
     }
 
     // Se foi ontem
     if (date.toDateString() === ontem.toDateString()) {
-      return `Ontem às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+      return `Ontem às ${date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
     }
 
     // Senão, data completa
-    return date.toLocaleDateString('pt-BR', { 
-      day: '2-digit', 
-      month: 'short', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return date.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const handleEventoClick = (evento) => {
     // Navegação futura para telas específicas
-    console.log('Evento clicado:', evento);
+    console.log("Evento clicado:", evento);
     // TODO: Implementar navegação baseada no tipo
     // if (evento.tipo_evento === 'venda') navigate(`/vendas/${evento.evento_id}`)
   };
@@ -132,9 +139,7 @@ const ClienteTimeline = ({
     return (
       <div className="text-center py-12">
         <FiCalendar className="mx-auto text-gray-300 mb-4" size={48} />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Nenhum evento registrado
-        </h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Nenhum evento registrado</h3>
         <p className="text-gray-600 text-sm">
           Eventos do cliente aparecerão aqui conforme forem acontecendo
         </p>
@@ -173,32 +178,33 @@ const ClienteTimeline = ({
             const corBadge = CORES_BADGE[evento.cor_badge] || CORES_BADGE.gray;
 
             return (
-              <div 
+              <div
                 key={`${evento.tipo_evento}-${evento.evento_id}-${index}`}
                 className="relative pl-12 group"
               >
                 {/* Ícone */}
                 <div className="absolute left-0 top-0 w-10 h-10 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center group-hover:border-blue-400 transition-colors">
-                  <IconeEvento className="text-gray-600 group-hover:text-blue-600 transition-colors" size={18} />
+                  <IconeEvento
+                    className="text-gray-600 group-hover:text-blue-600 transition-colors"
+                    size={18}
+                  />
                 </div>
 
                 {/* Card do evento */}
-                <div 
+                <div
                   onClick={() => handleEventoClick(evento)}
                   className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md hover:border-gray-300 transition-all cursor-pointer"
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1">
-                      <h4 className="font-semibold text-gray-900 mb-1">
-                        {evento.titulo}
-                      </h4>
-                      <p className="text-sm text-gray-600">
-                        {evento.descricao}
-                      </p>
+                      <h4 className="font-semibold text-gray-900 mb-1">{evento.titulo}</h4>
+                      <p className="text-sm text-gray-600">{evento.descricao}</p>
                     </div>
                     {/* Badge de status */}
-                    <span className={`ml-3 px-2 py-1 text-xs font-medium rounded border ${corBadge} whitespace-nowrap`}>
+                    <span
+                      className={`ml-3 px-2 py-1 text-xs font-medium rounded border ${corBadge} whitespace-nowrap`}
+                    >
                       {evento.status}
                     </span>
                   </div>
@@ -241,10 +247,10 @@ const ClienteTimeline = ({
 ClienteTimeline.propTypes = {
   clienteId: PropTypes.number,
   fornecedorId: PropTypes.number,
-  tipo: PropTypes.oneOf(['cliente', 'fornecedor']),
+  tipo: PropTypes.oneOf(["cliente", "fornecedor"]),
   limit: PropTypes.number,
   showHeader: PropTypes.bool,
-  onVerMais: PropTypes.func
+  onVerMais: PropTypes.func,
 };
 
 export default ClienteTimeline;

@@ -26,7 +26,9 @@ export function identificarIconeFormaPagamento(icone, nome) {
 }
 
 export function ehFormaPagamentoPix(formaPagamento = null) {
-  return String(formaPagamento?.nome || "").toLowerCase().includes("pix");
+  return String(formaPagamento?.nome || "")
+    .toLowerCase()
+    .includes("pix");
 }
 
 export function mapearTipoPagamentoStonePos(formaPagamento = null) {
@@ -58,16 +60,12 @@ export function podeEnviarPagamentoStonePos({
 
 export function calcularCustoTotalItensVenda(itens = []) {
   return (itens || []).reduce(
-    (sum, item) =>
-      sum + Number(item?.custo || 0) * Number(item?.quantidade || 1),
+    (sum, item) => sum + Number(item?.custo || 0) * Number(item?.quantidade || 1),
     0,
   );
 }
 
-export function montarVendaParaPersistirComCupom({
-  venda = {},
-  cupomParaFinalizar = null,
-}) {
+export function montarVendaParaPersistirComCupom({ venda = {}, cupomParaFinalizar = null }) {
   if (!cupomParaFinalizar) return venda;
 
   return {
@@ -101,9 +99,7 @@ export function obterCorVisualParcelamento({
   statusMargem = "verde",
 }) {
   return (
-    simulacoesParcelamento[formaPagamento?.id]?.[numeroParcelas]?.cor ||
-    statusMargem ||
-    "verde"
+    simulacoesParcelamento[formaPagamento?.id]?.[numeroParcelas]?.cor || statusMargem || "verde"
   );
 }
 
@@ -148,14 +144,12 @@ export function avaliarEstadoJustificativaMargem({
   corParcelamentoAtual = "verde",
   justificativaTexto = "",
 }) {
-  const margemCriticaAtual =
-    statusMargem === "vermelho" || corParcelamentoAtual === "vermelho";
+  const margemCriticaAtual = statusMargem === "vermelho" || corParcelamentoAtual === "vermelho";
 
   return {
     margemCriticaAtual,
     mostrarCampoJustificativa:
-      margemCriticaAtual ||
-      Boolean(justificativaTexto && justificativaTexto.trim().length > 0),
+      margemCriticaAtual || Boolean(justificativaTexto && justificativaTexto.trim().length > 0),
   };
 }
 
@@ -176,8 +170,7 @@ export function calcularResumoRecebimento({
     valorPago,
     valorRestante,
     vendaQuitadaComPagamentosExistentes,
-    podeConfirmarFinalizacao:
-      pagamentos.length > 0 || vendaQuitadaComPagamentosExistentes,
+    podeConfirmarFinalizacao: pagamentos.length > 0 || vendaQuitadaComPagamentosExistentes,
     troco: Number(valorRecebido || 0) > 0 ? Number(valorRecebido || 0) - valorRestante : 0,
   };
 }
@@ -193,10 +186,7 @@ export function montarCupomParaFinalizar({ cupomAplicado, venda = {} }) {
 }
 
 export function descreverCupomMargem(cupomParaFinalizar, formatarValor = (valor) => String(valor)) {
-  if (
-    !cupomParaFinalizar?.code ||
-    Number(cupomParaFinalizar?.discount_applied || 0) <= 0
-  ) {
+  if (!cupomParaFinalizar?.code || Number(cupomParaFinalizar?.discount_applied || 0) <= 0) {
     return "";
   }
 
@@ -217,9 +207,7 @@ export function montarObservacoesComJustificativaMargem({
     return observacoesAtuais || "";
   }
 
-  return observacoesAtuais
-    ? `${observacoesAtuais}\n\n${blocoJustificativa}`
-    : blocoJustificativa;
+  return observacoesAtuais ? `${observacoesAtuais}\n\n${blocoJustificativa}` : blocoJustificativa;
 }
 
 export function montarPagamentoRecebido({
@@ -249,8 +237,7 @@ export function montarPagamentoRecebido({
     parcelas,
     valor_recebido: Number(valor || 0),
     troco: tipo === "dinheiro" && troco > 0 ? troco : null,
-    is_credito_cliente:
-      formaPagamento.nome === "Crédito Cliente" || tipo === "credito_cliente",
+    is_credito_cliente: formaPagamento.nome === "Crédito Cliente" || tipo === "credito_cliente",
     is_cashback: formaPagamento.id === "cashback",
   };
 }
@@ -282,18 +269,13 @@ export function validarPagamentoParaAdicionar({
     ).toFixed(2)})`;
   }
 
-  if (
-    formaPagamento.id === "cashback" &&
-    valorNumerico > Number(saldoCashback || 0) + 0.01
-  ) {
+  if (formaPagamento.id === "cashback" && valorNumerico > Number(saldoCashback || 0) + 0.01) {
     return `Valor excede o cashback disponível (R$ ${Number(saldoCashback || 0)
       .toFixed(2)
       .replace(".", ",")})`;
   }
 
-  const isCartao = ["cartao_credito", "cartao_debito"].includes(
-    formaPagamento.tipo,
-  );
+  const isCartao = ["cartao_credito", "cartao_debito"].includes(formaPagamento.tipo);
 
   if (isCartao && !bandeira) {
     return "Selecione a bandeira do cartão";
@@ -357,14 +339,8 @@ export function montarFallbackSimulacaoParcelamento() {
   return { cor: null, classificacao: "verde" };
 }
 
-export function montarPagamentosMargem({
-  pagamentosExistentes = [],
-  pagamentos = [],
-}) {
-  return [
-    ...pagamentosExistentes,
-    ...pagamentos.filter((pagamento) => !pagamento.is_cashback),
-  ];
+export function montarPagamentosMargem({ pagamentosExistentes = [], pagamentos = [] }) {
+  return [...pagamentosExistentes, ...pagamentos.filter((pagamento) => !pagamento.is_cashback)];
 }
 
 export function montarPayloadAnaliseMargem({ venda = {}, formasPagamento = [] }) {
@@ -402,15 +378,14 @@ export function montarFormasPagamentoAnalise({
   formasPagamento = [],
   valorTotal = 0,
 }) {
-  const totalAlocado = pagamentos.reduce(
-    (sum, pagamento) => sum + Number(pagamento.valor || 0),
-    0,
-  );
+  const totalAlocado = pagamentos.reduce((sum, pagamento) => sum + Number(pagamento.valor || 0), 0);
   const restante = Number(valorTotal || 0) - totalAlocado;
   const dinheiro = formasPagamento.find(
     (forma) =>
       forma.tipo === "dinheiro" ||
-      String(forma.nome || "").toLowerCase().includes("dinheiro"),
+      String(forma.nome || "")
+        .toLowerCase()
+        .includes("dinheiro"),
   );
 
   if (pagamentos.length === 0) {
@@ -469,8 +444,7 @@ export function resolverFaixasParcelamentoDaForma({
   formasPagamento = [],
 }) {
   if (formaPagamentoSelecionada?.permite_parcelamento) {
-    const simulacoesExistentes =
-      simulacoesParcelamento[formaPagamentoSelecionada.id];
+    const simulacoesExistentes = simulacoesParcelamento[formaPagamentoSelecionada.id];
 
     if (!simulacoesExistentes) {
       return {
