@@ -1,6 +1,7 @@
 """
 Rotas de Autenticação Multi-Tenant
 """
+
 import logging
 import hashlib
 import os
@@ -19,16 +20,27 @@ from sqlalchemy.orm import Session
 from app.db import get_session
 from app.models import User, Tenant, Role, Permission, RolePermission, UserTenant
 from app.auth import (
-    verify_password, 
-    create_access_token, 
+    verify_password,
+    create_access_token,
     create_refresh_token,
     get_current_user,
-    hash_password
+    hash_password,
 )
 from app.auth.permission_dependencies import expand_permissions
 from app.config import JWT_SECRET_KEY as SECRET_KEY
-from app.auth.core import ALGORITHM, ACCESS_TOKEN_EXPIRE_DAYS, ACCESS_TOKEN_EXPIRE_SECONDS
-from app.session_manager import create_session, validate_session, revoke_session, revoke_all_sessions, get_active_sessions, get_session_by_jti
+from app.auth.core import (
+    ALGORITHM,
+    ACCESS_TOKEN_EXPIRE_DAYS,
+    ACCESS_TOKEN_EXPIRE_SECONDS,
+)
+from app.session_manager import (
+    create_session,
+    validate_session,
+    revoke_session,
+    revoke_all_sessions,
+    get_active_sessions,
+    get_session_by_jti,
+)
 from app.auth.dependencies import get_current_user_and_tenant
 from app.services.email_service import send_email
 from app.services.auth_security import (
@@ -54,7 +66,9 @@ security = HTTPBearer()
 router = APIRouter(prefix="/auth", tags=["auth-multitenant"])
 RESET_TOKEN_MINUTES = 30
 EMAIL_VERIFICATION_TOKEN_HOURS = int(os.getenv("EMAIL_VERIFICATION_TOKEN_HOURS", "24"))
-EMAIL_VERIFICATION_REQUIRED = os.getenv("EMAIL_VERIFICATION_REQUIRED", "true").strip().lower() not in {"0", "false", "no"}
+EMAIL_VERIFICATION_REQUIRED = os.getenv(
+    "EMAIL_VERIFICATION_REQUIRED", "true"
+).strip().lower() not in {"0", "false", "no"}
 TERMS_VERSION = os.getenv("TERMS_VERSION", "termos-2026-05-08")
 PRIVACY_VERSION = os.getenv("PRIVACY_VERSION", "privacidade-2026-05-08")
 STRICT_EMAIL_ENVS = {"production", "prod", "staging"}
@@ -67,13 +81,13 @@ DEFAULT_TRIAL_DAYS = 30
 # HELPER FUNCTIONS
 # =============================================================================
 
+
 def _current_environment_name() -> str:
     return (
-        os.getenv("ENVIRONMENT")
-        or os.getenv("APP_ENV")
-        or os.getenv("ENV")
-        or ""
-    ).strip().lower()
+        (os.getenv("ENVIRONMENT") or os.getenv("APP_ENV") or os.getenv("ENV") or "")
+        .strip()
+        .lower()
+    )
 
 
 def _is_local_signup_request(request: Request) -> bool:
@@ -97,55 +111,56 @@ def _email_verification_required_for_request(request: Request) -> bool:
 
     return True
 
-def grant_all_permissions_to_role(role_id: int, tenant_id: uuid.UUID, db: Session) -> int:
+
+def grant_all_permissions_to_role(
+    role_id: int, tenant_id: uuid.UUID, db: Session
+) -> int:
     """
     Vincula TODAS as permissões existentes no sistema a uma role.
-    
+
     Esta função garante que:
     - Todas as permissões da tabela Permission sejam vinculadas à role
     - Não haja duplicatas (verifica antes de inserir)
     - Funcione tanto para roles novas quanto para atualizar roles existentes
-    
+
     Args:
         role_id: ID da role que receberá as permissões
         tenant_id: ID do tenant (para RolePermission)
         db: Sessão do banco de dados
-    
+
     Returns:
         Número de permissões vinculadas (novas)
     """
     # Buscar todas as permissões do sistema
     all_permissions = db.query(Permission).all()
-    
+
     # Buscar permissões JÁ vinculadas a esta role
     existing_permission_ids = set(
         db.query(RolePermission.permission_id)
         .filter(
-            RolePermission.role_id == role_id,
-            RolePermission.tenant_id == tenant_id
+            RolePermission.role_id == role_id, RolePermission.tenant_id == tenant_id
         )
         .all()
     )
     existing_permission_ids = {pid[0] for pid in existing_permission_ids}
-    
+
     # Adicionar apenas as que ainda NÃO estão vinculadas
     new_permissions_count = 0
     for permission in all_permissions:
         if permission.id not in existing_permission_ids:
             role_permission = RolePermission(
-                role_id=role_id,
-                permission_id=permission.id,
-                tenant_id=tenant_id
+                role_id=role_id, permission_id=permission.id, tenant_id=tenant_id
             )
             db.add(role_permission)
             new_permissions_count += 1
-    
+
     return new_permissions_count
 
 
 # =============================================================================
 # REQUEST/RESPONSE MODELS
 # =============================================================================
+
 
 class LoginRequest(BaseModel):
     email: str
@@ -240,7 +255,9 @@ def _issue_password_reset_tokens() -> tuple[str, str, str]:
     return numeric_code, link_token, stored_token
 
 
-def _password_reset_token_matches(stored_token: str | None, received_token: str | None) -> bool:
+def _password_reset_token_matches(
+    stored_token: str | None, received_token: str | None
+) -> bool:
     if not stored_token or not received_token:
         return False
 
@@ -271,7 +288,9 @@ def _session_expiry_utc(db_session) -> datetime:
     return expires_at
 
 
-def _create_token_pair(user_id: int, token_jti: str, expires_at: datetime, tenant_id: str | None = None) -> tuple[str, str]:
+def _create_token_pair(
+    user_id: int, token_jti: str, expires_at: datetime, tenant_id: str | None = None
+) -> tuple[str, str]:
     token_data = {
         "sub": str(user_id),
         "jti": token_jti,
@@ -304,11 +323,15 @@ def _validate_refresh_tenant(db: Session, user_id: int, tenant_id: str | None):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user_tenant = db.query(UserTenant).filter(
-        UserTenant.user_id == user_id,
-        UserTenant.tenant_id == tenant_uuid,
-        UserTenant.is_active.is_(True),
-    ).first()
+    user_tenant = (
+        db.query(UserTenant)
+        .filter(
+            UserTenant.user_id == user_id,
+            UserTenant.tenant_id == tenant_uuid,
+            UserTenant.is_active.is_(True),
+        )
+        .first()
+    )
 
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_uuid)).first()
     tenant_status = str(getattr(tenant, "status", "") or "").strip().lower()
@@ -321,7 +344,9 @@ def _validate_refresh_tenant(db: Session, user_id: int, tenant_id: str | None):
     return tenant_uuid
 
 
-def _mark_user_consent(user: User, request: Request, terms_version: str | None, privacy_version: str | None) -> None:
+def _mark_user_consent(
+    user: User, request: Request, terms_version: str | None, privacy_version: str | None
+) -> None:
     user.consent_date = _now_utc()
     user.consent_version = terms_version or TERMS_VERSION
     user.privacy_version = privacy_version or PRIVACY_VERSION
@@ -332,12 +357,16 @@ def _mark_user_consent(user: User, request: Request, terms_version: str | None, 
 def _issue_email_verification_token(user: User) -> str:
     raw_token = _issue_numeric_code()
     user.email_verification_token_hash = _hash_token(raw_token)
-    user.email_verification_token_expires = _now_utc() + timedelta(hours=EMAIL_VERIFICATION_TOKEN_HOURS)
+    user.email_verification_token_expires = _now_utc() + timedelta(
+        hours=EMAIL_VERIFICATION_TOKEN_HOURS
+    )
     user.email_verification_sent_at = _now_utc()
     return raw_token
 
 
-def _build_email_verification_email(user: User, raw_token: str, verification_link: str) -> tuple[str, str, str]:
+def _build_email_verification_email(
+    user: User, raw_token: str, verification_link: str
+) -> tuple[str, str, str]:
     saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
     subject = "Confirme seu e-mail - CorePet"
     html_body = f"""
@@ -384,7 +413,9 @@ def _send_email_verification(user: User, request: Request) -> bool:
         f"{_resolve_frontend_base_url(request)}/verificar-email"
         f"?email={quote(user.email)}&token={quote(raw_token)}"
     )
-    subject, html_body, text_body = _build_email_verification_email(user, raw_token, verification_link)
+    subject, html_body, text_body = _build_email_verification_email(
+        user, raw_token, verification_link
+    )
     return send_email(
         to=user.email,
         subject=subject,
@@ -395,7 +426,9 @@ def _send_email_verification(user: User, request: Request) -> bool:
 
 
 def _email_verification_block(user: User) -> bool:
-    return EMAIL_VERIFICATION_REQUIRED and not bool(getattr(user, "email_verified", False))
+    return EMAIL_VERIFICATION_REQUIRED and not bool(
+        getattr(user, "email_verified", False)
+    )
 
 
 def _is_token_expired(expires_at: datetime | None) -> bool:
@@ -406,7 +439,9 @@ def _is_token_expired(expires_at: datetime | None) -> bool:
     return expires_at < _now_utc()
 
 
-def _build_password_reset_email(user: User, reset_token: str, reset_link: str) -> tuple[str, str, str]:
+def _build_password_reset_email(
+    user: User, reset_token: str, reset_link: str
+) -> tuple[str, str, str]:
     saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
     subject = "Recuperacao de senha - CorePet"
     html_body = f"""
@@ -449,10 +484,12 @@ def _build_password_reset_email(user: User, reset_token: str, reset_link: str) -
 
 
 @router.post("/register", response_model=LoginResponse)
-def register(request: Request, payload: RegisterRequest, db: Session = Depends(get_session)):
+def register(
+    request: Request, payload: RegisterRequest, db: Session = Depends(get_session)
+):
     """
     Registra novo usuário e cria tenant automaticamente.
-    
+
     - **email**: Email único
     - **password**: Senha (min 8 caracteres)
     - **nome**: Nome do usuário (opcional)
@@ -471,15 +508,14 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     existing = db.query(User).filter(User.email == email).first()
     if existing:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email ja cadastrado"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Email ja cadastrado"
         )
-    
+
     # Validar senha
     if len(payload.password) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Senha deve ter no minimo 8 caracteres"
+            detail="Senha deve ter no minimo 8 caracteres",
         )
 
     selected_plan = (payload.plan or "basico").strip().lower()
@@ -490,7 +526,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
         )
 
     email_verification_required = _email_verification_required_for_request(request)
-    
+
     # Criar tenant primeiro
     tenant_name = payload.nome_loja or f"Loja de {payload.nome or email}"
     tenant_id = uuid.uuid4()  # Gerar UUID
@@ -498,20 +534,20 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     tenant = Tenant(
         id=str(tenant_id),
         name=tenant_name,
-        status='active',
+        status="active",
         plan=selected_plan,
-        billing_status='trial',
+        billing_status="trial",
         trial_started_at=trial_started_at,
         trial_ends_at=trial_started_at + timedelta(days=DEFAULT_TRIAL_DAYS),
-        subscription_source='manual',
-        organization_type=payload.organization_type or 'petshop'
+        subscription_source="manual",
+        organization_type=payload.organization_type or "petshop",
     )
     db.add(tenant)
     db.flush()  # Para garantir que o tenant existe
-    
+
     # Definir contexto de tenant
     set_tenant_context(tenant_id)
-    
+
     # Criar usuário (definir tenant_id explicitamente)
     user = User(
         email=email,
@@ -522,35 +558,33 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
         is_admin=False,  # Admin da loja vem da role/permissao do tenant.
         email_verified=not email_verification_required,
         email_verified_at=_now_utc() if not email_verification_required else None,
-        tenant_id=tenant_id  # ✅ Definir tenant_id explicitamente
+        tenant_id=tenant_id,  # ✅ Definir tenant_id explicitamente
     )
     _mark_user_consent(user, request, payload.terms_version, payload.privacy_version)
     db.add(user)
     db.flush()  # Para obter user.id
-    
+
     # Criar role de Admin para este tenant
     admin_role = Role(
-        name='Administrador',
-        tenant_id=tenant_id  # ✅ Definir tenant_id explicitamente
+        name="Administrador",
+        tenant_id=tenant_id,  # ✅ Definir tenant_id explicitamente
     )
     db.add(admin_role)
     db.flush()
-    
+
     # ✅ VINCULAR TODAS AS PERMISSÕES À ROLE DE ADMINISTRADOR
     # Garante que TODAS as permissões (existentes e futuras) sejam vinculadas
     permissions_granted = grant_all_permissions_to_role(
-        role_id=admin_role.id,
-        tenant_id=tenant_id,
-        db=db
+        role_id=admin_role.id, tenant_id=tenant_id, db=db
     )
     db.flush()
-    
+
     # Log: quantas permissões foram vinculadas
     logger.info(
         f"Role 'Administrador' criada para tenant {tenant_id}: "
         f"{permissions_granted} permissões vinculadas"
     )
-    
+
     # Vincular usuário ao tenant com role de admin
     try:
         onboarding_result = onboard_tenant_defaults(
@@ -561,7 +595,11 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
             strict_required=True,
         )
         db.flush()
-        logger.info("Onboarding inicial do tenant %s concluido: %s", tenant_id, onboarding_result)
+        logger.info(
+            "Onboarding inicial do tenant %s concluido: %s",
+            tenant_id,
+            onboarding_result,
+        )
     except Exception:
         logger.warning(
             "Nao foi possivel criar os dados padrao de onboarding para o tenant %s",
@@ -579,7 +617,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
         user_id=user.id,
         tenant_id=tenant_id,  # ✅ Definir tenant_id explicitamente
         role_id=admin_role.id,
-        is_active=True
+        is_active=True,
     )
     db.add(user_tenant)
 
@@ -598,11 +636,9 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     db.commit()
     clear_tenant_context()
 
-    tenants_payload = [{
-        "id": str(tenant_id),
-        "name": tenant.name,
-        "role_id": admin_role.id
-    }]
+    tenants_payload = [
+        {"id": str(tenant_id), "name": tenant.name, "role_id": admin_role.id}
+    ]
 
     if email_verification_required:
         return LoginResponse(
@@ -619,16 +655,16 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
             requires_email_verification=True,
             email_verification_sent=email_verification_sent,
         )
-    
+
     # Criar sessão
     db_session = create_session(
         db=db,
         user_id=user.id,
         ip_address=get_request_ip(request),
         user_agent=request.headers.get("user-agent"),
-        expires_in_days=ACCESS_TOKEN_EXPIRE_DAYS
+        expires_in_days=ACCESS_TOKEN_EXPIRE_DAYS,
     )
-    
+
     # Criar token inicial (sem tenant_id - usuário precisa selecionar)
     token_jti = db_session.token_jti
     access_token, refresh_token = _create_token_pair(
@@ -636,7 +672,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
         token_jti,
         _session_expiry_utc(db_session),
     )
-    
+
     # Retornar dados do usuário e tenant
     return LoginResponse(
         **_auth_payload(access_token, refresh_token),
@@ -652,7 +688,9 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
 
 
 @router.post("/login-multitenant", response_model=LoginResponse)
-def login_multitenant(request: Request, credentials: LoginRequest, db: Session = Depends(get_session)):
+def login_multitenant(
+    request: Request, credentials: LoginRequest, db: Session = Depends(get_session)
+):
     """
     Fase 1: Autentica usuário e retorna lista de tenants disponíveis.
     Token gerado SEM tenant_id.
@@ -668,7 +706,9 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
             headers={"Retry-After": str(remaining_lock_seconds(user))},
         )
 
-    if not user or not verify_password(credentials.password, user.hashed_password or ""):
+    if not user or not verify_password(
+        credentials.password, user.hashed_password or ""
+    ):
         if user:
             register_failed_login(db, user, request)
             db.commit()
@@ -677,13 +717,13 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
             detail="Email ou senha incorretos",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuário inativo",
         )
-    
+
     if _email_verification_block(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -693,25 +733,23 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
     register_successful_login(db, user, request)
     sync_rls_auth_user(db, user.id)
 
-    user_tenants = db.query(UserTenant).filter(
-        UserTenant.user_id == user.id
-    ).all()
-    
+    user_tenants = db.query(UserTenant).filter(UserTenant.user_id == user.id).all()
+
     if not user_tenants:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuário não possui acesso a nenhum tenant",
         )
-    
+
     # Criar sessão (gera o JTI internamente)
     db_session = create_session(
         db=db,
         user_id=user.id,
         ip_address=get_request_ip(request),
         user_agent=request.headers.get("user-agent"),
-        expires_in_days=ACCESS_TOKEN_EXPIRE_DAYS
+        expires_in_days=ACCESS_TOKEN_EXPIRE_DAYS,
     )
-    
+
     # Usar o JTI gerado pela sessão
     token_jti = db_session.token_jti
     access_token, refresh_token = _create_token_pair(
@@ -719,17 +757,15 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
         token_jti,
         _session_expiry_utc(db_session),
     )
-    
+
     tenants_list = []
     for ut in user_tenants:
         tenant = db.query(Tenant).filter(Tenant.id == str(ut.tenant_id)).first()
         if tenant:
-            tenants_list.append({
-                "id": str(tenant.id),
-                "name": tenant.name,
-                "role_id": ut.role_id
-            })
-    
+            tenants_list.append(
+                {"id": str(tenant.id), "name": tenant.name, "role_id": ut.role_id}
+            )
+
     return LoginResponse(
         **_auth_payload(access_token, refresh_token),
         user={
@@ -739,12 +775,14 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
             "is_active": user.is_active,
             "email_verified": user.email_verified,
         },
-        tenants=tenants_list
+        tenants=tenants_list,
     )
 
 
 @router.post("/refresh", response_model=RefreshTokenResponse)
-def refresh_access_token(payload: RefreshTokenRequest, db: Session = Depends(get_session)):
+def refresh_access_token(
+    payload: RefreshTokenRequest, db: Session = Depends(get_session)
+):
     """
     Renova o access token curto usando um refresh token atrelado a sessao ativa.
     """
@@ -755,7 +793,9 @@ def refresh_access_token(payload: RefreshTokenRequest, db: Session = Depends(get
     )
 
     try:
-        token_payload = jwt.decode(payload.refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        token_payload = jwt.decode(
+            payload.refresh_token, SECRET_KEY, algorithms=[ALGORITHM]
+        )
     except JWTError:
         raise credentials_exception
 
@@ -791,7 +831,11 @@ def refresh_access_token(payload: RefreshTokenRequest, db: Session = Depends(get
         raise credentials_exception
 
     tenant_uuid = _validate_refresh_tenant(db, user_id_int, tenant_id)
-    if tenant_uuid and db_session.tenant_id and str(db_session.tenant_id) != str(tenant_uuid):
+    if (
+        tenant_uuid
+        and db_session.tenant_id
+        and str(db_session.tenant_id) != str(tenant_uuid)
+    ):
         raise credentials_exception
 
     access_token, refresh_token = _create_token_pair(
@@ -805,7 +849,9 @@ def refresh_access_token(payload: RefreshTokenRequest, db: Session = Depends(get
 
 
 @router.post("/verify-email")
-def verify_email(payload: VerifyEmailRequest, request: Request, db: Session = Depends(get_session)):
+def verify_email(
+    payload: VerifyEmailRequest, request: Request, db: Session = Depends(get_session)
+):
     email = (payload.email or "").strip().lower()
     if not email:
         raise HTTPException(
@@ -822,7 +868,10 @@ def verify_email(payload: VerifyEmailRequest, request: Request, db: Session = De
     user = query.first()
 
     if not user or _is_token_expired(user.email_verification_token_expires):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo de confirmacao invalido ou expirado")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Codigo de confirmacao invalido ou expirado",
+        )
 
     user.email_verified = True
     user.email_verified_at = _now_utc()
@@ -841,7 +890,9 @@ def resend_verification(
     request: Request,
     db: Session = Depends(get_session),
 ):
-    generic_response = {"message": "Se o email precisar de confirmacao, enviaremos um novo link."}
+    generic_response = {
+        "message": "Se o email precisar de confirmacao, enviaremos um novo link."
+    }
     email = payload.email.strip().lower()
     sync_rls_auth_email(db, email)
     user = db.query(User).filter(User.email == email).first()
@@ -868,7 +919,9 @@ def forgot_password(
     request: Request,
     db: Session = Depends(get_session),
 ):
-    generic_response = {"message": "Se o email existir, enviaremos instrucoes de recuperacao."}
+    generic_response = {
+        "message": "Se o email existir, enviaremos instrucoes de recuperacao."
+    }
     email = payload.email.strip().lower()
 
     sync_rls_auth_email(db, email)
@@ -879,13 +932,17 @@ def forgot_password(
 
     reset_code, reset_link_token, stored_reset_token = _issue_password_reset_tokens()
     user.reset_token = stored_reset_token
-    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_MINUTES)
+    user.reset_token_expires = datetime.now(timezone.utc) + timedelta(
+        minutes=RESET_TOKEN_MINUTES
+    )
 
     reset_link = (
         f"{_resolve_frontend_base_url(request)}/recuperar-senha"
         f"?email={quote(user.email)}&token={quote(reset_link_token)}"
     )
-    subject, html_body, text_body = _build_password_reset_email(user, reset_code, reset_link)
+    subject, html_body, text_body = _build_password_reset_email(
+        user, reset_code, reset_link
+    )
     enviado = send_email(
         to=user.email,
         subject=subject,
@@ -927,17 +984,26 @@ def reset_password(
     user = db.query(User).filter(User.email == email).first()
 
     if not user or not user.reset_token_expires:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo ou link de recuperacao invalido")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Codigo ou link de recuperacao invalido",
+        )
 
     if not _password_reset_token_matches(user.reset_token, payload.token):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo ou link de recuperacao invalido")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Codigo ou link de recuperacao invalido",
+        )
 
     expires_at = user.reset_token_expires
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
 
     if expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo ou link de recuperacao expirado")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Codigo ou link de recuperacao expirado",
+        )
 
     user.hashed_password = hash_password(payload.nova_senha)
     user.reset_token = None
@@ -955,79 +1021,82 @@ def select_tenant(
     body: SelectTenantRequest,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Fase 2: Seleciona tenant e gera token COM tenant_id.
     REUTILIZA a sessão criada no login.
     """
     from uuid import UUID
+
     sync_rls_auth_user(db, current_user.id)
-    
+
     try:
         tenant_uuid = UUID(body.tenant_id)
     except ValueError:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="tenant_id inválido"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="tenant_id inválido"
         )
-    
-    user_tenant = db.query(UserTenant).filter(
-        UserTenant.user_id == current_user.id,
-        UserTenant.tenant_id == tenant_uuid,
-        UserTenant.is_active.is_(True),
-    ).first()
-    
+
+    user_tenant = (
+        db.query(UserTenant)
+        .filter(
+            UserTenant.user_id == current_user.id,
+            UserTenant.tenant_id == tenant_uuid,
+            UserTenant.is_active.is_(True),
+        )
+        .first()
+    )
+
     if not user_tenant:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não tem acesso a este tenant"
+            detail="Você não tem acesso a este tenant",
         )
-    
+
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_uuid)).first()
     if not tenant:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant não encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Tenant não encontrado"
         )
-    
+
     tenant_status = str(tenant.status or "").strip().lower()
     if tenant_status not in {"active", "ativo"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Tenant inativo ou indisponivel"
+            detail="Tenant inativo ou indisponivel",
         )
 
     # Extrair JTI do token atual
     token = credentials.credentials
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     token_jti = payload.get("jti")
-    
+
     if not token_jti:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Token inválido - JTI não encontrado"
+            detail="Token inválido - JTI não encontrado",
         )
-    
+
     # Buscar sessão EXISTENTE
     db_session = get_session_by_jti(db, token_jti)
-    
+
     if not db_session:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Sessão não encontrada. Faça login novamente."
+            detail="Sessão não encontrada. Faça login novamente.",
         )
-    
+
     # Atualizar tenant_id na sessão EXISTENTE
     if db_session.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Sessao invalida. Faca login novamente."
+            detail="Sessao invalida. Faca login novamente.",
         )
 
     db_session.tenant_id = tenant_uuid
     db.commit()
-    
+
     # Gerar NOVO token COM tenant_id (MESMO JTI)
     access_token, refresh_token = _create_token_pair(
         current_user.id,
@@ -1035,7 +1104,7 @@ def select_tenant(
         _session_expiry_utc(db_session),
         str(tenant_uuid),
     )
-    
+
     # log_audit(
     #     db=db,
     #     user_id=current_user.id,
@@ -1046,25 +1115,25 @@ def select_tenant(
     #     user_agent=request.headers.get("user-agent"),
     #     tenant_id=tenant_uuid
     # )
-    
+
     return SelectTenantResponse(
         **_auth_payload(access_token, refresh_token),
         tenant={
             "id": str(tenant.id),
             "name": tenant.name,
-            "role_id": user_tenant.role_id
-        }
+            "role_id": user_tenant.role_id,
+        },
     )
 
 
 @router.get("/me-multitenant")
 def get_me_multitenant(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Retorna dados do usuário no contexto multi-tenant.
-    
+
     ORDEM GARANTIDA:
     1. get_current_user valida token + seta tenant no contexto
     2. get_current_user_and_tenant valida tenant no contexto
@@ -1086,7 +1155,7 @@ def get_me_multitenant(
     if not user_tenant_info:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuário não tem acesso ao tenant selecionado"
+            detail="Usuário não tem acesso ao tenant selecionado",
         )
 
     _user_tenant, role = user_tenant_info
@@ -1096,7 +1165,7 @@ def get_me_multitenant(
     if role:
         permissions = [
             codigo
-            for codigo, in (
+            for (codigo,) in (
                 db.query(Permission.code)
                 .join(RolePermission, RolePermission.permission_id == Permission.id)
                 .filter(
@@ -1106,10 +1175,10 @@ def get_me_multitenant(
                 .all()
             )
         ]
-    
+
     # 🔑 EXPANSÃO AUTOMÁTICA: Adicionar dependências implícitas
     permissions = expand_permissions(permissions)
-    
+
     return {
         "id": current_user.id,
         "name": current_user.nome,
@@ -1118,15 +1187,9 @@ def get_me_multitenant(
         "email_verified": current_user.email_verified,
         "consent_version": current_user.consent_version,
         "privacy_version": current_user.privacy_version,
-        "tenant": {
-            "id": str(tenant.id),
-            "name": tenant.name
-        } if tenant else None,
-        "role": {
-            "id": role.id,
-            "name": role.name
-        } if role else None,
-        "permissions": permissions
+        "tenant": {"id": str(tenant.id), "name": tenant.name} if tenant else None,
+        "role": {"id": role.id, "name": role.name} if role else None,
+        "permissions": permissions,
     }
 
 
@@ -1134,13 +1197,13 @@ def get_me_multitenant(
 def logout_multitenant(
     request: Request,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Revoga todas as sessões do usuário.
     """
     sessions = get_active_sessions(db, current_user.id)
-    
+
     for session in sessions:
         revoke_session(db, session.id, current_user.id, "user_logout")
 

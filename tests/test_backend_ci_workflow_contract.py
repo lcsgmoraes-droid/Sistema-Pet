@@ -954,6 +954,55 @@ def test_backend_ci_has_blocking_backend_admin_product_support_root_format_step(
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_auth_root_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend auth root format (blocking)" in source
+    assert (
+        "ruff format --check app/auth.py app/auth_routes_multitenant.py "
+        "app/usuarios_routes.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_backend_operational_remainder_root_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend operational remainder root format (blocking)" in source
+    assert (
+        "ruff format --check app/base_models.py app/caixa_routes.py "
+        "app/conciliacao_aba1_routes.py app/conciliacao_routes.py "
+        "app/financeiro_routes.py app/pdf_veterinario.py "
+        "app/promocoes_venda_utils.py app/seed_adquirentes.py "
+        "app/tenant_rls_migration.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_backend_ia_remainder_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend IA remainder format (blocking)" in source
+    assert (
+        "ruff format --check app/ia/aba5_fluxo_caixa.py "
+        "app/ia/aba6_chat_ia.py app/ia/aba7_anomalias.py "
+        "app/ia/aba7_dre.py app/ia/aba7_dre_canal.py "
+        "app/ia/aba7_dre_detalhada_service.py app/ia/aba7_exportador.py "
+        "app/ia/aba7_extrato_models.py app/ia/aba7_extrato_routes.py "
+        "app/ia/aba7_tributacao.py app/ia/extrato_ia.py "
+        "app/ia_config.py app/ia_fluxo_routes.py app/ia_routes.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_backend_bling_whatsapp_remainder_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend Bling WhatsApp remainder format (blocking)" in source
+    assert (
+        "ruff format --check app/bling_flow_monitor_routes.py app/bling_routes.py "
+        "app/integracao_bling_nf_routes.py app/integracao_bling_pedido_routes.py "
+        "app/whatsapp/analytics.py app/whatsapp/analytics_simple.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

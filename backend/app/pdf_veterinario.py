@@ -1,4 +1,5 @@
 """Geracao de PDF do modulo veterinario (prontuario e receituario)."""
+
 from datetime import datetime
 from io import BytesIO
 from xml.sax.saxutils import escape
@@ -53,7 +54,12 @@ def _bloco_info(titulo, linhas):
                 ("FONTNAME", (1, 1), (1, -1), "Helvetica"),
                 ("FONTSIZE", (0, 0), (-1, -1), 9),
                 ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#d1d5db")),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 1),
+                    (-1, -1),
+                    [colors.white, colors.HexColor("#f8fafc")],
+                ),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 6),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 6),
@@ -62,7 +68,11 @@ def _bloco_info(titulo, linhas):
             ]
         )
     )
-    return [Paragraph(f"<b>{titulo}</b>", _style_subtitle()), Spacer(1, 0.2 * cm), tabela]
+    return [
+        Paragraph(f"<b>{titulo}</b>", _style_subtitle()),
+        Spacer(1, 0.2 * cm),
+        tabela,
+    ]
 
 
 def _style_title():
@@ -173,7 +183,10 @@ def gerar_pdf_prontuario(consulta, validacao_assinatura, prescricoes, url_valida
         "Assinatura digital",
         [
             ["Assinada", "Sim" if validacao_assinatura.get("assinada") else "Nao"],
-            ["Hash valido", "Sim" if validacao_assinatura.get("hash_valido") else "Nao"],
+            [
+                "Hash valido",
+                "Sim" if validacao_assinatura.get("hash_valido") else "Nao",
+            ],
             ["Hash prontuario", _texto(validacao_assinatura.get("hash_prontuario"))],
             ["URL verificacao", _texto(url_validacao)],
         ],
@@ -191,7 +204,9 @@ def gerar_pdf_prontuario(consulta, validacao_assinatura, prescricoes, url_valida
                     _par(str(len(getattr(p, "itens", []) or []))),
                 ]
             )
-        tabela_prescricoes = Table(itens, colWidths=[3.2 * cm, 3 * cm, 5 * cm, 4.8 * cm])
+        tabela_prescricoes = Table(
+            itens, colWidths=[3.2 * cm, 3 * cm, 5 * cm, 4.8 * cm]
+        )
         tabela_prescricoes.setStyle(
             TableStyle(
                 [
@@ -216,7 +231,12 @@ def gerar_pdf_prontuario(consulta, validacao_assinatura, prescricoes, url_valida
     elementos.append(
         Paragraph(
             f"Documento gerado em {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
-            ParagraphStyle("Rodape", parent=_style_normal(), fontSize=8, textColor=colors.HexColor("#64748b")),
+            ParagraphStyle(
+                "Rodape",
+                parent=_style_normal(),
+                fontSize=8,
+                textColor=colors.HexColor("#64748b"),
+            ),
         )
     )
 
@@ -250,7 +270,14 @@ def gerar_pdf_receita(prescricao, url_validacao):
         "Dados basicos",
         [
             ["Pet", _texto(getattr(prescricao.pet, "nome", None))],
-            ["Veterinario", _texto(getattr(prescricao.consulta.veterinario, "nome", None) if prescricao.consulta else None)],
+            [
+                "Veterinario",
+                _texto(
+                    getattr(prescricao.consulta.veterinario, "nome", None)
+                    if prescricao.consulta
+                    else None
+                ),
+            ],
             ["Consulta", _texto(prescricao.consulta_id)],
             ["Tipo", _texto(prescricao.tipo_receituario)],
             ["Hash receita", _texto(prescricao.hash_receita)],
@@ -296,7 +323,12 @@ def gerar_pdf_receita(prescricao, url_validacao):
     elementos.append(
         Paragraph(
             f"Documento gerado em {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
-            ParagraphStyle("Rodape", parent=_style_normal(), fontSize=8, textColor=colors.HexColor("#64748b")),
+            ParagraphStyle(
+                "Rodape",
+                parent=_style_normal(),
+                fontSize=8,
+                textColor=colors.HexColor("#64748b"),
+            ),
         )
     )
 

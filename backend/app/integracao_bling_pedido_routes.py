@@ -1,4 +1,3 @@
-
 import os
 import re
 import time
@@ -41,10 +40,7 @@ from app.utils.logger import logger
 # Tenant fixo para webhooks do Bling (chamadas sem JWT)
 _BLING_WEBHOOK_TENANT_ID = os.getenv("BLING_WEBHOOK_TENANT_ID")
 
-router = APIRouter(
-    prefix="/integracoes/bling",
-    tags=["Integração Bling - Pedido"]
-)
+router = APIRouter(prefix="/integracoes/bling", tags=["Integração Bling - Pedido"])
 
 
 _CANAL_LABELS = {
@@ -129,7 +125,10 @@ def _normalizar_canal(valor):
         canal = "app"
     elif " whatsapp " in slug:
         canal = "whatsapp"
-    elif any(chave in slug for chave in (" site ", " loja virtual ", " ecommerce ", " e commerce ")):
+    elif any(
+        chave in slug
+        for chave in (" site ", " loja virtual ", " ecommerce ", " e commerce ")
+    ):
         canal = "site"
     elif slug.strip() == "online":
         canal = "online"
@@ -175,7 +174,9 @@ def _normalizar_resumo_nf(resumo_nf: dict | None) -> dict | None:
     if not resumo_nf:
         return None
 
-    nf_id = _nf_id_valido(_primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id")))
+    nf_id = _nf_id_valido(
+        _primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id"))
+    )
     if nf_id:
         if "id" in resumo_nf or "nfe_id" not in resumo_nf:
             resumo_nf["id"] = nf_id
@@ -188,9 +189,17 @@ def _normalizar_resumo_nf(resumo_nf: dict | None) -> dict | None:
     possui_referencia_util = bool(
         nf_id
         or _texto(resumo_nf.get("numero"))
-        or _texto(_primeiro_preenchido(resumo_nf.get("chaveAcesso"), resumo_nf.get("chave")))
-        or _texto(_primeiro_preenchido(resumo_nf.get("situacao"), resumo_nf.get("status")))
-        or _texto(_primeiro_preenchido(resumo_nf.get("data_emissao"), resumo_nf.get("dataEmissao")))
+        or _texto(
+            _primeiro_preenchido(resumo_nf.get("chaveAcesso"), resumo_nf.get("chave"))
+        )
+        or _texto(
+            _primeiro_preenchido(resumo_nf.get("situacao"), resumo_nf.get("status"))
+        )
+        or _texto(
+            _primeiro_preenchido(
+                resumo_nf.get("data_emissao"), resumo_nf.get("dataEmissao")
+            )
+        )
         or resumo_nf.get("valor_total") not in (None, "")
     )
 
@@ -266,11 +275,17 @@ def _nova_nf_deve_substituir(atual: dict | None, nova: dict | None) -> bool:
     atual_numero = _texto(atual.get("numero"))
     nova_numero = _texto(nova.get("numero"))
 
-    if (atual_id and nova_id and atual_id == nova_id) or (atual_numero and nova_numero and atual_numero == nova_numero):
+    if (atual_id and nova_id and atual_id == nova_id) or (
+        atual_numero and nova_numero and atual_numero == nova_numero
+    ):
         return True
 
-    atual_data = _coerce_data_nf(_primeiro_preenchido(atual.get("data_emissao"), atual.get("dataEmissao")))
-    nova_data = _coerce_data_nf(_primeiro_preenchido(nova.get("data_emissao"), nova.get("dataEmissao")))
+    atual_data = _coerce_data_nf(
+        _primeiro_preenchido(atual.get("data_emissao"), atual.get("dataEmissao"))
+    )
+    nova_data = _coerce_data_nf(
+        _primeiro_preenchido(nova.get("data_emissao"), nova.get("dataEmissao"))
+    )
     if atual_data and nova_data and atual_data != nova_data:
         return nova_data > atual_data
     if nova_data and not atual_data:
@@ -280,7 +295,11 @@ def _nova_nf_deve_substituir(atual: dict | None, nova: dict | None) -> bool:
 
     atual_numero_int = _numero_nf_int(atual)
     nova_numero_int = _numero_nf_int(nova)
-    if atual_numero_int is not None and nova_numero_int is not None and atual_numero_int != nova_numero_int:
+    if (
+        atual_numero_int is not None
+        and nova_numero_int is not None
+        and atual_numero_int != nova_numero_int
+    ):
         return nova_numero_int > atual_numero_int
 
     return False
@@ -294,14 +313,25 @@ def _consolidar_ultima_nf(atual: dict | None, nova: dict | None) -> dict | None:
     return _mesclar_ultima_nf(nova, atual)
 
 
-def _montar_payload_pedido(webhook_data: dict | None, pedido_completo: dict | None, payload_atual: dict | None = None, ultima_nf: dict | None = None) -> dict:
+def _montar_payload_pedido(
+    webhook_data: dict | None,
+    pedido_completo: dict | None,
+    payload_atual: dict | None = None,
+    ultima_nf: dict | None = None,
+) -> dict:
     payload = dict(_dict(payload_atual))
     if isinstance(webhook_data, dict) and webhook_data:
         payload["webhook"] = webhook_data
-    pedido_base = pedido_completo if isinstance(pedido_completo, dict) and pedido_completo else _payload_principal(payload) or _dict(webhook_data)
+    pedido_base = (
+        pedido_completo
+        if isinstance(pedido_completo, dict) and pedido_completo
+        else _payload_principal(payload) or _dict(webhook_data)
+    )
     payload["pedido"] = pedido_base
     if ultima_nf:
-        payload["ultima_nf"] = _consolidar_ultima_nf(payload.get("ultima_nf"), ultima_nf)
+        payload["ultima_nf"] = _consolidar_ultima_nf(
+            payload.get("ultima_nf"), ultima_nf
+        )
     return payload
 
 
@@ -312,7 +342,11 @@ def _resumir_ultima_nf_webhook(nf_data: dict | None) -> dict:
         "id": _texto(nf_data.get("id")),
         "numero": _texto(nf_data.get("numero")),
         "serie": _texto(nf_data.get("serie")),
-        "data_emissao": _texto(_primeiro_preenchido(nf_data.get("dataEmissao"), nf_data.get("data_emissao"))),
+        "data_emissao": _texto(
+            _primeiro_preenchido(
+                nf_data.get("dataEmissao"), nf_data.get("data_emissao")
+            )
+        ),
         "situacao": _texto(
             _primeiro_preenchido(
                 situacao_nf.get("descricao"),
@@ -327,7 +361,9 @@ def _resumir_ultima_nf_webhook(nf_data: dict | None) -> dict:
                 nf_data.get("situacao"),
             )
         ),
-        "chave": _texto(_primeiro_preenchido(nf_data.get("chaveAcesso"), nf_data.get("chave"))),
+        "chave": _texto(
+            _primeiro_preenchido(nf_data.get("chaveAcesso"), nf_data.get("chave"))
+        ),
         "valor_total": _coerce_float(
             _primeiro_preenchido(
                 nf_data.get("valorNota"),
@@ -339,7 +375,9 @@ def _resumir_ultima_nf_webhook(nf_data: dict | None) -> dict:
     }
 
 
-def _resumir_ultima_nf_do_pedido_bling(pedido_payload: dict | None, *, enriquecer_via_api: bool = True) -> dict | None:
+def _resumir_ultima_nf_do_pedido_bling(
+    pedido_payload: dict | None, *, enriquecer_via_api: bool = True
+) -> dict | None:
     pedido_payload = _dict(pedido_payload)
     nota_ref = _dict(
         _primeiro_preenchido(
@@ -348,7 +386,9 @@ def _resumir_ultima_nf_do_pedido_bling(pedido_payload: dict | None, *, enriquece
             pedido_payload.get("nfe"),
         )
     )
-    nf_id = _nf_id_valido(_primeiro_preenchido(nota_ref.get("id"), nota_ref.get("nfe_id")))
+    nf_id = _nf_id_valido(
+        _primeiro_preenchido(nota_ref.get("id"), nota_ref.get("nfe_id"))
+    )
 
     resumo_payload = {**nota_ref}
     if nf_id:
@@ -380,9 +420,13 @@ def _resumir_ultima_nf_do_pedido_bling(pedido_payload: dict | None, *, enriquece
                 ultima_falha = exc
 
         if ultima_falha:
-            logger.warning(f"[BLING PEDIDO] Falha ao consultar NF {nf_id} vinculada ao pedido: {ultima_falha}")
+            logger.warning(
+                f"[BLING PEDIDO] Falha ao consultar NF {nf_id} vinculada ao pedido: {ultima_falha}"
+            )
     except Exception as exc:
-        logger.warning(f"[BLING PEDIDO] Falha ao enriquecer resumo da NF {nf_id}: {exc}")
+        logger.warning(
+            f"[BLING PEDIDO] Falha ao enriquecer resumo da NF {nf_id}: {exc}"
+        )
 
     return resumo_nf if resumo_nf.get("id") else None
 
@@ -416,10 +460,9 @@ def _sincronizar_nf_do_pedido(
 
     payload_atual = _dict(pedido.payload)
     ultima_nf_atual = _ultima_nf_payload_efetiva(payload_atual)
-    mesma_nf = (
-        _texto(ultima_nf_atual.get("id")) == _texto(resumo_nf.get("id"))
-        and _texto(ultima_nf_atual.get("numero")) == _texto(resumo_nf.get("numero"))
-    )
+    mesma_nf = _texto(ultima_nf_atual.get("id")) == _texto(
+        resumo_nf.get("id")
+    ) and _texto(ultima_nf_atual.get("numero")) == _texto(resumo_nf.get("numero"))
 
     pedido.payload = _montar_payload_pedido(
         webhook_data=webhook_data,
@@ -450,13 +493,19 @@ def _sincronizar_nf_do_pedido(
 def _resolver_canal_pedido(payload: dict | None, canal_salvo: str | None):
     pedido_payload = _payload_principal(payload)
     marketplace = _dict(pedido_payload.get("marketplace"))
-    loja = _dict(_primeiro_preenchido(pedido_payload.get("loja"), pedido_payload.get("lojaVirtual")))
-    numero_pedido_loja = _texto(_primeiro_preenchido(
-        pedido_payload.get("numeroPedidoLoja"),
-        pedido_payload.get("numeroLoja"),
-        pedido_payload.get("numeroPedido"),
-        pedido_payload.get("numero"),
-    ))
+    loja = _dict(
+        _primeiro_preenchido(
+            pedido_payload.get("loja"), pedido_payload.get("lojaVirtual")
+        )
+    )
+    numero_pedido_loja = _texto(
+        _primeiro_preenchido(
+            pedido_payload.get("numeroPedidoLoja"),
+            pedido_payload.get("numeroLoja"),
+            pedido_payload.get("numeroPedido"),
+            pedido_payload.get("numero"),
+        )
+    )
 
     candidatos = [
         pedido_payload.get("canal"),
@@ -487,16 +536,42 @@ def _resolver_canal_pedido(payload: dict | None, canal_salvo: str | None):
 
 
 def _normalizar_item_payload(item_payload: dict) -> dict:
-    item = _dict(item_payload.get("item")) if isinstance(item_payload, dict) and isinstance(item_payload.get("item"), dict) else _dict(item_payload)
+    item = (
+        _dict(item_payload.get("item"))
+        if isinstance(item_payload, dict) and isinstance(item_payload.get("item"), dict)
+        else _dict(item_payload)
+    )
     produto = _dict(item.get("produto"))
-    sku = _texto(_primeiro_preenchido(item.get("codigo"), item.get("sku"), produto.get("codigo"), produto.get("sku")))
+    sku = _texto(
+        _primeiro_preenchido(
+            item.get("codigo"),
+            item.get("sku"),
+            produto.get("codigo"),
+            produto.get("sku"),
+        )
+    )
     return {
         "sku": sku,
-        "descricao": _texto(_primeiro_preenchido(item.get("descricao"), item.get("nome"), produto.get("nome"))),
+        "descricao": _texto(
+            _primeiro_preenchido(
+                item.get("descricao"), item.get("nome"), produto.get("nome")
+            )
+        ),
         "quantidade": _coerce_float(item.get("quantidade"), 0.0) or 0.0,
-        "valor_unitario": _coerce_float(_primeiro_preenchido(item.get("valor"), item.get("valorUnitario"), item.get("preco"), item.get("precoUnitario"))),
-        "desconto": _coerce_float(_primeiro_preenchido(item.get("desconto"), item.get("valorDesconto"))),
-        "total": _coerce_float(_primeiro_preenchido(item.get("total"), item.get("valorTotal"))),
+        "valor_unitario": _coerce_float(
+            _primeiro_preenchido(
+                item.get("valor"),
+                item.get("valorUnitario"),
+                item.get("preco"),
+                item.get("precoUnitario"),
+            )
+        ),
+        "desconto": _coerce_float(
+            _primeiro_preenchido(item.get("desconto"), item.get("valorDesconto"))
+        ),
+        "total": _coerce_float(
+            _primeiro_preenchido(item.get("total"), item.get("valorTotal"))
+        ),
         "produto_bling_id": _texto(produto.get("id")),
     }
 
@@ -546,7 +621,9 @@ def _sincronizar_itens_pedido_integrado(
             if pedido.status not in {"cancelado", "expirado", "mesclado"}:
                 EstoqueReservaService.reservar(db, item_pedido)
         except ValueError as e:
-            logger.warning(f"[BLING WEBHOOK] Reserva nao criada para SKU {sku} em merge de duplicidade: {e}")
+            logger.warning(
+                f"[BLING WEBHOOK] Reserva nao criada para SKU {sku} em merge de duplicidade: {e}"
+            )
         db.add(item_pedido)
         chaves_existentes[chave] = chaves_existentes.get(chave, 0) + 1
         criados += 1
@@ -588,7 +665,9 @@ def _consolidar_pedido_duplicado_por_numero_loja(
         numero_pedido_loja=numero_pedido_loja,
         loja_id=loja_id,
     )
-    if not pedido_canonico or int(pedido_canonico.id) not in {int(pedido.id) for pedido in candidatos}:
+    if not pedido_canonico or int(pedido_canonico.id) not in {
+        int(pedido.id) for pedido in candidatos
+    }:
         return None
 
     payload_canonico = _montar_payload_pedido(
@@ -646,7 +725,9 @@ def _consolidar_pedido_duplicado_por_numero_loja(
             merged_at=datetime.utcnow(),
         )
         pedido_duplicado.status = "mesclado"
-        pedido_duplicado.cancelado_em = pedido_duplicado.cancelado_em or datetime.utcnow()
+        pedido_duplicado.cancelado_em = (
+            pedido_duplicado.cancelado_em or datetime.utcnow()
+        )
     db.add(pedido_duplicado)
 
     itens_criados = _sincronizar_itens_pedido_integrado(
@@ -683,16 +764,22 @@ def _consolidar_pedido_duplicado_por_numero_loja(
     return pedido_canonico
 
 
-def _serializar_itens_pedido(pedido_payload: dict, itens_db: list[PedidoIntegradoItem]) -> list[dict]:
-    payload_itens = [_normalizar_item_payload(item) for item in (pedido_payload.get("itens") or [])]
+def _serializar_itens_pedido(
+    pedido_payload: dict, itens_db: list[PedidoIntegradoItem]
+) -> list[dict]:
+    payload_itens = [
+        _normalizar_item_payload(item) for item in (pedido_payload.get("itens") or [])
+    ]
     usados: set[int] = set()
     itens_serializados = []
 
     for item_db in itens_db:
         idx_match = next(
             (
-                idx for idx, item_payload in enumerate(payload_itens)
-                if idx not in usados and (
+                idx
+                for idx, item_payload in enumerate(payload_itens)
+                if idx not in usados
+                and (
                     (item_payload.get("sku") and item_payload.get("sku") == item_db.sku)
                     or (
                         item_payload.get("descricao")
@@ -708,41 +795,47 @@ def _serializar_itens_pedido(pedido_payload: dict, itens_db: list[PedidoIntegrad
         if idx_match is not None:
             usados.add(idx_match)
 
-        itens_serializados.append({
-            "id": item_db.id,
-            "sku": item_db.sku,
-            "descricao": item_db.descricao or payload_item.get("descricao"),
-            "quantidade": item_db.quantidade,
-            "valor_unitario": payload_item.get("valor_unitario"),
-            "desconto": payload_item.get("desconto"),
-            "total": payload_item.get("total"),
-            "produto_bling_id": payload_item.get("produto_bling_id"),
-            "reservado_em": _dt_iso(item_db.reservado_em),
-            "liberado_em": _dt_iso(item_db.liberado_em),
-            "vendido_em": _dt_iso(item_db.vendido_em),
-        })
+        itens_serializados.append(
+            {
+                "id": item_db.id,
+                "sku": item_db.sku,
+                "descricao": item_db.descricao or payload_item.get("descricao"),
+                "quantidade": item_db.quantidade,
+                "valor_unitario": payload_item.get("valor_unitario"),
+                "desconto": payload_item.get("desconto"),
+                "total": payload_item.get("total"),
+                "produto_bling_id": payload_item.get("produto_bling_id"),
+                "reservado_em": _dt_iso(item_db.reservado_em),
+                "liberado_em": _dt_iso(item_db.liberado_em),
+                "vendido_em": _dt_iso(item_db.vendido_em),
+            }
+        )
 
     for idx, payload_item in enumerate(payload_itens):
         if idx in usados:
             continue
-        itens_serializados.append({
-            "id": None,
-            "sku": payload_item.get("sku"),
-            "descricao": payload_item.get("descricao"),
-            "quantidade": payload_item.get("quantidade"),
-            "valor_unitario": payload_item.get("valor_unitario"),
-            "desconto": payload_item.get("desconto"),
-            "total": payload_item.get("total"),
-            "produto_bling_id": payload_item.get("produto_bling_id"),
-            "reservado_em": None,
-            "liberado_em": None,
-            "vendido_em": None,
-        })
+        itens_serializados.append(
+            {
+                "id": None,
+                "sku": payload_item.get("sku"),
+                "descricao": payload_item.get("descricao"),
+                "quantidade": payload_item.get("quantidade"),
+                "valor_unitario": payload_item.get("valor_unitario"),
+                "desconto": payload_item.get("desconto"),
+                "total": payload_item.get("total"),
+                "produto_bling_id": payload_item.get("produto_bling_id"),
+                "reservado_em": None,
+                "liberado_em": None,
+                "vendido_em": None,
+            }
+        )
 
     return itens_serializados
 
 
-def _acoes_operacionais_pedido(pedido: PedidoIntegrado, duplicidade: dict | None = None) -> dict:
+def _acoes_operacionais_pedido(
+    pedido: PedidoIntegrado, duplicidade: dict | None = None
+) -> dict:
     duplicidade = _dict(duplicidade)
     pedido_atual_eh_canonico = bool(duplicidade.get("pedido_atual_eh_canonico"))
     pedidos_seguro_ids = duplicidade.get("pedidos_seguro_ids") or []
@@ -763,7 +856,11 @@ def _serializar_pedido_bling(
 ) -> dict:
     payload = _dict(pedido.payload)
     pedido_payload = _payload_principal(payload)
-    contato = _dict(_primeiro_preenchido(pedido_payload.get("contato"), pedido_payload.get("cliente")))
+    contato = _dict(
+        _primeiro_preenchido(
+            pedido_payload.get("contato"), pedido_payload.get("cliente")
+        )
+    )
     loja = _dict(pedido_payload.get("loja"))
     ultima_nf = _ultima_nf_payload_efetiva(payload)
     situacao = _dict(pedido_payload.get("situacao"))
@@ -773,14 +870,24 @@ def _serializar_pedido_bling(
     return {
         "id": pedido.id,
         "pedido_bling_id": pedido.pedido_bling_id,
-        "pedido_bling_numero": _texto(_primeiro_preenchido(pedido.pedido_bling_numero, pedido_payload.get("numero"))),
-        "numero_pedido_loja": _texto(_primeiro_preenchido(pedido_payload.get("numeroPedidoLoja"), pedido_payload.get("numeroLoja"))),
-        "numero_pedido_canal": _texto(_primeiro_preenchido(
-            pedido_payload.get("numeroPedidoCanalVenda"),
-            pedido_payload.get("numeroPedidoCanal"),
-            pedido_payload.get("numeroPedidoMarketplace"),
-            pedido_payload.get("numeroPedido"),
-        )),
+        "pedido_bling_numero": _texto(
+            _primeiro_preenchido(
+                pedido.pedido_bling_numero, pedido_payload.get("numero")
+            )
+        ),
+        "numero_pedido_loja": _texto(
+            _primeiro_preenchido(
+                pedido_payload.get("numeroPedidoLoja"), pedido_payload.get("numeroLoja")
+            )
+        ),
+        "numero_pedido_canal": _texto(
+            _primeiro_preenchido(
+                pedido_payload.get("numeroPedidoCanalVenda"),
+                pedido_payload.get("numeroPedidoCanal"),
+                pedido_payload.get("numeroPedidoMarketplace"),
+                pedido_payload.get("numeroPedido"),
+            )
+        ),
         "canal": canal,
         "canal_label": canal_label,
         "canal_origem": canal_origem,
@@ -789,38 +896,86 @@ def _serializar_pedido_bling(
         "expira_em": _dt_iso(pedido.expira_em),
         "confirmado_em": _dt_iso(pedido.confirmado_em),
         "cancelado_em": _dt_iso(pedido.cancelado_em),
-        "data_pedido": _texto(_primeiro_preenchido(
-            pedido_payload.get("data"),
-            pedido_payload.get("dataPedido"),
-            pedido_payload.get("dataSaida"),
-        )),
+        "data_pedido": _texto(
+            _primeiro_preenchido(
+                pedido_payload.get("data"),
+                pedido_payload.get("dataPedido"),
+                pedido_payload.get("dataSaida"),
+            )
+        ),
         "loja": {
             "id": loja.get("id"),
             "nome": _texto(loja.get("nome")),
         },
         "cliente": {
-            "nome": _texto(_primeiro_preenchido(contato.get("nome"), contato.get("descricao"))),
-            "documento": _texto(_primeiro_preenchido(contato.get("numeroDocumento"), contato.get("cpfCnpj"), contato.get("cpf"), contato.get("cnpj"))),
+            "nome": _texto(
+                _primeiro_preenchido(contato.get("nome"), contato.get("descricao"))
+            ),
+            "documento": _texto(
+                _primeiro_preenchido(
+                    contato.get("numeroDocumento"),
+                    contato.get("cpfCnpj"),
+                    contato.get("cpf"),
+                    contato.get("cnpj"),
+                )
+            ),
             "email": _texto(contato.get("email")),
-            "telefone": _texto(_primeiro_preenchido(contato.get("telefone"), contato.get("celular"))),
+            "telefone": _texto(
+                _primeiro_preenchido(contato.get("telefone"), contato.get("celular"))
+            ),
         },
         "financeiro": {
-            "total": _coerce_float(_primeiro_preenchido(pedido_payload.get("total"), pedido_payload.get("valorTotal"))),
-            "desconto": _coerce_float(_primeiro_preenchido(pedido_payload.get("desconto"), pedido_payload.get("valorDesconto"))),
-            "frete": _coerce_float(_primeiro_preenchido(pedido_payload.get("frete"), _dict(pedido_payload.get("transporte")).get("frete"))),
+            "total": _coerce_float(
+                _primeiro_preenchido(
+                    pedido_payload.get("total"), pedido_payload.get("valorTotal")
+                )
+            ),
+            "desconto": _coerce_float(
+                _primeiro_preenchido(
+                    pedido_payload.get("desconto"), pedido_payload.get("valorDesconto")
+                )
+            ),
+            "frete": _coerce_float(
+                _primeiro_preenchido(
+                    pedido_payload.get("frete"),
+                    _dict(pedido_payload.get("transporte")).get("frete"),
+                )
+            ),
         },
         "situacao_bling": {
-            "codigo": _situacao_codigo_bling(_primeiro_preenchido(situacao, pedido_payload.get("situacao"))),
-            "descricao": _texto(_primeiro_preenchido(situacao.get("descricao"), situacao.get("nome"), situacao.get("descricaoInterna"))),
+            "codigo": _situacao_codigo_bling(
+                _primeiro_preenchido(situacao, pedido_payload.get("situacao"))
+            ),
+            "descricao": _texto(
+                _primeiro_preenchido(
+                    situacao.get("descricao"),
+                    situacao.get("nome"),
+                    situacao.get("descricaoInterna"),
+                )
+            ),
         },
         "nota_fiscal": {
-            "id": _texto(_primeiro_preenchido(ultima_nf.get("id"), ultima_nf.get("nfe_id"))),
+            "id": _texto(
+                _primeiro_preenchido(ultima_nf.get("id"), ultima_nf.get("nfe_id"))
+            ),
             "numero": _texto(ultima_nf.get("numero")),
             "serie": _texto(ultima_nf.get("serie")),
-            "situacao": _texto(_primeiro_preenchido(ultima_nf.get("situacao"), ultima_nf.get("status"))),
-            "chave": _texto(_primeiro_preenchido(ultima_nf.get("chaveAcesso"), ultima_nf.get("chave"))),
+            "situacao": _texto(
+                _primeiro_preenchido(ultima_nf.get("situacao"), ultima_nf.get("status"))
+            ),
+            "chave": _texto(
+                _primeiro_preenchido(
+                    ultima_nf.get("chaveAcesso"), ultima_nf.get("chave")
+                )
+            ),
         },
-        "observacoes": _texto(_primeiro_preenchido(pedido_payload.get("observacoes"), pedido_payload.get("observacao"), pedido_payload.get("observacoesInternas"))),
+        "observacoes": _texto(
+            _primeiro_preenchido(
+                pedido_payload.get("observacoes"),
+                pedido_payload.get("observacao"),
+                pedido_payload.get("observacoesInternas"),
+            )
+        ),
         "itens": _serializar_itens_pedido(pedido_payload, itens_db),
         "duplicidade": duplicidade
         or {
@@ -837,8 +992,13 @@ def _serializar_pedido_bling(
     }
 
 
-def _resolver_produto_local(db: Session, pedido: PedidoIntegrado, item: PedidoIntegradoItem):
-    from app.services.bling_nf_service import buscar_produto_do_item, criar_produto_automatico_do_bling
+def _resolver_produto_local(
+    db: Session, pedido: PedidoIntegrado, item: PedidoIntegradoItem
+):
+    from app.services.bling_nf_service import (
+        buscar_produto_do_item,
+        criar_produto_automatico_do_bling,
+    )
 
     produto = buscar_produto_do_item(
         db=db,
@@ -855,14 +1015,27 @@ def _resolver_produto_local(db: Session, pedido: PedidoIntegrado, item: PedidoIn
     )
 
 
-def _baixar_item_pedido(db: Session, pedido: PedidoIntegrado, item: PedidoIntegradoItem, *, motivo: str, observacao: str, user_id: int = 0) -> str | None:
-    from app.services.bling_nf_service import baixar_estoque_item_integrado, _obter_usuario_padrao_tenant
+def _baixar_item_pedido(
+    db: Session,
+    pedido: PedidoIntegrado,
+    item: PedidoIntegradoItem,
+    *,
+    motivo: str,
+    observacao: str,
+    user_id: int = 0,
+) -> str | None:
+    from app.services.bling_nf_service import (
+        baixar_estoque_item_integrado,
+        _obter_usuario_padrao_tenant,
+    )
 
     produto = _resolver_produto_local(db=db, pedido=pedido, item=item)
     if not produto:
         return f"SKU '{item.sku}' nao encontrado"
 
-    user_id_execucao = user_id or getattr(_obter_usuario_padrao_tenant(db=db, tenant_id=pedido.tenant_id), "id", None)
+    user_id_execucao = user_id or getattr(
+        _obter_usuario_padrao_tenant(db=db, tenant_id=pedido.tenant_id), "id", None
+    )
     if not user_id_execucao:
         return "Nenhum usuario valido encontrado para registrar a baixa automatica"
 
@@ -1028,7 +1201,13 @@ def _confirmar_pedido(
     return erros
 
 
-def _cancelar_pedido(db: Session, pedido: PedidoIntegrado, itens: list[PedidoIntegradoItem], *, processed_at=None) -> None:
+def _cancelar_pedido(
+    db: Session,
+    pedido: PedidoIntegrado,
+    itens: list[PedidoIntegradoItem],
+    *,
+    processed_at=None,
+) -> None:
     for item in itens:
         if not item.liberado_em and not item.vendido_em:
             EstoqueReservaService.liberar(db, item)
@@ -1055,11 +1234,18 @@ def _cancelar_pedido(db: Session, pedido: PedidoIntegrado, itens: list[PedidoInt
 # GET /integracoes/bling/pedidos  — listagem com filtros
 # ============================================================
 
+
 @router.get("/pedidos")
 def listar_pedidos_bling(
-    status: Optional[str] = Query(None, description="aberto|confirmado|expirado|cancelado"),
-    busca: Optional[str] = Query(None, description="Numero interno do pedido Bling ou ID do pedido"),
-    pedido: Optional[str] = Query(None, alias="pedido", description="Alias legado para o filtro de busca"),
+    status: Optional[str] = Query(
+        None, description="aberto|confirmado|expirado|cancelado"
+    ),
+    busca: Optional[str] = Query(
+        None, description="Numero interno do pedido Bling ou ID do pedido"
+    ),
+    pedido: Optional[str] = Query(
+        None, alias="pedido", description="Alias legado para o filtro de busca"
+    ),
     pagina: int = Query(1, ge=1),
     por_pagina: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_session),
@@ -1100,9 +1286,11 @@ def listar_pedidos_bling(
 
     result = []
     for p in pedidos:
-        itens = db.query(PedidoIntegradoItem).filter(
-            PedidoIntegradoItem.pedido_integrado_id == p.id
-        ).all()
+        itens = (
+            db.query(PedidoIntegradoItem)
+            .filter(PedidoIntegradoItem.pedido_integrado_id == p.id)
+            .all()
+        )
         try:
             result.append(
                 _serializar_pedido_bling(
@@ -1150,8 +1338,12 @@ def reconciliar_status_pedidos_recentes(
             limite_pedidos=limite,
         )
     except Exception as exc:
-        logger.exception("[BLING PEDIDOS] Falha ao reconciliar status dos pedidos recentes: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Erro ao reconciliar status dos pedidos: {exc}")
+        logger.exception(
+            "[BLING PEDIDOS] Falha ao reconciliar status dos pedidos recentes: %s", exc
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao reconciliar status dos pedidos: {exc}"
+        )
 
 
 @router.post("/pedidos/reconciliar-duplicidades")
@@ -1175,8 +1367,14 @@ def reconciliar_duplicidades_pedidos_recentes(
             limite_grupos=limite,
         )
     except Exception as exc:
-        logger.exception("[BLING PEDIDOS] Falha ao reconciliar duplicidades recentes dos pedidos: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Erro ao reconciliar duplicidades dos pedidos: {exc}")
+        logger.exception(
+            "[BLING PEDIDOS] Falha ao reconciliar duplicidades recentes dos pedidos: %s",
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao reconciliar duplicidades dos pedidos: {exc}",
+        )
 
 
 @router.post("/pedidos/{pedido_id}/consolidar-duplicidade")
@@ -1194,8 +1392,14 @@ def consolidar_duplicidade_pedido(
             pedido_id=pedido_id,
         )
     except Exception as exc:
-        logger.exception("[BLING PEDIDOS] Falha ao consolidar duplicidade do pedido %s: %s", pedido_id, exc)
-        raise HTTPException(status_code=500, detail=f"Erro ao consolidar duplicidade: {exc}")
+        logger.exception(
+            "[BLING PEDIDOS] Falha ao consolidar duplicidade do pedido %s: %s",
+            pedido_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao consolidar duplicidade: {exc}"
+        )
 
     if resultado.get("success"):
         return resultado
@@ -1204,8 +1408,14 @@ def consolidar_duplicidade_pedido(
     if motivo == "pedido_nao_encontrado":
         raise HTTPException(status_code=404, detail="Pedido nao encontrado")
     if motivo == "pedido_sem_duplicidade":
-        raise HTTPException(status_code=400, detail="Este pedido nao possui duplicidade ativa")
-    if motivo in {"pedido_sem_duplicidade_canonica", "duplicidades_requerem_revisao_manual", "nenhuma_duplicidade_segura_aplicada"}:
+        raise HTTPException(
+            status_code=400, detail="Este pedido nao possui duplicidade ativa"
+        )
+    if motivo in {
+        "pedido_sem_duplicidade_canonica",
+        "duplicidades_requerem_revisao_manual",
+        "nenhuma_duplicidade_segura_aplicada",
+    }:
         raise HTTPException(status_code=409, detail=resultado)
 
     raise HTTPException(status_code=400, detail=resultado)
@@ -1226,8 +1436,14 @@ def reconciliar_fluxo_pedido(
             pedido_id=pedido_id,
         )
     except Exception as exc:
-        logger.exception("[BLING PEDIDOS] Falha ao reconciliar fluxo do pedido %s: %s", pedido_id, exc)
-        raise HTTPException(status_code=500, detail=f"Erro ao reconciliar fluxo do pedido: {exc}")
+        logger.exception(
+            "[BLING PEDIDOS] Falha ao reconciliar fluxo do pedido %s: %s",
+            pedido_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao reconciliar fluxo do pedido: {exc}"
+        )
 
     if resultado.get("success"):
         return resultado
@@ -1245,6 +1461,7 @@ def reconciliar_fluxo_pedido(
 # POST /integracoes/bling/pedidos/{id}/confirmar-manual
 # ============================================================
 
+
 @router.post("/pedidos/{pedido_id}/confirmar-manual")
 def confirmar_pedido_manual(
     pedido_id: str,
@@ -1254,10 +1471,14 @@ def confirmar_pedido_manual(
     tenant_id = user_tenant[1]
     user = user_tenant[0]
 
-    pedido = db.query(PedidoIntegrado).filter(
-        PedidoIntegrado.id == pedido_id,
-        PedidoIntegrado.tenant_id == tenant_id,
-    ).first()
+    pedido = (
+        db.query(PedidoIntegrado)
+        .filter(
+            PedidoIntegrado.id == pedido_id,
+            PedidoIntegrado.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
@@ -1268,9 +1489,11 @@ def confirmar_pedido_manual(
             detail=f"Pedido com status '{pedido.status}' não pode ser confirmado manualmente",
         )
 
-    itens = db.query(PedidoIntegradoItem).filter(
-        PedidoIntegradoItem.pedido_integrado_id == pedido.id
-    ).all()
+    itens = (
+        db.query(PedidoIntegradoItem)
+        .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+        .all()
+    )
 
     erros_estoque = _confirmar_pedido(
         db=db,
@@ -1294,6 +1517,7 @@ def confirmar_pedido_manual(
 # POST /integracoes/bling/pedidos/{id}/cancelar
 # ============================================================
 
+
 @router.post("/pedidos/{pedido_id}/cancelar")
 def cancelar_pedido_manual(
     pedido_id: str,
@@ -1302,10 +1526,14 @@ def cancelar_pedido_manual(
 ):
     tenant_id = user_tenant[1]
 
-    pedido = db.query(PedidoIntegrado).filter(
-        PedidoIntegrado.id == pedido_id,
-        PedidoIntegrado.tenant_id == tenant_id,
-    ).first()
+    pedido = (
+        db.query(PedidoIntegrado)
+        .filter(
+            PedidoIntegrado.id == pedido_id,
+            PedidoIntegrado.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
@@ -1316,9 +1544,11 @@ def cancelar_pedido_manual(
             detail=f"Pedido com status '{pedido.status}' não pode ser cancelado",
         )
 
-    itens = db.query(PedidoIntegradoItem).filter(
-        PedidoIntegradoItem.pedido_integrado_id == pedido.id
-    ).all()
+    itens = (
+        db.query(PedidoIntegradoItem)
+        .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+        .all()
+    )
 
     _cancelar_pedido(db=db, pedido=pedido, itens=itens)
 
@@ -1328,6 +1558,7 @@ def cancelar_pedido_manual(
 # ============================================================
 # POST /integracoes/bling/pedidos/reprocessar-sem-itens
 # ============================================================
+
 
 @router.post("/pedidos/reprocessar-sem-itens")
 def reprocessar_pedidos_sem_itens(
@@ -1343,9 +1574,7 @@ def reprocessar_pedidos_sem_itens(
 
     # Pedidos abertos sem nenhum item registrado
     subq_com_itens = (
-        db.query(PedidoIntegradoItem.pedido_integrado_id)
-        .distinct()
-        .subquery()
+        db.query(PedidoIntegradoItem.pedido_integrado_id).distinct().subquery()
     )
     pedidos_sem_itens = (
         db.query(PedidoIntegrado)
@@ -1362,6 +1591,7 @@ def reprocessar_pedidos_sem_itens(
         return {"reprocessados": 0, "message": "Nenhum pedido sem itens encontrado"}
 
     from app.bling_integration import BlingAPI
+
     _bling_api = BlingAPI()
 
     reprocessados = 0
@@ -1403,7 +1633,9 @@ def reprocessar_pedidos_sem_itens(
             db.commit()
             reprocessados += 1
         except Exception as e:
-            erros.append({"pedido_bling_id": pedido.pedido_bling_id, "erro": str(e)[:120]})
+            erros.append(
+                {"pedido_bling_id": pedido.pedido_bling_id, "erro": str(e)[:120]}
+            )
 
     return {
         "reprocessados": reprocessados,
@@ -1422,7 +1654,7 @@ _SITUACOES_PEDIDO_CANCELADO = {
 }
 
 _SITUACOES_PEDIDO_ATENDIDO = {
-    9,   # Atendido (concluído/nota fiscal emitida)
+    9,  # Atendido (concluído/nota fiscal emitida)
 }
 
 
@@ -1462,7 +1694,9 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
         return processar_pedido_bling_payload(body, db)
 
     try:
-        from app.services.bling_pedido_webhook_queue_service import enqueue_bling_pedido_webhook
+        from app.services.bling_pedido_webhook_queue_service import (
+            enqueue_bling_pedido_webhook,
+        )
 
         result = enqueue_bling_pedido_webhook(db, body)
         return {
@@ -1470,14 +1704,20 @@ async def receber_pedido_bling(request: Request, db: Session = Depends(get_sessi
             "mode": "async_queue",
         }
     except Exception as exc:
-        logger.exception("[BLING WEBHOOK] Falha ao enfileirar webhook de pedido: %s", exc)
+        logger.exception(
+            "[BLING WEBHOOK] Falha ao enfileirar webhook de pedido: %s", exc
+        )
         try:
             db.rollback()
         except Exception:
             pass
-        if str(os.getenv("BLING_PEDIDO_WEBHOOK_FALLBACK_SYNC", "true")).strip().lower() in {"1", "true", "yes", "on"}:
+        if str(
+            os.getenv("BLING_PEDIDO_WEBHOOK_FALLBACK_SYNC", "true")
+        ).strip().lower() in {"1", "true", "yes", "on"}:
             return processar_pedido_bling_payload(body, db)
-        raise HTTPException(status_code=503, detail="Fila de webhooks do Bling indisponivel")
+        raise HTTPException(
+            status_code=503, detail="Fila de webhooks do Bling indisponivel"
+        )
 
 
 def processar_pedido_bling_payload(body: dict, db: Session):
@@ -1499,20 +1739,29 @@ def processar_pedido_bling_payload(body: dict, db: Session):
     # Quando o Bling gera uma NF vinculada a um pedido de marketplace,
     # confirmar o pedido e baixar o estoque imediatamente.
     # ========================
-    if "notafiscal" in event.lower() or "nota_fiscal" in event.lower() or event.startswith("nfe.") or event.startswith("nfce."):
+    if (
+        "notafiscal" in event.lower()
+        or "nota_fiscal" in event.lower()
+        or event.startswith("nfe.")
+        or event.startswith("nfce.")
+    ):
         nf_data = data or {}
         # O pedido pode vir na chave "pedido" ou "pedidoVenda" do payload da NF
         pedido_ref = nf_data.get("pedido") or nf_data.get("pedidoVenda") or {}
-        pedido_numero_nf = str(pedido_ref.get("numero") or pedido_ref.get("id") or "").strip()
+        pedido_numero_nf = str(
+            pedido_ref.get("numero") or pedido_ref.get("id") or ""
+        ).strip()
         nf_id_bling = str(nf_data.get("id") or "").strip()
 
         if pedido_numero_nf or nf_id_bling:
             pedido = None
             # Buscar pelo número do pedido Bling (campo pedido_bling_numero)
             if pedido_numero_nf:
-                pedido = db.query(PedidoIntegrado).filter(
-                    PedidoIntegrado.pedido_bling_numero == pedido_numero_nf
-                ).first()
+                pedido = (
+                    db.query(PedidoIntegrado)
+                    .filter(PedidoIntegrado.pedido_bling_numero == pedido_numero_nf)
+                    .first()
+                )
             # Fallback: buscar pela chave do pedido se vier como ID
             if not pedido and pedido_numero_nf:
                 pedido = localizar_pedido_por_bling_id(
@@ -1543,9 +1792,11 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     payload=nf_data,
                     processed_at=event_date,
                 )
-                itens = db.query(PedidoIntegradoItem).filter(
-                    PedidoIntegradoItem.pedido_integrado_id == pedido.id
-                ).all()
+                itens = (
+                    db.query(PedidoIntegradoItem)
+                    .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+                    .all()
+                )
                 pedido.payload = _montar_payload_pedido(
                     webhook_data=_dict((pedido.payload or {})).get("webhook"),
                     pedido_completo=_payload_principal(pedido.payload),
@@ -1592,7 +1843,11 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                 logger.warning(
                     f"[BLING NF WEBHOOK] Pedido {pedido.pedido_bling_id} recebeu evento NF sem id deterministico; estoque mantido aguardando reconciliação"
                 )
-                return {"status": "ok", "acao": "aguardando_nf_deterministica", "erros_estoque": []}
+                return {
+                    "status": "ok",
+                    "acao": "aguardando_nf_deterministica",
+                    "erros_estoque": [],
+                }
 
         if _tenant_uuid:
             registrar_evento(
@@ -1607,7 +1862,10 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                 payload=nf_data,
                 processed_at=event_date,
             )
-        return {"status": "ignorado", "motivo": f"evento_nf_sem_pedido_correspondente ({event})"}
+        return {
+            "status": "ignorado",
+            "motivo": f"evento_nf_sem_pedido_correspondente ({event})",
+        }
 
     pedido_bling_id = str(data.get("id", ""))
     if not pedido_bling_id or pedido_bling_id == "None":
@@ -1646,9 +1904,11 @@ def processar_pedido_bling_payload(body: dict, db: Session):
             pedido_bling_id=pedido_bling_id,
         )
         if pedido and pedido.status != "cancelado":
-            itens = db.query(PedidoIntegradoItem).filter(
-                PedidoIntegradoItem.pedido_integrado_id == pedido.id
-            ).all()
+            itens = (
+                db.query(PedidoIntegradoItem)
+                .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+                .all()
+            )
             _cancelar_pedido(db=db, pedido=pedido, itens=itens, processed_at=event_date)
 
         return {"status": "ok", "acao": "cancelado"}
@@ -1661,14 +1921,20 @@ def processar_pedido_bling_payload(body: dict, db: Session):
         pedido_api = None
         situacao_id_api = None
 
-        if (situacao_id and situacao_id in (_SITUACOES_PEDIDO_CANCELADO | _SITUACOES_PEDIDO_ATENDIDO)) or not situacao_id:
+        if (
+            situacao_id
+            and situacao_id
+            in (_SITUACOES_PEDIDO_CANCELADO | _SITUACOES_PEDIDO_ATENDIDO)
+        ) or not situacao_id:
             try:
                 from app.bling_integration import BlingAPI
 
                 pedido_api = BlingAPI().consultar_pedido(pedido_bling_id)
                 situacao_id_api = _situacao_codigo_bling(pedido_api.get("situacao"))
             except Exception as e:
-                logger.warning(f"[BLING WEBHOOK] Falha ao consultar pedido {pedido_bling_id} na API: {e}")
+                logger.warning(
+                    f"[BLING WEBHOOK] Falha ao consultar pedido {pedido_bling_id} na API: {e}"
+                )
 
         if situacao_id and situacao_id in _SITUACOES_PEDIDO_CANCELADO:
             pedido = localizar_pedido_por_bling_id(
@@ -1677,9 +1943,11 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                 pedido_bling_id=pedido_bling_id,
             )
             if pedido and pedido.status != "cancelado":
-                itens = db.query(PedidoIntegradoItem).filter(
-                    PedidoIntegradoItem.pedido_integrado_id == pedido.id
-                ).all()
+                itens = (
+                    db.query(PedidoIntegradoItem)
+                    .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+                    .all()
+                )
                 _sincronizar_nf_do_pedido(
                     db=db,
                     pedido=pedido,
@@ -1690,8 +1958,12 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     message="NF identificada no pedido atualizado e vinculada localmente.",
                     link_source="pedido.updated",
                 )
-                _cancelar_pedido(db=db, pedido=pedido, itens=itens, processed_at=event_date)
-                logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} cancelado (situacao_id={situacao_id})")
+                _cancelar_pedido(
+                    db=db, pedido=pedido, itens=itens, processed_at=event_date
+                )
+                logger.info(
+                    f"[BLING WEBHOOK] Pedido {pedido_bling_id} cancelado (situacao_id={situacao_id})"
+                )
 
             return {"status": "ok", "acao": "cancelado_por_situacao"}
 
@@ -1702,9 +1974,11 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                 pedido_bling_id=pedido_bling_id,
             )
             if pedido and pedido.status != "cancelado":
-                itens = db.query(PedidoIntegradoItem).filter(
-                    PedidoIntegradoItem.pedido_integrado_id == pedido.id
-                ).all()
+                itens = (
+                    db.query(PedidoIntegradoItem)
+                    .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+                    .all()
+                )
                 _sincronizar_nf_do_pedido(
                     db=db,
                     pedido=pedido,
@@ -1724,7 +1998,9 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     processed_at=event_date,
                     aplicar_baixa_estoque=False,
                 )
-                logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado sem baixa de estoque; aguardando NF (situacao_id={situacao_id})")
+                logger.info(
+                    f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado sem baixa de estoque; aguardando NF (situacao_id={situacao_id})"
+                )
 
             return {"status": "ok", "acao": "confirmado_por_situacao"}
 
@@ -1735,9 +2011,11 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                 pedido_bling_id=pedido_bling_id,
             )
             if pedido and pedido.status != "cancelado":
-                itens = db.query(PedidoIntegradoItem).filter(
-                    PedidoIntegradoItem.pedido_integrado_id == pedido.id
-                ).all()
+                itens = (
+                    db.query(PedidoIntegradoItem)
+                    .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+                    .all()
+                )
                 _sincronizar_nf_do_pedido(
                     db=db,
                     pedido=pedido,
@@ -1754,8 +2032,12 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     payload_atual=pedido.payload,
                     ultima_nf=_ultima_nf_payload_efetiva(pedido.payload) or None,
                 )
-                _cancelar_pedido(db=db, pedido=pedido, itens=itens, processed_at=event_date)
-                logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} cancelado via consulta API (situacao_id={situacao_id_api})")
+                _cancelar_pedido(
+                    db=db, pedido=pedido, itens=itens, processed_at=event_date
+                )
+                logger.info(
+                    f"[BLING WEBHOOK] Pedido {pedido_bling_id} cancelado via consulta API (situacao_id={situacao_id_api})"
+                )
 
             return {"status": "ok", "acao": "cancelado_via_consulta_api"}
 
@@ -1766,9 +2048,11 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                 pedido_bling_id=pedido_bling_id,
             )
             if pedido and pedido.status not in ("confirmado", "cancelado"):
-                itens = db.query(PedidoIntegradoItem).filter(
-                    PedidoIntegradoItem.pedido_integrado_id == pedido.id
-                ).all()
+                itens = (
+                    db.query(PedidoIntegradoItem)
+                    .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+                    .all()
+                )
                 _sincronizar_nf_do_pedido(
                     db=db,
                     pedido=pedido,
@@ -1794,7 +2078,9 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     processed_at=event_date,
                     aplicar_baixa_estoque=False,
                 )
-                logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado via consulta API sem baixa; aguardando NF (situacao_id={situacao_id_api})")
+                logger.info(
+                    f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado via consulta API sem baixa; aguardando NF (situacao_id={situacao_id_api})"
+                )
 
             return {"status": "ok", "acao": "confirmado_via_consulta_api"}
 
@@ -1811,7 +2097,11 @@ def processar_pedido_bling_payload(body: dict, db: Session):
         resolver_mescla=False,
     )
     if existente:
-        motivo = "pedido_ja_mesclado" if pedido_esta_mesclado(existente) else "pedido_ja_existe"
+        motivo = (
+            "pedido_ja_mesclado"
+            if pedido_esta_mesclado(existente)
+            else "pedido_ja_existe"
+        )
         return {"status": "ignorado", "motivo": motivo}
 
     numero = data.get("numero")
@@ -1825,6 +2115,7 @@ def processar_pedido_bling_payload(body: dict, db: Session):
     itens_bling = []
     try:
         from app.bling_integration import BlingAPI
+
         _bling_api = BlingAPI()
         for _tentativa in range(3):
             try:
@@ -1840,7 +2131,9 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     raise
                 time.sleep(2.0)
         if not itens_bling:
-            logger.warning(f"[BLING WEBHOOK] Pedido {pedido_bling_id}: itens vazios após 3 tentativas")
+            logger.warning(
+                f"[BLING WEBHOOK] Pedido {pedido_bling_id}: itens vazios após 3 tentativas"
+            )
             if _tenant_uuid:
                 abrir_incidente(
                     tenant_id=_tenant_uuid,
@@ -1854,20 +2147,32 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     details={"event": event},
                 )
     except Exception as e:
-        logger.warning(f"[BLING WEBHOOK] Falha ao buscar itens do pedido {pedido_bling_id}: {e}")
+        logger.warning(
+            f"[BLING WEBHOOK] Falha ao buscar itens do pedido {pedido_bling_id}: {e}"
+        )
 
     if not _tenant_uuid:
-        logger.error("[BLING WEBHOOK] BLING_WEBHOOK_TENANT_ID não configurado — pedido ignorado")
+        logger.error(
+            "[BLING WEBHOOK] BLING_WEBHOOK_TENANT_ID não configurado — pedido ignorado"
+        )
         return {"status": "erro", "motivo": "tenant_nao_configurado"}
 
     # Verificar situação atual no Bling — se já cancelado, não criar como aberto
-    situacao_id_criacao = _situacao_codigo_bling(pedido_completo.get("situacao") if pedido_completo else None)
+    situacao_id_criacao = _situacao_codigo_bling(
+        pedido_completo.get("situacao") if pedido_completo else None
+    )
 
     if situacao_id_criacao and situacao_id_criacao in _SITUACOES_PEDIDO_CANCELADO:
-        logger.info(f"[BLING WEBHOOK] Pedido {pedido_bling_id} order.created mas já cancelado (situacao_id={situacao_id_criacao}) — ignorado")
+        logger.info(
+            f"[BLING WEBHOOK] Pedido {pedido_bling_id} order.created mas já cancelado (situacao_id={situacao_id_criacao}) — ignorado"
+        )
         return {"status": "ignorado", "motivo": "order_created_ja_cancelado"}
 
-    status_inicial = "confirmado" if (situacao_id_criacao and situacao_id_criacao in _SITUACOES_PEDIDO_ATENDIDO) else "aberto"
+    status_inicial = (
+        "confirmado"
+        if (situacao_id_criacao and situacao_id_criacao in _SITUACOES_PEDIDO_ATENDIDO)
+        else "aberto"
+    )
     resumo_nf_pedido = _resumir_ultima_nf_do_pedido_bling(pedido_completo or data)
     payload_pedido = _montar_payload_pedido(
         webhook_data=data,
@@ -1889,10 +2194,17 @@ def processar_pedido_bling_payload(body: dict, db: Session):
         event_date=event_date,
     )
     if pedido_consolidado:
-        if status_inicial == "confirmado" and pedido_consolidado.status not in ("confirmado", "cancelado"):
-            itens_salvos = db.query(PedidoIntegradoItem).filter(
-                PedidoIntegradoItem.pedido_integrado_id == pedido_consolidado.id
-            ).all()
+        if status_inicial == "confirmado" and pedido_consolidado.status not in (
+            "confirmado",
+            "cancelado",
+        ):
+            itens_salvos = (
+                db.query(PedidoIntegradoItem)
+                .filter(
+                    PedidoIntegradoItem.pedido_integrado_id == pedido_consolidado.id
+                )
+                .all()
+            )
             _confirmar_pedido(
                 db=db,
                 pedido=pedido_consolidado,
@@ -1902,7 +2214,11 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                 processed_at=event_date,
                 aplicar_baixa_estoque=False,
             )
-        return {"status": "ok", "pedido_id": pedido_consolidado.id, "acao": "pedido_duplicado_mesclado"}
+        return {
+            "status": "ok",
+            "pedido_id": pedido_consolidado.id,
+            "acao": "pedido_duplicado_mesclado",
+        }
 
     pedido = PedidoIntegrado(
         tenant_id=_tenant_uuid,
@@ -1911,7 +2227,7 @@ def processar_pedido_bling_payload(body: dict, db: Session):
         canal=canal,
         status=status_inicial,
         expira_em=PedidoIntegrado.calcular_expiracao(),
-        payload=payload_pedido
+        payload=payload_pedido,
     )
 
     db.add(pedido)
@@ -1932,7 +2248,7 @@ def processar_pedido_bling_payload(body: dict, db: Session):
             pedido_integrado_id=pedido.id,
             sku=sku,
             descricao=descricao,
-            quantidade=quantidade
+            quantidade=quantidade,
         )
 
         try:
@@ -1997,9 +2313,11 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                 processed_at=event_date,
                 db=db,
             )
-        itens_salvos = db.query(PedidoIntegradoItem).filter(
-            PedidoIntegradoItem.pedido_integrado_id == pedido.id
-        ).all()
+        itens_salvos = (
+            db.query(PedidoIntegradoItem)
+            .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+            .all()
+        )
         _confirmar_pedido(
             db=db,
             pedido=pedido,

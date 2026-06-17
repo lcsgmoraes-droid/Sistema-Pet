@@ -5,8 +5,12 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 
 
-TENANT_RLS_GUARD = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
-AUTH_USER_ID_SETTING_INT = "NULLIF(current_setting('app.auth_user_id', true), '')::integer"
+TENANT_RLS_GUARD = (
+    "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
+)
+AUTH_USER_ID_SETTING_INT = (
+    "NULLIF(current_setting('app.auth_user_id', true), '')::integer"
+)
 AUTH_EMAIL_SETTING_TEXT = "NULLIF(current_setting('app.auth_email', true), '')"
 PARTNER_TENANT_SETTING_UUID = "NULLIF(current_setting('app.tenant_id', true), '')::uuid"
 PARTNER_OWN_TENANT_GUARD = f"tenant_id = {PARTNER_TENANT_SETTING_UUID}"
@@ -43,7 +47,9 @@ AUTH_USERS_ACCESS_GUARD = (
     f"OR ({AUTH_USER_EMAIL_GUARD})"
 )
 AUTH_USER_TENANTS_SELF_GUARD = f"user_id = {AUTH_USER_ID_SETTING_INT}"
-AUTH_USER_TENANTS_ACCESS_GUARD = f"({PARTNER_OWN_TENANT_GUARD}) OR ({AUTH_USER_TENANTS_SELF_GUARD})"
+AUTH_USER_TENANTS_ACCESS_GUARD = (
+    f"({PARTNER_OWN_TENANT_GUARD}) OR ({AUTH_USER_TENANTS_SELF_GUARD})"
+)
 
 _AUTH_POLICY_ORDER = {
     "users": (
@@ -91,7 +97,9 @@ def _auth_policy_names(table_name: str) -> list[str]:
     return _custom_policy_names(table_name, _AUTH_POLICY_ORDER[table_name])
 
 
-def _custom_policy_names(table_name: str, policy_order: Sequence[tuple[str, str]]) -> list[str]:
+def _custom_policy_names(
+    table_name: str, policy_order: Sequence[tuple[str, str]]
+) -> list[str]:
     return [f"{table_name}_{suffix}" for suffix, _ in policy_order]
 
 
@@ -136,7 +144,9 @@ def _iter_custom_rls_statements(
     yield f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY"
 
 
-def iter_partner_readable_rls_statements(table_name: str, *, enable: bool) -> Iterator[str]:
+def iter_partner_readable_rls_statements(
+    table_name: str, *, enable: bool
+) -> Iterator[str]:
     yield from _iter_custom_rls_statements(
         table_name,
         enable=enable,
@@ -190,7 +200,9 @@ def apply_partner_readable_rls(
         present_tables.reverse()
 
     for table_name in present_tables:
-        for statement in iter_partner_readable_rls_statements(table_name, enable=enable):
+        for statement in iter_partner_readable_rls_statements(
+            table_name, enable=enable
+        ):
             op_module.execute(statement)
 
 
