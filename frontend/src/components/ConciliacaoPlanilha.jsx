@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+import { useState } from "react";
+import axios from "axios";
 
 const ConciliacaoPlanilha = () => {
   const [step, setStep] = useState(1); // 1=upload, 2=mapeamento, 3=resultado
   const [file, setFile] = useState(null);
   const [uploadData, setUploadData] = useState(null);
   const [mapeamento, setMapeamento] = useState({
-    coluna_identificador: '',
-    coluna_valor: '',
-    coluna_data: '',
-    coluna_status: '',
-    coluna_adquirente: '',
-    formato_data: 'DD/MM/YYYY'
+    coluna_identificador: "",
+    coluna_valor: "",
+    coluna_data: "",
+    coluna_status: "",
+    coluna_adquirente: "",
+    formato_data: "DD/MM/YYYY",
   });
   const [resultado, setResultado] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -23,17 +23,17 @@ const ConciliacaoPlanilha = () => {
 
     setLoading(true);
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
 
     try {
-      const response = await axios.post('/api/conciliacao/upload-planilha', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const response = await axios.post("/api/conciliacao/upload-planilha", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
       setUploadData(response.data);
       setStep(2);
     } catch (error) {
-      alert('Erro ao carregar planilha: ' + (error.response?.data?.detail || error.message));
+      alert("Erro ao carregar planilha: " + (error.response?.data?.detail || error.message));
     } finally {
       setLoading(false);
     }
@@ -42,36 +42,36 @@ const ConciliacaoPlanilha = () => {
   // Step 2: Processar com mapeamento
   const handleProcessar = async (e) => {
     e.preventDefault();
-    
+
     if (!mapeamento.coluna_identificador || !mapeamento.coluna_valor || !mapeamento.coluna_data) {
-      alert('Preencha os campos obrigatórios: Identificador, Valor e Data');
+      alert("Preencha os campos obrigatórios: Identificador, Valor e Data");
       return;
     }
 
     setLoading(true);
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('coluna_identificador', mapeamento.coluna_identificador);
-    formData.append('coluna_valor', mapeamento.coluna_valor);
-    formData.append('coluna_data', mapeamento.coluna_data);
-    formData.append('formato_data', mapeamento.formato_data);
-    
+    formData.append("file", file);
+    formData.append("coluna_identificador", mapeamento.coluna_identificador);
+    formData.append("coluna_valor", mapeamento.coluna_valor);
+    formData.append("coluna_data", mapeamento.coluna_data);
+    formData.append("formato_data", mapeamento.formato_data);
+
     if (mapeamento.coluna_status) {
-      formData.append('coluna_status', mapeamento.coluna_status);
+      formData.append("coluna_status", mapeamento.coluna_status);
     }
     if (mapeamento.coluna_adquirente) {
-      formData.append('coluna_adquirente', mapeamento.coluna_adquirente);
+      formData.append("coluna_adquirente", mapeamento.coluna_adquirente);
     }
 
     try {
-      const response = await axios.post('/api/conciliacao/mapear-colunas', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const response = await axios.post("/api/conciliacao/mapear-colunas", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
       setResultado(response.data);
       setStep(3);
     } catch (error) {
-      alert('Erro ao processar conciliação: ' + (error.response?.data?.detail || error.message));
+      alert("Erro ao processar conciliação: " + (error.response?.data?.detail || error.message));
     } finally {
       setLoading(false);
     }
@@ -82,12 +82,12 @@ const ConciliacaoPlanilha = () => {
     setFile(null);
     setUploadData(null);
     setMapeamento({
-      coluna_identificador: '',
-      coluna_valor: '',
-      coluna_data: '',
-      coluna_status: '',
-      coluna_adquirente: '',
-      formato_data: 'DD/MM/YYYY'
+      coluna_identificador: "",
+      coluna_valor: "",
+      coluna_data: "",
+      coluna_status: "",
+      coluna_adquirente: "",
+      formato_data: "DD/MM/YYYY",
     });
     setResultado(null);
   };
@@ -101,15 +101,13 @@ const ConciliacaoPlanilha = () => {
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">1️⃣ Upload da Planilha</h2>
           <p className="text-gray-600 mb-4">
-            Faça upload de uma planilha Excel (.xlsx) ou CSV com os dados das transações da adquirente 
-            (Stone, Cielo, Rede, PagSeguro, etc).
+            Faça upload de uma planilha Excel (.xlsx) ou CSV com os dados das transações da
+            adquirente (Stone, Cielo, Rede, PagSeguro, etc).
           </p>
 
           <form onSubmit={handleFileUpload}>
             <div className="mb-4">
-              <label className="block text-sm font-medium mb-2">
-                Selecione o arquivo:
-              </label>
+              <label className="block text-sm font-medium mb-2">Selecione o arquivo:</label>
               <input
                 type="file"
                 accept=".xlsx,.xls,.csv"
@@ -123,7 +121,7 @@ const ConciliacaoPlanilha = () => {
               disabled={!file || loading}
               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
             >
-              {loading ? 'Carregando...' : '📤 Fazer Upload'}
+              {loading ? "Carregando..." : "📤 Fazer Upload"}
             </button>
           </form>
         </div>
@@ -133,7 +131,7 @@ const ConciliacaoPlanilha = () => {
       {step === 2 && uploadData && (
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">2️⃣ Configuração de Mapeamento</h2>
-          
+
           <div className="bg-blue-50 p-4 rounded mb-4">
             <p className="font-medium">📄 {uploadData.filename}</p>
             <p className="text-sm text-gray-600">{uploadData.total_rows} linhas carregadas</p>
@@ -149,61 +147,63 @@ const ConciliacaoPlanilha = () => {
                 </label>
                 <select
                   value={mapeamento.coluna_identificador}
-                  onChange={(e) => setMapeamento({...mapeamento, coluna_identificador: e.target.value})}
+                  onChange={(e) =>
+                    setMapeamento({ ...mapeamento, coluna_identificador: e.target.value })
+                  }
                   className="w-full border border-gray-300 rounded px-3 py-2"
                   required
                 >
                   <option value="">Selecione...</option>
-                  {uploadData.columns.map(col => (
-                    <option key={col} value={col}>{col}</option>
+                  {uploadData.columns.map((col) => (
+                    <option key={col} value={col}>
+                      {col}
+                    </option>
                   ))}
                 </select>
               </div>
 
               {/* Valor */}
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  * Coluna do Valor:
-                </label>
+                <label className="block text-sm font-medium mb-2">* Coluna do Valor:</label>
                 <select
                   value={mapeamento.coluna_valor}
-                  onChange={(e) => setMapeamento({...mapeamento, coluna_valor: e.target.value})}
+                  onChange={(e) => setMapeamento({ ...mapeamento, coluna_valor: e.target.value })}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                   required
                 >
                   <option value="">Selecione...</option>
-                  {uploadData.columns.map(col => (
-                    <option key={col} value={col}>{col}</option>
+                  {uploadData.columns.map((col) => (
+                    <option key={col} value={col}>
+                      {col}
+                    </option>
                   ))}
                 </select>
               </div>
 
               {/* Data */}
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  * Coluna da Data:
-                </label>
+                <label className="block text-sm font-medium mb-2">* Coluna da Data:</label>
                 <select
                   value={mapeamento.coluna_data}
-                  onChange={(e) => setMapeamento({...mapeamento, coluna_data: e.target.value})}
+                  onChange={(e) => setMapeamento({ ...mapeamento, coluna_data: e.target.value })}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                   required
                 >
                   <option value="">Selecione...</option>
-                  {uploadData.columns.map(col => (
-                    <option key={col} value={col}>{col}</option>
+                  {uploadData.columns.map((col) => (
+                    <option key={col} value={col}>
+                      {col}
+                    </option>
                   ))}
                 </select>
               </div>
 
               {/* Formato Data */}
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  * Formato da Data:
-                </label>
+                <label className="block text-sm font-medium mb-2">* Formato da Data:</label>
                 <select
                   value={mapeamento.formato_data}
-                  onChange={(e) => setMapeamento({...mapeamento, formato_data: e.target.value})}
+                  onChange={(e) => setMapeamento({ ...mapeamento, formato_data: e.target.value })}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 >
                   <option value="DD/MM/YYYY">DD/MM/YYYY</option>
@@ -219,12 +219,14 @@ const ConciliacaoPlanilha = () => {
                 </label>
                 <select
                   value={mapeamento.coluna_status}
-                  onChange={(e) => setMapeamento({...mapeamento, coluna_status: e.target.value})}
+                  onChange={(e) => setMapeamento({ ...mapeamento, coluna_status: e.target.value })}
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 >
                   <option value="">Não usar</option>
-                  {uploadData.columns.map(col => (
-                    <option key={col} value={col}>{col}</option>
+                  {uploadData.columns.map((col) => (
+                    <option key={col} value={col}>
+                      {col}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -236,12 +238,16 @@ const ConciliacaoPlanilha = () => {
                 </label>
                 <select
                   value={mapeamento.coluna_adquirente}
-                  onChange={(e) => setMapeamento({...mapeamento, coluna_adquirente: e.target.value})}
+                  onChange={(e) =>
+                    setMapeamento({ ...mapeamento, coluna_adquirente: e.target.value })
+                  }
                   className="w-full border border-gray-300 rounded px-3 py-2"
                 >
                   <option value="">Não usar</option>
-                  {uploadData.columns.map(col => (
-                    <option key={col} value={col}>{col}</option>
+                  {uploadData.columns.map((col) => (
+                    <option key={col} value={col}>
+                      {col}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -254,16 +260,20 @@ const ConciliacaoPlanilha = () => {
                 <table className="min-w-full text-sm border">
                   <thead className="bg-gray-100">
                     <tr>
-                      {uploadData.columns.map(col => (
-                        <th key={col} className="px-4 py-2 border">{col}</th>
+                      {uploadData.columns.map((col) => (
+                        <th key={col} className="px-4 py-2 border">
+                          {col}
+                        </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {uploadData.preview.slice(0, 5).map((row, idx) => (
                       <tr key={idx} className="hover:bg-gray-50">
-                        {uploadData.columns.map(col => (
-                          <td key={col} className="px-4 py-2 border">{row[col]}</td>
+                        {uploadData.columns.map((col) => (
+                          <td key={col} className="px-4 py-2 border">
+                            {row[col]}
+                          </td>
                         ))}
                       </tr>
                     ))}
@@ -285,7 +295,7 @@ const ConciliacaoPlanilha = () => {
                 disabled={loading}
                 className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400"
               >
-                {loading ? 'Processando...' : '✅ Processar Conciliação'}
+                {loading ? "Processando..." : "✅ Processar Conciliação"}
               </button>
             </div>
           </form>
@@ -304,11 +314,15 @@ const ConciliacaoPlanilha = () => {
               <p className="text-sm text-gray-600">Total Processado</p>
             </div>
             <div className="bg-green-50 p-4 rounded">
-              <p className="text-2xl font-bold text-green-600">{resultado.resumo.conciliados_automatico}</p>
+              <p className="text-2xl font-bold text-green-600">
+                {resultado.resumo.conciliados_automatico}
+              </p>
               <p className="text-sm text-gray-600">Match Automático (NSU)</p>
             </div>
             <div className="bg-yellow-50 p-4 rounded">
-              <p className="text-2xl font-bold text-yellow-600">{resultado.resumo.conciliados_manual}</p>
+              <p className="text-2xl font-bold text-yellow-600">
+                {resultado.resumo.conciliados_manual}
+              </p>
               <p className="text-sm text-gray-600">Match Manual (Valor+Data)</p>
             </div>
             <div className="bg-red-50 p-4 rounded">
@@ -332,7 +346,7 @@ const ConciliacaoPlanilha = () => {
               </thead>
               <tbody>
                 {resultado.detalhes.map((item, idx) => (
-                  <tr key={idx} className={item.match ? 'bg-green-50' : 'bg-red-50'}>
+                  <tr key={idx} className={item.match ? "bg-green-50" : "bg-red-50"}>
                     <td className="px-4 py-2">{item.linha}</td>
                     <td className="px-4 py-2 font-mono text-xs">{item.identificador}</td>
                     <td className="px-4 py-2">R$ {item.valor?.toFixed(2)}</td>
@@ -340,7 +354,7 @@ const ConciliacaoPlanilha = () => {
                     <td className="px-4 py-2">
                       {item.match ? (
                         <span className="px-2 py-1 bg-green-200 text-green-800 rounded text-xs">
-                          ✅ {item.match_type === 'nsu' ? 'NSU' : 'Valor+Data'}
+                          ✅ {item.match_type === "nsu" ? "NSU" : "Valor+Data"}
                         </span>
                       ) : (
                         <span className="px-2 py-1 bg-red-200 text-red-800 rounded text-xs">
@@ -348,9 +362,7 @@ const ConciliacaoPlanilha = () => {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-2">
-                      {item.venda_numero || item.motivo || item.erro}
-                    </td>
+                    <td className="px-4 py-2">{item.venda_numero || item.motivo || item.erro}</td>
                   </tr>
                 ))}
               </tbody>
