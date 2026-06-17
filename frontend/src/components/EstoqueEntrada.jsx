@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import api from '../api';
-import { toast } from 'react-hot-toast';
-import FornecedorSelector, { getFornecedorNome } from './fornecedores/FornecedorSelector';
+import { useState, useEffect } from "react";
+import api from "../api";
+import { toast } from "react-hot-toast";
+import FornecedorSelector, { getFornecedorNome } from "./fornecedores/FornecedorSelector";
 
 const EstoqueEntrada = () => {
   const [produtos, setProdutos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    produto_id: '',
-    quantidade: '',
-    custo_unitario: '',
-    numero_lote: '',
-    data_fabricacao: '',
-    data_validade: '',
-    fornecedor: '',
-    motivo: 'Entrada manual de estoque',
-    observacoes: ''
+    produto_id: "",
+    quantidade: "",
+    custo_unitario: "",
+    numero_lote: "",
+    data_fabricacao: "",
+    data_validade: "",
+    fornecedor: "",
+    motivo: "Entrada manual de estoque",
+    observacoes: "",
   });
 
   useEffect(() => {
@@ -24,10 +24,10 @@ const EstoqueEntrada = () => {
 
   const carregarProdutos = async () => {
     try {
-            const response = await api.get(`/produtos/`);
+      const response = await api.get(`/produtos/`);
       setProdutos(response.data);
     } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
+      console.error("Erro ao carregar produtos:", error);
     }
   };
 
@@ -36,7 +36,7 @@ const EstoqueEntrada = () => {
     setLoading(true);
 
     try {
-            const payload = {
+      const payload = {
         produto_id: parseInt(formData.produto_id),
         quantidade: parseFloat(formData.quantidade),
         custo_unitario: parseFloat(formData.custo_unitario),
@@ -45,36 +45,36 @@ const EstoqueEntrada = () => {
         data_validade: formData.data_validade || undefined,
         fornecedor: formData.fornecedor || undefined,
         motivo: formData.motivo,
-        observacoes: formData.observacoes || undefined
+        observacoes: formData.observacoes || undefined,
       };
 
       await api.post(`/estoque/entrada`, payload);
 
-      toast.success('✅ Entrada de estoque realizada com sucesso!');
-      
+      toast.success("✅ Entrada de estoque realizada com sucesso!");
+
       // Limpar formulário
       setFormData({
-        produto_id: '',
-        quantidade: '',
-        custo_unitario: '',
-        numero_lote: '',
-        data_fabricacao: '',
-        data_validade: '',
-        fornecedor: '',
-        motivo: 'Entrada manual de estoque',
-        observacoes: ''
+        produto_id: "",
+        quantidade: "",
+        custo_unitario: "",
+        numero_lote: "",
+        data_fabricacao: "",
+        data_validade: "",
+        fornecedor: "",
+        motivo: "Entrada manual de estoque",
+        observacoes: "",
       });
-      
+
       carregarProdutos();
     } catch (error) {
-      console.error('Erro ao dar entrada:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao dar entrada no estoque');
+      console.error("Erro ao dar entrada:", error);
+      toast.error(error.response?.data?.detail || "Erro ao dar entrada no estoque");
     } finally {
       setLoading(false);
     }
   };
 
-  const produtoSelecionado = produtos.find(p => p.id === parseInt(formData.produto_id));
+  const produtoSelecionado = produtos.find((p) => p.id === parseInt(formData.produto_id));
 
   return (
     <div className="p-6">
@@ -87,9 +87,7 @@ const EstoqueEntrada = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Produto */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Produto *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Produto *</label>
             <select
               value={formData.produto_id}
               onChange={(e) => setFormData({ ...formData, produto_id: e.target.value })}
@@ -97,7 +95,7 @@ const EstoqueEntrada = () => {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="">Selecione um produto</option>
-              {produtos.map(produto => (
+              {produtos.map((produto) => (
                 <option key={produto.id} value={produto.id}>
                   {produto.codigo} - {produto.nome} (Estoque atual: {produto.estoque_atual || 0})
                 </option>
@@ -112,22 +110,26 @@ const EstoqueEntrada = () => {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-gray-600">Estoque Atual:</span>
-                  <span className="ml-2 font-semibold">{produtoSelecionado.estoque_atual || 0}</span>
+                  <span className="ml-2 font-semibold">
+                    {produtoSelecionado.estoque_atual || 0}
+                  </span>
                 </div>
                 <div>
                   <span className="text-gray-600">Estoque Mínimo:</span>
-                  <span className="ml-2 font-semibold">{produtoSelecionado.estoque_minimo || 0}</span>
+                  <span className="ml-2 font-semibold">
+                    {produtoSelecionado.estoque_minimo || 0}
+                  </span>
                 </div>
                 <div>
                   <span className="text-gray-600">Custo Médio:</span>
                   <span className="ml-2 font-semibold">
-                    R$ {produtoSelecionado.custo_medio?.toFixed(2) || '0.00'}
+                    R$ {produtoSelecionado.custo_medio?.toFixed(2) || "0.00"}
                   </span>
                 </div>
                 <div>
                   <span className="text-gray-600">Preço Venda:</span>
                   <span className="ml-2 font-semibold">
-                    R$ {produtoSelecionado.preco_venda?.toFixed(2) || '0.00'}
+                    R$ {produtoSelecionado.preco_venda?.toFixed(2) || "0.00"}
                   </span>
                 </div>
               </div>
@@ -137,9 +139,7 @@ const EstoqueEntrada = () => {
           {/* Quantidade e Custo */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Quantidade *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Quantidade *</label>
               <input
                 type="number"
                 step="0.01"
@@ -171,9 +171,7 @@ const EstoqueEntrada = () => {
           {/* Lote e Fornecedor */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Número do Lote
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Número do Lote</label>
               <input
                 type="text"
                 value={formData.numero_lote}
@@ -183,9 +181,7 @@ const EstoqueEntrada = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Fornecedor
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Fornecedor</label>
               <FornecedorSelector
                 value={formData.fornecedor}
                 showLabel={false}
@@ -195,7 +191,7 @@ const EstoqueEntrada = () => {
                 onSelect={(fornecedor) =>
                   setFormData({ ...formData, fornecedor: getFornecedorNome(fornecedor) })
                 }
-                onClear={() => setFormData({ ...formData, fornecedor: '' })}
+                onClear={() => setFormData({ ...formData, fornecedor: "" })}
                 onFornecedorCriado={(fornecedor) =>
                   setFormData({ ...formData, fornecedor: getFornecedorNome(fornecedor) })
                 }
@@ -231,9 +227,7 @@ const EstoqueEntrada = () => {
 
           {/* Motivo */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Motivo *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Motivo *</label>
             <input
               type="text"
               value={formData.motivo}
@@ -246,9 +240,7 @@ const EstoqueEntrada = () => {
 
           {/* Observações */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Observações
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Observações</label>
             <textarea
               value={formData.observacoes}
               onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
@@ -269,12 +261,18 @@ const EstoqueEntrada = () => {
                 </div>
                 <div>
                   <span className="text-gray-600">Custo Unitário:</span>
-                  <span className="ml-2 font-semibold">R$ {parseFloat(formData.custo_unitario || 0).toFixed(2)}</span>
+                  <span className="ml-2 font-semibold">
+                    R$ {parseFloat(formData.custo_unitario || 0).toFixed(2)}
+                  </span>
                 </div>
                 <div className="pt-2 border-t border-green-300">
                   <span className="text-gray-600">Valor Total:</span>
                   <span className="ml-2 font-bold text-lg text-green-700">
-                    R$ {(parseFloat(formData.quantidade || 0) * parseFloat(formData.custo_unitario || 0)).toFixed(2)}
+                    R${" "}
+                    {(
+                      parseFloat(formData.quantidade || 0) *
+                      parseFloat(formData.custo_unitario || 0)
+                    ).toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -288,21 +286,23 @@ const EstoqueEntrada = () => {
               disabled={loading}
               className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? '⏳ Processando...' : '✅ Confirmar Entrada'}
+              {loading ? "⏳ Processando..." : "✅ Confirmar Entrada"}
             </button>
             <button
               type="button"
-              onClick={() => setFormData({
-                produto_id: '',
-                quantidade: '',
-                custo_unitario: '',
-                numero_lote: '',
-                data_fabricacao: '',
-                data_validade: '',
-                fornecedor: '',
-                motivo: 'Entrada manual de estoque',
-                observacoes: ''
-              })}
+              onClick={() =>
+                setFormData({
+                  produto_id: "",
+                  quantidade: "",
+                  custo_unitario: "",
+                  numero_lote: "",
+                  data_fabricacao: "",
+                  data_validade: "",
+                  fornecedor: "",
+                  motivo: "Entrada manual de estoque",
+                  observacoes: "",
+                })
+              }
               className="px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
             >
               🔄 Limpar

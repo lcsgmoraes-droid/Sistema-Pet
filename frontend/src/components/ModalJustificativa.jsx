@@ -2,30 +2,32 @@
  * Modal de Justificativa para Vendas com Margem Crítica
  * Aparece quando statusMargem === 'vermelho' ou parcelamento proibido
  */
-import React, { useState } from 'react';
-import { X, AlertTriangle } from 'lucide-react';
+import { useState } from "react";
+import { X, AlertTriangle } from "lucide-react";
 
-const ModalJustificativa = ({ mostrar, onConfirmar, onCancelar, tipo = 'margem_critica' }) => {
-  const [justificativa, setJustificativa] = useState('');
+const ModalJustificativa = ({ mostrar, onConfirmar, onCancelar, tipo = "margem_critica" }) => {
+  const [justificativa, setJustificativa] = useState("");
 
   if (!mostrar) return null;
 
   const mensagens = {
     margem_critica: {
-      titulo: '⚠️ Margem Crítica Detectada',
-      descricao: 'A margem desta venda está abaixo do recomendado. Por favor, informe o motivo para continuar:',
-      placeholder: 'Ex: Cliente preferencial, promoção especial, venda estratégica...'
+      titulo: "⚠️ Margem Crítica Detectada",
+      descricao:
+        "A margem desta venda está abaixo do recomendado. Por favor, informe o motivo para continuar:",
+      placeholder: "Ex: Cliente preferencial, promoção especial, venda estratégica...",
     },
     parcelamento_proibido: {
-      titulo: '⚠️ Parcelamento não Recomendado',
-      descricao: 'O número de parcelas selecionado pode comprometer a margem da venda. Justifique para prosseguir:',
-      placeholder: 'Ex: Cliente fiel, necessidade de fluxo de caixa, acordo comercial...'
+      titulo: "⚠️ Parcelamento não Recomendado",
+      descricao:
+        "O número de parcelas selecionado pode comprometer a margem da venda. Justifique para prosseguir:",
+      placeholder: "Ex: Cliente fiel, necessidade de fluxo de caixa, acordo comercial...",
     },
     desconto_alto: {
-      titulo: '⚠️ Desconto Elevado',
-      descricao: 'O desconto aplicado é alto para a margem atual. Informe a justificativa:',
-      placeholder: 'Ex: Acordo com gerência, cliente VIP, liquidação de estoque...'
-    }
+      titulo: "⚠️ Desconto Elevado",
+      descricao: "O desconto aplicado é alto para a margem atual. Informe a justificativa:",
+      placeholder: "Ex: Acordo com gerência, cliente VIP, liquidação de estoque...",
+    },
   };
 
   const config = mensagens[tipo] || mensagens.margem_critica;
@@ -33,11 +35,11 @@ const ModalJustificativa = ({ mostrar, onConfirmar, onCancelar, tipo = 'margem_c
   const handleConfirmar = () => {
     // Permite continuar mesmo sem justificativa (apenas alerta, não bloqueia)
     onConfirmar(justificativa.trim());
-    setJustificativa('');
+    setJustificativa("");
   };
 
   const handleCancelar = () => {
-    setJustificativa('');
+    setJustificativa("");
     onCancelar();
   };
 
@@ -60,9 +62,7 @@ const ModalJustificativa = ({ mostrar, onConfirmar, onCancelar, tipo = 'margem_c
 
         {/* Content */}
         <div className="p-4 space-y-4">
-          <p className="text-sm text-gray-600">
-            {config.descricao}
-          </p>
+          <p className="text-sm text-gray-600">{config.descricao}</p>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">

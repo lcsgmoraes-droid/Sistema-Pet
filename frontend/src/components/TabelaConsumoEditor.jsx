@@ -1,32 +1,28 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { FiPlus, FiTrash2, FiSave, FiAlertCircle } from 'react-icons/fi';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { FiPlus, FiTrash2, FiSave, FiAlertCircle } from "react-icons/fi";
 
 const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
-  const [tipoTabela, setTipoTabela] = useState('filhote_peso_adulto');
+  const [tipoTabela, setTipoTabela] = useState("filhote_peso_adulto");
   const [linhas, setLinhas] = useState([]);
   const [carregado, setCarregado] = useState(false);
   const ultimoSalvoRef = useRef(null); // Rastreia última versão salva
   const ultimoValorRecebidoRef = useRef(null);
   const [colunas] = useState([
-    { id: '2m', label: '2 meses' },
-    { id: '3m', label: '3 meses' },
-    { id: '4m', label: '4 meses' },
-    { id: '6m', label: '6 meses' },
-    { id: '8m', label: '8 meses' },
-    { id: '10m', label: '10 meses' },
-    { id: '12m', label: '12 meses' },
-    { id: '15m', label: '15 meses' },
-    { id: '18m', label: '18 meses' },
-    { id: 'adulto', label: 'Adulto' }
+    { id: "2m", label: "2 meses" },
+    { id: "3m", label: "3 meses" },
+    { id: "4m", label: "4 meses" },
+    { id: "6m", label: "6 meses" },
+    { id: "8m", label: "8 meses" },
+    { id: "10m", label: "10 meses" },
+    { id: "12m", label: "12 meses" },
+    { id: "15m", label: "15 meses" },
+    { id: "18m", label: "18 meses" },
+    { id: "adulto", label: "Adulto" },
   ]);
 
   // Carregar dados existentes e liberar o editor mesmo quando o produto ainda nao tem tabela.
   useEffect(() => {
-    const valorNormalizado = typeof value === 'string'
-      ? value
-      : value
-        ? JSON.stringify(value)
-        : '';
+    const valorNormalizado = typeof value === "string" ? value : value ? JSON.stringify(value) : "";
 
     if (valorNormalizado === ultimoValorRecebidoRef.current) {
       return;
@@ -37,7 +33,7 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
     if (!valorNormalizado) {
       setLinhas([]);
       setCarregado(true);
-      ultimoSalvoRef.current = '';
+      ultimoSalvoRef.current = "";
       return;
     }
 
@@ -46,50 +42,50 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
     }
 
     try {
-      const data = typeof value === 'string' ? JSON.parse(value) : value;
-      console.log('📥 Carregando tabela:', data);
+      const data = typeof value === "string" ? JSON.parse(value) : value;
+      console.log("📥 Carregando tabela:", data);
       if (data.tipo) setTipoTabela(data.tipo);
       if (data.dados) {
         const linhasCarregadas = Object.entries(data.dados).map(([peso, consumos]) => ({
           peso,
-          consumos
+          consumos,
         }));
         setLinhas(linhasCarregadas);
       }
       setCarregado(true);
       ultimoSalvoRef.current = valorNormalizado;
     } catch (error) {
-      console.error('Erro ao carregar tabela:', error);
+      console.error("Erro ao carregar tabela:", error);
       setCarregado(true);
     }
   }, [value]);
 
   const getLabelPeso = () => {
     switch (tipoTabela) {
-      case 'filhote_peso_adulto':
-        return 'Peso Adulto Esperado';
-      case 'adulto':
-        return 'Peso Atual';
+      case "filhote_peso_adulto":
+        return "Peso Adulto Esperado";
+      case "adulto":
+        return "Peso Atual";
       default:
-        return 'Peso';
+        return "Peso";
     }
   };
 
   const getPlaceholderPeso = () => {
     switch (tipoTabela) {
-      case 'filhote_peso_adulto':
-        return 'Ex: 5kg, 10kg, 15kg, 20kg';
-      case 'adulto':
-        return 'Ex: 5kg, 10kg, 15kg, 20kg';
+      case "filhote_peso_adulto":
+        return "Ex: 5kg, 10kg, 15kg, 20kg";
+      case "adulto":
+        return "Ex: 5kg, 10kg, 15kg, 20kg";
       default:
-        return '';
+        return "";
     }
   };
 
   const adicionarLinha = () => {
     const novaLinha = {
-      peso: '',
-      consumos: {}
+      peso: "",
+      consumos: {},
     };
     const novasLinhas = [...linhas, novaLinha];
     setLinhas(novasLinhas);
@@ -112,79 +108,85 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
     if (!novasLinhas[indexLinha].consumos) {
       novasLinhas[indexLinha].consumos = {};
     }
-    
+
     // Armazenar apenas gramas (número)
     const gramas = parseFloat(valorGramas) || 0;
     novasLinhas[indexLinha].consumos[colunaId] = gramas;
-    
+
     setLinhas(novasLinhas);
   };
 
   const calcularDuracao = (consumoDiario) => {
-    if (!pesoEmbalagem || !consumoDiario) return '-';
+    if (!pesoEmbalagem || !consumoDiario) return "-";
     const pesoGramas = pesoEmbalagem * 1000; // converter kg para gramas
     const dias = Math.floor(pesoGramas / consumoDiario);
     return `${dias}d`;
   };
 
-  const salvarDados = useCallback((linhasParaSalvar, opcoes = {}) => {
-    if (!carregado) {
-      console.log('⏸️ Aguardando carregamento inicial...');
-      return false; // Não salvar se ainda não carregou
-    }
-    
-    const linhasAtuais = linhasParaSalvar || linhas;
-    const dados = {};
-    linhasAtuais.forEach(linha => {
-      const consumosValidos = Object.entries(linha.consumos || {}).reduce((acc, [coluna, valor]) => {
-        const gramas = parseFloat(valor);
-        if (Number.isFinite(gramas) && gramas > 0) {
-          acc[coluna] = gramas;
+  const salvarDados = useCallback(
+    (linhasParaSalvar, opcoes = {}) => {
+      if (!carregado) {
+        console.log("⏸️ Aguardando carregamento inicial...");
+        return false; // Não salvar se ainda não carregou
+      }
+
+      const linhasAtuais = linhasParaSalvar || linhas;
+      const dados = {};
+      linhasAtuais.forEach((linha) => {
+        const consumosValidos = Object.entries(linha.consumos || {}).reduce(
+          (acc, [coluna, valor]) => {
+            const gramas = parseFloat(valor);
+            if (Number.isFinite(gramas) && gramas > 0) {
+              acc[coluna] = gramas;
+            }
+            return acc;
+          },
+          {},
+        );
+
+        if (linha.peso && Object.keys(consumosValidos).length > 0) {
+          dados[linha.peso] = consumosValidos;
         }
-        return acc;
-      }, {});
+      });
 
-      if (linha.peso && Object.keys(consumosValidos).length > 0) {
-        dados[linha.peso] = consumosValidos;
+      if (Object.keys(dados).length === 0) {
+        if (opcoes.exigirLinhaValida) {
+          return false;
+        }
+
+        ultimoSalvoRef.current = "";
+        onChange("");
+        return true;
       }
-    });
 
-    if (Object.keys(dados).length === 0) {
-      if (opcoes.exigirLinhaValida) {
-        return false;
+      const tabelaCompleta = {
+        tipo: tipoTabela,
+        dados: dados,
+      };
+
+      const jsonString = JSON.stringify(tabelaCompleta);
+
+      // Comparar com última versão salva para evitar salvamentos duplicados
+      if (ultimoSalvoRef.current === jsonString) {
+        console.log("⏭️ Ignorando - já está salvo");
+        return true;
       }
 
-      ultimoSalvoRef.current = '';
-      onChange('');
+      console.log("💾 Salvando tabela:", tabelaCompleta);
+      ultimoSalvoRef.current = jsonString;
+      onChange(jsonString);
       return true;
-    }
-
-    const tabelaCompleta = {
-      tipo: tipoTabela,
-      dados: dados
-    };
-
-    const jsonString = JSON.stringify(tabelaCompleta);
-    
-    // Comparar com última versão salva para evitar salvamentos duplicados
-    if (ultimoSalvoRef.current === jsonString) {
-      console.log('⏭️ Ignorando - já está salvo');
-      return true;
-    }
-    
-    console.log('💾 Salvando tabela:', tabelaCompleta);
-    ultimoSalvoRef.current = jsonString;
-    onChange(jsonString);
-    return true;
-  }, [linhas, tipoTabela, onChange, carregado]);
+    },
+    [linhas, tipoTabela, onChange, carregado],
+  );
 
   const handleSalvar = () => {
     const salvou = salvarDados(undefined, { exigirLinhaValida: true });
     if (!salvou) {
-      alert('Adicione pelo menos uma linha com peso e consumo em gramas antes de salvar.');
+      alert("Adicione pelo menos uma linha com peso e consumo em gramas antes de salvar.");
       return;
     }
-    alert('Tabela de consumo aplicada. Clique em Atualizar para gravar o produto.');
+    alert("Tabela de consumo aplicada. Clique em Atualizar para gravar o produto.");
   };
 
   return (
@@ -195,7 +197,8 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
           📊 Tabela de Consumo da Embalagem
         </h3>
         <p className="text-sm text-gray-600 mb-3">
-          Preencha a tabela com as informações da embalagem. A IA usará esses dados para calcular duração e custo-benefício.
+          Preencha a tabela com as informações da embalagem. A IA usará esses dados para calcular
+          duração e custo-benefício.
         </p>
 
         {/* Seletor de Tipo */}
@@ -208,7 +211,7 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
               <input
                 type="radio"
                 value="filhote_peso_adulto"
-                checked={tipoTabela === 'filhote_peso_adulto'}
+                checked={tipoTabela === "filhote_peso_adulto"}
                 onChange={(e) => setTipoTabela(e.target.value)}
                 className="text-blue-600"
               />
@@ -218,7 +221,7 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
               <input
                 type="radio"
                 value="adulto"
-                checked={tipoTabela === 'adulto'}
+                checked={tipoTabela === "adulto"}
                 onChange={(e) => setTipoTabela(e.target.value)}
                 className="text-blue-600"
               />
@@ -236,8 +239,11 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
               <th className="border border-gray-300 px-3 py-2 text-left text-sm font-semibold text-gray-700 w-32">
                 {getLabelPeso()}
               </th>
-              {colunas.map(col => (
-                <th key={col.id} className="border border-gray-300 px-2 py-2 text-center text-xs font-semibold text-gray-700 min-w-[90px]">
+              {colunas.map((col) => (
+                <th
+                  key={col.id}
+                  className="border border-gray-300 px-2 py-2 text-center text-xs font-semibold text-gray-700 min-w-[90px]"
+                >
                   {col.label}
                   <div className="text-[10px] text-gray-500 font-normal">g/dia | dias</div>
                 </th>
@@ -250,7 +256,10 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
           <tbody>
             {linhas.length === 0 ? (
               <tr>
-                <td colSpan={colunas.length + 2} className="border border-gray-300 px-4 py-8 text-center text-gray-500">
+                <td
+                  colSpan={colunas.length + 2}
+                  className="border border-gray-300 px-4 py-8 text-center text-gray-500"
+                >
                   <FiAlertCircle className="inline-block mr-2" />
                   Nenhuma linha adicionada. Clique em "Adicionar Linha" para começar.
                 </td>
@@ -268,8 +277,8 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
                       className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </td>
-                  {colunas.map(col => {
-                    const consumo = linha.consumos?.[col.id] || '';
+                  {colunas.map((col) => {
+                    const consumo = linha.consumos?.[col.id] || "";
                     const duracao = calcularDuracao(consumo);
                     return (
                       <td key={col.id} className="border border-gray-300 px-1 py-1">
@@ -329,8 +338,8 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
         <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-sm text-yellow-800">
             💡 <strong>Peso da embalagem:</strong> {pesoEmbalagem}kg ({pesoEmbalagem * 1000}g)
-            <br />
-            A duração (dias) é calculada automaticamente: <code>peso_embalagem ÷ consumo_diário</code>
+            <br />A duração (dias) é calculada automaticamente:{" "}
+            <code>peso_embalagem ÷ consumo_diário</code>
           </p>
         </div>
       )}

@@ -1,16 +1,30 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  FiUser, FiDollarSign, FiShoppingCart, FiAlertCircle, 
-  FiTrendingUp, FiClock, FiPhone, FiMail, FiMapPin,
-  FiChevronDown, FiChevronUp, FiPackage, FiMessageCircle,
-  FiSend, FiBarChart2, FiLink, FiCopy, FiCheck
-} from 'react-icons/fi';
-import api from '../api';
-import CustomerIdentity from './ui/CustomerIdentity';
-import PetIdentity from './ui/PetIdentity';
-import ProductIdentity from './ui/ProductIdentity';
-import SaleReference from './ui/SaleReference';
-import { getClienteAlertasPdvAtivos } from '../utils/clienteAlertasPdv';
+import { useState, useEffect, useRef } from "react";
+import {
+  FiUser,
+  FiDollarSign,
+  FiShoppingCart,
+  FiAlertCircle,
+  FiTrendingUp,
+  FiClock,
+  FiPhone,
+  FiMail,
+  FiMapPin,
+  FiChevronDown,
+  FiChevronUp,
+  FiPackage,
+  FiMessageCircle,
+  FiSend,
+  FiBarChart2,
+  FiLink,
+  FiCopy,
+  FiCheck,
+} from "react-icons/fi";
+import api from "../api";
+import CustomerIdentity from "./ui/CustomerIdentity";
+import PetIdentity from "./ui/PetIdentity";
+import ProductIdentity from "./ui/ProductIdentity";
+import SaleReference from "./ui/SaleReference";
+import { getClienteAlertasPdvAtivos } from "../utils/clienteAlertasPdv";
 
 /**
  * Widget de informações do cliente para PDV
@@ -20,9 +34,9 @@ export default function ClienteInfoWidget({ clienteId }) {
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState(null);
   const [error, setError] = useState(null);
-  
+
   // Chat IA
-  const [mensagemChat, setMensagemChat] = useState('');
+  const [mensagemChat, setMensagemChat] = useState("");
   const [conversaChat, setConversaChat] = useState([]);
   const [loadingChat, setLoadingChat] = useState(false);
   const chatEndRef = useRef(null);
@@ -41,7 +55,7 @@ export default function ClienteInfoWidget({ clienteId }) {
     sugestoes: false,
     relacionados: false,
     sazonalidade: false,
-    chat: false
+    chat: false,
   });
 
   useEffect(() => {
@@ -57,58 +71,63 @@ export default function ClienteInfoWidget({ clienteId }) {
       const response = await api.get(`/clientes/${clienteId}/info-pdv`);
       setInfo(response.data);
     } catch (err) {
-      console.error('Erro ao carregar informações do cliente:', err);
-      setError(err.response?.data?.detail || 'Erro ao carregar dados');
+      console.error("Erro ao carregar informações do cliente:", err);
+      setError(err.response?.data?.detail || "Erro ao carregar dados");
     } finally {
       setLoading(false);
     }
   };
 
   const toggleSecao = (secao) => {
-    setExpandido(prev => ({
+    setExpandido((prev) => ({
       ...prev,
-      [secao]: !prev[secao]
+      [secao]: !prev[secao],
     }));
   };
 
   const enviarMensagemChat = async () => {
     if (!mensagemChat.trim()) return;
-    
+
     const novaMensagem = mensagemChat;
-    setMensagemChat('');
-    
+    setMensagemChat("");
+
     // Adicionar mensagem do usuário
-    setConversaChat(prev => [...prev, { tipo: 'user', texto: novaMensagem }]);
-    
+    setConversaChat((prev) => [...prev, { tipo: "user", texto: novaMensagem }]);
+
     try {
       setLoadingChat(true);
       const response = await api.post(`/clientes/${clienteId}/chat-pdv`, {
-        mensagem: novaMensagem
+        mensagem: novaMensagem,
       });
-      
+
       // Adicionar resposta da IA
-      setConversaChat(prev => [...prev, { 
-        tipo: 'ia', 
-        texto: response.data.resposta,
-        ia_disponivel: response.data.ia_disponivel
-      }]);
-      
+      setConversaChat((prev) => [
+        ...prev,
+        {
+          tipo: "ia",
+          texto: response.data.resposta,
+          ia_disponivel: response.data.ia_disponivel,
+        },
+      ]);
+
       // Scroll para o fim
-      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-      
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch (err) {
-      console.error('Erro no chat:', err);
-      setConversaChat(prev => [...prev, { 
-        tipo: 'erro', 
-        texto: 'Erro ao processar mensagem. Tente novamente.' 
-      }]);
+      console.error("Erro no chat:", err);
+      setConversaChat((prev) => [
+        ...prev,
+        {
+          tipo: "erro",
+          texto: "Erro ao processar mensagem. Tente novamente.",
+        },
+      ]);
     } finally {
       setLoadingChat(false);
     }
   };
 
   const handleKeyPressChat = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       enviarMensagemChat();
     }
@@ -152,16 +171,16 @@ export default function ClienteInfoWidget({ clienteId }) {
 
   if (!info) return null;
 
-  const { 
-    cliente, 
-    resumo_financeiro, 
-    pets, 
+  const {
+    cliente,
+    resumo_financeiro,
+    pets,
     alertas_veterinarios,
-    ultimas_compras, 
-    oportunidades, 
+    ultimas_compras,
+    oportunidades,
     sugestoes,
     produtos_relacionados,
-    padroes_sazonais
+    padroes_sazonais,
   } = info;
   const alertasCliente = getClienteAlertasPdvAtivos(cliente);
 
@@ -191,11 +210,11 @@ export default function ClienteInfoWidget({ clienteId }) {
                   <FiPhone className="text-xs" />
                   {cliente.telefone}
                   <button
-                    onClick={() => copiarDado(cliente.telefone, 'phone')}
+                    onClick={() => copiarDado(cliente.telefone, "phone")}
                     className="text-gray-400 hover:text-gray-700 transition ml-1"
                     title="Copiar telefone"
                   >
-                    {copiado === 'phone' ? (
+                    {copiado === "phone" ? (
                       <FiCheck className="text-green-600 text-sm" />
                     ) : (
                       <FiCopy className="text-sm" />
@@ -225,7 +244,7 @@ export default function ClienteInfoWidget({ clienteId }) {
           titulo="Alertas do Cliente"
           icone={<FiAlertCircle />}
           expandido={expandido.alertasCliente}
-          onToggle={() => toggleSecao('alertasCliente')}
+          onToggle={() => toggleSecao("alertasCliente")}
           badge={alertasCliente.length}
           badgeColor="bg-amber-500"
         >
@@ -235,9 +254,7 @@ export default function ClienteInfoWidget({ clienteId }) {
                 key={`${alerta.titulo}_${idx}`}
                 className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
               >
-                <p className="text-sm font-semibold text-amber-900">
-                  {alerta.titulo}
-                </p>
+                <p className="text-sm font-semibold text-amber-900">{alerta.titulo}</p>
                 {alerta.mensagem && (
                   <p className="mt-1 whitespace-pre-wrap break-words text-xs text-amber-800">
                     {alerta.mensagem}
@@ -254,7 +271,7 @@ export default function ClienteInfoWidget({ clienteId }) {
         titulo="Resumo Financeiro"
         icone={<FiDollarSign />}
         expandido={expandido.resumo}
-        onToggle={() => toggleSecao('resumo')}
+        onToggle={() => toggleSecao("resumo")}
         badge={resumo_financeiro.numero_compras}
       >
         <div className="grid grid-cols-2 gap-3">
@@ -264,30 +281,26 @@ export default function ClienteInfoWidget({ clienteId }) {
               R$ {resumo_financeiro.total_gasto.toFixed(2)}
             </p>
           </div>
-          
+
           <div className="bg-blue-50 rounded-lg p-3">
             <p className="text-xs text-blue-600 font-medium mb-1">Ticket Médio</p>
             <p className="text-lg font-bold text-blue-700">
               R$ {resumo_financeiro.ticket_medio.toFixed(2)}
             </p>
           </div>
-          
+
           <div className="bg-purple-50 rounded-lg p-3">
             <p className="text-xs text-purple-600 font-medium mb-1">Nº Compras</p>
-            <p className="text-lg font-bold text-purple-700">
-              {resumo_financeiro.numero_compras}
-            </p>
+            <p className="text-lg font-bold text-purple-700">{resumo_financeiro.numero_compras}</p>
           </div>
-          
+
           <div className="bg-orange-50 rounded-lg p-3">
             <p className="text-xs text-orange-600 font-medium mb-1">Maior Compra</p>
             <p className="text-lg font-bold text-orange-700">
               R$ {resumo_financeiro.maior_compra.valor.toFixed(2)}
             </p>
             {resumo_financeiro.maior_compra.data && (
-              <p className="text-xs text-gray-500 mt-1">
-                {resumo_financeiro.maior_compra.data}
-              </p>
+              <p className="text-xs text-gray-500 mt-1">{resumo_financeiro.maior_compra.data}</p>
             )}
           </div>
         </div>
@@ -296,7 +309,8 @@ export default function ClienteInfoWidget({ clienteId }) {
           <div className="mt-3 pt-3 border-t border-gray-200">
             <p className="text-xs text-gray-500 flex items-center gap-1">
               <FiClock className="text-xs" />
-              Última compra: {resumo_financeiro.ultima_compra.data} - R$ {resumo_financeiro.ultima_compra.valor.toFixed(2)}
+              Última compra: {resumo_financeiro.ultima_compra.data} - R${" "}
+              {resumo_financeiro.ultima_compra.valor.toFixed(2)}
             </p>
           </div>
         )}
@@ -308,11 +322,11 @@ export default function ClienteInfoWidget({ clienteId }) {
           titulo="Pets Registrados"
           icone={<FiUser />}
           expandido={expandido.pets}
-          onToggle={() => toggleSecao('pets')}
+          onToggle={() => toggleSecao("pets")}
           badge={pets.length}
         >
           <div className="space-y-2">
-            {pets.map(pet => (
+            {pets.map((pet) => (
               <div key={pet.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg">
                 <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold">
                   {pet.nome[0].toUpperCase()}
@@ -325,16 +339,24 @@ export default function ClienteInfoWidget({ clienteId }) {
                     {pet.idade_anos !== null && ` • ${pet.idade_anos} anos`}
                   </p>
                   {!!pet.alergias_lista?.length && (
-                    <p className="text-xs text-red-600 mt-1">Alergias: {pet.alergias_lista.join(', ')}</p>
+                    <p className="text-xs text-red-600 mt-1">
+                      Alergias: {pet.alergias_lista.join(", ")}
+                    </p>
                   )}
                   {!!pet.restricoes_alimentares_lista?.length && (
-                    <p className="text-xs text-amber-700 mt-1">Restrições: {pet.restricoes_alimentares_lista.join(', ')}</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      Restrições: {pet.restricoes_alimentares_lista.join(", ")}
+                    </p>
                   )}
                   {!!pet.vacinas_vencidas?.length && (
-                    <p className="text-xs text-amber-700 mt-1">Vacinas atrasadas: {pet.vacinas_vencidas.length}</p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      Vacinas atrasadas: {pet.vacinas_vencidas.length}
+                    </p>
                   )}
                   {!!pet.exames_pendentes && (
-                    <p className="text-xs text-blue-700 mt-1">Exames pendentes: {pet.exames_pendentes}</p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      Exames pendentes: {pet.exames_pendentes}
+                    </p>
                   )}
                 </div>
               </div>
@@ -348,17 +370,17 @@ export default function ClienteInfoWidget({ clienteId }) {
           titulo="Alertas Veterinários"
           icone={<FiAlertCircle />}
           expandido={expandido.alertasVet}
-          onToggle={() => toggleSecao('alertasVet')}
+          onToggle={() => toggleSecao("alertasVet")}
           badge={alertas_veterinarios.length}
           badgeColor="bg-red-500"
         >
           <div className="space-y-2">
             {alertas_veterinarios.map((alerta, idx) => (
-              <div key={`${alerta.pet_id}_${idx}`} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                <PetIdentity
-                  nameClassName="font-medium text-amber-900"
-                  record={alerta}
-                />
+              <div
+                key={`${alerta.pet_id}_${idx}`}
+                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
+              >
+                <PetIdentity nameClassName="font-medium text-amber-900" record={alerta} />
                 <p className="text-xs text-amber-800 mt-1">{alerta.mensagem}</p>
               </div>
             ))}
@@ -372,18 +394,18 @@ export default function ClienteInfoWidget({ clienteId }) {
           titulo="Oportunidades de Venda"
           icone={<FiAlertCircle />}
           expandido={expandido.oportunidades}
-          onToggle={() => toggleSecao('oportunidades')}
+          onToggle={() => toggleSecao("oportunidades")}
           badge={oportunidades.length}
           badgeColor="bg-orange-500"
         >
           <div className="space-y-2">
             {oportunidades.map((op, idx) => (
-              <div 
-                key={idx} 
+              <div
+                key={idx}
                 className={`p-3 rounded-lg border-l-4 ${
-                  op.urgencia === 'alta' 
-                    ? 'bg-red-50 border-red-400' 
-                    : 'bg-yellow-50 border-yellow-400'
+                  op.urgencia === "alta"
+                    ? "bg-red-50 border-red-400"
+                    : "bg-yellow-50 border-yellow-400"
                 }`}
               >
                 <div className="flex items-start justify-between">
@@ -395,15 +417,13 @@ export default function ClienteInfoWidget({ clienteId }) {
                     />
                     <p className="text-xs text-gray-600 mt-1">{op.mensagem}</p>
                   </div>
-                  {op.urgencia === 'alta' && (
+                  {op.urgencia === "alta" && (
                     <span className="ml-2 px-2 py-1 bg-red-500 text-white text-xs rounded-full">
                       Urgente
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  Atrasado {op.dias_atraso} dias
-                </p>
+                <p className="text-xs text-gray-500 mt-2">Atrasado {op.dias_atraso} dias</p>
               </div>
             ))}
           </div>
@@ -416,12 +436,15 @@ export default function ClienteInfoWidget({ clienteId }) {
           titulo="Produtos Favoritos"
           icone={<FiTrendingUp />}
           expandido={expandido.sugestoes}
-          onToggle={() => toggleSecao('sugestoes')}
+          onToggle={() => toggleSecao("sugestoes")}
           badge={sugestoes.length}
         >
           <div className="space-y-2">
             {sugestoes.map((sug, idx) => (
-              <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer">
+              <div
+                key={idx}
+                className="flex items-center justify-between p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+              >
                 <div className="flex-1">
                   <p className="font-medium text-gray-800 text-sm">{sug.nome}</p>
                   <p className="text-xs text-gray-500">
@@ -429,9 +452,7 @@ export default function ClienteInfoWidget({ clienteId }) {
                     {sug.ultima_compra && ` • Última: ${sug.ultima_compra}`}
                   </p>
                 </div>
-                <p className="font-bold text-indigo-600 ml-2">
-                  R$ {sug.preco.toFixed(2)}
-                </p>
+                <p className="font-bold text-indigo-600 ml-2">R$ {sug.preco.toFixed(2)}</p>
               </div>
             ))}
           </div>
@@ -444,28 +465,31 @@ export default function ClienteInfoWidget({ clienteId }) {
           titulo="Últimas Compras"
           icone={<FiShoppingCart />}
           expandido={expandido.compras}
-          onToggle={() => toggleSecao('compras')}
+          onToggle={() => toggleSecao("compras")}
           badge={ultimas_compras.length}
         >
           <div className="space-y-3">
             {ultimas_compras.map((compra, idx) => (
-              <div key={idx} className="border-l-4 border-indigo-300 pl-3 py-2 bg-gray-50 rounded-r-lg">
+              <div
+                key={idx}
+                className="border-l-4 border-indigo-300 pl-3 py-2 bg-gray-50 rounded-r-lg"
+              >
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <p className="text-xs text-gray-500">
-                      {compra.data} •{" "}
-                      <SaleReference value={compra.numero_venda} />
+                      {compra.data} • <SaleReference value={compra.numero_venda} />
                     </p>
-                    <p className="font-bold text-indigo-600">
-                      R$ {compra.valor_total.toFixed(2)}
-                    </p>
+                    <p className="font-bold text-indigo-600">R$ {compra.valor_total.toFixed(2)}</p>
                   </div>
                 </div>
-                
+
                 {compra.produtos && compra.produtos.length > 0 && (
                   <div className="space-y-1 mt-2">
                     {compra.produtos.map((prod, pidx) => (
-                      <p key={pidx} className="text-xs text-gray-600 flex flex-wrap items-center gap-1">
+                      <p
+                        key={pidx}
+                        className="text-xs text-gray-600 flex flex-wrap items-center gap-1"
+                      >
                         <FiPackage className="text-xs" />
                         <span>{prod.quantidade}x</span>
                         <ProductIdentity name={prod.nome} product={prod} />
@@ -486,13 +510,16 @@ export default function ClienteInfoWidget({ clienteId }) {
           titulo="Produtos Comprados Juntos"
           icone={<FiLink />}
           expandido={expandido.relacionados}
-          onToggle={() => toggleSecao('relacionados')}
+          onToggle={() => toggleSecao("relacionados")}
           badge={produtos_relacionados.length}
           badgeColor="bg-purple-500"
         >
           <div className="space-y-2">
             {produtos_relacionados.map((rel, idx) => (
-              <div key={idx} className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+              <div
+                key={idx}
+                className="p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200"
+              >
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-semibold text-purple-600">
                     {rel.vezes_juntos}x comprados juntos
@@ -505,7 +532,9 @@ export default function ClienteInfoWidget({ clienteId }) {
                       product={rel.produto1}
                       nameClassName="font-medium text-gray-800"
                     />
-                    <span className="text-purple-600 font-bold">R$ {rel.produto1.preco.toFixed(2)}</span>
+                    <span className="text-purple-600 font-bold">
+                      R$ {rel.produto1.preco.toFixed(2)}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <ProductIdentity
@@ -513,12 +542,12 @@ export default function ClienteInfoWidget({ clienteId }) {
                       product={rel.produto2}
                       nameClassName="font-medium text-gray-800"
                     />
-                    <span className="text-purple-600 font-bold">R$ {rel.produto2.preco.toFixed(2)}</span>
+                    <span className="text-purple-600 font-bold">
+                      R$ {rel.produto2.preco.toFixed(2)}
+                    </span>
                   </div>
                 </div>
-                <p className="text-xs text-purple-600 mt-2 italic">
-                  💡 Sugestão: Oferecer combo!
-                </p>
+                <p className="text-xs text-purple-600 mt-2 italic">💡 Sugestão: Oferecer combo!</p>
               </div>
             ))}
           </div>
@@ -531,7 +560,7 @@ export default function ClienteInfoWidget({ clienteId }) {
           titulo="Padrões de Compra"
           icone={<FiBarChart2 />}
           expandido={expandido.sazonalidade}
-          onToggle={() => toggleSecao('sazonalidade')}
+          onToggle={() => toggleSecao("sazonalidade")}
           badge={padroes_sazonais.length}
           badgeColor="bg-green-500"
         >
@@ -545,11 +574,15 @@ export default function ClienteInfoWidget({ clienteId }) {
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <span className="text-gray-600">Total:</span>
-                    <span className="font-bold text-green-700 ml-1">R$ {padrao.total_gasto.toFixed(2)}</span>
+                    <span className="font-bold text-green-700 ml-1">
+                      R$ {padrao.total_gasto.toFixed(2)}
+                    </span>
                   </div>
                   <div>
                     <span className="text-gray-600">Ticket médio:</span>
-                    <span className="font-bold text-green-700 ml-1">R$ {padrao.ticket_medio.toFixed(2)}</span>
+                    <span className="font-bold text-green-700 ml-1">
+                      R$ {padrao.ticket_medio.toFixed(2)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -563,7 +596,7 @@ export default function ClienteInfoWidget({ clienteId }) {
         titulo="Chat IA - Assistente de Vendas"
         icone={<FiMessageCircle />}
         expandido={expandido.chat}
-        onToggle={() => toggleSecao('chat')}
+        onToggle={() => toggleSecao("chat")}
         badgeColor="bg-blue-500"
       >
         <div className="space-y-3">
@@ -575,7 +608,7 @@ export default function ClienteInfoWidget({ clienteId }) {
                 "Quais os produtos favoritos?",
                 "Quando foi a última compra?",
                 "Quais pets ele tem?",
-                "Quanto já gastou total?"
+                "Quanto já gastou total?",
               ].map((sugestao, idx) => (
                 <button
                   key={idx}
@@ -594,16 +627,21 @@ export default function ClienteInfoWidget({ clienteId }) {
           {/* Histórico de conversa */}
           <div className="max-h-64 overflow-y-auto space-y-2">
             {conversaChat.map((msg, idx) => (
-              <div key={idx} className={`flex ${msg.tipo === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
-                  msg.tipo === 'user' 
-                    ? 'bg-blue-600 text-white' 
-                    : msg.tipo === 'erro'
-                    ? 'bg-red-100 text-red-700'
-                    : 'bg-gray-100 text-gray-800'
-                }`}>
+              <div
+                key={idx}
+                className={`flex ${msg.tipo === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
+                    msg.tipo === "user"
+                      ? "bg-blue-600 text-white"
+                      : msg.tipo === "erro"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-gray-100 text-gray-800"
+                  }`}
+                >
                   {msg.texto}
-                  {msg.tipo === 'ia' && !msg.ia_disponivel && (
+                  {msg.tipo === "ia" && !msg.ia_disponivel && (
                     <p className="text-xs mt-1 opacity-70">💡 Modo básico (IA não configurada)</p>
                   )}
                 </div>
@@ -644,14 +682,14 @@ export default function ClienteInfoWidget({ clienteId }) {
 /**
  * Componente de seção colapsável
  */
-function SecaoCollapsible({ 
-  titulo, 
-  icone, 
-  expandido, 
-  onToggle, 
-  badge, 
+function SecaoCollapsible({
+  titulo,
+  icone,
+  expandido,
+  onToggle,
+  badge,
   badgeColor = "bg-indigo-500",
-  children 
+  children,
 }) {
   return (
     <div className="border-b border-gray-200">
@@ -674,12 +712,8 @@ function SecaoCollapsible({
           <FiChevronDown className="text-gray-400" />
         )}
       </button>
-      
-      {expandido && (
-        <div className="px-4 pb-4">
-          {children}
-        </div>
-      )}
+
+      {expandido && <div className="px-4 pb-4">{children}</div>}
     </div>
   );
 }
