@@ -1,31 +1,31 @@
-import { useState, useEffect } from 'react';
-import { X, DollarSign, CheckCircle, AlertCircle, Loader } from 'lucide-react';
-import { toast } from 'react-hot-toast';
-import api from '../../api';
-import { formatBRL, formatMoneyBRL } from '../../utils/formatters';
+import { useState, useEffect } from "react";
+import { X, DollarSign, CheckCircle, AlertCircle, Loader } from "lucide-react";
+import { toast } from "react-hot-toast";
+import api from "../../api";
+import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
 import {
   campaignAllowsSaleChannel,
   getCashbackBonusParamKey,
-} from '../../utils/campaignChannelScope';
-import { useModulos } from '../../contexts/ModulosContext';
-import CustomerIdentity from '../ui/CustomerIdentity';
-import SaleReference from '../ui/SaleReference';
+} from "../../utils/campaignChannelScope";
+import { useModulos } from "../../contexts/ModulosContext";
+import CustomerIdentity from "../ui/CustomerIdentity";
+import SaleReference from "../ui/SaleReference";
 
 export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClose, onSucesso }) {
   const { moduloAtivo } = useModulos();
-  const moduloCampanhasAtivo = moduloAtivo('campanhas');
+  const moduloCampanhasAtivo = moduloAtivo("campanhas");
   const [vendas, setVendas] = useState([]);
   const [vendasSelecionadas, setVendasSelecionadas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processando, setProcessando] = useState(false);
-  const [valorPagamento, setValorPagamento] = useState('');
-  const [formaPagamento, setFormaPagamento] = useState('dinheiro');
-  const [numeroTransacao, setNumeroTransacao] = useState('');
-  const [observacoes, setObservacoes] = useState('');
+  const [valorPagamento, setValorPagamento] = useState("");
+  const [formaPagamento, setFormaPagamento] = useState("dinheiro");
+  const [numeroTransacao, setNumeroTransacao] = useState("");
+  const [observacoes, setObservacoes] = useState("");
   const [resumo, setResumo] = useState({ total_vendas: 0, total_em_aberto: 0 });
-  const [ordenacao, setOrdenacao] = useState('antiga'); // 'antiga' ou 'recente'
+  const [ordenacao, setOrdenacao] = useState("antiga"); // 'antiga' ou 'recente'
   const [campanhasCompra, setCampanhasCompra] = useState([]);
-  const [rankCliente, setRankCliente] = useState('bronze');
+  const [rankCliente, setRankCliente] = useState("bronze");
   const [loadingCampanhasCompra, setLoadingCampanhasCompra] = useState(false);
   const [campanhasCarregadas, setCampanhasCarregadas] = useState(false);
 
@@ -35,14 +35,14 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
 
   useEffect(() => {
     setCampanhasCompra([]);
-    setRankCliente('bronze');
+    setRankCliente("bronze");
     setCampanhasCarregadas(false);
   }, [clienteId, moduloCampanhasAtivo]);
 
   useEffect(() => {
     if (!moduloCampanhasAtivo) {
       setCampanhasCompra([]);
-      setRankCliente('bronze');
+      setRankCliente("bronze");
       setCampanhasCarregadas(true);
       setLoadingCampanhasCompra(false);
       return;
@@ -53,22 +53,24 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
       try {
         setLoadingCampanhasCompra(true);
         const [campanhasResp, saldoResp] = await Promise.allSettled([
-          api.get('/campanhas'),
+          api.get("/campanhas"),
           api.get(`/campanhas/clientes/${clienteId}/saldo`),
         ]);
 
-        const campanhasAtivas = campanhasResp.status === 'fulfilled'
-          ? (campanhasResp.value.data || []).filter((campanha) => campanha.status === 'active')
-          : [];
+        const campanhasAtivas =
+          campanhasResp.status === "fulfilled"
+            ? (campanhasResp.value.data || []).filter((campanha) => campanha.status === "active")
+            : [];
 
-        const rankAtual = saldoResp.status === 'fulfilled'
-          ? String(saldoResp.value?.data?.rank_level || 'bronze').toLowerCase()
-          : 'bronze';
+        const rankAtual =
+          saldoResp.status === "fulfilled"
+            ? String(saldoResp.value?.data?.rank_level || "bronze").toLowerCase()
+            : "bronze";
 
         setCampanhasCompra(campanhasAtivas);
         setRankCliente(rankAtual);
       } catch (error) {
-        console.error('Erro ao carregar campanhas para previsao no PDV:', error);
+        console.error("Erro ao carregar campanhas para previsao no PDV:", error);
       } finally {
         setCampanhasCarregadas(true);
         setLoadingCampanhasCompra(false);
@@ -85,17 +87,17 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
       setVendas(response.data.vendas || []);
       setResumo(response.data.resumo || { total_vendas: 0, total_em_aberto: 0 });
     } catch (error) {
-      console.error('Erro ao carregar vendas em aberto:', error);
-      toast.error('Erro ao carregar vendas em aberto');
+      console.error("Erro ao carregar vendas em aberto:", error);
+      toast.error("Erro ao carregar vendas em aberto");
     } finally {
       setLoading(false);
     }
   };
 
   const toggleVenda = (vendaId) => {
-    setVendasSelecionadas(prev => {
+    setVendasSelecionadas((prev) => {
       if (prev.includes(vendaId)) {
-        return prev.filter(id => id !== vendaId);
+        return prev.filter((id) => id !== vendaId);
       } else {
         return [...prev, vendaId];
       }
@@ -106,7 +108,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
     if (vendasSelecionadas.length === vendas.length) {
       setVendasSelecionadas([]);
     } else {
-      setVendasSelecionadas(vendas.map(v => v.id));
+      setVendasSelecionadas(vendas.map((v) => v.id));
     }
   };
 
@@ -120,7 +122,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
 
   // Ordenar vendas
   const vendasOrdenadas = [...vendas].sort((a, b) => {
-    if (ordenacao === 'antiga') {
+    if (ordenacao === "antiga") {
       return new Date(a.data_venda) - new Date(b.data_venda);
     } else {
       return new Date(b.data_venda) - new Date(a.data_venda);
@@ -128,7 +130,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
   });
 
   const totalSelecionado = vendas
-    .filter(v => vendasSelecionadas.includes(v.id))
+    .filter((v) => vendasSelecionadas.includes(v.id))
     .reduce((sum, v) => sum + parseFloat(v.saldo_devedor), 0);
 
   const vendasSelecionadasOrdenadas = vendas
@@ -156,17 +158,21 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
   }
 
   const totalVendasQuitadasPrevistas = vendasPrevistasQuitadas.length;
-  const totalQuitadoPrevisto = vendasPrevistasQuitadas
-    .reduce((acc, venda) => acc + parseFloat(venda.total || 0), 0);
 
   const vendasElegiveisParaCampanha = (campanha) =>
     vendasPrevistasQuitadas.filter((venda) =>
-      campaignAllowsSaleChannel(campanha, venda.canal || 'loja_fisica'),
+      campaignAllowsSaleChannel(campanha, venda.canal || "loja_fisica"),
     );
 
-  const campanhasCashback = campanhasCompra.filter((campanha) => campanha.campaign_type === 'cashback');
-  const campanhasCarimbo = campanhasCompra.filter((campanha) => campanha.campaign_type === 'loyalty_stamp');
-  const campanhasRecompra = campanhasCompra.filter((campanha) => campanha.campaign_type === 'quick_repurchase');
+  const campanhasCashback = campanhasCompra.filter(
+    (campanha) => campanha.campaign_type === "cashback",
+  );
+  const campanhasCarimbo = campanhasCompra.filter(
+    (campanha) => campanha.campaign_type === "loyalty_stamp",
+  );
+  const campanhasRecompra = campanhasCompra.filter(
+    (campanha) => campanha.campaign_type === "quick_repurchase",
+  );
 
   const cashbackPrevisto = campanhasCashback
     .map((campanha) => {
@@ -178,7 +184,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
       const percentualBase = Number(params[chaveRank] ?? params.bronze_percent ?? 0);
       const percentuais = new Set();
       const valorCashback = vendasElegiveis.reduce((acc, venda) => {
-        const bonusKey = getCashbackBonusParamKey(venda.canal || 'loja_fisica');
+        const bonusKey = getCashbackBonusParamKey(venda.canal || "loja_fisica");
         const percentualTotal = percentualBase + Number(params[bonusKey] ?? 0);
         percentuais.add(percentualTotal);
         const totalVenda = parseFloat(venda.total || 0);
@@ -221,7 +227,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
     .map((campanha) => {
       const params = campanha.params || {};
       const minPurchase = Number(params.min_purchase_value || 0);
-      const couponType = String(params.coupon_type || 'percent');
+      const couponType = String(params.coupon_type || "percent");
       const couponValue = Number(params.coupon_value || 0);
       const vendasElegiveis = vendasElegiveisParaCampanha(campanha);
 
@@ -242,60 +248,60 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
 
   const handleBaixarVendas = async () => {
     if (vendasSelecionadas.length === 0) {
-      toast.error('Selecione ao menos uma venda');
+      toast.error("Selecione ao menos uma venda");
       return;
     }
 
     if (!valorPagamento || parseFloat(valorPagamento) <= 0) {
-      toast.error('Informe um valor válido');
+      toast.error("Informe um valor válido");
       return;
     }
 
     if (parseFloat(valorPagamento) > totalSelecionado) {
-      toast.error('Valor do pagamento não pode ser maior que o total selecionado');
+      toast.error("Valor do pagamento não pode ser maior que o total selecionado");
       return;
     }
 
     try {
       setProcessando(true);
-      console.log('Enviando requisição:', {
+      console.log("Enviando requisição:", {
         vendas_ids: vendasSelecionadas,
         valor_total: parseFloat(valorPagamento),
         forma_pagamento: formaPagamento,
         numero_transacao: numeroTransacao || null,
-        observacoes: observacoes || null
+        observacoes: observacoes || null,
       });
-      
+
       const response = await api.post(`/clientes/${clienteId}/baixar-vendas-lote`, {
         vendas_ids: vendasSelecionadas,
         valor_total: parseFloat(valorPagamento),
         forma_pagamento: formaPagamento,
         numero_transacao: numeroTransacao || null,
-        observacoes: observacoes || null
+        observacoes: observacoes || null,
       });
 
-      console.log('Resposta completa:', response);
-      console.log('Response.data:', response.data);
+      console.log("Resposta completa:", response);
+      console.log("Response.data:", response.data);
 
       if (!response.data) {
-        throw new Error('Resposta vazia do servidor');
+        throw new Error("Resposta vazia do servidor");
       }
 
       const { vendas_quitadas, vendas_parciais, valor_total_baixado } = response.data;
 
       // Mensagem de sucesso detalhada
       let mensagem = `💰 Total baixado: R$ ${valor_total_baixado.toFixed(2)}\n`;
-      
+
       if (vendas_quitadas.length > 0) {
         mensagem += `\n✅ ${vendas_quitadas.length} venda(s) quitada(s):`;
-        vendas_quitadas.forEach(v => {
+        vendas_quitadas.forEach((v) => {
           mensagem += `\n  • ${v.numero_venda}: R$ ${v.valor_baixado.toFixed(2)}`;
         });
       }
-      
+
       if (vendas_parciais.length > 0) {
         mensagem += `\n\n⚠️ ${vendas_parciais.length} venda(s) parcial:`;
-        vendas_parciais.forEach(v => {
+        vendas_parciais.forEach((v) => {
           mensagem += `\n  • ${v.numero_venda}:`;
           mensagem += `\n    Baixado: R$ ${v.valor_baixado.toFixed(2)}`;
           mensagem += `\n    Falta: R$ ${v.saldo_restante.toFixed(2)}`;
@@ -303,19 +309,19 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
       }
 
       toast.success(mensagem, { duration: 6000 });
-      
+
       if (onSucesso) {
         onSucesso();
       }
-      
+
       onClose();
     } catch (error) {
-      console.error('Erro completo:', error);
-      console.error('Erro response:', error.response);
-      console.error('Erro response data:', error.response?.data);
-      console.error('Erro response status:', error.response?.status);
-      
-      const mensagemErro = error.response?.data?.detail || error.message || 'Erro ao baixar vendas';
+      console.error("Erro completo:", error);
+      console.error("Erro response:", error.response);
+      console.error("Erro response data:", error.response?.data);
+      console.error("Erro response status:", error.response?.status);
+
+      const mensagemErro = error.response?.data?.detail || error.message || "Erro ao baixar vendas";
       toast.error(mensagemErro);
     } finally {
       setProcessando(false);
@@ -353,10 +359,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                 />
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white rounded-lg transition-colors"
-            >
+            <button onClick={onClose} className="p-2 hover:bg-white rounded-lg transition-colors">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -393,13 +396,15 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                     onClick={selecionarTodas}
                     className="text-blue-600 hover:text-blue-700 font-medium text-sm"
                   >
-                    {vendasSelecionadas.length === vendas.length ? 'Desmarcar todas' : 'Selecionar todas'}
+                    {vendasSelecionadas.length === vendas.length
+                      ? "Desmarcar todas"
+                      : "Selecionar todas"}
                   </button>
                   <button
-                    onClick={() => setOrdenacao(ordenacao === 'antiga' ? 'recente' : 'antiga')}
+                    onClick={() => setOrdenacao(ordenacao === "antiga" ? "recente" : "antiga")}
                     className="text-sm text-gray-600 hover:text-gray-700 flex items-center gap-1 font-medium"
                   >
-                    📅 {ordenacao === 'antiga' ? '↑ Mais Antigas' : '↓ Mais Recentes'}
+                    📅 {ordenacao === "antiga" ? "↑ Mais Antigas" : "↓ Mais Recentes"}
                   </button>
                 </div>
                 <div className="text-sm text-gray-600">
@@ -420,23 +425,35 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                           className="rounded border-gray-300"
                         />
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Venda</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Pago</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saldo Devedor</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Dias</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Venda
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Data
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Total
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Pago
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Saldo Devedor
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                        Dias
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {vendasOrdenadas.map((venda) => {
                       const dias = calcularDiasEmAberto(venda.data_venda);
                       const isVencido = dias > 30;
-                      
+
                       return (
                         <tr
                           key={venda.id}
-                          className={`hover:bg-gray-50 ${vendasSelecionadas.includes(venda.id) ? 'bg-blue-50' : ''}`}
+                          className={`hover:bg-gray-50 ${vendasSelecionadas.includes(venda.id) ? "bg-blue-50" : ""}`}
                         >
                           <td className="px-4 py-3">
                             <input
@@ -450,7 +467,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                             <SaleReference sale={venda} showPrefix={false} />
                           </td>
                           <td className="px-4 py-3 text-gray-600 text-sm">
-                            {new Date(venda.data_venda).toLocaleDateString('pt-BR')}
+                            {new Date(venda.data_venda).toLocaleDateString("pt-BR")}
                           </td>
                           <td className="px-4 py-3 text-right text-gray-900">
                             R$ {parseFloat(venda.total).toFixed(2)}
@@ -465,13 +482,13 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                             <span
                               className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                                 isVencido
-                                  ? 'bg-red-100 text-red-800'
+                                  ? "bg-red-100 text-red-800"
                                   : dias > 15
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-green-100 text-green-800'
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-green-100 text-green-800"
                               }`}
                             >
-                              {dias} {dias === 1 ? 'dia' : 'dias'}
+                              {dias} {dias === 1 ? "dia" : "dias"}
                             </span>
                           </td>
                         </tr>
@@ -485,7 +502,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
               {vendasSelecionadas.length > 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Registrar Pagamento</h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -495,7 +512,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                         R$ {totalSelecionado.toFixed(2)}
                       </div>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Valor do Pagamento *
@@ -529,7 +546,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                       </select>
                     </div>
 
-                    {(formaPagamento === 'pix' || formaPagamento === 'transferencia') && (
+                    {(formaPagamento === "pix" || formaPagamento === "transferencia") && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Número da Transação
@@ -561,13 +578,16 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                   <div className="flex items-start space-x-2 mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-yellow-800">
-                      <strong>Atenção:</strong> O valor será aplicado automaticamente da venda mais antiga para a mais recente. 
-                      Se o valor for insuficiente para quitar todas as vendas selecionadas, a última venda ficará parcialmente paga.
+                      <strong>Atenção:</strong> O valor será aplicado automaticamente da venda mais
+                      antiga para a mais recente. Se o valor for insuficiente para quitar todas as
+                      vendas selecionadas, a última venda ficará parcialmente paga.
                     </div>
                   </div>
 
                   <div className="mb-4 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
-                    <div className="text-sm font-semibold text-indigo-900 mb-1">Benefícios que esta baixa pode gerar</div>
+                    <div className="text-sm font-semibold text-indigo-900 mb-1">
+                      Benefícios que esta baixa pode gerar
+                    </div>
                     <div className="text-xs text-indigo-700 mb-3">
                       Prévia baseada no valor informado e nas vendas que devem ficar quitadas agora.
                     </div>
@@ -577,36 +597,51 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
                     ) : (
                       <div className="space-y-2 text-sm text-indigo-900">
                         <div>
-                          Vendas que devem ser quitadas agora: <strong>{totalVendasQuitadasPrevistas}</strong>
+                          Vendas que devem ser quitadas agora:{" "}
+                          <strong>{totalVendasQuitadasPrevistas}</strong>
                         </div>
 
-                        {carimbosPrevistos.length > 0 && carimbosPrevistos.map((item) => (
-                          <div key={`carimbo-${item.campanha}`}>
-                            {item.campanha}: esta baixa está gerando <strong>{item.quantidade}</strong> carimbo(s).
-                          </div>
-                        ))}
+                        {carimbosPrevistos.length > 0 &&
+                          carimbosPrevistos.map((item) => (
+                            <div key={`carimbo-${item.campanha}`}>
+                              {item.campanha}: esta baixa está gerando{" "}
+                              <strong>{item.quantidade}</strong> carimbo(s).
+                            </div>
+                          ))}
 
-                        {cashbackPrevisto.length > 0 && cashbackPrevisto.map((item) => (
-                          <div key={`cashback-${item.campanha}`}>
-                            {item.campanha}: cashback previsto de <strong>{formatMoneyBRL(item.valor)}</strong>
-                            {item.percentual === null
-                              ? " (percentual varia por canal)."
-                              : ` (${formatBRL(item.percentual)}%).`}
-                          </div>
-                        ))}
+                        {cashbackPrevisto.length > 0 &&
+                          cashbackPrevisto.map((item) => (
+                            <div key={`cashback-${item.campanha}`}>
+                              {item.campanha}: cashback previsto de{" "}
+                              <strong>{formatMoneyBRL(item.valor)}</strong>
+                              {item.percentual === null
+                                ? " (percentual varia por canal)."
+                                : ` (${formatBRL(item.percentual)}%).`}
+                            </div>
+                          ))}
 
-                        {recompraPrevista.length > 0 && recompraPrevista.map((item) => (
-                          <div key={`recompra-${item.campanha}`}>
-                            {item.campanha}: pode gerar 1 cupom de recompra de
-                            <strong> {item.tipo === 'fixed' ? formatMoneyBRL(item.valor) : `${formatBRL(item.valor)}%`}</strong>.
-                          </div>
-                        ))}
+                        {recompraPrevista.length > 0 &&
+                          recompraPrevista.map((item) => (
+                            <div key={`recompra-${item.campanha}`}>
+                              {item.campanha}: pode gerar 1 cupom de recompra de
+                              <strong>
+                                {" "}
+                                {item.tipo === "fixed"
+                                  ? formatMoneyBRL(item.valor)
+                                  : `${formatBRL(item.valor)}%`}
+                              </strong>
+                              .
+                            </div>
+                          ))}
 
-                        {carimbosPrevistos.length === 0 && cashbackPrevisto.length === 0 && recompraPrevista.length === 0 && (
-                          <div>
-                            Com o valor atual, não há benefício de campanha previsto para esta baixa.
-                          </div>
-                        )}
+                        {carimbosPrevistos.length === 0 &&
+                          cashbackPrevisto.length === 0 &&
+                          recompraPrevista.length === 0 && (
+                            <div>
+                              Com o valor atual, não há benefício de campanha previsto para esta
+                              baixa.
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>

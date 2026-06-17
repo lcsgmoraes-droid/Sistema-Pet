@@ -10,8 +10,7 @@ export default function PDVDescontoTotalModal({
   valorDescontoTotal,
 }) {
   const totalBruto = itens.reduce(
-    (sum, item) =>
-      sum + (item.preco_unitario || item.preco_venda) * item.quantidade,
+    (sum, item) => sum + (item.preco_unitario || item.preco_venda) * item.quantidade,
     0,
   );
   const descontoPreview =
@@ -23,31 +22,20 @@ export default function PDVDescontoTotalModal({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
         <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <h3 className="text-xl font-bold text-gray-900">
-            💰 Aplicar desconto
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <h3 className="text-xl font-bold text-gray-900">💰 Aplicar desconto</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X size={24} />
           </button>
         </div>
 
         <div className="p-6 space-y-4">
           <div className="bg-gray-100 p-4 rounded-lg">
-            <div className="text-sm text-gray-600">
-              Total bruto (sem desconto)
-            </div>
-            <div className="text-2xl font-bold text-gray-900">
-              R$ {totalBruto.toFixed(2)}
-            </div>
+            <div className="text-sm text-gray-600">Total bruto (sem desconto)</div>
+            <div className="text-2xl font-bold text-gray-900">R$ {totalBruto.toFixed(2)}</div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tipo de desconto
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de desconto</label>
             <div className="flex gap-2">
               <button
                 onClick={() => setTipoDescontoTotal("valor")}
@@ -73,9 +61,7 @@ export default function PDVDescontoTotalModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Valor
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Valor</label>
             <div className="relative">
               <span className="absolute left-3 top-3 text-gray-500">
                 {tipoDescontoTotal === "valor" ? "R$" : "%"}
@@ -84,9 +70,7 @@ export default function PDVDescontoTotalModal({
                 type="number"
                 step="0.01"
                 value={valorDescontoTotal}
-                onChange={(e) =>
-                  setValorDescontoTotal(parseFloat(e.target.value) || 0)
-                }
+                onChange={(e) => setValorDescontoTotal(parseFloat(e.target.value) || 0)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"
               />
@@ -96,9 +80,7 @@ export default function PDVDescontoTotalModal({
           <div className="bg-blue-50 p-4 rounded-lg">
             <div className="flex justify-between text-sm mb-1">
               <span className="text-gray-700">Desconto</span>
-              <span className="text-red-600 font-medium">
-                - R$ {descontoPreview.toFixed(2)}
-              </span>
+              <span className="text-red-600 font-medium">- R$ {descontoPreview.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-baseline border-t border-blue-200 pt-2 mt-2">
               <span className="text-sm text-gray-700">Total líquido</span>

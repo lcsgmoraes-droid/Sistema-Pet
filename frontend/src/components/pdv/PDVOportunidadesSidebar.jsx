@@ -35,12 +35,8 @@ export default function PDVOportunidadesSidebar({
               key={opp.id}
               className="p-3 bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors"
             >
-              <h3 className="text-xs font-medium text-gray-900 mb-1">
-                {opp.titulo}
-              </h3>
-              <p className="text-xs text-gray-700 mb-2 leading-relaxed">
-                {opp.descricao_curta}
-              </p>
+              <h3 className="text-xs font-medium text-gray-900 mb-1">{opp.titulo}</h3>
+              <p className="text-xs text-gray-700 mb-2 leading-relaxed">{opp.descricao_curta}</p>
 
               <div className="flex items-center justify-between gap-2 text-xs mt-2">
                 <button
@@ -82,9 +78,7 @@ export default function PDVOportunidadesSidebar({
 
         <div className="px-4 py-2 border-t border-gray-200 bg-white">
           <p className="text-[10px] text-gray-400 text-center">
-            {opportunities.length > 0
-              ? `${Math.min(opportunities.length, 6)} oportunidades`
-              : ""}
+            {opportunities.length > 0 ? `${Math.min(opportunities.length, 6)} oportunidades` : ""}
           </p>
         </div>
       </div>

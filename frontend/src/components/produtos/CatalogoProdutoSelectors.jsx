@@ -7,11 +7,7 @@ export function getCategoriaProdutoLabel(categoria) {
 }
 
 export function getCategoriaProdutoSearchText(categoria) {
-  return [
-    categoria?.nome,
-    categoria?.nomeFormatado,
-    categoria?.descricao,
-  ]
+  return [categoria?.nome, categoria?.nomeFormatado, categoria?.descricao]
     .filter(Boolean)
     .join(" ");
 }

@@ -1,4 +1,13 @@
-import { FileText, GitMerge, Package, Pencil, Plus, Settings, Trash2, UploadCloud } from "lucide-react";
+import {
+  FileText,
+  GitMerge,
+  Package,
+  Pencil,
+  Plus,
+  Settings,
+  Trash2,
+  UploadCloud,
+} from "lucide-react";
 import ActionButton from "../ui/ActionButton";
 import PageHeader from "../ui/PageHeader";
 

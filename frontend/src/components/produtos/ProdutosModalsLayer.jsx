@@ -1,4 +1,3 @@
-import React from "react";
 import ModalImportacaoProdutos from "../ModalImportacaoProdutos";
 import ProdutosColunasModal from "./ProdutosColunasModal";
 import ProdutosConflitoExclusaoModal from "./ProdutosConflitoExclusaoModal";

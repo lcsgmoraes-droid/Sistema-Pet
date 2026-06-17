@@ -12,7 +12,7 @@ export default function ProdutoFiscalTab({ produto }) {
         const { data } = await api.get(`/produto/${produto.id}/fiscal`);
         setFiscal(data);
         setPersonalizado(!data.herdado_da_empresa);
-      } catch (e) {
+      } catch {
         setFiscal({});
       }
     }
@@ -22,7 +22,7 @@ export default function ProdutoFiscalTab({ produto }) {
       if (personalizado) return;
 
       const { data } = await api.post("/fiscal/sugestao/produto", {
-        descricao: produto.descricao
+        descricao: produto.descricao,
       });
       setSugestoes(data.sugestoes || []);
     }
@@ -35,7 +35,7 @@ export default function ProdutoFiscalTab({ produto }) {
     const { name, value } = e.target;
     setFiscal({
       ...fiscal,
-      [name]: value
+      [name]: value,
     });
     setPersonalizado(true);
   }
@@ -65,33 +65,49 @@ export default function ProdutoFiscalTab({ produto }) {
       <h3>Fiscal do Produto</h3>
 
       <label>
-        NCM {personalizado ? <span className="badge yellow">Personalizado</span> : <span className="badge">Sugerido</span>}
+        NCM{" "}
+        {personalizado ? (
+          <span className="badge yellow">Personalizado</span>
+        ) : (
+          <span className="badge">Sugerido</span>
+        )}
       </label>
       <input name="ncm" value={fiscal.ncm || ""} onChange={editarCampo} />
 
       <label>
-        CEST {personalizado ? <span className="badge yellow">Personalizado</span> : <span className="badge">Sugerido</span>}
+        CEST{" "}
+        {personalizado ? (
+          <span className="badge yellow">Personalizado</span>
+        ) : (
+          <span className="badge">Sugerido</span>
+        )}
       </label>
       <input name="cest" value={fiscal.cest || ""} onChange={editarCampo} />
 
       <label>
-        CST ICMS {personalizado ? <span className="badge yellow">Personalizado</span> : <span className="badge">Sugerido</span>}
+        CST ICMS{" "}
+        {personalizado ? (
+          <span className="badge yellow">Personalizado</span>
+        ) : (
+          <span className="badge">Sugerido</span>
+        )}
       </label>
       <input name="cst_icms" value={fiscal.cst_icms || ""} onChange={editarCampo} />
 
       <label>
-        ICMS ST {personalizado ? <span className="badge yellow">Personalizado</span> : <span className="badge">Sugerido</span>}
+        ICMS ST{" "}
+        {personalizado ? (
+          <span className="badge yellow">Personalizado</span>
+        ) : (
+          <span className="badge">Sugerido</span>
+        )}
       </label>
       <select name="icms_st" value={fiscal.icms_st ? "true" : "false"} onChange={editarCampo}>
         <option value="true">Sim</option>
         <option value="false">Não</option>
       </select>
 
-      {personalizado && (
-        <button onClick={salvarEdicaoManual}>
-          Salvar alterações manuais
-        </button>
-      )}
+      {personalizado && <button onClick={salvarEdicaoManual}>Salvar alterações manuais</button>}
 
       <button className="secondary" onClick={resetar}>
         Resetar para padrão da empresa
@@ -100,12 +116,12 @@ export default function ProdutoFiscalTab({ produto }) {
       {!personalizado && sugestoes.length > 0 && (
         <div className="suggestion-box">
           <h4>💡 Sugestão do sistema</h4>
-          <p><strong>{sugestoes[0].categoria_fiscal}</strong></p>
+          <p>
+            <strong>{sugestoes[0].categoria_fiscal}</strong>
+          </p>
           <p>{sugestoes[0].observacao}</p>
 
-          <button onClick={() => aplicarSugestao(sugestoes[0])}>
-            Aplicar sugestão
-          </button>
+          <button onClick={() => aplicarSugestao(sugestoes[0])}>Aplicar sugestão</button>
           <button className="secondary" onClick={() => setSugestoes([])}>
             Ignorar
           </button>

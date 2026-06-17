@@ -5,9 +5,7 @@ export const parseNumeroBR = (valor) => {
   const texto = String(valor).trim();
   if (!texto) return Number.NaN;
 
-  const normalizado = texto.includes(",")
-    ? texto.replaceAll(".", "").replace(",", ".")
-    : texto;
+  const normalizado = texto.includes(",") ? texto.replaceAll(".", "").replace(",", ".") : texto;
   const numero = Number(normalizado);
   return Number.isFinite(numero) ? numero : Number.NaN;
 };
@@ -24,7 +22,7 @@ export const formatQtd = (valor) => {
 export const montarMovimentoBalanco = (
   produto,
   saldoFinal,
-  { numeroLote = "", dataValidade = "" } = {}
+  { numeroLote = "", dataValidade = "" } = {},
 ) => {
   const estoqueAtual = parseNumeroBR(produto?.estoque_atual ?? 0);
   if (!Number.isFinite(estoqueAtual)) {

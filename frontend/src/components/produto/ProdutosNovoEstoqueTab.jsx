@@ -11,9 +11,14 @@ export default function ProdutosNovoEstoqueTab({
 }) {
   return (
     <div className="space-y-6">
-      {formData.tipo_produto === 'PAI' ? (
+      {formData.tipo_produto === "PAI" ? (
         <div className="text-center py-12 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50">
-          <svg className="mx-auto h-12 w-12 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg
+            className="mx-auto h-12 w-12 text-blue-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -24,8 +29,7 @@ export default function ProdutosNovoEstoqueTab({
           <p className="mt-4 text-lg font-medium text-blue-900">Produto com Variações</p>
           <p className="mt-2 text-sm text-blue-700">
             Produtos PAI não possuem estoque próprio.
-            <br />
-            O controle de estoque é feito individualmente nas variações.
+            <br />O controle de estoque é feito individualmente nas variações.
           </p>
         </div>
       ) : (
@@ -36,7 +40,7 @@ export default function ProdutosNovoEstoqueTab({
                 <input
                   type="checkbox"
                   checked={formData.controle_lote}
-                  onChange={(e) => handleChange('controle_lote', e.target.checked)}
+                  onChange={(e) => handleChange("controle_lote", e.target.checked)}
                   className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="text-sm font-medium text-gray-700">Controlar Estoque</span>
@@ -49,7 +53,7 @@ export default function ProdutosNovoEstoqueTab({
                 type="number"
                 step="0.01"
                 value={formData.estoque_minimo}
-                onChange={(e) => handleChange('estoque_minimo', e.target.value)}
+                onChange={(e) => handleChange("estoque_minimo", e.target.value)}
                 disabled={!formData.controle_lote}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                 placeholder="0"
@@ -62,7 +66,7 @@ export default function ProdutosNovoEstoqueTab({
                 type="number"
                 step="0.01"
                 value={formData.estoque_maximo}
-                onChange={(e) => handleChange('estoque_maximo', e.target.value)}
+                onChange={(e) => handleChange("estoque_maximo", e.target.value)}
                 disabled={!formData.controle_lote}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
                 placeholder="0"
@@ -76,7 +80,7 @@ export default function ProdutosNovoEstoqueTab({
                 type="checkbox"
                 checked={formData.e_granel ? false : formData.participa_sugestao_compra !== false}
                 disabled={formData.e_granel}
-                onChange={(e) => handleChange('participa_sugestao_compra', e.target.checked)}
+                onChange={(e) => handleChange("participa_sugestao_compra", e.target.checked)}
                 className="mt-1 h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50"
               />
               <span>
@@ -111,23 +115,41 @@ export default function ProdutosNovoEstoqueTab({
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lote</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd Disponível</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fabricação</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Validade</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Custo Unit.</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Lote
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                          Qtd Disponível
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Fabricação
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Validade
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                          Custo Unit.
+                        </th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                          Ações
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {lotes.map((lote) => (
                         <tr key={lote.id}>
-                          <td className="px-4 py-3 text-sm text-gray-900">{lote.nome_lote || '-'}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {lote.nome_lote || "-"}
+                          </td>
                           <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
                             {lote.quantidade_disponivel}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-700">{formatarData(lote.data_fabricacao)}</td>
-                          <td className="px-4 py-3 text-sm text-gray-700">{formatarData(lote.data_validade)}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {formatarData(lote.data_fabricacao)}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700">
+                            {formatarData(lote.data_validade)}
+                          </td>
                           <td className="px-4 py-3 text-sm text-right text-gray-900">
                             {formatarMoeda(lote.custo_unitario)}
                           </td>
@@ -139,7 +161,12 @@ export default function ProdutosNovoEstoqueTab({
                                 className="text-blue-600 hover:text-blue-800"
                                 title="Editar lote"
                               >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg
+                                  className="w-5 h-5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
                                   <path
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
@@ -154,7 +181,12 @@ export default function ProdutosNovoEstoqueTab({
                                 className="text-red-600 hover:text-red-800"
                                 title="Excluir lote"
                               >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg
+                                  className="w-5 h-5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
                                   <path
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
@@ -174,7 +206,11 @@ export default function ProdutosNovoEstoqueTab({
             </>
           )}
 
-          {!isEdicao && <div className="text-center py-8 text-gray-500">Salve o produto primeiro para gerenciar lotes</div>}
+          {!isEdicao && (
+            <div className="text-center py-8 text-gray-500">
+              Salve o produto primeiro para gerenciar lotes
+            </div>
+          )}
         </>
       )}
     </div>

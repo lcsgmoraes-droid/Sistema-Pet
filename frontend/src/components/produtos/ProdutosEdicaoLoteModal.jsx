@@ -1,9 +1,6 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../../api";
-import {
-  CategoriaProdutoSelector,
-  MarcaProdutoSelector,
-} from "./CatalogoProdutoSelectors";
+import { CategoriaProdutoSelector, MarcaProdutoSelector } from "./CatalogoProdutoSelectors";
 import FornecedorPrincipalDecisaoModal from "./FornecedorPrincipalDecisaoModal";
 import ProdutosFornecedoresLoteSection from "./ProdutosFornecedoresLoteSection";
 
@@ -91,15 +88,14 @@ export default function ProdutosEdicaoLoteModal({
     const carregarOpcoesRacao = async () => {
       try {
         setLoadingOpcoesRacao(true);
-        const [linhas, portes, fases, tratamentos, sabores, apresentacoes] =
-          await Promise.all([
-            api.get("/opcoes-racao/linhas", { params: { apenas_ativos: true } }),
-            api.get("/opcoes-racao/portes", { params: { apenas_ativos: true } }),
-            api.get("/opcoes-racao/fases", { params: { apenas_ativos: true } }),
-            api.get("/opcoes-racao/tratamentos", { params: { apenas_ativos: true } }),
-            api.get("/opcoes-racao/sabores", { params: { apenas_ativos: true } }),
-            api.get("/opcoes-racao/apresentacoes", { params: { apenas_ativos: true } }),
-          ]);
+        const [linhas, portes, fases, tratamentos, sabores, apresentacoes] = await Promise.all([
+          api.get("/opcoes-racao/linhas", { params: { apenas_ativos: true } }),
+          api.get("/opcoes-racao/portes", { params: { apenas_ativos: true } }),
+          api.get("/opcoes-racao/fases", { params: { apenas_ativos: true } }),
+          api.get("/opcoes-racao/tratamentos", { params: { apenas_ativos: true } }),
+          api.get("/opcoes-racao/sabores", { params: { apenas_ativos: true } }),
+          api.get("/opcoes-racao/apresentacoes", { params: { apenas_ativos: true } }),
+        ]);
 
         if (!ativo) return;
 
@@ -166,13 +162,16 @@ export default function ProdutosEdicaoLoteModal({
     (fornecedor) => Number(fornecedor.id) === Number(dadosEdicaoLote.fornecedor_id),
   );
   const nomeFornecedorSelecionado =
-    fornecedorSelecionado?.nome
-    || fornecedorSelecionado?.razao_social
-    || fornecedorSelecionado?.nome_fantasia
-    || "Fornecedor selecionado";
+    fornecedorSelecionado?.nome ||
+    fornecedorSelecionado?.razao_social ||
+    fornecedorSelecionado?.nome_fantasia ||
+    "Fornecedor selecionado";
 
   const salvarComDecisaoFornecedor = () => {
-    if (dadosEdicaoLote.fornecedor_operacao === "definir_principal" && dadosEdicaoLote.fornecedor_id) {
+    if (
+      dadosEdicaoLote.fornecedor_operacao === "definir_principal" &&
+      dadosEdicaoLote.fornecedor_id
+    ) {
       setDecisaoFornecedor("");
       setMostrarDecisaoFornecedor(true);
       return;
@@ -271,7 +270,8 @@ export default function ProdutosEdicaoLoteModal({
 
             {dadosEdicaoLote.ativo === "false" && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                Os produtos selecionados ficarao inativos e os canais e-commerce/app serao desligados automaticamente.
+                Os produtos selecionados ficarao inativos e os canais e-commerce/app serao
+                desligados automaticamente.
               </div>
             )}
           </section>
@@ -456,7 +456,8 @@ export default function ProdutosEdicaoLoteModal({
                 Canais de venda
               </h3>
               <p className="text-xs text-gray-500">
-                Se o produto estiver inativo na loja fisica, os canais continuam sendo desligados automaticamente.
+                Se o produto estiver inativo na loja fisica, os canais continuam sendo desligados
+                automaticamente.
               </p>
             </div>
 

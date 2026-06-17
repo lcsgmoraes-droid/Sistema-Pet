@@ -39,13 +39,8 @@ export default function PDVDescontoItemModal({
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 p-4">
       <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <h3 className="text-xl font-bold text-gray-900">
-            Alterar item da venda
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 transition-colors hover:text-gray-600"
-          >
+          <h3 className="text-xl font-bold text-gray-900">Alterar item da venda</h3>
+          <button onClick={onClose} className="text-gray-400 transition-colors hover:text-gray-600">
             <X size={24} />
           </button>
         </div>
@@ -72,9 +67,7 @@ export default function PDVDescontoItemModal({
                 <h4 className="text-lg font-semibold leading-tight text-gray-900">
                   {itemEditando.produto_nome}
                 </h4>
-                <p className="text-sm text-gray-600">
-                  Codigo: {itemEditando.produto_codigo}
-                </p>
+                <p className="text-sm text-gray-600">Codigo: {itemEditando.produto_codigo}</p>
               </div>
               <p className="text-xs text-gray-500">
                 Confira a imagem, o preco e o desconto antes de salvar.
@@ -88,9 +81,7 @@ export default function PDVDescontoItemModal({
                 Preco <span className="text-red-600">*</span>
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-2.5 text-gray-500">
-                  R$
-                </span>
+                <span className="absolute left-3 top-2.5 text-gray-500">R$</span>
                 <input
                   type="number"
                   step="0.01"
@@ -107,9 +98,7 @@ export default function PDVDescontoItemModal({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Quantidade
-              </label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Quantidade</label>
               <input
                 type="number"
                 step="0.001"
@@ -120,13 +109,9 @@ export default function PDVDescontoItemModal({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Subtotal
-              </label>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Subtotal</label>
               <div className="relative">
-                <span className="absolute left-3 top-2.5 text-gray-500">
-                  R$
-                </span>
+                <span className="absolute left-3 top-2.5 text-gray-500">R$</span>
                 <input
                   type="text"
                   value={totalBruto.toFixed(2)}
@@ -138,9 +123,7 @@ export default function PDVDescontoItemModal({
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Tipo de desconto
-            </label>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Tipo de desconto</label>
             <div className="flex gap-2">
               <button
                 onClick={() =>
@@ -219,14 +202,11 @@ export default function PDVDescontoItemModal({
               <span className="text-gray-700">Total bruto</span>
               <span className="font-medium">R$ {totalBruto.toFixed(2)}</span>
             </div>
-            {(itemEditando.descontoValor > 0 ||
-              itemEditando.descontoPercentual > 0) && (
+            {(itemEditando.descontoValor > 0 || itemEditando.descontoPercentual > 0) && (
               <>
                 <div className="mt-1 flex justify-between text-sm text-red-600">
                   <span>Desconto</span>
-                  <span className="font-medium">
-                    - R$ {descontoCalculado.toFixed(2)}
-                  </span>
+                  <span className="font-medium">- R$ {descontoCalculado.toFixed(2)}</span>
                 </div>
                 <div className="mt-1 flex justify-between text-sm text-orange-600">
                   <span>{percentualEquivalente.toFixed(2)}% de desconto</span>
