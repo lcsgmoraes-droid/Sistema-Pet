@@ -742,6 +742,20 @@ def test_backend_ci_has_blocking_backend_fiscal_nf_root_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_stock_conciliation_root_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend stock conciliation root format (blocking)" in source
+    assert (
+        "ruff format --check app/conciliacao_bancaria_routes.py "
+        "app/conciliacao_cartao_routes.py app/conciliacao_helpers.py "
+        "app/conciliacao_historico_routes.py app/conciliacao_models.py "
+        "app/conciliacao_operadora_detector.py "
+        "app/estoque_movimentacoes_manuais_routes.py "
+        "app/estoque_relatorios_routes.py app/estoque_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_backend_routers_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
