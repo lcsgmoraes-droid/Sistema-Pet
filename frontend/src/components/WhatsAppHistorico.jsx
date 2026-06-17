@@ -15,9 +15,7 @@ export default function WhatsAppHistorico({ clienteId }) {
   const loadMensagens = async () => {
     try {
       setLoadingMensagens(true);
-      const response = await api.get(
-        `/whatsapp/clientes/${clienteId}/whatsapp/ultimas?limit=5`,
-      );
+      const response = await api.get(`/whatsapp/clientes/${clienteId}/whatsapp/ultimas?limit=5`);
       setMensagens(response.data);
     } catch (err) {
       console.error("Erro ao carregar mensagens:", err);
@@ -41,18 +39,14 @@ export default function WhatsAppHistorico({ clienteId }) {
       <div className="text-center py-6 text-gray-500">
         <FiMessageCircle size={32} className="mx-auto mb-2 text-gray-400" />
         <p className="text-sm">Nenhuma mensagem registrada ainda</p>
-        <p className="text-xs mt-1">
-          As mensagens enviadas e recebidas aparecerao aqui
-        </p>
+        <p className="text-xs mt-1">As mensagens enviadas e recebidas aparecerao aqui</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <p className="text-sm font-medium text-gray-700 mb-3">
-        Ultimas 5 mensagens:
-      </p>
+      <p className="text-sm font-medium text-gray-700 mb-3">Ultimas 5 mensagens:</p>
       {mensagens.map((msg) => (
         <div
           key={msg.id}
@@ -66,9 +60,7 @@ export default function WhatsAppHistorico({ clienteId }) {
             <div className="flex items-center gap-2">
               <span
                 className={`text-xs font-semibold ${
-                  msg.direcao === "enviada"
-                    ? "text-green-700"
-                    : "text-blue-700"
+                  msg.direcao === "enviada" ? "text-green-700" : "text-blue-700"
                 }`}
               >
                 {msg.direcao === "enviada" ? "-> Enviada" : "<- Recebida"}

@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
-import { X, Search, RotateCcw, AlertCircle, Check, Filter, Package, Layers } from 'lucide-react';
-import api from '../api';
-import CustomerIdentity from './ui/CustomerIdentity';
-import ProductIdentity from './ui/ProductIdentity';
-import SaleReference from './ui/SaleReference';
+import { useState, useEffect, useRef } from "react";
+import { X, RotateCcw, AlertCircle, Check, Package, Layers } from "lucide-react";
+import api from "../api";
+import CustomerIdentity from "./ui/CustomerIdentity";
+import ProductIdentity from "./ui/ProductIdentity";
+import SaleReference from "./ui/SaleReference";
 
 export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, onSucesso }) {
   const [passo, setPasso] = useState(1); // 1: listar vendas, 2: selecionar itens
@@ -11,45 +11,41 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
   const [vendaSelecionada, setVendaSelecionada] = useState(null);
   const [itensSelecionados, setItensSelecionados] = useState({});
   const [quantidades, setQuantidades] = useState({});
-  const [motivo, setMotivo] = useState('');
+  const [motivo, setMotivo] = useState("");
   const [gerarCredito, setGerarCredito] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState('');
+  const [erro, setErro] = useState("");
   const vendaInicialCarregadaRef = useRef(null);
-  
+
   // 🆕 Estados para devolução de KIT
   const [modoDevolucaoKit, setModoDevolucaoKit] = useState({}); // {itemId: 'kit_inteiro' | 'componentes'}
   const [componentesSelecionados, setComponentesSelecionados] = useState({}); // {itemId: {componenteId: true/false}}
   const [quantidadesComponentes, setQuantidadesComponentes] = useState({}); // {itemId: {componenteIndex: quantidade}}
-  
+
   // Filtros
   const [filtros, setFiltros] = useState({
-    busca: '',
-    data_inicio: '',
-    data_fim: '',
-    status: 'finalizada'
+    busca: "",
+    data_inicio: "",
+    data_fim: "",
+    status: "finalizada",
   });
 
-  const obterDataVenda = (venda) => (
-    venda?.data_venda
-    || venda?.data_criacao
-    || venda?.created_at
-    || venda?.data_finalizacao
-  );
+  const obterDataVenda = (venda) =>
+    venda?.data_venda || venda?.data_criacao || venda?.created_at || venda?.data_finalizacao;
 
   const formatarDataVenda = (venda) => {
     const data = obterDataVenda(venda);
-    if (!data) return 'Data não disponível';
+    if (!data) return "Data não disponível";
 
     const dataObj = new Date(data);
-    if (Number.isNaN(dataObj.getTime())) return 'Data não disponível';
+    if (Number.isNaN(dataObj.getTime())) return "Data não disponível";
 
-    return dataObj.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return dataObj.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -67,19 +63,19 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
 
   const buscarVendas = async () => {
     setLoading(true);
-    setErro('');
+    setErro("");
 
     try {
       const params = {
         per_page: 50,
-        ...filtros
+        ...filtros,
       };
-      
-      const response = await api.get('/vendas', { params });
+
+      const response = await api.get("/vendas", { params });
       setVendas(response.data.vendas || []);
     } catch (error) {
-      console.error('Erro ao buscar vendas:', error);
-      setErro('Erro ao carregar vendas');
+      console.error("Erro ao buscar vendas:", error);
+      setErro("Erro ao carregar vendas");
     } finally {
       setLoading(false);
     }
@@ -87,7 +83,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
 
   const selecionarVenda = async (venda) => {
     setLoading(true);
-    setErro('');
+    setErro("");
 
     try {
       // Buscar detalhes completos da venda
@@ -97,20 +93,20 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
       setModoDevolucaoKit({});
       setComponentesSelecionados({});
       setQuantidadesComponentes({});
-      setMotivo('');
-      setErro('');
-      
+      setMotivo("");
+      setErro("");
+
       // Inicializar quantidades com o máximo disponível
       const qtds = {};
-      response.data.itens.forEach(item => {
+      response.data.itens.forEach((item) => {
         qtds[item.id] = item.quantidade;
       });
       setQuantidades(qtds);
-      
+
       setPasso(2);
     } catch (error) {
-      console.error('Erro ao buscar venda:', error);
-      setErro(error.response?.data?.detail || 'Erro ao carregar detalhes da venda');
+      console.error("Erro ao buscar venda:", error);
+      setErro(error.response?.data?.detail || "Erro ao carregar detalhes da venda");
     } finally {
       setLoading(false);
     }
@@ -118,25 +114,25 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
 
   const toggleItem = (itemId) => {
     const wasSelected = itensSelecionados[itemId];
-    
-    setItensSelecionados(prev => ({
+
+    setItensSelecionados((prev) => ({
       ...prev,
-      [itemId]: !prev[itemId]
+      [itemId]: !prev[itemId],
     }));
-    
+
     // 🆕 Se está desmarcando, limpar estados do KIT
     if (wasSelected) {
-      setModoDevolucaoKit(prev => {
+      setModoDevolucaoKit((prev) => {
         const novo = { ...prev };
         delete novo[itemId];
         return novo;
       });
-      setComponentesSelecionados(prev => {
+      setComponentesSelecionados((prev) => {
         const novo = { ...prev };
         delete novo[itemId];
         return novo;
       });
-      setQuantidadesComponentes(prev => {
+      setQuantidadesComponentes((prev) => {
         const novo = { ...prev };
         delete novo[itemId];
         return novo;
@@ -145,30 +141,30 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
   };
 
   const handleQuantidadeChange = (itemId, valor) => {
-    const item = vendaSelecionada.itens.find(i => i.id === itemId);
+    const item = vendaSelecionada.itens.find((i) => i.id === itemId);
     const qtdMaxima = item.quantidade;
     const qtdNova = Math.min(Math.max(0, parseFloat(valor) || 0), qtdMaxima);
-    
-    setQuantidades(prev => ({
+
+    setQuantidades((prev) => ({
       ...prev,
-      [itemId]: qtdNova
+      [itemId]: qtdNova,
     }));
   };
 
   // 🆕 Funções para gerenciar devolução de KIT
   const isItemKit = (item) => {
-    return item.tipo_produto === 'KIT' && item.composicao_kit && item.composicao_kit.length > 0;
+    return item.tipo_produto === "KIT" && item.composicao_kit && item.composicao_kit.length > 0;
   };
 
   const handleEscolhaModoKit = (itemId, modo) => {
-    setModoDevolucaoKit(prev => ({
+    setModoDevolucaoKit((prev) => ({
       ...prev,
-      [itemId]: modo
+      [itemId]: modo,
     }));
 
     // Se escolheu componentes, inicializar estados
-    if (modo === 'componentes') {
-      const item = vendaSelecionada.itens.find(i => i.id === itemId);
+    if (modo === "componentes") {
+      const item = vendaSelecionada.itens.find((i) => i.id === itemId);
       if (item && item.composicao_kit) {
         // Inicializar todos componentes como NÃO selecionados
         const compSel = {};
@@ -178,56 +174,58 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
           // Quantidade máxima = quantidade do componente no KIT * quantidade do KIT vendido
           compQtd[index] = comp.quantidade * item.quantidade;
         });
-        
-        setComponentesSelecionados(prev => ({
+
+        setComponentesSelecionados((prev) => ({
           ...prev,
-          [itemId]: compSel
+          [itemId]: compSel,
         }));
-        
-        setQuantidadesComponentes(prev => ({
+
+        setQuantidadesComponentes((prev) => ({
           ...prev,
-          [itemId]: compQtd
+          [itemId]: compQtd,
         }));
       }
     }
   };
 
   const toggleComponente = (itemId, componenteIndex) => {
-    setComponentesSelecionados(prev => ({
+    setComponentesSelecionados((prev) => ({
       ...prev,
       [itemId]: {
         ...(prev[itemId] || {}),
-        [componenteIndex]: !prev[itemId]?.[componenteIndex]
-      }
+        [componenteIndex]: !prev[itemId]?.[componenteIndex],
+      },
     }));
   };
 
   const handleQuantidadeComponenteChange = (itemId, componenteIndex, valor) => {
-    const item = vendaSelecionada.itens.find(i => i.id === itemId);
+    const item = vendaSelecionada.itens.find((i) => i.id === itemId);
     const componente = item.composicao_kit[componenteIndex];
     const qtdMaxima = componente.quantidade * item.quantidade;
     const qtdNova = Math.min(Math.max(0, parseFloat(valor) || 0), qtdMaxima);
-    
-    setQuantidadesComponentes(prev => ({
+
+    setQuantidadesComponentes((prev) => ({
       ...prev,
       [itemId]: {
         ...(prev[itemId] || {}),
-        [componenteIndex]: qtdNova
-      }
+        [componenteIndex]: qtdNova,
+      },
     }));
   };
 
   const handleConfirmar = async () => {
     // 🆕 Validar KITs: se selecionou KIT, precisa escolher modo
     const itensKitSemEscolha = Object.keys(itensSelecionados)
-      .filter(id => itensSelecionados[id])
-      .filter(id => {
-        const item = vendaSelecionada.itens.find(i => i.id === parseInt(id));
+      .filter((id) => itensSelecionados[id])
+      .filter((id) => {
+        const item = vendaSelecionada.itens.find((i) => i.id === parseInt(id));
         return isItemKit(item) && !modoDevolucaoKit[id];
       });
 
     if (itensKitSemEscolha.length > 0) {
-      setErro('Para itens KIT, você deve escolher entre devolver o KIT inteiro ou selecionar componentes');
+      setErro(
+        "Para itens KIT, você deve escolher entre devolver o KIT inteiro ou selecionar componentes",
+      );
       return;
     }
 
@@ -235,41 +233,45 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
     const itensDevolucao = [];
 
     Object.keys(itensSelecionados)
-      .filter(id => itensSelecionados[id])
-      .forEach(id => {
+      .filter((id) => itensSelecionados[id])
+      .forEach((id) => {
         const itemId = parseInt(id);
-        const item = vendaSelecionada.itens.find(i => i.id === itemId);
+        const item = vendaSelecionada.itens.find((i) => i.id === itemId);
 
         if (isItemKit(item)) {
           const modo = modoDevolucaoKit[id];
 
-          if (modo === 'kit_inteiro') {
+          if (modo === "kit_inteiro") {
             // Devolver KIT inteiro
             itensDevolucao.push({
               item_id: itemId,
-              quantidade: quantidades[id]
+              quantidade: quantidades[id],
             });
-          } else if (modo === 'componentes') {
+          } else if (modo === "componentes") {
             // Devolver apenas componentes selecionados
             const compSel = componentesSelecionados[id] || {};
             const compQtd = quantidadesComponentes[id] || {};
 
             const componentesParaDevolver = Object.keys(compSel)
-              .filter(index => compSel[index])
-              .map(index => parseInt(index));
+              .filter((index) => compSel[index])
+              .map((index) => parseInt(index));
 
             if (componentesParaDevolver.length === 0) {
-              setErro(`Você deve selecionar pelo menos um componente do KIT "${item.produto_nome}"`);
+              setErro(
+                `Você deve selecionar pelo menos um componente do KIT "${item.produto_nome}"`,
+              );
               return;
             }
 
             // Para cada componente selecionado, criar entrada de devolução
-            componentesParaDevolver.forEach(index => {
+            componentesParaDevolver.forEach((index) => {
               const componente = item.composicao_kit[index];
               const qtd = compQtd[index] || 0;
 
               if (qtd <= 0) {
-                setErro(`Quantidade do componente "${componente.produto_nome}" deve ser maior que zero`);
+                setErro(
+                  `Quantidade do componente "${componente.produto_nome}" deve ser maior que zero`,
+                );
                 return;
               }
 
@@ -278,9 +280,12 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
               itensDevolucao.push({
                 produto_id: componente.produto_id,
                 quantidade: qtd,
-                preco_unitario: (item.preco_unitario / item.composicao_kit.reduce((sum, c) => sum + c.quantidade, 0)) * componente.quantidade,
+                preco_unitario:
+                  (item.preco_unitario /
+                    item.composicao_kit.reduce((sum, c) => sum + c.quantidade, 0)) *
+                  componente.quantidade,
                 is_componente_kit: true,
-                kit_item_id: itemId
+                kit_item_id: itemId,
               });
             });
           }
@@ -288,44 +293,44 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
           // Item normal (não KIT)
           itensDevolucao.push({
             item_id: itemId,
-            quantidade: quantidades[id]
+            quantidade: quantidades[id],
           });
         }
       });
 
     if (itensDevolucao.length === 0) {
-      setErro('Selecione pelo menos um item para devolução');
+      setErro("Selecione pelo menos um item para devolução");
       return;
     }
 
     // Validar quantidades
-    const temQuantidadeInvalida = itensDevolucao.some(item => item.quantidade <= 0);
+    const temQuantidadeInvalida = itensDevolucao.some((item) => item.quantidade <= 0);
     if (temQuantidadeInvalida) {
-      setErro('Todas as quantidades devem ser maiores que zero');
+      setErro("Todas as quantidades devem ser maiores que zero");
       return;
     }
 
     if (!motivo.trim()) {
-      setErro('Informe o motivo da devolução');
+      setErro("Informe o motivo da devolução");
       return;
     }
 
     setLoading(true);
-    setErro('');
+    setErro("");
 
     try {
       await api.post(`/vendas/${vendaSelecionada.id}/devolucao`, {
         caixa_id: caixaId,
         itens: itensDevolucao,
         motivo: motivo,
-        gerar_credito: gerarCredito
+        gerar_credito: gerarCredito,
       });
 
-      alert('Devolução registrada com sucesso!');
+      alert("Devolução registrada com sucesso!");
       onSucesso();
     } catch (error) {
-      console.error('Erro ao registrar devolução:', error);
-      setErro(error.response?.data?.detail || 'Erro ao registrar devolução');
+      console.error("Erro ao registrar devolução:", error);
+      setErro(error.response?.data?.detail || "Erro ao registrar devolução");
     } finally {
       setLoading(false);
     }
@@ -333,37 +338,41 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
 
   const calcularTotalDevolucao = () => {
     if (!vendaSelecionada) return 0;
-    
+
     let total = 0;
 
     Object.keys(itensSelecionados)
-      .filter(id => itensSelecionados[id])
-      .forEach(id => {
-        const item = vendaSelecionada.itens.find(i => i.id === parseInt(id));
-        
+      .filter((id) => itensSelecionados[id])
+      .forEach((id) => {
+        const item = vendaSelecionada.itens.find((i) => i.id === parseInt(id));
+
         if (isItemKit(item)) {
           const modo = modoDevolucaoKit[id];
 
-          if (modo === 'kit_inteiro') {
+          if (modo === "kit_inteiro") {
             // Valor do KIT inteiro
             const qtd = quantidades[id] || 0;
             total += item.preco_unitario * qtd;
-          } else if (modo === 'componentes') {
+          } else if (modo === "componentes") {
             // Valor proporcional dos componentes
             const compSel = componentesSelecionados[id] || {};
             const compQtd = quantidadesComponentes[id] || {};
-            
+
             // Calcular valor proporcional baseado na composição
-            const totalQuantidadeComposicao = item.composicao_kit.reduce((sum, c) => sum + c.quantidade, 0);
-            
+            const totalQuantidadeComposicao = item.composicao_kit.reduce(
+              (sum, c) => sum + c.quantidade,
+              0,
+            );
+
             Object.keys(compSel)
-              .filter(index => compSel[index])
-              .forEach(index => {
+              .filter((index) => compSel[index])
+              .forEach((index) => {
                 const componente = item.composicao_kit[index];
                 const qtd = compQtd[index] || 0;
-                
+
                 // Valor proporcional do componente
-                const valorProporcional = (item.preco_unitario / totalQuantidadeComposicao) * componente.quantidade;
+                const valorProporcional =
+                  (item.preco_unitario / totalQuantidadeComposicao) * componente.quantidade;
                 const qtdKits = qtd / componente.quantidade;
                 total += valorProporcional * qtdKits;
               });
@@ -390,14 +399,11 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Devolução</h2>
               <p className="text-sm text-gray-500">
-                {passo === 1 ? 'Selecione a venda' : 'Selecionar itens para devolução'}
+                {passo === 1 ? "Selecione a venda" : "Selecionar itens para devolução"}
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -411,9 +417,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
               <div className="bg-gray-50 rounded-lg p-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Buscar
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Buscar</label>
                     <input
                       type="text"
                       value={filtros.busca}
@@ -436,9 +440,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Data Fim
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Data Fim</label>
                     <input
                       type="date"
                       value={filtros.data_fim}
@@ -469,7 +471,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                       tabIndex={0}
                       onClick={() => selecionarVenda(venda)}
                       onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
+                        if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
                           selecionarVenda(venda);
                         }
@@ -482,11 +484,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                             <SaleReference sale={venda} />
                           </div>
                           <div className="mt-1 text-sm text-gray-600">
-                            <CustomerIdentity
-                              fallback="Consumidor Final"
-                              showLabel
-                              venda={venda}
-                            />
+                            <CustomerIdentity fallback="Consumidor Final" showLabel venda={venda} />
                           </div>
                           <div className="text-xs text-gray-500 mt-1">
                             {formatarDataVenda(venda)}
@@ -496,13 +494,20 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                           <div className="text-lg font-bold text-green-600">
                             R$ {venda.total.toFixed(2)}
                           </div>
-                          <div className={`text-xs mt-1 px-2 py-1 rounded ${
-                            venda.status === 'finalizada' ? 'bg-green-100 text-green-800' :
-                            venda.status === 'baixa_parcial' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {venda.status === 'finalizada' ? 'Finalizada' :
-                             venda.status === 'baixa_parcial' ? 'Parcial' : 'Aberta'}
+                          <div
+                            className={`text-xs mt-1 px-2 py-1 rounded ${
+                              venda.status === "finalizada"
+                                ? "bg-green-100 text-green-800"
+                                : venda.status === "baixa_parcial"
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : "bg-gray-100 text-gray-800"
+                            }`}
+                          >
+                            {venda.status === "finalizada"
+                              ? "Finalizada"
+                              : venda.status === "baixa_parcial"
+                                ? "Parcial"
+                                : "Aberta"}
                           </div>
                         </div>
                       </div>
@@ -536,9 +541,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                 <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
                   <div>
                     <span className="text-gray-600">Data:</span>
-                    <span className="ml-2 font-medium">
-                      {formatarDataVenda(vendaSelecionada)}
-                    </span>
+                    <span className="ml-2 font-medium">{formatarDataVenda(vendaSelecionada)}</span>
                   </div>
                   <div>
                     <CustomerIdentity
@@ -550,7 +553,9 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                   </div>
                   <div>
                     <span className="text-gray-600">Total:</span>
-                    <span className="ml-2 font-medium text-green-600">R$ {vendaSelecionada.total.toFixed(2)}</span>
+                    <span className="ml-2 font-medium text-green-600">
+                      R$ {vendaSelecionada.total.toFixed(2)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -567,7 +572,9 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                       <div
                         key={item.id}
                         className={`border rounded-lg p-4 transition-colors ${
-                          itensSelecionados[item.id] ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                          itensSelecionados[item.id]
+                            ? "border-blue-500 bg-blue-50"
+                            : "border-gray-200"
                         }`}
                       >
                         <div className="flex items-start gap-4">
@@ -577,7 +584,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                             onChange={() => toggleItem(item.id)}
                             className="mt-1 w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                           />
-                          
+
                           <div className="flex-1">
                             <ProductIdentity
                               className="gap-2"
@@ -593,10 +600,10 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                               )}
                             </ProductIdentity>
                             <div className="text-sm text-gray-600">
-                              Preço unitário: R$ {item.preco_unitario.toFixed(2)} | 
-                              Qtd vendida: {item.quantidade}
+                              Preço unitário: R$ {item.preco_unitario.toFixed(2)} | Qtd vendida:{" "}
+                              {item.quantidade}
                             </div>
-                            
+
                             {/* 🆕 ESCOLHA: KIT INTEIRO OU COMPONENTES */}
                             {itensSelecionados[item.id] && isKit && (
                               <div className="mt-4 bg-white border-2 border-purple-300 rounded-lg p-4">
@@ -604,14 +611,14 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                                   <Package className="w-5 h-5 text-purple-600" />
                                   Como deseja devolver este KIT?
                                 </div>
-                                
+
                                 <div className="space-y-3">
                                   <label className="flex items-start gap-3 cursor-pointer group">
                                     <input
                                       type="radio"
                                       name={`modo-kit-${item.id}`}
-                                      checked={modoKit === 'kit_inteiro'}
-                                      onChange={() => handleEscolhaModoKit(item.id, 'kit_inteiro')}
+                                      checked={modoKit === "kit_inteiro"}
+                                      onChange={() => handleEscolhaModoKit(item.id, "kit_inteiro")}
                                       className="mt-1 w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
                                     />
                                     <div className="flex-1">
@@ -628,8 +635,8 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                                     <input
                                       type="radio"
                                       name={`modo-kit-${item.id}`}
-                                      checked={modoKit === 'componentes'}
-                                      onChange={() => handleEscolhaModoKit(item.id, 'componentes')}
+                                      checked={modoKit === "componentes"}
+                                      onChange={() => handleEscolhaModoKit(item.id, "componentes")}
                                       className="mt-1 w-4 h-4 text-purple-600 focus:ring-2 focus:ring-purple-500"
                                     />
                                     <div className="flex-1">
@@ -661,13 +668,14 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                                   className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                 />
                                 <span className="text-sm text-gray-600">
-                                  Subtotal: R$ {(item.preco_unitario * (quantidades[item.id] || 0)).toFixed(2)}
+                                  Subtotal: R${" "}
+                                  {(item.preco_unitario * (quantidades[item.id] || 0)).toFixed(2)}
                                 </span>
                               </div>
                             )}
 
                             {/* QUANTIDADE - KIT INTEIRO (quando escolheu devolver inteiro) */}
-                            {itensSelecionados[item.id] && isKit && modoKit === 'kit_inteiro' && (
+                            {itensSelecionados[item.id] && isKit && modoKit === "kit_inteiro" && (
                               <div className="mt-3 flex items-center gap-4">
                                 <label className="text-sm font-medium text-gray-700">
                                   Quantidade de KITs a devolver:
@@ -682,27 +690,31 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                                   className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                 />
                                 <span className="text-sm text-gray-600">
-                                  Subtotal: R$ {(item.preco_unitario * (quantidades[item.id] || 0)).toFixed(2)}
+                                  Subtotal: R${" "}
+                                  {(item.preco_unitario * (quantidades[item.id] || 0)).toFixed(2)}
                                 </span>
                               </div>
                             )}
 
                             {/* LISTA DE COMPONENTES (quando escolheu devolver por componentes) */}
-                            {itensSelecionados[item.id] && isKit && modoKit === 'componentes' && (
+                            {itensSelecionados[item.id] && isKit && modoKit === "componentes" && (
                               <div className="mt-4 bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
                                 <div className="font-semibold text-gray-800 mb-3">
                                   Selecione os componentes a devolver:
                                 </div>
                                 <div className="space-y-3">
                                   {item.composicao_kit.map((componente, compIndex) => {
-                                    const compSelecionado = componentesSelecionados[item.id]?.[compIndex];
+                                    const compSelecionado =
+                                      componentesSelecionados[item.id]?.[compIndex];
                                     const qtdMaxima = componente.quantidade * item.quantidade;
 
                                     return (
                                       <div
                                         key={compIndex}
                                         className={`border rounded-lg p-3 transition-colors ${
-                                          compSelecionado ? 'border-purple-500 bg-white' : 'border-gray-200 bg-gray-50'
+                                          compSelecionado
+                                            ? "border-purple-500 bg-white"
+                                            : "border-gray-200 bg-gray-50"
                                         }`}
                                       >
                                         <div className="flex items-start gap-3">
@@ -722,9 +734,10 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                                               />
                                             </div>
                                             <div className="text-xs text-gray-600 mt-1">
-                                              Qtd no KIT: {componente.quantidade} | Qtd total disponível: {qtdMaxima}
+                                              Qtd no KIT: {componente.quantidade} | Qtd total
+                                              disponível: {qtdMaxima}
                                             </div>
-                                            
+
                                             {compSelecionado && (
                                               <div className="mt-2 flex items-center gap-3">
                                                 <label className="text-xs font-medium text-gray-700">
@@ -735,8 +748,17 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                                                   step="0.01"
                                                   min="0"
                                                   max={qtdMaxima}
-                                                  value={quantidadesComponentes[item.id]?.[compIndex] || 0}
-                                                  onChange={(e) => handleQuantidadeComponenteChange(item.id, compIndex, e.target.value)}
+                                                  value={
+                                                    quantidadesComponentes[item.id]?.[compIndex] ||
+                                                    0
+                                                  }
+                                                  onChange={(e) =>
+                                                    handleQuantidadeComponenteChange(
+                                                      item.id,
+                                                      compIndex,
+                                                      e.target.value,
+                                                    )
+                                                  }
                                                   className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500"
                                                 />
                                               </div>
@@ -806,7 +828,8 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                         🎁 Gerar Crédito para o Cliente
                       </div>
                       <p className="text-xs text-gray-600 mt-1">
-                        O valor será convertido em crédito para uso em futuras compras (sem movimentação de caixa)
+                        O valor será convertido em crédito para uso em futuras compras (sem
+                        movimentação de caixa)
                       </p>
                     </div>
                   </label>
@@ -816,18 +839,23 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                   <div className="mt-3 p-3 bg-yellow-50 border border-yellow-300 rounded-lg">
                     <p className="text-xs text-yellow-800 flex items-center gap-2">
                       <AlertCircle className="w-4 h-4" />
-                      <span><strong>Atenção:</strong> Esta venda não possui cliente vinculado. Para gerar crédito, é necessário ter um cliente cadastrado.</span>
+                      <span>
+                        <strong>Atenção:</strong> Esta venda não possui cliente vinculado. Para
+                        gerar crédito, é necessário ter um cliente cadastrado.
+                      </span>
                     </p>
                   </div>
                 )}
               </div>
 
               {/* Total */}
-              <div className={`border-2 rounded-lg p-4 ${gerarCredito ? 'bg-purple-50 border-purple-300' : 'bg-orange-50 border-orange-200'}`}>
+              <div
+                className={`border-2 rounded-lg p-4 ${gerarCredito ? "bg-purple-50 border-purple-300" : "bg-orange-50 border-orange-200"}`}
+              >
                 <div className="flex justify-between items-center">
                   <div>
                     <span className="text-lg font-semibold text-gray-900">
-                      {gerarCredito ? 'Crédito a Gerar:' : 'Total da Devolução:'}
+                      {gerarCredito ? "Crédito a Gerar:" : "Total da Devolução:"}
                     </span>
                     {gerarCredito && vendaSelecionada?.cliente && (
                       <p className="text-xs text-gray-600 mt-1">
@@ -840,7 +868,9 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                       </p>
                     )}
                   </div>
-                  <span className={`text-2xl font-bold ${gerarCredito ? 'text-purple-600' : 'text-orange-600'}`}>
+                  <span
+                    className={`text-2xl font-bold ${gerarCredito ? "text-purple-600" : "text-orange-600"}`}
+                  >
                     R$ {calcularTotalDevolucao().toFixed(2)}
                   </span>
                 </div>
@@ -860,18 +890,22 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
         <div className="border-t p-6 bg-gray-50">
           <div className="flex justify-between">
             <button
-              onClick={passo === 1 ? onClose : () => {
-                setPasso(1);
-                setVendaSelecionada(null);
-                setItensSelecionados({});
-                setQuantidades({});
-                setMotivo('');
-                setErro('');
-              }}
+              onClick={
+                passo === 1
+                  ? onClose
+                  : () => {
+                      setPasso(1);
+                      setVendaSelecionada(null);
+                      setItensSelecionados({});
+                      setQuantidades({});
+                      setMotivo("");
+                      setErro("");
+                    }
+              }
               disabled={loading}
               className="px-6 py-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
             >
-              {passo === 1 ? 'Cancelar' : 'Voltar'}
+              {passo === 1 ? "Cancelar" : "Voltar"}
             </button>
 
             {passo === 2 && (

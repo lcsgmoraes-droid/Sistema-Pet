@@ -4,11 +4,11 @@
  * Atualizado: 2025-01-10
  */
 
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../api';
-import { getAccessToken } from '../auth/tokenStorage';
-import toast from 'react-hot-toast';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../api";
+import { getAccessToken } from "../auth/tokenStorage";
+import toast from "react-hot-toast";
 import {
   AlertTriangle,
   ArrowRight,
@@ -24,8 +24,8 @@ import {
   Plus,
   Send,
   ShoppingCart,
-  Wallet
-} from 'lucide-react';
+  Wallet,
+} from "lucide-react";
 
 export default function DashboardFinanceiro() {
   const navigate = useNavigate();
@@ -48,7 +48,7 @@ export default function DashboardFinanceiro() {
         api.get(`/contas-pagar/dashboard/resumo`, config),
         api.get(`/contas-receber/dashboard/resumo`, config),
         api.get(`/contas-bancarias?apenas_ativas=true`, config),
-        api.get(`/contas-bancarias/resumo/saldos`, config)
+        api.get(`/contas-bancarias/resumo/saldos`, config),
       ]);
 
       setResumoPagar(resPagar.data);
@@ -56,17 +56,17 @@ export default function DashboardFinanceiro() {
       setContas(resContas.data);
       setResumoContas(resResumo.data);
     } catch (error) {
-      console.error('Erro ao carregar dashboard:', error);
-      toast.error('Erro ao carregar resumo financeiro');
+      console.error("Erro ao carregar dashboard:", error);
+      toast.error("Erro ao carregar resumo financeiro");
     } finally {
       setLoading(false);
     }
   };
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(valor || 0);
   };
 
@@ -81,9 +81,9 @@ export default function DashboardFinanceiro() {
   const saldoLiquido = (resumoReceber?.total_pendente || 0) - (resumoPagar?.total_pendente || 0);
 
   const TIPOS_CONTA = {
-    'banco': { label: 'Bancos', icon: Building2 },
-    'caixa': { label: 'Caixas', icon: Wallet },
-    'digital': { label: 'Digitais', icon: CreditCard }
+    banco: { label: "Bancos", icon: Building2 },
+    caixa: { label: "Caixas", icon: Wallet },
+    digital: { label: "Digitais", icon: CreditCard },
   };
 
   return (
@@ -107,7 +107,7 @@ export default function DashboardFinanceiro() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <div className="grid grid-cols-6 gap-3">
           <button
-            onClick={() => navigate('/financeiro/vendas')}
+            onClick={() => navigate("/financeiro/vendas")}
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-blue-50 transition group"
           >
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center group-hover:bg-blue-200">
@@ -117,7 +117,7 @@ export default function DashboardFinanceiro() {
           </button>
 
           <button
-            onClick={() => navigate('/financeiro/contas-receber')}
+            onClick={() => navigate("/financeiro/contas-receber")}
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-green-50 transition group"
           >
             <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center group-hover:bg-green-200">
@@ -127,7 +127,7 @@ export default function DashboardFinanceiro() {
           </button>
 
           <button
-            onClick={() => navigate('/financeiro/contas-pagar')}
+            onClick={() => navigate("/financeiro/contas-pagar")}
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-red-50 transition group"
           >
             <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center group-hover:bg-red-200">
@@ -137,7 +137,7 @@ export default function DashboardFinanceiro() {
           </button>
 
           <button
-            onClick={() => navigate('/financeiro/contas')}
+            onClick={() => navigate("/financeiro/contas")}
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-indigo-50 transition group"
           >
             <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center group-hover:bg-indigo-200">
@@ -147,7 +147,7 @@ export default function DashboardFinanceiro() {
           </button>
 
           <button
-            onClick={() => navigate('/financeiro/formas-pagamento')}
+            onClick={() => navigate("/financeiro/formas-pagamento")}
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-purple-50 transition group"
           >
             <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-purple-200">
@@ -157,7 +157,7 @@ export default function DashboardFinanceiro() {
           </button>
 
           <button
-            onClick={() => navigate('/financeiro/fluxo-caixa')}
+            onClick={() => navigate("/financeiro/fluxo-caixa")}
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-yellow-50 transition group"
           >
             <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center group-hover:bg-yellow-200">
@@ -175,7 +175,7 @@ export default function DashboardFinanceiro() {
             Contas Bancárias
           </h2>
           <button
-            onClick={() => navigate('/financeiro/contas')}
+            onClick={() => navigate("/financeiro/contas")}
             className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
           >
             Ver todas
@@ -189,9 +189,11 @@ export default function DashboardFinanceiro() {
           {/* Card Saldo Total */}
           <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-4 text-white">
             <p className="text-blue-100 text-sm mb-1">Saldo Total</p>
-            <p className="text-3xl font-bold mb-1">{formatarMoeda(resumoContas?.total_geral || 0)}</p>
+            <p className="text-3xl font-bold mb-1">
+              {formatarMoeda(resumoContas?.total_geral || 0)}
+            </p>
             <p className="text-xs text-blue-200">
-              {contas.length} {contas.length === 1 ? 'conta' : 'contas'}
+              {contas.length} {contas.length === 1 ? "conta" : "contas"}
             </p>
           </div>
 
@@ -214,9 +216,12 @@ export default function DashboardFinanceiro() {
         {/* Mini lista de contas */}
         {contas.length > 0 && (
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-            {contas.slice(0, 3).map(conta => (
-              <div key={conta.id} className="bg-white rounded-lg p-3 flex items-center gap-3 border border-gray-100">
-                <div 
+            {contas.slice(0, 3).map((conta) => (
+              <div
+                key={conta.id}
+                className="bg-white rounded-lg p-3 flex items-center gap-3 border border-gray-100"
+              >
+                <div
                   className="w-10 h-10 rounded-full flex items-center justify-center text-lg"
                   style={{ backgroundColor: `${conta.cor}20` }}
                 >
@@ -230,7 +235,7 @@ export default function DashboardFinanceiro() {
             ))}
             {contas.length > 3 && (
               <button
-                onClick={() => navigate('/financeiro/contas')}
+                onClick={() => navigate("/financeiro/contas")}
                 className="bg-gray-50 rounded-lg p-3 flex items-center justify-center gap-2 border border-gray-200 hover:bg-gray-100 transition"
               >
                 <Plus className="w-4 h-4 text-gray-600" />
@@ -242,15 +247,17 @@ export default function DashboardFinanceiro() {
       </div>
 
       {/* SALDO LÍQUIDO */}
-      <div className={`p-6 rounded-xl ${saldoLiquido >= 0 ? 'bg-green-50 border-2 border-green-300' : 'bg-red-50 border-2 border-red-300'}`}>
+      <div
+        className={`p-6 rounded-xl ${saldoLiquido >= 0 ? "bg-green-50 border-2 border-green-300" : "bg-red-50 border-2 border-red-300"}`}
+      >
         <div className="text-center">
           <p className="text-sm font-medium text-gray-600 mb-2">Saldo Líquido Previsto</p>
-          <p className={`text-4xl font-bold ${saldoLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <p
+            className={`text-4xl font-bold ${saldoLiquido >= 0 ? "text-green-600" : "text-red-600"}`}
+          >
             {formatarMoeda(saldoLiquido)}
           </p>
-          <p className="text-xs text-gray-500 mt-2">
-            (Contas a Receber - Contas a Pagar)
-          </p>
+          <p className="text-xs text-gray-500 mt-2">(Contas a Receber - Contas a Pagar)</p>
         </div>
       </div>
 
@@ -282,7 +289,9 @@ export default function DashboardFinanceiro() {
                   <AlertTriangle className="w-4 h-4" />
                   Vencidas
                 </p>
-                <p className="text-xs text-gray-600">{resumoPagar?.vencidas?.quantidade || 0} contas</p>
+                <p className="text-xs text-gray-600">
+                  {resumoPagar?.vencidas?.quantidade || 0} contas
+                </p>
               </div>
               <p className="font-bold text-red-700">
                 {formatarMoeda(resumoPagar?.vencidas?.total)}
@@ -295,9 +304,7 @@ export default function DashboardFinanceiro() {
                 <Bell className="w-4 h-4" />
                 Vence Hoje
               </p>
-              <p className="font-bold text-orange-700">
-                {formatarMoeda(resumoPagar?.vence_hoje)}
-              </p>
+              <p className="font-bold text-orange-700">{formatarMoeda(resumoPagar?.vence_hoje)}</p>
             </div>
 
             {/* Próximos 7 dias */}
@@ -334,8 +341,8 @@ export default function DashboardFinanceiro() {
             </div>
           </div>
 
-          <button 
-            onClick={() => navigate('/financeiro/contas-pagar')}
+          <button
+            onClick={() => navigate("/financeiro/contas-pagar")}
             className="w-full mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
           >
             <span className="inline-flex items-center justify-center gap-1">
@@ -371,7 +378,9 @@ export default function DashboardFinanceiro() {
                   <AlertTriangle className="w-4 h-4" />
                   Não Recebidas (Vencidas)
                 </p>
-                <p className="text-xs text-gray-600">{resumoReceber?.vencidas?.quantidade || 0} contas</p>
+                <p className="text-xs text-gray-600">
+                  {resumoReceber?.vencidas?.quantidade || 0} contas
+                </p>
               </div>
               <p className="font-bold text-red-700">
                 {formatarMoeda(resumoReceber?.vencidas?.total)}
@@ -392,8 +401,7 @@ export default function DashboardFinanceiro() {
             {/* A Receber - 7 dias */}
             <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
               <p className="font-semibold text-yellow-700 flex items-center gap-1">
-                <CalendarDays className="w-4 h-4" />
-                A Receber (7 dias)
+                <CalendarDays className="w-4 h-4" />A Receber (7 dias)
               </p>
               <p className="font-bold text-yellow-700">
                 {formatarMoeda(resumoReceber?.proximos_7_dias)}
@@ -403,8 +411,7 @@ export default function DashboardFinanceiro() {
             {/* A Receber - 30 dias */}
             <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
               <p className="font-semibold text-blue-700 flex items-center gap-1">
-                <BarChart3 className="w-4 h-4" />
-                A Receber (30 dias)
+                <BarChart3 className="w-4 h-4" />A Receber (30 dias)
               </p>
               <p className="font-bold text-blue-700">
                 {formatarMoeda(resumoReceber?.proximos_30_dias)}
@@ -423,8 +430,8 @@ export default function DashboardFinanceiro() {
             </div>
           </div>
 
-          <button 
-            onClick={() => navigate('/financeiro/contas-receber')}
+          <button
+            onClick={() => navigate("/financeiro/contas-receber")}
             className="w-full mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
             <span className="inline-flex items-center justify-center gap-1">
@@ -437,4 +444,3 @@ export default function DashboardFinanceiro() {
     </div>
   );
 }
-

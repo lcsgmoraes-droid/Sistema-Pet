@@ -1,10 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  FiX, FiCheck, FiAlertCircle, FiDollarSign, FiCalendar, 
-  FiZap, FiLoader, FiCheckCircle, FiXCircle, FiFilter 
-} from 'react-icons/fi';
-import api from '../api';
-import { toast } from 'react-hot-toast';
+import { useState, useEffect } from "react";
+import {
+  FiX,
+  FiCheck,
+  FiAlertCircle,
+  FiDollarSign,
+  FiCalendar,
+  FiZap,
+  FiLoader,
+  FiCheckCircle,
+} from "react-icons/fi";
+import api from "../api";
+import { toast } from "react-hot-toast";
 
 const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -12,7 +18,7 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
   const [pendentes, setPendentes] = useState({ contas_pagar: [], contas_receber: [] });
   const [sugestoes, setSugestoes] = useState({});
   const [classificados, setClassificados] = useState(new Set());
-  const [filtro, setFiltro] = useState('todos'); // todos, pagar, receber
+  const [filtro, setFiltro] = useState("todos"); // todos, pagar, receber
   const [autoClassificando, setAutoClassificando] = useState(false);
   const [categoriasDRE, setCategoriasDRE] = useState([]);
   const [classificacaoManual, setClassificacaoManual] = useState({}); // { lancamento_key: subcategoria_id }
@@ -26,29 +32,29 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
 
   const carregarCategoriasDRE = async () => {
     try {
-      const response = await api.get('/dre/subcategorias');
+      const response = await api.get("/dre/subcategorias");
       setCategoriasDRE(response.data);
     } catch (error) {
-      console.error('Erro ao carregar categorias DRE:', error);
+      console.error("Erro ao carregar categorias DRE:", error);
     }
   };
 
   const carregarPendentes = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/dre/classificar/pendentes', {
-        params: { limit: 100 }
+      const response = await api.get("/dre/classificar/pendentes", {
+        params: { limit: 100 },
       });
-      
+
       setPendentes(response.data);
-      
+
       // Buscar sugestões para cada lançamento
       await carregarSugestoes(response.data);
-      
+
       toast.success(`${response.data.total_pendentes} lançamentos pendentes encontrados`);
     } catch (error) {
-      console.error('Erro ao carregar pendentes:', error);
-      toast.error('Erro ao carregar lançamentos pendentes');
+      console.error("Erro ao carregar pendentes:", error);
+      toast.error("Erro ao carregar lançamentos pendentes");
     } finally {
       setLoading(false);
     }
@@ -56,13 +62,13 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
 
   const carregarSugestoes = async (dados) => {
     const novasSugestoes = {};
-    
+
     // Buscar sugestões para contas a pagar
     for (const cp of dados.contas_pagar) {
       try {
-        const response = await api.post('/dre/classificar/sugerir', {
-          tipo: 'pagar',
-          lancamento_id: cp.id
+        const response = await api.post("/dre/classificar/sugerir", {
+          tipo: "pagar",
+          lancamento_id: cp.id,
         });
         novasSugestoes[`pagar_${cp.id}`] = response.data;
       } catch (error) {
@@ -70,13 +76,13 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
         novasSugestoes[`pagar_${cp.id}`] = [];
       }
     }
-    
+
     // Buscar sugestões para contas a receber
     for (const cr of dados.contas_receber) {
       try {
-        const response = await api.post('/dre/classificar/sugerir', {
-          tipo: 'receber',
-          lancamento_id: cr.id
+        const response = await api.post("/dre/classificar/sugerir", {
+          tipo: "receber",
+          lancamento_id: cr.id,
         });
         novasSugestoes[`receber_${cr.id}`] = response.data;
       } catch (error) {
@@ -84,29 +90,29 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
         novasSugestoes[`receber_${cr.id}`] = [];
       }
     }
-    
+
     setSugestoes(novasSugestoes);
   };
 
   const aplicarClassificacao = async (tipo, lancamentoId, sugestao) => {
     setProcessando(true);
     try {
-      await api.post('/dre/classificar/aplicar', {
+      await api.post("/dre/classificar/aplicar", {
         tipo,
         lancamento_id: lancamentoId,
         dre_subcategoria_id: sugestao.dre_subcategoria_id,
         canal: null, // Será inferido do lançamento
         regra_id: sugestao.regra_id,
-        forma_classificacao: 'sugestao_aceita'
+        forma_classificacao: "sugestao_aceita",
       });
-      
+
       // Marcar como classificado
-      setClassificados(prev => new Set([...prev, `${tipo}_${lancamentoId}`]));
-      
+      setClassificados((prev) => new Set([...prev, `${tipo}_${lancamentoId}`]));
+
       toast.success(`✅ Classificado: ${sugestao.subcategoria_nome}`);
     } catch (error) {
-      console.error('Erro ao aplicar classificação:', error);
-      toast.error('Erro ao aplicar classificação');
+      console.error("Erro ao aplicar classificação:", error);
+      toast.error("Erro ao aplicar classificação");
     } finally {
       setProcessando(false);
     }
@@ -115,24 +121,24 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
   const autoClassificar = async () => {
     setAutoClassificando(true);
     try {
-      const response = await api.post('/dre/classificar/auto-classificar-pendentes', null, {
+      const response = await api.post("/dre/classificar/auto-classificar-pendentes", null, {
         params: {
-          apenas_alta_confianca: true
-        }
+          apenas_alta_confianca: true,
+        },
       });
-      
+
       toast.success(
         `🤖 Auto-classificação concluída!\n${response.data.total_classificado} de ${response.data.total_processado} lançamentos classificados`,
-        { duration: 5000 }
+        { duration: 5000 },
       );
-      
+
       // Recarregar pendentes
       await carregarPendentes();
-      
+
       if (onSuccess) onSuccess();
     } catch (error) {
-      console.error('Erro ao auto-classificar:', error);
-      toast.error('Erro ao executar auto-classificação');
+      console.error("Erro ao auto-classificar:", error);
+      toast.error("Erro ao executar auto-classificação");
     } finally {
       setAutoClassificando(false);
     }
@@ -140,37 +146,37 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
 
   const aplicarClassificacaoManual = async (tipo, lancamentoId, subcategoriaId) => {
     if (!subcategoriaId) {
-      toast.error('Selecione uma categoria DRE');
+      toast.error("Selecione uma categoria DRE");
       return;
     }
 
     setProcessando(true);
     try {
-      const subcategoria = categoriasDRE.find(cat => cat.id === parseInt(subcategoriaId));
-      
-      await api.post('/dre/classificar/aplicar', {
+      const subcategoria = categoriasDRE.find((cat) => cat.id === parseInt(subcategoriaId));
+
+      await api.post("/dre/classificar/aplicar", {
         tipo,
         lancamento_id: lancamentoId,
         dre_subcategoria_id: parseInt(subcategoriaId),
         canal: null,
         regra_id: null,
-        forma_classificacao: 'manual'
+        forma_classificacao: "manual",
       });
-      
+
       // Marcar como classificado
-      setClassificados(prev => new Set([...prev, `${tipo}_${lancamentoId}`]));
-      
+      setClassificados((prev) => new Set([...prev, `${tipo}_${lancamentoId}`]));
+
       // Limpar seleção
-      setClassificacaoManual(prev => {
+      setClassificacaoManual((prev) => {
         const newState = { ...prev };
         delete newState[`${tipo}_${lancamentoId}`];
         return newState;
       });
-      
-      toast.success(`✅ Classificado manualmente: ${subcategoria?.nome || 'Categoria'}`);
+
+      toast.success(`✅ Classificado manualmente: ${subcategoria?.nome || "Categoria"}`);
     } catch (error) {
-      console.error('Erro ao aplicar classificação manual:', error);
-      toast.error('Erro ao aplicar classificação manual');
+      console.error("Erro ao aplicar classificação manual:", error);
+      toast.error("Erro ao aplicar classificação manual");
     } finally {
       setProcessando(false);
     }
@@ -180,33 +186,41 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
     setProcessando(true);
     try {
       // Apenas remover da lista sem classificar (lançamentos de estoque/produtos)
-      setClassificados(prev => new Set([...prev, `${tipo}_${lancamentoId}`]));
-      
+      setClassificados((prev) => new Set([...prev, `${tipo}_${lancamentoId}`]));
+
       toast.success('📦 Marcado como "Não Controla DRE" (Estoque/Produtos)');
     } catch (error) {
-      console.error('Erro ao marcar como não-DRE:', error);
-      toast.error('Erro ao processar');
+      console.error("Erro ao marcar como não-DRE:", error);
+      toast.error("Erro ao processar");
     } finally {
       setProcessando(false);
     }
   };
 
-  const marcarFornecedorNaoDRE = async (tipo, lancamentoId, beneficiario, fornecedorId, clienteId) => {
+  const marcarFornecedorNaoDRE = async (
+    tipo,
+    lancamentoId,
+    beneficiario,
+    fornecedorId,
+    clienteId,
+  ) => {
     if (!beneficiario) {
-      toast.error('Lançamento sem fornecedor/cliente vinculado');
+      toast.error("Lançamento sem fornecedor/cliente vinculado");
       return;
     }
 
     const id = fornecedorId || clienteId;
     if (!id) {
-      toast.error('ID do fornecedor/cliente não encontrado');
+      toast.error("ID do fornecedor/cliente não encontrado");
       return;
     }
 
-    if (!window.confirm(
-      `Deseja marcar "${beneficiario}" como fornecedor de produtos (Não Controla DRE)?\n\n` +
-      `Todos os lançamentos deste fornecedor serão automaticamente ignorados no DRE.`
-    )) {
+    if (
+      !window.confirm(
+        `Deseja marcar "${beneficiario}" como fornecedor de produtos (Não Controla DRE)?\n\n` +
+          `Todos os lançamentos deste fornecedor serão automaticamente ignorados no DRE.`,
+      )
+    ) {
       return;
     }
 
@@ -214,58 +228,59 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
     try {
       // Chamar endpoint para atualizar controla_dre do fornecedor/cliente
       await api.patch(`/clientes/${id}/controla-dre?controla_dre=false`);
-      
+
       // Marcar este lançamento como processado
-      setClassificados(prev => new Set([...prev, `${tipo}_${lancamentoId}`]));
-      
-      toast.success(`✅ Fornecedor "${beneficiario}" marcado como "Não Controla DRE"\n\nTodos os lançamentos futuros serão ignorados automaticamente.`, {
-        duration: 6000
-      });
-      
+      setClassificados((prev) => new Set([...prev, `${tipo}_${lancamentoId}`]));
+
+      toast.success(
+        `✅ Fornecedor "${beneficiario}" marcado como "Não Controla DRE"\n\nTodos os lançamentos futuros serão ignorados automaticamente.`,
+        {
+          duration: 6000,
+        },
+      );
+
       // Recarregar pendentes para remover outros lançamentos do mesmo fornecedor
       setTimeout(() => carregarPendentes(), 1000);
     } catch (error) {
-      console.error('Erro ao marcar fornecedor:', error);
-      toast.error('Erro ao marcar fornecedor como Não DRE');
+      console.error("Erro ao marcar fornecedor:", error);
+      toast.error("Erro ao marcar fornecedor como Não DRE");
     } finally {
       setProcessando(false);
     }
   };
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(valor || 0);
   };
 
   const formatarData = (data) => {
-    if (!data) return '-';
-    return new Date(data).toLocaleDateString('pt-BR');
+    if (!data) return "-";
+    return new Date(data).toLocaleDateString("pt-BR");
   };
 
   const getConfiancaColor = (confianca) => {
-    if (confianca >= 90) return 'text-green-600 bg-green-100';
-    if (confianca >= 70) return 'text-yellow-600 bg-yellow-100';
-    return 'text-red-600 bg-red-100';
+    if (confianca >= 90) return "text-green-600 bg-green-100";
+    if (confianca >= 70) return "text-yellow-600 bg-yellow-100";
+    return "text-red-600 bg-red-100";
   };
 
   const lancamentosFiltrados = () => {
-    if (filtro === 'pagar') {
-      return pendentes.contas_pagar.map(cp => ({ ...cp, tipo: 'pagar' }));
-    } else if (filtro === 'receber') {
-      return pendentes.contas_receber.map(cr => ({ ...cr, tipo: 'receber' }));
+    if (filtro === "pagar") {
+      return pendentes.contas_pagar.map((cp) => ({ ...cp, tipo: "pagar" }));
+    } else if (filtro === "receber") {
+      return pendentes.contas_receber.map((cr) => ({ ...cr, tipo: "receber" }));
     } else {
       return [
-        ...pendentes.contas_pagar.map(cp => ({ ...cp, tipo: 'pagar' })),
-        ...pendentes.contas_receber.map(cr => ({ ...cr, tipo: 'receber' }))
+        ...pendentes.contas_pagar.map((cp) => ({ ...cp, tipo: "pagar" })),
+        ...pendentes.contas_receber.map((cr) => ({ ...cr, tipo: "receber" })),
       ];
     }
   };
 
-  const lancamentos = lancamentosFiltrados().filter(
-    l => !classificados.has(`${l.tipo}_${l.id}`)
-  );
+  const lancamentos = lancamentosFiltrados().filter((l) => !classificados.has(`${l.tipo}_${l.id}`));
 
   if (!isOpen) return null;
 
@@ -294,31 +309,31 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
         <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
           <div className="flex gap-2">
             <button
-              onClick={() => setFiltro('todos')}
+              onClick={() => setFiltro("todos")}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filtro === 'todos'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-100'
+                filtro === "todos"
+                  ? "bg-purple-600 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-100"
               }`}
             >
               📊 Todos ({pendentes.contas_pagar.length + pendentes.contas_receber.length})
             </button>
             <button
-              onClick={() => setFiltro('pagar')}
+              onClick={() => setFiltro("pagar")}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filtro === 'pagar'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-100'
+                filtro === "pagar"
+                  ? "bg-red-600 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-100"
               }`}
             >
               💸 A Pagar ({pendentes.contas_pagar.length})
             </button>
             <button
-              onClick={() => setFiltro('receber')}
+              onClick={() => setFiltro("receber")}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filtro === 'receber'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-100'
+                filtro === "receber"
+                  ? "bg-green-600 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-100"
               }`}
             >
               💰 A Receber ({pendentes.contas_receber.length})
@@ -361,7 +376,6 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
               {lancamentos.map((lancamento) => {
                 const key = `${lancamento.tipo}_${lancamento.id}`;
                 const sugestoesLancamento = sugestoes[key] || [];
-                const melhorSugestao = sugestoesLancamento[0];
 
                 return (
                   <div
@@ -374,16 +388,14 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
                         <div className="flex items-center gap-3 mb-2">
                           <span
                             className={`px-3 py-1 rounded-full text-xs font-bold ${
-                              lancamento.tipo === 'pagar'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-green-100 text-green-700'
+                              lancamento.tipo === "pagar"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-green-100 text-green-700"
                             }`}
                           >
-                            {lancamento.tipo === 'pagar' ? '💸 A Pagar' : '💰 A Receber'}
+                            {lancamento.tipo === "pagar" ? "💸 A Pagar" : "💰 A Receber"}
                           </span>
-                          <span className="text-sm text-gray-500">
-                            #{lancamento.id}
-                          </span>
+                          <span className="text-sm text-gray-500">#{lancamento.id}</span>
                         </div>
                         <h3 className="font-semibold text-gray-800 text-lg mb-1">
                           {lancamento.descricao}
@@ -423,26 +435,30 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
                         <div className="space-y-2">
                           <div className="flex gap-2">
                             <select
-                              value={classificacaoManual[key] || ''}
-                              onChange={(e) => setClassificacaoManual(prev => ({
-                                ...prev,
-                                [key]: e.target.value
-                              }))}
+                              value={classificacaoManual[key] || ""}
+                              onChange={(e) =>
+                                setClassificacaoManual((prev) => ({
+                                  ...prev,
+                                  [key]: e.target.value,
+                                }))
+                              }
                               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                             >
                               <option value="">Selecione uma categoria DRE...</option>
-                              {categoriasDRE.map(cat => (
+                              {categoriasDRE.map((cat) => (
                                 <option key={cat.id} value={cat.id}>
                                   {cat.categoria_nome} → {cat.nome}
                                 </option>
                               ))}
                             </select>
                             <button
-                              onClick={() => aplicarClassificacaoManual(
-                                lancamento.tipo,
-                                lancamento.id,
-                                classificacaoManual[key]
-                              )}
+                              onClick={() =>
+                                aplicarClassificacaoManual(
+                                  lancamento.tipo,
+                                  lancamento.id,
+                                  classificacaoManual[key],
+                                )
+                              }
                               disabled={processando || !classificacaoManual[key]}
                               className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                             >
@@ -461,13 +477,15 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
                             </button>
                             {lancamento.beneficiario && (
                               <button
-                                onClick={() => marcarFornecedorNaoDRE(
-                                  lancamento.tipo, 
-                                  lancamento.id, 
-                                  lancamento.beneficiario,
-                                  lancamento.fornecedor_id,
-                                  lancamento.cliente_id
-                                )}
+                                onClick={() =>
+                                  marcarFornecedorNaoDRE(
+                                    lancamento.tipo,
+                                    lancamento.id,
+                                    lancamento.beneficiario,
+                                    lancamento.fornecedor_id,
+                                    lancamento.cliente_id,
+                                  )
+                                }
                                 disabled={processando}
                                 className="flex-1 flex items-center justify-center gap-2 bg-orange-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 title={`Marca TODOS os lançamentos de ${lancamento.beneficiario} como Não DRE`}
@@ -488,8 +506,8 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
                             key={index}
                             className={`flex justify-between items-center p-3 rounded-lg border-2 ${
                               index === 0
-                                ? 'border-purple-300 bg-purple-50'
-                                : 'border-gray-200 bg-gray-50'
+                                ? "border-purple-300 bg-purple-50"
+                                : "border-gray-200 bg-gray-50"
                             }`}
                           >
                             <div className="flex-1">
@@ -499,7 +517,7 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
                                 </span>
                                 <span
                                   className={`px-2 py-1 rounded-full text-xs font-bold ${getConfiancaColor(
-                                    sugestao.confianca
+                                    sugestao.confianca,
                                   )}`}
                                 >
                                   {sugestao.confianca}% confiança
@@ -510,9 +528,7 @@ const ClassificarLancamentosModal = ({ isOpen, onClose, onSuccess }) => {
                                   </span>
                                 )}
                               </div>
-                              <p className="text-xs text-gray-600">
-                                {sugestao.motivo}
-                              </p>
+                              <p className="text-xs text-gray-600">{sugestao.motivo}</p>
                               <p className="text-xs text-gray-500 mt-1">
                                 Regra: {sugestao.regra_nome}
                               </p>

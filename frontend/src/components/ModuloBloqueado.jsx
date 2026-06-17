@@ -3,13 +3,7 @@
  * Cada modulo tem preview interativo + argumentos de ROI para converter.
  */
 import { useEffect, useState } from "react";
-import {
-  FiCheckCircle,
-  FiHelpCircle,
-  FiLock,
-  FiMessageCircle,
-  FiTrendingUp,
-} from "react-icons/fi";
+import { FiCheckCircle, FiHelpCircle, FiLock, FiMessageCircle, FiTrendingUp } from "react-icons/fi";
 import { Link } from "react-router-dom";
 import { MODULOS_INFO, useModulos } from "../contexts/ModulosContext";
 
@@ -26,13 +20,11 @@ const MODULOS_EXTRAS = {
     beneficios: [
       {
         texto: "Mensagens automaticas no WhatsApp",
-        detalhe:
-          "Sem copiar e colar — o sistema dispara pra voce na hora certa",
+        detalhe: "Sem copiar e colar — o sistema dispara pra voce na hora certa",
       },
       {
         texto: "Segmentacao inteligente de clientes",
-        detalhe:
-          "Clientes sumidos, aniversariantes, por raca, por servico contratado...",
+        detalhe: "Clientes sumidos, aniversariantes, por raca, por servico contratado...",
       },
       {
         texto: "Cartao fidelidade com regra automatica",
@@ -41,23 +33,19 @@ const MODULOS_EXTRAS = {
       },
       {
         texto: "Fluxo de cashback para acelerar recompra",
-        detalhe:
-          "Define valor e validade do cashback para trazer o cliente de volta mais rapido",
+        detalhe: "Define valor e validade do cashback para trazer o cliente de volta mais rapido",
       },
       {
         texto: "Reativacao de clientes parados (30 dias+)",
-        detalhe:
-          "Campanha automatica para recuperar clientes que sumiram da base",
+        detalhe: "Campanha automatica para recuperar clientes que sumiram da base",
       },
       {
         texto: "Recompra programada em 7 dias",
-        detalhe:
-          "Mensagem no momento certo para reposicao de racao, areia e itens recorrentes",
+        detalhe: "Mensagem no momento certo para reposicao de racao, areia e itens recorrentes",
       },
       {
         texto: "Relatorio de retorno por campanha",
-        detalhe:
-          "Veja exatamente quantos clientes cada campanha trouxe de volta e quanto gerou",
+        detalhe: "Veja exatamente quantos clientes cada campanha trouxe de volta e quanto gerou",
       },
       {
         texto: "Promocoes e cupons com envio automatico",
@@ -84,13 +72,11 @@ const MODULOS_EXTRAS = {
       },
       {
         texto: "Cliente recebe notificacao de saida automaticamente",
-        detalhe:
-          "Quando o pedido sai, o cliente e avisado na hora e ja se prepara para receber",
+        detalhe: "Quando o pedido sai, o cliente e avisado na hora e ja se prepara para receber",
       },
       {
         texto: "Acompanhamento em tempo real no mapa",
-        detalhe:
-          "Mais transparencia para o cliente e menos desgaste para o caixa/atendimento",
+        detalhe: "Mais transparencia para o cliente e menos desgaste para o caixa/atendimento",
       },
       {
         texto: "Controle de multiplos entregadores",
@@ -98,8 +84,7 @@ const MODULOS_EXTRAS = {
       },
       {
         texto: "Controle de distancia, custo e manutencao da moto",
-        detalhe:
-          "Acompanhe km rodado, custo por entrega e alertas de revisao para reduzir gastos",
+        detalhe: "Acompanhe km rodado, custo por entrega e alertas de revisao para reduzir gastos",
       },
       {
         texto: "Organizacao de rotas por sistema inteligente",
@@ -119,18 +104,15 @@ const MODULOS_EXTRAS = {
     beneficios: [
       {
         texto: "Loja virtual com seu proprio dominio",
-        detalhe:
-          "Aparece no Google com o nome do seu pet shop — sem depender do Instagram",
+        detalhe: "Aparece no Google com o nome do seu pet shop — sem depender do Instagram",
       },
       {
         texto: "Pagamento online — Pix + Cartao",
-        detalhe:
-          "Receba antes de separar o pedido. Zero inadimplencia, zero fiado",
+        detalhe: "Receba antes de separar o pedido. Zero inadimplencia, zero fiado",
       },
       {
         texto: "Estoque sincronizado em tempo real",
-        detalhe:
-          "Produto esgotado no fisico? Some automaticamente do site tambem",
+        detalhe: "Produto esgotado no fisico? Some automaticamente do site tambem",
       },
       {
         texto: "Gestao de pedidos integrada ao sistema",
@@ -149,13 +131,11 @@ const MODULOS_EXTRAS = {
     beneficios: [
       {
         texto: "Bot que responde, consulta estoque e fecha venda",
-        detalhe:
-          "Conversa completa no WhatsApp e pedido pronto para o caixa apenas confirmar",
+        detalhe: "Conversa completa no WhatsApp e pedido pronto para o caixa apenas confirmar",
       },
       {
         texto: "Venda vai para o caixa pronta para confirmacao",
-        detalhe:
-          "Itens, valores, observacoes e forma de pagamento chegam organizados no sistema",
+        detalhe: "Itens, valores, observacoes e forma de pagamento chegam organizados no sistema",
       },
       {
         texto: "Consulta fotos dos produtos no sistema e envia ao cliente",
@@ -164,8 +144,7 @@ const MODULOS_EXTRAS = {
       },
       {
         texto: "Recupera carrinho e negocia automaticamente",
-        detalhe:
-          "Se o cliente para no meio, o bot retoma a conversa e tenta concluir a compra",
+        detalhe: "Se o cliente para no meio, o bot retoma a conversa e tenta concluir a compra",
       },
       {
         texto: "Agendamento automatico de banho e tosa",
@@ -181,8 +160,7 @@ const MODULOS_EXTRAS = {
       },
       {
         texto: "Atendimento padronizado 24h",
-        detalhe:
-          "Mesmo nivel de resposta em todos os turnos, sem depender de quem esta no caixa",
+        detalhe: "Mesmo nivel de resposta em todos os turnos, sem depender de quem esta no caixa",
       },
     ],
   },
@@ -254,9 +232,7 @@ const PreviewCampanhas = () => {
         >
           <p className="text-sm font-semibold text-gray-800">{c.nome}</p>
           <p className="text-xs text-gray-500 mt-1">{c.resumo}</p>
-          <p className="text-xs font-medium text-indigo-700 mt-1">
-            {c.impacto}
-          </p>
+          <p className="text-xs font-medium text-indigo-700 mt-1">{c.impacto}</p>
           <p className="text-[11px] text-gray-400 mt-1">{c.detalhe}</p>
         </div>
       ))}
@@ -286,30 +262,21 @@ const PreviewCampanhas = () => {
         <div key={campanhaAtiva.nome} className="space-y-2 animate-fadeIn">
           <div className="flex justify-end">
             <div className="bg-[#dcf8c6] rounded-lg rounded-tr-none px-3 py-2 shadow-sm max-w-[90%]">
-              <p className="text-xs text-gray-800">
-                {campanhaAtiva.msgSistema}
-              </p>
-              <p className="text-[10px] text-gray-400 text-right mt-1">
-                CorePet ✓✓
-              </p>
+              <p className="text-xs text-gray-800">{campanhaAtiva.msgSistema}</p>
+              <p className="text-[10px] text-gray-400 text-right mt-1">CorePet ✓✓</p>
             </div>
           </div>
           <div className="flex justify-start">
             <div className="bg-white rounded-lg rounded-tl-none px-3 py-2 shadow-sm max-w-[85%]">
-              <p className="text-xs text-gray-800">
-                {campanhaAtiva.msgCliente}
-              </p>
-              <p className="text-[10px] text-gray-400 text-right mt-1">
-                Cliente
-              </p>
+              <p className="text-xs text-gray-800">{campanhaAtiva.msgCliente}</p>
+              <p className="text-[10px] text-gray-400 text-right mt-1">Cliente</p>
             </div>
           </div>
         </div>
         <div className="mt-2 flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
           <p className="text-[11px] text-green-700 font-medium">
-            Passe o mouse na campanha (ou toque no celular) para atualizar a
-            mensagem
+            Passe o mouse na campanha (ou toque no celular) para atualizar a mensagem
           </p>
         </div>
       </div>
@@ -331,9 +298,7 @@ const PreviewEntregas = () => {
     <div className="space-y-3">
       {/* Resumo rapido */}
       <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-3 text-white">
-        <p className="text-xs font-medium opacity-90">
-          Operacao de entregas hoje
-        </p>
+        <p className="text-xs font-medium opacity-90">Operacao de entregas hoje</p>
         <div className="grid grid-cols-3 gap-2 mt-2">
           <div>
             <p className="text-lg font-bold">94</p>
@@ -366,9 +331,7 @@ const PreviewEntregas = () => {
           </div>
           <div className="bg-amber-50 rounded-lg p-2 border border-amber-100">
             <p className="text-[10px] text-amber-700">manutencao</p>
-            <p className="text-sm font-bold text-amber-700">
-              revisao em 4 dias
-            </p>
+            <p className="text-sm font-bold text-amber-700">revisao em 4 dias</p>
           </div>
         </div>
       </div>
@@ -398,28 +361,21 @@ const PreviewEntregas = () => {
 
         <div className="space-y-2">
           <div className="bg-white rounded-lg border border-green-100 px-3 py-2">
-            <p className="text-xs font-semibold text-green-700">
-              1. Notificacao de saida
-            </p>
+            <p className="text-xs font-semibold text-green-700">1. Notificacao de saida</p>
             <p className="text-[11px] text-gray-600 mt-0.5">
               Cliente recebe no WhatsApp: "pedido saiu para entrega".
             </p>
           </div>
 
           <div className="bg-white rounded-lg border border-green-100 px-3 py-2">
-            <p className="text-xs font-semibold text-green-700">
-              2. Cliente acompanha no mapa
-            </p>
+            <p className="text-xs font-semibold text-green-700">2. Cliente acompanha no mapa</p>
             <p className="text-[11px] text-gray-600 mt-0.5">
-              Acompanhamento ao vivo reduz ansiedade e evita ligacoes para a
-              loja.
+              Acompanhamento ao vivo reduz ansiedade e evita ligacoes para a loja.
             </p>
           </div>
 
           <div className="bg-white rounded-lg border border-green-100 px-3 py-2">
-            <p className="text-xs font-semibold text-green-700">
-              3. Conclusao com comprovante
-            </p>
+            <p className="text-xs font-semibold text-green-700">3. Conclusao com comprovante</p>
             <p className="text-[11px] text-gray-600 mt-0.5">
               Entrega finalizada com foto/confirmacao no app e historico salvo.
             </p>
@@ -429,12 +385,9 @@ const PreviewEntregas = () => {
 
       {/* App do entregador */}
       <div className="bg-blue-50 rounded-xl p-3 border border-blue-100">
-        <p className="text-xs font-semibold text-blue-700 mb-1">
-          App do entregador em tempo real
-        </p>
+        <p className="text-xs font-semibold text-blue-700 mb-1">App do entregador em tempo real</p>
         <p className="text-[11px] text-blue-700">
-          Entregador consulta itens da venda, observacoes e pagamento no
-          celular.
+          Entregador consulta itens da venda, observacoes e pagamento no celular.
         </p>
         <p className="text-[11px] text-blue-700 mt-1">
           Resultado: menos erro de entrega, menos retrabalho e mais agilidade.
@@ -474,9 +427,7 @@ const PreviewEcommerce = () => {
             🛒
           </div>
           <div>
-            <p
-              className={`text-xs font-bold ${notifVis ? "text-white" : "text-indigo-700"}`}
-            >
+            <p className={`text-xs font-bold ${notifVis ? "text-white" : "text-indigo-700"}`}>
               NOVO PEDIDO RECEBIDO
             </p>
             <p
@@ -484,9 +435,7 @@ const PreviewEcommerce = () => {
             >
               Fernanda C. — R$ 189,90 🎂 Pix confirmado
             </p>
-            <p
-              className={`text-xs ${notifVis ? "text-indigo-200" : "text-gray-400"}`}
-            >
+            <p className={`text-xs ${notifVis ? "text-indigo-200" : "text-gray-400"}`}>
               Racao Golden 15kg + Petisco Dental — Domingo 23:47
             </p>
           </div>
@@ -540,9 +489,7 @@ const PreviewEcommerce = () => {
           <div key={p.n} className="flex items-center gap-2 py-1.5">
             <span className="text-lg">{p.e}</span>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-gray-800 truncate">
-                {p.n}
-              </p>
+              <p className="text-xs font-semibold text-gray-800 truncate">{p.n}</p>
               <div className="flex-1 bg-gray-100 rounded-full h-1 mt-1">
                 <div
                   className="bg-indigo-400 h-1 rounded-full"
@@ -586,9 +533,7 @@ const PreviewWhatsApp = () => {
         {/* Cliente pergunta */}
         <div className="flex justify-start">
           <div className="bg-white rounded-lg rounded-tl-none px-3 py-2 shadow-sm max-w-[80%]">
-            <p className="text-xs text-gray-800">
-              Oi! Quero saber o preco da racao Golden 15kg 🐶
-            </p>
+            <p className="text-xs text-gray-800">Oi! Quero saber o preco da racao Golden 15kg 🐶</p>
             <p className="text-[10px] text-gray-400 text-right mt-1">14:22</p>
           </div>
         </div>
@@ -596,12 +541,10 @@ const PreviewWhatsApp = () => {
         <div className="flex justify-end">
           <div className="bg-[#dcf8c6] rounded-lg rounded-tr-none px-3 py-2 shadow-sm max-w-[85%]">
             <p className="text-xs text-gray-800">
-              Ola! 😊 A racao Golden 15kg esta <strong>R$ 179,90</strong>. Temos
-              em estoque! Quer que eu adicione ao carrinho?
+              Ola! 😊 A racao Golden 15kg esta <strong>R$ 179,90</strong>. Temos em estoque! Quer
+              que eu adicione ao carrinho?
             </p>
-            <p className="text-[10px] text-gray-400 text-right mt-1">
-              14:22 ✓✓
-            </p>
+            <p className="text-[10px] text-gray-400 text-right mt-1">14:22 ✓✓</p>
           </div>
         </div>
 
@@ -616,9 +559,7 @@ const PreviewWhatsApp = () => {
             <p className="text-xs text-gray-800">
               Sim! Entrega em ate 2h. Frete R$ 8,00. Confirmo o pedido? 🛵
             </p>
-            <p className="text-[10px] text-gray-400 text-right mt-1">
-              14:23 ✓✓
-            </p>
+            <p className="text-[10px] text-gray-400 text-right mt-1">14:23 ✓✓</p>
           </div>
         </div>
 
@@ -629,9 +570,7 @@ const PreviewWhatsApp = () => {
             </p>
             <div className="mt-1.5 inline-flex items-center gap-1.5 bg-gray-100 rounded px-2 py-1">
               <span className="text-[10px]">📷</span>
-              <span className="text-[10px] text-gray-600">
-                foto_porte_pet.jpg
-              </span>
+              <span className="text-[10px] text-gray-600">foto_porte_pet.jpg</span>
             </div>
             <p className="text-[10px] text-gray-400 text-right mt-1">14:24</p>
           </div>
@@ -640,8 +579,8 @@ const PreviewWhatsApp = () => {
         <div className="flex justify-end">
           <div className="bg-[#dcf8c6] rounded-lg rounded-tr-none px-3 py-2 shadow-sm max-w-[88%]">
             <p className="text-xs text-gray-800">
-              Analisei a foto ✅ Pelo porte do pet, recomendo o tamanho M. Ja te
-              envio as fotos do modelo azul e preto no catalogo.
+              Analisei a foto ✅ Pelo porte do pet, recomendo o tamanho M. Ja te envio as fotos do
+              modelo azul e preto no catalogo.
             </p>
             <div className="mt-1.5 flex items-center gap-1.5">
               <span className="text-[10px] bg-white/80 rounded px-1.5 py-0.5 text-gray-600">
@@ -651,27 +590,21 @@ const PreviewWhatsApp = () => {
                 🖼️ Foto preta
               </span>
             </div>
-            <p className="text-[10px] text-gray-400 text-right mt-1">
-              14:24 ✓✓
-            </p>
+            <p className="text-[10px] text-gray-400 text-right mt-1">14:24 ✓✓</p>
           </div>
         </div>
       </div>
 
       <div className="bg-indigo-50 rounded-xl p-3 border border-indigo-100">
-        <p className="text-xs font-semibold text-indigo-700">
-          No sistema (caixa/PDV)
-        </p>
+        <p className="text-xs font-semibold text-indigo-700">No sistema (caixa/PDV)</p>
         <p className="text-[11px] text-indigo-700 mt-1">
-          Venda #PDV-10492 gerada automaticamente com 3 itens (R$ 267,70). O
-          caixa apenas confirma e finaliza.
+          Venda #PDV-10492 gerada automaticamente com 3 itens (R$ 267,70). O caixa apenas confirma e
+          finaliza.
         </p>
       </div>
 
       <div className="bg-green-50 rounded-xl p-3 border border-green-100 text-center">
-        <p className="text-xs text-green-700 font-semibold">
-          1 minuto. Sem funcionario.
-        </p>
+        <p className="text-xs text-green-700 font-semibold">1 minuto. Sem funcionario.</p>
       </div>
     </div>
   );
@@ -736,26 +669,16 @@ function getBeneficiosPorSecao(modulo, beneficios) {
    Componente principal
 --------------------------------------------------- */
 const ModuloBloqueado = ({ modulo, children }) => {
-  const {
-    moduloAtivo,
-    modulosAtivos,
-    moduloBetaPublico,
-    moduloForaOfertaPublica,
-  } = useModulos();
+  const { moduloAtivo, modulosAtivos, moduloBetaPublico, moduloForaOfertaPublica } = useModulos();
 
   // Registrar tentativa de acesso a módulo bloqueado (tracking leve)
   useEffect(() => {
     if (modulosAtivos !== null && !moduloAtivo(modulo)) {
       // Evento local — pode ser expandido para analytics no futuro
       try {
-        const tentativas = JSON.parse(
-          sessionStorage.getItem("modulos_tentativas") || "{}",
-        );
+        const tentativas = JSON.parse(sessionStorage.getItem("modulos_tentativas") || "{}");
         tentativas[modulo] = (tentativas[modulo] || 0) + 1;
-        sessionStorage.setItem(
-          "modulos_tentativas",
-          JSON.stringify(tentativas),
-        );
+        sessionStorage.setItem("modulos_tentativas", JSON.stringify(tentativas));
       } catch {
         // Silencioso — não bloqueia a UI
       }
@@ -793,9 +716,8 @@ const ModuloBloqueado = ({ modulo, children }) => {
             Este recurso nao esta disponivel para novos tenants.
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
-            O trial publico libera o Plano Basico completo por 30 dias. Modulos
-            avancados entram apenas como Beta acompanhado, quando fizer sentido
-            para o cliente e para a operacao.
+            O trial publico libera o Plano Basico completo por 30 dias. Modulos avancados entram
+            apenas como Beta acompanhado, quando fizer sentido para o cliente e para a operacao.
           </p>
           <Link
             to="/dashboard"
@@ -839,15 +761,11 @@ const ModuloBloqueado = ({ modulo, children }) => {
 
         {/* Banner ROI */}
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-4 mb-5 text-white text-center shadow-lg">
-          <p className="text-sm font-medium opacity-90">
-            {extras.roi_banner}
-          </p>
+          <p className="text-sm font-medium opacity-90">{extras.roi_banner}</p>
         </div>
 
         {/* Grid: preview + card */}
-        <div
-          className={`grid gap-6 ${Preview ? "lg:grid-cols-2" : "max-w-md mx-auto"}`}
-        >
+        <div className={`grid gap-6 ${Preview ? "lg:grid-cols-2" : "max-w-md mx-auto"}`}>
           {/* Preview visual */}
           {Preview && (
             <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 shadow-inner">
@@ -882,20 +800,11 @@ const ModuloBloqueado = ({ modulo, children }) => {
                   </p>
                   <ul className="space-y-2.5">
                     {secao.itens.map((b) => (
-                      <li
-                        key={`${secao.titulo}-${b.texto}`}
-                        className="flex items-start gap-2.5"
-                      >
+                      <li key={`${secao.titulo}-${b.texto}`} className="flex items-start gap-2.5">
                         <FiCheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-sm font-medium text-gray-800">
-                            {b.texto}
-                          </p>
-                          {b.detalhe && (
-                            <p className="text-xs text-gray-500 mt-0.5">
-                              {b.detalhe}
-                            </p>
-                          )}
+                          <p className="text-sm font-medium text-gray-800">{b.texto}</p>
+                          {b.detalhe && <p className="text-xs text-gray-500 mt-0.5">{b.detalhe}</p>}
                         </div>
                       </li>
                     ))}
@@ -946,9 +855,7 @@ const ModuloBloqueado = ({ modulo, children }) => {
             <div className="flex flex-col items-center gap-2 mt-4">
               <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
                 <FiLock className="w-3 h-3 flex-shrink-0" />
-                <span>
-                  Liberacao manual por tenant, com acompanhamento do piloto.
-                </span>
+                <span>Liberacao manual por tenant, com acompanhamento do piloto.</span>
               </div>
               <Link
                 to="/ajuda"

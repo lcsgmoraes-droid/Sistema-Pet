@@ -1,18 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  AlertTriangle, AlertCircle, TrendingUp, TrendingDown, 
-  Clock, DollarSign, Calendar, CheckCircle, X, Sparkles 
-} from 'lucide-react';
-import api from '../api';
-import { useModulos } from '../contexts/ModulosContext';
+import { useState, useEffect } from "react";
+import {
+  AlertTriangle,
+  AlertCircle,
+  TrendingUp,
+  TrendingDown,
+  Clock,
+  Calendar,
+  CheckCircle,
+  X,
+  Sparkles,
+} from "lucide-react";
+import api from "../api";
+import { useModulos } from "../contexts/ModulosContext";
 
 const AlertasIA = ({ compacto = false }) => {
   const { moduloAtivo } = useModulos();
-  const financeiroErpAtivo = moduloAtivo('financeiro_erp');
-  const iaAvancadaAtiva = moduloAtivo('ia_avancada');
+  const financeiroErpAtivo = moduloAtivo("financeiro_erp");
+  const iaAvancadaAtiva = moduloAtivo("ia_avancada");
   const [alertas, setAlertas] = useState([]);
   const [carregando, setCarregando] = useState(true);
-  const [filtroSeveridade, setFiltroSeveridade] = useState('todos'); // todos, crítico, atenção, info
+  const [filtroSeveridade, setFiltroSeveridade] = useState("todos"); // todos, crítico, atenção, info
 
   useEffect(() => {
     carregarAlertas();
@@ -31,8 +38,8 @@ const AlertasIA = ({ compacto = false }) => {
       // TODO: Criar endpoint /api/ia/fluxo/alertas no backend
       const alertasGerados = await gerarAlertas();
       setAlertas(alertasGerados);
-    } catch (erro) {
-      console.error('Erro ao carregar alertas:', erro);
+    } catch (_erro) {
+      console.error("Erro ao carregar alertas:", _erro);
     } finally {
       setCarregando(false);
     }
@@ -47,25 +54,25 @@ const AlertasIA = ({ compacto = false }) => {
       const saldoAtual = await buscarSaldoAtual();
       if (saldoAtual < 1000) {
         alertasArray.push({
-          id: 'saldo-critico',
-          tipo: 'saldo',
-          severidade: 'crítico',
-          titulo: 'Saldo Crítico',
+          id: "saldo-critico",
+          tipo: "saldo",
+          severidade: "crítico",
+          titulo: "Saldo Crítico",
           mensagem: `Seu saldo está abaixo de R$ 1.000,00. Saldo atual: ${formatarMoeda(saldoAtual)}`,
-          recomendacao: 'Considere adiar pagamentos não essenciais ou antecipar recebimentos.',
+          recomendacao: "Considere adiar pagamentos não essenciais ou antecipar recebimentos.",
           icone: AlertTriangle,
-          data: hoje.toISOString()
+          data: hoje.toISOString(),
         });
       } else if (saldoAtual < 5000) {
         alertasArray.push({
-          id: 'saldo-atencao',
-          tipo: 'saldo',
-          severidade: 'atenção',
-          titulo: 'Saldo Baixo',
+          id: "saldo-atencao",
+          tipo: "saldo",
+          severidade: "atenção",
+          titulo: "Saldo Baixo",
           mensagem: `Seu saldo está em nível de atenção: ${formatarMoeda(saldoAtual)}`,
-          recomendacao: 'Monitore suas despesas e prepare-se para possíveis necessidades de caixa.',
+          recomendacao: "Monitore suas despesas e prepare-se para possíveis necessidades de caixa.",
           icone: AlertCircle,
-          data: hoje.toISOString()
+          data: hoje.toISOString(),
         });
       }
 
@@ -74,15 +81,15 @@ const AlertasIA = ({ compacto = false }) => {
       if (vencimentosProximos.length > 0) {
         const totalVencimentos = vencimentosProximos.reduce((sum, v) => sum + v.valor, 0);
         alertasArray.push({
-          id: 'vencimentos-proximos',
-          tipo: 'vencimento',
-          severidade: 'atenção',
+          id: "vencimentos-proximos",
+          tipo: "vencimento",
+          severidade: "atenção",
           titulo: `${vencimentosProximos.length} Pagamentos Vencendo`,
           mensagem: `Você tem ${vencimentosProximos.length} pagamentos vencendo nos próximos 7 dias, totalizando ${formatarMoeda(totalVencimentos)}`,
-          recomendacao: 'Verifique se há saldo suficiente para cobrir estes pagamentos.',
+          recomendacao: "Verifique se há saldo suficiente para cobrir estes pagamentos.",
           icone: Calendar,
           data: hoje.toISOString(),
-          detalhes: vencimentosProximos
+          detalhes: vencimentosProximos,
         });
       }
 
@@ -91,15 +98,15 @@ const AlertasIA = ({ compacto = false }) => {
       if (vencimentosAtrasados.length > 0) {
         const totalAtrasados = vencimentosAtrasados.reduce((sum, v) => sum + v.valor, 0);
         alertasArray.push({
-          id: 'vencimentos-atrasados',
-          tipo: 'atraso',
-          severidade: 'crítico',
+          id: "vencimentos-atrasados",
+          tipo: "atraso",
+          severidade: "crítico",
           titulo: `${vencimentosAtrasados.length} Pagamentos Atrasados`,
           mensagem: `Você tem ${vencimentosAtrasados.length} pagamentos em atraso, totalizando ${formatarMoeda(totalAtrasados)}`,
-          recomendacao: 'Priorize a quitação destes débitos para evitar juros e multas.',
+          recomendacao: "Priorize a quitação destes débitos para evitar juros e multas.",
           icone: AlertTriangle,
           data: hoje.toISOString(),
-          detalhes: vencimentosAtrasados
+          detalhes: vencimentosAtrasados,
         });
       }
 
@@ -107,15 +114,16 @@ const AlertasIA = ({ compacto = false }) => {
       const gastosRecentes = await analisarGastosRecentes();
       if (gastosRecentes.variacao > 30) {
         alertasArray.push({
-          id: 'gastos-anormais',
-          tipo: 'anomalia',
-          severidade: 'atenção',
-          titulo: 'Gastos Acima do Normal',
+          id: "gastos-anormais",
+          tipo: "anomalia",
+          severidade: "atenção",
+          titulo: "Gastos Acima do Normal",
           mensagem: `Suas despesas aumentaram ${gastosRecentes.variacao.toFixed(0)}% em relação à média histórica`,
-          recomendacao: 'Revise seus gastos recentes e identifique possíveis despesas extraordinárias.',
+          recomendacao:
+            "Revise seus gastos recentes e identifique possíveis despesas extraordinárias.",
           icone: TrendingUp,
           data: hoje.toISOString(),
-          detalhes: gastosRecentes
+          detalhes: gastosRecentes,
         });
       }
 
@@ -123,15 +131,15 @@ const AlertasIA = ({ compacto = false }) => {
       const recorrenciasPendentes = await verificarRecorrencias();
       if (recorrenciasPendentes.length > 0) {
         alertasArray.push({
-          id: 'recorrencias-pendentes',
-          tipo: 'recorrencia',
-          severidade: 'info',
-          titulo: 'Despesas Recorrentes Próximas',
+          id: "recorrencias-pendentes",
+          tipo: "recorrencia",
+          severidade: "info",
+          titulo: "Despesas Recorrentes Próximas",
           mensagem: `${recorrenciasPendentes.length} despesas recorrentes vencerão em breve`,
-          recomendacao: 'Certifique-se de que há saldo para cobrir estas despesas automáticas.',
+          recomendacao: "Certifique-se de que há saldo para cobrir estas despesas automáticas.",
           icone: Clock,
           data: hoje.toISOString(),
-          detalhes: recorrenciasPendentes
+          detalhes: recorrenciasPendentes,
         });
       }
 
@@ -139,15 +147,15 @@ const AlertasIA = ({ compacto = false }) => {
       const projecaoNegativa = await verificarProjecaoNegativa(15);
       if (projecaoNegativa.diasAteNegativo > 0) {
         alertasArray.push({
-          id: 'projecao-negativa',
-          tipo: 'projecao',
-          severidade: 'crítico',
-          titulo: 'Risco de Saldo Negativo',
+          id: "projecao-negativa",
+          tipo: "projecao",
+          severidade: "crítico",
+          titulo: "Risco de Saldo Negativo",
           mensagem: `Com o padrão atual, seu saldo pode ficar negativo em ${projecaoNegativa.diasAteNegativo} dias`,
-          recomendacao: 'Tome medidas urgentes para aumentar receitas ou reduzir despesas.',
+          recomendacao: "Tome medidas urgentes para aumentar receitas ou reduzir despesas.",
           icone: TrendingDown,
           data: hoje.toISOString(),
-          detalhes: projecaoNegativa
+          detalhes: projecaoNegativa,
         });
       }
 
@@ -155,17 +163,17 @@ const AlertasIA = ({ compacto = false }) => {
         const ordem = { crítico: 0, atenção: 1, info: 2 };
         return ordem[a.severidade] - ordem[b.severidade];
       });
-    } catch (erro) {
-      console.error('Erro ao gerar alertas:', erro);
+    } catch (_erro) {
+      console.error("Erro ao gerar alertas:", _erro);
       return [];
     }
   };
 
   const buscarSaldoAtual = async () => {
     try {
-      const response = await api.get('/financeiro/saldo-atual');
+      const response = await api.get("/financeiro/saldo-atual");
       return response.data.saldo || 10000;
-    } catch (erro) {
+    } catch (_erro) {
       return 10000; // valor padrão
     }
   };
@@ -176,29 +184,29 @@ const AlertasIA = ({ compacto = false }) => {
       const dataLimite = new Date();
       dataLimite.setDate(dataLimite.getDate() + dias);
 
-      const response = await api.get('/financeiro/contas-pagar', {
+      const response = await api.get("/financeiro/contas-pagar", {
         params: {
-          data_inicio: hoje.toISOString().split('T')[0],
-          data_fim: dataLimite.toISOString().split('T')[0],
-          status: 'pendente'
-        }
+          data_inicio: hoje.toISOString().split("T")[0],
+          data_fim: dataLimite.toISOString().split("T")[0],
+          status: "pendente",
+        },
       });
 
       return response.data || [];
-    } catch (erro) {
+    } catch (_erro) {
       return [];
     }
   };
 
   const buscarVencimentosAtrasados = async () => {
     try {
-      const response = await api.get('/financeiro/contas-pagar', {
+      const response = await api.get("/financeiro/contas-pagar", {
         params: {
-          atrasadas: true
-        }
+          atrasadas: true,
+        },
       });
       return response.data || [];
-    } catch (erro) {
+    } catch (_erro) {
       return [];
     }
   };
@@ -210,85 +218,85 @@ const AlertasIA = ({ compacto = false }) => {
       const inicio = new Date();
       inicio.setDate(inicio.getDate() - 30);
 
-      const response = await api.get('/financeiro/analise-gastos', {
+      const response = await api.get("/financeiro/analise-gastos", {
         params: {
-          data_inicio: inicio.toISOString().split('T')[0],
-          data_fim: hoje.toISOString().split('T')[0]
-        }
+          data_inicio: inicio.toISOString().split("T")[0],
+          data_fim: hoje.toISOString().split("T")[0],
+        },
       });
 
       return response.data || { variacao: 0 };
-    } catch (erro) {
+    } catch (_erro) {
       return { variacao: 0 };
     }
   };
 
   const verificarRecorrencias = async () => {
     try {
-      const response = await api.get('/financeiro/recorrencias-proximas');
+      const response = await api.get("/financeiro/recorrencias-proximas");
       return response.data || [];
-    } catch (erro) {
+    } catch (_erro) {
       return [];
     }
   };
 
   const verificarProjecaoNegativa = async (dias) => {
     try {
-      const response = await api.get('/ia/fluxo/projecao-saldo', {
-        params: { dias }
+      const response = await api.get("/ia/fluxo/projecao-saldo", {
+        params: { dias },
       });
       return response.data || { diasAteNegativo: 0 };
-    } catch (erro) {
+    } catch (_erro) {
       return { diasAteNegativo: 0 };
     }
   };
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(valor);
   };
 
   const marcarComoResolvido = (alertaId) => {
-    setAlertas(alertas.filter(a => a.id !== alertaId));
+    setAlertas(alertas.filter((a) => a.id !== alertaId));
   };
 
   const getCorSeveridade = (severidade) => {
     switch (severidade) {
-      case 'crítico':
+      case "crítico":
         return {
-          bg: 'bg-red-50',
-          border: 'border-red-300',
-          text: 'text-red-800',
-          badge: 'bg-red-100 text-red-800'
+          bg: "bg-red-50",
+          border: "border-red-300",
+          text: "text-red-800",
+          badge: "bg-red-100 text-red-800",
         };
-      case 'atenção':
+      case "atenção":
         return {
-          bg: 'bg-yellow-50',
-          border: 'border-yellow-300',
-          text: 'text-yellow-800',
-          badge: 'bg-yellow-100 text-yellow-800'
+          bg: "bg-yellow-50",
+          border: "border-yellow-300",
+          text: "text-yellow-800",
+          badge: "bg-yellow-100 text-yellow-800",
         };
-      case 'info':
+      case "info":
         return {
-          bg: 'bg-blue-50',
-          border: 'border-blue-300',
-          text: 'text-blue-800',
-          badge: 'bg-blue-100 text-blue-800'
+          bg: "bg-blue-50",
+          border: "border-blue-300",
+          text: "text-blue-800",
+          badge: "bg-blue-100 text-blue-800",
         };
       default:
         return {
-          bg: 'bg-gray-50',
-          border: 'border-gray-300',
-          text: 'text-gray-800',
-          badge: 'bg-gray-100 text-gray-800'
+          bg: "bg-gray-50",
+          border: "border-gray-300",
+          text: "text-gray-800",
+          badge: "bg-gray-100 text-gray-800",
         };
     }
   };
 
-  const alertasFiltrados = alertas.filter(alerta => {
-    if (filtroSeveridade === 'todos') return true;
+  const alertasFiltrados = alertas.filter((alerta) => {
+    if (filtroSeveridade === "todos") return true;
     return alerta.severidade === filtroSeveridade;
   });
 
@@ -339,7 +347,9 @@ const AlertasIA = ({ compacto = false }) => {
                         <p className={`text-xs font-semibold ${cores.text} truncate`}>
                           {alerta.titulo}
                         </p>
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${cores.badge}`}>
+                        <span
+                          className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${cores.badge}`}
+                        >
                           {alerta.severidade}
                         </span>
                       </div>
@@ -380,24 +390,24 @@ const AlertasIA = ({ compacto = false }) => {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => setFiltroSeveridade('todos')}
+              onClick={() => setFiltroSeveridade("todos")}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filtroSeveridade === 'todos'
-                  ? 'bg-white text-orange-600'
-                  : 'bg-orange-500 text-white hover:bg-orange-400'
+                filtroSeveridade === "todos"
+                  ? "bg-white text-orange-600"
+                  : "bg-orange-500 text-white hover:bg-orange-400"
               }`}
             >
               Todos ({alertas.length})
             </button>
             <button
-              onClick={() => setFiltroSeveridade('crítico')}
+              onClick={() => setFiltroSeveridade("crítico")}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                filtroSeveridade === 'crítico'
-                  ? 'bg-white text-orange-600'
-                  : 'bg-orange-500 text-white hover:bg-orange-400'
+                filtroSeveridade === "crítico"
+                  ? "bg-white text-orange-600"
+                  : "bg-orange-500 text-white hover:bg-orange-400"
               }`}
             >
-              Críticos ({alertas.filter(a => a.severidade === 'crítico').length})
+              Críticos ({alertas.filter((a) => a.severidade === "crítico").length})
             </button>
           </div>
         </div>
@@ -407,9 +417,7 @@ const AlertasIA = ({ compacto = false }) => {
       {alertasFiltrados.length === 0 ? (
         <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
           <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-3" />
-          <h4 className="text-lg font-semibold text-green-800 mb-2">
-            Tudo em ordem!
-          </h4>
+          <h4 className="text-lg font-semibold text-green-800 mb-2">Tudo em ordem!</h4>
           <p className="text-green-700">
             Não há alertas no momento. Seu fluxo de caixa está saudável.
           </p>
@@ -432,23 +440,17 @@ const AlertasIA = ({ compacto = false }) => {
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <h4 className={`font-semibold ${cores.text}`}>
-                          {alerta.titulo}
-                        </h4>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${cores.badge}`}>
+                        <h4 className={`font-semibold ${cores.text}`}>{alerta.titulo}</h4>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${cores.badge}`}
+                        >
                           {alerta.severidade}
                         </span>
                       </div>
-                      <p className={`text-sm mb-3 ${cores.text}`}>
-                        {alerta.mensagem}
-                      </p>
+                      <p className={`text-sm mb-3 ${cores.text}`}>{alerta.mensagem}</p>
                       <div className="bg-white bg-opacity-50 rounded-lg p-3 mb-3">
-                        <p className="text-sm font-medium text-gray-700 mb-1">
-                          💡 Recomendação:
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {alerta.recomendacao}
-                        </p>
+                        <p className="text-sm font-medium text-gray-700 mb-1">💡 Recomendação:</p>
+                        <p className="text-sm text-gray-600">{alerta.recomendacao}</p>
                       </div>
                       {alerta.detalhes && (
                         <details className="text-sm">
