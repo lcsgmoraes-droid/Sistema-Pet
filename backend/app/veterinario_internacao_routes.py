@@ -1,4 +1,5 @@
-﻿"""Rotas de internacao veterinaria."""
+"""Rotas de internacao veterinaria."""
+
 from datetime import date
 from typing import Optional
 
@@ -15,7 +16,11 @@ from .veterinario_core import (
     _serializar_datetime_vet,
     _vet_now,
 )
-from .veterinario_financeiro import _aplicar_baixa_estoque_itens, _as_float, _enriquecer_insumos_com_custos
+from .veterinario_financeiro import (
+    _aplicar_baixa_estoque_itens,
+    _as_float,
+    _enriquecer_insumos_com_custos,
+)
 from .veterinario_internacao import (
     _build_payload_procedimento_agenda_internacao,
     _build_procedimento_observacao,
@@ -50,6 +55,7 @@ router = APIRouter()
 # INTERNAÇÃO
 # ═══════════════════════════════════════════════════════════════
 
+
 @router.get("/internacoes")
 def listar_internacoes(
     status: Optional[str] = "internado",
@@ -74,7 +80,9 @@ def listar_internacoes(
     if tenant_id is None and isinstance(user, dict):
         tenant_id = user.get("tenant_id")
     if tenant_id is None:
-        raise HTTPException(status_code=401, detail="Tenant não identificado para listar internações")
+        raise HTTPException(
+            status_code=401, detail="Tenant não identificado para listar internações"
+        )
 
     q = db.query(InternacaoVet).filter(InternacaoVet.tenant_id == tenant_id)
     if status_normalizado:
@@ -93,21 +101,23 @@ def listar_internacoes(
     for i in internacoes:
         motivo_limpo, box = _split_motivo_baia(i.motivo)
         tutor = i.pet.cliente if i.pet and i.pet.cliente else None
-        result.append({
-            "id": i.id,
-            "pet_id": i.pet_id,
-            "consulta_id": i.consulta_id,
-            "veterinario_id": i.veterinario_id,
-            "pet_nome": i.pet.nome if i.pet else None,
-            "tutor_id": tutor.id if tutor else None,
-            "tutor_nome": tutor.nome if tutor else None,
-            "motivo": motivo_limpo,
-            "box": box,
-            "status": i.status,
-            "data_entrada": _serializar_datetime_vet(i.data_entrada),
-            "data_saida": _serializar_datetime_vet(i.data_saida),
-            "observacoes_alta": i.observacoes,
-        })
+        result.append(
+            {
+                "id": i.id,
+                "pet_id": i.pet_id,
+                "consulta_id": i.consulta_id,
+                "veterinario_id": i.veterinario_id,
+                "pet_nome": i.pet.nome if i.pet else None,
+                "tutor_id": tutor.id if tutor else None,
+                "tutor_nome": tutor.nome if tutor else None,
+                "motivo": motivo_limpo,
+                "box": box,
+                "status": i.status,
+                "data_entrada": _serializar_datetime_vet(i.data_entrada),
+                "data_saida": _serializar_datetime_vet(i.data_saida),
+                "observacoes_alta": i.observacoes,
+            }
+        )
     return result
 
 
@@ -117,10 +127,18 @@ def obter_config_internacao(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    tenant_id = _resolver_tenant_id_vet(user, tenant_id, "Tenant nao identificado para configuracao de internacao")
-    user_id = _resolver_user_id_vet(user, "Usuario invalido para configuracao de internacao")
+    tenant_id = _resolver_tenant_id_vet(
+        user, tenant_id, "Tenant nao identificado para configuracao de internacao"
+    )
+    user_id = _resolver_user_id_vet(
+        user, "Usuario invalido para configuracao de internacao"
+    )
 
-    config = db.query(InternacaoConfig).filter(InternacaoConfig.tenant_id == tenant_id).first()
+    config = (
+        db.query(InternacaoConfig)
+        .filter(InternacaoConfig.tenant_id == tenant_id)
+        .first()
+    )
     if not config:
         config = InternacaoConfig(
             tenant_id=tenant_id,
@@ -144,10 +162,18 @@ def atualizar_config_internacao(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    tenant_id = _resolver_tenant_id_vet(user, tenant_id, "Tenant nao identificado para configuracao de internacao")
-    user_id = _resolver_user_id_vet(user, "Usuario invalido para configuracao de internacao")
+    tenant_id = _resolver_tenant_id_vet(
+        user, tenant_id, "Tenant nao identificado para configuracao de internacao"
+    )
+    user_id = _resolver_user_id_vet(
+        user, "Usuario invalido para configuracao de internacao"
+    )
 
-    config = db.query(InternacaoConfig).filter(InternacaoConfig.tenant_id == tenant_id).first()
+    config = (
+        db.query(InternacaoConfig)
+        .filter(InternacaoConfig.tenant_id == tenant_id)
+        .first()
+    )
     if not config:
         config = InternacaoConfig(
             tenant_id=tenant_id,
@@ -175,7 +201,9 @@ def listar_procedimentos_agenda_internacao(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    tenant_id = _resolver_tenant_id_vet(user, tenant_id, "Tenant nao identificado para agenda de internacao")
+    tenant_id = _resolver_tenant_id_vet(
+        user, tenant_id, "Tenant nao identificado para agenda de internacao"
+    )
 
     status_normalizado = (status or "ativos").strip().lower()
     if status_normalizado in {"", "ativos", "ativo"}:
@@ -187,7 +215,9 @@ def listar_procedimentos_agenda_internacao(
     elif status_normalizado in {"cancelado", "cancelados"}:
         status_filtro = ["cancelado"]
     else:
-        raise HTTPException(status_code=422, detail="Status da agenda de internacao invalido")
+        raise HTTPException(
+            status_code=422, detail="Status da agenda de internacao invalido"
+        )
 
     query = (
         db.query(InternacaoProcedimentoAgenda)
@@ -201,7 +231,9 @@ def listar_procedimentos_agenda_internacao(
         )
     )
     if internacao_id:
-        query = query.filter(InternacaoProcedimentoAgenda.internacao_id == internacao_id)
+        query = query.filter(
+            InternacaoProcedimentoAgenda.internacao_id == internacao_id
+        )
 
     itens = query.order_by(InternacaoProcedimentoAgenda.horario_agendado.asc()).all()
     return [_serializar_procedimento_agenda_internacao(item) for item in itens]
@@ -215,7 +247,9 @@ def criar_procedimento_agenda_internacao(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    tenant_id = _resolver_tenant_id_vet(user, tenant_id, "Tenant nao identificado para agenda de internacao")
+    tenant_id = _resolver_tenant_id_vet(
+        user, tenant_id, "Tenant nao identificado para agenda de internacao"
+    )
     user_id = _resolver_user_id_vet(user, "Usuario invalido para agenda de internacao")
 
     internacao = (
@@ -230,11 +264,16 @@ def criar_procedimento_agenda_internacao(
     if not internacao:
         raise HTTPException(404, "Internacao nao encontrada")
     if internacao.status != "internado":
-        raise HTTPException(status_code=409, detail="Agenda de procedimento so pode ser criada para internacao ativa")
+        raise HTTPException(
+            status_code=409,
+            detail="Agenda de procedimento so pode ser criada para internacao ativa",
+        )
 
     medicamento = (body.medicamento or "").strip()
     if not medicamento:
-        raise HTTPException(status_code=422, detail="Medicamento/procedimento e obrigatorio")
+        raise HTTPException(
+            status_code=422, detail="Medicamento/procedimento e obrigatorio"
+        )
 
     horario_agendado = _normalizar_datetime_local_brasilia(body.horario_agendado)
     if not horario_agendado:
@@ -242,7 +281,9 @@ def criar_procedimento_agenda_internacao(
 
     quantidade_prevista = _as_float(body.quantidade_prevista)
     if quantidade_prevista is not None and quantidade_prevista < 0:
-        raise HTTPException(status_code=422, detail="Quantidade prevista nao pode ser negativa")
+        raise HTTPException(
+            status_code=422, detail="Quantidade prevista nao pode ser negativa"
+        )
 
     item = InternacaoProcedimentoAgenda(
         tenant_id=tenant_id,
@@ -276,7 +317,9 @@ def concluir_procedimento_agenda_internacao(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    tenant_id = _resolver_tenant_id_vet(user, tenant_id, "Tenant nao identificado para agenda de internacao")
+    tenant_id = _resolver_tenant_id_vet(
+        user, tenant_id, "Tenant nao identificado para agenda de internacao"
+    )
     user_id = _resolver_user_id_vet(user, "Usuario invalido para agenda de internacao")
 
     item = (
@@ -294,26 +337,38 @@ def concluir_procedimento_agenda_internacao(
     if not item:
         raise HTTPException(404, "Procedimento agendado nao encontrado")
     if item.status == "cancelado":
-        raise HTTPException(status_code=409, detail="Procedimento cancelado nao pode ser concluido")
+        raise HTTPException(
+            status_code=409, detail="Procedimento cancelado nao pode ser concluido"
+        )
 
     executado_por = (body.executado_por or "").strip()
     if not executado_por:
-        raise HTTPException(status_code=422, detail="Campo 'executado_por' e obrigatorio")
+        raise HTTPException(
+            status_code=422, detail="Campo 'executado_por' e obrigatorio"
+        )
 
     horario_execucao = _normalizar_datetime_local_brasilia(body.horario_execucao)
     if not horario_execucao:
-        raise HTTPException(status_code=422, detail="Campo 'horario_execucao' e obrigatorio")
+        raise HTTPException(
+            status_code=422, detail="Campo 'horario_execucao' e obrigatorio"
+        )
 
     quantidade_prevista = _as_float(body.quantidade_prevista)
     quantidade_executada = _as_float(body.quantidade_executada)
     quantidade_desperdicio = _as_float(body.quantidade_desperdicio) or 0.0
 
     if quantidade_prevista is not None and quantidade_prevista < 0:
-        raise HTTPException(status_code=422, detail="Quantidade prevista nao pode ser negativa")
+        raise HTTPException(
+            status_code=422, detail="Quantidade prevista nao pode ser negativa"
+        )
     if quantidade_executada is not None and quantidade_executada < 0:
-        raise HTTPException(status_code=422, detail="Quantidade executada nao pode ser negativa")
+        raise HTTPException(
+            status_code=422, detail="Quantidade executada nao pode ser negativa"
+        )
     if quantidade_desperdicio < 0:
-        raise HTTPException(status_code=422, detail="Quantidade de desperdicio nao pode ser negativa")
+        raise HTTPException(
+            status_code=422, detail="Quantidade de desperdicio nao pode ser negativa"
+        )
     if quantidade_executada is None and quantidade_prevista is not None:
         quantidade_executada = quantidade_prevista
 
@@ -321,17 +376,27 @@ def concluir_procedimento_agenda_internacao(
     item.executado_por = executado_por
     item.horario_execucao = horario_execucao
     item.observacao_execucao = (body.observacao_execucao or "").strip() or None
-    item.quantidade_prevista = quantidade_prevista if quantidade_prevista is not None else item.quantidade_prevista
+    item.quantidade_prevista = (
+        quantidade_prevista
+        if quantidade_prevista is not None
+        else item.quantidade_prevista
+    )
     item.quantidade_executada = quantidade_executada
     item.quantidade_desperdicio = quantidade_desperdicio
-    item.unidade_quantidade = (body.unidade_quantidade or "").strip() or item.unidade_quantidade
+    item.unidade_quantidade = (
+        body.unidade_quantidade or ""
+    ).strip() or item.unidade_quantidade
 
     payload = _build_payload_procedimento_agenda_internacao(item)
     if item.procedimento_evolucao_id:
-        evolucao = db.query(EvolucaoInternacao).filter(
-            EvolucaoInternacao.id == item.procedimento_evolucao_id,
-            EvolucaoInternacao.tenant_id == tenant_id,
-        ).first()
+        evolucao = (
+            db.query(EvolucaoInternacao)
+            .filter(
+                EvolucaoInternacao.id == item.procedimento_evolucao_id,
+                EvolucaoInternacao.tenant_id == tenant_id,
+            )
+            .first()
+        )
         if evolucao:
             evolucao.user_id = user_id
             evolucao.data_hora = horario_execucao
@@ -363,12 +428,18 @@ def remover_procedimento_agenda_internacao(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    tenant_id = _resolver_tenant_id_vet(user, tenant_id, "Tenant nao identificado para agenda de internacao")
+    tenant_id = _resolver_tenant_id_vet(
+        user, tenant_id, "Tenant nao identificado para agenda de internacao"
+    )
 
-    item = db.query(InternacaoProcedimentoAgenda).filter(
-        InternacaoProcedimentoAgenda.id == agenda_id,
-        InternacaoProcedimentoAgenda.tenant_id == tenant_id,
-    ).first()
+    item = (
+        db.query(InternacaoProcedimentoAgenda)
+        .filter(
+            InternacaoProcedimentoAgenda.id == agenda_id,
+            InternacaoProcedimentoAgenda.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not item:
         raise HTTPException(404, "Procedimento agendado nao encontrado")
     if item.status == "concluido":
@@ -406,7 +477,9 @@ def obter_internacao(
 
     motivo_limpo, box = _split_motivo_baia(i.motivo)
 
-    evolucoes_formatadas, procedimentos_formatados = _separar_evolucoes_e_procedimentos(evolucoes)
+    evolucoes_formatadas, procedimentos_formatados = _separar_evolucoes_e_procedimentos(
+        evolucoes
+    )
 
     data_entrada_exibicao = _resolver_data_entrada_exibicao_internacao(i, evolucoes)
 
@@ -466,19 +539,23 @@ def obter_historico_internacoes_pet(
         )
         evols, procs = _separar_evolucoes_e_procedimentos(registros)
 
-        data_entrada_exibicao = _resolver_data_entrada_exibicao_internacao(internacao, registros)
+        data_entrada_exibicao = _resolver_data_entrada_exibicao_internacao(
+            internacao, registros
+        )
 
-        historico.append({
-            "internacao_id": internacao.id,
-            "status": internacao.status,
-            "motivo": motivo_limpo,
-            "box": box,
-            "data_entrada": data_entrada_exibicao,
-            "data_saida": _serializar_datetime_vet(internacao.data_saida),
-            "observacoes_alta": internacao.observacoes,
-            "evolucoes": evols,
-            "procedimentos": procs,
-        })
+        historico.append(
+            {
+                "internacao_id": internacao.id,
+                "status": internacao.status,
+                "motivo": motivo_limpo,
+                "box": box,
+                "data_entrada": data_entrada_exibicao,
+                "data_saida": _serializar_datetime_vet(internacao.data_saida),
+                "observacoes_alta": internacao.observacoes,
+                "evolucoes": evols,
+                "procedimentos": procs,
+            }
+        )
 
     return {
         "pet_id": pet.id,
@@ -507,21 +584,32 @@ def criar_internacao(
             raise HTTPException(status_code=400, detail="Pet inválido para internação")
         tenant_id = pet_ref.tenant_id
 
-    pet_ok = db.query(Pet).filter(
-        Pet.id == body.pet_id,
-        Pet.tenant_id == tenant_id,
-    ).first()
+    pet_ok = (
+        db.query(Pet)
+        .filter(
+            Pet.id == body.pet_id,
+            Pet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not pet_ok:
         raise HTTPException(status_code=404, detail="Pet não encontrado neste tenant")
 
     if body.consulta_id:
-        consulta_ok = db.query(ConsultaVet).filter(
-            ConsultaVet.id == body.consulta_id,
-            ConsultaVet.pet_id == body.pet_id,
-            ConsultaVet.tenant_id == tenant_id,
-        ).first()
+        consulta_ok = (
+            db.query(ConsultaVet)
+            .filter(
+                ConsultaVet.id == body.consulta_id,
+                ConsultaVet.pet_id == body.pet_id,
+                ConsultaVet.tenant_id == tenant_id,
+            )
+            .first()
+        )
         if not consulta_ok:
-            raise HTTPException(status_code=404, detail="Consulta vinculada nÃ£o encontrada para este pet")
+            raise HTTPException(
+                status_code=404,
+                detail="Consulta vinculada nÃ£o encontrada para este pet",
+            )
 
     if box_normalizado:
         internacoes_ativas = (
@@ -553,7 +641,9 @@ def criar_internacao(
         user_id=user_id,
         tenant_id=tenant_id,
         motivo=_pack_motivo_baia(motivo, box),
-        data_entrada=_normalizar_datetime_local_brasilia(body.data_entrada) if body.data_entrada else _vet_now(),
+        data_entrada=_normalizar_datetime_local_brasilia(body.data_entrada)
+        if body.data_entrada
+        else _vet_now(),
         status="internado",
     )
     db.add(i)
@@ -586,19 +676,26 @@ def registrar_evolucao(
 
     tenant_id_evolucao = i.tenant_id or tenant_id
     if tenant_id_evolucao is None:
-        raise HTTPException(status_code=422, detail="Tenant não identificado para registrar evolução")
+        raise HTTPException(
+            status_code=422, detail="Tenant não identificado para registrar evolução"
+        )
 
     user_id = getattr(user, "id", None)
     if user_id is None and isinstance(user, dict):
         user_id = user.get("id")
     if user_id is None:
-        raise HTTPException(status_code=401, detail="Usuário inválido para registrar evolução")
+        raise HTTPException(
+            status_code=401, detail="Usuário inválido para registrar evolução"
+        )
 
     dados = body.model_dump(exclude_unset=True)
     # Compatibilidade de nomes de campos vindos de versões antigas da tela.
     if dados.get("frequencia_cardiaca") is None and body.freq_cardiaca is not None:
         dados["frequencia_cardiaca"] = body.freq_cardiaca
-    if dados.get("frequencia_respiratoria") is None and body.freq_respiratoria is not None:
+    if (
+        dados.get("frequencia_respiratoria") is None
+        and body.freq_respiratoria is not None
+    ):
         dados["frequencia_respiratoria"] = body.freq_respiratoria
     dados.pop("freq_cardiaca", None)
     dados.pop("freq_respiratoria", None)
@@ -633,23 +730,37 @@ def registrar_procedimento_internacao(
 
     tenant_id_registro = i.tenant_id or tenant_id
     if tenant_id_registro is None:
-        raise HTTPException(status_code=422, detail="Tenant não identificado para registrar procedimento")
+        raise HTTPException(
+            status_code=422,
+            detail="Tenant não identificado para registrar procedimento",
+        )
 
     user_id = getattr(user, "id", None)
     if user_id is None and isinstance(user, dict):
         user_id = user.get("id")
     if user_id is None:
-        raise HTTPException(status_code=401, detail="Usuário inválido para registrar procedimento")
+        raise HTTPException(
+            status_code=401, detail="Usuário inválido para registrar procedimento"
+        )
 
     status_procedimento = (body.status or "concluido").strip().lower()
     if status_procedimento not in {"agendado", "concluido"}:
-        raise HTTPException(status_code=422, detail="Status do procedimento inválido. Use 'agendado' ou 'concluido'.")
+        raise HTTPException(
+            status_code=422,
+            detail="Status do procedimento inválido. Use 'agendado' ou 'concluido'.",
+        )
 
     if status_procedimento == "concluido":
         if not (body.executado_por or "").strip():
-            raise HTTPException(status_code=422, detail="Campo 'executado_por' é obrigatório para procedimento concluído")
+            raise HTTPException(
+                status_code=422,
+                detail="Campo 'executado_por' é obrigatório para procedimento concluído",
+            )
         if not body.horario_execucao:
-            raise HTTPException(status_code=422, detail="Campo 'horario_execucao' é obrigatório para procedimento concluído")
+            raise HTTPException(
+                status_code=422,
+                detail="Campo 'horario_execucao' é obrigatório para procedimento concluído",
+            )
 
     horario_agendado = _normalizar_datetime_local_brasilia(body.horario_agendado)
     horario_execucao = _normalizar_datetime_local_brasilia(body.horario_execucao)
@@ -658,16 +769,30 @@ def registrar_procedimento_internacao(
     quantidade_desperdicio = _as_float(body.quantidade_desperdicio) or 0.0
 
     if quantidade_prevista is not None and quantidade_prevista < 0:
-        raise HTTPException(status_code=422, detail="Quantidade prevista nÃ£o pode ser negativa")
+        raise HTTPException(
+            status_code=422, detail="Quantidade prevista nÃ£o pode ser negativa"
+        )
     if quantidade_executada is not None and quantidade_executada < 0:
-        raise HTTPException(status_code=422, detail="Quantidade executada nÃ£o pode ser negativa")
+        raise HTTPException(
+            status_code=422, detail="Quantidade executada nÃ£o pode ser negativa"
+        )
     if quantidade_desperdicio < 0:
-        raise HTTPException(status_code=422, detail="Quantidade de desperdÃ­cio nÃ£o pode ser negativa")
-    if status_procedimento == "concluido" and quantidade_executada is None and quantidade_prevista is not None:
+        raise HTTPException(
+            status_code=422, detail="Quantidade de desperdÃ­cio nÃ£o pode ser negativa"
+        )
+    if (
+        status_procedimento == "concluido"
+        and quantidade_executada is None
+        and quantidade_prevista is not None
+    ):
         quantidade_executada = quantidade_prevista
 
     data_referencia = horario_agendado or horario_execucao or _vet_now()
-    insumos = _enriquecer_insumos_com_custos(db, tenant_id_registro, body.insumos or []) if body.insumos else []
+    insumos = (
+        _enriquecer_insumos_com_custos(db, tenant_id_registro, body.insumos or [])
+        if body.insumos
+        else []
+    )
 
     ev = EvolucaoInternacao(
         internacao_id=internacao_id,
@@ -697,7 +822,8 @@ def registrar_procedimento_internacao(
 
     payload = {
         "status": status_procedimento,
-        "tipo_registro": (body.tipo_registro or "procedimento").strip().lower() or "procedimento",
+        "tipo_registro": (body.tipo_registro or "procedimento").strip().lower()
+        or "procedimento",
         "horario_agendado": horario_agendado.isoformat() if horario_agendado else None,
         "medicamento": body.medicamento,
         "dose": body.dose,
@@ -735,10 +861,14 @@ def dar_alta(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    i = db.query(InternacaoVet).filter(
-        InternacaoVet.id == internacao_id,
-        InternacaoVet.tenant_id == tenant_id,
-    ).first()
+    i = (
+        db.query(InternacaoVet)
+        .filter(
+            InternacaoVet.id == internacao_id,
+            InternacaoVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not i:
         raise HTTPException(404, "Internação não encontrada")
     i.status = "alta"
@@ -746,4 +876,8 @@ def dar_alta(
     if observacoes:
         i.observacoes = observacoes
     db.commit()
-    return {"ok": True, "status": "alta", "data_saida": _serializar_datetime_vet(i.data_saida)}
+    return {
+        "ok": True,
+        "status": "alta",
+        "data_saida": _serializar_datetime_vet(i.data_saida),
+    }

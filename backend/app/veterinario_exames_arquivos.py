@@ -11,7 +11,9 @@ from typing import Optional
 
 try:
     import pdfplumber
-except ModuleNotFoundError:  # pragma: no cover - dependencia existe no container de producao.
+except (
+    ModuleNotFoundError
+):  # pragma: no cover - dependencia existe no container de producao.
     pdfplumber = None
 
 from fastapi import HTTPException, UploadFile
@@ -70,14 +72,18 @@ def _resolve_exame_file_path(exame, tenant_id) -> Path:
             uploads_idx = idx
             break
     if uploads_idx is not None:
-        caminho_alternativo = Path(__file__).resolve().parents[1].joinpath(*partes[uploads_idx:])
+        caminho_alternativo = (
+            Path(__file__).resolve().parents[1].joinpath(*partes[uploads_idx:])
+        )
         if caminho_alternativo.exists():
             return caminho_alternativo
 
     raise HTTPException(404, "Arquivo do exame não foi encontrado no servidor.")
 
 
-def _extract_text_from_pdf(pdf_path: Path, max_pages: int = 8, max_chars: int = 18000) -> str:
+def _extract_text_from_pdf(
+    pdf_path: Path, max_pages: int = 8, max_chars: int = 18000
+) -> str:
     if pdfplumber is None:
         raise HTTPException(500, "Leitor de PDF indisponível no backend.")
 
@@ -158,7 +164,10 @@ def _call_openai_exam_file_analysis(
                         "role": "user",
                         "content": [
                             {"type": "text", "text": prompt_texto},
-                            {"type": "image_url", "image_url": {"url": imagem_data_url}},
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": imagem_data_url},
+                            },
                         ],
                     },
                 ],
@@ -182,7 +191,11 @@ def _call_openai_exam_file_analysis(
         ) from exc
     except RateLimitError as exc:
         mensagem = str(exc).lower()
-        if "insufficient_quota" in mensagem or "quota" in mensagem or "billing" in mensagem:
+        if (
+            "insufficient_quota" in mensagem
+            or "quota" in mensagem
+            or "billing" in mensagem
+        ):
             raise HTTPException(
                 status_code=429,
                 detail="A IA veterinaria da OpenAI esta sem creditos ou sem faturamento ativo. Adicione creditos em platform.openai.com/account/billing e tente novamente.",
@@ -224,7 +237,11 @@ def _persist_exam_file_ai_analysis(
 ) -> None:
     if texto_extraido and not (exame.resultado_texto or "").strip():
         exame.resultado_texto = texto_extraido
-    elif texto_extraido and (exame.resultado_texto or "").strip() and texto_extraido not in (exame.resultado_texto or ""):
+    elif (
+        texto_extraido
+        and (exame.resultado_texto or "").strip()
+        and texto_extraido not in (exame.resultado_texto or "")
+    ):
         exame.resultado_texto = f"{(exame.resultado_texto or '').strip()}\n\n--- Texto extraído do arquivo ---\n{texto_extraido}".strip()
 
     exame.resultado_json = _merge_exam_result_json(exame, resultado_json)
@@ -232,11 +249,17 @@ def _persist_exam_file_ai_analysis(
     analise_fallback = _gerar_interpretacao_exame(exame)
     exame.interpretacao_ia = (conclusao or "").strip() or analise_fallback["conclusao"]
     exame.interpretacao_ia_resumo = (resumo or "").strip() or analise_fallback["resumo"]
-    exame.interpretacao_ia_confianca = round(float(confianca), 2) if confianca is not None else analise_fallback["confianca"]
+    exame.interpretacao_ia_confianca = (
+        round(float(confianca), 2)
+        if confianca is not None
+        else analise_fallback["confianca"]
+    )
     exame.interpretacao_ia_alertas = alertas or analise_fallback["alertas"]
 
     payload_base = {
-        "resultado_json": exame.resultado_json if isinstance(exame.resultado_json, dict) else {},
+        "resultado_json": exame.resultado_json
+        if isinstance(exame.resultado_json, dict)
+        else {},
         "tem_resultado_texto": bool(exame.resultado_texto),
         "analisado_em": datetime.utcnow().isoformat(),
         "fonte_arquivo": True,
@@ -308,9 +331,21 @@ def _process_exam_file_with_ai(
     resumo = str(resposta_ai.get("resumo") or "").strip()
     conclusao = str(resposta_ai.get("conclusao") or "").strip()
     confianca = _as_float(resposta_ai.get("confianca"))
-    achados_imagem = resposta_ai.get("achados_imagem") if isinstance(resposta_ai.get("achados_imagem"), list) else []
-    conduta_sugerida = resposta_ai.get("conduta_sugerida") if isinstance(resposta_ai.get("conduta_sugerida"), list) else []
-    limitacoes = resposta_ai.get("limitacoes") if isinstance(resposta_ai.get("limitacoes"), list) else []
+    achados_imagem = (
+        resposta_ai.get("achados_imagem")
+        if isinstance(resposta_ai.get("achados_imagem"), list)
+        else []
+    )
+    conduta_sugerida = (
+        resposta_ai.get("conduta_sugerida")
+        if isinstance(resposta_ai.get("conduta_sugerida"), list)
+        else []
+    )
+    limitacoes = (
+        resposta_ai.get("limitacoes")
+        if isinstance(resposta_ai.get("limitacoes"), list)
+        else []
+    )
     if falha_ia_detail:
         limitacoes = [*limitacoes, falha_ia_detail]
 
@@ -320,11 +355,13 @@ def _process_exam_file_with_ai(
             "Não foi possível extrair conteúdo útil do arquivo. Em PDFs escaneados, tente anexar como imagem ou informe o laudo em texto.",
         )
 
-    payload_extra.update({
-        "achados_imagem": achados_imagem,
-        "conduta_sugerida": conduta_sugerida,
-        "limitacoes": limitacoes,
-    })
+    payload_extra.update(
+        {
+            "achados_imagem": achados_imagem,
+            "conduta_sugerida": conduta_sugerida,
+            "limitacoes": limitacoes,
+        }
+    )
 
     _persist_exam_file_ai_analysis(
         exame,
@@ -353,7 +390,10 @@ def salvar_arquivo_exame_upload(exame, tenant_id, arquivo: UploadFile) -> str:
     pasta_tenant = UPLOADS_DIR / str(tenant_id)
     pasta_tenant.mkdir(parents=True, exist_ok=True)
 
-    nome_seguro = re.sub(r"[^a-zA-Z0-9_.-]", "_", Path(nome_original).stem).strip("_") or "resultado"
+    nome_seguro = (
+        re.sub(r"[^a-zA-Z0-9_.-]", "_", Path(nome_original).stem).strip("_")
+        or "resultado"
+    )
     nome_arquivo = f"exame_{exame.id}_{secrets.token_hex(4)}_{nome_seguro}{extensao}"
     caminho_arquivo = pasta_tenant / nome_arquivo
     caminho_arquivo.write_bytes(conteudo)

@@ -1,4 +1,5 @@
-﻿"""Rotas de agenda e cadastros operacionais do modulo veterinario."""
+"""Rotas de agenda e cadastros operacionais do modulo veterinario."""
+
 from datetime import date
 from typing import List, Optional
 
@@ -43,6 +44,7 @@ router = APIRouter()
 # VETERINÁRIOS (listagem para seleção em formulários)
 # ═══════════════════════════════════════════════════════════════
 
+
 @router.get("/veterinarios", response_model=List[VeterinarioSimples])
 def listar_veterinarios(
     db: Session = Depends(get_session),
@@ -61,7 +63,13 @@ def listar_veterinarios(
         .all()
     )
     return [
-        {"id": v.id, "nome": v.nome, "crmv": getattr(v, "crmv", None), "email": v.email, "telefone": v.telefone}
+        {
+            "id": v.id,
+            "nome": v.nome,
+            "crmv": getattr(v, "crmv", None),
+            "email": v.email,
+            "telefone": v.telefone,
+        }
         for v in vets
     ]
 
@@ -90,16 +98,25 @@ def criar_consultorio(
     if not nome:
         raise HTTPException(status_code=422, detail="Informe o nome do consultorio")
 
-    existente = db.query(ConsultorioVet).filter(
-        ConsultorioVet.tenant_id == tenant_id,
-        func.lower(ConsultorioVet.nome) == nome.lower(),
-    ).first()
+    existente = (
+        db.query(ConsultorioVet)
+        .filter(
+            ConsultorioVet.tenant_id == tenant_id,
+            func.lower(ConsultorioVet.nome) == nome.lower(),
+        )
+        .first()
+    )
     if existente:
-        raise HTTPException(status_code=409, detail="Ja existe um consultorio com esse nome")
+        raise HTTPException(
+            status_code=409, detail="Ja existe um consultorio com esse nome"
+        )
 
-    ultima_ordem = db.query(func.max(ConsultorioVet.ordem)).filter(
-        ConsultorioVet.tenant_id == tenant_id
-    ).scalar() or 0
+    ultima_ordem = (
+        db.query(func.max(ConsultorioVet.ordem))
+        .filter(ConsultorioVet.tenant_id == tenant_id)
+        .scalar()
+        or 0
+    )
 
     consultorio = ConsultorioVet(
         tenant_id=tenant_id,
@@ -122,10 +139,14 @@ def atualizar_consultorio(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    consultorio = db.query(ConsultorioVet).filter(
-        ConsultorioVet.id == consultorio_id,
-        ConsultorioVet.tenant_id == tenant_id,
-    ).first()
+    consultorio = (
+        db.query(ConsultorioVet)
+        .filter(
+            ConsultorioVet.id == consultorio_id,
+            ConsultorioVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not consultorio:
         raise HTTPException(status_code=404, detail="Consultorio nao encontrado")
 
@@ -134,13 +155,19 @@ def atualizar_consultorio(
         nome = (payload.get("nome") or "").strip()
         if not nome:
             raise HTTPException(status_code=422, detail="Informe o nome do consultorio")
-        duplicado = db.query(ConsultorioVet).filter(
-            ConsultorioVet.tenant_id == tenant_id,
-            func.lower(ConsultorioVet.nome) == nome.lower(),
-            ConsultorioVet.id != consultorio_id,
-        ).first()
+        duplicado = (
+            db.query(ConsultorioVet)
+            .filter(
+                ConsultorioVet.tenant_id == tenant_id,
+                func.lower(ConsultorioVet.nome) == nome.lower(),
+                ConsultorioVet.id != consultorio_id,
+            )
+            .first()
+        )
         if duplicado:
-            raise HTTPException(status_code=409, detail="Ja existe um consultorio com esse nome")
+            raise HTTPException(
+                status_code=409, detail="Ja existe um consultorio com esse nome"
+            )
         consultorio.nome = nome
 
     if "descricao" in payload:
@@ -162,17 +189,25 @@ def remover_consultorio(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    consultorio = db.query(ConsultorioVet).filter(
-        ConsultorioVet.id == consultorio_id,
-        ConsultorioVet.tenant_id == tenant_id,
-    ).first()
+    consultorio = (
+        db.query(ConsultorioVet)
+        .filter(
+            ConsultorioVet.id == consultorio_id,
+            ConsultorioVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not consultorio:
         raise HTTPException(status_code=404, detail="Consultorio nao encontrado")
 
-    agendamento_vinculado = db.query(AgendamentoVet.id).filter(
-        AgendamentoVet.tenant_id == tenant_id,
-        AgendamentoVet.consultorio_id == consultorio_id,
-    ).first()
+    agendamento_vinculado = (
+        db.query(AgendamentoVet.id)
+        .filter(
+            AgendamentoVet.tenant_id == tenant_id,
+            AgendamentoVet.consultorio_id == consultorio_id,
+        )
+        .first()
+    )
     if agendamento_vinculado:
         raise HTTPException(
             status_code=409,
@@ -187,6 +222,7 @@ def remover_consultorio(
 # ═══════════════════════════════════════════════════════════════
 # PETS ACESSÍVEIS (próprio tenant + empresas parceiras)
 # ═══════════════════════════════════════════════════════════════
+
 
 @router.get("/pets")
 def listar_pets_vet(
@@ -268,14 +304,22 @@ def _validar_consulta_origem_agendamento(
     if str(consulta_origem_id).strip() == "":
         return None
 
-    consulta = db.query(ConsultaVet).filter(
-        ConsultaVet.id == consulta_origem_id,
-        ConsultaVet.tenant_id == tenant_id,
-    ).first()
+    consulta = (
+        db.query(ConsultaVet)
+        .filter(
+            ConsultaVet.id == consulta_origem_id,
+            ConsultaVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not consulta:
-        raise HTTPException(status_code=422, detail="Consulta de origem do retorno nao foi encontrada")
+        raise HTTPException(
+            status_code=422, detail="Consulta de origem do retorno nao foi encontrada"
+        )
     if pet_id and consulta.pet_id != pet_id:
-        raise HTTPException(status_code=422, detail="Consulta de origem nao pertence ao pet selecionado")
+        raise HTTPException(
+            status_code=422, detail="Consulta de origem nao pertence ao pet selecionado"
+        )
     return consulta
 
 
@@ -326,7 +370,9 @@ def baixar_calendario_agenda_vet(
         "Content-Disposition": 'attachment; filename="agenda-veterinaria.ics"',
         "Cache-Control": "no-store",
     }
-    return Response(content=conteudo, media_type="text/calendar; charset=utf-8", headers=headers)
+    return Response(
+        content=conteudo, media_type="text/calendar; charset=utf-8", headers=headers
+    )
 
 
 @router.get("/agenda/feed/{token}.ics")
@@ -403,31 +449,50 @@ def diagnostico_push_agendamento(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    ag = db.query(AgendamentoVet).filter(
-        AgendamentoVet.id == agendamento_id,
-        AgendamentoVet.tenant_id == tenant_id,
-    ).first()
+    ag = (
+        db.query(AgendamentoVet)
+        .filter(
+            AgendamentoVet.id == agendamento_id,
+            AgendamentoVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not ag:
         raise HTTPException(404, "Agendamento não encontrado")
 
     from app.campaigns.models import NotificationQueue
 
-    cliente = db.query(Cliente).filter(
-        Cliente.id == ag.cliente_id,
-        Cliente.tenant_id == str(tenant_id),
-    ).first()
+    cliente = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == ag.cliente_id,
+            Cliente.tenant_id == str(tenant_id),
+        )
+        .first()
+    )
     user_tutor = None
     if cliente and cliente.user_id:
-        user_tutor = db.query(User).filter(
-            User.id == cliente.user_id,
-            User.tenant_id == str(tenant_id),
-        ).first()
+        user_tutor = (
+            db.query(User)
+            .filter(
+                User.id == cliente.user_id,
+                User.tenant_id == str(tenant_id),
+            )
+            .first()
+        )
 
     prefixo = f"vet-agendamento:{ag.id}:"
-    lembretes = db.query(NotificationQueue).filter(
-        NotificationQueue.tenant_id == str(tenant_id),
-        NotificationQueue.idempotency_key.like(f"{prefixo}%"),
-    ).order_by(NotificationQueue.scheduled_at.asc(), NotificationQueue.created_at.desc()).all()
+    lembretes = (
+        db.query(NotificationQueue)
+        .filter(
+            NotificationQueue.tenant_id == str(tenant_id),
+            NotificationQueue.idempotency_key.like(f"{prefixo}%"),
+        )
+        .order_by(
+            NotificationQueue.scheduled_at.asc(), NotificationQueue.created_at.desc()
+        )
+        .all()
+    )
 
     return {
         "agendamento_id": ag.id,
@@ -436,13 +501,19 @@ def diagnostico_push_agendamento(
         "data_hora": ag.data_hora.isoformat() if ag.data_hora else None,
         "status": ag.status,
         "tutor_tem_push_token": bool(getattr(user_tutor, "push_token", None)),
-        "push_token_preview": f"{user_tutor.push_token[:18]}..." if getattr(user_tutor, "push_token", None) else None,
+        "push_token_preview": f"{user_tutor.push_token[:18]}..."
+        if getattr(user_tutor, "push_token", None)
+        else None,
         "lembretes": [
             {
                 "id": lembrete.id,
                 "subject": lembrete.subject,
-                "status": lembrete.status.value if hasattr(lembrete.status, "value") else str(lembrete.status),
-                "scheduled_at": lembrete.scheduled_at.isoformat() if lembrete.scheduled_at else None,
+                "status": lembrete.status.value
+                if hasattr(lembrete.status, "value")
+                else str(lembrete.status),
+                "scheduled_at": lembrete.scheduled_at.isoformat()
+                if lembrete.scheduled_at
+                else None,
             }
             for lembrete in lembretes
         ],
@@ -468,11 +539,15 @@ def criar_agendamento(
         .first()
     )
     if not pet_ref:
-        raise HTTPException(status_code=404, detail="Pet nao encontrado para este agendamento")
+        raise HTTPException(
+            status_code=404, detail="Pet nao encontrado para este agendamento"
+        )
 
     cliente_id = body.cliente_id or pet_ref.cliente_id
     if cliente_id != pet_ref.cliente_id:
-        raise HTTPException(status_code=422, detail="Tutor informado nao corresponde ao pet selecionado")
+        raise HTTPException(
+            status_code=422, detail="Tutor informado nao corresponde ao pet selecionado"
+        )
 
     _validar_veterinario_agendamento(db, tenant_id, body.veterinario_id)
     _validar_consultorio_agendamento(db, tenant_id, body.consultorio_id)
@@ -484,12 +559,16 @@ def criar_agendamento(
     )
     retorno_existente = None
     if body.tipo == "retorno" and body.consulta_origem_id:
-        retorno_existente = db.query(AgendamentoVet).filter(
-            AgendamentoVet.tenant_id == tenant_id,
-            AgendamentoVet.consulta_origem_id == body.consulta_origem_id,
-            AgendamentoVet.tipo == "retorno",
-            AgendamentoVet.status.in_(["agendado", "confirmado", "aguardando"]),
-        ).first()
+        retorno_existente = (
+            db.query(AgendamentoVet)
+            .filter(
+                AgendamentoVet.tenant_id == tenant_id,
+                AgendamentoVet.consulta_origem_id == body.consulta_origem_id,
+                AgendamentoVet.tipo == "retorno",
+                AgendamentoVet.status.in_(["agendado", "confirmado", "aguardando"]),
+            )
+            .first()
+        )
 
     _garantir_sem_conflitos_agendamento(
         db,
@@ -503,7 +582,10 @@ def criar_agendamento(
 
     tenant_agendamento = tenant_id or getattr(pet_ref, "tenant_id", None)
     if tenant_agendamento is None:
-        raise HTTPException(status_code=400, detail="Nao foi possivel identificar o tenant do agendamento")
+        raise HTTPException(
+            status_code=400,
+            detail="Nao foi possivel identificar o tenant do agendamento",
+        )
 
     if retorno_existente:
         retorno_existente.pet_id = body.pet_id
@@ -544,6 +626,8 @@ def criar_agendamento(
     db.commit()
     db.refresh(ag)
     return _agendamento_to_dict(ag)
+
+
 @router.patch("/agendamentos/{agendamento_id}", response_model=AgendamentoResponse)
 def atualizar_agendamento(
     agendamento_id: int,
@@ -552,10 +636,14 @@ def atualizar_agendamento(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    ag = db.query(AgendamentoVet).filter(
-        AgendamentoVet.id == agendamento_id,
-        AgendamentoVet.tenant_id == tenant_id,
-    ).first()
+    ag = (
+        db.query(AgendamentoVet)
+        .filter(
+            AgendamentoVet.id == agendamento_id,
+            AgendamentoVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not ag:
         raise HTTPException(404, "Agendamento não encontrado")
 
@@ -575,16 +663,24 @@ def atualizar_agendamento(
             .first()
         )
         if not pet_ref:
-            raise HTTPException(status_code=404, detail="Pet nao encontrado para este agendamento")
+            raise HTTPException(
+                status_code=404, detail="Pet nao encontrado para este agendamento"
+            )
 
         cliente_relacionado = cliente_id_novo or pet_ref.cliente_id
         if cliente_relacionado != pet_ref.cliente_id:
-            raise HTTPException(status_code=422, detail="Tutor informado nao corresponde ao pet selecionado")
+            raise HTTPException(
+                status_code=422,
+                detail="Tutor informado nao corresponde ao pet selecionado",
+            )
 
         ag.pet_id = pet_ref.id
         ag.cliente_id = cliente_relacionado
     elif cliente_id_novo is not None and cliente_id_novo != ag.cliente_id:
-        raise HTTPException(status_code=422, detail="Para alterar o tutor, selecione tambem o pet correspondente")
+        raise HTTPException(
+            status_code=422,
+            detail="Para alterar o tutor, selecione tambem o pet correspondente",
+        )
 
     veterinario_id_novo = payload.get("veterinario_id", ag.veterinario_id)
     consultorio_id_novo = payload.get("consultorio_id", ag.consultorio_id)
@@ -627,10 +723,14 @@ def remover_agendamento(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    ag = db.query(AgendamentoVet).filter(
-        AgendamentoVet.id == agendamento_id,
-        AgendamentoVet.tenant_id == tenant_id,
-    ).first()
+    ag = (
+        db.query(AgendamentoVet)
+        .filter(
+            AgendamentoVet.id == agendamento_id,
+            AgendamentoVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not ag:
         raise HTTPException(404, "Agendamento não encontrado")
 
@@ -656,23 +756,30 @@ def remover_agendamento(
     return Response(status_code=204)
 
 
-@router.post("/agendamentos/{agendamento_id}/desfazer-inicio", response_model=AgendamentoResponse)
+@router.post(
+    "/agendamentos/{agendamento_id}/desfazer-inicio", response_model=AgendamentoResponse
+)
 def desfazer_inicio_agendamento(
     agendamento_id: int,
     db: Session = Depends(get_session),
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    ag = db.query(AgendamentoVet).options(
-        joinedload(AgendamentoVet.consulta),
-        joinedload(AgendamentoVet.pet),
-        joinedload(AgendamentoVet.cliente),
-        joinedload(AgendamentoVet.veterinario),
-        joinedload(AgendamentoVet.consultorio),
-    ).filter(
-        AgendamentoVet.id == agendamento_id,
-        AgendamentoVet.tenant_id == tenant_id,
-    ).first()
+    ag = (
+        db.query(AgendamentoVet)
+        .options(
+            joinedload(AgendamentoVet.consulta),
+            joinedload(AgendamentoVet.pet),
+            joinedload(AgendamentoVet.cliente),
+            joinedload(AgendamentoVet.veterinario),
+            joinedload(AgendamentoVet.consultorio),
+        )
+        .filter(
+            AgendamentoVet.id == agendamento_id,
+            AgendamentoVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not ag:
         raise HTTPException(status_code=404, detail="Agendamento nao encontrado")
 
@@ -684,10 +791,14 @@ def desfazer_inicio_agendamento(
 
     consulta = None
     if ag.consulta_id:
-        consulta = db.query(ConsultaVet).filter(
-            ConsultaVet.id == ag.consulta_id,
-            ConsultaVet.tenant_id == tenant_id,
-        ).first()
+        consulta = (
+            db.query(ConsultaVet)
+            .filter(
+                ConsultaVet.id == ag.consulta_id,
+                ConsultaVet.tenant_id == tenant_id,
+            )
+            .first()
+        )
 
     if consulta:
         if consulta.status == "finalizada":
@@ -695,7 +806,9 @@ def desfazer_inicio_agendamento(
                 status_code=409,
                 detail="Esse atendimento ja foi finalizado. Para excluir o agendamento, primeiro cancele ou trate o atendimento vinculado.",
             )
-        if _consulta_tem_conteudo_clinico(consulta) or _consulta_tem_dependencias(db, tenant_id, consulta.id):
+        if _consulta_tem_conteudo_clinico(consulta) or _consulta_tem_dependencias(
+            db, tenant_id, consulta.id
+        ):
             raise HTTPException(
                 status_code=409,
                 detail="Esse atendimento ja tem dados clinicos ou registros vinculados. Exclua/cancele o atendimento antes de voltar o agendamento.",

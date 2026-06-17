@@ -1,4 +1,5 @@
 """Rotas de exames veterinarios, arquivos e interpretacao IA."""
+
 from datetime import date, timedelta
 from typing import List, Optional
 
@@ -10,9 +11,15 @@ from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
 from .models import Cliente, Pet
 from .veterinario_agendamentos import _atualizar_status_agendamento
-from .veterinario_clinico import _auditar_exame_pos_finalizacao, _bloquear_lancamento_em_consulta_finalizada
+from .veterinario_clinico import (
+    _auditar_exame_pos_finalizacao,
+    _bloquear_lancamento_em_consulta_finalizada,
+)
 from .veterinario_core import _get_tenant
-from .veterinario_exames_arquivos import _process_exam_file_with_ai, salvar_arquivo_exame_upload
+from .veterinario_exames_arquivos import (
+    _process_exam_file_with_ai,
+    salvar_arquivo_exame_upload,
+)
 from .veterinario_exames_ia import _gerar_interpretacao_exame
 from .veterinario_internacao import _resolver_user_id_vet
 from .veterinario_models import ConsultaVet, ExameVet
@@ -28,10 +35,15 @@ def listar_exames_pet(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    exames = db.query(ExameVet).filter(
-        ExameVet.pet_id == pet_id,
-        ExameVet.tenant_id == tenant_id,
-    ).order_by(ExameVet.data_solicitacao.desc()).all()
+    exames = (
+        db.query(ExameVet)
+        .filter(
+            ExameVet.pet_id == pet_id,
+            ExameVet.tenant_id == tenant_id,
+        )
+        .order_by(ExameVet.data_solicitacao.desc())
+        .all()
+    )
     return exames
 
 
@@ -57,13 +69,17 @@ def listar_exames_anexados(
         fim_ref = hoje
     elif periodo == "periodo":
         if not data_inicio or not data_fim:
-            raise HTTPException(422, "Informe data_inicio e data_fim para o período personalizado.")
+            raise HTTPException(
+                422, "Informe data_inicio e data_fim para o período personalizado."
+            )
         inicio_ref = data_inicio
         fim_ref = data_fim
     else:
         raise HTTPException(422, "Período inválido. Use: hoje, semana ou periodo.")
 
-    data_ref_expr = func.date(func.coalesce(ExameVet.data_resultado, ExameVet.created_at))
+    data_ref_expr = func.date(
+        func.coalesce(ExameVet.data_resultado, ExameVet.created_at)
+    )
 
     q = (
         db.query(ExameVet)
@@ -93,20 +109,22 @@ def listar_exames_anexados(
         pet = exame.pet
         tutor_nome = pet.cliente.nome if pet and pet.cliente else None
 
-        items.append({
-            "exame_id": exame.id,
-            "pet_id": exame.pet_id,
-            "consulta_id": exame.consulta_id,
-            "pet_nome": pet.nome if pet else None,
-            "tutor_nome": tutor_nome,
-            "nome_exame": exame.nome,
-            "tipo": exame.tipo,
-            "status": exame.status,
-            "data_upload": data_upload.isoformat() if data_upload else None,
-            "arquivo_nome": exame.arquivo_nome,
-            "arquivo_url": exame.arquivo_url,
-            "tem_interpretacao_ia": bool(exame.interpretacao_ia),
-        })
+        items.append(
+            {
+                "exame_id": exame.id,
+                "pet_id": exame.pet_id,
+                "consulta_id": exame.consulta_id,
+                "pet_nome": pet.nome if pet else None,
+                "tutor_nome": tutor_nome,
+                "nome_exame": exame.nome,
+                "tipo": exame.tipo,
+                "status": exame.status,
+                "data_upload": data_upload.isoformat() if data_upload else None,
+                "arquivo_nome": exame.arquivo_nome,
+                "arquivo_url": exame.arquivo_url,
+                "tem_interpretacao_ia": bool(exame.interpretacao_ia),
+            }
+        )
 
     return {
         "items": items,
@@ -125,15 +143,24 @@ def criar_exame(
 ):
     user, tenant_id = _get_tenant(current)
     if body.consulta_id:
-        consulta_ok = db.query(ConsultaVet).filter(
-            ConsultaVet.id == body.consulta_id,
-            ConsultaVet.pet_id == body.pet_id,
-            ConsultaVet.tenant_id == tenant_id,
-        ).first()
+        consulta_ok = (
+            db.query(ConsultaVet)
+            .filter(
+                ConsultaVet.id == body.consulta_id,
+                ConsultaVet.pet_id == body.pet_id,
+                ConsultaVet.tenant_id == tenant_id,
+            )
+            .first()
+        )
         if not consulta_ok:
-            raise HTTPException(status_code=404, detail="Consulta vinculada nÃ£o encontrada para este pet")
+            raise HTTPException(
+                status_code=404,
+                detail="Consulta vinculada nÃ£o encontrada para este pet",
+            )
     if body.consulta_id:
-        _bloquear_lancamento_em_consulta_finalizada(consulta_ok, "nova solicitacao de exame vinculada")
+        _bloquear_lancamento_em_consulta_finalizada(
+            consulta_ok, "nova solicitacao de exame vinculada"
+        )
 
     e = ExameVet(
         tenant_id=tenant_id,
@@ -167,7 +194,11 @@ def atualizar_exame(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    e = db.query(ExameVet).filter(ExameVet.id == exame_id, ExameVet.tenant_id == tenant_id).first()
+    e = (
+        db.query(ExameVet)
+        .filter(ExameVet.id == exame_id, ExameVet.tenant_id == tenant_id)
+        .first()
+    )
     if not e:
         raise HTTPException(404, "Exame não encontrado")
     dados_update = body.model_dump(exclude_unset=True)
@@ -210,17 +241,23 @@ def interpretar_exame_ia(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    exame = db.query(ExameVet).filter(
-        ExameVet.id == exame_id,
-        ExameVet.tenant_id == tenant_id,
-    ).first()
+    exame = (
+        db.query(ExameVet)
+        .filter(
+            ExameVet.id == exame_id,
+            ExameVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not exame:
         raise HTTPException(404, "Exame não encontrado")
     if not exame.resultado_texto and not exame.resultado_json:
         if exame.arquivo_url:
             exame = _process_exam_file_with_ai(db, tenant_id=tenant_id, exame=exame)
         else:
-            raise HTTPException(400, "O exame ainda não possui resultado para interpretar")
+            raise HTTPException(
+                400, "O exame ainda não possui resultado para interpretar"
+            )
 
     analise = _gerar_interpretacao_exame(exame)
     exame.interpretacao_ia = analise["conclusao"]
@@ -237,7 +274,10 @@ def interpretar_exame_ia(
         exame=exame,
         action="vet_exame_ia_pos_finalizacao",
         details={"origem": "interpretar_ia"},
-        new_value={"status": exame.status, "interpretacao_ia_resumo": exame.interpretacao_ia_resumo},
+        new_value={
+            "status": exame.status,
+            "interpretacao_ia_resumo": exame.interpretacao_ia_resumo,
+        },
     )
     db.commit()
     db.refresh(exame)
@@ -251,10 +291,14 @@ def processar_arquivo_exame_ia(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    exame = db.query(ExameVet).filter(
-        ExameVet.id == exame_id,
-        ExameVet.tenant_id == tenant_id,
-    ).first()
+    exame = (
+        db.query(ExameVet)
+        .filter(
+            ExameVet.id == exame_id,
+            ExameVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not exame:
         raise HTTPException(404, "Exame não encontrado")
     if not exame.arquivo_url:
@@ -283,10 +327,14 @@ def upload_arquivo_exame(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    exame = db.query(ExameVet).filter(
-        ExameVet.id == exame_id,
-        ExameVet.tenant_id == tenant_id,
-    ).first()
+    exame = (
+        db.query(ExameVet)
+        .filter(
+            ExameVet.id == exame_id,
+            ExameVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not exame:
         raise HTTPException(404, "Exame não encontrado")
 

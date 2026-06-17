@@ -37,50 +37,83 @@ def _orcamento_or_404(db: Session, tenant_id, orcamento_id: int) -> OrcamentoVet
         .first()
     )
     if not orcamento:
-        raise HTTPException(status_code=404, detail="Orcamento veterinario nao encontrado")
+        raise HTTPException(
+            status_code=404, detail="Orcamento veterinario nao encontrado"
+        )
     return orcamento
 
 
-def _consulta_or_none(db: Session, tenant_id, consulta_id: Optional[int]) -> Optional[ConsultaVet]:
+def _consulta_or_none(
+    db: Session, tenant_id, consulta_id: Optional[int]
+) -> Optional[ConsultaVet]:
     if not consulta_id:
         return None
-    consulta = db.query(ConsultaVet).filter(
-        ConsultaVet.id == consulta_id,
-        ConsultaVet.tenant_id == tenant_id,
-    ).first()
+    consulta = (
+        db.query(ConsultaVet)
+        .filter(
+            ConsultaVet.id == consulta_id,
+            ConsultaVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not consulta:
-        raise HTTPException(status_code=404, detail="Consulta nao encontrada para o orcamento")
+        raise HTTPException(
+            status_code=404, detail="Consulta nao encontrada para o orcamento"
+        )
     return consulta
 
 
-def _internacao_or_none(db: Session, tenant_id, internacao_id: Optional[int]) -> Optional[InternacaoVet]:
+def _internacao_or_none(
+    db: Session, tenant_id, internacao_id: Optional[int]
+) -> Optional[InternacaoVet]:
     if not internacao_id:
         return None
-    internacao = db.query(InternacaoVet).filter(
-        InternacaoVet.id == internacao_id,
-        InternacaoVet.tenant_id == tenant_id,
-    ).first()
+    internacao = (
+        db.query(InternacaoVet)
+        .filter(
+            InternacaoVet.id == internacao_id,
+            InternacaoVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not internacao:
-        raise HTTPException(status_code=404, detail="Internacao nao encontrada para o orcamento")
+        raise HTTPException(
+            status_code=404, detail="Internacao nao encontrada para o orcamento"
+        )
     return internacao
 
 
-def _validar_pet_cliente(db: Session, tenant_id, pet_id: Optional[int], cliente_id: Optional[int]) -> None:
+def _validar_pet_cliente(
+    db: Session, tenant_id, pet_id: Optional[int], cliente_id: Optional[int]
+) -> None:
     if pet_id:
-        pet = db.query(Pet).join(Cliente).filter(
-            Pet.id == pet_id,
-            Cliente.tenant_id == tenant_id,
-        ).first()
+        pet = (
+            db.query(Pet)
+            .join(Cliente)
+            .filter(
+                Pet.id == pet_id,
+                Cliente.tenant_id == tenant_id,
+            )
+            .first()
+        )
         if not pet:
-            raise HTTPException(status_code=404, detail="Pet nao encontrado para o orcamento")
+            raise HTTPException(
+                status_code=404, detail="Pet nao encontrado para o orcamento"
+            )
 
     if cliente_id:
-        cliente = db.query(Cliente).filter(
-            Cliente.id == cliente_id,
-            Cliente.tenant_id == tenant_id,
-        ).first()
+        cliente = (
+            db.query(Cliente)
+            .filter(
+                Cliente.id == cliente_id,
+                Cliente.tenant_id == tenant_id,
+            )
+            .first()
+        )
         if not cliente:
-            raise HTTPException(status_code=404, detail="Cliente nao encontrado para o orcamento")
+            raise HTTPException(
+                status_code=404, detail="Cliente nao encontrado para o orcamento"
+            )
 
 
 def _resolver_vinculos(db: Session, tenant_id, payload: dict) -> dict:
@@ -105,12 +138,18 @@ def _resolver_vinculos(db: Session, tenant_id, payload: dict) -> dict:
     _validar_pet_cliente(db, tenant_id, pet_id, cliente_id)
 
     if veterinario_id:
-        veterinario = db.query(Cliente).filter(
-            Cliente.id == veterinario_id,
-            Cliente.tenant_id == tenant_id,
-        ).first()
+        veterinario = (
+            db.query(Cliente)
+            .filter(
+                Cliente.id == veterinario_id,
+                Cliente.tenant_id == tenant_id,
+            )
+            .first()
+        )
         if not veterinario:
-            raise HTTPException(status_code=404, detail="Veterinario nao encontrado para o orcamento")
+            raise HTTPException(
+                status_code=404, detail="Veterinario nao encontrado para o orcamento"
+            )
 
     return {
         "consulta_id": payload.get("consulta_id"),
@@ -128,7 +167,9 @@ def _payload_item(item) -> dict:
 
 
 def _coletar_referencias(itens: list[dict]) -> tuple[set[int], set[int]]:
-    catalogo_ids = {int(item["catalogo_id"]) for item in itens if item.get("catalogo_id")}
+    catalogo_ids = {
+        int(item["catalogo_id"]) for item in itens if item.get("catalogo_id")
+    }
     produto_ids = {int(item["produto_id"]) for item in itens if item.get("produto_id")}
     for item in itens:
         for insumo in item.get("insumos") or []:
@@ -137,24 +178,36 @@ def _coletar_referencias(itens: list[dict]) -> tuple[set[int], set[int]]:
     return catalogo_ids, produto_ids
 
 
-def _buscar_catalogos(db: Session, tenant_id, catalogo_ids: set[int]) -> dict[int, CatalogoProcedimento]:
+def _buscar_catalogos(
+    db: Session, tenant_id, catalogo_ids: set[int]
+) -> dict[int, CatalogoProcedimento]:
     if not catalogo_ids:
         return {}
-    catalogos = db.query(CatalogoProcedimento).filter(
-        CatalogoProcedimento.tenant_id == tenant_id,
-        CatalogoProcedimento.id.in_(catalogo_ids),
-        CatalogoProcedimento.ativo.is_(True),
-    ).all()
+    catalogos = (
+        db.query(CatalogoProcedimento)
+        .filter(
+            CatalogoProcedimento.tenant_id == tenant_id,
+            CatalogoProcedimento.id.in_(catalogo_ids),
+            CatalogoProcedimento.ativo.is_(True),
+        )
+        .all()
+    )
     return {catalogo.id: catalogo for catalogo in catalogos}
 
 
-def _buscar_produtos(db: Session, tenant_id, produto_ids: set[int]) -> dict[int, Produto]:
+def _buscar_produtos(
+    db: Session, tenant_id, produto_ids: set[int]
+) -> dict[int, Produto]:
     if not produto_ids:
         return {}
-    produtos = db.query(Produto).filter(
-        Produto.tenant_id == str(tenant_id),
-        Produto.id.in_(produto_ids),
-    ).all()
+    produtos = (
+        db.query(Produto)
+        .filter(
+            Produto.tenant_id == str(tenant_id),
+            Produto.id.in_(produto_ids),
+        )
+        .all()
+    )
     return {produto.id: produto for produto in produtos}
 
 
@@ -172,26 +225,36 @@ def _normalizar_itens_orcamento(db: Session, tenant_id, itens_raw) -> list[dict]
         if catalogo_id:
             catalogo = catalogos.get(int(catalogo_id))
             if not catalogo:
-                raise HTTPException(status_code=404, detail=f"Procedimento {catalogo_id} nao encontrado para o orcamento")
-            itens.append(montar_item_orcamento_catalogo(
-                catalogo,
-                produtos,
-                quantidade=item.get("quantidade", 1),
-                preco_unitario=item.get("preco_unitario"),
-                observacoes=item.get("observacoes"),
-            ))
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Procedimento {catalogo_id} nao encontrado para o orcamento",
+                )
+            itens.append(
+                montar_item_orcamento_catalogo(
+                    catalogo,
+                    produtos,
+                    quantidade=item.get("quantidade", 1),
+                    preco_unitario=item.get("preco_unitario"),
+                    observacoes=item.get("observacoes"),
+                )
+            )
             continue
 
         if produto_id:
             produto = produtos.get(int(produto_id))
             if not produto:
-                raise HTTPException(status_code=404, detail=f"Produto {produto_id} nao encontrado para o orcamento")
-            itens.append(montar_item_orcamento_produto(
-                produto,
-                quantidade=item.get("quantidade", 1),
-                preco_unitario=item.get("preco_unitario"),
-                observacoes=item.get("observacoes"),
-            ))
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Produto {produto_id} nao encontrado para o orcamento",
+                )
+            itens.append(
+                montar_item_orcamento_produto(
+                    produto,
+                    quantidade=item.get("quantidade", 1),
+                    preco_unitario=item.get("preco_unitario"),
+                    observacoes=item.get("observacoes"),
+                )
+            )
             continue
 
         itens.append(montar_item_orcamento_manual(item))
@@ -199,33 +262,37 @@ def _normalizar_itens_orcamento(db: Session, tenant_id, itens_raw) -> list[dict]
     return itens
 
 
-def _substituir_itens(db: Session, orcamento: OrcamentoVet, tenant_id, itens_payload: list[dict]) -> None:
+def _substituir_itens(
+    db: Session, orcamento: OrcamentoVet, tenant_id, itens_payload: list[dict]
+) -> None:
     for item_existente in list(orcamento.itens or []):
         db.delete(item_existente)
     db.flush()
 
     for ordem, item in enumerate(itens_payload, start=1):
-        db.add(OrcamentoVetItem(
-            tenant_id=tenant_id,
-            orcamento_id=orcamento.id,
-            origem=item["origem"],
-            ordem=ordem,
-            catalogo_id=item.get("catalogo_id"),
-            produto_id=item.get("produto_id"),
-            nome=item["nome"],
-            descricao=item.get("descricao"),
-            unidade=item.get("unidade"),
-            quantidade=item["quantidade"],
-            custo_unitario_estimado=item["custo_unitario_estimado"],
-            preco_unitario_sugerido=item["preco_unitario_sugerido"],
-            preco_unitario=item["preco_unitario"],
-            custo_total_estimado=item["custo_total_estimado"],
-            preco_total=item["preco_total"],
-            margem_valor=item["margem_valor"],
-            margem_percentual=item["margem_percentual"],
-            insumos=item.get("insumos") or [],
-            observacoes=item.get("observacoes"),
-        ))
+        db.add(
+            OrcamentoVetItem(
+                tenant_id=tenant_id,
+                orcamento_id=orcamento.id,
+                origem=item["origem"],
+                ordem=ordem,
+                catalogo_id=item.get("catalogo_id"),
+                produto_id=item.get("produto_id"),
+                nome=item["nome"],
+                descricao=item.get("descricao"),
+                unidade=item.get("unidade"),
+                quantidade=item["quantidade"],
+                custo_unitario_estimado=item["custo_unitario_estimado"],
+                preco_unitario_sugerido=item["preco_unitario_sugerido"],
+                preco_unitario=item["preco_unitario"],
+                custo_total_estimado=item["custo_total_estimado"],
+                preco_total=item["preco_total"],
+                margem_valor=item["margem_valor"],
+                margem_percentual=item["margem_percentual"],
+                insumos=item.get("insumos") or [],
+                observacoes=item.get("observacoes"),
+            )
+        )
 
     totais = calcular_totais_orcamento(itens_payload)
     orcamento.custo_total_estimado = totais["custo_total_estimado"]
@@ -311,7 +378,16 @@ def atualizar_orcamento(
     orcamento = _orcamento_or_404(db, tenant_id, orcamento_id)
     payload = body.model_dump(exclude_unset=True)
 
-    if any(campo in payload for campo in {"consulta_id", "internacao_id", "pet_id", "cliente_id", "veterinario_id"}):
+    if any(
+        campo in payload
+        for campo in {
+            "consulta_id",
+            "internacao_id",
+            "pet_id",
+            "cliente_id",
+            "veterinario_id",
+        }
+    ):
         vinculos_payload = {
             "consulta_id": payload.get("consulta_id", orcamento.consulta_id),
             "internacao_id": payload.get("internacao_id", orcamento.internacao_id),

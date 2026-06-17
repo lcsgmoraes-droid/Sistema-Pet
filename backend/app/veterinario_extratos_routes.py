@@ -22,17 +22,24 @@ from .veterinario_extratos import (
     normalizar_colunas_extrato,
 )
 from .veterinario_internacao import _separar_evolucoes_e_procedimentos
-from .veterinario_models import ConsultaVet, EvolucaoInternacao, InternacaoVet, ProcedimentoConsulta
+from .veterinario_models import (
+    ConsultaVet,
+    EvolucaoInternacao,
+    InternacaoVet,
+    ProcedimentoConsulta,
+)
 
 
 router = APIRouter(tags=["Veterinario - Extratos"])
 
 
 def _content_disposition(filename: str) -> str:
-    return f'attachment; filename="{filename}"; filename*=UTF-8\'\'{quote(filename)}'
+    return f"attachment; filename=\"{filename}\"; filename*=UTF-8''{quote(filename)}"
 
 
-def _consulta_or_none(db: Session, tenant_id, consulta_id: Optional[int]) -> Optional[ConsultaVet]:
+def _consulta_or_none(
+    db: Session, tenant_id, consulta_id: Optional[int]
+) -> Optional[ConsultaVet]:
     if not consulta_id:
         return None
     return (
@@ -65,10 +72,14 @@ def _internacoes_atendimento(
         query = query.filter(InternacaoVet.consulta_id == consulta_id)
     else:
         return []
-    return query.order_by(InternacaoVet.data_entrada.asc(), InternacaoVet.id.asc()).all()
+    return query.order_by(
+        InternacaoVet.data_entrada.asc(), InternacaoVet.id.asc()
+    ).all()
 
 
-def _procedimentos_consulta(db: Session, tenant_id, consulta_id: Optional[int]) -> list[ProcedimentoConsulta]:
+def _procedimentos_consulta(
+    db: Session, tenant_id, consulta_id: Optional[int]
+) -> list[ProcedimentoConsulta]:
     if not consulta_id:
         return []
     return (
@@ -82,7 +93,9 @@ def _procedimentos_consulta(db: Session, tenant_id, consulta_id: Optional[int]) 
     )
 
 
-def _procedimentos_internacao(db: Session, tenant_id, internacoes: list[InternacaoVet]) -> list[dict]:
+def _procedimentos_internacao(
+    db: Session, tenant_id, internacoes: list[InternacaoVet]
+) -> list[dict]:
     if not internacoes:
         return []
     internacao_ids = [item.id for item in internacoes]
@@ -114,7 +127,9 @@ def _procedimentos_internacao(db: Session, tenant_id, internacoes: list[Internac
     return procedimentos
 
 
-def _produtos_por_id(db: Session, tenant_id, produto_ids: list[int]) -> dict[int, Produto]:
+def _produtos_por_id(
+    db: Session, tenant_id, produto_ids: list[int]
+) -> dict[int, Produto]:
     if not produto_ids:
         return {}
     produtos = (
@@ -134,7 +149,10 @@ def _montar_extrato_route(
     tenant_id,
 ) -> dict:
     if not consulta_id and not internacao_id:
-        raise HTTPException(status_code=422, detail="Informe consulta_id ou internacao_id para gerar o extrato")
+        raise HTTPException(
+            status_code=422,
+            detail="Informe consulta_id ou internacao_id para gerar o extrato",
+        )
 
     consulta = _consulta_or_none(db, tenant_id, consulta_id)
     if consulta_id and not consulta:

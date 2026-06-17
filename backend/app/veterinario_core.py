@@ -31,7 +31,9 @@ def _normalizar_datetime_vet(value: Optional[datetime]) -> Optional[datetime]:
     return value
 
 
-def _normalizar_datetime_local_brasilia(value: Optional[datetime]) -> Optional[datetime]:
+def _normalizar_datetime_local_brasilia(
+    value: Optional[datetime],
+) -> Optional[datetime]:
     """Interpreta datetime digitado sem fuso como horario local de Brasilia."""
     if value is None:
         return None
@@ -74,10 +76,14 @@ def _date_para_datetime_vet(value: Optional[date]) -> Optional[datetime]:
 
 def _get_partner_tenant_ids(db: Session, tenant_id) -> list:
     """Retorna lista de empresa_tenant_ids onde este vet e parceiro ativo."""
-    links = db.query(VetPartnerLink).filter(
-        VetPartnerLink.vet_tenant_id == str(tenant_id),
-        VetPartnerLink.ativo.is_(True),
-    ).all()
+    links = (
+        db.query(VetPartnerLink)
+        .filter(
+            VetPartnerLink.vet_tenant_id == str(tenant_id),
+            VetPartnerLink.ativo.is_(True),
+        )
+        .all()
+    )
     return [link.empresa_tenant_id for link in links]
 
 

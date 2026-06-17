@@ -55,7 +55,9 @@ def garantir_token_calendario_vet(db: Session, user: User) -> str:
     return user.vet_calendar_token
 
 
-def resolver_veterinario_por_usuario(db: Session, tenant_id, user: Optional[User]) -> Optional[Cliente]:
+def resolver_veterinario_por_usuario(
+    db: Session, tenant_id, user: Optional[User]
+) -> Optional[Cliente]:
     email = (getattr(user, "email", None) or "").strip().lower()
     if not email:
         return None
@@ -77,9 +79,9 @@ def montar_urls_calendario_vet(request: Request, token: str) -> tuple[str, str]:
     base_url = str(request.base_url).rstrip("/")
     feed_url = f"{base_url}/api/vet/agenda/feed/{token}.ics"
     if feed_url.startswith("https://"):
-        webcal_url = f"webcal://{feed_url[len('https://'):]}"
+        webcal_url = f"webcal://{feed_url[len('https://') :]}"
     elif feed_url.startswith("http://"):
-        webcal_url = f"webcal://{feed_url[len('http://'):]}"
+        webcal_url = f"webcal://{feed_url[len('http://') :]}"
     else:
         webcal_url = feed_url
     return feed_url, webcal_url
@@ -150,7 +152,9 @@ def gerar_calendario_ics(
         tutor_nome = ag.cliente.nome if ag.cliente else None
         vet_nome = ag.veterinario.nome if ag.veterinario else None
         consultorio_nome = ag.consultorio.nome if ag.consultorio else None
-        tipo_label = TIPO_AGENDAMENTO_LABEL.get(ag.tipo, (ag.tipo or "Consulta").title())
+        tipo_label = TIPO_AGENDAMENTO_LABEL.get(
+            ag.tipo, (ag.tipo or "Consulta").title()
+        )
         status_label = STATUS_AGENDAMENTO_LABEL.get(ag.status, ag.status or "Agendado")
 
         detalhes = [
@@ -168,16 +172,18 @@ def gerar_calendario_ics(
         if ag.observacoes:
             detalhes.append(f"Observacoes: {ag.observacoes}")
 
-        linhas.extend([
-            "BEGIN:VEVENT",
-            f"UID:vet-agendamento-{ag.id}@corepet",
-            f"DTSTAMP:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
-            f"DTSTART:{formatar_datetime_ics(data_inicio)}",
-            f"DTEND:{formatar_datetime_ics(data_fim)}",
-            "SUMMARY:" + escape_ics(f"{tipo_label} - {pet_nome}"),
-            "DESCRIPTION:" + escape_ics("\n".join(detalhes)),
-            "STATUS:CONFIRMED",
-        ])
+        linhas.extend(
+            [
+                "BEGIN:VEVENT",
+                f"UID:vet-agendamento-{ag.id}@corepet",
+                f"DTSTAMP:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
+                f"DTSTART:{formatar_datetime_ics(data_inicio)}",
+                f"DTEND:{formatar_datetime_ics(data_fim)}",
+                "SUMMARY:" + escape_ics(f"{tipo_label} - {pet_nome}"),
+                "DESCRIPTION:" + escape_ics("\n".join(detalhes)),
+                "STATUS:CONFIRMED",
+            ]
+        )
         if consultorio_nome:
             linhas.append("LOCATION:" + escape_ics(consultorio_nome))
         linhas.append("END:VEVENT")

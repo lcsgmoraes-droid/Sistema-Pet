@@ -8,7 +8,11 @@ from typing import Optional
 from fastapi import HTTPException
 
 from .veterinario_core import _serializar_datetime_vet
-from .veterinario_models import EvolucaoInternacao, InternacaoProcedimentoAgenda, InternacaoVet
+from .veterinario_models import (
+    EvolucaoInternacao,
+    InternacaoProcedimentoAgenda,
+    InternacaoVet,
+)
 
 
 _BAIA_MOTIVO_RE = re.compile(r"\s*\[BAIA:(?P<baia>[^\]]+)\]\s*$")
@@ -38,7 +42,10 @@ def _resolver_data_entrada_exibicao_internacao(
 
     try:
         diff_horas = abs((primeira_movimentacao - data_entrada).total_seconds()) / 3600
-        if data_entrada.date() == primeira_movimentacao.date() and 2.5 <= diff_horas <= 3.5:
+        if (
+            data_entrada.date() == primeira_movimentacao.date()
+            and 2.5 <= diff_horas <= 3.5
+        ):
             return primeira_movimentacao
     except Exception:
         return data_entrada
@@ -79,7 +86,7 @@ def _parse_procedimento_observacao(observacoes: Optional[str]) -> Optional[dict]
     texto = (observacoes or "").strip()
     if not texto.startswith(_PROC_PREFIX):
         return None
-    bruto = texto[len(_PROC_PREFIX):]
+    bruto = texto[len(_PROC_PREFIX) :]
     if not bruto:
         return None
     try:
@@ -89,48 +96,60 @@ def _parse_procedimento_observacao(observacoes: Optional[str]) -> Optional[dict]
         return None
 
 
-def _separar_evolucoes_e_procedimentos(registros: list[EvolucaoInternacao]) -> tuple[list[dict], list[dict]]:
+def _separar_evolucoes_e_procedimentos(
+    registros: list[EvolucaoInternacao],
+) -> tuple[list[dict], list[dict]]:
     evolucoes_formatadas = []
     procedimentos_formatados = []
 
     for ev in registros:
         proc_payload = _parse_procedimento_observacao(ev.observacoes)
         if proc_payload:
-            procedimentos_formatados.append({
-                "id": ev.id,
-                "data_hora": _serializar_datetime_vet(ev.data_hora),
-                "status": proc_payload.get("status") or "concluido",
-                "tipo_registro": proc_payload.get("tipo_registro") or "procedimento",
-                "horario_agendado": proc_payload.get("horario_agendado"),
-                "medicamento": proc_payload.get("medicamento"),
-                "dose": proc_payload.get("dose"),
-                "via": proc_payload.get("via"),
-                "quantidade_prevista": proc_payload.get("quantidade_prevista"),
-                "quantidade_executada": proc_payload.get("quantidade_executada"),
-                "quantidade_desperdicio": proc_payload.get("quantidade_desperdicio"),
-                "unidade_quantidade": proc_payload.get("unidade_quantidade"),
-                "insumos": proc_payload.get("insumos") or [],
-                "estoque_baixado": bool(proc_payload.get("estoque_baixado")),
-                "estoque_movimentacao_ids": proc_payload.get("estoque_movimentacao_ids") or [],
-                "executado_por": proc_payload.get("executado_por"),
-                "horario_execucao": proc_payload.get("horario_execucao"),
-                "observacao_execucao": proc_payload.get("observacao_execucao"),
-                "observacoes_agenda": proc_payload.get("observacoes_agenda"),
-            })
+            procedimentos_formatados.append(
+                {
+                    "id": ev.id,
+                    "data_hora": _serializar_datetime_vet(ev.data_hora),
+                    "status": proc_payload.get("status") or "concluido",
+                    "tipo_registro": proc_payload.get("tipo_registro")
+                    or "procedimento",
+                    "horario_agendado": proc_payload.get("horario_agendado"),
+                    "medicamento": proc_payload.get("medicamento"),
+                    "dose": proc_payload.get("dose"),
+                    "via": proc_payload.get("via"),
+                    "quantidade_prevista": proc_payload.get("quantidade_prevista"),
+                    "quantidade_executada": proc_payload.get("quantidade_executada"),
+                    "quantidade_desperdicio": proc_payload.get(
+                        "quantidade_desperdicio"
+                    ),
+                    "unidade_quantidade": proc_payload.get("unidade_quantidade"),
+                    "insumos": proc_payload.get("insumos") or [],
+                    "estoque_baixado": bool(proc_payload.get("estoque_baixado")),
+                    "estoque_movimentacao_ids": proc_payload.get(
+                        "estoque_movimentacao_ids"
+                    )
+                    or [],
+                    "executado_por": proc_payload.get("executado_por"),
+                    "horario_execucao": proc_payload.get("horario_execucao"),
+                    "observacao_execucao": proc_payload.get("observacao_execucao"),
+                    "observacoes_agenda": proc_payload.get("observacoes_agenda"),
+                }
+            )
             continue
 
-        evolucoes_formatadas.append({
-            "id": ev.id,
-            "data_hora": _serializar_datetime_vet(ev.data_hora),
-            "temperatura": ev.temperatura,
-            "freq_cardiaca": ev.frequencia_cardiaca,
-            "freq_respiratoria": ev.frequencia_respiratoria,
-            "nivel_dor": ev.nivel_dor,
-            "pressao_sistolica": ev.pressao_sistolica,
-            "glicemia": ev.glicemia,
-            "peso": ev.peso,
-            "observacoes": ev.observacoes,
-        })
+        evolucoes_formatadas.append(
+            {
+                "id": ev.id,
+                "data_hora": _serializar_datetime_vet(ev.data_hora),
+                "temperatura": ev.temperatura,
+                "freq_cardiaca": ev.frequencia_cardiaca,
+                "freq_respiratoria": ev.frequencia_respiratoria,
+                "nivel_dor": ev.nivel_dor,
+                "pressao_sistolica": ev.pressao_sistolica,
+                "glicemia": ev.glicemia,
+                "peso": ev.peso,
+                "observacoes": ev.observacoes,
+            }
+        )
 
     return evolucoes_formatadas, procedimentos_formatados
 
@@ -159,7 +178,9 @@ def _datetime_iso_vet(value: Optional[datetime]) -> Optional[str]:
     return serializado.isoformat() if serializado else None
 
 
-def _serializar_procedimento_agenda_internacao(item: InternacaoProcedimentoAgenda) -> dict:
+def _serializar_procedimento_agenda_internacao(
+    item: InternacaoProcedimentoAgenda,
+) -> dict:
     _, box = _split_motivo_baia(item.internacao.motivo if item.internacao else None)
     pet_nome = item.pet.nome if item.pet else None
     return {
@@ -191,7 +212,9 @@ def _serializar_procedimento_agenda_internacao(item: InternacaoProcedimentoAgend
     }
 
 
-def _build_payload_procedimento_agenda_internacao(item: InternacaoProcedimentoAgenda) -> dict:
+def _build_payload_procedimento_agenda_internacao(
+    item: InternacaoProcedimentoAgenda,
+) -> dict:
     return {
         "status": item.status,
         "tipo_registro": "procedimento_agendado",

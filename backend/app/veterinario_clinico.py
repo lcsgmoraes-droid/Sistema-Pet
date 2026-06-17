@@ -31,7 +31,9 @@ def _aliases_especie_vet(especie: str) -> set[str]:
     return aliases
 
 
-def _idade_inicio_meses_protocolo(dose_inicial_semanas: Optional[int]) -> Optional[float]:
+def _idade_inicio_meses_protocolo(
+    dose_inicial_semanas: Optional[int],
+) -> Optional[float]:
     if not dose_inicial_semanas:
         return None
     return round(float(dose_inicial_semanas) / 4, 2)
@@ -51,27 +53,34 @@ def _idade_meses_pet(pet: Pet) -> Optional[int]:
 
 
 def _assinatura_publica_vacina(registro: VacinaRegistro, pet: Pet, tenant_id) -> str:
-    payload = "|".join([
-        str(tenant_id or ""),
-        str(registro.id or ""),
-        str(pet.id or ""),
-        str(registro.nome_vacina or ""),
-        str(registro.data_aplicacao or ""),
-        str(registro.lote or ""),
-        str(registro.fabricante or ""),
-        str(getattr(registro, "veterinario_id", None) or ""),
-    ])
+    payload = "|".join(
+        [
+            str(tenant_id or ""),
+            str(registro.id or ""),
+            str(pet.id or ""),
+            str(registro.nome_vacina or ""),
+            str(registro.data_aplicacao or ""),
+            str(registro.lote or ""),
+            str(registro.fabricante or ""),
+            str(getattr(registro, "veterinario_id", None) or ""),
+        ]
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _status_vacinal_pet(db: Session, pet: Pet, tenant_id) -> dict:
     especies_pet = _aliases_especie_vet(pet.especie or "")
-    protocolos = db.query(ProtocoloVacina).filter(
-        ProtocoloVacina.tenant_id == tenant_id,
-        ProtocoloVacina.ativo.is_(True),
-    ).all()
+    protocolos = (
+        db.query(ProtocoloVacina)
+        .filter(
+            ProtocoloVacina.tenant_id == tenant_id,
+            ProtocoloVacina.ativo.is_(True),
+        )
+        .all()
+    )
     protocolos_ativos = [
-        protocolo for protocolo in protocolos
+        protocolo
+        for protocolo in protocolos
         if (
             not protocolo.especie
             or protocolo.especie.strip().lower() in {"", "todos", "all"}
@@ -79,10 +88,15 @@ def _status_vacinal_pet(db: Session, pet: Pet, tenant_id) -> dict:
         )
     ]
 
-    registros = db.query(VacinaRegistro).filter(
-        VacinaRegistro.pet_id == pet.id,
-        VacinaRegistro.tenant_id == tenant_id,
-    ).order_by(VacinaRegistro.data_aplicacao.desc()).all()
+    registros = (
+        db.query(VacinaRegistro)
+        .filter(
+            VacinaRegistro.pet_id == pet.id,
+            VacinaRegistro.tenant_id == tenant_id,
+        )
+        .order_by(VacinaRegistro.data_aplicacao.desc())
+        .all()
+    )
 
     veterinarios_por_id = {}
     veterinario_ids = {
@@ -91,11 +105,17 @@ def _status_vacinal_pet(db: Session, pet: Pet, tenant_id) -> dict:
         if getattr(registro, "veterinario_id", None)
     }
     if veterinario_ids:
-        veterinarios = db.query(Cliente).filter(
-            Cliente.id.in_(veterinario_ids),
-            Cliente.tenant_id == str(tenant_id),
-        ).all()
-        veterinarios_por_id = {veterinario.id: veterinario for veterinario in veterinarios}
+        veterinarios = (
+            db.query(Cliente)
+            .filter(
+                Cliente.id.in_(veterinario_ids),
+                Cliente.tenant_id == str(tenant_id),
+            )
+            .all()
+        )
+        veterinarios_por_id = {
+            veterinario.id: veterinario for veterinario in veterinarios
+        }
 
     pendentes = []
     vencidas = []
@@ -108,31 +128,44 @@ def _status_vacinal_pet(db: Session, pet: Pet, tenant_id) -> dict:
         status = "em_dia"
         if registro.data_proxima_dose and registro.data_proxima_dose < hoje:
             status = "atrasada"
-            vencidas.append({
-                "nome": registro.nome_vacina,
-                "data_proxima_dose": registro.data_proxima_dose.isoformat(),
-                "dias_atraso": (hoje - registro.data_proxima_dose).days,
-            })
-        elif registro.data_proxima_dose and registro.data_proxima_dose <= hoje + timedelta(days=30):
+            vencidas.append(
+                {
+                    "nome": registro.nome_vacina,
+                    "data_proxima_dose": registro.data_proxima_dose.isoformat(),
+                    "dias_atraso": (hoje - registro.data_proxima_dose).days,
+                }
+            )
+        elif (
+            registro.data_proxima_dose
+            and registro.data_proxima_dose <= hoje + timedelta(days=30)
+        ):
             status = "vence_breve"
         assinatura_hash = _assinatura_publica_vacina(registro, pet, tenant_id)
         veterinario_id = getattr(registro, "veterinario_id", None)
         veterinario = veterinarios_por_id.get(veterinario_id)
-        carteira.append({
-            "id": registro.id,
-            "nome": registro.nome_vacina,
-            "data_aplicacao": registro.data_aplicacao.isoformat(),
-            "data_proxima_dose": registro.data_proxima_dose.isoformat() if registro.data_proxima_dose else None,
-            "numero_dose": registro.numero_dose,
-            "lote": registro.lote,
-            "fabricante": registro.fabricante,
-            "veterinario_id": veterinario_id,
-            "veterinario_nome": getattr(veterinario, "nome", None) if veterinario else None,
-            "assinatura_digital": f"VAC-{assinatura_hash[:12].upper()}" if veterinario_id else None,
-            "assinatura_valida": bool(veterinario_id),
-            "hash_validacao": assinatura_hash,
-            "status": status,
-        })
+        carteira.append(
+            {
+                "id": registro.id,
+                "nome": registro.nome_vacina,
+                "data_aplicacao": registro.data_aplicacao.isoformat(),
+                "data_proxima_dose": registro.data_proxima_dose.isoformat()
+                if registro.data_proxima_dose
+                else None,
+                "numero_dose": registro.numero_dose,
+                "lote": registro.lote,
+                "fabricante": registro.fabricante,
+                "veterinario_id": veterinario_id,
+                "veterinario_nome": getattr(veterinario, "nome", None)
+                if veterinario
+                else None,
+                "assinatura_digital": f"VAC-{assinatura_hash[:12].upper()}"
+                if veterinario_id
+                else None,
+                "assinatura_valida": bool(veterinario_id),
+                "hash_validacao": assinatura_hash,
+                "status": status,
+            }
+        )
 
     idade_meses = _idade_meses_pet(pet)
     for protocolo in protocolos_ativos:
@@ -142,11 +175,13 @@ def _status_vacinal_pet(db: Session, pet: Pet, tenant_id) -> dict:
             continue
         idade_inicio = _idade_inicio_meses_protocolo(protocolo.dose_inicial_semanas)
         if idade_inicio is None or idade_meses is None or idade_meses >= idade_inicio:
-            pendentes.append({
-                "nome": protocolo.nome,
-                "motivo": "Vacina prevista no protocolo sem registro aplicado.",
-                "idade_inicio_meses": idade_inicio,
-            })
+            pendentes.append(
+                {
+                    "nome": protocolo.nome,
+                    "motivo": "Vacina prevista no protocolo sem registro aplicado.",
+                    "idade_inicio_meses": idade_inicio,
+                }
+            )
 
     return {
         "carteira": carteira,
@@ -162,41 +197,69 @@ def _status_vacinal_pet(db: Session, pet: Pet, tenant_id) -> dict:
 
 def _montar_alertas_pet(db: Session, pet: Pet, tenant_id) -> list[dict]:
     alertas = []
-    alergias = pet.alergias_lista if isinstance(getattr(pet, "alergias_lista", None), list) else None
+    alergias = (
+        pet.alergias_lista
+        if isinstance(getattr(pet, "alergias_lista", None), list)
+        else None
+    )
     if not alergias and pet.alergias:
         alergias = [pet.alergias]
     for alergia in alergias or []:
-        alertas.append({"tipo": "alergia", "nivel": "critico", "mensagem": f"Alergia registrada: {alergia}"})
+        alertas.append(
+            {
+                "tipo": "alergia",
+                "nivel": "critico",
+                "mensagem": f"Alergia registrada: {alergia}",
+            }
+        )
 
     restricoes = getattr(pet, "restricoes_alimentares_lista", None) or []
     for restricao in restricoes:
-        alertas.append({"tipo": "restricao", "nivel": "aviso", "mensagem": f"Restrição alimentar: {restricao}"})
+        alertas.append(
+            {
+                "tipo": "restricao",
+                "nivel": "aviso",
+                "mensagem": f"Restrição alimentar: {restricao}",
+            }
+        )
 
     status_vacinal = _status_vacinal_pet(db, pet, tenant_id)
     for vacina in status_vacinal["vencidas"]:
-        alertas.append({
-            "tipo": "vacina_atrasada",
-            "nivel": "aviso",
-            "mensagem": f"Vacina {vacina['nome']} atrasada há {vacina['dias_atraso']} dia(s).",
-        })
+        alertas.append(
+            {
+                "tipo": "vacina_atrasada",
+                "nivel": "aviso",
+                "mensagem": f"Vacina {vacina['nome']} atrasada há {vacina['dias_atraso']} dia(s).",
+            }
+        )
     for pendente in status_vacinal["pendentes"][:3]:
-        alertas.append({
-            "tipo": "vacina_pendente",
-            "nivel": "info",
-            "mensagem": f"Protocolo sem registro: {pendente['nome']}.",
-        })
+        alertas.append(
+            {
+                "tipo": "vacina_pendente",
+                "nivel": "info",
+                "mensagem": f"Protocolo sem registro: {pendente['nome']}.",
+            }
+        )
 
-    exames_pendentes = db.query(ExameVet).filter(
-        ExameVet.pet_id == pet.id,
-        ExameVet.tenant_id == tenant_id,
-        ExameVet.status.in_(["solicitado", "aguardando", "disponivel"]),
-    ).order_by(ExameVet.created_at.desc()).limit(3).all()
+    exames_pendentes = (
+        db.query(ExameVet)
+        .filter(
+            ExameVet.pet_id == pet.id,
+            ExameVet.tenant_id == tenant_id,
+            ExameVet.status.in_(["solicitado", "aguardando", "disponivel"]),
+        )
+        .order_by(ExameVet.created_at.desc())
+        .limit(3)
+        .all()
+    )
     for exame in exames_pendentes:
-        alertas.append({
-            "tipo": "exame_pendente",
-            "nivel": "info",
-            "mensagem": f"Exame {exame.nome} ainda está em {exame.status}.",
-        })
+        alertas.append(
+            {
+                "tipo": "exame_pendente",
+                "nivel": "info",
+                "mensagem": f"Exame {exame.nome} ainda está em {exame.status}.",
+            }
+        )
 
     return alertas
 
@@ -216,7 +279,11 @@ def _pet_or_404(db: Session, pet_id: int, tenant_id) -> Pet:
 
 
 def _consulta_or_404(db: Session, consulta_id: int, tenant_id) -> ConsultaVet:
-    c = db.query(ConsultaVet).filter(ConsultaVet.id == consulta_id, ConsultaVet.tenant_id == tenant_id).first()
+    c = (
+        db.query(ConsultaVet)
+        .filter(ConsultaVet.id == consulta_id, ConsultaVet.tenant_id == tenant_id)
+        .first()
+    )
     if not c:
         raise HTTPException(status_code=404, detail="Consulta não encontrada")
     return c
@@ -226,7 +293,9 @@ def _consulta_esta_finalizada(consulta: Optional[ConsultaVet]) -> bool:
     return (getattr(consulta, "status", None) or "").strip().lower() == "finalizada"
 
 
-def _bloquear_lancamento_em_consulta_finalizada(consulta: Optional[ConsultaVet], acao: str) -> None:
+def _bloquear_lancamento_em_consulta_finalizada(
+    consulta: Optional[ConsultaVet], acao: str
+) -> None:
     if not _consulta_esta_finalizada(consulta):
         return
     raise HTTPException(
@@ -252,34 +321,52 @@ def _auditar_exame_pos_finalizacao(
     if not exame.consulta_id:
         return
 
-    consulta = db.query(ConsultaVet).filter(
-        ConsultaVet.id == exame.consulta_id,
-        ConsultaVet.tenant_id == tenant_id,
-    ).first()
+    consulta = (
+        db.query(ConsultaVet)
+        .filter(
+            ConsultaVet.id == exame.consulta_id,
+            ConsultaVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not _consulta_esta_finalizada(consulta):
         return
 
-    db.add(AuditLog(
-        tenant_id=tenant_id,
-        user_id=user_id,
-        action=action,
-        entity_type="vet_exame",
-        entity_id=exame.id,
-        old_value=json.dumps(old_value, ensure_ascii=True, default=str) if old_value else None,
-        new_value=json.dumps(new_value, ensure_ascii=True, default=str) if new_value else None,
-        details=json.dumps({
-            "consulta_id": exame.consulta_id,
-            "consulta_finalizada": True,
-            **details,
-        }, ensure_ascii=True, default=str),
-        timestamp=_vet_now(),
-    ))
+    db.add(
+        AuditLog(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            action=action,
+            entity_type="vet_exame",
+            entity_id=exame.id,
+            old_value=json.dumps(old_value, ensure_ascii=True, default=str)
+            if old_value
+            else None,
+            new_value=json.dumps(new_value, ensure_ascii=True, default=str)
+            if new_value
+            else None,
+            details=json.dumps(
+                {
+                    "consulta_id": exame.consulta_id,
+                    "consulta_finalizada": True,
+                    **details,
+                },
+                ensure_ascii=True,
+                default=str,
+            ),
+            timestamp=_vet_now(),
+        )
+    )
 
 
 def _prescricao_or_404(db: Session, prescricao_id: int, tenant_id) -> PrescricaoVet:
     p = (
         db.query(PrescricaoVet)
-        .options(joinedload(PrescricaoVet.itens), joinedload(PrescricaoVet.pet), joinedload(PrescricaoVet.consulta))
+        .options(
+            joinedload(PrescricaoVet.itens),
+            joinedload(PrescricaoVet.pet),
+            joinedload(PrescricaoVet.consulta),
+        )
         .filter(PrescricaoVet.id == prescricao_id, PrescricaoVet.tenant_id == tenant_id)
         .first()
     )
@@ -288,7 +375,9 @@ def _prescricao_or_404(db: Session, prescricao_id: int, tenant_id) -> Prescricao
     return p
 
 
-def _upsert_lembretes_push_agendamento(db: Session, ag: AgendamentoVet, tenant_id) -> None:
+def _upsert_lembretes_push_agendamento(
+    db: Session, ag: AgendamentoVet, tenant_id
+) -> None:
     """Cria/atualiza lembretes push de 24h e 1h para o tutor no app mobile."""
     if not ag.data_hora or not ag.cliente_id:
         return
@@ -296,19 +385,31 @@ def _upsert_lembretes_push_agendamento(db: Session, ag: AgendamentoVet, tenant_i
     if ag.status in {"cancelado", "faltou"}:
         return
 
-    from app.campaigns.models import NotificationChannelEnum, NotificationQueue, NotificationStatusEnum
+    from app.campaigns.models import (
+        NotificationChannelEnum,
+        NotificationQueue,
+        NotificationStatusEnum,
+    )
 
-    cliente = db.query(Cliente).filter(
-        Cliente.id == ag.cliente_id,
-        Cliente.tenant_id == str(tenant_id),
-    ).first()
+    cliente = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == ag.cliente_id,
+            Cliente.tenant_id == str(tenant_id),
+        )
+        .first()
+    )
     if not cliente or not cliente.user_id:
         return
 
-    user_tutor = db.query(User).filter(
-        User.id == cliente.user_id,
-        User.tenant_id == str(tenant_id),
-    ).first()
+    user_tutor = (
+        db.query(User)
+        .filter(
+            User.id == cliente.user_id,
+            User.tenant_id == str(tenant_id),
+        )
+        .first()
+    )
     if not user_tutor or not getattr(user_tutor, "push_token", None):
         return
 
@@ -319,7 +420,11 @@ def _upsert_lembretes_push_agendamento(db: Session, ag: AgendamentoVet, tenant_i
         NotificationQueue.status == NotificationStatusEnum.pending,
     ).delete(synchronize_session=False)
 
-    agora = datetime.now(ag.data_hora.tzinfo) if getattr(ag.data_hora, "tzinfo", None) else datetime.now()
+    agora = (
+        datetime.now(ag.data_hora.tzinfo)
+        if getattr(ag.data_hora, "tzinfo", None)
+        else datetime.now()
+    )
     lembretes = [
         (
             24,
@@ -339,9 +444,11 @@ def _upsert_lembretes_push_agendamento(db: Session, ag: AgendamentoVet, tenant_i
             continue
 
         idempotencia = f"{prefixo}{horas}h:{ag.data_hora.isoformat()}"
-        existe = db.query(NotificationQueue.id).filter(
-            NotificationQueue.idempotency_key == idempotencia
-        ).first()
+        existe = (
+            db.query(NotificationQueue.id)
+            .filter(NotificationQueue.idempotency_key == idempotencia)
+            .first()
+        )
         if existe:
             continue
 

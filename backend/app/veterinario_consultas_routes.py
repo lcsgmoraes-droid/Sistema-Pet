@@ -1,4 +1,5 @@
 """Rotas de consultas, prontuario e prescricoes veterinarias."""
+
 import hashlib
 from datetime import date, datetime
 from typing import List, Optional
@@ -11,8 +12,14 @@ from sqlalchemy.orm import Session
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
 from .models import Cliente, Pet
-from .veterinario_agendamentos import _agendamento_to_dict, _sincronizar_marcos_agendamento
-from .veterinario_clinico import _bloquear_lancamento_em_consulta_finalizada, _consulta_or_404
+from .veterinario_agendamentos import (
+    _agendamento_to_dict,
+    _sincronizar_marcos_agendamento,
+)
+from .veterinario_clinico import (
+    _bloquear_lancamento_em_consulta_finalizada,
+    _consulta_or_404,
+)
 from .veterinario_core import (
     _date_para_datetime_vet,
     _get_tenant,
@@ -41,7 +48,11 @@ from .veterinario_schemas import (
     PrescricaoCreate,
     PrescricaoResponse,
 )
-from .veterinario_serializers import _consulta_to_dict, _hash_prontuario_consulta, _prescricao_to_dict
+from .veterinario_serializers import (
+    _consulta_to_dict,
+    _hash_prontuario_consulta,
+    _prescricao_to_dict,
+)
 
 router = APIRouter()
 
@@ -61,19 +72,21 @@ def _sanitizar_prescricao_rascunho(itens: list[dict]) -> list[dict]:
         nome = _texto_limpo(item.get("nome"))
         if not nome:
             continue
-        itens_limpos.append({
-            "medicamento_id": item.get("medicamento_id") or "",
-            "nome": nome,
-            "principio_ativo": _texto_limpo(item.get("principio_ativo")) or "",
-            "dose_mg": _texto_limpo(item.get("dose_mg")) or "",
-            "unidade": _texto_limpo(item.get("unidade")) or "mg",
-            "dose_minima_mg_kg": item.get("dose_minima_mg_kg") or "",
-            "dose_maxima_mg_kg": item.get("dose_maxima_mg_kg") or "",
-            "frequencia": _texto_limpo(item.get("frequencia")) or "",
-            "duracao_dias": item.get("duracao_dias") or "",
-            "via": _texto_limpo(item.get("via")) or "oral",
-            "instrucoes": _texto_limpo(item.get("instrucoes")) or "",
-        })
+        itens_limpos.append(
+            {
+                "medicamento_id": item.get("medicamento_id") or "",
+                "nome": nome,
+                "principio_ativo": _texto_limpo(item.get("principio_ativo")) or "",
+                "dose_mg": _texto_limpo(item.get("dose_mg")) or "",
+                "unidade": _texto_limpo(item.get("unidade")) or "mg",
+                "dose_minima_mg_kg": item.get("dose_minima_mg_kg") or "",
+                "dose_maxima_mg_kg": item.get("dose_maxima_mg_kg") or "",
+                "frequencia": _texto_limpo(item.get("frequencia")) or "",
+                "duracao_dias": item.get("duracao_dias") or "",
+                "via": _texto_limpo(item.get("via")) or "oral",
+                "instrucoes": _texto_limpo(item.get("instrucoes")) or "",
+            }
+        )
     return itens_limpos
 
 
@@ -85,24 +98,33 @@ def _sanitizar_procedimentos_rascunho(itens: list[dict]) -> list[dict]:
         nome = _texto_limpo(item.get("nome"))
         if not nome:
             continue
-        itens_limpos.append({
-            "catalogo_id": item.get("catalogo_id") or "",
-            "nome": nome,
-            "descricao": _texto_limpo(item.get("descricao")) or "",
-            "valor": item.get("valor") or "",
-            "observacoes": _texto_limpo(item.get("observacoes")) or "",
-            "baixar_estoque": item.get("baixar_estoque") is not False,
-        })
+        itens_limpos.append(
+            {
+                "catalogo_id": item.get("catalogo_id") or "",
+                "nome": nome,
+                "descricao": _texto_limpo(item.get("descricao")) or "",
+                "valor": item.get("valor") or "",
+                "observacoes": _texto_limpo(item.get("observacoes")) or "",
+                "baixar_estoque": item.get("baixar_estoque") is not False,
+            }
+        )
     return itens_limpos
 
 
-def _retorno_agendado_consulta(db: Session, consulta: ConsultaVet, tenant_id) -> Optional[dict]:
-    retorno = db.query(AgendamentoVet).filter(
-        AgendamentoVet.tenant_id == tenant_id,
-        AgendamentoVet.consulta_origem_id == consulta.id,
-        AgendamentoVet.tipo == "retorno",
-        AgendamentoVet.status.notin_(["cancelado", "faltou"]),
-    ).order_by(AgendamentoVet.data_hora.asc()).first()
+def _retorno_agendado_consulta(
+    db: Session, consulta: ConsultaVet, tenant_id
+) -> Optional[dict]:
+    retorno = (
+        db.query(AgendamentoVet)
+        .filter(
+            AgendamentoVet.tenant_id == tenant_id,
+            AgendamentoVet.consulta_origem_id == consulta.id,
+            AgendamentoVet.tipo == "retorno",
+            AgendamentoVet.status.notin_(["cancelado", "faltou"]),
+        )
+        .order_by(AgendamentoVet.data_hora.asc())
+        .first()
+    )
     if not retorno:
         return None
     return _agendamento_to_dict(retorno)
@@ -123,7 +145,9 @@ def listar_consultas(
         q = q.filter(ConsultaVet.pet_id == pet_id)
     if status:
         q = q.filter(ConsultaVet.status == status)
-    consultas = q.order_by(ConsultaVet.created_at.desc()).offset(skip).limit(limit).all()
+    consultas = (
+        q.order_by(ConsultaVet.created_at.desc()).offset(skip).limit(limit).all()
+    )
     return [_consulta_to_dict(c) for c in consultas]
 
 
@@ -139,22 +163,34 @@ def criar_consulta(
     if tenant_id is None:
         cliente_ref = db.query(Cliente).filter(Cliente.id == body.cliente_id).first()
         if not cliente_ref or not cliente_ref.tenant_id:
-            raise HTTPException(status_code=400, detail="Cliente inválido para criação da consulta")
+            raise HTTPException(
+                status_code=400, detail="Cliente inválido para criação da consulta"
+            )
         tenant_id = cliente_ref.tenant_id
 
-    cliente_ok = db.query(Cliente).filter(
-        Cliente.id == body.cliente_id,
-        Cliente.tenant_id == tenant_id,
-    ).first()
+    cliente_ok = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == body.cliente_id,
+            Cliente.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not cliente_ok:
         raise HTTPException(status_code=404, detail="Tutor não encontrado neste tenant")
 
-    pet_ok = db.query(Pet).filter(
-        Pet.id == body.pet_id,
-        Pet.cliente_id == body.cliente_id,
-    ).first()
+    pet_ok = (
+        db.query(Pet)
+        .filter(
+            Pet.id == body.pet_id,
+            Pet.cliente_id == body.cliente_id,
+        )
+        .first()
+    )
     if not pet_ok:
-        raise HTTPException(status_code=404, detail="Pet não encontrado para o tutor informado")
+        raise HTTPException(
+            status_code=404, detail="Pet não encontrado para o tutor informado"
+        )
 
     c = ConsultaVet(
         pet_id=body.pet_id,
@@ -172,10 +208,14 @@ def criar_consulta(
 
     # Vincula ao agendamento se informado
     if body.agendamento_id:
-        ag = db.query(AgendamentoVet).filter(
-            AgendamentoVet.id == body.agendamento_id,
-            AgendamentoVet.tenant_id == tenant_id,
-        ).first()
+        ag = (
+            db.query(AgendamentoVet)
+            .filter(
+                AgendamentoVet.id == body.agendamento_id,
+                AgendamentoVet.tenant_id == tenant_id,
+            )
+            .first()
+        )
         if ag:
             ag.consulta_id = c.id
             ag.status = "em_atendimento"
@@ -209,16 +249,24 @@ def remover_consulta(
     _, tenant_id = _get_tenant(current)
     consulta = _consulta_or_404(db, consulta_id, tenant_id)
 
-    if consulta.status == "finalizada" or consulta.finalizado_em or consulta.hash_prontuario:
+    if (
+        consulta.status == "finalizada"
+        or consulta.finalizado_em
+        or consulta.hash_prontuario
+    ):
         raise HTTPException(
             status_code=409,
             detail="Consulta finalizada ou assinada nao pode ser excluida.",
         )
 
-    agendamentos_vinculados = db.query(AgendamentoVet).filter(
-        AgendamentoVet.tenant_id == tenant_id,
-        AgendamentoVet.consulta_id == consulta.id,
-    ).all()
+    agendamentos_vinculados = (
+        db.query(AgendamentoVet)
+        .filter(
+            AgendamentoVet.tenant_id == tenant_id,
+            AgendamentoVet.consulta_id == consulta.id,
+        )
+        .all()
+    )
     for agendamento in agendamentos_vinculados:
         agendamento.consulta_id = None
         if agendamento.status in {"em_atendimento", "finalizado"}:
@@ -269,21 +317,33 @@ def obter_timeline_consulta(
 
     eventos: list[dict] = []
 
-    def adicionar_evento(*, kind: str, item_id: int | str, titulo: str, status_item: Optional[str], data_evento: Optional[datetime], descricao: Optional[str] = None, link: Optional[str] = None, meta: Optional[dict] = None):
+    def adicionar_evento(
+        *,
+        kind: str,
+        item_id: int | str,
+        titulo: str,
+        status_item: Optional[str],
+        data_evento: Optional[datetime],
+        descricao: Optional[str] = None,
+        link: Optional[str] = None,
+        meta: Optional[dict] = None,
+    ):
         if data_evento is None:
             return
         data_evento_ordenacao = _normalizar_datetime_vet(data_evento) or data_evento
-        eventos.append({
-            "kind": kind,
-            "item_id": item_id,
-            "titulo": titulo,
-            "status": status_item,
-            "data_hora": _serializar_datetime_vet(data_evento),
-            "descricao": descricao,
-            "link": link,
-            "meta": meta or {},
-            "_ordem": data_evento_ordenacao,
-        })
+        eventos.append(
+            {
+                "kind": kind,
+                "item_id": item_id,
+                "titulo": titulo,
+                "status": status_item,
+                "data_hora": _serializar_datetime_vet(data_evento),
+                "descricao": descricao,
+                "link": link,
+                "meta": meta or {},
+                "_ordem": data_evento_ordenacao,
+            }
+        )
 
     adicionar_evento(
         kind="consulta",
@@ -306,10 +366,15 @@ def obter_timeline_consulta(
             link=f"/veterinario/consultas/{c.id}",
         )
 
-    procedimentos = db.query(ProcedimentoConsulta).filter(
-        ProcedimentoConsulta.consulta_id == consulta_id,
-        ProcedimentoConsulta.tenant_id == tenant_id,
-    ).order_by(ProcedimentoConsulta.created_at.desc()).all()
+    procedimentos = (
+        db.query(ProcedimentoConsulta)
+        .filter(
+            ProcedimentoConsulta.consulta_id == consulta_id,
+            ProcedimentoConsulta.tenant_id == tenant_id,
+        )
+        .order_by(ProcedimentoConsulta.created_at.desc())
+        .all()
+    )
     for procedimento in procedimentos:
         adicionar_evento(
             kind="procedimento",
@@ -326,17 +391,24 @@ def obter_timeline_consulta(
             },
         )
 
-    exames = db.query(ExameVet).filter(
-        ExameVet.consulta_id == consulta_id,
-        ExameVet.tenant_id == tenant_id,
-    ).order_by(ExameVet.created_at.desc()).all()
+    exames = (
+        db.query(ExameVet)
+        .filter(
+            ExameVet.consulta_id == consulta_id,
+            ExameVet.tenant_id == tenant_id,
+        )
+        .order_by(ExameVet.created_at.desc())
+        .all()
+    )
     for exame in exames:
         adicionar_evento(
             kind="exame",
             item_id=exame.id,
             titulo=exame.nome,
             status_item=exame.status,
-            data_evento=_date_para_datetime_vet(exame.data_resultado) or _date_para_datetime_vet(exame.data_solicitacao) or exame.created_at,
+            data_evento=_date_para_datetime_vet(exame.data_resultado)
+            or _date_para_datetime_vet(exame.data_solicitacao)
+            or exame.created_at,
             descricao=exame.observacoes or exame.interpretacao_ia_resumo or exame.tipo,
             link=f"/veterinario/exames?consulta_id={c.id}&pet_id={c.pet_id}",
             meta={
@@ -346,10 +418,15 @@ def obter_timeline_consulta(
             },
         )
 
-    vacinas = db.query(VacinaRegistro).filter(
-        VacinaRegistro.consulta_id == consulta_id,
-        VacinaRegistro.tenant_id == tenant_id,
-    ).order_by(VacinaRegistro.data_aplicacao.desc()).all()
+    vacinas = (
+        db.query(VacinaRegistro)
+        .filter(
+            VacinaRegistro.consulta_id == consulta_id,
+            VacinaRegistro.tenant_id == tenant_id,
+        )
+        .order_by(VacinaRegistro.data_aplicacao.desc())
+        .all()
+    )
     for vacina in vacinas:
         adicionar_evento(
             kind="vacina",
@@ -362,14 +439,21 @@ def obter_timeline_consulta(
             meta={
                 "lote": vacina.lote,
                 "numero_dose": vacina.numero_dose,
-                "proxima_dose": vacina.data_proxima_dose.isoformat() if vacina.data_proxima_dose else None,
+                "proxima_dose": vacina.data_proxima_dose.isoformat()
+                if vacina.data_proxima_dose
+                else None,
             },
         )
 
-    internacoes = db.query(InternacaoVet).filter(
-        InternacaoVet.consulta_id == consulta_id,
-        InternacaoVet.tenant_id == tenant_id,
-    ).order_by(InternacaoVet.data_entrada.desc()).all()
+    internacoes = (
+        db.query(InternacaoVet)
+        .filter(
+            InternacaoVet.consulta_id == consulta_id,
+            InternacaoVet.tenant_id == tenant_id,
+        )
+        .order_by(InternacaoVet.data_entrada.desc())
+        .all()
+    )
     for internacao in internacoes:
         motivo_limpo, box = _split_motivo_baia(internacao.motivo)
         adicionar_evento(
@@ -382,7 +466,11 @@ def obter_timeline_consulta(
             link=f"/veterinario/internacoes?consulta_id={c.id}",
             meta={
                 "box": box,
-                "data_saida": _serializar_datetime_vet(internacao.data_saida).isoformat() if internacao.data_saida else None,
+                "data_saida": _serializar_datetime_vet(
+                    internacao.data_saida
+                ).isoformat()
+                if internacao.data_saida
+                else None,
             },
         )
         if internacao.data_saida:
@@ -397,10 +485,15 @@ def obter_timeline_consulta(
                 meta={"box": box},
             )
 
-    prescricoes = db.query(PrescricaoVet).filter(
-        PrescricaoVet.consulta_id == consulta_id,
-        PrescricaoVet.tenant_id == tenant_id,
-    ).order_by(PrescricaoVet.created_at.desc()).all()
+    prescricoes = (
+        db.query(PrescricaoVet)
+        .filter(
+            PrescricaoVet.consulta_id == consulta_id,
+            PrescricaoVet.tenant_id == tenant_id,
+        )
+        .order_by(PrescricaoVet.created_at.desc())
+        .all()
+    )
     for prescricao in prescricoes:
         adicionar_evento(
             kind="prescricao",
@@ -445,10 +538,14 @@ def atualizar_consulta(
 
     # Se registrou peso, cria registro na curva de peso
     if body.peso_consulta is not None and body.peso_consulta > 0:
-        peso_reg = db.query(PesoRegistro).filter(
-            PesoRegistro.consulta_id == c.id,
-            PesoRegistro.tenant_id == tenant_id,
-        ).first()
+        peso_reg = (
+            db.query(PesoRegistro)
+            .filter(
+                PesoRegistro.consulta_id == c.id,
+                PesoRegistro.tenant_id == tenant_id,
+            )
+            .first()
+        )
         if peso_reg:
             peso_reg.data = date.today()
             peso_reg.peso_kg = body.peso_consulta
@@ -487,7 +584,9 @@ def sincronizar_rascunho_itens_consulta(
         raise HTTPException(400, "Consulta finalizada nao pode receber rascunho")
 
     c.prescricao_rascunho = _sanitizar_prescricao_rascunho(body.prescricao_itens)
-    c.procedimentos_rascunho = _sanitizar_procedimentos_rascunho(body.procedimentos_realizados)
+    c.procedimentos_rascunho = _sanitizar_procedimentos_rascunho(
+        body.procedimentos_realizados
+    )
     db.commit()
     db.refresh(c)
     return _consulta_to_dict(c)
@@ -523,7 +622,9 @@ def finalizar_consulta(
     return _consulta_to_dict(c)
 
 
-@router.get("/consultas/{consulta_id}/prescricoes", response_model=List[PrescricaoResponse])
+@router.get(
+    "/consultas/{consulta_id}/prescricoes", response_model=List[PrescricaoResponse]
+)
 def listar_prescricoes(
     consulta_id: int,
     db: Session = Depends(get_session),
@@ -531,10 +632,14 @@ def listar_prescricoes(
 ):
     user, tenant_id = _get_tenant(current)
     _consulta_or_404(db, consulta_id, tenant_id)
-    prescricoes = db.query(PrescricaoVet).filter(
-        PrescricaoVet.consulta_id == consulta_id,
-        PrescricaoVet.tenant_id == tenant_id,
-    ).all()
+    prescricoes = (
+        db.query(PrescricaoVet)
+        .filter(
+            PrescricaoVet.consulta_id == consulta_id,
+            PrescricaoVet.tenant_id == tenant_id,
+        )
+        .all()
+    )
     return [_prescricao_to_dict(p) for p in prescricoes]
 
 
@@ -547,23 +652,43 @@ def criar_prescricao(
     user, tenant_id = _get_tenant(current)
 
     if tenant_id is None:
-        consulta_ref = db.query(ConsultaVet).filter(ConsultaVet.id == body.consulta_id).first()
+        consulta_ref = (
+            db.query(ConsultaVet).filter(ConsultaVet.id == body.consulta_id).first()
+        )
         if not consulta_ref or not consulta_ref.tenant_id:
-            raise HTTPException(status_code=400, detail="Consulta inválida para emissão de prescrição")
+            raise HTTPException(
+                status_code=400, detail="Consulta inválida para emissão de prescrição"
+            )
         tenant_id = consulta_ref.tenant_id
 
-    consulta_ok = db.query(ConsultaVet).filter(
-        ConsultaVet.id == body.consulta_id,
-        ConsultaVet.tenant_id == tenant_id,
-    ).first()
+    consulta_ok = (
+        db.query(ConsultaVet)
+        .filter(
+            ConsultaVet.id == body.consulta_id,
+            ConsultaVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not consulta_ok:
-        raise HTTPException(status_code=404, detail="Consulta não encontrada neste tenant")
+        raise HTTPException(
+            status_code=404, detail="Consulta não encontrada neste tenant"
+        )
 
     # Número sequencial
     if consulta_ok.pet_id != body.pet_id:
-        raise HTTPException(status_code=422, detail="Pet da prescricao nao confere com o pet da consulta")
-    _bloquear_lancamento_em_consulta_finalizada(consulta_ok, "nova prescricao vinculada")
-    total = db.query(func.count(PrescricaoVet.id)).filter(PrescricaoVet.tenant_id == tenant_id).scalar() or 0
+        raise HTTPException(
+            status_code=422,
+            detail="Pet da prescricao nao confere com o pet da consulta",
+        )
+    _bloquear_lancamento_em_consulta_finalizada(
+        consulta_ok, "nova prescricao vinculada"
+    )
+    total = (
+        db.query(func.count(PrescricaoVet.id))
+        .filter(PrescricaoVet.tenant_id == tenant_id)
+        .scalar()
+        or 0
+    )
     numero = f"REC-{total + 1:05d}"
 
     p = PrescricaoVet(

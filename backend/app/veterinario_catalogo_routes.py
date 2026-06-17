@@ -1,4 +1,5 @@
 """Rotas de procedimentos, catalogos e apoio clinico veterinario."""
+
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -47,18 +48,28 @@ from .veterinario_schemas import (
 router = APIRouter()
 
 
-@router.get("/consultas/{consulta_id}/procedimentos", response_model=List[ProcedimentoResponse])
+@router.get(
+    "/consultas/{consulta_id}/procedimentos", response_model=List[ProcedimentoResponse]
+)
 def listar_procedimentos_consulta(
     consulta_id: int,
     db: Session = Depends(get_session),
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    procedimentos = db.query(ProcedimentoConsulta).filter(
-        ProcedimentoConsulta.consulta_id == consulta_id,
-        ProcedimentoConsulta.tenant_id == tenant_id,
-    ).order_by(ProcedimentoConsulta.created_at.desc()).all()
-    return [_serializar_procedimento(procedimento, db, tenant_id) for procedimento in procedimentos]
+    procedimentos = (
+        db.query(ProcedimentoConsulta)
+        .filter(
+            ProcedimentoConsulta.consulta_id == consulta_id,
+            ProcedimentoConsulta.tenant_id == tenant_id,
+        )
+        .order_by(ProcedimentoConsulta.created_at.desc())
+        .all()
+    )
+    return [
+        _serializar_procedimento(procedimento, db, tenant_id)
+        for procedimento in procedimentos
+    ]
 
 
 @router.post("/procedimentos", response_model=ProcedimentoResponse, status_code=201)
@@ -73,12 +84,18 @@ def adicionar_procedimento(
 
     catalogo = None
     if body.catalogo_id:
-        catalogo = db.query(CatalogoProcedimento).filter(
-            CatalogoProcedimento.id == body.catalogo_id,
-            CatalogoProcedimento.tenant_id == tenant_id,
-        ).first()
+        catalogo = (
+            db.query(CatalogoProcedimento)
+            .filter(
+                CatalogoProcedimento.id == body.catalogo_id,
+                CatalogoProcedimento.tenant_id == tenant_id,
+            )
+            .first()
+        )
         if not catalogo:
-            raise HTTPException(status_code=404, detail="Procedimento de catálogo não encontrado")
+            raise HTTPException(
+                status_code=404, detail="Procedimento de catálogo não encontrado"
+            )
 
     insumos = _normalizar_insumos(body.insumos or [])
     if not insumos and catalogo and isinstance(catalogo.insumos, list):
@@ -91,8 +108,16 @@ def adicionar_procedimento(
         catalogo_id=body.catalogo_id,
         user_id=user.id,
         nome=body.nome or (catalogo.nome if catalogo else "Procedimento"),
-        descricao=body.descricao if body.descricao is not None else (catalogo.descricao if catalogo else None),
-        valor=body.valor if body.valor is not None else (float(catalogo.valor_padrao) if catalogo and catalogo.valor_padrao is not None else None),
+        descricao=body.descricao
+        if body.descricao is not None
+        else (catalogo.descricao if catalogo else None),
+        valor=body.valor
+        if body.valor is not None
+        else (
+            float(catalogo.valor_padrao)
+            if catalogo and catalogo.valor_padrao is not None
+            else None
+        ),
         realizado=body.realizado,
         observacoes=body.observacoes,
         insumos=insumos,
@@ -113,14 +138,21 @@ def listar_catalogo_procedimentos(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    catalogos = db.query(CatalogoProcedimento).filter(
-        CatalogoProcedimento.tenant_id == tenant_id,
-        CatalogoProcedimento.ativo == True,  # noqa
-    ).order_by(CatalogoProcedimento.nome).all()
+    catalogos = (
+        db.query(CatalogoProcedimento)
+        .filter(
+            CatalogoProcedimento.tenant_id == tenant_id,
+            CatalogoProcedimento.ativo == True,  # noqa
+        )
+        .order_by(CatalogoProcedimento.nome)
+        .all()
+    )
     return [_serializar_catalogo(catalogo, db, tenant_id) for catalogo in catalogos]
 
 
-@router.post("/catalogo/procedimentos", response_model=CatalogoResponse, status_code=201)
+@router.post(
+    "/catalogo/procedimentos", response_model=CatalogoResponse, status_code=201
+)
 def criar_catalogo_procedimento(
     body: CatalogoCreate,
     db: Session = Depends(get_session),
@@ -152,11 +184,15 @@ def atualizar_catalogo_procedimento(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    catalogo = db.query(CatalogoProcedimento).filter(
-        CatalogoProcedimento.id == catalogo_id,
-        CatalogoProcedimento.tenant_id == tenant_id,
-        CatalogoProcedimento.ativo == True,  # noqa
-    ).first()
+    catalogo = (
+        db.query(CatalogoProcedimento)
+        .filter(
+            CatalogoProcedimento.id == catalogo_id,
+            CatalogoProcedimento.tenant_id == tenant_id,
+            CatalogoProcedimento.ativo == True,  # noqa
+        )
+        .first()
+    )
     if not catalogo:
         raise HTTPException(404, "Procedimento de catálogo não encontrado")
 
@@ -178,11 +214,15 @@ def remover_catalogo_procedimento(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    catalogo = db.query(CatalogoProcedimento).filter(
-        CatalogoProcedimento.id == catalogo_id,
-        CatalogoProcedimento.tenant_id == tenant_id,
-        CatalogoProcedimento.ativo == True,  # noqa
-    ).first()
+    catalogo = (
+        db.query(CatalogoProcedimento)
+        .filter(
+            CatalogoProcedimento.id == catalogo_id,
+            CatalogoProcedimento.tenant_id == tenant_id,
+            CatalogoProcedimento.ativo == True,  # noqa
+        )
+        .first()
+    )
     if not catalogo:
         raise HTTPException(404, "Procedimento de catálogo não encontrado")
 
@@ -246,14 +286,26 @@ def obter_carteirinha_pet(
     _, tenant_id = _get_tenant(current)
     pet = _pet_or_404(db, pet_id, tenant_id)
     status_vacinal = _status_vacinal_pet(db, pet, tenant_id)
-    exames = db.query(ExameVet).filter(
-        ExameVet.pet_id == pet.id,
-        ExameVet.tenant_id == tenant_id,
-    ).order_by(ExameVet.created_at.desc()).limit(10).all()
-    consultas = db.query(ConsultaVet).filter(
-        ConsultaVet.pet_id == pet.id,
-        ConsultaVet.tenant_id == tenant_id,
-    ).order_by(ConsultaVet.created_at.desc()).limit(10).all()
+    exames = (
+        db.query(ExameVet)
+        .filter(
+            ExameVet.pet_id == pet.id,
+            ExameVet.tenant_id == tenant_id,
+        )
+        .order_by(ExameVet.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    consultas = (
+        db.query(ConsultaVet)
+        .filter(
+            ConsultaVet.pet_id == pet.id,
+            ConsultaVet.tenant_id == tenant_id,
+        )
+        .order_by(ConsultaVet.created_at.desc())
+        .limit(10)
+        .all()
+    )
 
     return {
         "pet": {
@@ -264,9 +316,12 @@ def obter_carteirinha_pet(
             "peso": float(pet.peso) if pet.peso is not None else None,
             "foto_url": pet.foto_url,
             "tipo_sanguineo": getattr(pet, "tipo_sanguineo", None),
-            "alergias": getattr(pet, "alergias_lista", None) or ([pet.alergias] if pet.alergias else []),
-            "restricoes_alimentares": getattr(pet, "restricoes_alimentares_lista", None) or [],
-            "medicamentos_continuos": getattr(pet, "medicamentos_continuos_lista", None) or [],
+            "alergias": getattr(pet, "alergias_lista", None)
+            or ([pet.alergias] if pet.alergias else []),
+            "restricoes_alimentares": getattr(pet, "restricoes_alimentares_lista", None)
+            or [],
+            "medicamentos_continuos": getattr(pet, "medicamentos_continuos_lista", None)
+            or [],
             "condicoes_cronicas": getattr(pet, "condicoes_cronicas_lista", None) or [],
         },
         "alertas": _montar_alertas_pet(db, pet, tenant_id),
@@ -274,7 +329,9 @@ def obter_carteirinha_pet(
         "consultas": [
             {
                 "id": consulta.id,
-                "data": consulta.created_at.date().isoformat() if consulta.created_at else None,
+                "data": consulta.created_at.date().isoformat()
+                if consulta.created_at
+                else None,
                 "tipo": consulta.tipo,
                 "status": consulta.status,
                 "diagnostico": consulta.diagnostico,
@@ -288,7 +345,9 @@ def obter_carteirinha_pet(
                 "nome": exame.nome,
                 "tipo": exame.tipo,
                 "status": exame.status,
-                "data_resultado": exame.data_resultado.isoformat() if exame.data_resultado else None,
+                "data_resultado": exame.data_resultado.isoformat()
+                if exame.data_resultado
+                else None,
                 "interpretacao_ia_resumo": exame.interpretacao_ia_resumo,
                 "arquivo_url": exame.arquivo_url,
             }
@@ -342,11 +401,15 @@ def atualizar_medicamento(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    medicamento = db.query(MedicamentoCatalogo).filter(
-        MedicamentoCatalogo.id == medicamento_id,
-        MedicamentoCatalogo.tenant_id == tenant_id,
-        MedicamentoCatalogo.ativo == True,  # noqa
-    ).first()
+    medicamento = (
+        db.query(MedicamentoCatalogo)
+        .filter(
+            MedicamentoCatalogo.id == medicamento_id,
+            MedicamentoCatalogo.tenant_id == tenant_id,
+            MedicamentoCatalogo.ativo == True,  # noqa
+        )
+        .first()
+    )
     if not medicamento:
         raise HTTPException(404, "Medicamento não encontrado")
 
@@ -365,11 +428,15 @@ def remover_medicamento(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    medicamento = db.query(MedicamentoCatalogo).filter(
-        MedicamentoCatalogo.id == medicamento_id,
-        MedicamentoCatalogo.tenant_id == tenant_id,
-        MedicamentoCatalogo.ativo == True,  # noqa
-    ).first()
+    medicamento = (
+        db.query(MedicamentoCatalogo)
+        .filter(
+            MedicamentoCatalogo.id == medicamento_id,
+            MedicamentoCatalogo.tenant_id == tenant_id,
+            MedicamentoCatalogo.ativo == True,  # noqa
+        )
+        .first()
+    )
     if not medicamento:
         raise HTTPException(404, "Medicamento não encontrado")
 
@@ -384,10 +451,15 @@ def listar_protocolos_vacinas(
     current=Depends(get_current_user_and_tenant),
 ):
     user, tenant_id = _get_tenant(current)
-    return db.query(ProtocoloVacina).filter(
-        ProtocoloVacina.tenant_id == tenant_id,
-        ProtocoloVacina.ativo == True,  # noqa
-    ).order_by(ProtocoloVacina.nome).all()
+    return (
+        db.query(ProtocoloVacina)
+        .filter(
+            ProtocoloVacina.tenant_id == tenant_id,
+            ProtocoloVacina.ativo == True,  # noqa
+        )
+        .order_by(ProtocoloVacina.nome)
+        .all()
+    )
 
 
 @router.post("/catalogo/protocolos-vacinas", status_code=201)
@@ -427,11 +499,15 @@ def atualizar_protocolo_vacina(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    protocolo = db.query(ProtocoloVacina).filter(
-        ProtocoloVacina.id == protocolo_id,
-        ProtocoloVacina.tenant_id == tenant_id,
-        ProtocoloVacina.ativo == True,  # noqa
-    ).first()
+    protocolo = (
+        db.query(ProtocoloVacina)
+        .filter(
+            ProtocoloVacina.id == protocolo_id,
+            ProtocoloVacina.tenant_id == tenant_id,
+            ProtocoloVacina.ativo == True,  # noqa
+        )
+        .first()
+    )
     if not protocolo:
         raise HTTPException(404, "Protocolo de vacina não encontrado")
 
@@ -450,11 +526,15 @@ def remover_protocolo_vacina(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    protocolo = db.query(ProtocoloVacina).filter(
-        ProtocoloVacina.id == protocolo_id,
-        ProtocoloVacina.tenant_id == tenant_id,
-        ProtocoloVacina.ativo == True,  # noqa
-    ).first()
+    protocolo = (
+        db.query(ProtocoloVacina)
+        .filter(
+            ProtocoloVacina.id == protocolo_id,
+            ProtocoloVacina.tenant_id == tenant_id,
+            ProtocoloVacina.ativo == True,  # noqa
+        )
+        .first()
+    )
     if not protocolo:
         raise HTTPException(404, "Protocolo de vacina não encontrado")
 

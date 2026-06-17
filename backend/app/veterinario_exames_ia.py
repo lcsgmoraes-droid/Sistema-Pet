@@ -109,18 +109,22 @@ def _normalize_ai_alerts(alertas) -> list[dict]:
         if isinstance(alerta, str):
             mensagem = alerta.strip()
             if mensagem:
-                normalizados.append({"campo": "atencao", "status": "atencao", "mensagem": mensagem})
+                normalizados.append(
+                    {"campo": "atencao", "status": "atencao", "mensagem": mensagem}
+                )
             continue
         if not isinstance(alerta, dict):
             continue
         mensagem = str(alerta.get("mensagem") or "").strip()
         if not mensagem:
             continue
-        normalizados.append({
-            "campo": str(alerta.get("campo") or "atencao").strip() or "atencao",
-            "status": str(alerta.get("status") or "atencao").strip() or "atencao",
-            "mensagem": mensagem,
-        })
+        normalizados.append(
+            {
+                "campo": str(alerta.get("campo") or "atencao").strip() or "atencao",
+                "status": str(alerta.get("status") or "atencao").strip() or "atencao",
+                "mensagem": mensagem,
+            }
+        )
     return normalizados
 
 
@@ -149,7 +153,9 @@ def _merge_exam_result_json(exame, novo_json: dict) -> dict:
     return merged
 
 
-def _meses_desde(data_base: Optional[date], referencia: Optional[date] = None) -> Optional[int]:
+def _meses_desde(
+    data_base: Optional[date], referencia: Optional[date] = None
+) -> Optional[int]:
     if not data_base:
         return None
     ref = referencia or date.today()
