@@ -23,7 +23,9 @@ def _texto(value: Optional[str]) -> Optional[str]:
 
 def _margem(preco_total: float, custo_total: float) -> tuple[float, float]:
     margem_valor = _round_money(preco_total - custo_total)
-    margem_percentual = round((margem_valor / preco_total) * 100, 2) if preco_total > 0 else 0.0
+    margem_percentual = (
+        round((margem_valor / preco_total) * 100, 2) if preco_total > 0 else 0.0
+    )
     return margem_valor, margem_percentual
 
 
@@ -45,7 +47,9 @@ def _montar_item_base(
     quantidade_normalizada = _quantidade(quantidade)
     custo_unitario = _round_money(custo_unitario_estimado)
     preco_sugerido = _round_money(preco_unitario_sugerido)
-    preco_cobrado = _round_money(preco_unitario if preco_unitario is not None else preco_sugerido)
+    preco_cobrado = _round_money(
+        preco_unitario if preco_unitario is not None else preco_sugerido
+    )
     custo_total = _round_money(custo_unitario * quantidade_normalizada)
     preco_total = _round_money(preco_cobrado * quantidade_normalizada)
     margem_valor, margem_percentual = _margem(preco_total, custo_total)
@@ -97,20 +101,24 @@ def montar_item_orcamento_catalogo(
         custo_unitario_estimado = _round_money(custo_unitario_estimado + custo_total)
         preco_insumos_sugerido = _round_money(preco_insumos_sugerido + preco_total)
 
-        insumos.append({
-            "produto_id": int(produto_id),
-            "nome": insumo.get("nome") or getattr(produto, "nome", None),
-            "unidade": insumo.get("unidade") or getattr(produto, "unidade", None),
-            "quantidade": quantidade_insumo,
-            "custo_unitario": custo_unitario,
-            "custo_total": custo_total,
-            "preco_unitario_sugerido": preco_unitario_produto,
-            "preco_total_sugerido": preco_total,
-            "baixar_estoque": False,
-        })
+        insumos.append(
+            {
+                "produto_id": int(produto_id),
+                "nome": insumo.get("nome") or getattr(produto, "nome", None),
+                "unidade": insumo.get("unidade") or getattr(produto, "unidade", None),
+                "quantidade": quantidade_insumo,
+                "custo_unitario": custo_unitario,
+                "custo_total": custo_total,
+                "preco_unitario_sugerido": preco_unitario_produto,
+                "preco_total_sugerido": preco_total,
+                "baixar_estoque": False,
+            }
+        )
 
     valor_catalogo = _as_float(getattr(catalogo, "valor_padrao", None))
-    preco_sugerido = valor_catalogo if valor_catalogo is not None else preco_insumos_sugerido
+    preco_sugerido = (
+        valor_catalogo if valor_catalogo is not None else preco_insumos_sugerido
+    )
 
     return _montar_item_base(
         origem="catalogo",
@@ -152,12 +160,15 @@ def montar_item_orcamento_manual(payload: dict) -> dict:
         origem = "manual"
     return _montar_item_base(
         origem=origem,
-        nome=payload.get("nome") or ("Diaria de internacao" if origem == "diaria" else "Item do orcamento"),
+        nome=payload.get("nome")
+        or ("Diaria de internacao" if origem == "diaria" else "Item do orcamento"),
         descricao=payload.get("descricao"),
         unidade=payload.get("unidade"),
         quantidade=payload.get("quantidade", 1),
         custo_unitario_estimado=payload.get("custo_unitario_estimado", 0),
-        preco_unitario_sugerido=payload.get("preco_unitario_sugerido", payload.get("preco_unitario", 0)),
+        preco_unitario_sugerido=payload.get(
+            "preco_unitario_sugerido", payload.get("preco_unitario", 0)
+        ),
         preco_unitario=payload.get("preco_unitario"),
         insumos=payload.get("insumos") or [],
         observacoes=payload.get("observacoes"),
@@ -165,8 +176,12 @@ def montar_item_orcamento_manual(payload: dict) -> dict:
 
 
 def calcular_totais_orcamento(itens: Iterable[dict]) -> dict:
-    custo_total = _round_money(sum((_as_float(item.get("custo_total_estimado")) or 0) for item in itens))
-    preco_total = _round_money(sum((_as_float(item.get("preco_total")) or 0) for item in itens))
+    custo_total = _round_money(
+        sum((_as_float(item.get("custo_total_estimado")) or 0) for item in itens)
+    )
+    preco_total = _round_money(
+        sum((_as_float(item.get("preco_total")) or 0) for item in itens)
+    )
     margem_valor, margem_percentual = _margem(preco_total, custo_total)
     return {
         "custo_total_estimado": custo_total,

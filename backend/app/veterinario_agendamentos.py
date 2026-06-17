@@ -53,10 +53,14 @@ def _atualizar_status_agendamento(
     if not agendamento_id:
         return None
 
-    ag = db.query(AgendamentoVet).filter(
-        AgendamentoVet.id == agendamento_id,
-        AgendamentoVet.tenant_id == tenant_id,
-    ).first()
+    ag = (
+        db.query(AgendamentoVet)
+        .filter(
+            AgendamentoVet.id == agendamento_id,
+            AgendamentoVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not ag:
         return None
 
@@ -65,36 +69,56 @@ def _atualizar_status_agendamento(
     return ag
 
 
-def _validar_veterinario_agendamento(db: Session, tenant_id, veterinario_id: Optional[int]) -> Optional[Cliente]:
+def _validar_veterinario_agendamento(
+    db: Session, tenant_id, veterinario_id: Optional[int]
+) -> Optional[Cliente]:
     if not veterinario_id:
         return None
 
-    veterinario = db.query(Cliente).filter(
-        Cliente.id == veterinario_id,
-        Cliente.tenant_id == tenant_id,
-        Cliente.tipo_cadastro == "veterinario",
-        Cliente.ativo.is_(True),
-    ).first()
+    veterinario = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == veterinario_id,
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "veterinario",
+            Cliente.ativo.is_(True),
+        )
+        .first()
+    )
     if not veterinario:
-        raise HTTPException(status_code=422, detail="Veterinario selecionado nao foi encontrado ou esta inativo")
+        raise HTTPException(
+            status_code=422,
+            detail="Veterinario selecionado nao foi encontrado ou esta inativo",
+        )
     return veterinario
 
 
-def _validar_consultorio_agendamento(db: Session, tenant_id, consultorio_id: Optional[int]) -> Optional[ConsultorioVet]:
+def _validar_consultorio_agendamento(
+    db: Session, tenant_id, consultorio_id: Optional[int]
+) -> Optional[ConsultorioVet]:
     if not consultorio_id:
         return None
 
-    consultorio = db.query(ConsultorioVet).filter(
-        ConsultorioVet.id == consultorio_id,
-        ConsultorioVet.tenant_id == tenant_id,
-        ConsultorioVet.ativo.is_(True),
-    ).first()
+    consultorio = (
+        db.query(ConsultorioVet)
+        .filter(
+            ConsultorioVet.id == consultorio_id,
+            ConsultorioVet.tenant_id == tenant_id,
+            ConsultorioVet.ativo.is_(True),
+        )
+        .first()
+    )
     if not consultorio:
-        raise HTTPException(status_code=422, detail="Consultorio selecionado nao foi encontrado ou esta inativo")
+        raise HTTPException(
+            status_code=422,
+            detail="Consultorio selecionado nao foi encontrado ou esta inativo",
+        )
     return consultorio
 
 
-def _agendamento_intervalo(data_hora: datetime, duracao_minutos: Optional[int]) -> tuple[datetime, datetime]:
+def _agendamento_intervalo(
+    data_hora: datetime, duracao_minutos: Optional[int]
+) -> tuple[datetime, datetime]:
     inicio = _normalizar_data_hora_agendada_vet(data_hora)
     fim = inicio + timedelta(minutes=max(int(duracao_minutos or 30), 1))
     return inicio, fim
@@ -113,13 +137,17 @@ def _garantir_sem_conflitos_agendamento(
     if not veterinario_id and not consultorio_id:
         return
 
-    consulta = db.query(AgendamentoVet).options(
-        joinedload(AgendamentoVet.veterinario),
-        joinedload(AgendamentoVet.consultorio),
-    ).filter(
-        AgendamentoVet.tenant_id == tenant_id,
-        func.date(AgendamentoVet.data_hora) == data_hora.date(),
-        AgendamentoVet.status != "cancelado",
+    consulta = (
+        db.query(AgendamentoVet)
+        .options(
+            joinedload(AgendamentoVet.veterinario),
+            joinedload(AgendamentoVet.consultorio),
+        )
+        .filter(
+            AgendamentoVet.tenant_id == tenant_id,
+            func.date(AgendamentoVet.data_hora) == data_hora.date(),
+            AgendamentoVet.status != "cancelado",
+        )
     )
 
     if agendamento_id_ignorar:
@@ -142,26 +170,42 @@ def _garantir_sem_conflitos_agendamento(
     conflito_consultorio = None
 
     for existente in consulta.all():
-        existente_inicio, existente_fim = _agendamento_intervalo(existente.data_hora, existente.duracao_minutos)
+        existente_inicio, existente_fim = _agendamento_intervalo(
+            existente.data_hora, existente.duracao_minutos
+        )
         if novo_inicio >= existente_fim or novo_fim <= existente_inicio:
             continue
 
-        if veterinario_id and existente.veterinario_id == veterinario_id and conflito_veterinario is None:
+        if (
+            veterinario_id
+            and existente.veterinario_id == veterinario_id
+            and conflito_veterinario is None
+        ):
             conflito_veterinario = existente
-        if consultorio_id and existente.consultorio_id == consultorio_id and conflito_consultorio is None:
+        if (
+            consultorio_id
+            and existente.consultorio_id == consultorio_id
+            and conflito_consultorio is None
+        ):
             conflito_consultorio = existente
 
     mensagens = []
     if conflito_veterinario:
-        nome_vet = conflito_veterinario.veterinario.nome if conflito_veterinario.veterinario else "O veterinario selecionado"
+        nome_vet = (
+            conflito_veterinario.veterinario.nome
+            if conflito_veterinario.veterinario
+            else "O veterinario selecionado"
+        )
         mensagens.append(
             f"{nome_vet} ja possui outro agendamento em conflito nesse horario"
         )
     if conflito_consultorio:
-        nome_consultorio = conflito_consultorio.consultorio.nome if conflito_consultorio.consultorio else "O consultorio selecionado"
-        mensagens.append(
-            f"{nome_consultorio} ja esta reservado nesse horario"
+        nome_consultorio = (
+            conflito_consultorio.consultorio.nome
+            if conflito_consultorio.consultorio
+            else "O consultorio selecionado"
         )
+        mensagens.append(f"{nome_consultorio} ja esta reservado nesse horario")
     if mensagens:
         raise HTTPException(status_code=409, detail=". ".join(mensagens) + ".")
 
@@ -213,13 +257,43 @@ def _consulta_tem_conteudo_clinico(consulta: ConsultaVet) -> bool:
 
 def _consulta_tem_dependencias(db: Session, tenant_id, consulta_id: int) -> bool:
     checagens = (
-        db.query(PrescricaoVet.id).filter(PrescricaoVet.tenant_id == tenant_id, PrescricaoVet.consulta_id == consulta_id).first(),
-        db.query(ExameVet.id).filter(ExameVet.tenant_id == tenant_id, ExameVet.consulta_id == consulta_id).first(),
-        db.query(ProcedimentoConsulta.id).filter(ProcedimentoConsulta.tenant_id == tenant_id, ProcedimentoConsulta.consulta_id == consulta_id).first(),
-        db.query(FotoClinica.id).filter(FotoClinica.tenant_id == tenant_id, FotoClinica.consulta_id == consulta_id).first(),
-        db.query(VacinaRegistro.id).filter(VacinaRegistro.tenant_id == tenant_id, VacinaRegistro.consulta_id == consulta_id).first(),
-        db.query(InternacaoVet.id).filter(InternacaoVet.tenant_id == tenant_id, InternacaoVet.consulta_id == consulta_id).first(),
-        db.query(PesoRegistro.id).filter(PesoRegistro.tenant_id == tenant_id, PesoRegistro.consulta_id == consulta_id).first(),
+        db.query(PrescricaoVet.id)
+        .filter(
+            PrescricaoVet.tenant_id == tenant_id,
+            PrescricaoVet.consulta_id == consulta_id,
+        )
+        .first(),
+        db.query(ExameVet.id)
+        .filter(ExameVet.tenant_id == tenant_id, ExameVet.consulta_id == consulta_id)
+        .first(),
+        db.query(ProcedimentoConsulta.id)
+        .filter(
+            ProcedimentoConsulta.tenant_id == tenant_id,
+            ProcedimentoConsulta.consulta_id == consulta_id,
+        )
+        .first(),
+        db.query(FotoClinica.id)
+        .filter(
+            FotoClinica.tenant_id == tenant_id, FotoClinica.consulta_id == consulta_id
+        )
+        .first(),
+        db.query(VacinaRegistro.id)
+        .filter(
+            VacinaRegistro.tenant_id == tenant_id,
+            VacinaRegistro.consulta_id == consulta_id,
+        )
+        .first(),
+        db.query(InternacaoVet.id)
+        .filter(
+            InternacaoVet.tenant_id == tenant_id,
+            InternacaoVet.consulta_id == consulta_id,
+        )
+        .first(),
+        db.query(PesoRegistro.id)
+        .filter(
+            PesoRegistro.tenant_id == tenant_id, PesoRegistro.consulta_id == consulta_id
+        )
+        .first(),
     )
     return any(item is not None for item in checagens)
 

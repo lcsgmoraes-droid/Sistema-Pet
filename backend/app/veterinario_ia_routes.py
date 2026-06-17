@@ -1,4 +1,5 @@
-﻿"""Rotas do assistente IA veterinario."""
+"""Rotas do assistente IA veterinario."""
+
 from datetime import datetime
 from typing import Optional
 
@@ -24,7 +25,11 @@ from .veterinario_ia import (
     _tentar_resposta_llm_veterinaria,
 )
 from .veterinario_models import ConsultaVet, ExameVet, MedicamentoCatalogo
-from .veterinario_schemas import ExameChatPayload, VetAssistenteIAPayload, VetMensagemFeedbackPayload
+from .veterinario_schemas import (
+    ExameChatPayload,
+    VetAssistenteIAPayload,
+    VetMensagemFeedbackPayload,
+)
 
 router = APIRouter()
 
@@ -32,7 +37,11 @@ router = APIRouter()
 # CHAT IA — interpretação clínica conversacional de exames
 # ═══════════════════════════════════════════════════════════════
 
-@router.post("/ia/assistente", summary="Assistente IA veterinário (livre ou vinculado ao atendimento)")
+
+@router.post(
+    "/ia/assistente",
+    summary="Assistente IA veterinário (livre ou vinculado ao atendimento)",
+)
 def assistente_ia_veterinario(
     payload: VetAssistenteIAPayload,
     db: Session = Depends(get_session),
@@ -49,23 +58,43 @@ def assistente_ia_veterinario(
     exame = None
 
     if payload.pet_id:
-        pet = db.query(Pet).filter(Pet.id == payload.pet_id, Pet.tenant_id == tenant_id).first()
+        pet = (
+            db.query(Pet)
+            .filter(Pet.id == payload.pet_id, Pet.tenant_id == tenant_id)
+            .first()
+        )
 
     if payload.consulta_id:
-        consulta = db.query(ConsultaVet).filter(
-            ConsultaVet.id == payload.consulta_id,
-            ConsultaVet.tenant_id == tenant_id,
-        ).first()
+        consulta = (
+            db.query(ConsultaVet)
+            .filter(
+                ConsultaVet.id == payload.consulta_id,
+                ConsultaVet.tenant_id == tenant_id,
+            )
+            .first()
+        )
         if consulta and not pet:
-            pet = db.query(Pet).filter(Pet.id == consulta.pet_id, Pet.tenant_id == tenant_id).first()
+            pet = (
+                db.query(Pet)
+                .filter(Pet.id == consulta.pet_id, Pet.tenant_id == tenant_id)
+                .first()
+            )
 
     if payload.exame_id:
-        exame = db.query(ExameVet).filter(
-            ExameVet.id == payload.exame_id,
-            ExameVet.tenant_id == tenant_id,
-        ).first()
+        exame = (
+            db.query(ExameVet)
+            .filter(
+                ExameVet.id == payload.exame_id,
+                ExameVet.tenant_id == tenant_id,
+            )
+            .first()
+        )
         if exame and not pet:
-            pet = db.query(Pet).filter(Pet.id == exame.pet_id, Pet.tenant_id == tenant_id).first()
+            pet = (
+                db.query(Pet)
+                .filter(Pet.id == exame.pet_id, Pet.tenant_id == tenant_id)
+                .first()
+            )
 
     especie = payload.especie or (pet.especie if pet else None)
     peso_kg = payload.peso_kg
@@ -74,16 +103,26 @@ def assistente_ia_veterinario(
             peso_kg = float(pet.peso)
         except Exception:
             peso_kg = None
-    if (not peso_kg or peso_kg <= 0) and consulta and getattr(consulta, "peso_consulta", None):
+    if (
+        (not peso_kg or peso_kg <= 0)
+        and consulta
+        and getattr(consulta, "peso_consulta", None)
+    ):
         try:
             peso_kg = float(consulta.peso_consulta)
         except Exception:
             peso_kg = None
 
-    meds = db.query(MedicamentoCatalogo).filter(
-        MedicamentoCatalogo.tenant_id == tenant_id,
-        MedicamentoCatalogo.ativo == True,  # noqa
-    ).order_by(MedicamentoCatalogo.nome).limit(200).all()
+    meds = (
+        db.query(MedicamentoCatalogo)
+        .filter(
+            MedicamentoCatalogo.tenant_id == tenant_id,
+            MedicamentoCatalogo.ativo == True,  # noqa
+        )
+        .order_by(MedicamentoCatalogo.nome)
+        .limit(200)
+        .all()
+    )
 
     conversa = None
     memoria = []
@@ -169,7 +208,9 @@ def assistente_ia_veterinario(
         if resp_sintomas:
             respostas.append(resp_sintomas)
 
-        resp_plano = _montar_resposta_plano_estruturado(mensagem_analise, pet, consulta, exame)
+        resp_plano = _montar_resposta_plano_estruturado(
+            mensagem_analise, pet, consulta, exame
+        )
         if resp_plano:
             respostas.append(resp_plano)
 
@@ -181,7 +222,9 @@ def assistente_ia_veterinario(
                 contexto.append(f"espécie: {especie}")
             if peso_kg:
                 contexto.append(f"peso: {peso_kg:.2f} kg")
-            contexto_txt = " | ".join(contexto) if contexto else "sem contexto clínico selecionado"
+            contexto_txt = (
+                " | ".join(contexto) if contexto else "sem contexto clínico selecionado"
+            )
 
             respostas.append(
                 "Posso te ajudar com: cálculo de dose por mg/kg, avaliação de associação medicamentosa, "
@@ -208,22 +251,26 @@ def assistente_ia_veterinario(
 
     if payload.salvar_historico and conversa:
         try:
-            db.add(MensagemChat(
-                tenant_id=str(tenant_id),
-                conversa_id=conversa.id,
-                tipo="usuario",
-                conteudo=mensagem,
-                modelo_usado=modelo_usado,
-                contexto_usado=contexto_msg,
-            ))
-            db.add(MensagemChat(
-                tenant_id=str(tenant_id),
-                conversa_id=conversa.id,
-                tipo="assistente",
-                conteudo=resposta_final,
-                modelo_usado=modelo_usado,
-                contexto_usado={**contexto_msg, "feedback": None},
-            ))
+            db.add(
+                MensagemChat(
+                    tenant_id=str(tenant_id),
+                    conversa_id=conversa.id,
+                    tipo="usuario",
+                    conteudo=mensagem,
+                    modelo_usado=modelo_usado,
+                    contexto_usado=contexto_msg,
+                )
+            )
+            db.add(
+                MensagemChat(
+                    tenant_id=str(tenant_id),
+                    conversa_id=conversa.id,
+                    tipo="assistente",
+                    conteudo=resposta_final,
+                    modelo_usado=modelo_usado,
+                    contexto_usado={**contexto_msg, "feedback": None},
+                )
+            )
             conversa.atualizado_em = datetime.utcnow()
             db.commit()
             historico_salvo = True
@@ -259,52 +306,87 @@ def listar_conversas_assistente_vet(
     user, tenant_id = _get_tenant(current)
     _garantir_tabelas_memoria_ia(db)
 
-    conversas = db.query(Conversa).filter(
-        Conversa.tenant_id == str(tenant_id),
-        Conversa.usuario_id == user.id,
-    ).order_by(Conversa.atualizado_em.desc(), Conversa.id.desc()).limit(limit).all()
+    conversas = (
+        db.query(Conversa)
+        .filter(
+            Conversa.tenant_id == str(tenant_id),
+            Conversa.usuario_id == user.id,
+        )
+        .order_by(Conversa.atualizado_em.desc(), Conversa.id.desc())
+        .limit(limit)
+        .all()
+    )
 
     itens = []
     for conversa in conversas:
-        mensagens = db.query(MensagemChat).filter(
-            MensagemChat.tenant_id == str(tenant_id),
-            MensagemChat.conversa_id == conversa.id,
-        ).order_by(MensagemChat.id.asc()).all()
+        mensagens = (
+            db.query(MensagemChat)
+            .filter(
+                MensagemChat.tenant_id == str(tenant_id),
+                MensagemChat.conversa_id == conversa.id,
+            )
+            .order_by(MensagemChat.id.asc())
+            .all()
+        )
 
         if not mensagens:
             continue
 
-        mensagens_vet = [m for m in mensagens if isinstance(m.contexto_usado, dict) and m.contexto_usado.get("modulo") == "vet"]
+        mensagens_vet = [
+            m
+            for m in mensagens
+            if isinstance(m.contexto_usado, dict)
+            and m.contexto_usado.get("modulo") == "vet"
+        ]
         if not mensagens_vet:
             continue
 
         ultima = mensagens[-1]
-        contexto_base = next((m.contexto_usado for m in mensagens_vet if isinstance(m.contexto_usado, dict)), {}) or {}
+        contexto_base = (
+            next(
+                (
+                    m.contexto_usado
+                    for m in mensagens_vet
+                    if isinstance(m.contexto_usado, dict)
+                ),
+                {},
+            )
+            or {}
+        )
 
         if pet_id and int(contexto_base.get("pet_id") or 0) != int(pet_id):
             continue
-        if consulta_id and int(contexto_base.get("consulta_id") or 0) != int(consulta_id):
+        if consulta_id and int(contexto_base.get("consulta_id") or 0) != int(
+            consulta_id
+        ):
             continue
         if exame_id and int(contexto_base.get("exame_id") or 0) != int(exame_id):
             continue
 
-        itens.append({
-            "id": conversa.id,
-            "titulo": conversa.titulo,
-            "atualizado_em": conversa.atualizado_em.isoformat() if conversa.atualizado_em else None,
-            "ultima_mensagem": (ultima.conteudo or "")[:180],
-            "contexto": {
-                "modo": contexto_base.get("modo"),
-                "pet_id": contexto_base.get("pet_id"),
-                "consulta_id": contexto_base.get("consulta_id"),
-                "exame_id": contexto_base.get("exame_id"),
-            },
-        })
+        itens.append(
+            {
+                "id": conversa.id,
+                "titulo": conversa.titulo,
+                "atualizado_em": conversa.atualizado_em.isoformat()
+                if conversa.atualizado_em
+                else None,
+                "ultima_mensagem": (ultima.conteudo or "")[:180],
+                "contexto": {
+                    "modo": contexto_base.get("modo"),
+                    "pet_id": contexto_base.get("pet_id"),
+                    "consulta_id": contexto_base.get("consulta_id"),
+                    "exame_id": contexto_base.get("exame_id"),
+                },
+            }
+        )
 
     return {"items": itens}
 
 
-@router.get("/ia/conversas/{conversa_id}/mensagens", summary="Lista mensagens de uma conversa IA veterinária")
+@router.get(
+    "/ia/conversas/{conversa_id}/mensagens",
+    summary="Lista mensagens de uma conversa IA veterinária",
+)
 def listar_mensagens_conversa_assistente_vet(
     conversa_id: int,
     db: Session = Depends(get_session),
@@ -313,43 +395,59 @@ def listar_mensagens_conversa_assistente_vet(
     user, tenant_id = _get_tenant(current)
     _garantir_tabelas_memoria_ia(db)
 
-    conversa = db.query(Conversa).filter(
-        Conversa.id == conversa_id,
-        Conversa.tenant_id == str(tenant_id),
-        Conversa.usuario_id == user.id,
-    ).first()
+    conversa = (
+        db.query(Conversa)
+        .filter(
+            Conversa.id == conversa_id,
+            Conversa.tenant_id == str(tenant_id),
+            Conversa.usuario_id == user.id,
+        )
+        .first()
+    )
     if not conversa:
         raise HTTPException(404, "Conversa não encontrada.")
 
-    mensagens = db.query(MensagemChat).filter(
-        MensagemChat.tenant_id == str(tenant_id),
-        MensagemChat.conversa_id == conversa_id,
-    ).order_by(MensagemChat.id.asc()).all()
+    mensagens = (
+        db.query(MensagemChat)
+        .filter(
+            MensagemChat.tenant_id == str(tenant_id),
+            MensagemChat.conversa_id == conversa_id,
+        )
+        .order_by(MensagemChat.id.asc())
+        .all()
+    )
 
     itens = []
     for msg in mensagens:
         contexto = msg.contexto_usado if isinstance(msg.contexto_usado, dict) else {}
         if contexto.get("modulo") != "vet":
             continue
-        itens.append({
-            "id": msg.id,
-            "tipo": msg.tipo,
-            "conteudo": msg.conteudo,
-            "criado_em": msg.criado_em.isoformat() if msg.criado_em else None,
-            "feedback": contexto.get("feedback"),
-        })
+        itens.append(
+            {
+                "id": msg.id,
+                "tipo": msg.tipo,
+                "conteudo": msg.conteudo,
+                "criado_em": msg.criado_em.isoformat() if msg.criado_em else None,
+                "feedback": contexto.get("feedback"),
+            }
+        )
 
     return {
         "conversa": {
             "id": conversa.id,
             "titulo": conversa.titulo,
-            "atualizado_em": conversa.atualizado_em.isoformat() if conversa.atualizado_em else None,
+            "atualizado_em": conversa.atualizado_em.isoformat()
+            if conversa.atualizado_em
+            else None,
         },
         "items": itens,
     }
 
 
-@router.post("/ia/mensagens/{mensagem_id}/feedback", summary="Registra feedback da resposta da IA veterinária")
+@router.post(
+    "/ia/mensagens/{mensagem_id}/feedback",
+    summary="Registra feedback da resposta da IA veterinária",
+)
 def registrar_feedback_mensagem_assistente_vet(
     mensagem_id: int,
     payload: VetMensagemFeedbackPayload,
@@ -359,19 +457,24 @@ def registrar_feedback_mensagem_assistente_vet(
     user, tenant_id = _get_tenant(current)
     _garantir_tabelas_memoria_ia(db)
 
-    mensagem = db.query(MensagemChat).join(
-        Conversa, Conversa.id == MensagemChat.conversa_id
-    ).filter(
-        MensagemChat.id == mensagem_id,
-        MensagemChat.tenant_id == str(tenant_id),
-        Conversa.usuario_id == user.id,
-    ).first()
+    mensagem = (
+        db.query(MensagemChat)
+        .join(Conversa, Conversa.id == MensagemChat.conversa_id)
+        .filter(
+            MensagemChat.id == mensagem_id,
+            MensagemChat.tenant_id == str(tenant_id),
+            Conversa.usuario_id == user.id,
+        )
+        .first()
+    )
     if not mensagem:
         raise HTTPException(404, "Mensagem não encontrada.")
     if mensagem.tipo != "assistente":
         raise HTTPException(400, "Feedback só pode ser registrado em respostas da IA.")
 
-    contexto = mensagem.contexto_usado if isinstance(mensagem.contexto_usado, dict) else {}
+    contexto = (
+        mensagem.contexto_usado if isinstance(mensagem.contexto_usado, dict) else {}
+    )
     if contexto.get("modulo") != "vet":
         raise HTTPException(400, "Mensagem não pertence ao assistente veterinário.")
 
@@ -388,7 +491,10 @@ def registrar_feedback_mensagem_assistente_vet(
     return {"ok": True, "mensagem_id": mensagem.id, "feedback": contexto["feedback"]}
 
 
-@router.get("/ia/memoria-status", summary="Verifica e prepara tabelas de memória da IA veterinária")
+@router.get(
+    "/ia/memoria-status",
+    summary="Verifica e prepara tabelas de memória da IA veterinária",
+)
 def memoria_status_assistente_vet(
     db: Session = Depends(get_session),
     current=Depends(get_current_user_and_tenant),
@@ -398,7 +504,9 @@ def memoria_status_assistente_vet(
     return status_memoria
 
 
-@router.post("/exames/{exame_id}/chat", summary="Chat clínico conversacional sobre um exame")
+@router.post(
+    "/exames/{exame_id}/chat", summary="Chat clínico conversacional sobre um exame"
+)
 def chat_exame_ia(
     exame_id: int,
     payload: ExameChatPayload,
@@ -411,10 +519,14 @@ def chat_exame_ia(
     """
     user, tenant_id = _get_tenant(current)
 
-    exame = db.query(ExameVet).filter(
-        ExameVet.id == exame_id,
-        ExameVet.tenant_id == tenant_id,
-    ).first()
+    exame = (
+        db.query(ExameVet)
+        .filter(
+            ExameVet.id == exame_id,
+            ExameVet.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not exame:
         raise HTTPException(404, "Exame não encontrado.")
 

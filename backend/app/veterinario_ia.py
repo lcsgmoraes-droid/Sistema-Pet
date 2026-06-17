@@ -16,13 +16,19 @@ def _normalizar_texto(v: Optional[str]) -> str:
     return (v or "").strip().lower()
 
 
-def _detectar_medicamentos_no_texto(texto: str, meds: list[MedicamentoCatalogo]) -> list[MedicamentoCatalogo]:
+def _detectar_medicamentos_no_texto(
+    texto: str, meds: list[MedicamentoCatalogo]
+) -> list[MedicamentoCatalogo]:
     encontrados: list[MedicamentoCatalogo] = []
     for med in meds:
         nome = _normalizar_texto(med.nome)
         nome_comercial = _normalizar_texto(med.nome_comercial)
         principio = _normalizar_texto(med.principio_ativo)
-        if (nome and nome in texto) or (nome_comercial and nome_comercial in texto) or (principio and principio in texto):
+        if (
+            (nome and nome in texto)
+            or (nome_comercial and nome_comercial in texto)
+            or (principio and principio in texto)
+        ):
             encontrados.append(med)
         if len(encontrados) >= 2:
             break
@@ -54,11 +60,19 @@ def _garantir_tabelas_memoria_ia(db: Session) -> dict:
     return {"ok": True, "criadas": criadas}
 
 
-def _carregar_memoria_conversa(db: Session, tenant_id, conversa_id: int, limite: int = 8) -> list[MensagemChat]:
-    return db.query(MensagemChat).filter(
-        MensagemChat.tenant_id == str(tenant_id),
-        MensagemChat.conversa_id == conversa_id,
-    ).order_by(MensagemChat.id.desc()).limit(limite).all()[::-1]
+def _carregar_memoria_conversa(
+    db: Session, tenant_id, conversa_id: int, limite: int = 8
+) -> list[MensagemChat]:
+    return (
+        db.query(MensagemChat)
+        .filter(
+            MensagemChat.tenant_id == str(tenant_id),
+            MensagemChat.conversa_id == conversa_id,
+        )
+        .order_by(MensagemChat.id.desc())
+        .limit(limite)
+        .all()[::-1]
+    )
 
 
 def _obter_ou_criar_conversa_vet(
@@ -71,11 +85,15 @@ def _obter_ou_criar_conversa_vet(
     exame: Optional[ExameVet],
 ) -> Conversa:
     if payload.conversa_id:
-        conversa = db.query(Conversa).filter(
-            Conversa.id == payload.conversa_id,
-            Conversa.tenant_id == str(tenant_id),
-            Conversa.usuario_id == user_id,
-        ).first()
+        conversa = (
+            db.query(Conversa)
+            .filter(
+                Conversa.id == payload.conversa_id,
+                Conversa.tenant_id == str(tenant_id),
+                Conversa.usuario_id == user_id,
+            )
+            .first()
+        )
         if conversa:
             return conversa
 
@@ -149,7 +167,11 @@ def _montar_resposta_dose(
         nome = _normalizar_texto(med.nome)
         nome_comercial = _normalizar_texto(med.nome_comercial)
         principio = _normalizar_texto(med.principio_ativo)
-        if (nome and nome in texto) or (nome_comercial and nome_comercial in texto) or (principio and principio in texto):
+        if (
+            (nome and nome in texto)
+            or (nome_comercial and nome_comercial in texto)
+            or (principio and principio in texto)
+        ):
             med_match = med
             break
 
@@ -193,7 +215,9 @@ def _montar_resposta_interacao(
     medicamento_2: Optional[str],
 ) -> Optional[str]:
     texto = _normalizar_texto(mensagem)
-    if not any(k in texto for k in ["associar", "junto", "intera", "combinar", "pode usar com"]):
+    if not any(
+        k in texto for k in ["associar", "junto", "intera", "combinar", "pode usar com"]
+    ):
         return None
 
     med_a = None
@@ -206,9 +230,13 @@ def _montar_resposta_interacao(
             nome = _normalizar_texto(med.nome)
             nome_comercial = _normalizar_texto(med.nome_comercial)
             principio = _normalizar_texto(med.principio_ativo)
-            if not med_a and (m1 == nome or m1 == nome_comercial or m1 == principio or m1 in nome):
+            if not med_a and (
+                m1 == nome or m1 == nome_comercial or m1 == principio or m1 in nome
+            ):
                 med_a = med
-            if not med_b and (m2 == nome or m2 == nome_comercial or m2 == principio or m2 in nome):
+            if not med_b and (
+                m2 == nome or m2 == nome_comercial or m2 == principio or m2 in nome
+            ):
                 med_b = med
     else:
         encontrados = _detectar_medicamentos_no_texto(texto, meds)
@@ -228,11 +256,17 @@ def _montar_resposta_interacao(
         )
 
     riscos = []
-    texto_interacoes = f"{_normalizar_texto(med_a.interacoes)} {_normalizar_texto(med_b.interacoes)}"
+    texto_interacoes = (
+        f"{_normalizar_texto(med_a.interacoes)} {_normalizar_texto(med_b.interacoes)}"
+    )
     if principio_a and principio_a in texto_interacoes:
-        riscos.append(f"{med_b.nome} cita interação relevante com o princípio {med_a.principio_ativo}.")
+        riscos.append(
+            f"{med_b.nome} cita interação relevante com o princípio {med_a.principio_ativo}."
+        )
     if principio_b and principio_b in texto_interacoes:
-        riscos.append(f"{med_a.nome} cita interação relevante com o princípio {med_b.principio_ativo}.")
+        riscos.append(
+            f"{med_a.nome} cita interação relevante com o princípio {med_b.principio_ativo}."
+        )
 
     if riscos:
         return (
@@ -249,19 +283,50 @@ def _montar_resposta_interacao(
 
 def _montar_resposta_sintomas(mensagem: str, especie: Optional[str]) -> Optional[str]:
     texto = _normalizar_texto(mensagem)
-    gatilhos = ["sintoma", "possibilidade", "diagnóstico", "hipótese", "o que olhar", "investigar"]
+    gatilhos = [
+        "sintoma",
+        "possibilidade",
+        "diagnóstico",
+        "hipótese",
+        "o que olhar",
+        "investigar",
+    ]
     if not any(k in texto for k in gatilhos):
         return None
 
     mapa = {
-        "vomit": ["gastroenterite", "ingestão alimentar inadequada", "pancreatite", "corpo estranho"],
-        "diarre": ["parasitoses", "gastroenterite", "disbiose", "doença inflamatória intestinal"],
-        "tosse": ["traqueobronquite", "colapso de traqueia", "cardiopatia", "pneumonia"],
-        "febre": ["processo infeccioso", "inflamação sistêmica", "doença transmitida por vetor"],
+        "vomit": [
+            "gastroenterite",
+            "ingestão alimentar inadequada",
+            "pancreatite",
+            "corpo estranho",
+        ],
+        "diarre": [
+            "parasitoses",
+            "gastroenterite",
+            "disbiose",
+            "doença inflamatória intestinal",
+        ],
+        "tosse": [
+            "traqueobronquite",
+            "colapso de traqueia",
+            "cardiopatia",
+            "pneumonia",
+        ],
+        "febre": [
+            "processo infeccioso",
+            "inflamação sistêmica",
+            "doença transmitida por vetor",
+        ],
         "apat": ["dor", "infecção", "anemia", "distúrbio metabólico"],
         "prur": ["dermatite alérgica", "ectoparasitas", "infecção cutânea secundária"],
         "poliuria": ["doença renal", "diabetes mellitus", "hiperadrenocorticismo"],
-        "convuls": ["epilepsia", "distúrbio metabólico", "intoxicação", "doença intracraniana"],
+        "convuls": [
+            "epilepsia",
+            "distúrbio metabólico",
+            "intoxicação",
+            "doença intracraniana",
+        ],
     }
 
     hipoteses = []
@@ -298,7 +363,13 @@ def _montar_resposta_plano_estruturado(
     exame: Optional[ExameVet],
 ) -> Optional[str]:
     texto = _normalizar_texto(mensagem)
-    gatilhos = ["plano", "conduta", "fechar diagnóstico", "fechar diagnostico", "o que fazer agora"]
+    gatilhos = [
+        "plano",
+        "conduta",
+        "fechar diagnóstico",
+        "fechar diagnostico",
+        "o que fazer agora",
+    ]
     if not any(k in texto for k in gatilhos):
         return None
 
@@ -334,7 +405,9 @@ def _montar_prompt_vet_llm(
     modo: Optional[str],
 ) -> tuple[str, str]:
     especie_txt = (especie or "não informada").strip()
-    peso_txt = f"{float(peso_kg):.2f} kg" if peso_kg and peso_kg > 0 else "não informado"
+    peso_txt = (
+        f"{float(peso_kg):.2f} kg" if peso_kg and peso_kg > 0 else "não informado"
+    )
 
     meds_preview = []
     for med in meds[:20]:
@@ -342,12 +415,23 @@ def _montar_prompt_vet_llm(
         if med.principio_ativo:
             partes.append(f"princípio: {med.principio_ativo}")
         if med.dose_min_mgkg is not None or med.dose_max_mgkg is not None:
-            dmin = med.dose_min_mgkg if med.dose_min_mgkg is not None else med.dose_max_mgkg
-            dmax = med.dose_max_mgkg if med.dose_max_mgkg is not None else med.dose_min_mgkg
+            dmin = (
+                med.dose_min_mgkg
+                if med.dose_min_mgkg is not None
+                else med.dose_max_mgkg
+            )
+            dmax = (
+                med.dose_max_mgkg
+                if med.dose_max_mgkg is not None
+                else med.dose_min_mgkg
+            )
             partes.append(f"dose mg/kg: {dmin} a {dmax}")
         meds_preview.append(" | ".join(partes))
 
-    contexto_clinico = _resumo_contexto_clinico(pet, consulta, exame) or "Sem contexto clínico detalhado."
+    contexto_clinico = (
+        _resumo_contexto_clinico(pet, consulta, exame)
+        or "Sem contexto clínico detalhado."
+    )
 
     prompt_system = (
         "Você é um assistente clínico veterinário para apoio à decisão. "
@@ -443,7 +527,11 @@ def _tentar_resposta_llm_veterinaria(
             genai.configure(api_key=gemini_key)
             model_ia = genai.GenerativeModel("gemini-1.5-flash")
             historico_txt = "\n".join(
-                [f"{msg['role']}: {msg['content']}" for msg in mensagens if msg["role"] != "system"]
+                [
+                    f"{msg['role']}: {msg['content']}"
+                    for msg in mensagens
+                    if msg["role"] != "system"
+                ]
             )
             prompt_completo = f"{prompt_system}\n\n{historico_txt}"
             response = model_ia.generate_content(prompt_completo)
@@ -482,11 +570,25 @@ def _responder_chat_exame(
         conclusao_ia = resumo_ia
 
     alertas_mensagens = [a.get("mensagem", "") for a in alertas if isinstance(a, dict)]
-    achados_imagem = payload_ia.get("achados_imagem") if isinstance(payload_ia, dict) else []
+    achados_imagem = (
+        payload_ia.get("achados_imagem") if isinstance(payload_ia, dict) else []
+    )
     limitacoes = payload_ia.get("limitacoes") if isinstance(payload_ia, dict) else []
-    conduta_sugerida = payload_ia.get("conduta_sugerida") if isinstance(payload_ia, dict) else []
+    conduta_sugerida = (
+        payload_ia.get("conduta_sugerida") if isinstance(payload_ia, dict) else []
+    )
 
-    if any(k in pergunta for k in ["resumo", "resumir", "explicar", "o que diz", "o que significa", "resultado"]):
+    if any(
+        k in pergunta
+        for k in [
+            "resumo",
+            "resumir",
+            "explicar",
+            "o que diz",
+            "o que significa",
+            "resultado",
+        ]
+    ):
         if not texto_resultado and not dados_json:
             return f"O exame '{exame_nome}' ainda não tem resultado registrado. Adicione o resultado antes de solicitar a interpretação."
         partes = []
@@ -496,20 +598,41 @@ def _responder_chat_exame(
             partes.append(f"**Detalhes:** {resumo_ia}")
         if alertas_mensagens:
             partes.append("**Alertas encontrados:** " + "; ".join(alertas_mensagens))
-        return "\n\n".join(partes) if partes else "Nenhuma interpretação disponível ainda."
+        return (
+            "\n\n".join(partes) if partes else "Nenhuma interpretação disponível ainda."
+        )
 
-    if any(k in pergunta for k in ["alerta", "preocupante", "crítico", "grave", "urgente", "emergência"]):
+    if any(
+        k in pergunta
+        for k in ["alerta", "preocupante", "crítico", "grave", "urgente", "emergência"]
+    ):
         if not alertas:
             return f"A triagem automática do exame '{exame_nome}' não encontrou alertas críticos. Isso não substitui a avaliação clínica — verifique os valores numericamente se disponíveis."
-        msgs = "\n- ".join(alertas_mensagens) if alertas_mensagens else "Alertas detectados, mas sem detalhes textuais."
+        msgs = (
+            "\n- ".join(alertas_mensagens)
+            if alertas_mensagens
+            else "Alertas detectados, mas sem detalhes textuais."
+        )
         return f"**Pontos de atenção encontrados no exame {exame_nome}:**\n\n- {msgs}\n\nRecomendo revisão clínica presencial."
 
-    if any(k in pergunta for k in ["normal", "status", "tudo certo", "está bem", "dentro do normal"]):
+    if any(
+        k in pergunta
+        for k in ["normal", "status", "tudo certo", "está bem", "dentro do normal"]
+    ):
         if not alertas:
             return f"A triagem automática não encontrou valores fora do padrão em '{exame_nome}'. O exame parece dentro da normalidade pelos critérios automatizados — confirme com avaliação clínica."
         return f"Foram encontrados {len(alertas)} ponto(s) de atenção: {resumo_ia}. Revise os valores clínicamente."
 
-    if any(k in pergunta for k in ["próximo passo", "conduta", "tratamento", "o que fazer", "recomendação"]):
+    if any(
+        k in pergunta
+        for k in [
+            "próximo passo",
+            "conduta",
+            "tratamento",
+            "o que fazer",
+            "recomendação",
+        ]
+    ):
         if alertas:
             return (
                 f"Com base nos alertas encontrados em '{exame_nome}' ({especie}), a conduta sugerida é:\n\n"
@@ -527,7 +650,10 @@ def _responder_chat_exame(
             f"3. Repetir o exame conforme evolução clínica\n"
         )
 
-    if any(k in pergunta for k in ["alergia", "medicamento", "contraindicado", "intolerância"]):
+    if any(
+        k in pergunta
+        for k in ["alergia", "medicamento", "contraindicado", "intolerância"]
+    ):
         if alergias:
             lista_al = ", ".join(alergias)
             return (
@@ -540,7 +666,9 @@ def _responder_chat_exame(
         dados_hemo = {
             k: v
             for k, v in dados_json.items()
-            if any(t in k.lower() for t in ["leuco", "eritro", "hemo", "plaqueta", "glob"])
+            if any(
+                t in k.lower() for t in ["leuco", "eritro", "hemo", "plaqueta", "glob"]
+            )
         }
         if dados_hemo:
             linhas = "\n".join(f"- {k}: {v}" for k, v in dados_hemo.items())
@@ -551,23 +679,39 @@ def _responder_chat_exame(
         dados_renal = {
             k: v
             for k, v in dados_json.items()
-            if any(t in k.lower() for t in ["creat", "ureia", "uria", "rim", "renal", "tgo", "tgp"])
+            if any(
+                t in k.lower()
+                for t in ["creat", "ureia", "uria", "rim", "renal", "tgo", "tgp"]
+            )
         }
         if dados_renal:
             linhas = "\n".join(f"- {k}: {v}" for k, v in dados_renal.items())
             return f"Valores relacionados à função renal/hepática:\n{linhas}\n\n{resumo_ia or 'Consulte a interpretação automática.'}"
         return "Não há parâmetros renais estruturados no resultado. Verifique o laudo original."
 
-    if any(k in pergunta for k in ["imagem", "raio", "ultrassom", "eco", "rx", "radiografia"]):
+    if any(
+        k in pergunta
+        for k in ["imagem", "raio", "ultrassom", "eco", "rx", "radiografia"]
+    ):
         if tipo_exame in {"radiografia", "ultrassom", "ecocardiograma", "imagem"}:
             if achados_imagem:
                 partes = [
                     f"**Achados sugeridos pela análise do arquivo em '{exame_nome}':**",
-                    "\n- " + "\n- ".join(str(item) for item in achados_imagem if str(item).strip()),
+                    "\n- "
+                    + "\n- ".join(
+                        str(item) for item in achados_imagem if str(item).strip()
+                    ),
                 ]
                 if limitacoes:
-                    partes.append("\n**Limitações:** " + "; ".join(str(item) for item in limitacoes if str(item).strip()))
-                partes.append("\nConfirme sempre com o laudo do especialista e a correlação clínica.")
+                    partes.append(
+                        "\n**Limitações:** "
+                        + "; ".join(
+                            str(item) for item in limitacoes if str(item).strip()
+                        )
+                    )
+                partes.append(
+                    "\nConfirme sempre com o laudo do especialista e a correlação clínica."
+                )
                 return "".join(partes)
             return (
                 f"O exame '{exame_nome}' é do tipo imagem. "
@@ -581,7 +725,9 @@ def _responder_chat_exame(
     if conclusao_ia:
         partes_resposta.append(f"\n**Interpretação automática:** {conclusao_ia}")
     if alertas_mensagens:
-        partes_resposta.append(f"\n**Pontos de atenção:** {'; '.join(alertas_mensagens)}")
+        partes_resposta.append(
+            f"\n**Pontos de atenção:** {'; '.join(alertas_mensagens)}"
+        )
     if not conclusao_ia and not alertas:
         if tem_arquivo:
             partes_resposta.append(
