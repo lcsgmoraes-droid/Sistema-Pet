@@ -25,7 +25,9 @@ class BlingPedidoWebhookEvent(Base):
     status = Column(String(24), nullable=False, default="pending", index=True)
     attempts = Column(Integer, nullable=False, default=0)
     max_attempts = Column(Integer, nullable=False, default=6)
-    next_attempt_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    next_attempt_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
     started_at = Column(DateTime(timezone=True), nullable=True)
     processed_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -33,5 +35,12 @@ class BlingPedidoWebhookEvent(Base):
     response_payload = Column(JSON, nullable=True)
     last_error = Column(Text, nullable=True)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )

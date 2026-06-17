@@ -16,7 +16,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def sincronizar_bling_background(produto_id: int, estoque_novo: float, motivo: str = "") -> None:
+def sincronizar_bling_background(
+    produto_id: int, estoque_novo: float, motivo: str = ""
+) -> None:
     """
     Enfileira sincronização de estoque com o Bling em fila persistente.
 
@@ -38,4 +40,8 @@ def sincronizar_bling_background(produto_id: int, estoque_novo: float, motivo: s
             origem="evento",
         )
     except Exception as error:
-        logger.warning("⚠️ Não foi possível enfileirar sync Bling (produto_id=%s): %s", produto_id, error)
+        logger.warning(
+            "⚠️ Não foi possível enfileirar sync Bling (produto_id=%s): %s",
+            produto_id,
+            error,
+        )

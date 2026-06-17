@@ -699,6 +699,20 @@ def test_backend_ci_has_blocking_backend_routes_format_step():
     )
 
 
+def test_backend_ci_has_blocking_backend_integrations_racoes_pdv_root_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend integrations racoes pdv root format (blocking)" in source
+    assert (
+        "ruff format --check app/bling_estoque_sync.py "
+        "app/bling_flow_monitor_models.py "
+        "app/bling_pedido_webhook_queue_models.py app/integracao_bling_models.py "
+        "app/integracao_bling_webhook_routes.py app/ml_racoes_routes.py "
+        "app/pdv_ai_routes.py app/pdv_indicadores_routes.py "
+        "app/pdv_racoes_routes.py app/sugestoes_racoes_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_backend_ai_packages_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
