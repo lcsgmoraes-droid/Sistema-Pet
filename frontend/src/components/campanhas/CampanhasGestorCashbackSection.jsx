@@ -43,9 +43,7 @@ export default function CampanhasGestorCashbackSection({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Tipo
-              </label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
               <select
                 value={gestorCashbackTipo}
                 onChange={(e) => setGestorCashbackTipo(e.target.value)}
@@ -57,9 +55,7 @@ export default function CampanhasGestorCashbackSection({
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Valor (R$)
-              </label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Valor (R$)</label>
               <input
                 type="number"
                 min="0.01"

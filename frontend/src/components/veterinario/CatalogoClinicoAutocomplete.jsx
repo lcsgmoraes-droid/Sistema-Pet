@@ -22,13 +22,10 @@ export default function CatalogoClinicoAutocomplete({
 
   const opcoes = useMemo(
     () => montarOpcoesCatalogoClinico({ medicamentos, procedimentos }),
-    [medicamentos, procedimentos]
+    [medicamentos, procedimentos],
   );
 
-  const sugestoes = useMemo(
-    () => filtrarCatalogoClinico(opcoes, value),
-    [opcoes, value]
-  );
+  const sugestoes = useMemo(() => filtrarCatalogoClinico(opcoes, value), [opcoes, value]);
 
   useEffect(() => {
     const handleClickFora = (event) => {
@@ -109,9 +106,13 @@ export default function CatalogoClinicoAutocomplete({
       {aberto && !disabled ? (
         <div className="absolute z-40 mt-2 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
           {!termoSuficiente ? (
-            <div className="px-4 py-3 text-sm text-slate-500">Digite pelo menos 2 letras para buscar.</div>
+            <div className="px-4 py-3 text-sm text-slate-500">
+              Digite pelo menos 2 letras para buscar.
+            </div>
           ) : sugestoes.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-slate-500">Nenhum item encontrado. Voce pode manter o texto digitado.</div>
+            <div className="px-4 py-3 text-sm text-slate-500">
+              Nenhum item encontrado. Voce pode manter o texto digitado.
+            </div>
           ) : (
             sugestoes.map((opcao) => (
               <button
@@ -121,16 +122,22 @@ export default function CatalogoClinicoAutocomplete({
                 className="w-full border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50"
               >
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-semibold text-slate-800">{opcao.label}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                    opcao.tipo === "medicamento"
-                      ? "bg-blue-50 text-blue-700"
-                      : "bg-purple-50 text-purple-700"
-                  }`}>
+                  <span className="truncate text-sm font-semibold text-slate-800">
+                    {opcao.label}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      opcao.tipo === "medicamento"
+                        ? "bg-blue-50 text-blue-700"
+                        : "bg-purple-50 text-purple-700"
+                    }`}
+                  >
                     {opcao.tipo}
                   </span>
                 </div>
-                {opcao.meta ? <div className="mt-0.5 truncate text-xs text-slate-500">{opcao.meta}</div> : null}
+                {opcao.meta ? (
+                  <div className="mt-0.5 truncate text-xs text-slate-500">{opcao.meta}</div>
+                ) : null}
               </button>
             ))
           )}

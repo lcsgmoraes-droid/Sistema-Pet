@@ -43,9 +43,8 @@ function CampanhasCanaisBeneficioSection({ paramsEditando, setParamsEditando }) 
             Canais que geram beneficio
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            Marque onde esta campanha pode liberar carimbo, cashback ou cupom
-            pos-compra. Banho & Tosa e Veterinario ficam bloqueados ate serem
-            liberados aqui.
+            Marque onde esta campanha pode liberar carimbo, cashback ou cupom pos-compra. Banho &
+            Tosa e Veterinario ficam bloqueados ate serem liberados aqui.
           </p>
         </div>
         {!explicitConfig && (
@@ -74,12 +73,8 @@ function CampanhasCanaisBeneficioSection({ paramsEditando, setParamsEditando }) 
                 className="mt-0.5 h-4 w-4 accent-indigo-600"
               />
               <span>
-                <span className="block text-sm font-semibold">
-                  {option.label}
-                </span>
-                <span className="block text-xs text-gray-500">
-                  {option.description}
-                </span>
+                <span className="block text-sm font-semibold">{option.label}</span>
+                <span className="block text-xs text-gray-500">{option.description}</span>
               </span>
             </label>
           );
@@ -120,11 +115,7 @@ function withPurchaseBenefitChannels(tipo, content, paramsEditando, setParamsEdi
   );
 }
 
-export default function CampanhasParametrosForm({
-  campanha,
-  paramsEditando,
-  setParamsEditando,
-}) {
+export default function CampanhasParametrosForm({ campanha, paramsEditando, setParamsEditando }) {
   const tipo = campanha.campaign_type;
   const set = (key, val) => setParamsEditando((p) => ({ ...p, [key]: val }));
   const num = (key) => paramsEditando[key] ?? "";
@@ -149,33 +140,20 @@ export default function CampanhasParametrosForm({
   }
 
   if (["birthday", "birthday_customer", "birthday_pet"].includes(tipo)) {
-    return (
-      <CampanhasParametrosBirthdaySection
-        tipo={tipo}
-        num={num}
-        str={str}
-        set={set}
-      />
-    );
+    return <CampanhasParametrosBirthdaySection tipo={tipo} num={num} str={str} set={set} />;
   }
 
   if (tipo === "quick_repurchase") {
     return withPurchaseBenefitChannels(
       tipo,
-      <CampanhasParametrosQuickRepurchaseSection
-        num={num}
-        str={str}
-        set={set}
-      />,
+      <CampanhasParametrosQuickRepurchaseSection num={num} str={str} set={set} />,
       paramsEditando,
       setParamsEditando,
     );
   }
 
   if (tipo === "inactivity") {
-    return (
-      <CampanhasParametrosInactivitySection num={num} str={str} set={set} />
-    );
+    return <CampanhasParametrosInactivitySection num={num} str={str} set={set} />;
   }
 
   if (tipo === "welcome" || tipo === "welcome_app") {

@@ -1,5 +1,4 @@
-import React from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle } from "lucide-react";
 
 const DashboardRacoesRankingVendas = ({ rankingVendas, loadingAnalise }) => {
   if (loadingAnalise) {
@@ -21,12 +20,24 @@ const DashboardRacoesRankingVendas = ({ rankingVendas, loadingAnalise }) => {
         <thead className="bg-gray-50">
           <tr>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">#</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Produto</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Marca</th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Qtd Vendida</th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Faturamento</th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Margem Média</th>
-            <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Preço Médio</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+              Produto
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+              Marca
+            </th>
+            <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
+              Qtd Vendida
+            </th>
+            <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
+              Faturamento
+            </th>
+            <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
+              Margem Média
+            </th>
+            <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">
+              Preço Médio
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
@@ -36,12 +47,12 @@ const DashboardRacoesRankingVendas = ({ rankingVendas, loadingAnalise }) => {
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
                     idx === 0
-                      ? 'bg-yellow-100 text-yellow-700'
+                      ? "bg-yellow-100 text-yellow-700"
                       : idx === 1
-                        ? 'bg-gray-200 text-gray-700'
+                        ? "bg-gray-200 text-gray-700"
                         : idx === 2
-                          ? 'bg-orange-100 text-orange-700'
-                          : 'bg-gray-50 text-gray-600'
+                          ? "bg-orange-100 text-orange-700"
+                          : "bg-gray-50 text-gray-600"
                   }`}
                 >
                   {idx + 1}
@@ -49,18 +60,20 @@ const DashboardRacoesRankingVendas = ({ rankingVendas, loadingAnalise }) => {
               </td>
               <td className="px-4 py-3 text-sm text-gray-900">{prod.nome}</td>
               <td className="px-4 py-3 text-sm text-gray-600">{prod.marca}</td>
-              <td className="px-4 py-3 text-sm text-center font-semibold text-gray-900">{prod.quantidade_vendida}</td>
+              <td className="px-4 py-3 text-sm text-center font-semibold text-gray-900">
+                {prod.quantidade_vendida}
+              </td>
               <td className="px-4 py-3 text-sm text-center font-semibold text-green-600">
-                R$ {prod.faturamento.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {prod.faturamento.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
               </td>
               <td className="px-4 py-3 text-sm text-center">
                 <span
                   className={`font-semibold ${
                     prod.margem_media >= 30
-                      ? 'text-green-600'
+                      ? "text-green-600"
                       : prod.margem_media >= 20
-                        ? 'text-yellow-600'
-                        : 'text-red-600'
+                        ? "text-yellow-600"
+                        : "text-red-600"
                   }`}
                 >
                   {prod.margem_media}%

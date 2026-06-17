@@ -13,28 +13,20 @@ function CampanhasRankingCupomDetalhesRow({ cupom }) {
 
           {cupom.nome_campanha && (
             <div>
-              <p className="text-xs text-gray-500 font-medium mb-0.5">
-                Campanha
-              </p>
+              <p className="text-xs text-gray-500 font-medium mb-0.5">Campanha</p>
               <p className="text-gray-700">{cupom.nome_campanha}</p>
             </div>
           )}
 
           <div>
-            <p className="text-xs text-gray-500 font-medium mb-0.5">
-              Criado em
-            </p>
+            <p className="text-xs text-gray-500 font-medium mb-0.5">Criado em</p>
             <p className="text-gray-700">
-              {cupom.created_at
-                ? new Date(cupom.created_at).toLocaleString("pt-BR")
-                : "-"}
+              {cupom.created_at ? new Date(cupom.created_at).toLocaleString("pt-BR") : "-"}
             </p>
           </div>
 
           <div>
-            <p className="text-xs text-gray-500 font-medium mb-0.5">
-              Valido ate
-            </p>
+            <p className="text-xs text-gray-500 font-medium mb-0.5">Valido ate</p>
             <p className="text-gray-700">
               {cupom.valid_until
                 ? new Date(cupom.valid_until).toLocaleDateString("pt-BR")
@@ -44,29 +36,21 @@ function CampanhasRankingCupomDetalhesRow({ cupom }) {
 
           {cupom.used_at && (
             <div>
-              <p className="text-xs text-gray-500 font-medium mb-0.5">
-                Usado em
-              </p>
-              <p className="text-gray-700">
-                {new Date(cupom.used_at).toLocaleString("pt-BR")}
-              </p>
+              <p className="text-xs text-gray-500 font-medium mb-0.5">Usado em</p>
+              <p className="text-gray-700">{new Date(cupom.used_at).toLocaleString("pt-BR")}</p>
             </div>
           )}
 
           {cupom.coupon_type === "gift" && cupom.meta?.mensagem && (
             <div className="col-span-2">
-              <p className="text-xs text-gray-500 font-medium mb-0.5">
-                Mensagem do brinde
-              </p>
+              <p className="text-xs text-gray-500 font-medium mb-0.5">Mensagem do brinde</p>
               <p className="text-gray-700">{cupom.meta.mensagem}</p>
             </div>
           )}
 
           {cupom.meta?.retirar_de && (
             <div>
-              <p className="text-xs text-gray-500 font-medium mb-0.5">
-                Retirada a partir de
-              </p>
+              <p className="text-xs text-gray-500 font-medium mb-0.5">Retirada a partir de</p>
               <p className="text-gray-700">
                 {new Date(cupom.meta.retirar_de).toLocaleDateString("pt-BR")}
               </p>
@@ -75,9 +59,7 @@ function CampanhasRankingCupomDetalhesRow({ cupom }) {
 
           {cupom.meta?.retirar_ate && (
             <div>
-              <p className="text-xs text-gray-500 font-medium mb-0.5">
-                Retirada ate
-              </p>
+              <p className="text-xs text-gray-500 font-medium mb-0.5">Retirada ate</p>
               <p className="text-gray-700">
                 {new Date(cupom.meta.retirar_ate).toLocaleDateString("pt-BR")}
               </p>
@@ -86,9 +68,7 @@ function CampanhasRankingCupomDetalhesRow({ cupom }) {
 
           {cupom.meta?.categoria && (
             <div>
-              <p className="text-xs text-gray-500 font-medium mb-0.5">
-                Categoria destaque
-              </p>
+              <p className="text-xs text-gray-500 font-medium mb-0.5">Categoria destaque</p>
               <p className="text-gray-700">
                 {cupom.meta.categoria === "maior_gasto"
                   ? "Maior gasto"
@@ -101,9 +81,7 @@ function CampanhasRankingCupomDetalhesRow({ cupom }) {
 
           {cupom.meta?.periodo && (
             <div>
-              <p className="text-xs text-gray-500 font-medium mb-0.5">
-                Periodo
-              </p>
+              <p className="text-xs text-gray-500 font-medium mb-0.5">Periodo</p>
               <p className="text-gray-700">{cupom.meta.periodo}</p>
             </div>
           )}
@@ -140,33 +118,15 @@ export default function CampanhasRankingCuponsTable({
       <table className="w-full text-sm">
         <thead className="bg-gray-50 border-b">
           <tr>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">
-              Codigo
-            </th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">
-              Tipo
-            </th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">
-              Canal
-            </th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">
-              Desconto
-            </th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">
-              Cliente
-            </th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">
-              Criado em
-            </th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">
-              Validade
-            </th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">
-              Status
-            </th>
-            <th className="px-4 py-3 text-left font-medium text-gray-600">
-              Acao
-            </th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Codigo</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Tipo</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Canal</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Desconto</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Cliente</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Criado em</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Validade</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+            <th className="px-4 py-3 text-left font-medium text-gray-600">Acao</th>
           </tr>
         </thead>
         <tbody className="divide-y">
@@ -180,14 +140,10 @@ export default function CampanhasRankingCuponsTable({
             return (
               <Fragment key={cupom.id}>
                 <tr
-                  className={`hover:bg-gray-50 cursor-pointer ${
-                    isDetalhes ? "bg-blue-50" : ""
-                  }`}
+                  className={`hover:bg-gray-50 cursor-pointer ${isDetalhes ? "bg-blue-50" : ""}`}
                   onClick={() => setCupomDetalhes(isDetalhes ? null : cupom)}
                 >
-                  <td className="px-4 py-3 font-mono font-semibold text-gray-800">
-                    {cupom.code}
-                  </td>
+                  <td className="px-4 py-3 font-mono font-semibold text-gray-800">{cupom.code}</td>
                   <td className="px-4 py-3 text-gray-600">
                     {cupom.coupon_type === "percent"
                       ? "Percentual"
@@ -197,9 +153,7 @@ export default function CampanhasRankingCuponsTable({
                           ? "Brinde"
                           : cupom.coupon_type}
                   </td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {cupom.channel || "pdv"}
-                  </td>
+                  <td className="px-4 py-3 text-gray-500">{cupom.channel || "pdv"}</td>
                   <td className="px-4 py-3 font-medium text-gray-900">
                     {formatarValorCupom(cupom)}
                   </td>

@@ -52,9 +52,7 @@ export default function CampanhasDestaqueTab({
       <div className="bg-white rounded-xl border shadow-sm p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="font-semibold text-gray-900">
-              Vencedores - {destaque.periodo}
-            </h3>
+            <h3 className="font-semibold text-gray-900">Vencedores - {destaque.periodo}</h3>
             <p className="text-xs text-gray-500 mt-0.5">
               {destaque.total_clientes_ativos} clientes ativos no periodo
             </p>
@@ -69,8 +67,7 @@ export default function CampanhasDestaqueTab({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
           {Object.entries(destaque.vencedores).map(([categoria, info]) => {
-            const premio =
-              premiosPorVencedor[categoria] || createDefaultPremio();
+            const premio = premiosPorVencedor[categoria] || createDefaultPremio();
             const setPremio = (update) =>
               setPremiosPorVencedor((prev) => ({
                 ...prev,
@@ -118,14 +115,11 @@ export default function CampanhasDestaqueTab({
             <button
               onClick={enviarDestaque}
               disabled={
-                enviandoDestaque ||
-                Object.values(vencedoresSelecionados).every((valor) => !valor)
+                enviandoDestaque || Object.values(vencedoresSelecionados).every((valor) => !valor)
               }
               className="w-full py-3 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 disabled:opacity-50 transition-colors"
             >
-              {enviandoDestaque
-                ? "Enviando premios..."
-                : "Enviar Premios aos Vencedores"}
+              {enviandoDestaque ? "Enviando premios..." : "Enviar Premios aos Vencedores"}
             </button>
           )
         )}

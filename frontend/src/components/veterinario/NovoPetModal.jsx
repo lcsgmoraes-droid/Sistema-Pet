@@ -39,8 +39,8 @@ export default function NovoPetModal({
       ...sugestoesEspecies,
       ...especiesCatalogo.map((item) => item?.nome).filter(Boolean),
     ];
-    return Array.from(new Set(nomes.map((item) => String(item).trim()).filter(Boolean))).sort((a, b) =>
-      a.localeCompare(b, "pt-BR")
+    return Array.from(new Set(nomes.map((item) => String(item).trim()).filter(Boolean))).sort(
+      (a, b) => a.localeCompare(b, "pt-BR"),
     );
   }, [especiesCatalogo, sugestoesEspecies]);
 
@@ -136,9 +136,7 @@ export default function NovoPetModal({
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Cadastro rapido de pet</h2>
-              <p className="text-sm text-gray-500">
-                {descricao}
-              </p>
+              <p className="text-sm text-gray-500">{descricao}</p>
             </div>
           </div>
           <button
@@ -152,10 +150,15 @@ export default function NovoPetModal({
         </div>
 
         <div className="mt-5 rounded-xl border border-cyan-100 bg-cyan-50 px-4 py-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-cyan-700">Tutor selecionado</p>
-          <p className="mt-1 text-sm font-semibold text-cyan-900">{tutor?.nome || "Tutor nao informado"}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-cyan-700">
+            Tutor selecionado
+          </p>
+          <p className="mt-1 text-sm font-semibold text-cyan-900">
+            {tutor?.nome || "Tutor nao informado"}
+          </p>
           <p className="mt-1 text-xs text-cyan-700">
-            {[tutor?.telefone, tutor?.celular].filter(Boolean).join(" • ") || "Sem telefone cadastrado"}
+            {[tutor?.telefone, tutor?.celular].filter(Boolean).join(" • ") ||
+              "Sem telefone cadastrado"}
           </p>
         </div>
 
@@ -278,7 +281,8 @@ export default function NovoPetModal({
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-300"
               />
               <p className="mt-1 text-[11px] text-gray-500">
-                Se precisar complementar o cadastro depois, voce ainda pode editar o pet normalmente.
+                Se precisar complementar o cadastro depois, voce ainda pode editar o pet
+                normalmente.
               </p>
             </div>
           </div>
