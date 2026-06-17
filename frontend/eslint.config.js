@@ -14,6 +14,7 @@ export default [
   {
     files: [
       "scripts/**/*.{js,mjs,cjs}",
+      "src/api/**/*.{js,mjs,cjs}",
       "src/helpers/**/*.{js,mjs,cjs}",
       "src/utils/**/*.{js,mjs,cjs}",
     ],

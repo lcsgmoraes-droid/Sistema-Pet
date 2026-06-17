@@ -2,13 +2,13 @@
  * API Client para o módulo de Clientes
  */
 
-import api from '../api';
+import api from "../api";
 
 /**
  * Buscar clientes
  */
 export const buscarClientes = async (params = {}) => {
-  const response = await api.get('/clientes/', { params });
+  const response = await api.get("/clientes/", { params });
   // API retorna objeto paginado {items: [], total, skip, limit}
   // Retornar apenas o array de clientes
   return response.data.items || response.data.clientes || response.data || [];
@@ -26,7 +26,7 @@ export const buscarClientePorId = async (clienteId) => {
  * Criar novo cliente
  */
 export const criarCliente = async (dados) => {
-  const response = await api.post('/clientes/', dados);
+  const response = await api.post("/clientes/", dados);
   return response.data;
 };
 
@@ -64,17 +64,17 @@ export const verificarDuplicata = async (campo, valor) => {
 };
 
 export const previewFusaoPessoas = (data) => {
-  return api.post('/clientes/fusao/preview', data);
+  return api.post("/clientes/fusao/preview", data);
 };
 
 export const executarFusaoPessoas = (data) => {
-  return api.post('/clientes/fusao/executar', data);
+  return api.post("/clientes/fusao/executar", data);
 };
 
 export const buscarSugestoesDuplicidadePessoas = (params = {}) => {
-  return api.get('/clientes/duplicidades/sugestoes', { params });
+  return api.get("/clientes/duplicidades/sugestoes", { params });
 };
 
 export const executarFusoesAutomaticasPessoas = () => {
-  return api.post('/clientes/duplicidades/fundir-automaticas');
+  return api.post("/clientes/duplicidades/fundir-automaticas");
 };

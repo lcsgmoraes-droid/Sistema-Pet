@@ -33,9 +33,9 @@ def test_frontend_package_exposes_core_lint_and_format_scripts():
 
     assert (
         package["scripts"]["lint:core"]
-        == "eslint src/utils src/helpers scripts --max-warnings=0"
+        == "eslint src/api src/utils src/helpers scripts --max-warnings=0"
     )
     assert (
         package["scripts"]["format:core:check"]
-        == "prettier --check src/utils src/helpers scripts"
+        == "prettier --check src/api src/utils src/helpers scripts"
     )

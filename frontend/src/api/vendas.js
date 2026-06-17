@@ -2,13 +2,13 @@
  * API Client para o módulo de Vendas (PDV)
  */
 
-import api from '../api';
+import api from "../api";
 
 /**
  * Listar vendas com filtros
  */
 export const listarVendas = async (params = {}) => {
-  const response = await api.get('/vendas', { params });
+  const response = await api.get("/vendas", { params });
   return response.data;
 };
 
@@ -24,7 +24,7 @@ export const buscarVenda = async (vendaId) => {
  * Criar nova venda
  */
 export const criarVenda = async (dados) => {
-  const response = await api.post('/vendas', dados);
+  const response = await api.post("/vendas", dados);
   return response.data;
 };
 
@@ -39,11 +39,7 @@ export const atualizarVenda = async (vendaId, dados) => {
 /**
  * Finalizar venda (com pagamentos)
  */
-export const finalizarVenda = async (
-  vendaId,
-  pagamentos,
-  options = {},
-) => {
+export const finalizarVenda = async (vendaId, pagamentos, options = {}) => {
   const response = await api.post(`/vendas/${vendaId}/finalizar`, {
     pagamentos,
     cupom_code: options.cupom_code || null,
@@ -57,7 +53,7 @@ export const finalizarVenda = async (
  */
 export const cancelarVenda = async (vendaId, motivo) => {
   const response = await api.post(`/vendas/${vendaId}/cancelar`, {
-    motivo
+    motivo,
   });
   return response.data;
 };
@@ -66,7 +62,7 @@ export const cancelarVenda = async (vendaId, motivo) => {
  * Buscar configurações de entrega
  */
 export const buscarConfigEntrega = async () => {
-  const response = await api.get('/vendas/configuracoes-entrega');
+  const response = await api.get("/vendas/configuracoes-entrega");
   return response.data;
 };
 
@@ -74,7 +70,7 @@ export const buscarConfigEntrega = async () => {
  * Salvar configurações de entrega
  */
 export const salvarConfigEntrega = async (config) => {
-  const response = await api.post('/vendas/configuracoes-entrega', config);
+  const response = await api.post("/vendas/configuracoes-entrega", config);
   return response.data;
 };
 
@@ -85,7 +81,7 @@ export const relatorioResumo = async (dataInicio, dataFim) => {
   const params = {};
   if (dataInicio) params.data_inicio = dataInicio;
   if (dataFim) params.data_fim = dataFim;
-  
-  const response = await api.get('/vendas/relatorios/resumo', { params });
+
+  const response = await api.get("/vendas/relatorios/resumo", { params });
   return response.data;
 };
