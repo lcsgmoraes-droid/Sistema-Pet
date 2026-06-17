@@ -2,34 +2,34 @@
  * API de Alertas de Estoque Negativo
  * Integração com backend de monitoramento de estoque crítico
  */
-import api from '../api';
+import api from "../api";
 
 /**
  * Listar alertas pendentes (não resolvidos)
  */
 export const getAlertasPendentes = () => {
-  return api.get('/estoque/alertas/pendentes');
+  return api.get("/estoque/alertas/pendentes");
 };
 
 /**
  * Listar todos os alertas (histórico completo)
  */
 export const getTodosAlertas = (params = {}) => {
-  return api.get('/estoque/alertas/todos', { params });
+  return api.get("/estoque/alertas/todos", { params });
 };
 
 /**
  * Obter dashboard com métricas de alertas
  */
 export const getDashboardAlertas = () => {
-  return api.get('/estoque/alertas/dashboard');
+  return api.get("/estoque/alertas/dashboard");
 };
 
 /**
  * Alertas de preco do granel abaixo da margem minima esperada.
  */
 export const getAlertasPrecoGranel = (params = {}) => {
-  return api.get('/estoque/granel/alertas-preco', { params });
+  return api.get("/estoque/granel/alertas-preco", { params });
 };
 
 /**
@@ -40,8 +40,8 @@ export const getAlertasPrecoGranel = (params = {}) => {
  */
 export const resolverAlerta = (alertaId, acao, observacao = null) => {
   return api.put(`/estoque/alertas/${alertaId}/resolver`, {
-    status: acao,  // Backend espera 'status' e não 'acao'
-    observacao
+    status: acao, // Backend espera 'status' e não 'acao'
+    observacao,
   });
 };
 
@@ -59,5 +59,5 @@ export const deletarAlerta = (alertaId) => {
  * @returns {Promise} - Lista de produtos que ficarão com estoque negativo
  */
 export const verificarEstoqueNegativo = (itens) => {
-  return api.post('/estoque/alertas/verificar-estoque-negativo', { itens });
+  return api.post("/estoque/alertas/verificar-estoque-negativo", { itens });
 };

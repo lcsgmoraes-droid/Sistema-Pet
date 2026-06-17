@@ -1,7 +1,7 @@
 /**
  * API de Produtos - Integração com Backend
  */
-import api from '../api';
+import api from "../api";
 
 // ========================================
 // CATEGORIAS
@@ -11,14 +11,14 @@ import api from '../api';
  * Listar categorias (com filtros opcionais)
  */
 export const getCategorias = (params = {}) => {
-  return api.get('/produtos/categorias', { params });
+  return api.get("/produtos/categorias", { params });
 };
 
 /**
  * Obter hierarquia completa de categorias (árvore)
  */
 export const getCategoriaHierarquia = () => {
-  return api.get('/produtos/categorias/hierarquia');
+  return api.get("/produtos/categorias/hierarquia");
 };
 
 /**
@@ -32,7 +32,7 @@ export const getCategoria = (id) => {
  * Criar nova categoria
  */
 export const createCategoria = (data) => {
-  return api.post('/produtos/categorias', data);
+  return api.post("/produtos/categorias", data);
 };
 
 /**
@@ -57,7 +57,7 @@ export const deleteCategoria = (id) => {
  * Listar marcas (com busca opcional)
  */
 export const getMarcas = (params = {}) => {
-  return api.get('/produtos/marcas', { params });
+  return api.get("/produtos/marcas", { params });
 };
 
 /**
@@ -71,7 +71,7 @@ export const getMarca = (id) => {
  * Criar nova marca
  */
 export const createMarca = (data) => {
-  return api.post('/produtos/marcas', data);
+  return api.post("/produtos/marcas", data);
 };
 
 /**
@@ -96,7 +96,7 @@ export const deleteMarca = (id) => {
  * Listar departamentos
  */
 export const getDepartamentos = (params = {}) => {
-  return api.get('/produtos/departamentos', { params });
+  return api.get("/produtos/departamentos", { params });
 };
 
 /**
@@ -110,7 +110,7 @@ export const getDepartamento = (id) => {
  * Criar novo departamento
  */
 export const createDepartamento = (data) => {
-  return api.post('/produtos/departamentos', data);
+  return api.post("/produtos/departamentos", data);
 };
 
 /**
@@ -136,7 +136,7 @@ export const deleteDepartamento = (id) => {
  * @param {Object} params - Filtros: busca, categoria_id, marca_id, departamento_id, estoque_baixo, em_promocao
  */
 export const getProdutos = (params = {}) => {
-  return api.get('/produtos/', { params });
+  return api.get("/produtos/", { params });
 };
 
 /**
@@ -145,7 +145,7 @@ export const getProdutos = (params = {}) => {
  * @param {Object} params - Filtros: busca, categoria_id, marca_id, etc
  */
 export const getProdutosVendaveis = (params = {}, config = {}) => {
-  return api.get('/produtos/vendaveis', { ...config, params });
+  return api.get("/produtos/vendaveis", { ...config, params });
 };
 
 /**
@@ -188,7 +188,7 @@ export const excluirVariacaoPermanente = (variacaoId) => {
  * Criar novo produto
  */
 export const createProduto = (data) => {
-  return api.post('/produtos/', data);
+  return api.post("/produtos/", data);
 };
 
 /**
@@ -213,19 +213,19 @@ export const toggleProdutoAtivo = (id, ativo) => {
 };
 
 export const previewFusaoProdutos = (data) => {
-  return api.post('/produtos/fusao/preview', data);
+  return api.post("/produtos/fusao/preview", data);
 };
 
 export const executarFusaoProdutos = (data) => {
-  return api.post('/produtos/fusao/executar', data);
+  return api.post("/produtos/fusao/executar", data);
 };
 
 /**
  * Gerar SKU automático
  * @param {string} prefixo - Prefixo opcional para o SKU
  */
-export const gerarSKU = (prefixo = '') => {
-  return api.post('/produtos/gerar-sku', { prefixo });
+export const gerarSKU = (prefixo = "") => {
+  return api.post("/produtos/gerar-sku", { prefixo });
 };
 
 // ========================================
@@ -237,7 +237,7 @@ export const gerarSKU = (prefixo = '') => {
  * @param {string} sku - SKU do produto
  */
 export const gerarCodigoBarras = (sku) => {
-  return api.post('/produtos/gerar-codigo-barras', { sku });
+  return api.post("/produtos/gerar-codigo-barras", { sku });
 };
 
 /**
@@ -303,7 +303,7 @@ export const saidaFIFO = (produtoId, data) => {
 export const uploadImagemProduto = (produtoId, formData) => {
   return api.post(`/produtos/${produtoId}/imagens`, formData, {
     headers: {
-      'Content-Type': 'multipart/form-data',
+      "Content-Type": "multipart/form-data",
     },
   });
 };
@@ -362,14 +362,14 @@ export const deleteFornecedorProduto = (id) => {
  * Listar listas de preço
  */
 export const getListasPreco = () => {
-  return api.get('/produtos/listas-preco');
+  return api.get("/produtos/listas-preco");
 };
 
 /**
  * Criar lista de preço
  */
 export const createListaPreco = (data) => {
-  return api.post('/produtos/listas-preco', data);
+  return api.post("/produtos/listas-preco", data);
 };
 
 /**
@@ -398,22 +398,22 @@ export const addProdutoListaPreco = (listaId, produtoId, preco) => {
  * @param {Object} params - Filtros: data_inicio, data_fim, produto_id, tipo_movimentacao
  */
 export const getRelatorioMovimentacoes = (params = {}) => {
-  return api.get('/produtos/relatorio/movimentacoes', { params });
+  return api.get("/produtos/relatorio/movimentacoes", { params });
 };
 
 export const getRelatorioProdutoVendas = (params = {}) => {
-  return api.get('/produtos/relatorio/produto-vendas', { params });
+  return api.get("/produtos/relatorio/produto-vendas", { params });
 };
 
 export const getRelatorioValorizacaoEstoque = (params = {}) => {
-  return api.get('/produtos/relatorio/valorizacao-estoque', { params });
+  return api.get("/produtos/relatorio/valorizacao-estoque", { params });
 };
 
 /**
  * Relatório de estoque baixo
  */
 export const getRelatorioEstoqueBaixo = () => {
-  return api.get('/produtos/relatorio/estoque-baixo');
+  return api.get("/produtos/relatorio/estoque-baixo");
 };
 
 /**
@@ -421,7 +421,7 @@ export const getRelatorioEstoqueBaixo = () => {
  * @param {Object} params - Filtros: data_inicio, data_fim, limit
  */
 export const getRelatorioMaisVendidos = (params = {}) => {
-  return api.get('/produtos/relatorio/mais-vendidos', { params });
+  return api.get("/produtos/relatorio/mais-vendidos", { params });
 };
 
 /**
@@ -429,12 +429,9 @@ export const getRelatorioMaisVendidos = (params = {}) => {
  * @param {number} dias - Dias para considerar validade próxima
  */
 export const getRelatorioValidadeProxima = (paramsOrDias = 30) => {
-  const params =
-    typeof paramsOrDias === 'number'
-      ? { dias: paramsOrDias }
-      : paramsOrDias || {};
+  const params = typeof paramsOrDias === "number" ? { dias: paramsOrDias } : paramsOrDias || {};
 
-  return api.get('/produtos/relatorio/validade-proxima', { params });
+  return api.get("/produtos/relatorio/validade-proxima", { params });
 };
 
 // ========================================
@@ -464,9 +461,9 @@ export const calcularMarkup = (precoCusto, precoVenda) => {
  * Formatar moeda (BRL)
  */
 export const formatarMoeda = (valor) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
   }).format(valor || 0);
 };
 
@@ -474,16 +471,16 @@ export const formatarMoeda = (valor) => {
  * Formatar data
  */
 export const formatarData = (data) => {
-  if (!data) return '-';
-  return new Date(data).toLocaleDateString('pt-BR');
+  if (!data) return "-";
+  return new Date(data).toLocaleDateString("pt-BR");
 };
 
 /**
  * Formatar data e hora
  */
 export const formatarDataHora = (data) => {
-  if (!data) return '-';
-  return new Date(data).toLocaleString('pt-BR');
+  if (!data) return "-";
+  return new Date(data).toLocaleString("pt-BR");
 };
 
 export default {

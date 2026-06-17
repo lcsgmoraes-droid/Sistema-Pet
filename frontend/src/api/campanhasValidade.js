@@ -1,7 +1,6 @@
 import api from "../api";
 
-export const getCampanhaValidadeConfig = () =>
-  api.get("/campanhas/validade/config");
+export const getCampanhaValidadeConfig = () => api.get("/campanhas/validade/config");
 
 export const salvarCampanhaValidadeConfig = (payload) =>
   api.put("/campanhas/validade/config", payload);
