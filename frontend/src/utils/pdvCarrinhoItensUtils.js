@@ -9,8 +9,7 @@ export const QUANTIDADE_MINIMA_PDV = 0.001;
 export function normalizarQuantidadePDV(valor, fallback = 1) {
   if (valor === null || valor === undefined || valor === "") return fallback;
 
-  const valorNormalizado =
-    typeof valor === "string" ? valor.replace(",", ".") : valor;
+  const valorNormalizado = typeof valor === "string" ? valor.replace(",", ".") : valor;
   const numero = Number(valorNormalizado);
 
   if (!Number.isFinite(numero)) return fallback;
@@ -18,10 +17,7 @@ export function normalizarQuantidadePDV(valor, fallback = 1) {
 }
 
 export function obterPrecoVendaPDV(produto) {
-  const preco =
-    produto?.preco_venda_pdv ??
-    produto?.preco_venda_efetivo ??
-    produto?.preco_venda;
+  const preco = produto?.preco_venda_pdv ?? produto?.preco_venda_efetivo ?? produto?.preco_venda;
   const numero = Number.parseFloat(preco);
   return Number.isFinite(numero) ? numero : 0;
 }
@@ -32,12 +28,8 @@ export function recalcularSubtotalItem(item, novaQuantidade) {
   const subtotalSemDesconto = precoUnitario * quantidade;
   let novoDescontoValor = Number(item.desconto_valor || 0) || 0;
 
-  if (
-    item.tipo_desconto_aplicado === "percentual" &&
-    Number(item.desconto_percentual) > 0
-  ) {
-    novoDescontoValor =
-      (subtotalSemDesconto * Number(item.desconto_percentual)) / 100;
+  if (item.tipo_desconto_aplicado === "percentual" && Number(item.desconto_percentual) > 0) {
+    novoDescontoValor = (subtotalSemDesconto * Number(item.desconto_percentual)) / 100;
   }
 
   novoDescontoValor = Math.min(novoDescontoValor, subtotalSemDesconto);

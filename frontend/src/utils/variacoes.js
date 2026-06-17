@@ -9,39 +9,39 @@
  * @returns {string} - String formatada (ex: "Cor: Azul | Tamanho: M")
  */
 export function formatarVariacao(produto) {
-  if (!produto) return '';
-  
+  if (!produto) return "";
+
   // Se tiver variation_attributes (JSON)
-  if (produto.variation_attributes && typeof produto.variation_attributes === 'object') {
+  if (produto.variation_attributes && typeof produto.variation_attributes === "object") {
     const atributos = Object.entries(produto.variation_attributes)
       .map(([chave, valor]) => {
         // Capitalizar primeira letra da chave
         const chaveFormatada = chave.charAt(0).toUpperCase() + chave.slice(1);
         return `${chaveFormatada}: ${valor}`;
       })
-      .join(' | ');
-    
+      .join(" | ");
+
     return atributos;
   }
-  
+
   // Se tiver variation_signature (string)
   if (produto.variation_signature) {
     const atributos = produto.variation_signature
-      .split('|')
-      .map(part => {
-        const [chave, valor] = part.split(':');
+      .split("|")
+      .map((part) => {
+        const [chave, valor] = part.split(":");
         if (chave && valor) {
           const chaveFormatada = chave.charAt(0).toUpperCase() + chave.slice(1);
           return `${chaveFormatada}: ${valor}`;
         }
         return part;
       })
-      .join(' | ');
-    
+      .join(" | ");
+
     return atributos;
   }
-  
-  return '';
+
+  return "";
 }
 
 /**
@@ -51,25 +51,25 @@ export function formatarVariacao(produto) {
  * @returns {string} - Nome formatado
  */
 export function nomeCompletoVariacao(produto, produtoPai = null) {
-  if (!produto) return '';
-  
+  if (!produto) return "";
+
   // Se for variação e tiver produto pai
-  if (produto.tipo_produto === 'VARIACAO' && produtoPai) {
+  if (produto.tipo_produto === "VARIACAO" && produtoPai) {
     const atributos = formatarVariacao(produto);
     if (atributos) {
       return `${produtoPai.nome} - ${atributos}`;
     }
     return produto.nome;
   }
-  
+
   // Se for variação mas não temos o pai, tentar extrair da signature
-  if (produto.tipo_produto === 'VARIACAO') {
+  if (produto.tipo_produto === "VARIACAO") {
     const atributos = formatarVariacao(produto);
     if (atributos) {
-      return `${produto.nome.split(' - ')[0]} - ${atributos}`;
+      return `${produto.nome.split(" - ")[0]} - ${atributos}`;
     }
   }
-  
+
   return produto.nome;
 }
 
@@ -80,12 +80,12 @@ export function nomeCompletoVariacao(produto, produtoPai = null) {
  */
 export function isProdutoVendavel(produto) {
   if (!produto) return false;
-  
+
   // Produtos PAI não são vendáveis
-  if (produto.is_parent || produto.tipo_produto === 'PAI') {
+  if (produto.is_parent || produto.tipo_produto === "PAI") {
     return false;
   }
-  
+
   // Produtos SIMPLES, VARIACAO e KIT são vendáveis
-  return ['SIMPLES', 'VARIACAO', 'KIT'].includes(produto.tipo_produto);
+  return ["SIMPLES", "VARIACAO", "KIT"].includes(produto.tipo_produto);
 }

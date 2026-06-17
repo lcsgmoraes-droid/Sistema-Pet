@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build --mode production",
     "build:dev": "vite build --mode development",
+    "lint:core": "eslint src/utils src/helpers scripts --max-warnings=0",
+    "format:core:check": "prettier --check src/utils src/helpers scripts",
     "test:auth-storage": "node scripts/test-token-storage.mjs",
     "test:auth-refresh": "node scripts/test-refresh-manager.mjs",
     "test:corepet-branding": "node scripts/test-corepet-branding.mjs",
@@ -48,11 +50,15 @@
     "ws": "8.21.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^6.0.2",
     "autoprefixer": "^10.4.16",
+    "eslint": "^10.5.0",
+    "globals": "^17.6.0",
     "postcss": "^8.4.32",
+    "prettier": "^3.8.4",
     "tailwindcss": "^3.4.0",
     "vite": "^8.0.16"
   }

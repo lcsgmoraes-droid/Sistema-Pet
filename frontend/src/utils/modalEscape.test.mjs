@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  createEscapeCloseRegistry,
-  shouldCloseModalWithKeyboardEvent,
-} from "./modalEscape.js";
+import { createEscapeCloseRegistry, shouldCloseModalWithKeyboardEvent } from "./modalEscape.js";
 
 test("shouldCloseModalWithKeyboardEvent aceita apenas Escape sem modificadores", () => {
   assert.equal(shouldCloseModalWithKeyboardEvent({ key: "Escape" }), true);

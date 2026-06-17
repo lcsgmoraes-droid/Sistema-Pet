@@ -11,11 +11,7 @@ assert.equal(parseNumeroBR("31.5"), 31.5);
 assert.equal(parseNumeroBR("1.234,5"), 1234.5);
 assert.equal(formatQtd("31,00"), "31");
 
-const saida = montarMovimentoBalanco(
-  { id: 10, estoque_atual: "31,00" },
-  28,
-  {}
-);
+const saida = montarMovimentoBalanco({ id: 10, estoque_atual: "31,00" }, 28, {});
 
 assert.deepEqual(saida, {
   endpoint: "/estoque/saida",
@@ -29,11 +25,10 @@ assert.deepEqual(saida, {
   estoqueAtual: 31,
 });
 
-const entrada = montarMovimentoBalanco(
-  { id: 11, estoque_atual: "2.5" },
-  4,
-  { numeroLote: "L-1", dataValidade: "2026-12-31" }
-);
+const entrada = montarMovimentoBalanco({ id: 11, estoque_atual: "2.5" }, 4, {
+  numeroLote: "L-1",
+  dataValidade: "2026-12-31",
+});
 
 assert.deepEqual(entrada, {
   endpoint: "/estoque/entrada",
@@ -49,12 +44,13 @@ assert.deepEqual(entrada, {
   estoqueAtual: 2.5,
 });
 
-assert.deepEqual(
-  montarMovimentoBalanco({ id: 12, estoque_atual: "7" }, 7, {}),
-  { semAlteracao: true, diferenca: 0, estoqueAtual: 7 }
-);
+assert.deepEqual(montarMovimentoBalanco({ id: 12, estoque_atual: "7" }, 7, {}), {
+  semAlteracao: true,
+  diferenca: 0,
+  estoqueAtual: 7,
+});
 
 assert.equal(
   montarMovimentoBalanco({ id: 13, estoque_atual: "??" }, 1, {}).erro,
-  "Estoque atual invalido."
+  "Estoque atual invalido.",
 );

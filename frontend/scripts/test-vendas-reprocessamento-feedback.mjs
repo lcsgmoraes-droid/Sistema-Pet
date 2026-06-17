@@ -5,10 +5,7 @@ import {
   normalizarVendaIdsFeedback,
 } from "../src/components/financeiro/vendasReprocessamentoFeedback.js";
 
-assert.deepEqual(normalizarVendaIdsFeedback([10, "11", 10, 0, -1, "abc", null]), [
-  10,
-  11,
-]);
+assert.deepEqual(normalizarVendaIdsFeedback([10, "11", 10, 0, -1, "abc", null]), [10, 11]);
 
 assert.deepEqual(
   montarFeedbackReprocessamentoVendas({

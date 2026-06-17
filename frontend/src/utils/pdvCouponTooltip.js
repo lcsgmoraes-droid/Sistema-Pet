@@ -24,10 +24,12 @@ const CHANNEL_LABELS = {
 
 function formatCurrency(value) {
   const amount = Number(value || 0);
-  return amount.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).replace(/\u00a0/g, " ");
+  return amount
+    .toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    })
+    .replace(/\u00a0/g, " ");
 }
 
 function formatDate(value) {
@@ -63,8 +65,7 @@ function hasBenefitChannelScope(params = {}) {
 }
 
 function getConfiguredRules(coupon = {}) {
-  const explicitRules =
-    coupon.meta?.regras_resumo || coupon.rules_summary || coupon.regras_resumo;
+  const explicitRules = coupon.meta?.regras_resumo || coupon.rules_summary || coupon.regras_resumo;
 
   if (explicitRules) return explicitRules;
 
@@ -79,7 +80,7 @@ function getConfiguredRules(coupon = {}) {
     rules.push(
       inactivityDays
         ? `Cliente sem compra ha ${inactivityDays} dia(s)`
-        : "Cliente inativo conforme configuracao da campanha"
+        : "Cliente inativo conforme configuracao da campanha",
     );
   } else if (campaignType === "birthday_customer") {
     rules.push("Gerado por aniversario do cliente");
@@ -90,7 +91,7 @@ function getConfiguredRules(coupon = {}) {
   } else if (campaignType === "loyalty_stamp") {
     const stamps = params.stamps_to_complete || params.carimbos_para_resgate;
     rules.push(
-      stamps ? `Resgate ao completar ${stamps} carimbo(s)` : "Gerado pelo cartao fidelidade"
+      stamps ? `Resgate ao completar ${stamps} carimbo(s)` : "Gerado pelo cartao fidelidade",
     );
   }
 
@@ -122,10 +123,7 @@ export function buildPdvCouponTooltip(coupon = {}) {
   const reason = coupon.meta?.motivo || coupon.meta?.source || coupon.meta?.origem;
   const rules = getConfiguredRules(coupon);
 
-  const lines = [
-    code ? `Cupom ${code}` : "Cupom disponivel",
-    `Campanha: ${campaignName}`,
-  ];
+  const lines = [code ? `Cupom ${code}` : "Cupom disponivel", `Campanha: ${campaignName}`];
 
   if (campaignTypeLabel) lines.push(`Tipo: ${campaignTypeLabel}`);
   lines.push(`Beneficio: ${getCouponBenefit(coupon)}`);
