@@ -842,8 +842,8 @@ def criar_produto(
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     # LOG: Dados recebidos
-    logger.info(f"ðŸ” Criando produto - User: {current_user.email}")
-    logger.info(f"ðŸ“¦ Dados recebidos: {produto.model_dump()}")
+    logger.info("Criando produto")
+    logger.info("Dados de produto recebidos para criacao")
     produto.codigo = _normalizar_sku_produto(produto.codigo)
 
     # ========================================
@@ -1205,7 +1205,7 @@ def listar_produtos(
     # TOTAL
     total = query.count()
 
-    logger.info(f"ðŸ“¦ GET /produtos/ - Total encontrado: {total} | Tenant: {tenant_id}")
+    logger.info("GET /produtos/ - total encontrado: %s", total)
 
     # PAGINAÃ‡ÃƒO
     offset = (page - 1) * page_size
@@ -3582,7 +3582,7 @@ async def upload_imagem_produto(
         ).first()
 
         if not produto:
-            logger.error(f"[UPLOAD] Produto {produto_id} nÃ£o encontrado para usuÃ¡rio {current_user.email}")
+            logger.error("[UPLOAD] Produto nao encontrado para upload de imagem")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Produto nÃ£o encontrado"
@@ -3593,7 +3593,7 @@ async def upload_imagem_produto(
         # Validar tipo de arquivo
         allowed_types = ["image/jpeg", "image/png", "image/webp"]
         if file.content_type not in allowed_types:
-            logger.error(f"[UPLOAD] Tipo invÃ¡lido: {file.content_type}")
+            logger.error("[UPLOAD] Tipo de imagem invalido")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Formato nÃ£o aceito. Use JPG, PNG ou WebP"
@@ -3665,7 +3665,7 @@ async def upload_imagem_produto(
         db.commit()
         db.refresh(nova_imagem)
 
-        logger.info(f"[UPLOAD] ✅ Imagem {nova_imagem.id} adicionada ao produto {produto_id} por {current_user.email}")
+        logger.info("[UPLOAD] Imagem adicionada ao produto")
 
         return nova_imagem
 
@@ -3773,7 +3773,7 @@ def atualizar_imagem(
     db.commit()
     db.refresh(imagem)
 
-    logger.info(f"Imagem {imagem_id} atualizada por {user.email}")
+    logger.info("Imagem de produto atualizada")
 
     return imagem
 
@@ -3838,7 +3838,7 @@ def deletar_imagem(
 
     db.commit()
 
-    logger.info(f"Imagem {imagem_id} deletada por {current_user.email}")
+    logger.info("Imagem de produto deletada")
 
     return {"message": "Imagem deletada com sucesso"}
 
@@ -4117,7 +4117,7 @@ def atualizar_vinculo_fornecedor(
     db.commit()
     db.refresh(vinculo)
 
-    logger.info(f"VÃ­nculo fornecedor {vinculo_id} atualizado por {current_user.email}")
+    logger.info("Vinculo de fornecedor atualizado")
 
     # Buscar dados do fornecedor para resposta
     fornecedor = db.query(Cliente).filter(Cliente.id == vinculo.fornecedor_id).first()
@@ -4200,7 +4200,7 @@ def desvincular_fornecedor(
 
     db.commit()
 
-    logger.info(f"Fornecedor desvinculado (id {vinculo_id}) por {current_user.email}")
+    logger.info("Fornecedor desvinculado do produto")
 
     return {"message": "Fornecedor desvinculado com sucesso"}
 
@@ -4530,7 +4530,7 @@ async def listar_racoes_sem_classificacao(
     try:
         current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-        logger.info(f"[racao/alertas] Iniciando busca para tenant {tenant_id}, especie={especie}")
+        logger.info("[racao/alertas] Iniciando busca")
 
         # Buscar raÃ§Ãµes sem classificaÃ§Ã£o completa
         # Considera "raÃ§Ã£o" se:

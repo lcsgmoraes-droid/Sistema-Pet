@@ -247,7 +247,7 @@ def sync_now(
     from datetime import datetime, timezone
 
     current_user, tenant_id = auth
-    logger.info(f"[SEFAZ] [manual] Pedido de sync manual — tenant {tenant_id} user {current_user.id}")
+    logger.info("[SEFAZ] [manual] Pedido de sync manual recebido")
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
     cfg = SefazTenantConfigService.merged_config(tenant_id, tenant)
 

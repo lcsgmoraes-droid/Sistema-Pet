@@ -1094,7 +1094,10 @@ def processar_upload_conciliacao_vendas(
         }
     """
     try:
-        logger.info(f"[Upload] Iniciando processamento: {nome_arquivo} ({len(arquivo_bytes)} bytes)")
+        logger.info(
+            "[Upload] Iniciando processamento de arquivo de conciliacao (%s bytes)",
+            len(arquivo_bytes),
+        )
         
         # 1. Calcular hashes
         hashes = calcular_hash_arquivo(arquivo_bytes)

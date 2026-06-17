@@ -468,8 +468,8 @@ def _read_shared_snapshot(snapshot_name: str, tenant_id: int) -> Optional[dict]:
 
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as error:
-        logger.warning("Falha ao ler snapshot compartilhado %s do tenant %s: %s", snapshot_name, tenant_id, error)
+    except Exception:
+        logger.warning("Falha ao ler snapshot compartilhado", exc_info=True)
         return None
 
     if not isinstance(data, dict) or not isinstance(data.get("payload"), dict):
@@ -489,8 +489,8 @@ def _write_shared_snapshot(snapshot_name: str, tenant_id: int, payload: dict) ->
         temp_path = path.with_suffix(".tmp")
         temp_path.write_text(json.dumps(data, default=str, ensure_ascii=False), encoding="utf-8")
         os.replace(temp_path, path)
-    except Exception as error:
-        logger.warning("Falha ao gravar snapshot compartilhado %s do tenant %s: %s", snapshot_name, tenant_id, error)
+    except Exception:
+        logger.warning("Falha ao gravar snapshot compartilhado", exc_info=True)
 
 
 def _delete_shared_snapshot(snapshot_name: str, tenant_id: int) -> None:
@@ -2482,7 +2482,7 @@ def reconciliar_estoque(
     - origem=bling: Busca valor do Bling → atualiza sistema
     - origem=manual: Usa valor_manual → atualiza ambos
     """
-    logger.info(f"🔄 Reconciliando estoque - Produto {produto_id}, Origem: {origem}")
+    logger.info("Reconciliando estoque manual")
 
     current_user, _tenant = user_and_tenant
 

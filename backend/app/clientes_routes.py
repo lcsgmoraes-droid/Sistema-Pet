@@ -1204,8 +1204,8 @@ def update_cliente(
     
     import logging
     logger = logging.getLogger(__name__)
-    logger.info(f"[DEBUG update_cliente] ID={cliente_id}, tenant_id={tenant_id}, data_fechamento_comissao={cliente_data.data_fechamento_comissao}")
-    logger.info(f"[DEBUG] entregador_padrao={cliente_data.entregador_padrao}, gera_conta_pagar_custo_entrega={cliente_data.gera_conta_pagar_custo_entrega}")
+    logger.info("[update_cliente] Atualizando cliente")
+    logger.info("[update_cliente] Dados de configuracao de entrega recebidos")
     
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
     _validar_telefone_cliente_obrigatorio(cliente_data, cliente)
@@ -2248,8 +2248,8 @@ async def get_vendas_em_aberto(
     ).order_by(Venda.data_venda.asc()).all()
     
     # DEBUG: Log para verificar quantas vendas foram encontradas
-    logger.info(f"ðŸ” DEBUG vendas-em-aberto: cliente_id={cliente_id}, user_id={current_user.id}")
-    logger.info(f"ðŸ“Š Total vendas encontradas: {len(vendas_aberto)}")
+    logger.info("Buscando vendas em aberto do cliente")
+    logger.info("Total de vendas em aberto encontrado: %s", len(vendas_aberto))
     
     # Filtrar apenas vendas com saldo devedor maior que zero
     vendas_com_saldo = []

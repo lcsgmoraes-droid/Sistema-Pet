@@ -657,7 +657,7 @@ def listar_pedidos(
 ):
     """Lista pedidos de compra com filtros"""
     current_user, tenant_id = current_user_and_tenant
-    logger.info(f"📋 Listando pedidos de compra - Usuário: {current_user.nome}")
+    logger.info("Listando pedidos de compra")
     
     query = db.query(PedidoCompra).options(joinedload(PedidoCompra.itens)).filter(
         PedidoCompra.tenant_id == tenant_id
@@ -1342,9 +1342,7 @@ def buscar_rascunho_fornecedor(
 ):
     """Retorna o rascunho mais recente de um fornecedor, se existir."""
     current_user, tenant_id = current_user_and_tenant
-    logger.info(
-        f"🧾 Buscando rascunho em aberto do fornecedor {fornecedor_id} para o tenant {tenant_id}"
-    )
+    logger.info("Buscando rascunho em aberto do fornecedor")
 
     fornecedor = db.query(Cliente).filter(
         Cliente.id == fornecedor_id,

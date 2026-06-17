@@ -666,7 +666,7 @@ async def obter_opcoes_filtros(
         import logging
         
         logger = logging.getLogger(__name__)
-        logger.info(f"[opcoes-filtros] Iniciando busca de opções para tenant {tenant_id}")
+        logger.info("[opcoes-filtros] Iniciando busca de opcoes")
         
         # Marcas
         try:

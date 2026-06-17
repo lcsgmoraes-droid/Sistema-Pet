@@ -1939,12 +1939,7 @@ def excluir_venda(
             }
         )
 
-    logger.info(
-        "Cancelando venda por rota DELETE preservando auditoria: venda_id=%s user_id=%s tenant_id=%s",
-        venda_id,
-        current_user.id,
-        tenant_id,
-    )
+    logger.info("Cancelando venda por rota DELETE preservando auditoria")
     resultado = VendaService.cancelar_venda(
         venda_id=venda_id,
         motivo=motivo_final,
@@ -1972,10 +1967,10 @@ def registrar_devolucao(
     try:
         logger.info(f"\n{'='*80}")
         logger.info(f"🔄 INICIANDO DEVOLUÇÃO - Venda #{venda_id}")
-        logger.info(f"{'='*80}")
-        logger.info(f"📦 Dados recebidos: {dados}")
-        logger.info(f"👤 Usuário: {current_user.nome} (ID: {current_user.id})")
-        logger.info(f"🏪 Tenant ID: {tenant_id}")
+        logger.info("=" * 80)
+        logger.info("Dados de devolucao recebidos")
+        logger.info("Usuario autenticado para devolucao")
+        logger.info("Tenant validado para devolucao")
 
         # Buscar a venda
         venda = db.query(Venda).filter_by(

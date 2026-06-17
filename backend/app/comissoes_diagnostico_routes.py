@@ -73,7 +73,7 @@ async def diagnosticar_comissoes(
     user, tenant_id = current_user_tenant
     set_tenant_context(tenant_id)
     
-    logger.info(f"🔍 Diagnóstico de comissões para tenant {tenant_id}")
+    logger.info("Diagnostico de comissoes iniciado")
     
     try:
         # ============================================================
