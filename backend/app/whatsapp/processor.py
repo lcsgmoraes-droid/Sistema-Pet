@@ -10,6 +10,7 @@ Orquestra todo o fluxo de processamento:
 6. Enviar resposta
 7. Registrar métricas
 """
+
 import json
 import logging
 import os
@@ -20,9 +21,18 @@ from types import SimpleNamespace
 
 from app.ai.intent_classifier import IntentClassifier, IntentRouter
 from app.ai.context_builder import ContextBuilder
-from app.ai.llm_client import LLMClient, PromptBuilder, AVAILABLE_FUNCTIONS_PHASE1_READ_ONLY
+from app.ai.llm_client import (
+    LLMClient,
+    PromptBuilder,
+    AVAILABLE_FUNCTIONS_PHASE1_READ_ONLY,
+)
 from app.whatsapp.sender import send_whatsapp_message
-from app.whatsapp.models import WhatsAppSession, WhatsAppMessage, WhatsAppMetric, TenantWhatsAppConfig
+from app.whatsapp.models import (
+    WhatsAppSession,
+    WhatsAppMessage,
+    WhatsAppMetric,
+    TenantWhatsAppConfig,
+)
 from app.whatsapp.handoff_manager import HandoffManager
 from app.whatsapp.tenant_context import whatsapp_tenant_context
 
@@ -33,16 +43,18 @@ class MessageProcessor:
     """
     Processador principal de mensagens WhatsApp.
     """
-    
+
     def __init__(self, db: Session, tenant_id: str):
         self.db = db
         self.tenant_id = tenant_id
-        
+
         # Buscar config
         with whatsapp_tenant_context(tenant_id):
-            config = db.query(TenantWhatsAppConfig).filter(
-                TenantWhatsAppConfig.tenant_id == tenant_id
-            ).first()
+            config = (
+                db.query(TenantWhatsAppConfig)
+                .filter(TenantWhatsAppConfig.tenant_id == tenant_id)
+                .first()
+            )
 
         fallback_openai_key = os.getenv("OPENAI_API_KEY", "")
         if not config:
@@ -60,16 +72,22 @@ class MessageProcessor:
             if not self.config.openai_api_key and fallback_openai_key:
                 self.config = SimpleNamespace(
                     openai_api_key=fallback_openai_key,
-                    auto_response_enabled=getattr(config, "auto_response_enabled", True),
+                    auto_response_enabled=getattr(
+                        config, "auto_response_enabled", True
+                    ),
                     bot_name=getattr(config, "bot_name", "Assistente"),
                 )
 
         self.ai_enabled = bool(self.config.openai_api_key)
 
         # Inicializar componentes
-        self.intent_classifier = IntentClassifier(self.config.openai_api_key) if self.ai_enabled else None
+        self.intent_classifier = (
+            IntentClassifier(self.config.openai_api_key) if self.ai_enabled else None
+        )
         self.context_builder = ContextBuilder(db)
-        self.llm_client = LLMClient(self.config.openai_api_key) if self.ai_enabled else None
+        self.llm_client = (
+            LLMClient(self.config.openai_api_key) if self.ai_enabled else None
+        )
         self.router = IntentRouter()
 
     @staticmethod
@@ -88,7 +106,9 @@ class MessageProcessor:
         ]
         return any(trigger in text for trigger in triggers)
 
-    async def _build_context(self, session_id: str, message_content: str) -> Dict[str, Any]:
+    async def _build_context(
+        self, session_id: str, message_content: str
+    ) -> Dict[str, Any]:
         try:
             return await self.context_builder.build_context(
                 tenant_id=self.tenant_id,
@@ -96,11 +116,15 @@ class MessageProcessor:
                 message=message_content,
             )
         except Exception as context_error:
-            logger.warning(f"Falha ao construir contexto, seguindo com contexto mínimo: {context_error}")
+            logger.warning(
+                f"Falha ao construir contexto, seguindo com contexto mínimo: {context_error}"
+            )
             self.db.rollback()
             return {}
 
-    async def _detect_intent(self, message_content: str, context: Dict[str, Any]) -> tuple[str, float]:
+    async def _detect_intent(
+        self, message_content: str, context: Dict[str, Any]
+    ) -> tuple[str, float]:
         if not self.ai_enabled:
             return "geral", 0.6
 
@@ -134,7 +158,9 @@ class MessageProcessor:
             logger.warning(f"Falha ao salvar intent na sessão: {session_save_error}")
             self.db.rollback()
 
-    def _save_detected_intent(self, message_id: str, session_id: str, intent: str) -> None:
+    def _save_detected_intent(
+        self, message_id: str, session_id: str, intent: str
+    ) -> None:
         self._save_message_intent(message_id, intent)
         self._save_session_intent(session_id, intent)
 
@@ -157,7 +183,9 @@ class MessageProcessor:
 
         return None
 
-    async def _send_basic_mode_response(self, session_id: str, intent: str) -> Dict[str, Any]:
+    async def _send_basic_mode_response(
+        self, session_id: str, intent: str
+    ) -> Dict[str, Any]:
         return await self._send_response(
             session_id=session_id,
             response=(
@@ -171,7 +199,9 @@ class MessageProcessor:
             processing_time_ms=0,
         )
 
-    async def _handle_processing_error(self, session_id: str, error: Exception) -> Dict[str, Any]:
+    async def _handle_processing_error(
+        self, session_id: str, error: Exception
+    ) -> Dict[str, Any]:
         logger.error(f"❌ Erro ao processar mensagem: {error}")
         self.db.rollback()
         fallback_message = await send_whatsapp_message(
@@ -183,12 +213,9 @@ class MessageProcessor:
         if fallback_message:
             return {"action": "fallback_responded", "error": str(error)}
         return {"action": "error", "error": str(error)}
-    
+
     async def process_message(
-        self,
-        session_id: str,
-        message_id: str,
-        message_content: str
+        self, session_id: str, message_id: str, message_content: str
     ) -> Dict[str, Any]:
         with whatsapp_tenant_context(self.tenant_id):
             return await self._process_message_with_context(
@@ -198,41 +225,38 @@ class MessageProcessor:
             )
 
     async def _process_message_with_context(
-        self,
-        session_id: str,
-        message_id: str,
-        message_content: str
+        self, session_id: str, message_id: str, message_content: str
     ) -> Dict[str, Any]:
         """
         Processa mensagem completa.
-        
+
         Args:
             session_id: ID da sessão
             message_id: ID da mensagem no banco
             message_content: Conteúdo da mensagem
-            
+
         Returns:
             Resultado do processamento
         """
         start_time = datetime.utcnow()
-        
+
         try:
             logger.info(f"🔄 Processando mensagem: session={session_id}")
-            
+
             # 0. Verificar se auto-response está habilitado
             if not self.config.auto_response_enabled:
                 logger.info("Auto-response desabilitado")
                 return {"action": "skipped", "reason": "auto_response_disabled"}
-            
+
             # 1. Construir contexto
             context = await self._build_context(session_id, message_content)
 
             # 2. Classificar intenção
             intent, confidence = await self._detect_intent(message_content, context)
-            
+
             # Atualizar mensagem e sessão com intent detectado
             self._save_detected_intent(message_id, session_id, intent)
-            
+
             # 3. Verificar se deve transferir para humano
             transfer_result = await self._maybe_transfer_to_human(
                 session_id=session_id,
@@ -242,13 +266,12 @@ class MessageProcessor:
             )
             if transfer_result:
                 return transfer_result
-            
+
             # 4. Resposta rápida (sem IA) para intents simples
             quick_response = self.router.get_quick_response(
-                intent,
-                bot_name=self.config.bot_name or "Assistente"
+                intent, bot_name=self.config.bot_name or "Assistente"
             )
-            
+
             if quick_response:
                 return await self._send_response(
                     session_id=session_id,
@@ -257,9 +280,9 @@ class MessageProcessor:
                     model_used="quick_response",
                     tokens_input=0,
                     tokens_output=0,
-                    processing_time_ms=0
+                    processing_time_ms=0,
                 )
-            
+
             # 5. Processar com IA
             if not self.ai_enabled:
                 return await self._send_basic_mode_response(session_id, intent)
@@ -268,27 +291,27 @@ class MessageProcessor:
                 session_id=session_id,
                 message_content=message_content,
                 context=context,
-                intent=intent
+                intent=intent,
             )
-            
+
         except Exception as e:
             return await self._handle_processing_error(session_id, e)
-        
+
         finally:
             # Registrar métrica
             processing_time = (datetime.utcnow() - start_time).total_seconds()
             await self._log_metric("processing_time", processing_time)
-    
+
     # ========================================================================
     # PROCESSAMENTO COM IA
     # ========================================================================
-    
+
     async def _process_with_ai(
         self,
         session_id: str,
         message_content: str,
         context: Dict[str, Any],
-        intent: str
+        intent: str,
     ) -> Dict[str, Any]:
         """
         Processa mensagem com IA (GPT).
@@ -296,27 +319,27 @@ class MessageProcessor:
         try:
             # 1. Construir system prompt
             system_prompt = PromptBuilder.build_system_prompt(context)
-            
+
             # 2. Construir histórico
             history_messages = PromptBuilder.format_conversation_history(
                 context.get("historico_conversa", [])
             )
-            
+
             # 3. Mensagem atual
             current_message = {"role": "user", "content": message_content}
-            
+
             # 4. Montar messages completo
             messages = [
                 {"role": "system", "content": system_prompt},
                 *history_messages,
-                current_message
+                current_message,
             ]
-            
+
             # 5. Decidir modelo
             model = None
             if self.router.should_use_advanced_model(intent, context):
                 model = "gpt-4-turbo-preview"  # Força modelo avançado
-            
+
             # 6. Chamar LLM
             response = await self.llm_client.chat_completion(
                 messages=messages,
@@ -324,9 +347,9 @@ class MessageProcessor:
                 temperature=0.7,
                 max_tokens=500,
                 functions=AVAILABLE_FUNCTIONS_PHASE1_READ_ONLY,
-                function_call="auto"
+                function_call="auto",
             )
-            
+
             # 7. Verificar se chamou function
             if response.get("tool_calls"):
                 return await self._handle_function_calls(
@@ -334,9 +357,9 @@ class MessageProcessor:
                     tool_calls=response["tool_calls"],
                     context=context,
                     messages=messages,
-                    response=response
+                    response=response,
                 )
-            
+
             # 8. Resposta direta (sem function call)
             return await self._send_response(
                 session_id=session_id,
@@ -345,9 +368,9 @@ class MessageProcessor:
                 model_used=response["model_used"],
                 tokens_input=response["tokens_input"],
                 tokens_output=response["tokens_output"],
-                processing_time_ms=response["processing_time_ms"]
+                processing_time_ms=response["processing_time_ms"],
             )
-            
+
         except Exception as e:
             logger.error(f"Erro no processamento IA: {e}")
             self.db.rollback()
@@ -359,75 +382,79 @@ class MessageProcessor:
                 model_used="fallback",
                 tokens_input=0,
                 tokens_output=0,
-                processing_time_ms=0
+                processing_time_ms=0,
             )
-    
+
     # ========================================================================
     # FUNCTION CALLING
     # ========================================================================
-    
+
     async def _handle_function_calls(
         self,
         session_id: str,
         tool_calls: list,
         context: Dict,
         messages: list,
-        response: Dict
+        response: Dict,
     ) -> Dict[str, Any]:
         """
         Executa function calls e retorna resposta final.
         """
         logger.info(f"🔧 Function calls: {[tc['function'] for tc in tool_calls]}")
-        
+
         # Executar cada function
         function_results = []
-        
+
         for tool_call in tool_calls:
             function_name = tool_call["function"]
             arguments = tool_call["arguments"]
-            
+
             # Executar function
             result = await self._execute_function(
                 function_name=function_name,
                 arguments=arguments,
                 context=context,
-                session_id=session_id
+                session_id=session_id,
             )
-            
-            function_results.append({
-                "tool_call_id": tool_call["id"],
-                "role": "tool",
-                "name": function_name,
-                "content": str(result)
-            })
-        
+
+            function_results.append(
+                {
+                    "tool_call_id": tool_call["id"],
+                    "role": "tool",
+                    "name": function_name,
+                    "content": str(result),
+                }
+            )
+
         # Chamar IA novamente com resultados das functions
         # OBRIGATÓRIO: adicionar primeiro a mensagem do assistente com tool_calls
         # (a API da OpenAI exige que toda mensagem "tool" seja precedida por
         #  uma mensagem "assistant" contendo os tool_calls correspondentes)
-        messages.append({
-            "role": "assistant",
-            "content": response.get("content"),
-            "tool_calls": [
-                {
-                    "id": tc["id"],
-                    "type": "function",
-                    "function": {
-                        "name": tc["function"],
-                        "arguments": json.dumps(tc["arguments"], ensure_ascii=False)
+        messages.append(
+            {
+                "role": "assistant",
+                "content": response.get("content"),
+                "tool_calls": [
+                    {
+                        "id": tc["id"],
+                        "type": "function",
+                        "function": {
+                            "name": tc["function"],
+                            "arguments": json.dumps(
+                                tc["arguments"], ensure_ascii=False
+                            ),
+                        },
                     }
-                }
-                for tc in tool_calls
-            ]
-        })
-        messages.extend(function_results)
-        
-        final_response = await self.llm_client.chat_completion(
-            messages=messages,
-            temperature=0.7,
-            max_tokens=500
+                    for tc in tool_calls
+                ],
+            }
         )
-        
+        messages.extend(function_results)
+
+        final_response = await self.llm_client.chat_completion(
+            messages=messages, temperature=0.7, max_tokens=500
+        )
+
         # Enviar resposta final
         return await self._send_response(
             session_id=session_id,
@@ -436,24 +463,21 @@ class MessageProcessor:
             model_used=final_response["model_used"],
             tokens_input=response["tokens_input"] + final_response["tokens_input"],
             tokens_output=response["tokens_output"] + final_response["tokens_output"],
-            processing_time_ms=response["processing_time_ms"] + final_response["processing_time_ms"]
+            processing_time_ms=response["processing_time_ms"]
+            + final_response["processing_time_ms"],
         )
-    
+
     async def _execute_function(
-        self,
-        function_name: str,
-        arguments: Dict,
-        context: Dict,
-        session_id: str
+        self, function_name: str, arguments: Dict, context: Dict, session_id: str
     ) -> Any:
         """
         Executa function call usando handlers reais.
         """
         logger.info(f"🔧 Executando function: {function_name}({arguments})")
-        
+
         # Importar handlers
         from app.whatsapp.function_handlers import execute_function
-        
+
         # Executar function real
         try:
             result = execute_function(
@@ -461,20 +485,20 @@ class MessageProcessor:
                 db=self.db,
                 tenant_id=self.tenant_id,
                 session_id=session_id,
-                **arguments
+                **arguments,
             )
-            
+
             logger.info(f"✅ Function {function_name} executada: {result}")
             return result
-            
+
         except Exception as e:
             logger.error(f"❌ Erro ao executar {function_name}: {e}")
             return {"error": str(e)}
-    
+
     # ========================================================================
     # HELPERS
     # ========================================================================
-    
+
     async def _send_response(
         self,
         session_id: str,
@@ -483,7 +507,7 @@ class MessageProcessor:
         model_used: str,
         tokens_input: int,
         tokens_output: int,
-        processing_time_ms: int
+        processing_time_ms: int,
     ) -> Dict[str, Any]:
         """
         Envia resposta via WhatsApp e registra no banco.
@@ -493,39 +517,36 @@ class MessageProcessor:
             db=self.db,
             tenant_id=self.tenant_id,
             session_id=session_id,
-            message=response
+            message=response,
         )
-        
+
         if not message:
             logger.error("Falha ao enviar mensagem")
             return {"action": "error", "error": "send_failed"}
-        
+
         # Atualizar mensagem com métricas de IA
         message.model_used = model_used
         message.tokens_input = tokens_input
         message.tokens_output = tokens_output
         message.processing_time_ms = processing_time_ms
         self.db.commit()
-        
+
         # Registrar métricas
         await self._log_metric("message_sent", 1)
         await self._log_metric("tokens_used", tokens_input + tokens_output)
-        
+
         logger.info(f"✅ Resposta enviada: {len(response)} chars")
-        
+
         return {
             "action": "responded",
             "message_id": message.id,
             "intent": intent,
             "model": model_used,
-            "tokens": tokens_input + tokens_output
+            "tokens": tokens_input + tokens_output,
         }
-    
+
     async def _transfer_to_human(
-        self,
-        session_id: str,
-        reason: str,
-        reason_details: Optional[str] = None
+        self, session_id: str, reason: str, reason_details: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Transfere conversa para atendente humano.
@@ -546,28 +567,31 @@ class MessageProcessor:
                     session_id=session_id,
                     phone_number=session.phone_number,
                     reason=reason,
-                    priority="high" if reason in {"reclamacao", "manual_request"} else "medium",
-                    reason_details=reason_details or f"Transferência automática por intent: {reason}"
+                    priority="high"
+                    if reason in {"reclamacao", "manual_request"}
+                    else "medium",
+                    reason_details=reason_details
+                    or f"Transferência automática por intent: {reason}",
                 )
 
             self.db.commit()
-        
+
         # Enviar mensagem de transferência
         await send_whatsapp_message(
             db=self.db,
             tenant_id=self.tenant_id,
             session_id=session_id,
-            message="Um momento! Estou transferindo você para um atendente humano. ⏳"
+            message="Um momento! Estou transferindo você para um atendente humano. ⏳",
         )
-        
+
         logger.info(f"👤 Transferido para humano: {reason}")
-        
+
         return {
             "action": "transferred_to_human",
             "reason": reason,
             "handoff_id": str(handoff.id) if handoff else None,
         }
-    
+
     async def _log_metric(self, metric_type: str, value: float):
         with whatsapp_tenant_context(self.tenant_id):
             return await self._log_metric_with_context(metric_type, value)
@@ -579,7 +603,7 @@ class MessageProcessor:
                 tenant_id=self.tenant_id,
                 metric_type=metric_type,
                 value=value,
-                timestamp=datetime.utcnow()
+                timestamp=datetime.utcnow(),
             )
             self.db.add(metric)
             self.db.commit()

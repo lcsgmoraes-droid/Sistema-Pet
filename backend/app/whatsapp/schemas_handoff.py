@@ -2,6 +2,7 @@
 Sprint 4 - Human Handoff Schemas
 Pydantic models para validação de requests/responses
 """
+
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -11,8 +12,10 @@ from uuid import UUID
 
 # ==================== WHATSAPP AGENT SCHEMAS ====================
 
+
 class WhatsAppAgentCreate(BaseModel):
     """Criar novo agente"""
+
     name: str = Field(..., min_length=3, max_length=200)
     email: str = Field(..., min_length=5, max_length=200)
     status: str = Field(default="offline", pattern="^(online|offline|busy|away)$")
@@ -21,6 +24,7 @@ class WhatsAppAgentCreate(BaseModel):
 
 class WhatsAppAgentUpdate(BaseModel):
     """Atualizar agente existente"""
+
     name: Optional[str] = Field(None, min_length=3, max_length=200)
     email: Optional[str] = Field(None, min_length=5, max_length=200)
     status: Optional[str] = Field(None, pattern="^(online|offline|busy|away)$")
@@ -31,6 +35,7 @@ class WhatsAppAgentUpdate(BaseModel):
 
 class WhatsAppAgentResponse(BaseModel):
     """Response de agente"""
+
     id: str
     tenant_id: str
     user_id: int
@@ -43,22 +48,24 @@ class WhatsAppAgentResponse(BaseModel):
     receive_notifications: bool
     created_at: datetime
     updated_at: datetime
-    
-    @field_validator('id', 'tenant_id', mode='before')
+
+    @field_validator("id", "tenant_id", mode="before")
     @classmethod
     def validate_uuid(cls, v):
         if isinstance(v, UUID):
             return str(v)
         return v
-    
+
     class Config:
         from_attributes = True
 
 
 # ==================== WHATSAPP HANDOFF SCHEMAS ====================
 
+
 class WhatsAppHandoffCreate(BaseModel):
     """Criar novo handoff"""
+
     session_id: str
     phone_number: str
     customer_name: Optional[str] = None
@@ -69,6 +76,7 @@ class WhatsAppHandoffCreate(BaseModel):
 
 class WhatsAppHandoffResponse(BaseModel):
     """Response de handoff"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -88,8 +96,10 @@ class WhatsAppHandoffResponse(BaseModel):
     rating_feedback: Optional[str]
     created_at: datetime
     updated_at: datetime
-    
-    @field_validator('id', 'tenant_id', 'session_id', 'assigned_agent_id', mode='before')
+
+    @field_validator(
+        "id", "tenant_id", "session_id", "assigned_agent_id", mode="before"
+    )
     @classmethod
     def validate_uuid(cls, v):
         if v is None:
@@ -97,29 +107,36 @@ class WhatsAppHandoffResponse(BaseModel):
         if isinstance(v, UUID):
             return str(v)
         return v
-    
+
 
 class WhatsAppHandoffAssign(BaseModel):
     """Atribuir handoff a um agente"""
+
     agent_id: str
 
 
 class WhatsAppHandoffResolve(BaseModel):
     """Resolver handoff"""
+
     resolution_notes: str = Field(..., min_length=1, max_length=2000)
 
 
 # ==================== INTERNAL NOTES ====================
 
+
 class WhatsAppInternalNoteCreate(BaseModel):
     """Criar nota interna"""
+
     author_id: Optional[str] = None
     content: str = Field(..., min_length=1, max_length=2000)
-    note_type: Optional[str] = Field(default="info", pattern="^(info|warning|follow_up)$")
+    note_type: Optional[str] = Field(
+        default="info", pattern="^(info|warning|follow_up)$"
+    )
 
 
 class WhatsAppInternalNoteResponse(BaseModel):
     """Response de nota interna"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: str
@@ -128,19 +145,21 @@ class WhatsAppInternalNoteResponse(BaseModel):
     content: str
     note_type: str
     created_at: datetime
-    
-    @field_validator('id', 'handoff_id', 'author_id', mode='before')
+
+    @field_validator("id", "handoff_id", "author_id", mode="before")
     @classmethod
     def validate_uuid(cls, v):
         if isinstance(v, UUID):
             return str(v)
         return v
-    
+
 
 # ==================== DASHBOARD SCHEMAS ====================
 
+
 class HandoffDashboardResponse(BaseModel):
     """Dashboard de handoffs"""
+
     pending: List[WhatsAppHandoffResponse]
     active: List[WhatsAppHandoffResponse]
     stats: Dict[str, Any]
@@ -148,6 +167,7 @@ class HandoffDashboardResponse(BaseModel):
 
 class HandoffStats(BaseModel):
     """Estatísticas de handoffs"""
+
     total_handoffs: int
     pending_count: int
     active_count: int
@@ -157,6 +177,7 @@ class HandoffStats(BaseModel):
 
 
 # ==================== LEGACY SCHEMAS (manter compatibilidade) ====================
+
 
 class AgentBase(BaseModel):
     name: str
@@ -187,7 +208,7 @@ class AgentResponse(AgentBase):
     current_chats: int
     created_at: datetime
     updated_at: datetime
-    
+
     class Config:
         from_attributes = True
 
@@ -205,8 +226,12 @@ class AgentStats(BaseModel):
 
 # ==================== HANDOFF SCHEMAS ====================
 
+
 class HandoffBase(BaseModel):
-    reason: str = Field(..., description="auto_sentiment, manual_request, auto_repeat, auto_timeout, auto_complex")
+    reason: str = Field(
+        ...,
+        description="auto_sentiment, manual_request, auto_repeat, auto_timeout, auto_complex",
+    )
     reason_details: Optional[str] = None
     priority: str = "medium"  # low, medium, high, urgent
 
@@ -245,23 +270,25 @@ class HandoffResponse(HandoffBase):
     rating_feedback: Optional[str]
     created_at: datetime
     updated_at: datetime
-    
+
     # Dados adicionais (computados)
     agent_name: Optional[str] = None
     message_count: int = 0
     last_message_at: Optional[datetime] = None
-    
+
     class Config:
         from_attributes = True
 
 
 class HandoffWithMessages(HandoffResponse):
     """Handoff com histórico de mensagens"""
+
     messages: List[Dict[str, Any]] = []
     notes: List[Dict[str, Any]] = []
 
 
 # ==================== INTERNAL NOTE SCHEMAS ====================
+
 
 class InternalNoteCreate(BaseModel):
     note: str
@@ -275,15 +302,17 @@ class InternalNoteResponse(InternalNoteCreate):
     agent_id: str
     agent_name: str
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
 
 
 # ==================== DASHBOARD SCHEMAS ====================
 
+
 class ConversationListItem(BaseModel):
     """Item da lista de conversas no dashboard"""
+
     session_id: str
     phone_number: str
     customer_name: Optional[str]
@@ -292,7 +321,7 @@ class ConversationListItem(BaseModel):
     last_message_at: datetime
     message_count: int
     unread_count: int = 0
-    
+
     # Handoff info (se existir)
     handoff_id: Optional[str] = None
     handoff_status: Optional[str] = None
@@ -304,6 +333,7 @@ class ConversationListItem(BaseModel):
 
 class DashboardStats(BaseModel):
     """Estatísticas do dashboard"""
+
     pending_handoffs: int
     active_conversations: int
     agents_online: int
@@ -315,31 +345,37 @@ class DashboardStats(BaseModel):
 
 class TakeConversationRequest(BaseModel):
     """Request para atendente pegar conversa"""
+
     agent_id: str
 
 
 class SendAgentMessageRequest(BaseModel):
     """Request para atendente enviar mensagem"""
+
     message: str
     agent_id: str
 
 
 class ResolveHandoffRequest(BaseModel):
     """Request para marcar handoff como resolvido"""
+
     resolution_notes: str
     send_rating_request: bool = True
 
 
 class RateConversationRequest(BaseModel):
     """Request para cliente avaliar atendimento"""
+
     rating: int = Field(..., ge=1, le=5)
     feedback: Optional[str] = None
 
 
 # ==================== BOT ASSIST SCHEMAS ====================
 
+
 class BotAssistSuggestion(BaseModel):
     """Sugestão do bot assist para atendente"""
+
     type: str  # quick_reply, product_info, customer_history, similar_question
     title: str
     content: str
@@ -349,6 +385,7 @@ class BotAssistSuggestion(BaseModel):
 
 class BotAssistRequest(BaseModel):
     """Request para buscar sugestões do bot assist"""
+
     session_id: str
     context: Optional[str] = None
     query: Optional[str] = None
@@ -356,6 +393,7 @@ class BotAssistRequest(BaseModel):
 
 class BotAssistResponse(BaseModel):
     """Response com sugestões do bot assist"""
+
     suggestions: List[BotAssistSuggestion]
     customer_summary: Optional[Dict[str, Any]] = None
     recent_products: List[Dict[str, Any]] = []
@@ -364,8 +402,10 @@ class BotAssistResponse(BaseModel):
 
 # ==================== SENTIMENT ANALYSIS SCHEMAS ====================
 
+
 class SentimentAnalysisResult(BaseModel):
     """Resultado de análise de sentimento"""
+
     score: Decimal = Field(..., ge=-1.0, le=1.0)
     label: str  # very_negative, negative, neutral, positive, very_positive
     confidence: float = Field(..., ge=0.0, le=1.0)
