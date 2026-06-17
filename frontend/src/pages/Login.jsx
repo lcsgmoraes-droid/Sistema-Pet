@@ -1,41 +1,41 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { FiAlertCircle, FiEye, FiEyeOff, FiLock, FiMail } from 'react-icons/fi';
-import { useAuth } from '../contexts/AuthContext';
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { FiAlertCircle, FiEye, FiEyeOff, FiLock, FiMail } from "react-icons/fi";
+import { useAuth } from "../contexts/AuthContext";
 
-const COREPET_LOGO = '/brand/corepet/corepet-horizontal.png';
+const COREPET_LOGO = "/brand/corepet/corepet-horizontal.png";
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const redirectAfterLogin = () => {
-    const savedUser = localStorage.getItem('user');
+    const savedUser = localStorage.getItem("user");
     if (!savedUser) {
-      navigate('/lembretes');
+      navigate("/lembretes");
       return;
     }
 
     const user = JSON.parse(savedUser);
     const roleName = user.role?.name?.toLowerCase();
 
-    if (roleName === 'caixa') {
-      navigate('/pdv');
-    } else if (roleName === 'admin' || roleName === 'gerente') {
-      navigate('/dashboard');
+    if (roleName === "caixa") {
+      navigate("/pdv");
+    } else if (roleName === "admin" || roleName === "gerente") {
+      navigate("/dashboard");
     } else {
-      navigate('/lembretes');
+      navigate("/lembretes");
     }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
@@ -43,10 +43,10 @@ const Login = () => {
       if (result.success) {
         redirectAfterLogin();
       } else {
-        setError(result.error || 'Erro desconhecido ao fazer login');
+        setError(result.error || "Erro desconhecido ao fazer login");
       }
     } catch {
-      setError('Erro inesperado ao fazer login');
+      setError("Erro inesperado ao fazer login");
     } finally {
       setLoading(false);
     }
@@ -69,14 +69,15 @@ const Login = () => {
             <FiAlertCircle className="flex-shrink-0 mt-0.5" />
             <div className="text-sm">
               <div>{error}</div>
-              {String(error).toLowerCase().includes('email') && String(error).toLowerCase().includes('confirm') && (
-                <Link
-                  to={`/verificar-email?email=${encodeURIComponent(email)}`}
-                  className="inline-block mt-2 font-semibold text-red-800 underline"
-                >
-                  Confirmar e-mail ou reenviar link
-                </Link>
-              )}
+              {String(error).toLowerCase().includes("email") &&
+                String(error).toLowerCase().includes("confirm") && (
+                  <Link
+                    to={`/verificar-email?email=${encodeURIComponent(email)}`}
+                    className="inline-block mt-2 font-semibold text-red-800 underline"
+                  >
+                    Confirmar e-mail ou reenviar link
+                  </Link>
+                )}
             </div>
           </div>
         )}
@@ -103,7 +104,7 @@ const Login = () => {
             <div className="relative">
               <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
-                type={showPassword ? 'text' : 'password'}
+                type={showPassword ? "text" : "password"}
                 value={password}
                 autoComplete="current-password"
                 onChange={(event) => setPassword(event.target.value)}
@@ -115,7 +116,7 @@ const Login = () => {
                 type="button"
                 onClick={() => setShowPassword((value) => !value)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
               >
                 {showPassword ? <FiEyeOff /> : <FiEye />}
               </button>
@@ -127,19 +128,22 @@ const Login = () => {
             disabled={loading}
             className="w-full bg-[#0f8b8d] hover:bg-[#0d7375] text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Entrando...' : 'Entrar'}
+            {loading ? "Entrando..." : "Entrar"}
           </button>
         </form>
 
         <div className="mt-4 text-center">
-          <Link to="/recuperar-senha" className="text-sm text-[#0f8b8d] hover:text-[#0d7375] font-semibold">
+          <Link
+            to="/recuperar-senha"
+            className="text-sm text-[#0f8b8d] hover:text-[#0d7375] font-semibold"
+          >
             Esqueci minha senha
           </Link>
         </div>
 
         <div className="mt-6 text-center">
           <p className="text-gray-600">
-            Nao tem uma conta?{' '}
+            Nao tem uma conta?{" "}
             <Link to="/register" className="text-[#0f8b8d] hover:text-[#0d7375] font-semibold">
               Criar conta
             </Link>

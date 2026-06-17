@@ -2,9 +2,10 @@ export function toNumber(value) {
   if (value == null || value === "") return 0;
   let normalized = String(value).trim();
   if (normalized.includes(",") && normalized.includes(".")) {
-    normalized = normalized.lastIndexOf(",") > normalized.lastIndexOf(".")
-      ? normalized.replace(/\./g, "").replace(",", ".")
-      : normalized.replace(/,/g, "");
+    normalized =
+      normalized.lastIndexOf(",") > normalized.lastIndexOf(".")
+        ? normalized.replace(/\./g, "").replace(",", ".")
+        : normalized.replace(/,/g, "");
   } else if (normalized.includes(",")) {
     normalized = normalized.replace(",", ".");
   } else if ((normalized.match(/\./g) || []).length > 1) {
@@ -110,8 +111,12 @@ export function recalcularItemOrcamento(item, updates = {}) {
 }
 
 export function calcularTotaisOrcamento(itens) {
-  const custoTotal = roundMoney((itens || []).reduce((total, item) => total + toNumber(item.custo_total_estimado), 0));
-  const precoTotal = roundMoney((itens || []).reduce((total, item) => total + toNumber(item.preco_total), 0));
+  const custoTotal = roundMoney(
+    (itens || []).reduce((total, item) => total + toNumber(item.custo_total_estimado), 0),
+  );
+  const precoTotal = roundMoney(
+    (itens || []).reduce((total, item) => total + toNumber(item.preco_total), 0),
+  );
   const margem = calcularMargem(precoTotal, custoTotal);
   return {
     custo_total_estimado: custoTotal,

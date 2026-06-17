@@ -1,12 +1,19 @@
-import { useState, useEffect } from 'react';
-import api from '../api.js';
-import { 
-  FiPlus, FiEdit2, FiTrash2, FiSave, FiX, FiAlertCircle, 
-  FiChevronDown, FiChevronRight, FiCheck 
-} from 'react-icons/fi';
-import { PawPrint } from 'lucide-react';
-import './Cadastros.css';
-import './EspeciesRacas.css';
+import { useState, useEffect } from "react";
+import api from "../api.js";
+import {
+  FiPlus,
+  FiEdit2,
+  FiTrash2,
+  FiSave,
+  FiX,
+  FiAlertCircle,
+  FiChevronDown,
+  FiChevronRight,
+  FiCheck,
+} from "react-icons/fi";
+import { PawPrint } from "lucide-react";
+import "./Cadastros.css";
+import "./EspeciesRacas.css";
 
 const EspeciesRacas = () => {
   const [especies, setEspecies] = useState([]);
@@ -17,18 +24,18 @@ const EspeciesRacas = () => {
   const [editingEspecie, setEditingEspecie] = useState(null);
   const [editingRaca, setEditingRaca] = useState(null);
   const [especieSelecionada, setEspecieSelecionada] = useState(null);
-  const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  
+  const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+
   const [formEspecie, setFormEspecie] = useState({
-    nome: '',
-    ativo: true
+    nome: "",
+    ativo: true,
   });
 
   const [formRaca, setFormRaca] = useState({
-    nome: '',
-    especie_id: '',
-    ativo: true
+    nome: "",
+    especie_id: "",
+    ativo: true,
   });
 
   useEffect(() => {
@@ -39,24 +46,24 @@ const EspeciesRacas = () => {
     try {
       setLoading(true);
       const [especiesRes, racasRes] = await Promise.all([
-        api.get('/cadastros/especies'),
-        api.get('/cadastros/racas')
+        api.get("/cadastros/especies"),
+        api.get("/cadastros/racas"),
       ]);
-      
+
       // Agrupar raças por espécie
-      const especiesComRacas = especiesRes.data.map(especie => ({
+      const especiesComRacas = especiesRes.data.map((especie) => ({
         ...especie,
-        racas: racasRes.data.filter(r => r.especie_id === especie.id)
+        racas: racasRes.data.filter((r) => r.especie_id === especie.id),
       }));
-      
+
       setEspecies(especiesComRacas);
-      
+
       // Expandir todas por padrão
-      const todasEspecies = new Set(especiesComRacas.map(e => e.id));
+      const todasEspecies = new Set(especiesComRacas.map((e) => e.id));
       setExpandedEspecies(todasEspecies);
     } catch (err) {
-      console.error('Erro ao carregar dados:', err);
-      setError('Erro ao carregar dados');
+      console.error("Erro ao carregar dados:", err);
+      setError("Erro ao carregar dados");
     } finally {
       setLoading(false);
     }
@@ -79,29 +86,29 @@ const EspeciesRacas = () => {
       setEditingEspecie(especie);
       setFormEspecie({
         nome: especie.nome,
-        ativo: especie.ativo
+        ativo: especie.ativo,
       });
     } else {
       setEditingEspecie(null);
-      setFormEspecie({ nome: '', ativo: true });
+      setFormEspecie({ nome: "", ativo: true });
     }
-    setError('');
+    setError("");
     setShowModalEspecie(true);
   };
 
   const fecharModalEspecie = () => {
     setShowModalEspecie(false);
     setEditingEspecie(null);
-    setFormEspecie({ nome: '', ativo: true });
-    setError('');
+    setFormEspecie({ nome: "", ativo: true });
+    setError("");
   };
 
   const handleSubmitEspecie = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
-    if (!formEspecie.nome || formEspecie.nome.trim() === '') {
-      setError('O nome da espécie é obrigatório');
+    if (!formEspecie.nome || formEspecie.nome.trim() === "") {
+      setError("O nome da espécie é obrigatório");
       return;
     }
 
@@ -109,19 +116,23 @@ const EspeciesRacas = () => {
       if (editingEspecie) {
         await api.put(`/cadastros/especies/${editingEspecie.id}`, formEspecie);
       } else {
-        await api.post('/cadastros/especies', formEspecie);
+        await api.post("/cadastros/especies", formEspecie);
       }
-      
+
       carregarEspeciesComRacas();
       fecharModalEspecie();
     } catch (err) {
-      console.error('Erro ao salvar espécie:', err);
-      setError(err.response?.data?.detail || 'Erro ao salvar espécie');
+      console.error("Erro ao salvar espécie:", err);
+      setError(err.response?.data?.detail || "Erro ao salvar espécie");
     }
   };
 
   const handleDeleteEspecie = async (especie) => {
-    if (!window.confirm(`Deseja realmente desativar a espécie "${especie.nome}"?\n\nIsso também desativará todas as raças vinculadas.`)) {
+    if (
+      !window.confirm(
+        `Deseja realmente desativar a espécie "${especie.nome}"?\n\nIsso também desativará todas as raças vinculadas.`,
+      )
+    ) {
       return;
     }
 
@@ -129,8 +140,8 @@ const EspeciesRacas = () => {
       await api.delete(`/cadastros/especies/${especie.id}`);
       carregarEspeciesComRacas();
     } catch (err) {
-      console.error('Erro ao desativar espécie:', err);
-      alert(err.response?.data?.detail || 'Erro ao desativar espécie');
+      console.error("Erro ao desativar espécie:", err);
+      alert(err.response?.data?.detail || "Erro ao desativar espécie");
     }
   };
 
@@ -138,23 +149,23 @@ const EspeciesRacas = () => {
 
   const abrirModalRaca = (especie, raca = null) => {
     setEspecieSelecionada(especie);
-    
+
     if (raca) {
       setEditingRaca(raca);
       setFormRaca({
         nome: raca.nome,
         especie_id: raca.especie_id,
-        ativo: raca.ativo
+        ativo: raca.ativo,
       });
     } else {
       setEditingRaca(null);
       setFormRaca({
-        nome: '',
+        nome: "",
         especie_id: especie.id,
-        ativo: true
+        ativo: true,
       });
     }
-    setError('');
+    setError("");
     setShowModalRaca(true);
   };
 
@@ -162,16 +173,16 @@ const EspeciesRacas = () => {
     setShowModalRaca(false);
     setEditingRaca(null);
     setEspecieSelecionada(null);
-    setFormRaca({ nome: '', especie_id: '', ativo: true });
-    setError('');
+    setFormRaca({ nome: "", especie_id: "", ativo: true });
+    setError("");
   };
 
   const handleSubmitRaca = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
-    if (!formRaca.nome || formRaca.nome.trim() === '') {
-      setError('O nome da raça é obrigatório');
+    if (!formRaca.nome || formRaca.nome.trim() === "") {
+      setError("O nome da raça é obrigatório");
       return;
     }
 
@@ -179,20 +190,20 @@ const EspeciesRacas = () => {
       const payload = {
         nome: formRaca.nome,
         especie_id: parseInt(formRaca.especie_id),
-        ativo: formRaca.ativo
+        ativo: formRaca.ativo,
       };
 
       if (editingRaca) {
         await api.put(`/cadastros/racas/${editingRaca.id}`, payload);
       } else {
-        await api.post('/cadastros/racas', payload);
+        await api.post("/cadastros/racas", payload);
       }
-      
+
       carregarEspeciesComRacas();
       fecharModalRaca();
     } catch (err) {
-      console.error('Erro ao salvar raça:', err);
-      setError(err.response?.data?.detail || 'Erro ao salvar raça');
+      console.error("Erro ao salvar raça:", err);
+      setError(err.response?.data?.detail || "Erro ao salvar raça");
     }
   };
 
@@ -205,16 +216,17 @@ const EspeciesRacas = () => {
       await api.delete(`/cadastros/racas/${raca.id}`);
       carregarEspeciesComRacas();
     } catch (err) {
-      console.error('Erro ao desativar raça:', err);
-      alert(err.response?.data?.detail || 'Erro ao desativar raça');
+      console.error("Erro ao desativar raça:", err);
+      alert(err.response?.data?.detail || "Erro ao desativar raça");
     }
   };
 
   // ========== FILTROS ==========
 
-  const especiesFiltradas = especies.filter(especie =>
-    especie.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    especie.racas.some(r => r.nome.toLowerCase().includes(searchTerm.toLowerCase()))
+  const especiesFiltradas = especies.filter(
+    (especie) =>
+      especie.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      especie.racas.some((r) => r.nome.toLowerCase().includes(searchTerm.toLowerCase())),
   );
 
   if (loading) {
@@ -247,22 +259,22 @@ const EspeciesRacas = () => {
           className="search-input"
         />
         <div className="filter-info">
-          {especiesFiltradas.length} espécie{especiesFiltradas.length !== 1 ? 's' : ''}
+          {especiesFiltradas.length} espécie{especiesFiltradas.length !== 1 ? "s" : ""}
         </div>
       </div>
 
       <div className="especies-list">
         {especiesFiltradas.length === 0 ? (
           <div className="empty-state">
-            {searchTerm ? 'Nenhuma espécie ou raça encontrada' : 'Nenhuma espécie cadastrada'}
+            {searchTerm ? "Nenhuma espécie ou raça encontrada" : "Nenhuma espécie cadastrada"}
           </div>
         ) : (
-          especiesFiltradas.map(especie => {
+          especiesFiltradas.map((especie) => {
             const isExpanded = expandedEspecies.has(especie.id);
-            const racasAtivas = especie.racas.filter(r => r.ativo);
-            
+            const racasAtivas = especie.racas.filter((r) => r.ativo);
+
             return (
-              <div key={especie.id} className={`especie-card ${!especie.ativo ? 'inactive' : ''}`}>
+              <div key={especie.id} className={`especie-card ${!especie.ativo ? "inactive" : ""}`}>
                 {/* Header da Espécie */}
                 <div className="especie-header">
                   <div className="especie-info" onClick={() => toggleEspecie(especie.id)}>
@@ -273,14 +285,13 @@ const EspeciesRacas = () => {
                     <div>
                       <h3 className="especie-nome">{especie.nome}</h3>
                       <span className="racas-count">
-                        {racasAtivas.length} raça{racasAtivas.length !== 1 ? 's' : ''} ativa{racasAtivas.length !== 1 ? 's' : ''}
+                        {racasAtivas.length} raça{racasAtivas.length !== 1 ? "s" : ""} ativa
+                        {racasAtivas.length !== 1 ? "s" : ""}
                       </span>
                     </div>
-                    {!especie.ativo && (
-                      <span className="badge badge-danger">Inativa</span>
-                    )}
+                    {!especie.ativo && <span className="badge badge-danger">Inativa</span>}
                   </div>
-                  
+
                   <div className="especie-actions">
                     <button
                       className="btn-icon btn-success"
@@ -323,8 +334,11 @@ const EspeciesRacas = () => {
                       </div>
                     ) : (
                       <>
-                        {especie.racas.map(raca => (
-                          <div key={raca.id} className={`raca-item ${!raca.ativo ? 'inactive' : ''}`}>
+                        {especie.racas.map((raca) => (
+                          <div
+                            key={raca.id}
+                            className={`raca-item ${!raca.ativo ? "inactive" : ""}`}
+                          >
                             <div className="raca-info">
                               <FiCheck className="raca-icon" size={16} />
                               <span className="raca-nome">{raca.nome}</span>
@@ -365,9 +379,9 @@ const EspeciesRacas = () => {
       {/* Modal Espécie */}
       {showModalEspecie && (
         <div className="modal-overlay" onClick={fecharModalEspecie}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>{editingEspecie ? 'Editar Espécie' : 'Nova Espécie'}</h2>
+              <h2>{editingEspecie ? "Editar Espécie" : "Nova Espécie"}</h2>
               <button className="btn-close" onClick={fecharModalEspecie}>
                 <FiX />
               </button>
@@ -422,10 +436,10 @@ const EspeciesRacas = () => {
       {/* Modal Raça */}
       {showModalRaca && (
         <div className="modal-overlay" onClick={fecharModalRaca}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>
-                {editingRaca ? 'Editar Raça' : 'Nova Raça'}
+                {editingRaca ? "Editar Raça" : "Nova Raça"}
                 {especieSelecionada && (
                   <span className="subtitle"> - {especieSelecionada.nome}</span>
                 )}
@@ -453,9 +467,7 @@ const EspeciesRacas = () => {
                     required
                     autoFocus
                   />
-                  <small>
-                    Exemplos: Labrador, Golden Retriever, SRD (Sem Raça Definida)
-                  </small>
+                  <small>Exemplos: Labrador, Golden Retriever, SRD (Sem Raça Definida)</small>
                 </div>
 
                 <div className="form-group">

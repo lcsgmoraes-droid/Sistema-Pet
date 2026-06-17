@@ -1,16 +1,14 @@
 import { BedDouble, MessageSquare, Syringe } from "lucide-react";
 
-export default function FluxosVinculadosConsulta({
-  consultaIdAtual,
-  abrirFluxoConsulta,
-}) {
+export default function FluxosVinculadosConsulta({ consultaIdAtual, abrirFluxoConsulta }) {
   return (
     <div className="rounded-xl border border-purple-100 bg-purple-50 px-4 py-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-purple-900">Fluxos vinculados à consulta</h3>
           <p className="text-xs text-purple-700">
-            Use a consulta #{consultaIdAtual || "-"} como referência para exames, vacinas, IA e internação.
+            Use a consulta #{consultaIdAtual || "-"} como referência para exames, vacinas, IA e
+            internação.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

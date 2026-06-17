@@ -13,7 +13,11 @@ import {
   normalizarTipoAgendamento,
 } from "./agendaUtils";
 
-export default function AgendamentoDiaCard({ abrindoAgendamentoId, agendamento, onOpenAgendamento }) {
+export default function AgendamentoDiaCard({
+  abrindoAgendamentoId,
+  agendamento,
+  onOpenAgendamento,
+}) {
   const tipoAgendamento = normalizarTipoAgendamento(agendamento.tipo);
 
   return (
@@ -21,7 +25,9 @@ export default function AgendamentoDiaCard({ abrindoAgendamentoId, agendamento, 
       type="button"
       onClick={() => onOpenAgendamento(agendamento)}
       className={`w-full rounded-lg border px-3 py-2 text-left ${
-        TIPO_CARD_COLOR[tipoAgendamento] || STATUS_COLOR[agendamento.status] || "border-l-gray-200 bg-white"
+        TIPO_CARD_COLOR[tipoAgendamento] ||
+        STATUS_COLOR[agendamento.status] ||
+        "border-l-gray-200 bg-white"
       }`}
     >
       <div className="flex items-center gap-2">
@@ -63,7 +69,7 @@ export default function AgendamentoDiaCard({ abrindoAgendamentoId, agendamento, 
           ? "Abrindo fluxo..."
           : tipoAgendamento === "consulta" || tipoAgendamento === "retorno"
             ? getAgendamentoConsultaActionLabel(agendamento)
-            : TIPO_ACAO[tipoAgendamento] ?? "Abrir atendimento"}
+            : (TIPO_ACAO[tipoAgendamento] ?? "Abrir atendimento")}
       </div>
     </button>
   );

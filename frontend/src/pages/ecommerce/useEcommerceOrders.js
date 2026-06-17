@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import ecommerceApi from '../../services/ecommerceApi';
-import { STORAGE_ORDERS_KEY, extractApiErrorMessage } from './ecommerceMvpUtils';
+import { useEffect, useState } from "react";
+import ecommerceApi from "../../services/ecommerceApi";
+import { STORAGE_ORDERS_KEY, extractApiErrorMessage } from "./ecommerceMvpUtils";
 
 export default function useEcommerceOrders({ authHeaders, customerToken, view, onError }) {
   const [orderIds, setOrderIds] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_ORDERS_KEY) || '[]');
+      return JSON.parse(localStorage.getItem(STORAGE_ORDERS_KEY) || "[]");
     } catch {
       return [];
     }
@@ -22,7 +22,7 @@ export default function useEcommerceOrders({ authHeaders, customerToken, view, o
     if (!customerToken) return;
     setOrdersLoading(true);
     try {
-      const response = await ecommerceApi.get('/api/checkout/pedidos', {
+      const response = await ecommerceApi.get("/api/checkout/pedidos", {
         headers: authHeaders,
         params: { limit: 20 },
       });
@@ -35,7 +35,7 @@ export default function useEcommerceOrders({ authHeaders, customerToken, view, o
       }
     } catch (err) {
       setOrdersDetailed([]);
-      onError(extractApiErrorMessage(err, 'Erro ao carregar detalhes dos pedidos'));
+      onError(extractApiErrorMessage(err, "Erro ao carregar detalhes dos pedidos"));
     } finally {
       setOrdersLoading(false);
     }
@@ -48,16 +48,20 @@ export default function useEcommerceOrders({ authHeaders, customerToken, view, o
   }
 
   useEffect(() => {
-    if (!customerToken || view !== 'pedidos') return;
+    if (!customerToken || view !== "pedidos") return;
     loadOrdersDetailed();
   }, [view, customerToken]);
 
   async function avisarCheguei(pedidoId) {
     try {
-      await ecommerceApi.post(`/api/checkout/pedido/${pedidoId}/drive-cheguei`, {}, { headers: authHeaders });
+      await ecommerceApi.post(
+        `/api/checkout/pedido/${pedidoId}/drive-cheguei`,
+        {},
+        { headers: authHeaders },
+      );
       await loadOrdersDetailed();
     } catch (err) {
-      onError(extractApiErrorMessage(err, 'Erro ao avisar chegada'));
+      onError(extractApiErrorMessage(err, "Erro ao avisar chegada"));
     }
   }
 

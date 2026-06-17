@@ -16,9 +16,7 @@ export default function HistoricoTransferenciaFilters({
     <>
       <div className="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-gray-900">
-            Historico de transferencias
-          </h2>
+          <h2 className="text-lg font-semibold text-gray-900">Historico de transferencias</h2>
           <p className="mt-1 text-sm text-gray-600">
             Acompanhe o que saiu do estoque, quanto a pessoa ja ressarciu e o que segue em aberto.
           </p>
@@ -89,9 +87,7 @@ export default function HistoricoTransferenciaFilters({
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700">
-            Status
-          </label>
+          <label className="mb-2 block text-sm font-medium text-gray-700">Status</label>
           <select
             value={filtros.status_filtro}
             onChange={(event) => atualizarFiltro("status_filtro", event.target.value)}
@@ -107,9 +103,7 @@ export default function HistoricoTransferenciaFilters({
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700">
-            Data inicial
-          </label>
+          <label className="mb-2 block text-sm font-medium text-gray-700">Data inicial</label>
           <input
             type="date"
             value={filtros.data_inicio}
@@ -119,9 +113,7 @@ export default function HistoricoTransferenciaFilters({
         </div>
 
         <div>
-          <label className="mb-2 block text-sm font-medium text-gray-700">
-            Data final
-          </label>
+          <label className="mb-2 block text-sm font-medium text-gray-700">Data final</label>
           <input
             type="date"
             value={filtros.data_fim}

@@ -12,7 +12,8 @@ export default function AgendaCelularCard({
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-cyan-900">Agenda no celular</h2>
           <p className="mt-1 text-sm text-cyan-800">
-            Use um link privado para assinar sua agenda veterinaria no Google Calendar, Apple Calendar ou Outlook.
+            Use um link privado para assinar sua agenda veterinaria no Google Calendar, Apple
+            Calendar ou Outlook.
           </p>
           {calendarioMeta?.mensagem_escopo && (
             <p className="mt-2 text-xs text-cyan-700">{calendarioMeta.mensagem_escopo}</p>

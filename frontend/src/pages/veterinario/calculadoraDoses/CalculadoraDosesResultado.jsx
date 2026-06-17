@@ -18,9 +18,18 @@ export default function CalculadoraDosesResultado({
 
       <div className="grid grid-cols-2 gap-3">
         <ResultadoCard label="Mg por dose" valor={calculo ? calculo.mgPorDose.toFixed(2) : "--"} />
-        <ResultadoCard label="Doses por dia" valor={calculo?.dosesPorDia ? calculo.dosesPorDia.toFixed(2) : "--"} />
-        <ResultadoCard label="Mg por dia" valor={calculo?.mgDia ? calculo.mgDia.toFixed(2) : "--"} />
-        <ResultadoCard label="Mg no tratamento" valor={calculo?.mgTratamento ? calculo.mgTratamento.toFixed(2) : "--"} />
+        <ResultadoCard
+          label="Doses por dia"
+          valor={calculo?.dosesPorDia ? calculo.dosesPorDia.toFixed(2) : "--"}
+        />
+        <ResultadoCard
+          label="Mg por dia"
+          valor={calculo?.mgDia ? calculo.mgDia.toFixed(2) : "--"}
+        />
+        <ResultadoCard
+          label="Mg no tratamento"
+          valor={calculo?.mgTratamento ? calculo.mgTratamento.toFixed(2) : "--"}
+        />
       </div>
 
       <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">

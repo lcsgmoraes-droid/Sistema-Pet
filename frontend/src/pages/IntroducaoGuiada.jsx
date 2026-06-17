@@ -364,18 +364,20 @@ export default function IntroducaoGuiada() {
     const chamadas = [
       api.get("/empresa/fiscal").then((res) => {
         const data = res.data || {};
-        results.empresaFiscal = Boolean(data.regime_tributario || data.cnae_principal || data.aliquota_simples_vigente);
+        results.empresaFiscal = Boolean(
+          data.regime_tributario || data.cnae_principal || data.aliquota_simples_vigente,
+        );
       }),
       api.get("/empresa/dados-cadastrais").then((res) => {
         const data = res.data || {};
         results.empresaDados = Boolean(
           data.cnpj &&
-            data.razao_social &&
-            data.endereco &&
-            data.numero &&
-            data.bairro &&
-            data.cidade &&
-            data.uf,
+          data.razao_social &&
+          data.endereco &&
+          data.numero &&
+          data.bairro &&
+          data.cidade &&
+          data.uf,
         );
       }),
       api.get("/contas-bancarias?apenas_ativas=true").then((res) => {
@@ -392,7 +394,9 @@ export default function IntroducaoGuiada() {
       }),
       api.get("/produtos?per_page=1").then((res) => {
         const data = res.data || {};
-        results.produtos = Boolean((Array.isArray(data.produtos) && data.produtos.length > 0) || data.total > 0);
+        results.produtos = Boolean(
+          (Array.isArray(data.produtos) && data.produtos.length > 0) || data.total > 0,
+        );
       }),
       api.get("/clientes/?limit=1").then((res) => {
         results.pessoas = toCount(res.data) > 0;
@@ -457,7 +461,8 @@ export default function IntroducaoGuiada() {
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Preparando seu sistema</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Sequencia guiada para configurar o sistema do jeito certo e evitar falhas no dia a dia.
+              Sequencia guiada para configurar o sistema do jeito certo e evitar falhas no dia a
+              dia.
             </p>
           </div>
           <div className="flex gap-2">
@@ -480,7 +485,9 @@ export default function IntroducaoGuiada() {
 
         <div className="mb-2 flex items-center justify-between text-sm">
           <span className="text-gray-600">Progresso geral</span>
-          <span className="font-semibold text-gray-900">{concluidos}/{total} ({percentual}%)</span>
+          <span className="font-semibold text-gray-900">
+            {concluidos}/{total} ({percentual}%)
+          </span>
         </div>
         <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden">
           <div
@@ -496,12 +503,17 @@ export default function IntroducaoGuiada() {
 
       <div className="grid grid-cols-1 gap-4">
         {SECOES.map((secao) => (
-          <section key={secao.id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+          <section
+            key={secao.id}
+            className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
+          >
             <h3 className="text-lg font-bold text-gray-900 mb-4">{secao.titulo}</h3>
 
             <div className="space-y-3">
               {secao.itens.map((item) => {
-                const autoConcluido = item.autoCheckKey ? Boolean(autoChecks[item.autoCheckKey]) : false;
+                const autoConcluido = item.autoCheckKey
+                  ? Boolean(autoChecks[item.autoCheckKey])
+                  : false;
                 const concluido = autoConcluido || Boolean(marcados[item.id]);
                 const badgeObrigatorio = item.obrigatorio ? "Obrigatorio" : "Opcional";
 
@@ -528,7 +540,9 @@ export default function IntroducaoGuiada() {
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-1">
                           <p className="text-sm font-semibold text-gray-900">{item.titulo}</p>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${item.obrigatorio ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"}`}>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${item.obrigatorio ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"}`}
+                          >
                             {badgeObrigatorio}
                           </span>
                           {autoConcluido && (
@@ -574,8 +588,8 @@ export default function IntroducaoGuiada() {
       <div className="mt-6 bg-blue-50 border border-blue-200 rounded-2xl p-5">
         <p className="text-sm font-semibold text-blue-900 mb-1">Proxima evolucao (ja planejada)</p>
         <p className="text-sm text-blue-800">
-          Pre-configuracao automatica com 1 clique para criar cadastros padrao (formas de pagamento, categorias e ajustes iniciais),
-          reduzindo o trabalho manual na implantacao.
+          Pre-configuracao automatica com 1 clique para criar cadastros padrao (formas de pagamento,
+          categorias e ajustes iniciais), reduzindo o trabalho manual na implantacao.
         </p>
       </div>
     </div>

@@ -1,12 +1,6 @@
-import {
-  formatarHorarioLocalizacao,
-  getUltimaParadaPendente,
-} from "./rotasEntregaUtils";
+import { formatarHorarioLocalizacao, getUltimaParadaPendente } from "./rotasEntregaUtils";
 
-export default function MonitoramentoEntregadores({
-  grupos = {},
-  onAbrirMapaRota,
-}) {
+export default function MonitoramentoEntregadores({ grupos = {}, onAbrirMapaRota }) {
   const gruposOrdenados = Object.values(grupos);
 
   if (gruposOrdenados.length === 0) return null;
@@ -21,9 +15,7 @@ export default function MonitoramentoEntregadores({
         backgroundColor: "#f3fbf6",
       }}
     >
-      <h3 style={{ marginTop: 0, marginBottom: 12 }}>
-        📡 Entregas em andamento por entregador
-      </h3>
+      <h3 style={{ marginTop: 0, marginBottom: 12 }}>📡 Entregas em andamento por entregador</h3>
       <p style={{ marginTop: 0, marginBottom: 14, color: "#4d5b52" }}>
         Acompanhe quem está na rua agora e abra o rastreio em tempo real com 1 clique.
       </p>
@@ -39,9 +31,7 @@ export default function MonitoramentoEntregadores({
               padding: 12,
             }}
           >
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>
-              🧑‍🛵 {grupo.entregadorNome}
-            </div>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>🧑‍🛵 {grupo.entregadorNome}</div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {grupo.rotas.map((rota) => {
@@ -63,8 +53,8 @@ export default function MonitoramentoEntregadores({
                   >
                     <div>
                       <div style={{ fontWeight: 600 }}>
-                        🚚 {rota.numero || `Rota #${rota.id}`} •{" "}
-                        {rota.paradas?.length || 0} parada(s)
+                        🚚 {rota.numero || `Rota #${rota.id}`} • {rota.paradas?.length || 0}{" "}
+                        parada(s)
                       </div>
                       <div
                         style={{
@@ -84,8 +74,7 @@ export default function MonitoramentoEntregadores({
                           marginTop: 2,
                         }}
                       >
-                        Próxima entrega:{" "}
-                        {ultimaParada?.endereco || "Não informado"}
+                        Próxima entrega: {ultimaParada?.endereco || "Não informado"}
                       </div>
                     </div>
 

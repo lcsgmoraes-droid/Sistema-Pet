@@ -187,11 +187,7 @@ export default function EstoqueTransferenciaParceiro() {
   );
 
   const totalRessarcimento = useMemo(
-    () =>
-      itens.reduce(
-        (acumulado, item) => acumulado + Number(item.total_item || 0),
-        0,
-      ),
+    () => itens.reduce((acumulado, item) => acumulado + Number(item.total_item || 0), 0),
     [itens],
   );
 
@@ -453,7 +449,9 @@ export default function EstoqueTransferenciaParceiro() {
       const produtos = extrairListaProdutos(response?.data).filter(
         (produto) => !produto?.is_parent && produto?.tipo_produto !== "PAI",
       );
-      const encontrado = produtos.find((produto) => produtoConfereCodigo(produto, termo)) || (produtos.length === 1 ? produtos[0] : null);
+      const encontrado =
+        produtos.find((produto) => produtoConfereCodigo(produto, termo)) ||
+        (produtos.length === 1 ? produtos[0] : null);
       if (encontrado) {
         adicionarProduto(encontrado, { scroll: false });
       } else {
@@ -471,9 +469,7 @@ export default function EstoqueTransferenciaParceiro() {
   const atualizarQuantidade = (uid, valor) => {
     if (valor === "") {
       setItens((prev) =>
-        prev.map((item) =>
-          item.uid === uid ? { ...item, quantidade: "", total_item: 0 } : item,
-        ),
+        prev.map((item) => (item.uid === uid ? { ...item, quantidade: "", total_item: 0 } : item)),
       );
       return;
     }
@@ -527,9 +523,7 @@ export default function EstoqueTransferenciaParceiro() {
   const atualizarTotalItem = (uid, valor) => {
     if (valor === "") {
       setItens((prev) =>
-        prev.map((item) =>
-          item.uid === uid ? { ...item, total_item: "" } : item,
-        ),
+        prev.map((item) => (item.uid === uid ? { ...item, total_item: "" } : item)),
       );
       return;
     }
@@ -546,7 +540,8 @@ export default function EstoqueTransferenciaParceiro() {
         return {
           ...item,
           total_item: totalItem,
-          custo_unitario: quantidade > 0 ? totalItem / quantidade : Number(item.custo_unitario || 0),
+          custo_unitario:
+            quantidade > 0 ? totalItem / quantidade : Number(item.custo_unitario || 0),
         };
       }),
     );
@@ -600,13 +595,14 @@ export default function EstoqueTransferenciaParceiro() {
     setBuscaParceiro("");
     setSugestoesParceiros([]);
     setDropdownParceiroAberto(false);
-    setForm(criarFormTransferencia({
-      parceiro_id: registro.parceiro_id ? String(registro.parceiro_id) : "",
-      data_vencimento:
-        registro.data_vencimento || criarFormTransferencia().data_vencimento,
-      documento: registro.documento || "",
-      observacao: extrairObservacaoManualTransferencia(registro.observacoes),
-    }));
+    setForm(
+      criarFormTransferencia({
+        parceiro_id: registro.parceiro_id ? String(registro.parceiro_id) : "",
+        data_vencimento: registro.data_vencimento || criarFormTransferencia().data_vencimento,
+        documento: registro.documento || "",
+        observacao: extrairObservacaoManualTransferencia(registro.observacoes),
+      }),
+    );
     setItens(criarItensEdicaoTransferencia(registro));
     setBuscaProduto("");
     setSugestoesProdutos([]);
@@ -665,10 +661,7 @@ export default function EstoqueTransferenciaParceiro() {
       void carregarHistoricoTransferencias(filtrosHistoricoAplicados, 1);
     } catch (error) {
       console.error("Erro ao registrar transferencia:", error);
-      toast.error(
-        error?.response?.data?.detail ||
-          "Nao foi possivel registrar a transferencia.",
-      );
+      toast.error(error?.response?.data?.detail || "Nao foi possivel registrar a transferencia.");
     } finally {
       setSalvando(false);
     }
@@ -781,11 +774,9 @@ export default function EstoqueTransferenciaParceiro() {
 
     try {
       setGerandoPdfConsolidado(true);
-      const response = await api.post(
-        "/estoque/transferencia-parceiro/pdf-consolidado",
-        payload,
-        { responseType: "blob" },
-      );
+      const response = await api.post("/estoque/transferencia-parceiro/pdf-consolidado", payload, {
+        responseType: "blob",
+      });
       baixarArquivoBlob(response.data, "transferencias_consolidadas.pdf");
       return true;
     } catch (error) {
@@ -843,13 +834,10 @@ export default function EstoqueTransferenciaParceiro() {
 
     try {
       setContaEnviandoEmail(registro.conta_receber_id);
-      await api.post(
-        `/estoque/transferencia-parceiro/${registro.conta_receber_id}/enviar-email`,
-        {
-          email: registro.parceiro_email,
-          ...montarParametrosDocumentoTransferencia(colunasDocumento),
-        },
-      );
+      await api.post(`/estoque/transferencia-parceiro/${registro.conta_receber_id}/enviar-email`, {
+        email: registro.parceiro_email,
+        ...montarParametrosDocumentoTransferencia(colunasDocumento),
+      });
       toast.success(`E-mail enviado para ${registro.parceiro_email}.`);
       return true;
     } catch (error) {
@@ -866,13 +854,13 @@ export default function EstoqueTransferenciaParceiro() {
   const abrirBaixaTransferencia = async (registro) => {
     setBaixaAbertaId(registro.conta_receber_id);
     setHistoricoExpandidoIds((prev) =>
-      prev.includes(registro.conta_receber_id)
-        ? prev
-        : [...prev, registro.conta_receber_id],
+      prev.includes(registro.conta_receber_id) ? prev : [...prev, registro.conta_receber_id],
     );
-    setFormBaixa(criarFormBaixaTransferencia({
-      valor_recebido: Number(registro.saldo_aberto || 0).toFixed(2),
-    }));
+    setFormBaixa(
+      criarFormBaixaTransferencia({
+        valor_recebido: Number(registro.saldo_aberto || 0).toFixed(2),
+      }),
+    );
     await carregarContasPagarCompensacao(registro.conta_receber_id);
   };
 
@@ -908,21 +896,17 @@ export default function EstoqueTransferenciaParceiro() {
 
     try {
       setContaRecebendo(registro.conta_receber_id);
-      await api.post(
-        `/estoque/transferencia-parceiro/${registro.conta_receber_id}/receber`,
-        {
-          valor_recebido: valorRecebido,
-          data_recebimento: formBaixa.data_recebimento || hojeIso(),
-          modo_baixa: formBaixa.modo_baixa || "recebimento",
-          forma_pagamento_id:
-            formBaixa.modo_baixa === "recebimento" && formBaixa.forma_pagamento_id
-              ? Number(formBaixa.forma_pagamento_id)
-              : undefined,
-          compensacoes:
-            formBaixa.modo_baixa === "acerto" ? compensacoesPayload : undefined,
-          observacao: formBaixa.observacao.trim() || undefined,
-        },
-      );
+      await api.post(`/estoque/transferencia-parceiro/${registro.conta_receber_id}/receber`, {
+        valor_recebido: valorRecebido,
+        data_recebimento: formBaixa.data_recebimento || hojeIso(),
+        modo_baixa: formBaixa.modo_baixa || "recebimento",
+        forma_pagamento_id:
+          formBaixa.modo_baixa === "recebimento" && formBaixa.forma_pagamento_id
+            ? Number(formBaixa.forma_pagamento_id)
+            : undefined,
+        compensacoes: formBaixa.modo_baixa === "acerto" ? compensacoesPayload : undefined,
+        observacao: formBaixa.observacao.trim() || undefined,
+      });
       toast.success("Baixa registrada com sucesso.");
       fecharBaixaTransferencia();
       void carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico);
@@ -930,8 +914,7 @@ export default function EstoqueTransferenciaParceiro() {
     } catch (error) {
       console.error("Erro ao registrar baixa da transferencia:", error);
       toast.error(
-        error?.response?.data?.detail ||
-          "Nao foi possivel registrar a baixa da transferencia.",
+        error?.response?.data?.detail || "Nao foi possivel registrar a baixa da transferencia.",
       );
     } finally {
       setContaRecebendo(null);
@@ -948,9 +931,7 @@ export default function EstoqueTransferenciaParceiro() {
       setContaExcluindo(registro.conta_receber_id);
       await api.delete(`/estoque/transferencia-parceiro/${registro.conta_receber_id}`);
       toast.success("Transferencia excluida com sucesso.");
-      setSelecionadosHistorico((prev) =>
-        prev.filter((id) => id !== registro.conta_receber_id),
-      );
+      setSelecionadosHistorico((prev) => prev.filter((id) => id !== registro.conta_receber_id));
       if (baixaAbertaId === registro.conta_receber_id) {
         fecharBaixaTransferencia();
       }
@@ -960,10 +941,7 @@ export default function EstoqueTransferenciaParceiro() {
       void carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico);
     } catch (error) {
       console.error("Erro ao excluir transferencia:", error);
-      toast.error(
-        error?.response?.data?.detail ||
-          "Nao foi possivel excluir a transferencia.",
-      );
+      toast.error(error?.response?.data?.detail || "Nao foi possivel excluir a transferencia.");
     } finally {
       setContaExcluindo(null);
     }
@@ -976,9 +954,9 @@ export default function EstoqueTransferenciaParceiro() {
       ? gerandoPdfConsolidado
       : modalDocumentoTransferencia.tipo === "email" && modalDocumentoTransferencia.registro
         ? contaEnviandoEmail === modalDocumentoTransferencia.registro.conta_receber_id
-      : modalDocumentoTransferencia.tipo === "pdf" && modalDocumentoTransferencia.registro
-        ? contaGerandoPdf === modalDocumentoTransferencia.registro.conta_receber_id
-        : false;
+        : modalDocumentoTransferencia.tipo === "pdf" && modalDocumentoTransferencia.registro
+          ? contaGerandoPdf === modalDocumentoTransferencia.registro.conta_receber_id
+          : false;
 
   return (
     <div className="space-y-6 p-6">
@@ -1040,58 +1018,58 @@ export default function EstoqueTransferenciaParceiro() {
           removerItem={removerItem}
         />
       ) : (
-      <section className="rounded-3xl border border-gray-200 bg-white shadow-sm">
-        <HistoricoTransferenciaFilters
-          parceiroSelecionado={parceiroSelecionado}
-          onUsarParceiroAtual={usarParceiroAtualNoHistorico}
-          onAtualizarHistorico={() =>
-            void carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico)
-          }
-          totais={historico.totais}
-          filtros={filtrosHistoricoForm}
-          atualizarFiltro={atualizarFiltroHistorico}
-          aplicarPeriodoRapido={aplicarPeriodoRapidoHistorico}
-          limparFiltros={limparFiltrosHistorico}
-          onSubmit={aplicarFiltrosHistorico}
-        />
+        <section className="rounded-3xl border border-gray-200 bg-white shadow-sm">
+          <HistoricoTransferenciaFilters
+            parceiroSelecionado={parceiroSelecionado}
+            onUsarParceiroAtual={usarParceiroAtualNoHistorico}
+            onAtualizarHistorico={() =>
+              void carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico)
+            }
+            totais={historico.totais}
+            filtros={filtrosHistoricoForm}
+            atualizarFiltro={atualizarFiltroHistorico}
+            aplicarPeriodoRapido={aplicarPeriodoRapidoHistorico}
+            limparFiltros={limparFiltrosHistorico}
+            onSubmit={aplicarFiltrosHistorico}
+          />
 
-        <HistoricoTransferenciaResults
-          loadingHistorico={loadingHistorico}
-          historico={historico}
-          selecionadosHistorico={selecionadosHistorico}
-          todosPaginaSelecionados={todosPaginaSelecionados}
-          gerandoPdfConsolidado={gerandoPdfConsolidado}
-          historicoExpandidoIds={historicoExpandidoIds}
-          baixaAbertaId={baixaAbertaId}
-          formBaixa={formBaixa}
-          setFormBaixa={setFormBaixa}
-          loadingFormasPagamento={loadingFormasPagamento}
-          formasPagamento={formasPagamento}
-          totalCompensadoBaixa={totalCompensadoBaixa}
-          loadingContasPagarCompensacao={loadingContasPagarCompensacao}
-          contasPagarCompensacao={contasPagarCompensacao}
-          contaRecebendo={contaRecebendo}
-          contaGerandoPdf={contaGerandoPdf}
-          contaEnviandoEmail={contaEnviandoEmail}
-          contaExcluindo={contaExcluindo}
-          totalPaginasHistorico={totalPaginasHistorico}
-          paginaHistorico={paginaHistorico}
-          onAlternarSelecaoPaginaHistorico={alternarSelecaoPaginaHistorico}
-          onLimparSelecaoHistorico={limparSelecaoHistorico}
-          onAbrirModalDocumentoTransferencia={abrirModalDocumentoTransferencia}
-          onAlternarSelecaoHistorico={alternarSelecaoHistorico}
-          onAlternarExpansaoHistorico={alternarExpansaoHistorico}
-          onAbrirBaixaTransferencia={abrirBaixaTransferencia}
-          onIniciarEdicaoTransferencia={iniciarEdicaoTransferencia}
-          onExcluirTransferencia={excluirTransferencia}
-          onPreencherCompensacaoAutomatica={preencherCompensacaoAutomatica}
-          onLimparCompensacoesBaixa={limparCompensacoesBaixa}
-          onAtualizarValorCompensacao={atualizarValorCompensacao}
-          onFecharBaixaTransferencia={fecharBaixaTransferencia}
-          onRegistrarBaixaTransferencia={registrarBaixaTransferencia}
-          onSetPaginaHistorico={setPaginaHistorico}
-        />
-      </section>
+          <HistoricoTransferenciaResults
+            loadingHistorico={loadingHistorico}
+            historico={historico}
+            selecionadosHistorico={selecionadosHistorico}
+            todosPaginaSelecionados={todosPaginaSelecionados}
+            gerandoPdfConsolidado={gerandoPdfConsolidado}
+            historicoExpandidoIds={historicoExpandidoIds}
+            baixaAbertaId={baixaAbertaId}
+            formBaixa={formBaixa}
+            setFormBaixa={setFormBaixa}
+            loadingFormasPagamento={loadingFormasPagamento}
+            formasPagamento={formasPagamento}
+            totalCompensadoBaixa={totalCompensadoBaixa}
+            loadingContasPagarCompensacao={loadingContasPagarCompensacao}
+            contasPagarCompensacao={contasPagarCompensacao}
+            contaRecebendo={contaRecebendo}
+            contaGerandoPdf={contaGerandoPdf}
+            contaEnviandoEmail={contaEnviandoEmail}
+            contaExcluindo={contaExcluindo}
+            totalPaginasHistorico={totalPaginasHistorico}
+            paginaHistorico={paginaHistorico}
+            onAlternarSelecaoPaginaHistorico={alternarSelecaoPaginaHistorico}
+            onLimparSelecaoHistorico={limparSelecaoHistorico}
+            onAbrirModalDocumentoTransferencia={abrirModalDocumentoTransferencia}
+            onAlternarSelecaoHistorico={alternarSelecaoHistorico}
+            onAlternarExpansaoHistorico={alternarExpansaoHistorico}
+            onAbrirBaixaTransferencia={abrirBaixaTransferencia}
+            onIniciarEdicaoTransferencia={iniciarEdicaoTransferencia}
+            onExcluirTransferencia={excluirTransferencia}
+            onPreencherCompensacaoAutomatica={preencherCompensacaoAutomatica}
+            onLimparCompensacoesBaixa={limparCompensacoesBaixa}
+            onAtualizarValorCompensacao={atualizarValorCompensacao}
+            onFecharBaixaTransferencia={fecharBaixaTransferencia}
+            onRegistrarBaixaTransferencia={registrarBaixaTransferencia}
+            onSetPaginaHistorico={setPaginaHistorico}
+          />
+        </section>
       )}
     </div>
   );

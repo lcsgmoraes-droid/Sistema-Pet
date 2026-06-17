@@ -55,14 +55,17 @@ export function buildExtratoParams(contexto = {}, colunas = EXTRATO_COLUNAS_DEFA
 }
 
 export function resumirLinhasExtrato(linhas = []) {
-  return linhas.reduce((acc, linha) => {
-    if (linha?.contabilizar_total) {
-      acc.contabilizadas += 1;
-    } else {
-      acc.detalhes += 1;
-    }
-    return acc;
-  }, { contabilizadas: 0, detalhes: 0 });
+  return linhas.reduce(
+    (acc, linha) => {
+      if (linha?.contabilizar_total) {
+        acc.contabilizadas += 1;
+      } else {
+        acc.detalhes += 1;
+      }
+      return acc;
+    },
+    { contabilizadas: 0, detalhes: 0 },
+  );
 }
 
 export function buildExtratoDownloadName(contexto = {}, formato = "pdf") {

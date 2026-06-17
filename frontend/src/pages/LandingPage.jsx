@@ -1,7 +1,6 @@
 import {
   ArrowRight,
   BarChart3,
-  Check,
   CreditCard,
   Database,
   MessageCircle,
@@ -22,12 +21,36 @@ const heroImage =
   "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&w=2200&q=85";
 
 const includedItems = [
-  { icon: Users, title: "Clientes e pets", text: "Cadastro, histórico essencial e organização da base." },
-  { icon: Package, title: "Produtos e estoque", text: "SKU, validade, lotes, movimentações e saldo operacional." },
-  { icon: ShoppingCart, title: "PDV e caixa", text: "Venda no balcão, pagamentos, sangria, suprimento e fechamento." },
-  { icon: BarChart3, title: "Vendas e gestão", text: "Lista de vendas, visão por cliente e indicadores básicos." },
-  { icon: CreditCard, title: "Formas de pagamento", text: "Cadastro de meios, operadoras e taxas para venda diária." },
-  { icon: ShieldCheck, title: "Usuários e permissões", text: "Perfis de acesso, LGPD operacional e isolamento por empresa." },
+  {
+    icon: Users,
+    title: "Clientes e pets",
+    text: "Cadastro, histórico essencial e organização da base.",
+  },
+  {
+    icon: Package,
+    title: "Produtos e estoque",
+    text: "SKU, validade, lotes, movimentações e saldo operacional.",
+  },
+  {
+    icon: ShoppingCart,
+    title: "PDV e caixa",
+    text: "Venda no balcão, pagamentos, sangria, suprimento e fechamento.",
+  },
+  {
+    icon: BarChart3,
+    title: "Vendas e gestão",
+    text: "Lista de vendas, visão por cliente e indicadores básicos.",
+  },
+  {
+    icon: CreditCard,
+    title: "Formas de pagamento",
+    text: "Cadastro de meios, operadoras e taxas para venda diária.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Usuários e permissões",
+    text: "Perfis de acesso, LGPD operacional e isolamento por empresa.",
+  },
 ];
 
 const processSteps = [
@@ -76,7 +99,7 @@ export default function LandingPage() {
     document.title = "CorePet | 30 dias grátis do Plano Básico";
     metaDescription.setAttribute(
       "content",
-      "Teste o Plano Básico do CorePet por 30 dias: clientes, pets, produtos, estoque, PDV, caixa, vendas, usuários e permissões."
+      "Teste o Plano Básico do CorePet por 30 dias: clientes, pets, produtos, estoque, PDV, caixa, vendas, usuários e permissões.",
     );
 
     return () => {
@@ -106,13 +129,22 @@ export default function LandingPage() {
           </Link>
 
           <div className="hidden items-center gap-7 text-sm font-semibold text-slate-200 md:flex">
-            <a href="#plano-basico" className="hover:text-white">Plano Básico</a>
-            <a href="#incluido" className="hover:text-white">Incluído</a>
-            <a href="#proximos-modulos" className="hover:text-white">Módulos futuros</a>
+            <a href="#plano-basico" className="hover:text-white">
+              Plano Básico
+            </a>
+            <a href="#incluido" className="hover:text-white">
+              Incluído
+            </a>
+            <a href="#proximos-modulos" className="hover:text-white">
+              Módulos futuros
+            </a>
           </div>
 
           <div className="flex items-center gap-3">
-            <Link to="/login" className="hidden text-sm font-semibold text-white/90 hover:text-white sm:inline-flex">
+            <Link
+              to="/login"
+              className="hidden text-sm font-semibold text-white/90 hover:text-white sm:inline-flex"
+            >
               Entrar
             </Link>
             <Link
@@ -139,12 +171,10 @@ export default function LandingPage() {
                 <Sparkles className="h-4 w-4" />
                 30 dias grátis do Plano Básico
               </span>
-              <h1 className="mt-6 text-4xl font-extrabold leading-tight md:text-6xl">
-                CorePet
-              </h1>
+              <h1 className="mt-6 text-4xl font-extrabold leading-tight md:text-6xl">CorePet</h1>
               <p className="mt-5 max-w-2xl text-xl leading-8 text-slate-100">
-                Use clientes, pets, estoque, PDV, caixa, vendas e permissões sem pagar no
-                primeiro mês. Os módulos avançados aparecem como próximos passos ou pilotos.
+                Use clientes, pets, estoque, PDV, caixa, vendas e permissões sem pagar no primeiro
+                mês. Os módulos avançados aparecem como próximos passos ou pilotos.
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -186,7 +216,10 @@ export default function LandingPage() {
 
             <div className="grid gap-3 md:grid-cols-3">
               {processSteps.map((step, index) => (
-                <article key={step.title} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <article
+                  key={step.title}
+                  className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+                >
                   <span className="text-sm font-extrabold text-emerald-600">0{index + 1}</span>
                   <h3 className="mt-3 font-bold text-slate-950">{step.title}</h3>
                   <p className="mt-2 text-sm leading-6 text-slate-600">{step.text}</p>
@@ -218,7 +251,10 @@ export default function LandingPage() {
 
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {includedItems.map(({ icon: Icon, title, text }) => (
-                <article key={title} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                <article
+                  key={title}
+                  className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+                >
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
                     <Icon className="h-5 w-5" />
                   </div>
@@ -234,8 +270,7 @@ export default function LandingPage() {
           <div className="mx-auto grid max-w-6xl gap-10 px-4 lg:grid-cols-[1fr_1fr] lg:items-center">
             <div>
               <span className="inline-flex items-center gap-2 rounded-md bg-amber-300/15 px-3 py-1 text-sm font-bold text-amber-200">
-                <Sparkles className="h-4 w-4" />
-                O que vem por aí
+                <Sparkles className="h-4 w-4" />O que vem por aí
               </span>
               <h2 className="mt-5 text-3xl font-extrabold md:text-4xl">
                 Mais recursos para conhecer e pedir acesso.
@@ -248,7 +283,10 @@ export default function LandingPage() {
 
             <div className="grid gap-3">
               {nextModules.map((module) => (
-                <div key={module} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3">
+                <div
+                  key={module}
+                  className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3"
+                >
                   <Database className="h-5 w-5 flex-none text-amber-200" />
                   <span className="font-semibold text-slate-100">{module}</span>
                 </div>
@@ -267,8 +305,9 @@ export default function LandingPage() {
                 Comece com 30 dias grátis no Básico.
               </h2>
               <p className="mt-3 max-w-2xl text-slate-600">
-                O cadastro cria a empresa no Plano Básico e mantém módulos avançados como
-                Beta sob liberação acompanhada. Integrações externas específicas não fazem parte desta oferta.
+                O cadastro cria a empresa no Plano Básico e mantém módulos avançados como Beta sob
+                liberação acompanhada. Integrações externas específicas não fazem parte desta
+                oferta.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -297,9 +336,15 @@ export default function LandingPage() {
             CorePet
           </div>
           <div className="flex flex-wrap gap-5">
-            <Link to="/termos" className="hover:text-slate-900">Termos</Link>
-            <Link to="/privacidade" className="hover:text-slate-900">Privacidade</Link>
-            <Link to="/planos" className="hover:text-slate-900">Planos</Link>
+            <Link to="/termos" className="hover:text-slate-900">
+              Termos
+            </Link>
+            <Link to="/privacidade" className="hover:text-slate-900">
+              Privacidade
+            </Link>
+            <Link to="/planos" className="hover:text-slate-900">
+              Planos
+            </Link>
           </div>
         </div>
       </footer>

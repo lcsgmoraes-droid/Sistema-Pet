@@ -14,7 +14,11 @@ export function isBillingAttention(status) {
     "suspended",
     "blocked",
     "bloqueado",
-  ].includes(String(status || "").trim().toLowerCase());
+  ].includes(
+    String(status || "")
+      .trim()
+      .toLowerCase(),
+  );
 }
 
 export function formatStorageMb(bytes) {
@@ -29,7 +33,8 @@ export function buildOpsTenantTabSummaries(items = [], summary = {}) {
   const total = Number(summary?.total ?? items.length);
   const active = Number(
     summary?.active ??
-      items.filter((item) => ["active", "ativo"].includes(String(item?.status || "").toLowerCase())).length,
+      items.filter((item) => ["active", "ativo"].includes(String(item?.status || "").toLowerCase()))
+        .length,
   );
   const installed = Number(
     summary?.with_base_catalog ?? items.filter((item) => item?.base_catalog?.installed).length,
@@ -38,11 +43,15 @@ export function buildOpsTenantTabSummaries(items = [], summary = {}) {
     ["suspended", "blocked", "bloqueado"].includes(String(item?.status || "").toLowerCase()),
   ).length;
   const attention = Number(
-    summary?.billing_attention ?? items.filter((item) => isBillingAttention(item?.billing_status)).length,
+    summary?.billing_attention ??
+      items.filter((item) => isBillingAttention(item?.billing_status)).length,
   );
   const recordsTotal = Number(
     summary?.records_total ??
-      items.reduce((totalRecords, item) => totalRecords + Number(item?.usage?.records_total || 0), 0),
+      items.reduce(
+        (totalRecords, item) => totalRecords + Number(item?.usage?.records_total || 0),
+        0,
+      ),
   );
   const imageBytes = Number(
     summary?.image_bytes ??
@@ -72,17 +81,29 @@ export function buildOpsTenantTabSummaries(items = [], summary = {}) {
 
 export function buildOpsTenantCommercialForm(tenant = {}) {
   return {
-    status: String(tenant?.status || "active").trim().toLowerCase(),
-    plan: String(tenant?.plan || "basico").trim().toLowerCase(),
-    billing_status: String(tenant?.billing_status || "active").trim().toLowerCase(),
-    subscription_source: String(tenant?.subscription_source || "manual").trim().toLowerCase(),
+    status: String(tenant?.status || "active")
+      .trim()
+      .toLowerCase(),
+    plan: String(tenant?.plan || "basico")
+      .trim()
+      .toLowerCase(),
+    billing_status: String(tenant?.billing_status || "active")
+      .trim()
+      .toLowerCase(),
+    subscription_source: String(tenant?.subscription_source || "manual")
+      .trim()
+      .toLowerCase(),
   };
 }
 
 export function buildOpsTenantCommercialPayload(current = {}, next = {}) {
   return ["status", "plan", "billing_status", "subscription_source"].reduce((payload, field) => {
-    const currentValue = String(current?.[field] || "").trim().toLowerCase();
-    const nextValue = String(next?.[field] || "").trim().toLowerCase();
+    const currentValue = String(current?.[field] || "")
+      .trim()
+      .toLowerCase();
+    const nextValue = String(next?.[field] || "")
+      .trim()
+      .toLowerCase();
     if (nextValue && nextValue !== currentValue) {
       payload[field] = nextValue;
     }

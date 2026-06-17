@@ -46,7 +46,9 @@ export default function CalendarioPreventivoTab({
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Vacina / Protocolo</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600">
+                  Vacina / Protocolo
+                </th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Espécie</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Fase</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600">Idade mín.</th>
@@ -64,7 +66,9 @@ export default function CalendarioPreventivoTab({
                   <td className="px-4 py-3 font-medium text-gray-800">{item.vacina}</td>
                   <td className="px-4 py-3 text-gray-600 capitalize">{item.especie ?? "-"}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${classeFaseCalendario(item.fase)}`}>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${classeFaseCalendario(item.fase)}`}
+                    >
                       {item.fase ?? "-"}
                     </span>
                   </td>

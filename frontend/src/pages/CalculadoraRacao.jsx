@@ -65,8 +65,7 @@ function RacaoSearchInput({
     const margemTela = 16;
     const espacoAbaixo = window.innerHeight - rect.bottom - margemTela;
     const espacoAcima = rect.top - margemTela;
-    const direction =
-      espacoAbaixo < 260 && espacoAcima > espacoAbaixo ? "up" : "down";
+    const direction = espacoAbaixo < 260 && espacoAcima > espacoAbaixo ? "up" : "down";
     const espacoDisponivel = direction === "up" ? espacoAcima : espacoAbaixo;
 
     setDropdown({
@@ -148,9 +147,7 @@ function RacaoSearchInput({
             "--racao-options-max-height": `${dropdown.maxHeight}px`,
           }}
         >
-          {loading && (
-            <div className="racao-empty">Buscando no cadastro...</div>
-          )}
+          {loading && <div className="racao-empty">Buscando no cadastro...</div>}
           {!loading && opcoes.length === 0 ? (
             <div className="racao-empty">Nenhuma ração encontrada.</div>
           ) : (
@@ -158,29 +155,21 @@ function RacaoSearchInput({
               <button
                 key={produto.id}
                 type="button"
-                className={`racao-option ${
-                  produto.aptidao.apta ? "is-ready" : "is-incomplete"
-                }`}
+                className={`racao-option ${produto.aptidao.apta ? "is-ready" : "is-incomplete"}`}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => selecionar(produto)}
                 aria-disabled={!produto.aptidao.apta}
               >
                 <div className="racao-option-main">
                   <span className="racao-option-name">{produto.nome}</span>
-                  <span
-                    className={`racao-status ${
-                      produto.aptidao.apta ? "ready" : "incomplete"
-                    }`}
-                  >
+                  <span className={`racao-status ${produto.aptidao.apta ? "ready" : "incomplete"}`}>
                     {produto.aptidao.apta ? "Apta" : "Cadastro incompleto"}
                   </span>
                 </div>
                 <div className="racao-option-meta">
                   <span>{formatarPeso(produto.peso_embalagem)}</span>
                   <span>{formatarMoeda(produto.preco_venda)}</span>
-                  {produto.classificacao_racao && (
-                    <span>{produto.classificacao_racao}</span>
-                  )}
+                  {produto.classificacao_racao && <span>{produto.classificacao_racao}</span>}
                 </div>
                 {!produto.aptidao.apta && (
                   <div className="racao-option-missing">
@@ -234,10 +223,7 @@ export default function CalculadoraRacao() {
     carregarPets();
   }, []);
 
-  const produtosComAptidao = useMemo(
-    () => prepararProdutosComAptidao(produtos),
-    [produtos],
-  );
+  const produtosComAptidao = useMemo(() => prepararProdutosComAptidao(produtos), [produtos]);
 
   const produtosBuscaPrincipalComAptidao = useMemo(
     () => prepararProdutosComAptidao(produtosBuscaPrincipal),
@@ -250,20 +236,12 @@ export default function CalculadoraRacao() {
   );
 
   const opcoesRacaoPrincipal = useMemo(
-    () =>
-      combinarProdutosComAptidao(
-        produtosBuscaPrincipalComAptidao,
-        produtosComAptidao,
-      ),
+    () => combinarProdutosComAptidao(produtosBuscaPrincipalComAptidao, produtosComAptidao),
     [produtosBuscaPrincipalComAptidao, produtosComAptidao],
   );
 
   const opcoesRacaoComparativo = useMemo(
-    () =>
-      combinarProdutosComAptidao(
-        produtosBuscaComparativoComAptidao,
-        produtosComAptidao,
-      ),
+    () => combinarProdutosComAptidao(produtosBuscaComparativoComAptidao, produtosComAptidao),
     [produtosBuscaComparativoComAptidao, produtosComAptidao],
   );
 
@@ -357,11 +335,7 @@ export default function CalculadoraRacao() {
   const resolverRacaoPrincipalDigitada = async () => {
     const texto = String(form.produto_nome || "").trim();
 
-    let produto = escolherRacaoAptaPorTexto(
-      texto,
-      opcoesRacaoPrincipal,
-      produtosComAptidao,
-    );
+    let produto = escolherRacaoAptaPorTexto(texto, opcoesRacaoPrincipal, produtosComAptidao);
 
     if (produto) return produto;
     if (texto.length < 2) return null;
@@ -438,9 +412,7 @@ export default function CalculadoraRacao() {
       ...prev,
       produto_id: produtoExato?.aptidao.apta ? produtoExato.id : "",
       produto_nome: valor,
-      categoria_racao: produtoExato?.aptidao.apta
-        ? produtoExato.categoria_racao || ""
-        : "",
+      categoria_racao: produtoExato?.aptidao.apta ? produtoExato.categoria_racao || "" : "",
     }));
   };
 
@@ -471,10 +443,7 @@ export default function CalculadoraRacao() {
         status: response.status,
         dataType: typeof response.data,
         isArray: Array.isArray(response.data),
-        dataPreview:
-          typeof response.data === "string"
-            ? response.data.substring(0, 200)
-            : "object",
+        dataPreview: typeof response.data === "string" ? response.data.substring(0, 200) : "object",
       });
 
       // Se a resposta for string, tentar parsear
@@ -496,9 +465,7 @@ export default function CalculadoraRacao() {
       console.log("📦 Total de produtos recebidos:", listaProdutos.length);
       console.log(
         "📦 Estrutura da resposta:",
-        Array.isArray(data)
-          ? "Array direto"
-          : `Objeto com keys: ${Object.keys(data).join(", ")}`,
+        Array.isArray(data) ? "Array direto" : `Objeto com keys: ${Object.keys(data).join(", ")}`,
       );
 
       if (listaProdutos.length > 0) {
@@ -546,9 +513,7 @@ export default function CalculadoraRacao() {
     } catch (error) {
       console.error("❌ Erro ao carregar produtos:", error);
       console.error("❌ Detalhes:", error.response?.data || error.message);
-      toast.error(
-        `Erro ao carregar produtos: ${error.response?.data?.detail || error.message}`,
-      );
+      toast.error(`Erro ao carregar produtos: ${error.response?.data?.detail || error.message}`);
     }
   };
 
@@ -611,19 +576,14 @@ export default function CalculadoraRacao() {
       return;
     }
 
-    let produtoSelecionado = form.produto_id
-      ? buscarProdutoComAptidao(form.produto_id)
-      : null;
+    let produtoSelecionado = form.produto_id ? buscarProdutoComAptidao(form.produto_id) : null;
 
     if (!produtoSelecionado && form.produto_nome) {
       produtoSelecionado = await resolverRacaoPrincipalDigitada();
     }
 
-    const produtoIdCalculo = produtoSelecionado?.id
-      ? parseInt(produtoSelecionado.id)
-      : null;
-    const categoriaRacaoCalculo =
-      produtoSelecionado?.categoria_racao || form.categoria_racao;
+    const produtoIdCalculo = produtoSelecionado?.id ? parseInt(produtoSelecionado.id) : null;
+    const categoriaRacaoCalculo = produtoSelecionado?.categoria_racao || form.categoria_racao;
 
     if (!produtoIdCalculo) {
       toast.error("Selecione uma ração apta para análise.");
@@ -708,15 +668,12 @@ export default function CalculadoraRacao() {
 
         // Se também selecionou uma ração principal, calcular ela também
         if (form.produto_id) {
-          const calcPrincipal = await api.post(
-            "/produtos/calculadora-racao",
-            {
-              produto_id: parseInt(form.produto_id),
-              peso_pet_kg: parseFloat(form.peso_pet_kg),
-              idade_meses: form.idade_meses ? parseInt(form.idade_meses) : null,
-              nivel_atividade: form.nivel_atividade,
-            },
-          );
+          const calcPrincipal = await api.post("/produtos/calculadora-racao", {
+            produto_id: parseInt(form.produto_id),
+            peso_pet_kg: parseFloat(form.peso_pet_kg),
+            idade_meses: form.idade_meses ? parseInt(form.idade_meses) : null,
+            nivel_atividade: form.nivel_atividade,
+          });
 
           // Evitar duplicatas: se selecionou a mesma ração
           if (calcPrincipal.data.produto_id === racaoComparar.produto_id) {
@@ -754,20 +711,15 @@ export default function CalculadoraRacao() {
         // Se há uma ração selecionada no campo principal, incluir ela sempre
         if (form.produto_id) {
           // Primeiro, remover a ração principal da lista se já estiver lá
-          todasRacoes = todasRacoes.filter(
-            (r) => r.produto_id !== parseInt(form.produto_id),
-          );
+          todasRacoes = todasRacoes.filter((r) => r.produto_id !== parseInt(form.produto_id));
 
           // Calcular a ração principal
-          const calcPrincipal = await api.post(
-            "/produtos/calculadora-racao",
-            {
-              produto_id: parseInt(form.produto_id),
-              peso_pet_kg: parseFloat(form.peso_pet_kg),
-              idade_meses: form.idade_meses ? parseInt(form.idade_meses) : null,
-              nivel_atividade: form.nivel_atividade,
-            },
-          );
+          const calcPrincipal = await api.post("/produtos/calculadora-racao", {
+            produto_id: parseInt(form.produto_id),
+            peso_pet_kg: parseFloat(form.peso_pet_kg),
+            idade_meses: form.idade_meses ? parseInt(form.idade_meses) : null,
+            nivel_atividade: form.nivel_atividade,
+          });
 
           const racaoPrincipal = calcPrincipal.data;
 
@@ -786,9 +738,7 @@ export default function CalculadoraRacao() {
 
         const totalRacoes = todasRacoes.length;
         if (totalRacoes === 0) {
-          toast.error(
-            "Nenhuma ração encontrada com esses filtros. Tente outros critérios.",
-          );
+          toast.error("Nenhuma ração encontrada com esses filtros. Tente outros critérios.");
         }
       }
     } catch (error) {
@@ -826,9 +776,7 @@ export default function CalculadoraRacao() {
 
                 // Se digitou exatamente o nome de um pet, seleciona ele
                 const petEncontrado = pets.find(
-                  (p) =>
-                    `${p.nome} - ${p.especie} ${p.peso ? `(${p.peso}kg)` : ""}` ===
-                    nomePet,
+                  (p) => `${p.nome} - ${p.especie} ${p.peso ? `(${p.peso}kg)` : ""}` === nomePet,
                 );
                 if (petEncontrado) {
                   handlePetChange(petEncontrado.id);
@@ -846,8 +794,7 @@ export default function CalculadoraRacao() {
               ))}
             </datalist>
             <small className="form-hint">
-              💡 Digite ou selecione um pet para preencher automaticamente peso
-              e idade
+              💡 Digite ou selecione um pet para preencher automaticamente peso e idade
             </small>
           </div>
 
@@ -859,9 +806,7 @@ export default function CalculadoraRacao() {
               type="number"
               step="0.1"
               value={form.peso_pet_kg}
-              onChange={(e) =>
-                setForm({ ...form, peso_pet_kg: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, peso_pet_kg: e.target.value })}
               placeholder="Ex: 8.5"
             />
           </div>
@@ -869,18 +814,14 @@ export default function CalculadoraRacao() {
           <div className="form-group">
             <label htmlFor="racao-idade-meses">
               Idade (meses)
-              {form.categoria_racao === "filhote" && (
-                <span style={{ color: "#ff6b6b" }}> *</span>
-              )}
+              {form.categoria_racao === "filhote" && <span style={{ color: "#ff6b6b" }}> *</span>}
             </label>
             <input
               id="racao-idade-meses"
               name="racao_idade_meses"
               type="number"
               value={form.idade_meses}
-              onChange={(e) =>
-                setForm({ ...form, idade_meses: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, idade_meses: e.target.value })}
               placeholder={
                 form.categoria_racao === "filhote"
                   ? "Obrigatório para filhotes!"
@@ -901,9 +842,7 @@ export default function CalculadoraRacao() {
               id="racao-nivel-atividade"
               name="racao_nivel_atividade"
               value={form.nivel_atividade}
-              onChange={(e) =>
-                setForm({ ...form, nivel_atividade: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, nivel_atividade: e.target.value })}
             >
               <option value="baixo">Baixo</option>
               <option value="normal">Normal</option>
@@ -937,21 +876,14 @@ export default function CalculadoraRacao() {
               hint={`${resumoAptidao.aptas} aptas para análise · ${resumoAptidao.incompletas} com cadastro incompleto`}
             />
             {form.categoria_racao === "filhote" && (
-              <small
-                className="form-hint"
-                style={{ color: "#ff6b6b", fontWeight: "bold" }}
-              >
+              <small className="form-hint" style={{ color: "#ff6b6b", fontWeight: "bold" }}>
                 ⚠️ Ração de filhote - idade é obrigatória!
               </small>
             )}
           </div>
 
           <div className="button-group">
-            <button
-              onClick={calcular}
-              disabled={loading}
-              className="btn-primary"
-            >
+            <button onClick={calcular} disabled={loading} className="btn-primary">
               {loading ? "Calculando..." : "📊 Calcular"}
             </button>
           </div>
@@ -1060,11 +992,7 @@ export default function CalculadoraRacao() {
           </div>
 
           <div className="button-group">
-            <button
-              onClick={compararRacoes}
-              disabled={loading}
-              className="btn-secondary"
-            >
+            <button onClick={compararRacoes} disabled={loading} className="btn-secondary">
               {loading ? "Comparando..." : "🔍 Comparar Todas"}
             </button>
           </div>
@@ -1087,9 +1015,7 @@ export default function CalculadoraRacao() {
               <div className="result-stats">
                 <div className="stat">
                   <span className="label">Peso Embalagem</span>
-                  <span className="value">
-                    {resultado.peso_embalagem_kg} kg
-                  </span>
+                  <span className="value">{resultado.peso_embalagem_kg} kg</span>
                 </div>
                 <div className="stat">
                   <span className="label">Preço</span>
@@ -1103,8 +1029,7 @@ export default function CalculadoraRacao() {
                   <div>
                     <strong>Duração</strong>
                     <p>
-                      {resultado.duracao_dias} dias ({resultado.duracao_meses}{" "}
-                      meses)
+                      {resultado.duracao_dias} dias ({resultado.duracao_meses} meses)
                     </p>
                   </div>
                 </div>
@@ -1144,22 +1069,17 @@ export default function CalculadoraRacao() {
           {comparativo.length > 0 && (
             <div className="comparativo-card">
               <h2>🏆 Comparativo de Rações ({comparativo.length})</h2>
-              <p className="subtitle">
-                Ordenado por melhor custo-benefício (menor custo diário)
-              </p>
+              <p className="subtitle">Ordenado por melhor custo-benefício (menor custo diário)</p>
 
               <div className="comparativo-list">
                 {(() => {
                   // Encontrar menor custo diário
-                  const menorCusto = Math.min(
-                    ...comparativo.map((r) => r.custo_por_dia),
-                  );
+                  const menorCusto = Math.min(...comparativo.map((r) => r.custo_por_dia));
 
-                  return comparativo.map((item, index) => {
+                  return comparativo.map((item) => {
                     // ⭐ Ração BASE (do campo "Selecionar Ração")
                     const isSelecionada =
-                      form.produto_id &&
-                      item.produto_id === parseInt(form.produto_id);
+                      form.produto_id && item.produto_id === parseInt(form.produto_id);
                     // 🏆 Melhor custo-benefício
                     const isMelhor = item.custo_por_dia === menorCusto;
 
@@ -1171,14 +1091,10 @@ export default function CalculadoraRacao() {
                         {(isSelecionada || isMelhor) && (
                           <div className="comparativo-badges">
                             {isSelecionada && (
-                              <span className="badge-selecionada">
-                                ⭐ Selecionada
-                              </span>
+                              <span className="badge-selecionada">⭐ Selecionada</span>
                             )}
                             {isMelhor && (
-                              <span className="badge-melhor">
-                                🏆 Melhor Custo-Benefício
-                              </span>
+                              <span className="badge-melhor">🏆 Melhor Custo-Benefício</span>
                             )}
                           </div>
                         )}
@@ -1195,9 +1111,7 @@ export default function CalculadoraRacao() {
                               }}
                             >
                               {item.classificacao && (
-                                <span
-                                  className={`badge badge-${item.classificacao}`}
-                                >
+                                <span className={`badge badge-${item.classificacao}`}>
                                   {item.classificacao.replace("_", " ")}
                                 </span>
                               )}
@@ -1214,9 +1128,7 @@ export default function CalculadoraRacao() {
                               </span>
                             </div>
                           </div>
-                          <div className="item-price">
-                            R$ {item.preco.toFixed(2)}
-                          </div>
+                          <div className="item-price">R$ {item.preco.toFixed(2)}</div>
                         </div>
 
                         <div className="item-stats">
@@ -1279,24 +1191,16 @@ export default function CalculadoraRacao() {
                                   ? "premium tem melhor densidade nutricional"
                                   : "tem excelente eficiência alimentar"}
                               , então seu pet consome apenas{" "}
-                              <strong>
-                                {item.quantidade_diaria_g}g por dia
-                              </strong>
-                              .
+                              <strong>{item.quantidade_diaria_g}g por dia</strong>.
                               {comparativo[1] && (
                                 <>
                                   {" "}
                                   Em comparação, a segunda opção requer{" "}
-                                  <strong>
-                                    {comparativo[1].quantidade_diaria_g}g/dia
-                                  </strong>
-                                  , resultando em um custo diário{" "}
+                                  <strong>{comparativo[1].quantidade_diaria_g}g/dia</strong>,
+                                  resultando em um custo diário{" "}
                                   <strong>
                                     R${" "}
-                                    {(
-                                      comparativo[1].custo_por_dia -
-                                      item.custo_por_dia
-                                    ).toFixed(2)}{" "}
+                                    {(comparativo[1].custo_por_dia - item.custo_por_dia).toFixed(2)}{" "}
                                     maior
                                   </strong>
                                   (R$ {item.custo_por_dia.toFixed(2)} vs R${" "}

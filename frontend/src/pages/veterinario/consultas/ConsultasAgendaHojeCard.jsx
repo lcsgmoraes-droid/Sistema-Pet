@@ -2,7 +2,13 @@ import { AlertCircle, CalendarClock, PlayCircle, RefreshCw } from "lucide-react"
 
 import PetIdentity from "../../../components/ui/PetIdentity";
 import { getAgendamentoConsultaActionLabel } from "../fluxoConsultaAgendamentoUtils";
-import { STATUS_BADGE, STATUS_LABEL, TIPO_BADGE, TIPO_LABEL, normalizarTipoAgendamento } from "../agenda/agendaUtils";
+import {
+  STATUS_BADGE,
+  STATUS_LABEL,
+  TIPO_BADGE,
+  TIPO_LABEL,
+  normalizarTipoAgendamento,
+} from "../agenda/agendaUtils";
 
 export default function ConsultasAgendaHojeCard({
   abrindoAgendamentoId,
@@ -22,7 +28,9 @@ export default function ConsultasAgendaHojeCard({
             <CalendarClock size={17} className="text-blue-600" />
             Agendamentos de hoje
           </h2>
-          <p className="mt-1 text-xs text-slate-500">Pacientes agendados para atendimento clinico nesta data.</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Pacientes agendados para atendimento clinico nesta data.
+          </p>
         </div>
         <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 md:w-auto">
           <button
@@ -83,10 +91,14 @@ function AgendamentoHojeItem({ abrindo, agendamento, onIniciarAgendamento }) {
         <span className="text-sm font-semibold text-slate-800">
           {String(agendamento.data_hora || "").slice(11, 16) || "--:--"}
         </span>
-        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${TIPO_BADGE[tipo] ?? "bg-gray-100 text-gray-600"}`}>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${TIPO_BADGE[tipo] ?? "bg-gray-100 text-gray-600"}`}
+        >
           {TIPO_LABEL[tipo] ?? "Consulta"}
         </span>
-        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_BADGE[agendamento.status] ?? "bg-gray-100 text-gray-600"}`}>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_BADGE[agendamento.status] ?? "bg-gray-100 text-gray-600"}`}
+        >
           {STATUS_LABEL[agendamento.status] ?? agendamento.status}
         </span>
       </div>

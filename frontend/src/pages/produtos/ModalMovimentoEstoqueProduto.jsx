@@ -1,8 +1,5 @@
-import { useState } from 'react';
-import {
-  montarEstadoMovimentoEstoque,
-  montarPayloadMovimentoEstoque,
-} from '../produtosFormUtils';
+import { useState } from "react";
+import { montarEstadoMovimentoEstoque, montarPayloadMovimentoEstoque } from "../produtosFormUtils";
 
 export default function ModalMovimentoEstoqueProduto({ tipo, onSave, onClose }) {
   const [dados, setDados] = useState(() => montarEstadoMovimentoEstoque());
@@ -17,16 +14,16 @@ export default function ModalMovimentoEstoqueProduto({ tipo, onSave, onClose }) 
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
         <div className="flex justify-between items-center p-6 border-b">
           <h3 className="text-lg font-semibold">
-            {tipo === 'entrada' ? '➕ Entrada de Estoque' : '➖ Saída de Estoque'}
+            {tipo === "entrada" ? "➕ Entrada de Estoque" : "➖ Saída de Estoque"}
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            ✕
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Quantidade *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Quantidade *</label>
             <input
               type="number"
               value={dados.quantidade}
@@ -40,7 +37,7 @@ export default function ModalMovimentoEstoqueProduto({ tipo, onSave, onClose }) 
             />
           </div>
 
-          {tipo === 'entrada' && (
+          {tipo === "entrada" && (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -88,9 +85,7 @@ export default function ModalMovimentoEstoqueProduto({ tipo, onSave, onClose }) 
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Observação
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Observação</label>
             <textarea
               value={dados.observacao}
               onChange={(e) => setDados({ ...dados, observacao: e.target.value })}
@@ -100,10 +95,11 @@ export default function ModalMovimentoEstoqueProduto({ tipo, onSave, onClose }) 
             />
           </div>
 
-          {tipo === 'saida' && (
+          {tipo === "saida" && (
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
               <p className="text-sm text-yellow-800">
-                <strong>FIFO:</strong> A saída será descontada automaticamente dos lotes mais antigos primeiro.
+                <strong>FIFO:</strong> A saída será descontada automaticamente dos lotes mais
+                antigos primeiro.
               </p>
             </div>
           )}
@@ -119,9 +115,9 @@ export default function ModalMovimentoEstoqueProduto({ tipo, onSave, onClose }) 
             <button
               type="submit"
               className={`px-4 py-2 text-white rounded-lg ${
-                tipo === 'entrada'
-                  ? 'bg-green-600 hover:bg-green-700'
-                  : 'bg-red-600 hover:bg-red-700'
+                tipo === "entrada"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : "bg-red-600 hover:bg-red-700"
               }`}
             >
               Confirmar

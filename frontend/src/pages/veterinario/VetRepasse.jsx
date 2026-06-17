@@ -16,7 +16,8 @@ export default function VetRepasse() {
       {repasse.dados && <RepasseResumoCards {...repasse} />}
       <RepasseTabela {...repasse} />
       <p className="text-xs text-gray-400 text-right">
-        Os lancamentos sao gerados ao finalizar uma consulta com procedimentos vinculados a um veterinario parceiro.
+        Os lancamentos sao gerados ao finalizar uma consulta com procedimentos vinculados a um
+        veterinario parceiro.
       </p>
     </div>
   );

@@ -13,7 +13,10 @@ function separarPosologia(item) {
     return { unidade: "mg", frequencia: "", instrucoes: "" };
   }
 
-  const partes = posologia.split(" - ").map((parte) => parte.trim()).filter(Boolean);
+  const partes = posologia
+    .split(" - ")
+    .map((parte) => parte.trim())
+    .filter(Boolean);
   const primeira = partes[0] || "";
   const doseRegex = quantidade
     ? new RegExp(`^${quantidade.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*(\\S+)?`, "i")
@@ -52,7 +55,7 @@ export function mapPrescricoesParaForm(prescricoes = []) {
         via: texto(item.via_administracao) || "oral",
         instrucoes: posologia.instrucoes,
       };
-    })
+    }),
   );
 }
 
@@ -86,7 +89,8 @@ export function mapConsultaParaForm(consulta) {
     diagnostico: consulta.diagnostico ?? "",
     prognostico: consulta.hipotese_diagnostica ?? consulta.prognostico ?? "",
     tratamento: consulta.conduta ?? consulta.tratamento ?? "",
-    observacoes: consulta.observacoes_tutor ?? consulta.observacoes_internas ?? consulta.observacoes ?? "",
+    observacoes:
+      consulta.observacoes_tutor ?? consulta.observacoes_internas ?? consulta.observacoes ?? "",
     retorno_em_dias: consulta.retorno_em_dias ?? "",
     retorno_agendado: consulta.retorno_agendado ?? null,
     prescricao_itens: listaOuVazia(consulta.prescricao_rascunho),

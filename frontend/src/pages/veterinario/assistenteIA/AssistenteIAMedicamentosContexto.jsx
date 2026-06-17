@@ -36,7 +36,10 @@ export default function AssistenteIAMedicamentosContexto({
           Peso (kg) para cálculo de dose
         </label>
         <div className="relative">
-          <Calculator size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Calculator
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
           <input
             id="vet-ia-peso"
             value={pesoKg}

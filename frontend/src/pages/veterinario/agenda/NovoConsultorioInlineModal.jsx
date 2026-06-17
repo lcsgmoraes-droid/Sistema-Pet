@@ -55,12 +55,7 @@ export default function NovoConsultorioInlineModal({
               Cadastre uma sala e continue o agendamento sem sair desta tela.
             </p>
           </div>
-          <IconActionButton
-            aria-label="Fechar"
-            icon={X}
-            onClick={onClose}
-            tone="ghost"
-          />
+          <IconActionButton aria-label="Fechar" icon={X} onClick={onClose} tone="ghost" />
         </div>
 
         {erro && (

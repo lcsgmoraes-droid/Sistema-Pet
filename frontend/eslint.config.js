@@ -19,6 +19,7 @@ export default [
       "src/components/**/*.{js,jsx,mjs,cjs}",
       "src/helpers/**/*.{js,mjs,cjs}",
       "src/hooks/**/*.{js,jsx,mjs,cjs}",
+      "src/pages/**/*.{js,jsx,mjs,cjs}",
       "src/utils/**/*.{js,mjs,cjs}",
     ],
     languageOptions: {

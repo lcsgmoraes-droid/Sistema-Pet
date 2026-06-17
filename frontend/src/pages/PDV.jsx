@@ -1,4 +1,4 @@
-﻿// âš ï¸ ARQUIVO CRÃTICO DE PRODUÃ‡ÃƒO
+// ARQUIVO CRITICO DE PRODUCAO
 // Este arquivo impacta diretamente operaÃ§Ãµes reais (PDV / Financeiro / Estoque).
 // NÃƒO alterar sem:
 // 1. Entender o fluxo completo

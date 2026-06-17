@@ -45,7 +45,12 @@ export default function BanhoTosaTaxiDogList({
         />
       ))}
       {items.length === 0 && (
-        <EmptyState compact description="Cadastre um transporte vinculado a um agendamento." icon={Route} title="Nenhum taxi dog para esta data" />
+        <EmptyState
+          compact
+          description="Cadastre um transporte vinculado a um agendamento."
+          icon={Route}
+          title="Nenhum taxi dog para esta data"
+        />
       )}
     </div>
   );
@@ -57,7 +62,12 @@ function TaxiCard({ item, saving, onAtualizarMedicao, onSalvarMedicao, onStatus 
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <PetAvatar alt={item.pet_nome || "Pet"} name={item.pet_nome} size="md" url={item.pet_foto_url} />
+          <PetAvatar
+            alt={item.pet_nome || "Pet"}
+            name={item.pet_nome}
+            size="md"
+            url={item.pet_foto_url}
+          />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-semibold text-slate-900">
@@ -76,13 +86,23 @@ function TaxiCard({ item, saving, onAtualizarMedicao, onSalvarMedicao, onStatus 
                   record={item}
                 />
               </h3>
-              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">{labelStatus(item.status)}</span>
+              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                {labelStatus(item.status)}
+              </span>
             </div>
-            <p className="mt-1 text-sm text-slate-500">{labelTipo(item.tipo)} | {hora(item.janela_inicio)} - {hora(item.janela_fim)}</p>
+            <p className="mt-1 text-sm text-slate-500">
+              {labelTipo(item.tipo)} | {hora(item.janela_inicio)} - {hora(item.janela_fim)}
+            </p>
           </div>
         </div>
         {proximo && (
-          <ActionButton disabled={saving} icon={ArrowRight} intent="edit" onClick={() => onStatus(item, proximo)} tone="soft">
+          <ActionButton
+            disabled={saving}
+            icon={ArrowRight}
+            intent="edit"
+            onClick={() => onStatus(item, proximo)}
+            tone="soft"
+          >
             {labelAcao(proximo)}
           </ActionButton>
         )}
@@ -95,9 +115,26 @@ function TaxiCard({ item, saving, onAtualizarMedicao, onSalvarMedicao, onStatus 
         <MiniMetric label="Destino" value={item.endereco_destino || "-"} />
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-        <TextField label="Km real" type="number" value={String(item.km_real ?? "0")} onChange={(value) => atualizarItem(item.id, "km_real", value, onAtualizarMedicao)} />
-        <TextField label="Custo real" type="number" value={String(item.custo_real ?? "0")} onChange={(value) => atualizarItem(item.id, "custo_real", value, onAtualizarMedicao)} />
-        <ActionButton className="self-end" disabled={saving} icon={Save} intent="neutral" onClick={() => onSalvarMedicao(item)} tone="soft">
+        <TextField
+          label="Km real"
+          type="number"
+          value={String(item.km_real ?? "0")}
+          onChange={(value) => atualizarItem(item.id, "km_real", value, onAtualizarMedicao)}
+        />
+        <TextField
+          label="Custo real"
+          type="number"
+          value={String(item.custo_real ?? "0")}
+          onChange={(value) => atualizarItem(item.id, "custo_real", value, onAtualizarMedicao)}
+        />
+        <ActionButton
+          className="self-end"
+          disabled={saving}
+          icon={Save}
+          intent="neutral"
+          onClick={() => onSalvarMedicao(item)}
+          tone="soft"
+        >
           Salvar medicao
         </ActionButton>
       </div>
@@ -106,7 +143,9 @@ function TaxiCard({ item, saving, onAtualizarMedicao, onSalvarMedicao, onStatus 
 }
 
 function atualizarItem(id, field, value, onAtualizarMedicao) {
-  onAtualizarMedicao((prev) => prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
+  onAtualizarMedicao((prev) =>
+    prev.map((item) => (item.id === id ? { ...item, [field]: value } : item)),
+  );
 }
 
 function proximoStatus(status) {

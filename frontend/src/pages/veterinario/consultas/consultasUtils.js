@@ -27,13 +27,14 @@ export function filtrarConsultas(consultas, busca) {
   if (!busca) return consultas;
 
   const texto = busca.toLowerCase();
-  return consultas.filter((consulta) => (
-    String(consulta.id ?? "").includes(texto) ||
-    (consulta.pet_nome ?? "").toLowerCase().includes(texto) ||
-    (consulta.veterinario_nome ?? "").toLowerCase().includes(texto) ||
-    (consulta.motivo_consulta ?? "").toLowerCase().includes(texto) ||
-    (consulta.diagnostico ?? "").toLowerCase().includes(texto)
-  ));
+  return consultas.filter(
+    (consulta) =>
+      String(consulta.id ?? "").includes(texto) ||
+      (consulta.pet_nome ?? "").toLowerCase().includes(texto) ||
+      (consulta.veterinario_nome ?? "").toLowerCase().includes(texto) ||
+      (consulta.motivo_consulta ?? "").toLowerCase().includes(texto) ||
+      (consulta.diagnostico ?? "").toLowerCase().includes(texto),
+  );
 }
 
 export function toggleConsultaSelecionada(selecionadas, consultaId) {

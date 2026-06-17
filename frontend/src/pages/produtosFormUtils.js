@@ -10,9 +10,7 @@ export function organizarCategoriasHierarquicas(categorias) {
   categorias.forEach((categoria) => {
     if (categoria.categoria_pai_id) {
       if (categoriasMap[categoria.categoria_pai_id]) {
-        categoriasMap[categoria.categoria_pai_id].filhas.push(
-          categoriasMap[categoria.id],
-        );
+        categoriasMap[categoria.categoria_pai_id].filhas.push(categoriasMap[categoria.id]);
       }
     } else {
       raizes.push(categoriasMap[categoria.id]);
@@ -129,9 +127,10 @@ export function montarEstadoProdutoClonado(prod = {}) {
     especie_compativel: prod.especie_compativel || "both",
     eh_racao: Boolean(prod.eh_racao),
     e_granel: Boolean(prod.e_granel),
-    classificacao_racao: prod.classificacao_racao && prod.classificacao_racao !== "sim"
-      ? prod.classificacao_racao
-      : "",
+    classificacao_racao:
+      prod.classificacao_racao && prod.classificacao_racao !== "sim"
+        ? prod.classificacao_racao
+        : "",
     peso_embalagem: prod.peso_embalagem || "",
     tabela_nutricional: prod.tabela_nutricional || "",
     tabela_consumo: prod.tabela_consumo || "",

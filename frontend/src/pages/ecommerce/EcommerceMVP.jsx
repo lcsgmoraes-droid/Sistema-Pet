@@ -1,32 +1,29 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import ecommerceApi from '../../services/ecommerceApi';
-import { api } from '../../services/api';
-import EcommerceAccountPage from './EcommerceAccountPage';
-import { EcommerceCartPage } from './EcommerceCartPanels';
-import EcommerceCheckoutPage from './EcommerceCheckoutPage';
-import EcommerceFooter from './EcommerceFooter';
-import EcommerceNotifyMeModal from './EcommerceNotifyMeModal';
-import EcommerceOrdersPage from './EcommerceOrdersPage';
-import EcommerceProductDetailModal from './EcommerceProductDetailModal';
-import EcommerceStorePage from './EcommerceStorePage';
-import EcommerceStorefrontChrome from './EcommerceStorefrontChrome';
-import ecommerceMvpStyles from './ecommerceMvpStyles';
-import useEcommerceCart from './useEcommerceCart';
-import useEcommerceCatalog from './useEcommerceCatalog';
-import useEcommerceCheckout from './useEcommerceCheckout';
-import useEcommerceCustomer from './useEcommerceCustomer';
-import useEcommerceEngagement from './useEcommerceEngagement';
-import useEcommerceOrders from './useEcommerceOrders';
-import useEcommerceProductModal from './useEcommerceProductModal';
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import ecommerceApi from "../../services/ecommerceApi";
+import { api } from "../../services/api";
+import EcommerceAccountPage from "./EcommerceAccountPage";
+import { EcommerceCartPage } from "./EcommerceCartPanels";
+import EcommerceCheckoutPage from "./EcommerceCheckoutPage";
+import EcommerceFooter from "./EcommerceFooter";
+import EcommerceNotifyMeModal from "./EcommerceNotifyMeModal";
+import EcommerceOrdersPage from "./EcommerceOrdersPage";
+import EcommerceProductDetailModal from "./EcommerceProductDetailModal";
+import EcommerceStorePage from "./EcommerceStorePage";
+import EcommerceStorefrontChrome from "./EcommerceStorefrontChrome";
+import ecommerceMvpStyles from "./ecommerceMvpStyles";
+import useEcommerceCart from "./useEcommerceCart";
+import useEcommerceCatalog from "./useEcommerceCatalog";
+import useEcommerceCheckout from "./useEcommerceCheckout";
+import useEcommerceCustomer from "./useEcommerceCustomer";
+import useEcommerceEngagement from "./useEcommerceEngagement";
+import useEcommerceOrders from "./useEcommerceOrders";
+import useEcommerceProductModal from "./useEcommerceProductModal";
 import {
   readMercadoPagoPaymentReturn,
   stripMercadoPagoPaymentReturnParams,
-} from '../../utils/mercadoPagoPaymentReturn';
-import {
-  trackPageView,
-  trackViewCart,
-} from '../../services/analytics';
+} from "../../utils/mercadoPagoPaymentReturn";
+import { trackPageView, trackViewCart } from "../../services/analytics";
 import {
   DEFAULT_CATALOG_LIMIT,
   STORAGE_TOKEN_KEY,
@@ -34,20 +31,20 @@ import {
   buildCatalogQueryParams,
   buildPaginationWindow,
   extractApiErrorMessage,
-  isProductOutOfStock,
   normalizeCatalogPayload,
   resolveStoreDisplayName,
-} from './ecommerceMvpUtils';
+} from "./ecommerceMvpUtils";
 
 export default function EcommerceMVP() {
   // Inject Plus Jakarta Sans font (matches design system)
   useEffect(() => {
-    const id = 'plus-jakarta-sans-font';
+    const id = "plus-jakarta-sans-font";
     if (!document.getElementById(id)) {
-      const link = document.createElement('link');
+      const link = document.createElement("link");
       link.id = id;
-      link.rel = 'stylesheet';
-      link.href = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap';
+      link.rel = "stylesheet";
+      link.href =
+        "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap";
       document.head.appendChild(link);
     }
   }, []);
@@ -56,20 +53,22 @@ export default function EcommerceMVP() {
   const navigate = useNavigate();
   const params = useParams();
 
-  const [view, setView] = useState('loja');
+  const [view, setView] = useState("loja");
 
   // Detecta mobile (< 768px)
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : false);
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 768 : false,
+  );
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
   }, []);
 
   // Rastreia no Google Analytics sempre que o cliente muda de tela
   useEffect(() => {
     trackPageView(view);
-    if (view === 'carrinho') trackViewCart(cart);
+    if (view === "carrinho") trackViewCart(cart);
   }, [view]);
   const [bannerSlide, setBannerSlide] = useState(0);
   const [hoveredCard, setHoveredCard] = useState(null);
@@ -99,10 +98,10 @@ export default function EcommerceMVP() {
     openProductDetails,
     closeProductModal,
   } = useEcommerceProductModal({ products, location, navigate });
-  const [customerToken, setCustomerToken] = useState(localStorage.getItem(STORAGE_TOKEN_KEY) || '');
+  const [customerToken, setCustomerToken] = useState(localStorage.getItem(STORAGE_TOKEN_KEY) || "");
 
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [tenantContext, setTenantContext] = useState(null);
 
   // Banners: usa URLs do tenant se configuradas, senão exibe os padrões
@@ -112,13 +111,13 @@ export default function EcommerceMVP() {
 
   const tenantRef = useMemo(() => {
     const query = new URLSearchParams(location.search);
-    const tenantFromQuery = query.get('tenant');
-    return tenantFromQuery || params.tenantId || '';
+    const tenantFromQuery = query.get("tenant");
+    return tenantFromQuery || params.tenantId || "";
   }, [location.search, params.tenantId]);
 
   const tenantHeaders = useMemo(() => {
     if (!tenantContext?.id) return {};
-    return { 'X-Tenant-ID': tenantContext.id };
+    return { "X-Tenant-ID": tenantContext.id };
   }, [tenantContext?.id]);
 
   const authHeaders = useMemo(() => {
@@ -126,7 +125,7 @@ export default function EcommerceMVP() {
     return { Authorization: `Bearer ${customerToken}` };
   }, [customerToken]);
 
-  const storefrontRef = tenantContext?.ecommerce_slug || tenantRef || '';
+  const storefrontRef = tenantContext?.ecommerce_slug || tenantRef || "";
 
   const storeDisplayName = useMemo(() => {
     return resolveStoreDisplayName({ tenantContext, storefrontRef });
@@ -157,8 +156,8 @@ export default function EcommerceMVP() {
 
   const handleCatalogPageChange = (nextPage) => {
     setCatalogPage(nextPage);
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
@@ -253,22 +252,17 @@ export default function EcommerceMVP() {
     onSuccess: setSuccess,
   });
 
-  const {
-    ordersDetailed,
-    ordersLoading,
-    loadOrdersDetailed,
-    avisarCheguei,
-    recordOrderId,
-  } = useEcommerceOrders({
-    authHeaders,
-    customerToken,
-    view,
-    onError: setError,
-  });
+  const { ordersDetailed, ordersLoading, loadOrdersDetailed, avisarCheguei, recordOrderId } =
+    useEcommerceOrders({
+      authHeaders,
+      customerToken,
+      view,
+      onError: setError,
+    });
 
   useEffect(() => {
-    const viewParam = new URLSearchParams(location.search).get('view');
-    if (['loja', 'carrinho', 'checkout', 'pedidos', 'conta'].includes(viewParam)) {
+    const viewParam = new URLSearchParams(location.search).get("view");
+    if (["loja", "carrinho", "checkout", "pedidos", "conta"].includes(viewParam)) {
       setView(viewParam);
     }
   }, [location.search]);
@@ -277,12 +271,12 @@ export default function EcommerceMVP() {
     const paymentReturn = readMercadoPagoPaymentReturn(location.search);
     if (!paymentReturn) return;
 
-    setView('pedidos');
-    if (paymentReturn.level === 'error') {
+    setView("pedidos");
+    if (paymentReturn.level === "error") {
       setError(`${paymentReturn.title}: ${paymentReturn.message}`);
-      setSuccess('');
+      setSuccess("");
     } else {
-      setError('');
+      setError("");
       setSuccess(`${paymentReturn.title}: ${paymentReturn.message}`);
     }
     if (paymentReturn.pedidoId) {
@@ -290,7 +284,7 @@ export default function EcommerceMVP() {
     }
 
     const cleanedSearch = stripMercadoPagoPaymentReturnParams(location.search);
-    navigate(`${location.pathname}${cleanedSearch ? `?${cleanedSearch}` : ''}`, { replace: true });
+    navigate(`${location.pathname}${cleanedSearch ? `?${cleanedSearch}` : ""}`, { replace: true });
   }, [location.pathname, location.search, navigate, recordOrderId]);
 
   const {
@@ -344,7 +338,7 @@ export default function EcommerceMVP() {
   // Ler ?busca= da URL (ex: link do email de avise-me) e pré-filtrar
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const buscaParam = params.get('busca');
+    const buscaParam = params.get("busca");
     if (buscaParam) {
       handleCatalogSearchChange(buscaParam);
     }
@@ -379,7 +373,15 @@ export default function EcommerceMVP() {
       loadProductsById(tenantContext.id);
     }, 220);
     return () => clearTimeout(timer);
-  }, [tenantContext?.ecommerce_slug, tenantContext?.id, tenantRef, search, categoria, ordenacaoCatalogo, catalogPage]);
+  }, [
+    tenantContext?.ecommerce_slug,
+    tenantContext?.id,
+    tenantRef,
+    search,
+    categoria,
+    ordenacaoCatalogo,
+    catalogPage,
+  ]);
 
   useEffect(() => {
     const total = activeBanners.length;
@@ -391,26 +393,26 @@ export default function EcommerceMVP() {
     try {
       // Sem slug na URL = acesso pelo painel (usuario logado) → usa API autenticada
       if (!tenantRef) {
-        const response = await api.get('/ecommerce-aparencia/tenant-context');
+        const response = await api.get("/ecommerce-aparencia/tenant-context");
         setTenantContext(response?.data || null);
         return;
       }
-      const response = await ecommerceApi.get('/api/ecommerce/tenant-context', {
+      const response = await ecommerceApi.get("/api/ecommerce/tenant-context", {
         params: { tenant: tenantRef },
       });
       setTenantContext(response?.data || null);
     } catch (err) {
       setTenantContext(null);
-      setError(extractApiErrorMessage(err, 'Loja inválida para e-commerce'));
+      setError(extractApiErrorMessage(err, "Loja inválida para e-commerce"));
     }
   }
 
   async function loadCatalogProducts(tenantValue) {
     if (!tenantValue) return;
     setLoading(true);
-    setError('');
+    setError("");
     try {
-      const response = await ecommerceApi.get('/api/ecommerce/produtos', {
+      const response = await ecommerceApi.get("/api/ecommerce/produtos", {
         params: buildCatalogQueryParams({
           tenant: tenantValue,
           search,
@@ -418,7 +420,7 @@ export default function EcommerceMVP() {
           order: ordenacaoCatalogo,
           page: catalogPage,
           limit: DEFAULT_CATALOG_LIMIT,
-          channel: 'ecommerce',
+          channel: "ecommerce",
         }),
       });
       const payload = normalizeCatalogPayload(response?.data);
@@ -437,7 +439,7 @@ export default function EcommerceMVP() {
         limit: DEFAULT_CATALOG_LIMIT,
         categories: [],
       });
-      setError(extractApiErrorMessage(err, 'Erro ao carregar produtos vendaveis'));
+      setError(extractApiErrorMessage(err, "Erro ao carregar produtos vendaveis"));
     } finally {
       setLoading(false);
     }
@@ -455,7 +457,7 @@ export default function EcommerceMVP() {
     clearCustomerSession();
     clearCart();
     resetCheckoutStatus();
-    setSuccess('Sess\u00e3o encerrada.');
+    setSuccess("Sess\u00e3o encerrada.");
   }
 
   const S = ecommerceMvpStyles;
@@ -481,22 +483,30 @@ export default function EcommerceMVP() {
       />
 
       {!tenantRef && (
-        <div style={{ background: '#fef2f2', color: '#991b1b', padding: '10px 20px', fontSize: 13, borderBottom: '1px solid #fecaca' }}>
+        <div
+          style={{
+            background: "#fef2f2",
+            color: "#991b1b",
+            padding: "10px 20px",
+            fontSize: 13,
+            borderBottom: "1px solid #fecaca",
+          }}
+        >
           ⚠️ Use a URL no formato: /slug-da-loja
         </div>
       )}
 
       {/* ALERTAS */}
       {(error || success) && (
-        <div style={{ padding: '0 20px' }}>
-          <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+        <div style={{ padding: "0 20px" }}>
+          <div style={{ maxWidth: 1280, margin: "0 auto" }}>
             {error && <div style={S.alertError}>⚠️ {error}</div>}
             {success && <div style={S.alertSuccess}>✓ {success}</div>}
           </div>
         </div>
       )}
 
-      {view === 'loja' && (
+      {view === "loja" && (
         <EcommerceStorePage
           cart={cart}
           cartTotal={cartTotal}
@@ -526,7 +536,7 @@ export default function EcommerceMVP() {
           onRefresh={loadProducts}
           onSearchChange={handleCatalogSearchChange}
           onToggleWishlist={toggleWishlist}
-          onViewCart={() => setView('carrinho')}
+          onViewCart={() => setView("carrinho")}
         />
       )}
 
@@ -541,19 +551,22 @@ export default function EcommerceMVP() {
           onClose={closeProductModal}
           onCopyLink={(product) => {
             const url = `${window.location.origin}${location.pathname}?produto=${product.id}`;
-            navigator.clipboard?.writeText(url).then(() => setSuccess('Link copiado!')).catch(() => setSuccess(`Link: ${url}`));
+            navigator.clipboard
+              ?.writeText(url)
+              .then(() => setSuccess("Link copiado!"))
+              .catch(() => setSuccess(`Link: ${url}`));
           }}
           onImageChange={setActiveProductImage}
           onNotifyMe={registerNotifyMe}
           onToggleWishlist={toggleWishlist}
           onViewCart={() => {
             closeProductModal();
-            setView('carrinho');
+            setView("carrinho");
           }}
         />
       )}
 
-      {view === 'carrinho' && (
+      {view === "carrinho" && (
         <EcommerceCartPage
           cart={cart}
           cartLoading={cartLoading}
@@ -565,13 +578,13 @@ export default function EcommerceMVP() {
           styles={S}
           onApplyCoupon={applyCupom}
           onCheckout={handleCheckoutFromLoja}
-          onContinueShopping={() => setView('loja')}
+          onContinueShopping={() => setView("loja")}
           onCouponChange={setCupom}
           onUpdateItem={updateCartItem}
         />
       )}
 
-      {view === 'checkout' && (
+      {view === "checkout" && (
         <EcommerceCheckoutPage
           addressFields={addressFields}
           cart={cart}
@@ -603,18 +616,18 @@ export default function EcommerceMVP() {
         />
       )}
 
-      {view === 'pedidos' && (
+      {view === "pedidos" && (
         <EcommerceOrdersPage
           orders={ordersDetailed}
           ordersLoading={ordersLoading}
           styles={S}
-          onContinueShopping={() => setView('loja')}
+          onContinueShopping={() => setView("loja")}
           onDriveArrived={avisarCheguei}
           onOpenPayment={abrirPagamentoPedido}
           onReload={loadOrdersDetailed}
         />
       )}
-      {view === 'conta' && (
+      {view === "conta" && (
         <EcommerceAccountPage
           authLoading={authLoading}
           customer={customer}
@@ -651,13 +664,13 @@ export default function EcommerceMVP() {
           onRegister={handleRegister}
           onSaveProfile={saveProfile}
           onSwitchRecoveryToRequest={() => {
-            setRecoveryStep('request');
+            setRecoveryStep("request");
             setRecoveryTokenFromLink(false);
-            setError('');
-            setSuccess('');
+            setError("");
+            setSuccess("");
           }}
           onSwitchRecoveryToReset={() => {
-            setRecoveryStep('reset');
+            setRecoveryStep("reset");
             setRecoveryTokenFromLink(false);
           }}
           onToggleLoginPassword={() => setShowLoginPassword((prev) => !prev)}
@@ -670,7 +683,7 @@ export default function EcommerceMVP() {
       <EcommerceNotifyMeModal
         modal={notifyMeModal}
         styles={S}
-        onClose={() => setNotifyMeModal({ open: false, product: null, email: '', loading: false })}
+        onClose={() => setNotifyMeModal({ open: false, product: null, email: "", loading: false })}
         onEmailChange={(email) => setNotifyMeModal((prev) => ({ ...prev, email }))}
         onSubmit={submitNotifyMe}
       />

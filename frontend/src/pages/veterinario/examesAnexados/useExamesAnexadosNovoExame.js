@@ -25,7 +25,7 @@ export function useExamesAnexadosNovoExame({
   const petsDoTutor = useMemo(() => {
     if (!tutorFormSelecionado?.id) return [];
     return pets.filter(
-      (pet) => String(pet.cliente_id) === String(tutorFormSelecionado.id) && pet.ativo !== false
+      (pet) => String(pet.cliente_id) === String(tutorFormSelecionado.id) && pet.ativo !== false,
     );
   }, [pets, tutorFormSelecionado]);
 
@@ -77,7 +77,13 @@ export function useExamesAnexadosNovoExame({
     setForm(FORM_EXAME_ANEXADO_INICIAL);
     setArquivoNovo(null);
 
-    if (acaoQuery === "novo" || petIdQuery || novoPetIdQuery || agendamentoIdQuery || consultaIdQuery) {
+    if (
+      acaoQuery === "novo" ||
+      petIdQuery ||
+      novoPetIdQuery ||
+      agendamentoIdQuery ||
+      consultaIdQuery
+    ) {
       navigate("/veterinario/exames", { replace: true });
     }
   }

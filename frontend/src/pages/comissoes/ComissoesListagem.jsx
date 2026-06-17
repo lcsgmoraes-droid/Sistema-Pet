@@ -1,30 +1,30 @@
 /**
  * DEMONSTRATIVO DE COMISSÕES - LISTAGEM
- * 
+ *
  * ⚠️ IMPORTANTE: Esta tela consome dados de snapshots imutáveis.
  * Nenhum valor aqui é recalculado. Todos os dados vêm diretamente
  * da tabela comissoes_itens conforme registrado no momento da venda.
- * 
+ *
  * Criado em: 22/01/2026
  */
 
-import React, { useState, useEffect } from 'react';
-import { BarChart3, CheckCircle2, FileText, Filter, History, RotateCcw, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import api from '../../api';
-import ActionButton from '../../components/ui/ActionButton';
-import CopyableCode from '../../components/ui/CopyableCode';
-import EmptyState from '../../components/ui/EmptyState';
-import ErrorState from '../../components/ui/ErrorState';
-import LoadingState from '../../components/ui/LoadingState';
-import MetricCard from '../../components/ui/MetricCard';
-import MetricGrid from '../../components/ui/MetricGrid';
-import MoneyCell, { formatMoneyCellValue } from '../../components/ui/MoneyCell';
-import NumberCell from '../../components/ui/NumberCell';
-import SaleReference from '../../components/ui/SaleReference';
-import StatusBadge from '../../components/ui/StatusBadge';
-import { formatarDataHoraComissao } from '../../utils/comissoesDate';
-import ComissaoDetalhe from './ComissaoDetalhe';
+import { useState, useEffect } from "react";
+import { BarChart3, CheckCircle2, FileText, Filter, History, RotateCcw, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import api from "../../api";
+import ActionButton from "../../components/ui/ActionButton";
+import CopyableCode from "../../components/ui/CopyableCode";
+import EmptyState from "../../components/ui/EmptyState";
+import ErrorState from "../../components/ui/ErrorState";
+import LoadingState from "../../components/ui/LoadingState";
+import MetricCard from "../../components/ui/MetricCard";
+import MetricGrid from "../../components/ui/MetricGrid";
+import MoneyCell, { formatMoneyCellValue } from "../../components/ui/MoneyCell";
+import NumberCell from "../../components/ui/NumberCell";
+import SaleReference from "../../components/ui/SaleReference";
+import StatusBadge from "../../components/ui/StatusBadge";
+import { formatarDataHoraComissao } from "../../utils/comissoesDate";
+import ComissaoDetalhe from "./ComissaoDetalhe";
 
 const ComissoesListagem = () => {
   const navigate = useNavigate();
@@ -43,23 +43,23 @@ const ComissoesListagem = () => {
 
   // Estados - Filtros
   const [filtros, setFiltros] = useState({
-    funcionario_id: '',
-    status: '',
-    data_inicio: '',
-    data_fim: '',
-    venda_id: '',
-    produto_id: '',  // NOVO
-    grupo_id: ''     // NOVO
+    funcionario_id: "",
+    status: "",
+    data_inicio: "",
+    data_fim: "",
+    venda_id: "",
+    produto_id: "", // NOVO
+    grupo_id: "", // NOVO
   });
 
   // Estados - Filtros Avançados
-  const [tipoFiltroData, setTipoFiltroData] = useState('ate_hoje'); // 'ate_hoje', 'personalizado'
+  const [tipoFiltroData, setTipoFiltroData] = useState("ate_hoje"); // 'ate_hoje', 'personalizado'
   const [produtosDisponiveis, setProdutosDisponiveis] = useState([]);
   const [gruposDisponiveis, setGruposDisponiveis] = useState([]);
   const [produtoSelecionado, setProdutoSelecionado] = useState(null);
   const [grupoSelecionado, setGrupoSelecionado] = useState(null);
-  const [termoBuscaProduto, setTermoBuscaProduto] = useState('');
-  const [termoBuscaGrupo, setTermoBuscaGrupo] = useState('');
+  const [termoBuscaProduto, setTermoBuscaProduto] = useState("");
+  const [termoBuscaGrupo, setTermoBuscaGrupo] = useState("");
   const [mostrarDropdownProduto, setMostrarDropdownProduto] = useState(false);
   const [mostrarDropdownGrupo, setMostrarDropdownGrupo] = useState(false);
 
@@ -67,20 +67,20 @@ const ComissoesListagem = () => {
   const [funcionariosDisponiveis, setFuncionariosDisponiveis] = useState([]);
   const [funcionarioSelecionado, setFuncionarioSelecionado] = useState(null);
   const [loadingFuncionarios, setLoadingFuncionarios] = useState(false);
-  const [termoBuscaFuncionario, setTermoBuscaFuncionario] = useState('');
+  const [termoBuscaFuncionario, setTermoBuscaFuncionario] = useState("");
   const [mostrarDropdownFuncionario, setMostrarDropdownFuncionario] = useState(false);
 
   // Estados - Fechamento de Comissões
   const [comissoesSelecionadas, setComissoesSelecionadas] = useState([]);
   const [mostrarModalFechamento, setMostrarModalFechamento] = useState(false);
-  const [dataPagamento, setDataPagamento] = useState('');
-  const [observacaoFechamento, setObservacaoFechamento] = useState('');
+  const [dataPagamento, setDataPagamento] = useState("");
+  const [observacaoFechamento, setObservacaoFechamento] = useState("");
   const [loadingFechamento, setLoadingFechamento] = useState(false);
-  
+
   // NOVOS Estados para Modal de Fechamento Avançado
-  const [tipoPagamento, setTipoPagamento] = useState('sem_pagar'); // 'sem_pagar', 'com_pagamento'
-  const [formaPagamento, setFormaPagamento] = useState('');
-  const [contaBancariaId, setContaBancariaId] = useState('');
+  const [tipoPagamento, setTipoPagamento] = useState("sem_pagar"); // 'sem_pagar', 'com_pagamento'
+  const [formaPagamento, setFormaPagamento] = useState("");
+  const [contaBancariaId, setContaBancariaId] = useState("");
   const [valorTotalEditavel, setValorTotalEditavel] = useState(0);
   const [formasPagamentoDisponiveis, setFormasPagamentoDisponiveis] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
@@ -90,8 +90,8 @@ const ComissoesListagem = () => {
 
   // Carregar comissões e resumo ao montar o componente
   useEffect(() => {
-    console.log('[ComissoesListagem] Iniciando carregamento...');
-    
+    console.log("[ComissoesListagem] Iniciando carregamento...");
+
     const init = async () => {
       try {
         await carregarComissoes();
@@ -102,76 +102,75 @@ const ComissoesListagem = () => {
         await carregarFormasPagamento();
         await carregarContasBancarias();
       } catch (err) {
-        console.error('[ComissoesListagem] Erro no carregamento inicial:', err);
+        console.error("[ComissoesListagem] Erro no carregamento inicial:", err);
       }
     };
-    
+
     init();
-    
+
     // Setar filtro de data padrão "até hoje"
-    const hoje = new Date().toISOString().split('T')[0];
-    setFiltros(prev => ({
+    const hoje = new Date().toISOString().split("T")[0];
+    setFiltros((prev) => ({
       ...prev,
-      data_fim: hoje
+      data_fim: hoje,
     }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fechar dropdown ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (mostrarDropdownFuncionario && !event.target.closest('.autocomplete-container')) {
+      if (mostrarDropdownFuncionario && !event.target.closest(".autocomplete-container")) {
         setMostrarDropdownFuncionario(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [mostrarDropdownFuncionario]);
 
   const carregarComissoes = async () => {
-    console.log('[carregarComissoes] Iniciando...');
+    console.log("[carregarComissoes] Iniciando...");
     try {
       setLoading(true);
       setErro(null);
-      
+
       // Construir query params a partir dos filtros
       const params = new URLSearchParams();
-      
+
       if (filtros.funcionario_id) {
-        params.append('funcionario_id', filtros.funcionario_id);
+        params.append("funcionario_id", filtros.funcionario_id);
       }
       if (filtros.status) {
-        params.append('status', filtros.status);
+        params.append("status", filtros.status);
       }
       if (filtros.data_inicio) {
-        params.append('data_inicio', filtros.data_inicio);
+        params.append("data_inicio", filtros.data_inicio);
       }
       if (filtros.data_fim) {
-        params.append('data_fim', filtros.data_fim);
+        params.append("data_fim", filtros.data_fim);
       }
       if (filtros.venda_id) {
-        params.append('venda_id', filtros.venda_id);
+        params.append("venda_id", filtros.venda_id);
       }
-      
+
       const queryString = params.toString();
-      const url = queryString ? `/comissoes?${queryString}` : '/comissoes';
-      
+      const url = queryString ? `/comissoes?${queryString}` : "/comissoes";
+
       const response = await api.get(url);
-      
+
       if (response.data.success) {
         setComissoes(response.data.lista);
       } else {
-        setErro('Erro ao carregar comissões');
+        setErro("Erro ao carregar comissões");
       }
     } catch (error) {
-      console.error('Erro ao carregar comissões:', error);
-      setErro(error.response?.data?.detail || 'Erro ao conectar com o servidor');
+      console.error("Erro ao carregar comissões:", error);
+      setErro(error.response?.data?.detail || "Erro ao conectar com o servidor");
     } finally {
       setLoading(false);
-      console.log('[carregarComissoes] Finalizado');
+      console.log("[carregarComissoes] Finalizado");
     }
   };
 
@@ -179,17 +178,17 @@ const ComissoesListagem = () => {
     try {
       setLoadingResumo(true);
       setErroResumo(null);
-      
+
       const response = await api.get(`/comissoes/resumo?funcionario_id=${FUNCIONARIO_ID}`);
-      
+
       if (response.data.success) {
         setResumo(response.data.resumo);
       } else {
-        setErroResumo('Erro ao carregar resumo');
+        setErroResumo("Erro ao carregar resumo");
       }
     } catch (error) {
-      console.error('Erro ao carregar resumo:', error);
-      setErroResumo(error.response?.data?.detail || 'Erro ao carregar resumo');
+      console.error("Erro ao carregar resumo:", error);
+      setErroResumo(error.response?.data?.detail || "Erro ao carregar resumo");
     } finally {
       setLoadingResumo(false);
     }
@@ -198,20 +197,20 @@ const ComissoesListagem = () => {
   const carregarFuncionarios = async () => {
     try {
       setLoadingFuncionarios(true);
-      
-      const response = await api.get('/comissoes/funcionarios');
-      
+
+      const response = await api.get("/comissoes/funcionarios");
+
       if (response.data.success) {
         // Aceitar tanto 'lista' quanto 'data' para compatibilidade
-        const lista = Array.isArray(response.data.lista) 
-          ? response.data.lista 
+        const lista = Array.isArray(response.data.lista)
+          ? response.data.lista
           : Array.isArray(response.data.data)
-          ? response.data.data
-          : [];
+            ? response.data.data
+            : [];
         setFuncionariosDisponiveis(lista);
       }
     } catch (error) {
-      console.error('Erro ao carregar funcionários:', error);
+      console.error("Erro ao carregar funcionários:", error);
       // Em caso de erro, garantir array vazio
       setFuncionariosDisponiveis([]);
     } finally {
@@ -221,62 +220,64 @@ const ComissoesListagem = () => {
 
   const carregarProdutos = async () => {
     try {
-      const response = await api.get('/produtos/');
+      const response = await api.get("/produtos/");
       if (response.data) {
         setProdutosDisponiveis(Array.isArray(response.data) ? response.data : []);
       }
     } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
+      console.error("Erro ao carregar produtos:", error);
       setProdutosDisponiveis([]);
     }
   };
 
   const carregarGrupos = async () => {
     try {
-      const response = await api.get('/categorias-financeiras');
+      const response = await api.get("/categorias-financeiras");
       if (response.data) {
         setGruposDisponiveis(Array.isArray(response.data) ? response.data : []);
       }
     } catch (error) {
-      console.error('Erro ao carregar grupos:', error);
+      console.error("Erro ao carregar grupos:", error);
       setGruposDisponiveis([]);
     }
   };
 
   const carregarFormasPagamento = async () => {
-    console.log('[carregarFormasPagamento] Iniciando...');
+    console.log("[carregarFormasPagamento] Iniciando...");
     try {
-      const response = await api.get('/comissoes/formas-pagamento');
+      const response = await api.get("/comissoes/formas-pagamento");
       if (response.data) {
         setFormasPagamentoDisponiveis(Array.isArray(response.data) ? response.data : []);
       }
     } catch (error) {
-      console.error('[carregarFormasPagamento] Erro:', error);
+      console.error("[carregarFormasPagamento] Erro:", error);
     } finally {
-      console.log('[carregarFormasPagamento] Finalizado');
+      console.log("[carregarFormasPagamento] Finalizado");
     }
   };
 
   const carregarContasBancarias = async () => {
     try {
-      const response = await api.get('/contas-bancarias');
+      const response = await api.get("/contas-bancarias");
       if (response.data) {
-        setContasBancarias(Array.isArray(response.data) ? response.data.filter(c => c.ativa) : []);
+        setContasBancarias(
+          Array.isArray(response.data) ? response.data.filter((c) => c.ativa) : [],
+        );
       }
     } catch (error) {
-      console.error('Erro ao carregar contas bancárias:', error);
+      console.error("Erro ao carregar contas bancárias:", error);
     }
   };
 
   // Calcular total das comissões pendentes filtradas (para rodapé)
   const calcularTotalFiltrado = () => {
-    const comissoesPendentes = comissoes.filter(c => c.status === 'pendente');
+    const comissoesPendentes = comissoes.filter((c) => c.status === "pendente");
     return comissoesPendentes.reduce((sum, c) => sum + (c.valor_comissao_gerada || 0), 0);
   };
 
   // Calcular total das comissões selecionadas
   const calcularTotalSelecionado = () => {
-    const comissoesSel = comissoes.filter(c => comissoesSelecionadas.includes(c.id));
+    const comissoesSel = comissoes.filter((c) => comissoesSelecionadas.includes(c.id));
     return comissoesSel.reduce((sum, c) => sum + (c.valor_comissao_gerada || 0), 0);
   };
 
@@ -298,13 +299,13 @@ const ComissoesListagem = () => {
   // Badge de tipo de cálculo
   const renderizarTipoCalculo = (tipo) => {
     const labels = {
-      percentual: 'Percentual',
-      lucro: 'Lucro'
+      percentual: "Percentual",
+      lucro: "Lucro",
     };
 
     return (
-      <StatusBadge intent={tipo === 'lucro' ? 'purple' : 'info'}>
-        {labels[tipo] || tipo || '-'}
+      <StatusBadge intent={tipo === "lucro" ? "purple" : "info"}>
+        {labels[tipo] || tipo || "-"}
       </StatusBadge>
     );
   };
@@ -338,25 +339,25 @@ const ComissoesListagem = () => {
 
     const cards = [
       {
-        titulo: 'Total Gerado',
+        titulo: "Total Gerado",
         valor: resumo.total_gerado,
-        intent: 'blue'
+        intent: "blue",
       },
       {
-        titulo: 'Total Pago',
+        titulo: "Total Pago",
         valor: resumo.total_pago,
-        intent: 'emerald'
+        intent: "emerald",
       },
       {
-        titulo: 'Total Pendente',
+        titulo: "Total Pendente",
         valor: resumo.total_pendente,
-        intent: 'amber'
+        intent: "amber",
       },
       {
-        titulo: 'Saldo a Pagar',
+        titulo: "Saldo a Pagar",
         valor: resumo.saldo_a_pagar,
-        intent: 'violet'
-      }
+        intent: "violet",
+      },
     ];
 
     return (
@@ -385,9 +386,9 @@ const ComissoesListagem = () => {
 
   // Atualizar campo de filtro
   const handleFiltroChange = (campo, valor) => {
-    setFiltros(prev => ({
+    setFiltros((prev) => ({
       ...prev,
-      [campo]: valor
+      [campo]: valor,
     }));
   };
 
@@ -399,25 +400,25 @@ const ComissoesListagem = () => {
   // Limpar filtros
   const limparFiltros = () => {
     const filtrosLimpos = {
-      funcionario_id: '',
-      status: '',
-      data_inicio: '',
-      data_fim: '',
-      venda_id: '',
-      produto_id: '',
-      grupo_id: ''
+      funcionario_id: "",
+      status: "",
+      data_inicio: "",
+      data_fim: "",
+      venda_id: "",
+      produto_id: "",
+      grupo_id: "",
     };
     setFiltros(filtrosLimpos);
     setFuncionarioSelecionado(null);
     setProdutoSelecionado(null);
     setGrupoSelecionado(null);
-    setTermoBuscaFuncionario('');
-    setTermoBuscaProduto('');
-    setTermoBuscaGrupo('');
-    setTipoFiltroData('ate_hoje');
-    
+    setTermoBuscaFuncionario("");
+    setTermoBuscaProduto("");
+    setTermoBuscaGrupo("");
+    setTipoFiltroData("ate_hoje");
+
     // Setar "até hoje" novamente
-    const hoje = new Date().toISOString().split('T')[0];
+    const hoje = new Date().toISOString().split("T")[0];
     setTimeout(() => {
       const loadSemFiltros = async () => {
         try {
@@ -427,7 +428,7 @@ const ComissoesListagem = () => {
             setComissoes(response.data.lista);
           }
         } catch (error) {
-          console.error('Erro:', error);
+          console.error("Erro:", error);
         } finally {
           setLoading(false);
         }
@@ -441,7 +442,7 @@ const ComissoesListagem = () => {
     setProdutoSelecionado(produto);
     setTermoBuscaProduto(produto.nome);
     setMostrarDropdownProduto(false);
-    setFiltros(prev => ({ ...prev, produto_id: produto.id }));
+    setFiltros((prev) => ({ ...prev, produto_id: produto.id }));
   };
 
   // Selecionar grupo do autocomplete
@@ -449,7 +450,7 @@ const ComissoesListagem = () => {
     setGrupoSelecionado(grupo);
     setTermoBuscaGrupo(grupo.nome);
     setMostrarDropdownGrupo(false);
-    setFiltros(prev => ({ ...prev, grupo_id: grupo.id }));
+    setFiltros((prev) => ({ ...prev, grupo_id: grupo.id }));
   };
 
   // Selecionar funcionário do autocomplete
@@ -458,15 +459,15 @@ const ComissoesListagem = () => {
     setTermoBuscaFuncionario(funcionario.nome);
     setMostrarDropdownFuncionario(false);
     // Atualizar filtros com o ID do funcionário
-    setFiltros(prev => ({
+    setFiltros((prev) => ({
       ...prev,
-      funcionario_id: funcionario.id
+      funcionario_id: funcionario.id,
     }));
   };
 
   // Filtrar funcionários pela busca (proteção defensiva)
-  const funcionariosFiltrados = (funcionariosDisponiveis || []).filter(func =>
-    func?.nome?.toLowerCase().includes(termoBuscaFuncionario.toLowerCase())
+  const funcionariosFiltrados = (funcionariosDisponiveis || []).filter((func) =>
+    func?.nome?.toLowerCase().includes(termoBuscaFuncionario.toLowerCase()),
   );
 
   // ========== FUNÇÕES DE FECHAMENTO ==========
@@ -474,11 +475,11 @@ const ComissoesListagem = () => {
   // Toggle seleção de comissão individual
   const toggleSelecaoComissao = (comissaoId, status) => {
     // Não permitir selecionar comissões já pagas ou estornadas
-    if (status !== 'pendente') return;
+    if (status !== "pendente") return;
 
-    setComissoesSelecionadas(prev => {
+    setComissoesSelecionadas((prev) => {
       if (prev.includes(comissaoId)) {
-        return prev.filter(id => id !== comissaoId);
+        return prev.filter((id) => id !== comissaoId);
       } else {
         return [...prev, comissaoId];
       }
@@ -487,50 +488,50 @@ const ComissoesListagem = () => {
 
   // Selecionar/desselecionar todas as comissões pendentes
   const toggleSelecionarTodas = () => {
-    const comissoesPendentes = comissoes.filter(c => c.status === 'pendente');
-    
+    const comissoesPendentes = comissoes.filter((c) => c.status === "pendente");
+
     if (comissoesSelecionadas.length === comissoesPendentes.length) {
       // Se todas estão selecionadas, desselecionar
       setComissoesSelecionadas([]);
     } else {
       // Selecionar todas pendentes
-      setComissoesSelecionadas(comissoesPendentes.map(c => c.id));
+      setComissoesSelecionadas(comissoesPendentes.map((c) => c.id));
     }
   };
 
   // Abrir modal de fechamento
   const abrirModalFechamento = () => {
     // Setar data padrão como hoje
-    const hoje = new Date().toISOString().split('T')[0];
+    const hoje = new Date().toISOString().split("T")[0];
     setDataPagamento(hoje);
-    setObservacaoFechamento('');
-    setTipoPagamento('sem_pagar');
-    setFormaPagamento('');
-    setContaBancariaId('');
-    
+    setObservacaoFechamento("");
+    setTipoPagamento("sem_pagar");
+    setFormaPagamento("");
+    setContaBancariaId("");
+
     // Calcular total das comissões selecionadas
     const total = calcularTotalSelecionado();
     setValorTotalEditavel(total);
-    
+
     setMostrarModalFechamento(true);
   };
 
   // Fechar modal
   const fecharModalFechamento = () => {
     setMostrarModalFechamento(false);
-    setDataPagamento('');
-    setObservacaoFechamento('');
+    setDataPagamento("");
+    setObservacaoFechamento("");
   };
 
   // Confirmar fechamento
   const confirmarFechamento = async () => {
     if (!dataPagamento) {
-      alert('Por favor, informe a data de pagamento');
+      alert("Por favor, informe a data de pagamento");
       return;
     }
 
-    if (tipoPagamento === 'com_pagamento' && !contaBancariaId) {
-      alert('Por favor, selecione a conta bancária para o pagamento');
+    if (tipoPagamento === "com_pagamento" && !contaBancariaId) {
+      alert("Por favor, selecione a conta bancária para o pagamento");
       return;
     }
 
@@ -539,32 +540,32 @@ const ComissoesListagem = () => {
 
       let response;
 
-      if (tipoPagamento === 'sem_pagar') {
+      if (tipoPagamento === "sem_pagar") {
         // Fechamento simples (sem pagamento)
-        response = await api.post('/comissoes/fechar', {
+        response = await api.post("/comissoes/fechar", {
           comissoes_ids: comissoesSelecionadas,
           data_pagamento: dataPagamento,
-          observacao: observacaoFechamento || null
+          observacao: observacaoFechamento || null,
         });
       } else {
         // Fechamento com pagamento (usando endpoint avançado)
         const params = new URLSearchParams({
           valor_pago: valorTotalEditavel.toString(),
-          forma_pagamento: formaPagamento || 'nao_informado',
-          data_pagamento: dataPagamento
+          forma_pagamento: formaPagamento || "nao_informado",
+          data_pagamento: dataPagamento,
         });
 
         if (contaBancariaId) {
-          params.append('conta_bancaria_id', contaBancariaId);
+          params.append("conta_bancaria_id", contaBancariaId);
         }
 
         if (observacaoFechamento) {
-          params.append('observacoes', observacaoFechamento);
+          params.append("observacoes", observacaoFechamento);
         }
 
         // Adicionar IDs das comissões
-        comissoesSelecionadas.forEach(id => {
-          params.append('comissoes_ids', id);
+        comissoesSelecionadas.forEach((id) => {
+          params.append("comissoes_ids", id);
         });
 
         response = await api.post(`/comissoes/fechar-com-pagamento?${params.toString()}`);
@@ -572,27 +573,28 @@ const ComissoesListagem = () => {
 
       if (response.data.success) {
         // Feedback de sucesso
-        const valorTotal = tipoPagamento === 'sem_pagar' 
-          ? response.data.valor_total_fechamento 
-          : response.data.valor_total_pago;
+        const valorTotal =
+          tipoPagamento === "sem_pagar"
+            ? response.data.valor_total_fechamento
+            : response.data.valor_total_pago;
 
         alert(
           `✅ ${response.data.total_processadas} comissão(ões) fechada(s) com sucesso!\n\n` +
-          `Valor total: ${formatarMoeda(valorTotal)}\n` +
-          `Modo: ${tipoPagamento === 'sem_pagar' ? 'Sem pagamento (para pagar depois)' : 'Com pagamento no ato'}`
+            `Valor total: ${formatarMoeda(valorTotal)}\n` +
+            `Modo: ${tipoPagamento === "sem_pagar" ? "Sem pagamento (para pagar depois)" : "Com pagamento no ato"}`,
         );
-        
+
         // Recarregar dados
         await carregarComissoes();
         await carregarResumo();
-        
+
         // Limpar seleção e fechar modal
         setComissoesSelecionadas([]);
         fecharModalFechamento();
       }
     } catch (error) {
-      console.error('Erro ao fechar comissões:', error);
-      alert('❌ Erro ao fechar comissões: ' + (error.response?.data?.detail || error.message));
+      console.error("Erro ao fechar comissões:", error);
+      alert("❌ Erro ao fechar comissões: " + (error.response?.data?.detail || error.message));
     } finally {
       setLoadingFechamento(false);
     }
@@ -601,12 +603,12 @@ const ComissoesListagem = () => {
   // Renderizar painel de filtros
   const renderizarFiltros = () => {
     // Filtrar produtos e grupos
-    const produtosFiltrados = (produtosDisponiveis || []).filter(p =>
-      p?.nome?.toLowerCase().includes(termoBuscaProduto.toLowerCase())
+    const produtosFiltrados = (produtosDisponiveis || []).filter((p) =>
+      p?.nome?.toLowerCase().includes(termoBuscaProduto.toLowerCase()),
     );
 
-    const gruposFiltrados = (gruposDisponiveis || []).filter(g =>
-      g?.nome?.toLowerCase().includes(termoBuscaGrupo.toLowerCase())
+    const gruposFiltrados = (gruposDisponiveis || []).filter((g) =>
+      g?.nome?.toLowerCase().includes(termoBuscaGrupo.toLowerCase()),
     );
 
     return (
@@ -614,7 +616,8 @@ const ComissoesListagem = () => {
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-gray-800">Filtros</h3>
           <span className="text-xs text-gray-500">
-            {comissoes.length} registro{comissoes.length !== 1 ? 's' : ''} encontrado{comissoes.length !== 1 ? 's' : ''}
+            {comissoes.length} registro{comissoes.length !== 1 ? "s" : ""} encontrado
+            {comissoes.length !== 1 ? "s" : ""}
           </span>
         </div>
 
@@ -626,11 +629,11 @@ const ComissoesListagem = () => {
               <input
                 type="radio"
                 value="ate_hoje"
-                checked={tipoFiltroData === 'ate_hoje'}
+                checked={tipoFiltroData === "ate_hoje"}
                 onChange={(e) => {
                   setTipoFiltroData(e.target.value);
-                  const hoje = new Date().toISOString().split('T')[0];
-                  setFiltros(prev => ({ ...prev, data_inicio: '', data_fim: hoje }));
+                  const hoje = new Date().toISOString().split("T")[0];
+                  setFiltros((prev) => ({ ...prev, data_inicio: "", data_fim: hoje }));
                 }}
                 className="text-blue-600"
               />
@@ -640,7 +643,7 @@ const ComissoesListagem = () => {
               <input
                 type="radio"
                 value="personalizado"
-                checked={tipoFiltroData === 'personalizado'}
+                checked={tipoFiltroData === "personalizado"}
                 onChange={(e) => setTipoFiltroData(e.target.value)}
                 className="text-blue-600"
               />
@@ -648,27 +651,23 @@ const ComissoesListagem = () => {
             </label>
           </div>
 
-          {tipoFiltroData === 'personalizado' && (
+          {tipoFiltroData === "personalizado" && (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Data Início
-                </label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Data Início</label>
                 <input
                   type="date"
                   value={filtros.data_inicio}
-                  onChange={(e) => handleFiltroChange('data_inicio', e.target.value)}
+                  onChange={(e) => handleFiltroChange("data_inicio", e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Data Fim
-                </label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Data Fim</label>
                 <input
                   type="date"
                   value={filtros.data_fim}
-                  onChange={(e) => handleFiltroChange('data_fim', e.target.value)}
+                  onChange={(e) => handleFiltroChange("data_fim", e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -679,18 +678,16 @@ const ComissoesListagem = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {/* Funcionário (Autocomplete) */}
           <div className="relative autocomplete-container">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Funcionário
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Funcionário</label>
             <input
               type="text"
               value={termoBuscaFuncionario}
               onChange={(e) => {
                 setTermoBuscaFuncionario(e.target.value);
                 setMostrarDropdownFuncionario(true);
-                if (e.target.value === '') {
+                if (e.target.value === "") {
                   setFuncionarioSelecionado(null);
-                  setFiltros(prev => ({...prev, funcionario_id: ''}));
+                  setFiltros((prev) => ({ ...prev, funcionario_id: "" }));
                 }
               }}
               onFocus={() => setMostrarDropdownFuncionario(true)}
@@ -698,11 +695,11 @@ const ComissoesListagem = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
               placeholder={loadingFuncionarios ? "Carregando..." : "Digite o nome"}
             />
-            
+
             {mostrarDropdownFuncionario && termoBuscaFuncionario && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
                 {funcionariosFiltrados.length > 0 ? (
-                  funcionariosFiltrados.map(func => (
+                  funcionariosFiltrados.map((func) => (
                     <div
                       key={func.id}
                       onClick={() => selecionarFuncionario(func)}
@@ -723,29 +720,27 @@ const ComissoesListagem = () => {
 
           {/* Produto (Autocomplete) */}
           <div className="relative autocomplete-container">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Produto
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Produto</label>
             <input
               type="text"
               value={termoBuscaProduto}
               onChange={(e) => {
                 setTermoBuscaProduto(e.target.value);
                 setMostrarDropdownProduto(true);
-                if (e.target.value === '') {
+                if (e.target.value === "") {
                   setProdutoSelecionado(null);
-                  setFiltros(prev => ({...prev, produto_id: ''}));
+                  setFiltros((prev) => ({ ...prev, produto_id: "" }));
                 }
               }}
               onFocus={() => setMostrarDropdownProduto(true)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="Digite o nome do produto"
             />
-            
+
             {mostrarDropdownProduto && termoBuscaProduto && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
                 {produtosFiltrados.length > 0 ? (
-                  produtosFiltrados.map(prod => (
+                  produtosFiltrados.map((prod) => (
                     <div
                       key={prod.id}
                       onClick={() => selecionarProduto(prod)}
@@ -756,9 +751,7 @@ const ComissoesListagem = () => {
                     </div>
                   ))
                 ) : (
-                  <div className="px-3 py-2 text-gray-500 text-sm">
-                    Nenhum produto encontrado
-                  </div>
+                  <div className="px-3 py-2 text-gray-500 text-sm">Nenhum produto encontrado</div>
                 )}
               </div>
             )}
@@ -766,29 +759,27 @@ const ComissoesListagem = () => {
 
           {/* Grupo/Categoria (Autocomplete) */}
           <div className="relative autocomplete-container">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Grupo/Categoria
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Grupo/Categoria</label>
             <input
               type="text"
               value={termoBuscaGrupo}
               onChange={(e) => {
                 setTermoBuscaGrupo(e.target.value);
                 setMostrarDropdownGrupo(true);
-                if (e.target.value === '') {
+                if (e.target.value === "") {
                   setGrupoSelecionado(null);
-                  setFiltros(prev => ({...prev, grupo_id: ''}));
+                  setFiltros((prev) => ({ ...prev, grupo_id: "" }));
                 }
               }}
               onFocus={() => setMostrarDropdownGrupo(true)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="Digite o nome do grupo"
             />
-            
+
             {mostrarDropdownGrupo && termoBuscaGrupo && (
               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto">
                 {gruposFiltrados.length > 0 ? (
-                  gruposFiltrados.map(grupo => (
+                  gruposFiltrados.map((grupo) => (
                     <div
                       key={grupo.id}
                       onClick={() => selecionarGrupo(grupo)}
@@ -799,9 +790,7 @@ const ComissoesListagem = () => {
                     </div>
                   ))
                 ) : (
-                  <div className="px-3 py-2 text-gray-500 text-sm">
-                    Nenhum grupo encontrado
-                  </div>
+                  <div className="px-3 py-2 text-gray-500 text-sm">Nenhum grupo encontrado</div>
                 )}
               </div>
             )}
@@ -809,12 +798,10 @@ const ComissoesListagem = () => {
 
           {/* Status */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Status
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
             <select
               value={filtros.status}
-              onChange={(e) => handleFiltroChange('status', e.target.value)}
+              onChange={(e) => handleFiltroChange("status", e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Todos</option>
@@ -854,12 +841,7 @@ const ComissoesListagem = () => {
 
   // Renderização de loading
   if (loading) {
-    return (
-      <LoadingState
-        className="min-h-screen"
-        label="Carregando comissões..."
-      />
-    );
+    return <LoadingState className="min-h-screen" label="Carregando comissões..." />;
   }
 
   // Renderização de erro
@@ -869,15 +851,11 @@ const ComissoesListagem = () => {
         <ErrorState
           title="Erro ao carregar comissões"
           description={erro}
-          action={(
-            <ActionButton
-              icon={RotateCcw}
-              intent="delete"
-              onClick={carregarComissoes}
-            >
+          action={
+            <ActionButton icon={RotateCcw} intent="delete" onClick={carregarComissoes}>
               Tentar novamente
             </ActionButton>
-          )}
+          }
         />
       </div>
     );
@@ -905,14 +883,12 @@ const ComissoesListagem = () => {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Demonstrativo de Comissões</h1>
-          <p className="text-gray-600 mt-1">
-            Total de registros: {comissoes.length}
-          </p>
+          <p className="text-gray-600 mt-1">Total de registros: {comissoes.length}</p>
         </div>
-        
+
         <div className="flex gap-3">
           <ActionButton
-            onClick={() => navigate('/comissoes/relatorios')}
+            onClick={() => navigate("/comissoes/relatorios")}
             icon={BarChart3}
             intent="info"
             size="md"
@@ -920,9 +896,9 @@ const ComissoesListagem = () => {
           >
             Relatórios
           </ActionButton>
-          
+
           <ActionButton
-            onClick={() => navigate('/comissoes/fechamentos')}
+            onClick={() => navigate("/comissoes/fechamentos")}
             icon={History}
             intent="neutral"
             size="md"
@@ -979,9 +955,13 @@ const ComissoesListagem = () => {
                 <th className="px-6 py-3 text-left">
                   <input
                     type="checkbox"
-                    checked={comissoesSelecionadas.length > 0 && comissoesSelecionadas.length === comissoes.filter(c => c.status === 'pendente').length}
+                    checked={
+                      comissoesSelecionadas.length > 0 &&
+                      comissoesSelecionadas.length ===
+                        comissoes.filter((c) => c.status === "pendente").length
+                    }
                     onChange={toggleSelecionarTodas}
-                    disabled={comissoes.filter(c => c.status === 'pendente').length === 0}
+                    disabled={comissoes.filter((c) => c.status === "pendente").length === 0}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                     title="Selecionar todas pendentes"
                   />
@@ -1017,27 +997,28 @@ const ComissoesListagem = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {comissoes.map((comissao) => (
-                <tr
-                  key={comissao.id}
-                  className="hover:bg-blue-50 transition"
-                >
+                <tr key={comissao.id} className="hover:bg-blue-50 transition">
                   <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={comissoesSelecionadas.includes(comissao.id)}
                       onChange={() => toggleSelecaoComissao(comissao.id, comissao.status)}
-                      disabled={comissao.status !== 'pendente'}
+                      disabled={comissao.status !== "pendente"}
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                      title={comissao.status !== 'pendente' ? `Comissão ${comissao.status}` : 'Selecionar para fechamento'}
+                      title={
+                        comissao.status !== "pendente"
+                          ? `Comissão ${comissao.status}`
+                          : "Selecionar para fechamento"
+                      }
                     />
                   </td>
-                  <td 
+                  <td
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
                     {formatarData(comissao.data_venda)}
                   </td>
-                  <td 
+                  <td
                     className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                     title={`ID interno: #${comissao.venda_id}`}
@@ -1047,43 +1028,43 @@ const ComissoesListagem = () => {
                       showPrefix={false}
                     />
                   </td>
-                  <td 
+                  <td
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
                     <CopyableCode label="Produto" value={comissao.produto_id} />
                   </td>
-                  <td 
+                  <td
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
                     {comissao.parcela_numero}
                   </td>
-                  <td 
+                  <td
                     className="px-6 py-4 whitespace-nowrap text-sm cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
                     {renderizarTipoCalculo(comissao.tipo_calculo)}
                   </td>
-                  <td 
+                  <td
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
                     <MoneyCell value={comissao.valor_base_calculo} />
                   </td>
-                  <td 
+                  <td
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
                     <NumberCell value={comissao.percentual_comissao} decimals={1} suffix="%" />
                   </td>
-                  <td 
+                  <td
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-bold cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
                     <MoneyCell value={comissao.valor_comissao_gerada} />
                   </td>
-                  <td 
+                  <td
                     className="px-6 py-4 whitespace-nowrap text-sm cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
@@ -1099,9 +1080,11 @@ const ComissoesListagem = () => {
       {/* Rodapé informativo */}
       <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-blue-800">
-          <strong>ℹ️ Informação:</strong> Os valores exibidos são snapshots imutáveis do momento da venda.
-          Eles não são recalculados e refletem exatamente como a comissão foi gerada.
-          <span className="ml-2 text-blue-600 font-medium">Clique em qualquer linha para ver mais detalhes.</span>
+          <strong>ℹ️ Informação:</strong> Os valores exibidos são snapshots imutáveis do momento da
+          venda. Eles não são recalculados e refletem exatamente como a comissão foi gerada.
+          <span className="ml-2 text-blue-600 font-medium">
+            Clique em qualquer linha para ver mais detalhes.
+          </span>
         </p>
       </div>
 
@@ -1113,15 +1096,21 @@ const ComissoesListagem = () => {
               {/* Período Selecionado */}
               <div className="flex items-center gap-8">
                 <div>
-                  <div className="text-[10px] font-semibold text-indigo-200 mb-0.5 tracking-wide uppercase">📅 Período</div>
+                  <div className="text-[10px] font-semibold text-indigo-200 mb-0.5 tracking-wide uppercase">
+                    📅 Período
+                  </div>
                   <div className="text-sm font-bold text-white">
-                    {tipoFiltroData === 'ate_hoje' ? (
-                      'Até hoje'
+                    {tipoFiltroData === "ate_hoje" ? (
+                      "Até hoje"
                     ) : (
                       <>
-                        {filtros.data_inicio ? new Date(filtros.data_inicio).toLocaleDateString('pt-BR') : 'Início'} 
-                        {' → '}
-                        {filtros.data_fim ? new Date(filtros.data_fim).toLocaleDateString('pt-BR') : 'Fim'}
+                        {filtros.data_inicio
+                          ? new Date(filtros.data_inicio).toLocaleDateString("pt-BR")
+                          : "Início"}
+                        {" → "}
+                        {filtros.data_fim
+                          ? new Date(filtros.data_fim).toLocaleDateString("pt-BR")
+                          : "Fim"}
                       </>
                     )}
                   </div>
@@ -1129,25 +1118,49 @@ const ComissoesListagem = () => {
 
                 {/* Filtros Ativos */}
                 <div>
-                  <div className="text-[10px] font-semibold text-indigo-200 mb-0.5 tracking-wide uppercase">🔍 Filtros</div>
+                  <div className="text-[10px] font-semibold text-indigo-200 mb-0.5 tracking-wide uppercase">
+                    🔍 Filtros
+                  </div>
                   <div className="text-sm font-bold text-white">
-                    {funcionarioSelecionado && <span className="mr-2 bg-white/10 px-2 py-0.5 rounded">👤 {funcionarioSelecionado.nome}</span>}
-                    {produtoSelecionado && <span className="mr-2 bg-white/10 px-2 py-0.5 rounded">📦 {produtoSelecionado.nome}</span>}
-                    {grupoSelecionado && <span className="mr-2 bg-white/10 px-2 py-0.5 rounded">📂 {grupoSelecionado.nome}</span>}
-                    {filtros.status && <span className="mr-2 bg-white/10 px-2 py-0.5 rounded">⚡ {filtros.status}</span>}
-                    {!funcionarioSelecionado && !produtoSelecionado && !grupoSelecionado && !filtros.status && <span className="text-indigo-200">Sem filtros</span>}
+                    {funcionarioSelecionado && (
+                      <span className="mr-2 bg-white/10 px-2 py-0.5 rounded">
+                        👤 {funcionarioSelecionado.nome}
+                      </span>
+                    )}
+                    {produtoSelecionado && (
+                      <span className="mr-2 bg-white/10 px-2 py-0.5 rounded">
+                        📦 {produtoSelecionado.nome}
+                      </span>
+                    )}
+                    {grupoSelecionado && (
+                      <span className="mr-2 bg-white/10 px-2 py-0.5 rounded">
+                        📂 {grupoSelecionado.nome}
+                      </span>
+                    )}
+                    {filtros.status && (
+                      <span className="mr-2 bg-white/10 px-2 py-0.5 rounded">
+                        ⚡ {filtros.status}
+                      </span>
+                    )}
+                    {!funcionarioSelecionado &&
+                      !produtoSelecionado &&
+                      !grupoSelecionado &&
+                      !filtros.status && <span className="text-indigo-200">Sem filtros</span>}
                   </div>
                 </div>
               </div>
 
               {/* Total Calculado */}
               <div className="text-right">
-                <div className="text-[10px] font-semibold text-indigo-200 mb-0.5 tracking-wide uppercase">💰 Total Pendente (Filtrado)</div>
+                <div className="text-[10px] font-semibold text-indigo-200 mb-0.5 tracking-wide uppercase">
+                  💰 Total Pendente (Filtrado)
+                </div>
                 <div className="text-3xl font-bold text-white drop-shadow-sm">
                   <MoneyCell value={calcularTotalFiltrado()} />
                 </div>
                 <div className="text-[11px] text-indigo-100 mt-0.5 font-medium">
-                  {comissoes.filter(c => c.status === 'pendente').length} comissão(ões) pendente(s)
+                  {comissoes.filter((c) => c.status === "pendente").length} comissão(ões)
+                  pendente(s)
                 </div>
               </div>
             </div>
@@ -1160,10 +1173,7 @@ const ComissoesListagem = () => {
 
       {/* Modal de Detalhe */}
       {comissaoSelecionada && (
-        <ComissaoDetalhe
-          comissaoId={comissaoSelecionada}
-          onClose={fecharDetalhe}
-        />
+        <ComissaoDetalhe comissaoId={comissaoSelecionada} onClose={fecharDetalhe} />
       )}
 
       {/* Modal de Fechamento UNIFICADO */}
@@ -1172,12 +1182,14 @@ const ComissoesListagem = () => {
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold text-gray-800">Fechar Comissões Selecionadas</h3>
-              <button
-                onClick={fecharModalFechamento}
-                className="text-gray-400 hover:text-gray-600"
-              >
+              <button onClick={fecharModalFechamento} className="text-gray-400 hover:text-gray-600">
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -1207,37 +1219,33 @@ const ComissoesListagem = () => {
               <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
-                  onClick={() => setTipoPagamento('sem_pagar')}
+                  onClick={() => setTipoPagamento("sem_pagar")}
                   className={`p-4 border-2 rounded-lg transition-all ${
-                    tipoPagamento === 'sem_pagar'
-                      ? 'border-blue-500 bg-blue-50 shadow-md'
-                      : 'border-gray-300 hover:border-blue-300'
+                    tipoPagamento === "sem_pagar"
+                      ? "border-blue-500 bg-blue-50 shadow-md"
+                      : "border-gray-300 hover:border-blue-300"
                   }`}
                 >
                   <div className="text-center">
                     <div className="text-3xl mb-2">📋</div>
                     <div className="font-bold text-gray-800">Fechar sem Pagar</div>
-                    <div className="text-xs text-gray-600 mt-1">
-                      Apenas registrar fechamento
-                    </div>
+                    <div className="text-xs text-gray-600 mt-1">Apenas registrar fechamento</div>
                   </div>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setTipoPagamento('com_pagamento')}
+                  onClick={() => setTipoPagamento("com_pagamento")}
                   className={`p-4 border-2 rounded-lg transition-all ${
-                    tipoPagamento === 'com_pagamento'
-                      ? 'border-green-500 bg-green-50 shadow-md'
-                      : 'border-gray-300 hover:border-green-300'
+                    tipoPagamento === "com_pagamento"
+                      ? "border-green-500 bg-green-50 shadow-md"
+                      : "border-gray-300 hover:border-green-300"
                   }`}
                 >
                   <div className="text-center">
                     <div className="text-3xl mb-2">💰</div>
                     <div className="font-bold text-gray-800">Fechar e Pagar</div>
-                    <div className="text-xs text-gray-600 mt-1">
-                      Com lançamento financeiro
-                    </div>
+                    <div className="text-xs text-gray-600 mt-1">Com lançamento financeiro</div>
                   </div>
                 </button>
               </div>
@@ -1257,11 +1265,9 @@ const ComissoesListagem = () => {
             </div>
 
             {/* CAMPOS CONDICIONAIS - PAGAMENTO */}
-            {tipoPagamento === 'com_pagamento' && (
+            {tipoPagamento === "com_pagamento" && (
               <div className="space-y-4 mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <h4 className="text-sm font-bold text-green-800 mb-3">
-                  💳 Dados do Pagamento
-                </h4>
+                <h4 className="text-sm font-bold text-green-800 mb-3">💳 Dados do Pagamento</h4>
 
                 {/* Valor Total (editável) */}
                 <div>
@@ -1291,7 +1297,7 @@ const ComissoesListagem = () => {
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   >
                     <option value="">Selecione...</option>
-                    {formasPagamento.map(fp => (
+                    {formasPagamentoDisponiveis.map((fp) => (
                       <option key={fp.id} value={fp.id}>
                         {fp.nome}
                       </option>
@@ -1310,7 +1316,7 @@ const ComissoesListagem = () => {
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   >
                     <option value="">Selecione...</option>
-                    {contasBancarias.map(cb => (
+                    {contasBancarias.map((cb) => (
                       <option key={cb.id} value={cb.id}>
                         {cb.nome} ({cb.banco}) - Saldo: {formatarMoeda(cb.saldo || 0)}
                       </option>
@@ -1322,9 +1328,7 @@ const ComissoesListagem = () => {
 
             {/* Observações */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                📝 Observações
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">📝 Observações</label>
               <textarea
                 value={observacaoFechamento}
                 onChange={(e) => setObservacaoFechamento(e.target.value)}
@@ -1345,11 +1349,15 @@ const ComissoesListagem = () => {
               </button>
               <button
                 onClick={confirmarFechamento}
-                disabled={loadingFechamento || !dataPagamento || (tipoPagamento === 'com_pagamento' && (!formaPagamento || !contaBancariaId))}
+                disabled={
+                  loadingFechamento ||
+                  !dataPagamento ||
+                  (tipoPagamento === "com_pagamento" && (!formaPagamento || !contaBancariaId))
+                }
                 className={`flex-1 px-4 py-2 rounded-lg transition disabled:opacity-50 flex items-center justify-center gap-2 ${
-                  tipoPagamento === 'com_pagamento' 
-                    ? 'bg-green-600 hover:bg-green-700' 
-                    : 'bg-blue-600 hover:bg-blue-700'
+                  tipoPagamento === "com_pagamento"
+                    ? "bg-green-600 hover:bg-green-700"
+                    : "bg-blue-600 hover:bg-blue-700"
                 } text-white`}
               >
                 {loadingFechamento ? (
@@ -1360,9 +1368,16 @@ const ComissoesListagem = () => {
                 ) : (
                   <>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
-                    {tipoPagamento === 'com_pagamento' ? '💰 Fechar e Pagar' : '📋 Fechar sem Pagar'}
+                    {tipoPagamento === "com_pagamento"
+                      ? "💰 Fechar e Pagar"
+                      : "📋 Fechar sem Pagar"}
                   </>
                 )}
               </button>

@@ -47,12 +47,12 @@ export function useVetRepasse() {
         setBaixando(null);
       }
     },
-    [carregar]
+    [carregar],
   );
 
   const itensFiltrados = useMemo(
     () => (dados?.items ?? []).filter((item) => !filtroTipo || item.tipo === filtroTipo),
-    [dados?.items, filtroTipo]
+    [dados?.items, filtroTipo],
   );
 
   const totais = useMemo(() => calcularTotaisRepasse(itensFiltrados), [itensFiltrados]);

@@ -47,8 +47,7 @@ function RotaCardHeader({
               }}
             >
               <div>
-                <strong>Entregador:</strong>{" "}
-                {rota.entregador?.nome || "Não informado"}
+                <strong>Entregador:</strong> {rota.entregador?.nome || "Não informado"}
               </div>
 
               <div>
@@ -57,8 +56,7 @@ function RotaCardHeader({
 
               {rota.distancia_prevista && (
                 <div>
-                  <strong>Distância Prevista:</strong> {rota.distancia_prevista}{" "}
-                  km
+                  <strong>Distância Prevista:</strong> {rota.distancia_prevista} km
                 </div>
               )}
 
@@ -85,24 +83,21 @@ function RotaCardHeader({
 
               {tempoEstimado && (
                 <div>
-                  <strong>Tempo Estimado:</strong>{" "}
-                  {formatarTempo(tempoEstimado)}
+                  <strong>Tempo Estimado:</strong> {formatarTempo(tempoEstimado)}
                 </div>
               )}
 
               {/* KM Inicial - Mostra quando a rota foi iniciada */}
               {rota.km_inicial && (
                 <div>
-                  <strong>🏁 KM Inicial:</strong>{" "}
-                  {parseFloat(rota.km_inicial).toFixed(1)} km
+                  <strong>🏁 KM Inicial:</strong> {parseFloat(rota.km_inicial).toFixed(1)} km
                 </div>
               )}
 
               {/* KM Final - Mostra quando a rota foi finalizada */}
               {rota.km_final && (
                 <div>
-                  <strong>🏁 KM Final:</strong>{" "}
-                  {parseFloat(rota.km_final).toFixed(1)} km
+                  <strong>🏁 KM Final:</strong> {parseFloat(rota.km_final).toFixed(1)} km
                 </div>
               )}
 
@@ -110,21 +105,14 @@ function RotaCardHeader({
               {rota.km_inicial && rota.km_final && (
                 <div style={{ color: "#007BFF", fontWeight: "600" }}>
                   <strong>📏 Total Rodado:</strong>{" "}
-                  {(
-                    parseFloat(rota.km_final) - parseFloat(rota.km_inicial)
-                  ).toFixed(1)}{" "}
-                  km
+                  {(parseFloat(rota.km_final) - parseFloat(rota.km_inicial)).toFixed(1)} km
                   {/* Comparação com Projetado - Se existir distância prevista */}
                   {rota.distancia_prevista &&
                     (() => {
-                      const realizado =
-                        parseFloat(rota.km_final) - parseFloat(rota.km_inicial);
+                      const realizado = parseFloat(rota.km_final) - parseFloat(rota.km_inicial);
                       const projetado = parseFloat(rota.distancia_prevista);
                       const diferenca = realizado - projetado;
-                      const percentual = (
-                        (diferenca / projetado) *
-                        100
-                      ).toFixed(1);
+                      const percentual = ((diferenca / projetado) * 100).toFixed(1);
 
                       return (
                         <span
@@ -135,8 +123,7 @@ function RotaCardHeader({
                           }}
                         >
                           ({diferenca > 0 ? "+" : ""}
-                          {diferenca.toFixed(1)} km /{" "}
-                          {percentual > 0 ? "+" : ""}
+                          {diferenca.toFixed(1)} km / {percentual > 0 ? "+" : ""}
                           {percentual}% vs projetado)
                         </span>
                       );
@@ -145,8 +132,7 @@ function RotaCardHeader({
               )}
 
               <div>
-                <strong>Criada em:</strong>{" "}
-                {new Date(rota.created_at).toLocaleString("pt-BR")}
+                <strong>Criada em:</strong> {new Date(rota.created_at).toLocaleString("pt-BR")}
               </div>
 
               {rota.data_conclusao && (
@@ -185,35 +171,30 @@ function RotaCardHeader({
             )}
 
             {/* Botão Finalizar Rota - visível quando rota em_rota e todas entregas concluídas */}
-            {(rota.status === "em_rota" || rota.status === "em_andamento") &&
-              todasEntregue && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    finalizarRota(rota.id, rota.km_inicial);
-                  }}
-                  disabled={processandoFinalizacao}
-                  style={{
-                    padding: "8px 16px",
-                    backgroundColor: processandoFinalizacao
-                      ? "#ccc"
-                      : "#007BFF",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 6,
-                    cursor: processandoFinalizacao ? "not-allowed" : "pointer",
-                    fontWeight: "bold",
-                    fontSize: 14,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 5,
-                  }}
-                >
-                  {processandoFinalizacao
-                    ? "⏳ Processando..."
-                    : "✅ Finalizar Rota"}
-                </button>
-              )}
+            {(rota.status === "em_rota" || rota.status === "em_andamento") && todasEntregue && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  finalizarRota(rota.id, rota.km_inicial);
+                }}
+                disabled={processandoFinalizacao}
+                style={{
+                  padding: "8px 16px",
+                  backgroundColor: processandoFinalizacao ? "#ccc" : "#007BFF",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  cursor: processandoFinalizacao ? "not-allowed" : "pointer",
+                  fontWeight: "bold",
+                  fontSize: 14,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+              >
+                {processandoFinalizacao ? "⏳ Processando..." : "✅ Finalizar Rota"}
+              </button>
+            )}
 
             {/* Botão Reverter Início - visível quando rota em_rota mas nenhuma entrega foi feita */}
             {(rota.status === "em_rota" || rota.status === "em_andamento") &&

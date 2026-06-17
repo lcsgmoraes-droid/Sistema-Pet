@@ -28,7 +28,8 @@ export default function ConsultasTableCard({
       {totalSelecionadas > 0 && (
         <div className="flex flex-col gap-3 border-b border-red-100 bg-red-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm font-medium text-red-700">
-            {totalSelecionadas} consulta{totalSelecionadas > 1 ? "s" : ""} selecionada{totalSelecionadas > 1 ? "s" : ""}
+            {totalSelecionadas} consulta{totalSelecionadas > 1 ? "s" : ""} selecionada
+            {totalSelecionadas > 1 ? "s" : ""}
           </span>
           <button
             type="button"
@@ -125,22 +126,23 @@ function ConsultaTableRow({ consulta, onAbrirConsulta, onSelecionarConsulta, sel
         <div className="text-[11px] text-gray-400">Consulta</div>
       </td>
       <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-        {formatDataConsulta(dataAtendimento)}
-        {" "}
+        {formatDataConsulta(dataAtendimento)}{" "}
         <span className="text-xs ml-1 text-gray-400">{formatHoraConsulta(dataAtendimento)}</span>
       </td>
       <td className="px-4 py-3 font-medium text-gray-800">
-        <PetIdentity
-          fallback=""
-          nameClassName="font-medium text-gray-800"
-          record={consulta}
-        />
+        <PetIdentity fallback="" nameClassName="font-medium text-gray-800" record={consulta} />
       </td>
       <td className="px-4 py-3 text-gray-600">{consulta.veterinario_nome ?? "-"}</td>
-      <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate">{consulta.motivo_consulta ?? "-"}</td>
-      <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate">{consulta.diagnostico ?? "-"}</td>
+      <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate">
+        {consulta.motivo_consulta ?? "-"}
+      </td>
+      <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate">
+        {consulta.diagnostico ?? "-"}
+      </td>
       <td className="px-4 py-3">
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[consulta.status] ?? "bg-gray-100"}`}>
+        <span
+          className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[consulta.status] ?? "bg-gray-100"}`}
+        >
           {STATUS_LABEL[consulta.status] ?? consulta.status}
         </span>
       </td>

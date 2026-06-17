@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import api from '../api';
-import { getGuiaClassNames } from '../utils/guiaHighlight';
+import React, { useState, useEffect } from "react";
+import api from "../api";
+import { getGuiaClassNames } from "../utils/guiaHighlight";
 
 const Comissoes = () => {
-  const guiaAtiva = new URLSearchParams(window.location.search).get('guia');
-  const destacarComissoes = guiaAtiva === 'comissao-func' || guiaAtiva === 'comissao-regras';
+  const guiaAtiva = new URLSearchParams(window.location.search).get("guia");
+  const destacarComissoes = guiaAtiva === "comissao-func" || guiaAtiva === "comissao-regras";
   const guiaClasses = getGuiaClassNames(destacarComissoes);
   const [funcionarios, setFuncionarios] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,13 +22,13 @@ const Comissoes = () => {
   const carregarFuncionarios = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/comissoes/configuracoes/funcionarios');
+      const response = await api.get("/comissoes/configuracoes/funcionarios");
       if (response.data.success) {
         setFuncionarios(response.data.data);
       }
     } catch (error) {
-      console.error('Erro ao carregar parceiros:', error);
-      setError('Erro ao carregar parceiros com comissões');
+      console.error("Erro ao carregar parceiros:", error);
+      setError("Erro ao carregar parceiros com comissões");
     } finally {
       setLoading(false);
     }
@@ -38,24 +38,26 @@ const Comissoes = () => {
     setFuncionarioSelecionado(funcionarioId);
     setShowModal(true);
     setLoadingArvore(true);
-    
+
     try {
       // Carregar árvore de produtos
-      const arvoreResponse = await api.get('/comissoes/arvore-produtos');
+      const arvoreResponse = await api.get("/comissoes/arvore-produtos");
       if (arvoreResponse.data.success) {
         setArvoreProdutos(arvoreResponse.data.data);
       }
 
       // Se está editando, carregar configurações existentes
       if (funcionarioId) {
-        const configResponse = await api.get(`/comissoes/configuracoes/funcionario/${funcionarioId}`);
+        const configResponse = await api.get(
+          `/comissoes/configuracoes/funcionario/${funcionarioId}`,
+        );
         if (configResponse.data.success) {
           setConfiguracoes(configResponse.data.data);
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      setError('Erro ao carregar dados de configuração');
+      console.error("Erro ao carregar dados:", error);
+      setError("Erro ao carregar dados de configuração");
     } finally {
       setLoadingArvore(false);
     }
@@ -70,13 +72,13 @@ const Comissoes = () => {
   };
 
   const duplicarConfiguracao = async (funcionarioOrigemId) => {
-    const funcionarioDestinoId = prompt('Digite o ID do parceiro de destino:');
+    const funcionarioDestinoId = prompt("Digite o ID do parceiro de destino:");
     if (!funcionarioDestinoId) return;
 
     try {
-      const response = await api.post('/comissoes/configuracoes/duplicar', {
+      const response = await api.post("/comissoes/configuracoes/duplicar", {
         funcionario_origem_id: parseInt(funcionarioOrigemId),
-        funcionario_destino_id: parseInt(funcionarioDestinoId)
+        funcionario_destino_id: parseInt(funcionarioDestinoId),
       });
 
       if (response.data.success) {
@@ -84,8 +86,8 @@ const Comissoes = () => {
         carregarFuncionarios();
       }
     } catch (error) {
-      console.error('Erro ao duplicar configuração:', error);
-      alert('Erro ao duplicar configuração');
+      console.error("Erro ao duplicar configuração:", error);
+      alert("Erro ao duplicar configuração");
     }
   };
 
@@ -101,7 +103,8 @@ const Comissoes = () => {
     <div className="p-6">
       {destacarComissoes && (
         <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
-          Etapa da introducao guiada: clique em <strong>Nova Comissao</strong> para definir parceiro e regras por categoria, subcategoria ou produto.
+          Etapa da introducao guiada: clique em <strong>Nova Comissao</strong> para definir parceiro
+          e regras por categoria, subcategoria ou produto.
         </div>
       )}
 
@@ -117,7 +120,7 @@ const Comissoes = () => {
             className={`text-white px-4 py-2 rounded-lg flex items-center gap-2 ${
               destacarComissoes
                 ? `bg-amber-600 hover:bg-amber-700 ${guiaClasses.action}`
-                : 'bg-blue-600 hover:bg-blue-700'
+                : "bg-blue-600 hover:bg-blue-700"
             }`}
           >
             <span>+</span>
@@ -134,11 +137,7 @@ const Comissoes = () => {
       )}
 
       {/* Lista de Parceiros */}
-      <div
-        className={`bg-white rounded-lg shadow ${
-          destacarComissoes ? guiaClasses.box : ''
-        }`}
-      >
+      <div className={`bg-white rounded-lg shadow ${destacarComissoes ? guiaClasses.box : ""}`}>
         {funcionarios.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             <p className="text-lg mb-2">Nenhuma comissão configurada</p>
@@ -227,10 +226,17 @@ const Comissoes = () => {
 };
 
 // Modal de Configuração
-const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loading, onClose, onSave }) => {
+const ModalConfiguracao = ({
+  funcionarioId,
+  configuracoes,
+  arvoreProdutos,
+  loading,
+  onClose,
+  onSave,
+}) => {
   const [funcionarios, setFuncionarios] = useState([]);
-  const [funcionarioSel, setFuncionarioSel] = useState(funcionarioId || '');
-  const [dataFechamento, setDataFechamento] = useState('');
+  const [funcionarioSel, setFuncionarioSel] = useState(funcionarioId || "");
+  const [dataFechamento, setDataFechamento] = useState("");
   const [regras, setRegras] = useState({
     desconta_taxa_cartao: true,
     desconta_impostos: true,
@@ -252,12 +258,12 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
   useEffect(() => {
     // Processar configurações existentes
     const configMap = {};
-    configuracoes.forEach(config => {
+    configuracoes.forEach((config) => {
       const key = `${config.tipo}-${config.referencia_id}`;
       configMap[key] = config;
     });
     setConfiguracao(configMap);
-    
+
     // CARREGAR REGRAS da primeira configuração (todas compartilham as mesmas regras)
     if (configuracoes.length > 0) {
       const primeiraConfig = configuracoes[0];
@@ -274,27 +280,27 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
 
   const carregarFuncionarios = async () => {
     try {
-      const response = await api.get('/comissoes/funcionarios');
+      const response = await api.get("/comissoes/funcionarios");
       if (response.data.success) {
         setFuncionarios(response.data.data);
-        
+
         // Se estiver editando, carregar data de fechamento do parceiro
         if (funcionarioId) {
-          const funcionario = response.data.data.find(f => f.id === parseInt(funcionarioId));
+          const funcionario = response.data.data.find((f) => f.id === parseInt(funcionarioId));
           if (funcionario && funcionario.data_fechamento_comissao) {
             setDataFechamento(String(funcionario.data_fechamento_comissao));
           }
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar parceiros:', error);
+      console.error("Erro ao carregar parceiros:", error);
     }
   };
 
   const toggleCategoria = (catId) => {
-    setCategoriasExpanded(prev => ({
+    setCategoriasExpanded((prev) => ({
       ...prev,
-      [catId]: !prev[catId]
+      [catId]: !prev[catId],
     }));
   };
 
@@ -306,53 +312,58 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
       tipo,
       id,
       nome,
-      tipo_calculo: configExistente?.tipo_calculo || 'percentual',
+      tipo_calculo: configExistente?.tipo_calculo || "percentual",
       percentual: configExistente?.percentual || 10,
       percentual_loja: configExistente?.percentual_loja || 50,
       permite_edicao_venda: configExistente?.permite_edicao_venda || false,
-      observacoes: configExistente?.observacoes || '',
+      observacoes: configExistente?.observacoes || "",
     });
   };
 
   const adicionarConfiguracao = () => {
     if (!funcionarioSel) {
-      alert('Selecione um parceiro');
+      alert("Selecione um parceiro");
       return;
     }
 
     if (!itemSelecionado) {
-      alert('Selecione um item para configurar');
+      alert("Selecione um item para configurar");
       return;
     }
 
     // Verificar se já existe na lista
     const jaDuplicado = configuracoesParaSalvar.some(
-      c => c.tipo === itemSelecionado.tipo && c.referencia_id === itemSelecionado.id
+      (c) => c.tipo === itemSelecionado.tipo && c.referencia_id === itemSelecionado.id,
     );
-    
+
     if (jaDuplicado) {
-      alert('Este item já foi adicionado à lista!');
+      alert("Este item já foi adicionado à lista!");
       return;
     }
 
     // Verificar conflitos de hierarquia
-    if (itemSelecionado.tipo === 'geral' && (configuracoesParaSalvar.length > 0 || Object.keys(configuracao).length > 0)) {
+    if (
+      itemSelecionado.tipo === "geral" &&
+      (configuracoesParaSalvar.length > 0 || Object.keys(configuracao).length > 0)
+    ) {
       const confirma = confirm(
-        'A regra geral vale para todos os produtos e categorias deste parceiro.\n\n' +
-        'Regras especificas de produto, subcategoria ou categoria continuam com prioridade.\n\nDeseja adicionar mesmo assim?'
+        "A regra geral vale para todos os produtos e categorias deste parceiro.\n\n" +
+          "Regras especificas de produto, subcategoria ou categoria continuam com prioridade.\n\nDeseja adicionar mesmo assim?",
       );
       if (!confirma) return;
     }
 
-    if (itemSelecionado.tipo === 'categoria') {
+    if (itemSelecionado.tipo === "categoria") {
       const temProdutosOuSubs = configuracoesParaSalvar.some(
-        c => (c.tipo === 'subcategoria' || c.tipo === 'produto') && c.nome.includes(itemSelecionado.nome)
+        (c) =>
+          (c.tipo === "subcategoria" || c.tipo === "produto") &&
+          c.nome.includes(itemSelecionado.nome),
       );
       if (temProdutosOuSubs) {
         const confirma = confirm(
           `⚠️ ATENÇÃO: Você já configurou produtos/subcategorias desta categoria.\n\n` +
-          `HIERARQUIA: Produto > Subcategoria > Categoria\n\n` +
-          `A configuração mais específica tem prioridade.\n\nDeseja adicionar mesmo assim?`
+            `HIERARQUIA: Produto > Subcategoria > Categoria\n\n` +
+            `A configuração mais específica tem prioridade.\n\nDeseja adicionar mesmo assim?`,
         );
         if (!confirma) return;
       }
@@ -364,9 +375,12 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
       nome: itemSelecionado.nome,
       tipo_calculo: itemSelecionado.tipo_calculo,
       percentual: parseFloat(itemSelecionado.percentual) || 0,
-      percentual_loja: itemSelecionado.tipo_calculo === 'lucro' ? (parseFloat(itemSelecionado.percentual_loja) || 0) : null,
+      percentual_loja:
+        itemSelecionado.tipo_calculo === "lucro"
+          ? parseFloat(itemSelecionado.percentual_loja) || 0
+          : null,
       permite_edicao_venda: itemSelecionado.permite_edicao_venda || false,
-      observacoes: itemSelecionado.observacoes || '',
+      observacoes: itemSelecionado.observacoes || "",
     };
 
     setConfiguracoesParaSalvar([...configuracoesParaSalvar, novaConfig]);
@@ -380,12 +394,12 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
 
   const salvarTodasConfiguracoes = async () => {
     if (!funcionarioSel) {
-      alert('Selecione um parceiro');
+      alert("Selecione um parceiro");
       return;
     }
 
     if (configuracoesParaSalvar.length === 0) {
-      alert('Adicione pelo menos uma configuração');
+      alert("Adicione pelo menos uma configuração");
       return;
     }
 
@@ -395,12 +409,12 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
       // Atualizar data de fechamento da pessoa parceira (se fornecida)
       if (dataFechamento) {
         await api.put(`/clientes/${funcionarioSel}`, {
-          data_fechamento_comissao: parseInt(dataFechamento)
+          data_fechamento_comissao: parseInt(dataFechamento),
         });
       }
 
       // 2️⃣ Preparar TODAS as configurações
-      const configuracoes = configuracoesParaSalvar.map(config => ({
+      const configuracoes = configuracoesParaSalvar.map((config) => ({
         funcionario_id: parseInt(funcionarioSel),
         tipo: config.tipo,
         referencia_id: config.referencia_id,
@@ -408,51 +422,53 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
         percentual: parseFloat(config.percentual) || 0,
         percentual_loja: config.percentual_loja ? parseFloat(config.percentual_loja) : null,
         permite_edicao_venda: config.permite_edicao_venda || false,
-        observacoes: config.observacoes || '',
+        observacoes: config.observacoes || "",
         desconta_taxa_cartao: regras.desconta_taxa_cartao,
         desconta_impostos: regras.desconta_impostos,
         desconta_custo_entrega: regras.desconta_taxa_entrega,
         comissao_venda_parcial: regras.comissao_venda_parcial,
       }));
 
-      console.log('Enviando configurações em batch:', configuracoes);
+      console.log("Enviando configurações em batch:", configuracoes);
 
       // 3️⃣ SALVAR TUDO DE UMA VEZ em uma única transação
-      const response = await api.post('/comissoes/configuracoes/batch', {
-        configuracoes: configuracoes
+      const response = await api.post("/comissoes/configuracoes/batch", {
+        configuracoes: configuracoes,
       });
 
-      console.log('Resposta do servidor:', response.data);
+      console.log("Resposta do servidor:", response.data);
 
       if (response.data.success) {
         alert(`✅ ${response.data.total} configurações salvas com sucesso!`);
         setConfiguracoesParaSalvar([]);
-        
+
         // 🔥 RECARREGAR configurações após salvar
         if (funcionarioSel) {
           try {
-            const configResponse = await api.get(`/comissoes/configuracoes/funcionario/${funcionarioSel}`);
+            const configResponse = await api.get(
+              `/comissoes/configuracoes/funcionario/${funcionarioSel}`,
+            );
             if (configResponse.data.success) {
               // Atualizar mapa de configurações
               const configMap = {};
-              configResponse.data.data.forEach(config => {
+              configResponse.data.data.forEach((config) => {
                 const key = `${config.tipo}-${config.referencia_id}`;
                 configMap[key] = config;
               });
               setConfiguracao(configMap);
             }
           } catch (error) {
-            console.error('Erro ao recarregar configurações:', error);
+            console.error("Erro ao recarregar configurações:", error);
           }
         }
-        
+
         onSave(); // Fecha modal e recarrega lista de parceiros
       }
     } catch (error) {
-      console.error('Erro ao salvar configurações:', error);
-      console.error('Resposta do servidor:', error.response?.data);
-      
-      const mensagemErro = error.response?.data?.detail || error.message || 'Erro desconhecido';
+      console.error("Erro ao salvar configurações:", error);
+      console.error("Resposta do servidor:", error.response?.data);
+
+      const mensagemErro = error.response?.data?.detail || error.message || "Erro desconhecido";
       alert(`❌ Erro ao salvar configurações:\n\n${mensagemErro}`);
     } finally {
       setSalvando(false);
@@ -462,37 +478,39 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
 
   const salvarItem = async () => {
     if (!funcionarioSel) {
-      alert('Selecione um parceiro');
+      alert("Selecione um parceiro");
       return;
     }
 
     // Se não há item selecionado, salvar apenas as regras em TODAS as configurações existentes
     if (!itemSelecionado) {
       if (Object.keys(configuracao).length === 0) {
-        alert('Nenhuma configuração encontrada para atualizar as regras.');
+        alert("Nenhuma configuração encontrada para atualizar as regras.");
         return;
       }
 
-      const regrasAlteradas = regrasOriginais && (
-        regras.desconta_taxa_cartao !== regrasOriginais.desconta_taxa_cartao ||
-        regras.desconta_impostos !== regrasOriginais.desconta_impostos ||
-        regras.desconta_taxa_entrega !== regrasOriginais.desconta_taxa_entrega ||
-        regras.comissao_venda_parcial !== regrasOriginais.comissao_venda_parcial
-      );
+      const regrasAlteradas =
+        regrasOriginais &&
+        (regras.desconta_taxa_cartao !== regrasOriginais.desconta_taxa_cartao ||
+          regras.desconta_impostos !== regrasOriginais.desconta_impostos ||
+          regras.desconta_taxa_entrega !== regrasOriginais.desconta_taxa_entrega ||
+          regras.comissao_venda_parcial !== regrasOriginais.comissao_venda_parcial);
 
       if (!regrasAlteradas) {
-        alert('Nenhuma alteração detectada nas regras.');
+        alert("Nenhuma alteração detectada nas regras.");
         return;
       }
 
-      if (!confirm('Deseja atualizar as regras de cálculo em TODAS as configurações deste parceiro?')) {
+      if (
+        !confirm("Deseja atualizar as regras de cálculo em TODAS as configurações deste parceiro?")
+      ) {
         return;
       }
 
       try {
-        console.log('💾 SALVANDO REGRAS - Estado atual:', regras);
+        console.log("💾 SALVANDO REGRAS - Estado atual:", regras);
         // Atualizar cada configuração existente com as novas regras
-        for (const [key, config] of Object.entries(configuracao)) {
+        for (const config of Object.values(configuracao)) {
           const dados = {
             funcionario_id: parseInt(funcionarioSel),
             tipo: config.tipo,
@@ -505,26 +523,26 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
             desconta_custo_entrega: regras.desconta_taxa_entrega,
             comissao_venda_parcial: regras.comissao_venda_parcial,
             permite_edicao_venda: config.permite_edicao_venda,
-            observacoes: config.observacoes || '',
+            observacoes: config.observacoes || "",
           };
-          console.log('💾 Dados sendo enviados ao backend:', dados);
+          console.log("💾 Dados sendo enviados ao backend:", dados);
 
-          await api.post('/comissoes/configuracoes', dados);
+          await api.post("/comissoes/configuracoes", dados);
         }
 
-        alert('✅ Regras atualizadas com sucesso em todas as configurações!');
+        alert("✅ Regras atualizadas com sucesso em todas as configurações!");
         setRegrasOriginais(regras); // Atualizar regras originais
         // ✅ Não recarrega mais - mantém o modal aberto
       } catch (error) {
-        console.error('Erro ao atualizar regras:', error);
-        alert('Erro ao atualizar regras');
+        console.error("Erro ao atualizar regras:", error);
+        alert("Erro ao atualizar regras");
       }
       return;
     }
 
     // Fluxo normal: salvar item selecionado
     if (!itemSelecionado) {
-      alert('Selecione um item para configurar');
+      alert("Selecione um item para configurar");
       return;
     }
 
@@ -535,7 +553,10 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
         referencia_id: itemSelecionado.id,
         tipo_calculo: itemSelecionado.tipo_calculo,
         percentual: parseFloat(itemSelecionado.percentual),
-        percentual_loja: itemSelecionado.tipo_calculo === 'lucro' ? parseFloat(itemSelecionado.percentual_loja) : null,
+        percentual_loja:
+          itemSelecionado.tipo_calculo === "lucro"
+            ? parseFloat(itemSelecionado.percentual_loja)
+            : null,
         desconta_taxa_cartao: regras.desconta_taxa_cartao,
         desconta_impostos: regras.desconta_impostos,
         desconta_custo_entrega: regras.desconta_taxa_entrega,
@@ -544,24 +565,24 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
         observacoes: itemSelecionado.observacoes,
       };
 
-      const response = await api.post('/comissoes/configuracoes', dados);
+      const response = await api.post("/comissoes/configuracoes", dados);
 
       if (response.data.success) {
-        alert('Configuração salva com sucesso!');
-        
+        alert("Configuração salva com sucesso!");
+
         // Atualizar configuração local
         const key = `${itemSelecionado.tipo}-${itemSelecionado.id}`;
-        setConfiguracao(prev => ({
+        setConfiguracao((prev) => ({
           ...prev,
-          [key]: { ...dados, id: response.data.config_id, nome_item: itemSelecionado.nome }
+          [key]: { ...dados, id: response.data.config_id, nome_item: itemSelecionado.nome },
         }));
-        
+
         setItemSelecionado(null);
         // ✅ Não recarrega mais - mantém o modal aberto
       }
     } catch (error) {
-      console.error('Erro ao salvar configuração:', error);
-      alert('Erro ao salvar configuração');
+      console.error("Erro ao salvar configuração:", error);
+      alert("Erro ao salvar configuração");
     }
   };
 
@@ -575,47 +596,45 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
   };
 
   const itemJaAdicionado = (tipo, id) => {
-    return configuracoesParaSalvar.some(c => c.tipo === tipo && c.referencia_id === id);
+    return configuracoesParaSalvar.some((c) => c.tipo === tipo && c.referencia_id === id);
   };
 
   // Função recursiva para renderizar categorias em qualquer nível
   const renderCategoria = (categoria, nivel = 0) => {
-    const indentacao = '  '.repeat(nivel);
-    const icone = nivel === 0 ? '📦' : '→';
+    const indentacao = "  ".repeat(nivel);
+    const icone = nivel === 0 ? "📦" : "→";
     const temFilhas = categoria.filhas && categoria.filhas.length > 0;
     const temProdutos = categoria.produtos && categoria.produtos.length > 0;
-    
+
     // 🔥 OCULTAR categoria se já estiver configurada
-    const jaConfigurado = temConfiguracao('categoria', categoria.id);
+    const jaConfigurado = temConfiguracao("categoria", categoria.id);
     if (jaConfigurado) {
       // Ainda renderizar filhas e produtos se existirem (dentro de um fragment)
       if (!categoriasExpanded[categoria.id]) return null;
-      
+
       return (
         <React.Fragment key={`cat-${categoria.id}`}>
-          {temFilhas && categoria.filhas.map(filha => renderCategoria(filha, nivel + 1))}
-          
+          {temFilhas && categoria.filhas.map((filha) => renderCategoria(filha, nivel + 1))}
+
           {temProdutos && (
             <div className="pl-6" style={{ paddingLeft: `${24 + nivel * 20}px` }}>
-              {categoria.produtos.map(prod => {
-                const prodConfigurado = temConfiguracao('produto', prod.id);
-                const prodAdicionado = itemJaAdicionado('produto', prod.id);
-                
+              {categoria.produtos.map((prod) => {
+                const prodConfigurado = temConfiguracao("produto", prod.id);
+                const prodAdicionado = itemJaAdicionado("produto", prod.id);
+
                 // 🔥 OCULTAR produto se já estiver configurado
                 if (prodConfigurado) return null;
-                
+
                 return (
                   <div
                     key={`prod-${prod.id}`}
                     className={`p-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 ${
-                      prodAdicionado ? 'bg-yellow-50' : ''
+                      prodAdicionado ? "bg-yellow-50" : ""
                     }`}
-                    onClick={() => selecionarItem('produto', prod.id, prod.nome)}
+                    onClick={() => selecionarItem("produto", prod.id, prod.nome)}
                   >
                     <span className="text-sm">📌 {prod.nome}</span>
-                    {prodAdicionado && (
-                      <span className="text-xs text-yellow-600">⏳ Na lista</span>
-                    )}
+                    {prodAdicionado && <span className="text-xs text-yellow-600">⏳ Na lista</span>}
                   </div>
                 );
               })}
@@ -630,10 +649,12 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
         {/* Categoria */}
         <div
           className={`p-3 flex items-center justify-between cursor-pointer hover:bg-gray-50 ${
-            itemJaAdicionado('categoria', categoria.id) ? 'bg-yellow-50' : ''
+            itemJaAdicionado("categoria", categoria.id) ? "bg-yellow-50" : ""
           }`}
           style={{ paddingLeft: `${12 + nivel * 20}px` }}
-          onClick={() => selecionarItem('categoria', categoria.id, `${indentacao}${categoria.nome}`)}
+          onClick={() =>
+            selecionarItem("categoria", categoria.id, `${indentacao}${categoria.nome}`)
+          }
         >
           <div className="flex items-center gap-2">
             {(temFilhas || temProdutos) && (
@@ -644,15 +665,15 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                 }}
                 className="text-gray-500"
               >
-                {categoriasExpanded[categoria.id] ? '▼' : '▶'}
+                {categoriasExpanded[categoria.id] ? "▼" : "▶"}
               </button>
             )}
-            <span className={nivel === 0 ? 'font-medium' : 'text-sm'}>
+            <span className={nivel === 0 ? "font-medium" : "text-sm"}>
               {icone} {categoria.nome}
               {nivel > 0 && <span className="text-xs text-gray-500 ml-1">(Nível {nivel + 1})</span>}
             </span>
           </div>
-          {itemJaAdicionado('categoria', categoria.id) && (
+          {itemJaAdicionado("categoria", categoria.id) && (
             <span className="text-xs text-yellow-600">⏳ Na lista</span>
           )}
         </div>
@@ -662,28 +683,26 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
           <div>
             {/* Categorias Filhas (recursivo) */}
             {temFilhas && (
-              <div>
-                {categoria.filhas.map(filha => renderCategoria(filha, nivel + 1))}
-              </div>
+              <div>{categoria.filhas.map((filha) => renderCategoria(filha, nivel + 1))}</div>
             )}
 
             {/* Produtos desta categoria */}
             {temProdutos && (
               <div className="pl-6" style={{ paddingLeft: `${24 + nivel * 20}px` }}>
-                {categoria.produtos.map(prod => {
-                  const prodConfigurado = temConfiguracao('produto', prod.id);
-                  const prodAdicionado = itemJaAdicionado('produto', prod.id);
-                  
+                {categoria.produtos.map((prod) => {
+                  const prodConfigurado = temConfiguracao("produto", prod.id);
+                  const prodAdicionado = itemJaAdicionado("produto", prod.id);
+
                   // 🔥 OCULTAR produto se já estiver configurado
                   if (prodConfigurado) return null;
-                  
+
                   return (
                     <div
                       key={`prod-${prod.id}`}
                       className={`p-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 ${
-                        prodAdicionado ? 'bg-yellow-50' : ''
+                        prodAdicionado ? "bg-yellow-50" : ""
                       }`}
-                      onClick={() => selecionarItem('produto', prod.id, prod.nome)}
+                      onClick={() => selecionarItem("produto", prod.id, prod.nome)}
                     >
                       <span className="text-sm">📌 {prod.nome}</span>
                       {prodAdicionado && (
@@ -706,10 +725,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
         {/* Header */}
         <div className="p-6 border-b flex justify-between items-center">
           <h2 className="text-2xl font-bold">Configuração de Comissão</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl"
-          >
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">
             ×
           </button>
         </div>
@@ -718,9 +734,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
         <div className="flex-1 overflow-y-auto p-6">
           {/* Selecionar Parceiro */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Parceiro
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Parceiro</label>
             <select
               value={funcionarioSel}
               onChange={(e) => setFuncionarioSel(e.target.value)}
@@ -728,20 +742,22 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
               disabled={!!funcionarioId}
             >
               <option value="">Selecione um parceiro</option>
-              {funcionarios.map(func => (
+              {funcionarios.map((func) => (
                 <option key={func.id} value={func.id}>
                   {func.nome} - {func.cargo}
                 </option>
               ))}
             </select>
-            
+
             {/* Aviso sobre Parceiro */}
             <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded text-xs">
               <div className="flex items-start gap-2">
                 <span className="text-blue-600">ℹ️</span>
                 <div className="text-blue-700">
-                  <strong>Apenas parceiros podem receber comissões.</strong><br />
-                  Se a pessoa não aparecer na lista, marque-a como "Parceiro" no cadastro de pessoas primeiro.
+                  <strong>Apenas parceiros podem receber comissões.</strong>
+                  <br />
+                  Se a pessoa não aparecer na lista, marque-a como "Parceiro" no cadastro de pessoas
+                  primeiro.
                 </div>
               </div>
             </div>
@@ -767,12 +783,12 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                   onClick={async () => {
                     try {
                       await api.put(`/clientes/${funcionarioSel}`, {
-                        data_fechamento_comissao: dataFechamento ? parseInt(dataFechamento) : null
+                        data_fechamento_comissao: dataFechamento ? parseInt(dataFechamento) : null,
                       });
-                      alert('✅ Data de fechamento salva com sucesso!');
+                      alert("✅ Data de fechamento salva com sucesso!");
                     } catch (error) {
-                      console.error('Erro ao salvar data:', error);
-                      alert('❌ Erro ao salvar data de fechamento');
+                      console.error("Erro ao salvar data:", error);
+                      alert("❌ Erro ao salvar data de fechamento");
                     }
                   }}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 whitespace-nowrap"
@@ -789,14 +805,19 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
           {/* Regras de Cálculo */}
           <div className="mb-6 p-4 bg-gray-50 rounded-lg">
             <h3 className="font-semibold mb-3">Regras de Cálculo</h3>
-            
+
             {/* Aviso sobre Hierarquia */}
             <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
               <div className="font-semibold text-blue-800 mb-1">📋 Hierarquia de Configurações</div>
               <div className="text-blue-700 text-xs">
-                <strong aria-label="Produto > Subcategoria > Categoria > Regra geral">Produto {'>'} Subcategoria {'>'} Categoria {'>'} Regra geral</strong>
+                <strong aria-label="Produto > Subcategoria > Categoria > Regra geral">
+                  Produto {">"} Subcategoria {">"} Categoria {">"} Regra geral
+                </strong>
                 <br />
-                <span className="text-blue-600">Ao vender um produto, o sistema busca a configuração mais específica. A regra geral cobre tudo quando nao houver uma regra especifica.</span>
+                <span className="text-blue-600">
+                  Ao vender um produto, o sistema busca a configuração mais específica. A regra
+                  geral cobre tudo quando nao houver uma regra especifica.
+                </span>
               </div>
             </div>
 
@@ -806,8 +827,8 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                   type="checkbox"
                   checked={regras.desconta_taxa_cartao}
                   onChange={(e) => {
-                    console.log('✅ Checkbox TAXA CARTÃO alterado para:', e.target.checked);
-                    setRegras({...regras, desconta_taxa_cartao: e.target.checked});
+                    console.log("✅ Checkbox TAXA CARTÃO alterado para:", e.target.checked);
+                    setRegras({ ...regras, desconta_taxa_cartao: e.target.checked });
                   }}
                   className="rounded"
                 />
@@ -818,8 +839,8 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                   type="checkbox"
                   checked={regras.desconta_impostos}
                   onChange={(e) => {
-                    console.log('✅ Checkbox IMPOSTOS alterado para:', e.target.checked);
-                    setRegras({...regras, desconta_impostos: e.target.checked});
+                    console.log("✅ Checkbox IMPOSTOS alterado para:", e.target.checked);
+                    setRegras({ ...regras, desconta_impostos: e.target.checked });
                   }}
                   className="rounded"
                 />
@@ -830,8 +851,8 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                   type="checkbox"
                   checked={regras.desconta_taxa_entrega}
                   onChange={(e) => {
-                    console.log('✅ Checkbox TAXA ENTREGA alterado para:', e.target.checked);
-                    setRegras({...regras, desconta_taxa_entrega: e.target.checked});
+                    console.log("✅ Checkbox TAXA ENTREGA alterado para:", e.target.checked);
+                    setRegras({ ...regras, desconta_taxa_entrega: e.target.checked });
                   }}
                   className="rounded"
                 />
@@ -843,17 +864,17 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                     type="checkbox"
                     checked={regras.comissao_venda_parcial}
                     onChange={(e) => {
-                      console.log('✅ Checkbox VENDA PARCIAL alterado para:', e.target.checked);
-                      setRegras({...regras, comissao_venda_parcial: e.target.checked});
+                      console.log("✅ Checkbox VENDA PARCIAL alterado para:", e.target.checked);
+                      setRegras({ ...regras, comissao_venda_parcial: e.target.checked });
                     }}
                     className="rounded"
                   />
                   <div className="flex flex-col">
                     <span className="text-sm font-medium">Gerar comissão em vendas parciais</span>
                     <span className="text-xs text-gray-500">
-                      {regras.comissao_venda_parcial 
-                        ? 'Comissão gerada proporcionalmente a cada pagamento recebido'
-                        : 'Comissão gerada somente quando a venda estiver 100% paga'}
+                      {regras.comissao_venda_parcial
+                        ? "Comissão gerada proporcionalmente a cada pagamento recebido"
+                        : "Comissão gerada somente quando a venda estiver 100% paga"}
                     </span>
                   </div>
                 </label>
@@ -865,7 +886,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
             {/* Árvore de Produtos */}
             <div>
               <h3 className="font-semibold mb-3">Seleção de Produtos</h3>
-              
+
               {/* Lista de Itens Já Configurados */}
               {Object.keys(configuracao).length > 0 && (
                 <div className="mb-4 border rounded-lg p-3 bg-green-50">
@@ -879,32 +900,46 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                         className="w-full flex items-center justify-between text-xs bg-white p-2 rounded hover:bg-gray-50 transition-colors group"
                       >
                         <button
-                          onClick={() => selecionarItem(config.tipo, config.referencia_id, config.nome_item || 'Item')}
+                          onClick={() =>
+                            selecionarItem(
+                              config.tipo,
+                              config.referencia_id,
+                              config.nome_item || "Item",
+                            )
+                          }
                           className="flex-1 flex items-center gap-2 text-left"
                         >
-                          {config.tipo === 'categoria' && '📦'}
-                          {config.tipo === 'subcategoria' && '📂'}
-                          {config.tipo === 'produto' && '📌'}
-                          {config.tipo === 'geral' && <span className="font-semibold text-blue-700">Todos</span>}
-                          <span className="text-gray-700">{config.nome_item || 'Item'}</span>
+                          {config.tipo === "categoria" && "📦"}
+                          {config.tipo === "subcategoria" && "📂"}
+                          {config.tipo === "produto" && "📌"}
+                          {config.tipo === "geral" && (
+                            <span className="font-semibold text-blue-700">Todos</span>
+                          )}
+                          <span className="text-gray-700">{config.nome_item || "Item"}</span>
                           <span className="text-green-600 font-medium ml-auto">
-                            {config.tipo_calculo === 'percentual' ? `${config.percentual}%` : `Lucro ${config.percentual}%`}
+                            {config.tipo_calculo === "percentual"
+                              ? `${config.percentual}%`
+                              : `Lucro ${config.percentual}%`}
                           </span>
                         </button>
                         <button
                           onClick={async () => {
-                            if (confirm(`Deseja remover a configuração de "${config.nome_item || 'Item'}"?`)) {
+                            if (
+                              confirm(
+                                `Deseja remover a configuração de "${config.nome_item || "Item"}"?`,
+                              )
+                            ) {
                               try {
                                 await api.delete(`/comissoes/configuracoes/${config.id}`);
-                                alert('Configuração removida com sucesso!');
+                                alert("Configuração removida com sucesso!");
                                 // Atualizar estado local
                                 const novoConfig = { ...configuracao };
                                 delete novoConfig[key];
                                 setConfiguracao(novoConfig);
                                 // ✅ Não recarrega mais - mantém o modal aberto
                               } catch (error) {
-                                console.error('Erro ao remover:', error);
-                                alert('Erro ao remover configuração');
+                                console.error("Erro ao remover:", error);
+                                alert("Erro ao remover configuração");
                               }
                             }
                           }}
@@ -920,40 +955,45 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                   </p>
                 </div>
               )}
-              
+
               {loading ? (
                 <div className="text-center py-8">Carregando...</div>
               ) : (
-                <div key={Object.keys(configuracao).length} className="border rounded-lg max-h-96 overflow-y-auto">
+                <div
+                  key={Object.keys(configuracao).length}
+                  className="border rounded-lg max-h-96 overflow-y-auto"
+                >
                   <div
                     className={`p-3 border-b cursor-pointer transition-colors ${
-                      temConfiguracao('geral', 0)
-                        ? 'bg-green-50 text-green-700 cursor-default'
-                        : itemJaAdicionado('geral', 0)
-                          ? 'bg-yellow-50'
-                          : 'bg-blue-50 hover:bg-blue-100'
+                      temConfiguracao("geral", 0)
+                        ? "bg-green-50 text-green-700 cursor-default"
+                        : itemJaAdicionado("geral", 0)
+                          ? "bg-yellow-50"
+                          : "bg-blue-50 hover:bg-blue-100"
                     }`}
                     onClick={() => {
-                      if (!temConfiguracao('geral', 0)) {
-                        selecionarItem('geral', 0, 'Regra geral');
+                      if (!temConfiguracao("geral", 0)) {
+                        selecionarItem("geral", 0, "Regra geral");
                       }
                     }}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="font-semibold text-sm">Regra geral</p>
-                        <p className="text-xs text-gray-600">Todos os produtos e categorias deste parceiro</p>
+                        <p className="text-xs text-gray-600">
+                          Todos os produtos e categorias deste parceiro
+                        </p>
                       </div>
-                      {temConfiguracao('geral', 0) ? (
+                      {temConfiguracao("geral", 0) ? (
                         <span className="text-xs font-medium text-green-700">Ja configurada</span>
-                      ) : itemJaAdicionado('geral', 0) ? (
+                      ) : itemJaAdicionado("geral", 0) ? (
                         <span className="text-xs text-yellow-600">Na lista</span>
                       ) : (
                         <span className="text-xs font-medium text-blue-700">Selecionar tudo</span>
                       )}
                     </div>
                   </div>
-                  {arvoreProdutos.map(categoria => renderCategoria(categoria, 0))}
+                  {arvoreProdutos.map((categoria) => renderCategoria(categoria, 0))}
                 </div>
               )}
             </div>
@@ -965,28 +1005,26 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                 <div className="border rounded-lg p-4 space-y-4">
                   <div>
                     <h4 className="font-medium text-gray-700">
-                      {itemSelecionado.tipo === 'categoria' && '📦 '}
-                      {itemSelecionado.tipo === 'subcategoria' && '📂 '}
-                      {itemSelecionado.tipo === 'produto' && '📌 '}
-                      {itemSelecionado.tipo === 'geral' && 'Todos '}
+                      {itemSelecionado.tipo === "categoria" && "📦 "}
+                      {itemSelecionado.tipo === "subcategoria" && "📂 "}
+                      {itemSelecionado.tipo === "produto" && "📌 "}
+                      {itemSelecionado.tipo === "geral" && "Todos "}
                       {itemSelecionado.nome}
                     </h4>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Tipo: {itemSelecionado.tipo}
-                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Tipo: {itemSelecionado.tipo}</p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Tipo de Comissão
-                    </label>
+                    <label className="block text-sm font-medium mb-2">Tipo de Comissão</label>
                     <div className="space-y-2">
                       <label className="flex items-center gap-2">
                         <input
                           type="radio"
                           value="percentual"
-                          checked={itemSelecionado.tipo_calculo === 'percentual'}
-                          onChange={(e) => setItemSelecionado({...itemSelecionado, tipo_calculo: e.target.value})}
+                          checked={itemSelecionado.tipo_calculo === "percentual"}
+                          onChange={(e) =>
+                            setItemSelecionado({ ...itemSelecionado, tipo_calculo: e.target.value })
+                          }
                         />
                         <span className="text-sm">Percentual fixo sobre venda</span>
                       </label>
@@ -994,19 +1032,19 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                         <input
                           type="radio"
                           value="lucro"
-                          checked={itemSelecionado.tipo_calculo === 'lucro'}
-                          onChange={(e) => setItemSelecionado({...itemSelecionado, tipo_calculo: e.target.value})}
+                          checked={itemSelecionado.tipo_calculo === "lucro"}
+                          onChange={(e) =>
+                            setItemSelecionado({ ...itemSelecionado, tipo_calculo: e.target.value })
+                          }
                         />
                         <span className="text-sm">Divisão de lucro</span>
                       </label>
                     </div>
                   </div>
 
-                  {itemSelecionado.tipo_calculo === 'percentual' ? (
+                  {itemSelecionado.tipo_calculo === "percentual" ? (
                     <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Percentual
-                      </label>
+                      <label className="block text-sm font-medium mb-2">Percentual</label>
                       <div className="flex items-center gap-2">
                         <input
                           type="number"
@@ -1014,7 +1052,9 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                           max="100"
                           step="0.1"
                           value={itemSelecionado.percentual}
-                          onChange={(e) => setItemSelecionado({...itemSelecionado, percentual: e.target.value})}
+                          onChange={(e) =>
+                            setItemSelecionado({ ...itemSelecionado, percentual: e.target.value })
+                          }
                           className="border rounded px-3 py-2 w-24"
                         />
                         <span>%</span>
@@ -1022,9 +1062,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                     </div>
                   ) : (
                     <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Divisão do Lucro
-                      </label>
+                      <label className="block text-sm font-medium mb-2">Divisão do Lucro</label>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="text-xs text-gray-600">Parceiro</label>
@@ -1039,7 +1077,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                                 setItemSelecionado({
                                   ...itemSelecionado,
                                   percentual: val,
-                                  percentual_loja: 100 - val
+                                  percentual_loja: 100 - val,
                                 });
                               }}
                               className="border rounded px-2 py-1 w-20"
@@ -1071,7 +1109,12 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                       <input
                         type="checkbox"
                         checked={itemSelecionado.permite_edicao_venda}
-                        onChange={(e) => setItemSelecionado({...itemSelecionado, permite_edicao_venda: e.target.checked})}
+                        onChange={(e) =>
+                          setItemSelecionado({
+                            ...itemSelecionado,
+                            permite_edicao_venda: e.target.checked,
+                          })
+                        }
                         className="rounded"
                       />
                       <span className="text-sm">Permite editar percentual na venda</span>
@@ -1079,12 +1122,12 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Observações
-                    </label>
+                    <label className="block text-sm font-medium mb-2">Observações</label>
                     <textarea
                       value={itemSelecionado.observacoes}
-                      onChange={(e) => setItemSelecionado({...itemSelecionado, observacoes: e.target.value})}
+                      onChange={(e) =>
+                        setItemSelecionado({ ...itemSelecionado, observacoes: e.target.value })
+                      }
                       className="border rounded px-3 py-2 w-full"
                       rows="3"
                     />
@@ -1106,21 +1149,33 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                 </div>
               ) : (
                 <div className="border rounded-lg p-8 text-center text-gray-500">
-                  <p>Selecione a regra geral, uma categoria, subcategoria ou produto ao lado para configurar</p>
+                  <p>
+                    Selecione a regra geral, uma categoria, subcategoria ou produto ao lado para
+                    configurar
+                  </p>
                 </div>
               )}
 
               {/* Lista de Configurações Adicionadas */}
               {configuracoesParaSalvar.length > 0 && (
                 <div className="mt-6 border rounded-lg p-4">
-                  <h4 className="font-semibold mb-3">Configurações a Salvar ({configuracoesParaSalvar.length})</h4>
+                  <h4 className="font-semibold mb-3">
+                    Configurações a Salvar ({configuracoesParaSalvar.length})
+                  </h4>
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {configuracoesParaSalvar.map((config, index) => (
-                      <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded text-sm">
+                      <div
+                        key={index}
+                        className="flex items-center justify-between bg-gray-50 p-2 rounded text-sm"
+                      >
                         <div>
                           <span className="font-medium">{config.nome}</span>
                           <span className="text-gray-500 ml-2">
-                            ({config.tipo_calculo === 'percentual' ? `${config.percentual}%` : `Lucro ${config.percentual}%`})
+                            (
+                            {config.tipo_calculo === "percentual"
+                              ? `${config.percentual}%`
+                              : `Lucro ${config.percentual}%`}
+                            )
                           </span>
                         </div>
                         <button
@@ -1136,9 +1191,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                     onClick={salvarTodasConfiguracoes}
                     disabled={salvando}
                     className={`w-full py-2 rounded mt-4 text-white ${
-                      salvando 
-                        ? 'bg-gray-400 cursor-not-allowed' 
-                        : 'bg-blue-600 hover:bg-blue-700'
+                      salvando ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
                     }`}
                   >
                     {salvando ? (
@@ -1146,7 +1199,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                         ⏳ Salvando {progressoSalvamento.atual}/{progressoSalvamento.total}...
                       </span>
                     ) : (
-                      '💾 Salvar Todas as Configurações'
+                      "💾 Salvar Todas as Configurações"
                     )}
                   </button>
                 </div>
@@ -1160,7 +1213,8 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
           <div className="flex items-center justify-between gap-4">
             <div className="flex-1">
               <p className="text-sm text-gray-600">
-                ℹ️ As configurações se aplicam <strong>apenas às comissões futuras</strong>. Comissões já geradas não são alteradas.
+                ℹ️ As configurações se aplicam <strong>apenas às comissões futuras</strong>.
+                Comissões já geradas não são alteradas.
               </p>
             </div>
             <div className="flex gap-2">
@@ -1172,24 +1226,26 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
               </button>
               <button
                 onClick={salvarItem}
-                disabled={!itemSelecionado && (!regrasOriginais || (
-                  regras.desconta_taxa_cartao === regrasOriginais.desconta_taxa_cartao &&
-                  regras.desconta_impostos === regrasOriginais.desconta_impostos &&
-                  regras.desconta_taxa_entrega === regrasOriginais.desconta_taxa_entrega &&
-                  regras.comissao_venda_parcial === regrasOriginais.comissao_venda_parcial
-                ))}
+                disabled={
+                  !itemSelecionado &&
+                  (!regrasOriginais ||
+                    (regras.desconta_taxa_cartao === regrasOriginais.desconta_taxa_cartao &&
+                      regras.desconta_impostos === regrasOriginais.desconta_impostos &&
+                      regras.desconta_taxa_entrega === regrasOriginais.desconta_taxa_entrega &&
+                      regras.comissao_venda_parcial === regrasOriginais.comissao_venda_parcial))
+                }
                 className={`px-6 py-2 rounded font-medium ${
-                  itemSelecionado || (regrasOriginais && (
-                    regras.desconta_taxa_cartao !== regrasOriginais.desconta_taxa_cartao ||
-                    regras.desconta_impostos !== regrasOriginais.desconta_impostos ||
-                    regras.desconta_taxa_entrega !== regrasOriginais.desconta_taxa_entrega ||
-                    regras.comissao_venda_parcial !== regrasOriginais.comissao_venda_parcial
-                  ))
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  itemSelecionado ||
+                  (regrasOriginais &&
+                    (regras.desconta_taxa_cartao !== regrasOriginais.desconta_taxa_cartao ||
+                      regras.desconta_impostos !== regrasOriginais.desconta_impostos ||
+                      regras.desconta_taxa_entrega !== regrasOriginais.desconta_taxa_entrega ||
+                      regras.comissao_venda_parcial !== regrasOriginais.comissao_venda_parcial))
+                    ? "bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
                 }`}
               >
-                💾 {itemSelecionado ? 'Salvar Alterações' : 'Atualizar Regras'}
+                💾 {itemSelecionado ? "Salvar Alterações" : "Atualizar Regras"}
               </button>
             </div>
           </div>

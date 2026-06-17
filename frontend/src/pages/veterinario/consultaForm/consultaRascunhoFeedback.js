@@ -6,10 +6,7 @@ export const RASCUNHO_SALVO_ACOES = Object.freeze({
   LISTA: "lista",
 });
 
-export function buildMensagemRascunhoSalvo({
-  etapa,
-  totalEtapas = ETAPAS.length,
-} = {}) {
+export function buildMensagemRascunhoSalvo({ etapa, totalEtapas = ETAPAS.length } = {}) {
   return etapa < totalEtapas - 1
     ? "Rascunho salvo com sucesso."
     : "Rascunho salvo com sucesso. Voce pode finalizar quando quiser.";

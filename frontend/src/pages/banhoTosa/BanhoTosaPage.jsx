@@ -47,14 +47,7 @@ export default function BanhoTosaPage({ view = "dashboard" }) {
     setError("");
 
     try {
-      const [
-        dashboardRes,
-        configRes,
-        funcionariosRes,
-        recursosRes,
-        servicosRes,
-        parametrosRes,
-      ] =
+      const [dashboardRes, configRes, funcionariosRes, recursosRes, servicosRes, parametrosRes] =
         await Promise.all([
           banhoTosaApi.dashboard(),
           banhoTosaApi.obterConfiguracao(),
@@ -84,12 +77,7 @@ export default function BanhoTosaPage({ view = "dashboard" }) {
 
   function renderView() {
     if (view === "servicos") {
-      return (
-        <BanhoTosaServicosView
-          servicos={servicos}
-          onChanged={carregarDados}
-        />
-      );
+      return <BanhoTosaServicosView servicos={servicos} onChanged={carregarDados} />;
     }
 
     if (view === "parametros") {
@@ -103,21 +91,12 @@ export default function BanhoTosaPage({ view = "dashboard" }) {
     }
 
     if (view === "recursos") {
-      return (
-        <BanhoTosaRecursosView
-          recursos={recursos}
-          onChanged={carregarDados}
-        />
-      );
+      return <BanhoTosaRecursosView recursos={recursos} onChanged={carregarDados} />;
     }
 
     if (view === "agenda") {
       return (
-        <BanhoTosaAgendaView
-          recursos={recursos}
-          servicos={servicos}
-          onChanged={carregarDados}
-        />
+        <BanhoTosaAgendaView recursos={recursos} servicos={servicos} onChanged={carregarDados} />
       );
     }
 
@@ -133,12 +112,7 @@ export default function BanhoTosaPage({ view = "dashboard" }) {
     }
 
     if (view === "taxi-dog") {
-      return (
-        <BanhoTosaTaxiDogView
-          funcionarios={funcionarios}
-          onChanged={carregarDados}
-        />
-      );
+      return <BanhoTosaTaxiDogView funcionarios={funcionarios} onChanged={carregarDados} />;
     }
 
     if (view === "pacotes") {
@@ -221,9 +195,7 @@ export default function BanhoTosaPage({ view = "dashboard" }) {
         {loading ? (
           <div className="rounded-lg border border-slate-200 bg-white p-10 text-center shadow-sm">
             <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-blue-100 border-t-blue-600" />
-            <p className="mt-4 text-sm font-semibold text-slate-500">
-              Carregando modulo...
-            </p>
+            <p className="mt-4 text-sm font-semibold text-slate-500">Carregando modulo...</p>
           </div>
         ) : (
           renderView()

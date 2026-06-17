@@ -8,7 +8,12 @@ import ExameIAIntro from "./exameIA/ExameIAIntro";
 import ExameIAResumoCard from "./exameIA/ExameIAResumoCard";
 import { montarDadosExameIA } from "./exameIA/exameIAUtils";
 
-export default function ExameAnexadoPainelIA({ resumo, onAtualizado, onNovoExame, onAbrirConsulta }) {
+export default function ExameAnexadoPainelIA({
+  resumo,
+  onAtualizado,
+  onNovoExame,
+  onAbrirConsulta,
+}) {
   const [exame, setExame] = useState(null);
   const [carregandoDetalhe, setCarregandoDetalhe] = useState(true);
   const [processando, setProcessando] = useState(false);
@@ -24,7 +29,7 @@ export default function ExameAnexadoPainelIA({ resumo, onAtualizado, onNovoExame
       setCarregandoDetalhe(true);
       setErroLocal("");
       const response = await vetApi.listarExamesPet(resumo.pet_id);
-      const lista = Array.isArray(response.data) ? response.data : response.data?.items ?? [];
+      const lista = Array.isArray(response.data) ? response.data : (response.data?.items ?? []);
       const encontrado = lista.find((item) => String(item.id) === String(resumo.exame_id));
       if (!encontrado) {
         setExame(null);
@@ -73,7 +78,7 @@ export default function ExameAnexadoPainelIA({ resumo, onAtualizado, onNovoExame
         error?.response?.data?.detail ||
           (dadosIA.temArquivo
             ? "Nao foi possivel processar o arquivo com IA agora."
-            : "Nao foi possivel interpretar o resultado deste exame.")
+            : "Nao foi possivel interpretar o resultado deste exame."),
       );
     } finally {
       setProcessando(false);
@@ -89,7 +94,10 @@ export default function ExameAnexadoPainelIA({ resumo, onAtualizado, onNovoExame
     setErroLocal("");
     try {
       const response = await vetApi.chatExameIA(Number(exame.id), textoPergunta);
-      setHistorico((mensagens) => [...mensagens, { role: "ia", text: response.data?.resposta || "" }]);
+      setHistorico((mensagens) => [
+        ...mensagens,
+        { role: "ia", text: response.data?.resposta || "" },
+      ]);
       await carregarDetalhe();
     } catch (error) {
       setErroLocal(error?.response?.data?.detail || "Nao foi possivel consultar a IA deste exame.");

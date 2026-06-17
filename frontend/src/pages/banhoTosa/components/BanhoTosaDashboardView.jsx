@@ -7,12 +7,7 @@ import Panel from "../../../components/ui/Panel";
 import BanhoTosaDefaultsPanel from "./BanhoTosaDefaultsPanel";
 import BanhoTosaSimulador from "./BanhoTosaSimulador";
 
-export default function BanhoTosaDashboardView({
-  dashboard,
-  config,
-  parametros,
-  onChanged,
-}) {
+export default function BanhoTosaDashboardView({ dashboard, config, parametros, onChanged }) {
   const [mostrarBase, setMostrarBase] = useState(false);
   const [mostrarSimulador, setMostrarSimulador] = useState(false);
   const parametrosAtivos = parametros.filter((item) => item.ativo).length;
@@ -103,16 +98,8 @@ export default function BanhoTosaDashboardView({
           title="Fluxo operacional"
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              "Agendado",
-              "Check-in",
-              "Banho / Tosa",
-              "Pronto / Entregue",
-            ].map((etapa, index) => (
-              <div
-                key={etapa}
-                className="rounded-lg border border-slate-200 bg-slate-50 p-4"
-              >
+            {["Agendado", "Check-in", "Banho / Tosa", "Pronto / Entregue"].map((etapa, index) => (
+              <div key={etapa} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
                   {index + 1}
                 </span>
@@ -129,9 +116,7 @@ export default function BanhoTosaDashboardView({
           <dl className="space-y-3 text-sm">
             <div className="flex flex-col gap-1 rounded-lg bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <dt className="text-slate-500">Servicos ativos</dt>
-              <dd className="font-semibold text-slate-900">
-                {dashboard?.servicos_ativos ?? 0}
-              </dd>
+              <dd className="font-semibold text-slate-900">{dashboard?.servicos_ativos ?? 0}</dd>
             </div>
             <div className="flex flex-col gap-1 rounded-lg bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <dt className="text-slate-500">Portes ativos</dt>

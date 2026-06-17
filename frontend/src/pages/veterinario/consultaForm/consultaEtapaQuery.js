@@ -1,7 +1,14 @@
 export function normalizarEtapaConsultaQuery(value) {
-  const texto = String(value || "").trim().toLowerCase();
+  const texto = String(value || "")
+    .trim()
+    .toLowerCase();
   if (!texto) return null;
-  if (texto === "diagnostico" || texto === "diagnóstico" || texto === "prescricao" || texto === "prescrição") {
+  if (
+    texto === "diagnostico" ||
+    texto === "diagnóstico" ||
+    texto === "prescricao" ||
+    texto === "prescrição"
+  ) {
     return 2;
   }
   if (!/^\d+$/.test(texto)) return null;

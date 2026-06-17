@@ -9,9 +9,7 @@ export default function AssistenteIAHistorico({
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
       <h2 className="text-sm font-semibold text-gray-700">Conversa</h2>
-      {carregandoHistorico && (
-        <p className="text-xs text-gray-400">Carregando histórico...</p>
-      )}
+      {carregandoHistorico && <p className="text-xs text-gray-400">Carregando histórico...</p>}
 
       {historico.length === 0 ? (
         <p className="text-sm text-gray-400">Ainda sem mensagens. Envie a primeira pergunta.</p>

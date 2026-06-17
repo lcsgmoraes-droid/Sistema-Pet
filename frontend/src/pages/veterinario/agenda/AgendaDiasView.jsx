@@ -35,7 +35,9 @@ export default function AgendaDiasView({
           >
             <div
               className={`border-b px-3 py-2 text-xs font-semibold ${
-                ehHoje ? "border-blue-600 bg-blue-600 text-white" : "border-gray-200 bg-gray-50 text-gray-600"
+                ehHoje
+                  ? "border-blue-600 bg-blue-600 text-white"
+                  : "border-gray-200 bg-gray-50 text-gray-600"
               }`}
             >
               <span className="capitalize">
@@ -70,7 +72,9 @@ export default function AgendaDiasView({
                       onGerenciarAgendamento(ag);
                     }}
                     className={`cursor-pointer rounded-xl border border-slate-200 border-l-4 px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md ${
-                      TIPO_CARD_COLOR[tipoAgendamento] || STATUS_COLOR[ag.status] || "border-l-gray-200 bg-white"
+                      TIPO_CARD_COLOR[tipoAgendamento] ||
+                      STATUS_COLOR[ag.status] ||
+                      "border-l-gray-200 bg-white"
                     }`}
                   >
                     <div className="mb-0.5 flex items-center gap-1">

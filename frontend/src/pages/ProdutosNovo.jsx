@@ -1,38 +1,33 @@
 /**
  * FormulÃ¡rio de Cadastro/EdiÃ§Ã£o de Produtos - Layout em Abas
  */
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import ProdutosNovoMainContent from '../components/produto/ProdutosNovoMainContent';
-import ProdutosNovoModalsLayer from '../components/produto/ProdutosNovoModalsLayer';
-import useProdutosNovoCarregamento from '../hooks/useProdutosNovoCarregamento';
-import useProdutosNovoCodigos from '../hooks/useProdutosNovoCodigos';
-import useProdutosNovoFornecedores from '../hooks/useProdutosNovoFornecedores';
-import useProdutosNovoImagens from '../hooks/useProdutosNovoImagens';
-import useProdutosNovoKit from '../hooks/useProdutosNovoKit';
-import useProdutosNovoLotes from '../hooks/useProdutosNovoLotes';
-import useProdutosNovoPredecessor from '../hooks/useProdutosNovoPredecessor';
-import useProdutosNovoRacao from '../hooks/useProdutosNovoRacao';
-import useProdutosNovoRecorrencia from '../hooks/useProdutosNovoRecorrencia';
-import useProdutosNovoSubmit from '../hooks/useProdutosNovoSubmit';
-import useProdutosNovoTributacao from '../hooks/useProdutosNovoTributacao';
-import useProdutosNovoVariacoes from '../hooks/useProdutosNovoVariacoes';
-import useProdutosNovoPageComposition from '../hooks/useProdutosNovoPageComposition';
-import api from '../api';
-import {
-  calcularPrecoVenda,
-  calcularMarkup,
-  formatarMoeda,
-  formatarData,
-} from '../api/produtos';
+import { useState, useEffect } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import ProdutosNovoMainContent from "../components/produto/ProdutosNovoMainContent";
+import ProdutosNovoModalsLayer from "../components/produto/ProdutosNovoModalsLayer";
+import useProdutosNovoCarregamento from "../hooks/useProdutosNovoCarregamento";
+import useProdutosNovoCodigos from "../hooks/useProdutosNovoCodigos";
+import useProdutosNovoFornecedores from "../hooks/useProdutosNovoFornecedores";
+import useProdutosNovoImagens from "../hooks/useProdutosNovoImagens";
+import useProdutosNovoKit from "../hooks/useProdutosNovoKit";
+import useProdutosNovoLotes from "../hooks/useProdutosNovoLotes";
+import useProdutosNovoPredecessor from "../hooks/useProdutosNovoPredecessor";
+import useProdutosNovoRacao from "../hooks/useProdutosNovoRacao";
+import useProdutosNovoRecorrencia from "../hooks/useProdutosNovoRecorrencia";
+import useProdutosNovoSubmit from "../hooks/useProdutosNovoSubmit";
+import useProdutosNovoTributacao from "../hooks/useProdutosNovoTributacao";
+import useProdutosNovoVariacoes from "../hooks/useProdutosNovoVariacoes";
+import useProdutosNovoPageComposition from "../hooks/useProdutosNovoPageComposition";
+import api from "../api";
+import { calcularPrecoVenda, calcularMarkup, formatarMoeda, formatarData } from "../api/produtos";
 
 // Função auxiliar para converter valores sem retornar NaN
 const parseNumber = (valor) => {
-  if (valor === '' || valor === null || valor === undefined) return 0;
+  if (valor === "" || valor === null || valor === undefined) return 0;
   // Permite tanto vírgula quanto ponto como separador decimal
-  const limpo = valor.toString().replace(/[^\d.,]/g, '');
+  const limpo = valor.toString().replace(/[^\d.,]/g, "");
   // Normaliza vírgula para ponto
-  const normalizado = limpo.replace(',', '.');
+  const normalizado = limpo.replace(",", ".");
   const numero = parseFloat(normalizado);
   return isNaN(numero) ? 0 : numero;
 };
@@ -42,7 +37,7 @@ export default function ProdutosNovo() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const isEdicao = !!id;
-  const cloneId = searchParams.get('clone') || searchParams.get('clone_id');
+  const cloneId = searchParams.get("clone") || searchParams.get("clone_id");
   const isClone = !isEdicao && !!cloneId;
 
   // Estado das abas
@@ -51,112 +46,112 @@ export default function ProdutosNovo() {
   // Estado do formulÃ¡rio
   const [formData, setFormData] = useState({
     // Aba 1: Características
-    codigo: '',
-    sku: '',
-    nome: '',
-    codigo_barras: '',
-    categoria_id: '',
-    marca_id: '',
-    departamento_id: '',
-    tipo: 'produto',
-    unidade: 'UN',
-    descricao: '',
-    preco_custo: '',
-    preco_venda: '',
-    preco_promocional: '',
-    data_inicio_promocao: '',
-    data_fim_promocao: '',
-    preco_ecommerce: '',
-    preco_ecommerce_promo: '',
-    preco_ecommerce_promo_inicio: '',
-    preco_ecommerce_promo_fim: '',
-    preco_app: '',
-    preco_app_promo: '',
-    preco_app_promo_inicio: '',
-    preco_app_promo_fim: '',
+    codigo: "",
+    sku: "",
+    nome: "",
+    codigo_barras: "",
+    categoria_id: "",
+    marca_id: "",
+    departamento_id: "",
+    tipo: "produto",
+    unidade: "UN",
+    descricao: "",
+    preco_custo: "",
+    preco_venda: "",
+    preco_promocional: "",
+    data_inicio_promocao: "",
+    data_fim_promocao: "",
+    preco_ecommerce: "",
+    preco_ecommerce_promo: "",
+    preco_ecommerce_promo_inicio: "",
+    preco_ecommerce_promo_fim: "",
+    preco_app: "",
+    preco_app_promo: "",
+    preco_app_promo_inicio: "",
+    preco_app_promo_fim: "",
     anunciar_ecommerce: true,
     anunciar_app: true,
     ativo: true,
     situacao: true,
-    markup: '',
-    
+    markup: "",
+
     // Sprint 2: Produtos com variação
-    tipo_produto: 'SIMPLES', // SIMPLES, PAI (variação), KIT (composição), VARIACAO
+    tipo_produto: "SIMPLES", // SIMPLES, PAI (variação), KIT (composição), VARIACAO
     produto_pai_id: null,
-    
+
     // Composição do Kit (VARIACAO também pode ser KIT)
     tipo_kit: null, // 'VIRTUAL' ou 'FISICO' (quando é kit)
     e_kit_fisico: false, // Se false, estoque é virtual (calculado)
     composicao_kit: [], // Array de {produto_id, produto_nome, quantidade}
-    
+
     // Sistema Predecessor/Sucessor
     produto_predecessor_id: null,
-    motivo_descontinuacao: '',
-    
+    motivo_descontinuacao: "",
+
     // Aba 3: Estoque
     controle_lote: true,
-    estoque_minimo: '',
-    estoque_maximo: '',
+    estoque_minimo: "",
+    estoque_maximo: "",
     participa_sugestao_compra: true,
-    
+
     // Aba 5: Tributação (Fiscal V2)
     tributacao: {
       origem: null, // 'empresa_legado', 'produto_legado', 'produto_fiscal_v2', 'kit_fiscal_v2'
       herdado_da_empresa: false,
-      origem_mercadoria: '0',
-      ncm: '',
-      cest: '',
-      cfop: '',
-      cst_icms: '',
-      icms_aliquota: '',
+      origem_mercadoria: "0",
+      ncm: "",
+      cest: "",
+      cfop: "",
+      cst_icms: "",
+      icms_aliquota: "",
       icms_st: false,
-      pis_aliquota: '',
-      cofins_aliquota: '',
+      pis_aliquota: "",
+      cofins_aliquota: "",
     },
     // Campos legados (mantidos para fallback)
-    origem: '0',
-    ncm: '',
-    cest: '',
-    cfop: '',
-    aliquota_icms: '',
-    aliquota_pis: '',
-    aliquota_cofins: '',
-    
+    origem: "0",
+    ncm: "",
+    cest: "",
+    cfop: "",
+    aliquota_icms: "",
+    aliquota_pis: "",
+    aliquota_cofins: "",
+
     // Aba 6: Recorrência (Fase 1)
     tem_recorrencia: false,
-    tipo_recorrencia: 'monthly',
-    intervalo_dias: '',
-    numero_doses: '',
-    observacoes_recorrencia: '',
-    especie_compativel: 'both',
-    
+    tipo_recorrencia: "monthly",
+    intervalo_dias: "",
+    numero_doses: "",
+    observacoes_recorrencia: "",
+    especie_compativel: "both",
+
     // Aba 7: Ração - Calculadora (Fase 2)
     eh_racao: false,
     e_granel: false,
-    classificacao_racao: '',
-    peso_embalagem: '',
-    tabela_nutricional: '',
-    tabela_consumo: '',
-    categoria_racao: '',
-    especies_indicadas: 'both',
-    
+    classificacao_racao: "",
+    peso_embalagem: "",
+    tabela_nutricional: "",
+    tabela_consumo: "",
+    categoria_racao: "",
+    especies_indicadas: "both",
+
     // Opções de Ração - Sistema Dinâmico
-    linha_racao_id: '',
-    porte_animal_id: '',
-    fase_publico_id: '',
-    tipo_tratamento_id: '',
-    sabor_proteina_id: '',
-    apresentacao_peso_id: '',
+    linha_racao_id: "",
+    porte_animal_id: "",
+    fase_publico_id: "",
+    tipo_tratamento_id: "",
+    sabor_proteina_id: "",
+    apresentacao_peso_id: "",
   });
 
   // Dados auxiliares
-  const [categorias, setCategorias] = useState([]);
+  const [, setCategorias] = useState([]);
   const [categoriasHierarquicas, setCategoriasHierarquicas] = useState([]);
   const [marcas, setMarcas] = useState([]);
   const [departamentos, setDepartamentos] = useState([]);
   const [imagens, setImagens] = useState([]);
   const [clientes, setClientes] = useState([]);
-  
+
   // Opções de Ração - Dados dinâmicos das APIs
   const [opcoesLinhas, setOpcoesLinhas] = useState([]);
   const [opcoesPortes, setOpcoesPortes] = useState([]);
@@ -164,10 +159,10 @@ export default function ProdutosNovo() {
   const [opcoesTratamentos, setOpcoesTratamentos] = useState([]);
   const [opcoesSabores, setOpcoesSabores] = useState([]);
   const [opcoesApresentacoes, setOpcoesApresentacoes] = useState([]);
-  
+
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  
+
   // Estados para controlar edição de campos monetários
   const [camposEmEdicao, setCamposEmEdicao] = useState({
     preco_custo: false,
@@ -177,37 +172,37 @@ export default function ProdutosNovo() {
   });
 
   const handleChange = (campo, valor) => {
-    setFormData(prev => {
+    setFormData((prev) => {
       const novosDados = { ...prev, [campo]: valor };
 
-      if (campo === 'sku' || campo === 'codigo') {
-        const skuNormalizado = (valor || '').toString().toUpperCase();
+      if (campo === "sku" || campo === "codigo") {
+        const skuNormalizado = (valor || "").toString().toUpperCase();
         novosDados.sku = skuNormalizado;
         novosDados.codigo = skuNormalizado;
       }
-      
+
       // Calcular markup automaticamente quando mudar preço
-      if (campo === 'preco_custo' || campo === 'preco_venda') {
-        const custo = parseNumber(campo === 'preco_custo' ? valor : prev.preco_custo);
-        const venda = parseNumber(campo === 'preco_venda' ? valor : prev.preco_venda);
-        
+      if (campo === "preco_custo" || campo === "preco_venda") {
+        const custo = parseNumber(campo === "preco_custo" ? valor : prev.preco_custo);
+        const venda = parseNumber(campo === "preco_venda" ? valor : prev.preco_venda);
+
         if (custo && venda && custo > 0) {
           const markup = calcularMarkup(custo, venda);
           novosDados.markup = markup.toFixed(2);
         }
       }
-      
+
       // Calcular preço de venda pelo markup
-      if (campo === 'markup') {
+      if (campo === "markup") {
         const custo = parseNumber(prev.preco_custo);
         const markupVal = parseNumber(valor);
-        
+
         if (custo && custo > 0 && markupVal >= 0) {
           const venda = calcularPrecoVenda(custo, markupVal);
           novosDados.preco_venda = venda.toFixed(2);
         }
       }
-      
+
       return novosDados;
     });
   };
@@ -289,15 +284,11 @@ export default function ProdutosNovo() {
     setFormData,
   });
 
-  const {
-    uploadingImage,
-    handleUploadImagem,
-    handleDeleteImagem,
-    handleSetPrincipal,
-  } = useProdutosNovoImagens({
-    id,
-    setImagens,
-  });
+  const { uploadingImage, handleUploadImagem, handleDeleteImagem, handleSetPrincipal } =
+    useProdutosNovoImagens({
+      id,
+      setImagens,
+    });
 
   const {
     produtosDisponiveis,
@@ -339,15 +330,12 @@ export default function ProdutosNovo() {
     handleChange,
   });
 
-  const {
-    handleClassificacaoRacaoChange,
-    handleFasePublicoChange,
-    handleApresentacaoPesoChange,
-  } = useProdutosNovoRacao({
-    opcoesApresentacoes,
-    opcoesFases,
-    setFormData,
-  });
+  const { handleClassificacaoRacaoChange, handleFasePublicoChange, handleApresentacaoPesoChange } =
+    useProdutosNovoRacao({
+      opcoesApresentacoes,
+      opcoesFases,
+      setFormData,
+    });
 
   const { handleSubmit } = useProdutosNovoSubmit({
     id,
@@ -365,12 +353,12 @@ export default function ProdutosNovo() {
   });
 
   const handleVoltar = () => {
-    if (formData.tipo_produto === 'VARIACAO' && formData.produto_pai_id) {
+    if (formData.tipo_produto === "VARIACAO" && formData.produto_pai_id) {
       navigate(`/produtos/${formData.produto_pai_id}/editar?aba=8`);
       return;
     }
 
-    navigate('/produtos');
+    navigate("/produtos");
   };
 
   const handleClonarProduto = () => {
@@ -381,48 +369,48 @@ export default function ProdutosNovo() {
   const handleCriarOpcaoRacao = async (tipo, dados) => {
     const configs = {
       linha: {
-        endpoint: '/opcoes-racao/linhas',
+        endpoint: "/opcoes-racao/linhas",
         setter: setOpcoesLinhas,
-        field: 'linha_racao_id',
-        afterSelect: (item) => handleChange('classificacao_racao', item.nome || ''),
+        field: "linha_racao_id",
+        afterSelect: (item) => handleChange("classificacao_racao", item.nome || ""),
       },
       porte: {
-        endpoint: '/opcoes-racao/portes',
+        endpoint: "/opcoes-racao/portes",
         setter: setOpcoesPortes,
-        field: 'porte_animal_id',
+        field: "porte_animal_id",
       },
       fase: {
-        endpoint: '/opcoes-racao/fases',
+        endpoint: "/opcoes-racao/fases",
         setter: setOpcoesFases,
-        field: 'fase_publico_id',
-        afterSelect: (item) => handleChange('categoria_racao', item.nome || ''),
+        field: "fase_publico_id",
+        afterSelect: (item) => handleChange("categoria_racao", item.nome || ""),
       },
       tratamento: {
-        endpoint: '/opcoes-racao/tratamentos',
+        endpoint: "/opcoes-racao/tratamentos",
         setter: setOpcoesTratamentos,
-        field: 'tipo_tratamento_id',
+        field: "tipo_tratamento_id",
       },
       sabor: {
-        endpoint: '/opcoes-racao/sabores',
+        endpoint: "/opcoes-racao/sabores",
         setter: setOpcoesSabores,
-        field: 'sabor_proteina_id',
+        field: "sabor_proteina_id",
       },
       apresentacao: {
-        endpoint: '/opcoes-racao/apresentacoes',
+        endpoint: "/opcoes-racao/apresentacoes",
         setter: setOpcoesApresentacoes,
-        field: 'apresentacao_peso_id',
-        afterSelect: (item) => handleChange('peso_embalagem', item.peso_kg || ''),
+        field: "apresentacao_peso_id",
+        afterSelect: (item) => handleChange("peso_embalagem", item.peso_kg || ""),
       },
     };
     const config = configs[tipo];
     if (!config) {
-      throw new Error('Tipo de opcao de racao invalido.');
+      throw new Error("Tipo de opcao de racao invalido.");
     }
 
     const pesoKg = Number(dados.peso_kg);
     const pesoLabel = Number.isInteger(pesoKg) ? `${pesoKg}kg` : `${pesoKg.toString()}kg`;
     const payload =
-      tipo === 'apresentacao'
+      tipo === "apresentacao"
         ? {
             peso_kg: pesoKg,
             descricao: dados.descricao || pesoLabel,
@@ -430,7 +418,7 @@ export default function ProdutosNovo() {
             ativo: true,
           }
         : {
-            nome: (dados.nome || '').trim(),
+            nome: (dados.nome || "").trim(),
             descricao: dados.descricao || null,
             ordem: 999,
             ativo: true,
@@ -454,7 +442,7 @@ export default function ProdutosNovo() {
       const incluiCriado = lista.some((opcao) => String(opcao.id) === String(item.id));
       config.setter(ordenarOpcoes(incluiCriado ? lista : [...lista, item]));
     } catch (error) {
-      console.error('Erro ao recarregar opcoes de racao apos cadastro rapido:', error);
+      console.error("Erro ao recarregar opcoes de racao apos cadastro rapido:", error);
       config.setter((prev) => {
         const semDuplicado = prev.filter((opcao) => String(opcao.id) !== String(item.id));
         return ordenarOpcoes([...semDuplicado, item]);
@@ -464,7 +452,6 @@ export default function ProdutosNovo() {
     config.afterSelect?.(item);
     return item;
   };
-
 
   const { mainContentProps, modalsLayerProps } = useProdutosNovoPageComposition({
     pageState: {
@@ -588,35 +575,35 @@ export default function ProdutosNovo() {
       parseNumber,
     },
   });
-  
+
   // Auto-detectar "ração" no nome do produto
   useEffect(() => {
     if (!isEdicao && formData.nome) {
       const nomeMinusculo = formData.nome.toLowerCase();
-      const isRacao = nomeMinusculo.includes('racao') || nomeMinusculo.includes('ração');
-      
+      const isRacao = nomeMinusculo.includes("racao") || nomeMinusculo.includes("ração");
+
       if (isRacao && !formData.eh_racao) {
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          eh_racao: true
+          eh_racao: true,
         }));
       }
     }
   }, [formData.nome, isEdicao, formData.eh_racao]);
-  
+
   // Detectar parâmetro de aba na URL (após carregar o produto)
   useEffect(() => {
     if (!loading && isEdicao) {
-      const abaParam = searchParams.get('aba');
+      const abaParam = searchParams.get("aba");
       if (abaParam) {
         setAbaAtiva(parseInt(abaParam, 10));
       }
     }
   }, [loading, searchParams, isEdicao]);
-  
+
   // 🛡️ PROTEÇÃO: Se for VARIACAO e estiver na aba 8, voltar para aba 1
   useEffect(() => {
-    if (isEdicao && formData.tipo_produto === 'VARIACAO' && abaAtiva === 8) {
+    if (isEdicao && formData.tipo_produto === "VARIACAO" && abaAtiva === 8) {
       setAbaAtiva(1);
     }
   }, [formData.tipo_produto, abaAtiva, isEdicao]);
@@ -624,7 +611,9 @@ export default function ProdutosNovo() {
   if (loading) {
     return (
       <div className="p-6 flex justify-center items-center h-96">
-        <div className="text-gray-600">{isClone ? 'Preparando clone do produto...' : 'Carregando produto...'}</div>
+        <div className="text-gray-600">
+          {isClone ? "Preparando clone do produto..." : "Carregando produto..."}
+        </div>
       </div>
     );
   }
@@ -633,17 +622,16 @@ export default function ProdutosNovo() {
   if ((isEdicao || isClone) && !formData.nome) {
     return (
       <div className="p-6 flex justify-center items-center h-96">
-        <div className="text-gray-600">{isClone ? 'Preparando dados para clonar...' : 'Carregando dados...'}</div>
+        <div className="text-gray-600">
+          {isClone ? "Preparando dados para clonar..." : "Carregando dados..."}
+        </div>
       </div>
     );
   }
 
   return (
     <>
-      <ProdutosNovoMainContent
-        handleSubmit={handleSubmit}
-        {...mainContentProps}
-      />
+      <ProdutosNovoMainContent handleSubmit={handleSubmit} {...mainContentProps} />
 
       <ProdutosNovoModalsLayer {...modalsLayerProps} />
     </>

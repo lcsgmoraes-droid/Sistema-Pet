@@ -2,7 +2,13 @@ import CustomerIdentity from "../../../../components/ui/CustomerIdentity";
 import PetIdentity from "../../../../components/ui/PetIdentity";
 import { formatarDataExame } from "./exameIAUtils";
 
-export default function ExameIACabecalho({ exame, resumo, temAnaliseIA, temArquivo, temResultadoBase }) {
+export default function ExameIACabecalho({
+  exame,
+  resumo,
+  temAnaliseIA,
+  temArquivo,
+  temResultadoBase,
+}) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -11,7 +17,9 @@ export default function ExameIACabecalho({ exame, resumo, temAnaliseIA, temArqui
         </div>
         <p className="mt-1 text-indigo-600">
           Tipo: {exame.tipo || "nao informado"}
-          {exame.data_solicitacao ? ` - solicitado em ${formatarDataExame(exame.data_solicitacao)}` : ""}
+          {exame.data_solicitacao
+            ? ` - solicitado em ${formatarDataExame(exame.data_solicitacao)}`
+            : ""}
         </p>
         {resumo && (
           <p className="mt-1 flex flex-wrap items-center gap-1.5 text-indigo-600">

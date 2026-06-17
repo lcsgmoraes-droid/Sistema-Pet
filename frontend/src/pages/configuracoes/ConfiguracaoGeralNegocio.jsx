@@ -196,12 +196,17 @@ export default function ConfiguracaoGeralNegocio() {
       <div className={blocoClass(["margem_saudavel_minima", "margem_alerta_minima"])}>
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Analise de Margem do PDV</h2>
         <p className="text-sm text-gray-600 mb-4">
-          Verde: margem igual ou acima de "Margem Saudavel". Amarelo: entre "Margem Alerta" e "Margem Saudavel".
-          Vermelho: abaixo de "Margem Alerta".
+          Verde: margem igual ou acima de "Margem Saudavel". Amarelo: entre "Margem Alerta" e
+          "Margem Saudavel". Vermelho: abaixo de "Margem Alerta".
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="margem-saudavel-minima" className="block text-sm font-medium text-gray-700 mb-1">Margem Saudavel (verde) %</label>
+            <label
+              htmlFor="margem-saudavel-minima"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Margem Saudavel (verde) %
+            </label>
             <input
               id="margem-saudavel-minima"
               type="number"
@@ -214,7 +219,12 @@ export default function ConfiguracaoGeralNegocio() {
             />
           </div>
           <div>
-            <label htmlFor="margem-alerta-minima" className="block text-sm font-medium text-gray-700 mb-1">Margem Alerta (amarelo) %</label>
+            <label
+              htmlFor="margem-alerta-minima"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Margem Alerta (amarelo) %
+            </label>
             <input
               id="margem-alerta-minima"
               type="number"
@@ -229,15 +239,22 @@ export default function ConfiguracaoGeralNegocio() {
         </div>
       </div>
 
-      <div className={blocoClass([
-        "mensagem_venda_saudavel",
-        "mensagem_venda_alerta",
-        "mensagem_venda_critica",
-      ])}>
+      <div
+        className={blocoClass([
+          "mensagem_venda_saudavel",
+          "mensagem_venda_alerta",
+          "mensagem_venda_critica",
+        ])}
+      >
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Mensagens da Analise do PDV</h2>
         <div className="space-y-4">
           <div>
-            <label htmlFor="mensagem-venda-saudavel" className="block text-sm font-medium text-gray-700 mb-1">Mensagem da venda verde</label>
+            <label
+              htmlFor="mensagem-venda-saudavel"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Mensagem da venda verde
+            </label>
             <input
               id="mensagem-venda-saudavel"
               type="text"
@@ -247,7 +264,12 @@ export default function ConfiguracaoGeralNegocio() {
             />
           </div>
           <div>
-            <label htmlFor="mensagem-venda-alerta" className="block text-sm font-medium text-gray-700 mb-1">Mensagem da venda amarela</label>
+            <label
+              htmlFor="mensagem-venda-alerta"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Mensagem da venda amarela
+            </label>
             <input
               id="mensagem-venda-alerta"
               type="text"
@@ -257,7 +279,12 @@ export default function ConfiguracaoGeralNegocio() {
             />
           </div>
           <div>
-            <label htmlFor="mensagem-venda-critica" className="block text-sm font-medium text-gray-700 mb-1">Mensagem da venda vermelha</label>
+            <label
+              htmlFor="mensagem-venda-critica"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Mensagem da venda vermelha
+            </label>
             <input
               id="mensagem-venda-critica"
               type="text"
@@ -269,11 +296,22 @@ export default function ConfiguracaoGeralNegocio() {
         </div>
       </div>
 
-      <div className={blocoClass(["meta_faturamento_mensal", "alerta_estoque_percentual", "dias_produto_parado"])}>
+      <div
+        className={blocoClass([
+          "meta_faturamento_mensal",
+          "alerta_estoque_percentual",
+          "dias_produto_parado",
+        ])}
+      >
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Metas e Alertas Operacionais</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="meta-faturamento-mensal" className="block text-sm font-medium text-gray-700 mb-1">Meta de faturamento mensal (R$)</label>
+            <label
+              htmlFor="meta-faturamento-mensal"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Meta de faturamento mensal (R$)
+            </label>
             <input
               id="meta-faturamento-mensal"
               type="number"
@@ -285,7 +323,12 @@ export default function ConfiguracaoGeralNegocio() {
             />
           </div>
           <div>
-            <label htmlFor="aliquota-imposto-padrao" className="block text-sm font-medium text-gray-700 mb-1">Aliquota padrao de imposto %</label>
+            <label
+              htmlFor="aliquota-imposto-padrao"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Aliquota padrao de imposto %
+            </label>
             <input
               id="aliquota-imposto-padrao"
               type="number"
@@ -298,7 +341,12 @@ export default function ConfiguracaoGeralNegocio() {
             />
           </div>
           <div>
-            <label htmlFor="dias-tolerancia-atraso" className="block text-sm font-medium text-gray-700 mb-1">Tolerancia de atraso (dias)</label>
+            <label
+              htmlFor="dias-tolerancia-atraso"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Tolerancia de atraso (dias)
+            </label>
             <input
               id="dias-tolerancia-atraso"
               type="number"
@@ -309,7 +357,12 @@ export default function ConfiguracaoGeralNegocio() {
             />
           </div>
           <div>
-            <label htmlFor="alerta-estoque-percentual" className="block text-sm font-medium text-gray-700 mb-1">Alerta de estoque (%)</label>
+            <label
+              htmlFor="alerta-estoque-percentual"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Alerta de estoque (%)
+            </label>
             <input
               id="alerta-estoque-percentual"
               type="number"
@@ -321,7 +374,12 @@ export default function ConfiguracaoGeralNegocio() {
             />
           </div>
           <div>
-            <label htmlFor="dias-produto-parado" className="block text-sm font-medium text-gray-700 mb-1">Produto parado (dias)</label>
+            <label
+              htmlFor="dias-produto-parado"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Produto parado (dias)
+            </label>
             <input
               id="dias-produto-parado"
               type="number"

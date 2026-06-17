@@ -23,7 +23,7 @@ export function listarPetsAtivosDoTutor(pets, tutorSelecionado) {
   if (!tutorSelecionado) return [];
 
   const petsTutor = pets.filter(
-    (pet) => String(pet.cliente_id) === String(tutorSelecionado.id) && pet.ativo !== false
+    (pet) => String(pet.cliente_id) === String(tutorSelecionado.id) && pet.ativo !== false,
   );
 
   const porId = new Map();
@@ -42,7 +42,7 @@ export function obterPetSelecionadoLabel(petSelecionado) {
 
 export function listarSugestoesEspecies(pets) {
   return Array.from(
-    new Set(pets.map((pet) => pet?.especie).filter((especie) => especie && !/\?/.test(especie)))
+    new Set(pets.map((pet) => pet?.especie).filter((especie) => especie && !/\?/.test(especie))),
   );
 }
 
@@ -71,7 +71,8 @@ export function filtrarTutoresPorTermo(tutoresIndex, termoBusca) {
         nome.includes(termoLower) ||
         telefone.includes(termoLower) ||
         celular.includes(termoLower) ||
-        (termoDigitos && (telefoneDigitos.includes(termoDigitos) || celularDigitos.includes(termoDigitos)))
+        (termoDigitos &&
+          (telefoneDigitos.includes(termoDigitos) || celularDigitos.includes(termoDigitos)))
       );
     })
     .slice(0, 20);

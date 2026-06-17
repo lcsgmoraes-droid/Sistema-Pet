@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { trackAddToCart } from '../../services/analytics';
-import ecommerceApi from '../../services/ecommerceApi';
+import { useEffect, useState } from "react";
+import { trackAddToCart } from "../../services/analytics";
+import ecommerceApi from "../../services/ecommerceApi";
 import {
   EMPTY_CART,
   STORAGE_GUEST_CART_KEY,
@@ -10,9 +10,15 @@ import {
   resolveProductPrice,
   resolveProductStock,
   resolveValidityPromotionLimit,
-} from './ecommerceMvpUtils';
+} from "./ecommerceMvpUtils";
 
-export default function useEcommerceCart({ authHeaders, customerToken, productMap, onError, onSuccess }) {
+export default function useEcommerceCart({
+  authHeaders,
+  customerToken,
+  productMap,
+  onError,
+  onSuccess,
+}) {
   const [cart, setCart] = useState(() => getGuestCart());
   const [cartLoading, setCartLoading] = useState(false);
   const cartTotal = Number(cart?.total || 0);
@@ -35,10 +41,10 @@ export default function useEcommerceCart({ authHeaders, customerToken, productMa
     if (!customHeaders?.Authorization) return;
     setCartLoading(true);
     try {
-      const response = await ecommerceApi.get('/api/carrinho', { headers: customHeaders });
+      const response = await ecommerceApi.get("/api/carrinho", { headers: customHeaders });
       setCart(response.data || { ...EMPTY_CART });
     } catch (err) {
-      onError(extractApiErrorMessage(err, 'Erro ao carregar carrinho'));
+      onError(extractApiErrorMessage(err, "Erro ao carregar carrinho"));
     } finally {
       setCartLoading(false);
     }
@@ -52,12 +58,12 @@ export default function useEcommerceCart({ authHeaders, customerToken, productMa
 
     for (const item of guestCart.itens) {
       await ecommerceApi.post(
-        '/api/carrinho/adicionar',
+        "/api/carrinho/adicionar",
         {
           produto_id: item.produto_id,
           quantidade: item.quantidade,
         },
-        { headers }
+        { headers },
       );
     }
 
@@ -68,7 +74,7 @@ export default function useEcommerceCart({ authHeaders, customerToken, productMa
   async function addToCart(product) {
     const availableStock = resolveProductStock(product);
     if (availableStock <= 0) {
-      onError('Produto indispon\u00edvel no momento. Volto em breve.');
+      onError("Produto indispon\u00edvel no momento. Volto em breve.");
       return;
     }
 
@@ -81,7 +87,7 @@ export default function useEcommerceCart({ authHeaders, customerToken, productMa
         onError(`Oferta de validade disponivel para ate ${limiteValidade} unidade(s) nesse preco.`);
         return;
       }
-      onError('');
+      onError("");
       const price = resolveProductPrice(product);
       setCart((previousCart) => {
         const currentItems = Array.isArray(previousCart?.itens) ? previousCart.itens : [];
@@ -91,7 +97,7 @@ export default function useEcommerceCart({ authHeaders, customerToken, productMa
           ? currentItems.map((item) =>
               item.produto_id === product.id
                 ? { ...item, quantidade: Number(item.quantidade || 0) + 1 }
-                : item
+                : item,
             )
           : [
               ...currentItems,
@@ -106,23 +112,23 @@ export default function useEcommerceCart({ authHeaders, customerToken, productMa
 
         return recalculateGuestCart(nextItems);
       });
-      onSuccess('Produto adicionado ao carrinho. Fa\u00e7a login no checkout para finalizar.');
+      onSuccess("Produto adicionado ao carrinho. Fa\u00e7a login no checkout para finalizar.");
       trackAddToCart(product);
       return;
     }
 
-    onError('');
+    onError("");
     try {
       const response = await ecommerceApi.post(
-        '/api/carrinho/adicionar',
+        "/api/carrinho/adicionar",
         { produto_id: product.id, quantidade: 1 },
-        { headers: authHeaders }
+        { headers: authHeaders },
       );
       setCart(response.data);
-      onSuccess('Produto adicionado ao carrinho.');
+      onSuccess("Produto adicionado ao carrinho.");
       trackAddToCart(product);
     } catch (err) {
-      onError(extractApiErrorMessage(err, 'Erro ao adicionar no carrinho'));
+      onError(extractApiErrorMessage(err, "Erro ao adicionar no carrinho"));
     }
   }
 
@@ -146,13 +152,13 @@ export default function useEcommerceCart({ authHeaders, customerToken, productMa
         }
 
         const nextItems = currentItems.map((item) =>
-          item.item_id === itemId ? { ...item, quantidade } : item
+          item.item_id === itemId ? { ...item, quantidade } : item,
         );
         return recalculateGuestCart(nextItems);
       });
       return;
     }
-    onError('');
+    onError("");
     try {
       const itemAtual = Array.isArray(cart?.itens)
         ? cart.itens.find((item) => item.item_id === itemId)
@@ -160,18 +166,20 @@ export default function useEcommerceCart({ authHeaders, customerToken, productMa
       const produtoId = itemAtual?.produto_id || itemId;
 
       if (quantidade <= 0) {
-        const response = await ecommerceApi.delete(`/api/carrinho/remover/${produtoId}`, { headers: authHeaders });
+        const response = await ecommerceApi.delete(`/api/carrinho/remover/${produtoId}`, {
+          headers: authHeaders,
+        });
         setCart(response.data);
         return;
       }
       const response = await ecommerceApi.put(
-        '/api/carrinho/atualizar',
+        "/api/carrinho/atualizar",
         { produto_id: produtoId, quantidade },
-        { headers: authHeaders }
+        { headers: authHeaders },
       );
       setCart(response.data);
     } catch (err) {
-      onError(extractApiErrorMessage(err, 'Erro ao atualizar carrinho'));
+      onError(extractApiErrorMessage(err, "Erro ao atualizar carrinho"));
     }
   }
 

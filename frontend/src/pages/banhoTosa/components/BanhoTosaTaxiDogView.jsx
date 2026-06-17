@@ -65,7 +65,9 @@ export default function BanhoTosaTaxiDogView({ funcionarios = [], onChanged }) {
       setForm((prev) => ({
         ...prev,
         agendamento_id: value,
-        janela_inicio: agendamento ? toDateTimeInput(addMinutes(agendamento.data_hora_inicio, -60)) : prev.janela_inicio,
+        janela_inicio: agendamento
+          ? toDateTimeInput(addMinutes(agendamento.data_hora_inicio, -60))
+          : prev.janela_inicio,
         janela_fim: agendamento ? toDateTimeInput(agendamento.data_hora_inicio) : prev.janela_fim,
       }));
       return;
@@ -161,7 +163,13 @@ export default function BanhoTosaTaxiDogView({ funcionarios = [], onChanged }) {
             >
               Novo transporte
             </ActionButton>
-            <ActionButton icon={RefreshCw} intent="neutral" loading={loading} onClick={carregarDados} tone="soft">
+            <ActionButton
+              icon={RefreshCw}
+              intent="neutral"
+              loading={loading}
+              onClick={carregarDados}
+              tone="soft"
+            >
               Atualizar
             </ActionButton>
           </>
@@ -176,10 +184,27 @@ export default function BanhoTosaTaxiDogView({ funcionarios = [], onChanged }) {
 
       <MetricGrid>
         <MetricCard icon={<Route size={18} />} intent="blue" label="Rotas" value={taxiDog.length} />
-        <MetricCard icon={<CalendarDays size={18} />} intent="slate" label="Agendamentos" subtitle={`${agendamentosDisponiveis.length} sem transporte`} value={agendamentos.length} />
-        <MetricCard icon={<Truck size={18} />} intent="cyan" label="Em rota" value={resumo.emRota} />
+        <MetricCard
+          icon={<CalendarDays size={18} />}
+          intent="slate"
+          label="Agendamentos"
+          subtitle={`${agendamentosDisponiveis.length} sem transporte`}
+          value={agendamentos.length}
+        />
+        <MetricCard
+          icon={<Truck size={18} />}
+          intent="cyan"
+          label="Em rota"
+          value={resumo.emRota}
+        />
         <MetricCard intent="emerald" label="Concluidas" value={resumo.concluidas} />
-        <MetricCard icon={<CircleDollarSign size={18} />} intent="violet" label="Receita" subtitle={`Custo ${formatCurrency(resumo.custo)}`} value={formatCurrency(resumo.receita)} />
+        <MetricCard
+          icon={<CircleDollarSign size={18} />}
+          intent="violet"
+          label="Receita"
+          subtitle={`Custo ${formatCurrency(resumo.custo)}`}
+          value={formatCurrency(resumo.receita)}
+        />
       </MetricGrid>
 
       {showForm && (

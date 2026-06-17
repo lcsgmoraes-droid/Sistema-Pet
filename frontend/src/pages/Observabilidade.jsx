@@ -59,7 +59,9 @@ function statusTone(status) {
 
 function Badge({ children, className = "" }) {
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${className}`}>
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${className}`}
+    >
       {children}
     </span>
   );
@@ -95,7 +97,10 @@ function RankingList({ title, items, emptyLabel = "Sem eventos" }) {
           <p className="text-sm text-slate-500">{emptyLabel}</p>
         ) : (
           items.map(([label, total]) => (
-            <div key={label} className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+            <div
+              key={label}
+              className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2"
+            >
               <span className="truncate text-sm text-slate-700" title={label}>
                 {label}
               </span>
@@ -204,10 +209,15 @@ export default function Observabilidade() {
           </button>
         </div>
 
-        <form onSubmit={aplicarFiltros} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <form
+          onSubmit={aplicarFiltros}
+          className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+        >
           <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr_160px_120px]">
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Periodo</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Periodo
+              </span>
               <select
                 value={rangeHours}
                 onChange={(event) => {
@@ -225,7 +235,9 @@ export default function Observabilidade() {
             </label>
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tenant</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Tenant
+              </span>
               <input
                 value={tenantId}
                 onChange={(event) => {
@@ -238,7 +250,9 @@ export default function Observabilidade() {
             </label>
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rota contem</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Rota contem
+              </span>
               <div className="relative mt-1">
                 <FiSearch className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
                 <input
@@ -254,7 +268,9 @@ export default function Observabilidade() {
             </label>
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status min.</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Status min.
+              </span>
               <select
                 value={statusMin}
                 onChange={(event) => {
@@ -312,11 +328,43 @@ export default function Observabilidade() {
         ) : null}
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <MetricCard icon={FiActivity} label="Eventos" value={summary?.total ?? "-"} detail="No periodo filtrado" tone="blue" />
-          <MetricCard icon={FiAlertTriangle} label="Erros 5xx" value={summary?.errors_5xx ?? "-"} detail="Falhas reais do servidor" tone={Number(summary?.errors_5xx || 0) > 0 ? "red" : "green"} />
-          <MetricCard icon={FiClock} label="Requisicoes lentas" value={summary?.slow_requests ?? "-"} detail="Acima do limite tecnico" tone={Number(summary?.slow_requests || 0) > 0 ? "amber" : "green"} />
-          <MetricCard icon={FiDatabase} label="Banco" value={watchdog?.database || "-"} detail={watchdog?.latency_ms ? `${formatMs(watchdog.latency_ms)} de latencia` : "Watchdog"} tone={watchdogHealthy ? "green" : "amber"} />
-          <MetricCard icon={FiServer} label="Watchdog" value={watchdog?.status || "-"} detail={watchdog?.pool ? shortValue(watchdog.pool, 48) : "Saude operacional"} tone={watchdogHealthy ? "green" : "amber"} />
+          <MetricCard
+            icon={FiActivity}
+            label="Eventos"
+            value={summary?.total ?? "-"}
+            detail="No periodo filtrado"
+            tone="blue"
+          />
+          <MetricCard
+            icon={FiAlertTriangle}
+            label="Erros 5xx"
+            value={summary?.errors_5xx ?? "-"}
+            detail="Falhas reais do servidor"
+            tone={Number(summary?.errors_5xx || 0) > 0 ? "red" : "green"}
+          />
+          <MetricCard
+            icon={FiClock}
+            label="Requisicoes lentas"
+            value={summary?.slow_requests ?? "-"}
+            detail="Acima do limite tecnico"
+            tone={Number(summary?.slow_requests || 0) > 0 ? "amber" : "green"}
+          />
+          <MetricCard
+            icon={FiDatabase}
+            label="Banco"
+            value={watchdog?.database || "-"}
+            detail={
+              watchdog?.latency_ms ? `${formatMs(watchdog.latency_ms)} de latencia` : "Watchdog"
+            }
+            tone={watchdogHealthy ? "green" : "amber"}
+          />
+          <MetricCard
+            icon={FiServer}
+            label="Watchdog"
+            value={watchdog?.status || "-"}
+            detail={watchdog?.pool ? shortValue(watchdog.pool, 48) : "Saude operacional"}
+            tone={watchdogHealthy ? "green" : "amber"}
+          />
         </div>
 
         <div className="grid gap-4 xl:grid-cols-3">
@@ -384,30 +432,56 @@ export default function Observabilidade() {
                   </tr>
                 ) : (
                   events.items.map((event) => (
-                    <tr key={`${event.request_id}-${event.created_at}`} className="hover:bg-slate-50">
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatDate(event.created_at)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-600">{event.tenant_id || "sem_tenant"}</td>
+                    <tr
+                      key={`${event.request_id}-${event.created_at}`}
+                      className="hover:bg-slate-50"
+                    >
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">
+                        {formatDate(event.created_at)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-600">
+                        {event.tenant_id || "sem_tenant"}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <Badge className="border-slate-200 bg-slate-100 text-slate-600">{event.method || "-"}</Badge>
-                          <span className="max-w-[360px] truncate font-mono text-xs text-slate-800" title={event.path}>
+                          <Badge className="border-slate-200 bg-slate-100 text-slate-600">
+                            {event.method || "-"}
+                          </Badge>
+                          <span
+                            className="max-w-[360px] truncate font-mono text-xs text-slate-800"
+                            title={event.path}
+                          >
                             {event.path || "-"}
                           </span>
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <Badge className={statusTone(event.status_code)}>{event.status_code || "erro"}</Badge>
+                        <Badge className={statusTone(event.status_code)}>
+                          {event.status_code || "erro"}
+                        </Badge>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatMs(event.duration_ms)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{event.user_email || event.user_id || "-"}</td>
-                      <td className="px-4 py-3 text-slate-600" title={event.exception_message || event.user_agent || ""}>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">
+                        {formatMs(event.duration_ms)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                        {event.user_email || event.user_id || "-"}
+                      </td>
+                      <td
+                        className="px-4 py-3 text-slate-600"
+                        title={event.exception_message || event.user_agent || ""}
+                      >
                         <div className="flex items-center gap-2">
                           {event.exception_type ? (
                             <FiAlertTriangle className="h-4 w-4 shrink-0 text-rose-500" />
                           ) : (
                             <FiCheckCircle className="h-4 w-4 shrink-0 text-slate-400" />
                           )}
-                          <span>{shortValue(event.exception_message || event.exception_type || event.request_id, 110)}</span>
+                          <span>
+                            {shortValue(
+                              event.exception_message || event.exception_type || event.request_id,
+                              110,
+                            )}
+                          </span>
                         </div>
                       </td>
                     </tr>

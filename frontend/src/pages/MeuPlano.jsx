@@ -9,10 +9,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import {
-  MODULOS_INFO,
-  useModulos,
-} from "../contexts/ModulosContext";
+import { MODULOS_INFO, useModulos } from "../contexts/ModulosContext";
 
 const WHATSAPP_NUMERO = "5518997401641";
 
@@ -94,9 +91,7 @@ export default function MeuPlano() {
   const msgContratar = encodeURIComponent(
     "Ola! Quero ativar meu Plano Basico do CorePet apos o periodo gratuito.",
   );
-  const msgBeta = encodeURIComponent(
-    "Ola! Quero solicitar acesso Beta a um modulo do CorePet.",
-  );
+  const msgBeta = encodeURIComponent("Ola! Quero solicitar acesso Beta a um modulo do CorePet.");
 
   return (
     <main className="min-h-full bg-slate-50 p-4 md:p-6">
@@ -104,12 +99,10 @@ export default function MeuPlano() {
         <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-sm font-bold uppercase text-emerald-700">Assinatura</p>
-            <h1 className="mt-1 text-2xl font-extrabold text-slate-950 md:text-3xl">
-              Meu Plano
-            </h1>
+            <h1 className="mt-1 text-2xl font-extrabold text-slate-950 md:text-3xl">Meu Plano</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              A contratacao inicial e assistida: voce usa o Plano Basico no trial,
-              fala com atendimento e a ativacao e registrada manualmente.
+              A contratacao inicial e assistida: voce usa o Plano Basico no trial, fala com
+              atendimento e a ativacao e registrada manualmente.
             </p>
           </div>
           <button
@@ -133,12 +126,8 @@ export default function MeuPlano() {
                   <StatusIcon className="h-4 w-4" />
                   {statusInfo.label}
                 </span>
-                <h2 className="mt-4 text-xl font-extrabold text-slate-950">
-                  Plano Basico
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {statusInfo.text}
-                </p>
+                <h2 className="mt-4 text-xl font-extrabold text-slate-950">Plano Basico</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{statusInfo.text}</p>
               </div>
               <div className="rounded-md bg-slate-950 p-3 text-white">
                 <CreditCard className="h-6 w-6" />
@@ -148,14 +137,14 @@ export default function MeuPlano() {
             <div className="mt-6 grid gap-3 sm:grid-cols-3">
               <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs font-bold uppercase text-slate-500">Plano</p>
-                <p className="mt-1 text-lg font-bold text-slate-950">
-                  {planoAtual || "basico"}
-                </p>
+                <p className="mt-1 text-lg font-bold text-slate-950">{planoAtual || "basico"}</p>
               </div>
               <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs font-bold uppercase text-slate-500">Trial</p>
                 <p className="mt-1 text-lg font-bold text-slate-950">
-                  {diasRestantes == null ? `${trialPadrao?.dias || 30} dias` : `${diasRestantes} dia(s)`}
+                  {diasRestantes == null
+                    ? `${trialPadrao?.dias || 30} dias`
+                    : `${diasRestantes} dia(s)`}
                 </p>
               </div>
               <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
@@ -193,8 +182,8 @@ export default function MeuPlano() {
               <div>
                 <h2 className="font-bold text-slate-950">Sem pagamento integrado</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Por enquanto, a cobranca e feita fora do sistema. Depois da
-                  confirmacao, o acesso e ativado manualmente pelo administrativo.
+                  Por enquanto, a cobranca e feita fora do sistema. Depois da confirmacao, o acesso
+                  e ativado manualmente pelo administrativo.
                 </p>
               </div>
             </div>
@@ -218,8 +207,8 @@ export default function MeuPlano() {
                 Modulos que podem entrar depois
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                Eles aparecem como pilotos controlados. O trial padrao continua focado
-                no Plano Basico para reduzir risco na primeira venda.
+                Eles aparecem como pilotos controlados. O trial padrao continua focado no Plano
+                Basico para reduzir risco na primeira venda.
               </p>
             </div>
             <a
@@ -237,7 +226,10 @@ export default function MeuPlano() {
             {betaModules.map((modulo) => {
               const info = MODULOS_INFO[modulo] || { nome: modulo, descricao: "" };
               return (
-                <article key={modulo} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <article
+                  key={modulo}
+                  className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                >
                   <p className="text-sm font-bold text-slate-950">{info.nome}</p>
                   <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600">
                     {info.descricao}

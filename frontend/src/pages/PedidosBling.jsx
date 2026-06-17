@@ -1,6 +1,6 @@
-import PedidoBlingCard from '../components/pedidosBling/PedidoBlingCard';
-import { STATUS_CONFIG } from '../components/pedidosBling/pedidoBlingUtils';
-import usePedidosBlingListagem from '../hooks/usePedidosBlingListagem';
+import PedidoBlingCard from "../components/pedidosBling/PedidoBlingCard";
+import { STATUS_CONFIG } from "../components/pedidosBling/pedidoBlingUtils";
+import usePedidosBlingListagem from "../hooks/usePedidosBlingListagem";
 
 export default function PedidosBling() {
   const {
@@ -24,7 +24,8 @@ export default function PedidosBling() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Pedidos Bling</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Pedidos recebidos via Bling com canal, referencias, cliente, financeiro, itens e vinculo com NF quando disponivel.
+          Pedidos recebidos via Bling com canal, referencias, cliente, financeiro, itens e vinculo
+          com NF quando disponivel.
         </p>
       </div>
 
@@ -34,7 +35,9 @@ export default function PedidosBling() {
             key={aba.valor}
             onClick={() => mudarStatus(aba.valor)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
-              statusFiltro === aba.valor ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              statusFiltro === aba.valor
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
             }`}
           >
             {aba.label}
@@ -50,7 +53,9 @@ export default function PedidosBling() {
 
       <div className="flex items-center justify-between mb-3">
         <p className="text-sm text-gray-500">
-          {carregando ? 'Carregando...' : `${total} pedido${total !== 1 ? 's' : ''} encontrado${total !== 1 ? 's' : ''}`}
+          {carregando
+            ? "Carregando..."
+            : `${total} pedido${total !== 1 ? "s" : ""} encontrado${total !== 1 ? "s" : ""}`}
         </p>
         <button
           onClick={carregar}
@@ -70,7 +75,7 @@ export default function PedidosBling() {
           <p className="text-sm text-gray-400 mt-1">
             {statusFiltro
               ? `Sem pedidos com status "${STATUS_CONFIG[statusFiltro]?.label || statusFiltro}"`
-              : 'Os pedidos aparecem aqui quando o Bling envia via webhook'}
+              : "Os pedidos aparecem aqui quando o Bling envia via webhook"}
           </p>
         </div>
       ) : (

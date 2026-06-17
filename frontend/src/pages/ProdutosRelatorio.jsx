@@ -89,16 +89,12 @@ function JanelaVendaCard({ janela, ativa }) {
   return (
     <div
       className={`rounded-2xl border p-4 shadow-sm transition-colors ${
-        ativa
-          ? "border-blue-300 bg-blue-50"
-          : "border-gray-200 bg-white"
+        ativa ? "border-blue-300 bg-blue-50" : "border-gray-200 bg-white"
       }`}
     >
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-gray-900">
-            Ultimos {janela.dias} dias
-          </p>
+          <p className="text-sm font-semibold text-gray-900">Ultimos {janela.dias} dias</p>
           <p className="mt-1 text-2xl font-bold text-gray-900">
             {formatarQuantidade(janela.quantidade_vendida)}
           </p>
@@ -286,9 +282,7 @@ export default function ProdutosRelatorio() {
   const carregarMovimentacoes = async (filtros, pagina) => {
     try {
       setLoadingMovimentacoes(true);
-      const response = await getRelatorioMovimentacoes(
-        montarParamsMovimentacoes(filtros, pagina),
-      );
+      const response = await getRelatorioMovimentacoes(montarParamsMovimentacoes(filtros, pagina));
       const payload = response?.data || {};
       setDadosMovimentacoes({
         movimentacoes: Array.isArray(payload.movimentacoes) ? payload.movimentacoes : [],
@@ -304,10 +298,7 @@ export default function ProdutosRelatorio() {
       });
     } catch (error) {
       console.error("Erro ao carregar movimentacoes:", error);
-      toast.error(
-        error?.response?.data?.detail ||
-          "Nao foi possivel carregar as movimentacoes.",
-      );
+      toast.error(error?.response?.data?.detail || "Nao foi possivel carregar as movimentacoes.");
       setDadosMovimentacoes({
         movimentacoes: [],
         total_registros: 0,
@@ -339,8 +330,7 @@ export default function ProdutosRelatorio() {
     } catch (error) {
       console.error("Erro ao carregar resumo do produto:", error);
       toast.error(
-        error?.response?.data?.detail ||
-          "Nao foi possivel carregar o historico do produto.",
+        error?.response?.data?.detail || "Nao foi possivel carregar o historico do produto.",
       );
       setDadosProduto(null);
     } finally {
@@ -485,23 +475,25 @@ export default function ProdutosRelatorio() {
 
       const conteudo = [
         cabecalho.join(";"),
-        ...linhas.map((mov) => [
-          mov.data || "",
-          mov.lancamento || "",
-          mov.produto_nome || "",
-          mov.codigo || "",
-          mov.sku || "",
-          mov.tipo || "",
-          mov.motivo_label || "",
-          mov.entrada ?? "",
-          mov.saida ?? "",
-          mov.estoque ?? "",
-          mov.valor_total ?? "",
-          mov.em_promocao ? "Sim" : "Nao",
-          mov.promocao_origem || "",
-          mov.usuario || "",
-          mov.numero_pedido || "",
-        ].join(";")),
+        ...linhas.map((mov) =>
+          [
+            mov.data || "",
+            mov.lancamento || "",
+            mov.produto_nome || "",
+            mov.codigo || "",
+            mov.sku || "",
+            mov.tipo || "",
+            mov.motivo_label || "",
+            mov.entrada ?? "",
+            mov.saida ?? "",
+            mov.estoque ?? "",
+            mov.valor_total ?? "",
+            mov.em_promocao ? "Sim" : "Nao",
+            mov.promocao_origem || "",
+            mov.usuario || "",
+            mov.numero_pedido || "",
+          ].join(";"),
+        ),
       ].join("\n");
 
       const blob = new Blob([conteudo], { type: "text/csv;charset=utf-8;" });
@@ -513,8 +505,7 @@ export default function ProdutosRelatorio() {
     } catch (error) {
       console.error("Erro ao exportar CSV:", error);
       toast.error(
-        error?.response?.data?.detail ||
-          "Nao foi possivel exportar o CSV do filtro atual.",
+        error?.response?.data?.detail || "Nao foi possivel exportar o CSV do filtro atual.",
       );
     } finally {
       setExportando(false);
@@ -550,14 +541,11 @@ export default function ProdutosRelatorio() {
     <div className="space-y-6 p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Giro de Produto e Movimentacoes
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900">Giro de Produto e Movimentacoes</h1>
           <p className="mt-2 max-w-4xl text-sm text-gray-600">
-            Use esta tela para decidir compra com base no giro real do item.
-            Ao escolher um produto, o painel mostra vendas em 7, 15, 30, 60 e
-            90 dias, historico recente e as movimentacoes de estoque com
-            paginacao leve.
+            Use esta tela para decidir compra com base no giro real do item. Ao escolher um produto,
+            o painel mostra vendas em 7, 15, 30, 60 e 90 dias, historico recente e as movimentacoes
+            de estoque com paginacao leve.
           </p>
         </div>
 
@@ -592,9 +580,7 @@ export default function ProdutosRelatorio() {
 
         <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Data inicio
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Data inicio</label>
             <input
               type="date"
               value={filtrosForm.data_inicio}
@@ -607,9 +593,7 @@ export default function ProdutosRelatorio() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Data fim
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Data fim</label>
             <input
               type="date"
               value={filtrosForm.data_fim}
@@ -622,9 +606,7 @@ export default function ProdutosRelatorio() {
           </div>
 
           <div className="relative md:col-span-2" ref={buscaRef}>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Produto
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Produto</label>
             {produtoSelecionado ? (
               <div className="flex min-h-[46px] items-center gap-3 rounded-xl border border-blue-300 bg-blue-50 px-3 py-2">
                 <div className="min-w-0 flex-1">
@@ -666,16 +648,19 @@ export default function ProdutosRelatorio() {
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-red-500"
                   >
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 )}
                 {dropdownAberto && (buscaProduto.trim().length >= 2 || loadingBuscaProduto) && (
                   <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl">
                     {loadingBuscaProduto ? (
-                      <div className="px-4 py-3 text-sm text-gray-500">
-                        Buscando produtos...
-                      </div>
+                      <div className="px-4 py-3 text-sm text-gray-500">Buscando produtos...</div>
                     ) : sugestoesProdutos.length === 0 ? (
                       <div className="px-4 py-3 text-sm text-gray-500">
                         Nenhum produto encontrado para esse termo.
@@ -820,8 +805,8 @@ export default function ProdutosRelatorio() {
                   dadosProduto?.resumo?.ruptura_ativa
                     ? "Ruptura"
                     : dadosProduto?.resumo?.cobertura_estimada_dias != null
-                    ? `${formatarQuantidade(dadosProduto.resumo.cobertura_estimada_dias)} dias`
-                    : "Sem base"
+                      ? `${formatarQuantidade(dadosProduto.resumo.cobertura_estimada_dias)} dias`
+                      : "Sem base"
                 }
                 descricao={
                   dadosProduto?.resumo?.ruptura_ativa
@@ -874,7 +859,8 @@ export default function ProdutosRelatorio() {
                       Historico recente de vendas do produto
                     </h3>
                     <p className="mt-1 text-sm text-gray-600">
-                      Veja quando vendeu, para quem e em qual quantidade dentro do periodo selecionado.
+                      Veja quando vendeu, para quem e em qual quantidade dentro do periodo
+                      selecionado.
                     </p>
                   </div>
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -931,7 +917,9 @@ export default function ProdutosRelatorio() {
                                   {item.em_promocao && (
                                     <span
                                       className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-700"
-                                      title={item.promocao_origem || "Venda por preco promocional ativo"}
+                                      title={
+                                        item.promocao_origem || "Venda por preco promocional ativo"
+                                      }
                                     >
                                       Promo
                                     </span>
@@ -987,7 +975,9 @@ export default function ProdutosRelatorio() {
                           type="button"
                           onClick={() =>
                             setPaginaHistoricoVendas((prev) =>
-                              totalPaginasHistorico > 0 ? Math.min(prev + 1, totalPaginasHistorico) : prev,
+                              totalPaginasHistorico > 0
+                                ? Math.min(prev + 1, totalPaginasHistorico)
+                                : prev,
                             )
                           }
                           disabled={
@@ -1012,7 +1002,9 @@ export default function ProdutosRelatorio() {
             Selecione um produto para enxergar o padrao de venda
           </h2>
           <p className="mx-auto mt-3 max-w-3xl text-sm text-blue-800">
-            O objetivo principal desta tela agora e apoiar a compra. Busque o item por nome, SKU, codigo ou codigo de barras para ver o giro nos ultimos 7, 15, 30, 60 e 90 dias, alem do historico recente de vendas.
+            O objetivo principal desta tela agora e apoiar a compra. Busque o item por nome, SKU,
+            codigo ou codigo de barras para ver o giro nos ultimos 7, 15, 30, 60 e 90 dias, alem do
+            historico recente de vendas.
           </p>
         </div>
       )}
@@ -1041,9 +1033,7 @@ export default function ProdutosRelatorio() {
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">
-              Movimentacoes filtradas
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-900">Movimentacoes filtradas</h3>
             <p className="mt-1 text-sm text-gray-600">
               Historico operacional paginado para manter a tela leve mesmo com muitos registros.
             </p>
@@ -1051,7 +1041,8 @@ export default function ProdutosRelatorio() {
 
           <div className="flex flex-wrap gap-3">
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-              Exibindo {inicioItemMovimentacoes}-{fimItemMovimentacoes} de {dadosMovimentacoes.total_registros}
+              Exibindo {inicioItemMovimentacoes}-{fimItemMovimentacoes} de{" "}
+              {dadosMovimentacoes.total_registros}
             </span>
             <button
               type="button"
@@ -1147,7 +1138,9 @@ export default function ProdutosRelatorio() {
                           )}
                         </td>
                         <td className="px-5 py-3 text-sm text-gray-700">
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClasse}`}>
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${badgeClasse}`}
+                          >
                             {mov.tipo || "-"}
                           </span>
                           <p className="mt-2 text-xs text-gray-500">
@@ -1166,9 +1159,7 @@ export default function ProdutosRelatorio() {
                         <td className="px-5 py-3 text-right text-sm font-medium text-gray-900">
                           {formatarMoeda(mov.valor_total)}
                         </td>
-                        <td className="px-5 py-3 text-sm text-gray-700">
-                          {mov.usuario || "-"}
-                        </td>
+                        <td className="px-5 py-3 text-sm text-gray-700">{mov.usuario || "-"}</td>
                       </tr>
                     );
                   })}

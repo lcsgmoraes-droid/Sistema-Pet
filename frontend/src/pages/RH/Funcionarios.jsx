@@ -65,10 +65,9 @@ export default function Funcionarios() {
       complemento_modo: funcionario.complemento_modo || "automatico",
       complemento_fixo_valor: funcionario.complemento_fixo_valor ?? 0,
       remuneracao_observacoes: funcionario.remuneracao_observacoes || "",
-      app_access_profiles:
-        funcionario.app_access_profiles?.length
-          ? funcionario.app_access_profiles
-          : ["funcionario"],
+      app_access_profiles: funcionario.app_access_profiles?.length
+        ? funcionario.app_access_profiles
+        : ["funcionario"],
     });
   };
 
@@ -132,8 +131,7 @@ export default function Funcionarios() {
 
   const listaFiltrada = funcionarios.filter((f) => {
     const matchBusca =
-      f.nome.toLowerCase().includes(filtro.toLowerCase()) ||
-      (f.cpf || "").includes(filtro);
+      f.nome.toLowerCase().includes(filtro.toLowerCase()) || (f.cpf || "").includes(filtro);
 
     const matchStatus =
       filtroStatus === "todos" ||
@@ -160,7 +158,7 @@ export default function Funcionarios() {
       usaEncargos && inssFuncionarioFixo > 0
         ? inssFuncionarioFixo
         : usaEncargos
-          ? salario * Number(cargoSelecionado.inss_funcionario_percentual || 0) / 100
+          ? (salario * Number(cargoSelecionado.inss_funcionario_percentual || 0)) / 100
           : 0;
     const descontos =
       inssFuncionario +
@@ -175,9 +173,9 @@ export default function Funcionarios() {
           ? 0
           : Math.max(0, liquidoCombinado - liquidoHolerite);
     const inssPatronal = usaEncargos
-      ? salario * Number(cargoSelecionado.inss_patronal_percentual || 0) / 100
+      ? (salario * Number(cargoSelecionado.inss_patronal_percentual || 0)) / 100
       : 0;
-    const fgts = usaEncargos ? salario * Number(cargoSelecionado.fgts_percentual || 0) / 100 : 0;
+    const fgts = usaEncargos ? (salario * Number(cargoSelecionado.fgts_percentual || 0)) / 100 : 0;
     const ferias = usaEncargos && cargoSelecionado.gera_ferias ? salario / 12 : 0;
     const tercoFerias = usaEncargos && cargoSelecionado.gera_ferias ? salario / 36 : 0;
     const decimo = usaEncargos && cargoSelecionado.gera_decimo_terceiro ? salario / 12 : 0;
@@ -214,10 +212,7 @@ export default function Funcionarios() {
           </select>
         </div>
 
-        <button
-          onClick={novoFuncionario}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
-        >
+        <button onClick={novoFuncionario} className="bg-blue-600 text-white px-4 py-2 rounded">
           + Novo Funcionario
         </button>
       </div>
@@ -242,9 +237,11 @@ export default function Funcionarios() {
                   {f.cargo ? f.cargo.nome : <span className="text-gray-400 italic">Sem cargo</span>}
                 </td>
                 <td className="px-4 py-3 text-gray-600">
-                  {f.remuneracao
-                    ? formatarMoeda(f.remuneracao.salario_base)
-                    : <span className="text-gray-400">-</span>}
+                  {f.remuneracao ? (
+                    formatarMoeda(f.remuneracao.salario_base)
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-gray-600">
                   {f.remuneracao ? (
@@ -261,9 +258,11 @@ export default function Funcionarios() {
                   )}
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    f.ativo ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-                  }`}>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      f.ativo ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
+                    }`}
+                  >
                     {f.ativo ? "Ativo" : "Inativo"}
                   </span>
                 </td>
@@ -461,21 +460,22 @@ export default function Funcionarios() {
                 </div>
                 <div className="rounded border bg-blue-50 p-3">
                   <div className="text-xs text-blue-700">Complemento interno</div>
-                  <div className="font-semibold text-blue-800">{formatarMoeda(resumoForm.complemento)}</div>
+                  <div className="font-semibold text-blue-800">
+                    {formatarMoeda(resumoForm.complemento)}
+                  </div>
                 </div>
                 <div className="rounded border bg-green-50 p-3">
                   <div className="text-xs text-green-700">Custo total mensal</div>
-                  <div className="font-semibold text-green-800">{formatarMoeda(resumoForm.custoTotal)}</div>
+                  <div className="font-semibold text-green-800">
+                    {formatarMoeda(resumoForm.custoTotal)}
+                  </div>
                 </div>
               </div>
             )}
           </div>
 
           <div className="mt-4 space-x-2">
-            <button
-              onClick={salvar}
-              className="bg-green-600 text-white px-4 py-2 rounded"
-            >
+            <button onClick={salvar} className="bg-green-600 text-white px-4 py-2 rounded">
               Salvar
             </button>
             <button

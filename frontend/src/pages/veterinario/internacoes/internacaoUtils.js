@@ -8,13 +8,22 @@ export const STATUS_CORES = {
 
 export function formatData(iso) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 export function formatDateTime(iso) {
   if (!iso) return "—";
   const d = new Date(iso);
-  return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function parseQuantity(value) {
@@ -36,7 +45,12 @@ export function montarSerieEvolucao(registros = []) {
   return registros
     .filter((item) => item?.data_hora)
     .map((item) => ({
-      horario: new Date(item.data_hora).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
+      horario: new Date(item.data_hora).toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
       temperatura: item.temperatura ?? null,
       fc: item.freq_cardiaca ?? null,
       fr: item.freq_respiratoria ?? null,

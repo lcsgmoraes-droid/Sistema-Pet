@@ -33,7 +33,7 @@ export function useInternacoesCarregamentoAcoes({
               pet_id: filtroPetHistorico || undefined,
             };
       const res = await vetApi.listarInternacoes(params);
-      setInternacoes(Array.isArray(res.data) ? res.data : res.data?.items ?? []);
+      setInternacoes(Array.isArray(res.data) ? res.data : (res.data?.items ?? []));
     } catch {
       setErro("Erro ao carregar internações.");
     } finally {
@@ -59,7 +59,7 @@ export function useInternacoesCarregamentoAcoes({
         if (manterExpandido) setExpandida(id);
       } catch {}
     },
-    [setEvolucoes, setExpandida, setProcedimentosInternacao]
+    [setEvolucoes, setExpandida, setProcedimentosInternacao],
   );
 
   const abrirDetalhe = useCallback(
@@ -70,7 +70,7 @@ export function useInternacoesCarregamentoAcoes({
         await carregarDetalheInternacao(id, true);
       }
     },
-    [carregarDetalheInternacao, expandida, setExpandida]
+    [carregarDetalheInternacao, expandida, setExpandida],
   );
 
   const abrirHistoricoPet = useCallback(
@@ -88,7 +88,7 @@ export function useInternacoesCarregamentoAcoes({
         setCarregandoHistoricoPet(false);
       }
     },
-    [setCarregandoHistoricoPet, setErro, setHistoricoPet, setModalHistoricoPet]
+    [setCarregandoHistoricoPet, setErro, setHistoricoPet, setModalHistoricoPet],
   );
 
   return {

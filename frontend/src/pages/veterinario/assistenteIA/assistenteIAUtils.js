@@ -47,7 +47,7 @@ export function formatarLabelConsulta(consulta) {
         month: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
-      })
+      }),
     );
   }
   if (consulta.motivo_consulta) {

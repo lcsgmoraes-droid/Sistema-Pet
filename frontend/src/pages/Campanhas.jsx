@@ -8,16 +8,18 @@ import useCampanhasGestor from "../hooks/useCampanhasGestor";
 import useCampanhasConfiguracoes from "../hooks/useCampanhasConfiguracoes";
 import useCampanhasGestao from "../hooks/useCampanhasGestao";
 import useCampanhasInativos from "../hooks/useCampanhasInativos";
-import useCampanhasRetencao, {
-  NOVA_REGRA_RETENCAO_PADRAO,
-} from "../hooks/useCampanhasRetencao";
+import useCampanhasRetencao, { NOVA_REGRA_RETENCAO_PADRAO } from "../hooks/useCampanhasRetencao";
 import useCampanhasCupons from "../hooks/useCampanhasCupons";
 import useCampanhasDestaque from "../hooks/useCampanhasDestaque";
 import useCampanhasSorteios from "../hooks/useCampanhasSorteios";
 import useCampanhasLote from "../hooks/useCampanhasLote";
 import useCampanhasUnificacao from "../hooks/useCampanhasUnificacao";
 import useCampanhasFidelidade from "../hooks/useCampanhasFidelidade";
-import { hoje, primeiroDiaMes, createDefaultPremio } from "../components/campanhas/campanhasConstants";
+import {
+  hoje,
+  primeiroDiaMes,
+  createDefaultPremio,
+} from "../components/campanhas/campanhasConstants";
 import useCampanhasPageComposition from "../hooks/useCampanhasPageComposition";
 
 export default function Campanhas() {
@@ -30,20 +32,12 @@ export default function Campanhas() {
   const {
     aba,
     setAba,
-    campanhas,
     setCampanhas,
-    cupons,
     setCupons,
     destaque,
-    premiosPorVencedor,
-    vencedoresSelecionados,
-    sorteios,
     setSorteios,
-    codigosOffline,
     setCodigosOffline,
-    loadingCodigosOffline,
     setLoadingCodigosOffline,
-    sugestoes,
     setSugestoes,
     rankingConfig,
     setRankingConfig,
@@ -119,16 +113,12 @@ export default function Campanhas() {
     setAba,
     onCupomCriado: campanhasGestor.recarregarGestor,
   });
-  const {
-    enviandoDestaque,
-    destaqueResultado,
-    setDestaqueResultado,
-    enviarDestaque,
-  } = useCampanhasDestaque({
-    destaque,
-    premiosPorVencedor: campanhasConsultas.premiosPorVencedor,
-    vencedoresSelecionados: campanhasConsultas.vencedoresSelecionados,
-  });
+  const { enviandoDestaque, destaqueResultado, setDestaqueResultado, enviarDestaque } =
+    useCampanhasDestaque({
+      destaque,
+      premiosPorVencedor: campanhasConsultas.premiosPorVencedor,
+      vencedoresSelecionados: campanhasConsultas.vencedoresSelecionados,
+    });
   const {
     modalSorteio,
     setModalSorteio,
@@ -274,9 +264,7 @@ export default function Campanhas() {
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Campanhas de Fidelidade
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Campanhas de Fidelidade</h1>
           <p className="text-sm text-gray-500 mt-1">
             Gerencie campanhas automaticas, ranking de clientes e cupons.
           </p>

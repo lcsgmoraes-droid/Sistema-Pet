@@ -5,9 +5,21 @@ export default function ExameIAListas({ achadosImagem, condutasSugeridas, limita
 
   return (
     <div className="grid gap-3 md:grid-cols-3">
-      <ListaIA titulo="Achados da imagem" itens={achadosImagem} vazio="Sem achados visuais destacados." />
-      <ListaIA titulo="Condutas sugeridas" itens={condutasSugeridas} vazio="Sem conduta sugerida automaticamente." />
-      <ListaIA titulo="Limitacoes" itens={limitacoesIA} vazio="Sem limitacoes especiais registradas." />
+      <ListaIA
+        titulo="Achados da imagem"
+        itens={achadosImagem}
+        vazio="Sem achados visuais destacados."
+      />
+      <ListaIA
+        titulo="Condutas sugeridas"
+        itens={condutasSugeridas}
+        vazio="Sem conduta sugerida automaticamente."
+      />
+      <ListaIA
+        titulo="Limitacoes"
+        itens={limitacoesIA}
+        vazio="Sem limitacoes especiais registradas."
+      />
     </div>
   );
 }

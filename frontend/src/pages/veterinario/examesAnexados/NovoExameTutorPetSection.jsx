@@ -28,9 +28,7 @@ export default function NovoExameTutorPetSection({
       <PetSelector
         className="sm:col-span-2"
         onBeforeNovoPet={onClose}
-        onSelectPet={(pet) =>
-          setForm((prev) => ({ ...prev, pet_id: pet ? String(pet.id) : "" }))
-        }
+        onSelectPet={(pet) => setForm((prev) => ({ ...prev, pet_id: pet ? String(pet.id) : "" }))}
         petId={form.pet_id}
         petLabel="Pet*"
         pets={petsDoTutor}

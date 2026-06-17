@@ -41,10 +41,13 @@ export default function ExameChatIAAvancada({ petId, refreshToken, onNovoExame }
           )}
 
           {!petId ? (
-            <p className="text-xs italic text-indigo-500">Selecione o pet para carregar os exames.</p>
+            <p className="text-xs italic text-indigo-500">
+              Selecione o pet para carregar os exames.
+            </p>
           ) : chat.exames.length === 0 ? (
             <p className="text-xs italic text-indigo-500">
-              Nenhum exame encontrado para este pet ainda. Voce ja pode cadastrar e anexar um arquivo acima.
+              Nenhum exame encontrado para este pet ainda. Voce ja pode cadastrar e anexar um
+              arquivo acima.
             </p>
           ) : (
             <>

@@ -1,4 +1,13 @@
-import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { montarSerieEvolucao } from "./internacaoUtils";
 
 export default function CurvaEvolucaoInternacao({ evolucoes }) {

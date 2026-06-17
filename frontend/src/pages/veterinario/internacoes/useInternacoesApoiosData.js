@@ -22,12 +22,16 @@ export function useInternacoesApoiosData() {
 
     vetApi
       .listarMedicamentos()
-      .then((res) => setMedicamentosCatalogo(Array.isArray(res.data) ? res.data : (res.data?.items ?? [])))
+      .then((res) =>
+        setMedicamentosCatalogo(Array.isArray(res.data) ? res.data : (res.data?.items ?? [])),
+      )
       .catch(() => setMedicamentosCatalogo([]));
 
     vetApi
       .listarCatalogoProcedimentos()
-      .then((res) => setProcedimentosCatalogo(Array.isArray(res.data) ? res.data : (res.data?.items ?? [])))
+      .then((res) =>
+        setProcedimentosCatalogo(Array.isArray(res.data) ? res.data : (res.data?.items ?? [])),
+      )
       .catch(() => setProcedimentosCatalogo([]));
   }, []);
 

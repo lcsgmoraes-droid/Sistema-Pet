@@ -28,11 +28,15 @@ export default function NovoExameFields({
         />
       </div>
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-600">{"Data da solicita\u00e7\u00e3o"}</label>
+        <label className="mb-1 block text-xs font-medium text-gray-600">
+          {"Data da solicita\u00e7\u00e3o"}
+        </label>
         <input
           type="date"
           value={novoExameForm.data_solicitacao}
-          onChange={(e) => setNovoExameForm((prev) => ({ ...prev, data_solicitacao: e.target.value }))}
+          onChange={(e) =>
+            setNovoExameForm((prev) => ({ ...prev, data_solicitacao: e.target.value }))
+          }
           className={css.input}
         />
       </div>
@@ -56,7 +60,9 @@ export default function NovoExameFields({
         />
       </div>
       <div className="md:col-span-2">
-        <label className="mb-1 block text-xs font-medium text-gray-600">{"Observa\u00e7\u00f5es"}</label>
+        <label className="mb-1 block text-xs font-medium text-gray-600">
+          {"Observa\u00e7\u00f5es"}
+        </label>
         <textarea
           value={novoExameForm.observacoes}
           onChange={(e) => setNovoExameForm((prev) => ({ ...prev, observacoes: e.target.value }))}
@@ -73,7 +79,9 @@ export default function NovoExameFields({
           className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-blue-100 file:px-3 file:py-1.5 file:text-blue-700"
         />
         <p className="mt-1 text-xs text-gray-500">
-          {"Pode registrar sem arquivo agora e anexar depois, mas com anexo a IA ja ganha contexto melhor."}
+          {
+            "Pode registrar sem arquivo agora e anexar depois, mas com anexo a IA ja ganha contexto melhor."
+          }
         </p>
       </div>
     </div>

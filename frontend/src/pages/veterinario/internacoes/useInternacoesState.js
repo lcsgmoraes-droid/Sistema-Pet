@@ -36,7 +36,9 @@ export function useInternacoesState() {
   const [formFeito, setFormFeito] = useState(() => ({ ...FORM_FEITO_INICIAL }));
   const [modalInsumoRapido, setModalInsumoRapido] = useState(false);
   const [insumoRapidoSelecionado, setInsumoRapidoSelecionado] = useState(null);
-  const [formInsumoRapido, setFormInsumoRapido] = useState(() => ({ ...FORM_INSUMO_RAPIDO_INICIAL }));
+  const [formInsumoRapido, setFormInsumoRapido] = useState(() => ({
+    ...FORM_INSUMO_RAPIDO_INICIAL,
+  }));
   const [salvando, setSalvando] = useState(false);
 
   return {

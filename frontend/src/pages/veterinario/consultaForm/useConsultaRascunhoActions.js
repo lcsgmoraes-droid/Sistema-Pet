@@ -76,7 +76,7 @@ export default function useConsultaRascunhoActions({
 
       await vetApi.sincronizarRascunhoConsulta(
         consultaIdParaSalvar,
-        buildRascunhoItensConsultaPayload(form)
+        buildRascunhoItensConsultaPayload(form),
       );
 
       if (exibirFeedback) {

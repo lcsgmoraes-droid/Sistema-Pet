@@ -1,4 +1,4 @@
-﻿// âš ï¸ ARQUIVO CRÃTICO DE PRODUÃ‡ÃƒO
+// ARQUIVO CRITICO DE PRODUCAO
 // Este arquivo impacta diretamente operaÃ§Ãµes reais (PDV / Financeiro / Estoque).
 // NÃƒO alterar sem:
 // 1. Entender o fluxo completo
@@ -8,7 +8,7 @@
 /**
  * PÃ¡gina de Listagem de Produtos - Estilo Bling
  */
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import ProdutosMainContent from "../components/produtos/ProdutosMainContent";
@@ -112,8 +112,7 @@ export default function Produtos() {
     () => produtosBrutos.filter((produto) => selecionados.includes(produto.id)).slice(0, 2),
     [produtosBrutos, selecionados],
   );
-  const { categorias, departamentos, fornecedores, marcas } =
-    useProdutosCatalogos();
+  const { categorias, departamentos, fornecedores, marcas } = useProdutosCatalogos();
   const {
     dadosEdicaoLote,
     editandoMargem,
@@ -271,8 +270,7 @@ export default function Produtos() {
       onIrParaPrimeiraPagina: () => setPaginaAtual(1),
       onIrParaUltimaPagina: () => setPaginaAtual(totalPaginas),
       onPaginaAnterior: () => setPaginaAtual((prev) => Math.max(prev - 1, 1)),
-      onProximaPagina: () =>
-        setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas)),
+      onProximaPagina: () => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas)),
       paginaAtual,
       paisExpandidos,
       produtos,
@@ -298,4 +296,3 @@ export default function Produtos() {
     </div>
   );
 }
-

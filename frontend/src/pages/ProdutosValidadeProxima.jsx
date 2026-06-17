@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import {
-  formatarData,
-  formatarMoeda,
-  getRelatorioValidadeProxima,
-} from "../api/produtos";
+import { formatarData, formatarMoeda, getRelatorioValidadeProxima } from "../api/produtos";
 import {
   criarExclusaoCampanhaValidade,
   removerExclusaoCampanhaValidade,
@@ -60,9 +56,7 @@ function ResumoCard({
   };
 
   return (
-    <div
-      className={`rounded-2xl border p-5 shadow-sm ${estilos[destaque] || estilos.blue}`}
-    >
+    <div className={`rounded-2xl border p-5 shadow-sm ${estilos[destaque] || estilos.blue}`}>
       <p className="text-sm font-medium opacity-80">{titulo}</p>
       <p className={`mt-2 text-2xl font-bold ${valorClassName}`}>{valor}</p>
       <p className={`mt-2 text-xs opacity-75 ${descricaoClassName}`}>{descricao}</p>
@@ -127,12 +121,7 @@ function getDiasRestantesVisual(diasParaVencer) {
   return {
     destaque: `${dias} dia${dias === 1 ? "" : "s"}`,
     apoio: "para vencer",
-    className:
-      dias <= 7
-        ? "text-orange-700"
-        : dias <= 30
-          ? "text-amber-700"
-          : "text-blue-700",
+    className: dias <= 7 ? "text-orange-700" : dias <= 30 ? "text-amber-700" : "text-blue-700",
     surfaceClassName:
       dias <= 7
         ? "border-orange-200 bg-orange-50"
@@ -208,10 +197,7 @@ function baixarCsv(nomeArquivo, linhas) {
   URL.revokeObjectURL(url);
 }
 
-export default function ProdutosValidadeProxima({
-  embedded = false,
-  reloadSignal = 0,
-}) {
+export default function ProdutosValidadeProxima({ embedded = false, reloadSignal = 0 }) {
   const navigate = useNavigate();
   const { categorias, fornecedores, marcas, departamentos } = useProdutosCatalogos();
 
@@ -249,15 +235,12 @@ export default function ProdutosValidadeProxima({
   const carregarRelatorio = async (filtros, pagina) => {
     try {
       setLoading(true);
-      const response = await getRelatorioValidadeProxima(
-        montarParametros(filtros, pagina),
-      );
+      const response = await getRelatorioValidadeProxima(montarParametros(filtros, pagina));
       setDados(response.data);
     } catch (error) {
       console.error("Erro ao carregar validade proxima:", error);
       toast.error(
-        error?.response?.data?.detail ||
-          "Nao foi possivel carregar os lotes com validade proxima.",
+        error?.response?.data?.detail || "Nao foi possivel carregar os lotes com validade proxima.",
       );
       setDados({
         items: [],
@@ -419,10 +402,7 @@ export default function ProdutosValidadeProxima({
       );
 
       const dataArquivo = new Date().toISOString().slice(0, 10);
-      baixarCsv(
-        `validade_proxima_${dataArquivo}.csv`,
-        [cabecalho, ...linhas],
-      );
+      baixarCsv(`validade_proxima_${dataArquivo}.csv`, [cabecalho, ...linhas]);
       toast.success(`CSV gerado com ${itens.length} lote(s).`, {
         id: "csv-validade",
       });
@@ -436,10 +416,8 @@ export default function ProdutosValidadeProxima({
     }
   };
 
-  const inicioItem =
-    dados.total === 0 ? 0 : (dados.page - 1) * dados.page_size + 1;
-  const fimItem =
-    dados.total === 0 ? 0 : Math.min(dados.page * dados.page_size, dados.total);
+  const inicioItem = dados.total === 0 ? 0 : (dados.page - 1) * dados.page_size + 1;
+  const fimItem = dados.total === 0 ? 0 : Math.min(dados.page * dados.page_size, dados.total);
   const totalPaginas = dados.pages || 0;
   const loteMaisUrgente = useMemo(() => {
     if (!Array.isArray(dados.items) || dados.items.length === 0) {
@@ -473,10 +451,7 @@ export default function ProdutosValidadeProxima({
       await atualizarPainelAtual();
     } catch (error) {
       console.error("Erro ao excluir lote da campanha:", error);
-      toast.error(
-        error?.response?.data?.detail ||
-          "Nao foi possivel remover o lote da campanha.",
-      );
+      toast.error(error?.response?.data?.detail || "Nao foi possivel remover o lote da campanha.");
     } finally {
       setAcaoCampanhaLoteId(null);
     }
@@ -494,8 +469,7 @@ export default function ProdutosValidadeProxima({
     } catch (error) {
       console.error("Erro ao reincluir lote na campanha:", error);
       toast.error(
-        error?.response?.data?.detail ||
-          "Nao foi possivel reincluir o lote na campanha.",
+        error?.response?.data?.detail || "Nao foi possivel reincluir o lote na campanha.",
       );
     } finally {
       setAcaoCampanhaLoteId(null);
@@ -511,9 +485,9 @@ export default function ProdutosValidadeProxima({
               Produtos com validade proxima
             </h1>
             <p className="mt-2 max-w-4xl text-sm text-gray-600">
-              A tela considera o lote mais urgente primeiro, pagina em blocos
-              leves e deixa pronto o trabalho comercial: enxergar o risco,
-              priorizar o que vence antes e abrir campanhas sem perder tempo.
+              A tela considera o lote mais urgente primeiro, pagina em blocos leves e deixa pronto o
+              trabalho comercial: enxergar o risco, priorizar o que vence antes e abrir campanhas
+              sem perder tempo.
             </p>
           </div>
 
@@ -534,10 +508,7 @@ export default function ProdutosValidadeProxima({
             >
               Exportar CSV
             </ActionButton>
-            <ActionButton
-              onClick={() => navigate("/produtos")}
-              tone="soft"
-            >
+            <ActionButton onClick={() => navigate("/produtos")} tone="soft">
               Voltar para produtos
             </ActionButton>
           </div>
@@ -547,13 +518,11 @@ export default function ProdutosValidadeProxima({
       <div className="rounded-lg border border-emerald-100 bg-gradient-to-r from-emerald-50 via-white to-amber-50 p-4 shadow-sm md:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Regra automatica por validade
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-900">Regra automatica por validade</h2>
             <p className="mt-1 text-sm text-gray-600">
-              60 dias para planejar giro, 30 dias para acelerar oferta e 7 dias
-              para acao forte. Quando a campanha estiver ativa, o lote entra
-              sozinho com limite de quantidade do proprio lote.
+              60 dias para planejar giro, 30 dias para acelerar oferta e 7 dias para acao forte.
+              Quando a campanha estiver ativa, o lote entra sozinho com limite de quantidade do
+              proprio lote.
             </p>
           </div>
 
@@ -601,9 +570,7 @@ export default function ProdutosValidadeProxima({
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           <div className="xl:col-span-2">
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Busca
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Busca</label>
             <input
               type="text"
               value={filtrosForm.busca}
@@ -614,9 +581,7 @@ export default function ProdutosValidadeProxima({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Janela
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Janela</label>
             <select
               value={filtrosForm.dias}
               onChange={(event) => atualizarFiltro("dias", Number(event.target.value))}
@@ -631,14 +596,10 @@ export default function ProdutosValidadeProxima({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Status
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
             <select
               value={filtrosForm.status_validade}
-              onChange={(event) =>
-                atualizarFiltro("status_validade", event.target.value)
-              }
+              onChange={(event) => atualizarFiltro("status_validade", event.target.value)}
               className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             >
               <option value="proximos">Somente proximos</option>
@@ -648,9 +609,7 @@ export default function ProdutosValidadeProxima({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Ordenacao
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Ordenacao</label>
             <select
               value={filtrosForm.ordenacao}
               onChange={(event) => atualizarFiltro("ordenacao", event.target.value)}
@@ -684,14 +643,10 @@ export default function ProdutosValidadeProxima({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Setor
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Setor</label>
             <select
               value={filtrosForm.departamento_id}
-              onChange={(event) =>
-                atualizarFiltro("departamento_id", event.target.value)
-              }
+              onChange={(event) => atualizarFiltro("departamento_id", event.target.value)}
               className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             >
               <option value="">Todos os setores</option>
@@ -731,9 +686,7 @@ export default function ProdutosValidadeProxima({
               <input
                 type="checkbox"
                 checked={filtrosForm.apenas_com_estoque}
-                onChange={(event) =>
-                  atualizarFiltro("apenas_com_estoque", event.target.checked)
-                }
+                onChange={(event) => atualizarFiltro("apenas_com_estoque", event.target.checked)}
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
               Somente lotes com saldo
@@ -743,9 +696,7 @@ export default function ProdutosValidadeProxima({
               <span>Itens por pagina</span>
               <select
                 value={filtrosForm.page_size}
-                onChange={(event) =>
-                  atualizarFiltro("page_size", Number(event.target.value))
-                }
+                onChange={(event) => atualizarFiltro("page_size", Number(event.target.value))}
                 className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
               >
                 {[20, 50, 100].map((size) => (
@@ -758,16 +709,10 @@ export default function ProdutosValidadeProxima({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <ActionButton
-              onClick={limparFiltros}
-              tone="soft"
-            >
+            <ActionButton onClick={limparFiltros} tone="soft">
               Limpar filtros
             </ActionButton>
-            <ActionButton
-              type="submit"
-              intent="edit"
-            >
+            <ActionButton type="submit" intent="edit">
               Atualizar painel
             </ActionButton>
           </div>
@@ -828,9 +773,7 @@ export default function ProdutosValidadeProxima({
       <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-gray-200 px-4 py-4 lg:flex-row lg:items-center lg:justify-between md:px-5">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Lotes ordenados por vencimento
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-900">Lotes ordenados por vencimento</h2>
             <p className="text-sm text-gray-600">
               {loading
                 ? "Atualizando dados..."
@@ -875,7 +818,7 @@ export default function ProdutosValidadeProxima({
                         {item.nome}
                       </h3>
                       <p className="mt-1 text-xs text-gray-500">
-                        {(item.codigo || item.sku || "Sem codigo")}
+                        {item.codigo || item.sku || "Sem codigo"}
                         {item.marca_nome ? ` • ${item.marca_nome}` : ""}
                       </p>
                     </div>
@@ -887,7 +830,9 @@ export default function ProdutosValidadeProxima({
                   </div>
 
                   <div className="mt-3 flex gap-2">
-                    <div className={`min-w-0 flex-1 rounded-lg border p-3 ${diasRestantes.surfaceClassName}`}>
+                    <div
+                      className={`min-w-0 flex-1 rounded-lg border p-3 ${diasRestantes.surfaceClassName}`}
+                    >
                       <p className={`text-xl font-bold leading-tight ${diasRestantes.className}`}>
                         {diasRestantes.destaque}
                       </p>
@@ -914,9 +859,7 @@ export default function ProdutosValidadeProxima({
                   <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-xs font-semibold text-gray-900">
-                          Lote {item.nome_lote}
-                        </p>
+                        <p className="text-xs font-semibold text-gray-900">Lote {item.nome_lote}</p>
                         <p className="text-xs text-gray-500">
                           {item.categoria_nome || "Sem categoria"}
                         </p>
@@ -1016,10 +959,7 @@ export default function ProdutosValidadeProxima({
             <tbody className="divide-y divide-gray-100 bg-white">
               {!loading && dados.items.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="px-5 py-10 text-center text-sm text-gray-500"
-                  >
+                  <td colSpan={7} className="px-5 py-10 text-center text-sm text-gray-500">
                     Nenhum lote encontrado para os filtros aplicados.
                   </td>
                 </tr>
@@ -1035,11 +975,9 @@ export default function ProdutosValidadeProxima({
                   <tr key={item.lote_id} className="hover:bg-gray-50">
                     <td className="px-5 py-4 align-top">
                       <div className="space-y-1">
-                        <div className="text-sm font-semibold text-gray-900">
-                          {item.nome}
-                        </div>
+                        <div className="text-sm font-semibold text-gray-900">{item.nome}</div>
                         <div className="text-xs text-gray-500">
-                          {(item.codigo || item.sku || "Sem codigo")}
+                          {item.codigo || item.sku || "Sem codigo"}
                           {item.marca_nome ? ` • ${item.marca_nome}` : ""}
                           {item.categoria_nome ? ` • ${item.categoria_nome}` : ""}
                         </div>
@@ -1060,9 +998,7 @@ export default function ProdutosValidadeProxima({
 
                     <td className="px-5 py-4 align-top">
                       <div className="space-y-2">
-                        <div className="text-sm font-medium text-gray-900">
-                          {item.nome_lote}
-                        </div>
+                        <div className="text-sm font-medium text-gray-900">{item.nome_lote}</div>
                         <div className="text-xs text-gray-500">
                           Setor: {item.departamento_nome || "Nao informado"}
                         </div>
@@ -1133,7 +1069,8 @@ export default function ProdutosValidadeProxima({
                               Removido manualmente
                             </span>
                             <p className="max-w-xs text-xs text-gray-500">
-                              Esse lote foi tirado da campanha automatica, mas pode ser reincluido a qualquer momento.
+                              Esse lote foi tirado da campanha automatica, mas pode ser reincluido a
+                              qualquer momento.
                             </p>
                           </>
                         ) : item.campanha_validade_ativa ? (
@@ -1152,7 +1089,9 @@ export default function ProdutosValidadeProxima({
                                 )}
                               {item.preco_promocional_validade_ecommerce !== null &&
                                 item.preco_promocional_validade_ecommerce !== undefined && (
-                                  <p>Site: {formatarMoeda(item.preco_promocional_validade_ecommerce)}</p>
+                                  <p>
+                                    Site: {formatarMoeda(item.preco_promocional_validade_ecommerce)}
+                                  </p>
                                 )}
                             </div>
                           </>

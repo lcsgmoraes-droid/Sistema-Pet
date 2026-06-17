@@ -46,7 +46,7 @@ export async function historicoInternacoesPetApi(api, base, petId) {
           procedimentos: [],
         };
       }
-    })
+    }),
   );
 
   return {

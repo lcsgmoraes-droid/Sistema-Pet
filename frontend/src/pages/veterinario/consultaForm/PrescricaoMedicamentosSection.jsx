@@ -23,7 +23,10 @@ export default function PrescricaoMedicamentosSection({
   abrirCalculadoraPrescricaoItem,
 }) {
   return (
-    <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-3 disabled:opacity-100">
+    <fieldset
+      disabled={modoSomenteLeitura}
+      className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-3 disabled:opacity-100"
+    >
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-gray-700">{"Prescri\u00e7\u00e3o (opcional)"}</h2>
         <button
@@ -53,7 +56,9 @@ export default function PrescricaoMedicamentosSection({
               options={medicamentosCatalogo}
               getOptionLabel={(medicamento) => medicamento.nome}
               getOptionMeta={(medicamento) =>
-                [medicamento.principio_ativo, medicamento.via_administracao].filter(Boolean).join(" - ")
+                [medicamento.principio_ativo, medicamento.via_administracao]
+                  .filter(Boolean)
+                  .join(" - ")
               }
               placeholder="Digite para buscar medicamento..."
               emptyLabel="Nenhum medicamento encontrado"
@@ -75,9 +80,27 @@ export default function PrescricaoMedicamentosSection({
             </p>
           )}
           <div className="grid grid-cols-2 gap-2">
-            <input type="text" placeholder="Nome do medicamento" value={item.nome} onChange={(e) => setItem(idx, "nome", e.target.value)} className={css.input} />
-            <input type="text" placeholder={"Princ\u00edpio ativo"} value={item.principio_ativo} onChange={(e) => setItem(idx, "principio_ativo", e.target.value)} className={css.input} />
-            <input type="text" placeholder="Dose (ex: 10 mg/kg)" value={item.dose_mg} onChange={(e) => setItem(idx, "dose_mg", e.target.value)} className={css.input} />
+            <input
+              type="text"
+              placeholder="Nome do medicamento"
+              value={item.nome}
+              onChange={(e) => setItem(idx, "nome", e.target.value)}
+              className={css.input}
+            />
+            <input
+              type="text"
+              placeholder={"Princ\u00edpio ativo"}
+              value={item.principio_ativo}
+              onChange={(e) => setItem(idx, "principio_ativo", e.target.value)}
+              className={css.input}
+            />
+            <input
+              type="text"
+              placeholder="Dose (ex: 10 mg/kg)"
+              value={item.dose_mg}
+              onChange={(e) => setItem(idx, "dose_mg", e.target.value)}
+              className={css.input}
+            />
             <AutocompleteSelect
               value={item.via}
               onChange={(via) => setItem(idx, "via", via)}
@@ -87,10 +110,28 @@ export default function PrescricaoMedicamentosSection({
               showLabel={false}
               allowClear={false}
             />
-            <input type="text" placeholder={"Frequ\u00eancia (ex: a cada 12h)"} value={item.frequencia} onChange={(e) => setItem(idx, "frequencia", e.target.value)} className={css.input} />
-            <input type="number" placeholder={"Dura\u00e7\u00e3o (dias)"} value={item.duracao_dias} onChange={(e) => setItem(idx, "duracao_dias", e.target.value)} className={css.input} />
+            <input
+              type="text"
+              placeholder={"Frequ\u00eancia (ex: a cada 12h)"}
+              value={item.frequencia}
+              onChange={(e) => setItem(idx, "frequencia", e.target.value)}
+              className={css.input}
+            />
+            <input
+              type="number"
+              placeholder={"Dura\u00e7\u00e3o (dias)"}
+              value={item.duracao_dias}
+              onChange={(e) => setItem(idx, "duracao_dias", e.target.value)}
+              className={css.input}
+            />
           </div>
-          <input type="text" placeholder={"Instru\u00e7\u00f5es ao tutor"} value={item.instrucoes} onChange={(e) => setItem(idx, "instrucoes", e.target.value)} className={css.input} />
+          <input
+            type="text"
+            placeholder={"Instru\u00e7\u00f5es ao tutor"}
+            value={item.instrucoes}
+            onChange={(e) => setItem(idx, "instrucoes", e.target.value)}
+            className={css.input}
+          />
         </div>
       ))}
     </fieldset>

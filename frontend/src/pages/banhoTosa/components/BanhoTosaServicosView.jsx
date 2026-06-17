@@ -120,10 +120,30 @@ export default function BanhoTosaServicosView({ servicos, onChanged }) {
         title="Servicos de Banho & Tosa"
       >
         <MetricGrid>
-          <MetricCard intent="blue" label="Total" subtitle="Servicos cadastrados" value={servicos.length} />
-          <MetricCard intent="emerald" label="Ativos" subtitle="Disponiveis para operacao" value={ativos} />
-          <MetricCard intent="violet" label="Pacotes" subtitle="Permitem venda recorrente" value={pacotes} />
-          <MetricCard intent="slate" label="Duracao media" subtitle="Base da agenda" value={`${duracaoMedia} min`} />
+          <MetricCard
+            intent="blue"
+            label="Total"
+            subtitle="Servicos cadastrados"
+            value={servicos.length}
+          />
+          <MetricCard
+            intent="emerald"
+            label="Ativos"
+            subtitle="Disponiveis para operacao"
+            value={ativos}
+          />
+          <MetricCard
+            intent="violet"
+            label="Pacotes"
+            subtitle="Permitem venda recorrente"
+            value={pacotes}
+          />
+          <MetricCard
+            intent="slate"
+            label="Duracao media"
+            subtitle="Base da agenda"
+            value={`${duracaoMedia} min`}
+          />
         </MetricGrid>
       </Panel>
 

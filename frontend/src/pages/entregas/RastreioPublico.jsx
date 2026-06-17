@@ -26,9 +26,7 @@ function computeBearing(from, to) {
   const lat2 = toRad(to.lat);
   const diffLong = toRad(to.lon - from.lon);
   const y = Math.sin(diffLong) * Math.cos(lat2);
-  const x =
-    Math.cos(lat1) * Math.sin(lat2) -
-    Math.sin(lat1) * Math.cos(lat2) * Math.cos(diffLong);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(diffLong);
   return (toDeg(Math.atan2(y, x)) + 360) % 360;
 }
 
@@ -177,7 +175,11 @@ export default function RastreioPublico() {
     };
 
     animationFrameRef.current = requestAnimationFrame(animate);
-  }, [dados?.ultima_posicao_gps?.lat, dados?.ultima_posicao_gps?.lon, dados?.ultima_posicao_gps?.atualizada_em]);
+  }, [
+    dados?.ultima_posicao_gps?.lat,
+    dados?.ultima_posicao_gps?.lon,
+    dados?.ultima_posicao_gps?.atualizada_em,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -235,9 +237,7 @@ export default function RastreioPublico() {
   if (!dados) return null;
 
   const progresso =
-    dados.total_paradas > 0
-      ? Math.round((dados.entregues / dados.total_paradas) * 100)
-      : 0;
+    dados.total_paradas > 0 ? Math.round((dados.entregues / dados.total_paradas) * 100) : 0;
 
   const linkMaps = dados.ultima_posicao_gps
     ? `https://www.google.com/maps?q=${dados.ultima_posicao_gps.lat},${dados.ultima_posicao_gps.lon}`
@@ -278,7 +278,9 @@ export default function RastreioPublico() {
 
         <div style={styles.progressoBox}>
           <div style={styles.progressoTexto}>
-            <span>{dados.entregues} de {dados.total_paradas} entregas</span>
+            <span>
+              {dados.entregues} de {dados.total_paradas} entregas
+            </span>
             <span style={{ fontWeight: "bold" }}>{progresso}%</span>
           </div>
           <div style={styles.progressoBar}>
@@ -297,12 +299,7 @@ export default function RastreioPublico() {
               {gpsEhTempoReal ? "GPS ao vivo do entregador" : "Ultimo ponto confirmado"}
             </p>
             {gpsAtualizadoEm && <p style={styles.gpsSubtexto}>Atualizado em {gpsAtualizadoEm}</p>}
-            <a
-              href={linkMaps}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={styles.btnMaps}
-            >
+            <a href={linkMaps} target="_blank" rel="noopener noreferrer" style={styles.btnMaps}>
               Abrir no Google Maps
             </a>
             <div style={styles.mapaEmbedWrap}>
@@ -585,18 +582,9 @@ const styles = {
     borderRadius: 8,
     marginBottom: 8,
     backgroundColor:
-      status === "entregue"
-        ? "#f0fff4"
-        : status === "tentativa"
-          ? "#fff5f5"
-          : "#fafafa",
+      status === "entregue" ? "#f0fff4" : status === "tentativa" ? "#fff5f5" : "#fafafa",
     border: "1px solid",
-    borderColor:
-      status === "entregue"
-        ? "#c3e6cb"
-        : status === "tentativa"
-          ? "#f5c6cb"
-          : "#e9ecef",
+    borderColor: status === "entregue" ? "#c3e6cb" : status === "tentativa" ? "#f5c6cb" : "#e9ecef",
   }),
   paradaOrdem: {
     width: 28,
@@ -635,12 +623,7 @@ const styles = {
   paradaStatus: (status) => ({
     fontSize: 12,
     fontWeight: "600",
-    color:
-      status === "entregue"
-        ? "#28a745"
-        : status === "tentativa"
-          ? "#dc3545"
-          : "#666",
+    color: status === "entregue" ? "#28a745" : status === "tentativa" ? "#dc3545" : "#666",
   }),
   paradaHora: {
     fontSize: 12,

@@ -29,7 +29,7 @@ export function useInternacoesDerivados({
   const petsDaPessoa = useMemo(() => {
     if (!formNova.pessoa_id) return [];
     return pets.filter(
-      (pet) => String(pet.cliente_id) === String(formNova.pessoa_id) && pet.ativo !== false
+      (pet) => String(pet.cliente_id) === String(formNova.pessoa_id) && pet.ativo !== false,
     );
   }, [pets, formNova.pessoa_id]);
 
@@ -41,19 +41,19 @@ export function useInternacoesDerivados({
 
   const retornoNovoPet = useMemo(
     () => buildReturnTo(location.pathname, location.search, { abrir_nova: "1" }),
-    [location.pathname, location.search]
+    [location.pathname, location.search],
   );
 
   const petsHistoricoDaPessoa = useMemo(() => {
     if (!filtroPessoaHistorico) return [];
     return pets.filter(
-      (pet) => String(pet.cliente_id) === String(filtroPessoaHistorico) && pet.ativo !== false
+      (pet) => String(pet.cliente_id) === String(filtroPessoaHistorico) && pet.ativo !== false,
     );
   }, [pets, filtroPessoaHistorico]);
 
   const internacoesOrdenadas = useMemo(
     () => [...internacoes].sort((a, b) => new Date(b.data_entrada) - new Date(a.data_entrada)),
-    [internacoes]
+    [internacoes],
   );
 
   const ocupacaoPorBaia = useMemo(() => {
@@ -94,20 +94,26 @@ export function useInternacoesDerivados({
   const indicadoresInternacao = useMemo(() => {
     const total = internacoes.length;
     const semBaia = internacoes.filter((internacao) => !internacao.box).length;
-    const comEvolucao = internacoes.filter((internacao) => (evolucoes[internacao.id] ?? []).length > 0).length;
-    const procedimentosPendentes = agendaProcedimentos.filter((procedimento) => !procedimento.feito).length;
-    const procedimentosAtrasados = agendaProcedimentos.filter(
-      (procedimento) => !procedimento.feito && new Date(procedimento.horario).getTime() <= Date.now()
+    const comEvolucao = internacoes.filter(
+      (internacao) => (evolucoes[internacao.id] ?? []).length > 0,
     ).length;
-    const mediaDias = total === 0
-      ? 0
-      : internacoes.reduce((acc, internacao) => {
-          const dias = Math.max(
-            0,
-            Math.floor((Date.now() - new Date(internacao.data_entrada).getTime()) / 86400000)
-          );
-          return acc + dias;
-        }, 0) / total;
+    const procedimentosPendentes = agendaProcedimentos.filter(
+      (procedimento) => !procedimento.feito,
+    ).length;
+    const procedimentosAtrasados = agendaProcedimentos.filter(
+      (procedimento) =>
+        !procedimento.feito && new Date(procedimento.horario).getTime() <= Date.now(),
+    ).length;
+    const mediaDias =
+      total === 0
+        ? 0
+        : internacoes.reduce((acc, internacao) => {
+            const dias = Math.max(
+              0,
+              Math.floor((Date.now() - new Date(internacao.data_entrada).getTime()) / 86400000),
+            );
+            return acc + dias;
+          }, 0) / total;
 
     return {
       total,
@@ -123,8 +129,11 @@ export function useInternacoesDerivados({
   }, [internacoes, evolucoes, agendaProcedimentos, ocupacaoPorBaia, totalBaias]);
 
   const agendaOrdenada = useMemo(
-    () => [...agendaProcedimentos].sort((a, b) => new Date(a.horario).getTime() - new Date(b.horario).getTime()),
-    [agendaProcedimentos]
+    () =>
+      [...agendaProcedimentos].sort(
+        (a, b) => new Date(a.horario).getTime() - new Date(b.horario).getTime(),
+      ),
+    [agendaProcedimentos],
   );
 
   const internacaoPorId = useMemo(() => {

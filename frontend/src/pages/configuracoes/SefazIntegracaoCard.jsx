@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import PropTypes from "prop-types";
-import { FiCheckCircle, FiChevronDown, FiChevronUp, FiFileText, FiRefreshCw, FiXCircle } from "react-icons/fi";
+import {
+  FiCheckCircle,
+  FiChevronDown,
+  FiChevronUp,
+  FiFileText,
+  FiRefreshCw,
+  FiXCircle,
+} from "react-icons/fi";
 import { api } from "../../services/api";
 
 function StatusChip({ conectado }) {
@@ -99,7 +106,9 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
         });
       }
     } catch (err) {
-      setMensagem(err?.response?.data?.detail || "Nao foi possivel carregar configuracao da SEFAZ.");
+      setMensagem(
+        err?.response?.data?.detail || "Nao foi possivel carregar configuracao da SEFAZ.",
+      );
     } finally {
       setLoading(false);
     }
@@ -143,7 +152,11 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
       await carregar();
     } catch (err) {
       const detalhe = err?.response?.data?.detail;
-      setMensagem(detalhe ? `Falha na validacao do certificado: ${detalhe}` : "Erro ao salvar configuracao da SEFAZ.");
+      setMensagem(
+        detalhe
+          ? `Falha na validacao do certificado: ${detalhe}`
+          : "Erro ao salvar configuracao da SEFAZ.",
+      );
     } finally {
       setSalvando(false);
     }
@@ -164,28 +177,30 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
 
   const header = (
     <div className="bg-gray-50 border-b px-5 py-4 flex items-center justify-between">
-        <div>
-          <h2 className="font-semibold text-gray-800 flex items-center gap-2">
-            <FiFileText className="text-indigo-600" />
-            SEFAZ - NF-e
-          </h2>
-          <p className="text-sm text-gray-500">Certificado digital A1 e parametros da consulta fiscal.</p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <StatusChip conectado={status.cert_ok && status.enabled} />
-          {!modoModal && (
-            <button
-              type="button"
-              className="text-gray-500 hover:text-gray-700"
-              onClick={() => setExpandido((v) => !v)}
-              aria-label="Expandir configuracao SEFAZ"
-            >
-              {expandido ? <FiChevronUp size={18} /> : <FiChevronDown size={18} />}
-            </button>
-          )}
-        </div>
+      <div>
+        <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+          <FiFileText className="text-indigo-600" />
+          SEFAZ - NF-e
+        </h2>
+        <p className="text-sm text-gray-500">
+          Certificado digital A1 e parametros da consulta fiscal.
+        </p>
       </div>
+
+      <div className="flex items-center gap-2">
+        <StatusChip conectado={status.cert_ok && status.enabled} />
+        {!modoModal && (
+          <button
+            type="button"
+            className="text-gray-500 hover:text-gray-700"
+            onClick={() => setExpandido((v) => !v)}
+            aria-label="Expandir configuracao SEFAZ"
+          >
+            {expandido ? <FiChevronUp size={18} /> : <FiChevronDown size={18} />}
+          </button>
+        )}
+      </div>
+    </div>
   );
 
   const body = (
@@ -203,7 +218,8 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
 
       {integradoPronto ? (
         <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-          Integração ativa e validada. Para rotina de importação diária, use as telas NF Entrada (SEFAZ) e NF Saída (SEFAZ).
+          Integração ativa e validada. Para rotina de importação diária, use as telas NF Entrada
+          (SEFAZ) e NF Saída (SEFAZ).
         </div>
       ) : (
         <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 space-y-2">
@@ -218,7 +234,8 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
             </button>
           </div>
           <p className="text-xs text-sky-800">
-            Passos: 1) UF=SP, Modo=Real, Ambiente=Produção. 2) Informar CNPJ. 3) Informar senha e anexar certificado .pfx. 4) Salvar configuração.
+            Passos: 1) UF=SP, Modo=Real, Ambiente=Produção. 2) Informar CNPJ. 3) Informar senha e
+            anexar certificado .pfx. 4) Salvar configuração.
           </p>
         </div>
       )}
@@ -231,24 +248,30 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="sefaz-cnpj" className="block text-sm font-medium text-gray-700 mb-1">CNPJ</label>
+              <label htmlFor="sefaz-cnpj" className="block text-sm font-medium text-gray-700 mb-1">
+                CNPJ
+              </label>
               <input
                 id="sefaz-cnpj"
                 type="text"
-                    autoComplete="off"
+                autoComplete="off"
                 value={form.cnpj}
-                onChange={(e) => atualizarCampo("cnpj", e.target.value.replaceAll(/\D/g, "").slice(0, 14))}
+                onChange={(e) =>
+                  atualizarCampo("cnpj", e.target.value.replaceAll(/\D/g, "").slice(0, 14))
+                }
                 className="w-full border rounded-lg px-3 py-2 text-sm"
                 placeholder="Somente numeros"
               />
             </div>
 
             <div>
-              <label htmlFor="sefaz-uf" className="block text-sm font-medium text-gray-700 mb-1">UF</label>
+              <label htmlFor="sefaz-uf" className="block text-sm font-medium text-gray-700 mb-1">
+                UF
+              </label>
               <input
                 id="sefaz-uf"
                 type="text"
-                    autoComplete="address-level1"
+                autoComplete="address-level1"
                 value={form.uf}
                 onChange={(e) => atualizarCampo("uf", e.target.value.toUpperCase().slice(0, 2))}
                 className="w-full border rounded-lg px-3 py-2 text-sm"
@@ -257,7 +280,9 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
             </div>
 
             <div>
-              <label htmlFor="sefaz-modo" className="block text-sm font-medium text-gray-700 mb-1">Modo</label>
+              <label htmlFor="sefaz-modo" className="block text-sm font-medium text-gray-700 mb-1">
+                Modo
+              </label>
               <select
                 id="sefaz-modo"
                 value={form.modo}
@@ -270,7 +295,12 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
             </div>
 
             <div>
-              <label htmlFor="sefaz-ambiente" className="block text-sm font-medium text-gray-700 mb-1">Ambiente</label>
+              <label
+                htmlFor="sefaz-ambiente"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Ambiente
+              </label>
               <select
                 id="sefaz-ambiente"
                 value={form.ambiente}
@@ -283,7 +313,12 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
             </div>
 
             <div>
-              <label htmlFor="sefaz-password" className="block text-sm font-medium text-gray-700 mb-1">Senha do certificado</label>
+              <label
+                htmlFor="sefaz-password"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Senha do certificado
+              </label>
               <input
                 id="sefaz-password"
                 type="password"
@@ -296,7 +331,9 @@ export default function SefazIntegracaoCard({ modoModal = false, onStatusChange 
             </div>
 
             <div>
-              <label htmlFor="sefaz-cert" className="block text-sm font-medium text-gray-700 mb-1">Certificado A1 (.pfx)</label>
+              <label htmlFor="sefaz-cert" className="block text-sm font-medium text-gray-700 mb-1">
+                Certificado A1 (.pfx)
+              </label>
               <input
                 id="sefaz-cert"
                 type="file"

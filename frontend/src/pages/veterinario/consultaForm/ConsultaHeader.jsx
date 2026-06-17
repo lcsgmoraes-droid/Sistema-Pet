@@ -13,9 +13,7 @@ export default function ConsultaHeader({
           <Stethoscope size={22} className="text-blue-600" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-gray-800">
-            {tituloConsulta}
-          </h1>
+          <h1 className="text-xl font-bold text-gray-800">{tituloConsulta}</h1>
           <p className="text-xs text-gray-400">
             {consultaIdAtual ? `Código da consulta: #${consultaIdAtual}` : "Ainda não salva"}
           </p>

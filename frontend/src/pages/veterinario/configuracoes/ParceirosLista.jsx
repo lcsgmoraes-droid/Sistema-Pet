@@ -9,7 +9,8 @@ export default function ParceirosLista({ onRemover, onToggleAtivo, parceiros }) 
         <Building2 size={36} className="mx-auto mb-3 text-gray-300" />
         <p className="font-medium">Nenhum parceiro vinculado</p>
         <p className="text-sm mt-1">
-          Clique em &quot;Vincular parceiro&quot; para conectar um veterinario com conta propria no sistema.
+          Clique em &quot;Vincular parceiro&quot; para conectar um veterinario com conta propria no
+          sistema.
         </p>
       </div>
     );
@@ -42,7 +43,10 @@ function ParceiroRow({ onRemover, onToggleAtivo, parceiro }) {
         <p className="text-xs text-gray-500">
           {TIPO_RELACAO_LABEL[parceiro.tipo_relacao] ?? parceiro.tipo_relacao}
           {parceiro.comissao_empresa_pct != null && parceiro.tipo_relacao === "parceiro" && (
-            <> - Comissao empresa: <strong>{parceiro.comissao_empresa_pct}%</strong></>
+            <>
+              {" "}
+              - Comissao empresa: <strong>{parceiro.comissao_empresa_pct}%</strong>
+            </>
           )}
         </p>
       </div>

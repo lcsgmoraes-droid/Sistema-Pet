@@ -31,10 +31,7 @@ export default function AppPaymentReturn() {
   const paymentStatus = searchParams.get("payment_status") || "pending";
   const pedidoId = searchParams.get("pedido_id") || "";
   const loja =
-    searchParams.get("loja") ||
-    searchParams.get("tenant") ||
-    searchParams.get("store") ||
-    "";
+    searchParams.get("loja") || searchParams.get("tenant") || searchParams.get("store") || "";
   const statusCopy = STATUS_COPY[paymentStatus] || STATUS_COPY.pending;
   const Icon = statusCopy.icon;
 
@@ -77,7 +74,9 @@ export default function AppPaymentReturn() {
   return (
     <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-xl">
-        <div className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full ${statusCopy.bg}`}>
+        <div
+          className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full ${statusCopy.bg}`}
+        >
           <Icon className={`h-8 w-8 ${statusCopy.color}`} />
         </div>
         <h1 className="text-2xl font-bold text-slate-900">{statusCopy.title}</h1>

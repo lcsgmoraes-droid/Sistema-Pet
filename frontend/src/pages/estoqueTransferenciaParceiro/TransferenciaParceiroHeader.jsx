@@ -10,20 +10,17 @@ export default function TransferenciaParceiroHeader({
     <>
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Transferencia com Ressarcimento
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900">Transferencia com Ressarcimento</h1>
           <p className="mt-2 max-w-4xl text-sm text-gray-600">
-            Use esta tela para baixar estoque pelo custo quando qualquer pessoa
-            ou parceiro levar produtos. O sistema nao cria venda no PDV e gera
-            um contas a receber separado para o ressarcimento, com baixa por
-            recebimento normal ou acerto.
+            Use esta tela para baixar estoque pelo custo quando qualquer pessoa ou parceiro levar
+            produtos. O sistema nao cria venda no PDV e gera um contas a receber separado para o
+            ressarcimento, com baixa por recebimento normal ou acerto.
           </p>
         </div>
 
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Nao entra em faturamento de vendas. Sai do estoque e fica pendente no
-          financeiro da pessoa responsavel pelo ressarcimento ate voce baixar.
+          Nao entra em faturamento de vendas. Sai do estoque e fica pendente no financeiro da pessoa
+          responsavel pelo ressarcimento ate voce baixar.
         </div>
       </div>
 

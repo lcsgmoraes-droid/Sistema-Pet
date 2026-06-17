@@ -70,7 +70,9 @@ function OperadorasCartao() {
             <ul className="text-sm text-amber-700 space-y-1">
               <li>- Pelo menos uma operadora deve estar marcada como padrao e ativa</li>
               <li>- O PDV usara a operadora padrao automaticamente para vendas com cartao</li>
-              <li>- Operadoras com vendas vinculadas nao podem ser excluidas (apenas desativadas)</li>
+              <li>
+                - Operadoras com vendas vinculadas nao podem ser excluidas (apenas desativadas)
+              </li>
             </ul>
           </div>
         </div>

@@ -13,7 +13,8 @@ export default function AgendaCalendarioCard({
         <div>
           <h2 className="text-sm font-semibold text-cyan-900">Agenda no celular</h2>
           <p className="mt-1 text-sm text-cyan-800">
-            Assine sua agenda veterinária no calendário do celular com um link privado ou baixe um arquivo .ics.
+            Assine sua agenda veterinária no calendário do celular com um link privado ou baixe um
+            arquivo .ics.
           </p>
           {calendarioMeta?.mensagem_escopo && (
             <p className="mt-2 text-xs text-cyan-700">{calendarioMeta.mensagem_escopo}</p>

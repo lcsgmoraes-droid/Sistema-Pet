@@ -26,7 +26,10 @@ export default function TutorVeterinarioFields({
 
   return (
     <div className="grid grid-cols-2 gap-4">
-      {renderCampo("Tutor (nome/telefone)", true)(
+      {renderCampo(
+        "Tutor (nome/telefone)",
+        true,
+      )(
         <div className="relative">
           <input
             type="text"
@@ -46,24 +49,28 @@ export default function TutorVeterinarioFields({
             </button>
           )}
 
-          {!isEdicao && deveBuscarTutores(buscaTutor) && !tutorSelecionado && tutoresSugeridos.length > 0 && (
-            <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-              {tutoresSugeridos.map((tutor) => (
-                <button
-                  key={tutor.id}
-                  type="button"
-                  onClick={() => selecionarTutor(tutor)}
-                  className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
-                >
-                  <div className="text-sm font-medium text-gray-800">{tutor.nome}</div>
-                  <div className="text-xs text-gray-500">
-                    {[tutor.telefone, tutor.celular].filter(Boolean).join(" - ") || "Sem telefone"}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+          {!isEdicao &&
+            deveBuscarTutores(buscaTutor) &&
+            !tutorSelecionado &&
+            tutoresSugeridos.length > 0 && (
+              <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                {tutoresSugeridos.map((tutor) => (
+                  <button
+                    key={tutor.id}
+                    type="button"
+                    onClick={() => selecionarTutor(tutor)}
+                    className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
+                  >
+                    <div className="text-sm font-medium text-gray-800">{tutor.nome}</div>
+                    <div className="text-xs text-gray-500">
+                      {[tutor.telefone, tutor.celular].filter(Boolean).join(" - ") ||
+                        "Sem telefone"}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+        </div>,
       )}
 
       {renderCampo("Veterin\u00e1rio")(
@@ -75,7 +82,7 @@ export default function TutorVeterinarioFields({
           placeholder={"Digite para buscar veterin\u00e1rio..."}
           emptyLabel={"Nenhum veterin\u00e1rio encontrado"}
           showLabel={false}
-        />
+        />,
       )}
     </div>
   );

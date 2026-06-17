@@ -36,9 +36,7 @@ const temValorPreenchido = (valor) => {
   if (typeof valor === "object") return Object.keys(valor).length > 0;
 
   const texto = String(valor).trim();
-  return !["", "{}", "[]", "null", "undefined", "none"].includes(
-    texto.toLowerCase(),
-  );
+  return !["", "{}", "[]", "null", "undefined", "none"].includes(texto.toLowerCase());
 };
 
 const temJsonPreenchido = (valor) => {
@@ -103,8 +101,7 @@ export const avaliarAptidaoRacao = (produto) => {
   const faltantes = [];
 
   if (!produtoTemConfigRacao(produto)) faltantes.push("aba Ração");
-  if (!numeroPositivo(produto?.peso_embalagem))
-    faltantes.push("peso da embalagem");
+  if (!numeroPositivo(produto?.peso_embalagem)) faltantes.push("peso da embalagem");
   if (!numeroPositivo(produto?.preco_venda)) faltantes.push("preço de venda");
   if (!temValorPreenchido(produto?.linha_racao_id || produto?.classificacao_racao))
     faltantes.push("linha/classificação");
@@ -118,10 +115,8 @@ export const avaliarAptidaoRacao = (produto) => {
     faltantes.push("fase/público");
   if (!temValorPreenchido(produto?.sabor_proteina_id || produto?.sabor_proteina))
     faltantes.push("sabor/proteína");
-  if (!temValorPreenchido(produto?.especies_indicadas))
-    faltantes.push("espécie indicada");
-  if (!temJsonPreenchido(produto?.tabela_consumo))
-    faltantes.push("tabela de consumo");
+  if (!temValorPreenchido(produto?.especies_indicadas)) faltantes.push("espécie indicada");
+  if (!temJsonPreenchido(produto?.tabela_consumo)) faltantes.push("tabela de consumo");
 
   return {
     apta: faltantes.length === 0,
@@ -275,9 +270,7 @@ export const escolherRacaoAptaPorTexto = (valor, ...listas) => {
     (produto) => produto?.aptidao?.apta,
   );
 
-  const matchDireto = candidatos.find((produto) =>
-    produtoCasaComTextoSelecionado(produto, valor),
-  );
+  const matchDireto = candidatos.find((produto) => produtoCasaComTextoSelecionado(produto, valor));
   if (matchDireto) return matchDireto;
 
   const pontuados = candidatos
