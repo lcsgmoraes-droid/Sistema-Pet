@@ -1,12 +1,13 @@
-
 from sqlalchemy import Column, String, Numeric
 from app.database.base import BaseTenantModel
+
 
 class NotaFiscalRateioCanal(BaseTenantModel):
     """
     Rateio analítico de uma Nota Fiscal por canal de venda.
     Percentual total deve somar 100%.
     """
+
     __tablename__ = "nota_fiscal_rateio_canal"
 
     nota_fiscal_id = Column(String, nullable=False)

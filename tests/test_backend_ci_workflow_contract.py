@@ -732,6 +732,16 @@ def test_backend_ci_has_blocking_backend_veterinary_root_format_step():
     assert "ruff format --check app/veterinario_*.py" in source
 
 
+def test_backend_ci_has_blocking_backend_fiscal_nf_root_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend fiscal nf root format (blocking)" in source
+    assert (
+        "ruff format --check app/fiscal_*.py app/nf_*.py "
+        "app/nfe_*.py app/nota_fiscal_*.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_backend_routers_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

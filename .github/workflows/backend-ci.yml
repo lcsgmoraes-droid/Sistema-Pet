@@ -379,6 +379,10 @@ jobs:
         run: |
           ruff format --check app/veterinario_*.py
 
+      - name: Backend fiscal nf root format (blocking)
+        run: |
+          ruff format --check app/fiscal_*.py app/nf_*.py app/nfe_*.py app/nota_fiscal_*.py
+
       - name: Backend routers format (blocking)
         run: |
           ruff format --check app/routers

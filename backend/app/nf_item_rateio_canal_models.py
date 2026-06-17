@@ -1,6 +1,6 @@
-
 from sqlalchemy import Column, String, Integer, Numeric
 from app.database.base import BaseTenantModel
+
 
 class NotaFiscalItemRateioCanal(BaseTenantModel):
     """
@@ -8,6 +8,7 @@ class NotaFiscalItemRateioCanal(BaseTenantModel):
     A fonte da verdade é a QUANTIDADE.
     Valor e percentual são calculados no backend.
     """
+
     __tablename__ = "nota_fiscal_item_rateio_canal"
 
     nota_fiscal_item_id = Column(String, nullable=False)

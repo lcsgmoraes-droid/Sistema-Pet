@@ -1,4 +1,3 @@
-
 def validar_rateio_percentual(rateios):
     """
     rateios: lista de dicts no formato:
