@@ -7,7 +7,16 @@ Modelos de banco de dados para:
 - ClienteConversaInteligente: Cache de análises
 """
 
-from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, Text, ForeignKey
+from sqlalchemy import (
+    Column,
+    Integer,
+    Float,
+    String,
+    DateTime,
+    Boolean,
+    Text,
+    ForeignKey,
+)
 from datetime import datetime
 
 from app.base_models import BaseTenantModel
@@ -18,41 +27,46 @@ class ConversaWhatsApp(BaseTenantModel):
     Registro de uma conversa com o bot WhatsApp.
     Rastreia: estado, produto selecionado, venda gerada, etc.
     """
+
     __tablename__ = "conversas_whatsapp"
-    
+
     id = Column(Integer, primary_key=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     cliente_id = Column(Integer, ForeignKey("cliente.id"), nullable=True)
-    
+
     # Informações do contato
     numero_whatsapp = Column(String(20), nullable=False)
     nome_cliente = Column(String(200))
-    
+
     # Estado da conversa
-    estado_atual = Column(String)  # "inicial", "buscando", "desambiguacao", "quantidade", "confirmando", "venda_criada"
-    
+    estado_atual = Column(
+        String
+    )  # "inicial", "buscando", "desambiguacao", "quantidade", "confirmando", "venda_criada"
+
     # Venda associada
     venda_id = Column(Integer, ForeignKey("vendas.id"), nullable=True)
     venda_gerada_por_ia = Column(Boolean, default=True)
     confianca_ia = Column(Float)  # 0-100%
-    
+
     # Histórico (JSON)
-    historico_mensagens_json = Column(Text)  # JSON com [{"remetente": "cliente", "texto": "...", "timestamp": "..."}]
-    
+    historico_mensagens_json = Column(
+        Text
+    )  # JSON com [{"remetente": "cliente", "texto": "...", "timestamp": "..."}]
+
     # Métricas
     total_mensagens = Column(Integer, default=0)
     duracao_minutos = Column(Integer)
-    
+
     # Feedback e aprendizado
     resultado_venda = Column(String)  # "criada", "confirmada", "rejeitada", "cancelada"
     motivo_rejeicao = Column(String)
     rating_cliente = Column(Float)  # 1-5 stars (se disponível)
-    
+
     # Timestamps
     data_inicio = Column(DateTime, default=datetime.utcnow)
     data_fim = Column(DateTime, nullable=True)
     criado_em = Column(DateTime, default=datetime.utcnow)
-    
+
     def __repr__(self):
         return f"<ConversaWhatsApp {self.numero_whatsapp} estado={self.estado_atual}>"
 
@@ -62,30 +76,33 @@ class MensagemWhatsApp(BaseTenantModel):
     Histórico detalhado de cada mensagem em uma conversa.
     Usado para rastreamento e treinamento de IA.
     """
+
     __tablename__ = "mensagens_whatsapp"
-    
+
     id = Column(Integer, primary_key=True)
     conversa_id = Column(Integer, ForeignKey("conversas_whatsapp.id"), nullable=False)
-    
+
     # Quem enviou
     remetente = Column(String)  # "cliente" ou "bot"
-    
+
     # Conteúdo
-    tipo = Column(String, default="texto")  # "texto", "imagem", "arquivo", "localizacao"
+    tipo = Column(
+        String, default="texto"
+    )  # "texto", "imagem", "arquivo", "localizacao"
     mensagem = Column(Text)
-    
+
     # Intenção detectada (ABA 6)
     intencao_detectada = Column(String)  # "fluxo_caixa", "vendas", "estoque", etc
     confianca_intencao = Column(Float)  # 0-100%
-    
+
     # IA Processing
     processada_por_ia = Column(Boolean, default=False)
     resposta_ia = Column(Text)  # Resposta gerada
-    
+
     # Timestamps
     data_hora = Column(DateTime, default=datetime.utcnow)
     criada_em = Column(DateTime, default=datetime.utcnow)
-    
+
     def __repr__(self):
         return f"<MensagemWhatsApp {self.remetente} {self.mensagem[:50]}>"
 
@@ -94,47 +111,48 @@ class AnaliseClienteInteligente(BaseTenantModel):
     """
     Cache de análises dinâmicas sobre um cliente.
     Atualizado quando cliente interage via chat (ABA 6).
-    
+
     Usado para:
     - Recomendações personalizadas
     - Detecção de problemas
     - Sugestões de ação
     """
+
     __tablename__ = "analise_cliente_inteligente"
-    
+
     id = Column(Integer, primary_key=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     cliente_id = Column(Integer, ForeignKey("cliente.id"), nullable=False)
-    
+
     # Perfil de compra
     total_compras = Column(Integer, default=0)
     valor_total_gasto = Column(Float, default=0)
     ticket_medio = Column(Float)
     frequencia_dias = Column(Integer)  # A cada quantos dias compra?
-    
+
     # Produtos favoritos
     produto_favorito_id = Column(Integer, ForeignKey("produtos.id"), nullable=True)
     categoria_favorita = Column(String)
-    
+
     # Padrões
     melhor_dia_semana = Column(String)  # "segunda", "terça", etc
     melhor_horario = Column(String)  # "08:00", "14:00", etc
-    
+
     # Status
     status_cliente = Column(String)  # "ativo", "inativo", "em_risco", "estrela"
     dias_ultima_compra = Column(Integer)
-    
+
     # Recomendações geradas
     recomendacoes_json = Column(Text)  # JSON com recomendações
-    
+
     # Scores
     score_fidelidade = Column(Float)  # 0-100
     score_lucratividade = Column(Float)  # 0-100
-    
+
     # Timestamps
     ultima_atualizacao = Column(DateTime, default=datetime.utcnow)
     criada_em = Column(DateTime, default=datetime.utcnow)
-    
+
     def __repr__(self):
         return f"<AnaliseClienteInteligente cliente_id={self.cliente_id} status={self.status_cliente}>"
 

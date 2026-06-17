@@ -697,6 +697,20 @@ def test_backend_ci_has_blocking_backend_ai_packages_format_step():
     assert "ruff format --check app/ai app/ai_core" in source
 
 
+def test_backend_ci_has_blocking_backend_ia_stable_files_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend IA stable files format (blocking)" in source
+    assert (
+        "ruff format --check app/ia/aba5_models.py app/ia/aba6_aba9_models.py "
+        "app/ia/aba6_models.py app/ia/aba7_dre_detalhada_models.py "
+        "app/ia/aba7_models.py app/ia/aba8_models.py app/ia/acoes_assistidas.py "
+        "app/ia/alertas_ia_service.py app/ia/catalogo_fontes.py "
+        "app/ia/extrato_nlp.py app/ia/extrato_service.py "
+        "app/ia/memoria_conversacional.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_backend_domain_campaigns_vendas_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
