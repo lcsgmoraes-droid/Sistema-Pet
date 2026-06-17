@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter
 from sqlalchemy.orm import Session
 from app.database.session import get_db
@@ -7,12 +6,9 @@ from app.nf_rateio_canal_models import NotaFiscalRateioCanal
 
 router = APIRouter(prefix="/notas-fiscais", tags=["Notas Fiscais - Rateio"])
 
+
 @router.post("/{nota_fiscal_id}/rateio")
-def salvar_rateio_nf(
-    nota_fiscal_id: str,
-    rateios: list,
-    db: Session = next(get_db())
-):
+def salvar_rateio_nf(nota_fiscal_id: str, rateios: list, db: Session = next(get_db())):
     """
     Espera:
     [
@@ -34,7 +30,7 @@ def salvar_rateio_nf(
             NotaFiscalRateioCanal(
                 nota_fiscal_id=nota_fiscal_id,
                 canal=r["canal"],
-                percentual=r["percentual"]
+                percentual=r["percentual"],
             )
         )
 

@@ -1,4 +1,12 @@
-from sqlalchemy import Column, String, Integer, DateTime, JSON, Numeric, UniqueConstraint
+from sqlalchemy import (
+    Column,
+    String,
+    Integer,
+    DateTime,
+    JSON,
+    Numeric,
+    UniqueConstraint,
+)
 from sqlalchemy.sql import func
 
 from app.base_models import BaseTenantModel
@@ -41,4 +49,6 @@ class BlingNotaFiscalCache(BaseTenantModel):
     resumo_payload = Column(JSON, nullable=True)
     detalhe_payload = Column(JSON, nullable=True)
     detalhada_em = Column(DateTime, nullable=True)
-    last_synced_at = Column(DateTime, nullable=False, server_default=func.now(), index=True)
+    last_synced_at = Column(
+        DateTime, nullable=False, server_default=func.now(), index=True
+    )

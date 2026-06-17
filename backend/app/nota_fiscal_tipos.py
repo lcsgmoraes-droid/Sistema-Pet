@@ -1,5 +1,5 @@
-
 from enum import Enum
+
 
 class TipoNotaFiscal(str, Enum):
     LOJA_FISICA = "loja_fisica"

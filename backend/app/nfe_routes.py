@@ -23,7 +23,9 @@ from app.nfe_cache_models import BlingNotaFiscalCache
 from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import Produto, EstoqueMovimentacao
 from app.services.bling_sync_service import BlingSyncService
-from app.services.nfe_authorized_reconciliation_service import reconciliar_nf_autorizada_cache
+from app.services.nfe_authorized_reconciliation_service import (
+    reconciliar_nf_autorizada_cache,
+)
 from app.services.nfe_cache_service import (
     existe_nota_cache_no_intervalo,
     listar_notas_cache,
@@ -31,7 +33,9 @@ from app.services.nfe_cache_service import (
     obter_estado_cache_notas,
     upsert_nota_cache,
 )
-from app.services.nfe_pending_reconciliation_service import reconciliar_nfes_pendentes_recentes
+from app.services.nfe_pending_reconciliation_service import (
+    reconciliar_nfes_pendentes_recentes,
+)
 from app.vendas_models import Venda
 from app.bling_integration import (
     BlingAPI,
@@ -108,7 +112,9 @@ def _sort_key_nota_por_numero_desc(nota: dict) -> tuple[int, str, int]:
     return (numero_int, data_emissao, nota_id)
 
 
-def _cache_key_listar_nfes(tenant_id, data_inicial: str | None, data_final: str | None, situacao: str | None) -> tuple[str, str, str, str]:
+def _cache_key_listar_nfes(
+    tenant_id, data_inicial: str | None, data_final: str | None, situacao: str | None
+) -> tuple[str, str, str, str]:
     return (
         str(tenant_id or ""),
         str(data_inicial or ""),
@@ -117,7 +123,9 @@ def _cache_key_listar_nfes(tenant_id, data_inicial: str | None, data_final: str 
     )
 
 
-def _cache_key_detalhe_nfe(tenant_id, nfe_id: int, modelo: int | None = None) -> tuple[str, str, str]:
+def _cache_key_detalhe_nfe(
+    tenant_id, nfe_id: int, modelo: int | None = None
+) -> tuple[str, str, str]:
     return (
         str(tenant_id or ""),
         str(nfe_id or ""),
@@ -136,7 +144,9 @@ def _obter_detalhe_nfe_cache(tenant_id, nfe_id: int, modelo: int | None = None):
     return deepcopy(cache_atual.get("payload"))
 
 
-def _salvar_detalhe_nfe_cache(tenant_id, nfe_id: int, modelo: int | None, payload: dict) -> None:
+def _salvar_detalhe_nfe_cache(
+    tenant_id, nfe_id: int, modelo: int | None, payload: dict
+) -> None:
     _nfe_detail_cache[_cache_key_detalhe_nfe(tenant_id, nfe_id, modelo)] = {
         "ts_monotonic": monotonic(),
         "payload": deepcopy(payload),
@@ -213,13 +223,21 @@ def _canal_slug(value) -> str:
     if not texto:
         return ""
 
-    if any(chave in texto for chave in ("mercado livre", "mercadolivre", "mercado_livre")) or texto == "ml":
+    if (
+        any(
+            chave in texto
+            for chave in ("mercado livre", "mercadolivre", "mercado_livre")
+        )
+        or texto == "ml"
+    ):
         return "mercado_livre"
     if "shopee" in texto:
         return "shopee"
     if "amazon" in texto:
         return "amazon"
-    if any(chave in texto for chave in ("loja virtual", "ecommerce", "e-commerce", "site")):
+    if any(
+        chave in texto for chave in ("loja virtual", "ecommerce", "e-commerce", "site")
+    ):
         return "site"
     if any(chave in texto for chave in ("app", "aplicativo")):
         return "app"
@@ -278,19 +296,32 @@ def _inferir_canal_por_loja_id(loja_id) -> str | None:
 
 def _formatar_endereco(value) -> str | None:
     if isinstance(value, dict):
-        logradouro = _texto(_primeiro_preenchido(value.get("endereco"), value.get("logradouro"), value.get("descricao"), value.get("nome")))
+        logradouro = _texto(
+            _primeiro_preenchido(
+                value.get("endereco"),
+                value.get("logradouro"),
+                value.get("descricao"),
+                value.get("nome"),
+            )
+        )
         numero = _texto(value.get("numero"))
         bairro = _texto(value.get("bairro"))
         complemento = _texto(value.get("complemento"))
-        municipio = _texto(_primeiro_preenchido(value.get("municipio"), value.get("cidade")))
+        municipio = _texto(
+            _primeiro_preenchido(value.get("municipio"), value.get("cidade"))
+        )
         uf = _texto(_primeiro_preenchido(value.get("uf"), value.get("estado")))
 
         linha_principal = logradouro or None
         if linha_principal and numero:
             linha_principal = f"{linha_principal}, {numero}"
 
-        linha_secundaria = ", ".join([parte for parte in (bairro, municipio, uf) if parte]) or None
-        partes = [parte for parte in (linha_principal, complemento, linha_secundaria) if parte]
+        linha_secundaria = (
+            ", ".join([parte for parte in (bairro, municipio, uf) if parte]) or None
+        )
+        partes = [
+            parte for parte in (linha_principal, complemento, linha_secundaria) if parte
+        ]
         return " - ".join(partes) or None
 
     return _texto(value)
@@ -325,13 +356,17 @@ def _formatar_data_iso(valor) -> str | None:
 
 
 def _detalhe_nota_valido(item: dict | None) -> bool:
-    return isinstance(item, dict) and bool(item) and bool(
-        _primeiro_preenchido(
-            item.get("id"),
-            item.get("numero"),
-            item.get("chaveAcesso"),
-            item.get("contato"),
-            item.get("itens"),
+    return (
+        isinstance(item, dict)
+        and bool(item)
+        and bool(
+            _primeiro_preenchido(
+                item.get("id"),
+                item.get("numero"),
+                item.get("chaveAcesso"),
+                item.get("contato"),
+                item.get("itens"),
+            )
         )
     )
 
@@ -382,10 +417,16 @@ def _separar_data_hora(valor) -> tuple[str | None, str | None]:
 
 
 def _label_codigo(mapa: dict[str, str], valor) -> str | None:
-    texto = _texto_relacionado(valor, "descricao", "nome", "label", fallback_to_id=False)
+    texto = _texto_relacionado(
+        valor, "descricao", "nome", "label", fallback_to_id=False
+    )
     if texto:
         return texto
-    codigo = _texto(_primeiro_preenchido(_dict(valor).get("valor") if isinstance(valor, dict) else None, valor))
+    codigo = _texto(
+        _primeiro_preenchido(
+            _dict(valor).get("valor") if isinstance(valor, dict) else None, valor
+        )
+    )
     if not codigo:
         return None
     return mapa.get(codigo, codigo)
@@ -402,15 +443,21 @@ def _extrair_campos_fiscais_do_xml(xml_texto: str | None) -> dict:
     if ide is None:
         return {}
 
-    data_emissao, hora_emissao = _separar_data_hora(ide.findtext("nfe:dhEmi", default="", namespaces=_XML_NS))
-    data_saida, hora_saida = _separar_data_hora(ide.findtext("nfe:dhSaiEnt", default="", namespaces=_XML_NS))
+    data_emissao, hora_emissao = _separar_data_hora(
+        ide.findtext("nfe:dhEmi", default="", namespaces=_XML_NS)
+    )
+    data_saida, hora_saida = _separar_data_hora(
+        ide.findtext("nfe:dhSaiEnt", default="", namespaces=_XML_NS)
+    )
 
     return {
         "data_emissao": data_emissao,
         "hora_emissao": hora_emissao,
         "data_saida": data_saida,
         "hora_saida": hora_saida,
-        "natureza_operacao": _texto(ide.findtext("nfe:natOp", default="", namespaces=_XML_NS)),
+        "natureza_operacao": _texto(
+            ide.findtext("nfe:natOp", default="", namespaces=_XML_NS)
+        ),
         "codigo_regime_tributario": _REGIME_TRIBUTARIO_MAP.get(
             _texto(emit.findtext("nfe:CRT", default="", namespaces=_XML_NS)) or "",
         ),
@@ -432,7 +479,9 @@ def _consultar_campos_fiscais_no_xml(xml_url: str | None) -> dict:
 
 
 def _enriquecer_detalhe_com_xml_link(item: dict, detalhe: dict) -> None:
-    xml_url = _texto(_primeiro_preenchido(item.get("xml"), item.get("urlXml"), item.get("xmlUrl")))
+    xml_url = _texto(
+        _primeiro_preenchido(item.get("xml"), item.get("urlXml"), item.get("xmlUrl"))
+    )
     if not xml_url:
         return
 
@@ -447,7 +496,8 @@ def _enriquecer_detalhe_com_xml_link(item: dict, detalhe: dict) -> None:
             detalhe[campo] = campos_xml[campo]
 
     if campos_xml.get("natureza_operacao") and (
-        not detalhe.get("natureza_operacao") or str(detalhe.get("natureza_operacao", "")).startswith("ID ")
+        not detalhe.get("natureza_operacao")
+        or str(detalhe.get("natureza_operacao", "")).startswith("ID ")
     ):
         detalhe["natureza_operacao"] = campos_xml["natureza_operacao"]
 
@@ -466,52 +516,64 @@ def _normalizar_resumo_canal(item: dict, venda: Venda | None = None) -> dict:
     marketplace = _dict(item.get("marketplace"))
     info_adicionais = _dict(item.get("informacoesAdicionais"))
     intermediador = _dict(item.get("intermediador"))
-    pedido_ref = _dict(_primeiro_preenchido(item.get("pedido"), item.get("pedidoVenda"), item.get("pedidoCompra")))
+    pedido_ref = _dict(
+        _primeiro_preenchido(
+            item.get("pedido"), item.get("pedidoVenda"), item.get("pedidoCompra")
+        )
+    )
     loja_nome = _texto_relacionado(loja, fallback_to_id=False)
     unidade_negocio_nome = _texto_relacionado(unidade_negocio, fallback_to_id=False)
-    info_complementares = _texto(_primeiro_preenchido(
-        info_adicionais.get("informacoesComplementares"),
-        item.get("informacoesComplementares"),
-        item.get("observacao"),
-    ))
+    info_complementares = _texto(
+        _primeiro_preenchido(
+            info_adicionais.get("informacoesComplementares"),
+            item.get("informacoesComplementares"),
+            item.get("observacao"),
+        )
+    )
     numero_extraido_texto = _extrair_campo_texto(
         info_complementares,
         r"n[ºo°]?\s*pedido(?:\s*na\s*loja|\s*loja)?\s*:\s*([^\r\n|]+)",
         r"numero\s*loja\s*virtual\s*:\s*([^\r\n|]+)",
     )
 
-    numero_loja_virtual = _texto(_primeiro_preenchido(
-        item.get("numeroLojaVirtual"),
-        item.get("numeroPedidoLoja"),
-        item.get("numeroPedido"),
-        pedido_ref.get("numeroPedidoLoja"),
-        pedido_ref.get("numero"),
-        info_adicionais.get("numeroLojaVirtual"),
-        info_adicionais.get("numeroPedidoLoja"),
-        numero_extraido_texto,
-    ))
+    numero_loja_virtual = _texto(
+        _primeiro_preenchido(
+            item.get("numeroLojaVirtual"),
+            item.get("numeroPedidoLoja"),
+            item.get("numeroPedido"),
+            pedido_ref.get("numeroPedidoLoja"),
+            pedido_ref.get("numero"),
+            info_adicionais.get("numeroLojaVirtual"),
+            info_adicionais.get("numeroPedidoLoja"),
+            numero_extraido_texto,
+        )
+    )
     canal_inferido = _primeiro_preenchido(
         _inferir_canal_por_numero(numero_loja_virtual),
         _inferir_canal_por_loja_id(loja.get("id")),
     )
     canal_inferido_label = _canal_label(canal_inferido)
-    origem_loja_virtual = _texto(_primeiro_preenchido(
-        item.get("origemLojaVirtual"),
-        marketplace.get("nome"),
-        marketplace.get("descricao"),
-        info_adicionais.get("origemLojaVirtual"),
-        canal_inferido_label,
-        loja_nome,
-    ))
+    origem_loja_virtual = _texto(
+        _primeiro_preenchido(
+            item.get("origemLojaVirtual"),
+            marketplace.get("nome"),
+            marketplace.get("descricao"),
+            info_adicionais.get("origemLojaVirtual"),
+            canal_inferido_label,
+            loja_nome,
+        )
+    )
     if _texto_generico_baixo_valor(origem_loja_virtual) and canal_inferido_label:
         origem_loja_virtual = canal_inferido_label
 
-    origem_canal_venda = _texto(_primeiro_preenchido(
-        item.get("origemCanalVenda"),
-        info_adicionais.get("origemCanalVenda"),
-        venda.canal if venda else None,
-        canal_inferido_label,
-    ))
+    origem_canal_venda = _texto(
+        _primeiro_preenchido(
+            item.get("origemCanalVenda"),
+            info_adicionais.get("origemCanalVenda"),
+            venda.canal if venda else None,
+            canal_inferido_label,
+        )
+    )
     if _texto_generico_baixo_valor(origem_canal_venda) and canal_inferido_label:
         origem_canal_venda = canal_inferido_label
 
@@ -542,12 +604,18 @@ def _normalizar_resumo_canal(item: dict, venda: Venda | None = None) -> dict:
         "numero_pedido_loja": numero_loja_virtual,
         "pedido_bling_id_ref": _texto(pedido_ref.get("id")),
         "intermediador": {
-            "cnpj": _texto(_primeiro_preenchido(intermediador.get("cnpj"), item.get("cnpjIntermediador"))),
-            "identificacao": _texto(_primeiro_preenchido(
-                intermediador.get("identificacao"),
-                intermediador.get("identificacaoIntermediador"),
-                item.get("identificacaoIntermediador"),
-            )),
+            "cnpj": _texto(
+                _primeiro_preenchido(
+                    intermediador.get("cnpj"), item.get("cnpjIntermediador")
+                )
+            ),
+            "identificacao": _texto(
+                _primeiro_preenchido(
+                    intermediador.get("identificacao"),
+                    intermediador.get("identificacaoIntermediador"),
+                    item.get("identificacaoIntermediador"),
+                )
+            ),
         },
     }
 
@@ -555,66 +623,134 @@ def _normalizar_resumo_canal(item: dict, venda: Venda | None = None) -> dict:
 def _normalizar_parcela(item: dict) -> dict:
     parcela = _dict(_primeiro_preenchido(item.get("parcela"), item))
     return {
-        "dias": _coerce_int(_primeiro_preenchido(parcela.get("dias"), parcela.get("prazo")), 0),
-        "data": _texto(_primeiro_preenchido(parcela.get("data"), parcela.get("vencimento"))),
-        "valor": _coerce_float(_primeiro_preenchido(parcela.get("valor"), parcela.get("valorParcela")), 0.0),
-        "forma": _texto(_primeiro_preenchido(parcela.get("forma"), parcela.get("formaPagamento"), parcela.get("descricaoFormaPagamento"))),
-        "observacao": _texto(_primeiro_preenchido(parcela.get("observacao"), parcela.get("descricao"))),
+        "dias": _coerce_int(
+            _primeiro_preenchido(parcela.get("dias"), parcela.get("prazo")), 0
+        ),
+        "data": _texto(
+            _primeiro_preenchido(parcela.get("data"), parcela.get("vencimento"))
+        ),
+        "valor": _coerce_float(
+            _primeiro_preenchido(parcela.get("valor"), parcela.get("valorParcela")), 0.0
+        ),
+        "forma": _texto(
+            _primeiro_preenchido(
+                parcela.get("forma"),
+                parcela.get("formaPagamento"),
+                parcela.get("descricaoFormaPagamento"),
+            )
+        ),
+        "observacao": _texto(
+            _primeiro_preenchido(parcela.get("observacao"), parcela.get("descricao"))
+        ),
     }
 
 
 def _normalizar_item_nota(item: dict) -> dict:
     produto = _dict(item.get("produto"))
     return {
-        "descricao": _texto(_primeiro_preenchido(item.get("descricao"), item.get("nome"), produto.get("nome"))),
-        "codigo": _texto(_primeiro_preenchido(item.get("codigo"), item.get("sku"), produto.get("codigo"), produto.get("id"))),
-        "unidade": _texto(_primeiro_preenchido(item.get("unidade"), item.get("un"), item.get("siglaUnidade"))),
+        "descricao": _texto(
+            _primeiro_preenchido(
+                item.get("descricao"), item.get("nome"), produto.get("nome")
+            )
+        ),
+        "codigo": _texto(
+            _primeiro_preenchido(
+                item.get("codigo"),
+                item.get("sku"),
+                produto.get("codigo"),
+                produto.get("id"),
+            )
+        ),
+        "unidade": _texto(
+            _primeiro_preenchido(
+                item.get("unidade"), item.get("un"), item.get("siglaUnidade")
+            )
+        ),
         "quantidade": _coerce_float(item.get("quantidade"), 0.0),
-        "valor_unitario": _coerce_float(_primeiro_preenchido(item.get("valor"), item.get("valorUnitario"), item.get("preco"), item.get("precoUnitario")), 0.0),
-        "valor_total": _coerce_float(_primeiro_preenchido(item.get("total"), item.get("valorTotal")), 0.0),
-        "ncm": _texto(_primeiro_preenchido(item.get("ncm"), item.get("classificacaoFiscal"), produto.get("ncm"))),
+        "valor_unitario": _coerce_float(
+            _primeiro_preenchido(
+                item.get("valor"),
+                item.get("valorUnitario"),
+                item.get("preco"),
+                item.get("precoUnitario"),
+            ),
+            0.0,
+        ),
+        "valor_total": _coerce_float(
+            _primeiro_preenchido(item.get("total"), item.get("valorTotal")), 0.0
+        ),
+        "ncm": _texto(
+            _primeiro_preenchido(
+                item.get("ncm"), item.get("classificacaoFiscal"), produto.get("ncm")
+            )
+        ),
     }
 
 
-def _normalizar_detalhe_nota_bling(item: dict, modelo: int, venda: Venda | None = None) -> dict:
-    contato = _dict(_primeiro_preenchido(item.get("contato"), item.get("cliente"), item.get("destinatario")))
+def _normalizar_detalhe_nota_bling(
+    item: dict, modelo: int, venda: Venda | None = None
+) -> dict:
+    contato = _dict(
+        _primeiro_preenchido(
+            item.get("contato"), item.get("cliente"), item.get("destinatario")
+        )
+    )
     contato_endereco = _dict(contato.get("endereco"))
-    endereco_entrega = _dict(_primeiro_preenchido(item.get("enderecoEntrega"), item.get("entrega")))
+    endereco_entrega = _dict(
+        _primeiro_preenchido(item.get("enderecoEntrega"), item.get("entrega"))
+    )
     totais = _dict(item.get("totais"))
-    transporte = _dict(_primeiro_preenchido(item.get("transporte"), item.get("transportador")))
+    transporte = _dict(
+        _primeiro_preenchido(item.get("transporte"), item.get("transportador"))
+    )
     pagamento = _dict(item.get("pagamento"))
     info_adicionais = _dict(item.get("informacoesAdicionais"))
     intermediador = _dict(item.get("intermediador"))
     resumo_canal = _normalizar_resumo_canal(item, venda=venda)
     pessoas_autorizadas = [
-        _texto(_primeiro_preenchido(
-            autorizada.get("nome"),
-            autorizada.get("cpfCnpj"),
-            autorizada.get("numeroDocumento"),
-            autorizada.get("email"),
-        ))
-        for autorizada in _list(_primeiro_preenchido(
-            item.get("pessoasAutorizadasAcessarXml"),
-            item.get("pessoasAutorizadasXml"),
-            item.get("pessoasAutorizadas"),
-        ))
-        if _texto(_primeiro_preenchido(
-            autorizada.get("nome"),
-            autorizada.get("cpfCnpj"),
-            autorizada.get("numeroDocumento"),
-            autorizada.get("email"),
-        ))
+        _texto(
+            _primeiro_preenchido(
+                autorizada.get("nome"),
+                autorizada.get("cpfCnpj"),
+                autorizada.get("numeroDocumento"),
+                autorizada.get("email"),
+            )
+        )
+        for autorizada in _list(
+            _primeiro_preenchido(
+                item.get("pessoasAutorizadasAcessarXml"),
+                item.get("pessoasAutorizadasXml"),
+                item.get("pessoasAutorizadas"),
+            )
+        )
+        if _texto(
+            _primeiro_preenchido(
+                autorizada.get("nome"),
+                autorizada.get("cpfCnpj"),
+                autorizada.get("numeroDocumento"),
+                autorizada.get("email"),
+            )
+        )
     ]
 
-    parcelas = [_normalizar_parcela(parcela) for parcela in _list(_primeiro_preenchido(
-        pagamento.get("parcelas"),
-        item.get("parcelas"),
-    ))]
+    parcelas = [
+        _normalizar_parcela(parcela)
+        for parcela in _list(
+            _primeiro_preenchido(
+                pagamento.get("parcelas"),
+                item.get("parcelas"),
+            )
+        )
+    ]
 
     itens = [_normalizar_item_nota(item_nota) for item_nota in _list(item.get("itens"))]
 
-    data_emissao_raw = _primeiro_preenchido(item.get("dataEmissao"), item.get("data_emissao"))
-    data_saida_raw = _primeiro_preenchido(item.get("dataSaida"), item.get("dataOperacao"), item.get("data_saida"))
+    data_emissao_raw = _primeiro_preenchido(
+        item.get("dataEmissao"), item.get("data_emissao")
+    )
+    data_saida_raw = _primeiro_preenchido(
+        item.get("dataSaida"), item.get("dataOperacao"), item.get("data_saida")
+    )
     data_emissao, hora_emissao_extra = _separar_data_hora(data_emissao_raw)
     data_saida, hora_saida_extra = _separar_data_hora(data_saida_raw)
 
@@ -622,23 +758,84 @@ def _normalizar_detalhe_nota_bling(item: dict, modelo: int, venda: Venda | None 
         item.get("consumidorFinal"),
         contato.get("consumidorFinal"),
     )
-    cpf_cnpj = _texto(_primeiro_preenchido(contato.get("cpf"), contato.get("cnpj"), contato.get("cpfCnpj"), contato.get("numeroDocumento")))
+    cpf_cnpj = _texto(
+        _primeiro_preenchido(
+            contato.get("cpf"),
+            contato.get("cnpj"),
+            contato.get("cpfCnpj"),
+            contato.get("numeroDocumento"),
+        )
+    )
 
     cliente = {
-        "nome": _texto(_primeiro_preenchido(contato.get("nome"), contato.get("descricao"), venda.cliente.nome if venda and venda.cliente else None)),
-        "tipo_pessoa": _tipo_pessoa_label(_primeiro_preenchido(contato.get("tipoPessoa"), contato.get("tipo"), contato.get("tipoDocumento")), cpf_cnpj=cpf_cnpj),
+        "nome": _texto(
+            _primeiro_preenchido(
+                contato.get("nome"),
+                contato.get("descricao"),
+                venda.cliente.nome if venda and venda.cliente else None,
+            )
+        ),
+        "tipo_pessoa": _tipo_pessoa_label(
+            _primeiro_preenchido(
+                contato.get("tipoPessoa"),
+                contato.get("tipo"),
+                contato.get("tipoDocumento"),
+            ),
+            cpf_cnpj=cpf_cnpj,
+        ),
         "cpf_cnpj": cpf_cnpj,
-        "consumidor_final": bool(consumidor_final) if consumidor_final is not None else None,
-        "cep": _texto(_primeiro_preenchido(contato.get("cep"), contato_endereco.get("cep"))),
-        "uf": _texto(_primeiro_preenchido(contato.get("uf"), contato.get("estado"), contato_endereco.get("uf"), contato_endereco.get("estado"))),
-        "municipio": _texto(_primeiro_preenchido(contato.get("municipio"), contato.get("cidade"), contato_endereco.get("municipio"), contato_endereco.get("cidade"))),
-        "bairro": _texto(_primeiro_preenchido(contato.get("bairro"), contato_endereco.get("bairro"))),
-        "endereco": _formatar_endereco(_primeiro_preenchido(contato.get("endereco"), contato.get("logradouro"), contato_endereco)),
-        "numero": _texto(_primeiro_preenchido(contato.get("numero"), contato_endereco.get("numero"))),
-        "complemento": _texto(_primeiro_preenchido(contato.get("complemento"), contato_endereco.get("complemento"))),
-        "telefone": _texto(_primeiro_preenchido(contato.get("telefone"), contato.get("celular"))),
+        "consumidor_final": bool(consumidor_final)
+        if consumidor_final is not None
+        else None,
+        "cep": _texto(
+            _primeiro_preenchido(contato.get("cep"), contato_endereco.get("cep"))
+        ),
+        "uf": _texto(
+            _primeiro_preenchido(
+                contato.get("uf"),
+                contato.get("estado"),
+                contato_endereco.get("uf"),
+                contato_endereco.get("estado"),
+            )
+        ),
+        "municipio": _texto(
+            _primeiro_preenchido(
+                contato.get("municipio"),
+                contato.get("cidade"),
+                contato_endereco.get("municipio"),
+                contato_endereco.get("cidade"),
+            )
+        ),
+        "bairro": _texto(
+            _primeiro_preenchido(contato.get("bairro"), contato_endereco.get("bairro"))
+        ),
+        "endereco": _formatar_endereco(
+            _primeiro_preenchido(
+                contato.get("endereco"), contato.get("logradouro"), contato_endereco
+            )
+        ),
+        "numero": _texto(
+            _primeiro_preenchido(contato.get("numero"), contato_endereco.get("numero"))
+        ),
+        "complemento": _texto(
+            _primeiro_preenchido(
+                contato.get("complemento"), contato_endereco.get("complemento")
+            )
+        ),
+        "telefone": _texto(
+            _primeiro_preenchido(contato.get("telefone"), contato.get("celular"))
+        ),
         "email": _texto(contato.get("email")),
-        "vendedor": _texto_relacionado(_primeiro_preenchido(item.get("vendedor"), contato.get("vendedor"), venda.vendedor.nome if venda and venda.vendedor else None), "nome", "descricao", "apelido"),
+        "vendedor": _texto_relacionado(
+            _primeiro_preenchido(
+                item.get("vendedor"),
+                contato.get("vendedor"),
+                venda.vendedor.nome if venda and venda.vendedor else None,
+            ),
+            "nome",
+            "descricao",
+            "apelido",
+        ),
     }
 
     return {
@@ -649,84 +846,181 @@ def _normalizar_detalhe_nota_bling(item: dict, modelo: int, venda: Venda | None 
         "modelo": int(modelo),
         "tipo": "nfce" if int(modelo) == 65 else "nfe",
         "tipo_label": _tipo_nota_label(modelo),
-        "chave": _texto(_primeiro_preenchido(item.get("chaveAcesso"), item.get("chave"))),
+        "chave": _texto(
+            _primeiro_preenchido(item.get("chaveAcesso"), item.get("chave"))
+        ),
         "status": _status_nota_bling(item),
         "data_emissao": data_emissao or _formatar_data_iso(data_emissao_raw),
-        "hora_emissao": _texto(_primeiro_preenchido(item.get("horaEmissao"), item.get("hora_emissao"), hora_emissao_extra)),
+        "hora_emissao": _texto(
+            _primeiro_preenchido(
+                item.get("horaEmissao"), item.get("hora_emissao"), hora_emissao_extra
+            )
+        ),
         "data_saida": data_saida or _formatar_data_iso(data_saida_raw),
-        "hora_saida": _texto(_primeiro_preenchido(item.get("horaSaida"), item.get("horaOperacao"), item.get("hora_saida"), hora_saida_extra)),
-        "natureza_operacao": _texto(_primeiro_preenchido(
-            _texto_relacionado(item.get("naturezaOperacao"), "nome", "descricao", "descricaoPadrao"),
-            item.get("naturezaOperacaoDescricao"),
-        )),
-        "codigo_regime_tributario": _texto(_primeiro_preenchido(
-            _label_codigo(_REGIME_TRIBUTARIO_MAP, item.get("codigoRegimeTributario")),
-            _label_codigo(_REGIME_TRIBUTARIO_MAP, item.get("regimeTributario")),
-        )),
-        "finalidade": _texto(_primeiro_preenchido(
-            _label_codigo(_FINALIDADE_MAP, item.get("finalidade")),
-            item.get("finalidade"),
-        )),
-        "indicador_presenca": _texto(_primeiro_preenchido(
-            _label_codigo(_INDICADOR_PRESENCA_MAP, item.get("indicadorPresenca")),
-            item.get("indicadorPresenca"),
-        )),
+        "hora_saida": _texto(
+            _primeiro_preenchido(
+                item.get("horaSaida"),
+                item.get("horaOperacao"),
+                item.get("hora_saida"),
+                hora_saida_extra,
+            )
+        ),
+        "natureza_operacao": _texto(
+            _primeiro_preenchido(
+                _texto_relacionado(
+                    item.get("naturezaOperacao"), "nome", "descricao", "descricaoPadrao"
+                ),
+                item.get("naturezaOperacaoDescricao"),
+            )
+        ),
+        "codigo_regime_tributario": _texto(
+            _primeiro_preenchido(
+                _label_codigo(
+                    _REGIME_TRIBUTARIO_MAP, item.get("codigoRegimeTributario")
+                ),
+                _label_codigo(_REGIME_TRIBUTARIO_MAP, item.get("regimeTributario")),
+            )
+        ),
+        "finalidade": _texto(
+            _primeiro_preenchido(
+                _label_codigo(_FINALIDADE_MAP, item.get("finalidade")),
+                item.get("finalidade"),
+            )
+        ),
+        "indicador_presenca": _texto(
+            _primeiro_preenchido(
+                _label_codigo(_INDICADOR_PRESENCA_MAP, item.get("indicadorPresenca")),
+                item.get("indicadorPresenca"),
+            )
+        ),
         "cliente": cliente,
         "itens": itens,
         "totais": {
-            "valor_produtos": _coerce_float(_primeiro_preenchido(totais.get("valorProdutos"), item.get("valorProdutos")), 0.0),
-            "valor_frete": _coerce_float(_primeiro_preenchido(totais.get("valorFrete"), item.get("valorFrete")), 0.0),
-            "valor_seguro": _coerce_float(_primeiro_preenchido(totais.get("valorSeguro"), item.get("valorSeguro")), 0.0),
-            "outras_despesas": _coerce_float(_primeiro_preenchido(totais.get("outrasDespesas"), item.get("outrasDespesas")), 0.0),
-            "valor_desconto": _coerce_float(_primeiro_preenchido(totais.get("valorDesconto"), item.get("valorDesconto")), 0.0),
+            "valor_produtos": _coerce_float(
+                _primeiro_preenchido(
+                    totais.get("valorProdutos"), item.get("valorProdutos")
+                ),
+                0.0,
+            ),
+            "valor_frete": _coerce_float(
+                _primeiro_preenchido(totais.get("valorFrete"), item.get("valorFrete")),
+                0.0,
+            ),
+            "valor_seguro": _coerce_float(
+                _primeiro_preenchido(
+                    totais.get("valorSeguro"), item.get("valorSeguro")
+                ),
+                0.0,
+            ),
+            "outras_despesas": _coerce_float(
+                _primeiro_preenchido(
+                    totais.get("outrasDespesas"), item.get("outrasDespesas")
+                ),
+                0.0,
+            ),
+            "valor_desconto": _coerce_float(
+                _primeiro_preenchido(
+                    totais.get("valorDesconto"), item.get("valorDesconto")
+                ),
+                0.0,
+            ),
             "valor_total": _extrair_valor_nota(item),
         },
         "transporte": {
-            "tipo": _texto(_primeiro_preenchido(_texto_relacionado(transporte.get("tipo")), _texto_relacionado(transporte.get("modalidade")))),
-            "frete_por_conta": _texto(_primeiro_preenchido(_texto_relacionado(transporte.get("fretePorConta")), _texto_relacionado(item.get("fretePorConta")))),
+            "tipo": _texto(
+                _primeiro_preenchido(
+                    _texto_relacionado(transporte.get("tipo")),
+                    _texto_relacionado(transporte.get("modalidade")),
+                )
+            ),
+            "frete_por_conta": _texto(
+                _primeiro_preenchido(
+                    _texto_relacionado(transporte.get("fretePorConta")),
+                    _texto_relacionado(item.get("fretePorConta")),
+                )
+            ),
         },
         "endereco_entrega": {
-            "nome": _texto(_primeiro_preenchido(endereco_entrega.get("nome"), contato.get("nome"))),
+            "nome": _texto(
+                _primeiro_preenchido(endereco_entrega.get("nome"), contato.get("nome"))
+            ),
             "cep": _texto(endereco_entrega.get("cep")),
-            "uf": _texto(_primeiro_preenchido(endereco_entrega.get("uf"), endereco_entrega.get("estado"))),
-            "municipio": _texto(_primeiro_preenchido(endereco_entrega.get("municipio"), endereco_entrega.get("cidade"))),
+            "uf": _texto(
+                _primeiro_preenchido(
+                    endereco_entrega.get("uf"), endereco_entrega.get("estado")
+                )
+            ),
+            "municipio": _texto(
+                _primeiro_preenchido(
+                    endereco_entrega.get("municipio"), endereco_entrega.get("cidade")
+                )
+            ),
             "bairro": _texto(endereco_entrega.get("bairro")),
-            "endereco": _formatar_endereco(_primeiro_preenchido(endereco_entrega.get("endereco"), endereco_entrega.get("logradouro"), endereco_entrega)),
+            "endereco": _formatar_endereco(
+                _primeiro_preenchido(
+                    endereco_entrega.get("endereco"),
+                    endereco_entrega.get("logradouro"),
+                    endereco_entrega,
+                )
+            ),
             "numero": _texto(endereco_entrega.get("numero")),
             "complemento": _texto(endereco_entrega.get("complemento")),
         },
         "pagamento": {
-            "condicao": _texto(_primeiro_preenchido(
-                _texto_relacionado(pagamento.get("condicaoPagamento")),
-                _texto_relacionado(pagamento.get("descricaoCondicaoPagamento")),
-                item.get("condicaoPagamento"),
-            )),
-            "categoria": _texto(_primeiro_preenchido(_texto_relacionado(pagamento.get("categoria")), _texto_relacionado(item.get("categoria")))),
+            "condicao": _texto(
+                _primeiro_preenchido(
+                    _texto_relacionado(pagamento.get("condicaoPagamento")),
+                    _texto_relacionado(pagamento.get("descricaoCondicaoPagamento")),
+                    item.get("condicaoPagamento"),
+                )
+            ),
+            "categoria": _texto(
+                _primeiro_preenchido(
+                    _texto_relacionado(pagamento.get("categoria")),
+                    _texto_relacionado(item.get("categoria")),
+                )
+            ),
             "parcelas": parcelas,
         },
         "intermediador": {
-            "ativo": _texto(_primeiro_preenchido(_texto_relacionado(intermediador.get("tipo")), _texto_relacionado(intermediador.get("ativo")))),
-            "cnpj": _texto(_primeiro_preenchido(intermediador.get("cnpj"), resumo_canal.get("intermediador", {}).get("cnpj"))),
-            "identificacao": _texto(_primeiro_preenchido(
-                intermediador.get("identificacao"),
-                intermediador.get("identificacaoIntermediador"),
-                resumo_canal.get("intermediador", {}).get("identificacao"),
-            )),
+            "ativo": _texto(
+                _primeiro_preenchido(
+                    _texto_relacionado(intermediador.get("tipo")),
+                    _texto_relacionado(intermediador.get("ativo")),
+                )
+            ),
+            "cnpj": _texto(
+                _primeiro_preenchido(
+                    intermediador.get("cnpj"),
+                    resumo_canal.get("intermediador", {}).get("cnpj"),
+                )
+            ),
+            "identificacao": _texto(
+                _primeiro_preenchido(
+                    intermediador.get("identificacao"),
+                    intermediador.get("identificacaoIntermediador"),
+                    resumo_canal.get("intermediador", {}).get("identificacao"),
+                )
+            ),
         },
         "informacoes_adicionais": {
             "numero_loja_virtual": resumo_canal.get("numero_loja_virtual"),
             "origem_loja_virtual": resumo_canal.get("origem_loja_virtual"),
             "origem_canal_venda": resumo_canal.get("origem_canal_venda"),
             "numero_pedido_loja": resumo_canal.get("numero_pedido_loja"),
-            "informacoes_complementares": _texto(_primeiro_preenchido(
-                info_adicionais.get("informacoesComplementares"),
-                item.get("informacoesComplementares"),
-            )),
-            "informacoes_fisco": _texto(_primeiro_preenchido(
-                info_adicionais.get("informacoesAdicionaisInteresseFisco"),
-                info_adicionais.get("informacoesInteresseFisco"),
-                item.get("informacoesAdicionaisInteresseFisco"),
-            )),
+            "informacoes_complementares": _texto(
+                _primeiro_preenchido(
+                    info_adicionais.get("informacoesComplementares"),
+                    item.get("informacoesComplementares"),
+                )
+            ),
+            "informacoes_fisco": _texto(
+                _primeiro_preenchido(
+                    info_adicionais.get("informacoesAdicionaisInteresseFisco"),
+                    info_adicionais.get("informacoesInteresseFisco"),
+                    item.get("informacoesAdicionaisInteresseFisco"),
+                )
+            ),
         },
         "pessoas_autorizadas_xml": pessoas_autorizadas,
         "canal": resumo_canal.get("canal"),
@@ -783,7 +1077,11 @@ def _consultar_detalhe_nota_bling(
         if _detalhe_nota_valido(detalhe_cache):
             return detalhe_cache, modelo_atual, venda
         try:
-            detalhe = bling.consultar_nfce(nfe_id) if modelo_atual == 65 else bling.consultar_nfe(nfe_id)
+            detalhe = (
+                bling.consultar_nfce(nfe_id)
+                if modelo_atual == 65
+                else bling.consultar_nfe(nfe_id)
+            )
             if _detalhe_nota_valido(detalhe):
                 _salvar_detalhe_nfe_cache(tenant_id, nfe_id, modelo_atual, detalhe)
                 upsert_nota_cache(
@@ -804,11 +1102,17 @@ def _consultar_detalhe_nota_bling(
         "numero": venda.nfe_numero if venda else None,
         "serie": venda.nfe_serie if venda else None,
         "chaveAcesso": venda.nfe_chave if venda else None,
-        "situacao": {"descricao": venda.nfe_status} if venda and venda.nfe_status else None,
-        "dataEmissao": venda.nfe_data_emissao.isoformat() if venda and venda.nfe_data_emissao else None,
+        "situacao": {"descricao": venda.nfe_status}
+        if venda and venda.nfe_status
+        else None,
+        "dataEmissao": venda.nfe_data_emissao.isoformat()
+        if venda and venda.nfe_data_emissao
+        else None,
         "contato": {
             "nome": venda.cliente.nome if venda and venda.cliente else None,
-            "cpfCnpj": (venda.cliente.cpf or venda.cliente.cnpj) if venda and venda.cliente else None,
+            "cpfCnpj": (venda.cliente.cpf or venda.cliente.cnpj)
+            if venda and venda.cliente
+            else None,
         },
         "totais": {
             "valorTotal": float(venda.total or 0) if venda else 0,
@@ -919,12 +1223,19 @@ def _extrair_valor_nota(item: dict) -> float:
         except (TypeError, ValueError):
             continue
 
-    parcelas = _list(_primeiro_preenchido(pagamento.get("parcelas"), item.get("parcelas")))
+    parcelas = _list(
+        _primeiro_preenchido(pagamento.get("parcelas"), item.get("parcelas"))
+    )
     if parcelas:
         total_parcelas = 0.0
         encontrou_parcela = False
         for parcela in parcelas:
-            valor = _coerce_float(_primeiro_preenchido(_dict(parcela).get("valor"), _dict(parcela).get("valorParcela")), None)
+            valor = _coerce_float(
+                _primeiro_preenchido(
+                    _dict(parcela).get("valor"), _dict(parcela).get("valorParcela")
+                ),
+                None,
+            )
             if valor is None:
                 continue
             total_parcelas += valor
@@ -932,29 +1243,58 @@ def _extrair_valor_nota(item: dict) -> float:
         if encontrou_parcela:
             return total_parcelas
 
-    valor_produtos = _coerce_float(_primeiro_preenchido(totais.get("valorProdutos"), item.get("valorProdutos")), None)
-    valor_frete = _coerce_float(_primeiro_preenchido(totais.get("valorFrete"), item.get("valorFrete")), 0.0)
-    valor_seguro = _coerce_float(_primeiro_preenchido(totais.get("valorSeguro"), item.get("valorSeguro")), 0.0)
-    outras_despesas = _coerce_float(_primeiro_preenchido(totais.get("outrasDespesas"), item.get("outrasDespesas")), 0.0)
-    valor_desconto = _coerce_float(_primeiro_preenchido(totais.get("valorDesconto"), item.get("valorDesconto")), 0.0)
+    valor_produtos = _coerce_float(
+        _primeiro_preenchido(totais.get("valorProdutos"), item.get("valorProdutos")),
+        None,
+    )
+    valor_frete = _coerce_float(
+        _primeiro_preenchido(totais.get("valorFrete"), item.get("valorFrete")), 0.0
+    )
+    valor_seguro = _coerce_float(
+        _primeiro_preenchido(totais.get("valorSeguro"), item.get("valorSeguro")), 0.0
+    )
+    outras_despesas = _coerce_float(
+        _primeiro_preenchido(totais.get("outrasDespesas"), item.get("outrasDespesas")),
+        0.0,
+    )
+    valor_desconto = _coerce_float(
+        _primeiro_preenchido(totais.get("valorDesconto"), item.get("valorDesconto")),
+        0.0,
+    )
     if valor_produtos is not None:
-        return max(valor_produtos + valor_frete + valor_seguro + outras_despesas - valor_desconto, 0.0)
+        return max(
+            valor_produtos
+            + valor_frete
+            + valor_seguro
+            + outras_despesas
+            - valor_desconto,
+            0.0,
+        )
     return 0.0
 
 
 def _identificadores_pedido_integrado(pedido: PedidoIntegrado) -> set[str]:
     payload = _dict(pedido.payload)
     pedido_payload = _dict(_primeiro_preenchido(payload.get("pedido"), payload))
-    ultima_nf = _dict(_primeiro_preenchido(payload.get("ultima_nf"), pedido_payload.get("notaFiscal"), pedido_payload.get("nota"), pedido_payload.get("nfe")))
+    ultima_nf = _dict(
+        _primeiro_preenchido(
+            payload.get("ultima_nf"),
+            pedido_payload.get("notaFiscal"),
+            pedido_payload.get("nota"),
+            pedido_payload.get("nfe"),
+        )
+    )
     identificadores = {
         _texto(pedido.pedido_bling_id),
         _texto(pedido.pedido_bling_numero),
-        _texto(_primeiro_preenchido(
-            pedido_payload.get("numeroPedidoLoja"),
-            pedido_payload.get("numeroLoja"),
-            pedido_payload.get("numeroPedido"),
-            pedido_payload.get("numero"),
-        )),
+        _texto(
+            _primeiro_preenchido(
+                pedido_payload.get("numeroPedidoLoja"),
+                pedido_payload.get("numeroLoja"),
+                pedido_payload.get("numeroPedido"),
+                pedido_payload.get("numero"),
+            )
+        ),
         _texto(_primeiro_preenchido(ultima_nf.get("id"), ultima_nf.get("nfe_id"))),
         _texto(ultima_nf.get("numero")),
     }
@@ -964,8 +1304,21 @@ def _identificadores_pedido_integrado(pedido: PedidoIntegrado) -> set[str]:
 def _extrair_total_pedido_integrado(pedido: PedidoIntegrado) -> float:
     payload = _dict(pedido.payload)
     pedido_payload = _dict(_primeiro_preenchido(payload.get("pedido"), payload))
-    ultima_nf = _dict(_primeiro_preenchido(payload.get("ultima_nf"), pedido_payload.get("notaFiscal"), pedido_payload.get("nota"), pedido_payload.get("nfe")))
-    totais = _dict(_primeiro_preenchido(pedido_payload.get("totais"), pedido_payload.get("financeiro"), payload.get("totais")))
+    ultima_nf = _dict(
+        _primeiro_preenchido(
+            payload.get("ultima_nf"),
+            pedido_payload.get("notaFiscal"),
+            pedido_payload.get("nota"),
+            pedido_payload.get("nfe"),
+        )
+    )
+    totais = _dict(
+        _primeiro_preenchido(
+            pedido_payload.get("totais"),
+            pedido_payload.get("financeiro"),
+            payload.get("totais"),
+        )
+    )
 
     valor_total = _extrair_valor_nota(ultima_nf)
     if valor_total > 0:
@@ -984,12 +1337,17 @@ def _extrair_total_pedido_integrado(pedido: PedidoIntegrado) -> float:
     if valor_total > 0:
         return valor_total
 
-    itens = _list(_primeiro_preenchido(pedido_payload.get("itens"), payload.get("itens")))
+    itens = _list(
+        _primeiro_preenchido(pedido_payload.get("itens"), payload.get("itens"))
+    )
     total_itens = 0.0
     encontrou_item = False
     for item in itens:
         item_dict = _dict(_primeiro_preenchido(item.get("item"), item))
-        quantidade = _coerce_float(_primeiro_preenchido(item_dict.get("quantidade"), item.get("quantidade")), 0.0)
+        quantidade = _coerce_float(
+            _primeiro_preenchido(item_dict.get("quantidade"), item.get("quantidade")),
+            0.0,
+        )
         total_item = _coerce_float(
             _primeiro_preenchido(
                 item_dict.get("total"),
@@ -1024,16 +1382,22 @@ def _extrair_total_pedido_integrado(pedido: PedidoIntegrado) -> float:
             total_itens += total_item
 
     if encontrou_item:
-        frete = _coerce_float(_primeiro_preenchido(
-            pedido_payload.get("frete"),
-            _dict(pedido_payload.get("transporte")).get("frete"),
-            totais.get("valorFrete"),
-        ), 0.0)
-        desconto = _coerce_float(_primeiro_preenchido(
-            pedido_payload.get("desconto"),
-            pedido_payload.get("valorDesconto"),
-            totais.get("valorDesconto"),
-        ), 0.0)
+        frete = _coerce_float(
+            _primeiro_preenchido(
+                pedido_payload.get("frete"),
+                _dict(pedido_payload.get("transporte")).get("frete"),
+                totais.get("valorFrete"),
+            ),
+            0.0,
+        )
+        desconto = _coerce_float(
+            _primeiro_preenchido(
+                pedido_payload.get("desconto"),
+                pedido_payload.get("valorDesconto"),
+                totais.get("valorDesconto"),
+            ),
+            0.0,
+        )
         return max(total_itens + frete - desconto, 0.0)
 
     return 0.0
@@ -1062,30 +1426,38 @@ def _resumo_pedido_integrado(pedido: PedidoIntegrado) -> dict:
             "id": loja.get("id"),
             "nome": loja_nome,
         },
-        "numero_loja_virtual": _texto(_primeiro_preenchido(
-            pedido_payload.get("numeroPedidoLoja"),
-            pedido_payload.get("numeroLoja"),
-            pedido_payload.get("numeroPedido"),
-            pedido_payload.get("numero"),
-        )),
-        "numero_pedido_loja": _texto(_primeiro_preenchido(
-            pedido_payload.get("numeroPedidoLoja"),
-            pedido_payload.get("numeroLoja"),
-            pedido_payload.get("numeroPedido"),
-            pedido_payload.get("numero"),
-        )),
-        "origem_loja_virtual": _texto(_primeiro_preenchido(
-            pedido_payload.get("origemLojaVirtual"),
-            marketplace.get("nome"),
-            marketplace.get("descricao"),
-            loja_nome,
-        )),
-        "origem_canal_venda": _texto(_primeiro_preenchido(
-            pedido_payload.get("origemCanalVenda"),
-            marketplace.get("nome"),
-            marketplace.get("descricao"),
-            _canal_label(canal, canal_base),
-        )),
+        "numero_loja_virtual": _texto(
+            _primeiro_preenchido(
+                pedido_payload.get("numeroPedidoLoja"),
+                pedido_payload.get("numeroLoja"),
+                pedido_payload.get("numeroPedido"),
+                pedido_payload.get("numero"),
+            )
+        ),
+        "numero_pedido_loja": _texto(
+            _primeiro_preenchido(
+                pedido_payload.get("numeroPedidoLoja"),
+                pedido_payload.get("numeroLoja"),
+                pedido_payload.get("numeroPedido"),
+                pedido_payload.get("numero"),
+            )
+        ),
+        "origem_loja_virtual": _texto(
+            _primeiro_preenchido(
+                pedido_payload.get("origemLojaVirtual"),
+                marketplace.get("nome"),
+                marketplace.get("descricao"),
+                loja_nome,
+            )
+        ),
+        "origem_canal_venda": _texto(
+            _primeiro_preenchido(
+                pedido_payload.get("origemCanalVenda"),
+                marketplace.get("nome"),
+                marketplace.get("descricao"),
+                _canal_label(canal, canal_base),
+            )
+        ),
     }
 
 
@@ -1130,7 +1502,9 @@ def _planejar_sincronizacao_bling_nfes(
     agora: datetime | None = None,
 ) -> tuple[bool, str | None, str | None, str]:
     agora_ref = agora or datetime.now()
-    data_final_sync = _formatar_data_param_bling(data_final) or agora_ref.date().isoformat()
+    data_final_sync = (
+        _formatar_data_param_bling(data_final) or agora_ref.date().isoformat()
+    )
     data_inicial_sync = _formatar_data_param_bling(data_inicial)
     cache_stale = (
         force_refresh
@@ -1146,7 +1520,9 @@ def _planejar_sincronizacao_bling_nfes(
     if cache_total <= 0:
         return (
             True,
-            (agora_ref - timedelta(days=_NFE_SYNC_DEFAULT_LOOKBACK_DAYS)).date().isoformat(),
+            (agora_ref - timedelta(days=_NFE_SYNC_DEFAULT_LOOKBACK_DAYS))
+            .date()
+            .isoformat(),
             data_final_sync,
             "bootstrap_cache_vazio",
         )
@@ -1159,11 +1535,18 @@ def _planejar_sincronizacao_bling_nfes(
         (base_data - timedelta(days=_NFE_SYNC_SAFETY_LOOKBACK_DAYS)).date(),
         (agora_ref - timedelta(days=_NFE_SYNC_DEFAULT_LOOKBACK_DAYS)).date(),
     )
-    return True, janela_inicial.isoformat(), data_final_sync, "janela_incremental_recente"
+    return (
+        True,
+        janela_inicial.isoformat(),
+        data_final_sync,
+        "janela_incremental_recente",
+    )
 
 
 def _status_local_ultima_nf(ultima_nf: dict) -> str:
-    situacao_textual = _texto(_primeiro_preenchido(ultima_nf.get("situacao"), ultima_nf.get("status")))
+    situacao_textual = _texto(
+        _primeiro_preenchido(ultima_nf.get("situacao"), ultima_nf.get("status"))
+    )
     if situacao_textual:
         if situacao_textual.isdigit():
             return _STATUS_MAP.get(_coerce_int(situacao_textual, 0), situacao_textual)
@@ -1185,9 +1568,15 @@ def _normalizar_nota_pedido_integrado(pedido: PedidoIntegrado) -> dict | None:
         )
     )
     resumo = _resumo_pedido_integrado(pedido)
-    contato = _dict(_primeiro_preenchido(pedido_payload.get("contato"), pedido_payload.get("cliente")))
+    contato = _dict(
+        _primeiro_preenchido(
+            pedido_payload.get("contato"), pedido_payload.get("cliente")
+        )
+    )
 
-    nf_bling_id = _texto(_primeiro_preenchido(ultima_nf.get("id"), ultima_nf.get("nfe_id")))
+    nf_bling_id = _texto(
+        _primeiro_preenchido(ultima_nf.get("id"), ultima_nf.get("nfe_id"))
+    )
     if nf_bling_id in {"-1", "0"}:
         nf_bling_id = None
     nf_numero = _texto(ultima_nf.get("numero"))
@@ -1212,17 +1601,25 @@ def _normalizar_nota_pedido_integrado(pedido: PedidoIntegrado) -> dict | None:
         "tipo": "nfe",
         "tipo_codigo": 0,
         "modelo": 55,
-        "chave": _texto(_primeiro_preenchido(ultima_nf.get("chave"), ultima_nf.get("chaveAcesso"))),
+        "chave": _texto(
+            _primeiro_preenchido(ultima_nf.get("chave"), ultima_nf.get("chaveAcesso"))
+        ),
         "status": _status_local_ultima_nf(ultima_nf),
         "data_emissao": data_emissao,
         "valor": _coerce_float(
-            _primeiro_preenchido(ultima_nf.get("valor_total"), resumo.get("valor_total")),
+            _primeiro_preenchido(
+                ultima_nf.get("valor_total"), resumo.get("valor_total")
+            ),
             0.0,
         ),
         "cliente": {
             "id": contato.get("id"),
             "nome": _texto_relacionado(contato, fallback_to_id=False),
-            "cpf_cnpj": _texto(_primeiro_preenchido(contato.get("cpf"), contato.get("cnpj"), contato.get("cpfCnpj"))),
+            "cpf_cnpj": _texto(
+                _primeiro_preenchido(
+                    contato.get("cpf"), contato.get("cnpj"), contato.get("cpfCnpj")
+                )
+            ),
         },
         "canal": resumo.get("canal"),
         "canal_label": resumo.get("canal_label"),
@@ -1281,7 +1678,11 @@ def _adicionar_notas_de_pedidos_integrados(
             continue
 
         data_nota = _parse_data_referencia(nota.get("data_emissao"))
-        if data_inicial_ref and data_nota and data_nota.date() < data_inicial_ref.date():
+        if (
+            data_inicial_ref
+            and data_nota
+            and data_nota.date() < data_inicial_ref.date()
+        ):
             continue
         if data_final_ref and data_nota and data_nota.date() > data_final_ref.date():
             continue
@@ -1290,7 +1691,9 @@ def _adicionar_notas_de_pedidos_integrados(
         chaves_existentes.add(chave_nota)
 
 
-def _enriquecer_notas_com_pedidos_integrados(db: Session, tenant_id, notas: list[dict], limite_scan: int = 3000) -> None:
+def _enriquecer_notas_com_pedidos_integrados(
+    db: Session, tenant_id, notas: list[dict], limite_scan: int = 3000
+) -> None:
     identificadores_desejados: set[str] = set()
     for nota in notas:
         for identificador in (
@@ -1329,7 +1732,14 @@ def _enriquecer_notas_com_pedidos_integrados(db: Session, tenant_id, notas: list
             _texto(nota.get("id")),
             _texto(nota.get("numero")),
         ]
-        contexto = next((mapa_identificadores.get(candidato) for candidato in candidatos if candidato and mapa_identificadores.get(candidato)), None)
+        contexto = next(
+            (
+                mapa_identificadores.get(candidato)
+                for candidato in candidatos
+                if candidato and mapa_identificadores.get(candidato)
+            ),
+            None,
+        )
         if not contexto:
             continue
 
@@ -1340,10 +1750,18 @@ def _enriquecer_notas_com_pedidos_integrados(db: Session, tenant_id, notas: list
             nota["loja"] = contexto.get("loja")
         if not nota.get("valor") and contexto.get("valor_total"):
             nota["valor"] = float(contexto.get("valor_total") or 0)
-        nota["numero_loja_virtual"] = nota.get("numero_loja_virtual") or contexto.get("numero_loja_virtual")
-        nota["origem_loja_virtual"] = nota.get("origem_loja_virtual") or contexto.get("origem_loja_virtual")
-        nota["origem_canal_venda"] = nota.get("origem_canal_venda") or contexto.get("origem_canal_venda")
-        nota["numero_pedido_loja"] = nota.get("numero_pedido_loja") or contexto.get("numero_pedido_loja")
+        nota["numero_loja_virtual"] = nota.get("numero_loja_virtual") or contexto.get(
+            "numero_loja_virtual"
+        )
+        nota["origem_loja_virtual"] = nota.get("origem_loja_virtual") or contexto.get(
+            "origem_loja_virtual"
+        )
+        nota["origem_canal_venda"] = nota.get("origem_canal_venda") or contexto.get(
+            "origem_canal_venda"
+        )
+        nota["numero_pedido_loja"] = nota.get("numero_pedido_loja") or contexto.get(
+            "numero_pedido_loja"
+        )
 
 
 def _normalizar_nota_bling(item: dict, modelo: int) -> dict:
@@ -1364,7 +1782,9 @@ def _normalizar_nota_bling(item: dict, modelo: int) -> dict:
         "cliente": {
             "id": contato.get("id"),
             "nome": contato.get("nome") or contato.get("descricao"),
-            "cpf_cnpj": contato.get("cpf") or contato.get("cnpj") or contato.get("cpfCnpj"),
+            "cpf_cnpj": contato.get("cpf")
+            or contato.get("cnpj")
+            or contato.get("cpfCnpj"),
         },
         "canal": resumo_canal.get("canal"),
         "canal_label": resumo_canal.get("canal_label"),
@@ -1391,12 +1811,16 @@ def _normalizar_nota_venda_local(venda: Venda) -> dict:
         "modelo": _coerce_int(venda.nfe_modelo, 65 if _venda_usa_nfce(venda) else 55),
         "chave": venda.nfe_chave,
         "status": venda.nfe_status or "Pendente",
-        "data_emissao": venda.nfe_data_emissao.isoformat() if venda.nfe_data_emissao else None,
+        "data_emissao": venda.nfe_data_emissao.isoformat()
+        if venda.nfe_data_emissao
+        else None,
         "valor": float(venda.total or 0),
         "cliente": {
             "id": venda.cliente.id if venda.cliente else None,
             "nome": venda.cliente.nome if venda.cliente else None,
-            "cpf_cnpj": (venda.cliente.cpf or venda.cliente.cnpj) if venda.cliente else None,
+            "cpf_cnpj": (venda.cliente.cpf or venda.cliente.cnpj)
+            if venda.cliente
+            else None,
         },
         "canal": _texto(venda.canal),
         "canal_label": _canal_label(canal_slug, venda.canal),
@@ -1434,7 +1858,9 @@ def _sincronizar_vendas_em_cache(
             )
         )
 
-    for venda in query.order_by(Venda.updated_at.desc(), Venda.nfe_data_emissao.desc()).all():
+    for venda in query.order_by(
+        Venda.updated_at.desc(), Venda.nfe_data_emissao.desc()
+    ).all():
         upsert_nota_cache(
             db,
             tenant_id,
@@ -1455,7 +1881,9 @@ def _sincronizar_pedidos_integrados_em_cache(
         query = query.filter(PedidoIntegrado.updated_at >= desde)
 
     pedidos = (
-        query.order_by(PedidoIntegrado.updated_at.desc(), PedidoIntegrado.created_at.desc())
+        query.order_by(
+            PedidoIntegrado.updated_at.desc(), PedidoIntegrado.created_at.desc()
+        )
         .limit(limite_scan)
         .all()
     )
@@ -1481,7 +1909,11 @@ def _sincronizar_fontes_locais_nfe_em_cache(
 ) -> None:
     estado = estado_cache or obter_estado_cache_notas(db, tenant_id)
     desde = None
-    if estado.get("total") and not force_refresh and isinstance(estado.get("ultimo_sync"), datetime):
+    if (
+        estado.get("total")
+        and not force_refresh
+        and isinstance(estado.get("ultimo_sync"), datetime)
+    ):
         desde = estado["ultimo_sync"] - timedelta(hours=6)
 
     _sincronizar_vendas_em_cache(db, tenant_id, desde=desde)
@@ -1505,7 +1937,9 @@ def _enriquecer_notas_com_vendas(db: Session, tenant_id, notas: list[dict]) -> N
         )
         .all()
     )
-    vendas_por_bling_id = {str(venda.nfe_bling_id): venda for venda in vendas if venda.nfe_bling_id}
+    vendas_por_bling_id = {
+        str(venda.nfe_bling_id): venda for venda in vendas if venda.nfe_bling_id
+    }
 
     for nota in notas:
         venda = vendas_por_bling_id.get(str(nota.get("id") or ""))
@@ -1522,13 +1956,21 @@ def _enriquecer_notas_com_vendas(db: Session, tenant_id, notas: list[dict]) -> N
         if venda.cliente:
             cliente["id"] = cliente.get("id") or venda.cliente.id
             cliente["nome"] = cliente.get("nome") or venda.cliente.nome
-            cliente["cpf_cnpj"] = cliente.get("cpf_cnpj") or venda.cliente.cpf or venda.cliente.cnpj
+            cliente["cpf_cnpj"] = (
+                cliente.get("cpf_cnpj") or venda.cliente.cpf or venda.cliente.cnpj
+            )
         nota["cliente"] = cliente
 
         nota["canal"] = nota.get("canal") or _texto(venda.canal)
-        nota["canal_label"] = nota.get("canal_label") or _canal_label(_canal_slug(venda.canal), venda.canal)
-        nota["numero_pedido_loja"] = nota.get("numero_pedido_loja") or _texto(venda.numero_venda)
-        if not isinstance(nota.get("loja"), dict) or not nota.get("loja", {}).get("nome"):
+        nota["canal_label"] = nota.get("canal_label") or _canal_label(
+            _canal_slug(venda.canal), venda.canal
+        )
+        nota["numero_pedido_loja"] = nota.get("numero_pedido_loja") or _texto(
+            venda.numero_venda
+        )
+        if not isinstance(nota.get("loja"), dict) or not nota.get("loja", {}).get(
+            "nome"
+        ):
             nota["loja"] = {
                 "id": None,
                 "nome": _texto(venda.loja_origem),
@@ -1561,7 +2003,9 @@ def _enriquecer_notas_com_detalhes_bling(
         precisa_resumo_canal = not any(
             (
                 nota.get("canal_label"),
-                nota.get("loja", {}).get("nome") if isinstance(nota.get("loja"), dict) else None,
+                nota.get("loja", {}).get("nome")
+                if isinstance(nota.get("loja"), dict)
+                else None,
                 nota.get("origem_loja_virtual"),
                 nota.get("numero_pedido_loja"),
             )
@@ -1596,15 +2040,25 @@ def _enriquecer_notas_com_detalhes_bling(
                     intervalo = monotonic() - ultima_consulta_ts
                     if intervalo < 0.36:
                         sleep(0.36 - intervalo)
-                detalhe = bling.consultar_nfce(nota_id) if modelo_nota == 65 else bling.consultar_nfe(nota_id)
+                detalhe = (
+                    bling.consultar_nfce(nota_id)
+                    if modelo_nota == 65
+                    else bling.consultar_nfe(nota_id)
+                )
                 ultima_consulta_ts = monotonic()
                 if _detalhe_nota_valido(detalhe):
                     _salvar_detalhe_nfe_cache(tenant_id, nota_id, modelo_nota, detalhe)
                     fetched_remotamente = True
             if not _detalhe_nota_valido(detalhe):
                 continue
-            nota["numero"] = _texto(_primeiro_preenchido(detalhe.get("numero"), nota.get("numero"))) or ""
-            nota["serie"] = _texto(_primeiro_preenchido(detalhe.get("serie"), nota.get("serie"))) or ""
+            nota["numero"] = (
+                _texto(_primeiro_preenchido(detalhe.get("numero"), nota.get("numero")))
+                or ""
+            )
+            nota["serie"] = (
+                _texto(_primeiro_preenchido(detalhe.get("serie"), nota.get("serie")))
+                or ""
+            )
             nota["data_emissao"] = _primeiro_preenchido(
                 detalhe.get("dataEmissao"),
                 detalhe.get("data_emissao"),
@@ -1616,7 +2070,9 @@ def _enriquecer_notas_com_detalhes_bling(
             contato = detalhe.get("contato") or {}
             cliente = nota.get("cliente") or {}
             cliente["id"] = cliente.get("id") or contato.get("id")
-            cliente["nome"] = cliente.get("nome") or contato.get("nome") or contato.get("descricao")
+            cliente["nome"] = (
+                cliente.get("nome") or contato.get("nome") or contato.get("descricao")
+            )
             cliente["cpf_cnpj"] = (
                 cliente.get("cpf_cnpj")
                 or contato.get("cpf")
@@ -1626,15 +2082,31 @@ def _enriquecer_notas_com_detalhes_bling(
             nota["cliente"] = cliente
             resumo_canal = _normalizar_resumo_canal(detalhe)
             nota["canal"] = nota.get("canal") or resumo_canal.get("canal")
-            nota["canal_label"] = nota.get("canal_label") or resumo_canal.get("canal_label")
-            if not isinstance(nota.get("loja"), dict) or not nota.get("loja", {}).get("nome"):
+            nota["canal_label"] = nota.get("canal_label") or resumo_canal.get(
+                "canal_label"
+            )
+            if not isinstance(nota.get("loja"), dict) or not nota.get("loja", {}).get(
+                "nome"
+            ):
                 nota["loja"] = resumo_canal.get("loja")
-            nota["unidade_negocio"] = nota.get("unidade_negocio") or resumo_canal.get("unidade_negocio")
-            nota["numero_loja_virtual"] = nota.get("numero_loja_virtual") or resumo_canal.get("numero_loja_virtual")
-            nota["origem_loja_virtual"] = nota.get("origem_loja_virtual") or resumo_canal.get("origem_loja_virtual")
-            nota["origem_canal_venda"] = nota.get("origem_canal_venda") or resumo_canal.get("origem_canal_venda")
-            nota["numero_pedido_loja"] = nota.get("numero_pedido_loja") or resumo_canal.get("numero_pedido_loja")
-            nota["pedido_bling_id_ref"] = nota.get("pedido_bling_id_ref") or resumo_canal.get("pedido_bling_id_ref")
+            nota["unidade_negocio"] = nota.get("unidade_negocio") or resumo_canal.get(
+                "unidade_negocio"
+            )
+            nota["numero_loja_virtual"] = nota.get(
+                "numero_loja_virtual"
+            ) or resumo_canal.get("numero_loja_virtual")
+            nota["origem_loja_virtual"] = nota.get(
+                "origem_loja_virtual"
+            ) or resumo_canal.get("origem_loja_virtual")
+            nota["origem_canal_venda"] = nota.get(
+                "origem_canal_venda"
+            ) or resumo_canal.get("origem_canal_venda")
+            nota["numero_pedido_loja"] = nota.get(
+                "numero_pedido_loja"
+            ) or resumo_canal.get("numero_pedido_loja")
+            nota["pedido_bling_id_ref"] = nota.get(
+                "pedido_bling_id_ref"
+            ) or resumo_canal.get("pedido_bling_id_ref")
             if (
                 fetched_remotamente
                 or precisa_numero
@@ -1653,7 +2125,10 @@ def _enriquecer_notas_com_detalhes_bling(
             if fetched_remotamente:
                 consultas += 1
         except Exception as e:
-            logger.warning("listar_nfes", f"Falha ao enriquecer NF {nota_id} via detalhe do Bling: {e}")
+            logger.warning(
+                "listar_nfes",
+                f"Falha ao enriquecer NF {nota_id} via detalhe do Bling: {e}",
+            )
             mensagem = str(e).upper()
             if "429" in mensagem or "TOO_MANY_REQUESTS" in mensagem:
                 break
@@ -1672,7 +2147,9 @@ def _sincronizar_cache_nfes_com_bling(
     try:
         bling = BlingAPI()
     except Exception as e:
-        logger.warning("listar_nfes", f"Bling indisponivel para sincronizacao incremental: {e}")
+        logger.warning(
+            "listar_nfes", f"Bling indisponivel para sincronizacao incremental: {e}"
+        )
         return False, []
 
     try:
@@ -1681,11 +2158,14 @@ def _sincronizar_cache_nfes_com_bling(
             data_final=data_final,
             situacao=situacao,
         )
-        for item in (resp_nfe.get("data") or []):
+        for item in resp_nfe.get("data") or []:
             notas_sincronizadas.append(_normalizar_nota_bling(item, modelo=55))
         bling_ok = True
     except Exception as e:
-        logger.warning("listar_nfes", f"Bling NF-e nao disponivel para sincronizacao incremental: {e}")
+        logger.warning(
+            "listar_nfes",
+            f"Bling NF-e nao disponivel para sincronizacao incremental: {e}",
+        )
         if "TOO_MANY_REQUESTS" in str(e).upper() or "429" in str(e):
             BlingSyncService.register_rate_limit_cooldown(e)
             return False, []
@@ -1700,7 +2180,7 @@ def _sincronizar_cache_nfes_com_bling(
             (str(nota.get("id") or ""), _coerce_int(nota.get("modelo"), 55))
             for nota in notas_sincronizadas
         }
-        for item in (resp_nfce.get("data") or []):
+        for item in resp_nfce.get("data") or []:
             nota = _normalizar_nota_bling(item, modelo=65)
             chave = (str(nota.get("id") or ""), _coerce_int(nota.get("modelo"), 65))
             if chave in ids_ja_adicionados:
@@ -1709,7 +2189,10 @@ def _sincronizar_cache_nfes_com_bling(
             ids_ja_adicionados.add(chave)
         bling_ok = True
     except Exception as e:
-        logger.warning("listar_nfes", f"Bling NFC-e nao disponivel para sincronizacao incremental: {e}")
+        logger.warning(
+            "listar_nfes",
+            f"Bling NFC-e nao disponivel para sincronizacao incremental: {e}",
+        )
         if "TOO_MANY_REQUESTS" in str(e).upper() or "429" in str(e):
             BlingSyncService.register_rate_limit_cooldown(e)
             return False, []
@@ -1775,7 +2258,7 @@ def _buscar_venda_para_nfe(db: Session, venda_id: int, tenant_id):
 async def prevalidar_nfe(
     request: PrevalidarNFeRequest,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Valida pendencias fiscais antes de criar a nota no Bling."""
     current_user, tenant_id = user_and_tenant
@@ -1796,32 +2279,37 @@ async def prevalidar_nfe(
 async def emitir_nfe(
     request: EmitirNFeRequest,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Emite NF-e ou NFC-e para uma venda"""
     import traceback
+
     try:
         current_user, tenant_id = user_and_tenant
         tipo_nota = _normalizar_tipo_nota(request.tipo_nota)
         venda = _buscar_venda_para_nfe(db, request.venda_id, tenant_id)
         if not venda:
             raise HTTPException(status_code=404, detail="Venda não encontrada")
-        
+
         # Verificar se venda já tem NF emitida
         if venda.nfe_bling_id:
             raise HTTPException(
-                status_code=400, 
-                detail=f"Esta venda já possui nota fiscal emitida (NF #{venda.nfe_numero}). Cancele a nota existente antes de emitir uma nova."
+                status_code=400,
+                detail=f"Esta venda já possui nota fiscal emitida (NF #{venda.nfe_numero}). Cancele a nota existente antes de emitir uma nova.",
             )
-        
+
         logger.info("emitir_nfe", "\n=== EMITINDO NF-e ===")
         logger.info("emitir_nfe", f"Venda ID: {venda.id}")
         logger.info("emitir_nfe", f"Tipo: {tipo_nota}")
 
         validacao_fiscal = prevalidar_fiscal_venda(venda, tipo_nota, db)
-        pendencias_fiscais = validacao_fiscal.get("bloqueios") or validacao_fiscal.get("correcoes")
+        pendencias_fiscais = validacao_fiscal.get("bloqueios") or validacao_fiscal.get(
+            "correcoes"
+        )
         if pendencias_fiscais:
-            if request.autorizar_correcoes_fiscais and not validacao_fiscal.get("bloqueios"):
+            if request.autorizar_correcoes_fiscais and not validacao_fiscal.get(
+                "bloqueios"
+            ):
                 aplicar_correcoes_fiscais_venda(
                     venda,
                     tipo_nota,
@@ -1842,7 +2330,7 @@ async def emitir_nfe(
                         "validacao": validacao_fiscal,
                     },
                 )
-        
+
         bling = BlingAPI()
         resultado = bling.emitir_nota_fiscal(
             venda,
@@ -1850,12 +2338,14 @@ async def emitir_nfe(
             db,
             transmitir=request.transmitir,
         )
-        
+
         logger.info("emitir_nfe", f"DEBUG: Resultado Bling: {resultado}")
-        
+
         # Extrair dados da resposta (Bling retorna em 'data')
-        dados_nota = resultado.get('data', resultado) if isinstance(resultado, dict) else {}
-        
+        dados_nota = (
+            resultado.get("data", resultado) if isinstance(resultado, dict) else {}
+        )
+
         # Atualizar venda com dados da nota
         # IMPORTANTE: tipo deve ser INTEGER (0=NF-e, 1=NFC-e) para consultas funcionarem
         venda.nfe_tipo = tipo_nota
@@ -1863,25 +2353,34 @@ async def emitir_nfe(
         venda.nfe_numero = dados_nota.get("numero")
         venda.nfe_serie = dados_nota.get("serie")
         venda.nfe_chave = dados_nota.get("chaveAcesso")
-        
+
         # Mapear situacao (número) para texto
         venda.nfe_status = _status_nota_bling(dados_nota)
-        
+
         venda.nfe_bling_id = dados_nota.get("id")
         venda.nfe_data_emissao = datetime.now()
-        
-        logger.info("emitir_nfe", f"✅ Rastreamento: Venda #{venda.id} → Bling #{venda.nfe_bling_id} (Tipo {venda.nfe_tipo}, Modelo {venda.nfe_modelo})")
-        
-        logger.info("emitir_nfe", f"DEBUG: Salvando - nfe_bling_id={venda.nfe_bling_id}, numero={venda.nfe_numero}, status={venda.nfe_status}")
-        
+
+        logger.info(
+            "emitir_nfe",
+            f"✅ Rastreamento: Venda #{venda.id} → Bling #{venda.nfe_bling_id} (Tipo {venda.nfe_tipo}, Modelo {venda.nfe_modelo})",
+        )
+
+        logger.info(
+            "emitir_nfe",
+            f"DEBUG: Salvando - nfe_bling_id={venda.nfe_bling_id}, numero={venda.nfe_numero}, status={venda.nfe_status}",
+        )
+
         # Mudar status para 'pago_nf' quando a nota for emitida
-        venda.status = 'pago_nf'
-        
+        venda.status = "pago_nf"
+
         db.commit()
         db.refresh(venda)
-        
-        logger.info("emitir_nfe", f"DEBUG: Após commit - nfe_bling_id={venda.nfe_bling_id}, venda_id={venda.id}")
-        
+
+        logger.info(
+            "emitir_nfe",
+            f"DEBUG: Após commit - nfe_bling_id={venda.nfe_bling_id}, venda_id={venda.id}",
+        )
+
         return {
             "success": True,
             "message": f"{'NF-e' if tipo_nota == 'nfe' else 'NFC-e'} emitida com sucesso",
@@ -1890,9 +2389,11 @@ async def emitir_nfe(
             "serie": dados_nota.get("serie"),
             "chave_acesso": dados_nota.get("chaveAcesso"),
             "situacao": dados_nota.get("situacao", "Pendente"),
-            "transmissao": resultado.get("transmissao") if isinstance(resultado, dict) else None,
+            "transmissao": resultado.get("transmissao")
+            if isinstance(resultado, dict)
+            else None,
         }
-        
+
     except HTTPException:
         raise
     except ValueError as e:
@@ -1937,7 +2438,7 @@ async def listar_nfes(
     situacao: Optional[str] = None,
     force_refresh: bool = False,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Lista todas as NF-e/NFC-e emitidas — busca direto do Bling (inclui marketplace)"""
     current_user, tenant_id = user_and_tenant
@@ -1948,11 +2449,14 @@ async def listar_nfes(
     if (
         not force_refresh
         and cache_atual
-        and (agora_cache - cache_atual.get("ts_monotonic", 0)) <= _NFE_LIST_CACHE_SECONDS
+        and (agora_cache - cache_atual.get("ts_monotonic", 0))
+        <= _NFE_LIST_CACHE_SECONDS
     ):
         payload_cache = deepcopy(cache_atual.get("payload", {}))
         payload_cache["cache_utilizado"] = True
-        payload_cache["cache_idade_segundos"] = int(max(agora_cache - cache_atual.get("ts_monotonic", 0), 0))
+        payload_cache["cache_idade_segundos"] = int(
+            max(agora_cache - cache_atual.get("ts_monotonic", 0), 0)
+        )
         return payload_cache
 
     estado_cache = obter_estado_cache_notas(db, tenant_id)
@@ -1973,14 +2477,16 @@ async def listar_nfes(
     )
     estado_cache = obter_estado_cache_notas(db, tenant_id)
 
-    deve_sincronizar_bling, sync_data_inicial, sync_data_final, estrategia_sync = _planejar_sincronizacao_bling_nfes(
-        force_refresh=force_refresh,
-        data_inicial=data_inicial,
-        data_final=data_final,
-        cache_total=estado_cache.get("total", 0),
-        cache_intervalo_tem_dados=cache_intervalo_tem_dados,
-        ultimo_sync=estado_cache.get("ultimo_sync"),
-        ultima_data_emissao=estado_cache.get("ultima_data_emissao"),
+    deve_sincronizar_bling, sync_data_inicial, sync_data_final, estrategia_sync = (
+        _planejar_sincronizacao_bling_nfes(
+            force_refresh=force_refresh,
+            data_inicial=data_inicial,
+            data_final=data_final,
+            cache_total=estado_cache.get("total", 0),
+            cache_intervalo_tem_dados=cache_intervalo_tem_dados,
+            ultimo_sync=estado_cache.get("ultimo_sync"),
+            ultima_data_emissao=estado_cache.get("ultima_data_emissao"),
+        )
     )
 
     bling_ok = False
@@ -2012,7 +2518,9 @@ async def listar_nfes(
                 data_final=data_final,
             )
         except Exception as e:
-            logger.warning("listar_nfes", f"Erro ao complementar NFs via pedidos integrados: {e}")
+            logger.warning(
+                "listar_nfes", f"Erro ao complementar NFs via pedidos integrados: {e}"
+            )
 
     _enriquecer_notas_com_vendas(db, tenant_id, notas)
     _enriquecer_notas_com_pedidos_integrados(db, tenant_id, notas)
@@ -2046,7 +2554,7 @@ async def reconciliar_pendentes_nfe(
     dias: int = Query(default=3, ge=1, le=15),
     limite_notas: int = Query(default=200, ge=1, le=500),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = user_and_tenant
     try:
@@ -2061,15 +2569,19 @@ async def reconciliar_pendentes_nfe(
             **resultado,
         }
     except Exception as exc:
-        logger.warning("reconciliar_pendentes_nfe", f"Falha ao reconciliar NFs pendentes: {exc}")
-        raise HTTPException(status_code=500, detail=f"Erro ao reconciliar NFs pendentes: {exc}")
+        logger.warning(
+            "reconciliar_pendentes_nfe", f"Falha ao reconciliar NFs pendentes: {exc}"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao reconciliar NFs pendentes: {exc}"
+        )
 
 
 @router.post("/{nfe_id}/reconciliar-fluxo")
 async def reconciliar_fluxo_nfe(
     nfe_id: str,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = user_and_tenant
 
@@ -2107,15 +2619,20 @@ async def reconciliar_fluxo_nfe(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.warning("reconciliar_fluxo_nfe", f"Falha ao reconciliar NF {nfe_id}: {exc}")
-        raise HTTPException(status_code=500, detail=f"Erro ao reconciliar fluxo da NF: {exc}")
+        logger.warning(
+            "reconciliar_fluxo_nfe", f"Falha ao reconciliar NF {nfe_id}: {exc}"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao reconciliar fluxo da NF: {exc}"
+        )
+
 
 @router.get("/{nfe_id}")
 async def consultar_nfe(
     nfe_id: int,
     modelo: Optional[int] = None,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Consulta dados completos de uma NF-e/NFC-e"""
     try:
@@ -2128,21 +2645,25 @@ async def consultar_nfe(
             nfe_id,
             modelo=modelo,
         )
-        detalhe_normalizado = _normalizar_detalhe_nota_bling(detalhe, modelo_resolvido, venda=venda)
+        detalhe_normalizado = _normalizar_detalhe_nota_bling(
+            detalhe, modelo_resolvido, venda=venda
+        )
         _enriquecer_detalhe_com_xml_link(detalhe, detalhe_normalizado)
         _enriquecer_notas_com_pedidos_integrados(db, tenant_id, [detalhe_normalizado])
         return detalhe_normalizado
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao consultar nota fiscal: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao consultar nota fiscal: {str(e)}"
+        )
 
 
 @router.get("/{nfe_id}/xml")
 async def baixar_xml(
     nfe_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Baixa XML da NF-e"""
     try:
@@ -2158,26 +2679,26 @@ async def cancelar_nfe(
     nfe_id: int,
     request: CancelarNFeRequest,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Cancela uma NF-e"""
     try:
         bling = BlingAPI()
         resultado = bling.cancelar_nfe(nfe_id, request.justificativa)
-        
+
         # Atualizar status na venda
         venda = db.query(Venda).filter(Venda.nfe_bling_id == nfe_id).first()
         if venda:
             venda.nfe_status = "cancelada"
             venda.nfe_motivo_rejeicao = request.justificativa
             # Voltar status para 'finalizada' quando NF for cancelada
-            venda.status = 'finalizada'
+            venda.status = "finalizada"
             db.commit()
-        
+
         return {
             "success": True,
             "message": "NF-e cancelada com sucesso",
-            "data": resultado
+            "data": resultado,
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -2190,17 +2711,17 @@ async def carta_correcao(
     nfe_id: int,
     request: CartaCorrecaoRequest,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Emite Carta de Correção Eletrônica (CC-e)"""
     try:
         bling = BlingAPI()
         resultado = bling.carta_correcao(nfe_id, request.correcao)
-        
+
         return {
             "success": True,
             "message": "Carta de Correção emitida com sucesso",
-            "data": resultado
+            "data": resultado,
         }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -2212,31 +2733,32 @@ async def carta_correcao(
 async def excluir_nota(
     venda_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Remove os dados da nota fiscal da venda (apenas para notas não autorizadas)"""
     current_user, tenant_id = user_and_tenant
     try:
         # Buscar venda
-        venda = db.query(Venda).filter(
-            Venda.id == venda_id,
-            Venda.tenant_id == tenant_id
-        ).first()
-        
+        venda = (
+            db.query(Venda)
+            .filter(Venda.id == venda_id, Venda.tenant_id == tenant_id)
+            .first()
+        )
+
         if not venda:
             raise HTTPException(status_code=404, detail="Venda não encontrada")
-        
+
         if not venda.nfe_bling_id:
             raise HTTPException(status_code=400, detail="Venda não possui nota fiscal")
-        
+
         # Validar status - só permite excluir notas que não foram autorizadas
         status_permitidos = ["Pendente", "Erro", "Rejeitada", None]
         if venda.nfe_status not in status_permitidos:
             raise HTTPException(
-                status_code=400, 
-                detail=f"Não é possível excluir nota com status '{venda.nfe_status}'. Apenas notas Pendentes, com Erro ou Rejeitadas podem ser excluídas."
+                status_code=400,
+                detail=f"Não é possível excluir nota com status '{venda.nfe_status}'. Apenas notas Pendentes, com Erro ou Rejeitadas podem ser excluídas.",
             )
-        
+
         # Limpar dados da NF (mantém a venda)
         venda.nfe_tipo = None
         venda.nfe_modelo = None
@@ -2247,17 +2769,17 @@ async def excluir_nota(
         venda.nfe_bling_id = None
         venda.nfe_data_emissao = None
         venda.nfe_motivo_rejeicao = None
-        
+
         # Voltar status para finalizada
-        venda.status = 'finalizada'
-        
+        venda.status = "finalizada"
+
         db.commit()
-        
+
         return {
             "success": True,
-            "message": "Dados da nota fiscal removidos com sucesso"
+            "message": "Dados da nota fiscal removidos com sucesso",
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -2266,65 +2788,81 @@ async def excluir_nota(
 
 
 @router.post("/webhook/bling")
-async def webhook_bling(
-    request: Request,
-    db: Session = Depends(get_session)
-):
+async def webhook_bling(request: Request, db: Session = Depends(get_session)):
     """Recebe notificações do Bling sobre mudanças de status das notas"""
     try:
         # Pegar dados do webhook
         dados = await request.json()
-        
+
         logger.info("webhook_bling", "\n=== WEBHOOK BLING RECEBIDO ===")
         logger.info("webhook_bling", f"Dados: {dados}")
-        
+
         # Extrair informações do webhook
         # Formato esperado: { "topic": "nfe_notafiscal", "id": 123456, "status": "autorizada" }
         # Ou: { "topic": "notas_fiscais", "data": { "id": 123456, "situacao": 1 } }
         topic = dados.get("topic")
-        nfe_id = dados.get("id") or (dados.get("data", {}).get("id") if dados.get("data") else None)
-        
-        if topic not in ["nfe", "nfce", "nfe_notafiscal", "notas_fiscais"] or not nfe_id:
-            logger.warning("webhook_bling", f"Webhook ignorado: topic={topic}, nfe_id={nfe_id}")
+        nfe_id = dados.get("id") or (
+            dados.get("data", {}).get("id") if dados.get("data") else None
+        )
+
+        if (
+            topic not in ["nfe", "nfce", "nfe_notafiscal", "notas_fiscais"]
+            or not nfe_id
+        ):
+            logger.warning(
+                "webhook_bling", f"Webhook ignorado: topic={topic}, nfe_id={nfe_id}"
+            )
             return {"success": True, "message": "Webhook ignorado"}
-        
+
         # Buscar venda com essa nota
-        venda = db.query(Venda).filter(
-            Venda.nfe_bling_id == nfe_id
-        ).first()
-        
+        venda = db.query(Venda).filter(Venda.nfe_bling_id == nfe_id).first()
+
         if not venda:
-            logger.warning("webhook_bling", f"Venda não encontrada para nfe_bling_id={nfe_id}")
+            logger.warning(
+                "webhook_bling", f"Venda não encontrada para nfe_bling_id={nfe_id}"
+            )
             return {"success": True, "message": "Venda não encontrada"}
-        
+
         # Consultar status atualizado no Bling
         bling = BlingAPI()
-        
+
         if topic in ["nfce", "notas_fiscais"]:
             resultado = bling.consultar_nfce(nfe_id)
         else:
             resultado = bling.consultar_nfe(nfe_id)
-        
-        dados_nota = resultado.get('data', resultado) if isinstance(resultado, dict) else {}
+
+        dados_nota = (
+            resultado.get("data", resultado) if isinstance(resultado, dict) else {}
+        )
         novo_status = _status_nota_bling(dados_nota)
-        
+
         # Atualizar venda
         venda.nfe_status = novo_status
         venda.nfe_chave = dados_nota.get("chaveAcesso") or venda.nfe_chave
-        
+
         # ✅ Se NF foi AUTORIZADA, confirmar o estoque reservado e sincronizar o saldo final.
         if _nota_autorizada_bling(dados_nota):
-            logger.info("webhook_bling", f"✅ NF AUTORIZADA - Confirmando estoque da Venda #{venda.id}")
+            logger.info(
+                "webhook_bling",
+                f"✅ NF AUTORIZADA - Confirmando estoque da Venda #{venda.id}",
+            )
 
-            movimentacoes = db.query(EstoqueMovimentacao).filter(
-                EstoqueMovimentacao.referencia_id == venda.id,
-                EstoqueMovimentacao.referencia_tipo == 'venda_bling',
-                EstoqueMovimentacao.status == 'reservado'
-            ).all()
+            movimentacoes = (
+                db.query(EstoqueMovimentacao)
+                .filter(
+                    EstoqueMovimentacao.referencia_id == venda.id,
+                    EstoqueMovimentacao.referencia_tipo == "venda_bling",
+                    EstoqueMovimentacao.status == "reservado",
+                )
+                .all()
+            )
 
             for mov in movimentacoes:
-                mov.status = 'confirmado'
-                logger.info("webhook_bling", f"  📦 Movimentação #{mov.id} (Produto {mov.produto_id}) confirmada")
+                mov.status = "confirmado"
+                logger.info(
+                    "webhook_bling",
+                    f"  📦 Movimentação #{mov.id} (Produto {mov.produto_id}) confirmada",
+                )
 
                 try:
                     BlingSyncService.queue_product_sync(
@@ -2335,24 +2873,40 @@ async def webhook_bling(
                         force=True,
                     )
                 except Exception as e:
-                    logger.warning("webhook_bling", f"  ⚠️ Erro ao enfileirar sync do produto {mov.produto_id}: {e}")
+                    logger.warning(
+                        "webhook_bling",
+                        f"  ⚠️ Erro ao enfileirar sync do produto {mov.produto_id}: {e}",
+                    )
 
         # Se NF foi CANCELADA, revert estoque
         elif _nota_cancelada_bling(dados_nota):
-            logger.warning("webhook_bling", f"⚠️ NF CANCELADA - Revertendo estoque da Venda #{venda.id}")
+            logger.warning(
+                "webhook_bling",
+                f"⚠️ NF CANCELADA - Revertendo estoque da Venda #{venda.id}",
+            )
 
-            movimentacoes = db.query(EstoqueMovimentacao).filter(
-                EstoqueMovimentacao.referencia_id == venda.id,
-                EstoqueMovimentacao.referencia_tipo == 'venda_bling'
-            ).all()
+            movimentacoes = (
+                db.query(EstoqueMovimentacao)
+                .filter(
+                    EstoqueMovimentacao.referencia_id == venda.id,
+                    EstoqueMovimentacao.referencia_tipo == "venda_bling",
+                )
+                .all()
+            )
 
             for mov in movimentacoes:
-                if mov.status != 'cancelado':
-                    produto = db.query(Produto).filter(Produto.id == mov.produto_id).first()
+                if mov.status != "cancelado":
+                    produto = (
+                        db.query(Produto).filter(Produto.id == mov.produto_id).first()
+                    )
                     if produto:
-                        produto.estoque_atual = (produto.estoque_atual or 0) + mov.quantidade
-                        mov.status = 'cancelado'
-                        logger.info("webhook_bling", f"  ↩️ Estoque revertido: {produto.codigo}")
+                        produto.estoque_atual = (
+                            produto.estoque_atual or 0
+                        ) + mov.quantidade
+                        mov.status = "cancelado"
+                        logger.info(
+                            "webhook_bling", f"  ↩️ Estoque revertido: {produto.codigo}"
+                        )
                         try:
                             BlingSyncService.queue_product_sync(
                                 db,
@@ -2362,22 +2916,28 @@ async def webhook_bling(
                                 force=True,
                             )
                         except Exception as e:
-                            logger.warning("webhook_bling", f"  ⚠️ Erro ao enfileirar estorno do produto {produto.id}: {e}")
-        
+                            logger.warning(
+                                "webhook_bling",
+                                f"  ⚠️ Erro ao enfileirar estorno do produto {produto.id}: {e}",
+                            )
+
         db.commit()
-        
-        logger.info("webhook_bling", f"✅ Status atualizado: Venda #{venda.id} -> {novo_status}")
-        
+
+        logger.info(
+            "webhook_bling", f"✅ Status atualizado: Venda #{venda.id} -> {novo_status}"
+        )
+
         return {
             "success": True,
             "message": "Webhook processado com sucesso",
             "venda_id": venda.id,
-            "novo_status": novo_status
+            "novo_status": novo_status,
         }
-        
+
     except Exception as e:
         logger.error("webhook_error", f"Erro ao processar webhook: {str(e)}")
         import traceback
+
         logger.error("webhook_error", traceback.format_exc())
         # Retornar 200 mesmo com erro para não ficar reenviando
         return {"success": False, "error": str(e)}
@@ -2387,72 +2947,82 @@ async def webhook_bling(
 async def sincronizar_status_nota(
     venda_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Sincroniza o status da nota fiscal com o Bling"""
     current_user, tenant_id = user_and_tenant
     try:
         # Buscar venda
-        venda = db.query(Venda).filter(
-            Venda.id == venda_id,
-            Venda.tenant_id == tenant_id
-        ).first()
-        
+        venda = (
+            db.query(Venda)
+            .filter(Venda.id == venda_id, Venda.tenant_id == tenant_id)
+            .first()
+        )
+
         if not venda:
             raise HTTPException(status_code=404, detail="Venda não encontrada")
-        
+
         if not venda.nfe_bling_id:
-            raise HTTPException(status_code=400, detail="Venda não possui nota fiscal emitida")
-        
+            raise HTTPException(
+                status_code=400, detail="Venda não possui nota fiscal emitida"
+            )
+
         # Consultar nota no Bling
         bling = BlingAPI()
-        
+
         # Verificar se é NFC-e ou NF-e
         if _venda_usa_nfce(venda):
             resultado = bling.consultar_nfce(venda.nfe_bling_id)
         else:
             resultado = bling.consultar_nfe(venda.nfe_bling_id)
-        
-        dados_nota = resultado.get('data', resultado) if isinstance(resultado, dict) else {}
+
+        dados_nota = (
+            resultado.get("data", resultado) if isinstance(resultado, dict) else {}
+        )
         novo_status = _status_nota_bling(dados_nota)
-        
+
         # Atualizar venda
         venda.nfe_status = novo_status
         venda.nfe_chave = dados_nota.get("chaveAcesso") or venda.nfe_chave
-        
+
         db.commit()
         db.refresh(venda)
-        
+
         return {
             "success": True,
             "message": f"Status atualizado para: {novo_status}",
             "status": novo_status,
-            "dados_bling": dados_nota
+            "dados_bling": dados_nota,
         }
-        
+
     except Exception as e:
-        logger.error("sincronizar_status_error", f"Erro ao sincronizar status: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Erro ao sincronizar status: {str(e)}")
+        logger.error(
+            "sincronizar_status_error", f"Erro ao sincronizar status: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao sincronizar status: {str(e)}"
+        )
 
 
 @router.post("/sincronizar-todos")
 async def sincronizar_todos_status(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Sincroniza o status de todas as notas fiscais com o Bling"""
     current_user, tenant_id = user_and_tenant
     try:
         # Buscar vendas com NF emitida
-        vendas = db.query(Venda).filter(
-            Venda.tenant_id == tenant_id,
-            Venda.nfe_bling_id.isnot(None)
-        ).all()
-        
+        vendas = (
+            db.query(Venda)
+            .filter(Venda.tenant_id == tenant_id, Venda.nfe_bling_id.isnot(None))
+            .all()
+        )
+
         bling = BlingAPI()
         atualizados = 0
         erros = 0
-        
+
         for venda in vendas:
             try:
                 # Consultar nota no Bling
@@ -2460,30 +3030,37 @@ async def sincronizar_todos_status(
                     resultado = bling.consultar_nfce(venda.nfe_bling_id)
                 else:
                     resultado = bling.consultar_nfe(venda.nfe_bling_id)
-                
-                dados_nota = resultado.get('data', resultado) if isinstance(resultado, dict) else {}
+
+                dados_nota = (
+                    resultado.get("data", resultado)
+                    if isinstance(resultado, dict)
+                    else {}
+                )
                 novo_status = _status_nota_bling(dados_nota)
-                
+
                 # Atualizar apenas se mudou
                 if venda.nfe_status != novo_status:
                     venda.nfe_status = novo_status
                     venda.nfe_chave = dados_nota.get("chaveAcesso") or venda.nfe_chave
                     atualizados += 1
-                    
+
             except Exception as e:
-                logger.error("sincronizar_todos_error", f"Erro ao sincronizar venda {venda.id}: {str(e)}")
+                logger.error(
+                    "sincronizar_todos_error",
+                    f"Erro ao sincronizar venda {venda.id}: {str(e)}",
+                )
                 erros += 1
-        
+
         db.commit()
-        
+
         return {
             "success": True,
             "message": "Sincronização concluída",
             "total": len(vendas),
             "atualizados": atualizados,
-            "erros": erros
+            "erros": erros,
         }
-        
+
     except Exception as e:
         logger.error("sincronizar_todos_error", f"Erro ao sincronizar todos: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao sincronizar: {str(e)}")
@@ -2493,21 +3070,19 @@ async def sincronizar_todos_status(
 async def baixar_danfe(
     nfe_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Baixa PDF da DANFE"""
     from fastapi.responses import Response
-    
+
     try:
         bling = BlingAPI()
         pdf_content = bling.baixar_danfe(nfe_id)
-        
+
         return Response(
             content=pdf_content,
             media_type="application/pdf",
-            headers={
-                "Content-Disposition": f"attachment; filename=danfe_{nfe_id}.pdf"
-            }
+            headers={"Content-Disposition": f"attachment; filename=danfe_{nfe_id}.pdf"},
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao baixar DANFE: {str(e)}")

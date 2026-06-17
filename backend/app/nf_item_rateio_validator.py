@@ -1,9 +1,4 @@
-
-def validar_rateio_item(
-    rateios,
-    quantidade_total_item,
-    preco_unitario
-):
+def validar_rateio_item(rateios, quantidade_total_item, preco_unitario):
     """
     rateios: lista de dicts:
     [{ "canal": "mercado_livre", "quantidade": 7 }, ...]
@@ -43,11 +38,13 @@ def validar_rateio_item(
         valor = round(qtd * preco_unitario, 2)
         percentual = round((qtd / quantidade_total_item) * 100, 2)
 
-        resultado.append({
-            "canal": r["canal"],
-            "quantidade": qtd,
-            "valor_calculado": valor,
-            "percentual_calculado": percentual
-        })
+        resultado.append(
+            {
+                "canal": r["canal"],
+                "quantidade": qtd,
+                "valor_calculado": valor,
+                "percentual_calculado": percentual,
+            }
+        )
 
     return resultado
