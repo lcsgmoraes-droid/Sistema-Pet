@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { FiPlus, FiEdit2, FiTrash2, FiCheck } from 'react-icons/fi';
-import api from '../../api.js';
-import { toast } from 'react-hot-toast';
-import ActionButton from '../../components/ui/ActionButton';
-import IconActionButton from '../../components/ui/IconActionButton';
-import LoadingState from '../../components/ui/LoadingState';
+import { useState, useEffect } from "react";
+import { FiPlus, FiEdit2, FiTrash2, FiCheck } from "react-icons/fi";
+import api from "../../api.js";
+import { toast } from "react-hot-toast";
+import ActionButton from "../../components/ui/ActionButton";
+import IconActionButton from "../../components/ui/IconActionButton";
+import LoadingState from "../../components/ui/LoadingState";
 
 const TipoDespesa = () => {
   const [tipos, setTipos] = useState([]);
@@ -12,7 +12,7 @@ const TipoDespesa = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(null);
-  const [form, setForm] = useState({ nome: '', e_custo_fixo: true, dre_subcategoria_id: '' });
+  const [form, setForm] = useState({ nome: "", e_custo_fixo: true, dre_subcategoria_id: "" });
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -23,8 +23,8 @@ const TipoDespesa = () => {
     try {
       setLoading(true);
       const [tiposRes, subcategoriasRes] = await Promise.all([
-        api.get('/cadastros/tipo-despesa/'),
-        api.get('/dre/subcategorias'),
+        api.get("/cadastros/tipo-despesa/"),
+        api.get("/dre/subcategorias"),
       ]);
       setTipos(Array.isArray(tiposRes.data) ? tiposRes.data : []);
       setSubcategoriasDre(
@@ -33,7 +33,7 @@ const TipoDespesa = () => {
           : [],
       );
     } catch {
-      toast.error('Erro ao carregar tipos de despesa');
+      toast.error("Erro ao carregar tipos de despesa");
     } finally {
       setLoading(false);
     }
@@ -41,7 +41,7 @@ const TipoDespesa = () => {
 
   const abrirNovo = () => {
     setEditando(null);
-    setForm({ nome: '', e_custo_fixo: true, dre_subcategoria_id: '' });
+    setForm({ nome: "", e_custo_fixo: true, dre_subcategoria_id: "" });
     setShowModal(true);
   };
 
@@ -50,19 +50,19 @@ const TipoDespesa = () => {
     setForm({
       nome: tipo.nome,
       e_custo_fixo: tipo.e_custo_fixo,
-      dre_subcategoria_id: tipo.dre_subcategoria_id ? String(tipo.dre_subcategoria_id) : '',
+      dre_subcategoria_id: tipo.dre_subcategoria_id ? String(tipo.dre_subcategoria_id) : "",
     });
     setShowModal(true);
   };
 
   const salvar = async () => {
     if (!form.nome.trim()) {
-      toast.error('Informe o nome do tipo de despesa');
+      toast.error("Informe o nome do tipo de despesa");
       return;
     }
 
     if (!form.dre_subcategoria_id) {
-      toast.error('Selecione a subcategoria DRE');
+      toast.error("Selecione a subcategoria DRE");
       return;
     }
 
@@ -75,35 +75,36 @@ const TipoDespesa = () => {
       };
       if (editando) {
         await api.put(`/cadastros/tipo-despesa/${editando}`, payload);
-        toast.success('Tipo atualizado!');
+        toast.success("Tipo atualizado!");
       } else {
-        await api.post('/cadastros/tipo-despesa/', payload);
-        toast.success('Tipo criado!');
+        await api.post("/cadastros/tipo-despesa/", payload);
+        toast.success("Tipo criado!");
       }
       setShowModal(false);
       carregar();
     } catch {
-      toast.error('Erro ao salvar');
+      toast.error("Erro ao salvar");
     } finally {
       setSalvando(false);
     }
   };
 
   const excluir = async (id) => {
-    if (!window.confirm('Desativar este tipo de despesa?')) return;
+    if (!window.confirm("Desativar este tipo de despesa?")) return;
     try {
       await api.delete(`/cadastros/tipo-despesa/${id}`);
-      toast.success('Tipo desativado');
+      toast.success("Tipo desativado");
       carregar();
     } catch {
-      toast.error('Erro ao desativar');
+      toast.error("Erro ao desativar");
     }
   };
 
   const fixos = tipos.filter((t) => t.e_custo_fixo && t.ativo);
   const variaveis = tipos.filter((t) => !t.e_custo_fixo && t.ativo);
   const nomeSubcategoria = (id) =>
-    subcategoriasDre.find((item) => Number(item.id) === Number(id))?.nome || 'Subcategoria não encontrada';
+    subcategoriasDre.find((item) => Number(item.id) === Number(id))?.nome ||
+    "Subcategoria não encontrada";
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -111,15 +112,11 @@ const TipoDespesa = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-800">📋 Tipos de Despesa</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Classifique cada tipo como <strong>Fixo</strong> ou <strong>Variável</strong> para calcular o Ponto de Equilíbrio corretamente.
+            Classifique cada tipo como <strong>Fixo</strong> ou <strong>Variável</strong> para
+            calcular o Ponto de Equilíbrio corretamente.
           </p>
         </div>
-        <ActionButton
-          onClick={abrirNovo}
-          icon={FiPlus}
-          intent="create"
-          size="md"
-        >
+        <ActionButton onClick={abrirNovo} icon={FiPlus} intent="create" size="md">
           Novo Tipo
         </ActionButton>
       </div>
@@ -128,11 +125,17 @@ const TipoDespesa = () => {
       <div className="flex gap-4 mb-6">
         <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 text-sm">
           <span className="w-3 h-3 rounded-full bg-orange-400 inline-block" />
-          <span><strong>Custo Fixo</strong> — existe todo mês independente das vendas (aluguel, salário, impostos...)</span>
+          <span>
+            <strong>Custo Fixo</strong> — existe todo mês independente das vendas (aluguel, salário,
+            impostos...)
+          </span>
         </div>
         <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm">
           <span className="w-3 h-3 rounded-full bg-blue-400 inline-block" />
-          <span><strong>Custo Variável</strong> — cresce conforme as vendas (mercadorias, frete, comissões...)</span>
+          <span>
+            <strong>Custo Variável</strong> — cresce conforme as vendas (mercadorias, frete,
+            comissões...)
+          </span>
         </div>
       </div>
 
@@ -156,7 +159,9 @@ const TipoDespesa = () => {
                     <span className="text-orange-500 font-bold text-lg">F</span>
                     <div>
                       <span className="text-gray-800 font-medium">{tipo.nome}</span>
-                      <p className="text-xs text-gray-500">DRE: {nomeSubcategoria(tipo.dre_subcategoria_id)}</p>
+                      <p className="text-xs text-gray-500">
+                        DRE: {nomeSubcategoria(tipo.dre_subcategoria_id)}
+                      </p>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -199,7 +204,9 @@ const TipoDespesa = () => {
                     <span className="text-blue-500 font-bold text-lg">V</span>
                     <div>
                       <span className="text-gray-800 font-medium">{tipo.nome}</span>
-                      <p className="text-xs text-gray-500">DRE: {nomeSubcategoria(tipo.dre_subcategoria_id)}</p>
+                      <p className="text-xs text-gray-500">
+                        DRE: {nomeSubcategoria(tipo.dre_subcategoria_id)}
+                      </p>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -221,7 +228,9 @@ const TipoDespesa = () => {
                 </div>
               ))}
               {variaveis.length === 0 && (
-                <p className="text-sm text-gray-400 italic pl-2">Nenhum tipo variável cadastrado.</p>
+                <p className="text-sm text-gray-400 italic pl-2">
+                  Nenhum tipo variável cadastrado.
+                </p>
               )}
             </div>
           </div>
@@ -233,7 +242,7 @@ const TipoDespesa = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
             <h2 className="text-lg font-bold mb-5 text-gray-800">
-              {editando ? 'Editar Tipo de Despesa' : 'Novo Tipo de Despesa'}
+              {editando ? "Editar Tipo de Despesa" : "Novo Tipo de Despesa"}
             </h2>
 
             <div className="space-y-4">
@@ -245,21 +254,23 @@ const TipoDespesa = () => {
                   placeholder="Ex: Aluguel, Salários, Fornecedor..."
                   value={form.nome}
                   onChange={(e) => setForm({ ...form, nome: e.target.value })}
-                  onKeyDown={(e) => e.key === 'Enter' && salvar()}
+                  onKeyDown={(e) => e.key === "Enter" && salvar()}
                   autoFocus
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Classificação</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Classificação
+                </label>
                 <div className="flex gap-3">
                   <button
                     type="button"
                     onClick={() => setForm({ ...form, e_custo_fixo: true })}
                     className={`flex-1 flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-semibold transition ${
                       form.e_custo_fixo
-                        ? 'border-orange-500 bg-orange-50 text-orange-700'
-                        : 'border-gray-200 text-gray-500 hover:border-orange-300'
+                        ? "border-orange-500 bg-orange-50 text-orange-700"
+                        : "border-gray-200 text-gray-500 hover:border-orange-300"
                     }`}
                   >
                     {form.e_custo_fixo && <FiCheck size={14} />}
@@ -270,8 +281,8 @@ const TipoDespesa = () => {
                     onClick={() => setForm({ ...form, e_custo_fixo: false })}
                     className={`flex-1 flex items-center justify-center gap-2 rounded-lg border-2 px-4 py-3 text-sm font-semibold transition ${
                       !form.e_custo_fixo
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 text-gray-500 hover:border-blue-300'
+                        ? "border-blue-500 bg-blue-50 text-blue-700"
+                        : "border-gray-200 text-gray-500 hover:border-blue-300"
                     }`}
                   >
                     {!form.e_custo_fixo && <FiCheck size={14} />}
@@ -280,13 +291,15 @@ const TipoDespesa = () => {
                 </div>
                 <p className="text-xs text-gray-400 mt-2">
                   {form.e_custo_fixo
-                    ? '🔒 Fixo: valor não muda com o volume de vendas (ex: aluguel, salário, impostos)'
-                    : '📈 Variável: valor cresce com as vendas (ex: mercadorias, frete, comissões)'}
+                    ? "🔒 Fixo: valor não muda com o volume de vendas (ex: aluguel, salário, impostos)"
+                    : "📈 Variável: valor cresce com as vendas (ex: mercadorias, frete, comissões)"}
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Subcategoria DRE</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Subcategoria DRE
+                </label>
                 <select
                   value={form.dre_subcategoria_id}
                   onChange={(e) => setForm({ ...form, dre_subcategoria_id: e.target.value })}
@@ -315,10 +328,10 @@ const TipoDespesa = () => {
                 onClick={salvar}
                 disabled={salvando}
                 className="flex-1"
-                intent={editando ? 'edit' : 'create'}
+                intent={editando ? "edit" : "create"}
                 loading={salvando}
               >
-                {salvando ? 'Salvando...' : editando ? 'Salvar Alterações' : 'Criar Tipo'}
+                {salvando ? "Salvando..." : editando ? "Salvar Alterações" : "Criar Tipo"}
               </ActionButton>
             </div>
           </div>

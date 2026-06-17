@@ -45,9 +45,7 @@ export default function BanhoTosaSimulador({ config }) {
       custo_rateio_operacional: String(
         config.custo_rateio_operacional_padrao ?? prev.custo_rateio_operacional,
       ),
-      horas_produtivas_mes: String(
-        config.horas_produtivas_mes_padrao ?? prev.horas_produtivas_mes,
-      ),
+      horas_produtivas_mes: String(config.horas_produtivas_mes_padrao ?? prev.horas_produtivas_mes),
     }));
   }, [config?.id]);
 
@@ -129,18 +127,66 @@ export default function BanhoTosaSimulador({ config }) {
     >
       <form id="bt-simulador-custo" onSubmit={simular} className="space-y-5">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <NumberField label="Valor cobrado" value={form.valor_cobrado} onChange={(value) => updateField("valor_cobrado", value)} />
-          <NumberField label="Insumos totais" value={form.custo_insumos} onChange={(value) => updateField("custo_insumos", value)} />
-          <NumberField label="Minutos de banho" value={form.minutos_banho} onChange={(value) => updateField("minutos_banho", value)} />
-          <NumberField label="Vazao L/min" value={form.vazao_chuveiro_litros_min} onChange={(value) => updateField("vazao_chuveiro_litros_min", value)} />
-          <NumberField label="Custo litro agua" value={form.custo_litro_agua} onChange={(value) => updateField("custo_litro_agua", value)} />
-          <NumberField label="Potencia secador W" value={form.potencia_watts} onChange={(value) => updateField("potencia_watts", value)} />
-          <NumberField label="Minutos energia" value={form.minutos_energia} onChange={(value) => updateField("minutos_energia", value)} />
-          <NumberField label="Custo kWh" value={form.custo_kwh} onChange={(value) => updateField("custo_kwh", value)} />
-          <NumberField label="Salario/custo mensal" value={form.custo_mensal_funcionario} onChange={(value) => updateField("custo_mensal_funcionario", value)} />
-          <NumberField label="Horas produtivas mes" value={form.horas_produtivas_mes} onChange={(value) => updateField("horas_produtivas_mes", value)} />
-          <NumberField label="Minutos mao de obra" value={form.minutos_trabalhados} onChange={(value) => updateField("minutos_trabalhados", value)} />
-          <NumberField label="% taxas pagamento" value={form.percentual_taxas_pagamento} onChange={(value) => updateField("percentual_taxas_pagamento", value)} />
+          <NumberField
+            label="Valor cobrado"
+            value={form.valor_cobrado}
+            onChange={(value) => updateField("valor_cobrado", value)}
+          />
+          <NumberField
+            label="Insumos totais"
+            value={form.custo_insumos}
+            onChange={(value) => updateField("custo_insumos", value)}
+          />
+          <NumberField
+            label="Minutos de banho"
+            value={form.minutos_banho}
+            onChange={(value) => updateField("minutos_banho", value)}
+          />
+          <NumberField
+            label="Vazao L/min"
+            value={form.vazao_chuveiro_litros_min}
+            onChange={(value) => updateField("vazao_chuveiro_litros_min", value)}
+          />
+          <NumberField
+            label="Custo litro agua"
+            value={form.custo_litro_agua}
+            onChange={(value) => updateField("custo_litro_agua", value)}
+          />
+          <NumberField
+            label="Potencia secador W"
+            value={form.potencia_watts}
+            onChange={(value) => updateField("potencia_watts", value)}
+          />
+          <NumberField
+            label="Minutos energia"
+            value={form.minutos_energia}
+            onChange={(value) => updateField("minutos_energia", value)}
+          />
+          <NumberField
+            label="Custo kWh"
+            value={form.custo_kwh}
+            onChange={(value) => updateField("custo_kwh", value)}
+          />
+          <NumberField
+            label="Salario/custo mensal"
+            value={form.custo_mensal_funcionario}
+            onChange={(value) => updateField("custo_mensal_funcionario", value)}
+          />
+          <NumberField
+            label="Horas produtivas mes"
+            value={form.horas_produtivas_mes}
+            onChange={(value) => updateField("horas_produtivas_mes", value)}
+          />
+          <NumberField
+            label="Minutos mao de obra"
+            value={form.minutos_trabalhados}
+            onChange={(value) => updateField("minutos_trabalhados", value)}
+          />
+          <NumberField
+            label="% taxas pagamento"
+            value={form.percentual_taxas_pagamento}
+            onChange={(value) => updateField("percentual_taxas_pagamento", value)}
+          />
         </div>
 
         {resultado && (
@@ -152,7 +198,8 @@ export default function BanhoTosaSimulador({ config }) {
               </p>
               <p className="mt-4 text-sm text-blue-700">Margem</p>
               <p className="text-2xl font-bold text-slate-950">
-                {formatCurrency(resultado.margem_valor)} ({formatNumber(resultado.margem_percentual, 2)}%)
+                {formatCurrency(resultado.margem_valor)} (
+                {formatNumber(resultado.margem_percentual, 2)}%)
               </p>
             </div>
 
@@ -172,26 +219,14 @@ export default function BanhoTosaSimulador({ config }) {
 }
 
 function NumberField({ label, value, onChange }) {
-  return (
-    <TextField
-      label={label}
-      onChange={onChange}
-      step="0.01"
-      type="number"
-      value={value}
-    />
-  );
+  return <TextField label={label} onChange={onChange} step="0.01" type="number" value={value} />;
 }
 
 function Breakdown({ label, value }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1 text-lg font-semibold text-slate-900">
-        {formatCurrency(value)}
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-slate-900">{formatCurrency(value)}</p>
     </div>
   );
 }

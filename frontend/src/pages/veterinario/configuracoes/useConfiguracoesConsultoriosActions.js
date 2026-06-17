@@ -13,9 +13,12 @@ export function useConfiguracoesConsultoriosActions({
   setMostrarFormConsultorio,
   setSalvando,
 }) {
-  const atualizarConsultorioForm = useCallback((patch) => {
-    setConsultorioForm((prev) => ({ ...prev, ...patch }));
-  }, [setConsultorioForm]);
+  const atualizarConsultorioForm = useCallback(
+    (patch) => {
+      setConsultorioForm((prev) => ({ ...prev, ...patch }));
+    },
+    [setConsultorioForm],
+  );
 
   const salvarNovoConsultorio = useCallback(async () => {
     if (!consultorioForm.nome.trim()) {
@@ -50,18 +53,21 @@ export function useConfiguracoesConsultoriosActions({
     setSalvando,
   ]);
 
-  const toggleAtivoConsultorio = useCallback(async (consultorio) => {
-    try {
-      await vetApi.atualizarConsultorio(consultorio.id, { ativo: !consultorio.ativo });
-      setConsultorios((prev) =>
-        prev.map((item) =>
-          item.id === consultorio.id ? { ...item, ativo: !consultorio.ativo } : item
-        )
-      );
-    } catch (e) {
-      setErro(e?.response?.data?.detail || "Nao foi possivel atualizar o consultorio.");
-    }
-  }, [setConsultorios, setErro]);
+  const toggleAtivoConsultorio = useCallback(
+    async (consultorio) => {
+      try {
+        await vetApi.atualizarConsultorio(consultorio.id, { ativo: !consultorio.ativo });
+        setConsultorios((prev) =>
+          prev.map((item) =>
+            item.id === consultorio.id ? { ...item, ativo: !consultorio.ativo } : item,
+          ),
+        );
+      } catch (e) {
+        setErro(e?.response?.data?.detail || "Nao foi possivel atualizar o consultorio.");
+      }
+    },
+    [setConsultorios, setErro],
+  );
 
   const removerConsultorio = useCallback(
     async (consultorio) => {
@@ -75,7 +81,7 @@ export function useConfiguracoesConsultoriosActions({
         setErro(e?.response?.data?.detail || "Erro ao remover consultorio.");
       }
     },
-    [mostrarSucesso, setConsultorios, setErro]
+    [mostrarSucesso, setConsultorios, setErro],
   );
 
   const cancelarConsultorio = useCallback(() => {

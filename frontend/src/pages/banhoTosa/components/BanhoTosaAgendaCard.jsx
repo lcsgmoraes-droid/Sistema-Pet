@@ -43,7 +43,8 @@ export default function BanhoTosaAgendaCard({ agendamento, onCancelar, onCheckIn
               label="Tutor"
             />
             <p className="mt-1 text-sm font-medium text-slate-700">
-              {agendamento.servicos?.[0]?.nome_servico_snapshot || "Banho & Tosa"} - {formatCurrency(agendamento.valor_previsto)}
+              {agendamento.servicos?.[0]?.nome_servico_snapshot || "Banho & Tosa"} -{" "}
+              {formatCurrency(agendamento.valor_previsto)}
             </p>
             <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
               {agendamento.recurso_nome

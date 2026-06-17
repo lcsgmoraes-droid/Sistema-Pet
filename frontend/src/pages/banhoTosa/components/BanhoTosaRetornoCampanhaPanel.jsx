@@ -112,8 +112,17 @@ export default function BanhoTosaRetornoCampanhaPanel({ diasAntecedencia }) {
               </option>
             ))}
           </SelectField>
-          <SelectField label="Canal" value={canal} onChange={setCanal} disabled={Boolean(templateId)}>
-            {canais.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          <SelectField
+            label="Canal"
+            value={canal}
+            onChange={setCanal}
+            disabled={Boolean(templateId)}
+          >
+            {canais.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
           </SelectField>
           <ActionButton
             type="button"
@@ -131,14 +140,40 @@ export default function BanhoTosaRetornoCampanhaPanel({ diasAntecedencia }) {
       <Panel title="Novo template">
         <form onSubmit={criarTemplate}>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            <TextField label="Nome" value={form.nome} onChange={(value) => updateForm("nome", value)} required />
-            <SelectField label="Tipo" value={form.tipo_retorno} onChange={(value) => updateForm("tipo_retorno", value)}>
-              {tipos.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            <TextField
+              label="Nome"
+              value={form.nome}
+              onChange={(value) => updateForm("nome", value)}
+              required
+            />
+            <SelectField
+              label="Tipo"
+              value={form.tipo_retorno}
+              onChange={(value) => updateForm("tipo_retorno", value)}
+            >
+              {tipos.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </SelectField>
-            <SelectField label="Canal" value={form.canal} onChange={(value) => updateForm("canal", value)}>
-              {canais.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            <SelectField
+              label="Canal"
+              value={form.canal}
+              onChange={(value) => updateForm("canal", value)}
+            >
+              {canais.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
             </SelectField>
-            <TextField label="Assunto" value={form.assunto} onChange={(value) => updateForm("assunto", value)} required />
+            <TextField
+              label="Assunto"
+              value={form.assunto}
+              onChange={(value) => updateForm("assunto", value)}
+              required
+            />
           </div>
           <label className="mt-3 block">
             <span className="text-xs font-medium text-slate-600">Mensagem</span>
@@ -151,7 +186,8 @@ export default function BanhoTosaRetornoCampanhaPanel({ diasAntecedencia }) {
             />
           </label>
           <p className="mt-2 text-xs text-slate-400">
-            Variaveis: {"{cliente_nome}"}, {"{pet_nome}"}, {"{servico_nome}"}, {"{pacote_nome}"}, {"{data_referencia}"}, {"{dias_para_acao}"}.
+            Variaveis: {"{cliente_nome}"}, {"{pet_nome}"}, {"{servico_nome}"}, {"{pacote_nome}"},{" "}
+            {"{data_referencia}"}, {"{dias_para_acao}"}.
           </p>
           <ActionButton
             type="submit"

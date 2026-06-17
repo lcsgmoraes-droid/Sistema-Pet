@@ -33,10 +33,18 @@ export default function DiagnosticoBasicoSection({
   const retornoAgendado = form.retorno_agendado;
 
   return (
-    <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4 disabled:opacity-100">
+    <fieldset
+      disabled={modoSomenteLeitura}
+      className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4 disabled:opacity-100"
+    >
       <h2 className="font-semibold text-gray-700">{"Diagn\u00f3stico e tratamento"}</h2>
       {campo("Diagn\u00f3stico")(
-        <textarea value={form.diagnostico} onChange={(e) => setCampo("diagnostico", e.target.value)} className={css.textarea} placeholder={"Diagn\u00f3stico principal e diferenciais..."} />
+        <textarea
+          value={form.diagnostico}
+          onChange={(e) => setCampo("diagnostico", e.target.value)}
+          className={css.textarea}
+          placeholder={"Diagn\u00f3stico principal e diferenciais..."}
+        />,
       )}
       {campo("Progn\u00f3stico")(
         <AutocompleteSelect
@@ -46,10 +54,15 @@ export default function DiagnosticoBasicoSection({
           placeholder={"Digite para buscar progn\u00f3stico..."}
           emptyLabel={"Nenhum progn\u00f3stico encontrado"}
           showLabel={false}
-        />
+        />,
       )}
       {campo("Tratamento prescrito")(
-        <textarea value={form.tratamento} onChange={(e) => setCampo("tratamento", e.target.value)} className={css.textarea} placeholder={"Protocolo terap\u00eautico, cuidados em casa..."} />
+        <textarea
+          value={form.tratamento}
+          onChange={(e) => setCampo("tratamento", e.target.value)}
+          className={css.textarea}
+          placeholder={"Protocolo terap\u00eautico, cuidados em casa..."}
+        />,
       )}
       <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -74,7 +87,12 @@ export default function DiagnosticoBasicoSection({
         </button>
       </div>
       {campo("Observa\u00e7\u00f5es adicionais")(
-        <textarea value={form.observacoes} onChange={(e) => setCampo("observacoes", e.target.value)} className={css.textarea} placeholder={"Observa\u00e7\u00f5es para o tutor, cuidados especiais..."} />
+        <textarea
+          value={form.observacoes}
+          onChange={(e) => setCampo("observacoes", e.target.value)}
+          className={css.textarea}
+          placeholder={"Observa\u00e7\u00f5es para o tutor, cuidados especiais..."}
+        />,
       )}
     </fieldset>
   );

@@ -1,55 +1,57 @@
-import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { PawPrint } from 'lucide-react';
-import { FiAlertCircle, FiCheckCircle, FiMail } from 'react-icons/fi';
-import api from '../api';
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { PawPrint } from "lucide-react";
+import { FiAlertCircle, FiCheckCircle, FiMail } from "react-icons/fi";
+import api from "../api";
 
 const EmailVerification = () => {
   const [searchParams] = useSearchParams();
-  const [email, setEmail] = useState(searchParams.get('email') || '');
-  const [token, setToken] = useState(searchParams.get('token') || '');
-  const [status, setStatus] = useState('idle');
-  const [message, setMessage] = useState('');
-  const canal = (searchParams.get('canal') || '').trim().toLowerCase();
-  const isAppFlow = ['app', 'mobile', 'aplicativo'].includes(canal);
+  const [email, setEmail] = useState(searchParams.get("email") || "");
+  const [token, setToken] = useState(searchParams.get("token") || "");
+  const [status, setStatus] = useState("idle");
+  const [message, setMessage] = useState("");
+  const canal = (searchParams.get("canal") || "").trim().toLowerCase();
+  const isAppFlow = ["app", "mobile", "aplicativo"].includes(canal);
 
   const verify = async (manualToken = token) => {
     if (!manualToken) {
-      setStatus('idle');
+      setStatus("idle");
       return;
     }
 
-    setStatus('loading');
-    setMessage('');
+    setStatus("loading");
+    setMessage("");
     try {
-      const response = await api.post('/auth/verify-email', {
+      const response = await api.post("/auth/verify-email", {
         email: email || undefined,
         token: manualToken,
       });
-      setStatus('success');
-      setMessage(response.data?.message || 'Email confirmado com sucesso.');
+      setStatus("success");
+      setMessage(response.data?.message || "Email confirmado com sucesso.");
     } catch (error) {
-      setStatus('error');
-      setMessage(error.response?.data?.detail || 'Nao foi possivel confirmar este e-mail.');
+      setStatus("error");
+      setMessage(error.response?.data?.detail || "Nao foi possivel confirmar este e-mail.");
     }
   };
 
   const resend = async () => {
     if (!email) {
-      setStatus('error');
-      setMessage('Informe o e-mail para reenviar o link.');
+      setStatus("error");
+      setMessage("Informe o e-mail para reenviar o link.");
       return;
     }
 
-    setStatus('loading');
-    setMessage('');
+    setStatus("loading");
+    setMessage("");
     try {
-      const response = await api.post('/auth/resend-verification', { email });
-      setStatus('resent');
-      setMessage(response.data?.message || 'Se o email precisar de confirmacao, enviaremos um novo link.');
+      const response = await api.post("/auth/resend-verification", { email });
+      setStatus("resent");
+      setMessage(
+        response.data?.message || "Se o email precisar de confirmacao, enviaremos um novo link.",
+      );
     } catch (error) {
-      setStatus('error');
-      setMessage(error.response?.data?.detail || 'Nao foi possivel reenviar agora.');
+      setStatus("error");
+      setMessage(error.response?.data?.detail || "Nao foi possivel reenviar agora.");
     }
   };
 
@@ -57,10 +59,9 @@ const EmailVerification = () => {
     if (token) {
       verify(token);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const isSuccess = status === 'success';
+  const isSuccess = status === "success";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-700 to-purple-900 flex items-center justify-center p-4">
@@ -76,12 +77,12 @@ const EmailVerification = () => {
         {message && (
           <div
             className={`mb-6 p-4 rounded-lg flex items-start gap-2 ${
-              isSuccess || status === 'resent'
-                ? 'bg-green-50 border border-green-200 text-green-700'
-                : 'bg-red-50 border border-red-200 text-red-700'
+              isSuccess || status === "resent"
+                ? "bg-green-50 border border-green-200 text-green-700"
+                : "bg-red-50 border border-red-200 text-red-700"
             }`}
           >
-            {isSuccess || status === 'resent' ? (
+            {isSuccess || status === "resent" ? (
               <FiCheckCircle className="flex-shrink-0 mt-0.5" />
             ) : (
               <FiAlertCircle className="flex-shrink-0 mt-0.5" />
@@ -107,7 +108,9 @@ const EmailVerification = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Codigo de confirmacao</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Codigo de confirmacao
+              </label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -121,16 +124,16 @@ const EmailVerification = () => {
             <button
               type="button"
               onClick={() => verify()}
-              disabled={status === 'loading'}
+              disabled={status === "loading"}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {status === 'loading' ? 'Confirmando...' : 'Confirmar e-mail'}
+              {status === "loading" ? "Confirmando..." : "Confirmar e-mail"}
             </button>
 
             <button
               type="button"
               onClick={resend}
-              disabled={status === 'loading'}
+              disabled={status === "loading"}
               className="w-full border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Reenviar link

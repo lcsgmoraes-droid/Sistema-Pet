@@ -9,9 +9,7 @@ export default function EventosFuncionario({ funcionario, onClose }) {
   const carregarProvisoes = async () => {
     try {
       setErro(null);
-      const res = await api.get(
-        `/funcionarios/${funcionario.id}/provisoes`
-      );
+      const res = await api.get(`/funcionarios/${funcionario.id}/provisoes`);
       setProvisoes(res.data);
     } catch (error) {
       setErro(error.response?.data?.detail || "Erro ao carregar provisões do funcionário.");
@@ -25,16 +23,16 @@ export default function EventosFuncionario({ funcionario, onClose }) {
   const concederFerias = async () => {
     if (!window.confirm("Confirmar concessão de férias?")) return;
     setLoading(true);
-    
+
     try {
       const hoje = new Date();
       const payload = {
         mes: hoje.getMonth() + 1,
         ano: hoje.getFullYear(),
         dias_ferias: 30,
-        data_pagamento: null
+        data_pagamento: null,
       };
-      
+
       await api.post(`/funcionarios/${funcionario.id}/ferias`, payload);
       await carregarProvisoes();
       alert("Férias concedidas com sucesso");
@@ -47,15 +45,10 @@ export default function EventosFuncionario({ funcionario, onClose }) {
   };
 
   const pagarDecimo = async (parcela) => {
-    if (
-      !window.confirm(
-        `Confirmar pagamento da ${parcela}ª parcela do 13º?`
-      )
-    )
-      return;
+    if (!window.confirm(`Confirmar pagamento da ${parcela}ª parcela do 13º?`)) return;
 
     setLoading(true);
-    
+
     try {
       const hoje = new Date();
       const payload = {
@@ -63,13 +56,10 @@ export default function EventosFuncionario({ funcionario, onClose }) {
         ano: hoje.getFullYear(),
         percentual: parcela === 1 ? 50 : 100,
         descricao_parcela: parcela === 1 ? "1ª Parcela" : "2ª Parcela",
-        data_pagamento: null
+        data_pagamento: null,
       };
-      
-      await api.post(
-        `/funcionarios/${funcionario.id}/decimo-terceiro`,
-        payload
-      );
+
+      await api.post(`/funcionarios/${funcionario.id}/decimo-terceiro`, payload);
       await carregarProvisoes();
       alert("13º registrado com sucesso");
     } catch (error) {
@@ -85,55 +75,52 @@ export default function EventosFuncionario({ funcionario, onClose }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
       <div className="bg-white rounded p-6 w-[500px]">
-        <h3 className="text-lg font-semibold mb-4">
-          Eventos — {funcionario.nome}
-        </h3>
+        <h3 className="text-lg font-semibold mb-4">Eventos — {funcionario.nome}</h3>
 
         {erro ? (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
             {erro}
           </div>
-        ) : (<>
-        {/* Provisões */}
-        <div className="mb-4">
-          <h4 className="font-semibold mb-2">Provisões</h4>
-          <p>Férias: R$ {Number(provisoes.ferias || 0).toFixed(2)}</p>
-          <p>13º: R$ {Number(provisoes.decimo_terceiro || 0).toFixed(2)}</p>
-        </div>
+        ) : (
+          <>
+            {/* Provisões */}
+            <div className="mb-4">
+              <h4 className="font-semibold mb-2">Provisões</h4>
+              <p>Férias: R$ {Number(provisoes.ferias || 0).toFixed(2)}</p>
+              <p>13º: R$ {Number(provisoes.decimo_terceiro || 0).toFixed(2)}</p>
+            </div>
 
-        {/* Ações */}
-        <div className="space-y-2">
-          <button
-            disabled={loading}
-            onClick={concederFerias}
-            className="w-full bg-blue-600 text-white py-2 rounded"
-          >
-            Conceder Férias
-          </button>
+            {/* Ações */}
+            <div className="space-y-2">
+              <button
+                disabled={loading}
+                onClick={concederFerias}
+                className="w-full bg-blue-600 text-white py-2 rounded"
+              >
+                Conceder Férias
+              </button>
 
-          <button
-            disabled={loading}
-            onClick={() => pagarDecimo(1)}
-            className="w-full bg-green-600 text-white py-2 rounded"
-          >
-            Pagar 1ª Parcela do 13º
-          </button>
+              <button
+                disabled={loading}
+                onClick={() => pagarDecimo(1)}
+                className="w-full bg-green-600 text-white py-2 rounded"
+              >
+                Pagar 1ª Parcela do 13º
+              </button>
 
-          <button
-            disabled={loading}
-            onClick={() => pagarDecimo(2)}
-            className="w-full bg-green-700 text-white py-2 rounded"
-          >
-            Pagar 2ª Parcela do 13º
-          </button>
-        </div>
-        </>)}
+              <button
+                disabled={loading}
+                onClick={() => pagarDecimo(2)}
+                className="w-full bg-green-700 text-white py-2 rounded"
+              >
+                Pagar 2ª Parcela do 13º
+              </button>
+            </div>
+          </>
+        )}
 
         <div className="mt-4 text-right">
-          <button
-            onClick={onClose}
-            className="text-gray-600 underline"
-          >
+          <button onClick={onClose} className="text-gray-600 underline">
             Fechar
           </button>
         </div>

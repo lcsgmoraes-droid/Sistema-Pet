@@ -80,8 +80,9 @@ export default function AgendaProcedimentoForm({
         <div>
           <p className="text-sm font-semibold text-gray-700">Novo procedimento / lembrete</p>
           <p className="mt-1 text-xs text-gray-500">
-            Agende medicacoes e procedimentos previstos para o internado. O campo principal e digitavel:
-            busque no catalogo ou mantenha um texto manual quando ainda nao houver cadastro.
+            Agende medicacoes e procedimentos previstos para o internado. O campo principal e
+            digitavel: busque no catalogo ou mantenha um texto manual quando ainda nao houver
+            cadastro.
           </p>
         </div>
         <button
@@ -97,7 +98,9 @@ export default function AgendaProcedimentoForm({
         <Campo label="Internado / paciente">
           <select
             value={agendaForm.internacao_id}
-            onChange={(event) => setAgendaForm((prev) => ({ ...prev, internacao_id: event.target.value }))}
+            onChange={(event) =>
+              setAgendaForm((prev) => ({ ...prev, internacao_id: event.target.value }))
+            }
             className={inputClass}
           >
             <option value="">Selecione o internado...</option>
@@ -114,7 +117,9 @@ export default function AgendaProcedimentoForm({
           <input
             type="datetime-local"
             value={agendaForm.horario}
-            onChange={(event) => setAgendaForm((prev) => ({ ...prev, horario: event.target.value }))}
+            onChange={(event) =>
+              setAgendaForm((prev) => ({ ...prev, horario: event.target.value }))
+            }
             className={inputClass}
           />
         </Campo>
@@ -152,7 +157,9 @@ export default function AgendaProcedimentoForm({
             min="0"
             step="0.01"
             value={agendaForm.quantidade_prevista}
-            onChange={(event) => setAgendaForm((prev) => ({ ...prev, quantidade_prevista: event.target.value }))}
+            onChange={(event) =>
+              setAgendaForm((prev) => ({ ...prev, quantidade_prevista: event.target.value }))
+            }
             className={inputClass}
           />
         </Campo>
@@ -161,7 +168,9 @@ export default function AgendaProcedimentoForm({
           <input
             type="text"
             value={agendaForm.unidade_quantidade}
-            onChange={(event) => setAgendaForm((prev) => ({ ...prev, unidade_quantidade: event.target.value }))}
+            onChange={(event) =>
+              setAgendaForm((prev) => ({ ...prev, unidade_quantidade: event.target.value }))
+            }
             className={inputClass}
           />
         </Campo>
@@ -178,7 +187,11 @@ export default function AgendaProcedimentoForm({
         <Campo label="Baia / local">
           <input
             type="text"
-            value={agendaForm.internacao_id ? (internacaoSelecionadaAgenda?.box || "Sem baia") : "Selecione um internado"}
+            value={
+              agendaForm.internacao_id
+                ? internacaoSelecionadaAgenda?.box || "Sem baia"
+                : "Selecione um internado"
+            }
             disabled
             className={`${inputClass} bg-gray-50 text-gray-600`}
           />
@@ -189,7 +202,9 @@ export default function AgendaProcedimentoForm({
             type="number"
             min="0"
             value={agendaForm.lembrete_min}
-            onChange={(event) => setAgendaForm((prev) => ({ ...prev, lembrete_min: event.target.value }))}
+            onChange={(event) =>
+              setAgendaForm((prev) => ({ ...prev, lembrete_min: event.target.value }))
+            }
             className={inputClass}
           />
         </Campo>
@@ -198,7 +213,9 @@ export default function AgendaProcedimentoForm({
           <input
             type="text"
             value={agendaForm.observacoes}
-            onChange={(event) => setAgendaForm((prev) => ({ ...prev, observacoes: event.target.value }))}
+            onChange={(event) =>
+              setAgendaForm((prev) => ({ ...prev, observacoes: event.target.value }))
+            }
             className={inputClass}
           />
         </Campo>

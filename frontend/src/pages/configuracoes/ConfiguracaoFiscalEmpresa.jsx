@@ -12,7 +12,7 @@ export default function ConfiguracaoFiscalEmpresa() {
   const [guiaAtiva, setGuiaAtiva] = useState("");
 
   const normalizeCnaesSecundarios = (value) => {
-    console.log('🔧 normalizeCnaesSecundarios chamado com:', value, 'tipo:', typeof value);
+    console.log("🔧 normalizeCnaesSecundarios chamado com:", value, "tipo:", typeof value);
     if (!value) return [];
     if (Array.isArray(value)) return value;
     if (typeof value === "string") {
@@ -23,14 +23,14 @@ export default function ConfiguracaoFiscalEmpresa() {
         return [];
       }
     }
-    console.warn('⚠️ Valor inesperado para CNAEs, retornando array vazio');
+    console.warn("⚠️ Valor inesperado para CNAEs, retornando array vazio");
     return [];
   };
-  
+
   // Informações de CNAE
   const [cnaePrincipalDescricao, setCnaePrincipalDescricao] = useState("");
   const [cnaesSecundarios, setCnaesSecundarios] = useState([]);
-  
+
   // Dados Cadastrais
   const [dadosEmpresa, setDadosEmpresa] = useState({
     cnpj: "",
@@ -46,9 +46,9 @@ export default function ConfiguracaoFiscalEmpresa() {
     complemento: "",
     bairro: "",
     cidade: "",
-    uf: ""
+    uf: "",
   });
-  
+
   // Dados Fiscais
   const [form, setForm] = useState({
     regime_tributario: "",
@@ -58,7 +58,7 @@ export default function ConfiguracaoFiscalEmpresa() {
     cnae_principal: "",
     cnae_descricao: "",
     cnaes_secundarios: [],
-    uf: ""
+    uf: "",
   });
 
   useEffect(() => {
@@ -66,17 +66,15 @@ export default function ConfiguracaoFiscalEmpresa() {
       try {
         // Carregar dados fiscais
         const resFiscal = await api.get("/empresa/fiscal");
-        console.log('📊 Dados fiscais carregados:', resFiscal.data);
-        console.log('🔍 cnaes_secundarios recebido:', resFiscal.data.cnaes_secundarios);
-        console.log('🔍 Tipo:', typeof resFiscal.data.cnaes_secundarios);
-        console.log('🔍 É array?', Array.isArray(resFiscal.data.cnaes_secundarios));
-        
-        const cnaesSecundarios = normalizeCnaesSecundarios(
-          resFiscal.data.cnaes_secundarios
-        );
-        
-        console.log('✅ Após normalizar:', cnaesSecundarios);
-        console.log('✅ É array agora?', Array.isArray(cnaesSecundarios));
+        console.log("📊 Dados fiscais carregados:", resFiscal.data);
+        console.log("🔍 cnaes_secundarios recebido:", resFiscal.data.cnaes_secundarios);
+        console.log("🔍 Tipo:", typeof resFiscal.data.cnaes_secundarios);
+        console.log("🔍 É array?", Array.isArray(resFiscal.data.cnaes_secundarios));
+
+        const cnaesSecundarios = normalizeCnaesSecundarios(resFiscal.data.cnaes_secundarios);
+
+        console.log("✅ Após normalizar:", cnaesSecundarios);
+        console.log("✅ É array agora?", Array.isArray(cnaesSecundarios));
 
         setForm({
           regime_tributario: resFiscal.data.regime_tributario || "",
@@ -86,16 +84,16 @@ export default function ConfiguracaoFiscalEmpresa() {
           cnae_principal: resFiscal.data.cnae_principal || "",
           cnae_descricao: resFiscal.data.cnae_descricao || "",
           cnaes_secundarios: cnaesSecundarios,
-          uf: resFiscal.data.uf || ""
+          uf: resFiscal.data.uf || "",
         });
-        
+
         // Atualizar estados locais para exibição
         if (resFiscal.data.cnae_descricao) {
           setCnaePrincipalDescricao(resFiscal.data.cnae_descricao);
         }
         // Sempre atualizar cnaesSecundarios, mesmo que vazio
         setCnaesSecundarios(cnaesSecundarios);
-        
+
         // Tentar carregar dados cadastrais (se endpoint existir)
         try {
           const resDados = await api.get("/empresa/dados-cadastrais");
@@ -115,7 +113,7 @@ export default function ConfiguracaoFiscalEmpresa() {
               complemento: resDados.data.complemento || "",
               bairro: resDados.data.bairro || "",
               cidade: resDados.data.cidade || "",
-              uf: resDados.data.uf || ""
+              uf: resDados.data.uf || "",
             });
           }
         } catch (e) {
@@ -129,12 +127,12 @@ export default function ConfiguracaoFiscalEmpresa() {
         console.error("❌ Erro ao carregar configurações:", e);
         console.error("❌ Resposta completa:", e.response);
         toast.error("Erro ao carregar configurações da empresa");
-        
+
         // Garantir estados seguros mesmo em caso de erro
         setCnaesSecundarios([]);
-        setForm(prev => ({
+        setForm((prev) => ({
           ...prev,
-          cnaes_secundarios: []
+          cnaes_secundarios: [],
         }));
       } finally {
         setLoading(false);
@@ -170,17 +168,15 @@ export default function ConfiguracaoFiscalEmpresa() {
       "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500";
     const destacar = Boolean(CAMPOS_DESTACADOS[guiaAtiva]?.has(name));
     const guiaClasses = getGuiaClassNames(destacar);
-    return destacar
-      ? `${base} ${guiaClasses.input}`
-      : base;
+    return destacar ? `${base} ${guiaClasses.input}` : base;
   };
 
   function handleChange(e) {
     const { name, value } = e.target;
-    setForm(prev => {
+    setForm((prev) => {
       const updated = {
         ...prev,
-        [name]: value
+        [name]: value,
       };
 
       // Se mudou o regime para Simples Nacional, garantir valores padrão
@@ -199,91 +195,89 @@ export default function ConfiguracaoFiscalEmpresa() {
 
   function handleDadosChange(e) {
     const { name, value } = e.target;
-    setDadosEmpresa(prev => ({
+    setDadosEmpresa((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   }
 
   async function buscarDadosPorCNPJ() {
-    const cnpjLimpo = dadosEmpresa.cnpj.replace(/[^0-9]/g, '');
-    
+    const cnpjLimpo = dadosEmpresa.cnpj.replace(/[^0-9]/g, "");
+
     if (cnpjLimpo.length !== 14) {
-      toast.error('CNPJ deve ter 14 dígitos');
+      toast.error("CNPJ deve ter 14 dígitos");
       return;
     }
 
     setBuscandoCNPJ(true);
     try {
       const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`);
-      
+
       if (!response.ok) {
-        throw new Error('CNPJ não encontrado');
+        throw new Error("CNPJ não encontrado");
       }
-      
+
       const dados = await response.json();
-      console.log('🔍 Dados completos da API:', dados);
-      console.log('📋 CNAE Fiscal:', dados.cnae_fiscal);
-      console.log('📋 CNAE Descrição:', dados.cnae_fiscal_descricao);
-      console.log('📋 CNAEs Secundários:', dados.cnaes_secundarios);
-      
+      console.log("🔍 Dados completos da API:", dados);
+      console.log("📋 CNAE Fiscal:", dados.cnae_fiscal);
+      console.log("📋 CNAE Descrição:", dados.cnae_fiscal_descricao);
+      console.log("📋 CNAEs Secundários:", dados.cnaes_secundarios);
+
       // Atualizar apenas campos que vieram preenchidos da API
       const novosDados = { ...dadosEmpresa };
-      
+
       if (dados.razao_social) novosDados.razao_social = dados.razao_social;
       if (dados.nome_fantasia) novosDados.nome_fantasia = dados.nome_fantasia;
       if (dados.email) novosDados.email = dados.email;
-      
+
       // Inscrições (geralmente não vem da Receita Federal)
       if (dados.inscricao_estadual) novosDados.inscricao_estadual = dados.inscricao_estadual;
-      
+
       // Telefone pode vir em ddd_telefone_1 ou telefone
       const telefone = dados.ddd_telefone_1 || dados.telefone;
       if (telefone) novosDados.telefone = telefone;
-      
+
       // Endereço
-      if (dados.cep) novosDados.cep = dados.cep.replace(/[^0-9]/g, '');
+      if (dados.cep) novosDados.cep = dados.cep.replace(/[^0-9]/g, "");
       if (dados.logradouro) novosDados.endereco = dados.logradouro;
       if (dados.numero) novosDados.numero = dados.numero;
       if (dados.complemento) novosDados.complemento = dados.complemento;
       if (dados.bairro) novosDados.bairro = dados.bairro;
       if (dados.municipio) novosDados.cidade = dados.municipio;
       if (dados.uf) novosDados.uf = dados.uf;
-      
+
       setDadosEmpresa(novosDados);
-      
+
       // Atualizar CNAE principal com descrição
       if (dados.cnae_fiscal) {
         const cnaeNumero = dados.cnae_fiscal.toString();
-        console.log('✅ CNAE encontrado:', cnaeNumero);
-        
-        const cnaesSecundarios = normalizeCnaesSecundarios(
-          dados.cnaes_secundarios
-        );
+        console.log("✅ CNAE encontrado:", cnaeNumero);
 
-        setForm(prev => ({
+        const cnaesSecundarios = normalizeCnaesSecundarios(dados.cnaes_secundarios);
+
+        setForm((prev) => ({
           ...prev,
           cnae_principal: cnaeNumero,
           cnae_descricao: dados.cnae_fiscal_descricao || "",
-          cnaes_secundarios: cnaesSecundarios
+          cnaes_secundarios: cnaesSecundarios,
         }));
-        
+
         // Atualizar estados para exibição
         if (dados.cnae_fiscal_descricao) {
           setCnaePrincipalDescricao(dados.cnae_fiscal_descricao);
         }
-        
+
         // Sempre atualizar cnaesSecundarios, mesmo que vazio
         setCnaesSecundarios(cnaesSecundarios);
         if (cnaesSecundarios.length > 0) {
           console.log(`📋 Encontrados ${cnaesSecundarios.length} CNAEs secundários`);
         }
       }
-      
-      toast.success('✅ Dados preenchidos com sucesso!');
+
+      toast.success("✅ Dados preenchidos com sucesso!");
     } catch (error) {
-      console.error('Erro ao buscar CNPJ:', error);
-      toast.error('❌ Erro ao buscar CNPJ. Verifique o número.');
+      console.error("Erro ao buscar CNPJ:", error);
+      toast.error("❌ Erro ao buscar CNPJ. Verifique o número.");
     } finally {
       setBuscandoCNPJ(false);
     }
@@ -294,20 +288,20 @@ export default function ConfiguracaoFiscalEmpresa() {
     try {
       const payload = {
         ...form,
-        cnaes_secundarios: normalizeCnaesSecundarios(form.cnaes_secundarios)
+        cnaes_secundarios: normalizeCnaesSecundarios(form.cnaes_secundarios),
       };
 
-      console.log('💾 Salvando dados fiscais:', payload);
-      console.log('📋 CNAE Descrição no form:', form.cnae_descricao);
-      console.log('📋 CNAEs Secundários no form:', form.cnaes_secundarios);
-      
+      console.log("💾 Salvando dados fiscais:", payload);
+      console.log("📋 CNAE Descrição no form:", form.cnae_descricao);
+      console.log("📋 CNAEs Secundários no form:", form.cnaes_secundarios);
+
       // Salvar dados fiscais
       const response = await api.put("/empresa/fiscal", payload);
-      console.log('✅ Resposta do servidor (fiscal):', response.data);
-      
+      console.log("✅ Resposta do servidor (fiscal):", response.data);
+
       // Salvar dados cadastrais (se endpoint existir)
       try {
-        console.log('💾 Salvando dados cadastrais:', dadosEmpresa);
+        console.log("💾 Salvando dados cadastrais:", dadosEmpresa);
         await api.put("/empresa/dados-cadastrais", dadosEmpresa);
       } catch (e) {
         if (e.response?.status === 404) {
@@ -316,7 +310,7 @@ export default function ConfiguracaoFiscalEmpresa() {
           throw e;
         }
       }
-      
+
       toast.success("Configurações salvas com sucesso!");
     } catch (e) {
       console.error("Erro ao salvar:", e);
@@ -339,7 +333,7 @@ export default function ConfiguracaoFiscalEmpresa() {
 
   // 🛡️ PROTEÇÃO: Garantir que cnaesSecundarios seja SEMPRE um array
   const cnaesSecundariosSeguro = Array.isArray(cnaesSecundarios) ? cnaesSecundarios : [];
-  
+
   const simplesAtivo = form.regime_tributario === "Simples Nacional";
 
   return (
@@ -364,8 +358,9 @@ export default function ConfiguracaoFiscalEmpresa() {
           <div className="bg-blue-50 px-6 py-4 border-b border-blue-100">
             <h2 className="text-lg font-semibold text-blue-900">📋 Dados Cadastrais</h2>
             <p className="text-sm text-blue-700 mt-2">
-              💡 <strong>Dica:</strong> Digite o CNPJ e clique no botão 🔍 para preencher automaticamente 
-              os dados da empresa (razão social, endereço, CNAEs, etc.) consultando a Receita Federal.
+              💡 <strong>Dica:</strong> Digite o CNPJ e clique no botão 🔍 para preencher
+              automaticamente os dados da empresa (razão social, endereço, CNAEs, etc.) consultando
+              a Receita Federal.
             </p>
           </div>
           <div className="p-6 space-y-4">
@@ -393,13 +388,39 @@ export default function ConfiguracaoFiscalEmpresa() {
                     className="px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed flex items-center justify-center shadow-md hover:shadow-lg transition-all duration-200"
                   >
                     {buscandoCNPJ ? (
-                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      <svg
+                        className="animate-spin h-5 w-5"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
                       </svg>
                     ) : (
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      <svg
+                        className="h-5 w-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
                       </svg>
                     )}
                   </button>
@@ -422,9 +443,7 @@ export default function ConfiguracaoFiscalEmpresa() {
 
             {/* Linha 2: Nome Fantasia */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nome Fantasia
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Nome Fantasia</label>
               <input
                 type="text"
                 name="nome_fantasia"
@@ -468,9 +487,7 @@ export default function ConfiguracaoFiscalEmpresa() {
             {/* Linha 4: Contatos */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  E-mail
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">E-mail</label>
                 <input
                   type="email"
                   name="email"
@@ -481,9 +498,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Telefone
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
                 <input
                   type="text"
                   name="telefone"
@@ -498,9 +513,7 @@ export default function ConfiguracaoFiscalEmpresa() {
             {/* Linha 5: Endereço */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="md:col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  CEP
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">CEP</label>
                 <input
                   type="text"
                   name="cep"
@@ -512,9 +525,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                 />
               </div>
               <div className="md:col-span-3">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Endereço
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Endereço</label>
                 <input
                   type="text"
                   name="endereco"
@@ -529,9 +540,7 @@ export default function ConfiguracaoFiscalEmpresa() {
             {/* Linha 6: Complemento do Endereço */}
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
               <div className="md:col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Número
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Número</label>
                 <input
                   type="text"
                   name="numero"
@@ -542,9 +551,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Complemento
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Complemento</label>
                 <input
                   type="text"
                   name="complemento"
@@ -555,9 +562,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Bairro
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Bairro</label>
                 <input
                   type="text"
                   name="bairro"
@@ -568,9 +573,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                 />
               </div>
               <div className="md:col-span-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  UF
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">UF</label>
                 <select
                   name="uf"
                   value={dadosEmpresa.uf}
@@ -595,9 +598,7 @@ export default function ConfiguracaoFiscalEmpresa() {
 
             {/* Linha 7: Cidade */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cidade
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
               <input
                 type="text"
                 name="cidade"
@@ -613,14 +614,14 @@ export default function ConfiguracaoFiscalEmpresa() {
         {/* ===== SEÇÃO 2: CONFIGURAÇÃO FISCAL ===== */}
         <div className="bg-white rounded-lg shadow">
           <div className="bg-green-50 px-6 py-4 border-b border-green-100">
-            <h2 className="text-lg font-semibold text-green-900">💰 Configuração Fiscal e Tributária</h2>
+            <h2 className="text-lg font-semibold text-green-900">
+              💰 Configuração Fiscal e Tributária
+            </h2>
           </div>
           <div className="p-6 space-y-4">
             {/* CNAE */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                CNAE Principal
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">CNAE Principal</label>
               <input
                 type="text"
                 name="cnae_principal"
@@ -638,7 +639,7 @@ export default function ConfiguracaoFiscalEmpresa() {
                 Código da Classificação Nacional de Atividades Econômicas
               </p>
             </div>
-            
+
             {/* CNAEs Secundários */}
             {cnaesSecundariosSeguro.length > 0 && (
               <div>
@@ -647,15 +648,18 @@ export default function ConfiguracaoFiscalEmpresa() {
                 </label>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {cnaesSecundariosSeguro.map((cnae, index) => (
-                    <div key={index} className="p-3 bg-gray-50 border border-gray-200 rounded-md text-sm">
-                      <span className="font-semibold text-gray-700">{cnae?.codigo || 'N/A'}</span>
-                      <span className="text-gray-600"> - {cnae?.descricao || 'Sem descrição'}</span>
+                    <div
+                      key={index}
+                      className="p-3 bg-gray-50 border border-gray-200 rounded-md text-sm"
+                    >
+                      <span className="font-semibold text-gray-700">{cnae?.codigo || "N/A"}</span>
+                      <span className="text-gray-600"> - {cnae?.descricao || "Sem descrição"}</span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-        
+
             {/* Regime Tributário */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -683,9 +687,7 @@ export default function ConfiguracaoFiscalEmpresa() {
 
                 {/* Anexo */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Anexo
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Anexo</label>
                   <select
                     name="simples_anexo"
                     value={form.simples_anexo || "I"}

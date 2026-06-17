@@ -34,7 +34,9 @@ function ProcedimentoResumoCard({ procedimento, index }) {
         </span>
       </div>
       <StatusProcedimento status={procedimento.status} />
-      <p className="text-sm font-semibold text-emerald-800">{procedimento.medicamento || "Procedimento"}</p>
+      <p className="text-sm font-semibold text-emerald-800">
+        {procedimento.medicamento || "Procedimento"}
+      </p>
       <p className="text-gray-600">
         Dose: {procedimento.dose || "-"} - Via: {procedimento.via || "-"}
       </p>
@@ -75,8 +77,9 @@ function QuantidadesProcedimento({ procedimento }) {
 
   return (
     <p className="text-gray-600">
-      Previsto: {formatQuantity(procedimento.quantidade_prevista, procedimento.unidade_quantidade)} - Feito:{" "}
-      {formatQuantity(procedimento.quantidade_executada, procedimento.unidade_quantidade)} - Desperdício:{" "}
+      Previsto: {formatQuantity(procedimento.quantidade_prevista, procedimento.unidade_quantidade)}{" "}
+      - Feito: {formatQuantity(procedimento.quantidade_executada, procedimento.unidade_quantidade)}{" "}
+      - Desperdício:{" "}
       {formatQuantity(procedimento.quantidade_desperdicio, procedimento.unidade_quantidade)}
     </p>
   );
@@ -92,7 +95,8 @@ function InsumosProcedimento({ procedimento, index }) {
           key={`${procedimento.id ?? index}_insumo_${insumoIndex}`}
           className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-700"
         >
-          {insumo.nome || `Produto #${insumo.produto_id}`} - {formatQuantity(insumo.quantidade, insumo.unidade)}
+          {insumo.nome || `Produto #${insumo.produto_id}`} -{" "}
+          {formatQuantity(insumo.quantidade, insumo.unidade)}
         </span>
       ))}
     </div>

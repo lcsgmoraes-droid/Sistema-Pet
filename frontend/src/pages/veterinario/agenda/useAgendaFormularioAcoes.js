@@ -99,12 +99,16 @@ export function useAgendaFormularioAcoes({
       setPetsDoTutor,
       setTutorSelecionado,
       sugerirHoraLivre,
-    ]
+    ],
   );
 
   const criarAgendamento = useCallback(async () => {
     if (!formNovo.pet_id || !formNovo.data || !formNovo.hora) return;
-    if (bloqueioCamposAgendamento.veterinario || bloqueioCamposAgendamento.consultorio || conflitoHorarioSelecionado) {
+    if (
+      bloqueioCamposAgendamento.veterinario ||
+      bloqueioCamposAgendamento.consultorio ||
+      conflitoHorarioSelecionado
+    ) {
       return;
     }
 
@@ -116,7 +120,9 @@ export function useAgendaFormularioAcoes({
         cliente_id: tutorSelecionado?.id || petSelecionadoModal?.cliente_id,
         veterinario_id: formNovo.veterinario_id ? Number(formNovo.veterinario_id) : undefined,
         consultorio_id: formNovo.consultorio_id ? Number(formNovo.consultorio_id) : undefined,
-        consulta_origem_id: formNovo.consulta_origem_id ? Number(formNovo.consulta_origem_id) : undefined,
+        consulta_origem_id: formNovo.consulta_origem_id
+          ? Number(formNovo.consulta_origem_id)
+          : undefined,
         data_hora: `${formNovo.data}T${formNovo.hora}`,
         tipo: normalizarTipoAgendamento(formNovo.tipo),
         motivo: formNovo.motivo || undefined,
@@ -212,7 +218,7 @@ export function useAgendaFormularioAcoes({
     (patch) => {
       setConsultorioInlineForm((prev) => ({ ...prev, ...patch }));
     },
-    [setConsultorioInlineForm]
+    [setConsultorioInlineForm],
   );
 
   const salvarConsultorioInline = useCallback(async () => {

@@ -9,7 +9,11 @@ export default function CatMedicamentos() {
 
   return (
     <div className="space-y-3">
-      <MedicamentosToolbar busca={catalogo.busca} onBuscaChange={catalogo.setBusca} onNovo={catalogo.abrirNovo} />
+      <MedicamentosToolbar
+        busca={catalogo.busca}
+        onBuscaChange={catalogo.setBusca}
+        onNovo={catalogo.abrirNovo}
+      />
 
       <CatalogoErro erro={catalogo.erro} />
 

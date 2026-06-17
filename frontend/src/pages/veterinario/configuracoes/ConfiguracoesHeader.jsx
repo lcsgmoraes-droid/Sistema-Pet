@@ -8,7 +8,9 @@ export default function ConfiguracoesHeader({ onReload }) {
       </div>
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Configurações - Módulo Veterinário</h1>
-        <p className="text-gray-500 text-sm">Gerencie o modelo operacional e os veterinários parceiros.</p>
+        <p className="text-gray-500 text-sm">
+          Gerencie o modelo operacional e os veterinários parceiros.
+        </p>
       </div>
       <button
         onClick={onReload}

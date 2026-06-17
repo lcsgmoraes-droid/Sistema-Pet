@@ -97,12 +97,14 @@ export default function useInternacoesController() {
   });
 
   useEffect(() => {
-    state.setAgendaForm((prev) => (prev.horario ? prev : { ...prev, horario: derivados.sugestaoHorario }));
+    state.setAgendaForm((prev) =>
+      prev.horario ? prev : { ...prev, horario: derivados.sugestaoHorario },
+    );
   }, [derivados.sugestaoHorario, state.setAgendaForm]);
 
   useEffect(() => {
     state.setFormInsumoRapido((prev) =>
-      prev.horario_execucao ? prev : { ...prev, horario_execucao: derivados.sugestaoHorario }
+      prev.horario_execucao ? prev : { ...prev, horario_execucao: derivados.sugestaoHorario },
     );
   }, [derivados.sugestaoHorario, state.setFormInsumoRapido]);
 

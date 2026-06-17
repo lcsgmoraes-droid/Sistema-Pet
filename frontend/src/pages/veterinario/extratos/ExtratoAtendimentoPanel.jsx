@@ -15,10 +15,7 @@ import {
 
 const checkboxClass = "h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500";
 
-export default function ExtratoAtendimentoPanel({
-  contexto,
-  titulo = "Extrato do atendimento",
-}) {
+export default function ExtratoAtendimentoPanel({ contexto, titulo = "Extrato do atendimento" }) {
   const [extrato, setExtrato] = useState(null);
   const [colunasSelecionadas, setColunasSelecionadas] = useState(EXTRATO_COLUNAS_DEFAULT);
   const [carregando, setCarregando] = useState(false);
@@ -33,7 +30,9 @@ export default function ExtratoAtendimentoPanel({
     setCarregando(true);
     setErro(null);
     try {
-      const response = await vetApi.obterExtratoAtendimento(buildExtratoParams(contexto, colunasSelecionadas));
+      const response = await vetApi.obterExtratoAtendimento(
+        buildExtratoParams(contexto, colunasSelecionadas),
+      );
       setExtrato(response.data || null);
       if (Array.isArray(response.data?.colunas)) {
         setColunasSelecionadas(normalizarColunasSelecionadas(response.data.colunas));
@@ -70,10 +69,14 @@ export default function ExtratoAtendimentoPanel({
     setErro(null);
     try {
       const params = buildExtratoParams(contexto, colunasSelecionadas);
-      const response = formato === "pdf"
-        ? await vetApi.exportarExtratoAtendimentoPdf(params)
-        : await vetApi.exportarExtratoAtendimentoExcel(params);
-      downloadBlob(response.data, buildExtratoDownloadName(contexto, formato === "pdf" ? "pdf" : "xlsx"));
+      const response =
+        formato === "pdf"
+          ? await vetApi.exportarExtratoAtendimentoPdf(params)
+          : await vetApi.exportarExtratoAtendimentoExcel(params);
+      downloadBlob(
+        response.data,
+        buildExtratoDownloadName(contexto, formato === "pdf" ? "pdf" : "xlsx"),
+      );
     } catch (error) {
       setErro(error?.response?.data?.detail || "Nao foi possivel exportar o extrato.");
     } finally {
@@ -89,7 +92,10 @@ export default function ExtratoAtendimentoPanel({
         <div>
           <h2 className="font-semibold text-gray-800">{titulo}</h2>
           <p className="mt-1 text-xs text-gray-500">
-            Custo {formatMoneyBRL(totais.custo_total || 0)} · Venda {formatMoneyBRL(totais.preco_total || 0)} · Margem {formatMoneyBRL(totais.margem_valor || 0)} ({formatPercent(totais.margem_percentual || 0)})
+            Custo {formatMoneyBRL(totais.custo_total || 0)} · Venda{" "}
+            {formatMoneyBRL(totais.preco_total || 0)} · Margem{" "}
+            {formatMoneyBRL(totais.margem_valor || 0)} (
+            {formatPercent(totais.margem_percentual || 0)})
           </p>
           <p className="mt-1 text-xs text-gray-400">
             {resumoLinhas.contabilizadas} linha(s) no total · {resumoLinhas.detalhes} detalhe(s)
@@ -126,13 +132,14 @@ export default function ExtratoAtendimentoPanel({
         </div>
       </div>
 
-      {erro && (
-        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{erro}</p>
-      )}
+      {erro && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{erro}</p>}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {EXTRATO_COLUNAS.map((coluna) => (
-          <label key={coluna.chave} className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600">
+          <label
+            key={coluna.chave}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600"
+          >
             <input
               type="checkbox"
               checked={colunasSelecionadas.includes(coluna.chave)}
@@ -166,16 +173,29 @@ export default function ExtratoAtendimentoPanel({
               </tr>
             ) : (
               linhas.map((linha, index) => (
-                <tr key={`${linha.referencia || "linha"}_${index}`} className="border-b border-gray-50">
+                <tr
+                  key={`${linha.referencia || "linha"}_${index}`}
+                  className="border-b border-gray-50"
+                >
                   <td className="py-2 pr-4 text-xs text-gray-500">{linha.origem_label}</td>
                   <td className="py-2 pr-4">
                     <p className="font-medium text-gray-800">{linha.nome}</p>
-                    {linha.parent_referencia && <p className="text-xs text-gray-400">Detalhe de {linha.parent_referencia}</p>}
+                    {linha.parent_referencia && (
+                      <p className="text-xs text-gray-400">Detalhe de {linha.parent_referencia}</p>
+                    )}
                   </td>
-                  <td className="py-2 pr-4 text-right text-gray-600">{Number(linha.quantidade || 0).toLocaleString("pt-BR")} {linha.unidade || ""}</td>
-                  <td className="py-2 pr-4 text-right text-amber-700">{formatMoneyBRL(linha.custo_total || 0)}</td>
-                  <td className="py-2 pr-4 text-right text-gray-800">{formatMoneyBRL(linha.preco_total || 0)}</td>
-                  <td className="py-2 pr-4 text-right text-emerald-700">{formatMoneyBRL(linha.margem_valor || 0)}</td>
+                  <td className="py-2 pr-4 text-right text-gray-600">
+                    {Number(linha.quantidade || 0).toLocaleString("pt-BR")} {linha.unidade || ""}
+                  </td>
+                  <td className="py-2 pr-4 text-right text-amber-700">
+                    {formatMoneyBRL(linha.custo_total || 0)}
+                  </td>
+                  <td className="py-2 pr-4 text-right text-gray-800">
+                    {formatMoneyBRL(linha.preco_total || 0)}
+                  </td>
+                  <td className="py-2 pr-4 text-right text-emerald-700">
+                    {formatMoneyBRL(linha.margem_valor || 0)}
+                  </td>
                   <td className="py-2 pr-4 text-xs text-gray-500">{linha.contabilizar_label}</td>
                 </tr>
               ))

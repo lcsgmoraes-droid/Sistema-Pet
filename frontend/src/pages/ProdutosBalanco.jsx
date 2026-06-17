@@ -43,8 +43,8 @@ export default function ProdutosBalanco() {
           <span className="mx-1 inline-flex items-center rounded-md border border-blue-300 bg-white px-2 py-0.5 text-xs font-semibold text-blue-700 align-middle">
             TAB
           </span>{" "}
-          para lancar automaticamente e ir para o proximo produto. O destaque verde mostra os
-          itens ja lancados e permanece na tela ate voce clicar em Atualizar lista.
+          para lancar automaticamente e ir para o proximo produto. O destaque verde mostra os itens
+          ja lancados e permanece na tela ate voce clicar em Atualizar lista.
         </p>
       </div>
 

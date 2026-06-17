@@ -16,19 +16,17 @@ export function useExamesAnexadosResumo({ navigate, setDados }) {
               arquivo_url: exameAtualizado.arquivo_url || item.arquivo_url,
               tem_interpretacao_ia: Boolean(
                 exameAtualizado.interpretacao_ia ||
-                  exameAtualizado.interpretacao_ia_resumo ||
-                  exameAtualizado.interpretacao_ia_payload
+                exameAtualizado.interpretacao_ia_resumo ||
+                exameAtualizado.interpretacao_ia_payload,
               ),
             }
-          : item
+          : item,
       ),
     }));
   }
 
   function toggleExameExpandido(exameId) {
-    setExameExpandidoId((atual) => (
-      String(atual) === String(exameId) ? "" : String(exameId)
-    ));
+    setExameExpandidoId((atual) => (String(atual) === String(exameId) ? "" : String(exameId)));
   }
 
   function abrirConsultaExame(item) {

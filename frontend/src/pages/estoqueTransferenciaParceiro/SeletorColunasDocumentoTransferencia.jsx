@@ -6,10 +6,7 @@ import {
   normalizarColunasDocumentoTransferencia,
 } from "./transferenciaParceiroUtils";
 
-export default function SeletorColunasDocumentoTransferencia({
-  colunasSelecionadas,
-  onChange,
-}) {
+export default function SeletorColunasDocumentoTransferencia({ colunasSelecionadas, onChange }) {
   const colunasNormalizadas = normalizarColunasDocumentoTransferencia(colunasSelecionadas);
   const semValores = !documentoTransferenciaTemValores(colunasNormalizadas);
 

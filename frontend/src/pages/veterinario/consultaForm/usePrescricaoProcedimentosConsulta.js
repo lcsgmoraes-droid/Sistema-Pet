@@ -1,11 +1,5 @@
-import {
-  criarPrescricaoItemInicial,
-  criarProcedimentoRealizadoInicial,
-} from "./consultaFormState";
-import {
-  calcularDosePrescricaoPorPeso,
-  obterPesoParaCalculoDose,
-} from "./prescricaoDoseUtils";
+import { criarPrescricaoItemInicial, criarProcedimentoRealizadoInicial } from "./consultaFormState";
+import { calcularDosePrescricaoPorPeso, obterPesoParaCalculoDose } from "./prescricaoDoseUtils";
 
 export default function usePrescricaoProcedimentosConsulta({
   form,
@@ -18,10 +12,7 @@ export default function usePrescricaoProcedimentosConsulta({
   function adicionarItem() {
     setForm((prev) => ({
       ...prev,
-      prescricao_itens: [
-        ...prev.prescricao_itens,
-        criarPrescricaoItemInicial(),
-      ],
+      prescricao_itens: [...prev.prescricao_itens, criarPrescricaoItemInicial()],
     }));
   }
 
@@ -66,7 +57,9 @@ export default function usePrescricaoProcedimentosConsulta({
   }
 
   function selecionarProcedimentoCatalogo(idx, catalogoId) {
-    const procedimento = procedimentosCatalogo.find((item) => String(item.id) === String(catalogoId));
+    const procedimento = procedimentosCatalogo.find(
+      (item) => String(item.id) === String(catalogoId),
+    );
     setForm((prev) => {
       const itens = [...prev.procedimentos_realizados];
       itens[idx] = {
@@ -74,7 +67,8 @@ export default function usePrescricaoProcedimentosConsulta({
         catalogo_id: catalogoId,
         nome: procedimento?.nome || itens[idx].nome,
         descricao: procedimento?.descricao || "",
-        valor: procedimento?.valor_padrao != null ? String(procedimento.valor_padrao) : itens[idx].valor,
+        valor:
+          procedimento?.valor_padrao != null ? String(procedimento.valor_padrao) : itens[idx].valor,
       };
       return { ...prev, procedimentos_realizados: itens };
     });

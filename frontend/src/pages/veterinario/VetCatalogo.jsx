@@ -21,7 +21,9 @@ export default function VetCatalogo() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Catalogos</h1>
-          <p className="text-sm text-gray-500">Medicamentos, procedimentos e protocolos de vacinas.</p>
+          <p className="text-sm text-gray-500">
+            Medicamentos, procedimentos e protocolos de vacinas.
+          </p>
         </div>
       </div>
 

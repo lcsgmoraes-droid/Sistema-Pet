@@ -34,7 +34,7 @@ export function useInternacoesQueryEffects({
         prev || {
           id: String(tutorIdQuery),
           nome: tutorNomeQuery || `Pessoa #${tutorIdQuery}`,
-        }
+        },
     );
   }, [setFormNova, setTutorNovaSelecionado, tutorIdQuery, tutorNomeQuery]);
 

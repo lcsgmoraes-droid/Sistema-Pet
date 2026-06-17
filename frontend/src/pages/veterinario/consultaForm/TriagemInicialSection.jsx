@@ -25,7 +25,10 @@ export default function TriagemInicialSection({
   abrirModalNovoPet,
 }) {
   return (
-    <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4 disabled:opacity-100">
+    <fieldset
+      disabled={modoSomenteLeitura}
+      className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4 disabled:opacity-100"
+    >
       <h2 className="font-semibold text-gray-700">Triagem inicial</h2>
 
       <TutorVeterinarioFields
@@ -57,19 +60,9 @@ export default function TriagemInicialSection({
         abrirModalNovoPet={abrirModalNovoPet}
       />
 
-      <MotivoConsultaField
-        form={form}
-        setCampo={setCampo}
-        css={css}
-        renderCampo={renderCampo}
-      />
+      <MotivoConsultaField form={form} setCampo={setCampo} css={css} renderCampo={renderCampo} />
 
-      <SinaisVitaisFields
-        form={form}
-        setCampo={setCampo}
-        css={css}
-        renderCampo={renderCampo}
-      />
+      <SinaisVitaisFields form={form} setCampo={setCampo} css={css} renderCampo={renderCampo} />
     </fieldset>
   );
 }

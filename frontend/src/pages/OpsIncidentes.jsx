@@ -77,7 +77,9 @@ function severityLabel(severity) {
 
 function Badge({ children, className = "" }) {
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${className}`}>
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${className}`}
+    >
       {children}
     </span>
   );
@@ -110,8 +112,12 @@ function TenantCard({ item, selected, onSelect }) {
         <Badge className="border-white bg-white/80 text-slate-900">{item.total}</Badge>
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-        <span>5xx: <b>{item.errors_5xx}</b></span>
-        <span>Lentas: <b>{item.slow_requests}</b></span>
+        <span>
+          5xx: <b>{item.errors_5xx}</b>
+        </span>
+        <span>
+          Lentas: <b>{item.slow_requests}</b>
+        </span>
         <span>{formatDate(item.latest_at)}</span>
       </div>
     </button>
@@ -140,9 +146,15 @@ function RouteCard({ item, selected, onSelect }) {
         <Badge className="border-white bg-white/80 text-slate-900">{item.total}</Badge>
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-        <span>5xx: <b>{item.errors_5xx}</b></span>
-        <span>Lentas: <b>{item.slow_requests}</b></span>
-        <span>Media: <b>{formatMs(item.avg_duration_ms)}</b></span>
+        <span>
+          5xx: <b>{item.errors_5xx}</b>
+        </span>
+        <span>
+          Lentas: <b>{item.slow_requests}</b>
+        </span>
+        <span>
+          Media: <b>{formatMs(item.avg_duration_ms)}</b>
+        </span>
       </div>
     </button>
   );
@@ -171,15 +183,21 @@ function ActionableAlertsPanel({ alerts, notifications, recoveryActions, onApply
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notificacoes ativas</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Notificacoes ativas
+          </div>
           <div className="mt-1 text-xl font-bold text-slate-900">{activeAlerts}</div>
         </div>
         <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-rose-600">Criticas abertas</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-rose-600">
+            Criticas abertas
+          </div>
           <div className="mt-1 text-xl font-bold text-rose-700">{criticalAlerts}</div>
         </div>
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Acoes recuperacao</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+            Acoes recuperacao
+          </div>
           <div className="mt-1 text-xl font-bold text-emerald-800">{recoveries}</div>
         </div>
       </div>
@@ -200,7 +218,9 @@ function ActionableAlertsPanel({ alerts, notifications, recoveryActions, onApply
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge className="border-white bg-white/80 text-slate-800">{severityLabel(alert.severity)}</Badge>
+                    <Badge className="border-white bg-white/80 text-slate-800">
+                      {severityLabel(alert.severity)}
+                    </Badge>
                     <span className="text-sm font-bold">{alert.title}</span>
                   </div>
                   <p className="mt-2 text-xs text-slate-600">{alert.detail}</p>
@@ -261,17 +281,22 @@ function EventDetail({ event, auditTrail = [], auditLoading = false }) {
 
       <div className="mt-4 grid gap-2">
         {fields.map(([label, value]) => (
-          <div key={label} className="grid grid-cols-[110px_1fr] gap-3 rounded-md bg-slate-50 px-3 py-2 text-sm">
+          <div
+            key={label}
+            className="grid grid-cols-[110px_1fr] gap-3 rounded-md bg-slate-50 px-3 py-2 text-sm"
+          >
             <span className="font-semibold text-slate-500">{label}</span>
             <span className="min-w-0 break-words font-mono text-xs text-slate-800">{value}</span>
           </div>
         ))}
       </div>
 
-      {(event.exception_type || event.exception_message) ? (
+      {event.exception_type || event.exception_message ? (
         <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
           <div className="font-bold">{event.exception_type || "Erro"}</div>
-          <div className="mt-1 whitespace-pre-wrap text-xs">{event.exception_message || "Sem mensagem detalhada."}</div>
+          <div className="mt-1 whitespace-pre-wrap text-xs">
+            {event.exception_message || "Sem mensagem detalhada."}
+          </div>
         </div>
       ) : null}
 
@@ -279,13 +304,17 @@ function EventDetail({ event, auditTrail = [], auditLoading = false }) {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold text-slate-900">Auditoria do request</h3>
-            <p className="mt-1 text-xs text-slate-500">Eventos de negocio vinculados ao mesmo request_id.</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Eventos de negocio vinculados ao mesmo request_id.
+            </p>
           </div>
           <Badge className="border-slate-200 bg-slate-50 text-slate-600">{auditTrail.length}</Badge>
         </div>
 
         {auditLoading ? (
-          <div className="mt-3 rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">Carregando auditoria...</div>
+          <div className="mt-3 rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">
+            Carregando auditoria...
+          </div>
         ) : auditTrail.length === 0 ? (
           <div className="mt-3 rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">
             Nenhum evento de auditoria encontrado para este request.
@@ -387,7 +416,11 @@ export default function OpsIncidentes() {
       setEvents(eventsResult.data);
       setSelectedEvent((current) => {
         if (!current) return eventsResult.data.items?.[0] || null;
-        return eventsResult.data.items?.find((item) => item.request_id === current.request_id) || eventsResult.data.items?.[0] || null;
+        return (
+          eventsResult.data.items?.find((item) => item.request_id === current.request_id) ||
+          eventsResult.data.items?.[0] ||
+          null
+        );
       });
     } catch (err) {
       console.error("Erro ao carregar incidentes Ops:", err);
@@ -406,13 +439,14 @@ export default function OpsIncidentes() {
 
     let cancelled = false;
     setAuditLoading(true);
-    api.get("/admin/observabilidade/audit-events", {
-      params: {
-        request_id: requestId,
-        tenant_id: selectedEvent.tenant_id || undefined,
-        limit: 40,
-      },
-    })
+    api
+      .get("/admin/observabilidade/audit-events", {
+        params: {
+          request_id: requestId,
+          tenant_id: selectedEvent.tenant_id || undefined,
+          limit: 40,
+        },
+      })
       .then((response) => {
         if (!cancelled) setAuditTrail(response.data.items || []);
       })
@@ -487,7 +521,9 @@ export default function OpsIncidentes() {
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div className="grid gap-3 lg:grid-cols-[180px_160px_150px_minmax(220px,0.8fr)_1fr_auto]">
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Periodo</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Periodo
+              </span>
               <select
                 value={rangeHours}
                 onChange={(event) => {
@@ -497,13 +533,17 @@ export default function OpsIncidentes() {
                 className="mt-1 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900"
               >
                 {RANGE_OPTIONS.map((option) => (
-                  <option key={option.hours} value={option.hours}>{option.label}</option>
+                  <option key={option.hours} value={option.hours}>
+                    {option.label}
+                  </option>
                 ))}
               </select>
             </label>
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Status
+              </span>
               <select
                 value={statusMin}
                 onChange={(event) => {
@@ -534,7 +574,9 @@ export default function OpsIncidentes() {
             </div>
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Request ID</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Request ID
+              </span>
               <div className="relative mt-1">
                 <FiSearch className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
                 <input
@@ -550,7 +592,9 @@ export default function OpsIncidentes() {
             </label>
 
             <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Buscar no resultado</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Buscar no resultado
+              </span>
               <div className="relative mt-1">
                 <FiSearch className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
                 <input
@@ -575,10 +619,24 @@ export default function OpsIncidentes() {
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
-            {selectedTenant ? <Badge className="border-blue-200 bg-blue-50 text-blue-700">Tenant: {tenantNameById.get(selectedTenant) || selectedTenant}</Badge> : null}
-            {selectedPath ? <Badge className="border-blue-200 bg-blue-50 text-blue-700">Rota: {selectedPath}</Badge> : null}
-            {requestIdFilter ? <Badge className="border-blue-200 bg-blue-50 font-mono text-blue-700">Request: {requestIdFilter}</Badge> : null}
-            {!selectedTenant && !selectedPath ? <span>Selecione um card abaixo para afunilar a investigacao.</span> : null}
+            {selectedTenant ? (
+              <Badge className="border-blue-200 bg-blue-50 text-blue-700">
+                Tenant: {tenantNameById.get(selectedTenant) || selectedTenant}
+              </Badge>
+            ) : null}
+            {selectedPath ? (
+              <Badge className="border-blue-200 bg-blue-50 text-blue-700">
+                Rota: {selectedPath}
+              </Badge>
+            ) : null}
+            {requestIdFilter ? (
+              <Badge className="border-blue-200 bg-blue-50 font-mono text-blue-700">
+                Request: {requestIdFilter}
+              </Badge>
+            ) : null}
+            {!selectedTenant && !selectedPath ? (
+              <span>Selecione um card abaixo para afunilar a investigacao.</span>
+            ) : null}
           </div>
         </section>
 
@@ -600,7 +658,9 @@ export default function OpsIncidentes() {
             </div>
             <div className="mt-4 grid gap-2 md:grid-cols-2">
               {(summary?.tenant_incidents || []).length === 0 ? (
-                <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">Nenhum tenant com incidente.</div>
+                <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                  Nenhum tenant com incidente.
+                </div>
               ) : (
                 summary.tenant_incidents.slice(0, 10).map((item) => (
                   <TenantCard
@@ -627,7 +687,9 @@ export default function OpsIncidentes() {
             </div>
             <div className="mt-4 grid gap-2 md:grid-cols-2">
               {(summary?.route_incidents || []).length === 0 ? (
-                <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">Nenhuma rota com incidente.</div>
+                <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">
+                  Nenhuma rota com incidente.
+                </div>
               ) : (
                 summary.route_incidents.slice(0, 10).map((item) => (
                   <RouteCard
@@ -663,7 +725,9 @@ export default function OpsIncidentes() {
                 >
                   Anterior
                 </button>
-                <span className="text-sm text-slate-500">{page} / {totalPages}</span>
+                <span className="text-sm text-slate-500">
+                  {page} / {totalPages}
+                </span>
                 <button
                   type="button"
                   disabled={page >= totalPages || loading}
@@ -677,9 +741,13 @@ export default function OpsIncidentes() {
 
             <div className="divide-y divide-slate-100">
               {loading ? (
-                <div className="px-4 py-10 text-center text-sm text-slate-500">Carregando incidentes...</div>
+                <div className="px-4 py-10 text-center text-sm text-slate-500">
+                  Carregando incidentes...
+                </div>
               ) : filteredEvents.length === 0 ? (
-                <div className="px-4 py-10 text-center text-sm text-slate-500">Nenhum evento encontrado.</div>
+                <div className="px-4 py-10 text-center text-sm text-slate-500">
+                  Nenhum evento encontrado.
+                </div>
               ) : (
                 filteredEvents.map((event) => {
                   const selected = selectedEvent?.request_id === event.request_id;
@@ -694,9 +762,16 @@ export default function OpsIncidentes() {
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <Badge className={statusTone(event.status_code)}>{event.status_code || "erro"}</Badge>
-                            <Badge className="border-slate-200 bg-slate-100 text-slate-600">{event.method || "-"}</Badge>
-                            <span className="truncate font-mono text-xs font-semibold text-slate-900" title={event.path}>
+                            <Badge className={statusTone(event.status_code)}>
+                              {event.status_code || "erro"}
+                            </Badge>
+                            <Badge className="border-slate-200 bg-slate-100 text-slate-600">
+                              {event.method || "-"}
+                            </Badge>
+                            <span
+                              className="truncate font-mono text-xs font-semibold text-slate-900"
+                              title={event.path}
+                            >
                               {event.path || "-"}
                             </span>
                           </div>
@@ -706,7 +781,9 @@ export default function OpsIncidentes() {
                             <span>{tenantName || event.tenant_id || "sem_tenant"}</span>
                             <span>{event.user_email || event.user_id || "-"}</span>
                           </div>
-                          <div className="mt-1 font-mono text-[11px] text-slate-400">{event.request_id}</div>
+                          <div className="mt-1 font-mono text-[11px] text-slate-400">
+                            {event.request_id}
+                          </div>
                         </div>
                         {event.exception_type ? (
                           <FiAlertTriangle className="mt-1 h-5 w-5 shrink-0 text-rose-500" />
@@ -715,7 +792,10 @@ export default function OpsIncidentes() {
                         )}
                       </div>
                       <div className="mt-2 text-xs text-slate-600">
-                        {shortText(event.exception_message || event.exception_type || event.user_agent, 160)}
+                        {shortText(
+                          event.exception_message || event.exception_type || event.user_agent,
+                          160,
+                        )}
                       </div>
                     </button>
                   );

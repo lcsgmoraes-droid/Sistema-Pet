@@ -8,7 +8,9 @@ export default function VacinasVencendoTab({ vacinasVencendo }) {
       {vacinasVencendo.length === 0 ? (
         <div className="p-10 text-center">
           <CheckCircle size={36} className="mx-auto text-green-300 mb-3" />
-          <p className="text-gray-400 text-sm">Nenhuma vacina a vencer nos próximos 30 dias. Ótimo!</p>
+          <p className="text-gray-400 text-sm">
+            Nenhuma vacina a vencer nos próximos 30 dias. Ótimo!
+          </p>
         </div>
       ) : (
         <table className="w-full text-sm">

@@ -29,7 +29,8 @@ export default function useVetConsultaFormController() {
   const etapaQuery = searchParams.get("etapa") || "";
   const state = useConsultaFormState(consultaId);
 
-  const { pets, setPets, veterinarios, medicamentosCatalogo, procedimentosCatalogo } = useConsultaCatalogos();
+  const { pets, setPets, veterinarios, medicamentosCatalogo, procedimentosCatalogo } =
+    useConsultaCatalogos();
   const { carregando, finalizado, setFinalizado } = useConsultaEdicaoLoader({
     isEdicao,
     consultaId,
@@ -108,7 +109,12 @@ export default function useVetConsultaFormController() {
       params.set("tutor_nome", selecaoTutorPet.tutorSelecionado.nome);
     }
     return params.toString();
-  }, [state.form.pet_id, state.consultaIdAtual, agendamentoIdQuery, selecaoTutorPet.tutorSelecionado]);
+  }, [
+    state.form.pet_id,
+    state.consultaIdAtual,
+    agendamentoIdQuery,
+    selecaoTutorPet.tutorSelecionado,
+  ]);
 
   const acoes = useConsultaFormActions({
     agendamentoIdQuery,
@@ -163,7 +169,7 @@ export default function useVetConsultaFormController() {
           formConsulta: state.form,
           itemPrescricao,
           petSelecionado: selecaoTutorPet.petSelecionado,
-        })
+        }),
       );
       state.setModalCalculadoraAberto(true);
     },

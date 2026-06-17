@@ -1,30 +1,30 @@
-import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { PawPrint } from 'lucide-react';
-import { FiAlertCircle, FiEye, FiEyeOff, FiLock, FiMail } from 'react-icons/fi';
-import api from '../api';
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { PawPrint } from "lucide-react";
+import { FiAlertCircle, FiEye, FiEyeOff, FiLock, FiMail } from "react-icons/fi";
+import api from "../api";
 
 const INITIAL_FORM = {
-  email: '',
-  token: '',
-  novaSenha: '',
-  confirmarSenha: '',
+  email: "",
+  token: "",
+  novaSenha: "",
+  confirmarSenha: "",
 };
 
 export default function ForgotPassword() {
   const [searchParams] = useSearchParams();
-  const [step, setStep] = useState('request');
+  const [step, setStep] = useState("request");
   const [form, setForm] = useState(INITIAL_FORM);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [tokenFromLink, setTokenFromLink] = useState(false);
 
   useEffect(() => {
-    const email = (searchParams.get('email') || '').trim();
-    const token = (searchParams.get('token') || '').trim();
+    const email = (searchParams.get("email") || "").trim();
+    const token = (searchParams.get("token") || "").trim();
 
     if (!email && !token) {
       return;
@@ -36,7 +36,7 @@ export default function ForgotPassword() {
       token: token || prev.token,
     }));
     setTokenFromLink(Boolean(token));
-    setStep('reset');
+    setStep("reset");
   }, [searchParams]);
 
   async function handleRequestSubmit(event) {
@@ -44,33 +44,33 @@ export default function ForgotPassword() {
     const normalizedEmail = form.email.trim().toLowerCase();
 
     if (!normalizedEmail) {
-      setError('Informe o e-mail da conta para continuar.');
+      setError("Informe o e-mail da conta para continuar.");
       return;
     }
 
     setLoading(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     try {
-      const response = await api.post('/auth/forgot-password', { email: normalizedEmail });
+      const response = await api.post("/auth/forgot-password", { email: normalizedEmail });
       const minutes = response?.data?.expires_in_minutes;
-      setStep('request');
+      setStep("request");
       setForm((prev) => ({
         ...prev,
         email: normalizedEmail,
-        token: '',
-        novaSenha: '',
-        confirmarSenha: '',
+        token: "",
+        novaSenha: "",
+        confirmarSenha: "",
       }));
       setTokenFromLink(false);
       setSuccess(
         minutes
           ? `Se o e-mail existir, enviamos um link e um codigo de recuperacao. Abra o ultimo e-mail recebido ou clique em "Ja tenho o codigo". Eles expiram em ${minutes} minutos.`
-          : 'Se o e-mail existir, enviamos as instruções de recuperação.'
+          : "Se o e-mail existir, enviamos as instruções de recuperação.",
       );
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Não foi possível iniciar a recuperação agora.');
+      setError(err?.response?.data?.detail || "Não foi possível iniciar a recuperação agora.");
     } finally {
       setLoading(false);
     }
@@ -82,42 +82,46 @@ export default function ForgotPassword() {
     const token = form.token.trim();
 
     if (!normalizedEmail || !token) {
-      setError(tokenFromLink ? 'Link de recuperacao invalido. Solicite um novo link.' : 'Preencha o e-mail e o codigo recebido.');
+      setError(
+        tokenFromLink
+          ? "Link de recuperacao invalido. Solicite um novo link."
+          : "Preencha o e-mail e o codigo recebido.",
+      );
       return;
     }
 
     if (form.novaSenha.length < 8) {
-      setError('A nova senha deve ter pelo menos 8 caracteres.');
+      setError("A nova senha deve ter pelo menos 8 caracteres.");
       return;
     }
 
     if (form.novaSenha !== form.confirmarSenha) {
-      setError('A confirmação da senha não confere.');
+      setError("A confirmação da senha não confere.");
       return;
     }
 
     setLoading(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     try {
-      await api.post('/auth/reset-password', {
+      await api.post("/auth/reset-password", {
         email: normalizedEmail,
         token,
         nova_senha: form.novaSenha,
       });
 
-      setSuccess('Senha atualizada com sucesso. Você já pode entrar com a nova senha.');
-      setStep('request');
+      setSuccess("Senha atualizada com sucesso. Você já pode entrar com a nova senha.");
+      setStep("request");
       setForm({
         email: normalizedEmail,
-        token: '',
-        novaSenha: '',
-        confirmarSenha: '',
+        token: "",
+        novaSenha: "",
+        confirmarSenha: "",
       });
       setTokenFromLink(false);
     } catch (err) {
-      setError(err?.response?.data?.detail || 'Não foi possível redefinir a senha.');
+      setError(err?.response?.data?.detail || "Não foi possível redefinir a senha.");
     } finally {
       setLoading(false);
     }
@@ -132,11 +136,11 @@ export default function ForgotPassword() {
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Recuperar Senha</h1>
           <p className="text-gray-600 mt-2">
-            {step === 'request'
-              ? 'Vamos enviar as instruções para o e-mail da conta.'
+            {step === "request"
+              ? "Vamos enviar as instruções para o e-mail da conta."
               : tokenFromLink
-                ? 'Link seguro carregado. Defina sua nova senha.'
-                : 'Digite o codigo recebido e defina sua nova senha.'}
+                ? "Link seguro carregado. Defina sua nova senha."
+                : "Digite o codigo recebido e defina sua nova senha."}
           </p>
         </div>
 
@@ -154,7 +158,7 @@ export default function ForgotPassword() {
         )}
 
         <form
-          onSubmit={step === 'request' ? handleRequestSubmit : handleResetSubmit}
+          onSubmit={step === "request" ? handleRequestSubmit : handleResetSubmit}
           className="space-y-4"
         >
           <div>
@@ -172,7 +176,7 @@ export default function ForgotPassword() {
             </div>
           </div>
 
-          {step === 'reset' && (
+          {step === "reset" && (
             <>
               {tokenFromLink ? (
                 <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-800">
@@ -180,7 +184,9 @@ export default function ForgotPassword() {
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Codigo de recuperacao</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Codigo de recuperacao
+                  </label>
                   <input
                     type="text"
                     inputMode="numeric"
@@ -198,7 +204,7 @@ export default function ForgotPassword() {
                 <div className="relative">
                   <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     value={form.novaSenha}
                     onChange={(e) => setForm((prev) => ({ ...prev, novaSenha: e.target.value }))}
                     className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
@@ -216,13 +222,17 @@ export default function ForgotPassword() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Confirmar nova senha</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirmar nova senha
+                </label>
                 <div className="relative">
                   <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
-                    type={showConfirmPassword ? 'text' : 'password'}
+                    type={showConfirmPassword ? "text" : "password"}
                     value={form.confirmarSenha}
-                    onChange={(e) => setForm((prev) => ({ ...prev, confirmarSenha: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, confirmarSenha: e.target.value }))
+                    }
                     className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
                     placeholder="Repita a nova senha"
                     required
@@ -245,22 +255,22 @@ export default function ForgotPassword() {
             className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading
-              ? 'Processando...'
-              : step === 'request'
-                ? 'Enviar instruções'
-                : 'Salvar nova senha'}
+              ? "Processando..."
+              : step === "request"
+                ? "Enviar instruções"
+                : "Salvar nova senha"}
           </button>
         </form>
 
         <div className="mt-6 flex flex-col gap-3 text-center">
-          {step === 'request' ? (
+          {step === "request" ? (
             <button
               type="button"
               onClick={() => {
-                setStep('reset');
+                setStep("reset");
                 setTokenFromLink(false);
-                setError('');
-                setSuccess('');
+                setError("");
+                setSuccess("");
               }}
               className="text-sm text-purple-600 hover:text-purple-700 font-semibold"
             >
@@ -270,10 +280,10 @@ export default function ForgotPassword() {
             <button
               type="button"
               onClick={() => {
-                setStep('request');
+                setStep("request");
                 setTokenFromLink(false);
-                setError('');
-                setSuccess('');
+                setError("");
+                setSuccess("");
               }}
               className="text-sm text-purple-600 hover:text-purple-700 font-semibold"
             >

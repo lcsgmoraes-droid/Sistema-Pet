@@ -2,26 +2,33 @@
  * 📊 Página de Alertas de Estoque Negativo
  * Sistema de monitoramento e gerenciamento de estoque crítico
  */
-import { useState, useEffect, useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle, XCircle, TrendingDown, Package, RefreshCw } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useState, useEffect, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  TrendingDown,
+  Package,
+  RefreshCw,
+} from "lucide-react";
+import toast from "react-hot-toast";
 import {
   getAlertasPendentes,
   getTodosAlertas,
   getDashboardAlertas,
   getAlertasPrecoGranel,
-  resolverAlerta
-} from '../api/alertasEstoque';
-import { getProdutos } from '../api/produtos';
-import { formatBRL, formatMoneyBRL } from '../utils/formatters';
-import ProdutosValidadeProxima from './ProdutosValidadeProxima';
+  resolverAlerta,
+} from "../api/alertasEstoque";
+import { getProdutos } from "../api/produtos";
+import { formatBRL, formatMoneyBRL } from "../utils/formatters";
+import ProdutosValidadeProxima from "./ProdutosValidadeProxima";
 
-const ABAS_VALIDAS = ['pendentes', 'dashboard', 'historico', 'validade'];
+const ABAS_VALIDAS = ["pendentes", "dashboard", "historico", "validade"];
 
 const obterAbaDaQuery = (search) => {
-  const aba = new URLSearchParams(search).get('aba');
-  return ABAS_VALIDAS.includes(aba) ? aba : 'pendentes';
+  const aba = new URLSearchParams(search).get("aba");
+  return ABAS_VALIDAS.includes(aba) ? aba : "pendentes";
 };
 
 export default function AlertasEstoque() {
@@ -37,7 +44,7 @@ export default function AlertasEstoque() {
   const [alertasPrecoGranel, setAlertasPrecoGranel] = useState([]);
 
   useEffect(() => {
-    if (abaAtiva !== 'validade') {
+    if (abaAtiva !== "validade") {
       carregarDados();
     }
   }, [abaAtiva]);
@@ -50,15 +57,19 @@ export default function AlertasEstoque() {
   }, [location.search, abaAtiva]);
 
   useEffect(() => {
-    if (abaAtiva === 'validade' || produtosBrutos.length > 0) return;
+    if (abaAtiva === "validade" || produtosBrutos.length > 0) return;
 
     getProdutos({ page_size: 500, ativo: true })
-      .then(res => {
-        const lista = Array.isArray(res.data) ? res.data
-          : Array.isArray(res.data?.items) ? res.data.items
-          : Array.isArray(res.data?.itens) ? res.data.itens
-          : Array.isArray(res.data?.produtos) ? res.data.produtos
-          : [];
+      .then((res) => {
+        const lista = Array.isArray(res.data)
+          ? res.data
+          : Array.isArray(res.data?.items)
+            ? res.data.items
+            : Array.isArray(res.data?.itens)
+              ? res.data.itens
+              : Array.isArray(res.data?.produtos)
+                ? res.data.produtos
+                : [];
         setProdutosBrutos(lista);
       })
       .catch(() => {});
@@ -66,38 +77,47 @@ export default function AlertasEstoque() {
 
   const insights = useMemo(() => {
     const ativos = (produtosBrutos || []).filter(
-      p => p?.ativo !== false && p?.tipo_produto !== 'PAI'
+      (p) => p?.ativo !== false && p?.tipo_produto !== "PAI",
     );
-    const est = p => Number(p?.estoque_atual ?? p?.estoque ?? 0);
-    const min = p => Number(p?.estoque_minimo ?? 0);
+    const est = (p) => Number(p?.estoque_atual ?? p?.estoque ?? 0);
+    const min = (p) => Number(p?.estoque_minimo ?? 0);
 
-    const rupturas = ativos.filter(p => est(p) <= 0);
-    const riscoRuptura = ativos.filter(p => {
-      const a = est(p); const m = Math.max(1, min(p));
+    const rupturas = ativos.filter((p) => est(p) <= 0);
+    const riscoRuptura = ativos.filter((p) => {
+      const a = est(p);
+      const m = Math.max(1, min(p));
       return a > 0 && a <= m;
     });
-    const excessoEstoque = ativos.filter(p => {
-      const m = min(p); return m > 0 && est(p) >= m * 4;
+    const excessoEstoque = ativos.filter((p) => {
+      const m = min(p);
+      return m > 0 && est(p) >= m * 4;
     });
     const margemBaixa = ativos
-      .map(p => {
+      .map((p) => {
         const pv = Number(p?.preco_venda ?? 0);
         const pc = Number(p?.preco_custo ?? 0);
         const margem = pv ? Number((((pv - pc) / pv) * 100).toFixed(2)) : 0;
         return { ...p, margem };
       })
-      .filter(p => p.margem > 0 && p.margem < 15)
+      .filter((p) => p.margem > 0 && p.margem < 15)
       .sort((a, b) => a.margem - b.margem)
       .slice(0, 5);
-    const sugestoesReposicao = riscoRuptura.slice(0, 5).map(p => ({
+    const sugestoesReposicao = riscoRuptura.slice(0, 5).map((p) => ({
       ...p,
       sugestao: Math.max(Math.max(1, min(p)) * 2 - est(p), 1),
     }));
-    return { totalAtivos: ativos.length, rupturas, riscoRuptura, excessoEstoque, margemBaixa, sugestoesReposicao };
+    return {
+      totalAtivos: ativos.length,
+      rupturas,
+      riscoRuptura,
+      excessoEstoque,
+      margemBaixa,
+      sugestoesReposicao,
+    };
   }, [produtosBrutos]);
 
   const carregarDados = async () => {
-    if (abaAtiva === 'validade') {
+    if (abaAtiva === "validade") {
       setReloadValidade((prev) => prev + 1);
       return;
     }
@@ -108,22 +128,22 @@ export default function AlertasEstoque() {
         const granelRes = await getAlertasPrecoGranel({ margem_minima_percentual: 20, limite: 20 });
         setAlertasPrecoGranel(granelRes.data?.alertas || []);
       } catch (granelError) {
-        console.warn('Erro ao carregar alertas de preco do granel:', granelError);
+        console.warn("Erro ao carregar alertas de preco do granel:", granelError);
       }
 
-      if (abaAtiva === 'pendentes') {
+      if (abaAtiva === "pendentes") {
         const response = await getAlertasPendentes();
         setAlertasPendentes(response.data);
-      } else if (abaAtiva === 'historico') {
+      } else if (abaAtiva === "historico") {
         const response = await getTodosAlertas();
         setTodosAlertas(response.data);
-      } else if (abaAtiva === 'dashboard') {
+      } else if (abaAtiva === "dashboard") {
         const response = await getDashboardAlertas();
         setDashboard(response.data);
       }
     } catch (error) {
-      console.error('Erro ao carregar alertas:', error);
-      toast.error('Erro ao carregar alertas de estoque');
+      console.error("Erro ao carregar alertas:", error);
+      toast.error("Erro ao carregar alertas de estoque");
     } finally {
       setLoading(false);
     }
@@ -132,7 +152,7 @@ export default function AlertasEstoque() {
   const handleMudarAba = (aba) => {
     setAbaAtiva(aba);
     const params = new URLSearchParams(location.search);
-    params.set('aba', aba);
+    params.set("aba", aba);
     navigate(
       {
         pathname: location.pathname,
@@ -143,42 +163,42 @@ export default function AlertasEstoque() {
   };
 
   const handleResolverAlerta = async (alertaId, acao, produtoId = null) => {
-    if (acao === 'resolvido' && produtoId) {
+    if (acao === "resolvido" && produtoId) {
       // Redirecionar para página de produtos para fazer ajuste de estoque
       navigate(`/produtos?produto_id=${produtoId}`);
-      toast.info('Redirecionando para ajustar o estoque do produto...');
+      toast.info("Redirecionando para ajustar o estoque do produto...");
       return;
     }
-    
+
     // Apenas ignorar o alerta
     try {
       await resolverAlerta(alertaId, acao);
-      toast.success('Alerta ignorado com sucesso');
+      toast.success("Alerta ignorado com sucesso");
       carregarDados();
     } catch (error) {
-      console.error('Erro ao ignorar alerta:', error);
-      toast.error('Erro ao processar alerta');
+      console.error("Erro ao ignorar alerta:", error);
+      toast.error("Erro ao processar alerta");
     }
   };
 
   const getCriticidadeBadge = (criticidade) => {
     const cores = {
-      'CRITICO': 'bg-red-100 text-red-800 border-red-300',
-      'ALTO': 'bg-orange-100 text-orange-800 border-orange-300',
-      'MEDIO': 'bg-yellow-100 text-yellow-800 border-yellow-300',
-      'BAIXO': 'bg-blue-100 text-blue-800 border-blue-300'
+      CRITICO: "bg-red-100 text-red-800 border-red-300",
+      ALTO: "bg-orange-100 text-orange-800 border-orange-300",
+      MEDIO: "bg-yellow-100 text-yellow-800 border-yellow-300",
+      BAIXO: "bg-blue-100 text-blue-800 border-blue-300",
     };
-    return cores[criticidade] || cores['MEDIO'];
+    return cores[criticidade] || cores["MEDIO"];
   };
 
   const formatarData = (dataStr) => {
     const data = new Date(dataStr);
-    return data.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return data.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -196,7 +216,7 @@ export default function AlertasEstoque() {
       </div>
 
       {/* Análises Inteligentes */}
-      {abaAtiva !== 'validade' && produtosBrutos.length > 0 && (
+      {abaAtiva !== "validade" && produtosBrutos.length > 0 && (
         <div className="mb-4 rounded-lg border border-indigo-100 bg-white p-4 shadow-sm md:mb-6 md:p-5">
           <h2 className="text-base font-semibold text-gray-800 mb-4">Análises Inteligentes</h2>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
@@ -206,11 +226,15 @@ export default function AlertasEstoque() {
             </div>
             <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
               <div className="text-xs text-amber-700">Risco de ruptura</div>
-              <div className="text-2xl font-bold text-amber-700">{insights.riscoRuptura.length}</div>
+              <div className="text-2xl font-bold text-amber-700">
+                {insights.riscoRuptura.length}
+              </div>
             </div>
             <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
               <div className="text-xs text-blue-700">Excesso de estoque</div>
-              <div className="text-2xl font-bold text-blue-700">{insights.excessoEstoque.length}</div>
+              <div className="text-2xl font-bold text-blue-700">
+                {insights.excessoEstoque.length}
+              </div>
             </div>
             <div className="p-3 rounded-lg bg-orange-50 border border-orange-200">
               <div className="text-xs text-orange-700">Granel abaixo da meta</div>
@@ -223,13 +247,18 @@ export default function AlertasEstoque() {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Sugestão de reposição imediata</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                Sugestão de reposição imediata
+              </h3>
               {insights.sugestoesReposicao.length === 0 ? (
                 <p className="text-sm text-gray-500">Nenhuma reposição urgente agora.</p>
               ) : (
                 <div className="space-y-2">
-                  {insights.sugestoesReposicao.map(p => (
-                    <div key={p.id} className="text-sm p-2 rounded bg-gray-50 border border-gray-200 flex items-center justify-between gap-2">
+                  {insights.sugestoesReposicao.map((p) => (
+                    <div
+                      key={p.id}
+                      className="text-sm p-2 rounded bg-gray-50 border border-gray-200 flex items-center justify-between gap-2"
+                    >
                       <button
                         onClick={() => navigate(`/produtos/${p.id}/movimentacoes`)}
                         className="font-medium text-gray-800 hover:text-indigo-700 hover:underline text-left"
@@ -237,7 +266,8 @@ export default function AlertasEstoque() {
                         {p.nome}
                       </button>
                       <span className="text-gray-600 whitespace-nowrap">
-                        estoque {Number(p.estoque_atual ?? p.estoque ?? 0)} — comprar <strong>{p.sugestao}</strong>
+                        estoque {Number(p.estoque_atual ?? p.estoque ?? 0)} — comprar{" "}
+                        <strong>{p.sugestao}</strong>
                       </span>
                     </div>
                   ))}
@@ -247,11 +277,16 @@ export default function AlertasEstoque() {
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Granel abaixo da meta</h3>
               {alertasPrecoGranel.length === 0 ? (
-                <p className="text-sm text-gray-500">Nenhum granel abaixo da margem minima de 20%.</p>
+                <p className="text-sm text-gray-500">
+                  Nenhum granel abaixo da margem minima de 20%.
+                </p>
               ) : (
                 <div className="space-y-2">
-                  {alertasPrecoGranel.slice(0, 5).map(alerta => (
-                    <div key={`${alerta.vinculo_id}-${alerta.produto_granel_id}`} className="text-sm p-2 rounded bg-orange-50 border border-orange-100">
+                  {alertasPrecoGranel.slice(0, 5).map((alerta) => (
+                    <div
+                      key={`${alerta.vinculo_id}-${alerta.produto_granel_id}`}
+                      className="text-sm p-2 rounded bg-orange-50 border border-orange-100"
+                    >
                       <button
                         onClick={() => navigate(`/produtos/${alerta.produto_granel_id}/editar`)}
                         className="font-medium text-orange-900 hover:underline text-left"
@@ -259,10 +294,12 @@ export default function AlertasEstoque() {
                         {alerta.produto_granel_nome}
                       </button>
                       <div className="mt-1 text-xs text-orange-800">
-                        Atual {formatMoneyBRL(alerta.preco_venda_granel)} | meta {formatMoneyBRL(alerta.preco_minimo_granel)}
+                        Atual {formatMoneyBRL(alerta.preco_venda_granel)} | meta{" "}
+                        {formatMoneyBRL(alerta.preco_minimo_granel)}
                       </div>
                       <div className="mt-1 text-xs text-gray-600">
-                        Origem: {alerta.produto_origem_nome} | margem {formatBRL(alerta.margem_atual_sobre_venda_kg)}%
+                        Origem: {alerta.produto_origem_nome} | margem{" "}
+                        {formatBRL(alerta.margem_atual_sobre_venda_kg)}%
                       </div>
                     </div>
                   ))}
@@ -270,13 +307,18 @@ export default function AlertasEstoque() {
               )}
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Produtos com margem crítica</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                Produtos com margem crítica
+              </h3>
               {insights.margemBaixa.length === 0 ? (
                 <p className="text-sm text-gray-500">Nenhum produto com margem abaixo de 15%.</p>
               ) : (
                 <div className="space-y-2">
-                  {insights.margemBaixa.map(p => (
-                    <div key={p.id} className="text-sm p-2 rounded bg-red-50 border border-red-100 flex items-center justify-between gap-2">
+                  {insights.margemBaixa.map((p) => (
+                    <div
+                      key={p.id}
+                      className="text-sm p-2 rounded bg-red-50 border border-red-100 flex items-center justify-between gap-2"
+                    >
                       <button
                         onClick={() => navigate(`/produtos/${p.id}/movimentacoes`)}
                         className="font-medium text-red-800 hover:underline text-left"
@@ -300,11 +342,11 @@ export default function AlertasEstoque() {
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex overflow-x-auto">
             <button
-              onClick={() => handleMudarAba('pendentes')}
+              onClick={() => handleMudarAba("pendentes")}
               className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                abaAtiva === 'pendentes'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                abaAtiva === "pendentes"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -318,11 +360,11 @@ export default function AlertasEstoque() {
               </div>
             </button>
             <button
-              onClick={() => handleMudarAba('dashboard')}
+              onClick={() => handleMudarAba("dashboard")}
               className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                abaAtiva === 'dashboard'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                abaAtiva === "dashboard"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -331,11 +373,11 @@ export default function AlertasEstoque() {
               </div>
             </button>
             <button
-              onClick={() => handleMudarAba('historico')}
+              onClick={() => handleMudarAba("historico")}
               className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                abaAtiva === 'historico'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                abaAtiva === "historico"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -344,11 +386,11 @@ export default function AlertasEstoque() {
               </div>
             </button>
             <button
-              onClick={() => handleMudarAba('validade')}
+              onClick={() => handleMudarAba("validade")}
               className={`px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
-                abaAtiva === 'validade'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                abaAtiva === "validade"
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
               <div className="flex items-center gap-2">
@@ -367,13 +409,13 @@ export default function AlertasEstoque() {
           disabled={loading}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
         >
-          <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
           Atualizar
         </button>
       </div>
 
       {/* Conteúdo das Abas */}
-      {loading && abaAtiva !== 'validade' ? (
+      {loading && abaAtiva !== "validade" ? (
         <div className="bg-white rounded-lg shadow-sm p-12 text-center">
           <RefreshCw className="animate-spin mx-auto text-gray-400" size={48} />
           <p className="text-gray-600 mt-4">Carregando...</p>
@@ -381,7 +423,7 @@ export default function AlertasEstoque() {
       ) : (
         <>
           {/* Aba Pendentes */}
-          {abaAtiva === 'pendentes' && (
+          {abaAtiva === "pendentes" && (
             <div className="space-y-4">
               {alertasPendentes.length === 0 ? (
                 <div className="bg-white rounded-lg shadow-sm p-12 text-center">
@@ -407,7 +449,7 @@ export default function AlertasEstoque() {
                           </h3>
                           <span
                             className={`px-3 py-1 rounded-full text-xs font-medium border ${getCriticidadeBadge(
-                              alerta.criticidade
+                              alerta.criticidade,
                             )}`}
                           >
                             {alerta.criticidade}
@@ -436,7 +478,11 @@ export default function AlertasEstoque() {
                           <div>
                             <p className="text-sm text-gray-500">Venda</p>
                             <p className="text-lg font-semibold text-blue-600">
-                              {alerta.venda_codigo ? `#${alerta.venda_codigo}` : (alerta.venda_id ? `ID: ${alerta.venda_id}` : 'N/A')}
+                              {alerta.venda_codigo
+                                ? `#${alerta.venda_codigo}`
+                                : alerta.venda_id
+                                  ? `ID: ${alerta.venda_id}`
+                                  : "N/A"}
                             </p>
                           </div>
                         </div>
@@ -455,7 +501,9 @@ export default function AlertasEstoque() {
 
                       <div className="flex flex-col gap-2 ml-4">
                         <button
-                          onClick={() => handleResolverAlerta(alerta.id, 'resolvido', alerta.produto_id)}
+                          onClick={() =>
+                            handleResolverAlerta(alerta.id, "resolvido", alerta.produto_id)
+                          }
                           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
                           title="Ir para o produto e fazer ajuste de estoque"
                         >
@@ -463,7 +511,7 @@ export default function AlertasEstoque() {
                           Ajustar Estoque
                         </button>
                         <button
-                          onClick={() => handleResolverAlerta(alerta.id, 'ignorado')}
+                          onClick={() => handleResolverAlerta(alerta.id, "ignorado")}
                           className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
                           title="Ignorar este alerta (aceitar estoque negativo)"
                         >
@@ -479,7 +527,7 @@ export default function AlertasEstoque() {
           )}
 
           {/* Aba Dashboard */}
-          {abaAtiva === 'dashboard' && dashboard && (
+          {abaAtiva === "dashboard" && dashboard && (
             <div className="space-y-6">
               {/* Métricas Resumidas */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -533,51 +581,52 @@ export default function AlertasEstoque() {
               </div>
 
               {/* Produtos com Estoque Negativo */}
-              {dashboard.produtos_estoque_negativo && dashboard.produtos_estoque_negativo.length > 0 && (
-                <div className="bg-white rounded-lg shadow-sm p-6">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <Package className="text-red-500" />
-                    Produtos com Estoque Negativo Atual
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Produto
-                          </th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Estoque Atual
-                          </th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Alertas Pendentes
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {dashboard.produtos_estoque_negativo.map((produto, index) => (
-                          <tr key={index} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {produto.nome}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-red-600">
-                              {produto.estoque_atual}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
-                              {produto.alertas_pendentes}
-                            </td>
+              {dashboard.produtos_estoque_negativo &&
+                dashboard.produtos_estoque_negativo.length > 0 && (
+                  <div className="bg-white rounded-lg shadow-sm p-6">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                      <Package className="text-red-500" />
+                      Produtos com Estoque Negativo Atual
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Produto
+                            </th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Estoque Atual
+                            </th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Alertas Pendentes
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {dashboard.produtos_estoque_negativo.map((produto, index) => (
+                            <tr key={index} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {produto.nome}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-red-600">
+                                {produto.estoque_atual}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                                {produto.alertas_pendentes}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
           )}
 
           {/* Aba Histórico */}
-          {abaAtiva === 'historico' && (
+          {abaAtiva === "historico" && (
             <div className="bg-white rounded-lg shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -625,7 +674,7 @@ export default function AlertasEstoque() {
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             <span
                               className={`px-2 py-1 rounded-full text-xs font-medium ${getCriticidadeBadge(
-                                alerta.criticidade
+                                alerta.criticidade,
                               )}`}
                             >
                               {alerta.criticidade}
@@ -641,15 +690,19 @@ export default function AlertasEstoque() {
                             <span
                               className={`px-2 py-1 rounded-full text-xs font-medium ${
                                 alerta.resolvido
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-yellow-100 text-yellow-800'
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-yellow-100 text-yellow-800"
                               }`}
                             >
-                              {alerta.resolvido ? 'Resolvido' : 'Pendente'}
+                              {alerta.resolvido ? "Resolvido" : "Pendente"}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-blue-600 font-medium">
-                            {alerta.venda_codigo ? `#${alerta.venda_codigo}` : (alerta.venda_id ? `ID: ${alerta.venda_id}` : 'N/A')}
+                            {alerta.venda_codigo
+                              ? `#${alerta.venda_codigo}`
+                              : alerta.venda_id
+                                ? `ID: ${alerta.venda_id}`
+                                : "N/A"}
                           </td>
                         </tr>
                       ))
@@ -660,7 +713,7 @@ export default function AlertasEstoque() {
             </div>
           )}
 
-          {abaAtiva === 'validade' && (
+          {abaAtiva === "validade" && (
             <ProdutosValidadeProxima embedded reloadSignal={reloadValidade} />
           )}
         </>

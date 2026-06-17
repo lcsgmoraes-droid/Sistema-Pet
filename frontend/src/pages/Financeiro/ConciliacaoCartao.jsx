@@ -17,9 +17,7 @@ export default function ConciliacaoCartao() {
   async function carregarPendentes() {
     try {
       setLoading(true);
-      const response = await api.get(
-        "/financeiro/conciliacao-cartao/pendentes"
-      );
+      const response = await api.get("/financeiro/conciliacao-cartao/pendentes");
       setPendentes(response.data);
     } catch (err) {
       console.error(err);
@@ -66,11 +64,9 @@ export default function ConciliacaoCartao() {
 
     try {
       setEnviando(true);
-      const response = await api.post(
-        "/financeiro/conciliacao-cartao/upload",
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
+      const response = await api.post("/financeiro/conciliacao-cartao/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       setResultadoUpload(response.data);
       setArquivo(null);
@@ -97,11 +93,7 @@ export default function ConciliacaoCartao() {
       {/* UPLOAD CSV */}
       <div style={{ marginBottom: 24 }}>
         <h3>Upload de Conciliação (CSV)</h3>
-        <input
-          type="file"
-          accept=".csv"
-          onChange={(e) => setArquivo(e.target.files[0])}
-        />
+        <input type="file" accept=".csv" onChange={(e) => setArquivo(e.target.files[0])} />
         <button onClick={enviarCSV} disabled={enviando}>
           {enviando ? "Processando..." : "Enviar CSV"}
         </button>
@@ -141,9 +133,7 @@ export default function ConciliacaoCartao() {
                 </td>
                 <td>{item.data_prevista || "-"}</td>
                 <td>
-                  <button onClick={() => setSelecionado(item)}>
-                    Conciliar
-                  </button>
+                  <button onClick={() => setSelecionado(item)}>Conciliar</button>
                 </td>
               </tr>
             ))}
@@ -166,8 +156,12 @@ export default function ConciliacaoCartao() {
           <div style={{ background: "#fff", padding: 24, minWidth: 320 }}>
             <h3>Conciliar Parcela</h3>
 
-            <p><strong>NSU:</strong> {selecionado.nsu}</p>
-            <p><strong>Valor:</strong> R$ {selecionado.valor.toFixed(2)}</p>
+            <p>
+              <strong>NSU:</strong> {selecionado.nsu}
+            </p>
+            <p>
+              <strong>Valor:</strong> R$ {selecionado.valor.toFixed(2)}
+            </p>
 
             <label>Data de Recebimento</label>
             <input

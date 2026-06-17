@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { FiAlertCircle, FiEdit2, FiPlus, FiTrash2 } from 'react-icons/fi';
-import { createMarca, deleteMarca, getMarcas, updateMarca } from '../../api/produtos';
-import ActionButton from '../../components/ui/ActionButton';
-import EmptyState from '../../components/ui/EmptyState';
-import IconActionButton from '../../components/ui/IconActionButton';
-import LoadingState from '../../components/ui/LoadingState';
+import { useEffect, useState } from "react";
+import { FiAlertCircle, FiEdit2, FiPlus, FiTrash2 } from "react-icons/fi";
+import { createMarca, deleteMarca, getMarcas, updateMarca } from "../../api/produtos";
+import ActionButton from "../../components/ui/ActionButton";
+import EmptyState from "../../components/ui/EmptyState";
+import IconActionButton from "../../components/ui/IconActionButton";
+import LoadingState from "../../components/ui/LoadingState";
 
 const Marcas = () => {
   const [marcas, setMarcas] = useState([]);
@@ -12,8 +12,8 @@ const Marcas = () => {
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(null);
   const [formData, setFormData] = useState({
-    nome: '',
-    descricao: '',
+    nome: "",
+    descricao: "",
   });
 
   useEffect(() => {
@@ -26,15 +26,15 @@ const Marcas = () => {
       const response = await getMarcas();
       setMarcas(response.data || []);
     } catch (error) {
-      console.error('Erro ao carregar marcas:', error);
-      alert('Nao foi possivel carregar as marcas.');
+      console.error("Erro ao carregar marcas:", error);
+      alert("Nao foi possivel carregar as marcas.");
     } finally {
       setLoading(false);
     }
   };
 
   const limparCachesCatalogos = () => {
-    sessionStorage.removeItem('produtos_catalogos_cache_v1');
+    sessionStorage.removeItem("produtos_catalogos_cache_v1");
   };
 
   const handleSubmit = async (event) => {
@@ -50,11 +50,11 @@ const Marcas = () => {
       limparCachesCatalogos();
       setShowModal(false);
       setEditando(null);
-      setFormData({ nome: '', descricao: '' });
+      setFormData({ nome: "", descricao: "" });
       await carregarMarcas();
     } catch (error) {
-      console.error('Erro ao salvar marca:', error);
-      alert(error.response?.data?.detail || 'Nao foi possivel salvar a marca.');
+      console.error("Erro ao salvar marca:", error);
+      alert(error.response?.data?.detail || "Nao foi possivel salvar a marca.");
     }
   };
 
@@ -62,7 +62,7 @@ const Marcas = () => {
     setEditando(marca.id);
     setFormData({
       nome: marca.nome,
-      descricao: marca.descricao || '',
+      descricao: marca.descricao || "",
     });
     setShowModal(true);
   };
@@ -77,14 +77,14 @@ const Marcas = () => {
       limparCachesCatalogos();
       await carregarMarcas();
     } catch (error) {
-      console.error('Erro ao excluir marca:', error);
-      alert(error.response?.data?.detail || 'Nao foi possivel excluir a marca.');
+      console.error("Erro ao excluir marca:", error);
+      alert(error.response?.data?.detail || "Nao foi possivel excluir a marca.");
     }
   };
 
   const handleNovaMarca = () => {
     setEditando(null);
-    setFormData({ nome: '', descricao: '' });
+    setFormData({ nome: "", descricao: "" });
     setShowModal(true);
   };
 
@@ -105,12 +105,7 @@ const Marcas = () => {
             Marcas ajudam a organizar produtos, filtros e relatorios de estoque.
           </p>
         </div>
-        <ActionButton
-          onClick={handleNovaMarca}
-          icon={FiPlus}
-          intent="create"
-          size="md"
-        >
+        <ActionButton onClick={handleNovaMarca} icon={FiPlus} intent="create" size="md">
           Nova Marca
         </ActionButton>
       </div>
@@ -122,23 +117,20 @@ const Marcas = () => {
             description="Crie a primeira marca para classificar produtos no cadastro e nos filtros."
             icon={FiAlertCircle}
             title="Nenhuma marca cadastrada"
-            action={(
-              <ActionButton
-                onClick={handleNovaMarca}
-                icon={FiPlus}
-                intent="create"
-                tone="soft"
-              >
+            action={
+              <ActionButton onClick={handleNovaMarca} icon={FiPlus} intent="create" tone="soft">
                 Criar primeira marca
               </ActionButton>
-            )}
+            }
           />
         ) : (
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Nome</th>
-                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">Descricao</th>
+                <th className="text-left px-4 py-3 text-sm font-semibold text-gray-600">
+                  Descricao
+                </th>
                 <th className="text-right px-4 py-3 text-sm font-semibold text-gray-600">Acoes</th>
               </tr>
             </thead>
@@ -146,7 +138,7 @@ const Marcas = () => {
               {marcas.map((marca) => (
                 <tr key={marca.id} className="border-b hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-800">{marca.nome}</td>
-                  <td className="px-4 py-3 text-gray-600 text-sm">{marca.descricao || '-'}</td>
+                  <td className="px-4 py-3 text-gray-600 text-sm">{marca.descricao || "-"}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
                       <IconActionButton
@@ -173,13 +165,14 @@ const Marcas = () => {
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold mb-4">
-              {editando ? 'Editar Marca' : 'Nova Marca'}
-            </h2>
+            <h2 className="text-xl font-bold mb-4">{editando ? "Editar Marca" : "Nova Marca"}</h2>
 
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
-                <label htmlFor="marca-nome" className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="marca-nome"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Nome *
                 </label>
                 <input
@@ -195,7 +188,10 @@ const Marcas = () => {
               </div>
 
               <div className="mb-6">
-                <label htmlFor="marca-descricao" className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="marca-descricao"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Descricao
                 </label>
                 <textarea
@@ -210,18 +206,11 @@ const Marcas = () => {
               </div>
 
               <div className="flex justify-end gap-3">
-                <ActionButton
-                  onClick={() => setShowModal(false)}
-                  intent="neutral"
-                  tone="soft"
-                >
+                <ActionButton onClick={() => setShowModal(false)} intent="neutral" tone="soft">
                   Cancelar
                 </ActionButton>
-                <ActionButton
-                  type="submit"
-                  intent={editando ? 'edit' : 'create'}
-                >
-                  {editando ? 'Salvar' : 'Criar'}
+                <ActionButton type="submit" intent={editando ? "edit" : "create"}>
+                  {editando ? "Salvar" : "Criar"}
                 </ActionButton>
               </div>
             </form>

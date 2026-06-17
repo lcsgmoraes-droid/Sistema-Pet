@@ -34,11 +34,7 @@ export default function ParceirosSection({
         />
       )}
 
-      <ParceirosLista
-        onRemover={onRemover}
-        onToggleAtivo={onToggleAtivo}
-        parceiros={parceiros}
-      />
+      <ParceirosLista onRemover={onRemover} onToggleAtivo={onToggleAtivo} parceiros={parceiros} />
     </div>
   );
 }

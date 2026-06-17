@@ -39,7 +39,9 @@ export default function CalculadoraDoseFields({
           }}
           options={medicamentosCatalogo}
           getOptionLabel={(med) => med.nome}
-          getOptionMeta={(med) => [med.principio_ativo, med.via_administracao].filter(Boolean).join(" - ")}
+          getOptionMeta={(med) =>
+            [med.principio_ativo, med.via_administracao].filter(Boolean).join(" - ")
+          }
           placeholder="Digite para buscar medicamento..."
           emptyLabel="Nenhum medicamento encontrado"
           showLabel={false}
@@ -54,12 +56,14 @@ export default function CalculadoraDoseFields({
           onChange={(e) => setCalculadoraForm((prev) => ({ ...prev, dose_mg_kg: e.target.value }))}
           className={css.input}
         />
-        {(medicamentoSelecionado?.dose_minima_mg_kg || medicamentoSelecionado?.dose_maxima_mg_kg) && (
+        {(medicamentoSelecionado?.dose_minima_mg_kg ||
+          medicamentoSelecionado?.dose_maxima_mg_kg) && (
           <p className="mt-1 text-[11px] text-gray-500">
             Faixa do catálogo: {medicamentoSelecionado?.dose_minima_mg_kg || "-"}
             {medicamentoSelecionado?.dose_maxima_mg_kg
               ? ` a ${medicamentoSelecionado.dose_maxima_mg_kg}`
-              : ""} mg/kg
+              : ""}{" "}
+            mg/kg
           </p>
         )}
       </div>
@@ -69,7 +73,9 @@ export default function CalculadoraDoseFields({
           type="number"
           min="1"
           value={calculadoraForm.frequencia_horas}
-          onChange={(e) => setCalculadoraForm((prev) => ({ ...prev, frequencia_horas: e.target.value }))}
+          onChange={(e) =>
+            setCalculadoraForm((prev) => ({ ...prev, frequencia_horas: e.target.value }))
+          }
           className={css.input}
         />
       </div>

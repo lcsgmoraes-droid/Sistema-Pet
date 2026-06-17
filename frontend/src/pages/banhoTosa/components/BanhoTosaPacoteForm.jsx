@@ -94,9 +94,21 @@ export default function BanhoTosaPacoteForm({
       subtitle="Defina creditos, validade e servico coberto."
     >
       <form onSubmit={salvar} className="space-y-4">
-        <TextField label="Nome" value={form.nome} onChange={(value) => updateField("nome", value)} />
-        <TextField label="Descricao" value={form.descricao} onChange={(value) => updateField("descricao", value)} />
-        <SelectField label="Servico coberto" value={form.servico_id} onChange={(value) => updateField("servico_id", value)}>
+        <TextField
+          label="Nome"
+          value={form.nome}
+          onChange={(value) => updateField("nome", value)}
+        />
+        <TextField
+          label="Descricao"
+          value={form.descricao}
+          onChange={(value) => updateField("descricao", value)}
+        />
+        <SelectField
+          label="Servico coberto"
+          value={form.servico_id}
+          onChange={(value) => updateField("servico_id", value)}
+        >
           <option value="">Qualquer servico do atendimento</option>
           {servicosDisponiveis.map((servico) => (
             <option key={servico.id} value={servico.id}>
@@ -105,19 +117,43 @@ export default function BanhoTosaPacoteForm({
           ))}
         </SelectField>
         <div className="grid gap-3 sm:grid-cols-3">
-          <TextField label="Creditos" type="number" value={form.quantidade_creditos} onChange={(value) => updateField("quantidade_creditos", value)} />
-          <TextField label="Validade dias" type="number" value={form.validade_dias} onChange={(value) => updateField("validade_dias", value)} />
-          <TextField label="Preco" type="number" value={form.preco} onChange={(value) => updateField("preco", value)} />
+          <TextField
+            label="Creditos"
+            type="number"
+            value={form.quantidade_creditos}
+            onChange={(value) => updateField("quantidade_creditos", value)}
+          />
+          <TextField
+            label="Validade dias"
+            type="number"
+            value={form.validade_dias}
+            onChange={(value) => updateField("validade_dias", value)}
+          />
+          <TextField
+            label="Preco"
+            type="number"
+            value={form.preco}
+            onChange={(value) => updateField("preco", value)}
+          />
         </div>
         {editingPacote && (
-          <CheckboxField label="Ativo" checked={form.ativo} onChange={(value) => updateField("ativo", value)} />
+          <CheckboxField
+            label="Ativo"
+            checked={form.ativo}
+            onChange={(value) => updateField("ativo", value)}
+          />
         )}
 
         <div className="flex flex-wrap justify-end gap-2">
           <ActionButton icon={X} intent="neutral" onClick={onCancelEdit} tone="soft">
             Cancelar
           </ActionButton>
-          <ActionButton icon={Save} intent={editingPacote ? "edit" : "create"} loading={saving} type="submit">
+          <ActionButton
+            icon={Save}
+            intent={editingPacote ? "edit" : "create"}
+            loading={saving}
+            type="submit"
+          >
             {editingPacote ? "Salvar alteracoes" : "Cadastrar pacote"}
           </ActionButton>
         </div>

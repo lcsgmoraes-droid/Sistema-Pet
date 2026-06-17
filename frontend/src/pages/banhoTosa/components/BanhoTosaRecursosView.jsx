@@ -123,10 +123,25 @@ export default function BanhoTosaRecursosView({ recursos, onChanged }) {
       />
 
       <MetricGrid>
-        <MetricCard icon={<Boxes size={18} />} intent="blue" label="Recursos" value={recursos.length} />
+        <MetricCard
+          icon={<Boxes size={18} />}
+          intent="blue"
+          label="Recursos"
+          value={recursos.length}
+        />
         <MetricCard intent="emerald" label="Ativos" value={resumo.ativos} />
-        <MetricCard icon={<PlugZap size={18} />} intent="cyan" label="Capacidade total" value={formatNumber(resumo.capacidade, 0)} />
-        <MetricCard icon={<Wrench size={18} />} intent="violet" label="Manutencao/h" value={formatCurrency(resumo.manutencaoHora)} />
+        <MetricCard
+          icon={<PlugZap size={18} />}
+          intent="cyan"
+          label="Capacidade total"
+          value={formatNumber(resumo.capacidade, 0)}
+        />
+        <MetricCard
+          icon={<Wrench size={18} />}
+          intent="violet"
+          label="Manutencao/h"
+          value={formatCurrency(resumo.manutencaoHora)}
+        />
       </MetricGrid>
 
       {(showForm || editingRecurso) && (

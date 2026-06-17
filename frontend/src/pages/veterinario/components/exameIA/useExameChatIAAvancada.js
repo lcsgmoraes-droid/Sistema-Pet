@@ -16,7 +16,7 @@ export function useExameChatIAAvancada({ petId, refreshToken }) {
 
   const exameSelecionado = useMemo(
     () => exames.find((item) => String(item.id) === String(exameId)),
-    [exames, exameId]
+    [exames, exameId],
   );
   const dadosIA = useMemo(() => montarDadosExameIA(exameSelecionado), [exameSelecionado]);
 
@@ -24,7 +24,7 @@ export function useExameChatIAAvancada({ petId, refreshToken }) {
     if (!petId) return;
     try {
       const response = await vetApi.listarExamesPet(petId);
-      const lista = Array.isArray(response.data) ? response.data : response.data?.items ?? [];
+      const lista = Array.isArray(response.data) ? response.data : (response.data?.items ?? []);
       setExames(lista);
       setExameId((anterior) => {
         const alvo = preferidoId != null ? String(preferidoId) : anterior;
@@ -58,7 +58,9 @@ export function useExameChatIAAvancada({ petId, refreshToken }) {
         : await vetApi.interpretarExameIA(Number(exameSelecionado.id));
       const exameAtualizado = response.data;
       setExames((lista) =>
-        lista.map((item) => (String(item.id) === String(exameAtualizado.id) ? exameAtualizado : item))
+        lista.map((item) =>
+          String(item.id) === String(exameAtualizado.id) ? exameAtualizado : item,
+        ),
       );
       setHistorico((mensagens) => [
         ...mensagens,
@@ -74,7 +76,7 @@ export function useExameChatIAAvancada({ petId, refreshToken }) {
         erro?.response?.data?.detail ||
           (dadosIA.temArquivo
             ? "Nao foi possivel processar o arquivo com IA agora."
-            : "Nao foi possivel interpretar o resultado agora.")
+            : "Nao foi possivel interpretar o resultado agora."),
       );
     } finally {
       setProcessando(false);

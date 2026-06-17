@@ -48,7 +48,13 @@ export default function BanhoTosaRelatoriosView() {
     <div className="space-y-4">
       <Panel
         actions={
-          <ActionButton icon={RefreshCw} intent="neutral" loading={loading} onClick={carregarRelatorio} tone="soft">
+          <ActionButton
+            icon={RefreshCw}
+            intent="neutral"
+            loading={loading}
+            onClick={carregarRelatorio}
+            tone="soft"
+          >
             Atualizar
           </ActionButton>
         }
@@ -63,10 +69,30 @@ export default function BanhoTosaRelatoriosView() {
 
       <MetricGrid className="xl:grid-cols-5">
         <MetricCard intent="emerald" label="Receita" value={formatCurrency(resumo.receita)} />
-        <MetricCard intent="blue" label="Margem" subtitle={`${formatNumber(resumo.margem_percentual, 1)}%`} value={formatCurrency(resumo.margem_valor)} />
-        <MetricCard intent="slate" label="Ticket medio" subtitle={`${resumo.atendimentos || 0} atendimentos`} value={formatCurrency(resumo.ticket_medio)} />
-        <MetricCard intent="cyan" label="Ocupacao media" subtitle={`${resumo.agendamentos || 0} agendamentos`} value={`${formatNumber(resumo.ocupacao_media_percentual, 1)}%`} />
-        <MetricCard intent="violet" label="NPS" subtitle={`${resumo.avaliacoes || 0} avaliacoes`} value={formatNumber(resumo.nps, 0)} />
+        <MetricCard
+          intent="blue"
+          label="Margem"
+          subtitle={`${formatNumber(resumo.margem_percentual, 1)}%`}
+          value={formatCurrency(resumo.margem_valor)}
+        />
+        <MetricCard
+          intent="slate"
+          label="Ticket medio"
+          subtitle={`${resumo.atendimentos || 0} atendimentos`}
+          value={formatCurrency(resumo.ticket_medio)}
+        />
+        <MetricCard
+          intent="cyan"
+          label="Ocupacao media"
+          subtitle={`${resumo.agendamentos || 0} agendamentos`}
+          value={`${formatNumber(resumo.ocupacao_media_percentual, 1)}%`}
+        />
+        <MetricCard
+          intent="violet"
+          label="NPS"
+          subtitle={`${resumo.avaliacoes || 0} avaliacoes`}
+          value={formatNumber(resumo.nps, 0)}
+        />
       </MetricGrid>
 
       {relatorio?.alertas?.length > 0 ? (
@@ -109,7 +135,11 @@ function MarginRows({ items }) {
     <Row key={item.chave}>
       <Cell title={item.nome} subtitle={`${item.atendimentos} atend.`} />
       <Cell title={formatCurrency(item.receita)} subtitle="receita" align="right" />
-      <Cell title={formatCurrency(item.margem_valor)} subtitle={`${formatNumber(item.margem_percentual, 1)}%`} align="right" />
+      <Cell
+        title={formatCurrency(item.margem_valor)}
+        subtitle={`${formatNumber(item.margem_percentual, 1)}%`}
+        align="right"
+      />
     </Row>
   ));
 }
@@ -119,7 +149,11 @@ function ProdutividadeRows({ items }) {
   return items.slice(0, 8).map((item) => (
     <Row key={item.responsavel_id}>
       <Cell title={item.responsavel_nome} subtitle={`${item.atendimentos} atend.`} />
-      <Cell title={`${formatNumber(item.horas_trabalhadas, 1)}h`} subtitle={`${item.etapas} etapas`} align="right" />
+      <Cell
+        title={`${formatNumber(item.horas_trabalhadas, 1)}h`}
+        subtitle={`${item.etapas} etapas`}
+        align="right"
+      />
       <Cell title={`${item.minutos_trabalhados} min`} subtitle="tempo total" align="right" />
     </Row>
   ));
@@ -130,8 +164,16 @@ function OcupacaoRows({ items }) {
   return items.slice(0, 8).map((item) => (
     <Row key={item.recurso_id}>
       <Cell title={item.recurso_nome} subtitle={item.recurso_tipo} />
-      <Cell title={`${formatNumber(item.ocupacao_percentual, 1)}%`} subtitle="ocupacao" align="right" />
-      <Cell title={`${item.minutos_ocupados} min`} subtitle={`${item.minutos_disponiveis} disp.`} align="right" />
+      <Cell
+        title={`${formatNumber(item.ocupacao_percentual, 1)}%`}
+        subtitle="ocupacao"
+        align="right"
+      />
+      <Cell
+        title={`${item.minutos_ocupados} min`}
+        subtitle={`${item.minutos_disponiveis} disp.`}
+        align="right"
+      />
     </Row>
   ));
 }
@@ -141,7 +183,11 @@ function DesperdicioRows({ items }) {
   return items.slice(0, 8).map((item) => (
     <Row key={item.produto_id}>
       <Cell title={item.produto_nome} subtitle={item.unidade || "unidade"} />
-      <Cell title={formatNumber(item.quantidade_desperdicio, 3)} subtitle="qtd desperdicada" align="right" />
+      <Cell
+        title={formatNumber(item.quantidade_desperdicio, 3)}
+        subtitle="qtd desperdicada"
+        align="right"
+      />
       <Cell title={formatCurrency(item.custo_desperdicio)} subtitle="custo" align="right" />
     </Row>
   ));

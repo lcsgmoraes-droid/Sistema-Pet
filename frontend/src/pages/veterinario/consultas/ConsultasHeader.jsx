@@ -8,10 +8,10 @@ export default function ConsultasHeader({ onNovaConsulta, total }) {
           <Stethoscope size={22} className="text-blue-600" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">
-            Consultas / Prontuarios
-          </h1>
-          <p className="text-sm text-gray-500">{total} registro{total !== 1 ? "s" : ""}</p>
+          <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">Consultas / Prontuarios</h1>
+          <p className="text-sm text-gray-500">
+            {total} registro{total !== 1 ? "s" : ""}
+          </p>
         </div>
       </div>
       <button

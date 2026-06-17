@@ -93,25 +93,22 @@ test("encontra a proxima parada pendente com fallback para a ultima", () => {
 });
 
 test("monta destino de mapa por prioridade sem abrir janela", () => {
-  assert.deepEqual(
-    montarDestinoMapaRota({ token_rastreio: "abc 123" }),
-    {
-      url: "/rastreio/abc%20123",
-      tipo: "rastreio",
-    },
-  );
+  assert.deepEqual(montarDestinoMapaRota({ token_rastreio: "abc 123" }), {
+    url: "/rastreio/abc%20123",
+    tipo: "rastreio",
+  });
 
-  assert.deepEqual(
-    montarDestinoMapaRota({ lat_atual: -23.5, lon_atual: -46.6 }),
-    {
-      url: "https://www.google.com/maps?q=-23.5,-46.6",
-      tipo: "coordenadas",
-    },
-  );
+  assert.deepEqual(montarDestinoMapaRota({ lat_atual: -23.5, lon_atual: -46.6 }), {
+    url: "https://www.google.com/maps?q=-23.5,-46.6",
+    tipo: "coordenadas",
+  });
 
   assert.deepEqual(
     montarDestinoMapaRota({
-      paradas: [{ status: "entregue", endereco: "Rua A" }, { status: "pendente", endereco: "Rua B" }],
+      paradas: [
+        { status: "entregue", endereco: "Rua A" },
+        { status: "pendente", endereco: "Rua B" },
+      ],
     }),
     {
       url: "https://www.google.com/maps/search/?api=1&query=Rua%20B",

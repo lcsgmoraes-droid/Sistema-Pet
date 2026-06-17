@@ -21,9 +21,7 @@ export default function AuditoriaMensal() {
 
     setLoading(true);
     try {
-      const res = await api.get(
-        `/auditoria/provisoes/mensal?mes=${mes}&ano=${ano}`
-      );
+      const res = await api.get(`/auditoria/provisoes/mensal?mes=${mes}&ano=${ano}`);
       setDados(res.data);
     } catch (error) {
       console.error("Erro ao buscar auditoria:", error);
@@ -101,8 +99,7 @@ export default function AuditoriaMensal() {
           Auditoria Mensal — Provisão × Realizado
         </h1>
         <p className="text-gray-600 mt-2">
-          Compare valores provisionados com valores pagos para controle fiscal e
-          trabalhista
+          Compare valores provisionados com valores pagos para controle fiscal e trabalhista
         </p>
       </div>
 
@@ -110,9 +107,7 @@ export default function AuditoriaMensal() {
       <div className="bg-white rounded-lg shadow p-6 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Mês
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mês</label>
             <select
               value={mes}
               onChange={(e) => setMes(Number(e.target.value))}
@@ -127,9 +122,7 @@ export default function AuditoriaMensal() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ano
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ano</label>
             <input
               type="number"
               value={ano}
@@ -152,12 +145,7 @@ export default function AuditoriaMensal() {
                 </>
               ) : (
                 <>
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -177,11 +165,7 @@ export default function AuditoriaMensal() {
       {dados && (
         <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
           <div className="flex items-start">
-            <svg
-              className="h-5 w-5 text-blue-400 mt-0.5"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-            >
+            <svg className="h-5 w-5 text-blue-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
               <path
                 fillRule="evenodd"
                 d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
@@ -189,25 +173,20 @@ export default function AuditoriaMensal() {
               />
             </svg>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">
-                Interpretação dos Status:
-              </h3>
+              <h3 className="text-sm font-medium text-blue-800">Interpretação dos Status:</h3>
               <div className="mt-2 text-sm text-blue-700 space-y-1">
                 <p>
-                  <strong>✅ OK:</strong> Provisão igual ao realizado - situação
-                  perfeita
+                  <strong>✅ OK:</strong> Provisão igual ao realizado - situação perfeita
                 </p>
                 <p>
-                  <strong>⚠️ AJUSTE:</strong> Tem pagamento mas valores divergem
-                  - revisar
+                  <strong>⚠️ AJUSTE:</strong> Tem pagamento mas valores divergem - revisar
                 </p>
                 <p>
-                  <strong>🕒 ACUMULANDO:</strong> Provisionado mas não pago ainda
-                  - normal para férias e 13º
+                  <strong>🕒 ACUMULANDO:</strong> Provisionado mas não pago ainda - normal para
+                  férias e 13º
                 </p>
                 <p>
-                  <strong>➖ SEM DADOS:</strong> Sem provisão e sem pagamento no
-                  período
+                  <strong>➖ SEM DADOS:</strong> Sem provisão e sem pagamento no período
                 </p>
               </div>
             </div>
@@ -244,19 +223,12 @@ export default function AuditoriaMensal() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {dados.itens.map((item, idx) => (
-                  <tr
-                    key={idx}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
+                  <tr key={idx} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {item.item}
-                      </div>
+                      <div className="text-sm font-medium text-gray-900">{item.item}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <div className="text-sm text-gray-900">
-                        {formatarMoeda(item.provisao)}
-                      </div>
+                      <div className="text-sm text-gray-900">{formatarMoeda(item.provisao)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="text-sm font-semibold text-gray-900">
@@ -269,8 +241,8 @@ export default function AuditoriaMensal() {
                           item.diferenca === 0
                             ? "text-green-600"
                             : item.diferenca > 0
-                            ? "text-blue-600"
-                            : "text-red-600"
+                              ? "text-blue-600"
+                              : "text-red-600"
                         }`}
                       >
                         {item.diferenca > 0 && "+"}
@@ -291,9 +263,7 @@ export default function AuditoriaMensal() {
               <tfoot className="bg-gray-100">
                 <tr>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-bold text-gray-900">
-                      TOTAL
-                    </div>
+                    <div className="text-sm font-bold text-gray-900">TOTAL</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
                     <div className="text-sm font-bold text-gray-900">
@@ -311,8 +281,8 @@ export default function AuditoriaMensal() {
                         dados.total_diferenca === 0
                           ? "text-green-600"
                           : dados.total_diferenca > 0
-                          ? "text-blue-600"
-                          : "text-red-600"
+                            ? "text-blue-600"
+                            : "text-red-600"
                       }`}
                     >
                       {dados.total_diferenca > 0 && "+"}
@@ -324,7 +294,7 @@ export default function AuditoriaMensal() {
                       {formatarPercentual(
                         dados.total_provisao > 0
                           ? (dados.total_realizado / dados.total_provisao) * 100
-                          : 0
+                          : 0,
                       )}
                     </div>
                   </td>
@@ -353,8 +323,7 @@ export default function AuditoriaMensal() {
             />
           </svg>
           <p className="text-gray-600">
-            Selecione um mês e ano e clique em "Buscar" para visualizar a
-            auditoria
+            Selecione um mês e ano e clique em "Buscar" para visualizar a auditoria
           </p>
         </div>
       )}

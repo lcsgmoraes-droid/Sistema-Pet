@@ -1,30 +1,26 @@
-﻿import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+﻿import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   DollarSign,
   Calendar,
   Clock,
-  TrendingUp,
-  TrendingDown,
-  Receipt,
   AlertCircle,
   AlertTriangle,
   CheckCircle,
-  XCircle,
   RefreshCw,
-  Download
-} from 'lucide-react';
-import { listarCaixas, obterResumoCaixa, reabrirCaixa } from '../api/caixa';
-import { getAccessToken } from '../auth/tokenStorage';
+  Download,
+} from "lucide-react";
+import { listarCaixas, reabrirCaixa } from "../api/caixa";
+import { getAccessToken } from "../auth/tokenStorage";
 
 export default function MeusCaixas() {
   const navigate = useNavigate();
   const [caixas, setCaixas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtros, setFiltros] = useState({
-    data_inicio: '',
-    data_fim: '',
-    status: ''
+    data_inicio: "",
+    data_fim: "",
+    status: "",
   });
 
   useEffect(() => {
@@ -35,70 +31,70 @@ export default function MeusCaixas() {
     try {
       setLoading(true);
       const params = {};
-      
+
       if (filtros.data_inicio) params.data_inicio = filtros.data_inicio;
       if (filtros.data_fim) params.data_fim = filtros.data_fim;
       if (filtros.status) params.status_filter = filtros.status;
-      
+
       const response = await listarCaixas(params);
       setCaixas(response);
     } catch (error) {
-      console.error('Erro ao carregar caixas:', error);
-      alert('Erro ao carregar histÃ³rico de caixas');
+      console.error("Erro ao carregar caixas:", error);
+      alert("Erro ao carregar histÃ³rico de caixas");
     } finally {
       setLoading(false);
     }
   };
 
   const handleReabrir = async (caixaId) => {
-    if (!confirm('Deseja realmente reabrir este caixa?')) return;
+    if (!confirm("Deseja realmente reabrir este caixa?")) return;
 
     try {
       await reabrirCaixa(caixaId);
-      alert('Caixa reaberto com sucesso!');
-      navigate('/pdv'); // Redirecionar para o PDV
+      alert("Caixa reaberto com sucesso!");
+      navigate("/pdv"); // Redirecionar para o PDV
     } catch (error) {
-      console.error('Erro ao reabrir caixa:', error);
-      alert(error.response?.data?.detail || 'Erro ao reabrir caixa');
+      console.error("Erro ao reabrir caixa:", error);
+      alert(error.response?.data?.detail || "Erro ao reabrir caixa");
     }
   };
 
   const handleDownloadPDF = async (caixaId, numeroCaixa) => {
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_URL || '/api';
+      const apiBaseUrl = import.meta.env.VITE_API_URL || "/api";
       const token = getAccessToken();
       const response = await fetch(`${apiBaseUrl}/caixas/${caixaId}/pdf`, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao gerar PDF');
+        throw new Error("Erro ao gerar PDF");
       }
 
       // Converter resposta em blob
       const blob = await response.blob();
-      
+
       // Criar URL temporÃ¡ria e fazer download
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `Caixa_${numeroCaixa}_${new Date().toISOString().split('T')[0]}.pdf`;
+      a.download = `Caixa_${numeroCaixa}_${new Date().toISOString().split("T")[0]}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      
-      alert('PDF baixado com sucesso!');
+
+      alert("PDF baixado com sucesso!");
     } catch (error) {
-      console.error('Erro ao baixar PDF:', error);
-      alert('Erro ao gerar PDF do caixa');
+      console.error("Erro ao baixar PDF:", error);
+      alert("Erro ao gerar PDF do caixa");
     }
   };
 
   const getStatusBadge = (caixa) => {
-    if (caixa.status === 'aberto') {
+    if (caixa.status === "aberto") {
       return (
         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
           <CheckCircle className="w-4 h-4" />
@@ -107,13 +103,14 @@ export default function MeusCaixas() {
       );
     }
     // Fechado — verificar se tem diferença
-    const temDiferenca = caixa.diferenca !== null && caixa.diferenca !== undefined && Math.abs(caixa.diferenca) > 0.01;
+    const temDiferenca =
+      caixa.diferenca !== null && caixa.diferenca !== undefined && Math.abs(caixa.diferenca) > 0.01;
     if (temDiferenca) {
       const dif = caixa.diferenca;
       return (
         <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800">
           <AlertTriangle className="w-4 h-4" />
-          Diferença {dif > 0 ? '+' : '-'}R$ {Math.abs(dif).toFixed(2)}
+          Diferença {dif > 0 ? "+" : "-"}R$ {Math.abs(dif).toFixed(2)}
         </span>
       );
     }
@@ -129,7 +126,7 @@ export default function MeusCaixas() {
     const dif = informado - esperado;
     return {
       valor: Math.abs(dif),
-      tipo: dif > 0 ? 'sobra' : dif < 0 ? 'falta' : 'ok'
+      tipo: dif > 0 ? "sobra" : dif < 0 ? "falta" : "ok",
     };
   };
 
@@ -145,9 +142,7 @@ export default function MeusCaixas() {
       <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Data InÃ­cio
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Data InÃ­cio</label>
             <input
               type="date"
               value={filtros.data_inicio}
@@ -157,9 +152,7 @@ export default function MeusCaixas() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Data Fim
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Data Fim</label>
             <input
               type="date"
               value={filtros.data_fim}
@@ -169,9 +162,7 @@ export default function MeusCaixas() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Status
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
             <select
               value={filtros.status}
               onChange={(e) => setFiltros({ ...filtros, status: e.target.value })}
@@ -185,7 +176,7 @@ export default function MeusCaixas() {
 
           <div className="flex items-end">
             <button
-              onClick={() => setFiltros({ data_inicio: '', data_fim: '', status: '' })}
+              onClick={() => setFiltros({ data_inicio: "", data_fim: "", status: "" })}
               className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
             >
               Limpar Filtros
@@ -208,18 +199,26 @@ export default function MeusCaixas() {
       ) : (
         <div className="grid grid-cols-1 gap-6">
           {caixas.map((caixa) => {
-            const diferenca = caixa.status === 'fechado' && caixa.valor_esperado 
-              ? calcularDiferenca(caixa.valor_esperado, caixa.valor_informado)
-              : null;
+            const diferenca =
+              caixa.status === "fechado" && caixa.valor_esperado
+                ? calcularDiferenca(caixa.valor_esperado, caixa.valor_informado)
+                : null;
 
             return (
-              <div key={caixa.id} className={`bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow ${
-                caixa.status === 'fechado' && caixa.diferenca !== null && Math.abs(caixa.diferenca ?? 0) > 0.01
-                  ? 'border-l-4 border-l-amber-400'
-                  : caixa.status === 'fechado' && caixa.diferenca !== null && Math.abs(caixa.diferenca ?? 0) <= 0.01
-                  ? 'border-l-4 border-l-green-400'
-                  : ''
-              }`}>
+              <div
+                key={caixa.id}
+                className={`bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow ${
+                  caixa.status === "fechado" &&
+                  caixa.diferenca !== null &&
+                  Math.abs(caixa.diferenca ?? 0) > 0.01
+                    ? "border-l-4 border-l-amber-400"
+                    : caixa.status === "fechado" &&
+                        caixa.diferenca !== null &&
+                        Math.abs(caixa.diferenca ?? 0) <= 0.01
+                      ? "border-l-4 border-l-green-400"
+                      : ""
+                }`}
+              >
                 <div className="p-6">
                   {/* Header do Card */}
                   <div className="flex items-start justify-between mb-4">
@@ -241,12 +240,14 @@ export default function MeusCaixas() {
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Calendar className="w-4 h-4" />
-                      <span>Abertura: {new Date(caixa.data_abertura).toLocaleString('pt-BR')}</span>
+                      <span>Abertura: {new Date(caixa.data_abertura).toLocaleString("pt-BR")}</span>
                     </div>
                     {caixa.data_fechamento && (
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <Clock className="w-4 h-4" />
-                        <span>Fechamento: {new Date(caixa.data_fechamento).toLocaleString('pt-BR')}</span>
+                        <span>
+                          Fechamento: {new Date(caixa.data_fechamento).toLocaleString("pt-BR")}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -260,7 +261,7 @@ export default function MeusCaixas() {
                       </div>
                     </div>
 
-                    {caixa.status === 'fechado' && caixa.valor_esperado && (
+                    {caixa.status === "fechado" && caixa.valor_esperado && (
                       <>
                         <div className="bg-blue-50 rounded-lg p-3">
                           <div className="text-xs text-gray-600 mb-1">Esperado</div>
@@ -276,18 +277,28 @@ export default function MeusCaixas() {
                           </div>
                         </div>
 
-                        <div className={`rounded-lg p-3 ${
-                          diferenca.tipo === 'ok' ? 'bg-green-50' :
-                          diferenca.tipo === 'sobra' ? 'bg-blue-50' : 'bg-red-50'
-                        }`}>
+                        <div
+                          className={`rounded-lg p-3 ${
+                            diferenca.tipo === "ok"
+                              ? "bg-green-50"
+                              : diferenca.tipo === "sobra"
+                                ? "bg-blue-50"
+                                : "bg-red-50"
+                          }`}
+                        >
                           <div className="text-xs text-gray-600 mb-1">Diferença</div>
-                          <div className={`text-lg font-semibold ${
-                            diferenca.tipo === 'ok' ? 'text-green-700' :
-                            diferenca.tipo === 'sobra' ? 'text-blue-900' : 'text-red-900'
-                          }`}>
-                            {diferenca.tipo === 'ok' && '✓ Caixa Batido'}
-                            {diferenca.tipo === 'sobra' && `+ R$ ${diferenca.valor.toFixed(2)}`}
-                            {diferenca.tipo === 'falta' && `- R$ ${diferenca.valor.toFixed(2)}`}
+                          <div
+                            className={`text-lg font-semibold ${
+                              diferenca.tipo === "ok"
+                                ? "text-green-700"
+                                : diferenca.tipo === "sobra"
+                                  ? "text-blue-900"
+                                  : "text-red-900"
+                            }`}
+                          >
+                            {diferenca.tipo === "ok" && "✓ Caixa Batido"}
+                            {diferenca.tipo === "sobra" && `+ R$ ${diferenca.valor.toFixed(2)}`}
+                            {diferenca.tipo === "falta" && `- R$ ${diferenca.valor.toFixed(2)}`}
                           </div>
                         </div>
                       </>
@@ -299,19 +310,21 @@ export default function MeusCaixas() {
                     <div className="border-t pt-4 mb-4">
                       {caixa.observacoes_abertura && (
                         <p className="text-sm text-gray-600 mb-2">
-                          <span className="font-medium">Obs. Abertura:</span> {caixa.observacoes_abertura}
+                          <span className="font-medium">Obs. Abertura:</span>{" "}
+                          {caixa.observacoes_abertura}
                         </p>
                       )}
                       {caixa.observacoes_fechamento && (
                         <p className="text-sm text-gray-600">
-                          <span className="font-medium">Obs. Fechamento:</span> {caixa.observacoes_fechamento}
+                          <span className="font-medium">Obs. Fechamento:</span>{" "}
+                          {caixa.observacoes_fechamento}
                         </p>
                       )}
                     </div>
                   )}
 
                   {/* AÃ§Ãµes */}
-                  {caixa.status === 'fechado' && (
+                  {caixa.status === "fechado" && (
                     <div className="border-t pt-4 flex gap-3">
                       <button
                         onClick={() => handleReabrir(caixa.id)}
@@ -338,4 +351,3 @@ export default function MeusCaixas() {
     </div>
   );
 }
-

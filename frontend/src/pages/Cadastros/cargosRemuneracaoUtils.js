@@ -50,10 +50,7 @@ const CAMPOS_SINCRONIZADOS = {
 
 export const normalizarCamposRemuneracao = (form) => ({
   ...form,
-  inss_patronal_valor: calcularValorPorPercentual(
-    form.salario_base,
-    form.inss_patronal_percentual,
-  ),
+  inss_patronal_valor: calcularValorPorPercentual(form.salario_base, form.inss_patronal_percentual),
   fgts_valor: calcularValorPorPercentual(form.salario_base, form.fgts_percentual),
   inss_funcionario_valor:
     numeroCampoParaFloat(form.inss_funcionario_valor) > 0

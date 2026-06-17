@@ -9,8 +9,18 @@ export default function ProjecaoCaixa() {
   const [loading, setLoading] = useState(false);
 
   const meses = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
   ];
 
   useEffect(() => {
@@ -22,7 +32,7 @@ export default function ProjecaoCaixa() {
     try {
       const [resProjecao, resResumo] = await Promise.all([
         api.get(`/projecao-caixa/?meses_a_frente=${mesesAFrente}`),
-        api.get(`/projecao-caixa/resumo?meses_a_frente=${mesesAFrente}`)
+        api.get(`/projecao-caixa/resumo?meses_a_frente=${mesesAFrente}`),
       ]);
 
       if (resProjecao.data.sucesso) {
@@ -52,18 +62,20 @@ export default function ProjecaoCaixa() {
       POSITIVO: "bg-green-100 text-green-800",
       NEGATIVO: "bg-red-100 text-red-800",
       MISTO: "bg-yellow-100 text-yellow-800",
-      NEUTRO: "bg-gray-100 text-gray-800"
+      NEUTRO: "bg-gray-100 text-gray-800",
     };
 
     const textos = {
       POSITIVO: "📈 Todos os meses positivos",
       NEGATIVO: "📉 Todos os meses negativos",
       MISTO: "⚠️ Meses positivos e negativos",
-      NEUTRO: "➖ Sem dados"
+      NEUTRO: "➖ Sem dados",
     };
 
     return (
-      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${cores[tendencia] || cores.NEUTRO}`}>
+      <span
+        className={`px-3 py-1 rounded-full text-sm font-semibold ${cores[tendencia] || cores.NEUTRO}`}
+      >
         {textos[tendencia] || textos.NEUTRO}
       </span>
     );
@@ -83,9 +95,7 @@ export default function ProjecaoCaixa() {
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          💰 Projeção de Caixa
-        </h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">💰 Projeção de Caixa</h1>
         <p className="text-gray-600">
           Projeção futura baseada em histórico real + provisões obrigatórias
         </p>
@@ -94,9 +104,7 @@ export default function ProjecaoCaixa() {
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
         <div className="flex items-center gap-4">
-          <label className="text-sm font-medium text-gray-700">
-            Projetar para:
-          </label>
+          <label className="text-sm font-medium text-gray-700">Projetar para:</label>
           <select
             value={mesesAFrente}
             onChange={(e) => setMesesAFrente(Number(e.target.value))}
@@ -113,7 +121,7 @@ export default function ProjecaoCaixa() {
       {resumo && (
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-900 mb-4">📊 Resumo da Projeção</h2>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <div className="bg-white rounded-lg p-4 shadow-sm">
               <p className="text-sm text-gray-600 mb-1">Receita Total Projetada</p>
@@ -131,7 +139,9 @@ export default function ProjecaoCaixa() {
 
             <div className="bg-white rounded-lg p-4 shadow-sm">
               <p className="text-sm text-gray-600 mb-1">Saldo Total Projetado</p>
-              <p className={`text-2xl font-bold ${resumo.saldo_total >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <p
+                className={`text-2xl font-bold ${resumo.saldo_total >= 0 ? "text-green-600" : "text-red-600"}`}
+              >
                 {formatarMoeda(resumo.saldo_total)}
               </p>
             </div>
@@ -146,18 +156,14 @@ export default function ProjecaoCaixa() {
             </div>
           </div>
 
-          <div className="flex justify-center mt-4">
-            {getTendenciaBadge(resumo.tendencia)}
-          </div>
+          <div className="flex justify-center mt-4">{getTendenciaBadge(resumo.tendencia)}</div>
         </div>
       )}
 
       {/* Tabela de Projeção */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            📅 Projeção Mês a Mês
-          </h2>
+          <h2 className="text-lg font-semibold text-gray-900">📅 Projeção Mês a Mês</h2>
         </div>
 
         {loading ? (
@@ -168,7 +174,9 @@ export default function ProjecaoCaixa() {
         ) : projecao.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             <p className="text-lg mb-2">📊 Sem dados suficientes</p>
-            <p className="text-sm">É necessário ter pelo menos 3 meses de histórico para gerar projeções.</p>
+            <p className="text-sm">
+              É necessário ter pelo menos 3 meses de histórico para gerar projeções.
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -206,7 +214,7 @@ export default function ProjecaoCaixa() {
                         {meses[p.mes - 1]}/{p.ano}
                       </div>
                       <div className="text-xs text-gray-500">
-                        +{p.mes_futuro} {p.mes_futuro === 1 ? 'mês' : 'meses'}
+                        +{p.mes_futuro} {p.mes_futuro === 1 ? "mês" : "meses"}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-600 font-semibold">
@@ -253,7 +261,9 @@ export default function ProjecaoCaixa() {
           <li>Média de despesas fixas (custos + operacionais)</li>
           <li>Alíquota atual do Simples Nacional aplicada sobre receita projetada</li>
           <li>Folha de pagamento + encargos (INSS + FGTS ~28%)</li>
-          <li><strong>Sem chutes</strong> – Apenas dados reais + regras contábeis</li>
+          <li>
+            <strong>Sem chutes</strong> – Apenas dados reais + regras contábeis
+          </li>
         </ul>
       </div>
     </div>

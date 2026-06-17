@@ -75,7 +75,9 @@ export default function ConsultaActionsFooter({
                   onClick={onAgendarRetorno}
                   disabled={salvando || !consultaIdAtual}
                   className="flex items-center gap-2 px-4 py-2 text-sm border border-blue-300 text-blue-700 rounded-lg hover:bg-blue-50 disabled:opacity-60"
-                  title={!consultaIdAtual ? "Salve a consulta em rascunho antes de agendar retorno" : ""}
+                  title={
+                    !consultaIdAtual ? "Salve a consulta em rascunho antes de agendar retorno" : ""
+                  }
                 >
                   <CalendarPlus size={14} />
                   Agendar retorno
@@ -85,7 +87,9 @@ export default function ConsultaActionsFooter({
                   onClick={onAbrirInternacao}
                   disabled={salvando || !consultaIdAtual}
                   className="flex items-center gap-2 px-4 py-2 text-sm border border-emerald-300 text-emerald-700 rounded-lg hover:bg-emerald-50 disabled:opacity-60"
-                  title={!consultaIdAtual ? "Salve a consulta em rascunho antes de abrir internacao" : ""}
+                  title={
+                    !consultaIdAtual ? "Salve a consulta em rascunho antes de abrir internacao" : ""
+                  }
                 >
                   <Bed size={14} />
                   Internacao

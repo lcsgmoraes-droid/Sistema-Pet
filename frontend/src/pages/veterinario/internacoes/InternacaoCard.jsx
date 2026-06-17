@@ -80,7 +80,9 @@ function ResumoInternacao({ internacao }) {
           showLabel
         />
       )}
-      <p className="text-xs text-gray-400 truncate">{internacao.motivo ?? internacao.motivo_internacao}</p>
+      <p className="text-xs text-gray-400 truncate">
+        {internacao.motivo ?? internacao.motivo_internacao}
+      </p>
     </div>
   );
 }
@@ -89,7 +91,9 @@ function DatasInternacao({ internacao }) {
   return (
     <div className="text-right shrink-0">
       <p className="text-xs text-gray-400">Entrada: {formatData(internacao.data_entrada)}</p>
-      {internacao.data_saida && <p className="text-xs text-gray-400">Alta: {formatData(internacao.data_saida)}</p>}
+      {internacao.data_saida && (
+        <p className="text-xs text-gray-400">Alta: {formatData(internacao.data_saida)}</p>
+      )}
       {internacao.box && <p className="text-xs text-gray-500">Box: {internacao.box}</p>}
     </div>
   );

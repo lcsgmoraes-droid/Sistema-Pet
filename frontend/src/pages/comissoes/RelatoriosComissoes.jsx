@@ -1,10 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../../api';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../../api";
 import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
-} from 'recharts';
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 /**
  * RELATÓRIOS ANALÍTICOS DE COMISSÕES
@@ -15,15 +26,15 @@ import {
 
 const RelatoriosComissoes = () => {
   const navigate = useNavigate();
-  
+
   // Estado
-  const [abaAtiva, setAbaAtiva] = useState('margem-produto');
+  const [abaAtiva, setAbaAtiva] = useState("margem-produto");
   const [carregando, setCarregando] = useState(false);
-  
+
   // Filtros
-  const [dataInicio, setDataInicio] = useState('');
-  const [dataFim, setDataFim] = useState('');
-  
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
+
   // Dados dos relatórios
   const [dadosMargemProduto, setDadosMargemProduto] = useState(null);
   const [dadosProdutosPrejudiciais, setDadosProdutosPrejudiciais] = useState(null);
@@ -43,32 +54,32 @@ const RelatoriosComissoes = () => {
       if (dataInicio) params.data_inicio = dataInicio;
       if (dataFim) params.data_fim = dataFim;
 
-      let endpoint = '';
+      let endpoint = "";
       let setDados = null;
 
       switch (tipo) {
-        case 'margem-produto':
-          endpoint = '/relatorios-comissoes/margem-produto';
+        case "margem-produto":
+          endpoint = "/relatorios-comissoes/margem-produto";
           setDados = setDadosMargemProduto;
           break;
-        case 'produtos-prejudiciais':
-          endpoint = '/relatorios-comissoes/produtos-prejudiciais';
+        case "produtos-prejudiciais":
+          endpoint = "/relatorios-comissoes/produtos-prejudiciais";
           setDados = setDadosProdutosPrejudiciais;
           break;
-        case 'ranking-funcionarios':
-          endpoint = '/relatorios-comissoes/ranking-funcionarios';
+        case "ranking-funcionarios":
+          endpoint = "/relatorios-comissoes/ranking-funcionarios";
           setDados = setDadosRankingFuncionarios;
           break;
-        case 'ranking-produtos':
-          endpoint = '/relatorios-comissoes/ranking-produtos';
+        case "ranking-produtos":
+          endpoint = "/relatorios-comissoes/ranking-produtos";
           setDados = setDadosRankingProdutos;
           break;
-        case 'ranking-categorias':
-          endpoint = '/relatorios-comissoes/ranking-categorias';
+        case "ranking-categorias":
+          endpoint = "/relatorios-comissoes/ranking-categorias";
           setDados = setDadosRankingCategorias;
           break;
-        case 'dre':
-          endpoint = '/relatorios-comissoes/visao-dre';
+        case "dre":
+          endpoint = "/relatorios-comissoes/visao-dre";
           params.ano = 2026;
           setDados = setDadosDRE;
           break;
@@ -77,19 +88,19 @@ const RelatoriosComissoes = () => {
           return;
       }
 
-      const response = await api.get(endpoint, { 
+      const response = await api.get(endpoint, {
         params,
-        timeout: 10000 // 10 segundos timeout
+        timeout: 10000, // 10 segundos timeout
       });
       setDados(response.data);
     } catch (error) {
       console.error(`Erro ao carregar relatório ${tipo}:`, error);
-      
+
       // Se for erro de rede/timeout, mostrar estrutura vazia
-      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        alert('⏱️ Tempo de resposta excedido. Verifique se o backend está rodando.');
+      if (error.code === "ECONNABORTED" || error.message.includes("timeout")) {
+        alert("⏱️ Tempo de resposta excedido. Verifique se o backend está rodando.");
       } else {
-        alert('❌ Erro ao carregar relatório. Verifique o console para detalhes.');
+        alert("❌ Erro ao carregar relatório. Verifique o console para detalhes.");
       }
     } finally {
       setCarregando(false);
@@ -111,9 +122,9 @@ const RelatoriosComissoes = () => {
   // ========================================
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(valor);
   };
 
@@ -130,25 +141,28 @@ const RelatoriosComissoes = () => {
       const params = {
         tipo: abaAtiva,
         data_inicio: dataInicio,
-        data_fim: dataFim
+        data_fim: dataFim,
       };
 
-      const response = await api.get('/relatorios-comissoes/exportar-csv', {
+      const response = await api.get("/relatorios-comissoes/exportar-csv", {
         params,
-        responseType: 'blob'
+        responseType: "blob",
       });
 
       // Download do arquivo
       const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      link.setAttribute('download', `relatorio_${abaAtiva}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute(
+        "download",
+        `relatorio_${abaAtiva}_${new Date().toISOString().split("T")[0]}.csv`,
+      );
       document.body.appendChild(link);
       link.click();
       link.remove();
     } catch (error) {
-      console.error('Erro ao exportar CSV:', error);
-      alert('Erro ao exportar arquivo');
+      console.error("Erro ao exportar CSV:", error);
+      alert("Erro ao exportar arquivo");
     }
   };
 
@@ -156,12 +170,12 @@ const RelatoriosComissoes = () => {
   // CORES E TEMAS
   // ========================================
 
-  const CORES = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#a28bd4', '#f48fb1'];
+  const CORES = ["#8884d8", "#82ca9d", "#ffc658", "#ff7c7c", "#a28bd4", "#f48fb1"];
 
   const obterCorAlerta = (nivel) => {
-    if (nivel === 3) return 'text-red-700 bg-red-100 border-red-300';
-    if (nivel === 2) return 'text-orange-700 bg-orange-100 border-orange-300';
-    return 'text-yellow-700 bg-yellow-100 border-yellow-300';
+    if (nivel === 3) return "text-red-700 bg-red-100 border-red-300";
+    if (nivel === 2) return "text-orange-700 bg-orange-100 border-orange-300";
+    return "text-yellow-700 bg-yellow-100 border-yellow-300";
   };
 
   // ========================================
@@ -170,24 +184,24 @@ const RelatoriosComissoes = () => {
 
   const renderizarAbas = () => {
     const abas = [
-      { id: 'margem-produto', label: '📊 Margem por Produto', icone: '💰' },
-      { id: 'produtos-prejudiciais', label: '⚠️ Produtos Prejudiciais', icone: '🚨' },
-      { id: 'ranking-funcionarios', label: '👥 Ranking Funcionários', icone: '🏆' },
-      { id: 'ranking-produtos', label: '📦 Ranking Produtos', icone: '📈' },
-      { id: 'ranking-categorias', label: '📂 Ranking Categorias', icone: '🎯' },
-      { id: 'dre', label: '📑 Visão DRE', icone: '💼' }
+      { id: "margem-produto", label: "📊 Margem por Produto", icone: "💰" },
+      { id: "produtos-prejudiciais", label: "⚠️ Produtos Prejudiciais", icone: "🚨" },
+      { id: "ranking-funcionarios", label: "👥 Ranking Funcionários", icone: "🏆" },
+      { id: "ranking-produtos", label: "📦 Ranking Produtos", icone: "📈" },
+      { id: "ranking-categorias", label: "📂 Ranking Categorias", icone: "🎯" },
+      { id: "dre", label: "📑 Visão DRE", icone: "💼" },
     ];
 
     return (
       <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-        {abas.map(aba => (
+        {abas.map((aba) => (
           <button
             key={aba.id}
             onClick={() => setAbaAtiva(aba.id)}
             className={`px-4 py-3 rounded-lg font-medium whitespace-nowrap transition-all ${
               abaAtiva === aba.id
-                ? 'bg-blue-600 text-white shadow-lg'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? "bg-blue-600 text-white shadow-lg"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             }`}
           >
             <span className="text-xl mr-2">{aba.icone}</span>
@@ -207,9 +221,7 @@ const RelatoriosComissoes = () => {
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="flex items-center gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              📅 Data Início
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">📅 Data Início</label>
             <input
               type="date"
               value={dataInicio}
@@ -219,9 +231,7 @@ const RelatoriosComissoes = () => {
           </div>
 
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              📅 Data Fim
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">📅 Data Fim</label>
             <input
               type="date"
               value={dataFim}
@@ -237,19 +247,24 @@ const RelatoriosComissoes = () => {
             >
               🔍 Buscar
             </button>
-            
+
             <button
               onClick={() => {
-                setDataInicio('');
-                setDataFim('');
+                setDataInicio("");
+                setDataFim("");
                 carregarRelatorio(abaAtiva);
               }}
               className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition mt-6"
             >
               🔄 Limpar
             </button>
-            
-            {['margem-produto', 'produtos-prejudiciais', 'ranking-funcionarios', 'ranking-produtos'].includes(abaAtiva) && (
+
+            {[
+              "margem-produto",
+              "produtos-prejudiciais",
+              "ranking-funcionarios",
+              "ranking-produtos",
+            ].includes(abaAtiva) && (
               <button
                 onClick={exportarCSV}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition mt-6"
@@ -278,12 +293,16 @@ const RelatoriosComissoes = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="text-sm text-blue-600 font-medium">Total de Produtos</div>
-            <div className="text-3xl font-bold text-blue-800">{dadosMargemProduto.total_produtos}</div>
+            <div className="text-3xl font-bold text-blue-800">
+              {dadosMargemProduto.total_produtos}
+            </div>
           </div>
-          
+
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="text-sm text-red-600 font-medium">Produtos com Margem Negativa</div>
-            <div className="text-3xl font-bold text-red-800">{dadosMargemProduto.produtos_com_alerta}</div>
+            <div className="text-3xl font-bold text-red-800">
+              {dadosMargemProduto.produtos_com_alerta}
+            </div>
           </div>
 
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -318,19 +337,35 @@ const RelatoriosComissoes = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Venda</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Custo</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Comissão</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Margem Líquida</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">% Margem</th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Produto
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Categoria
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    Venda
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    Custo
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    Comissão
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    Margem Líquida
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    % Margem
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                    Status
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {dadosMargemProduto.dados.map((produto, idx) => (
-                  <tr key={idx} className={produto.alerta_margem_negativa ? 'bg-red-50' : ''}>
+                  <tr key={idx} className={produto.alerta_margem_negativa ? "bg-red-50" : ""}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {produto.produto_nome}
                     </td>
@@ -347,7 +382,9 @@ const RelatoriosComissoes = () => {
                       {formatarMoeda(produto.valor_comissao)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold">
-                      <span className={produto.margem_liquida < 0 ? 'text-red-600' : 'text-green-600'}>
+                      <span
+                        className={produto.margem_liquida < 0 ? "text-red-600" : "text-green-600"}
+                      >
                         {formatarMoeda(produto.margem_liquida)}
                       </span>
                     </td>
@@ -389,13 +426,18 @@ const RelatoriosComissoes = () => {
           <div className="flex items-start">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                  clipRule="evenodd"
+                />
               </svg>
             </div>
             <div className="ml-3">
               <p className="text-sm text-blue-800">
-                <strong className="font-semibold">Relatório informativo</strong> baseado em vendas já realizadas.
-                Os dados não alteram comissões, preços ou históricos e não devem ser usados para ajustes retroativos.
+                <strong className="font-semibold">Relatório informativo</strong> baseado em vendas
+                já realizadas. Os dados não alteram comissões, preços ou históricos e não devem ser
+                usados para ajustes retroativos.
               </p>
             </div>
           </div>
@@ -405,17 +447,23 @@ const RelatoriosComissoes = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="text-sm text-blue-600 font-medium">Produtos Analisados</div>
-            <div className="text-3xl font-bold text-blue-800">{dadosProdutosPrejudiciais.total_produtos_analisados}</div>
+            <div className="text-3xl font-bold text-blue-800">
+              {dadosProdutosPrejudiciais.total_produtos_analisados}
+            </div>
           </div>
-          
+
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="text-sm text-red-600 font-medium">Críticos</div>
-            <div className="text-3xl font-bold text-red-800">{dadosProdutosPrejudiciais.produtos_criticos}</div>
+            <div className="text-3xl font-bold text-red-800">
+              {dadosProdutosPrejudiciais.produtos_criticos}
+            </div>
           </div>
 
           <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
             <div className="text-sm text-orange-600 font-medium">Total Prejudiciais</div>
-            <div className="text-3xl font-bold text-orange-800">{dadosProdutosPrejudiciais.total_produtos_prejudiciais}</div>
+            <div className="text-3xl font-bold text-orange-800">
+              {dadosProdutosPrejudiciais.total_produtos_prejudiciais}
+            </div>
           </div>
         </div>
 
@@ -429,16 +477,17 @@ const RelatoriosComissoes = () => {
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="text-xl font-bold">
-                    {produto.nivel_gravidade === 3 && '🚨'} 
-                    {produto.nivel_gravidade === 2 && '⚠️'} 
-                    {produto.nivel_gravidade === 1 && '⚡'} 
-                    {' '}{produto.produto_nome}
+                    {produto.nivel_gravidade === 3 && "🚨"}
+                    {produto.nivel_gravidade === 2 && "⚠️"}
+                    {produto.nivel_gravidade === 1 && "⚡"} {produto.produto_nome}
                   </h3>
                   <p className="text-sm opacity-75">{produto.categoria_nome}</p>
                 </div>
                 <div className="text-right">
                   <div className="text-sm font-medium">Impacto Financeiro</div>
-                  <div className="text-2xl font-bold">{formatarMoeda(produto.impacto_financeiro)}</div>
+                  <div className="text-2xl font-bold">
+                    {formatarMoeda(produto.impacto_financeiro)}
+                  </div>
                 </div>
               </div>
 
@@ -449,7 +498,9 @@ const RelatoriosComissoes = () => {
                 </div>
                 <div>
                   <div className="text-xs font-medium opacity-75">% Margem</div>
-                  <div className="text-lg font-bold">{formatarPercentual(produto.percentual_margem)}</div>
+                  <div className="text-lg font-bold">
+                    {formatarPercentual(produto.percentual_margem)}
+                  </div>
                 </div>
                 <div>
                   <div className="text-xs font-medium opacity-75">Comissão</div>
@@ -457,7 +508,9 @@ const RelatoriosComissoes = () => {
                 </div>
                 <div>
                   <div className="text-xs font-medium opacity-75">% Comissão</div>
-                  <div className="text-lg font-bold">{formatarPercentual(produto.percentual_comissao)}</div>
+                  <div className="text-lg font-bold">
+                    {formatarPercentual(produto.percentual_comissao)}
+                  </div>
                 </div>
               </div>
 
@@ -490,13 +543,17 @@ const RelatoriosComissoes = () => {
           <div className="flex items-start">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                  clipRule="evenodd"
+                />
               </svg>
             </div>
             <div className="ml-3">
               <p className="text-sm text-blue-800">
-                <strong className="font-semibold">Relatório informativo</strong> baseado em volume histórico.
-                Não representa meta, desempenho ou política de incentivo.
+                <strong className="font-semibold">Relatório informativo</strong> baseado em volume
+                histórico. Não representa meta, desempenho ou política de incentivo.
               </p>
             </div>
           </div>
@@ -504,7 +561,9 @@ const RelatoriosComissoes = () => {
 
         {/* Gráfico de Barras */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4">Funcionários por Volume de Comissões (10 maiores)</h3>
+          <h3 className="text-lg font-bold text-gray-800 mb-4">
+            Funcionários por Volume de Comissões (10 maiores)
+          </h3>
           <ResponsiveContainer width="100%" height={400}>
             <BarChart data={dadosRankingFuncionarios.ranking}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -522,20 +581,28 @@ const RelatoriosComissoes = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Posição</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Funcionário</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Comissões</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Quantidade</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Média</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                  Posição
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Funcionário
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Total Comissões
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Quantidade
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Média
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {dadosRankingFuncionarios.ranking.map((item) => (
                 <tr key={item.posicao}>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <span className="text-lg font-semibold text-gray-700">
-                      {item.posicao}º
-                    </span>
+                    <span className="text-lg font-semibold text-gray-700">{item.posicao}º</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {item.funcionario_nome}
@@ -568,13 +635,17 @@ const RelatoriosComissoes = () => {
           <div className="flex items-start">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                  clipRule="evenodd"
+                />
               </svg>
             </div>
             <div className="ml-3">
               <p className="text-sm text-blue-800">
-                <strong className="font-semibold">Relatório informativo</strong> baseado em volume histórico.
-                Não representa meta, desempenho ou política de incentivo.
+                <strong className="font-semibold">Relatório informativo</strong> baseado em volume
+                histórico. Não representa meta, desempenho ou política de incentivo.
               </p>
             </div>
           </div>
@@ -582,7 +653,9 @@ const RelatoriosComissoes = () => {
 
         {/* Gráfico */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4">Produtos por Volume de Comissões (10 maiores)</h3>
+          <h3 className="text-lg font-bold text-gray-800 mb-4">
+            Produtos por Volume de Comissões (10 maiores)
+          </h3>
           <ResponsiveContainer width="100%" height={400}>
             <BarChart data={dadosRankingProdutos.ranking}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -600,12 +673,24 @@ const RelatoriosComissoes = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Posição</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Comissão</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd Vendas</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Venda</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                  Posição
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Produto
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Categoria
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Total Comissão
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Qtd Vendas
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Total Venda
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -648,13 +733,17 @@ const RelatoriosComissoes = () => {
           <div className="flex items-start">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                  clipRule="evenodd"
+                />
               </svg>
             </div>
             <div className="ml-3">
               <p className="text-sm text-blue-800">
-                <strong className="font-semibold">Relatório informativo</strong> baseado em volume histórico.
-                Não representa meta, desempenho ou política de incentivo.
+                <strong className="font-semibold">Relatório informativo</strong> baseado em volume
+                histórico. Não representa meta, desempenho ou política de incentivo.
               </p>
             </div>
           </div>
@@ -662,7 +751,9 @@ const RelatoriosComissoes = () => {
 
         {/* Gráfico de Pizza */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-bold text-gray-800 mb-4">Distribuição de Comissões por Categoria</h3>
+          <h3 className="text-lg font-bold text-gray-800 mb-4">
+            Distribuição de Comissões por Categoria
+          </h3>
           <ResponsiveContainer width="100%" height={400}>
             <PieChart>
               <Pie
@@ -688,12 +779,24 @@ const RelatoriosComissoes = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Posição</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Comissão</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">% do Total</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd Comissões</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total Vendas</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                  Posição
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Categoria
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Total Comissão
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  % do Total
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Qtd Comissões
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Total Vendas
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -740,14 +843,18 @@ const RelatoriosComissoes = () => {
           <div className="flex items-start">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-blue-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                  clipRule="evenodd"
+                />
               </svg>
             </div>
             <div className="ml-3">
               <p className="text-sm text-blue-800">
-                <strong className="font-semibold">Regime de competência:</strong> as comissões são reconhecidas
-                como despesa na data da venda, independentemente do pagamento.
-                Inclui comissões pendentes e pagas.
+                <strong className="font-semibold">Regime de competência:</strong> as comissões são
+                reconhecidas como despesa na data da venda, independentemente do pagamento. Inclui
+                comissões pendentes e pagas.
               </p>
             </div>
           </div>
@@ -761,7 +868,7 @@ const RelatoriosComissoes = () => {
               {formatarMoeda(dadosDRE.total_ano.receita_bruta)}
             </div>
           </div>
-          
+
           <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
             <div className="text-sm text-orange-600 font-medium">Despesa Comissão (Ano)</div>
             <div className="text-2xl font-bold text-orange-800">
@@ -794,9 +901,27 @@ const RelatoriosComissoes = () => {
               <YAxis />
               <Tooltip formatter={(value) => formatarMoeda(value)} />
               <Legend />
-              <Line type="monotone" dataKey="receita_bruta" stroke="#8884d8" name="Receita Bruta" strokeWidth={2} />
-              <Line type="monotone" dataKey="despesa_comissao" stroke="#ff7c7c" name="Despesa Comissão" strokeWidth={2} />
-              <Line type="monotone" dataKey="margem_liquida" stroke="#82ca9d" name="Margem Líquida" strokeWidth={2} />
+              <Line
+                type="monotone"
+                dataKey="receita_bruta"
+                stroke="#8884d8"
+                name="Receita Bruta"
+                strokeWidth={2}
+              />
+              <Line
+                type="monotone"
+                dataKey="despesa_comissao"
+                stroke="#ff7c7c"
+                name="Despesa Comissão"
+                strokeWidth={2}
+              />
+              <Line
+                type="monotone"
+                dataKey="margem_liquida"
+                stroke="#82ca9d"
+                name="Margem Líquida"
+                strokeWidth={2}
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -806,13 +931,27 @@ const RelatoriosComissoes = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mês</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Receita Bruta</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Custo</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Comissão</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Margem Bruta</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Margem Líquida</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">% Comissão</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Mês
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Receita Bruta
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Custo
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Comissão
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Margem Bruta
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Margem Líquida
+                </th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  % Comissão
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -857,11 +996,16 @@ const RelatoriosComissoes = () => {
       {/* Header */}
       <div className="mb-6">
         <button
-          onClick={() => navigate('/comissoes-listagem')}
+          onClick={() => navigate("/comissoes-listagem")}
           className="flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-4"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 19l-7-7 7-7"
+            />
           </svg>
           Voltar para Demonstrativo
         </button>
@@ -885,12 +1029,12 @@ const RelatoriosComissoes = () => {
         </div>
       ) : (
         <>
-          {abaAtiva === 'margem-produto' && renderizarMargemProduto()}
-          {abaAtiva === 'produtos-prejudiciais' && renderizarProdutosPrejudiciais()}
-          {abaAtiva === 'ranking-funcionarios' && renderizarRankingFuncionarios()}
-          {abaAtiva === 'ranking-produtos' && renderizarRankingProdutos()}
-          {abaAtiva === 'ranking-categorias' && renderizarRankingCategorias()}
-          {abaAtiva === 'dre' && renderizarVisaoDRE()}
+          {abaAtiva === "margem-produto" && renderizarMargemProduto()}
+          {abaAtiva === "produtos-prejudiciais" && renderizarProdutosPrejudiciais()}
+          {abaAtiva === "ranking-funcionarios" && renderizarRankingFuncionarios()}
+          {abaAtiva === "ranking-produtos" && renderizarRankingProdutos()}
+          {abaAtiva === "ranking-categorias" && renderizarRankingCategorias()}
+          {abaAtiva === "dre" && renderizarVisaoDRE()}
         </>
       )}
     </div>

@@ -40,9 +40,7 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
       custo_toalha_padrao: String(config.custo_toalha_padrao ?? "0"),
       custo_higienizacao_padrao: String(config.custo_higienizacao_padrao ?? "0"),
       percentual_taxas_padrao: String(config.percentual_taxas_padrao ?? "0"),
-      custo_rateio_operacional_padrao: String(
-        config.custo_rateio_operacional_padrao ?? "0",
-      ),
+      custo_rateio_operacional_padrao: String(config.custo_rateio_operacional_padrao ?? "0"),
       horas_produtivas_mes_padrao: String(config.horas_produtivas_mes_padrao ?? "176"),
       mostrar_calendario_cliente: Boolean(config.mostrar_calendario_cliente),
       whatsapp_agendamento: config.whatsapp_agendamento || "",
@@ -126,13 +124,8 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
         custo_toalha_padrao: toApiDecimal(configForm.custo_toalha_padrao),
         custo_higienizacao_padrao: toApiDecimal(configForm.custo_higienizacao_padrao),
         percentual_taxas_padrao: toApiDecimal(configForm.percentual_taxas_padrao),
-        custo_rateio_operacional_padrao: toApiDecimal(
-          configForm.custo_rateio_operacional_padrao,
-        ),
-        horas_produtivas_mes_padrao: toApiDecimal(
-          configForm.horas_produtivas_mes_padrao,
-          "176",
-        ),
+        custo_rateio_operacional_padrao: toApiDecimal(configForm.custo_rateio_operacional_padrao),
+        horas_produtivas_mes_padrao: toApiDecimal(configForm.horas_produtivas_mes_padrao, "176"),
         mostrar_calendario_cliente: Boolean(configForm.mostrar_calendario_cliente),
         whatsapp_agendamento: configForm.whatsapp_agendamento || null,
       });
@@ -262,24 +255,27 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Agenda no app do cliente
-                  </h3>
+                  <h3 className="text-sm font-semibold text-slate-900">Agenda no app do cliente</h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    O cliente ve horarios livres e ocupados sem nomes de pets e chama a loja pelo WhatsApp.
+                    O cliente ve horarios livres e ocupados sem nomes de pets e chama a loja pelo
+                    WhatsApp.
                   </p>
                 </div>
                 <CheckboxField
                   checked={Boolean(configForm.mostrar_calendario_cliente)}
                   label="Mostrar no app"
-                  labelAccessory={<BanhoTosaHelpTooltip text="Quando ativo, o app mostra horarios livres/ocupados sem revelar nomes dos pets." />}
+                  labelAccessory={
+                    <BanhoTosaHelpTooltip text="Quando ativo, o app mostra horarios livres/ocupados sem revelar nomes dos pets." />
+                  }
                   onChange={(value) => updateConfig("mostrar_calendario_cliente", value)}
                 />
               </div>
               <div className="mt-4">
                 <TextField
                   label="WhatsApp de agendamento"
-                  labelAccessory={tooltip("Numero usado no app para abrir a conversa de agendamento. Pode informar com DDD.")}
+                  labelAccessory={tooltip(
+                    "Numero usado no app para abrir a conversa de agendamento. Pode informar com DDD.",
+                  )}
                   onChange={(value) => updateConfig("whatsapp_agendamento", value)}
                   value={configForm.whatsapp_agendamento}
                 />
@@ -287,18 +283,105 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <TextField label="Inicio" onChange={(value) => updateConfig("horario_inicio", value)} type="time" value={configForm.horario_inicio} />
-              <TextField label="Fim" onChange={(value) => updateConfig("horario_fim", value)} type="time" value={configForm.horario_fim} />
-              <TextField label="Slot agenda (min)" labelAccessory={tooltip("Intervalo usado para montar a grade de horarios e sugerir encaixes.")} onChange={(value) => updateConfig("intervalo_slot_minutos", value)} type="number" value={configForm.intervalo_slot_minutos} />
-              <TextField label="Dias funcionamento" labelAccessory={tooltip("Informe os dias separados por virgula: segunda,terca,quarta...")} onChange={(value) => updateConfig("dias_funcionamento", value)} value={configForm.dias_funcionamento} />
-              <TextField label="Custo litro agua" labelAccessory={tooltip("Valor medio da agua e esgoto dividido por litro.")} onChange={(value) => updateConfig("custo_litro_agua", value)} type="number" value={configForm.custo_litro_agua} />
-              <TextField label="Vazao chuveiro L/min" labelAccessory={tooltip("Quantos litros o chuveiro consome por minuto durante o banho.")} onChange={(value) => updateConfig("vazao_chuveiro_litros_min", value)} type="number" value={configForm.vazao_chuveiro_litros_min} />
-              <TextField label="Custo kWh" labelAccessory={tooltip("Valor medio do kWh usado para calcular secador, soprador e equipamentos.")} onChange={(value) => updateConfig("custo_kwh", value)} type="number" value={configForm.custo_kwh} />
-              <TextField label="Toalha por banho" labelAccessory={tooltip("Custo medio de lavanderia, desgaste ou aluguel de toalha por atendimento.")} onChange={(value) => updateConfig("custo_toalha_padrao", value)} type="number" value={configForm.custo_toalha_padrao} />
-              <TextField label="Higienizacao por banho" labelAccessory={tooltip("Produtos de limpeza, desinfeccao de mesa/banheira e descartaveis.")} onChange={(value) => updateConfig("custo_higienizacao_padrao", value)} type="number" value={configForm.custo_higienizacao_padrao} />
-              <TextField label="% taxas padrao" labelAccessory={tooltip("Percentual medio de cartao, app ou taxa operacional sobre a venda.")} onChange={(value) => updateConfig("percentual_taxas_padrao", value)} type="number" value={configForm.percentual_taxas_padrao} />
-              <TextField label="Rateio operacional" labelAccessory={tooltip("Parcela media de aluguel, recepcao, limpeza e despesas fixas por atendimento.")} onChange={(value) => updateConfig("custo_rateio_operacional_padrao", value)} type="number" value={configForm.custo_rateio_operacional_padrao} />
-              <TextField label="Horas produtivas mes" labelAccessory={tooltip("Horas mensais usadas para ratear salario/custo do funcionario nos atendimentos.")} onChange={(value) => updateConfig("horas_produtivas_mes_padrao", value)} type="number" value={configForm.horas_produtivas_mes_padrao} />
+              <TextField
+                label="Inicio"
+                onChange={(value) => updateConfig("horario_inicio", value)}
+                type="time"
+                value={configForm.horario_inicio}
+              />
+              <TextField
+                label="Fim"
+                onChange={(value) => updateConfig("horario_fim", value)}
+                type="time"
+                value={configForm.horario_fim}
+              />
+              <TextField
+                label="Slot agenda (min)"
+                labelAccessory={tooltip(
+                  "Intervalo usado para montar a grade de horarios e sugerir encaixes.",
+                )}
+                onChange={(value) => updateConfig("intervalo_slot_minutos", value)}
+                type="number"
+                value={configForm.intervalo_slot_minutos}
+              />
+              <TextField
+                label="Dias funcionamento"
+                labelAccessory={tooltip(
+                  "Informe os dias separados por virgula: segunda,terca,quarta...",
+                )}
+                onChange={(value) => updateConfig("dias_funcionamento", value)}
+                value={configForm.dias_funcionamento}
+              />
+              <TextField
+                label="Custo litro agua"
+                labelAccessory={tooltip("Valor medio da agua e esgoto dividido por litro.")}
+                onChange={(value) => updateConfig("custo_litro_agua", value)}
+                type="number"
+                value={configForm.custo_litro_agua}
+              />
+              <TextField
+                label="Vazao chuveiro L/min"
+                labelAccessory={tooltip(
+                  "Quantos litros o chuveiro consome por minuto durante o banho.",
+                )}
+                onChange={(value) => updateConfig("vazao_chuveiro_litros_min", value)}
+                type="number"
+                value={configForm.vazao_chuveiro_litros_min}
+              />
+              <TextField
+                label="Custo kWh"
+                labelAccessory={tooltip(
+                  "Valor medio do kWh usado para calcular secador, soprador e equipamentos.",
+                )}
+                onChange={(value) => updateConfig("custo_kwh", value)}
+                type="number"
+                value={configForm.custo_kwh}
+              />
+              <TextField
+                label="Toalha por banho"
+                labelAccessory={tooltip(
+                  "Custo medio de lavanderia, desgaste ou aluguel de toalha por atendimento.",
+                )}
+                onChange={(value) => updateConfig("custo_toalha_padrao", value)}
+                type="number"
+                value={configForm.custo_toalha_padrao}
+              />
+              <TextField
+                label="Higienizacao por banho"
+                labelAccessory={tooltip(
+                  "Produtos de limpeza, desinfeccao de mesa/banheira e descartaveis.",
+                )}
+                onChange={(value) => updateConfig("custo_higienizacao_padrao", value)}
+                type="number"
+                value={configForm.custo_higienizacao_padrao}
+              />
+              <TextField
+                label="% taxas padrao"
+                labelAccessory={tooltip(
+                  "Percentual medio de cartao, app ou taxa operacional sobre a venda.",
+                )}
+                onChange={(value) => updateConfig("percentual_taxas_padrao", value)}
+                type="number"
+                value={configForm.percentual_taxas_padrao}
+              />
+              <TextField
+                label="Rateio operacional"
+                labelAccessory={tooltip(
+                  "Parcela media de aluguel, recepcao, limpeza e despesas fixas por atendimento.",
+                )}
+                onChange={(value) => updateConfig("custo_rateio_operacional_padrao", value)}
+                type="number"
+                value={configForm.custo_rateio_operacional_padrao}
+              />
+              <TextField
+                label="Horas produtivas mes"
+                labelAccessory={tooltip(
+                  "Horas mensais usadas para ratear salario/custo do funcionario nos atendimentos.",
+                )}
+                onChange={(value) => updateConfig("horas_produtivas_mes_padrao", value)}
+                type="number"
+                value={configForm.horas_produtivas_mes_padrao}
+              />
             </div>
 
             <div className="flex flex-wrap justify-end gap-2">

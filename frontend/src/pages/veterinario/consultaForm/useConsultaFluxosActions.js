@@ -6,10 +6,7 @@ import {
   criarNovoExameFormInicial,
 } from "./consultaFormState";
 import { parseNumero } from "./consultaFormUtils";
-import {
-  buildAgendarRetornoConsultaLink,
-  buildInternacaoConsultaLink,
-} from "./consultaFluxoLinks";
+import { buildAgendarRetornoConsultaLink, buildInternacaoConsultaLink } from "./consultaFluxoLinks";
 
 export default function useConsultaFluxosActions({
   agendamentoIdQuery,
@@ -122,12 +119,14 @@ export default function useConsultaFluxosActions({
     setSalvandoNovoExame(true);
     setErro(null);
     try {
-      const res = await vetApi.criarExame(buildNovoExamePayload({
-        form,
-        novoExameForm,
-        consultaIdAtual,
-        agendamentoIdQuery,
-      }));
+      const res = await vetApi.criarExame(
+        buildNovoExamePayload({
+          form,
+          novoExameForm,
+          consultaIdAtual,
+          agendamentoIdQuery,
+        }),
+      );
 
       if (novoExameArquivo) {
         await vetApi.uploadArquivoExame(res.data.id, novoExameArquivo);
@@ -178,14 +177,16 @@ export default function useConsultaFluxosActions({
     setSalvandoInsumoRapido(true);
     setErro(null);
     try {
-      await vetApi.adicionarProcedimento(buildInsumoProcedimentoPayload({
-        consultaIdAtual,
-        insumoRapidoSelecionado,
-        insumoRapidoForm,
-        quantidadeUtilizada,
-        quantidadeDesperdicio,
-        quantidadeConsumida,
-      }));
+      await vetApi.adicionarProcedimento(
+        buildInsumoProcedimentoPayload({
+          consultaIdAtual,
+          insumoRapidoSelecionado,
+          insumoRapidoForm,
+          quantidadeUtilizada,
+          quantidadeDesperdicio,
+          quantidadeConsumida,
+        }),
+      );
 
       setModalInsumoAberto(false);
       setInsumoRapidoSelecionado(null);

@@ -60,9 +60,7 @@ export default function LancamentoTransferenciaParceiro({
             {parceiroSelecionado ? (
               <div className="flex items-start justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4">
                 <div>
-                  <p className="text-sm font-semibold text-blue-900">
-                    {parceiroSelecionado.nome}
-                  </p>
+                  <p className="text-sm font-semibold text-blue-900">{parceiroSelecionado.nome}</p>
                   <p className="mt-1 text-xs text-blue-800">
                     Codigo: {parceiroSelecionado.codigo || "-"}
                     {parceiroSelecionado.celular
@@ -74,9 +72,7 @@ export default function LancamentoTransferenciaParceiro({
                     {parceiroSelecionado.parceiro_ativo ? " | Parceiro ativo" : ""}
                   </p>
                   {parceiroSelecionado.email ? (
-                    <p className="mt-1 text-xs text-blue-800">
-                      {parceiroSelecionado.email}
-                    </p>
+                    <p className="mt-1 text-xs text-blue-800">{parceiroSelecionado.email}</p>
                   ) : null}
                 </div>
                 <button
@@ -101,9 +97,7 @@ export default function LancamentoTransferenciaParceiro({
                 {dropdownParceiroAberto && (
                   <div className="absolute z-20 mt-2 w-full rounded-2xl border border-gray-200 bg-white p-2 shadow-xl">
                     {loadingParceiros ? (
-                      <p className="px-3 py-3 text-sm text-gray-500">
-                        Buscando pessoas...
-                      </p>
+                      <p className="px-3 py-3 text-sm text-gray-500">Buscando pessoas...</p>
                     ) : sugestoesParceiros.length > 0 ? (
                       sugestoesParceiros.map((parceiro) => (
                         <button
@@ -164,9 +158,7 @@ export default function LancamentoTransferenciaParceiro({
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Observacao
-            </label>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Observacao</label>
             <textarea
               value={form.observacao}
               onChange={(event) => atualizarCampo("observacao", event.target.value)}
@@ -182,15 +174,12 @@ export default function LancamentoTransferenciaParceiro({
         <div>
           <h2 className="text-lg font-semibold text-gray-900">2. Produtos</h2>
           <p className="mt-1 text-sm text-gray-600">
-            Pesquise por nome, SKU, codigo ou codigo de barras e monte a
-            transferencia.
+            Pesquise por nome, SKU, codigo ou codigo de barras e monte a transferencia.
           </p>
         </div>
 
         <div ref={produtoRef} className="relative mt-5">
-          <label className="mb-2 block text-sm font-medium text-gray-700">
-            Buscar produto
-          </label>
+          <label className="mb-2 block text-sm font-medium text-gray-700">Buscar produto</label>
           <input
             ref={produtoInputRef}
             type="text"
@@ -210,9 +199,7 @@ export default function LancamentoTransferenciaParceiro({
           {dropdownProdutoAberto && (
             <div className="absolute z-20 mt-2 w-full rounded-2xl border border-gray-200 bg-white p-2 shadow-xl">
               {loadingProdutos ? (
-                <p className="px-3 py-3 text-sm text-gray-500">
-                  Buscando produtos...
-                </p>
+                <p className="px-3 py-3 text-sm text-gray-500">Buscando produtos...</p>
               ) : sugestoesProdutos.length > 0 ? (
                 sugestoesProdutos.map((produto) => (
                   <button
@@ -221,9 +208,7 @@ export default function LancamentoTransferenciaParceiro({
                     onClick={() => adicionarProduto(produto)}
                     className="flex w-full flex-col rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-50"
                   >
-                    <span className="text-sm font-semibold text-gray-900">
-                      {produto.nome}
-                    </span>
+                    <span className="text-sm font-semibold text-gray-900">{produto.nome}</span>
                     <span className="mt-1 text-xs text-gray-500">
                       Codigo: {produto.codigo || "-"}
                       {produto.codigo_barras ? ` | CB: ${produto.codigo_barras}` : ""}
@@ -244,17 +229,15 @@ export default function LancamentoTransferenciaParceiro({
         </div>
 
         <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
-          Depois de selecionar o produto, confira quantidade e valores na lista
-          abaixo. O botao de registrar fica junto da conferencia final.
+          Depois de selecionar o produto, confira quantidade e valores na lista abaixo. O botao de
+          registrar fica junto da conferencia final.
         </div>
       </section>
 
       <section ref={itensRef} className="rounded-3xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              3. Itens da transferencia
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-900">3. Itens da transferencia</h2>
             <p className="mt-1 text-sm text-gray-600">
               Ajuste as quantidades e confira o total de ressarcimento antes de salvar.
             </p>
@@ -311,9 +294,7 @@ export default function LancamentoTransferenciaParceiro({
 
         {itens.length === 0 ? (
           <div className="px-6 py-12 text-center">
-            <p className="text-base font-semibold text-gray-900">
-              Nenhum item adicionado ainda
-            </p>
+            <p className="text-base font-semibold text-gray-900">Nenhum item adicionado ainda</p>
             <p className="mt-2 text-sm text-gray-500">
               Use a busca acima para incluir os produtos que sairao para a pessoa responsavel.
             </p>
@@ -337,9 +318,7 @@ export default function LancamentoTransferenciaParceiro({
                   return (
                     <tr key={item.uid} className="align-top">
                       <td className="px-6 py-4">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {item.produto_nome}
-                        </p>
+                        <p className="text-sm font-semibold text-gray-900">{item.produto_nome}</p>
                         <p className="mt-1 text-xs text-gray-500">
                           Codigo: {item.codigo || "-"}
                           {item.codigo_barras ? ` | CB: ${item.codigo_barras}` : ""}
@@ -354,9 +333,7 @@ export default function LancamentoTransferenciaParceiro({
                           min="0"
                           step="0.01"
                           value={item.custo_unitario ?? ""}
-                          onChange={(event) =>
-                            atualizarCustoUnitario(item.uid, event.target.value)
-                          }
+                          onChange={(event) => atualizarCustoUnitario(item.uid, event.target.value)}
                           className={`w-28 rounded-xl border px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 ${
                             semValor ? "border-amber-300 bg-amber-50" : "border-gray-300"
                           }`}
@@ -378,9 +355,7 @@ export default function LancamentoTransferenciaParceiro({
                           min="0"
                           step="0.01"
                           value={item.total_item ?? ""}
-                          onChange={(event) =>
-                            atualizarTotalItem(item.uid, event.target.value)
-                          }
+                          onChange={(event) => atualizarTotalItem(item.uid, event.target.value)}
                           className={`w-32 rounded-xl border px-3 py-2 text-sm font-semibold text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 ${
                             semValor ? "border-amber-300 bg-amber-50" : "border-gray-300"
                           }`}

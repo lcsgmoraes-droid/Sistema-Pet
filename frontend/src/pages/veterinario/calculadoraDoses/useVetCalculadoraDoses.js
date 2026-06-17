@@ -27,11 +27,13 @@ export function useVetCalculadoraDoses() {
   });
 
   useEffect(() => {
-    api.get("/pets", { params: { limit: 500 } })
+    api
+      .get("/pets", { params: { limit: 500 } })
       .then((res) => setPets(res.data?.items ?? res.data ?? []))
       .catch(() => setPets([]));
 
-    vetApi.listarMedicamentos()
+    vetApi
+      .listarMedicamentos()
       .then((res) => setMedicamentos(Array.isArray(res.data) ? res.data : (res.data?.items ?? [])))
       .catch(() => setMedicamentos([]));
   }, []);
@@ -50,7 +52,7 @@ export function useVetCalculadoraDoses() {
     setTutorSelecionado(
       pet?.cliente_id
         ? { id: String(pet.cliente_id), nome: pet.cliente_nome ?? `Pessoa #${pet.cliente_id}` }
-        : null
+        : null,
     );
   }, [petIdQuery, novoPetIdQuery, pets]);
 
@@ -69,18 +71,18 @@ export function useVetCalculadoraDoses() {
   const petsDaPessoa = useMemo(() => {
     if (!form.pessoa_id) return [];
     return pets.filter(
-      (pet) => String(pet.cliente_id) === String(form.pessoa_id) && pet.ativo !== false
+      (pet) => String(pet.cliente_id) === String(form.pessoa_id) && pet.ativo !== false,
     );
   }, [pets, form.pessoa_id]);
 
   const petSelecionado = useMemo(
     () => pets.find((item) => String(item.id) === String(form.pet_id)) ?? null,
-    [pets, form.pet_id]
+    [pets, form.pet_id],
   );
 
   const medicamentoSelecionado = useMemo(
     () => medicamentos.find((item) => String(item.id) === String(form.medicamento_id)) ?? null,
-    [medicamentos, form.medicamento_id]
+    [medicamentos, form.medicamento_id],
   );
 
   useEffect(() => {
@@ -95,7 +97,7 @@ export function useVetCalculadoraDoses() {
 
   const retornoNovoPet = useMemo(
     () => buildReturnTo(location.pathname, location.search),
-    [location.pathname, location.search]
+    [location.pathname, location.search],
   );
 
   const setCampo = (campo, valor) => setForm((prev) => ({ ...prev, [campo]: valor }));

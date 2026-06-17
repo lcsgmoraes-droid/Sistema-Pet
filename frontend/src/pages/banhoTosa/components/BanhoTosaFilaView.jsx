@@ -59,7 +59,8 @@ export default function BanhoTosaFilaView({ config, onChanged }) {
 
   const fluxo = useMemo(() => normalizarFluxo(fluxoLocal), [fluxoLocal]);
   const visiveis = useMemo(
-    () => atendimentos.filter((item) => !["entregue", "cancelado", "no_show"].includes(item.status)),
+    () =>
+      atendimentos.filter((item) => !["entregue", "cancelado", "no_show"].includes(item.status)),
     [atendimentos],
   );
 
@@ -92,7 +93,12 @@ export default function BanhoTosaFilaView({ config, onChanged }) {
   }
 
   function reordenarFluxo(origem, destino) {
-    if (!podeArrastarEtapa(origem, fluxoLocal.length) || !podeArrastarEtapa(destino, fluxoLocal.length) || origem === destino) return;
+    if (
+      !podeArrastarEtapa(origem, fluxoLocal.length) ||
+      !podeArrastarEtapa(destino, fluxoLocal.length) ||
+      origem === destino
+    )
+      return;
     const novoFluxo = [...fluxo];
     const [etapa] = novoFluxo.splice(origem, 1);
     novoFluxo.splice(destino, 0, etapa);
@@ -211,14 +217,7 @@ export default function BanhoTosaFilaView({ config, onChanged }) {
   );
 }
 
-function FluxoDraggable({
-  draggedIndex,
-  fluxo,
-  saving,
-  onDragEnd,
-  onDragStart,
-  onDrop,
-}) {
+function FluxoDraggable({ draggedIndex, fluxo, saving, onDragEnd, onDragStart, onDrop }) {
   return (
     <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -253,7 +252,9 @@ function FluxoDraggable({
               ].join(" ")}
             >
               {draggable && <GripVertical size={14} aria-hidden="true" />}
-              <span>{index + 1}. {labelEtapa(etapa)}</span>
+              <span>
+                {index + 1}. {labelEtapa(etapa)}
+              </span>
             </button>
           );
         })}
@@ -262,18 +263,13 @@ function FluxoDraggable({
   );
 }
 
-function AtendimentoCard({
-  atendimento,
-  fluxo,
-  processing,
-  onDragEnd,
-  onDragStart,
-  onMover,
-}) {
+function AtendimentoCard({ atendimento, fluxo, processing, onDragEnd, onDragStart, onMover }) {
   const [openSelector, setOpenSelector] = useState(false);
   const atual = etapaAtual(atendimento);
   const proxima = proximaEtapa(atendimento, fluxo);
-  const etapasDestino = [...fluxo, "entregue"].filter((etapa, index, lista) => lista.indexOf(etapa) === index);
+  const etapasDestino = [...fluxo, "entregue"].filter(
+    (etapa, index, lista) => lista.indexOf(etapa) === index,
+  );
 
   return (
     <article
@@ -381,7 +377,9 @@ function AtendimentoCard({
 function normalizarFluxo(valor) {
   const etapas = [];
   (Array.isArray(valor) && valor.length ? valor : DEFAULT_FLUXO).forEach((etapa) => {
-    const codigo = String(etapa || "").trim().toLowerCase();
+    const codigo = String(etapa || "")
+      .trim()
+      .toLowerCase();
     if (ETAPA_LABELS[codigo] && !etapas.includes(codigo)) {
       etapas.push(codigo);
     }
@@ -401,7 +399,9 @@ function labelEtapa(etapa) {
 function etapaAtual(atendimento) {
   const aberta = etapaAberta(atendimento);
   if (aberta?.tipo) return aberta.tipo;
-  return atendimento.etapa_atual_codigo || ETAPA_POR_STATUS[atendimento.status] || atendimento.status;
+  return (
+    atendimento.etapa_atual_codigo || ETAPA_POR_STATUS[atendimento.status] || atendimento.status
+  );
 }
 
 function etapaAberta(atendimento) {

@@ -2,10 +2,7 @@ import { useEffect, useState } from "react";
 
 import { vetApi } from "../vetApi";
 
-export default function useConsultaAssinatura({
-  modoSomenteLeitura,
-  consultaIdAtual,
-}) {
+export default function useConsultaAssinatura({ modoSomenteLeitura, consultaIdAtual }) {
   const [assinatura, setAssinatura] = useState(null);
 
   useEffect(() => {

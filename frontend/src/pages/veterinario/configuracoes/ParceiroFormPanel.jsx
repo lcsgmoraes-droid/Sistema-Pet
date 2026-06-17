@@ -16,7 +16,8 @@ export default function ParceiroFormPanel({
           </label>
           {tenantsVet.length === 0 ? (
             <p className="text-sm text-gray-500 italic">
-              Nenhum tenant veterinario cadastrado no sistema. O veterinario precisa ter uma conta propria no sistema.
+              Nenhum tenant veterinario cadastrado no sistema. O veterinario precisa ter uma conta
+              propria no sistema.
             </p>
           ) : (
             <select
@@ -35,9 +36,7 @@ export default function ParceiroFormPanel({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tipo de relacao
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de relacao</label>
           <select
             value={form.tipoRelacao}
             onChange={(event) => onChangeForm({ tipoRelacao: event.target.value })}

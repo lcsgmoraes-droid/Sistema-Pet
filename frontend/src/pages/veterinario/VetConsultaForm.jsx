@@ -73,7 +73,9 @@ export default function VetConsultaForm() {
             consultaId: consulta.consultaIdAtual,
             petId: consulta.form.pet_id ? Number(consulta.form.pet_id) : null,
             clienteId: consulta.tutorSelecionado?.id ?? null,
-            veterinarioId: consulta.form.veterinario_id ? Number(consulta.form.veterinario_id) : null,
+            veterinarioId: consulta.form.veterinario_id
+              ? Number(consulta.form.veterinario_id)
+              : null,
           }}
           procedimentosCatalogo={consulta.procedimentosCatalogo}
           modoSomenteLeitura={consulta.modoSomenteLeitura}

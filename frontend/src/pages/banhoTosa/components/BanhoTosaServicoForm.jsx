@@ -65,13 +65,17 @@ export default function BanhoTosaServicoForm({
         <div className="grid gap-4 lg:grid-cols-2">
           <TextField
             label="Nome"
-            labelAccessory={<BanhoTosaHelpTooltip text="Nome que aparece na agenda, na fila e no fechamento para o PDV." />}
+            labelAccessory={
+              <BanhoTosaHelpTooltip text="Nome que aparece na agenda, na fila e no fechamento para o PDV." />
+            }
             onChange={(value) => onChangeField("nome", value)}
             value={form.nome}
           />
           <SelectField
             label="Categoria"
-            labelAccessory={<BanhoTosaHelpTooltip text="Agrupa servicos para relatorios e filtros: banho, tosa, combo, higiene ou outro." />}
+            labelAccessory={
+              <BanhoTosaHelpTooltip text="Agrupa servicos para relatorios e filtros: banho, tosa, combo, higiene ou outro." />
+            }
             onChange={(value) => onChangeField("categoria", value)}
             value={form.categoria}
           >
@@ -86,14 +90,18 @@ export default function BanhoTosaServicoForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
             label="Duracao padrao (min)"
-            labelAccessory={<BanhoTosaHelpTooltip text="Tempo usado para prever fim do agendamento e ocupacao da equipe." />}
+            labelAccessory={
+              <BanhoTosaHelpTooltip text="Tempo usado para prever fim do agendamento e ocupacao da equipe." />
+            }
             onChange={(value) => onChangeField("duracao_padrao_minutos", value)}
             type="number"
             value={form.duracao_padrao_minutos}
           />
           <TextField
             label="Preco base"
-            labelAccessory={<BanhoTosaHelpTooltip text="Valor sugerido no agendamento e no fechamento. Pode ser alterado na venda final." />}
+            labelAccessory={
+              <BanhoTosaHelpTooltip text="Valor sugerido no agendamento e no fechamento. Pode ser alterado na venda final." />
+            }
             onChange={(value) => onChangeField("preco_base", value)}
             type="number"
             value={form.preco_base}
@@ -102,7 +110,9 @@ export default function BanhoTosaServicoForm({
 
         <TextField
           label="Descricao"
-          labelAccessory={<BanhoTosaHelpTooltip text="Explique o que esta incluso para padronizar a venda e o atendimento." />}
+          labelAccessory={
+            <BanhoTosaHelpTooltip text="Explique o que esta incluso para padronizar a venda e o atendimento." />
+          }
           onChange={(value) => onChangeField("descricao", value)}
           value={form.descricao}
         />
@@ -111,31 +121,41 @@ export default function BanhoTosaServicoForm({
           <CheckboxField
             checked={form.requer_banho}
             label="Requer banho"
-            labelAccessory={<BanhoTosaHelpTooltip text="Marca se o servico consome agua, shampoo e etapa de banho." />}
+            labelAccessory={
+              <BanhoTosaHelpTooltip text="Marca se o servico consome agua, shampoo e etapa de banho." />
+            }
             onChange={(value) => onChangeField("requer_banho", value)}
           />
           <CheckboxField
             checked={form.requer_tosa}
             label="Requer tosa"
-            labelAccessory={<BanhoTosaHelpTooltip text="Marca se precisa de tosador, mesa ou etapa de tosa." />}
+            labelAccessory={
+              <BanhoTosaHelpTooltip text="Marca se precisa de tosador, mesa ou etapa de tosa." />
+            }
             onChange={(value) => onChangeField("requer_tosa", value)}
           />
           <CheckboxField
             checked={form.requer_secagem}
             label="Requer secagem"
-            labelAccessory={<BanhoTosaHelpTooltip text="Marca se deve considerar secador/soprador no tempo e energia." />}
+            labelAccessory={
+              <BanhoTosaHelpTooltip text="Marca se deve considerar secador/soprador no tempo e energia." />
+            }
             onChange={(value) => onChangeField("requer_secagem", value)}
           />
           <CheckboxField
             checked={form.permite_pacote}
             label="Permite pacote"
-            labelAccessory={<BanhoTosaHelpTooltip text="Permite vender creditos recorrentes desse servico." />}
+            labelAccessory={
+              <BanhoTosaHelpTooltip text="Permite vender creditos recorrentes desse servico." />
+            }
             onChange={(value) => onChangeField("permite_pacote", value)}
           />
           <CheckboxField
             checked={form.ativo}
             label="Ativo"
-            labelAccessory={<BanhoTosaHelpTooltip text="Servicos inativos ficam fora da operacao, mas preservam historico." />}
+            labelAccessory={
+              <BanhoTosaHelpTooltip text="Servicos inativos ficam fora da operacao, mas preservam historico." />
+            }
             onChange={(value) => onChangeField("ativo", value)}
           />
         </div>

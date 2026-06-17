@@ -1,45 +1,53 @@
-import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { PawPrint } from 'lucide-react';
-import { FiAlertCircle, FiBriefcase, FiEye, FiEyeOff, FiLock, FiMail, FiUser } from 'react-icons/fi';
-import { useAuth } from '../contexts/AuthContext';
+import { useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { PawPrint } from "lucide-react";
+import {
+  FiAlertCircle,
+  FiBriefcase,
+  FiEye,
+  FiEyeOff,
+  FiLock,
+  FiMail,
+  FiUser,
+} from "react-icons/fi";
+import { useAuth } from "../contexts/AuthContext";
 
 const Register = () => {
-  const [nome, setNome] = useState('');
-  const [nomeLoja, setNomeLoja] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [organizationType, setOrganizationType] = useState('petshop');
+  const [nome, setNome] = useState("");
+  const [nomeLoja, setNomeLoja] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [organizationType, setOrganizationType] = useState("petshop");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const requestedPlan = (searchParams.get('plan') || 'basico').trim().toLowerCase();
-  const selectedPlan = requestedPlan === 'basico' ? 'basico' : 'basico';
-  const selectedPlanLabel = selectedPlan === 'basico' ? 'Plano Básico' : 'Plano Básico';
+  const requestedPlan = (searchParams.get("plan") || "basico").trim().toLowerCase();
+  const selectedPlan = requestedPlan === "basico" ? "basico" : "basico";
+  const selectedPlanLabel = selectedPlan === "basico" ? "Plano Básico" : "Plano Básico";
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError('');
+    setError("");
 
     if (password !== confirmPassword) {
-      setError('As senhas nao coincidem');
+      setError("As senhas nao coincidem");
       return;
     }
 
     if (password.length < 8) {
-      setError('A senha deve ter no minimo 8 caracteres');
+      setError("A senha deve ter no minimo 8 caracteres");
       return;
     }
 
     if (!acceptedTerms || !acceptedPrivacy) {
-      setError('Aceite os Termos de Uso e a Politica de Privacidade para continuar');
+      setError("Aceite os Termos de Uso e a Politica de Privacidade para continuar");
       return;
     }
 
@@ -58,7 +66,7 @@ const Register = () => {
     if (result.success && result.requiresEmailVerification) {
       navigate(`/verificar-email?email=${encodeURIComponent(email)}`);
     } else if (result.success) {
-      navigate('/dashboard');
+      navigate("/dashboard");
     } else {
       setError(result.error);
     }
@@ -74,9 +82,7 @@ const Register = () => {
             <PawPrint className="w-8 h-8 text-purple-600" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Criar empresa</h1>
-          <p className="text-gray-600 mt-2">
-            Comece com 30 dias grátis do Plano Básico
-          </p>
+          <p className="text-gray-600 mt-2">Comece com 30 dias grátis do Plano Básico</p>
         </div>
 
         {error && (
@@ -89,17 +95,22 @@ const Register = () => {
         <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
           <p className="font-semibold">Plano Básico grátis por 30 dias</p>
           <p className="mt-1">
-            Sua empresa será criada no {selectedPlanLabel}. Módulos avançados ficam como Beta
-            ou piloto acompanhado, sem liberação automática no cadastro.
+            Sua empresa será criada no {selectedPlanLabel}. Módulos avançados ficam como Beta ou
+            piloto acompanhado, sem liberação automática no cadastro.
           </p>
-          <Link to="/planos" className="mt-3 inline-flex text-xs font-bold text-emerald-800 underline">
+          <Link
+            to="/planos"
+            className="mt-3 inline-flex text-xs font-bold text-emerald-800 underline"
+          >
             Conferir plano e recursos
           </Link>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="register-nome" className="block text-sm font-medium text-gray-700 mb-2">Seu nome</label>
+            <label htmlFor="register-nome" className="block text-sm font-medium text-gray-700 mb-2">
+              Seu nome
+            </label>
             <div className="relative">
               <FiUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -116,7 +127,12 @@ const Register = () => {
           </div>
 
           <div>
-            <label htmlFor="register-nome-loja" className="block text-sm font-medium text-gray-700 mb-2">Nome da empresa</label>
+            <label
+              htmlFor="register-nome-loja"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Nome da empresa
+            </label>
             <div className="relative">
               <FiBriefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -133,7 +149,12 @@ const Register = () => {
           </div>
 
           <div>
-            <label htmlFor="register-organization-type" className="block text-sm font-medium text-gray-700 mb-2">Tipo de empresa</label>
+            <label
+              htmlFor="register-organization-type"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Tipo de empresa
+            </label>
             <div className="relative">
               <FiBriefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <select
@@ -152,7 +173,12 @@ const Register = () => {
           </div>
 
           <div>
-            <label htmlFor="register-email" className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+            <label
+              htmlFor="register-email"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Email
+            </label>
             <div className="relative">
               <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -170,13 +196,18 @@ const Register = () => {
           </div>
 
           <div>
-            <label htmlFor="register-password" className="block text-sm font-medium text-gray-700 mb-2">Senha</label>
+            <label
+              htmlFor="register-password"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Senha
+            </label>
             <div className="relative">
               <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 id="register-password"
                 name="password"
-                type={showPassword ? 'text' : 'password'}
+                type={showPassword ? "text" : "password"}
                 value={password}
                 autoComplete="new-password"
                 onChange={(event) => setPassword(event.target.value)}
@@ -188,7 +219,7 @@ const Register = () => {
                 type="button"
                 onClick={() => setShowPassword((value) => !value)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
               >
                 {showPassword ? <FiEyeOff /> : <FiEye />}
               </button>
@@ -196,13 +227,18 @@ const Register = () => {
           </div>
 
           <div>
-            <label htmlFor="register-confirm-password" className="block text-sm font-medium text-gray-700 mb-2">Confirmar senha</label>
+            <label
+              htmlFor="register-confirm-password"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Confirmar senha
+            </label>
             <div className="relative">
               <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 id="register-confirm-password"
                 name="confirm_password"
-                type={showConfirmPassword ? 'text' : 'password'}
+                type={showConfirmPassword ? "text" : "password"}
                 value={confirmPassword}
                 autoComplete="new-password"
                 onChange={(event) => setConfirmPassword(event.target.value)}
@@ -214,7 +250,7 @@ const Register = () => {
                 type="button"
                 onClick={() => setShowConfirmPassword((value) => !value)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-                aria-label={showConfirmPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                aria-label={showConfirmPassword ? "Ocultar senha" : "Mostrar senha"}
               >
                 {showConfirmPassword ? <FiEyeOff /> : <FiEye />}
               </button>
@@ -232,7 +268,11 @@ const Register = () => {
                 className="mt-1"
               />
               <span>
-                Li e aceito os <Link to="/termos" className="text-purple-700 font-semibold">Termos de Uso</Link>.
+                Li e aceito os{" "}
+                <Link to="/termos" className="text-purple-700 font-semibold">
+                  Termos de Uso
+                </Link>
+                .
               </span>
             </label>
             <label className="flex gap-3">
@@ -245,7 +285,11 @@ const Register = () => {
                 className="mt-1"
               />
               <span>
-                Li e aceito a <Link to="/privacidade" className="text-purple-700 font-semibold">Politica de Privacidade</Link>.
+                Li e aceito a{" "}
+                <Link to="/privacidade" className="text-purple-700 font-semibold">
+                  Politica de Privacidade
+                </Link>
+                .
               </span>
             </label>
           </div>
@@ -255,13 +299,13 @@ const Register = () => {
             disabled={loading}
             className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Criando conta...' : 'Criar conta'}
+            {loading ? "Criando conta..." : "Criar conta"}
           </button>
         </form>
 
         <div className="mt-6 text-center">
           <p className="text-gray-600">
-            Ja tem uma conta?{' '}
+            Ja tem uma conta?{" "}
             <Link to="/login" className="text-purple-600 hover:text-purple-700 font-semibold">
               Fazer login
             </Link>

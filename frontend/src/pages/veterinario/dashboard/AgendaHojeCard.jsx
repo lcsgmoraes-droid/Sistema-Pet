@@ -11,15 +11,16 @@ export default function AgendaHojeCard({ agendamentos, onAbrirAgenda, onAbrirAge
           <Calendar size={16} />
           Agenda de hoje
         </h2>
-        <button onClick={onAbrirAgenda} className="self-start text-sm text-blue-600 hover:underline sm:self-auto">
+        <button
+          onClick={onAbrirAgenda}
+          className="self-start text-sm text-blue-600 hover:underline sm:self-auto"
+        >
           Ver completa →
         </button>
       </div>
 
       {agendamentos.length === 0 ? (
-        <div className="p-8 text-center text-gray-400 text-sm">
-          Nenhum agendamento para hoje.
-        </div>
+        <div className="p-8 text-center text-gray-400 text-sm">Nenhum agendamento para hoje.</div>
       ) : (
         <div className="divide-y divide-gray-50">
           {agendamentos.slice(0, 10).map((agendamento) => (

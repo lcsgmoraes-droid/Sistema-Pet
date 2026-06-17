@@ -69,7 +69,14 @@ const GRUPOS_CUSTOS_FIXOS = [
   {
     id: "administrativo",
     label: "Escritorio e administrativo",
-    termos: ["escritorio", "administrativo", "contabilidade", "contador", "material de uso interno", "limpeza"],
+    termos: [
+      "escritorio",
+      "administrativo",
+      "contabilidade",
+      "contador",
+      "material de uso interno",
+      "limpeza",
+    ],
   },
   {
     id: "impacto_simulado",
@@ -119,7 +126,8 @@ export const FAIXAS_PORTE_PETSHOP = [
     label: "Grande",
     faixaMensal: "Acima de R$ 250 mil/mes",
     faixaAnual: "Acima de R$ 3 mi/ano",
-    descricao: "Petshop com escala maior, onde o custo fixo ideal tende a pesar menos no faturamento.",
+    descricao:
+      "Petshop com escala maior, onde o custo fixo ideal tende a pesar menos no faturamento.",
     referencias: {
       aluguel: { referenciaPercentual: 10, limiteAtencaoPercentual: 13 },
       folha: { referenciaPercentual: 25, limiteAtencaoPercentual: 32 },
@@ -187,19 +195,23 @@ function montarReferenciasGerenciais(porte) {
 }
 
 function textoItemCusto(item) {
-  return normalizarTexto([
-    item?.descricao,
-    item?.origem_classificacao,
-    item?.tipo_despesa_nome,
-    item?.categoria_nome,
-    item?.dre_subcategoria_nome,
-  ].filter(Boolean).join(" "));
+  return normalizarTexto(
+    [
+      item?.descricao,
+      item?.origem_classificacao,
+      item?.tipo_despesa_nome,
+      item?.categoria_nome,
+      item?.dre_subcategoria_nome,
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
 }
 
 function classificarGrupoCusto(item) {
   const texto = textoItemCusto(item);
   const grupo = GRUPOS_CUSTOS_FIXOS.find((opcao) =>
-    opcao.termos.some((termo) => texto.includes(termo))
+    opcao.termos.some((termo) => texto.includes(termo)),
   );
   return grupo?.id || "outros";
 }
@@ -219,21 +231,19 @@ function criarMapaGrupos() {
 function criarParecer({ id, valor, faturamento, referencia, metaPercentual }) {
   const valorSeguro = Math.max(0, numeroSeguro(valor));
   const faturamentoSeguro = Math.max(0, numeroSeguro(faturamento));
-  const percentualFaturamento = faturamentoSeguro > 0
-    ? (valorSeguro / faturamentoSeguro) * 100
-    : 0;
+  const percentualFaturamento = faturamentoSeguro > 0 ? (valorSeguro / faturamentoSeguro) * 100 : 0;
   const metaSaudavelPercentual = numeroOuPadrao(metaPercentual, referencia.referenciaPercentual);
   const valorMeta = faturamentoSeguro * (metaSaudavelPercentual / 100);
   const diferencaValor = valorSeguro - valorMeta;
   const diferencaPercentual = percentualFaturamento - metaSaudavelPercentual;
-  const limiteAtencao = id === "total_fixo"
-    ? referencia.limiteAtencaoPercentual
-    : referencia.referenciaPercentual;
-  const status = percentualFaturamento <= metaSaudavelPercentual
-    ? "saudavel"
-    : percentualFaturamento <= limiteAtencao
-      ? "atencao"
-      : "acima";
+  const limiteAtencao =
+    id === "total_fixo" ? referencia.limiteAtencaoPercentual : referencia.referenciaPercentual;
+  const status =
+    percentualFaturamento <= metaSaudavelPercentual
+      ? "saudavel"
+      : percentualFaturamento <= limiteAtencao
+        ? "atencao"
+        : "acima";
 
   return {
     id,
@@ -263,7 +273,10 @@ export function calcularImpactoPontoEquilibrio({
   const margemPercentual = numeroSeguro(margemContribuicaoPercentual);
   const margemDecimal = margemPercentual / 100;
   const faturamentoAtual = numeroSeguro(faturamento);
-  const faturamentoDaSimulacao = Math.max(0, numeroOuPadrao(faturamentoProjetado, faturamentoAtual));
+  const faturamentoDaSimulacao = Math.max(
+    0,
+    numeroOuPadrao(faturamentoProjetado, faturamentoAtual),
+  );
   const ticketMedioAtual = numeroSeguro(ticketMedio);
   const impactoInformado = numeroSeguro(impactoCustoFixo);
   const novoCustoFixo = Math.max(0, despesasFixasAtuais + impactoInformado);
@@ -352,9 +365,8 @@ export function montarAnaliseCustosPontoEquilibrio({
     .map((grupo) => ({
       ...grupo,
       valor: arredondarCentavos(grupo.valor),
-      percentualFaturamento: faturamentoSeguro > 0
-        ? arredondarPercentual((grupo.valor / faturamentoSeguro) * 100)
-        : 0,
+      percentualFaturamento:
+        faturamentoSeguro > 0 ? arredondarPercentual((grupo.valor / faturamentoSeguro) * 100) : 0,
     }))
     .filter((grupo) => grupo.valor > 0)
     .sort((a, b) => b.valor - a.valor);
@@ -371,7 +383,10 @@ export function montarAnaliseCustosPontoEquilibrio({
     if (somaReferenciasSetoriais <= 0 || metaTotalPercentual <= 0) {
       return referencias[id]?.referenciaPercentual || 0;
     }
-    return (numeroSeguro(referencias[id]?.referenciaPercentual) / somaReferenciasSetoriais) * metaTotalPercentual;
+    return (
+      (numeroSeguro(referencias[id]?.referenciaPercentual) / somaReferenciasSetoriais) *
+      metaTotalPercentual
+    );
   };
 
   const pareceres = [

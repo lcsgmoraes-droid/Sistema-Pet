@@ -38,7 +38,6 @@ export default function NovoAgendamentoTipoDataSection({
           onChange={(valor) => onChangeCampo("hora", valor)}
         />
       </div>
-
     </>
   );
 }

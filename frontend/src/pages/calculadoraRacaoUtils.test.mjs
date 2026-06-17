@@ -62,10 +62,9 @@ test("prepara e combina produtos com aptidao sem duplicar ids", () => {
   assert.equal(preparados.length, 1);
   assert.equal(preparados[0].aptidao.apta, true);
 
-  const combinados = combinarProdutosComAptidao(
-    preparados,
-    [racaoCompleta({ id: 1, nome: "Special Dog Atualizada" })],
-  );
+  const combinados = combinarProdutosComAptidao(preparados, [
+    racaoCompleta({ id: 1, nome: "Special Dog Atualizada" }),
+  ]);
 
   assert.equal(combinados.length, 1);
   assert.equal(combinados[0].nome, "Special Dog Atualizada");
@@ -81,10 +80,10 @@ test("busca considera todos os termos antes de escolher uma racao", () => {
 
   assert.equal(pontuarBuscaRacao(produtoComCodigoParecido, "special dog carne 15"), 0);
 
-  const escolhida = escolherRacaoAptaPorTexto(
-    "special dog carne 15",
-    [produtoComCodigoParecido, racao],
-  );
+  const escolhida = escolherRacaoAptaPorTexto("special dog carne 15", [
+    produtoComCodigoParecido,
+    racao,
+  ]);
 
   assert.equal(escolhida.id, 10);
 });

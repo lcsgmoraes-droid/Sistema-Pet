@@ -71,9 +71,7 @@ export default function BanhoTosaSugestoesSlots({
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <p className="mb-3 text-sm font-semibold text-slate-900">
-          Compromissos do dia selecionado
-        </p>
+        <p className="mb-3 text-sm font-semibold text-slate-900">Compromissos do dia selecionado</p>
         {loadingAgenda ? (
           <div className="text-sm text-slate-500">Carregando agenda do dia...</div>
         ) : agendamentos.length === 0 ? (
@@ -110,9 +108,7 @@ function HorarioButton({ selected, slot, onSelect }) {
         !selected && ocupado
           ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
           : "",
-        !selected && neutro
-          ? "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"
-          : "",
+        !selected && neutro ? "border-slate-200 bg-white text-slate-500 hover:bg-slate-50" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -125,8 +121,8 @@ function HorarioButton({ selected, slot, onSelect }) {
             ? `Livre + ${slot.ocupados.length} ocup.`
             : "Livre"
           : slot.ocupados.length
-          ? `${slot.ocupados.length} ocupado(s)`
-          : "Sem vaga"}
+            ? `${slot.ocupados.length} ocupado(s)`
+            : "Sem vaga"}
       </div>
     </button>
   );
@@ -149,7 +145,8 @@ function CompromissoCard({ agendamento }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold text-slate-900">
-              {inicio || "--:--"}{fim ? ` - ${fim}` : ""}
+              {inicio || "--:--"}
+              {fim ? ` - ${fim}` : ""}
             </span>
             <StatusBadge status={agendamento.status} />
           </div>
@@ -220,7 +217,10 @@ function montarSlotsModal({ agendamentos, capacidade, form, recursos, sugestoes 
 
 function temCapacidadeLivre(recursos, agendamentos, inicioSlot, fimSlot) {
   return recursos.some((recurso) => {
-    const capacidade = Math.max(Number(recurso.capacidade_simultanea || recurso.capacidade || 1), 1);
+    const capacidade = Math.max(
+      Number(recurso.capacidade_simultanea || recurso.capacidade || 1),
+      1,
+    );
     const ocupacao = agendamentos.filter((agendamento) => {
       if (String(agendamento.recurso_id || "") !== String(recurso.id)) return false;
       return sobrepoeSlot(agendamento, inicioSlot, fimSlot);
@@ -232,7 +232,8 @@ function temCapacidadeLivre(recursos, agendamentos, inicioSlot, fimSlot) {
 function descreverSlot({ livre, ocupados, sugestao }) {
   if (livre && sugestao?.recurso_nome) return `Livre em ${sugestao.recurso_nome}`;
   if (livre) return "Horario livre";
-  if (ocupados.length) return ocupados.map((item) => item.pet_nome || `Pet #${item.pet_id}`).join(", ");
+  if (ocupados.length)
+    return ocupados.map((item) => item.pet_nome || `Pet #${item.pet_id}`).join(", ");
   return "Sem vaga sugerida para este horario";
 }
 

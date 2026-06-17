@@ -27,7 +27,9 @@ export function mapMedicamentoParaForm(item) {
     fabricante: item?.fabricante || "",
     forma_farmaceutica: item?.forma_farmaceutica || "",
     concentracao: item?.concentracao || "",
-    especies_indicadas: Array.isArray(item?.especies_indicadas) ? item.especies_indicadas.join(", ") : "",
+    especies_indicadas: Array.isArray(item?.especies_indicadas)
+      ? item.especies_indicadas.join(", ")
+      : "",
     indicacoes: item?.indicacoes || "",
     posologia_referencia: item?.posologia_referencia || "",
     dose_min_mgkg: item?.dose_min_mgkg ?? "",

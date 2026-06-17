@@ -1,36 +1,36 @@
 /**
  * SPRINT 6 - PASSO 2/5: CONFERÊNCIA DE COMISSÃO POR FUNCIONÁRIO
- * 
+ *
  * Tela de conferência das comissões pendentes de um funcionário específico.
  * Permite visualizar, filtrar e validar antes do fechamento.
- * 
+ *
  * Criado em: 22/01/2026
  */
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import api from '../../api';
-import CustomerIdentity from '../../components/ui/CustomerIdentity';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import api from "../../api";
+import CustomerIdentity from "../../components/ui/CustomerIdentity";
 
 const ComissoesFechamentoFuncionario = () => {
   const { funcionario_id } = useParams();
   const navigate = useNavigate();
-  
+
   // Estados
   const [comissoes, setComissoes] = useState([]);
   const [funcionario, setFuncionario] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState(null);
   const [valorTotal, setValorTotal] = useState(0);
-  
+
   // Estados de filtro
-  const [dataInicio, setDataInicio] = useState('');
-  const [dataFim, setDataFim] = useState('');
-  
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
+
   // Estados de modal e fechamento
   const [mostrarModalFechamento, setMostrarModalFechamento] = useState(false);
-  const [dataPagamento, setDataPagamento] = useState('');
-  const [observacaoFechamento, setObservacaoFechamento] = useState('');
+  const [dataPagamento, setDataPagamento] = useState("");
+  const [observacaoFechamento, setObservacaoFechamento] = useState("");
   const [loadingFechamento, setLoadingFechamento] = useState(false);
   const [erroFechamento, setErroFechamento] = useState(null);
 
@@ -43,28 +43,28 @@ const ComissoesFechamentoFuncionario = () => {
     try {
       setLoading(true);
       setErro(null);
-      
+
       // Construir query params
       const params = new URLSearchParams();
-      if (dataInicio) params.append('data_inicio', dataInicio);
-      if (dataFim) params.append('data_fim', dataFim);
-      
-      const url = `/comissoes/fechamento/${funcionario_id}${params.toString() ? '?' + params.toString() : ''}`;
+      if (dataInicio) params.append("data_inicio", dataInicio);
+      if (dataFim) params.append("data_fim", dataFim);
+
+      const url = `/comissoes/fechamento/${funcionario_id}${params.toString() ? "?" + params.toString() : ""}`;
       const response = await api.get(url);
-      
+
       if (response.data.success) {
         setComissoes(response.data.comissoes || []);
         setFuncionario(response.data.funcionario);
         setValorTotal(response.data.valor_total || 0);
       } else {
-        setErro('Erro ao carregar comissões');
+        setErro("Erro ao carregar comissões");
       }
     } catch (error) {
-      console.error('Erro ao carregar comissões:', error);
+      console.error("Erro ao carregar comissões:", error);
       if (error.response?.status === 404) {
-        setErro('Funcionário não encontrado');
+        setErro("Funcionário não encontrado");
       } else {
-        setErro(error.response?.data?.detail || 'Erro ao carregar comissões');
+        setErro(error.response?.data?.detail || "Erro ao carregar comissões");
       }
     } finally {
       setLoading(false);
@@ -76,20 +76,20 @@ const ComissoesFechamentoFuncionario = () => {
   };
 
   const handleLimparFiltro = () => {
-    setDataInicio('');
-    setDataFim('');
+    setDataInicio("");
+    setDataFim("");
     setTimeout(() => carregarComissoes(), 100);
   };
 
   const handleVoltar = () => {
-    navigate('/comissoes/abertas');
+    navigate("/comissoes/abertas");
   };
 
   const handleAbrirModalFechamento = () => {
     // Inicializar com data de hoje
-    const hoje = new Date().toISOString().split('T')[0];
+    const hoje = new Date().toISOString().split("T")[0];
     setDataPagamento(hoje);
-    setObservacaoFechamento('');
+    setObservacaoFechamento("");
     setErroFechamento(null);
     setMostrarModalFechamento(true);
   };
@@ -107,36 +107,35 @@ const ComissoesFechamentoFuncionario = () => {
       setErroFechamento(null);
 
       // Preparar payload
-      const comissoesIds = comissoes.map(c => c.id);
-      
+      const comissoesIds = comissoes.map((c) => c.id);
+
       const payload = {
         comissoes_ids: comissoesIds,
         data_pagamento: dataPagamento,
-        observacao: observacaoFechamento || null
+        observacao: observacaoFechamento || null,
       };
 
       // Executar fechamento
-      const response = await api.post('/comissoes/fechar', payload);
+      const response = await api.post("/comissoes/fechar", payload);
 
       if (response.data.success) {
         // Sucesso - mostrar alert e redirecionar
         alert(
           `✅ Fechamento realizado com sucesso!\n\n` +
-          `Comissões processadas: ${response.data.total_processadas}\n` +
-          `Valor total: ${formatarMoeda(response.data.valor_total_fechamento)}\n` +
-          `Data do pagamento: ${formatarData(dataPagamento)}`
+            `Comissões processadas: ${response.data.total_processadas}\n` +
+            `Valor total: ${formatarMoeda(response.data.valor_total_fechamento)}\n` +
+            `Data do pagamento: ${formatarData(dataPagamento)}`,
         );
-        
+
         // Redirecionar para lista de comissões abertas
-        navigate('/comissoes/abertas');
+        navigate("/comissoes/abertas");
       } else {
-        setErroFechamento('Erro ao processar fechamento');
+        setErroFechamento("Erro ao processar fechamento");
       }
     } catch (error) {
-      console.error('Erro ao fechar comissões:', error);
+      console.error("Erro ao fechar comissões:", error);
       setErroFechamento(
-        error.response?.data?.detail || 
-        'Erro ao fechar comissões. Tente novamente.'
+        error.response?.data?.detail || "Erro ao fechar comissões. Tente novamente.",
       );
     } finally {
       setLoadingFechamento(false);
@@ -144,20 +143,20 @@ const ComissoesFechamentoFuncionario = () => {
   };
 
   const handleAbrirVenda = (vendaId) => {
-    window.open(`/pdv?venda_id=${vendaId}`, '_blank');
+    window.open(`/pdv?venda_id=${vendaId}`, "_blank");
   };
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(valor);
   };
 
   const formatarData = (data) => {
-    if (!data) return '-';
-    const dataObj = new Date(data + 'T00:00:00');
-    return dataObj.toLocaleDateString('pt-BR');
+    if (!data) return "-";
+    const dataObj = new Date(data + "T00:00:00");
+    return dataObj.toLocaleDateString("pt-BR");
   };
 
   // Loading
@@ -180,8 +179,18 @@ const ComissoesFechamentoFuncionario = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
           <div className="flex items-center">
-            <svg className="h-6 w-6 text-red-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="h-6 w-6 text-red-500 mr-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             <div>
               <h3 className="text-red-800 font-medium">Erro ao carregar dados</h3>
@@ -215,11 +224,10 @@ const ComissoesFechamentoFuncionario = () => {
         <div className="mb-6 border-b border-gray-200 pb-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-800">
-                Conferência de Comissões
-              </h1>
+              <h1 className="text-3xl font-bold text-gray-800">Conferência de Comissões</h1>
               <p className="text-gray-600 mt-1">
-                Funcionário: <span className="font-semibold text-gray-800">{funcionario?.nome}</span>
+                Funcionário:{" "}
+                <span className="font-semibold text-gray-800">{funcionario?.nome}</span>
               </p>
             </div>
             <button
@@ -227,7 +235,12 @@ const ComissoesFechamentoFuncionario = () => {
               className="flex items-center px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
             >
               <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                />
               </svg>
               Voltar
             </button>
@@ -239,9 +252,7 @@ const ComissoesFechamentoFuncionario = () => {
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Filtros</h3>
           <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Data Início
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Data Início</label>
               <input
                 type="date"
                 value={dataInicio}
@@ -250,9 +261,7 @@ const ComissoesFechamentoFuncionario = () => {
               />
             </div>
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Data Fim
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Data Fim</label>
               <input
                 type="date"
                 value={dataFim}
@@ -294,8 +303,18 @@ const ComissoesFechamentoFuncionario = () => {
         {/* Lista vazia */}
         {comissoes.length === 0 ? (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
-            <svg className="h-16 w-16 text-yellow-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="h-16 w-16 text-yellow-500 mx-auto mb-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             <h3 className="text-xl font-semibold text-yellow-800 mb-2">
               Nenhuma comissão encontrada
@@ -386,7 +405,8 @@ const ComissoesFechamentoFuncionario = () => {
             <div className="border-t-2 border-gray-300 pt-4 mt-6">
               <div className="flex justify-between items-center">
                 <div className="text-lg font-semibold text-gray-700">
-                  Total Geral: <span className="text-2xl text-green-600">{formatarMoeda(valorTotal)}</span>
+                  Total Geral:{" "}
+                  <span className="text-2xl text-green-600">{formatarMoeda(valorTotal)}</span>
                 </div>
                 <button
                   onClick={handleAbrirModalFechamento}
@@ -413,24 +433,37 @@ const ComissoesFechamentoFuncionario = () => {
                 className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
               >
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
-            
+
             {/* Aviso */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
               <div className="flex items-start">
-                <svg className="h-5 w-5 text-blue-600 mt-0.5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg
+                  className="h-5 w-5 text-blue-600 mt-0.5 mr-2"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
                 </svg>
                 <div>
                   <p className="text-sm text-blue-800 font-medium">
                     Você está prestes a fechar {comissoes.length} comissão(ões)
                   </p>
-                  <p className="text-sm text-blue-700 mt-1">
-                    Total: {formatarMoeda(valorTotal)}
-                  </p>
+                  <p className="text-sm text-blue-700 mt-1">Total: {formatarMoeda(valorTotal)}</p>
                 </div>
               </div>
             </div>
@@ -496,8 +529,18 @@ const ComissoesFechamentoFuncionario = () => {
                   </>
                 ) : (
                   <>
-                    <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <svg
+                      className="h-5 w-5 mr-2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                     Confirmar Fechamento
                   </>

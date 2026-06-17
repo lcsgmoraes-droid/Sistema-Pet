@@ -35,7 +35,9 @@ export default function ConfiguracaoEstoque() {
         setDiasAlertaValidade(res.data.dias_alerta_validade || 15);
         setBloquearValidadePdv(res.data.bloquear_validade_pdv ?? true);
         setBloquearValidadeEcommerce(res.data.bloquear_validade_ecommerce ?? true);
-        setBloquearValidadeIntegracoesOnline(Boolean(res.data.bloquear_validade_integracoes_online));
+        setBloquearValidadeIntegracoesOnline(
+          Boolean(res.data.bloquear_validade_integracoes_online),
+        );
       } catch (e) {
         console.error("Erro ao carregar configurações de estoque", e);
         toast.error("Erro ao carregar configurações");
@@ -55,7 +57,7 @@ export default function ConfiguracaoEstoque() {
         dias_alerta_validade: Number(diasAlertaValidade) || 15,
         bloquear_validade_pdv: bloquearValidadePdv,
         bloquear_validade_ecommerce: bloquearValidadeEcommerce,
-        bloquear_validade_integracoes_online: bloquearValidadeIntegracoesOnline
+        bloquear_validade_integracoes_online: bloquearValidadeIntegracoesOnline,
       });
       toast.success("Configurações de estoque atualizadas com sucesso!");
     } catch (e) {
@@ -97,16 +99,15 @@ export default function ConfiguracaoEstoque() {
       {/* Card de Configuração */}
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">
-            Controle de Estoque Negativo
-          </h2>
-          
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">Controle de Estoque Negativo</h2>
+
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
             <div className="flex items-start">
               <FiAlertTriangle className="text-yellow-600 mt-1 mr-3 flex-shrink-0" />
               <div>
                 <p className="text-sm text-gray-700">
-                  <strong>Atenção:</strong> Esta configuração afeta diretamente o controle de vendas e estoque.
+                  <strong>Atenção:</strong> Esta configuração afeta diretamente o controle de vendas
+                  e estoque.
                 </p>
               </div>
             </div>
@@ -126,8 +127,8 @@ export default function ConfiguracaoEstoque() {
                   🔒 Bloquear vendas sem estoque (Recomendado)
                 </div>
                 <div className="text-sm text-gray-600 mt-1">
-                  O sistema impedirá finalizar vendas quando não houver estoque suficiente. 
-                  Ideal para controle rigoroso de estoque.
+                  O sistema impedirá finalizar vendas quando não houver estoque suficiente. Ideal
+                  para controle rigoroso de estoque.
                 </div>
               </div>
             </label>
@@ -141,12 +142,10 @@ export default function ConfiguracaoEstoque() {
                 className="mt-1 mr-3 text-blue-600 focus:ring-blue-500"
               />
               <div className="flex-1">
-                <div className="font-semibold text-gray-900">
-                  ✅ Permitir estoque negativo
-                </div>
+                <div className="font-semibold text-gray-900">✅ Permitir estoque negativo</div>
                 <div className="text-sm text-gray-600 mt-1">
-                  O sistema permitirá vendas mesmo sem estoque disponível. 
-                  Útil para negócios que trabalham com encomendas ou reposição rápida.
+                  O sistema permitirá vendas mesmo sem estoque disponível. Útil para negócios que
+                  trabalham com encomendas ou reposição rápida.
                 </div>
                 <div className="text-xs text-red-600 mt-2 font-medium">
                   ⚠️ Use com cuidado: pode gerar descontinuidade no controle de estoque
@@ -163,11 +162,10 @@ export default function ConfiguracaoEstoque() {
               <FiShield />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-800">
-                Protecao por validade
-              </h2>
+              <h2 className="text-xl font-semibold text-gray-800">Protecao por validade</h2>
               <p className="text-sm text-gray-600 mt-1">
-                Remove do saldo vendavel os lotes proximos do vencimento e cria pendencias para decisao.
+                Remove do saldo vendavel os lotes proximos do vencimento e cria pendencias para
+                decisao.
               </p>
             </div>
           </div>
@@ -181,20 +179,17 @@ export default function ConfiguracaoEstoque() {
                 className="mt-1 mr-3 text-blue-600 focus:ring-blue-500"
               />
               <div className="flex-1">
-                <div className="font-semibold text-gray-900">
-                  Ativar protecao automatica
-                </div>
+                <div className="font-semibold text-gray-900">Ativar protecao automatica</div>
                 <div className="text-sm text-gray-600 mt-1">
-                  Produtos em risco saem do estoque vendavel ate serem descartados, trocados ou retornados.
+                  Produtos em risco saem do estoque vendavel ate serem descartados, trocados ou
+                  retornados.
                 </div>
               </div>
             </label>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <label className="block">
-                <span className="text-sm font-medium text-gray-700">
-                  Dias antes do vencimento
-                </span>
+                <span className="text-sm font-medium text-gray-700">Dias antes do vencimento</span>
                 <input
                   type="number"
                   min="1"
@@ -270,16 +265,16 @@ export default function ConfiguracaoEstoque() {
         <h3 className="font-semibold text-blue-900 mb-2">💡 Como funciona?</h3>
         <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
           <li>
-            <strong>Estoque Bloqueado:</strong> Ao tentar vender um produto sem estoque, 
-            o sistema exibirá um erro e impedirá a finalização da venda.
+            <strong>Estoque Bloqueado:</strong> Ao tentar vender um produto sem estoque, o sistema
+            exibirá um erro e impedirá a finalização da venda.
           </li>
           <li>
-            <strong>Estoque Negativo:</strong> O sistema permite a venda e o estoque 
-            ficará com valor negativo até a próxima reposição.
+            <strong>Estoque Negativo:</strong> O sistema permite a venda e o estoque ficará com
+            valor negativo até a próxima reposição.
           </li>
           <li>
-            Esta configuração é global e afeta todas as vendas realizadas no PDV e 
-            outros pontos de venda.
+            Esta configuração é global e afeta todas as vendas realizadas no PDV e outros pontos de
+            venda.
           </li>
         </ul>
       </div>

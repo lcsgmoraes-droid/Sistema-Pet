@@ -22,7 +22,9 @@ export default function NovoExameDadosSection({ form, setArquivoNovo, setForm })
         <input
           type="date"
           value={form.data_solicitacao}
-          onChange={(event) => setForm((prev) => ({ ...prev, data_solicitacao: event.target.value }))}
+          onChange={(event) =>
+            setForm((prev) => ({ ...prev, data_solicitacao: event.target.value }))
+          }
           className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
         />
       </div>

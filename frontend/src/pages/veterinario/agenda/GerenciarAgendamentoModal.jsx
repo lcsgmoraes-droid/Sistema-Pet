@@ -108,11 +108,15 @@ export default function GerenciarAgendamentoModal({
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Veterinario</p>
-            <p className="mt-1 text-sm text-gray-800">{agendamento.veterinario_nome || "Nao definido"}</p>
+            <p className="mt-1 text-sm text-gray-800">
+              {agendamento.veterinario_nome || "Nao definido"}
+            </p>
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Consultorio</p>
-            <p className="mt-1 text-sm text-gray-800">{agendamento.consultorio_nome || "Nao definido"}</p>
+            <p className="mt-1 text-sm text-gray-800">
+              {agendamento.consultorio_nome || "Nao definido"}
+            </p>
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Tipo</p>
@@ -126,7 +130,9 @@ export default function GerenciarAgendamentoModal({
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Motivo</p>
-            <p className="mt-1 text-sm text-gray-800">{agendamento.motivo || "Sem motivo informado"}</p>
+            <p className="mt-1 text-sm text-gray-800">
+              {agendamento.motivo || "Sem motivo informado"}
+            </p>
           </div>
         </div>
 
@@ -163,7 +169,8 @@ export default function GerenciarAgendamentoModal({
 
         {!podeExcluir && !podeVoltarStatus && agendamento.consulta_id && (
           <p className="mt-3 text-xs text-gray-500">
-            Este agendamento ja possui atendimento vinculado. Se foi apenas um teste, use "Desfazer inicio do atendimento". Se ja houver dados clinicos, trate primeiro o atendimento.
+            Este agendamento ja possui atendimento vinculado. Se foi apenas um teste, use "Desfazer
+            inicio do atendimento". Se ja houver dados clinicos, trate primeiro o atendimento.
           </p>
         )}
 

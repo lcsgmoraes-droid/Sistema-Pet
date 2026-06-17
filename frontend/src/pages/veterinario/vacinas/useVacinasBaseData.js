@@ -18,15 +18,18 @@ export function useVacinasBaseData() {
   }, []);
 
   useEffect(() => {
-    api.get("/pets", { params: { limit: 500 } })
+    api
+      .get("/pets", { params: { limit: 500 } })
       .then((res) => setPets(res.data?.items ?? res.data ?? []))
       .catch(() => {});
 
-    vetApi.listarVeterinarios()
+    vetApi
+      .listarVeterinarios()
       .then((res) => setVeterinarios(Array.isArray(res.data) ? res.data : []))
       .catch(() => setVeterinarios([]));
 
-    vetApi.listarProtocolosVacinas()
+    vetApi
+      .listarProtocolosVacinas()
       .then((res) => setProtocolos(Array.isArray(res.data) ? res.data : []))
       .catch(() => setProtocolos([]));
 

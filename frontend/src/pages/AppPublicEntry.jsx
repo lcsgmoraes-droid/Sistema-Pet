@@ -22,16 +22,13 @@ function extractStoreSlug(input) {
     if (queryText) {
       const queryParams = new URLSearchParams(queryText);
       const querySlug =
-        queryParams.get("loja") ||
-        queryParams.get("slug") ||
-        queryParams.get("tenant");
+        queryParams.get("loja") || queryParams.get("slug") || queryParams.get("tenant");
       if (querySlug) return sanitizeSlug(querySlug);
     }
 
     const withoutQuery = raw.split("?")[0];
     return sanitizeSlug(
-      firstUsefulSegment(withoutQuery.split("/").filter(Boolean)) ||
-        withoutQuery,
+      firstUsefulSegment(withoutQuery.split("/").filter(Boolean)) || withoutQuery,
     );
   }
 }
@@ -52,12 +49,7 @@ export default function AppPublicEntry() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialCode = useMemo(() => {
-    return (
-      searchParams.get("loja") ||
-      searchParams.get("slug") ||
-      searchParams.get("tenant") ||
-      ""
-    );
+    return searchParams.get("loja") || searchParams.get("slug") || searchParams.get("tenant") || "";
   }, [searchParams]);
 
   const [storeCode, setStoreCode] = useState(initialCode);
@@ -99,18 +91,19 @@ export default function AppPublicEntry() {
     if (initialCode) {
       searchStore(initialCode);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialCode]);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <section className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-5 py-12">
         <div className="mb-7 flex items-center gap-3">
-          <img src="/brand/corepet/corepet-icon-64.png" alt="" className="h-11 w-11 rounded-xl shadow-sm" />
+          <img
+            src="/brand/corepet/corepet-icon-64.png"
+            alt=""
+            className="h-11 w-11 rounded-xl shadow-sm"
+          />
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">
-              CorePet
-            </p>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">CorePet</p>
             <h1 className="text-2xl font-bold tracking-normal text-slate-950">
               Entrar na loja pelo app
             </h1>
@@ -167,11 +160,7 @@ export default function AppPublicEntry() {
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-white text-emerald-700 ring-1 ring-emerald-200">
                     {store.logo_url ? (
-                      <img
-                        src={store.logo_url}
-                        alt=""
-                        className="h-full w-full object-contain"
-                      />
+                      <img src={store.logo_url} alt="" className="h-full w-full object-contain" />
                     ) : (
                       <ShieldCheck size={24} />
                     )}
@@ -179,8 +168,7 @@ export default function AppPublicEntry() {
                   <div>
                     <p className="text-sm font-bold text-slate-950">{store.nome}</p>
                     <p className="text-xs text-slate-600">
-                      {[store.cidade, store.uf].filter(Boolean).join(" / ") ||
-                        "Loja encontrada"}
+                      {[store.cidade, store.uf].filter(Boolean).join(" / ") || "Loja encontrada"}
                     </p>
                   </div>
                 </div>

@@ -3,12 +3,7 @@ import EmptyState from "../../../components/ui/EmptyState";
 import Panel from "../../../components/ui/Panel";
 import StatusBadge from "../../../components/ui/StatusBadge";
 
-export default function BanhoTosaParametrosLista({
-  parametros,
-  onEdit,
-  onDelete,
-  onToggleAtivo,
-}) {
+export default function BanhoTosaParametrosLista({ parametros, onEdit, onDelete, onToggleAtivo }) {
   const parametrosOrdenados = [...parametros].sort((a, b) => {
     const pesoA = Number(a.peso_min_kg ?? 999999);
     const pesoB = Number(b.peso_min_kg ?? 999999);

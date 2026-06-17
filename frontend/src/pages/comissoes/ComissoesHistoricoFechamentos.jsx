@@ -1,29 +1,29 @@
 /**
  * SPRINT 6 - PASSO 4/5: HISTÓRICO DE FECHAMENTOS
- * 
+ *
  * Tela de auditoria que exibe histórico de fechamentos realizados.
  * SOMENTE LEITURA - sem possibilidade de edição ou reversão.
- * 
+ *
  * Criado em: 22/01/2026
  */
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../../api';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../../api";
 
 const ComissoesHistoricoFechamentos = () => {
   const navigate = useNavigate();
-  
+
   // Estados
   const [fechamentos, setFechamentos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState(null);
   const [resumo, setResumo] = useState(null);
-  
+
   // Estados de filtro
-  const [dataInicio, setDataInicio] = useState('');
-  const [dataFim, setDataFim] = useState('');
-  const [funcionarioId, setFuncionarioId] = useState('');
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
+  const [funcionarioId, setFuncionarioId] = useState("");
 
   // Carregar histórico ao montar componente
   useEffect(() => {
@@ -34,25 +34,25 @@ const ComissoesHistoricoFechamentos = () => {
     try {
       setLoading(true);
       setErro(null);
-      
+
       // Construir query params
       const params = new URLSearchParams();
-      if (dataInicio) params.append('data_inicio', dataInicio);
-      if (dataFim) params.append('data_fim', dataFim);
-      if (funcionarioId) params.append('funcionario_id', funcionarioId);
-      
-      const url = `/comissoes/fechamentos${params.toString() ? '?' + params.toString() : ''}`;
+      if (dataInicio) params.append("data_inicio", dataInicio);
+      if (dataFim) params.append("data_fim", dataFim);
+      if (funcionarioId) params.append("funcionario_id", funcionarioId);
+
+      const url = `/comissoes/fechamentos${params.toString() ? "?" + params.toString() : ""}`;
       const response = await api.get(url);
-      
+
       if (response.data.success) {
         setFechamentos(response.data.fechamentos || []);
         setResumo(response.data.resumo);
       } else {
-        setErro('Erro ao carregar histórico');
+        setErro("Erro ao carregar histórico");
       }
     } catch (error) {
-      console.error('Erro ao carregar histórico:', error);
-      setErro(error.response?.data?.detail || 'Erro ao carregar histórico de fechamentos');
+      console.error("Erro ao carregar histórico:", error);
+      setErro(error.response?.data?.detail || "Erro ao carregar histórico de fechamentos");
     } finally {
       setLoading(false);
     }
@@ -63,36 +63,36 @@ const ComissoesHistoricoFechamentos = () => {
   };
 
   const handleLimparFiltro = () => {
-    setDataInicio('');
-    setDataFim('');
-    setFuncionarioId('');
+    setDataInicio("");
+    setDataFim("");
+    setFuncionarioId("");
     setTimeout(() => carregarHistorico(), 100);
   };
 
   const handleVerDetalhes = (fechamento) => {
     // Navegar para tela de detalhes
     navigate(
-      `/comissoes/fechamentos/detalhe?funcionario_id=${fechamento.funcionario_id}&data_pagamento=${fechamento.data_pagamento}`
+      `/comissoes/fechamentos/detalhe?funcionario_id=${fechamento.funcionario_id}&data_pagamento=${fechamento.data_pagamento}`,
     );
   };
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(valor);
   };
 
   const formatarData = (data) => {
-    if (!data) return '-';
-    const dataObj = new Date(data + 'T00:00:00');
-    return dataObj.toLocaleDateString('pt-BR');
+    if (!data) return "-";
+    const dataObj = new Date(data + "T00:00:00");
+    return dataObj.toLocaleDateString("pt-BR");
   };
 
   const formatarDataHora = (dataHora) => {
-    if (!dataHora) return '-';
+    if (!dataHora) return "-";
     const dataObj = new Date(dataHora);
-    return dataObj.toLocaleString('pt-BR');
+    return dataObj.toLocaleString("pt-BR");
   };
 
   // Loading
@@ -115,8 +115,18 @@ const ComissoesHistoricoFechamentos = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
           <div className="flex items-center">
-            <svg className="h-6 w-6 text-red-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="h-6 w-6 text-red-500 mr-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             <div>
               <h3 className="text-red-800 font-medium">Erro ao carregar dados</h3>
@@ -141,9 +151,7 @@ const ComissoesHistoricoFechamentos = () => {
         {/* Header */}
         <div className="mb-6 border-b border-gray-200 pb-4">
           <h1 className="text-3xl font-bold text-gray-800">Histórico de Fechamentos</h1>
-          <p className="text-gray-600 mt-1">
-            Auditoria de comissões fechadas - somente leitura
-          </p>
+          <p className="text-gray-600 mt-1">Auditoria de comissões fechadas - somente leitura</p>
         </div>
 
         {/* Filtros */}
@@ -151,9 +159,7 @@ const ComissoesHistoricoFechamentos = () => {
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Filtros</h3>
           <div className="flex flex-wrap gap-4 items-end">
             <div className="flex-1 min-w-[180px]">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Data Início
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Data Início</label>
               <input
                 type="date"
                 value={dataInicio}
@@ -162,9 +168,7 @@ const ComissoesHistoricoFechamentos = () => {
               />
             </div>
             <div className="flex-1 min-w-[180px]">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Data Fim
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Data Fim</label>
               <input
                 type="date"
                 value={dataFim}
@@ -217,7 +221,9 @@ const ComissoesHistoricoFechamentos = () => {
               </div>
               <div>
                 <p className="text-sm text-purple-600 font-medium">Total de Comissões</p>
-                <p className="text-2xl font-bold text-purple-800">{resumo.quantidade_total_geral}</p>
+                <p className="text-2xl font-bold text-purple-800">
+                  {resumo.quantidade_total_geral}
+                </p>
               </div>
             </div>
           </div>
@@ -226,8 +232,18 @@ const ComissoesHistoricoFechamentos = () => {
         {/* Lista vazia */}
         {fechamentos.length === 0 ? (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
-            <svg className="h-16 w-16 text-yellow-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="h-16 w-16 text-yellow-500 mx-auto mb-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             <h3 className="text-xl font-semibold text-yellow-800 mb-2">
               Nenhum fechamento encontrado
@@ -265,7 +281,7 @@ const ComissoesHistoricoFechamentos = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {fechamentos.map((fechamento, index) => (
-                    <tr 
+                    <tr
                       key={`${fechamento.funcionario_id}_${fechamento.data_pagamento}_${index}`}
                       className="hover:bg-gray-50 transition-colors cursor-pointer"
                       onClick={() => handleVerDetalhes(fechamento)}

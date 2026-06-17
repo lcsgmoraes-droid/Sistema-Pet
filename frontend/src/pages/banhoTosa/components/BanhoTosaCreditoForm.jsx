@@ -34,7 +34,8 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onCancel, onChanged
 
     let active = true;
     setLoadingPets(true);
-    api.get("/vet/pets", { params: { cliente_id: tutor.id, limit: 100 } })
+    api
+      .get("/vet/pets", { params: { cliente_id: tutor.id, limit: 100 } })
       .then((response) => {
         if (!active) return;
         const lista = response.data?.items ?? response.data ?? [];
@@ -86,13 +87,19 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onCancel, onChanged
       subtitle="Vincule um pacote ativo ao tutor e, se precisar, a um pet especifico."
     >
       <form onSubmit={liberarCredito} className="space-y-4">
-        <SelectField label="Pacote" value={form.pacote_id} onChange={(value) => updateField("pacote_id", value)}>
+        <SelectField
+          label="Pacote"
+          value={form.pacote_id}
+          onChange={(value) => updateField("pacote_id", value)}
+        >
           <option value="">Selecione</option>
-          {pacotes.filter((item) => item.ativo).map((pacote) => (
-            <option key={pacote.id} value={pacote.id}>
-              {pacote.nome} - {pacote.quantidade_creditos} creditos
-            </option>
-          ))}
+          {pacotes
+            .filter((item) => item.ativo)
+            .map((pacote) => (
+              <option key={pacote.id} value={pacote.id}>
+                {pacote.nome} - {pacote.quantidade_creditos} creditos
+              </option>
+            ))}
         </SelectField>
 
         <TutorAutocomplete
@@ -119,10 +126,24 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onCancel, onChanged
         </SelectField>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextField label="Inicio" type="date" value={form.data_inicio} onChange={(value) => updateField("data_inicio", value)} />
-          <TextField label="Validade manual" type="date" value={form.data_validade} onChange={(value) => updateField("data_validade", value)} />
+          <TextField
+            label="Inicio"
+            type="date"
+            value={form.data_inicio}
+            onChange={(value) => updateField("data_inicio", value)}
+          />
+          <TextField
+            label="Validade manual"
+            type="date"
+            value={form.data_validade}
+            onChange={(value) => updateField("data_validade", value)}
+          />
         </div>
-        <TextField label="Observacoes" value={form.observacoes} onChange={(value) => updateField("observacoes", value)} />
+        <TextField
+          label="Observacoes"
+          value={form.observacoes}
+          onChange={(value) => updateField("observacoes", value)}
+        />
 
         <div className="flex flex-wrap justify-end gap-2">
           <ActionButton icon={X} intent="neutral" onClick={onCancel} tone="soft">

@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  filtrarTutoresPorTermo,
-} from "./tutorPetSelectionUtils.js";
+import { filtrarTutoresPorTermo } from "./tutorPetSelectionUtils.js";
 
 const tutores = [
   { id: 1, nome: "Ana Souza", telefone: "11999990000", celular: "" },
@@ -19,5 +17,8 @@ test("filtrarTutoresPorTermo nao lista tutores antes do termo minimo", () => {
 test("filtrarTutoresPorTermo lista tutores quando a busca tem termo suficiente", () => {
   const resultado = filtrarTutoresPorTermo(tutores, "ma");
 
-  assert.deepEqual(resultado.map((tutor) => tutor.nome), ["Maria Oliveira"]);
+  assert.deepEqual(
+    resultado.map((tutor) => tutor.nome),
+    ["Maria Oliveira"],
+  );
 });
