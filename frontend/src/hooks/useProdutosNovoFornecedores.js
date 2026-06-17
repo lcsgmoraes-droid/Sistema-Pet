@@ -1,17 +1,17 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   addFornecedorProduto,
   deleteFornecedorProduto,
   getFornecedoresProduto,
   updateFornecedorProduto,
-} from '../api/produtos';
+} from "../api/produtos";
 
 const FORNECEDOR_INICIAL = {
-  fornecedor_id: '',
-  codigo_fornecedor: '',
-  preco_custo: '',
-  prazo_entrega: '',
-  estoque_fornecedor: '',
+  fornecedor_id: "",
+  codigo_fornecedor: "",
+  preco_custo: "",
+  prazo_entrega: "",
+  estoque_fornecedor: "",
   e_principal: false,
 };
 
@@ -36,10 +36,10 @@ export default function useProdutosNovoFornecedores({ id }) {
     setFornecedorEdit(fornecedor);
     setFornecedorData({
       fornecedor_id: fornecedor.fornecedor_id,
-      codigo_fornecedor: fornecedor.codigo_fornecedor || '',
-      preco_custo: fornecedor.preco_custo || '',
-      prazo_entrega: fornecedor.prazo_entrega || '',
-      estoque_fornecedor: fornecedor.estoque_fornecedor || '',
+      codigo_fornecedor: fornecedor.codigo_fornecedor || "",
+      preco_custo: fornecedor.preco_custo || "",
+      prazo_entrega: fornecedor.prazo_entrega || "",
+      estoque_fornecedor: fornecedor.estoque_fornecedor || "",
       e_principal: fornecedor.e_principal || false,
     });
     setModalFornecedor(true);
@@ -47,16 +47,14 @@ export default function useProdutosNovoFornecedores({ id }) {
 
   const handleSaveFornecedor = async () => {
     if (!fornecedorData.fornecedor_id) {
-      alert('Selecione um fornecedor');
+      alert("Selecione um fornecedor");
       return;
     }
 
     try {
       const dados = {
         ...fornecedorData,
-        preco_custo: fornecedorData.preco_custo
-          ? parseFloat(fornecedorData.preco_custo)
-          : null,
+        preco_custo: fornecedorData.preco_custo ? parseFloat(fornecedorData.preco_custo) : null,
         prazo_entrega: fornecedorData.prazo_entrega
           ? parseInt(fornecedorData.prazo_entrega, 10)
           : null,
@@ -67,32 +65,32 @@ export default function useProdutosNovoFornecedores({ id }) {
 
       if (fornecedorEdit) {
         await updateFornecedorProduto(fornecedorEdit.id, dados);
-        alert('Fornecedor atualizado!');
+        alert("Fornecedor atualizado!");
       } else {
         await addFornecedorProduto(id, dados);
-        alert('Fornecedor vinculado!');
+        alert("Fornecedor vinculado!");
       }
 
       await recarregarFornecedores();
       setModalFornecedor(false);
     } catch (error) {
-      console.error('Erro ao salvar fornecedor:', error);
-      alert(error.response?.data?.detail || 'Erro ao salvar fornecedor');
+      console.error("Erro ao salvar fornecedor:", error);
+      alert(error.response?.data?.detail || "Erro ao salvar fornecedor");
     }
   };
 
   const handleDeleteFornecedor = async (fornecedorId) => {
-    if (!window.confirm('Deseja realmente desvincular este fornecedor?')) {
+    if (!window.confirm("Deseja realmente desvincular este fornecedor?")) {
       return;
     }
 
     try {
       await deleteFornecedorProduto(fornecedorId);
       await recarregarFornecedores();
-      alert('Fornecedor desvinculado!');
+      alert("Fornecedor desvinculado!");
     } catch (error) {
-      console.error('Erro ao desvincular fornecedor:', error);
-      alert('Erro ao desvincular fornecedor');
+      console.error("Erro ao desvincular fornecedor:", error);
+      alert("Erro ao desvincular fornecedor");
     }
   };
 

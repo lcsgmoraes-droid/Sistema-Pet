@@ -71,9 +71,7 @@ export function usePDVCaixaRacao({ vendaAtual, destaqueAbrirCaixa }) {
   const fecharCalculadoraRacao = () => {
     const racoes = vendaAtual.itens.filter((item) => {
       const nomeCategoria = (item.categoria_nome || "").toLowerCase();
-      return (
-        nomeCategoria.includes("ração") || nomeCategoria.includes("racao")
-      );
+      return nomeCategoria.includes("ração") || nomeCategoria.includes("racao");
     });
 
     if (racoes.length > 0) {

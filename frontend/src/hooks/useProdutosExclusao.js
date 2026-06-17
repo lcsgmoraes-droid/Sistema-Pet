@@ -1,10 +1,6 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
-import {
-  deleteProduto,
-  getProdutoVariacoes,
-  toggleProdutoAtivo,
-} from "../api/produtos";
+import { deleteProduto, getProdutoVariacoes, toggleProdutoAtivo } from "../api/produtos";
 
 export default function useProdutosExclusao({
   carregarDados,
@@ -15,13 +11,10 @@ export default function useProdutosExclusao({
 }) {
   const [modalConflitoExclusao, setModalConflitoExclusao] = useState(false);
   const [bloqueiosExclusao, setBloqueiosExclusao] = useState([]);
-  const [variacoesSelecionadasConflito, setVariacoesSelecionadasConflito] =
-    useState([]);
-  const [resolvendoConflitoExclusao, setResolvendoConflitoExclusao] =
-    useState(false);
+  const [variacoesSelecionadasConflito, setVariacoesSelecionadasConflito] = useState([]);
+  const [resolvendoConflitoExclusao, setResolvendoConflitoExclusao] = useState(false);
   const [autoSelecionarConflito, setAutoSelecionarConflito] = useState(true);
-  const [pularConfirmacaoConflito, setPularConfirmacaoConflito] =
-    useState(false);
+  const [pularConfirmacaoConflito, setPularConfirmacaoConflito] = useState(false);
 
   const obterNomeProduto = (id) => {
     const produto = produtosBrutos.find((item) => item.id === id);
@@ -36,8 +29,7 @@ export default function useProdutosExclusao({
       return {
         statusCode,
         mensagem:
-          detalheServidor ||
-          "Nao foi possivel excluir porque este produto possui vinculos ativos.",
+          detalheServidor || "Nao foi possivel excluir porque este produto possui vinculos ativos.",
       };
     }
 
@@ -50,9 +42,7 @@ export default function useProdutosExclusao({
 
     return {
       statusCode,
-      mensagem:
-        detalheServidor ||
-        "Erro ao excluir produto. Tente novamente em instantes.",
+      mensagem: detalheServidor || "Erro ao excluir produto. Tente novamente em instantes.",
     };
   };
 
@@ -110,8 +100,8 @@ export default function useProdutosExclusao({
   };
 
   const handleSelecionarTodasVariacoesDoPai = (parentId, checked) => {
-    const idsDoPai = (bloqueiosExclusao.find((item) => item.parentId === parentId)
-      ?.variacoes || []
+    const idsDoPai = (
+      bloqueiosExclusao.find((item) => item.parentId === parentId)?.variacoes || []
     ).map((variacao) => variacao.id);
 
     setVariacoesSelecionadasConflito((prev) => {
@@ -162,8 +152,7 @@ export default function useProdutosExclusao({
         const erroPai = extrairErroExclusao(error);
         paisComFalha.push({
           ...bloqueio,
-          mensagem:
-            falhasVariacao[0]?.mensagem || erroPai.mensagem || bloqueio.mensagem,
+          mensagem: falhasVariacao[0]?.mensagem || erroPai.mensagem || bloqueio.mensagem,
         });
       }
     }
@@ -172,9 +161,7 @@ export default function useProdutosExclusao({
     setModalConflitoExclusao(false);
 
     if (paisExcluidos.length > 0) {
-      toast.success(
-        `${paisExcluidos.length} produto(s) pai excluido(s) apos resolver variacoes.`,
-      );
+      toast.success(`${paisExcluidos.length} produto(s) pai excluido(s) apos resolver variacoes.`);
     }
 
     if (paisComFalha.length > 0) {
@@ -182,10 +169,7 @@ export default function useProdutosExclusao({
         .slice(0, 3)
         .map((item) => `${item.parentNome}: ${item.mensagem}`)
         .join("\n");
-      const sufixo =
-        paisComFalha.length > 3
-          ? "\n...e outros produtos continuam bloqueados."
-          : "";
+      const sufixo = paisComFalha.length > 3 ? "\n...e outros produtos continuam bloqueados." : "";
 
       alert(
         `Ainda nao foi possivel excluir ${paisComFalha.length} produto(s):\n\n${detalhes}${sufixo}`,
@@ -226,9 +210,7 @@ export default function useProdutosExclusao({
       return;
     }
 
-    const resultados = await Promise.allSettled(
-      selecionados.map((id) => deleteProduto(id)),
-    );
+    const resultados = await Promise.allSettled(selecionados.map((id) => deleteProduto(id)));
 
     const idsExcluidos = [];
     const falhas = [];
@@ -247,9 +229,7 @@ export default function useProdutosExclusao({
     });
 
     if (idsExcluidos.length > 0) {
-      toast.success(
-        `${idsExcluidos.length} produto(s) excluido(s) com sucesso!`,
-      );
+      toast.success(`${idsExcluidos.length} produto(s) excluido(s) com sucesso!`);
       carregarDados();
     }
 
@@ -260,9 +240,7 @@ export default function useProdutosExclusao({
         return;
       }
 
-      const mensagens = falhas
-        .slice(0, 3)
-        .map((falha) => `ID ${falha.id}: ${falha.mensagem}`);
+      const mensagens = falhas.slice(0, 3).map((falha) => `ID ${falha.id}: ${falha.mensagem}`);
       const sufixo = falhas.length > 3 ? "\n...e outros produtos com erro." : "";
 
       alert(

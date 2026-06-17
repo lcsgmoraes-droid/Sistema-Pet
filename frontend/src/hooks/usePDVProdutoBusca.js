@@ -21,8 +21,7 @@ export function usePDVProdutoBusca({
 }) {
   const [buscarProduto, setBuscarProduto] = useState("");
   const [produtosSugeridos, setProdutosSugeridos] = useState([]);
-  const [mostrarSugestoesProduto, setMostrarSugestoesProduto] =
-    useState(false);
+  const [mostrarSugestoesProduto, setMostrarSugestoesProduto] = useState(false);
 
   const inputProdutoRef = useRef(null);
   const buscaProdutoContainerRef = useRef(null);
@@ -53,15 +52,18 @@ export function usePDVProdutoBusca({
     buscaProdutoAbortControllerRef.current = controller;
 
     try {
-      const response = await getProdutosVendaveis({
-        busca: termo,
-        page_size: 12,
-        contar_total: false,
-        incluir_imagens: false,
-        _ts: Date.now(),
-      }, {
-        signal: controller.signal,
-      });
+      const response = await getProdutosVendaveis(
+        {
+          busca: termo,
+          page_size: 12,
+          contar_total: false,
+          incluir_imagens: false,
+          _ts: Date.now(),
+        },
+        {
+          signal: controller.signal,
+        },
+      );
 
       return response.data.items || [];
     } finally {
@@ -159,8 +161,7 @@ export function usePDVProdutoBusca({
               ultimoAutoAddProduto: ultimoAutoAddProdutoRef.current,
             })
           ) {
-            ultimoAutoAddProdutoRef.current =
-              normalizarCodigoProdutoBusca(termoAtual);
+            ultimoAutoAddProdutoRef.current = normalizarCodigoProdutoBusca(termoAtual);
             adicionarProduto(matchExato, { focarInput: true });
             return;
           }
@@ -209,12 +210,7 @@ export function usePDVProdutoBusca({
   );
 
   const registrarPossivelLeituraScanner = (evento) => {
-    if (
-      evento.key.length !== 1 ||
-      evento.ctrlKey ||
-      evento.altKey ||
-      evento.metaKey
-    ) {
+    if (evento.key.length !== 1 || evento.ctrlKey || evento.altKey || evento.metaKey) {
       return;
     }
 
@@ -240,8 +236,7 @@ export function usePDVProdutoBusca({
     adicionandoProdutoPorEnterRef.current = true;
     try {
       const produtos = await buscarProdutosAtualizados(termo);
-      const produtoSelecionado =
-        encontrarProdutoPorCodigo(produtos, termo) || produtos[0] || null;
+      const produtoSelecionado = encontrarProdutoPorCodigo(produtos, termo) || produtos[0] || null;
 
       if (produtoSelecionado) {
         adicionarProduto(produtoSelecionado, { focarInput: true });

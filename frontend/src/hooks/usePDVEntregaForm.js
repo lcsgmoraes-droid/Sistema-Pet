@@ -48,9 +48,7 @@ export function usePDVEntregaForm(
   };
 
   const handleSelecionarEntregador = (entregadorId) => {
-    const entregador = entregadores.find(
-      (item) => item.id === parseInt(entregadorId, 10),
-    );
+    const entregador = entregadores.find((item) => item.id === parseInt(entregadorId, 10));
 
     selecionarEntregador(entregador || null);
   };
@@ -61,16 +59,11 @@ export function usePDVEntregaForm(
 
     setVendaAtual((prev) => {
       const taxaLojaAtual = prev.entrega?.taxa_loja || 0;
-      const taxaEntregadorCalculada = parseFloat(
-        (totalArredondado - taxaLojaAtual).toFixed(2),
-      );
+      const taxaEntregadorCalculada = parseFloat((totalArredondado - taxaLojaAtual).toFixed(2));
 
       return {
         ...prev,
-        total: recalcularTotalComEntrega(
-          prev.subtotal,
-          prev.tem_entrega ? totalArredondado : 0,
-        ),
+        total: recalcularTotalComEntrega(prev.subtotal, prev.tem_entrega ? totalArredondado : 0),
         entrega: {
           ...prev.entrega,
           taxa_entrega_total: totalArredondado,
@@ -87,9 +80,7 @@ export function usePDVEntregaForm(
 
     setVendaAtual((prev) => {
       const total = prev.entrega?.taxa_entrega_total || 0;
-      const taxaEntregadorArredondada = parseFloat(
-        (total - taxaLojaArredondada).toFixed(2),
-      );
+      const taxaEntregadorArredondada = parseFloat((total - taxaLojaArredondada).toFixed(2));
 
       return {
         ...prev,
@@ -108,9 +99,7 @@ export function usePDVEntregaForm(
 
     setVendaAtual((prev) => {
       const total = prev.entrega?.taxa_entrega_total || 0;
-      const taxaLojaArredondada = parseFloat(
-        (total - taxaEntregadorArredondada).toFixed(2),
-      );
+      const taxaLojaArredondada = parseFloat((total - taxaEntregadorArredondada).toFixed(2));
 
       return {
         ...prev,

@@ -1,4 +1,5 @@
 import js from "@eslint/js";
+import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
 
 const sharedGlobals = {
@@ -16,12 +17,21 @@ export default [
       "scripts/**/*.{js,mjs,cjs}",
       "src/api/**/*.{js,mjs,cjs}",
       "src/helpers/**/*.{js,mjs,cjs}",
+      "src/hooks/**/*.{js,jsx,mjs,cjs}",
       "src/utils/**/*.{js,mjs,cjs}",
     ],
     languageOptions: {
       ecmaVersion: "latest",
       globals: sharedGlobals,
+      parserOptions: {
+        ecmaFeatures: {
+          jsx: true,
+        },
+      },
       sourceType: "module",
+    },
+    plugins: {
+      "react-hooks": reactHooks,
     },
     rules: {
       "no-empty": ["error", { allowEmptyCatch: true }],
@@ -33,6 +43,7 @@ export default [
           varsIgnorePattern: "^_",
         },
       ],
+      "react-hooks/rules-of-hooks": "error",
     },
   },
 ];

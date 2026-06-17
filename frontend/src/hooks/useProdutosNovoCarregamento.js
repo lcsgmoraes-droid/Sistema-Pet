@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
-import api from '../api';
-import { normalizeMarkdownContent } from '../utils/safeMarkdown';
+import { useEffect } from "react";
+import api from "../api";
+import { normalizeMarkdownContent } from "../utils/safeMarkdown";
 import {
   calcularMarkup,
   getCategorias,
@@ -9,8 +9,8 @@ import {
   getLotes,
   getMarcas,
   getProduto,
-} from '../api/produtos';
-import { montarEstadoProdutoClonado } from '../pages/produtosFormUtils';
+} from "../api/produtos";
+import { montarEstadoProdutoClonado } from "../pages/produtosFormUtils";
 
 const construirListaHierarquica = (categorias, parentId = null, nivel = 0) => {
   let resultado = [];
@@ -18,8 +18,8 @@ const construirListaHierarquica = (categorias, parentId = null, nivel = 0) => {
   const filhos = categorias.filter((categoria) => categoria.categoria_pai_id === parentId);
 
   filhos.forEach((categoria) => {
-    const indentacao = '\u00a0\u00a0\u00a0\u00a0'.repeat(nivel);
-    const seta = nivel > 0 ? '→ ' : '';
+    const indentacao = "\u00a0\u00a0\u00a0\u00a0".repeat(nivel);
+    const seta = nivel > 0 ? "→ " : "";
 
     resultado.push({
       ...categoria,
@@ -27,9 +27,7 @@ const construirListaHierarquica = (categorias, parentId = null, nivel = 0) => {
       nivel,
     });
 
-    resultado = resultado.concat(
-      construirListaHierarquica(categorias, categoria.id, nivel + 1),
-    );
+    resultado = resultado.concat(construirListaHierarquica(categorias, categoria.id, nivel + 1));
   });
 
   return resultado;
@@ -69,16 +67,16 @@ export default function useProdutosNovoCarregamento({
         saboresResult,
         apresentacoesResult,
       ] = await Promise.allSettled([
-        api.get('/opcoes-racao/linhas', { params: { apenas_ativos: true } }),
-        api.get('/opcoes-racao/portes', { params: { apenas_ativos: true } }),
-        api.get('/opcoes-racao/fases', { params: { apenas_ativos: true } }),
-        api.get('/opcoes-racao/tratamentos', { params: { apenas_ativos: true } }),
-        api.get('/opcoes-racao/sabores', { params: { apenas_ativos: true } }),
-        api.get('/opcoes-racao/apresentacoes', { params: { apenas_ativos: true } }),
+        api.get("/opcoes-racao/linhas", { params: { apenas_ativos: true } }),
+        api.get("/opcoes-racao/portes", { params: { apenas_ativos: true } }),
+        api.get("/opcoes-racao/fases", { params: { apenas_ativos: true } }),
+        api.get("/opcoes-racao/tratamentos", { params: { apenas_ativos: true } }),
+        api.get("/opcoes-racao/sabores", { params: { apenas_ativos: true } }),
+        api.get("/opcoes-racao/apresentacoes", { params: { apenas_ativos: true } }),
       ]);
 
       const aplicarResultado = (resultado, setter, nome) => {
-        if (resultado.status === 'fulfilled') {
+        if (resultado.status === "fulfilled") {
           setter(Array.isArray(resultado.value.data) ? resultado.value.data : []);
           return;
         }
@@ -86,14 +84,14 @@ export default function useProdutosNovoCarregamento({
         console.error(`Erro ao carregar opcoes de racao (${nome}):`, resultado.reason);
       };
 
-      aplicarResultado(linhasResult, setOpcoesLinhas, 'linhas');
-      aplicarResultado(portesResult, setOpcoesPortes, 'portes');
-      aplicarResultado(fasesResult, setOpcoesFases, 'fases');
-      aplicarResultado(tratamentosResult, setOpcoesTratamentos, 'tratamentos');
-      aplicarResultado(saboresResult, setOpcoesSabores, 'sabores');
-      aplicarResultado(apresentacoesResult, setOpcoesApresentacoes, 'apresentacoes');
+      aplicarResultado(linhasResult, setOpcoesLinhas, "linhas");
+      aplicarResultado(portesResult, setOpcoesPortes, "portes");
+      aplicarResultado(fasesResult, setOpcoesFases, "fases");
+      aplicarResultado(tratamentosResult, setOpcoesTratamentos, "tratamentos");
+      aplicarResultado(saboresResult, setOpcoesSabores, "sabores");
+      aplicarResultado(apresentacoesResult, setOpcoesApresentacoes, "apresentacoes");
     } catch (error) {
-      console.error('Erro ao carregar opções de ração:', error);
+      console.error("Erro ao carregar opções de ração:", error);
     }
   };
 
@@ -106,8 +104,8 @@ export default function useProdutosNovoCarregamento({
           getCategorias(),
           getMarcas(),
           getDepartamentos(),
-          api.get('/clientes/', {
-            params: { tipo_cadastro: 'fornecedor', apenas_ativos: true },
+          api.get("/clientes/", {
+            params: { tipo_cadastro: "fornecedor", apenas_ativos: true },
           }),
         ]);
 
@@ -118,16 +116,16 @@ export default function useProdutosNovoCarregamento({
       setClientes(
         Array.isArray(clientesResponse.data)
           ? clientesResponse.data
-          : (clientesResponse.data.items || []),
+          : clientesResponse.data.items || [],
       );
     } catch (error) {
-      console.error('Erro ao carregar dados auxiliares:', error);
+      console.error("Erro ao carregar dados auxiliares:", error);
     }
   };
 
   const carregarFiscal = async (produto) => {
     try {
-      const isKit = produto.tipo_produto === 'KIT';
+      const isKit = produto.tipo_produto === "KIT";
       const { data } = isKit
         ? await api.get(`/produtos/${produto.id}/kit/fiscal`)
         : await api.get(`/produtos/${produto.id}/fiscal`);
@@ -137,19 +135,19 @@ export default function useProdutosNovoCarregamento({
         tributacao: {
           origem: data.origem,
           herdado_da_empresa: data.herdado_da_empresa,
-          origem_mercadoria: data.origem_mercadoria ?? '0',
-          ncm: data.ncm ?? '',
-          cest: data.cest ?? '',
-          cfop: data.cfop ?? '',
-          cst_icms: data.cst_icms ?? '',
-          icms_aliquota: data.icms_aliquota ?? '',
+          origem_mercadoria: data.origem_mercadoria ?? "0",
+          ncm: data.ncm ?? "",
+          cest: data.cest ?? "",
+          cfop: data.cfop ?? "",
+          cst_icms: data.cst_icms ?? "",
+          icms_aliquota: data.icms_aliquota ?? "",
           icms_st: data.icms_st ?? false,
-          pis_aliquota: data.pis_aliquota ?? '',
-          cofins_aliquota: data.cofins_aliquota ?? '',
+          pis_aliquota: data.pis_aliquota ?? "",
+          cofins_aliquota: data.cofins_aliquota ?? "",
         },
       }));
     } catch (error) {
-      console.error('Erro ao carregar fiscal:', error);
+      console.error("Erro ao carregar fiscal:", error);
     }
   };
 
@@ -162,95 +160,96 @@ export default function useProdutosNovoCarregamento({
       const response = await getProduto(id);
       const produto = response.data;
 
-      let markup = '';
+      let markup = "";
       if (produto.preco_custo && produto.preco_venda && produto.preco_custo > 0) {
         markup = calcularMarkup(produto.preco_custo, produto.preco_venda).toFixed(2);
       }
 
       setFormData({
         ...produto,
-        sku: produto.codigo || '',
-        codigo: produto.codigo || '',
-        nome: produto.nome || '',
-        codigo_barras: produto.codigo_barras || '',
-        categoria_id: produto.categoria_id || '',
-        marca_id: produto.marca_id || '',
-        departamento_id: produto.departamento_id || '',
-        unidade: produto.unidade || 'UN',
-        descricao: normalizeMarkdownContent(produto.descricao_curta || ''),
-        tipo: produto.tipo || 'produto',
-        preco_custo: produto.preco_custo || '',
-        preco_venda: produto.preco_venda || '',
-        preco_promocional: produto.preco_promocional || '',
-        data_inicio_promocao: produto.promocao_inicio || '',
-        data_fim_promocao: produto.promocao_fim || '',
-        preco_ecommerce: produto.preco_ecommerce ?? '',
-        preco_ecommerce_promo: produto.preco_ecommerce_promo ?? '',
-        preco_ecommerce_promo_inicio: produto.preco_ecommerce_promo_inicio ?? '',
-        preco_ecommerce_promo_fim: produto.preco_ecommerce_promo_fim ?? '',
-        preco_app: produto.preco_app ?? '',
-        preco_app_promo: produto.preco_app_promo ?? '',
-        preco_app_promo_inicio: produto.preco_app_promo_inicio ?? '',
-        preco_app_promo_fim: produto.preco_app_promo_fim ?? '',
+        sku: produto.codigo || "",
+        codigo: produto.codigo || "",
+        nome: produto.nome || "",
+        codigo_barras: produto.codigo_barras || "",
+        categoria_id: produto.categoria_id || "",
+        marca_id: produto.marca_id || "",
+        departamento_id: produto.departamento_id || "",
+        unidade: produto.unidade || "UN",
+        descricao: normalizeMarkdownContent(produto.descricao_curta || ""),
+        tipo: produto.tipo || "produto",
+        preco_custo: produto.preco_custo || "",
+        preco_venda: produto.preco_venda || "",
+        preco_promocional: produto.preco_promocional || "",
+        data_inicio_promocao: produto.promocao_inicio || "",
+        data_fim_promocao: produto.promocao_fim || "",
+        preco_ecommerce: produto.preco_ecommerce ?? "",
+        preco_ecommerce_promo: produto.preco_ecommerce_promo ?? "",
+        preco_ecommerce_promo_inicio: produto.preco_ecommerce_promo_inicio ?? "",
+        preco_ecommerce_promo_fim: produto.preco_ecommerce_promo_fim ?? "",
+        preco_app: produto.preco_app ?? "",
+        preco_app_promo: produto.preco_app_promo ?? "",
+        preco_app_promo_inicio: produto.preco_app_promo_inicio ?? "",
+        preco_app_promo_fim: produto.preco_app_promo_fim ?? "",
         anunciar_ecommerce: produto.anunciar_ecommerce ?? true,
         anunciar_app: produto.anunciar_app ?? true,
         ativo: produto.ativo ?? true,
         situacao: produto.situacao ?? true,
-        estoque_minimo: produto.estoque_minimo || '',
-        estoque_maximo: produto.estoque_maximo || '',
+        estoque_minimo: produto.estoque_minimo || "",
+        estoque_maximo: produto.estoque_maximo || "",
         participa_sugestao_compra: produto.participa_sugestao_compra ?? true,
         controle_lote: produto.controle_lote ?? true,
         markup,
         tipo_produto:
-          Boolean(produto.e_granel) || (produto.nome || '').toLowerCase().includes('granel')
-            ? 'SIMPLES'
-            : produto.tipo_produto || 'SIMPLES',
+          Boolean(produto.e_granel) || (produto.nome || "").toLowerCase().includes("granel")
+            ? "SIMPLES"
+            : produto.tipo_produto || "SIMPLES",
         produto_pai_id: produto.produto_pai_id || null,
         tipo_kit:
-          Boolean(produto.e_granel) || (produto.nome || '').toLowerCase().includes('granel')
+          Boolean(produto.e_granel) || (produto.nome || "").toLowerCase().includes("granel")
             ? null
             : produto.tipo_kit || null,
         e_kit_fisico:
-          Boolean(produto.e_granel) || (produto.nome || '').toLowerCase().includes('granel')
+          Boolean(produto.e_granel) || (produto.nome || "").toLowerCase().includes("granel")
             ? false
             : produto.e_kit_fisico || false,
         composicao_kit: produto.composicao_kit || [],
-        origem: produto.origem || '0',
-        ncm: produto.ncm || '',
-        cest: produto.cest || '',
-        cfop: produto.cfop || '',
-        aliquota_icms: produto.aliquota_icms || '',
-        aliquota_pis: produto.aliquota_pis || '',
-        aliquota_cofins: produto.aliquota_cofins || '',
+        origem: produto.origem || "0",
+        ncm: produto.ncm || "",
+        cest: produto.cest || "",
+        cfop: produto.cfop || "",
+        aliquota_icms: produto.aliquota_icms || "",
+        aliquota_pis: produto.aliquota_pis || "",
+        aliquota_cofins: produto.aliquota_cofins || "",
         tem_recorrencia: produto.tem_recorrencia || false,
-        tipo_recorrencia: produto.tipo_recorrencia || 'monthly',
-        intervalo_dias: produto.intervalo_dias || '',
-        numero_doses: produto.numero_doses || '',
-        especie_compativel: produto.especie_compativel || 'both',
-        observacoes_recorrencia: produto.observacoes_recorrencia || '',
+        tipo_recorrencia: produto.tipo_recorrencia || "monthly",
+        intervalo_dias: produto.intervalo_dias || "",
+        numero_doses: produto.numero_doses || "",
+        especie_compativel: produto.especie_compativel || "both",
+        observacoes_recorrencia: produto.observacoes_recorrencia || "",
         eh_racao:
-          typeof produto.eh_racao === 'boolean'
+          typeof produto.eh_racao === "boolean"
             ? produto.eh_racao
-            : produto.tipo === 'ração' ||
-              produto.tipo === 'racao' ||
+            : produto.tipo === "ração" ||
+              produto.tipo === "racao" ||
               Boolean(produto.linha_racao_id) ||
-              Boolean(produto.classificacao_racao && produto.classificacao_racao !== 'nao'),
-        e_granel: Boolean(produto.e_granel) || (produto.nome || '').toLowerCase().includes('granel'),
+              Boolean(produto.classificacao_racao && produto.classificacao_racao !== "nao"),
+        e_granel:
+          Boolean(produto.e_granel) || (produto.nome || "").toLowerCase().includes("granel"),
         classificacao_racao:
-          produto.classificacao_racao && produto.classificacao_racao !== 'sim'
+          produto.classificacao_racao && produto.classificacao_racao !== "sim"
             ? produto.classificacao_racao
-            : '',
-        peso_embalagem: produto.peso_embalagem || '',
-        tabela_nutricional: produto.tabela_nutricional || '',
-        tabela_consumo: produto.tabela_consumo || '',
-        categoria_racao: produto.categoria_racao || '',
-        especies_indicadas: produto.especies_indicadas || 'both',
-        linha_racao_id: produto.linha_racao_id || '',
-        porte_animal_id: produto.porte_animal_id || '',
-        fase_publico_id: produto.fase_publico_id || '',
-        tipo_tratamento_id: produto.tipo_tratamento_id || '',
-        sabor_proteina_id: produto.sabor_proteina_id || '',
-        apresentacao_peso_id: produto.apresentacao_peso_id || '',
+            : "",
+        peso_embalagem: produto.peso_embalagem || "",
+        tabela_nutricional: produto.tabela_nutricional || "",
+        tabela_consumo: produto.tabela_consumo || "",
+        categoria_racao: produto.categoria_racao || "",
+        especies_indicadas: produto.especies_indicadas || "both",
+        linha_racao_id: produto.linha_racao_id || "",
+        porte_animal_id: produto.porte_animal_id || "",
+        fase_publico_id: produto.fase_publico_id || "",
+        tipo_tratamento_id: produto.tipo_tratamento_id || "",
+        sabor_proteina_id: produto.sabor_proteina_id || "",
+        apresentacao_peso_id: produto.apresentacao_peso_id || "",
       });
 
       if (produto.produto_predecessor_id) {
@@ -264,13 +263,13 @@ export default function useProdutosNovoCarregamento({
             data_descontinuacao: produto.predecessor?.data_descontinuacao,
           });
         } catch (error) {
-          console.error('Erro ao carregar predecessor:', error);
+          console.error("Erro ao carregar predecessor:", error);
         }
       }
 
       if (produto.data_descontinuacao) {
         try {
-          const sucessoresResponse = await api.get('/produtos/', {
+          const sucessoresResponse = await api.get("/produtos/", {
             params: {
               produto_predecessor_id: produto.id,
               ativo: null,
@@ -279,7 +278,7 @@ export default function useProdutosNovoCarregamento({
 
           const sucessores = Array.isArray(sucessoresResponse.data)
             ? sucessoresResponse.data
-            : (sucessoresResponse.data.items || []);
+            : sucessoresResponse.data.items || [];
 
           if (sucessores.length > 0) {
             const sucessor = sucessores[0];
@@ -292,7 +291,7 @@ export default function useProdutosNovoCarregamento({
             });
           }
         } catch (error) {
-          console.error('❌ Erro ao carregar sucessor:', error);
+          console.error("❌ Erro ao carregar sucessor:", error);
         }
       }
 
@@ -300,7 +299,7 @@ export default function useProdutosNovoCarregamento({
         const imagensRes = await api.get(`/produtos/${id}/imagens`);
         setImagens(imagensRes.data || []);
       } catch (error) {
-        console.error('Erro ao carregar imagens:', error);
+        console.error("Erro ao carregar imagens:", error);
         setImagens([]);
       }
 
@@ -312,7 +311,7 @@ export default function useProdutosNovoCarregamento({
           setFormData((prev) => ({ ...prev, controle_lote: true }));
         }
       } catch (error) {
-        console.error('Erro ao carregar lotes:', error);
+        console.error("Erro ao carregar lotes:", error);
         setLotes([]);
       }
 
@@ -321,8 +320,8 @@ export default function useProdutosNovoCarregamento({
 
       await carregarFiscal(produto);
     } catch (error) {
-      console.error('❌ Erro ao carregar produto:', error);
-      alert('Erro ao carregar produto: ' + (error.response?.data?.detail || error.message));
+      console.error("❌ Erro ao carregar produto:", error);
+      alert("Erro ao carregar produto: " + (error.response?.data?.detail || error.message));
     } finally {
       setLoading(false);
     }
@@ -341,7 +340,7 @@ export default function useProdutosNovoCarregamento({
       const produto = response.data;
       const clone = montarEstadoProdutoClonado(produto);
 
-      let markup = '';
+      let markup = "";
       if (clone.preco_custo && clone.preco_venda && Number(clone.preco_custo) > 0) {
         markup = calcularMarkup(Number(clone.preco_custo), Number(clone.preco_venda)).toFixed(2);
       }
@@ -352,8 +351,10 @@ export default function useProdutosNovoCarregamento({
         markup,
       }));
     } catch (error) {
-      console.error('Erro ao carregar produto para clone:', error);
-      alert('Erro ao carregar produto para clonar: ' + (error.response?.data?.detail || error.message));
+      console.error("Erro ao carregar produto para clone:", error);
+      alert(
+        "Erro ao carregar produto para clonar: " + (error.response?.data?.detail || error.message),
+      );
     } finally {
       setLoading(false);
     }
@@ -372,7 +373,7 @@ export default function useProdutosNovoCarregamento({
       cofins_aliquota: formData.tributacao.cofins_aliquota,
     };
 
-    if (produto.tipo_produto === 'KIT') {
+    if (produto.tipo_produto === "KIT") {
       await api.put(`/produtos/${produto.id}/kit/fiscal`, payload);
     } else {
       await api.put(`/produtos/${produto.id}/fiscal`, payload);

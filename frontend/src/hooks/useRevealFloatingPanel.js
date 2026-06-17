@@ -19,10 +19,7 @@ export default function useRevealFloatingPanel({
       revelarPainelFlutuante(panelRef?.current, { behavior, block, margin });
     };
 
-    if (
-      typeof window !== "undefined" &&
-      typeof window.requestAnimationFrame === "function"
-    ) {
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
       let primeiroFrame = 0;
       let segundoFrame = 0;
 

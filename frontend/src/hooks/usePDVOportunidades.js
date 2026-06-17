@@ -3,8 +3,7 @@ import api from "../api";
 import { debugLog } from "../utils/debug";
 
 export function usePDVOportunidades(vendaAtual, userId) {
-  const [painelOportunidadesAberto, setPainelOportunidadesAberto] =
-    useState(false);
+  const [painelOportunidadesAberto, setPainelOportunidadesAberto] = useState(false);
   const [opportunities, setOpportunities] = useState([]);
 
   const buscarOportunidades = async (vendaId) => {

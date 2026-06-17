@@ -73,9 +73,7 @@ function buildClienteFormData(cliente) {
     tipo_cadastro: cliente.tipo_cadastro || "cliente",
     tipo_pessoa: cliente.tipo_pessoa || "PF",
     nome: cliente.nome || "",
-    data_nascimento: cliente.data_nascimento
-      ? String(cliente.data_nascimento).slice(0, 10)
-      : "",
+    data_nascimento: cliente.data_nascimento ? String(cliente.data_nascimento).slice(0, 10) : "",
     cpf: cliente.cpf || "",
     email: cliente.email || "",
     telefone: cliente.telefone || "",
@@ -100,20 +98,17 @@ function buildClienteFormData(cliente) {
     endereco_entrega: cliente.endereco_entrega || "",
     endereco_entrega_2: cliente.endereco_entrega_2 || "",
     is_entregador: cliente.is_entregador || false,
-    entregador_ativo:
-      cliente.entregador_ativo !== undefined ? cliente.entregador_ativo : true,
+    entregador_ativo: cliente.entregador_ativo !== undefined ? cliente.entregador_ativo : true,
     entregador_padrao: cliente.entregador_padrao || false,
     tipo_vinculo_entrega: cliente.tipo_vinculo_entrega || "",
     controla_rh: cliente.controla_rh || false,
-    gera_conta_pagar_custo_entrega:
-      cliente.gera_conta_pagar_custo_entrega || false,
+    gera_conta_pagar_custo_entrega: cliente.gera_conta_pagar_custo_entrega || false,
     media_entregas_configurada: cliente.media_entregas_configurada || "",
     custo_rh_ajustado: cliente.custo_rh_ajustado || "",
     modelo_custo_entrega: cliente.modelo_custo_entrega || "",
     taxa_fixa_entrega: cliente.taxa_fixa_entrega || "",
     valor_por_km_entrega: cliente.valor_por_km_entrega || "",
-    moto_propria:
-      cliente.moto_propria !== undefined ? cliente.moto_propria : true,
+    moto_propria: cliente.moto_propria !== undefined ? cliente.moto_propria : true,
     tipo_acerto_entrega: cliente.tipo_acerto_entrega || "",
     dia_semana_acerto: cliente.dia_semana_acerto || "",
     dia_mes_acerto: cliente.dia_mes_acerto || "",
@@ -139,10 +134,8 @@ export function useClientesNovoCadastro({
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const [showModalImportacao, setShowModalImportacao] = useState(false);
-  const [mostrarModalAdicionarCredito, setMostrarModalAdicionarCredito] =
-    useState(false);
-  const [mostrarModalRemoverCredito, setMostrarModalRemoverCredito] =
-    useState(false);
+  const [mostrarModalAdicionarCredito, setMostrarModalAdicionarCredito] = useState(false);
+  const [mostrarModalRemoverCredito, setMostrarModalRemoverCredito] = useState(false);
   const [refreshKeyCredito, setRefreshKeyCredito] = useState(0);
   const [editingCliente, setEditingCliente] = useState(null);
   const [loadingCep, setLoadingCep] = useState(false);
@@ -157,9 +150,7 @@ export function useClientesNovoCadastro({
   const [loadingResumo, setLoadingResumo] = useState(false);
   const [saldoCampanhas, setSaldoCampanhas] = useState(null);
   const [loadingCadastro, setLoadingCadastro] = useState(false);
-  const [formData, setFormData] = useState(
-    buildNovoClienteFormData("cliente", "PF"),
-  );
+  const [formData, setFormData] = useState(buildNovoClienteFormData("cliente", "PF"));
 
   const {
     enderecosAdicionais,
@@ -257,8 +248,7 @@ export function useClientesNovoCadastro({
       loadSaldoCampanhas(cliente.id);
       setCurrentStep(petIdToEdit ? 5 : 1);
     } else {
-      const tipoCadastro =
-        tipo || (tipoFiltro === "todos" ? "cliente" : tipoFiltro);
+      const tipoCadastro = tipo || (tipoFiltro === "todos" ? "cliente" : tipoFiltro);
       const tipoPessoa = tipoCadastro === "fornecedor" ? "PJ" : "PF";
 
       setEditingCliente(null);
@@ -301,9 +291,7 @@ export function useClientesNovoCadastro({
         return false;
       }
 
-      const response = await api.get(
-        `/clientes/verificar-duplicata/campo?${params.toString()}`,
-      );
+      const response = await api.get(`/clientes/verificar-duplicata/campo?${params.toString()}`);
 
       if (response.data.duplicado) {
         setClienteDuplicado(response.data);
@@ -353,20 +341,14 @@ export function useClientesNovoCadastro({
 
       const proximoCodigo =
         editingCliente?.codigo ||
-        (clientes.length > 0
-          ? Math.max(...clientes.map((c) => c.codigo)) + 1
-          : 1);
+        (clientes.length > 0 ? Math.max(...clientes.map((c) => c.codigo)) + 1 : 1);
 
-      await api.put(
-        `/clientes/${clienteDuplicado.cliente.id}/remover-campo`,
-        null,
-        {
-          params: {
-            campo: clienteDuplicado.campo,
-            novo_cliente_codigo: proximoCodigo,
-          },
+      await api.put(`/clientes/${clienteDuplicado.cliente.id}/remover-campo`, null, {
+        params: {
+          campo: clienteDuplicado.campo,
+          novo_cliente_codigo: proximoCodigo,
         },
-      );
+      });
 
       setShowConfirmacaoRemocao(false);
       setShowDuplicadoWarning(false);
@@ -386,9 +368,7 @@ export function useClientesNovoCadastro({
   const irParaClienteExistente = () => {
     closeModal();
 
-    const elemento = document.getElementById(
-      `cliente-${clienteDuplicado.cliente.id}`,
-    );
+    const elemento = document.getElementById(`cliente-${clienteDuplicado.cliente.id}`);
 
     if (!elemento) {
       return;
@@ -437,7 +417,10 @@ export function useClientesNovoCadastro({
       }
 
       if (formData.tipo_cadastro === "cliente") {
-        const telefoneDigits = `${formData.telefone || ""}${formData.celular || ""}`.replace(/\D/g, "");
+        const telefoneDigits = `${formData.telefone || ""}${formData.celular || ""}`.replace(
+          /\D/g,
+          "",
+        );
         if (telefoneDigits.length < 10) {
           errosValidacao.push("Telefone ou celular");
         }
@@ -454,24 +437,16 @@ export function useClientesNovoCadastro({
 
       if (formData.is_entregador) {
         if (!formData.tipo_acerto_entrega) {
-          alert(
-            "Informe o tipo de acerto do entregador (semanal, quinzenal ou mensal)",
-          );
+          alert("Informe o tipo de acerto do entregador (semanal, quinzenal ou mensal)");
           return;
         }
 
-        if (
-          formData.tipo_acerto_entrega === "semanal" &&
-          !formData.dia_semana_acerto
-        ) {
+        if (formData.tipo_acerto_entrega === "semanal" && !formData.dia_semana_acerto) {
           alert("Informe o dia da semana para o acerto semanal");
           return;
         }
 
-        if (
-          formData.tipo_acerto_entrega === "mensal" &&
-          !formData.dia_mes_acerto
-        ) {
+        if (formData.tipo_acerto_entrega === "mensal" && !formData.dia_mes_acerto) {
           alert("Informe o dia do mes para o acerto mensal");
           return;
         }
@@ -485,7 +460,7 @@ export function useClientesNovoCadastro({
         }
       }
 
-      const { celular_whatsapp, tags, ...clienteData } = formData;
+      const { celular_whatsapp: _celular_whatsapp, tags: _tags, ...clienteData } = formData;
       clienteData.alertas_pdv = normalizeClienteAlertasPdv(clienteData.alertas_pdv);
 
       if (clienteData.is_entregador) {
@@ -604,18 +579,13 @@ export function useClientesNovoCadastro({
           const campo = detail.loc[detail.loc.length - 1];
           const nomeCampo = camposPtBr[campo] || campo;
 
-          if (
-            detail.type === "missing" ||
-            detail.type === "value_error.missing"
-          ) {
+          if (detail.type === "missing" || detail.type === "value_error.missing") {
             camposFaltando.push(nomeCampo);
           } else if (detail.msg) {
             camposFaltando.push(`${nomeCampo}: ${detail.msg}`);
           }
 
-          console.error(
-            `Campo: ${nomeCampo} | Tipo: ${detail.type} | Mensagem: ${detail.msg}`,
-          );
+          console.error(`Campo: ${nomeCampo} | Tipo: ${detail.type} | Mensagem: ${detail.msg}`);
         });
 
         if (camposFaltando.length > 0) {
@@ -625,8 +595,7 @@ export function useClientesNovoCadastro({
         }
       }
 
-      const errorMessage =
-        mensagemErro || err.response?.data?.message || "Erro ao salvar cliente";
+      const errorMessage = mensagemErro || err.response?.data?.message || "Erro ao salvar cliente";
       setError(errorMessage);
 
       if (mensagemErro) {

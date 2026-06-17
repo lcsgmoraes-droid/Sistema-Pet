@@ -100,8 +100,7 @@ export default function useProdutosCatalogos() {
 
     const categoriasData =
       categoriasResult.status === "fulfilled" ? categoriasResult.value.data || [] : [];
-    const marcasData =
-      marcasResult.status === "fulfilled" ? marcasResult.value.data || [] : [];
+    const marcasData = marcasResult.status === "fulfilled" ? marcasResult.value.data || [] : [];
     const fornecedoresPayload =
       fornecedoresResult.status === "fulfilled" ? fornecedoresResult.value.data : [];
     const departamentosData =

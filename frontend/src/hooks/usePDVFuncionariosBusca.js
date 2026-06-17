@@ -9,11 +9,11 @@ export function usePDVFuncionariosBusca() {
     try {
       const response = await api.get("/comissoes/configuracoes/funcionarios");
       const funcionarios = response.data.data || [];
-      const termo = String(busca || "").trim().toLowerCase();
+      const termo = String(busca || "")
+        .trim()
+        .toLowerCase();
       const filtrados = termo
-        ? funcionarios.filter((funcionario) =>
-            funcionario.nome.toLowerCase().includes(termo),
-          )
+        ? funcionarios.filter((funcionario) => funcionario.nome.toLowerCase().includes(termo))
         : funcionarios;
 
       setFuncionariosSugeridos(filtrados);

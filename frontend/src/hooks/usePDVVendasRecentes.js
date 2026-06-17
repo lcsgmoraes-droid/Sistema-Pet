@@ -75,9 +75,7 @@ export function usePDVVendasRecentes() {
 
     try {
       await api.post(`/ecommerce-drive/pedido/${pedidoId}/entregue`);
-      const proximosPedidos = driveAguardando.filter(
-        (pedido) => pedido.pedido_id !== pedidoId,
-      );
+      const proximosPedidos = driveAguardando.filter((pedido) => pedido.pedido_id !== pedidoId);
       setDriveAguardando(proximosPedidos);
       setDriveAlertVisible(proximosPedidos.length > 0);
     } catch (error) {

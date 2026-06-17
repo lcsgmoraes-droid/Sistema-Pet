@@ -16,7 +16,7 @@ function detalhesValidacaoParaMensagem(details) {
       [...(item.loc || []), item.msg || "", item.type || ""]
         .join(" ")
         .toLowerCase()
-        .includes("email")
+        .includes("email"),
     )
   ) {
     return "E-mail invalido. Use o formato nome@dominio.com, por exemplo usuario@empresa.com.br.";
@@ -118,9 +118,7 @@ export default function useUsuariosPage() {
 
   async function forcarLogout(userId) {
     if (
-      !confirm(
-        "Forcar logout deste usuario em todos os dispositivos? A conta continuara ativa.",
-      )
+      !confirm("Forcar logout deste usuario em todos os dispositivos? A conta continuara ativa.")
     ) {
       return;
     }

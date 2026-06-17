@@ -33,7 +33,7 @@ export function usePDVAssistente(vendaAtual) {
     setAlertasCarrinho([]);
     setInfosCarrinho([]);
     return undefined;
-  }, [vendaAtual.itens, vendaAtual.cliente?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [vendaAtual.itens, vendaAtual.cliente?.id]);
 
   const carregarInfoCliente = async (clienteId) => {
     if (!clienteId) return;
@@ -44,7 +44,10 @@ export function usePDVAssistente(vendaAtual) {
       const pets = info.pets?.map((p) => p.nome).join(", ") || "Nenhum";
       const ultimaCompra = info.resumo_financeiro?.ultima_compra;
       const topProdutos =
-        info.sugestoes?.slice(0, 3).map((s) => s.nome).join(", ") || "Nenhum";
+        info.sugestoes
+          ?.slice(0, 3)
+          .map((s) => s.nome)
+          .join(", ") || "Nenhum";
       const oportunidades = info.oportunidades || [];
 
       let autoMsg = `Resumo de **${info.cliente?.nome}**:\n`;
@@ -67,8 +70,7 @@ export function usePDVAssistente(vendaAtual) {
       setMensagensAssistente([
         {
           role: "assistant",
-          texto:
-            "Não foi possível carregar o histórico. Pode me perguntar qualquer coisa!",
+          texto: "Não foi possível carregar o histórico. Pode me perguntar qualquer coisa!",
         },
       ]);
     }
@@ -119,10 +121,7 @@ export function usePDVAssistente(vendaAtual) {
         mensagem: msg,
         carrinho: carrinhoPayload,
       });
-      setMensagensAssistente((prev) => [
-        ...prev,
-        { role: "assistant", texto: res.data.resposta },
-      ]);
+      setMensagensAssistente((prev) => [...prev, { role: "assistant", texto: res.data.resposta }]);
     } catch {
       setMensagensAssistente((prev) => [
         ...prev,

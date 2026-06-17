@@ -40,9 +40,7 @@ export default function useCampanhasConfiguracoes({
   const recalcularRanking = async () => {
     try {
       await api.post("/campanhas/ranking/recalcular");
-      alert(
-        "Recalculo de ranking enfileirado! O worker processara em ate 10 segundos.",
-      );
+      alert("Recalculo de ranking enfileirado! O worker processara em ate 10 segundos.");
       setTimeout(() => carregarRanking(), 3000);
     } catch (e) {
       alert("Erro: " + (e?.response?.data?.detail || e.message));
