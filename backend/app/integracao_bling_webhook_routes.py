@@ -1,14 +1,11 @@
-
 from fastapi import APIRouter, Request
 import json
 import logging
 
-router = APIRouter(
-    prefix="/integracoes/bling",
-    tags=["Integração Bling - Webhook"]
-)
+router = APIRouter(prefix="/integracoes/bling", tags=["Integração Bling - Webhook"])
 
 logger = logging.getLogger("bling_webhook")
+
 
 @router.post("/webhook")
 async def receber_webhook_bling(request: Request):

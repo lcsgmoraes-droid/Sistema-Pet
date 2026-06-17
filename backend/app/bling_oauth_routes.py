@@ -1,6 +1,7 @@
 """
 Bling OAuth2 - Callback e renovação automática de tokens
 """
+
 import os
 import base64
 import json
@@ -58,7 +59,9 @@ def _sincronizar_controle_token(expires_in: int = 21600) -> None:
     if token_control_path.exists():
         try:
             dados_atuais = json.loads(token_control_path.read_text(encoding="utf-8"))
-            renovacoes_automaticas = int(dados_atuais.get("renovacoes_automaticas") or 0)
+            renovacoes_automaticas = int(
+                dados_atuais.get("renovacoes_automaticas") or 0
+            )
         except Exception:
             renovacoes_automaticas = 0
 
@@ -149,17 +152,23 @@ def _trocar_code_por_tokens(code: str, redirect_uri: str) -> dict:
 
 
 @router.get("/callback", response_class=HTMLResponse)
-async def bling_oauth_callback(request: Request, code: str = None, error: str = None, state: str = None):
+async def bling_oauth_callback(
+    request: Request, code: str = None, error: str = None, state: str = None
+):
     """
     Endpoint de callback OAuth do Bling.
     O Bling redireciona aqui após o usuário autorizar o aplicativo.
     """
     if error:
         logger.error(f"Bling OAuth erro: {error}")
-        return HTMLResponse(content=_html_erro(f"Bling retornou erro: {error}"), status_code=400)
+        return HTMLResponse(
+            content=_html_erro(f"Bling retornou erro: {error}"), status_code=400
+        )
 
     if not code:
-        return HTMLResponse(content=_html_erro("Código de autorização não recebido"), status_code=400)
+        return HTMLResponse(
+            content=_html_erro("Código de autorização não recebido"), status_code=400
+        )
 
     try:
         # Montar redirect_uri com base na request atual
@@ -179,7 +188,9 @@ async def bling_oauth_callback(request: Request, code: str = None, error: str = 
         _salvar_tokens(access_token, refresh_token, expires_in=expires_in)
 
         expira_em = datetime.now() + timedelta(seconds=expires_in)
-        logger.info(f"✅ Bling OAuth concluído. Token expira em: {expira_em.strftime('%d/%m/%Y %H:%M')}")
+        logger.info(
+            f"✅ Bling OAuth concluído. Token expira em: {expira_em.strftime('%d/%m/%Y %H:%M')}"
+        )
 
         return HTMLResponse(content=_html_sucesso(expira_em, access_token))
 
@@ -191,7 +202,10 @@ async def bling_oauth_callback(request: Request, code: str = None, error: str = 
 @router.get("/link-autorizacao")
 async def gerar_link_autorizacao(
     request: Request,
-    redirect: bool = Query(False, description="Quando true, redireciona direto para a autorizacao do Bling."),
+    redirect: bool = Query(
+        False,
+        description="Quando true, redireciona direto para a autorizacao do Bling.",
+    ),
 ):
     """
     Retorna o link para o usuário autorizar o aplicativo no Bling.
@@ -205,6 +219,7 @@ async def gerar_link_autorizacao(
     redirect_uri = f"{base_url}/auth/bling/callback"
 
     import secrets
+
     state = secrets.token_hex(16)
 
     auth_url = (
@@ -222,7 +237,8 @@ async def gerar_link_autorizacao(
         "instrucao": "Acesse a URL abaixo no navegador para autorizar o Bling",
         "url_autorizacao": auth_url,
         "redirect_uri_configurado": redirect_uri,
-        "importante": "O 'Link de redirecionamento' no cadastro do app Bling deve ser: " + redirect_uri,
+        "importante": "O 'Link de redirecionamento' no cadastro do app Bling deve ser: "
+        + redirect_uri,
     }
 
 
@@ -239,7 +255,11 @@ async def status_token():
     try:
         r = requests.get(
             "https://api.bling.com.br/Api/v3/situacoes/modulos",
-            headers={"Authorization": f"Bearer {token}", "Accept": "application/json", "enable-jwt": "1"},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+                "enable-jwt": "1",
+            },
             timeout=10,
         )
         if r.status_code == 200:
@@ -257,7 +277,11 @@ async def status_token():
                 "refresh_token_configurado": bool(refresh),
             }
         else:
-            return {"status": "erro", "http_status": r.status_code, "detalhe": r.text[:200]}
+            return {
+                "status": "erro",
+                "http_status": r.status_code,
+                "detalhe": r.text[:200],
+            }
     except Exception as e:
         return {"status": "erro", "mensagem": str(e)}
 
@@ -276,7 +300,7 @@ def _html_sucesso(expira_em: datetime, token: str) -> str:
     <body><div class="box">
     <h1>✅ Bling Autorizado!</h1>
     <p>O token foi salvo com sucesso no sistema.</p>
-    <div class="badge">Token expira em: {expira_em.strftime('%d/%m/%Y às %H:%M')}</div>
+    <div class="badge">Token expira em: {expira_em.strftime("%d/%m/%Y às %H:%M")}</div>
         <p style="margin-top:20px">Redirecionando para o sistema em <span id="contador">3</span> segundos...</p>
         <a class="btn" href="/configuracoes/integracoes">Voltar agora</a>
         </div>
