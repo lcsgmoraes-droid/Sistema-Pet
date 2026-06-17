@@ -695,8 +695,7 @@ def test_backend_ci_has_blocking_backend_routes_format_step():
 
     assert "Backend routes format (blocking)" in source
     assert (
-        "ruff format --check app/routes --exclude app/routes/sefaz_routes.py"
-        in source
+        "ruff format --check app/routes --exclude app/routes/sefaz_routes.py" in source
     )
 
 
