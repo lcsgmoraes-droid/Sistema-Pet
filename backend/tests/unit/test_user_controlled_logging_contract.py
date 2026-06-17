@@ -64,6 +64,11 @@ FORBIDDEN_USER_CONTROLLED_LOG_PATTERNS = [
         "conciliation upload filename log",
     ),
     (
+        "app/dashboard_routes.py",
+        r"logger\.info\(f\"\[contas-vencidas\].*tenant \{tenant_id\}",
+        "overdue accounts tenant log",
+    ),
+    (
         "app/estoque_movimentacoes_edicao_routes.py",
         r"logger\.info\(\"Movimentacao %s excluida por %s\"",
         "stock movement delete user log",

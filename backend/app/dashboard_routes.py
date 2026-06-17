@@ -3,7 +3,7 @@ Rotas para Dashboard Financeiro
 Endpoints para dados consolidados do sistema
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import func, and_, or_
 from datetime import datetime, date, time, timedelta
@@ -1543,7 +1543,7 @@ async def obter_resumo_dashboard(
 
 @router.get("/dashboard/entradas-saidas")
 async def obter_entradas_saidas_por_dia(
-    periodo_dias: int = 30,
+    periodo_dias: int = Query(30, ge=0, le=366),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -1620,7 +1620,7 @@ async def obter_entradas_saidas_por_dia(
 
 @router.get("/dashboard/vendas-por-dia")
 async def obter_vendas_por_dia(
-    periodo_dias: int = 30,
+    periodo_dias: int = Query(30, ge=0, le=366),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -1690,7 +1690,7 @@ async def obter_contas_vencidas(
     
     try:
         hoje = datetime.now().date()
-        logger.info(f"[contas-vencidas] Buscando contas vencidas para tenant {tenant_id}")
+        logger.info("[contas-vencidas] Buscando contas vencidas")
         
         # Contas a receber vencidas
         try:
