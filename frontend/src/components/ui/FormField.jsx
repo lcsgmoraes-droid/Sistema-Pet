@@ -35,7 +35,13 @@ export function FormField({
   return (
     <label className={cx("block", className)}>
       {label && (
-        <span className={cx(styles.label, labelAccessory && "inline-flex items-center gap-1", labelClassName)}>
+        <span
+          className={cx(
+            styles.label,
+            labelAccessory && "inline-flex items-center gap-1",
+            labelClassName,
+          )}
+        >
           {label}
           {required && <span className="ml-0.5 text-red-500">*</span>}
           {labelAccessory}

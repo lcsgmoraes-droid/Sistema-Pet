@@ -4,11 +4,7 @@ function cx(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
-export default function LoadingState({
-  className = "",
-  compact = false,
-  label = "Carregando...",
-}) {
+export default function LoadingState({ className = "", compact = false, label = "Carregando..." }) {
   return (
     <div
       className={cx(

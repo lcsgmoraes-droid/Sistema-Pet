@@ -8,9 +8,7 @@ const ClientesNovoComplementaresStep = ({
   abrirModalEndereco,
   removerEndereco,
 }) => {
-  const alertasPdv = Array.isArray(formData.alertas_pdv)
-    ? formData.alertas_pdv
-    : [];
+  const alertasPdv = Array.isArray(formData.alertas_pdv) ? formData.alertas_pdv : [];
 
   const setAlertasPdv = (alertas) => {
     setFormData({ ...formData, alertas_pdv: alertas });
@@ -34,16 +32,12 @@ const ClientesNovoComplementaresStep = ({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-        Informacoes complementares
-      </h3>
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">Informacoes complementares</h3>
 
       <div className="border-b pb-4 mb-4">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h4 className="text-md font-semibold text-gray-800">
-              Enderecos Adicionais
-            </h4>
+            <h4 className="text-md font-semibold text-gray-800">Enderecos Adicionais</h4>
             <p className="text-sm text-gray-600">
               Cadastre multiplos enderecos para entrega, cobranca, etc.
             </p>
@@ -53,12 +47,7 @@ const ClientesNovoComplementaresStep = ({
             onClick={() => abrirModalEndereco()}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -103,14 +92,10 @@ const ClientesNovoComplementaresStep = ({
                                 ? "Residencial"
                                 : "Trabalho"}
                       </span>
-                      <span className="text-xs font-medium text-gray-500">
-                        +{index + 1}
-                      </span>
+                      <span className="text-xs font-medium text-gray-500">+{index + 1}</span>
                     </div>
                     {endereco.apelido && (
-                      <p className="text-sm font-semibold text-gray-900 mb-1">
-                        {endereco.apelido}
-                      </p>
+                      <p className="text-sm font-semibold text-gray-900 mb-1">{endereco.apelido}</p>
                     )}
                     <p className="text-sm text-gray-700">
                       {endereco.endereco}, {endereco.numero}
@@ -119,9 +104,7 @@ const ClientesNovoComplementaresStep = ({
                     <p className="text-xs text-gray-600 mt-1">
                       {endereco.bairro}, {endereco.cidade}/{endereco.estado}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      CEP: {endereco.cep}
-                    </p>
+                    <p className="text-xs text-gray-500 mt-1">CEP: {endereco.cep}</p>
                   </div>
                   <div className="flex gap-1 ml-2">
                     <button
@@ -214,35 +197,24 @@ const ClientesNovoComplementaresStep = ({
         {alertasPdv.length > 0 ? (
           <div className="space-y-3">
             {alertasPdv.map((alerta, index) => (
-              <div
-                key={index}
-                className="rounded-lg border border-amber-200 bg-amber-50 p-3"
-              >
+              <div key={index} className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_150px_auto] md:items-start">
                   <label className="block">
-                    <span className="mb-1 block text-sm font-medium text-gray-700">
-                      Tag
-                    </span>
+                    <span className="mb-1 block text-sm font-medium text-gray-700">Tag</span>
                     <input
                       type="text"
                       value={alerta.titulo || ""}
-                      onChange={(e) =>
-                        atualizarAlerta(index, "titulo", e.target.value)
-                      }
+                      onChange={(e) => atualizarAlerta(index, "titulo", e.target.value)}
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-amber-500"
                       placeholder="Preco especial"
                     />
                   </label>
 
                   <label className="block">
-                    <span className="mb-1 block text-sm font-medium text-gray-700">
-                      Prioridade
-                    </span>
+                    <span className="mb-1 block text-sm font-medium text-gray-700">Prioridade</span>
                     <select
                       value={alerta.prioridade || "aviso"}
-                      onChange={(e) =>
-                        atualizarAlerta(index, "prioridade", e.target.value)
-                      }
+                      onChange={(e) => atualizarAlerta(index, "prioridade", e.target.value)}
                       className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-amber-500"
                     >
                       <option value="aviso">Aviso</option>
@@ -262,14 +234,10 @@ const ClientesNovoComplementaresStep = ({
                 </div>
 
                 <label className="mt-3 block">
-                  <span className="mb-1 block text-sm font-medium text-gray-700">
-                    Mensagem
-                  </span>
+                  <span className="mb-1 block text-sm font-medium text-gray-700">Mensagem</span>
                   <textarea
                     value={alerta.mensagem || ""}
-                    onChange={(e) =>
-                      atualizarAlerta(index, "mensagem", e.target.value)
-                    }
+                    onChange={(e) => atualizarAlerta(index, "mensagem", e.target.value)}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-amber-500"
                     rows="2"
                     placeholder="Cliente tem preco especial na racao X: fazer por R$ 120,00"
@@ -280,9 +248,7 @@ const ClientesNovoComplementaresStep = ({
                   <input
                     type="checkbox"
                     checked={alerta.ativo !== false}
-                    onChange={(e) =>
-                      atualizarAlerta(index, "ativo", e.target.checked)
-                    }
+                    onChange={(e) => atualizarAlerta(index, "ativo", e.target.checked)}
                     className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
                   />
                   Ativo no PDV
@@ -298,9 +264,7 @@ const ClientesNovoComplementaresStep = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Observacoes
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Observacoes</label>
         <textarea
           value={formData.observacoes}
           onChange={(e) =>

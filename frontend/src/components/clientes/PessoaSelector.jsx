@@ -35,9 +35,7 @@ export default function PessoaSelector({
   const panelRef = useRef(null);
   const searchValue = String(value || "");
   const shouldShowSuggestions =
-    showSuggestions &&
-    searchValue.trim().length >= minChars &&
-    suggestions.length > 0;
+    showSuggestions && searchValue.trim().length >= minChars && suggestions.length > 0;
 
   useRevealFloatingPanel({
     enabled: shouldShowSuggestions && !disabled,
@@ -94,14 +92,10 @@ export default function PessoaSelector({
                   )}
                 </div>
                 {defaultPessoaMeta(pessoa) && (
-                  <div className="text-sm text-gray-500">
-                    {defaultPessoaMeta(pessoa)}
-                  </div>
+                  <div className="text-sm text-gray-500">{defaultPessoaMeta(pessoa)}</div>
                 )}
                 {pessoa?.pets?.length > 0 && (
-                  <div className="mt-1 text-xs text-blue-600">
-                    {pessoa.pets.length} pet(s)
-                  </div>
+                  <div className="mt-1 text-xs text-blue-600">{pessoa.pets.length} pet(s)</div>
                 )}
               </button>
             ),

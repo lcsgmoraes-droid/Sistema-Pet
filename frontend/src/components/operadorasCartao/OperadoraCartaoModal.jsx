@@ -57,11 +57,15 @@ function OperadoraCartaoModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Codigo (sigla)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Codigo (sigla)
+                </label>
                 <input
                   type="text"
                   value={formData.codigo}
-                  onChange={(e) => setFormData({ ...formData, codigo: e.target.value.toUpperCase() })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, codigo: e.target.value.toUpperCase() })
+                  }
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
                   placeholder="Ex: STONE, CIELO"
                   maxLength={50}
@@ -167,7 +171,9 @@ function OperadoraCartaoModal({
                 onChange={(e) => setFormData({ ...formData, api_enabled: e.target.checked })}
                 className="w-4 h-4 text-blue-600"
               />
-              <span className="text-sm font-medium text-gray-700">Habilitar integracao via API</span>
+              <span className="text-sm font-medium text-gray-700">
+                Habilitar integracao via API
+              </span>
             </label>
 
             {formData.api_enabled && (

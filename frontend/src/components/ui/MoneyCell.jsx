@@ -27,8 +27,6 @@ export default function MoneyCell({
   zeroAsDash = false,
 }) {
   return (
-    <span className={className}>
-      {formatMoneyCellValue(value, { absolute, sign, zeroAsDash })}
-    </span>
+    <span className={className}>{formatMoneyCellValue(value, { absolute, sign, zeroAsDash })}</span>
   );
 }

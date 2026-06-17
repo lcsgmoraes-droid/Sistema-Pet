@@ -1,12 +1,5 @@
 import { useEffect, useRef } from "react";
-import {
-  AlertCircle,
-  ChevronDown,
-  ChevronRight,
-  Save,
-  ShieldPlus,
-  X,
-} from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, Save, ShieldPlus, X } from "lucide-react";
 import ActionButton from "../ui/ActionButton";
 import { TextField } from "../ui/FormField";
 import IconActionButton from "../ui/IconActionButton";
@@ -97,9 +90,7 @@ function PermissionCategory({
                       {permission.descricao}
                     </span>
                   ) : (
-                    <span className="mt-0.5 block text-xs text-slate-400">
-                      {permission.nome}
-                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-400">{permission.nome}</span>
                   )}
                 </span>
               </label>
@@ -180,9 +171,7 @@ export default function RoleModal({
 
             <div>
               <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="text-xs font-medium text-slate-600">
-                  Permissoes
-                </span>
+                <span className="text-xs font-medium text-slate-600">Permissoes</span>
                 <span className="text-xs text-slate-500">
                   {roleForm.permissions.length} selecionadas
                 </span>
