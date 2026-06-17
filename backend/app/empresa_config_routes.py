@@ -18,6 +18,7 @@ router = APIRouter(prefix="/empresa/config", tags=["Configuração da Empresa"])
 
 # ===== SCHEMAS =====
 
+
 class EmpresaConfigGeralCreate(BaseModel):
     razao_social: Optional[str] = None
     nome_fantasia: Optional[str] = None
@@ -85,29 +86,32 @@ class EmpresaConfigGeralResponse(BaseModel):
     mensagem_venda_alerta: str
     mensagem_venda_critica: str
     aliquota_imposto_padrao: float
-    
+
     class Config:
         from_attributes = True
 
 
 # ===== ENDPOINTS =====
 
+
 @router.get("/", response_model=EmpresaConfigGeralResponse)
 @require_permission("configuracoes.editar")
 def get_config_empresa(
-    user_and_tenant = Depends(get_current_user_and_tenant),
-    db: Session = Depends(get_session)
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
 ):
     """
     Busca a configuração geral da empresa
     Se não existir, retorna configuração padrão
     """
     current_user, tenant_id = user_and_tenant
-    
-    config = db.query(EmpresaConfigGeral).filter(
-        EmpresaConfigGeral.tenant_id == tenant_id
-    ).first()
-    
+
+    config = (
+        db.query(EmpresaConfigGeral)
+        .filter(EmpresaConfigGeral.tenant_id == tenant_id)
+        .first()
+    )
+
     if not config:
         # Retorna configuração padrão
         return EmpresaConfigGeralResponse(
@@ -120,9 +124,9 @@ def get_config_empresa(
             mensagem_venda_saudavel="✅ Venda Saudável! Margem excelente.",
             mensagem_venda_alerta="⚠️ ATENÇÃO: Margem reduzida! Revisar preço.",
             mensagem_venda_critica="🚨 CRÍTICO: Margem muito baixa! Venda com prejuízo!",
-            aliquota_imposto_padrao=7.0
+            aliquota_imposto_padrao=7.0,
         )
-    
+
     return config
 
 
@@ -130,32 +134,33 @@ def get_config_empresa(
 @require_permission("configuracoes.editar")
 def create_config_empresa(
     config_data: EmpresaConfigGeralCreate,
-    user_and_tenant = Depends(get_current_user_and_tenant),
-    db: Session = Depends(get_session)
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
 ):
     """Cria a configuração geral da empresa"""
     current_user, tenant_id = user_and_tenant
-    
+
     # Verifica se já existe
-    config_existente = db.query(EmpresaConfigGeral).filter(
-        EmpresaConfigGeral.tenant_id == tenant_id
-    ).first()
-    
-    if config_existente:
-        raise HTTPException(status_code=400, detail="Configuração já existe. Use PUT para atualizar.")
-    
-    # Cria nova configuração
-    config = EmpresaConfigGeral(
-        tenant_id=tenant_id,
-        **config_data.model_dump()
+    config_existente = (
+        db.query(EmpresaConfigGeral)
+        .filter(EmpresaConfigGeral.tenant_id == tenant_id)
+        .first()
     )
-    
+
+    if config_existente:
+        raise HTTPException(
+            status_code=400, detail="Configuração já existe. Use PUT para atualizar."
+        )
+
+    # Cria nova configuração
+    config = EmpresaConfigGeral(tenant_id=tenant_id, **config_data.model_dump())
+
     db.add(config)
     db.commit()
     db.refresh(config)
-    
+
     logger.info(f"Configuração da empresa criada para tenant {tenant_id}")
-    
+
     return config
 
 
@@ -163,53 +168,57 @@ def create_config_empresa(
 @require_permission("configuracoes.editar")
 def update_config_empresa(
     config_data: EmpresaConfigGeralUpdate,
-    user_and_tenant = Depends(get_current_user_and_tenant),
-    db: Session = Depends(get_session)
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
 ):
     """Atualiza a configuração geral da empresa"""
     current_user, tenant_id = user_and_tenant
-    
-    config = db.query(EmpresaConfigGeral).filter(
-        EmpresaConfigGeral.tenant_id == tenant_id
-    ).first()
-    
+
+    config = (
+        db.query(EmpresaConfigGeral)
+        .filter(EmpresaConfigGeral.tenant_id == tenant_id)
+        .first()
+    )
+
     if not config:
         # Cria se não existir
         config = EmpresaConfigGeral(tenant_id=tenant_id)
         db.add(config)
-    
+
     # Atualiza apenas campos fornecidos
     update_data = config_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(config, field, value)
-    
+
     db.commit()
     db.refresh(config)
-    
+
     logger.info(f"Configuração da empresa atualizada para tenant {tenant_id}")
-    
+
     return config
 
 
 @router.delete("/")
 @require_permission("configuracoes.editar")
 def delete_config_empresa(
-    user_and_tenant = Depends(get_current_user_and_tenant),
-    db: Session = Depends(get_session)
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
 ):
     """Remove a configuração da empresa (volta para padrão)"""
     current_user, tenant_id = user_and_tenant
-    
-    config = db.query(EmpresaConfigGeral).filter(
-        EmpresaConfigGeral.tenant_id == tenant_id
-    ).first()
-    
+
+    config = (
+        db.query(EmpresaConfigGeral)
+        .filter(EmpresaConfigGeral.tenant_id == tenant_id)
+        .first()
+    )
+
     if not config:
         raise HTTPException(status_code=404, detail="Configuração não encontrada")
-    
+
     db.delete(config)
     db.commit()
-    
+
     logger.info(f"Configuração da empresa removida para tenant {tenant_id}")
-    
+
     return {"message": "Configuração removida. Usando valores padrão."}

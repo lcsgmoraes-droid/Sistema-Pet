@@ -1,6 +1,7 @@
 """
 Routes para gerenciamento de Cargos (RH)
 """
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -22,11 +23,17 @@ class CargoCreate(BaseModel):
     nome: str = Field(..., min_length=1, max_length=100)
     descricao: Optional[str] = None
     salario_base: Decimal = Field(..., gt=0)
-    regime_remuneracao: str = Field(default="clt", pattern="^(clt|sem_encargos|estagio|informal)$")
+    regime_remuneracao: str = Field(
+        default="clt", pattern="^(clt|sem_encargos|estagio|informal)$"
+    )
     gera_encargos: bool = True
-    inss_patronal_percentual: Optional[Decimal] = Field(default=Decimal("20.00"), ge=0, le=100)
+    inss_patronal_percentual: Optional[Decimal] = Field(
+        default=Decimal("20.00"), ge=0, le=100
+    )
     fgts_percentual: Optional[Decimal] = Field(default=Decimal("8.00"), ge=0, le=100)
-    inss_funcionario_percentual: Optional[Decimal] = Field(default=Decimal("0.00"), ge=0, le=100)
+    inss_funcionario_percentual: Optional[Decimal] = Field(
+        default=Decimal("0.00"), ge=0, le=100
+    )
     inss_funcionario_valor: Optional[Decimal] = Field(default=Decimal("0.00"), ge=0)
     desconto_transporte_valor: Optional[Decimal] = Field(default=Decimal("0.00"), ge=0)
     outros_descontos_valor: Optional[Decimal] = Field(default=Decimal("0.00"), ge=0)
@@ -41,7 +48,9 @@ class CargoUpdate(BaseModel):
     nome: Optional[str] = Field(None, min_length=1, max_length=100)
     descricao: Optional[str] = None
     salario_base: Optional[Decimal] = Field(None, gt=0)
-    regime_remuneracao: Optional[str] = Field(None, pattern="^(clt|sem_encargos|estagio|informal)$")
+    regime_remuneracao: Optional[str] = Field(
+        None, pattern="^(clt|sem_encargos|estagio|informal)$"
+    )
     gera_encargos: Optional[bool] = None
     inss_patronal_percentual: Optional[Decimal] = Field(None, ge=0, le=100)
     fgts_percentual: Optional[Decimal] = Field(None, ge=0, le=100)
@@ -105,37 +114,36 @@ def _cargo_response_dict(cargo: Cargo, total_funcionarios: int = 0) -> dict:
 async def listar_cargos(
     ativo: Optional[bool] = Query(None, description="Filtrar por status ativo/inativo"),
     db: Session = Depends(get_session),
-    current_user_and_tenant=Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Lista todos os cargos do tenant.
     """
     user, tenant_id = current_user_and_tenant
-    
+
     # Contar funcionários por cargo
-    query = db.query(
-        Cargo,
-        func.count(Cliente.id).label('total_funcionarios')
-    ).outerjoin(
-        Cliente,
-        (Cargo.id == Cliente.cargo_id) &
-        (Cliente.tipo_cadastro == 'funcionario') &
-        Cliente.ativo.is_(True)
-    ).filter(
-        Cargo.tenant_id == tenant_id
+    query = (
+        db.query(Cargo, func.count(Cliente.id).label("total_funcionarios"))
+        .outerjoin(
+            Cliente,
+            (Cargo.id == Cliente.cargo_id)
+            & (Cliente.tipo_cadastro == "funcionario")
+            & Cliente.ativo.is_(True),
+        )
+        .filter(Cargo.tenant_id == tenant_id)
     )
-    
+
     if ativo is not None:
         query = query.filter(Cargo.ativo == ativo)
-    
+
     query = query.group_by(Cargo.id).order_by(Cargo.nome)
-    
+
     result = query.all()
-    
+
     cargos_response = []
     for cargo, total_func in result:
         cargos_response.append(CargoResponse(**_cargo_response_dict(cargo, total_func)))
-    
+
     return cargos_response
 
 
@@ -143,30 +151,36 @@ async def listar_cargos(
 async def obter_cargo(
     cargo_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant=Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Obtém detalhes de um cargo específico.
     """
     user, tenant_id = current_user_and_tenant
-    
-    cargo = db.query(Cargo).filter(
-        Cargo.id == cargo_id,
-        Cargo.tenant_id == tenant_id
-    ).first()
-    
+
+    cargo = (
+        db.query(Cargo)
+        .filter(Cargo.id == cargo_id, Cargo.tenant_id == tenant_id)
+        .first()
+    )
+
     if not cargo:
         raise HTTPException(status_code=404, detail="Cargo não encontrado")
-    
+
     # Contar funcionários
     from app.models import Cliente
-    total_funcionarios = db.query(Cliente).filter(
-        Cliente.tenant_id == tenant_id,
-        Cliente.cargo_id == cargo_id,
-        Cliente.tipo_cadastro == "funcionario",
-        Cliente.ativo.is_(True)
-    ).count()
-    
+
+    total_funcionarios = (
+        db.query(Cliente)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.cargo_id == cargo_id,
+            Cliente.tipo_cadastro == "funcionario",
+            Cliente.ativo.is_(True),
+        )
+        .count()
+    )
+
     return CargoResponse(**_cargo_response_dict(cargo, total_funcionarios))
 
 
@@ -174,26 +188,30 @@ async def obter_cargo(
 async def criar_cargo(
     cargo_data: CargoCreate,
     db: Session = Depends(get_session),
-    current_user_and_tenant=Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Cria um novo cargo.
     """
     user, tenant_id = current_user_and_tenant
-    
+
     # Verificar se já existe cargo com esse nome
-    cargo_existente = db.query(Cargo).filter(
-        Cargo.tenant_id == tenant_id,
-        func.lower(Cargo.nome) == func.lower(cargo_data.nome),
-        Cargo.ativo.is_(True)
-    ).first()
-    
+    cargo_existente = (
+        db.query(Cargo)
+        .filter(
+            Cargo.tenant_id == tenant_id,
+            func.lower(Cargo.nome) == func.lower(cargo_data.nome),
+            Cargo.ativo.is_(True),
+        )
+        .first()
+    )
+
     if cargo_existente:
         raise HTTPException(
             status_code=400,
-            detail=f"Já existe um cargo ativo com o nome '{cargo_data.nome}'"
+            detail=f"Já existe um cargo ativo com o nome '{cargo_data.nome}'",
         )
-    
+
     # Criar cargo
     cargo = Cargo(
         tenant_id=tenant_id,
@@ -210,13 +228,13 @@ async def criar_cargo(
         outros_descontos_valor=cargo_data.outros_descontos_valor,
         gera_ferias=cargo_data.gera_ferias,
         gera_decimo_terceiro=cargo_data.gera_decimo_terceiro,
-        ativo=cargo_data.ativo
+        ativo=cargo_data.ativo,
     )
-    
+
     db.add(cargo)
     db.commit()
     db.refresh(cargo)
-    
+
     return CargoResponse(**_cargo_response_dict(cargo, 0))
 
 
@@ -225,36 +243,41 @@ async def atualizar_cargo(
     cargo_id: int,
     cargo_data: CargoUpdate,
     db: Session = Depends(get_session),
-    current_user_and_tenant=Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Atualiza um cargo existente.
     """
     user, tenant_id = current_user_and_tenant
-    
-    cargo = db.query(Cargo).filter(
-        Cargo.id == cargo_id,
-        Cargo.tenant_id == tenant_id
-    ).first()
-    
+
+    cargo = (
+        db.query(Cargo)
+        .filter(Cargo.id == cargo_id, Cargo.tenant_id == tenant_id)
+        .first()
+    )
+
     if not cargo:
         raise HTTPException(status_code=404, detail="Cargo não encontrado")
-    
+
     # Verificar duplicação de nome
     if cargo_data.nome and cargo_data.nome != cargo.nome:
-        cargo_existente = db.query(Cargo).filter(
-            Cargo.tenant_id == tenant_id,
-            func.lower(Cargo.nome) == func.lower(cargo_data.nome),
-            Cargo.id != cargo_id,
-            Cargo.ativo.is_(True)
-        ).first()
-        
+        cargo_existente = (
+            db.query(Cargo)
+            .filter(
+                Cargo.tenant_id == tenant_id,
+                func.lower(Cargo.nome) == func.lower(cargo_data.nome),
+                Cargo.id != cargo_id,
+                Cargo.ativo.is_(True),
+            )
+            .first()
+        )
+
         if cargo_existente:
             raise HTTPException(
                 status_code=400,
-                detail=f"Já existe um cargo ativo com o nome '{cargo_data.nome}'"
+                detail=f"Já existe um cargo ativo com o nome '{cargo_data.nome}'",
             )
-    
+
     # Atualizar campos
     update_data = cargo_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -264,19 +287,24 @@ async def atualizar_cargo(
             setattr(cargo, field, value.strip())
         else:
             setattr(cargo, field, value)
-    
+
     db.commit()
     db.refresh(cargo)
-    
+
     # Contar funcionários
     from app.models import Cliente
-    total_funcionarios = db.query(Cliente).filter(
-        Cliente.tenant_id == tenant_id,
-        Cliente.cargo_id == cargo_id,
-        Cliente.tipo_cadastro == "funcionario",
-        Cliente.ativo.is_(True)
-    ).count()
-    
+
+    total_funcionarios = (
+        db.query(Cliente)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.cargo_id == cargo_id,
+            Cliente.tipo_cadastro == "funcionario",
+            Cliente.ativo.is_(True),
+        )
+        .count()
+    )
+
     return CargoResponse(**_cargo_response_dict(cargo, total_funcionarios))
 
 
@@ -285,24 +313,25 @@ async def alterar_status_cargo(
     cargo_id: int,
     ativo: bool,
     db: Session = Depends(get_session),
-    current_user_and_tenant=Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Altera o status ativo/inativo de um cargo.
     """
     user, tenant_id = current_user_and_tenant
-    
-    cargo = db.query(Cargo).filter(
-        Cargo.id == cargo_id,
-        Cargo.tenant_id == tenant_id
-    ).first()
-    
+
+    cargo = (
+        db.query(Cargo)
+        .filter(Cargo.id == cargo_id, Cargo.tenant_id == tenant_id)
+        .first()
+    )
+
     if not cargo:
         raise HTTPException(status_code=404, detail="Cargo não encontrado")
-    
+
     cargo.ativo = ativo
     db.commit()
-    
+
     return {"message": f"Cargo {'ativado' if ativo else 'inativado'} com sucesso"}
 
 
@@ -310,30 +339,36 @@ async def alterar_status_cargo(
 async def deletar_cargo(
     cargo_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant=Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Inativa um cargo (não remove fisicamente se houver funcionários associados).
     """
     user, tenant_id = current_user_and_tenant
-    
-    cargo = db.query(Cargo).filter(
-        Cargo.id == cargo_id,
-        Cargo.tenant_id == tenant_id
-    ).first()
-    
+
+    cargo = (
+        db.query(Cargo)
+        .filter(Cargo.id == cargo_id, Cargo.tenant_id == tenant_id)
+        .first()
+    )
+
     if not cargo:
         raise HTTPException(status_code=404, detail="Cargo não encontrado")
-    
+
     # Verificar se há funcionários ativos usando este cargo
     from app.models import Cliente
-    funcionarios_ativos = db.query(Cliente).filter(
-        Cliente.tenant_id == tenant_id,
-        Cliente.cargo_id == cargo_id,
-        Cliente.tipo_cadastro == "funcionario",
-        Cliente.ativo.is_(True)
-    ).count()
-    
+
+    funcionarios_ativos = (
+        db.query(Cliente)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.cargo_id == cargo_id,
+            Cliente.tipo_cadastro == "funcionario",
+            Cliente.ativo.is_(True),
+        )
+        .count()
+    )
+
     if funcionarios_ativos > 0:
         # Apenas inativar
         cargo.ativo = False

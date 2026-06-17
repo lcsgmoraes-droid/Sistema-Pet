@@ -15,6 +15,7 @@ router = APIRouter(prefix="/roles", tags=["Roles"])
 # MODELS
 # =========================
 
+
 class RoleCreate(BaseModel):
     nome: str
     descricao: str | None = None
@@ -34,6 +35,7 @@ class PermissionsUpdate(BaseModel):
 # C1 - CRUD DE ROLES
 # =========================
 
+
 @router.get("", response_model=list[dict])
 @require_permission("usuarios.manage")
 def listar_roles(
@@ -43,7 +45,7 @@ def listar_roles(
     """Lista roles com suas permissões"""
     current_user, tenant_id = user_and_tenant
     roles = db.query(Role).filter(Role.tenant_id == tenant_id).all()
-    
+
     result = []
     for role in roles:
         # Buscar permiss�es da role
@@ -51,26 +53,23 @@ def listar_roles(
             db.query(Permission)
             .join(RolePermission, RolePermission.permission_id == Permission.id)
             .filter(
-                RolePermission.role_id == role.id,
-                RolePermission.tenant_id == tenant_id
+                RolePermission.role_id == role.id, RolePermission.tenant_id == tenant_id
             )
             .all()
         )
-        
-        result.append({
-            "role_id": role.id,
-            "nome": role.name,
-            "descricao": None,
-            "permissions": [
-                {
-                    "permission_id": p.id,
-                    "nome": p.code,
-                    "descricao": p.description
-                }
-                for p in perms
-            ]
-        })
-    
+
+        result.append(
+            {
+                "role_id": role.id,
+                "nome": role.name,
+                "descricao": None,
+                "permissions": [
+                    {"permission_id": p.id, "nome": p.code, "descricao": p.description}
+                    for p in perms
+                ],
+            }
+        )
+
     return result
 
 
@@ -93,41 +92,34 @@ def criar_role(
     role = Role(name=payload.nome, tenant_id=tenant_id)
     db.add(role)
     db.flush()
-    
+
     # Adicionar permiss�es
     for perm_id in payload.permissions:
-        db.add(RolePermission(
-            tenant_id=tenant_id,
-            role_id=role.id,
-            permission_id=perm_id
-        ))
-    
+        db.add(
+            RolePermission(tenant_id=tenant_id, role_id=role.id, permission_id=perm_id)
+        )
+
     db.commit()
     db.refresh(role)
-    
+
     # Buscar permiss�es para retornar
     perms = (
         db.query(Permission)
         .join(RolePermission, RolePermission.permission_id == Permission.id)
         .filter(
-            RolePermission.role_id == role.id,
-            RolePermission.tenant_id == tenant_id
+            RolePermission.role_id == role.id, RolePermission.tenant_id == tenant_id
         )
         .all()
     )
-    
+
     return {
         "role_id": role.id,
         "nome": role.name,
         "descricao": None,
         "permissions": [
-            {
-                "permission_id": p.id,
-                "nome": p.code,
-                "descricao": p.description
-            }
+            {"permission_id": p.id, "nome": p.code, "descricao": p.description}
             for p in perms
-        ]
+        ],
     }
 
 
@@ -141,55 +133,45 @@ def atualizar_role(
 ):
     current_user, tenant_id = user_and_tenant
     role = (
-        db.query(Role)
-        .filter(Role.id == role_id, Role.tenant_id == tenant_id)
-        .first()
+        db.query(Role).filter(Role.id == role_id, Role.tenant_id == tenant_id).first()
     )
     if not role:
         raise HTTPException(status_code=404, detail="Role n�o encontrado")
 
     role.name = payload.nome
-    
+
     # Remover permiss�es antigas
     db.query(RolePermission).filter(
-        RolePermission.role_id == role_id,
-        RolePermission.tenant_id == tenant_id
+        RolePermission.role_id == role_id, RolePermission.tenant_id == tenant_id
     ).delete()
-    
+
     # Adicionar novas permiss�es
     for perm_id in payload.permissions:
-        db.add(RolePermission(
-            tenant_id=tenant_id,
-            role_id=role.id,
-            permission_id=perm_id
-        ))
-    
+        db.add(
+            RolePermission(tenant_id=tenant_id, role_id=role.id, permission_id=perm_id)
+        )
+
     db.commit()
     db.refresh(role)
-    
+
     # Buscar permiss�es para retornar
     perms = (
         db.query(Permission)
         .join(RolePermission, RolePermission.permission_id == Permission.id)
         .filter(
-            RolePermission.role_id == role.id,
-            RolePermission.tenant_id == tenant_id
+            RolePermission.role_id == role.id, RolePermission.tenant_id == tenant_id
         )
         .all()
     )
-    
+
     return {
         "role_id": role.id,
         "nome": role.name,
         "descricao": None,
         "permissions": [
-            {
-                "permission_id": p.id,
-                "nome": p.code,
-                "descricao": p.description
-            }
+            {"permission_id": p.id, "nome": p.code, "descricao": p.description}
             for p in perms
-        ]
+        ],
     }
 
 
@@ -210,16 +192,13 @@ def deletar_role(
         raise HTTPException(status_code=400, detail="Role est� em uso")
 
     role = (
-        db.query(Role)
-        .filter(Role.id == role_id, Role.tenant_id == tenant_id)
-        .first()
+        db.query(Role).filter(Role.id == role_id, Role.tenant_id == tenant_id).first()
     )
     if not role:
         raise HTTPException(status_code=404, detail="Role n�o encontrado")
 
     db.query(RolePermission).filter(
-        RolePermission.role_id == role_id,
-        RolePermission.tenant_id == tenant_id
+        RolePermission.role_id == role_id, RolePermission.tenant_id == tenant_id
     ).delete()
 
     db.delete(role)
@@ -230,6 +209,7 @@ def deletar_role(
 # =========================
 # C2 � PERMISS�ES DO ROLE
 # =========================
+
 
 @router.get("/permissions", response_model=list[str])
 @require_permission("usuarios.manage")
@@ -251,9 +231,7 @@ def permissoes_do_role(
 ):
     current_user, tenant_id = user_and_tenant
     role = (
-        db.query(Role)
-        .filter(Role.id == role_id, Role.tenant_id == tenant_id)
-        .first()
+        db.query(Role).filter(Role.id == role_id, Role.tenant_id == tenant_id).first()
     )
     if not role:
         raise HTTPException(status_code=404, detail="Role n�o encontrado")
@@ -281,9 +259,7 @@ def atualizar_permissoes_role(
 ):
     current_user, tenant_id = user_and_tenant
     role = (
-        db.query(Role)
-        .filter(Role.id == role_id, Role.tenant_id == tenant_id)
-        .first()
+        db.query(Role).filter(Role.id == role_id, Role.tenant_id == tenant_id).first()
     )
     if not role:
         raise HTTPException(status_code=404, detail="Role n�o encontrado")

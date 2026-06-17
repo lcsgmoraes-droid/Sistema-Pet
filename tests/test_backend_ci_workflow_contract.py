@@ -673,6 +673,25 @@ def test_backend_ci_has_blocking_backend_access_config_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_people_company_finance_root_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend people company finance root format (blocking)" in source
+    assert (
+        "ruff format --check app/clientes_routes.py app/cliente_info_pdv.py "
+        "app/pets_routes.py app/cadastros_routes.py app/importacao_pessoas.py "
+        "app/fornecedor_grupos_routes.py app/funcionarios_routes.py "
+        "app/tipo_despesa_routes.py app/tributacao_routes.py "
+        "app/variacoes_routes.py app/empresa_routes.py "
+        "app/empresa_config_routes.py app/roles_routes.py app/cargos_routes.py "
+        "app/financeiro_models.py app/contas_bancarias_routes.py "
+        "app/contas_pagar_routes.py app/contas_receber_routes.py "
+        "app/lancamentos_routes.py app/operadoras_models.py "
+        "app/operadoras_routes.py app/formas_pagamento_models.py "
+        "app/formas_pagamento_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_backend_model_read_packages_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

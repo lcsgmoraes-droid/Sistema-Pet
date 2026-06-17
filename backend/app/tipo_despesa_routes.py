@@ -12,6 +12,7 @@ Exemplos pré-cadastrados:
   Frete de Compra   → Variável
   Comissões         → Variável
 """
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -23,20 +24,25 @@ from .auth.dependencies import get_current_user_and_tenant
 from .financeiro_models import TipoDespesa
 from .dre_plano_contas_models import DRESubcategoria
 
-router = APIRouter(prefix="/cadastros/tipo-despesa", tags=["Cadastros - Tipo de Despesa"])
+router = APIRouter(
+    prefix="/cadastros/tipo-despesa", tags=["Cadastros - Tipo de Despesa"]
+)
 
 # ===================== SCHEMAS =====================
+
 
 class TipoDespesaCreate(BaseModel):
     nome: str
     e_custo_fixo: bool  # True = Fixo, False = Variável
     dre_subcategoria_id: int
 
+
 class TipoDespesaUpdate(BaseModel):
     nome: Optional[str] = None
     e_custo_fixo: Optional[bool] = None
     dre_subcategoria_id: Optional[int] = None
     ativo: Optional[bool] = None
+
 
 class TipoDespesaResponse(BaseModel):
     id: int
@@ -46,36 +52,58 @@ class TipoDespesaResponse(BaseModel):
     ativo: bool
     model_config = {"from_attributes": True}
 
+
 # ===================== TIPOS PADRÃO A CRIAR NO PRIMEIRO ACESSO =====================
 
 TIPOS_PADRAO = [
     # Fixos
-    {"nome": "Aluguel",                           "e_custo_fixo": True, "dre_subcategoria_id": 2},
-    {"nome": "Salários e Encargos",               "e_custo_fixo": True, "dre_subcategoria_id": 2},
-    {"nome": "Impostos / DAS Simples Nacional",   "e_custo_fixo": True, "dre_subcategoria_id": 2},
-    {"nome": "Energia Elétrica",                  "e_custo_fixo": True, "dre_subcategoria_id": 2},
-    {"nome": "Internet / Telefone",               "e_custo_fixo": True, "dre_subcategoria_id": 2},
-    {"nome": "Água",                              "e_custo_fixo": True, "dre_subcategoria_id": 2},
-    {"nome": "Contador / Assessoria Contábil",    "e_custo_fixo": True, "dre_subcategoria_id": 2},
-    {"nome": "Sistema / Software",                "e_custo_fixo": True, "dre_subcategoria_id": 2},
-    {"nome": "Seguro",                            "e_custo_fixo": True, "dre_subcategoria_id": 2},
-    {"nome": "Marketing / Publicidade Fixo",      "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Aluguel", "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Salários e Encargos", "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {
+        "nome": "Impostos / DAS Simples Nacional",
+        "e_custo_fixo": True,
+        "dre_subcategoria_id": 2,
+    },
+    {"nome": "Energia Elétrica", "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Internet / Telefone", "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Água", "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {
+        "nome": "Contador / Assessoria Contábil",
+        "e_custo_fixo": True,
+        "dre_subcategoria_id": 2,
+    },
+    {"nome": "Sistema / Software", "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Seguro", "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {
+        "nome": "Marketing / Publicidade Fixo",
+        "e_custo_fixo": True,
+        "dre_subcategoria_id": 2,
+    },
     # Variáveis
-    {"nome": "Produto para Revenda",            "e_custo_fixo": False, "dre_subcategoria_id": 2},
-    {"nome": "Frete de Compra",                   "e_custo_fixo": False, "dre_subcategoria_id": 2},
-    {"nome": "Comissões de Vendas",               "e_custo_fixo": False, "dre_subcategoria_id": 2},
-    {"nome": "Embalagens",                        "e_custo_fixo": False, "dre_subcategoria_id": 2},
-    {"nome": "Marketing / Anúncios por Resultado","e_custo_fixo": False, "dre_subcategoria_id": 2},
-    {"nome": "Outros Custos Variáveis",           "e_custo_fixo": False, "dre_subcategoria_id": 2},
-    {"nome": "Outros Custos Fixos",               "e_custo_fixo": True, "dre_subcategoria_id": 2},
+    {"nome": "Produto para Revenda", "e_custo_fixo": False, "dre_subcategoria_id": 2},
+    {"nome": "Frete de Compra", "e_custo_fixo": False, "dre_subcategoria_id": 2},
+    {"nome": "Comissões de Vendas", "e_custo_fixo": False, "dre_subcategoria_id": 2},
+    {"nome": "Embalagens", "e_custo_fixo": False, "dre_subcategoria_id": 2},
+    {
+        "nome": "Marketing / Anúncios por Resultado",
+        "e_custo_fixo": False,
+        "dre_subcategoria_id": 2,
+    },
+    {
+        "nome": "Outros Custos Variáveis",
+        "e_custo_fixo": False,
+        "dre_subcategoria_id": 2,
+    },
+    {"nome": "Outros Custos Fixos", "e_custo_fixo": True, "dre_subcategoria_id": 2},
 ]
 
 # ===================== ENDPOINTS =====================
 
+
 @router.get("/", response_model=List[TipoDespesaResponse])
 def listar_tipos_despesa(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Lista todos os tipos de despesa do tenant.
@@ -83,9 +111,12 @@ def listar_tipos_despesa(
     """
     _, tenant_id = user_and_tenant
 
-    tipos = db.query(TipoDespesa).filter(
-        TipoDespesa.tenant_id == tenant_id
-    ).order_by(func.lower(TipoDespesa.nome)).all()
+    tipos = (
+        db.query(TipoDespesa)
+        .filter(TipoDespesa.tenant_id == tenant_id)
+        .order_by(func.lower(TipoDespesa.nome))
+        .all()
+    )
 
     # Seed automático na primeira vez
     if not tipos:
@@ -93,9 +124,12 @@ def listar_tipos_despesa(
             novo = TipoDespesa(tenant_id=tenant_id, **t)
             db.add(novo)
         db.commit()
-        tipos = db.query(TipoDespesa).filter(
-            TipoDespesa.tenant_id == tenant_id
-        ).order_by(func.lower(TipoDespesa.nome)).all()
+        tipos = (
+            db.query(TipoDespesa)
+            .filter(TipoDespesa.tenant_id == tenant_id)
+            .order_by(func.lower(TipoDespesa.nome))
+            .all()
+        )
 
     return tipos
 
@@ -104,14 +138,18 @@ def listar_tipos_despesa(
 def criar_tipo_despesa(
     data: TipoDespesaCreate,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = user_and_tenant
-    subcategoria = db.query(DRESubcategoria).filter(
-        DRESubcategoria.id == data.dre_subcategoria_id,
-        DRESubcategoria.tenant_id == tenant_id,
-        DRESubcategoria.ativo.is_(True),
-    ).first()
+    subcategoria = (
+        db.query(DRESubcategoria)
+        .filter(
+            DRESubcategoria.id == data.dre_subcategoria_id,
+            DRESubcategoria.tenant_id == tenant_id,
+            DRESubcategoria.ativo.is_(True),
+        )
+        .first()
+    )
     if not subcategoria:
         raise HTTPException(status_code=400, detail="Subcategoria DRE inválida")
 
@@ -132,13 +170,17 @@ def atualizar_tipo_despesa(
     tipo_id: int,
     data: TipoDespesaUpdate,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = user_and_tenant
-    tipo = db.query(TipoDespesa).filter(
-        TipoDespesa.id == tipo_id,
-        TipoDespesa.tenant_id == tenant_id,
-    ).first()
+    tipo = (
+        db.query(TipoDespesa)
+        .filter(
+            TipoDespesa.id == tipo_id,
+            TipoDespesa.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not tipo:
         raise HTTPException(status_code=404, detail="Tipo de despesa não encontrado")
     if data.nome is not None:
@@ -146,11 +188,15 @@ def atualizar_tipo_despesa(
     if data.e_custo_fixo is not None:
         tipo.e_custo_fixo = data.e_custo_fixo
     if data.dre_subcategoria_id is not None:
-        subcategoria = db.query(DRESubcategoria).filter(
-            DRESubcategoria.id == data.dre_subcategoria_id,
-            DRESubcategoria.tenant_id == tenant_id,
-            DRESubcategoria.ativo.is_(True),
-        ).first()
+        subcategoria = (
+            db.query(DRESubcategoria)
+            .filter(
+                DRESubcategoria.id == data.dre_subcategoria_id,
+                DRESubcategoria.tenant_id == tenant_id,
+                DRESubcategoria.ativo.is_(True),
+            )
+            .first()
+        )
         if not subcategoria:
             raise HTTPException(status_code=400, detail="Subcategoria DRE inválida")
         tipo.dre_subcategoria_id = data.dre_subcategoria_id
@@ -165,13 +211,17 @@ def atualizar_tipo_despesa(
 def excluir_tipo_despesa(
     tipo_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = user_and_tenant
-    tipo = db.query(TipoDespesa).filter(
-        TipoDespesa.id == tipo_id,
-        TipoDespesa.tenant_id == tenant_id,
-    ).first()
+    tipo = (
+        db.query(TipoDespesa)
+        .filter(
+            TipoDespesa.id == tipo_id,
+            TipoDespesa.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not tipo:
         raise HTTPException(status_code=404, detail="Tipo de despesa não encontrado")
     # Desativa ao invés de deletar para não quebrar histórico
