@@ -38,7 +38,7 @@ class Pedido(TenantScoped, Base):
     palavra_chave_retirada = Column(String(100), nullable=True)
 
     # Drive-thru pickup (cliente avisa que chegou no carro)
-    is_drive = Column(Boolean, default=False, nullable=False, server_default='0')
+    is_drive = Column(Boolean, default=False, nullable=False, server_default="0")
     drive_chegou_at = Column(DateTime(timezone=True), nullable=True)
     drive_entregue_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -48,7 +48,9 @@ class Pedido(TenantScoped, Base):
     # DDD Aggregate Methods (SAFE VERSION)
     # =====================================
 
-    def adicionar_item(self, db, *, produto_id, nome, quantidade, preco_unitario, tenant_id):
+    def adicionar_item(
+        self, db, *, produto_id, nome, quantidade, preco_unitario, tenant_id
+    ):
         """
         Método de domínio SAFE.
         Não altera fluxo atual — apenas encapsula criação.
@@ -61,7 +63,8 @@ class Pedido(TenantScoped, Base):
         # proteção contra duplicação acidental
         existente = next(
             (
-                i for i in db.new
+                i
+                for i in db.new
                 if isinstance(i, PedidoItem)
                 and i.pedido_id == self.pedido_id
                 and i.produto_id == produto_id
@@ -72,7 +75,9 @@ class Pedido(TenantScoped, Base):
 
         if existente:
             existente.quantidade += quantidade
-            existente.subtotal = (Money(existente.preco_unitario) * existente.quantidade).value
+            existente.subtotal = (
+                Money(existente.preco_unitario) * existente.quantidade
+            ).value
             return existente
 
         subtotal = (Money(preco_unitario) * quantidade).value
@@ -96,16 +101,19 @@ class Pedido(TenantScoped, Base):
         FIXED VERSION — força dirty tracking.
         """
         itens_pendentes = [
-            obj for obj in db.new
+            obj
+            for obj in db.new
             if isinstance(obj, PedidoItem) and obj.pedido_id == self.pedido_id
         ]
 
         if itens_pendentes:
             items = itens_pendentes
         else:
-            items = db.query(PedidoItem).filter(
-                PedidoItem.pedido_id == self.pedido_id
-            ).all()
+            items = (
+                db.query(PedidoItem)
+                .filter(PedidoItem.pedido_id == self.pedido_id)
+                .all()
+            )
 
         total_money = Money(0)
 
@@ -120,12 +128,15 @@ class Pedido(TenantScoped, Base):
 
 # ===== PedidoItem (Checkout Engine v1) =====
 
+
 class PedidoItem(TenantScoped, Base):
     __tablename__ = "pedido_itens"
 
     id = Column(Integer, primary_key=True, index=True)
 
-    pedido_id = Column(String, ForeignKey("pedidos.pedido_id"), index=True, nullable=False)
+    pedido_id = Column(
+        String, ForeignKey("pedidos.pedido_id"), index=True, nullable=False
+    )
 
     produto_id = Column(Integer, nullable=False)
     nome = Column(String, nullable=False)

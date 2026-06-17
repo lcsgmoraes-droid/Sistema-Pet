@@ -16,6 +16,7 @@ class ConfiguracaoCustoMoto(TenantScoped, Base):
     filtro automático. A coluna local sobrescreve o ``tenant_id`` do mixin para
     preservar o ``UNIQUE`` ("um config por loja").
     """
+
     __tablename__ = "configuracoes_custo_moto"
 
     id = Column(Integer, primary_key=True)

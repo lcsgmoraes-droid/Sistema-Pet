@@ -1,4 +1,14 @@
-from sqlalchemy import BigInteger, Column, DateTime, Float, Index, Integer, JSON, String, Text
+from sqlalchemy import (
+    BigInteger,
+    Column,
+    DateTime,
+    Float,
+    Index,
+    Integer,
+    JSON,
+    String,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
@@ -16,7 +26,9 @@ class OpsErrorEvent(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     event_key = Column(String(96), nullable=False, unique=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, index=True)
-    captured_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    captured_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     tenant_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     user_id = Column(String(80), nullable=True)
     user_email = Column(String(255), nullable=True)
@@ -60,8 +72,15 @@ class OpsAlert(Base):
     occurrence_count = Column(Integer, nullable=False, default=1)
     score = Column(Integer, nullable=False, default=0)
     payload = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
     resolved_at = Column(DateTime(timezone=True), nullable=True)
 
 
@@ -85,5 +104,7 @@ class OpsRecoveryAction(Base):
     started_at = Column(DateTime(timezone=True), nullable=True)
     finished_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, index=True)
-    captured_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    captured_at = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     payload = Column(JSON, nullable=True)

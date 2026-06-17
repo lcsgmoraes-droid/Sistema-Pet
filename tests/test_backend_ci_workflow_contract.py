@@ -903,6 +903,57 @@ def test_backend_ci_has_blocking_backend_stock_cash_support_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_residual_app_root_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend residual app root format (blocking)" in source
+    assert (
+        "ruff format --check app/auditoria_provisoes_routes.py "
+        "app/auth_routes.py app/chat_routes.py "
+        "app/criar_tabelas_formas_pagamento.py app/lembretes.py "
+        "app/models.py app/pdf_caixa.py app/projecao_caixa_routes.py "
+        "app/rotas_entrega_models.py app/simulacao_contratacao_routes.py "
+        "app/template_models.py app/vendas_models.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_backend_model_registry_root_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend model registry root format (blocking)" in source
+    assert (
+        "ruff format --check app/controle_processamento_models.py "
+        "app/duplicatas_ignoradas_models.py app/ecommerce_payment_models.py "
+        "app/fiscal_catalogo_produtos_models.py "
+        "app/fiscal_estado_padrao_models.py app/kit_composicao_models.py "
+        "app/kit_config_fiscal_models.py app/lgpd_models.py "
+        "app/local_estoque_models.py app/models_configuracao_custo_moto.py "
+        "app/nf_item_rateio_canal_models.py app/nf_rateio_canal_models.py "
+        "app/operadoras_cartao_models.py app/opportunities_models.py "
+        "app/opportunity_events_models.py app/ops_models.py "
+        "app/pedido_integrado_item_models.py app/pedido_integrado_models.py "
+        "app/pedido_models.py app/pendencia_estoque_models.py "
+        "app/produtos_models.py app/segmentacao_models.py "
+        "app/simples_nacional_models.py app/stone_models.py "
+        "app/variacao_config_fiscal_models.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_backend_admin_product_support_root_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend admin product support root format (blocking)" in source
+    assert (
+        "ruff format --check app/admin_fix_routes.py app/admin_routes.py "
+        "app/categorias_routes.py app/compras_pendencias_models.py "
+        "app/compras_pendencias_routes.py app/importacao_produtos.py "
+        "app/lgpd_routes.py app/opcoes_racao_models.py "
+        "app/opcoes_racao_routes.py app/pendencia_estoque_routes.py "
+        "app/pet_clinical_utils.py app/produto_config_fiscal_models.py "
+        "app/simples_routes.py app/subcategorias_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

@@ -1,13 +1,14 @@
-
 from sqlalchemy import Column, String, DateTime, JSON
 from app.base_models import BaseTenantModel
 from datetime import datetime, timedelta
+
 
 class PedidoIntegrado(BaseTenantModel):
     """
     Pedido vindo de integração (ex: Bling).
     Fonte da verdade para reserva de estoque.
     """
+
     __tablename__ = "pedidos_integrados"
 
     # Identificação Bling

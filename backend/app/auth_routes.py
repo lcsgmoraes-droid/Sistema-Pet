@@ -2,12 +2,18 @@
 Rotas de Autenticação
 Registro, Login, Logout, Recuperação de Senha
 """
+
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session as DBSession
 from app import db, models
-from app.auth import hash_password, verify_password, create_access_token, get_current_user
+from app.auth import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    get_current_user,
+)
 from app.audit_log import log_login, log_logout, log_action
 from app.session_manager import create_session, revoke_all_sessions, get_active_sessions
 from datetime import datetime, timezone
@@ -19,6 +25,7 @@ router = APIRouter()
 # ====================
 # SCHEMAS (PYDANTIC)
 # ====================
+
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -51,11 +58,12 @@ class UserResponse(BaseModel):
 # ROTAS
 # ====================
 
+
 @router.post("/register", response_model=TokenResponse)
 def register(payload: RegisterRequest, session: DBSession = Depends(db.get_session)):
     """
     Criar nova conta de usuário.
-    
+
     - **email**: Email único
     - **password**: Senha (min 8 caracteres)
     - **nome**: Nome do usuário (opcional)
@@ -63,12 +71,14 @@ def register(payload: RegisterRequest, session: DBSession = Depends(db.get_sessi
     # Verificar se email já existe
     email = payload.email.strip().lower()
     if len(payload.password) < 8:
-        raise HTTPException(status_code=400, detail="Senha deve ter no minimo 8 caracteres")
+        raise HTTPException(
+            status_code=400, detail="Senha deve ter no minimo 8 caracteres"
+        )
 
     existing = session.query(models.User).filter(models.User.email == email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email já cadastrado")
-    
+
     # Criar usuário
     user = models.User(
         email=email,
@@ -77,12 +87,12 @@ def register(payload: RegisterRequest, session: DBSession = Depends(db.get_sessi
         is_active=True,
         email_verified=True,
         email_verified_at=datetime.now(timezone.utc),
-        consent_date=datetime.now(timezone.utc)  # LGPD - aceite dos termos
+        consent_date=datetime.now(timezone.utc),  # LGPD - aceite dos termos
     )
     session.add(user)
     session.commit()
     session.refresh(user)
-    
+
     # Log de auditoria
     log_action(
         session,
@@ -90,12 +100,12 @@ def register(payload: RegisterRequest, session: DBSession = Depends(db.get_sessi
         action="register",
         entity_type="user",
         entity_id=user.id,
-        details="Novo usuário registrado"
+        details="Novo usuário registrado",
     )
-    
+
     # Gerar token
     token = create_access_token(data={"sub": str(user.id), "email": user.email})
-    
+
     return TokenResponse(access_token=token)
 
 
@@ -103,68 +113,75 @@ def register(payload: RegisterRequest, session: DBSession = Depends(db.get_sessi
 def login(
     request: Request,
     payload: LoginRequest,
-    session: DBSession = Depends(db.get_session)
+    session: DBSession = Depends(db.get_session),
 ):
     """
     Login com email e senha.
     Suporta 2FA se habilitado.
-    
+
     auth_mode é ativado automaticamente pelo TenantContextMiddleware
     """
     try:
         ip_address = request.client.host if request.client else None
         user_agent = request.headers.get("User-Agent")
-        
+
         # Buscar usuário
-        user = session.query(models.User).filter(models.User.email == payload.email).first()
-        
+        user = (
+            session.query(models.User)
+            .filter(models.User.email == payload.email)
+            .first()
+        )
+
         if not user or not verify_password(payload.password, user.hashed_password):
-            log_login(session, user.id if user else 0, ip_address, user_agent or "", success=False)
+            log_login(
+                session,
+                user.id if user else 0,
+                ip_address,
+                user_agent or "",
+                success=False,
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Email ou senha incorretos",
             )
-        
+
         if not user.is_active:
             raise HTTPException(status_code=403, detail="Conta desativada")
-        
+
         # Verificar 2FA (se habilitado)
         if user.two_factor_enabled:
             if not payload.code_2fa:
                 raise HTTPException(
                     status_code=403,
                     detail="Código 2FA obrigatório",
-                    headers={"X-Require-2FA": "true"}
+                    headers={"X-Require-2FA": "true"},
                 )
-            
+
             # Validar código TOTP
             totp = pyotp.TOTP(user.two_factor_secret)
             if not totp.verify(payload.code_2fa, valid_window=5):
                 raise HTTPException(status_code=401, detail="Código 2FA inválido")
-        
+
         # Criar sessão
         db_session = create_session(
-            db=session,
-            user_id=user.id,
-            ip_address=ip_address,
-            user_agent=user_agent
+            db=session, user_id=user.id, ip_address=ip_address, user_agent=user_agent
         )
-        
+
         # Log de auditoria
         log_login(session, user.id, ip_address or "", user_agent or "", success=True)
-        
+
         # Gerar token com JTI da sessão
         token = create_access_token(
-            data={"sub": str(user.id), "email": user.email},
-            jti=db_session.token_jti
+            data={"sub": str(user.id), "email": user.email}, jti=db_session.token_jti
         )
-        
+
         return TokenResponse(access_token=token)
-    
+
     except HTTPException:
         raise
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro no login: {str(e)}")
 
@@ -173,22 +190,22 @@ def login(
 def logout(
     request: Request,
     current_user: models.User = Depends(get_current_user),
-    session: DBSession = Depends(db.get_session)
+    session: DBSession = Depends(db.get_session),
 ):
     """
     Logout - revoga sessão atual.
     """
     ip_address = request.client.host if request.client else None
-    
+
     # Revogar todas as sessões do usuário
     revoked_count = revoke_all_sessions(session, current_user.id)
-    
+
     # Log
     log_logout(session, current_user.id, ip_address or "")
-    
+
     return {
         "message": "Logout realizado com sucesso",
-        "sessions_revoked": revoked_count
+        "sessions_revoked": revoked_count,
     }
 
 
@@ -204,20 +221,20 @@ def get_me(current_user: models.User = Depends(get_current_user)):
         "is_admin": current_user.is_admin,
         "is_active": current_user.is_active,
         "two_factor_enabled": current_user.two_factor_enabled,
-        "consent_date": current_user.consent_date
+        "consent_date": current_user.consent_date,
     }
 
 
 @router.get("/sessions")
 def get_sessions(
     current_user: models.User = Depends(get_current_user),
-    session: DBSession = Depends(db.get_session)
+    session: DBSession = Depends(db.get_session),
 ):
     """
     Lista sessões ativas do usuário.
     """
     sessions = get_active_sessions(session, current_user.id)
-    
+
     return {
         "sessions": [
             {
@@ -226,7 +243,7 @@ def get_sessions(
                 "user_agent": s.user_agent,
                 "created_at": s.created_at,
                 "last_activity_at": s.last_activity_at,
-                "expires_at": s.expires_at
+                "expires_at": s.expires_at,
             }
             for s in sessions
         ]

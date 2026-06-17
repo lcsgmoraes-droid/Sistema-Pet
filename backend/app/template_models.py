@@ -1,6 +1,15 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Integer,
+    JSON,
+    String,
+    Text,
+    UniqueConstraint,
+)
 
 from app.db import Base
 from app.base_models import TenantScoped
@@ -11,7 +20,9 @@ class TemplateBundle(Base):
 
     __tablename__ = "template_bundles"
     __table_args__ = (
-        UniqueConstraint("bundle_code", "version", name="uq_template_bundles_code_version"),
+        UniqueConstraint(
+            "bundle_code", "version", name="uq_template_bundles_code_version"
+        ),
         {"extend_existing": True},
     )
 
@@ -22,7 +33,9 @@ class TemplateBundle(Base):
     description = Column(Text, nullable=True)
     active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
 
 class TemplateItem(Base):
@@ -50,7 +63,9 @@ class TemplateItem(Base):
     sort_order = Column(Integer, nullable=False, default=0)
     active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
 
 class TenantTemplateInstall(TenantScoped, Base):
@@ -80,7 +95,9 @@ class TenantTemplateInstall(TenantScoped, Base):
     created_by_user_id = Column(Integer, nullable=True)
     summary = Column(JSON, nullable=False, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
 
 
 class TenantTemplateItemInstall(TenantScoped, Base):
@@ -114,4 +131,6 @@ class TenantTemplateItemInstall(TenantScoped, Base):
     status = Column(String(40), nullable=False, default="active")
     created_by_user_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )

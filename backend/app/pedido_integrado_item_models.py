@@ -1,20 +1,18 @@
-
 from sqlalchemy import Column, String, Integer, DateTime, ForeignKey
 from app.base_models import BaseTenantModel
 from datetime import datetime
+
 
 class PedidoIntegradoItem(BaseTenantModel):
     """
     Item de pedido integrado.
     Responsável pela reserva de estoque.
     """
+
     __tablename__ = "pedidos_integrados_itens"
 
     pedido_integrado_id = Column(
-        Integer,
-        ForeignKey("pedidos_integrados.id"),
-        nullable=False,
-        index=True
+        Integer, ForeignKey("pedidos_integrados.id"), nullable=False, index=True
     )
 
     sku = Column(String(100), nullable=False, index=True)

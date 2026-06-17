@@ -16,19 +16,26 @@ class DuplicataIgnorada(TenantScoped, Base):
     Quando usuário clica em "Ignorar", o par é salvo aqui
     O endpoint de detecção filtra esses pares
     """
+
     __tablename__ = "duplicatas_ignoradas"
-    
+
     id = Column(Integer, primary_key=True, index=True)
 
     # Os dois produtos do par (sempre salvar em ordem: menor ID primeiro)
-    produto_id_1 = Column(Integer, ForeignKey("produtos.id"), nullable=False, index=True)
-    produto_id_2 = Column(Integer, ForeignKey("produtos.id"), nullable=False, index=True)
-    
+    produto_id_1 = Column(
+        Integer, ForeignKey("produtos.id"), nullable=False, index=True
+    )
+    produto_id_2 = Column(
+        Integer, ForeignKey("produtos.id"), nullable=False, index=True
+    )
+
     # Auditoria
     usuario_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     data_ignorado = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     # Constraint: um par só pode ser ignorado uma vez por tenant
     __table_args__ = (
-        UniqueConstraint('tenant_id', 'produto_id_1', 'produto_id_2', name='uq_duplicata_ignorada'),
+        UniqueConstraint(
+            "tenant_id", "produto_id_1", "produto_id_2", name="uq_duplicata_ignorada"
+        ),
     )

@@ -1,6 +1,16 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship
 
 from .base_models import BaseTenantModel
@@ -12,7 +22,11 @@ class CompraPendenciaFornecedor(BaseTenantModel):
     __tablename__ = "compras_pendencias_fornecedor"
     __table_args__ = (
         Index("ix_compras_pendencias_fornecedor_tenant_status", "tenant_id", "status"),
-        Index("ix_compras_pendencias_fornecedor_tenant_nota", "tenant_id", "nota_entrada_id"),
+        Index(
+            "ix_compras_pendencias_fornecedor_tenant_nota",
+            "tenant_id",
+            "nota_entrada_id",
+        ),
         {"extend_existing": True},
     )
 
@@ -26,8 +40,12 @@ class CompraPendenciaFornecedor(BaseTenantModel):
     fornecedor_nome = Column(String(255), nullable=False)
     fornecedor_cnpj = Column(String(18), nullable=True)
 
-    nota_entrada_id = Column(Integer, ForeignKey("notas_entrada.id"), nullable=True, index=True)
-    pedido_compra_id = Column(Integer, ForeignKey("pedidos_compra.id"), nullable=True, index=True)
+    nota_entrada_id = Column(
+        Integer, ForeignKey("notas_entrada.id"), nullable=True, index=True
+    )
+    pedido_compra_id = Column(
+        Integer, ForeignKey("pedidos_compra.id"), nullable=True, index=True
+    )
     numero_nota = Column(String(20), nullable=True)
     numero_pedido = Column(String(50), nullable=True)
 
@@ -70,13 +88,24 @@ class CompraPendenciaFornecedorItem(BaseTenantModel):
 
     __tablename__ = "compras_pendencias_fornecedor_itens"
     __table_args__ = (
-        Index("ix_compras_pendencias_fornecedor_itens_tenant_pendencia", "tenant_id", "pendencia_id"),
+        Index(
+            "ix_compras_pendencias_fornecedor_itens_tenant_pendencia",
+            "tenant_id",
+            "pendencia_id",
+        ),
         {"extend_existing": True},
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    pendencia_id = Column(Integer, ForeignKey("compras_pendencias_fornecedor.id"), nullable=False, index=True)
-    nota_entrada_item_id = Column(Integer, ForeignKey("notas_entrada_itens.id"), nullable=True, index=True)
+    pendencia_id = Column(
+        Integer,
+        ForeignKey("compras_pendencias_fornecedor.id"),
+        nullable=False,
+        index=True,
+    )
+    nota_entrada_item_id = Column(
+        Integer, ForeignKey("notas_entrada_itens.id"), nullable=True, index=True
+    )
     produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=True, index=True)
 
     codigo_produto = Column(String(100), nullable=True)
@@ -108,12 +137,21 @@ class CompraPendenciaFornecedorHistorico(BaseTenantModel):
 
     __tablename__ = "compras_pendencias_fornecedor_historico"
     __table_args__ = (
-        Index("ix_compras_pendencias_fornecedor_hist_tenant_pendencia", "tenant_id", "pendencia_id"),
+        Index(
+            "ix_compras_pendencias_fornecedor_hist_tenant_pendencia",
+            "tenant_id",
+            "pendencia_id",
+        ),
         {"extend_existing": True},
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    pendencia_id = Column(Integer, ForeignKey("compras_pendencias_fornecedor.id"), nullable=False, index=True)
+    pendencia_id = Column(
+        Integer,
+        ForeignKey("compras_pendencias_fornecedor.id"),
+        nullable=False,
+        index=True,
+    )
     tipo = Column(String(40), nullable=False)
     observacao = Column(Text, nullable=True)
     status_anterior = Column(String(30), nullable=True)
