@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 export default function useEntradaXmlRateio({ api, toast }) {
-  const [tipoRateio, setTipoRateio] = useState('loja');
+  const [tipoRateio, setTipoRateio] = useState("loja");
   const [quantidadesOnline, setQuantidadesOnline] = useState({});
   const [multiplicadoresPack, setMultiplicadoresPack] = useState({});
 
@@ -11,16 +11,16 @@ export default function useEntradaXmlRateio({ api, toast }) {
         tipo_rateio: tipo,
       });
 
-      let descricaoTipo = 'Rateio Parcial';
-      if (tipo === 'online') descricaoTipo = '100% Online';
-      if (tipo === 'loja') descricaoTipo = '100% Loja Fisica';
+      let descricaoTipo = "Rateio Parcial";
+      if (tipo === "online") descricaoTipo = "100% Online";
+      if (tipo === "loja") descricaoTipo = "100% Loja Fisica";
       toast.success(`Nota configurada: ${descricaoTipo}`);
 
       const response = await api.get(`/notas-entrada/${notaId}`);
       aplicarNotaSelecionada(response.data);
     } catch (error) {
-      console.error('Erro ao salvar tipo de rateio:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao salvar tipo de rateio');
+      console.error("Erro ao salvar tipo de rateio:", error);
+      toast.error(error.response?.data?.detail || "Erro ao salvar tipo de rateio");
     }
   };
 
@@ -36,12 +36,12 @@ export default function useEntradaXmlRateio({ api, toast }) {
         quantidade_online: quantidadeNormalizada,
       });
 
-      toast.success('Quantidade online configurada!');
+      toast.success("Quantidade online configurada!");
 
       const totais = response.data.nota_totais;
       toast.success(
         `Nota: ${totais.percentual_online.toFixed(1)}% Online (R$ ${totais.valor_online.toFixed(2)}) | ` +
-        `${totais.percentual_loja.toFixed(1)}% Loja (R$ ${totais.valor_loja.toFixed(2)})`,
+          `${totais.percentual_loja.toFixed(1)}% Loja (R$ ${totais.valor_loja.toFixed(2)})`,
       );
 
       setNotaSelecionada((prev) => ({
@@ -50,11 +50,9 @@ export default function useEntradaXmlRateio({ api, toast }) {
         percentual_loja: totais.percentual_loja,
         valor_online: totais.valor_online,
         valor_loja: totais.valor_loja,
-        itens: prev.itens.map((item) => (
-          item.id === itemId
-            ? { ...item, quantidade_online: quantidadeNormalizada }
-            : item
-        )),
+        itens: prev.itens.map((item) =>
+          item.id === itemId ? { ...item, quantidade_online: quantidadeNormalizada } : item,
+        ),
       }));
 
       setQuantidadesOnline((prev) => ({
@@ -62,8 +60,8 @@ export default function useEntradaXmlRateio({ api, toast }) {
         [itemId]: quantidadeNormalizada,
       }));
     } catch (error) {
-      console.error('Erro ao salvar quantidade online:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao salvar');
+      console.error("Erro ao salvar quantidade online:", error);
+      toast.error(error.response?.data?.detail || "Erro ao salvar");
     }
   };
 

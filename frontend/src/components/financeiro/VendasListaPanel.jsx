@@ -4,10 +4,7 @@ import ActionButton from "../ui/ActionButton";
 import MetricCard from "../ui/MetricCard";
 import MetricGrid from "../ui/MetricGrid";
 import VendasFinanceiroListaTable from "./VendasFinanceiroListaTable";
-import {
-  CANAL_LOJA_FISICA,
-  normalizeSalesChannel,
-} from "../../utils/salesChannel";
+import { CANAL_LOJA_FISICA, normalizeSalesChannel } from "../../utils/salesChannel";
 import { VENDAS_FINANCEIRO_CHANNEL_FILTERS } from "./vendasFinanceiroChannels";
 
 const formatCurrencyCompact = new Intl.NumberFormat("pt-BR", {

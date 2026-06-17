@@ -150,8 +150,8 @@ export default function EstoqueLancamentoModal({
             ) : null}
             {produtoEhGranel && tipoLancamento === "balanco" ? (
               <p className="mt-1 text-xs text-cyan-700">
-                Balanco manual permitido para ajuste de inventario. Para abastecer por pacote aberto,
-                use Lancar granel no produto fechado.
+                Balanco manual permitido para ajuste de inventario. Para abastecer por pacote
+                aberto, use Lancar granel no produto fechado.
               </p>
             ) : null}
           </div>
@@ -159,7 +159,9 @@ export default function EstoqueLancamentoModal({
           {tipoLancamento === "entrada" && !produtoEhGranel ? (
             <>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Preco de compra</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Preco de compra
+                </label>
                 <input
                   type="number"
                   step="0.01"
@@ -212,7 +214,9 @@ export default function EstoqueLancamentoModal({
           {tipoLancamento === "saida" ? (
             <>
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Motivo da saida *</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Motivo da saida *
+                </label>
                 <select
                   value={formData.motivo_saida || "saida_manual"}
                   onChange={(event) => handleMotivoSaidaChange(event.target.value)}
@@ -233,7 +237,9 @@ export default function EstoqueLancamentoModal({
                     <input
                       type="checkbox"
                       checked={formData.gerar_despesa_uso_interno === true}
-                      onChange={(event) => updateFormData("gerar_despesa_uso_interno", event.target.checked)}
+                      onChange={(event) =>
+                        updateFormData("gerar_despesa_uso_interno", event.target.checked)
+                      }
                       className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
                     />
                     <span>Lancar custo no financeiro/DRE</span>
@@ -242,21 +248,29 @@ export default function EstoqueLancamentoModal({
                   {formData.gerar_despesa_uso_interno === true ? (
                     <>
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-slate-700">Data de competencia</label>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Data de competencia
+                        </label>
                         <input
                           type="date"
                           value={formData.data_competencia || ""}
-                          onChange={(event) => updateFormData("data_competencia", event.target.value)}
+                          onChange={(event) =>
+                            updateFormData("data_competencia", event.target.value)
+                          }
                           className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                         />
                       </div>
 
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-slate-700">Descricao da despesa</label>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                          Descricao da despesa
+                        </label>
                         <input
                           type="text"
                           value={formData.descricao_despesa || ""}
-                          onChange={(event) => updateFormData("descricao_despesa", event.target.value)}
+                          onChange={(event) =>
+                            updateFormData("descricao_despesa", event.target.value)
+                          }
                           className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
                           placeholder="Material de uso interno"
                         />
@@ -273,7 +287,9 @@ export default function EstoqueLancamentoModal({
                       type="checkbox"
                       id="retornar_componentes"
                       checked={formData.retornar_componentes === true}
-                      onChange={(event) => updateFormData("retornar_componentes", event.target.checked)}
+                      onChange={(event) =>
+                        updateFormData("retornar_componentes", event.target.checked)
+                      }
                       className="mt-1 h-5 w-5 rounded border-slate-300 text-green-600 focus:ring-green-500"
                     />
                     <div className="flex-1">

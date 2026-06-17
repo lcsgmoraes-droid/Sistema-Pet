@@ -1,8 +1,4 @@
-import {
-  CANAL_APP,
-  CANAL_ECOMMERCE,
-  CANAL_LOJA_FISICA,
-} from "../../utils/salesChannel";
+import { CANAL_APP, CANAL_ECOMMERCE, CANAL_LOJA_FISICA } from "../../utils/salesChannel";
 
 export const VENDAS_FINANCEIRO_CHANNEL_FILTERS = [
   {

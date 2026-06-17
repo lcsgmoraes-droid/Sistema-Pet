@@ -1,31 +1,28 @@
 export function montarNomeXml(dados) {
-  const numero = String(dados?.numero_nf || '0').replaceAll(/\D/g, '');
-  const serie = String(dados?.serie || '1').replaceAll(/\D/g, '');
-  const chave = String(dados?.chave_acesso || '').replaceAll(/\D/g, '').slice(-8);
-  return `nfe_${numero || '0'}_${serie || '1'}_${chave || 'xml'}.xml`;
+  const numero = String(dados?.numero_nf || "0").replaceAll(/\D/g, "");
+  const serie = String(dados?.serie || "1").replaceAll(/\D/g, "");
+  const chave = String(dados?.chave_acesso || "")
+    .replaceAll(/\D/g, "")
+    .slice(-8);
+  return `nfe_${numero || "0"}_${serie || "1"}_${chave || "xml"}.xml`;
 }
 
-export function extrairMensagemErroApi(error, fallback = 'Erro ao processar solicitacao') {
+export function extrairMensagemErroApi(error, fallback = "Erro ao processar solicitacao") {
   const detail = error?.response?.data?.detail ?? error?.response?.data?.message;
 
-  if (typeof detail === 'string') {
+  if (typeof detail === "string") {
     return detail;
   }
 
   if (Array.isArray(detail)) {
     return detail
       .map((item) => item?.message || item?.msg || item?.detail || String(item))
-      .join(' | ');
+      .join(" | ");
   }
 
-  if (detail && typeof detail === 'object') {
+  if (detail && typeof detail === "object") {
     return (
-      detail.message ||
-      detail.mensagem ||
-      detail.error ||
-      detail.erro ||
-      detail.motivo ||
-      fallback
+      detail.message || detail.mensagem || detail.error || detail.erro || detail.motivo || fallback
     );
   }
 
@@ -33,15 +30,16 @@ export function extrairMensagemErroApi(error, fallback = 'Erro ao processar soli
 }
 
 export function formatarOpcaoProduto(produto) {
-  const sku = produto?.codigo || 'Sem SKU';
-  const ean = produto?.codigo_barras || produto?.gtin_ean || produto?.gtin_ean_tributario || 'Sem EAN';
-  const nome = produto?.nome || 'Produto sem nome';
+  const sku = produto?.codigo || "Sem SKU";
+  const ean =
+    produto?.codigo_barras || produto?.gtin_ean || produto?.gtin_ean_tributario || "Sem EAN";
+  const nome = produto?.nome || "Produto sem nome";
   const estoque = produto?.estoque_atual || 0;
   return `${sku} | EAN: ${ean} | ${nome} (Est: ${estoque})`;
 }
 
 export function formatarValorFiscal(valor, casas = 4) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
+  return Number(valor || 0).toLocaleString("pt-BR", {
     minimumFractionDigits: casas,
     maximumFractionDigits: casas,
   });
@@ -50,12 +48,12 @@ export function formatarValorFiscal(valor, casas = 4) {
 export function obterCustoAquisicaoItem(item) {
   return Number(
     item?.custo_aquisicao_unitario ??
-    item?.custo_aquisicao_unitario_nf ??
-    item?.composicao_custo?.custo_aquisicao_unitario ??
-    item?.custo_unitario_efetivo ??
-    item?.custo_unitario_efetivo_nf ??
-    item?.valor_unitario ??
-    0
+      item?.custo_aquisicao_unitario_nf ??
+      item?.composicao_custo?.custo_aquisicao_unitario ??
+      item?.custo_unitario_efetivo ??
+      item?.custo_unitario_efetivo_nf ??
+      item?.valor_unitario ??
+      0,
   );
 }
 
@@ -103,7 +101,9 @@ export function obterConfiguracaoPackItem(item, multiplicadoresOverride = {}) {
     multiplicador,
     multiplicadorDetectado,
     overrideManual,
-    packDetectadoAutomatico: Boolean(item?.pack_detectado_automatico || sugestaoAutomaticaDiferenteDoPadrao),
+    packDetectadoAutomatico: Boolean(
+      item?.pack_detectado_automatico || sugestaoAutomaticaDiferenteDoPadrao,
+    ),
     sugestaoAutomaticaDiferenteDoPadrao,
     usandoSugestaoAutomatica: sugestaoAutomaticaDiferenteDoPadrao && !overrideManual,
   };
@@ -116,7 +116,8 @@ export function ajustarComposicaoCustoParaMultiplicador(composicao, quantidadeBa
 
   const quantidadeEfetiva = Number(quantidadeBase || 0) * multiplicador;
   const componentesTotal = composicao.componentes_total || {};
-  const valorUnitario = (valorTotal) => (quantidadeEfetiva > 0 ? Number(valorTotal || 0) / quantidadeEfetiva : 0);
+  const valorUnitario = (valorTotal) =>
+    quantidadeEfetiva > 0 ? Number(valorTotal || 0) / quantidadeEfetiva : 0;
 
   return {
     ...composicao,
@@ -148,39 +149,37 @@ export function aplicarMultiplicadorPackAoItem(item, multiplicadoresOverride = {
   const quantidadeEfetiva = quantidadeNF * configPack.multiplicador;
   const custoTotal = Number(
     item.custo_aquisicao_total_nf ??
-    item.custo_aquisicao_total ??
-    item.composicao_custo?.custo_aquisicao_total ??
-    item.valor_total_nf ??
-    item.valor_total ??
-    0,
+      item.custo_aquisicao_total ??
+      item.composicao_custo?.custo_aquisicao_total ??
+      item.valor_total_nf ??
+      item.valor_total ??
+      0,
   );
   const custoUnitarioFallback = Number(
     item.custo_aquisicao_unitario_nf ??
-    item.custo_aquisicao_unitario ??
-    item.composicao_custo?.custo_aquisicao_unitario ??
-    item.custo_unitario_efetivo_nf ??
-    item.custo_unitario_efetivo ??
-    item.valor_unitario_nf ??
-    item.valor_unitario ??
-    0,
+      item.custo_aquisicao_unitario ??
+      item.composicao_custo?.custo_aquisicao_unitario ??
+      item.custo_unitario_efetivo_nf ??
+      item.custo_unitario_efetivo ??
+      item.valor_unitario_nf ??
+      item.valor_unitario ??
+      0,
   );
-  const custoUnitarioEfetivo = quantidadeEfetiva > 0
-    ? (custoTotal / quantidadeEfetiva)
-    : custoUnitarioFallback;
+  const custoUnitarioEfetivo =
+    quantidadeEfetiva > 0 ? custoTotal / quantidadeEfetiva : custoUnitarioFallback;
 
   let produtoVinculadoAjustado = item.produto_vinculado;
   if (item.produto_vinculado) {
     const custoAnterior = Number(item.produto_vinculado.custo_anterior || 0);
-    const variacaoCusto = custoAnterior > 0
-      ? ((custoUnitarioEfetivo - custoAnterior) / custoAnterior) * 100
-      : 0;
+    const variacaoCusto =
+      custoAnterior > 0 ? ((custoUnitarioEfetivo - custoAnterior) / custoAnterior) * 100 : 0;
     const precoVendaAtual = Number(item.produto_vinculado.preco_venda_atual || 0);
-    const margemReferencia = precoVendaAtual > 0 && custoAnterior > 0
-      ? ((precoVendaAtual - custoAnterior) / precoVendaAtual) * 100
-      : 0;
-    const margemProjetada = precoVendaAtual > 0
-      ? ((precoVendaAtual - custoUnitarioEfetivo) / precoVendaAtual) * 100
-      : 0;
+    const margemReferencia =
+      precoVendaAtual > 0 && custoAnterior > 0
+        ? ((precoVendaAtual - custoAnterior) / precoVendaAtual) * 100
+        : 0;
+    const margemProjetada =
+      precoVendaAtual > 0 ? ((precoVendaAtual - custoUnitarioEfetivo) / precoVendaAtual) * 100 : 0;
 
     produtoVinculadoAjustado = {
       ...item.produto_vinculado,
@@ -219,48 +218,50 @@ export function aplicarOverridesPackNoPreview(preview, multiplicadoresOverride =
 
   return {
     ...preview,
-    itens: preview.itens.map((item) => aplicarMultiplicadorPackAoItem(item, multiplicadoresOverride)),
+    itens: preview.itens.map((item) =>
+      aplicarMultiplicadorPackAoItem(item, multiplicadoresOverride),
+    ),
   };
 }
 
 export const CONFERENCIA_STATUS_META = {
   nao_iniciada: {
-    label: 'Nao conferida',
-    cls: 'bg-gray-100 text-gray-700 border-gray-200',
+    label: "Nao conferida",
+    cls: "bg-gray-100 text-gray-700 border-gray-200",
   },
   sem_divergencia: {
-    label: 'Conferida sem divergencias',
-    cls: 'bg-green-100 text-green-800 border-green-200',
+    label: "Conferida sem divergencias",
+    cls: "bg-green-100 text-green-800 border-green-200",
   },
   com_divergencia: {
-    label: 'Conferida com divergencias',
-    cls: 'bg-orange-100 text-orange-800 border-orange-200',
+    label: "Conferida com divergencias",
+    cls: "bg-orange-100 text-orange-800 border-orange-200",
   },
 };
 
 export const BASE_CALCULO_MARGEM_OPCOES = [
   {
-    value: 'nf',
-    label: 'Custo da NF',
-    descricao: 'Padrao. Usa o custo fiscal da NF como base da margem.',
+    value: "nf",
+    label: "Custo da NF",
+    descricao: "Padrao. Usa o custo fiscal da NF como base da margem.",
   },
   {
-    value: 'sistema',
-    label: 'Custo no sistema',
-    descricao: 'Usa o custo que sera aplicado no processamento da entrada.',
+    value: "sistema",
+    label: "Custo no sistema",
+    descricao: "Usa o custo que sera aplicado no processamento da entrada.",
   },
 ];
 
 export const ACAO_CONFERENCIA_OPCOES = [
-  { value: 'sem_acao', label: 'Sem acao' },
-  { value: 'contatar_fornecedor', label: 'Contatar fornecedor' },
-  { value: 'reposicao_fornecedor', label: 'Pedir reposicao' },
-  { value: 'nf_devolucao', label: 'NF de devolucao' },
-  { value: 'ajuste_interno', label: 'Ajuste interno' },
+  { value: "sem_acao", label: "Sem acao" },
+  { value: "contatar_fornecedor", label: "Contatar fornecedor" },
+  { value: "reposicao_fornecedor", label: "Pedir reposicao" },
+  { value: "nf_devolucao", label: "NF de devolucao" },
+  { value: "ajuste_interno", label: "Ajuste interno" },
 ];
 
 export function normalizarNumeroConferencia(valor, fallback = 0) {
-  const numero = Number.parseFloat(String(valor ?? '').replace(',', '.'));
+  const numero = Number.parseFloat(String(valor ?? "").replace(",", "."));
   if (!Number.isFinite(numero)) return fallback;
   return Math.max(0, numero);
 }
@@ -269,10 +270,7 @@ export function obterDraftConferenciaItem(item) {
   const quantidadeNF = Number(item?.quantidade ?? item?.quantidade_nf ?? 0);
   const quantidadeConferida = Math.max(
     0,
-    Math.min(
-      Number(item?.quantidade_conferida ?? quantidadeNF),
-      quantidadeNF,
-    ),
+    Math.min(Number(item?.quantidade_conferida ?? quantidadeNF), quantidadeNF),
   );
   const quantidadeAvariada = Math.max(
     0,
@@ -285,8 +283,8 @@ export function obterDraftConferenciaItem(item) {
   return {
     quantidade_conferida: quantidadeConferida,
     quantidade_avariada: quantidadeAvariada,
-    observacao_conferencia: item?.observacao_conferencia || '',
-    acao_sugerida: item?.acao_sugerida || 'sem_acao',
+    observacao_conferencia: item?.observacao_conferencia || "",
+    acao_sugerida: item?.acao_sugerida || "sem_acao",
   };
 }
 
@@ -299,21 +297,24 @@ export function calcularConferenciaItem(item, draft) {
   );
   const quantidadeAvariada = Math.max(
     0,
-    Math.min(Number(base?.quantidade_avariada ?? 0), Math.max(0, quantidadeNF - quantidadeConferida)),
+    Math.min(
+      Number(base?.quantidade_avariada ?? 0),
+      Math.max(0, quantidadeNF - quantidadeConferida),
+    ),
   );
   const quantidadeFaltante = Math.max(0, quantidadeNF - quantidadeConferida - quantidadeAvariada);
   const temAvaria = quantidadeAvariada > 0;
   const temFalta = quantidadeFaltante > 0;
 
-  let statusConferencia = 'ok';
-  if (temAvaria && temFalta) statusConferencia = 'falta_avaria';
-  else if (temAvaria) statusConferencia = 'avaria';
-  else if (temFalta) statusConferencia = 'falta';
+  let statusConferencia = "ok";
+  if (temAvaria && temFalta) statusConferencia = "falta_avaria";
+  else if (temAvaria) statusConferencia = "avaria";
+  else if (temFalta) statusConferencia = "falta";
 
-  const temDivergencia = statusConferencia !== 'ok';
+  const temDivergencia = statusConferencia !== "ok";
   const acaoSugerida = temDivergencia
-    ? (base?.acao_sugerida || (temAvaria ? 'nf_devolucao' : 'contatar_fornecedor'))
-    : 'sem_acao';
+    ? base?.acao_sugerida || (temAvaria ? "nf_devolucao" : "contatar_fornecedor")
+    : "sem_acao";
 
   return {
     quantidadeNF,
@@ -323,7 +324,7 @@ export function calcularConferenciaItem(item, draft) {
     statusConferencia,
     temDivergencia,
     acaoSugerida,
-    observacaoConferencia: base?.observacao_conferencia || '',
+    observacaoConferencia: base?.observacao_conferencia || "",
   };
 }
 
@@ -366,10 +367,13 @@ export function calcularResumoConferencia(nota, conferenciaItens) {
     }
   });
 
-  const statusBase = nota?.conferencia?.status || nota?.conferencia_status || 'nao_iniciada';
-  const status = statusBase === 'nao_iniciada'
-    ? 'nao_iniciada'
-    : (resumo.itens_com_divergencia > 0 ? 'com_divergencia' : 'sem_divergencia');
+  const statusBase = nota?.conferencia?.status || nota?.conferencia_status || "nao_iniciada";
+  const status =
+    statusBase === "nao_iniciada"
+      ? "nao_iniciada"
+      : resumo.itens_com_divergencia > 0
+        ? "com_divergencia"
+        : "sem_divergencia";
 
   return {
     ...resumo,
@@ -379,68 +383,70 @@ export function calcularResumoConferencia(nota, conferenciaItens) {
 }
 
 export function formatarDataRelatorio(valor) {
-  if (!valor) return 'Nao informado';
+  if (!valor) return "Nao informado";
   const dt = new Date(valor);
-  if (Number.isNaN(dt.getTime())) return 'Nao informado';
-  return dt.toLocaleDateString('pt-BR');
+  if (Number.isNaN(dt.getTime())) return "Nao informado";
+  return dt.toLocaleDateString("pt-BR");
 }
 
 export function formatarMoedaRelatorio(valor) {
   const numero = Number(valor || 0);
-  if (Number.isNaN(numero)) return '0,00';
-  return numero.toFixed(2).replace('.', ',');
+  if (Number.isNaN(numero)) return "0,00";
+  return numero.toFixed(2).replace(".", ",");
 }
 
 export function normalizarProdutoPreview(item) {
-  return item.produto_vinculado || {
-    produto_id: item.produto_id,
-    produto_nome: item.produto_nome,
-    produto_codigo: item.produto_codigo,
-    produto_ean: item.produto_ean,
-    produto_codigo_barras: item.produto_codigo_barras,
-    produto_gtin_ean: item.produto_gtin_ean,
-    produto_ean_tributario: item.produto_ean_tributario,
-    custo_anterior: item.custo_anterior,
-    custo_novo: item.custo_novo,
-    variacao_custo_percentual: item.variacao_custo_percentual,
-    preco_venda_atual: item.preco_venda_atual,
-    margem_atual: item.margem_atual,
-    margem_projetada_custo_novo: item.margem_projetada_custo_novo,
-    estoque_atual: item.estoque_atual,
-  };
+  return (
+    item.produto_vinculado || {
+      produto_id: item.produto_id,
+      produto_nome: item.produto_nome,
+      produto_codigo: item.produto_codigo,
+      produto_ean: item.produto_ean,
+      produto_codigo_barras: item.produto_codigo_barras,
+      produto_gtin_ean: item.produto_gtin_ean,
+      produto_ean_tributario: item.produto_ean_tributario,
+      custo_anterior: item.custo_anterior,
+      custo_novo: item.custo_novo,
+      variacao_custo_percentual: item.variacao_custo_percentual,
+      preco_venda_atual: item.preco_venda_atual,
+      margem_atual: item.margem_atual,
+      margem_projetada_custo_novo: item.margem_projetada_custo_novo,
+      estoque_atual: item.estoque_atual,
+    }
+  );
 }
 
 export function obterCustoBasePreviewItem(item) {
   return Number(
     item?.produto_vinculado?.custo_novo ??
-    item?.custo_novo ??
-    item?.custo_aquisicao_unitario_nf ??
-    item?.custo_unitario_efetivo_nf ??
-    item?.valor_unitario_nf ??
-    0
+      item?.custo_novo ??
+      item?.custo_aquisicao_unitario_nf ??
+      item?.custo_unitario_efetivo_nf ??
+      item?.valor_unitario_nf ??
+      0,
   );
 }
 
 export function obterHistoricoNfAnterior(historicos, numeroNotaAtual) {
   if (!Array.isArray(historicos) || historicos.length === 0) return null;
-  const numeroAtual = String(numeroNotaAtual || '').trim();
+  const numeroAtual = String(numeroNotaAtual || "").trim();
 
   const candidatoNfeAnterior = historicos.find((hist) => {
     if (!hist) return false;
-    const ehNfe = hist.motivo === 'nfe_entrada';
+    const ehNfe = hist.motivo === "nfe_entrada";
     const temNumero = !!hist.nota_numero;
     const temCusto = hist.preco_custo_novo !== null && hist.preco_custo_novo !== undefined;
-    const notaDiferente = String(hist.nota_numero || '').trim() !== numeroAtual;
+    const notaDiferente = String(hist.nota_numero || "").trim() !== numeroAtual;
     return ehNfe && temNumero && temCusto && notaDiferente;
   });
 
   if (candidatoNfeAnterior) return candidatoNfeAnterior;
 
-  return historicos.find((hist) =>
-    hist &&
-    hist.preco_custo_novo !== null &&
-    hist.preco_custo_novo !== undefined
-  ) || null;
+  return (
+    historicos.find(
+      (hist) => hist && hist.preco_custo_novo !== null && hist.preco_custo_novo !== undefined,
+    ) || null
+  );
 }
 
 export function detectarDivergencias(item) {
@@ -448,11 +454,14 @@ export function detectarDivergencias(item) {
   if (!produtoNome) return [];
 
   const divergencias = [];
-  const descNF = item.descricao_nf || item.descricao || '';
-  const descProd = produtoNome || '';
+  const descNF = item.descricao_nf || item.descricao || "";
+  const descProd = produtoNome || "";
 
   const divergenciaCodigoBarras = item.divergencia_codigo_barras;
-  if (divergenciaCodigoBarras?.tem_divergencia && Array.isArray(divergenciaCodigoBarras.mensagens)) {
+  if (
+    divergenciaCodigoBarras?.tem_divergencia &&
+    Array.isArray(divergenciaCodigoBarras.mensagens)
+  ) {
     divergenciaCodigoBarras.mensagens.forEach((mensagem) => {
       if (mensagem) divergencias.push(mensagem);
     });
@@ -461,40 +470,38 @@ export function detectarDivergencias(item) {
   if (!descNF || !descProd) return divergencias;
 
   const normalizarTexto = (txt) =>
-    (txt || '')
+    (txt || "")
       .toString()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
 
   const normalizarPesoToken = (pesoToken) => {
-    const match = String(pesoToken || '').match(/(\d+(?:[.,]\d+)?)\s*(kg|g|gr|mg|ml|l|un|und|unid)/i);
+    const match = String(pesoToken || "").match(
+      /(\d+(?:[.,]\d+)?)\s*(kg|g|gr|mg|ml|l|un|und|unid)/i,
+    );
     if (!match) return null;
-    const valor = Number.parseFloat(match[1].replace(',', '.'));
+    const valor = Number.parseFloat(match[1].replace(",", "."));
     if (Number.isNaN(valor)) return null;
     const unidade = match[2].toLowerCase();
 
-    if (['kg', 'g', 'gr', 'mg'].includes(unidade)) {
-      const emGramas = unidade === 'kg'
-        ? valor * 1000
-        : unidade === 'mg'
-          ? valor / 1000
-          : valor;
-      return { grupo: 'massa', valorBase: emGramas, texto: `${valor}${unidade}` };
+    if (["kg", "g", "gr", "mg"].includes(unidade)) {
+      const emGramas = unidade === "kg" ? valor * 1000 : unidade === "mg" ? valor / 1000 : valor;
+      return { grupo: "massa", valorBase: emGramas, texto: `${valor}${unidade}` };
     }
 
-    if (['l', 'ml'].includes(unidade)) {
-      const emMl = unidade === 'l' ? valor * 1000 : valor;
-      return { grupo: 'volume', valorBase: emMl, texto: `${valor}${unidade}` };
+    if (["l", "ml"].includes(unidade)) {
+      const emMl = unidade === "l" ? valor * 1000 : valor;
+      return { grupo: "volume", valorBase: emMl, texto: `${valor}${unidade}` };
     }
 
-    return { grupo: 'unidade', valorBase: valor, texto: `${valor}${unidade}` };
+    return { grupo: "unidade", valorBase: valor, texto: `${valor}${unidade}` };
   };
 
   const detectarEspecie = (txt) => {
     const t = normalizarTexto(txt);
-    if (/(\bgato\b|\bcat\b|\bfelino\b)/.test(t)) return 'gato';
-    if (/(\bcachorro\b|\bcao\b|\bdog\b|\bcanino\b)/.test(t)) return 'cachorro';
+    if (/(\bgato\b|\bcat\b|\bfelino\b)/.test(t)) return "gato";
+    if (/(\bcachorro\b|\bcao\b|\bdog\b|\bcanino\b)/.test(t)) return "cachorro";
     return null;
   };
 
@@ -511,16 +518,31 @@ export function detectarDivergencias(item) {
 
     if (pesoNF && pesoProd) {
       const mesmaCategoria = pesoNF.grupo === pesoProd.grupo;
-      const tolerancia = pesoNF.grupo === 'unidade' ? 0.01 : 0.5;
-      const diferente = !mesmaCategoria || Math.abs(pesoNF.valorBase - pesoProd.valorBase) > tolerancia;
+      const tolerancia = pesoNF.grupo === "unidade" ? 0.01 : 0.5;
+      const diferente =
+        !mesmaCategoria || Math.abs(pesoNF.valorBase - pesoProd.valorBase) > tolerancia;
 
       if (diferente) {
-        divergencias.push(`Peso/Tamanho diferente: NF="${pesoNF.texto}" vs Produto="${pesoProd.texto}"`);
+        divergencias.push(
+          `Peso/Tamanho diferente: NF="${pesoNF.texto}" vs Produto="${pesoProd.texto}"`,
+        );
       }
     }
   }
 
-  const cores = ['preto', 'branco', 'vermelho', 'azul', 'verde', 'amarelo', 'rosa', 'roxo', 'laranja', 'marrom', 'cinza'];
+  const cores = [
+    "preto",
+    "branco",
+    "vermelho",
+    "azul",
+    "verde",
+    "amarelo",
+    "rosa",
+    "roxo",
+    "laranja",
+    "marrom",
+    "cinza",
+  ];
   const corNF = cores.find((cor) => descNFLower.includes(cor));
   const corProd = cores.find((cor) => descProdLower.includes(cor));
 
@@ -528,7 +550,7 @@ export function detectarDivergencias(item) {
     divergencias.push(`Cor diferente: NF="${corNF}" vs Produto="${corProd}"`);
   }
 
-  const sabores = ['frango', 'carne', 'peixe', 'cordeiro', 'salmao', 'salmão', 'atum', 'vegetais'];
+  const sabores = ["frango", "carne", "peixe", "cordeiro", "salmao", "salmão", "atum", "vegetais"];
   const saborNF = sabores.find((sabor) => descNFLower.includes(sabor));
   const saborProd = sabores.find((sabor) => descProdLower.includes(sabor));
 
@@ -540,10 +562,10 @@ export function detectarDivergencias(item) {
   const especieProduto = detectarEspecie(descProd);
 
   if (especieNF && especieProduto && especieNF !== especieProduto) {
-    if (especieNF === 'cachorro') {
-      divergencias.push('⚠️ Animal diferente: NF para CACHORRO mas produto é para GATO');
+    if (especieNF === "cachorro") {
+      divergencias.push("⚠️ Animal diferente: NF para CACHORRO mas produto é para GATO");
     } else {
-      divergencias.push('⚠️ Animal diferente: NF para GATO mas produto é para CACHORRO');
+      divergencias.push("⚠️ Animal diferente: NF para GATO mas produto é para CACHORRO");
     }
   }
 

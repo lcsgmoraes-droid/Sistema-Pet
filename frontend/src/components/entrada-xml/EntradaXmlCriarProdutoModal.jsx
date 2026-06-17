@@ -1,8 +1,8 @@
-import PropTypes from 'prop-types';
-import { X } from 'lucide-react';
-import ActionButton from '../ui/ActionButton';
-import IconActionButton from '../ui/IconActionButton';
-import LoadingState from '../ui/LoadingState';
+import PropTypes from "prop-types";
+import { X } from "lucide-react";
+import ActionButton from "../ui/ActionButton";
+import IconActionButton from "../ui/IconActionButton";
+import LoadingState from "../ui/LoadingState";
 
 function CampoTexto({
   children,
@@ -19,7 +19,7 @@ function CampoTexto({
     <div>
       <label htmlFor={id} className="mb-1 block text-sm font-semibold text-gray-700">
         {children}
-        {required ? ' *' : ''}
+        {required ? " *" : ""}
       </label>
       <input
         id={id}
@@ -27,9 +27,11 @@ function CampoTexto({
         value={value}
         onChange={onChange}
         className={[
-          'w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500',
+          "w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500",
           inputClassName,
-        ].filter(Boolean).join(' ')}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         placeholder={placeholder}
       />
       {help ? <p className="mt-1 text-xs text-gray-500">{help}</p> : null}
@@ -50,11 +52,11 @@ CampoTexto.propTypes = {
 };
 
 CampoTexto.defaultProps = {
-  help: '',
-  inputClassName: '',
-  placeholder: '',
+  help: "",
+  inputClassName: "",
+  placeholder: "",
   required: false,
-  type: 'text',
+  type: "text",
 };
 
 export default function EntradaXmlCriarProdutoModal({
@@ -108,16 +110,27 @@ export default function EntradaXmlCriarProdutoModal({
               <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
                 <div className="mb-2 font-semibold text-blue-900">Dados da NF-e:</div>
                 <div className="space-y-1 text-sm text-blue-800">
-                  <div><strong>Descricao:</strong> {itemSelecionadoParaCriar.descricao}</div>
-                  <div><strong>Codigo Fornecedor:</strong> {itemSelecionadoParaCriar.codigo_produto}</div>
-                  <div><strong>NCM:</strong> {itemSelecionadoParaCriar.ncm}</div>
-                  {itemSelecionadoParaCriar.ean && (
-                    <div><strong>EAN:</strong> {itemSelecionadoParaCriar.ean}</div>
-                  )}
-                  <div><strong>Valor Unitario NF:</strong> R$ {itemSelecionadoParaCriar.valor_unitario.toFixed(2)}</div>
                   <div>
-                    <strong>Custo de Aquisicao:</strong>{' '}
-                    R$ {formatarValorFiscal(obterCustoAquisicaoItem(itemSelecionadoParaCriar), 4)}
+                    <strong>Descricao:</strong> {itemSelecionadoParaCriar.descricao}
+                  </div>
+                  <div>
+                    <strong>Codigo Fornecedor:</strong> {itemSelecionadoParaCriar.codigo_produto}
+                  </div>
+                  <div>
+                    <strong>NCM:</strong> {itemSelecionadoParaCriar.ncm}
+                  </div>
+                  {itemSelecionadoParaCriar.ean && (
+                    <div>
+                      <strong>EAN:</strong> {itemSelecionadoParaCriar.ean}
+                    </div>
+                  )}
+                  <div>
+                    <strong>Valor Unitario NF:</strong> R${" "}
+                    {itemSelecionadoParaCriar.valor_unitario.toFixed(2)}
+                  </div>
+                  <div>
+                    <strong>Custo de Aquisicao:</strong> R${" "}
+                    {formatarValorFiscal(obterCustoAquisicaoItem(itemSelecionadoParaCriar), 4)}
                   </div>
                 </div>
               </div>
@@ -128,8 +141,12 @@ export default function EntradaXmlCriarProdutoModal({
                     Codigo do fornecedor "{sugestaoSku.sku_proposto}" ja esta em uso.
                   </div>
                   <div className="mb-3 text-sm text-yellow-800">
-                    Produto existente: <strong>{sugestaoSku.produto_existente.nome}</strong><br />
-                    <span className="text-xs">Um SKU alternativo foi sugerido automaticamente. Voce pode alterar se preferir.</span>
+                    Produto existente: <strong>{sugestaoSku.produto_existente.nome}</strong>
+                    <br />
+                    <span className="text-xs">
+                      Um SKU alternativo foi sugerido automaticamente. Voce pode alterar se
+                      preferir.
+                    </span>
                   </div>
                   <div className="mb-2 text-sm font-semibold text-yellow-800">
                     Outras opcoes de SKU disponiveis:
@@ -140,12 +157,13 @@ export default function EntradaXmlCriarProdutoModal({
                         key={sugestao.sku}
                         type="button"
                         intent="edit"
-                        tone={formProduto.sku === sugestao.sku ? 'solid' : 'soft'}
+                        tone={formProduto.sku === sugestao.sku ? "solid" : "soft"}
                         size="xs"
-                        className={sugestao.padrao ? 'ring-2 ring-yellow-400' : ''}
+                        className={sugestao.padrao ? "ring-2 ring-yellow-400" : ""}
                         onClick={() => setFormProduto({ ...formProduto, sku: sugestao.sku })}
                       >
-                        {sugestao.sku}{sugestao.padrao ? ' (padrao)' : ''}
+                        {sugestao.sku}
+                        {sugestao.padrao ? " (padrao)" : ""}
                       </ActionButton>
                     ))}
                   </div>
@@ -155,7 +173,8 @@ export default function EntradaXmlCriarProdutoModal({
               {sugestaoSku && !sugestaoSku.ja_existe && (
                 <div className="rounded-lg border border-green-300 bg-green-50 p-3">
                   <div className="text-sm text-green-800">
-                    <strong>SKU disponivel.</strong> O codigo do fornecedor pode ser usado diretamente.
+                    <strong>SKU disponivel.</strong> O codigo do fornecedor pode ser usado
+                    diretamente.
                   </div>
                 </div>
               )}
@@ -184,13 +203,18 @@ export default function EntradaXmlCriarProdutoModal({
                 </CampoTexto>
 
                 <div>
-                  <label htmlFor="novo-produto-descricao" className="mb-1 block text-sm font-semibold text-gray-700">
+                  <label
+                    htmlFor="novo-produto-descricao"
+                    className="mb-1 block text-sm font-semibold text-gray-700"
+                  >
                     Descricao
                   </label>
                   <textarea
                     id="novo-produto-descricao"
                     value={formProduto.descricao}
-                    onChange={(event) => setFormProduto({ ...formProduto, descricao: event.target.value })}
+                    onChange={(event) =>
+                      setFormProduto({ ...formProduto, descricao: event.target.value })
+                    }
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-blue-500"
                     rows="2"
                     placeholder="Descricao detalhada (opcional)"
@@ -208,7 +232,9 @@ export default function EntradaXmlCriarProdutoModal({
                       setFormProduto({
                         ...formProduto,
                         preco_custo: custo,
-                        preco_venda: custo ? calcularPrecoVenda(Number.parseFloat(custo), margem) : '',
+                        preco_venda: custo
+                          ? calcularPrecoVenda(Number.parseFloat(custo), margem)
+                          : "",
                       });
                     }}
                     required
@@ -226,7 +252,10 @@ export default function EntradaXmlCriarProdutoModal({
                       setFormProduto({
                         ...formProduto,
                         margem_lucro: margem,
-                        preco_venda: custo && margem ? calcularPrecoVenda(custo, Number.parseFloat(margem)) : '',
+                        preco_venda:
+                          custo && margem
+                            ? calcularPrecoVenda(custo, Number.parseFloat(margem))
+                            : "",
                       });
                     }}
                     required
@@ -244,7 +273,10 @@ export default function EntradaXmlCriarProdutoModal({
                       setFormProduto({
                         ...formProduto,
                         preco_venda: venda,
-                        margem_lucro: custo && venda ? calcularMargemLucro(custo, Number.parseFloat(venda)) : '',
+                        margem_lucro:
+                          custo && venda
+                            ? calcularMargemLucro(custo, Number.parseFloat(venda))
+                            : "",
                       });
                     }}
                     required
@@ -258,10 +290,12 @@ export default function EntradaXmlCriarProdutoModal({
                     id="novo-produto-estoque-minimo"
                     type="number"
                     value={formProduto.estoque_minimo}
-                    onChange={(event) => setFormProduto({
-                      ...formProduto,
-                      estoque_minimo: Number.parseInt(event.target.value),
-                    })}
+                    onChange={(event) =>
+                      setFormProduto({
+                        ...formProduto,
+                        estoque_minimo: Number.parseInt(event.target.value),
+                      })
+                    }
                   >
                     Estoque Minimo
                   </CampoTexto>
@@ -270,10 +304,12 @@ export default function EntradaXmlCriarProdutoModal({
                     id="novo-produto-estoque-maximo"
                     type="number"
                     value={formProduto.estoque_maximo}
-                    onChange={(event) => setFormProduto({
-                      ...formProduto,
-                      estoque_maximo: Number.parseInt(event.target.value),
-                    })}
+                    onChange={(event) =>
+                      setFormProduto({
+                        ...formProduto,
+                        estoque_maximo: Number.parseInt(event.target.value),
+                      })
+                    }
                   >
                     Estoque Maximo
                   </CampoTexto>
@@ -284,13 +320,7 @@ export default function EntradaXmlCriarProdutoModal({
         </div>
 
         <div className="sticky bottom-0 flex justify-end gap-3 border-t bg-white px-6 py-4">
-          <ActionButton
-            type="button"
-            intent="neutral"
-            tone="soft"
-            size="md"
-            onClick={onClose}
-          >
+          <ActionButton type="button" intent="neutral" tone="soft" size="md" onClick={onClose}>
             Cancelar
           </ActionButton>
           <ActionButton
@@ -301,7 +331,7 @@ export default function EntradaXmlCriarProdutoModal({
             disabled={loading || !produtoValido}
             onClick={criarProdutoNovo}
           >
-            {loading ? 'Criando...' : 'Criar e Vincular Produto'}
+            {loading ? "Criando..." : "Criar e Vincular Produto"}
           </ActionButton>
         </div>
       </div>
@@ -343,10 +373,12 @@ EntradaXmlCriarProdutoModal.propTypes = {
       nome: PropTypes.string,
     }),
     sku_proposto: PropTypes.string,
-    sugestoes: PropTypes.arrayOf(PropTypes.shape({
-      padrao: PropTypes.bool,
-      sku: PropTypes.string,
-    })),
+    sugestoes: PropTypes.arrayOf(
+      PropTypes.shape({
+        padrao: PropTypes.bool,
+        sku: PropTypes.string,
+      }),
+    ),
   }),
 };
 

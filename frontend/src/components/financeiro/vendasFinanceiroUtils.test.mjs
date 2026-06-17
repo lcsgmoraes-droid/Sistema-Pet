@@ -303,9 +303,18 @@ test("filtra e ordena vendas para relatorio personalizado", () => {
     [2],
   );
 
-  assert.deepEqual(ordenarVendasRelatorio(vendas, "bruta_asc").map((venda) => venda.id), [1, 2]);
-  assert.deepEqual(ordenarVendasRelatorio(vendas, "lucro_desc").map((venda) => venda.id), [2, 1]);
-  assert.deepEqual(ordenarVendasRelatorio(vendas, "data_desc").map((venda) => venda.id), [2, 1]);
+  assert.deepEqual(
+    ordenarVendasRelatorio(vendas, "bruta_asc").map((venda) => venda.id),
+    [1, 2],
+  );
+  assert.deepEqual(
+    ordenarVendasRelatorio(vendas, "lucro_desc").map((venda) => venda.id),
+    [2, 1],
+  );
+  assert.deepEqual(
+    ordenarVendasRelatorio(vendas, "data_desc").map((venda) => venda.id),
+    [2, 1],
+  );
 });
 
 test("calcula totalizadores da lista de vendas financeiras", () => {
@@ -580,14 +589,26 @@ test("monta cards de composicao do resultado financeiro", () => {
       { sinal: "-", titulo: "Campanhas", valor: 4, percentual: undefined, acao: undefined },
       { sinal: "=", titulo: "Venda Liquida", valor: 250, percentual: undefined, acao: undefined },
       { sinal: "R$", titulo: "Valor Recebido", valor: 220, percentual: undefined, acao: undefined },
-      { sinal: "!", titulo: "Em Aberto", valor: 30, percentual: undefined, acao: "vendas_em_aberto" },
+      {
+        sinal: "!",
+        titulo: "Em Aberto",
+        valor: 30,
+        percentual: undefined,
+        acao: "vendas_em_aberto",
+      },
       { sinal: "-", titulo: "Custo Produtos", valor: 140, percentual: undefined, acao: undefined },
       { sinal: "=", titulo: "Lucro", valor: -10, percentual: undefined, acao: undefined },
       { sinal: "%", titulo: "Margem", valor: -4, percentual: true, acao: undefined },
     ],
   );
-  assert.equal(cards.find((card) => card.titulo === "Lucro").cor, "border-red-200 bg-red-50 text-red-800");
-  assert.equal(cards.find((card) => card.titulo === "Operacional").detalhe, "Repasse de entrega e custos operacionais.");
+  assert.equal(
+    cards.find((card) => card.titulo === "Lucro").cor,
+    "border-red-200 bg-red-50 text-red-800",
+  );
+  assert.equal(
+    cards.find((card) => card.titulo === "Operacional").detalhe,
+    "Repasse de entrega e custos operacionais.",
+  );
 
   const cardsComRepasseExplicito = montarFluxoResultadoCardsFinanceiro({
     taxa_entrega: 20,
@@ -596,7 +617,10 @@ test("monta cards de composicao do resultado financeiro", () => {
     lucro_total: 1,
   });
   assert.equal(cardsComRepasseExplicito.find((card) => card.titulo === "Operacional").valor, 13);
-  assert.equal(cardsComRepasseExplicito.find((card) => card.titulo === "Lucro").cor, "border-green-200 bg-green-50 text-green-800");
+  assert.equal(
+    cardsComRepasseExplicito.find((card) => card.titulo === "Lucro").cor,
+    "border-green-200 bg-green-50 text-green-800",
+  );
 });
 
 test("descreve periodo de comparacao financeiro", () => {
@@ -726,12 +750,7 @@ test("calcula analise inteligente de produtos e alertas de vendas", () => {
   assert.equal(analise.previsaoProximos7Dias, 1050);
   assert.deepEqual(
     analise.alertasInteligentesVendas.map((alerta) => alerta.id),
-    [
-      "queda-vendas",
-      "recebiveis-abertos",
-      "mix-baixa-margem",
-      "oportunidade-upsell",
-    ],
+    ["queda-vendas", "recebiveis-abertos", "mix-baixa-margem", "oportunidade-upsell"],
   );
 
   assert.deepEqual(calcularAnaliseInteligenteVendas({ produtosAnalise: [] }), {

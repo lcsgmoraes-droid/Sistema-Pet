@@ -1,18 +1,14 @@
-import PropTypes from 'prop-types';
-import { formatMoneyBRL } from '../../utils/formatters';
+import PropTypes from "prop-types";
+import { formatMoneyBRL } from "../../utils/formatters";
 
 function formatarValorFiscal(valor, casas = 4) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
+  return Number(valor || 0).toLocaleString("pt-BR", {
     minimumFractionDigits: casas,
     maximumFractionDigits: casas,
   });
 }
 
-function EntradaXmlRascunhoDevolucaoModal({
-  aberto,
-  rascunhoDevolucao,
-  onClose,
-}) {
+function EntradaXmlRascunhoDevolucaoModal({ aberto, rascunhoDevolucao, onClose }) {
   if (!aberto || !rascunhoDevolucao) return null;
 
   return (
@@ -25,10 +21,7 @@ function EntradaXmlRascunhoDevolucaoModal({
               NF origem {rascunhoDevolucao.numero_nota_origem} - {rascunhoDevolucao.fornecedor_nome}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl"
-          >
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">
             X
           </button>
         </div>
@@ -37,23 +30,31 @@ function EntradaXmlRascunhoDevolucaoModal({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
               <div className="text-xs uppercase tracking-wide text-orange-700">Itens devolucao</div>
-              <div className="text-2xl font-bold text-orange-900">{rascunhoDevolucao.quantidade_itens || 0}</div>
+              <div className="text-2xl font-bold text-orange-900">
+                {rascunhoDevolucao.quantidade_itens || 0}
+              </div>
             </div>
             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
               <div className="text-xs uppercase tracking-wide text-emerald-700">Valor estimado</div>
-              <div className="text-2xl font-bold text-emerald-900">{formatMoneyBRL(rascunhoDevolucao.valor_total_estimado || 0)}</div>
+              <div className="text-2xl font-bold text-emerald-900">
+                {formatMoneyBRL(rascunhoDevolucao.valor_total_estimado || 0)}
+              </div>
             </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
               <div className="text-xs uppercase tracking-wide text-slate-600">Status</div>
               <div className="text-sm font-semibold text-slate-800">
-                {rascunhoDevolucao.disponivel ? 'Rascunho pronto para gerar NF' : 'Sem itens avariados para devolucao'}
+                {rascunhoDevolucao.disponivel
+                  ? "Rascunho pronto para gerar NF"
+                  : "Sem itens avariados para devolucao"}
               </div>
             </div>
           </div>
 
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <div className="text-sm font-semibold text-gray-700 mb-1">Observacao sugerida</div>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{rascunhoDevolucao.observacao_sugerida}</p>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">
+              {rascunhoDevolucao.observacao_sugerida}
+            </p>
           </div>
 
           {rascunhoDevolucao.itens?.length > 0 ? (
@@ -73,15 +74,23 @@ function EntradaXmlRascunhoDevolucaoModal({
                       <td className="px-4 py-3">
                         <div className="font-semibold text-gray-900">{item.descricao}</div>
                         <div className="text-xs text-gray-500">
-                          {item.codigo_produto || 'Sem codigo'} - Item NF {item.numero_item_nf}
+                          {item.codigo_produto || "Sem codigo"} - Item NF {item.numero_item_nf}
                         </div>
                         {item.observacao_conferencia && (
-                          <div className="text-xs text-orange-700 mt-1">{item.observacao_conferencia}</div>
+                          <div className="text-xs text-orange-700 mt-1">
+                            {item.observacao_conferencia}
+                          </div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold">{formatarValorFiscal(item.quantidade_devolucao, 2)}</td>
-                      <td className="px-4 py-3 text-right">{formatMoneyBRL(item.valor_unitario || 0)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-emerald-700">{formatMoneyBRL(item.valor_total || 0)}</td>
+                      <td className="px-4 py-3 text-right font-semibold">
+                        {formatarValorFiscal(item.quantidade_devolucao, 2)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatMoneyBRL(item.valor_unitario || 0)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-emerald-700">
+                        {formatMoneyBRL(item.valor_total || 0)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

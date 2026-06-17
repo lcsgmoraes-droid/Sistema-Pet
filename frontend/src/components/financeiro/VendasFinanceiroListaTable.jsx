@@ -99,11 +99,7 @@ function hasValorInformado(valor) {
 }
 
 function obterTaxaGatewayInformada(venda) {
-  const camposTaxa = [
-    venda?.taxa_gateway,
-    venda?.taxa_mercado_pago,
-    venda?.taxa_pagamento,
-  ];
+  const camposTaxa = [venda?.taxa_gateway, venda?.taxa_mercado_pago, venda?.taxa_pagamento];
   return camposTaxa.find(hasValorInformado);
 }
 
@@ -119,9 +115,7 @@ function obterTaxaGateway(venda) {
 
 function obterLiquidoGateway(venda, taxaGateway) {
   const valor =
-    venda?.valor_liquido_gateway ??
-    venda?.gateway_valor_liquido ??
-    venda?.valor_recebido;
+    venda?.valor_liquido_gateway ?? venda?.gateway_valor_liquido ?? venda?.valor_recebido;
   if (valor !== null && valor !== undefined && valor !== "") return Number(valor || 0);
   return Number(venda?.venda_bruta || 0) - Number(taxaGateway || 0);
 }
@@ -131,12 +125,7 @@ function CodigoVendaCell({ abrirVendaNoPdv, venda }) {
 
   return (
     <div className="min-w-[120px]">
-      <SaleReference
-        sale={venda}
-        showPrefix={false}
-        value={saleNumber}
-        valueClassName=""
-      >
+      <SaleReference sale={venda} showPrefix={false} value={saleNumber} valueClassName="">
         <button
           type="button"
           onClick={(event) => {
@@ -208,11 +197,7 @@ function TaxaPagamentoCell({ venda }) {
             : "Taxa do Mercado Pago conciliada nesta venda"
         }
       >
-        {taxaPendente ? (
-          <AlertCircle className="h-3 w-3" />
-        ) : (
-          <CheckCircle2 className="h-3 w-3" />
-        )}
+        {taxaPendente ? <AlertCircle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
         {taxaPendente ? "Taxa pend." : "MP"}
       </span>
       {!taxaPendente && (
@@ -234,131 +219,130 @@ function ItensVendaDetalhes({ colSpan, formatarMoeda, venda }) {
           <div className="mb-2 font-semibold text-slate-700">Produtos desta venda:</div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1280px] text-xs">
-            <thead className="bg-blue-100">
-              <tr>
-                <th className="px-1 py-1 text-left">Produto</th>
-                <th className="px-1 py-1 text-center">Qtd</th>
-                <th className="px-1 py-1 text-right">Preço Unit.</th>
-                <th className="px-1 py-1 text-right">Venda Bruta</th>
-                <th className="px-1 py-1 text-right">Tx Loja</th>
-                <th className="px-1 py-1 text-right">Desconto</th>
-                <th className="px-1 py-1 text-right">Tx. Entr.</th>
-                <th className="px-1 py-1 text-right">Tx. Oper.</th>
-                <th className="px-1 py-1 text-right">Tx. Cartão</th>
-                <th className="px-1 py-1 text-right">Comissão</th>
-                <th className="px-1 py-1 text-right">Imposto</th>
-                <th
-                  className="px-1 py-1 text-right"
-                  title="Cashback/cupom rateado neste item"
-                >
-                  Campanha
-                </th>
-                <th className="px-1 py-1 text-right">Líquido</th>
-                <th className="px-1 py-1 text-right">Custo Unit.</th>
-                <th className="px-1 py-1 text-right">Custo Total</th>
-                <th className="px-1 py-1 text-right">Lucro</th>
-                <th className="px-1 py-1 text-right">MG Venda</th>
-                <th className="px-1 py-1 text-right">MG Custo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {venda.itens.map((item, idx) => (
-                <tr
-                  key={`${venda.id}-item-${item.produto_id || item.produto_nome || idx}`}
-                  className="border-b border-blue-200 hover:bg-blue-100"
-                >
-                  <td className="px-1 py-1">
-                    <ProductIdentity product={item}>
-                      {item.em_promocao && (
-                        <span
-                          className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold uppercase text-cyan-700"
-                          title={item.promocao_origem || "Item vendido por preço promocional ativo"}
-                        >
-                          Promo
-                        </span>
-                      )}
-                    </ProductIdentity>
-                  </td>
-                  <td className="px-1 py-1 text-center">
-                    <NumberCell value={item.quantidade} zeroAsDash />
-                  </td>
-                  <td className="px-1 py-1 text-right whitespace-nowrap">
-                    <MoneyCell value={item.preco_unitario} zeroAsDash />
-                  </td>
-                  <td className="px-1 py-1 text-right font-medium whitespace-nowrap">
-                    <MoneyCell value={item.venda_bruta} zeroAsDash />
-                  </td>
-                  <td className="px-1 py-1 text-right text-green-700 whitespace-nowrap">
-                    <MoneyCell value={item.taxa_loja || 0} sign="+" zeroAsDash />
-                  </td>
-                  <td className="px-1 py-1 text-right text-red-600 whitespace-nowrap">
-                    <MoneyCell value={item.desconto} sign="-" zeroAsDash />
-                  </td>
-                  <td className="px-1 py-1 text-right text-blue-600 whitespace-nowrap">
-                    <MoneyCell value={item.taxa_entrega} sign="-" zeroAsDash />
-                  </td>
-                  <td className="px-1 py-1 text-right text-orange-500 whitespace-nowrap">
-                    <MoneyCell value={item.taxa_operacional || 0} sign="-" zeroAsDash />
-                  </td>
-                  <td className="px-1 py-1 text-right text-purple-600 whitespace-nowrap">
-                    <MoneyCell value={item.taxa_cartao} sign="-" zeroAsDash />
-                  </td>
-                  <td className="px-1 py-1 text-right text-blue-600 whitespace-nowrap">
-                    <MoneyCell value={item.comissao} sign="-" zeroAsDash />
-                  </td>
-                  <td
-                    className="px-1 py-1 text-right text-pink-600 whitespace-nowrap"
-                    title={
-                      venda.imposto_aplicado
-                        ? "Impostos rateados neste item"
-                        : "Imposto oculto porque a venda não tem NF/NFC-e emitida"
-                    }
-                  >
-                    <MoneyCell value={item.imposto || 0} sign="-" zeroAsDash />
-                  </td>
-                  <td className="px-1 py-1 text-right text-teal-600 whitespace-nowrap">
-                    <MoneyCell value={item.campanha} sign="-" zeroAsDash />
-                  </td>
-                  <td className="px-1 py-1 text-right font-medium whitespace-nowrap">
-                    <MoneyCell value={item.valor_liquido} zeroAsDash />
-                  </td>
-                  <td className="px-1 py-1 text-right text-orange-600 whitespace-nowrap">
-                    <MoneyCell value={item.custo_unitario} zeroAsDash />
-                  </td>
-                  <td className="px-1 py-1 text-right text-orange-600 font-medium whitespace-nowrap">
-                    <MoneyCell value={item.custo_total} sign="-" zeroAsDash />
-                  </td>
-                  <td
-                    className={`px-1 py-1 text-right font-bold whitespace-nowrap ${item.lucro >= 0 ? "text-green-600" : "text-red-600"} cursor-help`}
-                    title={`Lucro unitário: ${formatarMoeda(item.lucro_unitario)}`}
-                  >
-                    <MoneyCell value={item.lucro} zeroAsDash />
-                  </td>
-                  <td
-                    className="px-1 py-1 text-right whitespace-nowrap cursor-help"
-                    title={`Margem: ${item.margem_sobre_venda}%`}
-                  >
-                    <NumberCell
-                      value={item.margem_sobre_venda}
-                      decimals={1}
-                      suffix="%"
-                      zeroAsDash
-                    />
-                  </td>
-                  <td
-                    className="px-1 py-1 text-right whitespace-nowrap cursor-help"
-                    title={`Markup: ${item.margem_sobre_custo}%`}
-                  >
-                    <NumberCell
-                      value={item.margem_sobre_custo}
-                      decimals={1}
-                      suffix="%"
-                      zeroAsDash
-                    />
-                  </td>
+              <thead className="bg-blue-100">
+                <tr>
+                  <th className="px-1 py-1 text-left">Produto</th>
+                  <th className="px-1 py-1 text-center">Qtd</th>
+                  <th className="px-1 py-1 text-right">Preço Unit.</th>
+                  <th className="px-1 py-1 text-right">Venda Bruta</th>
+                  <th className="px-1 py-1 text-right">Tx Loja</th>
+                  <th className="px-1 py-1 text-right">Desconto</th>
+                  <th className="px-1 py-1 text-right">Tx. Entr.</th>
+                  <th className="px-1 py-1 text-right">Tx. Oper.</th>
+                  <th className="px-1 py-1 text-right">Tx. Cartão</th>
+                  <th className="px-1 py-1 text-right">Comissão</th>
+                  <th className="px-1 py-1 text-right">Imposto</th>
+                  <th className="px-1 py-1 text-right" title="Cashback/cupom rateado neste item">
+                    Campanha
+                  </th>
+                  <th className="px-1 py-1 text-right">Líquido</th>
+                  <th className="px-1 py-1 text-right">Custo Unit.</th>
+                  <th className="px-1 py-1 text-right">Custo Total</th>
+                  <th className="px-1 py-1 text-right">Lucro</th>
+                  <th className="px-1 py-1 text-right">MG Venda</th>
+                  <th className="px-1 py-1 text-right">MG Custo</th>
                 </tr>
-              ))}
-            </tbody>
+              </thead>
+              <tbody>
+                {venda.itens.map((item, idx) => (
+                  <tr
+                    key={`${venda.id}-item-${item.produto_id || item.produto_nome || idx}`}
+                    className="border-b border-blue-200 hover:bg-blue-100"
+                  >
+                    <td className="px-1 py-1">
+                      <ProductIdentity product={item}>
+                        {item.em_promocao && (
+                          <span
+                            className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold uppercase text-cyan-700"
+                            title={
+                              item.promocao_origem || "Item vendido por preço promocional ativo"
+                            }
+                          >
+                            Promo
+                          </span>
+                        )}
+                      </ProductIdentity>
+                    </td>
+                    <td className="px-1 py-1 text-center">
+                      <NumberCell value={item.quantidade} zeroAsDash />
+                    </td>
+                    <td className="px-1 py-1 text-right whitespace-nowrap">
+                      <MoneyCell value={item.preco_unitario} zeroAsDash />
+                    </td>
+                    <td className="px-1 py-1 text-right font-medium whitespace-nowrap">
+                      <MoneyCell value={item.venda_bruta} zeroAsDash />
+                    </td>
+                    <td className="px-1 py-1 text-right text-green-700 whitespace-nowrap">
+                      <MoneyCell value={item.taxa_loja || 0} sign="+" zeroAsDash />
+                    </td>
+                    <td className="px-1 py-1 text-right text-red-600 whitespace-nowrap">
+                      <MoneyCell value={item.desconto} sign="-" zeroAsDash />
+                    </td>
+                    <td className="px-1 py-1 text-right text-blue-600 whitespace-nowrap">
+                      <MoneyCell value={item.taxa_entrega} sign="-" zeroAsDash />
+                    </td>
+                    <td className="px-1 py-1 text-right text-orange-500 whitespace-nowrap">
+                      <MoneyCell value={item.taxa_operacional || 0} sign="-" zeroAsDash />
+                    </td>
+                    <td className="px-1 py-1 text-right text-purple-600 whitespace-nowrap">
+                      <MoneyCell value={item.taxa_cartao} sign="-" zeroAsDash />
+                    </td>
+                    <td className="px-1 py-1 text-right text-blue-600 whitespace-nowrap">
+                      <MoneyCell value={item.comissao} sign="-" zeroAsDash />
+                    </td>
+                    <td
+                      className="px-1 py-1 text-right text-pink-600 whitespace-nowrap"
+                      title={
+                        venda.imposto_aplicado
+                          ? "Impostos rateados neste item"
+                          : "Imposto oculto porque a venda não tem NF/NFC-e emitida"
+                      }
+                    >
+                      <MoneyCell value={item.imposto || 0} sign="-" zeroAsDash />
+                    </td>
+                    <td className="px-1 py-1 text-right text-teal-600 whitespace-nowrap">
+                      <MoneyCell value={item.campanha} sign="-" zeroAsDash />
+                    </td>
+                    <td className="px-1 py-1 text-right font-medium whitespace-nowrap">
+                      <MoneyCell value={item.valor_liquido} zeroAsDash />
+                    </td>
+                    <td className="px-1 py-1 text-right text-orange-600 whitespace-nowrap">
+                      <MoneyCell value={item.custo_unitario} zeroAsDash />
+                    </td>
+                    <td className="px-1 py-1 text-right text-orange-600 font-medium whitespace-nowrap">
+                      <MoneyCell value={item.custo_total} sign="-" zeroAsDash />
+                    </td>
+                    <td
+                      className={`px-1 py-1 text-right font-bold whitespace-nowrap ${item.lucro >= 0 ? "text-green-600" : "text-red-600"} cursor-help`}
+                      title={`Lucro unitário: ${formatarMoeda(item.lucro_unitario)}`}
+                    >
+                      <MoneyCell value={item.lucro} zeroAsDash />
+                    </td>
+                    <td
+                      className="px-1 py-1 text-right whitespace-nowrap cursor-help"
+                      title={`Margem: ${item.margem_sobre_venda}%`}
+                    >
+                      <NumberCell
+                        value={item.margem_sobre_venda}
+                        decimals={1}
+                        suffix="%"
+                        zeroAsDash
+                      />
+                    </td>
+                    <td
+                      className="px-1 py-1 text-right whitespace-nowrap cursor-help"
+                      title={`Markup: ${item.margem_sobre_custo}%`}
+                    >
+                      <NumberCell
+                        value={item.margem_sobre_custo}
+                        decimals={1}
+                        suffix="%"
+                        zeroAsDash
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         </div>
@@ -461,21 +445,13 @@ export default function VendasFinanceiroListaTable({
       key: "codigo",
       header: "Código",
       className: "whitespace-nowrap",
-      render: (venda) => (
-        <CodigoVendaCell
-          abrirVendaNoPdv={abrirVendaNoPdv}
-          venda={venda}
-        />
-      ),
+      render: (venda) => <CodigoVendaCell abrirVendaNoPdv={abrirVendaNoPdv} venda={venda} />,
     },
     {
       key: "cliente",
       header: "Cliente",
       render: (venda) => (
-        <CustomerIdentity
-          nameClassName="font-medium text-slate-800"
-          venda={venda}
-        />
+        <CustomerIdentity nameClassName="font-medium text-slate-800" venda={venda} />
       ),
     },
     {
@@ -514,9 +490,7 @@ export default function VendasFinanceiroListaTable({
       align: "right",
       className: "text-orange-500 whitespace-nowrap",
       cellTitle: "Custo operacional da entrega (empresa)",
-      render: (venda) => (
-        <MoneyCell value={venda.taxa_operacional || 0} sign="-" zeroAsDash />
-      ),
+      render: (venda) => <MoneyCell value={venda.taxa_operacional || 0} sign="-" zeroAsDash />,
     },
     {
       key: "taxa_cartao",
@@ -637,9 +611,7 @@ export default function VendasFinanceiroListaTable({
       emptyMessage="Nenhuma venda encontrada"
       getRowKey={(venda) => venda.id}
       getRowRef={
-        onVendaRowRef
-          ? (venda, _rowIndex, element) => onVendaRowRef(venda.id, element)
-          : undefined
+        onVendaRowRef ? (venda, _rowIndex, element) => onVendaRowRef(venda.id, element) : undefined
       }
       isRowExpanded={(venda) => vendasExpandidas.has(venda.id)}
       onRowClick={(venda) => onToggleVenda(venda.id)}

@@ -28,7 +28,8 @@ export default function ReservasAtivasModal({
           <div>
             <h3 className="text-lg font-bold text-slate-900">Pedidos com reserva ativa</h3>
             <p className="mt-1 text-sm text-slate-500">
-              {reservasAtivas.length} pedido{reservasAtivas.length !== 1 ? "s" : ""} segurando este produto.
+              {reservasAtivas.length} pedido{reservasAtivas.length !== 1 ? "s" : ""} segurando este
+              produto.
             </p>
           </div>
           <button
@@ -62,7 +63,10 @@ export default function ReservasAtivasModal({
                         onClick={() => abrirPedidoReservado(pedido)}
                         className="text-left text-base font-bold text-blue-600 hover:underline"
                       >
-                        #{pedido.pedido_bling_numero || pedido.pedido_bling_id || pedido.pedido_integrado_id}
+                        #
+                        {pedido.pedido_bling_numero ||
+                          pedido.pedido_bling_id ||
+                          pedido.pedido_integrado_id}
                       </button>
                       <div className="mt-1 flex flex-wrap gap-2 text-xs">
                         {pedido.canal_label ? (
@@ -120,11 +124,13 @@ export default function ReservasAtivasModal({
                           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
                             <span>Qtd pedido: {formatarQuantidade(item.quantidade_item)}</span>
                             <span>
-                              Reserva neste produto: {formatarQuantidade(item.quantidade_reservada_produto)}
+                              Reserva neste produto:{" "}
+                              {formatarQuantidade(item.quantidade_reservada_produto)}
                             </span>
                             {item.origem_reserva === "componente_kit_virtual" ? (
                               <span>
-                                Origem: componente do kit {item.kit_origem_sku || item.kit_origem_nome || "-"}
+                                Origem: componente do kit{" "}
+                                {item.kit_origem_sku || item.kit_origem_nome || "-"}
                               </span>
                             ) : null}
                           </div>

@@ -1,17 +1,17 @@
-import PropTypes from 'prop-types';
+import PropTypes from "prop-types";
 
 const formatCurrency = (value) => Number(value || 0).toFixed(2);
 
 const motivoLabel = {
-  nfe_entrada: 'Entrada NF-e',
-  nfe_revisao_precos: 'Revisao de Precos',
-  manual: 'Ajuste Manual',
+  nfe_entrada: "Entrada NF-e",
+  nfe_revisao_precos: "Revisao de Precos",
+  manual: "Ajuste Manual",
 };
 
 const motivoIcon = {
-  nfe_entrada: 'NF',
-  nfe_revisao_precos: 'R$',
-  manual: 'Edit',
+  nfe_entrada: "NF",
+  nfe_revisao_precos: "R$",
+  manual: "Edit",
 };
 
 function EntradaXmlHistoricoPrecosModal({
@@ -28,11 +28,7 @@ function EntradaXmlHistoricoPrecosModal({
       <div className="bg-white rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-6">
           <h2 className="text-2xl font-bold">Historico de Alteracoes de Precos</h2>
-          {produtoHistorico && (
-            <p className="mt-2 text-purple-100">
-              {produtoHistorico.nome}
-            </p>
-          )}
+          {produtoHistorico && <p className="mt-2 text-purple-100">{produtoHistorico.nome}</p>}
         </div>
 
         <div className="p-6 overflow-y-auto flex-1">
@@ -47,12 +43,15 @@ function EntradaXmlHistoricoPrecosModal({
           ) : (
             <div className="space-y-4">
               {historicoPrecos.map((hist) => (
-                <div key={hist.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div
+                  key={hist.id}
+                  className="border rounded-lg p-4 hover:shadow-md transition-shadow"
+                >
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="inline-flex min-w-10 justify-center rounded bg-purple-50 px-2 py-1 text-sm font-semibold text-purple-700">
-                          {motivoIcon[hist.motivo] || 'Log'}
+                          {motivoIcon[hist.motivo] || "Log"}
                         </span>
                         <span className="font-semibold text-gray-800">
                           {motivoLabel[hist.motivo] || hist.motivo}
@@ -66,10 +65,8 @@ function EntradaXmlHistoricoPrecosModal({
                       )}
                     </div>
                     <div className="text-right text-sm text-gray-500">
-                      {new Date(hist.data).toLocaleString('pt-BR')}
-                      {hist.usuario && (
-                        <div className="text-xs mt-1">{hist.usuario}</div>
-                      )}
+                      {new Date(hist.data).toLocaleString("pt-BR")}
+                      {hist.usuario && <div className="text-xs mt-1">{hist.usuario}</div>}
                     </div>
                   </div>
 
@@ -80,63 +77,89 @@ function EntradaXmlHistoricoPrecosModal({
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="text-sm text-gray-500">Anterior</div>
-                            <div className="text-lg font-bold">R$ {formatCurrency(hist.preco_custo_anterior)}</div>
+                            <div className="text-lg font-bold">
+                              R$ {formatCurrency(hist.preco_custo_anterior)}
+                            </div>
                           </div>
                           <div className="text-2xl">-&gt;</div>
                           <div>
                             <div className="text-sm text-gray-500">Novo</div>
-                            <div className="text-lg font-bold text-blue-700">R$ {formatCurrency(hist.preco_custo_novo)}</div>
+                            <div className="text-lg font-bold text-blue-700">
+                              R$ {formatCurrency(hist.preco_custo_novo)}
+                            </div>
                           </div>
                         </div>
-                        {hist.variacao_custo_percentual !== null && hist.variacao_custo_percentual !== 0 && (
-                          <div className={`mt-2 text-sm font-semibold text-center ${
-                            hist.variacao_custo_percentual > 0 ? 'text-red-600' : 'text-green-600'
-                          }`}
-                          >
-                            {hist.variacao_custo_percentual > 0 ? '+' : '-'} {Math.abs(hist.variacao_custo_percentual).toFixed(2)}%
-                          </div>
-                        )}
+                        {hist.variacao_custo_percentual !== null &&
+                          hist.variacao_custo_percentual !== 0 && (
+                            <div
+                              className={`mt-2 text-sm font-semibold text-center ${
+                                hist.variacao_custo_percentual > 0
+                                  ? "text-red-600"
+                                  : "text-green-600"
+                              }`}
+                            >
+                              {hist.variacao_custo_percentual > 0 ? "+" : "-"}{" "}
+                              {Math.abs(hist.variacao_custo_percentual).toFixed(2)}%
+                            </div>
+                          )}
                       </div>
                     )}
 
                     {hist.preco_venda_anterior !== null && hist.preco_venda_novo !== null && (
                       <div className="bg-green-50 rounded-lg p-3">
-                        <div className="text-xs text-gray-600 font-semibold mb-2">PRECO DE VENDA</div>
+                        <div className="text-xs text-gray-600 font-semibold mb-2">
+                          PRECO DE VENDA
+                        </div>
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="text-sm text-gray-500">Anterior</div>
-                            <div className="text-lg font-bold">R$ {formatCurrency(hist.preco_venda_anterior)}</div>
+                            <div className="text-lg font-bold">
+                              R$ {formatCurrency(hist.preco_venda_anterior)}
+                            </div>
                           </div>
                           <div className="text-2xl">-&gt;</div>
                           <div>
                             <div className="text-sm text-gray-500">Novo</div>
-                            <div className="text-lg font-bold text-green-700">R$ {formatCurrency(hist.preco_venda_novo)}</div>
+                            <div className="text-lg font-bold text-green-700">
+                              R$ {formatCurrency(hist.preco_venda_novo)}
+                            </div>
                           </div>
                         </div>
-                        {hist.variacao_venda_percentual !== null && hist.variacao_venda_percentual !== 0 && (
-                          <div className={`mt-2 text-sm font-semibold text-center ${
-                            hist.variacao_venda_percentual > 0 ? 'text-green-600' : 'text-red-600'
-                          }`}
-                          >
-                            {hist.variacao_venda_percentual > 0 ? '+' : '-'} {Math.abs(hist.variacao_venda_percentual).toFixed(2)}%
-                          </div>
-                        )}
+                        {hist.variacao_venda_percentual !== null &&
+                          hist.variacao_venda_percentual !== 0 && (
+                            <div
+                              className={`mt-2 text-sm font-semibold text-center ${
+                                hist.variacao_venda_percentual > 0
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }`}
+                            >
+                              {hist.variacao_venda_percentual > 0 ? "+" : "-"}{" "}
+                              {Math.abs(hist.variacao_venda_percentual).toFixed(2)}%
+                            </div>
+                          )}
                       </div>
                     )}
                   </div>
 
                   {hist.margem_anterior !== null && hist.margem_nova !== null && (
                     <div className="mt-3 bg-purple-50 rounded-lg p-3">
-                      <div className="text-xs text-gray-600 font-semibold mb-2">MARGEM DE LUCRO</div>
+                      <div className="text-xs text-gray-600 font-semibold mb-2">
+                        MARGEM DE LUCRO
+                      </div>
                       <div className="flex items-center justify-around">
                         <div className="text-center">
                           <div className="text-sm text-gray-500">Anterior</div>
-                          <div className="text-xl font-bold">{hist.margem_anterior.toFixed(1)}%</div>
+                          <div className="text-xl font-bold">
+                            {hist.margem_anterior.toFixed(1)}%
+                          </div>
                         </div>
                         <div className="text-2xl">-&gt;</div>
                         <div className="text-center">
                           <div className="text-sm text-gray-500">Nova</div>
-                          <div className="text-xl font-bold text-purple-700">{hist.margem_nova.toFixed(1)}%</div>
+                          <div className="text-xl font-bold text-purple-700">
+                            {hist.margem_nova.toFixed(1)}%
+                          </div>
                         </div>
                       </div>
                     </div>
