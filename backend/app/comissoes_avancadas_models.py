@@ -15,37 +15,46 @@ from decimal import Decimal
 
 # ======================== MODELS DE REQUEST ========================
 
+
 class FiltrosConferencia(BaseModel):
     """Filtros para a tela de conferência"""
-    
-    grupo_produto: Optional[int] = Field(None, description="ID do grupo/categoria de produto")
+
+    grupo_produto: Optional[int] = Field(
+        None, description="ID do grupo/categoria de produto"
+    )
     produto_id: Optional[int] = Field(None, description="ID do produto específico")
-    data_inicio: Optional[date] = Field(None, description="Data inicial do período (YYYY-MM-DD)")
-    data_fim: Optional[date] = Field(None, description="Data final do período (YYYY-MM-DD)")
-    
+    data_inicio: Optional[date] = Field(
+        None, description="Data inicial do período (YYYY-MM-DD)"
+    )
+    data_fim: Optional[date] = Field(
+        None, description="Data final do período (YYYY-MM-DD)"
+    )
+
     class Config:
         json_schema_extra = {
             "example": {
                 "grupo_produto": 1,
                 "produto_id": None,
                 "data_inicio": "2026-01-15",
-                "data_fim": "2026-01-22"
+                "data_fim": "2026-01-22",
             }
         }
 
 
 class FecharComissaoComPagamento(BaseModel):
     """Modelo para fechar comissão com pagamento parcial"""
-    
+
     comissoes_ids: List[int] = Field(..., description="IDs das comissões a fechar")
     valor_pago: Decimal = Field(..., description="Valor a ser pago (pode ser parcial)")
     forma_pagamento: str = Field(
         "nao_informado",
-        description="Forma de pagamento: dinheiro, transferencia, cheque, cartao_credito, pix"
+        description="Forma de pagamento: dinheiro, transferencia, cheque, cartao_credito, pix",
     )
     data_pagamento: date = Field(..., description="Data do pagamento (YYYY-MM-DD)")
-    observacoes: Optional[str] = Field(None, description="Observações adicionais do pagamento")
-    
+    observacoes: Optional[str] = Field(
+        None, description="Observações adicionais do pagamento"
+    )
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -53,16 +62,17 @@ class FecharComissaoComPagamento(BaseModel):
                 "valor_pago": "100.50",
                 "forma_pagamento": "transferencia",
                 "data_pagamento": "2026-01-22",
-                "observacoes": "Pagamento parcial - saldo em 30 dias"
+                "observacoes": "Pagamento parcial - saldo em 30 dias",
             }
         }
 
 
 # ======================== MODELS DE RESPONSE ========================
 
+
 class ComissaoItem(BaseModel):
     """Item individual de comissão"""
-    
+
     id: int
     venda_id: int
     data_venda: str
@@ -83,7 +93,7 @@ class ComissaoItem(BaseModel):
 
 class PeriodoSelecionado(BaseModel):
     """Período selecionado nos filtros"""
-    
+
     data_inicio: Optional[date]
     data_fim: Optional[date]
     grupo_produto: Optional[int]
@@ -94,54 +104,50 @@ class PeriodoSelecionado(BaseModel):
 
 class ResumoComFiltros(BaseModel):
     """Resumo financeiro com filtros aplicados"""
-    
-    quantidade_comissoes: int = Field(..., description="Quantidade de comissões no resultado")
+
+    quantidade_comissoes: int = Field(
+        ..., description="Quantidade de comissões no resultado"
+    )
     valor_total: float = Field(..., description="Soma dos valores das comissões")
     valor_pago_total: Optional[float] = Field(
-        0.0,
-        description="Soma dos valores já pagos"
+        0.0, description="Soma dos valores já pagos"
     )
     saldo_restante_total: Optional[float] = Field(
-        None,
-        description="Saldo restante (valor_total - valor_pago_total)"
+        None, description="Saldo restante (valor_total - valor_pago_total)"
     )
     percentual_pago: Optional[float] = Field(
-        0.0,
-        description="Percentual do total que foi pago"
+        0.0, description="Percentual do total que foi pago"
     )
 
 
 class ConferenciaComFiltrosResponse(BaseModel):
     """Resposta da endpoint de conferência com filtros avançados"""
-    
+
     success: bool
     funcionario: Dict[str, Any]
     periodo_selecionado: PeriodoSelecionado
     resumo: ResumoComFiltros
     comissoes: List[ComissaoItem]
-    
+
     class Config:
         json_schema_extra = {
             "example": {
                 "success": True,
-                "funcionario": {
-                    "id": 14,
-                    "nome": "Dra Juliana Duarte"
-                },
+                "funcionario": {"id": 14, "nome": "Dra Juliana Duarte"},
                 "periodo_selecionado": {
                     "data_inicio": "2026-01-15",
                     "data_fim": "2026-01-22",
                     "grupo_produto": None,
                     "produto_id": None,
                     "grupo_produto_nome": None,
-                    "produto_nome": None
+                    "produto_nome": None,
                 },
                 "resumo": {
                     "quantidade_comissoes": 4,
                     "valor_total": 100.50,
                     "valor_pago_total": 50.25,
                     "saldo_restante_total": 50.25,
-                    "percentual_pago": 50.0
+                    "percentual_pago": 50.0,
                 },
                 "comissoes": [
                     {
@@ -160,16 +166,16 @@ class ConferenciaComFiltrosResponse(BaseModel):
                         "status": "pendente",
                         "forma_pagamento": None,
                         "valor_pago": None,
-                        "saldo_restante": None
+                        "saldo_restante": None,
                     }
-                ]
+                ],
             }
         }
 
 
 class FecharComPagamentoResponse(BaseModel):
     """Resposta ao fechar comissões com pagamento"""
-    
+
     success: bool
     total_processadas: int
     total_ignoradas: int
@@ -177,14 +183,13 @@ class FecharComPagamentoResponse(BaseModel):
     valor_total_pago: float
     saldo_total_restante: float
     comissoes_com_saldo: int = Field(
-        0,
-        description="Quantidade de comissões que ficaram com saldo restante"
+        0, description="Quantidade de comissões que ficaram com saldo restante"
     )
     forma_pagamento: str
     data_pagamento: str
     observacoes: Optional[str]
     mensagem: str
-    
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -198,14 +203,14 @@ class FecharComPagamentoResponse(BaseModel):
                 "forma_pagamento": "transferencia",
                 "data_pagamento": "2026-01-22",
                 "observacoes": "Pagamento parcial",
-                "mensagem": "4 comissões fechadas com pagamento parcial. Saldo: R$ 50.25"
+                "mensagem": "4 comissões fechadas com pagamento parcial. Saldo: R$ 50.25",
             }
         }
 
 
 class FormaPagamento(BaseModel):
     """Opção de forma de pagamento"""
-    
+
     id: int
     nome: str
     descricao: str
@@ -214,6 +219,6 @@ class FormaPagamento(BaseModel):
 
 class ListaFormasPagamento(BaseModel):
     """Lista de formas de pagamento disponíveis"""
-    
+
     success: bool
     formas: List[FormaPagamento]

@@ -709,6 +709,22 @@ def test_backend_ci_has_blocking_backend_banho_tosa_root_format_step():
     assert "ruff format --check app/banho_tosa*.py" in source
 
 
+def test_backend_ci_has_blocking_backend_commissions_dre_root_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend commissions dre root format (blocking)" in source
+    assert (
+        "ruff format --check app/comissoes_avancadas_models.py "
+        "app/comissoes_avancadas_routes.py app/comissoes_demonstrativo_routes.py "
+        "app/comissoes_estorno.py app/comissoes_models.py "
+        "app/comissoes_provisao.py app/comissoes_routes.py "
+        "app/comissoes_service.py app/dre_canais_routes.py "
+        "app/dre_classificacao_routes.py app/dre_classificacao_service.py "
+        "app/dre_ia_routes.py app/dre_plano_contas_models.py "
+        "app/dre_plano_contas_routes.py app/dre_regras_models.py app/dre_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_backend_routers_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
