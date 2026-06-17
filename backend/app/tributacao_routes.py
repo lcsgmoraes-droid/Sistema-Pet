@@ -17,14 +17,15 @@ router = APIRouter(prefix="/tributacao", tags=["Tributação e Impostos"])
 
 # ===== SCHEMAS =====
 
+
 class ConfigTributariaSchema(BaseModel):
     regime: str  # 'simples_nacional', 'lucro_presumido', 'lucro_real', 'mei'
-    
+
     # Simples Nacional
     anexo_simples: Optional[str] = None
     faixa_simples: Optional[str] = None
     aliquota_efetiva_simples: Optional[float] = None
-    
+
     # Lucro Presumido
     presuncao_lucro_percentual: Optional[float] = None
     aliquota_irpj: Optional[float] = None
@@ -32,7 +33,7 @@ class ConfigTributariaSchema(BaseModel):
     aliquota_csll: Optional[float] = None
     aliquota_pis: Optional[float] = None
     aliquota_cofins: Optional[float] = None
-    
+
     # ICMS/ISS
     estado: Optional[str] = None
     aliquota_icms: Optional[float] = None
@@ -69,25 +70,25 @@ class ConfigTributariaResponse(BaseModel):
     incluir_icms_dre: bool
     aliquota_iss: Optional[float]
     incluir_iss_dre: bool
-    
+
     model_config = {"from_attributes": True}
 
 
 # ===== ENDPOINTS =====
 
+
 @router.get("/configuracao", response_model=Optional[ConfigTributariaResponse])
 def obter_configuracao(
-    user_and_tenant=Depends(get_current_user_and_tenant),
-    db: Session = Depends(get_db)
+    user_and_tenant=Depends(get_current_user_and_tenant), db: Session = Depends(get_db)
 ):
     """Busca configuração tributária do usuário atual"""
     current_user, tenant_id = user_and_tenant
     calculadora = CalculadoraTributaria(db)
     config = calculadora.obter_configuracao(tenant_id=tenant_id)
-    
+
     if not config:
         return None
-    
+
     return config
 
 
@@ -95,11 +96,11 @@ def obter_configuracao(
 def salvar_configuracao(
     dados: ConfigTributariaSchema,
     user_and_tenant=Depends(get_current_user_and_tenant),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Cria ou atualiza configuração tributária
-    
+
     Regimes suportados:
     - simples_nacional: Alíquota única progressiva (4% a 19%)
     - lucro_presumido: PIS, COFINS, IRPJ, CSLL separados
@@ -108,7 +109,7 @@ def salvar_configuracao(
     """
     current_user, tenant_id = user_and_tenant
     calculadora = CalculadoraTributaria(db)
-    
+
     config = calculadora.salvar_configuracao(
         tenant_id=tenant_id,
         user_id=current_user.id,
@@ -126,9 +127,9 @@ def salvar_configuracao(
         aliquota_icms=dados.aliquota_icms,
         incluir_icms_dre=dados.incluir_icms_dre,
         aliquota_iss=dados.aliquota_iss,
-        incluir_iss_dre=dados.incluir_iss_dre
+        incluir_iss_dre=dados.incluir_iss_dre,
     )
-    
+
     return config
 
 
@@ -136,11 +137,11 @@ def salvar_configuracao(
 def calcular_impostos(
     dados: CalculoImpostosRequest,
     user_and_tenant=Depends(get_current_user_and_tenant),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Calcula impostos baseado no regime configurado
-    
+
     Returns:
         {
             'impostos': 850.50,
@@ -153,14 +154,14 @@ def calcular_impostos(
     """
     current_user, tenant_id = user_and_tenant
     calculadora = CalculadoraTributaria(db)
-    
+
     resultado = calculadora.calcular_impostos(
         tenant_id=tenant_id,
         receita_bruta=dados.receita_bruta,
         receita_liquida=dados.receita_liquida,
-        lucro_operacional=dados.lucro_operacional
+        lucro_operacional=dados.lucro_operacional,
     )
-    
+
     return resultado
 
 
@@ -168,11 +169,11 @@ def calcular_impostos(
 def estimar_melhor_regime(
     dados: EstimarRegimeRequest,
     user_and_tenant=Depends(get_current_user_and_tenant),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Compara todos os regimes e sugere o mais econômico
-    
+
     Returns:
         {
             'simples_nacional': {'impostos': 1000, 'aliquota': 8.5},
@@ -185,13 +186,13 @@ def estimar_melhor_regime(
     """
     current_user, tenant_id = user_and_tenant
     calculadora = CalculadoraTributaria(db)
-    
+
     resultado = calculadora.estimar_economia_regime(
         tenant_id=tenant_id,
         receita_bruta=dados.receita_bruta_mensal,
-        lucro_operacional=dados.lucro_operacional_mensal
+        lucro_operacional=dados.lucro_operacional_mensal,
     )
-    
+
     return resultado
 
 
@@ -209,8 +210,8 @@ def listar_regimes():
                 "vantagens": [
                     "Tributação unificada (8 impostos em 1 guia)",
                     "Alíquotas progressivas",
-                    "Simplificação burocrática"
-                ]
+                    "Simplificação burocrática",
+                ],
             },
             {
                 "id": "lucro_presumido",
@@ -221,8 +222,8 @@ def listar_regimes():
                 "vantagens": [
                     "Bom para margens altas",
                     "Menos burocracia que Lucro Real",
-                    "Sem obrigatoriedade de escrituração contábil completa"
-                ]
+                    "Sem obrigatoriedade de escrituração contábil completa",
+                ],
             },
             {
                 "id": "lucro_real",
@@ -233,8 +234,8 @@ def listar_regimes():
                 "vantagens": [
                     "Ideal para margens baixas ou prejuízo",
                     "Tributação sobre lucro real",
-                    "Compensa prejuízos fiscais"
-                ]
+                    "Compensa prejuízos fiscais",
+                ],
             },
             {
                 "id": "mei",
@@ -245,9 +246,9 @@ def listar_regimes():
                 "vantagens": [
                     "Valor fixo muito baixo",
                     "Máxima simplificação",
-                    "Sem contabilidade obrigatória"
-                ]
-            }
+                    "Sem contabilidade obrigatória",
+                ],
+            },
         ]
     }
 
@@ -266,8 +267,8 @@ def listar_anexos_simples():
                     {"limite": 720000, "aliquota": 9.50},
                     {"limite": 1800000, "aliquota": 10.70},
                     {"limite": 3600000, "aliquota": 14.30},
-                    {"limite": 4800000, "aliquota": 19.00}
-                ]
+                    {"limite": 4800000, "aliquota": 19.00},
+                ],
             },
             "Anexo III": {
                 "atividade": "Serviços (maioria)",
@@ -278,8 +279,8 @@ def listar_anexos_simples():
                     {"limite": 720000, "aliquota": 13.50},
                     {"limite": 1800000, "aliquota": 16.00},
                     {"limite": 3600000, "aliquota": 21.00},
-                    {"limite": 4800000, "aliquota": 33.00}
-                ]
+                    {"limite": 4800000, "aliquota": 33.00},
+                ],
             },
             "Anexo V": {
                 "atividade": "Serviços especializados",
@@ -290,8 +291,8 @@ def listar_anexos_simples():
                     {"limite": 720000, "aliquota": 19.50},
                     {"limite": 1800000, "aliquota": 20.50},
                     {"limite": 3600000, "aliquota": 23.00},
-                    {"limite": 4800000, "aliquota": 30.50}
-                ]
-            }
+                    {"limite": 4800000, "aliquota": 30.50},
+                ],
+            },
         }
     }

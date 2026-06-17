@@ -1,6 +1,7 @@
 """
 Routes para gerenciamento de contas bancárias
 """
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/contas-bancarias", tags=["Contas Bancárias"])
 
 
 # ==================== Schemas ====================
+
 
 class ContaBancariaCreate(BaseModel):
     nome: str = Field(..., min_length=1, max_length=100)
@@ -41,7 +43,9 @@ class ContaBancariaUpdate(BaseModel):
 
 class AjusteSaldo(BaseModel):
     novo_saldo: float = Field(..., description="Novo saldo da conta")
-    descricao: str = Field(..., min_length=1, max_length=500, description="Motivo do ajuste")
+    descricao: str = Field(
+        ..., min_length=1, max_length=500, description="Motivo do ajuste"
+    )
 
 
 class ContaBancariaResponse(BaseModel):
@@ -57,7 +61,7 @@ class ContaBancariaResponse(BaseModel):
     ativa: bool
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -75,32 +79,33 @@ class MovimentacaoResponse(BaseModel):
     categoria_id: Optional[int]
     forma_pagamento_id: Optional[int]
     created_at: datetime
-    
+
     model_config = {"from_attributes": True}
 
 
 # ==================== Rotas ====================
 
+
 @router.get("", response_model=List[ContaBancariaResponse])
 def listar_contas(
     apenas_ativas: bool = True,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Lista todas as contas bancárias do usuário"""
     current_user, tenant_id = user_and_tenant
     query = db.query(ContaBancaria).filter(ContaBancaria.tenant_id == tenant_id)
-    
+
     if apenas_ativas:
         query = query.filter(ContaBancaria.ativa.is_(True))
-    
+
     contas = query.order_by(ContaBancaria.nome).all()
-    
+
     # Converter saldos (centavos → reais) - force float para JSON
     for conta in contas:
         conta.saldo_inicial = float(conta.saldo_inicial) / 100
         conta.saldo_atual = float(conta.saldo_atual) / 100
-    
+
     return contas
 
 
@@ -108,24 +113,25 @@ def listar_contas(
 def obter_conta(
     conta_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Obtém detalhes de uma conta específica"""
     current_user, tenant_id = user_and_tenant
-    conta = db.query(ContaBancaria).filter(
-        and_(
-            ContaBancaria.id == conta_id,
-            ContaBancaria.tenant_id == tenant_id
+    conta = (
+        db.query(ContaBancaria)
+        .filter(
+            and_(ContaBancaria.id == conta_id, ContaBancaria.tenant_id == tenant_id)
         )
-    ).first()
-    
+        .first()
+    )
+
     if not conta:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
-    
+
     # Converter saldos (centavos → reais) - force float para JSON
     conta.saldo_inicial = float(conta.saldo_inicial) / 100
     conta.saldo_atual = float(conta.saldo_atual) / 100
-    
+
     return conta
 
 
@@ -133,43 +139,51 @@ def obter_conta(
 def criar_conta(
     conta_data: ContaBancariaCreate,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Cria uma nova conta bancária"""
     try:
         current_user, tenant_id = user_and_tenant
-        
+
         # Log para debug MELHORADO
         print(f"[DEBUG] user_and_tenant type: {type(user_and_tenant)}")
         print(f"[DEBUG] current_user type: {type(current_user)}")
         print(f"[DEBUG] current_user: {current_user}")
-        print(f"[DEBUG] current_user.id: {getattr(current_user, 'id', 'NO ID ATTRIBUTE')}")
+        print(
+            f"[DEBUG] current_user.id: {getattr(current_user, 'id', 'NO ID ATTRIBUTE')}"
+        )
         print(f"[DEBUG] tenant_id: {tenant_id}")
         print(f"[DEBUG] Dados: {conta_data.model_dump()}")
-        
+
         # Verificar se já existe conta com mesmo nome
-        existe = db.query(ContaBancaria).filter(
-            and_(
-                ContaBancaria.nome == conta_data.nome,
-                ContaBancaria.tenant_id == tenant_id
+        existe = (
+            db.query(ContaBancaria)
+            .filter(
+                and_(
+                    ContaBancaria.nome == conta_data.nome,
+                    ContaBancaria.tenant_id == tenant_id,
+                )
             )
-        ).first()
-        
+            .first()
+        )
+
         if existe:
-            raise HTTPException(status_code=400, detail="Já existe uma conta com este nome")
-        
+            raise HTTPException(
+                status_code=400, detail="Já existe uma conta com este nome"
+            )
+
         # Converter saldo (reais → centavos) usando Decimal para compatibilidade com Numeric
         # CORREÇÃO: Não multiplicar por 100 - o banco já aceita decimal direto
         saldo_decimal = Decimal(str(conta_data.saldo_inicial))
-        
+
         # CORREÇÃO CRÍTICA: Garantir que user_id não seja None
-        user_id = current_user.id if hasattr(current_user, 'id') else None
+        user_id = current_user.id if hasattr(current_user, "id") else None
         if user_id is None:
             raise HTTPException(
                 status_code=500,
-                detail=f"Erro interno: user_id não disponível. current_user={current_user}"
+                detail=f"Erro interno: user_id não disponível. current_user={current_user}",
             )
-        
+
         # Criar conta
         # NOTA: tenant_id deve ser passado explicitamente (não há auto-inject configurado)
         nova_conta = ContaBancaria(
@@ -182,13 +196,13 @@ def criar_conta(
             icone=conta_data.icone,
             ativa=conta_data.ativa,
             user_id=user_id,
-            tenant_id=tenant_id
+            tenant_id=tenant_id,
         )
-        
+
         db.add(nova_conta)
         db.commit()
         db.refresh(nova_conta)
-        
+
         # Se saldo inicial > 0, criar movimentação de abertura
         if saldo_decimal > 0:
             movimentacao = MovimentacaoFinanceira(
@@ -199,26 +213,29 @@ def criar_conta(
                 origem_tipo="abertura_conta",
                 status="realizado",
                 descricao=f"Saldo inicial da conta {nova_conta.nome}",
-                tenant_id=tenant_id
+                tenant_id=tenant_id,
             )
             db.add(movimentacao)
             db.commit()
-        
+
         # Converter para resposta - já está em formato correto (Decimal)
         nova_conta.saldo_inicial = float(nova_conta.saldo_inicial)
         nova_conta.saldo_atual = float(nova_conta.saldo_atual)
-        
+
         print(f"[DEBUG] Conta criada com sucesso - ID: {nova_conta.id}")
         return nova_conta
-        
+
     except HTTPException:
         raise
     except Exception as e:
         print(f"[ERROR] Erro ao criar conta: {str(e)}")
         import traceback
+
         traceback.print_exc()
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Erro interno ao criar conta: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Erro interno ao criar conta: {str(e)}"
+        )
 
 
 @router.put("/{conta_id}", response_model=ContaBancariaResponse)
@@ -226,73 +243,83 @@ def atualizar_conta(
     conta_id: int,
     conta_data: ContaBancariaUpdate,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Atualiza dados de uma conta bancária (não altera saldo)"""
     try:
         current_user, tenant_id = user_and_tenant
-        
-        print(f"[DEBUG] Atualizando conta {conta_id} - User: {current_user.id}, Tenant: {tenant_id}")
-        
-        conta = db.query(ContaBancaria).filter(
-            and_(
-                ContaBancaria.id == conta_id,
-                ContaBancaria.tenant_id == tenant_id
+
+        print(
+            f"[DEBUG] Atualizando conta {conta_id} - User: {current_user.id}, Tenant: {tenant_id}"
+        )
+
+        conta = (
+            db.query(ContaBancaria)
+            .filter(
+                and_(ContaBancaria.id == conta_id, ContaBancaria.tenant_id == tenant_id)
             )
-        ).first()
-        
+            .first()
+        )
+
         if not conta:
             raise HTTPException(status_code=404, detail="Conta não encontrada")
-        
+
         # Atualizar campos
         update_data = conta_data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(conta, field, value)
-        
+
         db.commit()
         db.refresh(conta)
-        
+
         # Converter saldos (centavos → reais) - force float para JSON
         conta.saldo_inicial = float(conta.saldo_inicial) / 100
         conta.saldo_atual = float(conta.saldo_atual) / 100
-        
+
         print(f"[DEBUG] Conta {conta_id} atualizada com sucesso")
         return conta
-        
+
     except HTTPException:
         raise
     except Exception as e:
         print(f"[ERROR] Erro ao atualizar conta: {str(e)}")
         import traceback
+
         traceback.print_exc()
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Erro interno ao atualizar conta: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Erro interno ao atualizar conta: {str(e)}"
+        )
 
 
 @router.delete("/{conta_id}")
 def excluir_conta(
     conta_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Desativa uma conta bancária (soft delete)"""
     current_user, tenant_id = user_and_tenant
-    
-    conta = db.query(ContaBancaria).filter(
-        and_(
-            ContaBancaria.id == conta_id,
-            ContaBancaria.tenant_id == tenant_id
+
+    conta = (
+        db.query(ContaBancaria)
+        .filter(
+            and_(ContaBancaria.id == conta_id, ContaBancaria.tenant_id == tenant_id)
         )
-    ).first()
-    
+        .first()
+    )
+
     if not conta:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
-    
+
     # Verificar se tem movimentações
-    tem_movimentacoes = db.query(MovimentacaoFinanceira).filter(
-        MovimentacaoFinanceira.conta_bancaria_id == conta_id
-    ).count() > 0
-    
+    tem_movimentacoes = (
+        db.query(MovimentacaoFinanceira)
+        .filter(MovimentacaoFinanceira.conta_bancaria_id == conta_id)
+        .count()
+        > 0
+    )
+
     if tem_movimentacoes:
         # Soft delete - apenas desativar
         conta.ativa = False
@@ -310,35 +337,36 @@ def ajustar_saldo(
     conta_id: int,
     ajuste: AjusteSaldo,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Ajusta o saldo de uma conta (cria movimentação de ajuste)"""
     current_user, tenant_id = user_and_tenant
-    
-    conta = db.query(ContaBancaria).filter(
-        and_(
-            ContaBancaria.id == conta_id,
-            ContaBancaria.tenant_id == tenant_id
+
+    conta = (
+        db.query(ContaBancaria)
+        .filter(
+            and_(ContaBancaria.id == conta_id, ContaBancaria.tenant_id == tenant_id)
         )
-    ).first()
-    
+        .first()
+    )
+
     if not conta:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
-    
+
     # Converter novo saldo (reais → centavos) usando Decimal
     novo_saldo_centavos = Decimal(str(ajuste.novo_saldo * 100))
     saldo_atual_centavos = conta.saldo_atual
-    
+
     # Calcular diferença
     diferenca = novo_saldo_centavos - saldo_atual_centavos
-    
+
     if diferenca == 0:
         raise HTTPException(status_code=400, detail="Novo saldo é igual ao saldo atual")
-    
+
     # Determinar tipo de movimentação
     tipo_mov = "entrada" if diferenca > 0 else "saida"
     valor_absoluto = abs(diferenca)
-    
+
     # Criar movimentação de ajuste
     movimentacao = MovimentacaoFinanceira(
         data_movimento=datetime.utcnow(),
@@ -348,23 +376,23 @@ def ajustar_saldo(
         origem_tipo="ajuste_manual",
         status="realizado",
         descricao=f"Ajuste de saldo: {ajuste.descricao}",
-        tenant_id=tenant_id
+        tenant_id=tenant_id,
     )
-    
+
     db.add(movimentacao)
-    
+
     # Atualizar saldo da conta
     conta.saldo_atual = novo_saldo_centavos
-    
+
     db.commit()
     db.refresh(conta)
-    
+
     return {
         "message": "Saldo ajustado com sucesso",
         "saldo_anterior": float(saldo_atual_centavos) / 100,
         "saldo_novo": float(novo_saldo_centavos) / 100,
         "diferenca": float(diferenca) / 100,
-        "movimentacao_id": movimentacao.id
+        "movimentacao_id": movimentacao.id,
     }
 
 
@@ -376,84 +404,87 @@ def listar_movimentacoes(
     tipo: Optional[str] = None,
     status: Optional[str] = None,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Lista movimentações de uma conta (extrato)"""
     current_user, tenant_id = user_and_tenant
-    
+
     # Verificar se conta existe e pertence ao usuário
-    conta = db.query(ContaBancaria).filter(
-        and_(
-            ContaBancaria.id == conta_id,
-            ContaBancaria.tenant_id == tenant_id
+    conta = (
+        db.query(ContaBancaria)
+        .filter(
+            and_(ContaBancaria.id == conta_id, ContaBancaria.tenant_id == tenant_id)
         )
-    ).first()
-    
+        .first()
+    )
+
     if not conta:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
-    
+
     # Buscar movimentações
     query = db.query(MovimentacaoFinanceira).filter(
         MovimentacaoFinanceira.conta_bancaria_id == conta_id
     )
-    
+
     if tipo:
         query = query.filter(MovimentacaoFinanceira.tipo == tipo)
-    
+
     if status:
         query = query.filter(MovimentacaoFinanceira.status == status)
-    
-    movimentacoes = query.order_by(
-        desc(MovimentacaoFinanceira.data_movimento)
-    ).offset(offset).limit(limit).all()
-    
+
+    movimentacoes = (
+        query.order_by(desc(MovimentacaoFinanceira.data_movimento))
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
     # Converter valores (centavos → reais) - force float para JSON
     for mov in movimentacoes:
         mov.valor = float(mov.valor) / 100
-    
+
     return movimentacoes
 
 
 @router.get("/resumo/saldos")
 def resumo_saldos(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Retorna resumo de saldos de todas as contas ativas"""
     current_user, tenant_id = user_and_tenant
-    
-    contas = db.query(ContaBancaria).filter(
-        and_(
-            ContaBancaria.tenant_id == tenant_id,
-            ContaBancaria.ativa.is_(True)
+
+    contas = (
+        db.query(ContaBancaria)
+        .filter(
+            and_(ContaBancaria.tenant_id == tenant_id, ContaBancaria.ativa.is_(True))
         )
-    ).all()
-    
+        .all()
+    )
+
     resumo = {
         "total_geral": 0,
-        "por_tipo": {
-            "banco": 0,
-            "caixa": 0,
-            "digital": 0
-        },
-        "contas": []
+        "por_tipo": {"banco": 0, "caixa": 0, "digital": 0},
+        "contas": [],
     }
-    
+
     for conta in contas:
         saldo_reais = float(conta.saldo_atual) / 100
         resumo["total_geral"] += saldo_reais
-        
+
         # Usar get para evitar KeyError com tipos não mapeados
         if conta.tipo in resumo["por_tipo"]:
             resumo["por_tipo"][conta.tipo] += saldo_reais
-        
-        resumo["contas"].append({
-            "id": conta.id,
-            "nome": conta.nome,
-            "tipo": conta.tipo,
-            "saldo": saldo_reais,
-            "cor": conta.cor,
-            "icone": conta.icone
-        })
-    
+
+        resumo["contas"].append(
+            {
+                "id": conta.id,
+                "nome": conta.nome,
+                "tipo": conta.tipo,
+                "saldo": saldo_reais,
+                "cor": conta.cor,
+                "icone": conta.icone,
+            }
+        )
+
     return resumo

@@ -18,9 +18,14 @@ from .auth.dependencies import get_current_user_and_tenant
 from .idempotency import idempotent  # ← IDEMPOTÊNCIA
 from .models import Cliente
 from .financeiro_models import (
-    ContaPagar, Pagamento, CategoriaFinanceira, FormaPagamento, LancamentoManual,
+    ContaPagar,
+    Pagamento,
+    CategoriaFinanceira,
+    FormaPagamento,
+    LancamentoManual,
     TipoDespesa,
-    MovimentacaoFinanceira, ContaBancaria
+    MovimentacaoFinanceira,
+    ContaBancaria,
 )
 from .produtos_models import NotaEntrada
 from .domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
@@ -38,6 +43,7 @@ from app.services.reconciliacao_simples_service import reconciliar_das_simples
 from app.services.reconciliacao_provisao_service import reconciliar_provisao
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/contas-pagar", tags=["Contas a Pagar"])
@@ -88,36 +94,44 @@ def _registrar_observacao_operacao_conta_pagar(
     observacoes_atuais = (conta.observacoes or "").strip()
     conta.observacoes = f"{observacoes_atuais}\n{linha}".strip()
 
+
 # ============================================================================
 # SCHEMAS
 # ============================================================================
+
 
 class ContaPagarCreate(BaseModel):
     descricao: str
     fornecedor_id: Optional[int] = None
     categoria_id: Optional[int] = None  # UX/Agrupamento
-    
+
     # ============================
     # DRE - CAMPOS OBRIGATORIOS (com padrões)
     # ============================
-    dre_subcategoria_id: Optional[int] = None  # Obrigatorio via categoria vinculada a DRE ou envio direto
-    canal: str = 'loja_fisica'  # OBRIGATORIO - loja_fisica, mercado_livre, shopee, amazon
+    dre_subcategoria_id: Optional[int] = (
+        None  # Obrigatorio via categoria vinculada a DRE ou envio direto
+    )
+    canal: str = (
+        "loja_fisica"  # OBRIGATORIO - loja_fisica, mercado_livre, shopee, amazon
+    )
     tipo_despesa_id: Optional[int] = None  # FK para TipoDespesa (fixo/variável)
-    
+
     valor_original: float
     data_emissao: date
     data_vencimento: date
     documento: Optional[str] = None
     observacoes: Optional[str] = None
     nota_entrada_id: Optional[int] = None
-    
+
     # Parcelamento
     eh_parcelado: bool = False
     total_parcelas: int = 1
-    
+
     # Recorrência
     eh_recorrente: bool = False
-    tipo_recorrencia: Optional[str] = None  # 'semanal', 'quinzenal', 'mensal', 'personalizado'
+    tipo_recorrencia: Optional[str] = (
+        None  # 'semanal', 'quinzenal', 'mensal', 'personalizado'
+    )
     intervalo_dias: Optional[int] = None  # Para tipo 'personalizado'
     data_inicio_recorrencia: Optional[date] = None
     data_fim_recorrencia: Optional[date] = None  # OU
@@ -235,7 +249,7 @@ class ContaPagarResponse(BaseModel):
     origem_lancamento: Optional[str] = None
     origem_lancamento_label: Optional[str] = None
     caixa_referencia: Optional[str] = None
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -245,19 +259,28 @@ def _obter_tipo_produto_revenda_id(db: Session, tenant_id) -> Optional[int]:
         "Fornecedor de Produto para Revenda",
     ]
     for nome in nomes_prioritarios:
-        tipo = db.query(TipoDespesa).filter(
-            TipoDespesa.tenant_id == tenant_id,
-            func.lower(TipoDespesa.nome) == nome.lower(),
-            TipoDespesa.ativo.is_(True),
-        ).first()
+        tipo = (
+            db.query(TipoDespesa)
+            .filter(
+                TipoDespesa.tenant_id == tenant_id,
+                func.lower(TipoDespesa.nome) == nome.lower(),
+                TipoDespesa.ativo.is_(True),
+            )
+            .first()
+        )
         if tipo:
             return tipo.id
 
-    tipo = db.query(TipoDespesa).filter(
-        TipoDespesa.tenant_id == tenant_id,
-        TipoDespesa.nome.ilike("%produto%revenda%"),
-        TipoDespesa.ativo.is_(True),
-    ).order_by(TipoDespesa.nome.asc()).first()
+    tipo = (
+        db.query(TipoDespesa)
+        .filter(
+            TipoDespesa.tenant_id == tenant_id,
+            TipoDespesa.nome.ilike("%produto%revenda%"),
+            TipoDespesa.ativo.is_(True),
+        )
+        .order_by(TipoDespesa.nome.asc())
+        .first()
+    )
     return tipo.id if tipo else None
 
 
@@ -269,11 +292,15 @@ def _resolver_dre_subcategoria_conta_pagar(
     categoria_id: Optional[int],
 ) -> int:
     if dre_subcategoria_id is not None:
-        subcategoria = db.query(DRESubcategoria).filter(
-            DRESubcategoria.id == dre_subcategoria_id,
-            DRESubcategoria.tenant_id == tenant_id,
-            DRESubcategoria.ativo.is_(True),
-        ).first()
+        subcategoria = (
+            db.query(DRESubcategoria)
+            .filter(
+                DRESubcategoria.id == dre_subcategoria_id,
+                DRESubcategoria.tenant_id == tenant_id,
+                DRESubcategoria.ativo.is_(True),
+            )
+            .first()
+        )
         if not subcategoria:
             raise HTTPException(
                 status_code=400,
@@ -282,11 +309,15 @@ def _resolver_dre_subcategoria_conta_pagar(
         return subcategoria.id
 
     if categoria_id is not None:
-        categoria = db.query(CategoriaFinanceira).filter(
-            CategoriaFinanceira.id == categoria_id,
-            CategoriaFinanceira.tenant_id == tenant_id,
-            CategoriaFinanceira.ativo.is_(True),
-        ).first()
+        categoria = (
+            db.query(CategoriaFinanceira)
+            .filter(
+                CategoriaFinanceira.id == categoria_id,
+                CategoriaFinanceira.tenant_id == tenant_id,
+                CategoriaFinanceira.ativo.is_(True),
+            )
+            .first()
+        )
         if not categoria:
             raise HTTPException(
                 status_code=400,
@@ -320,15 +351,18 @@ def _resolver_dre_subcategoria_conta_pagar(
 # FUNÇÃO HELPER: CALCULAR PRÓXIMA DATA DE RECORRÊNCIA
 # ============================================================================
 
-def calcular_proxima_recorrencia(data_base: date, tipo_recorrencia: str, intervalo_dias: Optional[int] = None) -> date:
+
+def calcular_proxima_recorrencia(
+    data_base: date, tipo_recorrencia: str, intervalo_dias: Optional[int] = None
+) -> date:
     """
     Calcula a próxima data de recorrência baseado no tipo
     """
-    if tipo_recorrencia == 'semanal':
+    if tipo_recorrencia == "semanal":
         return data_base + timedelta(days=7)
-    elif tipo_recorrencia == 'quinzenal':
+    elif tipo_recorrencia == "quinzenal":
         return data_base + timedelta(days=15)
-    elif tipo_recorrencia == 'mensal':
+    elif tipo_recorrencia == "mensal":
         # Adicionar 1 mês
         mes = data_base.month + 1
         ano = data_base.year
@@ -340,9 +374,10 @@ def calcular_proxima_recorrencia(data_base: date, tipo_recorrencia: str, interva
         except ValueError:
             # Caso dia não exista no próximo mês (ex: 31 de fev), usar último dia do mês
             import calendar
+
             ultimo_dia = calendar.monthrange(ano, mes)[1]
             return date(ano, mes, ultimo_dia)
-    elif tipo_recorrencia == 'personalizado' and intervalo_dias:
+    elif tipo_recorrencia == "personalizado" and intervalo_dias:
         return data_base + timedelta(days=intervalo_dias)
     else:
         raise ValueError(f"Tipo de recorrência inválido: {tipo_recorrencia}")
@@ -359,6 +394,7 @@ def adicionar_meses(data_base: date, meses_adicionar: int) -> date:
         return data_base.replace(year=ano, month=mes)
     except ValueError:
         import calendar
+
         ultimo_dia = calendar.monthrange(ano, mes)[1]
         return date(ano, mes, ultimo_dia)
 
@@ -378,26 +414,38 @@ def _gerar_contas_recorrentes_ate_janela(
 ) -> List[ContaPagar]:
     contas_criadas: List[ContaPagar] = []
 
-    while conta_origem.proxima_recorrencia and conta_origem.proxima_recorrencia <= limite_recorrencia:
+    while (
+        conta_origem.proxima_recorrencia
+        and conta_origem.proxima_recorrencia <= limite_recorrencia
+    ):
         nova_data_vencimento = conta_origem.proxima_recorrencia
 
-        if conta_origem.data_fim_recorrencia and nova_data_vencimento > conta_origem.data_fim_recorrencia:
+        if (
+            conta_origem.data_fim_recorrencia
+            and nova_data_vencimento > conta_origem.data_fim_recorrencia
+        ):
             break
 
         if conta_origem.numero_repeticoes:
-            count_geradas = db.query(func.count(ContaPagar.id)).filter(
-                ContaPagar.conta_recorrencia_origem_id == conta_origem.id
-            ).scalar()
+            count_geradas = (
+                db.query(func.count(ContaPagar.id))
+                .filter(ContaPagar.conta_recorrencia_origem_id == conta_origem.id)
+                .scalar()
+            )
             if count_geradas >= conta_origem.numero_repeticoes:
                 logger.info(
                     f"Conta #{conta_origem.id} atingiu o numero maximo de repeticoes ({conta_origem.numero_repeticoes})"
                 )
                 break
 
-        conta_existente = db.query(ContaPagar).filter(
-            ContaPagar.conta_recorrencia_origem_id == conta_origem.id,
-            ContaPagar.data_vencimento == nova_data_vencimento,
-        ).first()
+        conta_existente = (
+            db.query(ContaPagar)
+            .filter(
+                ContaPagar.conta_recorrencia_origem_id == conta_origem.id,
+                ContaPagar.data_vencimento == nova_data_vencimento,
+            )
+            .first()
+        )
         if conta_existente:
             conta_origem.proxima_recorrencia = calcular_proxima_recorrencia(
                 nova_data_vencimento,
@@ -417,7 +465,7 @@ def _gerar_contas_recorrentes_ate_janela(
             valor_final=conta_origem.valor_original,
             data_emissao=nova_data_vencimento,
             data_vencimento=nova_data_vencimento,
-            status='pendente',
+            status="pendente",
             nota_entrada_id=conta_origem.nota_entrada_id,
             documento=conta_origem.documento,
             observacoes=f"Gerada automaticamente da recorrencia #{conta_origem.id}",
@@ -430,13 +478,13 @@ def _gerar_contas_recorrentes_ate_janela(
         contas_criadas.append(nova_conta)
 
         lancamento = LancamentoManual(
-            tipo='saida',
+            tipo="saida",
             valor=nova_conta.valor_original,
             descricao=nova_conta.descricao,
             data_lancamento=nova_conta.data_vencimento,
             data_competencia=nova_conta.data_vencimento,
             categoria_id=nova_conta.categoria_id,
-            status='previsto',
+            status="previsto",
             documento=nova_conta.documento,
             observacoes=f"Gerado automaticamente da recorrencia #{conta_origem.id}",
             gerado_automaticamente=True,
@@ -463,19 +511,30 @@ def _garantir_janela_recorrencia_apos_pagamento(
 ) -> List[ContaPagar]:
     conta_origem = conta_paga
     if not conta_paga.eh_recorrente and conta_paga.conta_recorrencia_origem_id:
-        conta_origem = db.query(ContaPagar).filter(
-            ContaPagar.id == conta_paga.conta_recorrencia_origem_id,
-            ContaPagar.tenant_id == tenant_id,
-        ).first()
+        conta_origem = (
+            db.query(ContaPagar)
+            .filter(
+                ContaPagar.id == conta_paga.conta_recorrencia_origem_id,
+                ContaPagar.tenant_id == tenant_id,
+            )
+            .first()
+        )
 
     if not conta_origem:
         return []
 
-    if not conta_origem.eh_recorrente or not conta_origem.tipo_recorrencia or not conta_origem.proxima_recorrencia:
+    if (
+        not conta_origem.eh_recorrente
+        or not conta_origem.tipo_recorrencia
+        or not conta_origem.proxima_recorrencia
+    ):
         return []
 
     data_referencia = hoje or date.today()
-    if conta_origem.data_fim_recorrencia and conta_origem.data_fim_recorrencia < data_referencia:
+    if (
+        conta_origem.data_fim_recorrencia
+        and conta_origem.data_fim_recorrencia < data_referencia
+    ):
         return []
 
     limite_recorrencia = calcular_limite_janela_recorrencia(data_referencia)
@@ -493,10 +552,14 @@ def _obter_origem_recorrencia(
     conta: ContaPagar,
 ) -> Optional[ContaPagar]:
     if conta.conta_recorrencia_origem_id:
-        return db.query(ContaPagar).filter(
-            ContaPagar.id == conta.conta_recorrencia_origem_id,
-            ContaPagar.tenant_id == tenant_id,
-        ).first()
+        return (
+            db.query(ContaPagar)
+            .filter(
+                ContaPagar.id == conta.conta_recorrencia_origem_id,
+                ContaPagar.tenant_id == tenant_id,
+            )
+            .first()
+        )
     return conta if conta.eh_recorrente else None
 
 
@@ -517,14 +580,22 @@ def _garantir_janela_recorrencia_conta(
     hoje: Optional[date] = None,
 ) -> List[ContaPagar]:
     conta_origem = _obter_origem_recorrencia(db, tenant_id, conta)
-    if not conta_origem or not conta_origem.eh_recorrente or not conta_origem.tipo_recorrencia:
+    if (
+        not conta_origem
+        or not conta_origem.eh_recorrente
+        or not conta_origem.tipo_recorrencia
+    ):
         return []
 
     if not conta_origem.proxima_recorrencia:
-        ultima_data = db.query(func.max(ContaPagar.data_vencimento)).filter(
-            ContaPagar.tenant_id == tenant_id,
-            ContaPagar.conta_recorrencia_origem_id == conta_origem.id,
-        ).scalar()
+        ultima_data = (
+            db.query(func.max(ContaPagar.data_vencimento))
+            .filter(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.conta_recorrencia_origem_id == conta_origem.id,
+            )
+            .scalar()
+        )
         data_base = ultima_data or conta_origem.data_vencimento
         conta_origem.proxima_recorrencia = calcular_proxima_recorrencia(
             data_base,
@@ -533,7 +604,10 @@ def _garantir_janela_recorrencia_conta(
         )
 
     data_referencia = hoje or date.today()
-    if conta_origem.data_fim_recorrencia and conta_origem.data_fim_recorrencia < data_referencia:
+    if (
+        conta_origem.data_fim_recorrencia
+        and conta_origem.data_fim_recorrencia < data_referencia
+    ):
         return []
 
     return _gerar_contas_recorrentes_ate_janela(
@@ -568,14 +642,18 @@ def _aplicar_edicao_recorrencia_futura(
     if not campos_replicaveis.intersection(campos):
         return 0
 
-    futuras = db.query(ContaPagar).filter(
-        ContaPagar.tenant_id == tenant_id,
-        ContaPagar.conta_recorrencia_origem_id == conta_origem.id,
-        ContaPagar.id != conta.id,
-        ContaPagar.data_vencimento > conta.data_vencimento,
-        ContaPagar.status != "pago",
-        func.coalesce(ContaPagar.valor_pago, 0) <= 0,
-    ).all()
+    futuras = (
+        db.query(ContaPagar)
+        .filter(
+            ContaPagar.tenant_id == tenant_id,
+            ContaPagar.conta_recorrencia_origem_id == conta_origem.id,
+            ContaPagar.id != conta.id,
+            ContaPagar.data_vencimento > conta.data_vencimento,
+            ContaPagar.status != "pago",
+            func.coalesce(ContaPagar.valor_pago, 0) <= 0,
+        )
+        .all()
+    )
 
     atualizadas = 0
     for futura in futuras:
@@ -607,13 +685,14 @@ def _aplicar_edicao_recorrencia_futura(
 # CRIAR CONTA A PAGAR
 # ============================================================================
 
+
 @router.post("/", status_code=status.HTTP_201_CREATED)
 @idempotent()  # 🔒 IDEMPOTÊNCIA: evita criação duplicada de contas a pagar
 async def criar_conta_pagar(
     conta: ContaPagarCreate,
     request: Request,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Cria uma ou mais contas a pagar (com parcelamento se necessário)
@@ -621,7 +700,7 @@ async def criar_conta_pagar(
     """
     current_user, tenant_id = user_and_tenant
     contas_criadas = []
-    
+
     try:
         conta_pre_classificacao = ContaPagar(
             descricao=conta.descricao,
@@ -637,7 +716,9 @@ async def criar_conta_pagar(
             user_id=current_user.id,
             tenant_id=tenant_id,
         )
-        if aplicar_classificacao_aprendida_conta_pagar(db, tenant_id, conta_pre_classificacao):
+        if aplicar_classificacao_aprendida_conta_pagar(
+            db, tenant_id, conta_pre_classificacao
+        ):
             conta.categoria_id = conta_pre_classificacao.categoria_id
             conta.dre_subcategoria_id = conta_pre_classificacao.dre_subcategoria_id
             conta.canal = conta_pre_classificacao.canal or conta.canal
@@ -656,7 +737,7 @@ async def criar_conta_pagar(
         tipo_despesa_id = conta.tipo_despesa_id
         if conta.nota_entrada_id and not tipo_despesa_id:
             tipo_despesa_id = _obter_tipo_produto_revenda_id(db, tenant_id)
-        
+
         # ============================
         # CRIAÇÃO DE CONTAS
         # ============================
@@ -673,21 +754,21 @@ async def criar_conta_pagar(
                 valor_final=conta.valor_original,
                 data_emissao=conta.data_emissao,
                 data_vencimento=conta.data_vencimento,
-                status='parcelado',
+                status="parcelado",
                 eh_parcelado=True,
                 total_parcelas=conta.total_parcelas,
                 nota_entrada_id=conta.nota_entrada_id,
                 documento=conta.documento,
                 observacoes=conta.observacoes,
                 user_id=current_user.id,
-                tenant_id=tenant_id
+                tenant_id=tenant_id,
             )
             db.add(conta_principal)
             db.flush()
-            
+
             # Criar parcelas
             valor_parcela = conta.valor_original / conta.total_parcelas
-            
+
             for i in range(1, conta.total_parcelas + 1):
                 # Vencimento: soma i meses
                 vencimento_parcela = conta.data_vencimento
@@ -699,7 +780,7 @@ async def criar_conta_pagar(
                         mes -= 12
                         ano += 1
                     vencimento_parcela = vencimento_parcela.replace(year=ano, month=mes)
-                
+
                 parcela = ContaPagar(
                     descricao=f"{conta.descricao} - Parcela {i}/{conta.total_parcelas}",
                     fornecedor_id=conta.fornecedor_id,
@@ -711,7 +792,7 @@ async def criar_conta_pagar(
                     valor_final=valor_parcela,
                     data_emissao=conta.data_emissao,
                     data_vencimento=vencimento_parcela,
-                    status='pendente',
+                    status="pendente",
                     eh_parcelado=True,
                     numero_parcela=i,
                     total_parcelas=conta.total_parcelas,
@@ -720,11 +801,11 @@ async def criar_conta_pagar(
                     documento=conta.documento,
                     observacoes=f"Parcela {i} de {conta.total_parcelas}",
                     user_id=current_user.id,
-                    tenant_id=tenant_id
+                    tenant_id=tenant_id,
                 )
                 db.add(parcela)
                 contas_criadas.append(parcela)
-        
+
         else:
             # Conta simples (não parcelada)
             nova_conta = ContaPagar(
@@ -738,7 +819,7 @@ async def criar_conta_pagar(
                 valor_final=conta.valor_original,
                 data_emissao=conta.data_emissao,
                 data_vencimento=conta.data_vencimento,
-                status='pendente',
+                status="pendente",
                 nota_entrada_id=conta.nota_entrada_id,
                 documento=conta.documento,
                 observacoes=conta.observacoes,
@@ -746,28 +827,33 @@ async def criar_conta_pagar(
                 eh_recorrente=conta.eh_recorrente,
                 tipo_recorrencia=conta.tipo_recorrencia,
                 intervalo_dias=conta.intervalo_dias,
-                data_inicio_recorrencia=conta.data_inicio_recorrencia or conta.data_vencimento,
+                data_inicio_recorrencia=conta.data_inicio_recorrencia
+                or conta.data_vencimento,
                 data_fim_recorrencia=conta.data_fim_recorrencia,
                 numero_repeticoes=conta.numero_repeticoes,
                 user_id=current_user.id,
-                tenant_id=tenant_id
+                tenant_id=tenant_id,
             )
-            
+
             # Se é recorrente, calcular próxima recorrência
             if nova_conta.eh_recorrente and nova_conta.tipo_recorrencia:
                 try:
                     nova_conta.proxima_recorrencia = calcular_proxima_recorrencia(
-                        nova_conta.data_vencimento, 
-                        nova_conta.tipo_recorrencia, 
-                        nova_conta.intervalo_dias
+                        nova_conta.data_vencimento,
+                        nova_conta.tipo_recorrencia,
+                        nova_conta.intervalo_dias,
                     )
                 except Exception as e:
                     logger.warning(f"⚠️  Erro ao calcular próxima recorrência: {e}")
-            
+
             db.add(nova_conta)
             contas_criadas.append(nova_conta)
 
-            if nova_conta.eh_recorrente and nova_conta.tipo_recorrencia and nova_conta.proxima_recorrencia:
+            if (
+                nova_conta.eh_recorrente
+                and nova_conta.tipo_recorrencia
+                and nova_conta.proxima_recorrencia
+            ):
                 db.flush()
                 limite_recorrencia = calcular_limite_janela_recorrencia(date.today())
                 contas_criadas.extend(
@@ -778,9 +864,9 @@ async def criar_conta_pagar(
                         limite_recorrencia=limite_recorrencia,
                     )
                 )
-        
+
         db.commit()
-        
+
         # ============================
         # ATUALIZAR DRE EM TEMPO REAL
         # ============================
@@ -793,65 +879,82 @@ async def criar_conta_pagar(
                     canal=conta_criada.canal,
                     valor=conta_criada.valor_original,
                     data_lancamento=conta_criada.data_vencimento,
-                    tipo_movimentacao='DESPESA'
+                    tipo_movimentacao="DESPESA",
                 )
             except Exception as e:
-                logger.warning(f"⚠️ Erro ao atualizar DRE para conta #{conta_criada.id}: {e}")
-        
+                logger.warning(
+                    f"⚠️ Erro ao atualizar DRE para conta #{conta_criada.id}: {e}"
+                )
+
         # ============================
         # RECONCILIAÇÃO DAS SIMPLES NACIONAL
         # ============================
         for conta_criada in contas_criadas:
             try:
                 # Verificar se é DAS Simples Nacional
-                categoria = db.query(CategoriaFinanceira).filter(
-                    CategoriaFinanceira.id == conta_criada.categoria_id
-                ).first()
-                
-                if categoria and "DAS" in categoria.nome.upper() and "SIMPLES" in categoria.nome.upper():
+                categoria = (
+                    db.query(CategoriaFinanceira)
+                    .filter(CategoriaFinanceira.id == conta_criada.categoria_id)
+                    .first()
+                )
+
+                if (
+                    categoria
+                    and "DAS" in categoria.nome.upper()
+                    and "SIMPLES" in categoria.nome.upper()
+                ):
                     # Determinar competência pela data de emissão
                     mes_competencia = conta_criada.data_emissao.month
                     ano_competencia = conta_criada.data_emissao.year
-                    
+
                     resultado = reconciliar_das_simples(
                         db=db,
                         tenant_id=tenant_id,
                         valor_das=conta_criada.valor_original,
                         mes_competencia=mes_competencia,
                         ano_competencia=ano_competencia,
-                        usuario_id=current_user.id
+                        usuario_id=current_user.id,
                     )
-                    
+
                     if resultado.get("sucesso"):
                         logger.info(
                             f"✅ DAS reconciliado: R$ {resultado['valor_das_real']:.2f} "
                             f"(Ajuste: R$ {abs(resultado['diferenca']):.2f})"
                         )
                         if resultado.get("sugestao_aliquota"):
-                            logger.info(f"💡 Nova alíquota sugerida: {resultado['sugestao_aliquota']}%")
+                            logger.info(
+                                f"💡 Nova alíquota sugerida: {resultado['sugestao_aliquota']}%"
+                            )
                     else:
-                        logger.warning(f"⚠️ Reconciliação falhou: {resultado.get('motivo')}")
+                        logger.warning(
+                            f"⚠️ Reconciliação falhou: {resultado.get('motivo')}"
+                        )
             except Exception as e:
-                logger.warning(f"⚠️ Erro ao reconciliar DAS para conta #{conta_criada.id}: {e}")
+                logger.warning(
+                    f"⚠️ Erro ao reconciliar DAS para conta #{conta_criada.id}: {e}"
+                )
                 import traceback
+
                 traceback.print_exc()
-        
+
         # ============================
         # RECONCILIAÇÃO DE PROVISÕES TRABALHISTAS
         # ============================
         for conta_criada in contas_criadas:
             try:
-                categoria = db.query(CategoriaFinanceira).filter(
-                    CategoriaFinanceira.id == conta_criada.categoria_id
-                ).first()
-                
+                categoria = (
+                    db.query(CategoriaFinanceira)
+                    .filter(CategoriaFinanceira.id == conta_criada.categoria_id)
+                    .first()
+                )
+
                 if not categoria:
                     continue
-                
+
                 # Determinar competência pela data de emissão (ou vencimento)
                 mes_competencia = conta_criada.data_emissao.month
                 ano_competencia = conta_criada.data_emissao.year
-                
+
                 # Reconciliar INSS
                 if categoria.nome == "INSS Patronal":
                     reconciliar_provisao(
@@ -864,9 +967,11 @@ async def criar_conta_pagar(
                         ano=ano_competencia,
                         observacao_real="INSS Patronal (valor real)",
                     )
-                    logger.info(f"✅ INSS reconciliado: R$ {conta_criada.valor_original:.2f}")
+                    logger.info(
+                        f"✅ INSS reconciliado: R$ {conta_criada.valor_original:.2f}"
+                    )
                     db.commit()
-                
+
                 # Reconciliar FGTS
                 elif categoria.nome == "FGTS":
                     reconciliar_provisao(
@@ -879,9 +984,11 @@ async def criar_conta_pagar(
                         ano=ano_competencia,
                         observacao_real="FGTS (valor real)",
                     )
-                    logger.info(f"✅ FGTS reconciliado: R$ {conta_criada.valor_original:.2f}")
+                    logger.info(
+                        f"✅ FGTS reconciliado: R$ {conta_criada.valor_original:.2f}"
+                    )
                     db.commit()
-                
+
                 # Reconciliar Folha de Pagamento
                 elif categoria.nome == "Folha de Pagamento":
                     reconciliar_provisao(
@@ -894,19 +1001,24 @@ async def criar_conta_pagar(
                         ano=ano_competencia,
                         observacao_real="Folha de Pagamento (valor real)",
                     )
-                    logger.info(f"✅ Folha reconciliada: R$ {conta_criada.valor_original:.2f}")
+                    logger.info(
+                        f"✅ Folha reconciliada: R$ {conta_criada.valor_original:.2f}"
+                    )
                     db.commit()
-                    
+
             except Exception as e:
-                logger.warning(f"⚠️ Erro ao reconciliar provisão para conta #{conta_criada.id}: {e}")
+                logger.warning(
+                    f"⚠️ Erro ao reconciliar provisão para conta #{conta_criada.id}: {e}"
+                )
                 import traceback
+
                 traceback.print_exc()
-        
+
         # INTEGRAÇÃO REVERSA: Criar lançamentos manuais no fluxo de caixa
         for conta_criada in contas_criadas:
             try:
                 lancamento = LancamentoManual(
-                    tipo='saida',
+                    tipo="saida",
                     valor=conta_criada.valor_original,
                     descricao=conta_criada.descricao,
                     data_lancamento=conta_criada.data_emissao,
@@ -914,23 +1026,25 @@ async def criar_conta_pagar(
                     data_efetivacao=None,  # Ainda não pago
                     categoria_id=conta_criada.categoria_id,
                     conta_bancaria_id=None,
-                    status='previsto',
+                    status="previsto",
                     observacoes=f"Gerado automaticamente da conta a pagar #{conta_criada.id}",
                     gerado_automaticamente=True,
-                    confianca_ia=None
+                    confianca_ia=None,
                 )
                 db.add(lancamento)
             except Exception as e:
-                logger.warning(f"⚠️  Não foi possível criar lançamento para conta #{conta_criada.id}: {e}")
-        
+                logger.warning(
+                    f"⚠️  Não foi possível criar lançamento para conta #{conta_criada.id}: {e}"
+                )
+
         db.commit()
-        
+
         logger.info(f"✅ {len(contas_criadas)} conta(s) a pagar criada(s)")
-        
+
         return {
             "message": "Conta(s) criada(s) com sucesso",
             "total_contas": len(contas_criadas),
-            "ids": [c.id for c in contas_criadas]
+            "ids": [c.id for c in contas_criadas],
         }
 
     except HTTPException as e:
@@ -946,6 +1060,7 @@ async def criar_conta_pagar(
 # ============================================================================
 # LISTAR CONTAS A PAGAR
 # ============================================================================
+
 
 @router.get("/", response_model=List[ContaPagarResponse])
 def listar_contas_pagar(
@@ -966,22 +1081,22 @@ def listar_contas_pagar(
     limit: int = Query(100, le=500),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Lista contas a pagar com filtros
     """
     current_user, tenant_id = user_and_tenant
-    
+
     query = db.query(ContaPagar).filter(ContaPagar.tenant_id == tenant_id)
-    
+
     # Filtros
     if status:
         status_normalizado = status.strip().lower()
-        if status_normalizado == 'vencido':
+        if status_normalizado == "vencido":
             query = query.filter(
                 and_(
-                    ContaPagar.status != 'pago',
+                    ContaPagar.status != "pago",
                     ContaPagar.data_vencimento < date.today(),
                 )
             )
@@ -992,18 +1107,15 @@ def listar_contas_pagar(
     termo_fornecedor = (fornecedor_nome or "").strip()
     if termo_fornecedor:
         fornecedor_pattern = f"%{_normalizar_texto_busca(termo_fornecedor)}%"
-        fornecedores_match = (
-            select(Cliente.id)
-            .where(
-                Cliente.tenant_id == tenant_id,
-                or_(
-                    _expressao_texto_busca(Cliente.nome).like(fornecedor_pattern),
-                    _expressao_texto_busca(Cliente.nome_fantasia).like(fornecedor_pattern),
-                    _expressao_texto_busca(Cliente.razao_social).like(fornecedor_pattern),
-                    _expressao_texto_busca(Cliente.cnpj).like(fornecedor_pattern),
-                    _expressao_texto_busca(Cliente.cpf).like(fornecedor_pattern),
-                ),
-            )
+        fornecedores_match = select(Cliente.id).where(
+            Cliente.tenant_id == tenant_id,
+            or_(
+                _expressao_texto_busca(Cliente.nome).like(fornecedor_pattern),
+                _expressao_texto_busca(Cliente.nome_fantasia).like(fornecedor_pattern),
+                _expressao_texto_busca(Cliente.razao_social).like(fornecedor_pattern),
+                _expressao_texto_busca(Cliente.cnpj).like(fornecedor_pattern),
+                _expressao_texto_busca(Cliente.cpf).like(fornecedor_pattern),
+            ),
         )
         query = query.filter(ContaPagar.fornecedor_id.in_(fornecedores_match))
     if categoria_id:
@@ -1012,7 +1124,9 @@ def listar_contas_pagar(
         query = query.filter(ContaPagar.tipo_despesa_id == tipo_despesa_id)
 
     origem_normalizada = (origem or "").strip().lower()
-    caixa_pdv_condition = ContaPagar.observacoes.ilike(f"%{CAIXA_PDV_OBSERVACAO_MARKER}%")
+    caixa_pdv_condition = ContaPagar.observacoes.ilike(
+        f"%{CAIXA_PDV_OBSERVACAO_MARKER}%"
+    )
     if origem_normalizada == "caixa_pdv":
         query = query.filter(caixa_pdv_condition)
     elif origem_normalizada == "nota_entrada":
@@ -1026,16 +1140,13 @@ def listar_contas_pagar(
     termo_busca = (busca or "").strip()
     if termo_busca:
         busca_pattern = f"%{_normalizar_texto_busca(termo_busca)}%"
-        fornecedores_match = (
-            select(Cliente.id)
-            .where(
-                Cliente.tenant_id == tenant_id,
-                or_(
-                    _expressao_texto_busca(Cliente.nome).like(busca_pattern),
-                    _expressao_texto_busca(Cliente.nome_fantasia).like(busca_pattern),
-                    _expressao_texto_busca(Cliente.razao_social).like(busca_pattern),
-                ),
-            )
+        fornecedores_match = select(Cliente.id).where(
+            Cliente.tenant_id == tenant_id,
+            or_(
+                _expressao_texto_busca(Cliente.nome).like(busca_pattern),
+                _expressao_texto_busca(Cliente.nome_fantasia).like(busca_pattern),
+                _expressao_texto_busca(Cliente.razao_social).like(busca_pattern),
+            ),
         )
         query = query.filter(
             or_(
@@ -1058,56 +1169,56 @@ def listar_contas_pagar(
     if data_fim:
         query = query.filter(data_column <= data_fim)
     if numero_nf:
-        numero_nf_pattern = f'%{numero_nf}%'
+        numero_nf_pattern = f"%{numero_nf}%"
         query = query.filter(
             or_(
                 ContaPagar.nfe_numero.ilike(numero_nf_pattern),
                 ContaPagar.documento.ilike(numero_nf_pattern),
             )
         )
-    if tipo_custo in ('fixo', 'variavel'):
+    if tipo_custo in ("fixo", "variavel"):
         from .financeiro_models import CategoriaFinanceira as CF
+
         query = query.join(CF, ContaPagar.categoria_id == CF.id, isouter=True).filter(
             CF.tipo_custo == tipo_custo
         )
     if apenas_vencidas:
         query = query.filter(
-            and_(
-                ContaPagar.status != 'pago',
-                ContaPagar.data_vencimento < date.today()
-            )
+            and_(ContaPagar.status != "pago", ContaPagar.data_vencimento < date.today())
         )
     if apenas_vencer:
         query = query.filter(
             and_(
-                ContaPagar.status != 'pago',
-                ContaPagar.data_vencimento >= date.today()
+                ContaPagar.status != "pago", ContaPagar.data_vencimento >= date.today()
             )
         )
-    
+
     query = query.order_by(ContaPagar.data_vencimento.asc())
     contas = query.limit(limit).offset(offset).all()
-    
+
     # Montar response
     resultado = []
     for conta in contas:
-        status_value = conta.status or 'pendente'
+        status_value = conta.status or "pendente"
 
         # Calcular dias para vencimento
         dias_venc = None
-        if status_value == 'pendente':
+        if status_value == "pendente":
             dias_venc = (conta.data_vencimento - date.today()).days
-        
+
         # Buscar nome do fornecedor
         fornecedor_nome = None
         if conta.fornecedor_id:
-            fornecedor = db.query(Cliente).filter(
-                Cliente.id == conta.fornecedor_id,
-                Cliente.tenant_id == tenant_id
-            ).first()
+            fornecedor = (
+                db.query(Cliente)
+                .filter(
+                    Cliente.id == conta.fornecedor_id, Cliente.tenant_id == tenant_id
+                )
+                .first()
+            )
             if fornecedor:
                 fornecedor_nome = fornecedor.nome
-        
+
         item = {
             "id": conta.id,
             "descricao": conta.descricao,
@@ -1115,16 +1226,26 @@ def listar_contas_pagar(
             "fornecedor_nome": fornecedor_nome,
             "categoria_id": conta.categoria_id,
             "categoria_nome": conta.categoria.nome if conta.categoria else None,
-            "valor_original": float(conta.valor_original) if conta.valor_original is not None else 0.0,
-            "valor_pago": float(conta.valor_pago) if conta.valor_pago is not None else 0.0,
-            "valor_final": float(conta.valor_final) if conta.valor_final is not None else 0.0,
+            "valor_original": float(conta.valor_original)
+            if conta.valor_original is not None
+            else 0.0,
+            "valor_pago": float(conta.valor_pago)
+            if conta.valor_pago is not None
+            else 0.0,
+            "valor_final": float(conta.valor_final)
+            if conta.valor_final is not None
+            else 0.0,
             "data_emissao": conta.data_emissao,
             "data_vencimento": conta.data_vencimento,
             "data_pagamento": conta.data_pagamento,
             "status": status_value,
             "dias_vencimento": dias_venc,
-            "eh_parcelado": conta.eh_parcelado if conta.eh_parcelado is not None else False,
-            "eh_recorrente": conta.eh_recorrente if conta.eh_recorrente is not None else False,
+            "eh_parcelado": conta.eh_parcelado
+            if conta.eh_parcelado is not None
+            else False,
+            "eh_recorrente": conta.eh_recorrente
+            if conta.eh_recorrente is not None
+            else False,
             "tipo_recorrencia": conta.tipo_recorrencia,
             "intervalo_dias": conta.intervalo_dias,
             "data_inicio_recorrencia": conta.data_inicio_recorrencia,
@@ -1142,24 +1263,32 @@ def listar_contas_pagar(
             "dre_subcategoria_id": conta.dre_subcategoria_id,
             "dre_subcategoria_nome": None,
             "tipo_despesa_id": conta.tipo_despesa_id,
-            "tipo_despesa_nome": conta.tipo_despesa.nome if conta.tipo_despesa else None,
+            "tipo_despesa_nome": conta.tipo_despesa.nome
+            if conta.tipo_despesa
+            else None,
             "e_custo_fixo": (
-                conta.categoria.tipo_custo == 'fixo' if conta.categoria and conta.categoria.tipo_custo in ('fixo', 'variavel')
+                conta.categoria.tipo_custo == "fixo"
+                if conta.categoria
+                and conta.categoria.tipo_custo in ("fixo", "variavel")
                 else None
             ),
             **_identificar_origem_conta_pagar(conta),
         }
 
         if conta.dre_subcategoria_id:
-            sub = db.query(DRESubcategoria).filter(
-                DRESubcategoria.id == conta.dre_subcategoria_id,
-                DRESubcategoria.tenant_id == tenant_id,
-            ).first()
+            sub = (
+                db.query(DRESubcategoria)
+                .filter(
+                    DRESubcategoria.id == conta.dre_subcategoria_id,
+                    DRESubcategoria.tenant_id == tenant_id,
+                )
+                .first()
+            )
             if sub:
                 item["dre_subcategoria_nome"] = sub.nome
 
         resultado.append(item)
-    
+
     return resultado
 
 
@@ -1169,15 +1298,19 @@ def classificar_conta_pagar(
     payload: ContaPagarClassificacaoUpdate,
     aplicar_fornecedor: bool = Query(False),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Permite classificar conta existente com categoria, subcategoria DRE e tipo de despesa."""
     current_user, tenant_id = user_and_tenant
 
-    conta = db.query(ContaPagar).filter(
-        ContaPagar.id == conta_id,
-        ContaPagar.tenant_id == tenant_id,
-    ).first()
+    conta = (
+        db.query(ContaPagar)
+        .filter(
+            ContaPagar.id == conta_id,
+            ContaPagar.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not conta:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
 
@@ -1187,36 +1320,56 @@ def classificar_conta_pagar(
         and payload.tipo_despesa_id is None
         and payload.canal is None
     ):
-        raise HTTPException(status_code=422, detail="Informe pelo menos um campo para classificar")
+        raise HTTPException(
+            status_code=422, detail="Informe pelo menos um campo para classificar"
+        )
 
     if payload.categoria_id is not None:
-        categoria = db.query(CategoriaFinanceira).filter(
-            CategoriaFinanceira.id == payload.categoria_id,
-            CategoriaFinanceira.tenant_id == tenant_id,
-            CategoriaFinanceira.ativo.is_(True),
-        ).first()
+        categoria = (
+            db.query(CategoriaFinanceira)
+            .filter(
+                CategoriaFinanceira.id == payload.categoria_id,
+                CategoriaFinanceira.tenant_id == tenant_id,
+                CategoriaFinanceira.ativo.is_(True),
+            )
+            .first()
+        )
         if not categoria:
-            raise HTTPException(status_code=422, detail="Categoria financeira inválida para este tenant")
+            raise HTTPException(
+                status_code=422, detail="Categoria financeira inválida para este tenant"
+            )
         conta.categoria_id = payload.categoria_id
 
     if payload.dre_subcategoria_id is not None:
-        sub = db.query(DRESubcategoria).filter(
-            DRESubcategoria.id == payload.dre_subcategoria_id,
-            DRESubcategoria.tenant_id == tenant_id,
-            DRESubcategoria.ativo.is_(True),
-        ).first()
+        sub = (
+            db.query(DRESubcategoria)
+            .filter(
+                DRESubcategoria.id == payload.dre_subcategoria_id,
+                DRESubcategoria.tenant_id == tenant_id,
+                DRESubcategoria.ativo.is_(True),
+            )
+            .first()
+        )
         if not sub:
-            raise HTTPException(status_code=422, detail="Subcategoria DRE inválida para este tenant")
+            raise HTTPException(
+                status_code=422, detail="Subcategoria DRE inválida para este tenant"
+            )
         conta.dre_subcategoria_id = payload.dre_subcategoria_id
 
     if payload.tipo_despesa_id is not None:
-        tipo = db.query(TipoDespesa).filter(
-            TipoDespesa.id == payload.tipo_despesa_id,
-            TipoDespesa.tenant_id == tenant_id,
-            TipoDespesa.ativo.is_(True),
-        ).first()
+        tipo = (
+            db.query(TipoDespesa)
+            .filter(
+                TipoDespesa.id == payload.tipo_despesa_id,
+                TipoDespesa.tenant_id == tenant_id,
+                TipoDespesa.ativo.is_(True),
+            )
+            .first()
+        )
         if not tipo:
-            raise HTTPException(status_code=422, detail="Tipo de despesa inválido para este tenant")
+            raise HTTPException(
+                status_code=422, detail="Tipo de despesa inválido para este tenant"
+            )
         conta.tipo_despesa_id = payload.tipo_despesa_id
 
     if payload.canal is not None:
@@ -1260,12 +1413,13 @@ def classificar_conta_pagar(
 # BUSCAR CONTA ESPECÍFICA
 # ============================================================================
 
+
 @router.patch("/{conta_id}")
 def atualizar_conta_pagar(
     conta_id: int,
     payload: ContaPagarUpdate,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Atualiza dados operacionais de uma conta a pagar existente."""
     _, tenant_id = user_and_tenant
@@ -1282,12 +1436,18 @@ def atualizar_conta_pagar(
     recorrencia_alterada = bool(campos_recorrencia.intersection(campos))
 
     if not campos_operacionais:
-        raise HTTPException(status_code=422, detail="Informe pelo menos um campo para atualizar")
+        raise HTTPException(
+            status_code=422, detail="Informe pelo menos um campo para atualizar"
+        )
 
-    conta = db.query(ContaPagar).filter(
-        ContaPagar.id == conta_id,
-        ContaPagar.tenant_id == tenant_id,
-    ).first()
+    conta = (
+        db.query(ContaPagar)
+        .filter(
+            ContaPagar.id == conta_id,
+            ContaPagar.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not conta:
         raise HTTPException(status_code=404, detail="Conta nao encontrada")
 
@@ -1301,51 +1461,76 @@ def atualizar_conta_pagar(
         if payload.fornecedor_id is None:
             conta.fornecedor_id = None
         else:
-            fornecedor = db.query(Cliente).filter(
-                Cliente.id == payload.fornecedor_id,
-                Cliente.tenant_id == tenant_id,
-            ).first()
+            fornecedor = (
+                db.query(Cliente)
+                .filter(
+                    Cliente.id == payload.fornecedor_id,
+                    Cliente.tenant_id == tenant_id,
+                )
+                .first()
+            )
             if not fornecedor:
-                raise HTTPException(status_code=422, detail="Fornecedor invalido para este tenant")
+                raise HTTPException(
+                    status_code=422, detail="Fornecedor invalido para este tenant"
+                )
             conta.fornecedor_id = payload.fornecedor_id
 
     if "categoria_id" in campos:
         if payload.categoria_id is None:
             conta.categoria_id = None
         else:
-            categoria = db.query(CategoriaFinanceira).filter(
-                CategoriaFinanceira.id == payload.categoria_id,
-                CategoriaFinanceira.tenant_id == tenant_id,
-                CategoriaFinanceira.ativo.is_(True),
-            ).first()
+            categoria = (
+                db.query(CategoriaFinanceira)
+                .filter(
+                    CategoriaFinanceira.id == payload.categoria_id,
+                    CategoriaFinanceira.tenant_id == tenant_id,
+                    CategoriaFinanceira.ativo.is_(True),
+                )
+                .first()
+            )
             if not categoria:
-                raise HTTPException(status_code=422, detail="Categoria financeira invalida para este tenant")
+                raise HTTPException(
+                    status_code=422,
+                    detail="Categoria financeira invalida para este tenant",
+                )
             conta.categoria_id = payload.categoria_id
 
     if "dre_subcategoria_id" in campos:
         if payload.dre_subcategoria_id is None:
             conta.dre_subcategoria_id = None
         else:
-            sub = db.query(DRESubcategoria).filter(
-                DRESubcategoria.id == payload.dre_subcategoria_id,
-                DRESubcategoria.tenant_id == tenant_id,
-                DRESubcategoria.ativo.is_(True),
-            ).first()
+            sub = (
+                db.query(DRESubcategoria)
+                .filter(
+                    DRESubcategoria.id == payload.dre_subcategoria_id,
+                    DRESubcategoria.tenant_id == tenant_id,
+                    DRESubcategoria.ativo.is_(True),
+                )
+                .first()
+            )
             if not sub:
-                raise HTTPException(status_code=422, detail="Subcategoria DRE invalida para este tenant")
+                raise HTTPException(
+                    status_code=422, detail="Subcategoria DRE invalida para este tenant"
+                )
             conta.dre_subcategoria_id = payload.dre_subcategoria_id
 
     if "tipo_despesa_id" in campos:
         if payload.tipo_despesa_id is None:
             conta.tipo_despesa_id = None
         else:
-            tipo = db.query(TipoDespesa).filter(
-                TipoDespesa.id == payload.tipo_despesa_id,
-                TipoDespesa.tenant_id == tenant_id,
-                TipoDespesa.ativo.is_(True),
-            ).first()
+            tipo = (
+                db.query(TipoDespesa)
+                .filter(
+                    TipoDespesa.id == payload.tipo_despesa_id,
+                    TipoDespesa.tenant_id == tenant_id,
+                    TipoDespesa.ativo.is_(True),
+                )
+                .first()
+            )
             if not tipo:
-                raise HTTPException(status_code=422, detail="Tipo de despesa invalido para este tenant")
+                raise HTTPException(
+                    status_code=422, detail="Tipo de despesa invalido para este tenant"
+                )
             conta.tipo_despesa_id = payload.tipo_despesa_id
 
     if "canal" in campos:
@@ -1353,7 +1538,9 @@ def atualizar_conta_pagar(
 
     if "valor_original" in campos:
         if payload.valor_original is None or payload.valor_original <= 0:
-            raise HTTPException(status_code=422, detail="Valor original deve ser maior que zero")
+            raise HTTPException(
+                status_code=422, detail="Valor original deve ser maior que zero"
+            )
         conta.valor_original = Decimal(str(payload.valor_original))
 
     if "data_emissao" in campos:
@@ -1363,7 +1550,9 @@ def atualizar_conta_pagar(
 
     if "data_vencimento" in campos:
         if payload.data_vencimento is None:
-            raise HTTPException(status_code=422, detail="Data de vencimento e obrigatoria")
+            raise HTTPException(
+                status_code=422, detail="Data de vencimento e obrigatoria"
+            )
         conta.data_vencimento = payload.data_vencimento
 
     if "documento" in campos:
@@ -1393,8 +1582,15 @@ def atualizar_conta_pagar(
                 if "tipo_recorrencia" in campos
                 else conta.tipo_recorrencia
             ) or "mensal"
-            if tipo_recorrencia not in {"semanal", "quinzenal", "mensal", "personalizado"}:
-                raise HTTPException(status_code=422, detail="Tipo de recorrencia invalido")
+            if tipo_recorrencia not in {
+                "semanal",
+                "quinzenal",
+                "mensal",
+                "personalizado",
+            }:
+                raise HTTPException(
+                    status_code=422, detail="Tipo de recorrencia invalido"
+                )
 
             intervalo_dias = (
                 payload.intervalo_dias
@@ -1403,7 +1599,10 @@ def atualizar_conta_pagar(
             )
             if tipo_recorrencia == "personalizado":
                 if not intervalo_dias or intervalo_dias < 1:
-                    raise HTTPException(status_code=422, detail="Intervalo em dias e obrigatorio para recorrencia personalizada")
+                    raise HTTPException(
+                        status_code=422,
+                        detail="Intervalo em dias e obrigatorio para recorrencia personalizada",
+                    )
             else:
                 intervalo_dias = None
 
@@ -1424,9 +1623,15 @@ def atualizar_conta_pagar(
             )
 
             if data_fim_recorrencia and data_fim_recorrencia < data_inicio_recorrencia:
-                raise HTTPException(status_code=422, detail="Data final da recorrencia deve ser maior ou igual a data inicial")
+                raise HTTPException(
+                    status_code=422,
+                    detail="Data final da recorrencia deve ser maior ou igual a data inicial",
+                )
             if numero_repeticoes is not None and numero_repeticoes < 1:
-                raise HTTPException(status_code=422, detail="Numero de repeticoes deve ser maior que zero")
+                raise HTTPException(
+                    status_code=422,
+                    detail="Numero de repeticoes deve ser maior que zero",
+                )
 
             conta.eh_recorrente = True
             conta.tipo_recorrencia = tipo_recorrencia
@@ -1444,7 +1649,7 @@ def atualizar_conta_pagar(
     valor_juros = conta.valor_juros or Decimal("0")
     valor_multa = conta.valor_multa or Decimal("0")
     valor_desconto = conta.valor_desconto or Decimal("0")
-    conta.valor_final = (valor_original + valor_juros + valor_multa - valor_desconto)
+    conta.valor_final = valor_original + valor_juros + valor_multa - valor_desconto
 
     valor_pago = conta.valor_pago or Decimal("0")
     if valor_pago <= 0:
@@ -1457,7 +1662,9 @@ def atualizar_conta_pagar(
 
     recorrencias_criadas = []
     recorrencias_atualizadas = 0
-    deve_garantir_janela_recorrencia = bool(conta.eh_recorrente or conta.conta_recorrencia_origem_id)
+    deve_garantir_janela_recorrencia = bool(
+        conta.eh_recorrente or conta.conta_recorrencia_origem_id
+    )
     if deve_garantir_janela_recorrencia:
         db.flush()
         recorrencias_criadas = _garantir_janela_recorrencia_conta(
@@ -1509,15 +1716,19 @@ def atualizar_conta_pagar(
 def listar_recorrencia_conta_pagar(
     conta_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Lista a cadeia recorrente de uma conta para manutencao seletiva."""
     _, tenant_id = user_and_tenant
 
-    conta = db.query(ContaPagar).filter(
-        ContaPagar.id == conta_id,
-        ContaPagar.tenant_id == tenant_id,
-    ).first()
+    conta = (
+        db.query(ContaPagar)
+        .filter(
+            ContaPagar.id == conta_id,
+            ContaPagar.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not conta:
         raise HTTPException(status_code=404, detail="Conta nao encontrada")
 
@@ -1525,10 +1736,14 @@ def listar_recorrencia_conta_pagar(
     if not conta_origem:
         conta_origem = conta
 
-    itens = _query_contas_recorrencia(db, tenant_id, conta_origem.id).order_by(
-        ContaPagar.data_vencimento.asc(),
-        ContaPagar.id.asc(),
-    ).all()
+    itens = (
+        _query_contas_recorrencia(db, tenant_id, conta_origem.id)
+        .order_by(
+            ContaPagar.data_vencimento.asc(),
+            ContaPagar.id.asc(),
+        )
+        .all()
+    )
 
     return {
         "conta_origem_id": conta_origem.id,
@@ -1563,26 +1778,37 @@ def listar_recorrencia_conta_pagar(
 def excluir_recorrencias_contas_pagar(
     payload: ContaPagarRecorrenciaBulkDelete,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Exclui lancamentos recorrentes selecionados, desde que nao tenham pagamentos."""
     _, tenant_id = user_and_tenant
     ids = sorted({int(item_id) for item_id in payload.ids if item_id})
     if not ids:
-        raise HTTPException(status_code=422, detail="Selecione pelo menos um lancamento para excluir")
+        raise HTTPException(
+            status_code=422, detail="Selecione pelo menos um lancamento para excluir"
+        )
 
-    contas = db.query(ContaPagar).options(
-        joinedload(ContaPagar.pagamentos)
-    ).filter(
-        ContaPagar.tenant_id == tenant_id,
-        ContaPagar.id.in_(ids),
-    ).all()
+    contas = (
+        db.query(ContaPagar)
+        .options(joinedload(ContaPagar.pagamentos))
+        .filter(
+            ContaPagar.tenant_id == tenant_id,
+            ContaPagar.id.in_(ids),
+        )
+        .all()
+    )
     if len(contas) != len(ids):
-        raise HTTPException(status_code=404, detail="Uma ou mais contas nao foram encontradas")
+        raise HTTPException(
+            status_code=404, detail="Uma ou mais contas nao foram encontradas"
+        )
 
     contas_por_id = {conta.id: conta for conta in contas}
     for conta in contas:
-        if conta.status == "pago" or (conta.valor_pago or Decimal("0")) > 0 or conta.pagamentos:
+        if (
+            conta.status == "pago"
+            or (conta.valor_pago or Decimal("0")) > 0
+            or conta.pagamentos
+        ):
             raise HTTPException(
                 status_code=400,
                 detail=f"Conta #{conta.id} possui pagamento registrado e nao pode ser excluida",
@@ -1592,11 +1818,16 @@ def excluir_recorrencias_contas_pagar(
     for conta in contas:
         if not conta.eh_recorrente:
             continue
-        filhas_nao_selecionadas = db.query(func.count(ContaPagar.id)).filter(
-            ContaPagar.tenant_id == tenant_id,
-            ContaPagar.conta_recorrencia_origem_id == conta.id,
-            ~ContaPagar.id.in_(ids_set),
-        ).scalar() or 0
+        filhas_nao_selecionadas = (
+            db.query(func.count(ContaPagar.id))
+            .filter(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.conta_recorrencia_origem_id == conta.id,
+                ~ContaPagar.id.in_(ids_set),
+            )
+            .scalar()
+            or 0
+        )
         if filhas_nao_selecionadas:
             raise HTTPException(
                 status_code=400,
@@ -1627,17 +1858,20 @@ def excluir_recorrencias_contas_pagar(
 def excluir_conta_pagar(
     conta_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Exclui uma conta a pagar sem pagamento registrado."""
     _, tenant_id = user_and_tenant
 
-    conta = db.query(ContaPagar).options(
-        joinedload(ContaPagar.pagamentos)
-    ).filter(
-        ContaPagar.id == conta_id,
-        ContaPagar.tenant_id == tenant_id,
-    ).first()
+    conta = (
+        db.query(ContaPagar)
+        .options(joinedload(ContaPagar.pagamentos))
+        .filter(
+            ContaPagar.id == conta_id,
+            ContaPagar.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
     if not conta:
         raise HTTPException(status_code=404, detail="Conta nao encontrada")
@@ -1649,20 +1883,30 @@ def excluir_conta_pagar(
             detail="Conta com pagamento registrado nao pode ser excluida",
         )
 
-    recorrencias_filhas = db.query(func.count(ContaPagar.id)).filter(
-        ContaPagar.tenant_id == tenant_id,
-        ContaPagar.conta_recorrencia_origem_id == conta.id,
-    ).scalar() or 0
+    recorrencias_filhas = (
+        db.query(func.count(ContaPagar.id))
+        .filter(
+            ContaPagar.tenant_id == tenant_id,
+            ContaPagar.conta_recorrencia_origem_id == conta.id,
+        )
+        .scalar()
+        or 0
+    )
     if recorrencias_filhas:
         raise HTTPException(
             status_code=400,
             detail="Conta recorrente com lancamentos futuros nao pode ser excluida individualmente",
         )
 
-    parcelas_filhas = db.query(func.count(ContaPagar.id)).filter(
-        ContaPagar.tenant_id == tenant_id,
-        ContaPagar.conta_principal_id == conta.id,
-    ).scalar() or 0
+    parcelas_filhas = (
+        db.query(func.count(ContaPagar.id))
+        .filter(
+            ContaPagar.tenant_id == tenant_id,
+            ContaPagar.conta_principal_id == conta.id,
+        )
+        .scalar()
+        or 0
+    )
     if parcelas_filhas:
         raise HTTPException(
             status_code=400,
@@ -1684,17 +1928,20 @@ def estornar_pagamento_conta_pagar(
     conta_id: int,
     payload: ContaPagarOperacaoRequest,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Estorna os pagamentos registrados e reverte a movimentacao bancaria."""
     _, tenant_id = user_and_tenant
 
-    conta = db.query(ContaPagar).options(
-        joinedload(ContaPagar.pagamentos)
-    ).filter(
-        ContaPagar.id == conta_id,
-        ContaPagar.tenant_id == tenant_id,
-    ).first()
+    conta = (
+        db.query(ContaPagar)
+        .options(joinedload(ContaPagar.pagamentos))
+        .filter(
+            ContaPagar.id == conta_id,
+            ContaPagar.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
     if not conta:
         raise HTTPException(status_code=404, detail="Conta nao encontrada")
@@ -1706,18 +1953,26 @@ def estornar_pagamento_conta_pagar(
             detail="Conta nao possui pagamento registrado para estornar",
         )
 
-    movimentacoes = db.query(MovimentacaoFinanceira).filter(
-        MovimentacaoFinanceira.tenant_id == tenant_id,
-        MovimentacaoFinanceira.origem_tipo == 'conta_pagar',
-        MovimentacaoFinanceira.origem_id == conta.id,
-    ).all()
+    movimentacoes = (
+        db.query(MovimentacaoFinanceira)
+        .filter(
+            MovimentacaoFinanceira.tenant_id == tenant_id,
+            MovimentacaoFinanceira.origem_tipo == "conta_pagar",
+            MovimentacaoFinanceira.origem_id == conta.id,
+        )
+        .all()
+    )
 
     movimentacoes_estornadas = 0
     for movimentacao in movimentacoes:
-        conta_bancaria = db.query(ContaBancaria).filter(
-            ContaBancaria.id == movimentacao.conta_bancaria_id,
-            ContaBancaria.tenant_id == tenant_id,
-        ).first()
+        conta_bancaria = (
+            db.query(ContaBancaria)
+            .filter(
+                ContaBancaria.id == movimentacao.conta_bancaria_id,
+                ContaBancaria.tenant_id == tenant_id,
+            )
+            .first()
+        )
 
         if conta_bancaria:
             if movimentacao.tipo == "saida":
@@ -1762,17 +2017,20 @@ def cancelar_conta_pagar(
     conta_id: int,
     payload: ContaPagarOperacaoRequest,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Cancela uma conta a pagar sem apagar o historico do lancamento."""
     _, tenant_id = user_and_tenant
 
-    conta = db.query(ContaPagar).options(
-        joinedload(ContaPagar.pagamentos)
-    ).filter(
-        ContaPagar.id == conta_id,
-        ContaPagar.tenant_id == tenant_id,
-    ).first()
+    conta = (
+        db.query(ContaPagar)
+        .options(joinedload(ContaPagar.pagamentos))
+        .filter(
+            ContaPagar.id == conta_id,
+            ContaPagar.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
     if not conta:
         raise HTTPException(status_code=404, detail="Conta nao encontrada")
@@ -1805,53 +2063,67 @@ def cancelar_conta_pagar(
 def buscar_conta_pagar(
     conta_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Busca uma conta a pagar específica com todos os detalhes
     """
     current_user, tenant_id = user_and_tenant
-    
-    conta = db.query(ContaPagar).options(
-        joinedload(ContaPagar.categoria),
-        joinedload(ContaPagar.pagamentos)
-    ).filter(
-        ContaPagar.id == conta_id,
-        ContaPagar.tenant_id == tenant_id,
-    ).first()
-    
+
+    conta = (
+        db.query(ContaPagar)
+        .options(joinedload(ContaPagar.categoria), joinedload(ContaPagar.pagamentos))
+        .filter(
+            ContaPagar.id == conta_id,
+            ContaPagar.tenant_id == tenant_id,
+        )
+        .first()
+    )
+
     if not conta:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
-    
+
     # Buscar fornecedor
     fornecedor = None
     if conta.fornecedor_id:
-        fornecedor = db.query(Cliente).filter(
-            Cliente.id == conta.fornecedor_id,
-            Cliente.tenant_id == tenant_id,
-        ).first()
-    
+        fornecedor = (
+            db.query(Cliente)
+            .filter(
+                Cliente.id == conta.fornecedor_id,
+                Cliente.tenant_id == tenant_id,
+            )
+            .first()
+        )
+
     # Buscar nota de entrada se houver
     nota = None
     if conta.nota_entrada_id:
-        nota = db.query(NotaEntrada).filter(
-            NotaEntrada.id == conta.nota_entrada_id,
-            NotaEntrada.tenant_id == tenant_id,
-        ).first()
-    
+        nota = (
+            db.query(NotaEntrada)
+            .filter(
+                NotaEntrada.id == conta.nota_entrada_id,
+                NotaEntrada.tenant_id == tenant_id,
+            )
+            .first()
+        )
+
     return {
         "id": conta.id,
         "descricao": conta.descricao,
         "fornecedor": {
             "id": fornecedor.id if fornecedor else None,
             "nome": fornecedor.nome if fornecedor else None,
-            "cnpj": fornecedor.cnpj if fornecedor else None
-        } if fornecedor else None,
+            "cnpj": fornecedor.cnpj if fornecedor else None,
+        }
+        if fornecedor
+        else None,
         "categoria": {
             "id": conta.categoria.id if conta.categoria else None,
             "nome": conta.categoria.nome if conta.categoria else None,
-            "cor": conta.categoria.cor if conta.categoria else None
-        } if conta.categoria else None,
+            "cor": conta.categoria.cor if conta.categoria else None,
+        }
+        if conta.categoria
+        else None,
         "categoria_id": conta.categoria_id,
         "dre_subcategoria_id": conta.dre_subcategoria_id,
         "tipo_despesa_id": conta.tipo_despesa_id,
@@ -1863,20 +2135,26 @@ def buscar_conta_pagar(
             "juros": float(conta.valor_juros),
             "multa": float(conta.valor_multa),
             "final": float(conta.valor_final),
-            "saldo": float(conta.valor_final - conta.valor_pago)
+            "saldo": float(conta.valor_final - conta.valor_pago),
         },
         "datas": {
             "emissao": conta.data_emissao,
             "vencimento": conta.data_vencimento,
-            "pagamento": conta.data_pagamento
+            "pagamento": conta.data_pagamento,
         },
         "status": conta.status,
         "parcelamento": {
-            "eh_parcelado": conta.eh_parcelado if conta.eh_parcelado is not None else False,
+            "eh_parcelado": conta.eh_parcelado
+            if conta.eh_parcelado is not None
+            else False,
             "numero_parcela": conta.numero_parcela,
-            "total_parcelas": conta.total_parcelas
-        } if conta.eh_parcelado else None,
-        "eh_recorrente": conta.eh_recorrente if conta.eh_recorrente is not None else False,
+            "total_parcelas": conta.total_parcelas,
+        }
+        if conta.eh_parcelado
+        else None,
+        "eh_recorrente": conta.eh_recorrente
+        if conta.eh_recorrente is not None
+        else False,
         "tipo_recorrencia": conta.tipo_recorrencia,
         "intervalo_dias": conta.intervalo_dias,
         "data_inicio_recorrencia": conta.data_inicio_recorrencia,
@@ -1885,7 +2163,9 @@ def buscar_conta_pagar(
         "proxima_recorrencia": conta.proxima_recorrencia,
         "conta_recorrencia_origem_id": conta.conta_recorrencia_origem_id,
         "recorrencia": {
-            "eh_recorrente": conta.eh_recorrente if conta.eh_recorrente is not None else False,
+            "eh_recorrente": conta.eh_recorrente
+            if conta.eh_recorrente is not None
+            else False,
             "tipo_recorrencia": conta.tipo_recorrencia,
             "intervalo_dias": conta.intervalo_dias,
             "data_inicio_recorrencia": conta.data_inicio_recorrencia,
@@ -1897,8 +2177,10 @@ def buscar_conta_pagar(
         "nota_entrada": {
             "id": nota.id if nota else None,
             "numero": nota.numero_nota if nota else None,
-            "chave": nota.chave_acesso if nota else None
-        } if nota else None,
+            "chave": nota.chave_acesso if nota else None,
+        }
+        if nota
+        else None,
         "documento": conta.documento,
         "observacoes": conta.observacoes,
         "pagamentos": [
@@ -1907,15 +2189,17 @@ def buscar_conta_pagar(
                 "valor": float(p.valor_pago),
                 "data": p.data_pagamento,
                 "forma_pagamento_id": p.forma_pagamento_id,
-                "observacoes": p.observacoes
-            } for p in conta.pagamentos
-        ]
+                "observacoes": p.observacoes,
+            }
+            for p in conta.pagamentos
+        ],
     }
 
 
 # ============================================================================
 # REGISTRAR PAGAMENTO
 # ============================================================================
+
 
 @router.post("/{conta_id}/pagar")
 @idempotent()  # 🔒 IDEMPOTÊNCIA: evita pagamento duplicado
@@ -1924,24 +2208,28 @@ async def registrar_pagamento(
     pagamento: PagamentoCreate,
     request: Request,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Registra um pagamento (baixa) de conta a pagar
     """
     current_user, tenant_id = user_and_tenant
-    
-    conta = db.query(ContaPagar).filter(
-        ContaPagar.id == conta_id,
-        ContaPagar.tenant_id == tenant_id,
-    ).first()
-    
+
+    conta = (
+        db.query(ContaPagar)
+        .filter(
+            ContaPagar.id == conta_id,
+            ContaPagar.tenant_id == tenant_id,
+        )
+        .first()
+    )
+
     if not conta:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
-    
-    if conta.status == 'pago':
+
+    if conta.status == "pago":
         raise HTTPException(status_code=400, detail="Conta já está paga")
-    
+
     conta.valor_original = _decimal_monetario(conta.valor_original)
     conta.valor_pago = _decimal_monetario(conta.valor_pago)
     conta.valor_juros = _decimal_monetario(conta.valor_juros)
@@ -1953,7 +2241,9 @@ async def registrar_pagamento(
     valor_juros = _decimal_monetario(pagamento.valor_juros)
     valor_multa = _decimal_monetario(pagamento.valor_multa)
     valor_desconto = _decimal_monetario(pagamento.valor_desconto)
-    valor_total_pagamento = valor_base_pagamento + valor_juros + valor_multa - valor_desconto
+    valor_total_pagamento = (
+        valor_base_pagamento + valor_juros + valor_multa - valor_desconto
+    )
 
     if valor_base_pagamento <= 0:
         raise HTTPException(
@@ -1969,11 +2259,15 @@ async def registrar_pagamento(
 
     forma_pagamento_validada_id = None
     if pagamento.forma_pagamento_id:
-        forma_pagamento = db.query(FormaPagamento).filter(
-            FormaPagamento.id == pagamento.forma_pagamento_id,
-            FormaPagamento.tenant_id == tenant_id,
-            FormaPagamento.ativo.is_(True),
-        ).first()
+        forma_pagamento = (
+            db.query(FormaPagamento)
+            .filter(
+                FormaPagamento.id == pagamento.forma_pagamento_id,
+                FormaPagamento.tenant_id == tenant_id,
+                FormaPagamento.ativo.is_(True),
+            )
+            .first()
+        )
 
         if not forma_pagamento:
             raise HTTPException(
@@ -1988,22 +2282,22 @@ async def registrar_pagamento(
     conta.valor_juros += valor_juros
     conta.valor_multa += valor_multa
     conta.valor_desconto += valor_desconto
-    
+
     # Recalcular valor final
     conta.valor_final = (
-        conta.valor_original +
-        conta.valor_juros +
-        conta.valor_multa -
-        conta.valor_desconto
+        conta.valor_original
+        + conta.valor_juros
+        + conta.valor_multa
+        - conta.valor_desconto
     )
-    
+
     # Verificar se pagou tudo
     if conta.valor_pago >= conta.valor_final:
-        conta.status = 'pago'
+        conta.status = "pago"
         conta.data_pagamento = pagamento.data_pagamento
     else:
-        conta.status = 'parcial'
-    
+        conta.status = "parcial"
+
     # Registrar pagamento
     novo_pagamento = Pagamento(
         conta_pagar_id=conta.id,
@@ -2012,82 +2306,95 @@ async def registrar_pagamento(
         data_pagamento=pagamento.data_pagamento,
         observacoes=pagamento.observacoes,
         user_id=current_user.id,
-        tenant_id=tenant_id
+        tenant_id=tenant_id,
     )
     db.add(novo_pagamento)
-    
+
     # ========================================
     # CRIAR MOVIMENTAÇÃO FINANCEIRA E ATUALIZAR SALDO
     # ========================================
-    
+
     if pagamento.conta_bancaria_id:
         # Buscar conta bancária
-        conta_bancaria = db.query(ContaBancaria).filter(
-            ContaBancaria.id == pagamento.conta_bancaria_id,
-            ContaBancaria.tenant_id == tenant_id,
-        ).first()
-        
+        conta_bancaria = (
+            db.query(ContaBancaria)
+            .filter(
+                ContaBancaria.id == pagamento.conta_bancaria_id,
+                ContaBancaria.tenant_id == tenant_id,
+            )
+            .first()
+        )
+
         if not conta_bancaria:
             raise HTTPException(
                 status_code=404,
-                detail=f"Conta bancária {pagamento.conta_bancaria_id} não encontrada"
+                detail=f"Conta bancária {pagamento.conta_bancaria_id} não encontrada",
             )
-        
+
         if not conta_bancaria.ativa:
             raise HTTPException(
                 status_code=400,
-                detail=f"Conta bancária '{conta_bancaria.nome}' está inativa"
+                detail=f"Conta bancária '{conta_bancaria.nome}' está inativa",
             )
-        
+
         # Converter valor para centavos
         valor_centavos = _valor_reais_para_centavos(valor_total_pagamento)
-        
+
         # Criar movimentação financeira (SAÍDA)
         movimentacao = MovimentacaoFinanceira(
             conta_bancaria_id=conta_bancaria.id,
-            tipo='saida',
+            tipo="saida",
             valor=valor_centavos,
             descricao=f"Pagamento: {conta.descricao}",
-            data_movimento=datetime.combine(pagamento.data_pagamento, datetime.min.time()),
+            data_movimento=datetime.combine(
+                pagamento.data_pagamento, datetime.min.time()
+            ),
             categoria_id=conta.categoria_id,
-            status='realizado',
+            status="realizado",
             forma_pagamento_id=forma_pagamento_validada_id,
             documento=conta.documento,
-            origem_tipo='conta_pagar',
+            origem_tipo="conta_pagar",
             origem_id=conta.id,
             observacoes=pagamento.observacoes,
             user_id=current_user.id,
-            tenant_id=tenant_id
+            tenant_id=tenant_id,
         )
         db.add(movimentacao)
-        
+
         # Atualizar saldo da conta bancária (DÉBITO)
         conta_bancaria.saldo_atual -= valor_centavos
-        
+
         logger.info(
             f"🏦 Movimentação bancária criada: {conta_bancaria.nome} "
-            f"-R$ {valor_total_pagamento:.2f} (Saldo: R$ {conta_bancaria.saldo_atual/100:.2f})"
+            f"-R$ {valor_total_pagamento:.2f} (Saldo: R$ {conta_bancaria.saldo_atual / 100:.2f})"
         )
-    
+
     # ========================================
     # ATUALIZAR LANÇAMENTO MANUAL PREVISTO
     # ========================================
-    
+
     # Buscar lançamento manual previsto relacionado a esta conta
-    lancamento = db.query(LancamentoManual).filter(
-        LancamentoManual.tipo == 'saida',
-        LancamentoManual.status == 'previsto',
-        LancamentoManual.valor == conta.valor_original,
-        LancamentoManual.gerado_automaticamente.is_(True)
-    ).order_by(LancamentoManual.id.desc()).first()
-    
+    lancamento = (
+        db.query(LancamentoManual)
+        .filter(
+            LancamentoManual.tipo == "saida",
+            LancamentoManual.status == "previsto",
+            LancamentoManual.valor == conta.valor_original,
+            LancamentoManual.gerado_automaticamente.is_(True),
+        )
+        .order_by(LancamentoManual.id.desc())
+        .first()
+    )
+
     if lancamento:
-        lancamento.status = 'realizado'
+        lancamento.status = "realizado"
         lancamento.realizado_em = datetime.now()
-        logger.info(f"📊 Lançamento manual #{lancamento.id} atualizado para 'realizado'")
+        logger.info(
+            f"📊 Lançamento manual #{lancamento.id} atualizado para 'realizado'"
+        )
 
     contas_recorrentes_criadas = []
-    if conta.status == 'pago':
+    if conta.status == "pago":
         contas_recorrentes_criadas = _garantir_janela_recorrencia_apos_pagamento(
             db=db,
             tenant_id=tenant_id,
@@ -2104,15 +2411,19 @@ async def registrar_pagamento(
                     canal=conta_recorrente.canal,
                     valor=conta_recorrente.valor_original,
                     data_lancamento=conta_recorrente.data_vencimento,
-                    tipo_movimentacao='DESPESA'
+                    tipo_movimentacao="DESPESA",
                 )
             except Exception as e:
-                logger.warning(f"Erro ao atualizar DRE para conta recorrente #{conta_recorrente.id}: {e}")
-    
+                logger.warning(
+                    f"Erro ao atualizar DRE para conta recorrente #{conta_recorrente.id}: {e}"
+                )
+
     db.commit()
-    
-    logger.info(f"✅ Pagamento registrado: R$ {pagamento.valor_pago} - Conta {conta_id}")
-    
+
+    logger.info(
+        f"✅ Pagamento registrado: R$ {pagamento.valor_pago} - Conta {conta_id}"
+    )
+
     return {
         "message": "Pagamento registrado com sucesso",
         "conta_id": conta.id,
@@ -2128,83 +2439,104 @@ async def registrar_pagamento(
 # DASHBOARD / RESUMO
 # ============================================================================
 
+
 @router.get("/dashboard/resumo")
 def dashboard_contas_pagar(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Resumo financeiro de contas a pagar
     """
     current_user, tenant_id = user_and_tenant
-    
+
     hoje = date.today()
-    
+
     # Total pendente
-    total_pendente = db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago)).filter(
-        ContaPagar.status.in_(['pendente', 'parcial', 'vencido'])
-    ).scalar() or 0
-    
+    total_pendente = (
+        db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
+        .filter(ContaPagar.status.in_(["pendente", "parcial", "vencido"]))
+        .scalar()
+        or 0
+    )
+
     # Vencidas
-    total_vencido = db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago)).filter(
-        and_(
-            ContaPagar.status == 'pendente',
-            ContaPagar.data_vencimento < hoje
+    total_vencido = (
+        db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
+        .filter(
+            and_(ContaPagar.status == "pendente", ContaPagar.data_vencimento < hoje)
         )
-    ).scalar() or 0
-    
-    count_vencidas = db.query(func.count(ContaPagar.id)).filter(
-        and_(
-            ContaPagar.status == 'pendente',
-            ContaPagar.data_vencimento < hoje
+        .scalar()
+        or 0
+    )
+
+    count_vencidas = (
+        db.query(func.count(ContaPagar.id))
+        .filter(
+            and_(ContaPagar.status == "pendente", ContaPagar.data_vencimento < hoje)
         )
-    ).scalar()
-    
+        .scalar()
+    )
+
     # Vence hoje
-    total_vence_hoje = db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago)).filter(
-        and_(
-            ContaPagar.status == 'pendente',
-            ContaPagar.data_vencimento == hoje
+    total_vence_hoje = (
+        db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
+        .filter(
+            and_(ContaPagar.status == "pendente", ContaPagar.data_vencimento == hoje)
         )
-    ).scalar() or 0
-    
+        .scalar()
+        or 0
+    )
+
     # Próximos 7 dias
     data_7dias = hoje + timedelta(days=7)
-    total_7dias = db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago)).filter(
-        and_(
-            ContaPagar.status == 'pendente',
-            ContaPagar.data_vencimento.between(hoje, data_7dias)
+    total_7dias = (
+        db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
+        .filter(
+            and_(
+                ContaPagar.status == "pendente",
+                ContaPagar.data_vencimento.between(hoje, data_7dias),
+            )
         )
-    ).scalar() or 0
-    
+        .scalar()
+        or 0
+    )
+
     # Próximos 30 dias
     data_30dias = hoje + timedelta(days=30)
-    total_30dias = db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago)).filter(
-        and_(
-            ContaPagar.status == 'pendente',
-            ContaPagar.data_vencimento.between(hoje, data_30dias)
+    total_30dias = (
+        db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
+        .filter(
+            and_(
+                ContaPagar.status == "pendente",
+                ContaPagar.data_vencimento.between(hoje, data_30dias),
+            )
         )
-    ).scalar() or 0
-    
+        .scalar()
+        or 0
+    )
+
     # Pago no mês
     primeiro_dia_mes = hoje.replace(day=1)
-    total_pago_mes = db.query(func.sum(ContaPagar.valor_pago)).filter(
-        and_(
-            ContaPagar.data_pagamento >= primeiro_dia_mes,
-            ContaPagar.data_pagamento <= hoje
+    total_pago_mes = (
+        db.query(func.sum(ContaPagar.valor_pago))
+        .filter(
+            and_(
+                ContaPagar.data_pagamento >= primeiro_dia_mes,
+                ContaPagar.data_pagamento <= hoje,
+            )
         )
-    ).scalar() or 0
-    
+        .scalar()
+        or 0
+    )
+
     return {
         "total_pendente": float(total_pendente),
-        "vencidas": {
-            "total": float(total_vencido),
-            "quantidade": count_vencidas
-        },
+        "vencidas": {"total": float(total_vencido), "quantidade": count_vencidas},
         "vence_hoje": float(total_vence_hoje),
         "proximos_7_dias": float(total_7dias),
         "proximos_30_dias": float(total_30dias),
-        "pago_mes_atual": float(total_pago_mes)
+        "pago_mes_atual": float(total_pago_mes),
     }
 
 
@@ -2212,10 +2544,11 @@ def dashboard_contas_pagar(
 # PROCESSAR RECORRÊNCIAS
 # ============================================================================
 
+
 @router.post("/processar-recorrencias")
 async def processar_recorrencias_contas_pagar(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Processa contas recorrentes e cria novas contas quando necessário
@@ -2225,19 +2558,23 @@ async def processar_recorrencias_contas_pagar(
     hoje = date.today()
     limite_recorrencia = calcular_limite_janela_recorrencia(hoje)
     contas_criadas = []
-    
+
     # Buscar contas recorrentes que precisam manter a janela futura preenchida
-    contas_recorrentes = db.query(ContaPagar).filter(
-        and_(
-            ContaPagar.eh_recorrente.is_(True),
-            ContaPagar.proxima_recorrencia <= limite_recorrencia,
-            or_(
-                ContaPagar.data_fim_recorrencia.is_(None),
-                ContaPagar.data_fim_recorrencia >= hoje
+    contas_recorrentes = (
+        db.query(ContaPagar)
+        .filter(
+            and_(
+                ContaPagar.eh_recorrente.is_(True),
+                ContaPagar.proxima_recorrencia <= limite_recorrencia,
+                or_(
+                    ContaPagar.data_fim_recorrencia.is_(None),
+                    ContaPagar.data_fim_recorrencia >= hoje,
+                ),
             )
         )
-    ).all()
-    
+        .all()
+    )
+
     for conta_origem in contas_recorrentes:
         try:
             novas_contas = _gerar_contas_recorrentes_ate_janela(
@@ -2247,12 +2584,16 @@ async def processar_recorrencias_contas_pagar(
                 limite_recorrencia=limite_recorrencia,
             )
             contas_criadas.extend(novas_contas)
-            logger.info(f"Recorrencia #{conta_origem.id}: {len(novas_contas)} conta(s) gerada(s)")
-            
+            logger.info(
+                f"Recorrencia #{conta_origem.id}: {len(novas_contas)} conta(s) gerada(s)"
+            )
+
         except Exception as e:
-            logger.error(f"Erro ao processar recorrencia da conta #{conta_origem.id}: {e}")
+            logger.error(
+                f"Erro ao processar recorrencia da conta #{conta_origem.id}: {e}"
+            )
             continue
-    
+
     for conta_criada in contas_criadas:
         try:
             atualizar_dre_por_lancamento(
@@ -2262,15 +2603,17 @@ async def processar_recorrencias_contas_pagar(
                 canal=conta_criada.canal,
                 valor=conta_criada.valor_original,
                 data_lancamento=conta_criada.data_vencimento,
-                tipo_movimentacao='DESPESA'
+                tipo_movimentacao="DESPESA",
             )
         except Exception as e:
-            logger.warning(f"Erro ao atualizar DRE para conta recorrente #{conta_criada.id}: {e}")
+            logger.warning(
+                f"Erro ao atualizar DRE para conta recorrente #{conta_criada.id}: {e}"
+            )
 
     db.commit()
-    
+
     return {
         "message": f"{len(contas_criadas)} conta(s) recorrente(s) processada(s) com sucesso",
         "contas_criadas": len(contas_criadas),
-        "ids": [c.id for c in contas_criadas]
+        "ids": [c.id for c in contas_criadas],
     }
