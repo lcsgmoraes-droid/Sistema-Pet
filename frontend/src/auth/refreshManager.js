@@ -14,7 +14,7 @@ export const createRefreshManager = ({
 
     const refreshToken = getRefreshToken();
     if (!refreshToken) {
-      throw new Error('Refresh token ausente');
+      throw new Error("Refresh token ausente");
     }
 
     refreshPromise = refreshRequest(refreshToken)
@@ -23,7 +23,7 @@ export const createRefreshManager = ({
         const nextRefreshToken = response?.data?.refresh_token;
 
         if (!accessToken) {
-          throw new Error('Access token ausente na renovacao');
+          throw new Error("Access token ausente na renovacao");
         }
 
         setAccessToken(accessToken);

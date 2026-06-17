@@ -24,13 +24,13 @@ function gtag(...args) {
  */
 export function trackPageView(screenName) {
   const titles = {
-    loja: 'Loja',
-    carrinho: 'Carrinho',
-    checkout: 'Checkout',
-    conta: 'Minha Conta',
-    pedidos: 'Meus Pedidos',
+    loja: "Loja",
+    carrinho: "Carrinho",
+    checkout: "Checkout",
+    conta: "Minha Conta",
+    pedidos: "Meus Pedidos",
   };
-  gtag('event', 'page_view', {
+  gtag("event", "page_view", {
     page_title: titles[screenName] || screenName,
     page_location: window.location.href,
   });
@@ -40,8 +40,8 @@ export function trackPageView(screenName) {
  * Cliente abriu o detalhe de um produto.
  */
 export function trackViewItem(product) {
-  gtag('event', 'view_item', {
-    currency: 'BRL',
+  gtag("event", "view_item", {
+    currency: "BRL",
     value: resolvePrice(product),
     items: [buildItem(product, 1)],
   });
@@ -51,8 +51,8 @@ export function trackViewItem(product) {
  * Produto adicionado ao carrinho.
  */
 export function trackAddToCart(product) {
-  gtag('event', 'add_to_cart', {
-    currency: 'BRL',
+  gtag("event", "add_to_cart", {
+    currency: "BRL",
     value: resolvePrice(product),
     items: [buildItem(product, 1)],
   });
@@ -62,8 +62,8 @@ export function trackAddToCart(product) {
  * Cliente clicou em "Finalizar compra" (foi para a tela de checkout).
  */
 export function trackBeginCheckout(cart) {
-  gtag('event', 'begin_checkout', {
-    currency: 'BRL',
+  gtag("event", "begin_checkout", {
+    currency: "BRL",
     value: Number(cart?.total || 0),
     items: buildCartItems(cart),
   });
@@ -73,9 +73,9 @@ export function trackBeginCheckout(cart) {
  * Compra finalizada com sucesso.
  */
 export function trackPurchase(result, cart) {
-  gtag('event', 'purchase', {
-    transaction_id: result?.pedido_id || '',
-    currency: 'BRL',
+  gtag("event", "purchase", {
+    transaction_id: result?.pedido_id || "",
+    currency: "BRL",
     value: Number(cart?.total || 0),
     items: buildCartItems(cart),
   });
@@ -85,8 +85,8 @@ export function trackPurchase(result, cart) {
  * Cliente abriu o carrinho.
  */
 export function trackViewCart(cart) {
-  gtag('event', 'view_cart', {
-    currency: 'BRL',
+  gtag("event", "view_cart", {
+    currency: "BRL",
     value: Number(cart?.total || 0),
     items: buildCartItems(cart),
   });
@@ -100,8 +100,8 @@ function resolvePrice(product) {
 
 function buildItem(product, quantity) {
   return {
-    item_id: String(product?.id || product?.produto_id || ''),
-    item_name: product?.nome || product?.name || '',
+    item_id: String(product?.id || product?.produto_id || ""),
+    item_name: product?.nome || product?.name || "",
     price: resolvePrice(product),
     quantity: Number(quantity || 1),
   };
@@ -109,8 +109,8 @@ function buildItem(product, quantity) {
 
 function buildCartItems(cart) {
   return (cart?.itens || []).map((item) => ({
-    item_id: String(item.produto_id || ''),
-    item_name: item.nome || '',
+    item_id: String(item.produto_id || ""),
+    item_name: item.nome || "",
     price: Number(item.preco_unitario || 0),
     quantity: Number(item.quantidade || 1),
   }));

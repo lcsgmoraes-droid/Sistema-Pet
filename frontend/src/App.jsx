@@ -37,16 +37,11 @@ const preloadProdutos = () => import("./pages/Produtos");
 const Produtos = lazy(preloadProdutos);
 const ProdutosNovo = lazy(() => import("./pages/ProdutosNovo"));
 const ProdutosRelatorio = lazy(() => import("./pages/ProdutosRelatorio"));
-const ProdutosValorizacaoEstoque = lazy(
-  () => import("./pages/ProdutosValorizacaoEstoque"),
-);
+const ProdutosValorizacaoEstoque = lazy(() => import("./pages/ProdutosValorizacaoEstoque"));
 const ProdutosBalanco = lazy(() => import("./pages/ProdutosBalanco"));
 const AlertasEstoque = lazy(() => import("./pages/AlertasEstoque"));
 const EstoqueFullNF = lazy(() => import("./pages/EstoqueFullNF"));
-const EstoqueTransferenciaParceiro = lazy(
-  () => import("./pages/EstoqueTransferenciaParceiro"),
-);
-const SEFAZImportacao = lazy(() => import("./pages/SEFAZImportacao"));
+const EstoqueTransferenciaParceiro = lazy(() => import("./pages/EstoqueTransferenciaParceiro"));
 const preloadLembretes = () => import("./pages/Lembretes");
 const Lembretes = lazy(preloadLembretes);
 const CalculadoraRacao = lazy(() => import("./pages/CalculadoraRacao"));
@@ -76,18 +71,14 @@ const BanhoTosaPage = lazy(() => import("./pages/banhoTosa/BanhoTosaPage"));
 const preloadPDV = () => import("./pages/PDV");
 const PDV = lazy(preloadPDV);
 const MeusCaixas = lazy(() => import("./pages/MeusCaixas"));
-const NotasFiscais = lazy(() => import("./pages/NotasFiscais"));
 const NFEntrada = lazy(() => import("./pages/NFEntrada"));
-const NFSaida = lazy(() => import("./pages/NFSaida"));
 const CentralNFSaida = lazy(() => import("./pages/CentralNFSaida"));
 
 // Timeline de Cliente
 const ClienteTimelinePage = lazy(() => import("./pages/ClienteTimelinePage"));
 
 // Componentes de Estoque/Compras
-const MovimentacoesProduto = lazy(
-  () => import("./components/MovimentacoesProduto"),
-);
+const MovimentacoesProduto = lazy(() => import("./components/MovimentacoesProduto"));
 const EstoqueBling = lazy(() => import("./components/EstoqueBling"));
 const PedidosBling = lazy(() => import("./pages/PedidosBling"));
 const BlingFlowMonitor = lazy(() => import("./pages/BlingFlowMonitor"));
@@ -102,12 +93,8 @@ const ContasBancarias = lazy(() => import("./components/ContasBancarias"));
 const ContasPagar = lazy(() => import("./components/ContasPagar"));
 const ContasReceber = lazy(() => import("./components/ContasReceber"));
 const PontoEquilibrio = lazy(() => import("./pages/PontoEquilibrio"));
-const ConciliacaoCartoesTabs = lazy(
-  () => import("./pages/ConciliacaoCartoesTabs"),
-);
-const HistoricoConciliacoes = lazy(
-  () => import("./pages/HistoricoConciliacoes"),
-);
+const ConciliacaoCartoesTabs = lazy(() => import("./pages/ConciliacaoCartoesTabs"));
+const HistoricoConciliacoes = lazy(() => import("./pages/HistoricoConciliacoes"));
 const ConciliacaoBancaria = lazy(() => import("./pages/ConciliacaoBancaria"));
 const FormasPagamento = lazy(() => import("./components/FormasPagamento"));
 const OperadorasCartao = lazy(() => import("./pages/OperadorasCartao"));
@@ -124,42 +111,27 @@ const DRE = lazy(() => import("./components/DRE"));
 // Componentes de IA
 const IAFluxoCaixa = lazy(() => import("./pages/IAFluxoCaixa"));
 const ChatIA = lazy(() => import("./pages/IA/ChatIA"));
-const DREInteligente = lazy(() => import("./pages/IA/DREInteligente"));
-const RotasInteligentes = lazy(() => import("./pages/RotasInteligentes"));
 const WhatsAppDashboard = lazy(async () => {
   const module = await import("./pages/WhatsAppDashboard/index.tsx");
   return { default: module.WhatsAppDashboard };
 });
 const Comissoes = lazy(() => import("./pages/Comissoes"));
-const ComissoesListagem = lazy(
-  () => import("./pages/comissoes/ComissoesListagem"),
-);
-const ComissoesAbertas = lazy(
-  () => import("./pages/comissoes/ComissoesAbertas"),
-);
-const ComissoesFechamentoFuncionario = lazy(
-  () => import("./pages/comissoes/ComissoesFechamentoFuncionario"),
-);
-const ConferenciaAvancada = lazy(
-  () => import("./pages/comissoes/ConferenciaAvancada"),
-);
+const ComissoesListagem = lazy(() => import("./pages/comissoes/ComissoesListagem"));
+const ComissoesAbertas = lazy(() => import("./pages/comissoes/ComissoesAbertas"));
+const ConferenciaAvancada = lazy(() => import("./pages/comissoes/ConferenciaAvancada"));
 const ComissoesHistoricoFechamentos = lazy(
   () => import("./pages/comissoes/ComissoesHistoricoFechamentos"),
 );
 const ComissoesFechamentoDetalhe = lazy(
   () => import("./pages/comissoes/ComissoesFechamentoDetalhe"),
 );
-const RelatoriosComissoes = lazy(
-  () => import("./pages/comissoes/RelatoriosComissoes"),
-);
+const RelatoriosComissoes = lazy(() => import("./pages/comissoes/RelatoriosComissoes"));
 const Subcategorias = lazy(() => import("./pages/Subcategorias"));
 const Categorias = lazy(() => import("./pages/Cadastros/Categorias"));
 const Departamentos = lazy(() => import("./pages/Cadastros/Departamentos"));
 const Marcas = lazy(() => import("./pages/Cadastros/Marcas"));
 const TipoDespesa = lazy(() => import("./pages/Cadastros/TipoDespesa"));
-const CategoriasFinanceiras = lazy(
-  () => import("./pages/CategoriasFinanceiras"),
-);
+const CategoriasFinanceiras = lazy(() => import("./pages/CategoriasFinanceiras"));
 const EspeciesRacas = lazy(() => import("./pages/EspeciesRacas"));
 const ClienteFinanceiro = lazy(() => import("./pages/ClienteFinanceiro"));
 const DashboardGerencial = lazy(() => import("./pages/DashboardGerencial"));
@@ -174,13 +146,9 @@ const Configuracoes = lazy(() => import("./pages/Configuracoes"));
 const ConfiguracaoFiscalEmpresa = lazy(
   () => import("./pages/configuracoes/ConfiguracaoFiscalEmpresa"),
 );
-const EntregasConfig = lazy(
-  () => import("./pages/configuracoes/EntregasConfig"),
-);
+const EntregasConfig = lazy(() => import("./pages/configuracoes/EntregasConfig"));
 const CustosMoto = lazy(() => import("./pages/configuracoes/CustosMoto"));
-const ConfiguracaoEstoque = lazy(
-  () => import("./pages/configuracoes/ConfiguracaoEstoque"),
-);
+const ConfiguracaoEstoque = lazy(() => import("./pages/configuracoes/ConfiguracaoEstoque"));
 const ConfiguracaoGeralNegocio = lazy(
   () => import("./pages/configuracoes/ConfiguracaoGeralNegocio"),
 );
@@ -194,20 +162,12 @@ const Funcionarios = lazy(() => import("./pages/RH/Funcionarios"));
 const EntregasAbertas = lazy(() => import("./pages/entregas/EntregasAbertas"));
 const RotasEntrega = lazy(() => import("./pages/entregas/RotasEntrega"));
 const RastreioPublico = lazy(() => import("./pages/entregas/RastreioPublico"));
-const HistoricoEntregas = lazy(
-  () => import("./pages/entregas/HistoricoEntregas"),
-);
-const DashEntregasFinanceiro = lazy(
-  () => import("./pages/entregas/DashEntregasFinanceiro"),
-);
+const HistoricoEntregas = lazy(() => import("./pages/entregas/HistoricoEntregas"));
+const DashEntregasFinanceiro = lazy(() => import("./pages/entregas/DashEntregasFinanceiro"));
 const EcommerceMVP = lazy(() => import("./pages/ecommerce/EcommerceMVP"));
-const EcommerceAparencia = lazy(
-  () => import("./pages/ecommerce/EcommerceAparencia"),
-);
+const EcommerceAparencia = lazy(() => import("./pages/ecommerce/EcommerceAparencia"));
 const EcommerceConfig = lazy(() => import("./pages/ecommerce/EcommerceConfig"));
-const EcommerceAnalytics = lazy(
-  () => import("./pages/ecommerce/EcommerceAnalytics"),
-);
+const EcommerceAnalytics = lazy(() => import("./pages/ecommerce/EcommerceAnalytics"));
 const Campanhas = lazy(() => import("./pages/Campanhas"));
 const CanalDescontos = lazy(() => import("./pages/CanalDescontos"));
 const Ajuda = lazy(() => import("./pages/Ajuda"));
@@ -220,14 +180,11 @@ function AppRoutePreloader() {
     let delayedTimerId;
 
     const connection =
-      navigator.connection ||
-      navigator.mozConnection ||
-      navigator.webkitConnection;
+      navigator.connection || navigator.mozConnection || navigator.webkitConnection;
 
     const shouldSkipPreload =
       Boolean(connection?.saveData) ||
-      (typeof connection?.effectiveType === "string" &&
-        /(^|-)2g$/.test(connection.effectiveType));
+      (typeof connection?.effectiveType === "string" && /(^|-)2g$/.test(connection.effectiveType));
 
     if (shouldSkipPreload) {
       return () => {};
@@ -259,10 +216,7 @@ function AppRoutePreloader() {
     return () => {
       cancelled = true;
 
-      if (
-        typeof window.cancelIdleCallback === "function" &&
-        typeof idleId === "number"
-      ) {
+      if (typeof window.cancelIdleCallback === "function" && typeof idleId === "number") {
         window.cancelIdleCallback(idleId);
       }
 
@@ -281,7 +235,8 @@ function AppRoutePreloader() {
 
 function DefaultProtectedHomeRedirect() {
   const { user } = useAuth();
-  const destino = isMobileViewport() && isVeterinarioProfile(user) ? "/veterinario/agenda" : "/lembretes";
+  const destino =
+    isMobileViewport() && isVeterinarioProfile(user) ? "/veterinario/agenda" : "/lembretes";
   return <Navigate to={destino} replace />;
 }
 
@@ -297,11 +252,7 @@ function App() {
           <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Toaster position="top-right" />
             <AppRoutePreloader />
-            <Suspense
-              fallback={
-                <div className="p-4 text-sm text-gray-500">Carregando...</div>
-              }
-            >
+            <Suspense fallback={<div className="p-4 text-sm text-gray-500">Carregando...</div>}>
               <Routes>
                 {/* Rotas Públicas */}
                 <Route path="/login" element={<Login />} />
@@ -391,41 +342,240 @@ function App() {
                   />
 
                   {/* Rotas de Pets - Módulo Dedicado */}
-                  <Route path="pets" element={<ProtectedRoute permission="clientes.visualizar"><GerenciamentoPets /></ProtectedRoute>} />
-                  <Route path="pets/novo" element={<ProtectedRoute permission="clientes.visualizar"><PetForm /></ProtectedRoute>} />
-                  <Route path="pets/:petId" element={<ProtectedRoute permission="clientes.visualizar"><PetDetalhes /></ProtectedRoute>} />
-                  <Route path="pets/:petId/editar" element={<ProtectedRoute permission="clientes.visualizar"><PetForm /></ProtectedRoute>} />
+                  <Route
+                    path="pets"
+                    element={
+                      <ProtectedRoute permission="clientes.visualizar">
+                        <GerenciamentoPets />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="pets/novo"
+                    element={
+                      <ProtectedRoute permission="clientes.visualizar">
+                        <PetForm />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="pets/:petId"
+                    element={
+                      <ProtectedRoute permission="clientes.visualizar">
+                        <PetDetalhes />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="pets/:petId/editar"
+                    element={
+                      <ProtectedRoute permission="clientes.visualizar">
+                        <PetForm />
+                      </ProtectedRoute>
+                    }
+                  />
 
                   {/* ========================================
                 🩺 MÓDULO VETERINÁRIO
                 ======================================== */}
-                  <Route path="veterinario" element={<ModuleGate modulo="veterinario"><VetDashboard /></ModuleGate>} />
-                  <Route path="veterinario/agenda" element={<ModuleGate modulo="veterinario"><VetAgenda /></ModuleGate>} />
-                  <Route path="veterinario/consultas" element={<ModuleGate modulo="veterinario"><VetConsultas /></ModuleGate>} />
-                  <Route path="veterinario/consultas/nova" element={<ModuleGate modulo="veterinario"><VetConsultaForm /></ModuleGate>} />
-                  <Route path="veterinario/consultas/:consultaId" element={<ModuleGate modulo="veterinario"><VetConsultaForm /></ModuleGate>} />
-                  <Route path="veterinario/exames" element={<ModuleGate modulo="veterinario"><VetExamesAnexados /></ModuleGate>} />
-                  <Route path="veterinario/ia" element={<ModuleGate modulo="veterinario"><VetAssistenteIA /></ModuleGate>} />
-                  <Route path="veterinario/assistente-ia" element={<ModuleGate modulo="veterinario"><VetAssistenteIA /></ModuleGate>} />
-                  <Route path="veterinario/calculadora-doses" element={<ModuleGate modulo="veterinario"><VetCalculadoraDoses /></ModuleGate>} />
-                  <Route path="veterinario/vacinas" element={<ModuleGate modulo="veterinario"><VetVacinas /></ModuleGate>} />
-                  <Route path="veterinario/internacoes" element={<ModuleGate modulo="veterinario"><VetInternacoes /></ModuleGate>} />
-                  <Route path="veterinario/catalogo" element={<ModuleGate modulo="veterinario"><VetCatalogo /></ModuleGate>} />
-                  <Route path="veterinario/configuracoes" element={<ModuleGate modulo="veterinario"><VetConfiguracoes /></ModuleGate>} />
-                  <Route path="veterinario/repasse" element={<ModuleGate modulo="veterinario"><VetRepasse /></ModuleGate>} />
+                  <Route
+                    path="veterinario"
+                    element={
+                      <ModuleGate modulo="veterinario">
+                        <VetDashboard />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="veterinario/agenda"
+                    element={
+                      <ModuleGate modulo="veterinario">
+                        <VetAgenda />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="veterinario/consultas"
+                    element={
+                      <ModuleGate modulo="veterinario">
+                        <VetConsultas />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="veterinario/consultas/nova"
+                    element={
+                      <ModuleGate modulo="veterinario">
+                        <VetConsultaForm />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="veterinario/consultas/:consultaId"
+                    element={
+                      <ModuleGate modulo="veterinario">
+                        <VetConsultaForm />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="veterinario/exames"
+                    element={
+                      <ModuleGate modulo="veterinario">
+                        <VetExamesAnexados />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="veterinario/ia"
+                    element={
+                      <ModuleGate modulo="veterinario">
+                        <VetAssistenteIA />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="veterinario/assistente-ia"
+                    element={
+                      <ModuleGate modulo="veterinario">
+                        <VetAssistenteIA />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="veterinario/calculadora-doses"
+                    element={
+                      <ModuleGate modulo="veterinario">
+                        <VetCalculadoraDoses />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="veterinario/vacinas"
+                    element={
+                      <ModuleGate modulo="veterinario">
+                        <VetVacinas />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="veterinario/internacoes"
+                    element={
+                      <ModuleGate modulo="veterinario">
+                        <VetInternacoes />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="veterinario/catalogo"
+                    element={
+                      <ModuleGate modulo="veterinario">
+                        <VetCatalogo />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="veterinario/configuracoes"
+                    element={
+                      <ModuleGate modulo="veterinario">
+                        <VetConfiguracoes />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="veterinario/repasse"
+                    element={
+                      <ModuleGate modulo="veterinario">
+                        <VetRepasse />
+                      </ModuleGate>
+                    }
+                  />
 
                   {/* Modulo Banho & Tosa */}
-                  <Route path="banho-tosa" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="dashboard" /></ModuleGate>} />
-                  <Route path="banho-tosa/servicos" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="servicos" /></ModuleGate>} />
-                  <Route path="banho-tosa/parametros" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="parametros" /></ModuleGate>} />
-                  <Route path="banho-tosa/recursos" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="recursos" /></ModuleGate>} />
-                  <Route path="banho-tosa/agenda" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="agenda" /></ModuleGate>} />
-                  <Route path="banho-tosa/fila" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="fila" /></ModuleGate>} />
-                  <Route path="banho-tosa/fechamentos" element={<Navigate to="/banho-tosa/fila" replace />} />
-                  <Route path="banho-tosa/pacotes" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="pacotes" /></ModuleGate>} />
-                  <Route path="banho-tosa/retornos" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="retornos" /></ModuleGate>} />
-                  <Route path="banho-tosa/taxi-dog" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="taxi-dog" /></ModuleGate>} />
-                  <Route path="banho-tosa/relatorios" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="relatorios" /></ModuleGate>} />
+                  <Route
+                    path="banho-tosa"
+                    element={
+                      <ModuleGate modulo="banho_tosa">
+                        <BanhoTosaPage view="dashboard" />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="banho-tosa/servicos"
+                    element={
+                      <ModuleGate modulo="banho_tosa">
+                        <BanhoTosaPage view="servicos" />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="banho-tosa/parametros"
+                    element={
+                      <ModuleGate modulo="banho_tosa">
+                        <BanhoTosaPage view="parametros" />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="banho-tosa/recursos"
+                    element={
+                      <ModuleGate modulo="banho_tosa">
+                        <BanhoTosaPage view="recursos" />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="banho-tosa/agenda"
+                    element={
+                      <ModuleGate modulo="banho_tosa">
+                        <BanhoTosaPage view="agenda" />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="banho-tosa/fila"
+                    element={
+                      <ModuleGate modulo="banho_tosa">
+                        <BanhoTosaPage view="fila" />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="banho-tosa/fechamentos"
+                    element={<Navigate to="/banho-tosa/fila" replace />}
+                  />
+                  <Route
+                    path="banho-tosa/pacotes"
+                    element={
+                      <ModuleGate modulo="banho_tosa">
+                        <BanhoTosaPage view="pacotes" />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="banho-tosa/retornos"
+                    element={
+                      <ModuleGate modulo="banho_tosa">
+                        <BanhoTosaPage view="retornos" />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="banho-tosa/taxi-dog"
+                    element={
+                      <ModuleGate modulo="banho_tosa">
+                        <BanhoTosaPage view="taxi-dog" />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="banho-tosa/relatorios"
+                    element={
+                      <ModuleGate modulo="banho_tosa">
+                        <BanhoTosaPage view="relatorios" />
+                      </ModuleGate>
+                    }
+                  />
 
                   {/* ========================================
                 📦 ROTAS OFICIAIS DE PRODUTOS (JSX) - ATIVAS
@@ -465,11 +615,19 @@ function App() {
                   {/* Rotas auxiliares de produtos (mantidas) */}
                   <Route
                     path="produtos/:id/movimentacoes"
-                    element={<ProtectedRoute permission="produtos.visualizar"><MovimentacoesProduto /></ProtectedRoute>}
+                    element={
+                      <ProtectedRoute permission="produtos.visualizar">
+                        <MovimentacoesProduto />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="produtos/relatorio"
-                    element={<ProtectedRoute permission="produtos.visualizar"><ProdutosRelatorio /></ProtectedRoute>}
+                    element={
+                      <ProtectedRoute permission="produtos.visualizar">
+                        <ProdutosRelatorio />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="produtos/validade-proxima"
@@ -522,7 +680,11 @@ function App() {
                   <Route path="lembretes" element={<Lembretes />} />
                   <Route
                     path="calculadora-racao"
-                    element={<ProtectedRoute permission="produtos.visualizar"><CalculadoraRacao /></ProtectedRoute>}
+                    element={
+                      <ProtectedRoute permission="produtos.visualizar">
+                        <CalculadoraRacao />
+                      </ProtectedRoute>
+                    }
                   />
 
                   {/* Rotas de Vendas */}
@@ -534,11 +696,38 @@ function App() {
                       </ProtectedRoute>
                     }
                   />
-                  <Route path="meus-caixas" element={<ProtectedRoute permission="vendas.criar"><MeusCaixas /></ProtectedRoute>} />
-                  <Route path="notas-fiscais" element={<Navigate to="/notas-fiscais/saida" replace />} />
-                  <Route path="notas-fiscais/vendas" element={<Navigate to="/notas-fiscais/saida" replace />} />
-                  <Route path="notas-fiscais/saida" element={<ModuleGate modulo="fiscal"><CentralNFSaida /></ModuleGate>} />
-                  <Route path="notas-fiscais/entrada" element={<ModuleGate modulo="compras"><NFEntrada /></ModuleGate>} />
+                  <Route
+                    path="meus-caixas"
+                    element={
+                      <ProtectedRoute permission="vendas.criar">
+                        <MeusCaixas />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="notas-fiscais"
+                    element={<Navigate to="/notas-fiscais/saida" replace />}
+                  />
+                  <Route
+                    path="notas-fiscais/vendas"
+                    element={<Navigate to="/notas-fiscais/saida" replace />}
+                  />
+                  <Route
+                    path="notas-fiscais/saida"
+                    element={
+                      <ModuleGate modulo="fiscal">
+                        <CentralNFSaida />
+                      </ModuleGate>
+                    }
+                  />
+                  <Route
+                    path="notas-fiscais/entrada"
+                    element={
+                      <ModuleGate modulo="compras">
+                        <NFEntrada />
+                      </ModuleGate>
+                    }
+                  />
                   <Route
                     path="campanhas"
                     element={
@@ -621,7 +810,10 @@ function App() {
                       </ModuleGate>
                     }
                   />
-                  <Route path="compras/bling" element={<Navigate to="/produtos/sinc-bling" replace />} />
+                  <Route
+                    path="compras/bling"
+                    element={<Navigate to="/produtos/sinc-bling" replace />}
+                  />
                   <Route
                     path="vendas/bling-pedidos"
                     element={
@@ -658,10 +850,7 @@ function App() {
                     path="financeiro/vendas"
                     element={
                       <ProtectedRoute
-                        anyOfPermissions={[
-                          "relatorios.financeiro",
-                          "clientes.visualizar",
-                        ]}
+                        anyOfPermissions={["relatorios.financeiro", "clientes.visualizar"]}
                       >
                         <VendasFinanceiro />
                       </ProtectedRoute>
@@ -757,54 +946,129 @@ function App() {
                   />
 
                   {/* Rotas de Comissões */}
-                  <Route path="comissoes" element={<ModuleGate modulo="comissoes"><Comissoes /></ModuleGate>} />
+                  <Route
+                    path="comissoes"
+                    element={
+                      <ModuleGate modulo="comissoes">
+                        <Comissoes />
+                      </ModuleGate>
+                    }
+                  />
                   <Route
                     path="comissoes/demonstrativo"
-                    element={<ModuleGate modulo="comissoes"><ComissoesListagem /></ModuleGate>}
+                    element={
+                      <ModuleGate modulo="comissoes">
+                        <ComissoesListagem />
+                      </ModuleGate>
+                    }
                   />
                   <Route
                     path="comissoes/relatorios"
-                    element={<ModuleGate modulo="comissoes"><RelatoriosComissoes /></ModuleGate>}
+                    element={
+                      <ModuleGate modulo="comissoes">
+                        <RelatoriosComissoes />
+                      </ModuleGate>
+                    }
                   />
                   <Route
                     path="comissoes/abertas"
-                    element={<ModuleGate modulo="comissoes"><ComissoesAbertas /></ModuleGate>}
+                    element={
+                      <ModuleGate modulo="comissoes">
+                        <ComissoesAbertas />
+                      </ModuleGate>
+                    }
                   />
                   <Route
                     path="comissoes/fechamento/:funcionario_id"
-                    element={<ModuleGate modulo="comissoes"><ConferenciaAvancada /></ModuleGate>}
+                    element={
+                      <ModuleGate modulo="comissoes">
+                        <ConferenciaAvancada />
+                      </ModuleGate>
+                    }
                   />
                   <Route
                     path="comissoes/fechamentos"
-                    element={<ModuleGate modulo="comissoes"><ComissoesHistoricoFechamentos /></ModuleGate>}
+                    element={
+                      <ModuleGate modulo="comissoes">
+                        <ComissoesHistoricoFechamentos />
+                      </ModuleGate>
+                    }
                   />
                   <Route
                     path="comissoes/fechamentos/detalhe"
-                    element={<ModuleGate modulo="comissoes"><ComissoesFechamentoDetalhe /></ModuleGate>}
+                    element={
+                      <ModuleGate modulo="comissoes">
+                        <ComissoesFechamentoDetalhe />
+                      </ModuleGate>
+                    }
                   />
                   <Route path="subcategorias" element={<Subcategorias />} />
 
                   {/* Rotas de Cadastros */}
-                  <Route path="cadastros/departamentos" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Departamentos /></ProtectedRoute>} />
-                  <Route path="cadastros/marcas" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Marcas /></ProtectedRoute>} />
-                  <Route path="cadastros/categorias" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Categorias /></ProtectedRoute>} />
+                  <Route
+                    path="cadastros/departamentos"
+                    element={
+                      <ProtectedRoute permission="cadastros.categorias_produtos">
+                        <Departamentos />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="cadastros/marcas"
+                    element={
+                      <ProtectedRoute permission="cadastros.categorias_produtos">
+                        <Marcas />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="cadastros/categorias"
+                    element={
+                      <ProtectedRoute permission="cadastros.categorias_produtos">
+                        <Categorias />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route
                     path="cadastros/tipos-despesa"
-                    element={<ProtectedRoute permission="cadastros.categorias_financeiras"><TipoDespesa /></ProtectedRoute>}
+                    element={
+                      <ProtectedRoute permission="cadastros.categorias_financeiras">
+                        <TipoDespesa />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="cadastros/despesas-rapidas"
-                    element={<ProtectedRoute permission="cadastros.categorias_financeiras"><TipoDespesa /></ProtectedRoute>}
+                    element={
+                      <ProtectedRoute permission="cadastros.categorias_financeiras">
+                        <TipoDespesa />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="cadastros/categorias-financeiras"
-                    element={<ModuleGate modulo="financeiro_erp"><CategoriasFinanceiras /></ModuleGate>}
+                    element={
+                      <ModuleGate modulo="financeiro_erp">
+                        <CategoriasFinanceiras />
+                      </ModuleGate>
+                    }
                   />
                   <Route
                     path="cadastros/especies-racas"
-                    element={<ProtectedRoute permission="cadastros.especies_racas"><EspeciesRacas /></ProtectedRoute>}
+                    element={
+                      <ProtectedRoute permission="cadastros.especies_racas">
+                        <EspeciesRacas />
+                      </ProtectedRoute>
+                    }
                   />
-                  <Route path="cadastros/cargos" element={<ModuleGate modulo="rh"><Cargos /></ModuleGate>} />
+                  <Route
+                    path="cadastros/cargos"
+                    element={
+                      <ModuleGate modulo="rh">
+                        <Cargos />
+                      </ModuleGate>
+                    }
+                  />
                   <Route
                     path="cadastros/financeiro/bancos"
                     element={
@@ -853,7 +1117,9 @@ function App() {
                   <Route
                     path="configuracoes/fiscal"
                     element={
-                      <ProtectedRoute anyOfPermissions={["configuracoes.empresa", "configuracoes.editar"]}>
+                      <ProtectedRoute
+                        anyOfPermissions={["configuracoes.empresa", "configuracoes.editar"]}
+                      >
                         <ConfiguracaoFiscalEmpresa />
                       </ProtectedRoute>
                     }
@@ -868,11 +1134,19 @@ function App() {
                   />
                   <Route
                     path="configuracoes/entregas"
-                    element={<ModuleGate modulo="entregas"><EntregasConfig /></ModuleGate>}
+                    element={
+                      <ModuleGate modulo="entregas">
+                        <EntregasConfig />
+                      </ModuleGate>
+                    }
                   />
                   <Route
                     path="configuracoes/custos-moto"
-                    element={<ModuleGate modulo="entregas"><CustosMoto /></ModuleGate>}
+                    element={
+                      <ModuleGate modulo="entregas">
+                        <CustosMoto />
+                      </ModuleGate>
+                    }
                   />
                   <Route
                     path="configuracoes/estoque"
@@ -884,19 +1158,45 @@ function App() {
                   />
                   <Route
                     path="configuracoes/integracoes"
-                    element={<ModuleGate modulo="integracoes"><Integracoes /></ModuleGate>}
+                    element={
+                      <ModuleGate modulo="integracoes">
+                        <Integracoes />
+                      </ModuleGate>
+                    }
                   />
                   {/* <Route path="configuracoes/simples/fechamento" element={<FechamentoSimples />} /> */}
                   <Route
                     path="auditoria/provisoes"
-                    element={<ModuleGate modulo="financeiro_erp"><AuditoriaMensal /></ModuleGate>}
+                    element={
+                      <ModuleGate modulo="financeiro_erp">
+                        <AuditoriaMensal />
+                      </ModuleGate>
+                    }
                   />
-                  <Route path="projecao-caixa" element={<ModuleGate modulo="financeiro_erp"><ProjecaoCaixa /></ModuleGate>} />
+                  <Route
+                    path="projecao-caixa"
+                    element={
+                      <ModuleGate modulo="financeiro_erp">
+                        <ProjecaoCaixa />
+                      </ModuleGate>
+                    }
+                  />
                   <Route
                     path="simulacao-contratacao"
-                    element={<ModuleGate modulo="rh"><SimulacaoContratacao /></ModuleGate>}
+                    element={
+                      <ModuleGate modulo="rh">
+                        <SimulacaoContratacao />
+                      </ModuleGate>
+                    }
                   />
-                  <Route path="rh/funcionarios" element={<ModuleGate modulo="rh"><Funcionarios /></ModuleGate>} />
+                  <Route
+                    path="rh/funcionarios"
+                    element={
+                      <ModuleGate modulo="rh">
+                        <Funcionarios />
+                      </ModuleGate>
+                    }
+                  />
                   <Route
                     path="admin/roles"
                     element={
@@ -913,10 +1213,7 @@ function App() {
                       </ProtectedRoute>
                     }
                   />
-                  <Route
-                    path="lgpd"
-                    element={<Navigate to="/admin/lgpd" replace />}
-                  />
+                  <Route path="lgpd" element={<Navigate to="/admin/lgpd" replace />} />
                   <Route
                     path="admin/observabilidade"
                     element={<Navigate to="/ops/observabilidade" replace />}
@@ -973,7 +1270,11 @@ function App() {
                   />
                   <Route
                     path="ia/chat"
-                    element={<ModuleGate modulo="financeiro_erp"><ChatIA /></ModuleGate>}
+                    element={
+                      <ModuleGate modulo="financeiro_erp">
+                        <ChatIA />
+                      </ModuleGate>
+                    }
                   />
                   <Route
                     path="ia/whatsapp"
