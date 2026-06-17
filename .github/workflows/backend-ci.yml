@@ -371,6 +371,10 @@ jobs:
         run: |
           ruff format --check app/ai app/ai_core
 
+      - name: Backend IA package format (blocking)
+        run: |
+          ruff format --check app/ia
+
       - name: Backend domain campaigns vendas format (blocking)
         run: |
           ruff format --check app/domain app/campaigns app/vendas
