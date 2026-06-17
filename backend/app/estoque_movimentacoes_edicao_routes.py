@@ -149,7 +149,7 @@ def excluir_movimentacao(
         db.delete(movimentacao)
         db.commit()
 
-        logger.info("Movimentacao %s excluida por %s", movimentacao_id, current_user.nome)
+        logger.info("Movimentacao excluida")
 
         try:
             sincronizar_bling_background(produto.id, produto.estoque_atual, "exclusao_movimentacao")
@@ -231,7 +231,7 @@ def editar_movimentacao(
         db.commit()
         db.refresh(movimentacao)
 
-        logger.info("Movimentacao %s editada por %s", movimentacao_id, current_user.nome)
+        logger.info("Movimentacao editada")
 
         if dados.quantidade is not None:
             try:

@@ -1087,7 +1087,7 @@ async def exportar_vendas_pdf(
 
     # Buscar dados do relatório - obter_relatorio_vendas retorna um dict diretamente
     try:
-        logger.info(f"Gerando PDF de vendas para período: {data_inicio} até {data_fim}")
+        logger.info("Gerando PDF de vendas")
         # Construir filtros de data
         if not data_inicio:
             data_inicio = datetime.now().replace(day=1).strftime('%Y-%m-%d')

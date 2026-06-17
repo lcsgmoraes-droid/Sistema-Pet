@@ -673,9 +673,9 @@ async def calcular_racao(
         if not quantidade_diaria_g:
             # Passar tabela_consumo do produto se disponível
             tabela_consumo = produto.tabela_consumo if produto else None
-            logger.info(f"📊 Calculando para pet {req.peso_pet_kg}kg, idade {req.idade_meses}m, atividade {req.nivel_atividade}")
+            logger.info("Calculando sugestao de racao")
             if tabela_consumo:
-                logger.info(f"📋 Tabela consumo: {tabela_consumo[:200]}...")
+                logger.info("Tabela de consumo do produto disponivel")
             quantidade_diaria_g = calcular_quantidade_diaria(
                 peso_pet_kg=req.peso_pet_kg,
                 idade_meses=req.idade_meses,

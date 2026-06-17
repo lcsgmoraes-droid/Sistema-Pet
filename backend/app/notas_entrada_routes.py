@@ -94,14 +94,12 @@ async def upload_xml(
     """Upload de XML de NF-e e parse automÃ¡tico"""
     current_user, tenant_id = user_and_tenant
     
-    logger.info(f"ðŸ“„ Upload de XML - Arquivo: {file.filename}")
-    logger.info(f"   - Content-type: {file.content_type}")
-    logger.info(f"   - UsuÃ¡rio: {current_user.email} (ID: {current_user.id})")
+    logger.info("Upload de XML recebido")
     
     try:
         # Validar extensÃ£o
         if not file.filename.endswith('.xml'):
-            logger.error(f"âŒ Arquivo invÃ¡lido: {file.filename} (nÃ£o Ã© .xml)")
+            logger.error("Arquivo XML invalido recebido")
             raise HTTPException(status_code=400, detail="Arquivo deve ser .xml")
         
         # Ler conteÃºdo
@@ -327,9 +325,9 @@ async def upload_pdf(
     current_user, tenant_id = user_and_tenant
     filename = file.filename or ""
 
-    logger.info(f"Upload de PDF de entrada - Arquivo: {filename}")
-    logger.info(f"   - Fornecedor ID: {fornecedor_id}")
-    logger.info(f"   - Usuario: {current_user.email} (ID: {current_user.id})")
+    logger.info("Upload de PDF de entrada recebido")
+    logger.info("Fornecedor selecionado para upload de PDF")
+    logger.info("   - Usuario autenticado")
 
     try:
         if not filename.lower().endswith(".pdf"):
@@ -523,17 +521,16 @@ async def upload_lote_xml(
     """
     current_user, tenant_id = user_and_tenant
 
-    logger.info(f"ðŸ“¦ Upload em lote - {len(files)} arquivos")
-    logger.info(f"   - UsuÃ¡rio: {current_user.email}")
+    logger.info("Upload em lote de notas recebido (%s arquivos)", len(files))
     
     resultados = []
     sucessos = 0
     erros = 0
     
     for i, file in enumerate(files, 1):
-        logger.info(f"\n{'='*60}")
-        logger.info(f"ðŸ“„ Processando arquivo {i}/{len(files)}: {file.filename}")
-        logger.info(f"{'='*60}")
+        logger.info("\n%s", "=" * 60)
+        logger.info("Processando arquivo do lote de notas (%s/%s)", i, len(files))
+        logger.info("%s", "=" * 60)
         
         resultado = {
             "arquivo": file.filename,
@@ -663,7 +660,10 @@ async def upload_lote_xml(
             
             # Log de reativaÃ§Ãµes
             if produtos_reativados > 0:
-                logger.info(f"â™»ï¸  {produtos_reativados} produto(s) inativo(s) reativado(s) - Nota {nota.numero_nota}")
+                logger.info(
+                    "Produtos inativos reativados durante importacao de nota: %s",
+                    produtos_reativados,
+                )
             
             # Sucesso!
             resultado["sucesso"] = True
@@ -676,18 +676,18 @@ async def upload_lote_xml(
             resultado["produtos_nao_vinculados"] = nao_vinculados
             
             sucessos += 1
-            logger.info(f"âœ… {file.filename} processado com sucesso (Nota {nota.numero_nota})")
+            logger.info("Arquivo do lote de notas processado com sucesso")
             
         except ValueError as e:
             resultado["mensagem"] = f"Erro de validaÃ§Ã£o: {str(e)}"
             erros += 1
-            logger.error(f"âŒ {file.filename}: {str(e)}")
+            logger.error("Arquivo do lote de notas rejeitado por validacao")
             db.rollback()
             
         except Exception as e:
             resultado["mensagem"] = f"Erro ao processar: {str(e)}"
             erros += 1
-            logger.error(f"âŒ {file.filename}: Erro inesperado - {str(e)}")
+            logger.error("Erro inesperado ao processar arquivo do lote de notas", exc_info=True)
             db.rollback()
         
         resultados.append(resultado)
