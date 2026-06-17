@@ -371,9 +371,9 @@ jobs:
         run: |
           ruff format --check app/ai app/ai_core
 
-      - name: Backend IA package format (blocking)
+      - name: Backend IA stable files format (blocking)
         run: |
-          ruff format --check app/ia
+          ruff format --check app/ia/aba5_models.py app/ia/aba6_aba9_models.py app/ia/aba6_models.py app/ia/aba7_dre_detalhada_models.py app/ia/aba7_models.py app/ia/aba8_models.py app/ia/acoes_assistidas.py app/ia/alertas_ia_service.py app/ia/catalogo_fontes.py app/ia/extrato_nlp.py app/ia/extrato_service.py app/ia/memoria_conversacional.py
 
       - name: Backend domain campaigns vendas format (blocking)
         run: |

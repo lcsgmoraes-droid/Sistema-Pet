@@ -17,7 +17,7 @@ from app.ia.aba6_models import Conversa, MensagemChat
 from app.ia.aba5_fluxo_caixa import (
     calcular_indices_saude,
     obter_projecoes_proximos_dias,
-    gerar_alertas_caixa,
+    gerar_alertas_caixa
 )
 
 
@@ -25,16 +25,14 @@ class ChatIAService:
     """Serviço para gerenciar chat com IA"""
 
     LABEL_MES_ATUAL = "mes atual"
-
+    
     def __init__(self, db: Session):
         self.db = db
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
-
+    
     # ==================== CONVERSAS ====================
-
-    def criar_conversa(
-        self, usuario_id: int, tenant_id: Optional[str] = None
-    ) -> Conversa:
+    
+    def criar_conversa(self, usuario_id: int, tenant_id: Optional[str] = None) -> Conversa:
         """Cria nova conversa"""
         tenant_id_resolvido = self._resolver_tenant_id(usuario_id, tenant_id)
         if not tenant_id_resolvido:
@@ -43,16 +41,14 @@ class ChatIAService:
         conversa = Conversa(
             usuario_id=usuario_id,
             tenant_id=tenant_id_resolvido,
-            criado_em=datetime.utcnow(),
+            criado_em=datetime.utcnow()
         )
         self.db.add(conversa)
         self.db.commit()
         self.db.refresh(conversa)
         return conversa
-
-    def listar_conversas(
-        self, usuario_id: int, tenant_id: Optional[str], limit: int = 20
-    ) -> List[Conversa]:
+    
+    def listar_conversas(self, usuario_id: int, tenant_id: Optional[str], limit: int = 20) -> List[Conversa]:
         """Lista conversas do usuário"""
         tenant_id_resolvido = self._resolver_tenant_id(usuario_id, tenant_id)
         if not tenant_id_resolvido:
@@ -68,7 +64,7 @@ class ChatIAService:
             .limit(limit)
             .all()
         )
-
+    
     def obter_conversa(
         self,
         conversa_id: int,
@@ -89,21 +85,19 @@ class ChatIAService:
             )
             .first()
         )
-
-    def deletar_conversa(
-        self, conversa_id: int, usuario_id: int, tenant_id: Optional[str]
-    ) -> bool:
+    
+    def deletar_conversa(self, conversa_id: int, usuario_id: int, tenant_id: Optional[str]) -> bool:
         """Deleta conversa"""
         conversa = self.obter_conversa(conversa_id, usuario_id, tenant_id)
         if not conversa:
             return False
-
+        
         self.db.delete(conversa)
         self.db.commit()
         return True
-
+    
     # ==================== MENSAGENS ====================
-
+    
     def adicionar_mensagem(
         self,
         conversa_id: int,
@@ -138,22 +132,22 @@ class ChatIAService:
             modelo_usado=modelo_usado,
             contexto_usado=contexto_usado,
             tenant_id=tenant_id_resolvido,
-            criado_em=datetime.utcnow(),
+            criado_em=datetime.utcnow()
         )
         self.db.add(mensagem)
-
+        
         # Atualizar última mensagem da conversa
         if conversa:
             conversa.atualizado_em = datetime.utcnow()
-
+            
             # Se primeira mensagem e é do usuário, usar como título
             if not conversa.titulo and tipo == "usuario":
                 conversa.titulo = conteudo[:50] + ("..." if len(conteudo) > 50 else "")
-
+        
         self.db.commit()
         self.db.refresh(mensagem)
         return mensagem
-
+    
     def obter_historico(
         self,
         conversa_id: int,
@@ -161,17 +155,13 @@ class ChatIAService:
         limit: int = 50,
     ) -> List[MensagemChat]:
         """Obtém histórico de mensagens"""
-        query = self.db.query(MensagemChat).filter(
-            MensagemChat.conversa_id == conversa_id
-        )
+        query = self.db.query(MensagemChat).filter(MensagemChat.conversa_id == conversa_id)
         if tenant_id:
             query = query.filter(MensagemChat.tenant_id == str(tenant_id))
 
         return query.order_by(MensagemChat.criado_em.asc()).limit(limit).all()
 
-    def _resolver_tenant_id(
-        self, usuario_id: int, tenant_id: Optional[str]
-    ) -> Optional[str]:
+    def _resolver_tenant_id(self, usuario_id: int, tenant_id: Optional[str]) -> Optional[str]:
         """Resolve tenant_id para consultas seguras de dados."""
         if tenant_id:
             return str(tenant_id)
@@ -231,9 +221,7 @@ class ChatIAService:
             .all()
         )
 
-        faturamento_bruto = sum(
-            float(v.subtotal or 0) + float(v.taxa_entrega or 0) for v in vendas
-        )
+        faturamento_bruto = sum(float(v.subtotal or 0) + float(v.taxa_entrega or 0) for v in vendas)
         descontos = sum(float(v.desconto_valor or 0) for v in vendas)
         faturamento_liquido = sum(float(v.total or 0) for v in vendas)
 
@@ -311,13 +299,9 @@ class ChatIAService:
                 }
             )
 
-        top_vendidos = sorted(lista, key=lambda x: x["quantidade"], reverse=True)[
-            :limite
-        ]
+        top_vendidos = sorted(lista, key=lambda x: x["quantidade"], reverse=True)[:limite]
         top_margem = [p for p in lista if p["receita"] > 0]
-        top_margem = sorted(
-            top_margem, key=lambda x: x["margem_percentual"], reverse=True
-        )[:limite]
+        top_margem = sorted(top_margem, key=lambda x: x["margem_percentual"], reverse=True)[:limite]
 
         return {
             "top_vendidos": top_vendidos,
@@ -358,9 +342,7 @@ class ChatIAService:
             .all()
         )
 
-        receita_bruta = sum(
-            float(v.subtotal or 0) + float(v.taxa_entrega or 0) for v in vendas
-        )
+        receita_bruta = sum(float(v.subtotal or 0) + float(v.taxa_entrega or 0) for v in vendas)
         descontos = sum(float(v.desconto_valor or 0) for v in vendas)
         receita_liquida = receita_bruta - descontos
 
@@ -368,9 +350,7 @@ class ChatIAService:
         for venda in vendas:
             for item in venda.itens:
                 if item.produto and item.produto.preco_custo:
-                    cmv_estimado += float(item.produto.preco_custo) * float(
-                        item.quantidade or 0
-                    )
+                    cmv_estimado += float(item.produto.preco_custo) * float(item.quantidade or 0)
 
         lucro_bruto = receita_liquida - cmv_estimado
 
@@ -387,9 +367,7 @@ class ChatIAService:
         despesas_operacionais = sum(float(c.valor_original or 0) for c in despesas)
 
         lucro_liquido = lucro_bruto - despesas_operacionais
-        margem_liquida = (
-            (lucro_liquido / receita_bruta * 100) if receita_bruta > 0 else 0.0
-        )
+        margem_liquida = (lucro_liquido / receita_bruta * 100) if receita_bruta > 0 else 0.0
 
         return {
             "receita_bruta": round(receita_bruta, 2),
@@ -431,9 +409,7 @@ class ChatIAService:
         match_dias = re.search(r"ultimos?\s+(\d{1,3})\s+dias?", texto)
         if match_dias:
             dias = max(1, int(match_dias.group(1)))
-            inicio = datetime.combine(
-                hoje - timedelta(days=dias - 1), datetime.min.time()
-            )
+            inicio = datetime.combine(hoje - timedelta(days=dias - 1), datetime.min.time())
             fim = datetime.combine(hoje, datetime.max.time())
             return {"inicio": inicio, "fim": fim, "label": f"ultimos {dias} dias"}
 
@@ -491,20 +467,16 @@ class ChatIAService:
             if match_ano:
                 ano = int(match_ano.group(1))
 
-            encontrados.append(
-                {
-                    "nome": nome_mes,
-                    "numero": numero_mes,
-                    "ano": ano,
-                    "posicao": posicao,
-                }
-            )
+            encontrados.append({
+                "nome": nome_mes,
+                "numero": numero_mes,
+                "ano": ano,
+                "posicao": posicao,
+            })
 
         return sorted(encontrados, key=lambda item: item["posicao"])
 
-    def _periodo_mes(
-        self, ano: int, mes: int, nome_mes: Optional[str] = None
-    ) -> Dict[str, Any]:
+    def _periodo_mes(self, ano: int, mes: int, nome_mes: Optional[str] = None) -> Dict[str, Any]:
         inicio = datetime(ano, mes, 1)
         if mes == 12:
             proximo_mes = datetime(ano + 1, 1, 1)
@@ -517,9 +489,7 @@ class ChatIAService:
             "label": f"{nome_mes or mes} de {ano}",
         }
 
-    def _detectar_comparacao_periodos(
-        self, mensagem: str
-    ) -> Optional[Dict[str, Dict[str, Any]]]:
+    def _detectar_comparacao_periodos(self, mensagem: str) -> Optional[Dict[str, Dict[str, Any]]]:
         texto = self._normalizar_texto(mensagem)
         if not any(chave in texto for chave in ["compar", " vs ", " versus "]):
             return None
@@ -529,21 +499,15 @@ class ChatIAService:
             atual = meses_mencionados[0]
             comparado = meses_mencionados[1]
             return {
-                "periodo_a": self._periodo_mes(
-                    atual["ano"], atual["numero"], atual["nome"]
-                ),
-                "periodo_b": self._periodo_mes(
-                    comparado["ano"], comparado["numero"], comparado["nome"]
-                ),
+                "periodo_a": self._periodo_mes(atual["ano"], atual["numero"], atual["nome"]),
+                "periodo_b": self._periodo_mes(comparado["ano"], comparado["numero"], comparado["nome"]),
             }
 
         hoje = datetime.now()
         periodo_atual = self._periodo_mes(hoje.year, hoje.month, self.LABEL_MES_ATUAL)
         mes_anterior = 12 if hoje.month == 1 else hoje.month - 1
         ano_mes_anterior = hoje.year - 1 if hoje.month == 1 else hoje.year
-        periodo_anterior = self._periodo_mes(
-            ano_mes_anterior, mes_anterior, "mes anterior"
-        )
+        periodo_anterior = self._periodo_mes(ano_mes_anterior, mes_anterior, "mes anterior")
 
         return {
             "periodo_a": periodo_atual,
@@ -627,9 +591,7 @@ class ChatIAService:
             for nome, dados in canais.items()
         ]
 
-        top_categorias_margem.sort(
-            key=lambda item: item["margem_percentual"], reverse=True
-        )
+        top_categorias_margem.sort(key=lambda item: item["margem_percentual"], reverse=True)
         top_canais.sort(key=lambda item: item["receita"], reverse=True)
 
         return {
@@ -637,9 +599,7 @@ class ChatIAService:
             "top_canais": top_canais[:limite],
         }
 
-    def _montar_resumo_executivo_periodo(
-        self, tenant_id: Optional[str], periodo: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def _montar_resumo_executivo_periodo(self, tenant_id: Optional[str], periodo: Dict[str, Any]) -> Dict[str, Any]:
         inicio = periodo["inicio"]
         fim = periodo["fim"]
 
@@ -651,28 +611,25 @@ class ChatIAService:
             "rankings": self._obter_rankings_periodo(tenant_id, inicio, fim, limite=5),
         }
 
+    
     # ==================== CONTEXTO FINANCEIRO ====================
-
-    def obter_contexto_financeiro(
-        self, usuario_id: int, tenant_id: Optional[str] = None
-    ) -> Dict[str, Any]:
+    
+    def obter_contexto_financeiro(self, usuario_id: int, tenant_id: Optional[str] = None) -> Dict[str, Any]:
         """Obtém contexto financeiro do usuário (dados do ABA 5)"""
         contexto = {}
         tenant_id_resolvido = self._resolver_tenant_id(usuario_id, tenant_id)
-
+        
         try:
             # 1. Índices de saúde
-            indices = calcular_indices_saude(
-                usuario_id, self.db, tenant_id=tenant_id_resolvido
-            )
+            indices = calcular_indices_saude(usuario_id, self.db, tenant_id=tenant_id_resolvido)
             contexto["indices_saude"] = {
-                "saldo_atual": float(indices.get("saldo_atual", 0)),
-                "dias_de_caixa": float(indices.get("dias_de_caixa", 0)),
-                "status": indices.get("status", "desconhecido"),
-                "tendencia": indices.get("tendencia", "estavel"),
-                "score_saude": int(indices.get("score_saude", 0)),
+                "saldo_atual": float(indices.get('saldo_atual', 0)),
+                "dias_de_caixa": float(indices.get('dias_de_caixa', 0)),
+                "status": indices.get('status', 'desconhecido'),
+                "tendencia": indices.get('tendencia', 'estavel'),
+                "score_saude": int(indices.get('score_saude', 0))
             }
-
+            
             # 2. Projeções 15 dias
             projecoes = obter_projecoes_proximos_dias(
                 usuario_id,
@@ -682,23 +639,21 @@ class ChatIAService:
             )
             contexto["projecoes"] = [
                 {
-                    "data": p.get("data_projetada"),
-                    "saldo_estimado": float(p.get("saldo_estimado", 0)),
-                    "entrada_prevista": float(p.get("entrada_prevista", 0)),
-                    "saida_prevista": float(p.get("saida_prevista", 0)),
+                    "data": p.get('data_projetada'),
+                    "saldo_estimado": float(p.get('saldo_estimado', 0)),
+                    "entrada_prevista": float(p.get('entrada_prevista', 0)),
+                    "saida_prevista": float(p.get('saida_prevista', 0))
                 }
                 for p in projecoes[:7]  # Últimos 7 dias para resumo
             ]
-
+            
             # 3. Alertas
-            alertas = gerar_alertas_caixa(
-                usuario_id, self.db, tenant_id=tenant_id_resolvido
-            )
+            alertas = gerar_alertas_caixa(usuario_id, self.db, tenant_id=tenant_id_resolvido)
             contexto["alertas"] = [
                 {
                     "tipo": a.get("tipo", ""),
                     "titulo": a.get("titulo", ""),
-                    "mensagem": a.get("mensagem", ""),
+                    "mensagem": a.get("mensagem", "")
                 }
                 for a in alertas
             ]
@@ -718,15 +673,15 @@ class ChatIAService:
             contexto["dre_simplificada_mes"] = self._obter_dre_simplificada_mes(
                 tenant_id_resolvido, inicio_mes, fim_mes
             )
-
+            
         except Exception as e:
             logger.info(f"Erro ao obter contexto financeiro: {e}")
             contexto["erro"] = str(e)
-
+        
         return contexto
-
+    
     # ==================== IA RESPONSE ====================
-
+    
     def gerar_resposta_ia(
         self,
         usuario_id: int,
@@ -735,7 +690,7 @@ class ChatIAService:
         tenant_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Gera resposta da IA baseada na mensagem do usuário"""
-
+        
         # 1. Adicionar mensagem do usuário
         conversa = self.obter_conversa(conversa_id, usuario_id, tenant_id)
         if not conversa:
@@ -747,14 +702,12 @@ class ChatIAService:
             conteudo=mensagem_usuario,
             tenant_id=tenant_id,
         )
-
+        
         # 2. Obter contexto financeiro
         contexto = self.obter_contexto_financeiro(usuario_id, tenant_id)
-
+        
         # 3. Gerar resposta com regras locais
-        resposta_texto = self._gerar_resposta_simples(
-            mensagem_usuario, contexto, tenant_id=tenant_id
-        )
+        resposta_texto = self._gerar_resposta_simples(mensagem_usuario, contexto, tenant_id=tenant_id)
 
         # 4. Adicionar resposta da IA
         msg_ia = self.adicionar_mensagem(
@@ -766,25 +719,23 @@ class ChatIAService:
             contexto_usado=contexto,
             tenant_id=tenant_id,
         )
-
+        
         return {
             "conversa_id": conversa_id,
             "mensagem_usuario": {
                 "id": msg_usuario.id,
                 "conteudo": msg_usuario.conteudo,
-                "criado_em": msg_usuario.criado_em.isoformat(),
+                "criado_em": msg_usuario.criado_em.isoformat()
             },
             "mensagem_ia": {
                 "id": msg_ia.id,
                 "conteudo": msg_ia.conteudo,
-                "criado_em": msg_ia.criado_em.isoformat(),
+                "criado_em": msg_ia.criado_em.isoformat()
             },
-            "contexto_usado": contexto,
+            "contexto_usado": contexto
         }
-
-    def _gerar_resposta_simples(
-        self, mensagem: str, contexto: Dict, tenant_id: Optional[str] = None
-    ) -> str:
+    
+    def _gerar_resposta_simples(self, mensagem: str, contexto: Dict, tenant_id: Optional[str] = None) -> str:
         """Gera resposta simples baseada em regras (temporário antes de OpenAI)"""
 
         msg_lower = mensagem.lower()
@@ -800,9 +751,7 @@ class ChatIAService:
         status = indices.get("status", "").lower()
 
         periodo_detectado = self._detectar_periodo(mensagem)
-        resumo_periodo = self._montar_resumo_executivo_periodo(
-            tenant_id, periodo_detectado
-        )
+        resumo_periodo = self._montar_resumo_executivo_periodo(tenant_id, periodo_detectado)
         resumo_vendas_periodo = resumo_periodo["resumo_vendas"]
         produtos_periodo = resumo_periodo["produtos"]
         dre_periodo = resumo_periodo["dre"]
@@ -811,36 +760,20 @@ class ChatIAService:
         comparacao_periodos = self._detectar_comparacao_periodos(mensagem)
 
         def moeda(valor: float) -> str:
-            return (
-                f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            )
+            return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
         if comparacao_periodos:
-            resumo_a = self._montar_resumo_executivo_periodo(
-                tenant_id, comparacao_periodos["periodo_a"]
-            )
-            resumo_b = self._montar_resumo_executivo_periodo(
-                tenant_id, comparacao_periodos["periodo_b"]
-            )
+            resumo_a = self._montar_resumo_executivo_periodo(tenant_id, comparacao_periodos["periodo_a"])
+            resumo_b = self._montar_resumo_executivo_periodo(tenant_id, comparacao_periodos["periodo_b"])
 
-            faturamento_a = float(
-                resumo_a["resumo_vendas"].get("faturamento_liquido", 0)
-            )
-            faturamento_b = float(
-                resumo_b["resumo_vendas"].get("faturamento_liquido", 0)
-            )
+            faturamento_a = float(resumo_a["resumo_vendas"].get("faturamento_liquido", 0))
+            faturamento_b = float(resumo_b["resumo_vendas"].get("faturamento_liquido", 0))
             lucro_a = float(resumo_a["dre"].get("lucro_liquido_estimado", 0))
             lucro_b = float(resumo_b["dre"].get("lucro_liquido_estimado", 0))
 
             if any(palavra in msg_normalizada for palavra in ["canal", "canais"]):
-                canais_a = {
-                    item["canal"]: item
-                    for item in resumo_a["rankings"].get("top_canais", [])
-                }
-                canais_b = {
-                    item["canal"]: item
-                    for item in resumo_b["rankings"].get("top_canais", [])
-                }
+                canais_a = {item["canal"]: item for item in resumo_a["rankings"].get("top_canais", [])}
+                canais_b = {item["canal"]: item for item in resumo_b["rankings"].get("top_canais", [])}
                 canais_ordenados = sorted(
                     set(canais_a.keys()) | set(canais_b.keys()),
                     key=lambda canal: max(
@@ -876,10 +809,7 @@ class ChatIAService:
                 f"- Margem {comparacao_periodos['periodo_b']['label']}: **{float(resumo_b['dre'].get('margem_liquida_estimada', 0)):.2f}%**"
             )
 
-        if any(
-            palavra in msg_lower
-            for palavra in ["vendas do dia", "vendas hoje", "quanto vendi hoje"]
-        ):
+        if any(palavra in msg_lower for palavra in ["vendas do dia", "vendas hoje", "quanto vendi hoje"]):
             return (
                 "📊 **Vendas de Hoje**\n\n"
                 f"- Quantidade: **{int(vendas_hoje.get('quantidade', 0))}** vendas\n"
@@ -888,16 +818,7 @@ class ChatIAService:
                 f"- Faturamento líquido: **{moeda(float(vendas_hoje.get('faturamento_liquido', 0)))}**"
             )
 
-        if any(
-            palavra in msg_normalizada
-            for palavra in [
-                "raio x",
-                "raio-x",
-                "resumo geral",
-                "resumo gerencial",
-                "panorama",
-            ]
-        ):
+        if any(palavra in msg_normalizada for palavra in ["raio x", "raio-x", "resumo geral", "resumo gerencial", "panorama"]):
             top_produto = (produtos_periodo.get("top_vendidos") or [None])[0]
             top_categoria = (rankings_periodo.get("top_categorias_margem") or [None])[0]
             top_canal = (rankings_periodo.get("top_canais") or [None])[0]
@@ -925,28 +846,11 @@ class ChatIAService:
                 linhas.append(f"- Alertas ativos: **{len(alertas)}**")
             return "\n".join(linhas)
 
-        if any(
-            palavra in msg_lower for palavra in ["vendas do mês", "vendas do mes"]
-        ) or (
-            "vendas" in msg_normalizada
-            and any(
-                chave in msg_normalizada
-                for chave in [
-                    "ultimo",
-                    "ultimos",
-                    "marco",
-                    "abril",
-                    "maio",
-                    "junho",
-                    "julho",
-                    "agosto",
-                    "setembro",
-                    "outubro",
-                    "novembro",
-                    "dezembro",
-                    "janeiro",
-                    "fevereiro",
-                    "mes",
+        if any(palavra in msg_lower for palavra in ["vendas do mês", "vendas do mes"]) or (
+            "vendas" in msg_normalizada and any(
+                chave in msg_normalizada for chave in [
+                    "ultimo", "ultimos", "marco", "abril", "maio", "junho", "julho", "agosto",
+                    "setembro", "outubro", "novembro", "dezembro", "janeiro", "fevereiro", "mes"
                 ]
             )
         ):
@@ -958,10 +862,7 @@ class ChatIAService:
                 f"- Faturamento líquido: **{moeda(float(resumo_vendas_periodo.get('faturamento_liquido', 0)))}**"
             )
 
-        if any(
-            palavra in msg_lower
-            for palavra in ["mais vendido", "top produtos", "produto mais vendido"]
-        ):
+        if any(palavra in msg_lower for palavra in ["mais vendido", "top produtos", "produto mais vendido"]):
             top_vendidos = produtos_periodo.get("top_vendidos", [])
             if not top_vendidos:
                 return f"Ainda não encontrei produtos vendidos em {label_periodo} para montar o ranking."
@@ -973,10 +874,7 @@ class ChatIAService:
                 )
             return "\n".join(linhas)
 
-        if any(
-            palavra in msg_lower
-            for palavra in ["margem", "melhor margem", "maior margem"]
-        ):
+        if any(palavra in msg_lower for palavra in ["margem", "melhor margem", "maior margem"]):
             if "categoria" in msg_normalizada:
                 top_categorias = rankings_periodo.get("top_categorias_margem", [])
                 if not top_categorias:
@@ -1000,10 +898,7 @@ class ChatIAService:
                 )
             return "\n".join(linhas)
 
-        if any(
-            palavra in msg_normalizada
-            for palavra in ["canal", "canais", "desempenho por canal"]
-        ):
+        if any(palavra in msg_normalizada for palavra in ["canal", "canais", "desempenho por canal"]):
             top_canais = rankings_periodo.get("top_canais", [])
             if not top_canais:
                 return f"Ainda não encontrei vendas por canal em {label_periodo}."
@@ -1028,42 +923,28 @@ class ChatIAService:
                 f"- Margem líquida estimada: **{float(dre_periodo.get('margem_liquida_estimada', 0)):.2f}%**"
             )
 
-        if any(
-            palavra in msg_lower for palavra in ["saldo", "quanto tenho", "dinheiro"]
-        ):
+        if any(palavra in msg_lower for palavra in ["saldo", "quanto tenho", "dinheiro"]):
             return f"📊 Seu saldo atual é de **R$ {saldo:,.2f}**.\n\nVocê tem **{dias_caixa:.1f} dias de caixa**, o que significa que consegue cobrir suas despesas por esse período sem novas receitas.\n\n{'⚠️ Status: ' + status.upper() if status in ['critico', 'alerta'] else '✅ Status: OK'}"
 
-        if any(
-            palavra in msg_lower
-            for palavra in ["dias de caixa", "quanto tempo", "quantos dias"]
-        ):
+        if any(palavra in msg_lower for palavra in ["dias de caixa", "quanto tempo", "quantos dias"]):
             interpretacao = ""
             if dias_caixa < 7:
-                interpretacao = (
-                    "🔴 **CRÍTICO**: Menos de uma semana! Ação urgente necessária."
-                )
+                interpretacao = "🔴 **CRÍTICO**: Menos de uma semana! Ação urgente necessária."
             elif dias_caixa < 15:
-                interpretacao = (
-                    "🟡 **ALERTA**: Menos de duas semanas. Monitore com atenção."
-                )
+                interpretacao = "🟡 **ALERTA**: Menos de duas semanas. Monitore com atenção."
             else:
                 interpretacao = "🟢 **OK**: Situação confortável."
 
             return f"Você tem **{dias_caixa:.1f} dias de caixa**.\n\n{interpretacao}\n\nIsso é calculado dividindo seu saldo atual (R$ {saldo:,.2f}) pela despesa média diária."
 
-        if any(
-            palavra in msg_lower
-            for palavra in ["como está", "situação", "saúde", "status"]
-        ):
+        if any(palavra in msg_lower for palavra in ["como está", "situação", "saúde", "status"]):
             if status == "critico":
                 return f"🔴 **Situação CRÍTICA!**\n\nSeu caixa está com apenas {dias_caixa:.1f} dias.\n\n**Ações recomendadas:**\n- Cortar despesas não essenciais\n- Acelerar cobranças\n- Buscar empréstimo/capital\n- Revisar planejamento urgentemente"
             if status == "alerta":
                 return f"🟡 **Situação de ALERTA**\n\nVocê tem {dias_caixa:.1f} dias de caixa.\n\n**Recomendações:**\n- Monitorar diariamente\n- Evitar grandes gastos\n- Planejar com cuidado\n- Cobrar clientes em atraso"
             return f"🟢 **Situação OK!**\n\nVocê tem {dias_caixa:.1f} dias de caixa.\n\nSeu negócio está saudável financeiramente. Continue monitorando e aproveite para investir em crescimento."
 
-        if any(
-            palavra in msg_lower for palavra in ["alerta", "aviso", "problema", "risco"]
-        ):
+        if any(palavra in msg_lower for palavra in ["alerta", "aviso", "problema", "risco"]):
             if alertas:
                 resposta = f"⚠️ **Você tem {len(alertas)} alerta(s):**\n\n"
                 for i, alerta in enumerate(alertas[:3], 1):
@@ -1071,10 +952,7 @@ class ChatIAService:
                 return resposta
             return "✅ **Nenhum alerta no momento!**\n\nSeu caixa está saudável e não há riscos iminentes."
 
-        if any(
-            palavra in msg_lower
-            for palavra in ["projeção", "previsão", "futuro", "próximos dias"]
-        ):
+        if any(palavra in msg_lower for palavra in ["projeção", "previsão", "futuro", "próximos dias"]):
             if projecoes:
                 resposta = "📈 **Projeção dos próximos 7 dias:**\n\n"
                 for proj in projecoes[:7]:
@@ -1084,13 +962,11 @@ class ChatIAService:
                 return resposta
             return "Não há projeções disponíveis no momento. Clique em 'Atualizar Projeção' no Dashboard."
 
-        return f'Olá! 👋 Sou seu assistente financeiro com IA.\n\n**Perguntas que você pode fazer agora:**\n- "vendas de março"\n- "vendas dos últimos 15 dias"\n- "compare março com fevereiro"\n- "compare por canal este mês com o mês anterior"\n- "produto mais vendido no mês"\n- "melhor margem por categoria"\n- "desempenho por canal"\n- "DRE de março"\n- "qual é meu saldo atual?"\n- "há algum alerta?"\n- "me dá um raio-x do negócio"\n\n📊 **Resumo rápido:**\n- Saldo: {moeda(float(saldo))}\n- Dias de caixa: {dias_caixa:.1f}\n- Status: {status.upper()}'
+        return f"Olá! 👋 Sou seu assistente financeiro com IA.\n\n**Perguntas que você pode fazer agora:**\n- \"vendas de março\"\n- \"vendas dos últimos 15 dias\"\n- \"compare março com fevereiro\"\n- \"compare por canal este mês com o mês anterior\"\n- \"produto mais vendido no mês\"\n- \"melhor margem por categoria\"\n- \"desempenho por canal\"\n- \"DRE de março\"\n- \"qual é meu saldo atual?\"\n- \"há algum alerta?\"\n- \"me dá um raio-x do negócio\"\n\n📊 **Resumo rápido:**\n- Saldo: {moeda(float(saldo))}\n- Dias de caixa: {dias_caixa:.1f}\n- Status: {status.upper()}"
 
 
 # Funções auxiliares para endpoints
-def criar_conversa_service(
-    db: Session, usuario_id: int, tenant_id: Optional[str] = None
-) -> Conversa:
+def criar_conversa_service(db: Session, usuario_id: int, tenant_id: Optional[str] = None) -> Conversa:
     """Helper para criar conversa"""
     service = ChatIAService(db)
     return service.criar_conversa(usuario_id, tenant_id=tenant_id)
@@ -1112,13 +988,11 @@ def enviar_mensagem_service(
     usuario_id: int,
     tenant_id: Optional[str],
     conversa_id: int,
-    mensagem: str,
+    mensagem: str
 ) -> Dict[str, Any]:
     """Helper para enviar mensagem e obter resposta"""
     service = ChatIAService(db)
-    return service.gerar_resposta_ia(
-        usuario_id, conversa_id, mensagem, tenant_id=tenant_id
-    )
+    return service.gerar_resposta_ia(usuario_id, conversa_id, mensagem, tenant_id=tenant_id)
 
 
 def deletar_conversa_service(

@@ -21,7 +21,6 @@ router = APIRouter(prefix="/api/ia/extrato", tags=["ABA 7 - Extrato Bancário IA
 
 # ===== SCHEMAS =====
 
-
 class ResultadoImportacao(BaseModel):
     arquivo_id: int
     total_transacoes: int
@@ -96,18 +95,17 @@ class HistoricoImportacao(BaseModel):
 
 # ===== ENDPOINTS =====
 
-
 @router.post("/upload", response_model=ResultadoImportacao)
 async def upload_extrato(
     arquivo: UploadFile = File(...),
     conta_bancaria_id: Optional[int] = Form(None),
     db: Session = Depends(get_db),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
     Upload de extrato bancário.
     Suporta: Excel (XLS/XLSX), CSV, PDF (OCR), OFX.
-
+    
     Processa automaticamente:
     - Detecção de formato e banco
     - Extração NLP (CNPJ, CPF, tipo transação)
@@ -118,15 +116,13 @@ async def upload_extrato(
     try:
         # Ler arquivo
         conteudo = await arquivo.read()
-
+        
         if len(conteudo) == 0:
             raise HTTPException(status_code=400, detail="Arquivo vazio")
-
+        
         if len(conteudo) > 10 * 1024 * 1024:  # 10MB
-            raise HTTPException(
-                status_code=400, detail="Arquivo muito grande (máx 10MB)"
-            )
-
+            raise HTTPException(status_code=400, detail="Arquivo muito grande (máx 10MB)")
+        
         # Processar
         servico = ServicoImportacaoExtrato(db)
         resultado = servico.importar_extrato(
@@ -134,24 +130,22 @@ async def upload_extrato(
             nome_arquivo=arquivo.filename,
             user_id=current_user.id,
             tenant_id=tenant_id,
-            conta_bancaria_id=conta_bancaria_id,
+            conta_bancaria_id=conta_bancaria_id
         )
-
+        
         return resultado
-
+        
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Erro ao processar arquivo: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Erro ao processar arquivo: {str(e)}")
 
 
 @router.get("/pendentes", response_model=List[LancamentoPendente])
 def listar_pendentes(
     limite: int = 50,
     db: Session = Depends(get_db),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
     Lista lançamentos importados que necessitam validação.
@@ -160,7 +154,8 @@ def listar_pendentes(
     current_user, tenant_id = user_and_tenant
     servico = ServicoImportacaoExtrato(db)
     lancamentos = servico.listar_lancamentos_pendentes(
-        tenant_id=tenant_id, limite=limite
+        tenant_id=tenant_id,
+        limite=limite
     )
     return lancamentos
 
@@ -169,11 +164,11 @@ def listar_pendentes(
 def validar_lancamento(
     request: ValidacaoRequest,
     db: Session = Depends(get_db),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
     Valida um lançamento (aprova ou corrige).
-
+    
     - Se aprovado=True: incrementa acertos do padrão
     - Se aprovado=False + categoria_correta_id: aprende novo padrão
     """
@@ -183,7 +178,7 @@ def validar_lancamento(
         ia.validar_categorizacao(
             lancamento_id=request.lancamento_id,
             aprovado=request.aprovado,
-            categoria_correta_id=request.categoria_correta_id,
+            categoria_correta_id=request.categoria_correta_id
         )
         return {"success": True, "message": "Validação registrada"}
     except Exception as e:
@@ -194,7 +189,7 @@ def validar_lancamento(
 def validar_lote(
     request: ValidacaoLoteRequest,
     db: Session = Depends(get_db),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
     Valida múltiplos lançamentos de uma vez.
@@ -206,11 +201,11 @@ def validar_lote(
         servico.validar_lote(
             lancamento_ids=request.lancamento_ids,
             tenant_id=tenant_id,
-            aprovar=request.aprovar,
+            aprovar=request.aprovar
         )
         return {
             "success": True,
-            "message": f"{len(request.lancamento_ids)} lançamentos validados",
+            "message": f"{len(request.lancamento_ids)} lançamentos validados"
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -221,7 +216,7 @@ def listar_padroes(
     apenas_ativos: bool = True,
     ordenar_por: str = "confianca",  # confianca, aplicacoes, nome
     db: Session = Depends(get_db),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
     Lista padrões de categorização aprendidos pela IA.
@@ -231,10 +226,10 @@ def listar_padroes(
     query = db.query(PadraoCategoriacaoIA).filter(
         PadraoCategoriacaoIA.tenant_id == tenant_id
     )
-
+    
     if apenas_ativos:
         query = query.filter(PadraoCategoriacaoIA.ativo.is_(True))
-
+    
     # Ordenação
     if ordenar_por == "confianca":
         query = query.order_by(PadraoCategoriacaoIA.confianca_atual.desc())
@@ -242,9 +237,9 @@ def listar_padroes(
         query = query.order_by(PadraoCategoriacaoIA.total_aplicacoes.desc())
     else:
         query = query.order_by(PadraoCategoriacaoIA.categoria_nome)
-
+    
     padroes = query.all()
-
+    
     return [
         PadraoIA(
             id=p.id,
@@ -259,7 +254,7 @@ def listar_padroes(
             total_erros=p.total_erros,
             ativo=p.ativo,
             frequencia=p.frequencia,
-            valor_medio=float(p.valor_medio) if p.valor_medio else None,
+            valor_medio=float(p.valor_medio) if p.valor_medio else None
         )
         for p in padroes
     ]
@@ -270,30 +265,26 @@ def ativar_desativar_padrao(
     padrao_id: int,
     ativar: bool = True,
     db: Session = Depends(get_db),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
     Ativa ou desativa um padrão de categorização.
     """
     current_user, tenant_id = user_and_tenant
-    padrao = (
-        db.query(PadraoCategoriacaoIA)
-        .filter(
-            PadraoCategoriacaoIA.tenant_id == tenant_id,
-            PadraoCategoriacaoIA.id == padrao_id,
-        )
-        .first()
-    )
-
+    padrao = db.query(PadraoCategoriacaoIA).filter(
+        PadraoCategoriacaoIA.tenant_id == tenant_id,
+        PadraoCategoriacaoIA.id == padrao_id,
+    ).first()
+    
     if not padrao:
         raise HTTPException(status_code=404, detail="Padrão não encontrado")
-
+    
     padrao.ativo = ativar
     db.commit()
-
+    
     return {
         "success": True,
-        "message": f"Padrão {'ativado' if ativar else 'desativado'}",
+        "message": f"Padrão {'ativado' if ativar else 'desativado'}"
     }
 
 
@@ -301,33 +292,30 @@ def ativar_desativar_padrao(
 def deletar_padrao(
     padrao_id: int,
     db: Session = Depends(get_db),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
     Deleta um padrão de categorização.
     """
     current_user, tenant_id = user_and_tenant
-    padrao = (
-        db.query(PadraoCategoriacaoIA)
-        .filter(
-            PadraoCategoriacaoIA.tenant_id == tenant_id,
-            PadraoCategoriacaoIA.id == padrao_id,
-        )
-        .first()
-    )
-
+    padrao = db.query(PadraoCategoriacaoIA).filter(
+        PadraoCategoriacaoIA.tenant_id == tenant_id,
+        PadraoCategoriacaoIA.id == padrao_id,
+    ).first()
+    
     if not padrao:
         raise HTTPException(status_code=404, detail="Padrão não encontrado")
-
+    
     db.delete(padrao)
     db.commit()
-
+    
     return {"success": True, "message": "Padrão deletado"}
 
 
 @router.get("/estatisticas", response_model=EstatisticasIA)
 def obter_estatisticas(
-    db: Session = Depends(get_db), user_and_tenant=Depends(get_current_user_and_tenant)
+    db: Session = Depends(get_db),
+    user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
     Estatísticas do sistema de IA.
@@ -341,7 +329,8 @@ def obter_estatisticas(
 
 @router.get("/historico", response_model=List[HistoricoImportacao])
 def listar_historico(
-    db: Session = Depends(get_db), user_and_tenant=Depends(get_current_user_and_tenant)
+    db: Session = Depends(get_db),
+    user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
     Histórico de arquivos importados.
@@ -356,7 +345,7 @@ def listar_historico(
 def criar_lancamento_manual(
     lancamento_id: int,
     db: Session = Depends(get_db),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
     Cria lançamento manual a partir de importado validado.
@@ -366,12 +355,13 @@ def criar_lancamento_manual(
     try:
         servico = ServicoImportacaoExtrato(db)
         lancamento_manual_id = servico.criar_lancamento_financeiro(
-            lancamento_importado_id=lancamento_id, tenant_id=tenant_id
+            lancamento_importado_id=lancamento_id,
+            tenant_id=tenant_id
         )
         return {
             "success": True,
             "lancamento_manual_id": lancamento_manual_id,
-            "message": "Lançamento criado no módulo financeiro",
+            "message": "Lançamento criado no módulo financeiro"
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -381,7 +371,7 @@ def criar_lancamento_manual(
 async def testar_parser(
     formato: str = "demo",
     db: Session = Depends(get_db),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
     Endpoint de teste para verificar parsers.
@@ -389,9 +379,9 @@ async def testar_parser(
     """
     current_user, tenant_id = user_and_tenant
     from app.ia.extrato_parser import ExtratoParser
-
+    
     parser = ExtratoParser()
-
+    
     exemplo = {
         "formatos_suportados": ["excel", "csv", "pdf", "ofx"],
         "bancos_detectados": list(parser.BANCOS_CONHECIDOS.keys()),
@@ -401,8 +391,8 @@ async def testar_parser(
             "3": "Extrai transações (data, descrição, valor)",
             "4": "NLP extrai CNPJ, CPF, beneficiário",
             "5": "IA categoriza automaticamente",
-            "6": "Retorna lista para validação humana",
-        },
+            "6": "Retorna lista para validação humana"
+        }
     }
-
+    
     return exemplo
