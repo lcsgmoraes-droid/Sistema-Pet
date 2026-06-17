@@ -5,11 +5,21 @@ from fastapi import APIRouter, Depends, Query
 
 from app.auth.dependencies import require_admin
 from app.services.audit_event_report_service import list_audit_events
-from app.services.deploy_event_reporter import list_deploy_events, summarize_deploy_events
+from app.services.deploy_event_reporter import (
+    list_deploy_events,
+    summarize_deploy_events,
+)
 from app.services.error_event_reporter import list_error_events, summarize_error_events
 from app.services.ops_dashboard_service import build_ops_dashboard
-from app.services.ops_persistence_service import list_ops_alerts, query_recovery_actions, summarize_ops_alerts
-from app.services.watchdog_event_reporter import list_watchdog_events, summarize_watchdog_events
+from app.services.ops_persistence_service import (
+    list_ops_alerts,
+    query_recovery_actions,
+    summarize_ops_alerts,
+)
+from app.services.watchdog_event_reporter import (
+    list_watchdog_events,
+    summarize_watchdog_events,
+)
 from app.db import get_session
 from sqlalchemy.orm import Session
 

@@ -1,4 +1,5 @@
 """Rotas da API para o perfil de entregador no app mobile."""
+
 from datetime import datetime
 from decimal import Decimal
 from types import SimpleNamespace
@@ -6,7 +7,15 @@ from typing import List, Optional
 from uuid import UUID
 import secrets
 
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    HTTPException,
+    Query,
+    status,
+)
 from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
@@ -14,7 +23,10 @@ from sqlalchemy.orm import Session, joinedload
 from app.db import get_session
 from app.models import Cliente, ConfiguracaoEntrega, User
 from app.rotas_entrega_models import RotaEntrega, RotaEntregaParada
-from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
+from app.routes.ecommerce_auth import (
+    _activate_user_tenant_context,
+    _get_current_ecommerce_user,
+)
 from app.schemas.rota_entrega import RotaEntregaResponse, RotaEntregaUpdate
 from app.services.google_maps_service import calcular_rota_otimizada
 from app.tenancy.context import set_current_tenant
@@ -168,20 +180,26 @@ def minhas_rotas(
     tenant_id = _activate_cliente_tenant_context(cliente)
     ensure_rotas_entrega_schema(db)
 
-    query = db.query(RotaEntrega).options(
-        joinedload(RotaEntrega.entregador),
-        joinedload(RotaEntrega.paradas)
-        .joinedload(RotaEntregaParada.venda)
-        .joinedload(Venda.cliente),
-    ).filter(
-        RotaEntrega.tenant_id == tenant_id,
-        RotaEntrega.entregador_id == cliente.id,
+    query = (
+        db.query(RotaEntrega)
+        .options(
+            joinedload(RotaEntrega.entregador),
+            joinedload(RotaEntrega.paradas)
+            .joinedload(RotaEntregaParada.venda)
+            .joinedload(Venda.cliente),
+        )
+        .filter(
+            RotaEntrega.tenant_id == tenant_id,
+            RotaEntrega.entregador_id == cliente.id,
+        )
     )
 
     if filtro_status:
         query = query.filter(RotaEntrega.status == filtro_status)
     else:
-        query = query.filter(RotaEntrega.status.in_(["pendente", "em_rota", "em_andamento"]))
+        query = query.filter(
+            RotaEntrega.status.in_(["pendente", "em_rota", "em_andamento"])
+        )
 
     rotas = query.order_by(RotaEntrega.created_at.asc()).all()
 
@@ -213,7 +231,9 @@ def listar_entregas_abertas(
             Venda.endereco_entrega.isnot(None),
             or_(Venda.entregador_id == cliente.id, Venda.entregador_id.is_(None)),
         )
-        .order_by(Venda.ordem_entrega_otimizada.asc().nullslast(), Venda.created_at.asc())
+        .order_by(
+            Venda.ordem_entrega_otimizada.asc().nullslast(), Venda.created_at.asc()
+        )
         .all()
     )
 
@@ -242,9 +262,11 @@ def otimizar_entregas_selecionadas(
         raise HTTPException(status_code=400, detail="Selecione ao menos uma entrega")
 
     tenant_id = _activate_cliente_tenant_context(cliente)
-    config = db.query(ConfiguracaoEntrega).filter(
-        ConfiguracaoEntrega.tenant_id == tenant_id
-    ).first()
+    config = (
+        db.query(ConfiguracaoEntrega)
+        .filter(ConfiguracaoEntrega.tenant_id == tenant_id)
+        .first()
+    )
     origem = _montar_endereco_origem(config)
     if not origem:
         raise HTTPException(
@@ -267,7 +289,9 @@ def otimizar_entregas_selecionadas(
     )
 
     if len(vendas) != len(payload.venda_ids):
-        raise HTTPException(status_code=400, detail="Uma ou mais entregas não podem ser otimizadas")
+        raise HTTPException(
+            status_code=400, detail="Uma ou mais entregas não podem ser otimizadas"
+        )
 
     if len(vendas) == 1:
         vendas[0].ordem_entrega_otimizada = 1
@@ -312,16 +336,22 @@ def criar_rota_por_entregador(
             Venda.endereco_entrega.isnot(None),
             or_(Venda.entregador_id == cliente.id, Venda.entregador_id.is_(None)),
         )
-        .order_by(Venda.ordem_entrega_otimizada.asc().nullslast(), Venda.created_at.asc())
+        .order_by(
+            Venda.ordem_entrega_otimizada.asc().nullslast(), Venda.created_at.asc()
+        )
         .all()
     )
 
     if len(vendas) != len(payload.venda_ids):
-        raise HTTPException(status_code=400, detail="Uma ou mais entregas não podem entrar na rota")
+        raise HTTPException(
+            status_code=400, detail="Uma ou mais entregas não podem entrar na rota"
+        )
 
-    config = db.query(ConfiguracaoEntrega).filter(
-        ConfiguracaoEntrega.tenant_id == tenant_id
-    ).first()
+    config = (
+        db.query(ConfiguracaoEntrega)
+        .filter(ConfiguracaoEntrega.tenant_id == tenant_id)
+        .first()
+    )
     ponto_origem = _montar_endereco_origem(config)
 
     rota = RotaEntrega(
@@ -335,7 +365,9 @@ def criar_rota_por_entregador(
         retorna_origem=payload.retorna_origem,
     )
     # Campo numero em rotas_entrega é VARCHAR(20); manter identificador curto e único
-    rota.numero = f"R{datetime.now().strftime('%y%m%d%H%M%S')}{secrets.token_hex(3).upper()}"
+    rota.numero = (
+        f"R{datetime.now().strftime('%y%m%d%H%M%S')}{secrets.token_hex(3).upper()}"
+    )
     rota.token_rastreio = secrets.token_urlsafe(32)
 
     db.add(rota)
@@ -547,11 +579,15 @@ def reordenar_paradas_rota_entregador(
         if _is_int_like(rota_ref)
         else RotaEntrega.numero == rota_ref
     )
-    rota = db.query(RotaEntrega).filter(
-        rota_filter,
-        RotaEntrega.tenant_id == tenant_id,
-        RotaEntrega.entregador_id == cliente.id,
-    ).first()
+    rota = (
+        db.query(RotaEntrega)
+        .filter(
+            rota_filter,
+            RotaEntrega.tenant_id == tenant_id,
+            RotaEntrega.entregador_id == cliente.id,
+        )
+        .first()
+    )
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
     if not rota_entregador_permite_reordenar(rota.status):
@@ -560,10 +596,14 @@ def reordenar_paradas_rota_entregador(
             detail="Rota encerrada nao pode ser reordenada",
         )
 
-    paradas = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota.id,
-        RotaEntregaParada.tenant_id == tenant_id,
-    ).all()
+    paradas = (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.rota_id == rota.id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
+        .all()
+    )
     paradas_por_id = {p.id: p for p in paradas}
 
     if set(payload.parada_ids) != set(paradas_por_id.keys()):
@@ -596,21 +636,29 @@ def marcar_parada_nao_entregue_entregador(
         if _is_int_like(rota_ref)
         else RotaEntrega.numero == rota_ref
     )
-    rota = db.query(RotaEntrega).filter(
-        rota_filter,
-        RotaEntrega.tenant_id == tenant_id,
-        RotaEntrega.entregador_id == cliente.id,
-    ).first()
+    rota = (
+        db.query(RotaEntrega)
+        .filter(
+            rota_filter,
+            RotaEntrega.tenant_id == tenant_id,
+            RotaEntrega.entregador_id == cliente.id,
+        )
+        .first()
+    )
     if not rota:
         raise HTTPException(status_code=404, detail="Rota nao encontrada")
     if rota.status in ("concluida", "cancelada"):
         raise HTTPException(status_code=400, detail="Rota ja foi encerrada")
 
-    parada = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.id == parada_id,
-        RotaEntregaParada.rota_id == rota.id,
-        RotaEntregaParada.tenant_id == tenant_id,
-    ).first()
+    parada = (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.id == parada_id,
+            RotaEntregaParada.rota_id == rota.id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not parada:
         raise HTTPException(status_code=404, detail="Parada nao encontrada")
 
@@ -618,13 +666,19 @@ def marcar_parada_nao_entregue_entregador(
     if motivo_final:
         obs_existente = parada.observacoes or ""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-        parada.observacoes = f"{obs_existente}\n[{timestamp}] Nao entregue: {motivo_final}".strip()
+        parada.observacoes = (
+            f"{obs_existente}\n[{timestamp}] Nao entregue: {motivo_final}".strip()
+        )
 
     venda_id = parada.venda_id
-    venda = db.query(Venda).filter(
-        Venda.id == venda_id,
-        Venda.tenant_id == tenant_id,
-    ).first()
+    venda = (
+        db.query(Venda)
+        .filter(
+            Venda.id == venda_id,
+            Venda.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if venda:
         venda.status_entrega = "pendente"
 
@@ -667,7 +721,9 @@ def detalhes_venda_entregador(
 
     forma_pagamento = data.get("forma_pagamento")
     if not forma_pagamento and venda.baixas:
-        baixa_recente = sorted(venda.baixas, key=lambda b: b.data_baixa or datetime.min)[-1]
+        baixa_recente = sorted(
+            venda.baixas, key=lambda b: b.data_baixa or datetime.min
+        )[-1]
         forma_pagamento = baixa_recente.forma_pagamento
 
     data["forma_pagamento"] = forma_pagamento

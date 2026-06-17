@@ -10,7 +10,10 @@ from app.db import get_session
 from app.models import User
 from app.pedido_models import Pedido, PedidoItem
 from app.produtos_models import Produto
-from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
+from app.routes.ecommerce_auth import (
+    _activate_user_tenant_context,
+    _get_current_ecommerce_user,
+)
 from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
@@ -65,9 +68,13 @@ def _produto_disponivel_no_canal(produto: Produto, canal: str) -> bool:
     return bool(getattr(produto, "anunciar_ecommerce", True))
 
 
-def _current_identity(current_user: User = Depends(_get_current_ecommerce_user)) -> EcommerceIdentity:
+def _current_identity(
+    current_user: User = Depends(_get_current_ecommerce_user),
+) -> EcommerceIdentity:
     tenant_id = _activate_user_tenant_context(current_user)
-    return EcommerceIdentity(user_id=current_user.id, tenant_id=str(UUID(str(tenant_id))))
+    return EcommerceIdentity(
+        user_id=current_user.id, tenant_id=str(UUID(str(tenant_id)))
+    )
 
 
 def _find_or_create_carrinho(db: Session, identity: EcommerceIdentity) -> Pedido:
@@ -161,7 +168,9 @@ def _quantidade_reservada_produto(
 
 
 def _recalcular_total(db: Session, carrinho: Pedido) -> float:
-    itens = db.query(PedidoItem).filter(PedidoItem.pedido_id == carrinho.pedido_id).all()
+    itens = (
+        db.query(PedidoItem).filter(PedidoItem.pedido_id == carrinho.pedido_id).all()
+    )
     total = round(sum((item.subtotal or 0.0) for item in itens), 2)
     carrinho.total = total
     return total
@@ -209,7 +218,9 @@ def _formatar_quantidade_estoque(valor: float) -> str:
 
 
 def _resolver_precificacao_produto(db: Session, produto: Produto, canal: str):
-    oferta_validade = mapear_ofertas_validade_por_produto(db, [produto], canal).get(produto.id)
+    oferta_validade = mapear_ofertas_validade_por_produto(db, [produto], canal).get(
+        produto.id
+    )
     return resolver_preco_publico_produto(
         produto,
         canal,
@@ -219,7 +230,11 @@ def _resolver_precificacao_produto(db: Session, produto: Produto, canal: str):
 
 def _validar_limite_promocao_validade(pricing, quantidade: float):
     oferta_validade = pricing.validity_offer
-    if not pricing.promotion_active or pricing.promotion_origin != "validade" or not oferta_validade:
+    if (
+        not pricing.promotion_active
+        or pricing.promotion_origin != "validade"
+        or not oferta_validade
+    ):
         return
     limite = float(oferta_validade.quantity_available or 0)
     if float(quantidade) > limite:
@@ -253,18 +268,28 @@ def adicionar_item_carrinho(
     )
 
     if not produto:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado"
+        )
 
     if getattr(produto, "is_sellable", True) is False:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Produto não vendável")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Produto não vendável"
+        )
 
     canal_venda = _normalize_sales_channel(request.headers.get("X-Canal-Venda"))
     if not _produto_disponivel_no_canal(produto, canal_venda):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Produto indisponível neste canal")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Produto indisponível neste canal",
+        )
 
     estoque_disponivel = float(produto.estoque_atual or 0.0)
     if payload.quantidade > estoque_disponivel:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quantidade indisponível em estoque")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Quantidade indisponível em estoque",
+        )
 
     carrinho = _find_or_create_carrinho(db, identity)
 
@@ -282,8 +307,7 @@ def adicionar_item_carrinho(
     preco_unitario = float(
         pricing.promotional_price
         if pricing.promotional_price is not None
-        else pricing.regular_price
-        or 0.0
+        else pricing.regular_price or 0.0
     )
 
     nova_quantidade = payload.quantidade
@@ -362,7 +386,10 @@ def atualizar_item_carrinho(
     )
 
     if not item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item do carrinho não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Item do carrinho não encontrado",
+        )
 
     produto = (
         db.query(Produto)
@@ -374,11 +401,16 @@ def atualizar_item_carrinho(
         .first()
     )
     if not produto:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado"
+        )
 
     canal_venda = _normalize_sales_channel(request.headers.get("X-Canal-Venda"))
     if not _produto_disponivel_no_canal(produto, canal_venda):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Produto indisponível neste canal")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Produto indisponível neste canal",
+        )
 
     estoque_disponivel = float(produto.estoque_atual or 0.0)
     reservado_outros = _quantidade_reservada_produto(
@@ -399,8 +431,7 @@ def atualizar_item_carrinho(
     preco_unitario = float(
         pricing.promotional_price
         if pricing.promotional_price is not None
-        else pricing.regular_price
-        or 0.0
+        else pricing.regular_price or 0.0
     )
     _validar_limite_promocao_validade(pricing, payload.quantidade)
 
@@ -439,7 +470,12 @@ def limpar_carrinho(
         carrinho.total = 0.0
         db.commit()
 
-    return {"pedido_id": carrinho.pedido_id if carrinho else None, "itens": [], "subtotal": 0.0, "total": 0.0}
+    return {
+        "pedido_id": carrinho.pedido_id if carrinho else None,
+        "itens": [],
+        "subtotal": 0.0,
+        "total": 0.0,
+    }
 
 
 @router.delete("/remover/{produto_id}")
@@ -464,7 +500,10 @@ def remover_item_carrinho(
     )
 
     if not item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item do carrinho não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Item do carrinho não encontrado",
+        )
 
     db.delete(item)
     _recalcular_total(db, carrinho)
@@ -524,11 +563,17 @@ def aplicar_cupom(
     )
 
     if not carrinho:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio"
+        )
 
-    itens_count = db.query(PedidoItem).filter(PedidoItem.pedido_id == carrinho.pedido_id).count()
+    itens_count = (
+        db.query(PedidoItem).filter(PedidoItem.pedido_id == carrinho.pedido_id).count()
+    )
     if itens_count == 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio"
+        )
 
     cupom = payload.codigo.strip().upper()
     descontos = {
@@ -538,7 +583,9 @@ def aplicar_cupom(
 
     percentual = descontos.get(cupom)
     if not percentual:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cupom inválido")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Cupom inválido"
+        )
 
     subtotal = round(float(carrinho.total or 0.0), 2)
     desconto = round((subtotal * percentual) / 100.0, 2)

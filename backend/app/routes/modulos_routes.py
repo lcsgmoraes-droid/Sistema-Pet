@@ -3,6 +3,7 @@ Rotas para gerenciamento de módulos premium por tenant.
 
 GET /modulos/status — retorna quais módulos estão ativos para o tenant logado.
 """
+
 import json
 import logging
 from datetime import datetime, timezone
@@ -60,7 +61,9 @@ PLANOS_LEGADO_LIBERADOS = frozenset(["free", "legacy", "legado"])
 PLANOS_TODOS_MODULOS = frozenset(["premium", "enterprise", "full", "completo"])
 PLANOS_BASICOS = frozenset(["basico", "básico", "base", "basic"])
 TRIAL_DIAS_PADRAO = 30
-ASSINATURA_STATUS_VALIDOS = frozenset(["trial", "active", "expired", "blocked", "canceled"])
+ASSINATURA_STATUS_VALIDOS = frozenset(
+    ["trial", "active", "expired", "blocked", "canceled"]
+)
 
 
 def _set_tenant_context_for_target(tenant_id: str) -> str:
@@ -84,7 +87,9 @@ def _iso_datetime(value: datetime | None) -> str | None:
     return value.isoformat().replace("+00:00", "Z")
 
 
-def _dias_restantes_trial(trial_ends_at: datetime | None, agora: datetime) -> int | None:
+def _dias_restantes_trial(
+    trial_ends_at: datetime | None, agora: datetime
+) -> int | None:
     trial_ends_at = _datetime_utc(trial_ends_at)
     if trial_ends_at is None:
         return None
@@ -163,7 +168,10 @@ def _resolver_modulos_ativos(
             continue
         modulos_do_tenant.add(assinatura.modulo)
 
-    if plano_normalizado in PLANOS_LEGADO_LIBERADOS or plano_normalizado in PLANOS_TODOS_MODULOS:
+    if (
+        plano_normalizado in PLANOS_LEGADO_LIBERADOS
+        or plano_normalizado in PLANOS_TODOS_MODULOS
+    ):
         modulos_do_tenant.update(MODULOS_PREMIUM)
 
     return sorted(modulo for modulo in modulos_do_tenant if modulo in MODULOS_PREMIUM)
@@ -188,7 +196,9 @@ def get_modulos_status(
 
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Tenant não encontrado"
+        )
 
     if not _raw_modulos_ativos_valido(tenant.modulos_ativos):
         logger.warning("modulos_ativos inválido para tenant %s", tenant_id)
@@ -225,7 +235,8 @@ def get_modulos_status(
             "libera_premium_automaticamente": False,
         },
         "assinatura": _assinatura_resumo_tenant(tenant, agora),
-        "plano_legado_liberado": (tenant.plan or "").strip().lower() in PLANOS_LEGADO_LIBERADOS,
+        "plano_legado_liberado": (tenant.plan or "").strip().lower()
+        in PLANOS_LEGADO_LIBERADOS,
     }
 
 
@@ -241,8 +252,12 @@ def ativar_modulo(
     Apenas admins do sistema podem chamar este endpoint.
     """
     # Apenas superadmin pode ativar módulos manualmente
-    if not (current_user.is_superadmin or getattr(current_user, "is_system_admin", False)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado")
+    if not (
+        current_user.is_superadmin or getattr(current_user, "is_system_admin", False)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado"
+        )
 
     if modulo not in MODULOS_PREMIUM:
         raise HTTPException(
@@ -252,7 +267,9 @@ def ativar_modulo(
 
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id_alvo).first()
     if not tenant:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Tenant não encontrado"
+        )
 
     tenant_id_alvo = _set_tenant_context_for_target(str(tenant.id))
 
@@ -264,7 +281,9 @@ def ativar_modulo(
         except (json.JSONDecodeError, TypeError):
             modulos_atuais = []
 
-    modulos_anteriores = sorted(modulo_atual for modulo_atual in modulos_atuais if isinstance(modulo_atual, str))
+    modulos_anteriores = sorted(
+        modulo_atual for modulo_atual in modulos_atuais if isinstance(modulo_atual, str)
+    )
     if modulo not in modulos_atuais:
         modulos_atuais.append(modulo)
         tenant.modulos_ativos = json.dumps(modulos_atuais)
@@ -324,12 +343,18 @@ def ativar_plano_basico_manual(
     Marca manualmente o Plano Basico como ativo apos confirmacao externa de pagamento.
     Este endpoint nao processa pagamento; ele apenas registra a ativacao operacional.
     """
-    if not (current_user.is_superadmin or getattr(current_user, "is_system_admin", False)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado")
+    if not (
+        current_user.is_superadmin or getattr(current_user, "is_system_admin", False)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado"
+        )
 
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id_alvo).first()
     if not tenant:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant nao encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Tenant nao encontrado"
+        )
 
     agora = datetime.now(tz=timezone.utc)
     previous_state = {
@@ -339,8 +364,12 @@ def ativar_plano_basico_manual(
         "subscription_activated_at": tenant.subscription_activated_at.isoformat()
         if tenant.subscription_activated_at
         else None,
-        "trial_started_at": tenant.trial_started_at.isoformat() if tenant.trial_started_at else None,
-        "trial_ends_at": tenant.trial_ends_at.isoformat() if tenant.trial_ends_at else None,
+        "trial_started_at": tenant.trial_started_at.isoformat()
+        if tenant.trial_started_at
+        else None,
+        "trial_ends_at": tenant.trial_ends_at.isoformat()
+        if tenant.trial_ends_at
+        else None,
     }
     tenant.plan = "basico"
     tenant.billing_status = "active"

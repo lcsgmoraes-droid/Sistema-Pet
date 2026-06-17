@@ -40,39 +40,36 @@ router = APIRouter(
     tags=["Analytics"],
     responses={
         404: {"description": "Dados não encontrados"},
-        401: {"description": "Não autorizado"}
-    }
+        401: {"description": "Não autorizado"},
+    },
 )
 
 
 # ===== VALIDAÇÃO E SEGURANÇA =====
 
+
 def validate_date_range(data_inicio: date, data_fim: date) -> None:
     """
     Valida intervalo de datas.
-    
+
     Raises:
         HTTPException: Se intervalo for inválido
     """
     if data_inicio > data_fim:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="data_inicio deve ser anterior a data_fim"
+            detail="data_inicio deve ser anterior a data_fim",
         )
-    
+
     delta = (data_fim - data_inicio).days
     if delta > 365:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Intervalo máximo permitido: 365 dias"
+            detail="Intervalo máximo permitido: 365 dias",
         )
 
 
-def log_analytics_request(
-    endpoint: str,
-    user_id: int,
-    params: Dict[str, Any]
-) -> None:
+def log_analytics_request(endpoint: str, user_id: int, params: Dict[str, Any]) -> None:
     """Registra acesso a endpoint de analytics para auditoria"""
     safe_endpoint = SAFE_LOG_TOKEN_RE.sub("_", str(endpoint))[:80]
     safe_user_id = int(user_id)
@@ -89,27 +86,27 @@ def log_analytics_request(
 
 # ===== ENDPOINTS DE ANALYTICS =====
 
+
 @router.get("/resumo-diario")
 def get_resumo_diario(
     data: Optional[date] = Query(
-        None,
-        description="Data desejada (YYYY-MM-DD). Padrão: hoje"
+        None, description="Data desejada (YYYY-MM-DD). Padrão: hoje"
     ),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ) -> Dict[str, Any]:
     """
     📊 Resumo de vendas de um dia específico.
-    
+
     Retorna métricas agregadas:
     - Quantidade de vendas (aberta, finalizada, cancelada)
     - Total vendido e cancelado
     - Ticket médio
-    
+
     **Fonte de dados:** VendasResumoDiario (read model)
-    
+
     **Performance:** ~5ms (dados pré-agregados)
-    
+
     Exemplo de resposta:
     ```json
     {
@@ -125,13 +122,11 @@ def get_resumo_diario(
     ```
     """
     log_analytics_request(
-        "resumo-diario",
-        user_and_tenant[0].id,
-        {"data": data or date.today()}
+        "resumo-diario", user_and_tenant[0].id, {"data": data or date.today()}
     )
-    
+
     resumo = queries.obter_resumo_diario(db, data)
-    
+
     if not resumo:
         # Retorna estrutura vazia ao invés de 404
         data_consultada = data or date.today()
@@ -144,34 +139,33 @@ def get_resumo_diario(
             "total_cancelado": 0.0,
             "ticket_medio": 0.0,
             "atualizado_em": None,
-            "aviso": "Nenhuma venda registrada nesta data"
+            "aviso": "Nenhuma venda registrada nesta data",
         }
-    
+
     return resumo
 
 
 @router.get("/receita-mensal")
 def get_receita_mensal(
     mes_referencia: Optional[date] = Query(
-        None,
-        description="Primeiro dia do mês desejado (YYYY-MM-01). Padrão: mês atual"
+        None, description="Primeiro dia do mês desejado (YYYY-MM-01). Padrão: mês atual"
     ),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ) -> Dict[str, Any]:
     """
     💰 Receita agregada de um mês específico.
-    
+
     Retorna métricas financeiras:
     - Receita bruta, cancelada e líquida
     - Quantidade de vendas e cancelamentos
     - Ticket médio
     - Variação percentual em relação ao mês anterior
-    
+
     **Fonte de dados:** ReceitaMensal (read model)
-    
+
     **Performance:** ~8ms
-    
+
     Exemplo de resposta:
     ```json
     {
@@ -189,11 +183,11 @@ def get_receita_mensal(
     log_analytics_request(
         "receita-mensal",
         user_and_tenant[0].id,
-        {"mes_referencia": mes_referencia or date.today()}
+        {"mes_referencia": mes_referencia or date.today()},
     )
-    
+
     receita = queries.obter_receita_mensal(db, mes_referencia)
-    
+
     if not receita:
         mes_consultado = mes_referencia or date.today().replace(day=1)
         return {
@@ -205,30 +199,26 @@ def get_receita_mensal(
             "quantidade_cancelamentos": 0,
             "ticket_medio": 0.0,
             "variacao_percentual": None,
-            "aviso": "Nenhuma receita registrada neste mês"
+            "aviso": "Nenhuma receita registrada neste mês",
         }
-    
+
     return receita
 
 
 @router.get("/ranking-parceiros")
 def get_ranking_parceiros(
     mes_referencia: Optional[date] = Query(
-        None,
-        description="Primeiro dia do mês (YYYY-MM-01). Padrão: mês atual"
+        None, description="Primeiro dia do mês (YYYY-MM-01). Padrão: mês atual"
     ),
     limite: int = Query(
-        10,
-        ge=1,
-        le=100,
-        description="Quantidade de resultados (1-100)"
+        10, ge=1, le=100, description="Quantidade de resultados (1-100)"
     ),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ) -> List[Dict[str, Any]]:
     """
     🏆 Ranking de parceiros/vendedores por performance.
-    
+
     Retorna lista ordenada por total vendido (maior primeiro):
     - Posição no ranking
     - ID do funcionário
@@ -236,15 +226,15 @@ def get_ranking_parceiros(
     - Total vendido
     - Ticket médio
     - Taxa de cancelamento
-    
+
     **Fonte de dados:** PerformanceParceiro (read model)
-    
+
     **Performance:** ~10ms
-    
+
     **Filtros:**
     - `mes_referencia`: Mês desejado (padrão: atual)
     - `limite`: Top N vendedores (padrão: 10, max: 100)
-    
+
     Exemplo de resposta:
     ```json
     [
@@ -270,38 +260,36 @@ def get_ranking_parceiros(
     log_analytics_request(
         "ranking-parceiros",
         user_and_tenant[0].id,
-        {"mes_referencia": mes_referencia, "limite": limite}
+        {"mes_referencia": mes_referencia, "limite": limite},
     )
-    
+
     ranking = queries.obter_ranking_parceiros(
-        db,
-        mes_referencia=mes_referencia,
-        limite=limite
+        db, mes_referencia=mes_referencia, limite=limite
     )
-    
+
     return ranking
 
 
 @router.get("/estatisticas-gerais")
 def get_estatisticas_gerais(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ) -> Dict[str, Any]:
     """
     📈 Dashboard completo com estatísticas gerais.
-    
+
     Retorna agregação de múltiplos read models:
     - Resumo do dia atual
     - Receita do mês atual
     - Top 5 vendedores
     - Últimos 7 dias
-    
+
     **Fontes de dados:** Múltiplos read models
-    
+
     **Performance:** ~30ms (consulta integrada)
-    
+
     **Ideal para:** Dashboards gerenciais, home screens
-    
+
     Exemplo de resposta:
     ```json
     {
@@ -328,46 +316,37 @@ def get_estatisticas_gerais(
     }
     ```
     """
-    log_analytics_request(
-        "estatisticas-gerais",
-        user_and_tenant[0].id,
-        {}
-    )
-    
+    log_analytics_request("estatisticas-gerais", user_and_tenant[0].id, {})
+
     stats = queries.obter_estatisticas_gerais(db)
-    
+
     return stats
 
 
 @router.get("/ultimos-dias")
 def get_ultimos_dias(
-    quantidade: int = Query(
-        7,
-        ge=1,
-        le=90,
-        description="Quantidade de dias (1-90)"
-    ),
+    quantidade: int = Query(7, ge=1, le=90, description="Quantidade de dias (1-90)"),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ) -> List[Dict[str, Any]]:
     """
     📅 Histórico de vendas dos últimos N dias.
-    
+
     Retorna lista de resumos diários ordenados por data (mais recente primeiro):
     - Data
     - Métricas de vendas
     - Total vendido
     - Ticket médio
-    
+
     **Fonte de dados:** VendasResumoDiario (read model)
-    
+
     **Performance:** ~15ms para 30 dias
-    
+
     **Filtros:**
     - `quantidade`: Número de dias (1-90, padrão: 7)
-    
+
     **Uso comum:** Gráficos de tendência, análise temporal
-    
+
     Exemplo de resposta:
     ```json
     [
@@ -387,13 +366,11 @@ def get_ultimos_dias(
     ```
     """
     log_analytics_request(
-        "ultimos-dias",
-        user_and_tenant[0].id,
-        {"quantidade": quantidade}
+        "ultimos-dias", user_and_tenant[0].id, {"quantidade": quantidade}
     )
-    
+
     resumos = queries.obter_ultimos_dias(db, quantidade_dias=quantidade)
-    
+
     return resumos
 
 
@@ -402,73 +379,70 @@ def get_resumo_periodo(
     data_inicio: date = Query(..., description="Data inicial (YYYY-MM-DD)"),
     data_fim: date = Query(..., description="Data final (YYYY-MM-DD)"),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ) -> List[Dict[str, Any]]:
     """
     📆 Resumo de vendas para um período customizado.
-    
+
     Retorna lista de resumos diários no intervalo especificado:
     - Dados agregados por dia
     - Ordenados cronologicamente
-    
+
     **Fonte de dados:** VendasResumoDiario (read model)
-    
+
     **Performance:** ~20ms para 30 dias
-    
+
     **Validações:**
     - data_inicio <= data_fim
     - Intervalo máximo: 365 dias
-    
+
     **Parâmetros obrigatórios:**
     - `data_inicio`: Data inicial (inclusiva)
     - `data_fim`: Data final (inclusiva)
-    
+
     Exemplo de uso:
     ```
     GET /analytics/periodo?data_inicio=2026-01-01&data_fim=2026-01-31
     ```
     """
     validate_date_range(data_inicio, data_fim)
-    
+
     log_analytics_request(
         "periodo",
         user_and_tenant[0].id,
-        {"data_inicio": data_inicio, "data_fim": data_fim}
+        {"data_inicio": data_inicio, "data_fim": data_fim},
     )
-    
+
     resumos = queries.obter_resumo_periodo(db, data_inicio, data_fim)
-    
+
     return resumos
 
 
 @router.get("/comparativo-receita")
 def get_comparativo_receita(
     meses: int = Query(
-        6,
-        ge=2,
-        le=24,
-        description="Quantidade de meses para comparar (2-24)"
+        6, ge=2, le=24, description="Quantidade de meses para comparar (2-24)"
     ),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ) -> List[Dict[str, Any]]:
     """
     📊 Comparativo de receita dos últimos N meses.
-    
+
     Retorna lista de receitas mensais com:
     - Receita bruta, cancelada e líquida
     - Variação percentual em relação ao mês anterior
     - Tendência de crescimento
-    
+
     **Fonte de dados:** ReceitaMensal (read model)
-    
+
     **Performance:** ~15ms para 12 meses
-    
+
     **Filtros:**
     - `meses`: Quantidade de meses (2-24, padrão: 6)
-    
+
     **Uso comum:** Gráficos de evolução, projeções, análise de tendência
-    
+
     Exemplo de resposta:
     ```json
     [
@@ -491,13 +465,11 @@ def get_comparativo_receita(
     ```
     """
     log_analytics_request(
-        "comparativo-receita",
-        user_and_tenant[0].id,
-        {"meses": meses}
+        "comparativo-receita", user_and_tenant[0].id, {"meses": meses}
     )
-    
+
     comparativo = queries.obter_comparativo_mensal(db, meses=meses)
-    
+
     return comparativo
 
 
@@ -505,30 +477,29 @@ def get_comparativo_receita(
 def get_performance_funcionario(
     funcionario_id: int,
     mes_referencia: Optional[date] = Query(
-        None,
-        description="Primeiro dia do mês (YYYY-MM-01). Padrão: mês atual"
+        None, description="Primeiro dia do mês (YYYY-MM-01). Padrão: mês atual"
     ),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ) -> Dict[str, Any]:
     """
     👤 Performance individual de um funcionário.
-    
+
     Retorna métricas detalhadas de um funcionário específico:
     - Quantidade de vendas
     - Total vendido
     - Ticket médio
     - Taxa de cancelamento
     - Vendas canceladas
-    
+
     **Fonte de dados:** PerformanceParceiro (read model)
-    
+
     **Performance:** ~8ms
-    
+
     **Parâmetros:**
     - `funcionario_id`: ID do funcionário (path parameter)
     - `mes_referencia`: Mês desejado (query parameter, padrão: atual)
-    
+
     Exemplo de resposta:
     ```json
     {
@@ -545,39 +516,36 @@ def get_performance_funcionario(
     log_analytics_request(
         "performance-funcionario",
         user_and_tenant[0].id,
-        {"funcionario_id": funcionario_id, "mes_referencia": mes_referencia}
+        {"funcionario_id": funcionario_id, "mes_referencia": mes_referencia},
     )
-    
+
     performance = queries.obter_performance_funcionario(
-        db,
-        funcionario_id=funcionario_id,
-        mes_referencia=mes_referencia
+        db, funcionario_id=funcionario_id, mes_referencia=mes_referencia
     )
-    
+
     if not performance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Nenhuma performance encontrada para funcionário {funcionario_id}"
+            detail=f"Nenhuma performance encontrada para funcionário {funcionario_id}",
         )
-    
+
     return performance
 
 
 # ===== ENDPOINT DE SAÚDE =====
 
+
 @router.get("/health")
-def health_check(
-    db: Session = Depends(get_session)
-) -> Dict[str, str]:
+def health_check(db: Session = Depends(get_session)) -> Dict[str, str]:
     """
     🏥 Health check da API de analytics.
-    
+
     Verifica se:
     - Banco de dados está acessível
     - Read models estão disponíveis
-    
+
     **Não requer autenticação**
-    
+
     Retorna:
     ```json
     {
@@ -589,15 +557,13 @@ def health_check(
     try:
         # Testa acesso ao banco
         from app.read_models.models import VendasResumoDiario
+
         db.query(VendasResumoDiario).first()
-        
-        return {
-            "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat() + "Z"
-        }
+
+        return {"status": "healthy", "timestamp": datetime.utcnow().isoformat() + "Z"}
     except Exception as e:
         logger.error(f"❌ Health check falhou: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Analytics API indisponível"
+            detail="Analytics API indisponível",
         )

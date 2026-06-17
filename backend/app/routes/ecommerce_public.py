@@ -18,7 +18,14 @@ from app.tenancy.context import set_current_tenant
 
 router = APIRouter(prefix="/ecommerce", tags=["ecommerce-public"])
 _SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_CATALOG_ORDER_OPTIONS = {"prontos", "relevancia", "nome", "nome_asc", "menor_preco", "maior_preco"}
+_CATALOG_ORDER_OPTIONS = {
+    "prontos",
+    "relevancia",
+    "nome",
+    "nome_asc",
+    "menor_preco",
+    "maior_preco",
+}
 _CATALOG_ORDER_ALIASES = {
     "relevancia": "prontos",
     "nome_asc": "nome",
@@ -145,7 +152,9 @@ def _get_active_tenant(db: Session, tenant_ref: tuple[str, str]) -> Tenant:
     if kind == "id":
         tenant = db.query(Tenant).filter(Tenant.id == value).first()
     else:
-        tenant = db.query(Tenant).filter(func.lower(Tenant.ecommerce_slug) == value).first()
+        tenant = (
+            db.query(Tenant).filter(func.lower(Tenant.ecommerce_slug) == value).first()
+        )
 
     if not tenant:
         raise HTTPException(
@@ -200,12 +209,7 @@ def sugerir_tenants_por_localidade(
     if uf_norm:
         filtros.append(func.upper(Tenant.uf) == uf_norm)
 
-    candidates = (
-        db.query(Tenant)
-        .filter(*filtros)
-        .order_by(Tenant.name.asc())
-        .all()
-    )
+    candidates = db.query(Tenant).filter(*filtros).order_by(Tenant.name.asc()).all()
     tenants = [
         tenant
         for tenant in candidates
@@ -232,9 +236,9 @@ def buscar_tenant_por_slug(
             detail="Slug inválido. Use apenas letras minúsculas, números e hífens.",
         )
 
-    tenant = db.query(Tenant).filter(
-        func.lower(Tenant.ecommerce_slug) == slug_norm
-    ).first()
+    tenant = (
+        db.query(Tenant).filter(func.lower(Tenant.ecommerce_slug) == slug_norm).first()
+    )
 
     if not tenant:
         raise HTTPException(
@@ -377,8 +381,7 @@ def listar_produtos_publicos(
         categorias_query = categorias_query.filter(tem_imagem_expr)
 
     categorias = _serialize_catalog_categories(
-        categorias_query
-        .group_by(Produto.categoria_id, category_name_expr)
+        categorias_query.group_by(Produto.categoria_id, category_name_expr)
         .order_by(func.lower(category_name_expr).asc())
         .all()
     )
@@ -391,9 +394,13 @@ def listar_produtos_publicos(
     if ordenacao_normalizada == "nome":
         query = query.order_by(func.lower(Produto.nome).asc(), Produto.id.asc())
     elif ordenacao_normalizada == "menor_preco":
-        query = query.order_by(preco_catalogo.asc(), func.lower(Produto.nome).asc(), Produto.id.asc())
+        query = query.order_by(
+            preco_catalogo.asc(), func.lower(Produto.nome).asc(), Produto.id.asc()
+        )
     elif ordenacao_normalizada == "maior_preco":
-        query = query.order_by(preco_catalogo.desc(), func.lower(Produto.nome).asc(), Produto.id.asc())
+        query = query.order_by(
+            preco_catalogo.desc(), func.lower(Produto.nome).asc(), Produto.id.asc()
+        )
     else:
         query = query.order_by(
             prioridade_estoque.asc(),
@@ -412,40 +419,47 @@ def listar_produtos_publicos(
         "limit": limit,
         "categorias": categorias,
         "items": [
-            (lambda pricing, oferta: {
-                "id": produto.id,
-                "nome": produto.nome,
-                "codigo": produto.codigo,
-                "codigo_barras": produto.codigo_barras,
-                "preco_venda": pricing.regular_price,
-                "preco_promocional": pricing.promotional_price,
-                "promocao_ativa": pricing.promotion_active,
-                "promocao_origem": pricing.promotion_origin,
-                "promocao_validade": _serializar_promocao_validade(
-                    oferta,
-                    pricing.promotion_origin,
-                ),
-                "categoria_id": produto.categoria_id,
-                "categoria_nome": getattr(produto.categoria, "nome", None),
-                "marca_nome": getattr(produto.marca, "nome", None) if hasattr(produto, "marca") else None,
-                # Mantemos o campo por compatibilidade, mas com o mesmo saldo oficial.
-                "estoque_ecommerce": produto.estoque_atual,
-                "estoque_atual": produto.estoque_atual,
-                "imagem_principal": produto.imagem_principal,
-                "imagens": [
-                    {
-                        "id": imagem.id,
-                        "url": imagem.url,
-                        "ordem": imagem.ordem,
-                        "e_principal": imagem.e_principal,
-                    }
-                    for imagem in sorted(produto.imagens or [], key=lambda item: (item.ordem or 0, item.id or 0))
-                ],
-                "descricao": produto.descricao_curta or produto.descricao_completa,
-                "peso_embalagem": produto.peso_embalagem,
-                "classificacao_racao": produto.classificacao_racao,
-                "categoria_racao": produto.categoria_racao,
-            })(
+            (
+                lambda pricing, oferta: {
+                    "id": produto.id,
+                    "nome": produto.nome,
+                    "codigo": produto.codigo,
+                    "codigo_barras": produto.codigo_barras,
+                    "preco_venda": pricing.regular_price,
+                    "preco_promocional": pricing.promotional_price,
+                    "promocao_ativa": pricing.promotion_active,
+                    "promocao_origem": pricing.promotion_origin,
+                    "promocao_validade": _serializar_promocao_validade(
+                        oferta,
+                        pricing.promotion_origin,
+                    ),
+                    "categoria_id": produto.categoria_id,
+                    "categoria_nome": getattr(produto.categoria, "nome", None),
+                    "marca_nome": getattr(produto.marca, "nome", None)
+                    if hasattr(produto, "marca")
+                    else None,
+                    # Mantemos o campo por compatibilidade, mas com o mesmo saldo oficial.
+                    "estoque_ecommerce": produto.estoque_atual,
+                    "estoque_atual": produto.estoque_atual,
+                    "imagem_principal": produto.imagem_principal,
+                    "imagens": [
+                        {
+                            "id": imagem.id,
+                            "url": imagem.url,
+                            "ordem": imagem.ordem,
+                            "e_principal": imagem.e_principal,
+                        }
+                        for imagem in sorted(
+                            produto.imagens or [],
+                            key=lambda item: (item.ordem or 0, item.id or 0),
+                        )
+                    ],
+                    "descricao": produto.descricao_curta or produto.descricao_completa,
+                    "peso_embalagem": produto.peso_embalagem,
+                    "classificacao_racao": produto.classificacao_racao,
+                    "categoria_racao": produto.categoria_racao,
+                }
+            )(
                 resolver_preco_publico_produto(
                     produto,
                     canal_normalizado,
