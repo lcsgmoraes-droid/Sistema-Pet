@@ -1214,8 +1214,6 @@ async def exportar_vendas_pdf(
         logger.error(f"Erro ao buscar dados: {str(e)}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Erro ao buscar dados: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao buscar dados: {str(e)}")
 
     # Aplicar filtros se fornecidos
     if funcionario:
