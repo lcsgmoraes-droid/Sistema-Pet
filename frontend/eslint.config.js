@@ -13,15 +13,7 @@ export default [
   },
   js.configs.recommended,
   {
-    files: [
-      "scripts/**/*.{js,mjs,cjs}",
-      "src/api/**/*.{js,mjs,cjs}",
-      "src/components/**/*.{js,jsx,mjs,cjs}",
-      "src/helpers/**/*.{js,mjs,cjs}",
-      "src/hooks/**/*.{js,jsx,mjs,cjs}",
-      "src/pages/**/*.{js,jsx,mjs,cjs}",
-      "src/utils/**/*.{js,mjs,cjs}",
-    ],
+    files: ["scripts/**/*.{js,mjs,cjs}", "src/**/*.{js,jsx,mjs,cjs}"],
     languageOptions: {
       ecmaVersion: "latest",
       globals: sharedGlobals,

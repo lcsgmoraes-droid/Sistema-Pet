@@ -1,7 +1,7 @@
-const ACCESS_TOKEN_KEY = 'access_token';
-const REFRESH_TOKEN_KEY = 'refresh_token';
-const LEGACY_TOKEN_KEY = 'token';
-const TEMP_TOKEN_KEY = 'tempToken';
+const ACCESS_TOKEN_KEY = "access_token";
+const REFRESH_TOKEN_KEY = "refresh_token";
+const LEGACY_TOKEN_KEY = "token";
+const TEMP_TOKEN_KEY = "tempToken";
 
 const getSessionStorage = () => {
   try {
@@ -38,7 +38,6 @@ const persistRefreshToken = (token) => {
 };
 
 const hydrateTokenFromLocalStorage = (key) => {
-  const session = getSessionStorage();
   const local = getLocalStorage();
   if (!local) {
     return null;
@@ -59,7 +58,9 @@ export const getAccessToken = () => {
     return token;
   }
 
-  return hydrateTokenFromLocalStorage(ACCESS_TOKEN_KEY) || hydrateTokenFromLocalStorage(LEGACY_TOKEN_KEY);
+  return (
+    hydrateTokenFromLocalStorage(ACCESS_TOKEN_KEY) || hydrateTokenFromLocalStorage(LEGACY_TOKEN_KEY)
+  );
 };
 
 export const setAccessToken = (token) => {

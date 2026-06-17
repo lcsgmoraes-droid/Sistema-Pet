@@ -1,16 +1,22 @@
 /**
  * AuthContext - gerenciamento global de autenticacao.
  */
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import api from '../api';
-import { clearAuthTokens, getAccessToken, setAccessToken, setRefreshToken, setTempToken } from '../auth/tokenStorage';
+import { createContext, useContext, useEffect, useState } from "react";
+import api from "../api";
+import {
+  clearAuthTokens,
+  getAccessToken,
+  setAccessToken,
+  setRefreshToken,
+  setTempToken,
+} from "../auth/tokenStorage";
 
 const AuthContext = createContext();
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth deve ser usado dentro de AuthProvider');
+    throw new Error("useAuth deve ser usado dentro de AuthProvider");
   }
   return context;
 };
@@ -23,20 +29,20 @@ export const AuthProvider = ({ children }) => {
     const initAuth = async () => {
       try {
         const token = getAccessToken();
-        const savedUser = localStorage.getItem('user');
+        const savedUser = localStorage.getItem("user");
 
         if (token && savedUser) {
           await fetchUser();
         } else {
           if (!token) {
-            localStorage.removeItem('user');
-            localStorage.removeItem('tenants');
-            localStorage.removeItem('selectedTenant');
+            localStorage.removeItem("user");
+            localStorage.removeItem("tenants");
+            localStorage.removeItem("selectedTenant");
           }
           setLoading(false);
         }
       } catch (error) {
-        console.error('Erro ao inicializar auth:', error);
+        console.error("Erro ao inicializar auth:", error);
         setLoading(false);
       }
     };
@@ -46,22 +52,22 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUser = async () => {
     try {
-      const response = await api.get('/auth/me-multitenant');
+      const response = await api.get("/auth/me-multitenant");
       setUser(response.data);
-      localStorage.setItem('user', JSON.stringify(response.data));
+      localStorage.setItem("user", JSON.stringify(response.data));
       setLoading(false);
     } catch (error) {
       const status = error.response?.status;
       if (status === 401 || status === 403) {
-        console.warn('Sessao expirada ou tenant invalido. Limpando autenticacao local.');
+        console.warn("Sessao expirada ou tenant invalido. Limpando autenticacao local.");
         clearAuthTokens();
-        localStorage.removeItem('tenants');
-        localStorage.removeItem('user');
-        localStorage.removeItem('selectedTenant');
+        localStorage.removeItem("tenants");
+        localStorage.removeItem("user");
+        localStorage.removeItem("selectedTenant");
         setUser(null);
       } else {
-        console.error('Erro ao buscar usuario:', error);
-        const savedUser = localStorage.getItem('user');
+        console.error("Erro ao buscar usuario:", error);
+        const savedUser = localStorage.getItem("user");
         if (savedUser) {
           try {
             setUser(JSON.parse(savedUser));
@@ -80,16 +86,16 @@ export const AuthProvider = ({ children }) => {
     if (!accessToken || !tenants || tenants.length === 0) {
       return {
         success: false,
-        error: 'Nenhuma empresa disponivel para este usuario',
+        error: "Nenhuma empresa disponivel para este usuario",
       };
     }
 
     setTempToken(accessToken);
 
     const selectResponse = await api.post(
-      '/auth/select-tenant',
+      "/auth/select-tenant",
       { tenant_id: tenants[0].id },
-      { headers: { Authorization: `Bearer ${accessToken}` } }
+      { headers: { Authorization: `Bearer ${accessToken}` } },
     );
 
     const finalToken = selectResponse.data.access_token;
@@ -98,25 +104,25 @@ export const AuthProvider = ({ children }) => {
     if (finalRefreshToken) {
       setRefreshToken(finalRefreshToken);
     }
-    localStorage.setItem('selectedTenant', JSON.stringify(tenants[0]));
+    localStorage.setItem("selectedTenant", JSON.stringify(tenants[0]));
 
-    const userResponse = await api.get('/auth/me-multitenant');
+    const userResponse = await api.get("/auth/me-multitenant");
     setUser(userResponse.data);
-    localStorage.setItem('user', JSON.stringify(userResponse.data));
+    localStorage.setItem("user", JSON.stringify(userResponse.data));
 
     return { success: true };
   };
 
   const login = async (email, password) => {
     try {
-      const response = await api.post('/auth/login-multitenant', { email, password });
+      const response = await api.post("/auth/login-multitenant", { email, password });
       const { access_token, tenants } = response.data;
       return await completeTenantSelection(access_token, tenants);
     } catch (error) {
-      console.error('Erro no login:', error);
+      console.error("Erro no login:", error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Erro ao fazer login',
+        error: error.response?.data?.detail || "Erro ao fazer login",
       };
     }
   };
@@ -126,13 +132,13 @@ export const AuthProvider = ({ children }) => {
     password,
     nome,
     nome_loja,
-    plan = 'basico',
-    organization_type = 'petshop',
+    plan = "basico",
+    organization_type = "petshop",
     accepted_terms,
     accepted_privacy,
   }) => {
     try {
-      const response = await api.post('/auth/register', {
+      const response = await api.post("/auth/register", {
         email,
         password,
         nome,
@@ -154,26 +160,26 @@ export const AuthProvider = ({ children }) => {
       const { access_token, tenants } = response.data;
       return await completeTenantSelection(access_token, tenants);
     } catch (error) {
-      console.error('Erro no registro:', error);
+      console.error("Erro no registro:", error);
       return {
         success: false,
-        error: error.response?.data?.detail || 'Erro ao criar conta',
+        error: error.response?.data?.detail || "Erro ao criar conta",
       };
     }
   };
 
   const logout = async () => {
     try {
-      await api.post('/auth/logout-multitenant');
+      await api.post("/auth/logout-multitenant");
     } catch (error) {
-      console.error('Erro ao fazer logout:', error);
+      console.error("Erro ao fazer logout:", error);
     } finally {
       clearAuthTokens();
-      localStorage.removeItem('tenants');
-      localStorage.removeItem('user');
-      localStorage.removeItem('selectedTenant');
+      localStorage.removeItem("tenants");
+      localStorage.removeItem("user");
+      localStorage.removeItem("selectedTenant");
       setUser(null);
-      window.location.href = '/login';
+      window.location.href = "/login";
     }
   };
 
