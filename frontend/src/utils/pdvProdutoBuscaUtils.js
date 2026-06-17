@@ -14,7 +14,9 @@ const CAMPOS_CODIGO_PRODUTO = [
 ];
 
 export function normalizarCodigoProdutoBusca(valor) {
-  return String(valor ?? "").trim().toLowerCase();
+  return String(valor ?? "")
+    .trim()
+    .toLowerCase();
 }
 
 export function apenasDigitos(valor) {
@@ -39,9 +41,7 @@ export function encontrarProdutoPorCodigo(produtos, termo) {
 
         const codigoDigitos = apenasDigitos(codigo);
         return (
-          termoDigitos.length >= 6 &&
-          codigoDigitos.length >= 6 &&
-          codigoDigitos === termoDigitos
+          termoDigitos.length >= 6 && codigoDigitos.length >= 6 && codigoDigitos === termoDigitos
         );
       }),
     ) || null

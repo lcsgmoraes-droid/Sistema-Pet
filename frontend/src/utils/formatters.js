@@ -16,7 +16,7 @@
  */
 export function formatBRL(value) {
   const num = parseFloat(value) || 0;
-  return num.toLocaleString('pt-BR', {
+  return num.toLocaleString("pt-BR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -38,8 +38,10 @@ export function formatMoneyBRL(value) {
  */
 export function formatPercent(value) {
   const num = parseFloat(value) || 0;
-  return num.toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }) + '%';
+  return (
+    num.toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }) + "%"
+  );
 }

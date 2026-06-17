@@ -51,10 +51,7 @@ export function extrairAcaoCorrecaoFiscal(error) {
 
   if (!validacao || typeof validacao !== "object") return null;
 
-  const pendencias = [
-    ...(validacao.bloqueios || []),
-    ...(validacao.correcoes || []),
-  ];
+  const pendencias = [...(validacao.bloqueios || []), ...(validacao.correcoes || [])];
   const pendenciaProduto = pendencias.find((item) => item?.produto_id);
 
   if (!pendenciaProduto) return null;

@@ -30,10 +30,7 @@ function deveReduzirMovimento() {
   );
 }
 
-export function painelFlutuantePrecisaRevelar(
-  rect,
-  { margin = 24, viewportHeight } = {},
-) {
+export function painelFlutuantePrecisaRevelar(rect, { margin = 24, viewportHeight } = {}) {
   const alturaViewport = obterAlturaViewport(viewportHeight);
 
   if (!rect || !alturaViewport) {

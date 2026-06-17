@@ -1,16 +1,18 @@
+import { useCallback, useState } from "react";
+
 /**
  * Google Maps Loader - Etapa 9.1
- * 
+ *
  * Carrega o Google Maps API dinamicamente quando necessário.
  * Evita carregar a API na inicialização do app.
- * 
+ *
  * Uso:
  * ```javascript
  * import { loadGoogleMaps, isGoogleMapsLoaded } from '@/utils/googleMaps';
- * 
+ *
  * // Carregar antes de usar
  * await loadGoogleMaps();
- * 
+ *
  * // Verificar se já está carregado
  * if (isGoogleMapsLoaded()) {
  *   // Usar google.maps...
@@ -27,12 +29,12 @@ let loadPromise = null;
  * Verifica se o Google Maps já está carregado
  */
 export function isGoogleMapsLoaded() {
-  return isLoaded && typeof window.google !== 'undefined' && window.google.maps;
+  return isLoaded && typeof window.google !== "undefined" && window.google.maps;
 }
 
 /**
  * Carrega o Google Maps API dinamicamente
- * 
+ *
  * @returns {Promise<void>} Promise que resolve quando o Maps estiver carregado
  * @throws {Error} Se a API Key não estiver configurada
  */
@@ -49,19 +51,21 @@ export async function loadGoogleMaps() {
 
   // Pega a API Key do ambiente
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  
-  if (!apiKey || apiKey === 'your_google_maps_api_key_here') {
-    console.warn('[Google Maps] API Key não configurada. Configure VITE_GOOGLE_MAPS_API_KEY no arquivo .env');
-    throw new Error('Google Maps API Key não configurada');
+
+  if (!apiKey || apiKey === "your_google_maps_api_key_here") {
+    console.warn(
+      "[Google Maps] API Key não configurada. Configure VITE_GOOGLE_MAPS_API_KEY no arquivo .env",
+    );
+    throw new Error("Google Maps API Key não configurada");
   }
 
   // Inicia o carregamento
   isLoading = true;
-  
+
   loadPromise = new Promise((resolve, reject) => {
     try {
       // Cria o elemento script
-      const script = document.createElement('script');
+      const script = document.createElement("script");
       script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
       script.async = true;
       script.defer = true;
@@ -70,22 +74,22 @@ export async function loadGoogleMaps() {
       script.onload = () => {
         isLoaded = true;
         isLoading = false;
-        console.log('[Google Maps] API carregada com sucesso');
+        console.log("[Google Maps] API carregada com sucesso");
         resolve();
       };
 
       // Callback de erro
       script.onerror = (error) => {
         isLoading = false;
-        console.error('[Google Maps] Erro ao carregar API:', error);
-        reject(new Error('Falha ao carregar Google Maps API'));
+        console.error("[Google Maps] Erro ao carregar API:", error);
+        reject(new Error("Falha ao carregar Google Maps API"));
       };
 
       // Adiciona o script ao head
       document.head.appendChild(script);
     } catch (error) {
       isLoading = false;
-      console.error('[Google Maps] Erro ao criar script:', error);
+      console.error("[Google Maps] Erro ao criar script:", error);
       reject(error);
     }
   });
@@ -95,21 +99,21 @@ export async function loadGoogleMaps() {
 
 /**
  * Hook React para carregar Google Maps
- * 
+ *
  * @returns {Object} { isLoaded, isLoading, error, load }
  */
 export function useGoogleMaps() {
-  const [state, setState] = React.useState({
+  const [state, setState] = useState({
     isLoaded: isGoogleMapsLoaded(),
     isLoading: false,
-    error: null
+    error: null,
   });
 
-  const load = React.useCallback(async () => {
+  const load = useCallback(async () => {
     if (state.isLoaded) return;
-    
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
-    
+
+    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
     try {
       await loadGoogleMaps();
       setState({ isLoaded: true, isLoading: false, error: null });
@@ -134,5 +138,5 @@ export default {
   loadGoogleMaps,
   isGoogleMapsLoaded,
   useGoogleMaps,
-  resetGoogleMapsLoader
+  resetGoogleMapsLoader,
 };

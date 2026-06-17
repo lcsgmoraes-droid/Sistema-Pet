@@ -142,11 +142,9 @@ function isCloseControl(element) {
   if (element.hasAttribute("data-modal-close")) return true;
 
   const label = normalizeText(
-    [
-      element.getAttribute("aria-label"),
-      element.getAttribute("title"),
-      element.textContent,
-    ].filter(Boolean).join(" "),
+    [element.getAttribute("aria-label"), element.getAttribute("title"), element.textContent]
+      .filter(Boolean)
+      .join(" "),
   );
 
   if (!label) return false;
@@ -159,11 +157,9 @@ function isLikelyHeaderCloseIcon(element, root) {
   }
 
   const label = normalizeText(
-    [
-      element.getAttribute("aria-label"),
-      element.getAttribute("title"),
-      element.textContent,
-    ].filter(Boolean).join(" "),
+    [element.getAttribute("aria-label"), element.getAttribute("title"), element.textContent]
+      .filter(Boolean)
+      .join(" "),
   );
 
   if (label || !element.querySelector("svg")) return false;

@@ -1,27 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {
-  painelFlutuantePrecisaRevelar,
-  revelarPainelFlutuante,
-} from "./floatingPanelReveal.js";
+import { painelFlutuantePrecisaRevelar, revelarPainelFlutuante } from "./floatingPanelReveal.js";
 
 test("painelFlutuantePrecisaRevelar detecta painel abaixo da area visivel", () => {
   assert.equal(
-    painelFlutuantePrecisaRevelar(
-      { top: 720, bottom: 940 },
-      { viewportHeight: 800, margin: 24 },
-    ),
+    painelFlutuantePrecisaRevelar({ top: 720, bottom: 940 }, { viewportHeight: 800, margin: 24 }),
     true,
   );
 });
 
 test("painelFlutuantePrecisaRevelar ignora painel ja visivel", () => {
   assert.equal(
-    painelFlutuantePrecisaRevelar(
-      { top: 240, bottom: 520 },
-      { viewportHeight: 800, margin: 24 },
-    ),
+    painelFlutuantePrecisaRevelar({ top: 240, bottom: 520 }, { viewportHeight: 800, margin: 24 }),
     false,
   );
 });

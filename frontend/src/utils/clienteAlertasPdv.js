@@ -13,9 +13,7 @@ function normalizePriority(value) {
 function normalizeActive(value) {
   if (typeof value === "boolean") return value;
   if (typeof value === "string") {
-    return !["0", "false", "nao", "não", "no"].includes(
-      value.trim().toLowerCase(),
-    );
+    return !["0", "false", "nao", "não", "no"].includes(value.trim().toLowerCase());
   }
   return value !== false;
 }
@@ -36,10 +34,7 @@ export function normalizeClienteAlertasPdv(value) {
     .filter((item) => item && typeof item === "object")
     .map((item) => {
       const titulo = cleanText(item.titulo || item.tag || item.label, 80);
-      const mensagem = cleanText(
-        item.mensagem || item.observacao || item.descricao,
-        500,
-      );
+      const mensagem = cleanText(item.mensagem || item.observacao || item.descricao, 500);
 
       if (!titulo && !mensagem) return null;
 
@@ -54,9 +49,7 @@ export function normalizeClienteAlertasPdv(value) {
 }
 
 export function getClienteAlertasPdvAtivos(cliente) {
-  return normalizeClienteAlertasPdv(cliente?.alertas_pdv).filter(
-    (alerta) => alerta.ativo,
-  );
+  return normalizeClienteAlertasPdv(cliente?.alertas_pdv).filter((alerta) => alerta.ativo);
 }
 
 export function clienteTemAlertasPdv(cliente) {

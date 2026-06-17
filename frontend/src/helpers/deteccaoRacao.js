@@ -1,10 +1,10 @@
 /**
  * Helper para Detecção de Produtos de Ração
  * ==========================================
- * 
+ *
  * Centraliza a lógica de detecção de ração em um único lugar.
  * Reutilizável em PDV, Calculadora, Relatórios, etc.
- * 
+ *
  * REGRA ÚNICA:
  * Um produto é considerado "ração" se:
  * - Nome da categoria contém "ração" ou "racao" (case-insensitive)
@@ -19,12 +19,12 @@
 export function ehRacao(produto) {
   if (!produto) return false;
 
-  if (typeof produto.eh_racao === 'boolean') {
+  if (typeof produto.eh_racao === "boolean") {
     return produto.eh_racao;
   }
 
-  const tipo = (produto.tipo || '').toString().toLowerCase();
-  if (tipo === 'ração' || tipo === 'racao') {
+  const tipo = (produto.tipo || "").toString().toLowerCase();
+  if (tipo === "ração" || tipo === "racao") {
     return true;
   }
 
@@ -35,17 +35,17 @@ export function ehRacao(produto) {
   }
 
   // 🔄 FALLBACK: Se não tiver peso_embalagem, verificar classificação ou categoria
-  const classificacao = produto.classificacao_racao?.toLowerCase() || '';
+  const classificacao = produto.classificacao_racao?.toLowerCase() || "";
   const categoriaId = produto.categoria_id || produto.category_id;
-  const nomeCategoria = produto.categoria_nome?.toLowerCase() || '';
+  const nomeCategoria = produto.categoria_nome?.toLowerCase() || "";
 
   return (
     (classificacao &&
-      classificacao !== 'não é ração' &&
-      classificacao !== 'nao' &&
-      classificacao !== 'não') ||
-    nomeCategoria.includes('ração') ||
-    nomeCategoria.includes('racao') ||
+      classificacao !== "não é ração" &&
+      classificacao !== "nao" &&
+      classificacao !== "não") ||
+    nomeCategoria.includes("ração") ||
+    nomeCategoria.includes("racao") ||
     categoriaId === 5 // ID da categoria de ração (ajustar conforme BD)
   );
 }
@@ -57,7 +57,7 @@ export function ehRacao(produto) {
  */
 export function filtrarRacoes(itens) {
   if (!Array.isArray(itens)) return [];
-  return itens.filter(item => ehRacao(item));
+  return itens.filter((item) => ehRacao(item));
 }
 
 /**
@@ -83,5 +83,5 @@ export default {
   ehRacao,
   filtrarRacoes,
   obterUltimaRacao,
-  contarRacoes
+  contarRacoes,
 };

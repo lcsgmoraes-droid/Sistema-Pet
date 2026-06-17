@@ -6,13 +6,13 @@ export const STATUS_DEVOLUCAO_DIRETA = new Set([
 ]);
 
 export function normalizarStatusVenda(status) {
-  return String(status || "").trim().toLowerCase();
+  return String(status || "")
+    .trim()
+    .toLowerCase();
 }
 
 export function podeAbrirDevolucaoVenda(venda) {
-  return Boolean(
-    venda?.id && STATUS_DEVOLUCAO_DIRETA.has(normalizarStatusVenda(venda.status)),
-  );
+  return Boolean(venda?.id && STATUS_DEVOLUCAO_DIRETA.has(normalizarStatusVenda(venda.status)));
 }
 
 export function getNumeroVendaParaExibicao(venda) {
