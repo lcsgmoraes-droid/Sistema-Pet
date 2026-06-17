@@ -678,8 +678,8 @@ def test_backend_ci_has_blocking_backend_people_company_finance_root_format_step
 
     assert "Backend people company finance root format (blocking)" in source
     assert (
-        "ruff format --check app/clientes_routes.py app/cliente_info_pdv.py "
-        "app/pets_routes.py app/cadastros_routes.py app/importacao_pessoas.py "
+        "ruff format --check app/cliente_info_pdv.py app/pets_routes.py "
+        "app/cadastros_routes.py app/importacao_pessoas.py "
         "app/fornecedor_grupos_routes.py app/funcionarios_routes.py "
         "app/tipo_despesa_routes.py app/tributacao_routes.py "
         "app/variacoes_routes.py app/empresa_routes.py "

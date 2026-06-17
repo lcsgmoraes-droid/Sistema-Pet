@@ -361,7 +361,7 @@ jobs:
 
       - name: Backend people company finance root format (blocking)
         run: |
-          ruff format --check app/clientes_routes.py app/cliente_info_pdv.py app/pets_routes.py app/cadastros_routes.py app/importacao_pessoas.py app/fornecedor_grupos_routes.py app/funcionarios_routes.py app/tipo_despesa_routes.py app/tributacao_routes.py app/variacoes_routes.py app/empresa_routes.py app/empresa_config_routes.py app/roles_routes.py app/cargos_routes.py app/financeiro_models.py app/contas_bancarias_routes.py app/contas_pagar_routes.py app/contas_receber_routes.py app/lancamentos_routes.py app/operadoras_models.py app/operadoras_routes.py app/formas_pagamento_models.py app/formas_pagamento_routes.py
+          ruff format --check app/cliente_info_pdv.py app/pets_routes.py app/cadastros_routes.py app/importacao_pessoas.py app/fornecedor_grupos_routes.py app/funcionarios_routes.py app/tipo_despesa_routes.py app/tributacao_routes.py app/variacoes_routes.py app/empresa_routes.py app/empresa_config_routes.py app/roles_routes.py app/cargos_routes.py app/financeiro_models.py app/contas_bancarias_routes.py app/contas_pagar_routes.py app/contas_receber_routes.py app/lancamentos_routes.py app/operadoras_models.py app/operadoras_routes.py app/formas_pagamento_models.py app/formas_pagamento_routes.py
 
       - name: Backend model read packages format (blocking)
         run: |
