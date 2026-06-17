@@ -4,7 +4,11 @@ from contextlib import contextmanager
 from typing import Iterator
 from uuid import UUID
 
-from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
+from app.tenancy.context import (
+    clear_current_tenant,
+    get_current_tenant,
+    set_current_tenant,
+)
 
 
 @contextmanager
