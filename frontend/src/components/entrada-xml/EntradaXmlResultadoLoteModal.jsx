@@ -1,23 +1,17 @@
-import PropTypes from 'prop-types';
+import PropTypes from "prop-types";
 
-function EntradaXmlResultadoLoteModal({
-  aberto,
-  onClose,
-  resultadoLote,
-  uploadingLote,
-}) {
+function EntradaXmlResultadoLoteModal({ aberto, onClose, resultadoLote, uploadingLote }) {
   if (!aberto) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-6">
-          <h2 className="text-2xl font-bold">
-            Resultado do Processamento em Lote
-          </h2>
+          <h2 className="text-2xl font-bold">Resultado do Processamento em Lote</h2>
           {resultadoLote && (
             <p className="mt-2">
-              {resultadoLote.sucessos} sucesso(s) | {resultadoLote.erros} erro(s) | Total: {resultadoLote.total_arquivos}
+              {resultadoLote.sucessos} sucesso(s) | {resultadoLote.erros} erro(s) | Total:{" "}
+              {resultadoLote.total_arquivos}
             </p>
           )}
         </div>
@@ -34,7 +28,9 @@ function EntradaXmlResultadoLoteModal({
             <>
               <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="bg-gray-100 rounded-lg p-4 text-center">
-                  <div className="text-3xl font-bold text-blue-600">{resultadoLote.total_arquivos}</div>
+                  <div className="text-3xl font-bold text-blue-600">
+                    {resultadoLote.total_arquivos}
+                  </div>
                   <div className="text-sm text-gray-600">Total</div>
                 </div>
                 <div className="bg-green-50 rounded-lg p-4 text-center">
@@ -50,27 +46,26 @@ function EntradaXmlResultadoLoteModal({
               <div className="space-y-3">
                 {resultadoLote.resultados.map((resultado, idx) => (
                   <div
-                    key={`${resultado.arquivo || 'resultado'}-${idx}`}
+                    key={`${resultado.arquivo || "resultado"}-${idx}`}
                     className={`border rounded-lg p-4 ${
                       resultado.sucesso
-                        ? 'bg-green-50 border-green-200'
-                        : 'bg-red-50 border-red-200'
+                        ? "bg-green-50 border-green-200"
+                        : "bg-red-50 border-red-200"
                     }`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className={`rounded px-2 py-1 text-xs font-semibold ${
-                            resultado.sucesso
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-700'
-                          }`}
+                          <span
+                            className={`rounded px-2 py-1 text-xs font-semibold ${
+                              resultado.sucesso
+                                ? "bg-green-100 text-green-700"
+                                : "bg-red-100 text-red-700"
+                            }`}
                           >
-                            {resultado.sucesso ? 'OK' : 'ERRO'}
+                            {resultado.sucesso ? "OK" : "ERRO"}
                           </span>
-                          <span className="font-semibold text-gray-800">
-                            {resultado.arquivo}
-                          </span>
+                          <span className="font-semibold text-gray-800">{resultado.arquivo}</span>
                         </div>
 
                         {resultado.sucesso ? (
@@ -85,7 +80,8 @@ function EntradaXmlResultadoLoteModal({
                               <strong>Valor:</strong> R$ {resultado.valor_total?.toFixed(2)}
                             </p>
                             <p className="text-gray-700">
-                              <strong>Produtos:</strong> {resultado.produtos_vinculados} vinculados, {resultado.produtos_nao_vinculados} nao vinculados
+                              <strong>Produtos:</strong> {resultado.produtos_vinculados} vinculados,{" "}
+                              {resultado.produtos_nao_vinculados} nao vinculados
                             </p>
                           </div>
                         ) : (
@@ -107,7 +103,7 @@ function EntradaXmlResultadoLoteModal({
             disabled={uploadingLote}
             className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold disabled:opacity-50 transition-colors"
           >
-            {uploadingLote ? 'Processando...' : 'Fechar'}
+            {uploadingLote ? "Processando..." : "Fechar"}
           </button>
         </div>
       </div>

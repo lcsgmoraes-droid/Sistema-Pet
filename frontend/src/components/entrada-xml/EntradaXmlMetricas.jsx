@@ -1,16 +1,10 @@
-import PropTypes from 'prop-types';
-import MetricCard from '../ui/MetricCard';
-import MetricGrid from '../ui/MetricGrid';
+import PropTypes from "prop-types";
+import MetricCard from "../ui/MetricCard";
+import MetricGrid from "../ui/MetricGrid";
 
-function FiltroMetricCard({
-  intent,
-  label,
-  onClick,
-  subtitle,
-  value,
-}) {
+function FiltroMetricCard({ intent, label, onClick, subtitle, value }) {
   const handleKeyDown = (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
+    if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       onClick();
     }
@@ -41,18 +35,11 @@ FiltroMetricCard.defaultProps = {
   subtitle: undefined,
 };
 
-export default function EntradaXmlMetricas({
-  formatMoneyBRL,
-  notasEntrada,
-  onFiltroStatus,
-}) {
+export default function EntradaXmlMetricas({ formatMoneyBRL, notasEntrada, onFiltroStatus }) {
   const totalNotas = notasEntrada.length;
-  const pendentes = notasEntrada.filter((nota) => nota.status === 'pendente').length;
-  const conciliadas = notasEntrada.filter((nota) => nota.status === 'processada');
-  const valorConciliado = conciliadas.reduce(
-    (total, nota) => total + (nota.valor_total || 0),
-    0,
-  );
+  const pendentes = notasEntrada.filter((nota) => nota.status === "pendente").length;
+  const conciliadas = notasEntrada.filter((nota) => nota.status === "processada");
+  const valorConciliado = conciliadas.reduce((total, nota) => total + (nota.valor_total || 0), 0);
 
   return (
     <MetricGrid className="mb-6">
@@ -61,21 +48,21 @@ export default function EntradaXmlMetricas({
         label="Total de notas"
         value={totalNotas}
         subtitle="Todas as importacoes"
-        onClick={() => onFiltroStatus('todos')}
+        onClick={() => onFiltroStatus("todos")}
       />
       <FiltroMetricCard
         intent="amber"
         label="Pendentes"
         value={pendentes}
         subtitle="Aguardando conferencia"
-        onClick={() => onFiltroStatus('pendente')}
+        onClick={() => onFiltroStatus("pendente")}
       />
       <FiltroMetricCard
         intent="emerald"
         label="Conciliadas"
         value={conciliadas.length}
         subtitle="Entrada ja processada"
-        onClick={() => onFiltroStatus('processada')}
+        onClick={() => onFiltroStatus("processada")}
       />
       <MetricCard
         intent="violet"
@@ -89,9 +76,11 @@ export default function EntradaXmlMetricas({
 
 EntradaXmlMetricas.propTypes = {
   formatMoneyBRL: PropTypes.func.isRequired,
-  notasEntrada: PropTypes.arrayOf(PropTypes.shape({
-    status: PropTypes.string,
-    valor_total: PropTypes.number,
-  })).isRequired,
+  notasEntrada: PropTypes.arrayOf(
+    PropTypes.shape({
+      status: PropTypes.string,
+      valor_total: PropTypes.number,
+    }),
+  ).isRequired,
   onFiltroStatus: PropTypes.func.isRequired,
 };

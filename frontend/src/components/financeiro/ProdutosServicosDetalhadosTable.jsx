@@ -68,21 +68,12 @@ function criarLinhaTotal(linhas = []) {
 
   return {
     bruto: linhas.reduce((sum, categoria) => sum + Number(categoria.total_bruto || 0), 0),
-    desconto: linhas.reduce(
-      (sum, categoria) => sum + Number(categoria.total_desconto || 0),
-      0,
-    ),
+    desconto: linhas.reduce((sum, categoria) => sum + Number(categoria.total_desconto || 0), 0),
     key: "total-geral",
-    liquido: linhas.reduce(
-      (sum, categoria) => sum + Number(categoria.total_liquido || 0),
-      0,
-    ),
+    liquido: linhas.reduce((sum, categoria) => sum + Number(categoria.total_liquido || 0), 0),
     level: 0,
     nome: "TOTAL GERAL",
-    quantidade: linhas.reduce(
-      (sum, categoria) => sum + Number(categoria.total_quantidade || 0),
-      0,
-    ),
+    quantidade: linhas.reduce((sum, categoria) => sum + Number(categoria.total_quantidade || 0), 0),
     type: "total",
   };
 }
@@ -93,10 +84,7 @@ function nomeClassName(item) {
   return [padding, tone].filter(Boolean).join(" ");
 }
 
-export default function ProdutosServicosDetalhadosTable({
-  linhas = [],
-  linhasTotal = [],
-}) {
+export default function ProdutosServicosDetalhadosTable({ linhas = [], linhasTotal = [] }) {
   const linhaTotal = criarLinhaTotal(linhasTotal);
   const data = linhaTotal ? [...criarLinhas(linhas), linhaTotal] : criarLinhas(linhas);
 

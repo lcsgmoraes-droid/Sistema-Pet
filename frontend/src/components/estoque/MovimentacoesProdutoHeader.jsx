@@ -101,7 +101,9 @@ function KitNotice({ produto }) {
 function MetricCard({ children, className = "", label, sublabel, value }) {
   return (
     <div className={`rounded-xl border p-3 shadow-sm ${className}`}>
-      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">{label}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-80">
+        {label}
+      </div>
       <div className="mt-2 text-2xl font-black">{value}</div>
       {sublabel ? <div className="mt-1 text-[11px] opacity-70">{sublabel}</div> : null}
       {children}
@@ -153,13 +155,17 @@ export default function MovimentacoesProdutoHeader({
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               </button>
 
-              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${estoqueVisual.heroIconBg}`}>
+              <div
+                className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${estoqueVisual.heroIconBg}`}
+              >
                 <Boxes className={`h-6 w-6 ${estoqueVisual.heroIconColor}`} aria-hidden="true" />
               </div>
 
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-black tracking-tight text-slate-900">{produto.nome}</h1>
+                  <h1 className="text-2xl font-black tracking-tight text-slate-900">
+                    {produto.nome}
+                  </h1>
                   {mostrarControlesBling ? (
                     <span
                       className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
@@ -174,17 +180,24 @@ export default function MovimentacoesProdutoHeader({
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-600">
                   <div>
                     Codigo:{" "}
-                    <span className="font-mono font-medium text-slate-900">{produto.codigo || produto.sku}</span>
+                    <span className="font-mono font-medium text-slate-900">
+                      {produto.codigo || produto.sku}
+                    </span>
                   </div>
                   {produto.codigo_barras ? (
                     <div>
-                      EAN: <span className="font-mono font-medium text-slate-900">{produto.codigo_barras}</span>
+                      EAN:{" "}
+                      <span className="font-mono font-medium text-slate-900">
+                        {produto.codigo_barras}
+                      </span>
                     </div>
                   ) : null}
                   {mostrarControlesBling && syncDisponivel ? (
                     <div>
                       Bling ID:{" "}
-                      <span className="font-mono font-medium text-slate-900">{syncProduto?.bling_produto_id}</span>
+                      <span className="font-mono font-medium text-slate-900">
+                        {syncProduto?.bling_produto_id}
+                      </span>
                     </div>
                   ) : null}
                 </div>
@@ -202,7 +215,12 @@ export default function MovimentacoesProdutoHeader({
                     </ActionButton>
 
                     {podeLancarGranel ? (
-                      <ActionButton icon={PackageOpen} intent="warning" onClick={onLancarGranel} tone="soft">
+                      <ActionButton
+                        icon={PackageOpen}
+                        intent="warning"
+                        onClick={onLancarGranel}
+                        tone="soft"
+                      >
                         Lancar granel
                       </ActionButton>
                     ) : null}
@@ -269,22 +287,33 @@ export default function MovimentacoesProdutoHeader({
               >
                 Reservado
               </div>
-              <div className={`mt-2 text-2xl font-black ${estoqueReservado > 0 ? "text-amber-700" : "text-slate-400"}`}>
+              <div
+                className={`mt-2 text-2xl font-black ${estoqueReservado > 0 ? "text-amber-700" : "text-slate-400"}`}
+              >
                 {formatarQuantidade(estoqueReservado)}
               </div>
               <div className="mt-1 text-[11px] text-slate-500">
-                {estoqueReservado > 0 ? (loadingReservas ? "Carregando pedidos..." : "Pedidos em aberto") : unidade}
+                {estoqueReservado > 0
+                  ? loadingReservas
+                    ? "Carregando pedidos..."
+                    : "Pedidos em aberto"
+                  : unidade}
               </div>
             </button>
 
-            <div className={`rounded-xl border p-3 shadow-sm sm:col-span-2 ${disponivelVisual.card}`}>
+            <div
+              className={`rounded-xl border p-3 shadow-sm sm:col-span-2 ${disponivelVisual.card}`}
+            >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className={`text-[10px] font-semibold uppercase tracking-[0.18em] ${disponivelVisual.label}`}>
+                  <div
+                    className={`text-[10px] font-semibold uppercase tracking-[0.18em] ${disponivelVisual.label}`}
+                  >
                     Saldo disponivel
                   </div>
                   <div className={`mt-2 text-3xl font-black ${disponivelVisual.value}`}>
-                    {formatarQuantidade(saldoAposReserva)} <span className="text-lg font-bold">{unidade}</span>
+                    {formatarQuantidade(saldoAposReserva)}{" "}
+                    <span className="text-lg font-bold">{unidade}</span>
                   </div>
                 </div>
                 <div className="rounded-xl bg-white/80 px-3 py-2 text-right shadow-sm ring-1 ring-slate-200/70">

@@ -10,9 +10,7 @@ export default function VendasResultadoComposicaoPanel({
     <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-800">
-            Composicao do resultado
-          </h3>
+          <h3 className="text-lg font-semibold text-gray-800">Composicao do resultado</h3>
           <p className="text-sm text-gray-500">
             Sequencia da venda bruta ate o lucro do periodo filtrado.
           </p>
@@ -25,10 +23,7 @@ export default function VendasResultadoComposicaoPanel({
         {fluxoResultadoCards.map((card) => {
           const clicavel = card.acao === "vendas_em_aberto";
           const Container = clicavel ? "button" : "div";
-          const ativo =
-            clicavel &&
-            abaAtiva === "lista" &&
-            filtroStatusLista === "em_aberto";
+          const ativo = clicavel && abaAtiva === "lista" && filtroStatusLista === "em_aberto";
 
           return (
             <Container
@@ -42,9 +37,7 @@ export default function VendasResultadoComposicaoPanel({
               } ${ativo ? "ring-4 ring-red-100" : ""}`}
             >
               <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wide">
-                  {card.titulo}
-                </span>
+                <span className="text-xs font-semibold uppercase tracking-wide">{card.titulo}</span>
                 <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs font-bold">
                   {card.sinal || "R$"}
                 </span>

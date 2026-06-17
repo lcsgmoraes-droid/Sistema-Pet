@@ -1,6 +1,6 @@
-import FornecedorSelector from '../fornecedores/FornecedorSelector';
-import ProductIdentity from '../ui/ProductIdentity';
-import { normalizarTextoBusca } from './pedidoCompraUtils';
+import FornecedorSelector from "../fornecedores/FornecedorSelector";
+import ProductIdentity from "../ui/ProductIdentity";
+import { normalizarTextoBusca } from "./pedidoCompraUtils";
 
 export default function PedidoCompraFormulario({
   mostrarForm,
@@ -22,7 +22,6 @@ export default function PedidoCompraFormulario({
   setItemForm,
   itemFormInicial,
   limparEstadosSugestao,
-  obterGrupoDoFornecedor,
   abrirNovoGrupoFornecedor,
   formData,
   grupoFornecedorAtual,
@@ -52,10 +51,10 @@ export default function PedidoCompraFormulario({
   );
 
   const limparFornecedorSelecionado = () => {
-    setFormData((prev) => ({ ...prev, fornecedor_id: '', itens: [] }));
+    setFormData((prev) => ({ ...prev, fornecedor_id: "", itens: [] }));
     setProdutos([]);
     setIncluirGrupoFornecedor(false);
-    setProdutoTexto('');
+    setProdutoTexto("");
     setMostrarSugestoesProduto(false);
     setItemForm(itemFormInicial);
     limparEstadosSugestao();
@@ -65,7 +64,7 @@ export default function PedidoCompraFormulario({
     <div className="bg-white rounded-lg shadow-md p-6 mb-6">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">
-          {modoEdicao ? '✏️ Editar Pedido' : 'Novo Pedido de Compra'}
+          {modoEdicao ? "✏️ Editar Pedido" : "Novo Pedido de Compra"}
         </h2>
         <button
           type="button"
@@ -78,9 +77,7 @@ export default function PedidoCompraFormulario({
       <form onSubmit={modoEdicao ? editarPedido : handleSubmit} className="space-y-6">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Fornecedor *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Fornecedor *</label>
             <FornecedorSelector
               fornecedores={fornecedores}
               gruposFornecedores={gruposFornecedores}
@@ -99,12 +96,14 @@ export default function PedidoCompraFormulario({
               onSelect={selecionarFornecedor}
               onSelectGrupo={selecionarGrupoFornecedor}
               onClear={() => {
-                setFornecedorTexto('');
+                setFornecedorTexto("");
                 limparFornecedorSelecionado();
               }}
             />
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <p className="text-xs text-gray-500">Digite ou selecione um fornecedor para carregar seus produtos</p>
+              <p className="text-xs text-gray-500">
+                Digite ou selecione um fornecedor para carregar seus produtos
+              </p>
               <button
                 type="button"
                 onClick={abrirNovoGrupoFornecedor}
@@ -134,7 +133,8 @@ export default function PedidoCompraFormulario({
             )}
             {formData.fornecedor_id && !grupoFornecedorAtual && (
               <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Este fornecedor ainda nao esta em um grupo. Use "Grupos de fornecedor" para unificar CNPJs.
+                Este fornecedor ainda nao esta em um grupo. Use "Grupos de fornecedor" para unificar
+                CNPJs.
               </div>
             )}
             {formData.fornecedor_id && (
@@ -144,7 +144,9 @@ export default function PedidoCompraFormulario({
                 disabled={loadingPrepararSugestao}
                 className="mt-2 w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center justify-center gap-2"
               >
-                {loadingPrepararSugestao ? 'Verificando rascunho...' : '💡 Sugestão Inteligente de Pedido'}
+                {loadingPrepararSugestao
+                  ? "Verificando rascunho..."
+                  : "💡 Sugestão Inteligente de Pedido"}
               </button>
             )}
           </div>
@@ -181,20 +183,17 @@ export default function PedidoCompraFormulario({
 
                   setMostrarSugestoesProduto(true);
 
-                  const produtoExato = produtos.find((p) => [
-                    p.nome,
-                    p.codigo,
-                    p.sku,
-                    p.codigo_barras,
-                  ].some((campo) => {
-                    const campoNormalizado = normalizarTextoBusca(campo);
-                    return campoNormalizado && campoNormalizado === valorNormalizado;
-                  }));
+                  const produtoExato = produtos.find((p) =>
+                    [p.nome, p.codigo, p.sku, p.codigo_barras].some((campo) => {
+                      const campoNormalizado = normalizarTextoBusca(campo);
+                      return campoNormalizado && campoNormalizado === valorNormalizado;
+                    }),
+                  );
 
                   if (produtoExato) {
                     selecionarProduto(produtoExato);
                   } else {
-                    setItemForm((prev) => ({ ...prev, produto_id: '', preco_unitario: '' }));
+                    setItemForm((prev) => ({ ...prev, produto_id: "", preco_unitario: "" }));
                   }
                 }}
                 onFocus={() => {
@@ -205,28 +204,35 @@ export default function PedidoCompraFormulario({
                 onBlur={() => {
                   setTimeout(() => setMostrarSugestoesProduto(false), 120);
                 }}
-                placeholder={!formData.fornecedor_id ? 'Selecione um fornecedor primeiro' : 'Digite ou selecione o produto'}
+                placeholder={
+                  !formData.fornecedor_id
+                    ? "Selecione um fornecedor primeiro"
+                    : "Digite ou selecione o produto"
+                }
                 disabled={!formData.fornecedor_id}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 focus:ring-2 focus:ring-blue-500"
               />
-              {mostrarSugestoesProduto && produtosFiltrados.length > 0 && formData.fornecedor_id && (
-                <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                  {produtosFiltrados.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onMouseDown={(ev) => ev.preventDefault()}
-                      onClick={() => selecionarProduto(p)}
-                      className="w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
-                    >
-                      <div className="font-medium text-gray-800">{p.nome}</div>
-                      <div className="text-xs text-gray-500">
-                        SKU: {p.sku || p.codigo || 'N/A'} | Barras: {p.codigo_barras || 'N/A'} | Estoque: {p.estoque_atual || 0}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+              {mostrarSugestoesProduto &&
+                produtosFiltrados.length > 0 &&
+                formData.fornecedor_id && (
+                  <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                    {produtosFiltrados.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onMouseDown={(ev) => ev.preventDefault()}
+                        onClick={() => selecionarProduto(p)}
+                        className="w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-800">{p.nome}</div>
+                        <div className="text-xs text-gray-500">
+                          SKU: {p.sku || p.codigo || "N/A"} | Barras: {p.codigo_barras || "N/A"} |
+                          Estoque: {p.estoque_atual || 0}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
             </div>
             <input
               type="number"
@@ -271,7 +277,9 @@ export default function PedidoCompraFormulario({
                 <tbody>
                   {formData.itens.map((item, index) => (
                     <tr key={index} className="border-t">
-                      <td className="px-4 py-2 text-sm font-semibold text-slate-500">{index + 1}</td>
+                      <td className="px-4 py-2 text-sm font-semibold text-slate-500">
+                        {index + 1}
+                      </td>
                       <td className="px-4 py-2">
                         <ProductIdentity
                           code={obterSkuItemPedido(item)}
@@ -285,12 +293,18 @@ export default function PedidoCompraFormulario({
                           min="0.01"
                           step="0.01"
                           value={item.quantidade_pedida}
-                          onChange={(e) => atualizarItemPedido(index, 'quantidade_pedida', e.target.value)}
+                          onChange={(e) =>
+                            atualizarItemPedido(index, "quantidade_pedida", e.target.value)
+                          }
                           className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-right focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                         />
                       </td>
-                      <td className="px-4 py-2 text-right">R$ {numeroSeguro(item.preco_unitario).toFixed(2)}</td>
-                      <td className="px-4 py-2 text-right font-semibold">R$ {numeroSeguro(item.total).toFixed(2)}</td>
+                      <td className="px-4 py-2 text-right">
+                        R$ {numeroSeguro(item.preco_unitario).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-2 text-right font-semibold">
+                        R$ {numeroSeguro(item.total).toFixed(2)}
+                      </td>
                       <td className="px-4 py-2 text-right">
                         <button
                           type="button"
@@ -331,9 +345,7 @@ export default function PedidoCompraFormulario({
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Total</label>
-            <div className="text-2xl font-bold text-green-600">
-              R$ {calcularTotal().toFixed(2)}
-            </div>
+            <div className="text-2xl font-bold text-green-600">R$ {calcularTotal().toFixed(2)}</div>
           </div>
         </div>
 
@@ -342,12 +354,7 @@ export default function PedidoCompraFormulario({
           disabled={loading}
           className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
         >
-          {loading
-            ? '⏳ Processando...'
-            : modoEdicao
-              ? '✏️ Salvar Alterações'
-              : '✅ Criar Pedido'
-          }
+          {loading ? "⏳ Processando..." : modoEdicao ? "✏️ Salvar Alterações" : "✅ Criar Pedido"}
         </button>
       </form>
     </div>

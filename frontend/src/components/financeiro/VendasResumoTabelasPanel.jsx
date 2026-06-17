@@ -17,10 +17,7 @@ export default function VendasResumoTabelasPanel({
         <div className="rounded-t-lg bg-gray-600 px-4 py-2 font-semibold text-white">
           Vendas por data
         </div>
-        <VendasPorDataTable
-          formatarData={formatarData}
-          linhas={vendasPorDataCalendario}
-        />
+        <VendasPorDataTable formatarData={formatarData} linhas={vendasPorDataCalendario} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:gap-6">
@@ -39,9 +36,7 @@ export default function VendasResumoTabelasPanel({
         </div>
 
         <div className="rounded-lg bg-white shadow">
-          <div className="rounded-t-lg bg-gray-600 px-4 py-2 font-semibold text-white">
-            Tipo
-          </div>
+          <div className="rounded-t-lg bg-gray-600 px-4 py-2 font-semibold text-white">Tipo</div>
           <VendasResumoAgregadoTable
             emptyMessage="Nenhum tipo encontrado"
             includeQuantidade

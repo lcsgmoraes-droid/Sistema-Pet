@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   CONFERENCIA_STATUS_META,
   calcularConferenciaItem,
@@ -7,7 +7,7 @@ import {
   montarConferenciaState,
   normalizarNumeroConferencia,
   obterDraftConferenciaItem,
-} from './entradaXmlUtils';
+} from "./entradaXmlUtils";
 
 export default function useEntradaXmlConferencia({
   api,
@@ -20,9 +20,9 @@ export default function useEntradaXmlConferencia({
 }) {
   const [notaSelecionada, setNotaSelecionada] = useState(null);
   const [mostrarCamposConferencia, setMostrarCamposConferencia] = useState(false);
-  const [filtroItensNota, setFiltroItensNota] = useState('todos');
+  const [filtroItensNota, setFiltroItensNota] = useState("todos");
   const [conferenciaItens, setConferenciaItens] = useState({});
-  const [conferenciaObservacaoGeral, setConferenciaObservacaoGeral] = useState('');
+  const [conferenciaObservacaoGeral, setConferenciaObservacaoGeral] = useState("");
   const [salvandoConferencia, setSalvandoConferencia] = useState(false);
   const [desfazendoConferencia, setDesfazendoConferencia] = useState(false);
   const [gerandoRascunhoDevolucao, setGerandoRascunhoDevolucao] = useState(false);
@@ -38,8 +38,8 @@ export default function useEntradaXmlConferencia({
 
     setNotaSelecionada(notaNormalizada);
     setConferenciaItens(montarConferenciaState(notaNormalizada));
-    setConferenciaObservacaoGeral(notaNormalizada?.conferencia?.observacao_geral || '');
-    setTipoRateio(notaNormalizada.tipo_rateio || 'loja');
+    setConferenciaObservacaoGeral(notaNormalizada?.conferencia?.observacao_geral || "");
+    setTipoRateio(notaNormalizada.tipo_rateio || "loja");
 
     return notaNormalizada;
   };
@@ -50,7 +50,7 @@ export default function useEntradaXmlConferencia({
       const quantidadeNF = Number(item.quantidade ?? item.quantidade_nf ?? 0);
       const proximo = { ...atual };
 
-      if (campo === 'quantidade_conferida') {
+      if (campo === "quantidade_conferida") {
         proximo.quantidade_conferida = Math.max(
           0,
           Math.min(normalizarNumeroConferencia(valor, atual.quantidade_conferida), quantidadeNF),
@@ -59,27 +59,30 @@ export default function useEntradaXmlConferencia({
           Number(proximo.quantidade_avariada || 0),
           Math.max(0, quantidadeNF - proximo.quantidade_conferida),
         );
-      } else if (campo === 'quantidade_avariada') {
+      } else if (campo === "quantidade_avariada") {
         proximo.quantidade_avariada = Math.max(
           0,
           Math.min(
             normalizarNumeroConferencia(valor, atual.quantidade_avariada),
-            Math.max(0, quantidadeNF - Number(proximo.quantidade_conferida ?? atual.quantidade_conferida ?? quantidadeNF)),
+            Math.max(
+              0,
+              quantidadeNF -
+                Number(proximo.quantidade_conferida ?? atual.quantidade_conferida ?? quantidadeNF),
+            ),
           ),
         );
-      } else if (campo === 'observacao_conferencia') {
-        proximo.observacao_conferencia = String(valor ?? '');
-      } else if (campo === 'acao_sugerida') {
-        proximo.acao_sugerida = valor || 'sem_acao';
+      } else if (campo === "observacao_conferencia") {
+        proximo.observacao_conferencia = String(valor ?? "");
+      } else if (campo === "acao_sugerida") {
+        proximo.acao_sugerida = valor || "sem_acao";
       }
 
       const conferenciaItem = calcularConferenciaItem(item, proximo);
       if (!conferenciaItem.temDivergencia) {
-        proximo.acao_sugerida = 'sem_acao';
-      } else if (!proximo.acao_sugerida || proximo.acao_sugerida === 'sem_acao') {
-        proximo.acao_sugerida = conferenciaItem.quantidadeAvariada > 0
-          ? 'nf_devolucao'
-          : 'contatar_fornecedor';
+        proximo.acao_sugerida = "sem_acao";
+      } else if (!proximo.acao_sugerida || proximo.acao_sugerida === "sem_acao") {
+        proximo.acao_sugerida =
+          conferenciaItem.quantidadeAvariada > 0 ? "nf_devolucao" : "contatar_fornecedor";
       }
 
       return {
@@ -120,12 +123,12 @@ export default function useEntradaXmlConferencia({
       await carregarDados();
 
       if (!silencioso) {
-        toast.success('Conferencia salva com sucesso');
+        toast.success("Conferencia salva com sucesso");
       }
 
       return true;
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar conferencia');
+      toast.error(error.response?.data?.detail || "Erro ao salvar conferencia");
       return false;
     } finally {
       setSalvandoConferencia(false);
@@ -135,7 +138,9 @@ export default function useEntradaXmlConferencia({
   const desfazerConferenciaAtual = async () => {
     if (!notaSelecionada) return false;
 
-    const confirmou = window.confirm('Deseja desfazer a conferencia desta NF e voltar para o estado nao conferido?');
+    const confirmou = window.confirm(
+      "Deseja desfazer a conferencia desta NF e voltar para o estado nao conferido?",
+    );
     if (!confirmou) {
       return false;
     }
@@ -148,10 +153,10 @@ export default function useEntradaXmlConferencia({
       sincronizarNotaNaLista(notaAtualizada);
       setMostrarCamposConferencia(false);
       await carregarDados();
-      toast.success('Conferencia desfeita com sucesso');
+      toast.success("Conferencia desfeita com sucesso");
       return true;
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao desfazer conferencia');
+      toast.error(error.response?.data?.detail || "Erro ao desfazer conferencia");
       return false;
     } finally {
       setDesfazendoConferencia(false);
@@ -165,7 +170,7 @@ export default function useEntradaXmlConferencia({
   const gerarRascunhoDevolucao = async () => {
     if (!notaSelecionada) return;
 
-    if (notaSelecionada.status === 'pendente') {
+    if (notaSelecionada.status === "pendente") {
       const conferenciaSalva = await salvarConferenciaAtual({ silencioso: true });
       if (!conferenciaSalva) return;
     }
@@ -177,12 +182,12 @@ export default function useEntradaXmlConferencia({
       setMostrarRascunhoDevolucao(true);
 
       if (data.disponivel) {
-        toast.success('Rascunho de NF de devolucao gerado');
+        toast.success("Rascunho de NF de devolucao gerado");
       } else {
-        toast('Nao ha itens avariados para NF de devolucao');
+        toast("Nao ha itens avariados para NF de devolucao");
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao gerar rascunho da NF de devolucao');
+      toast.error(error.response?.data?.detail || "Erro ao gerar rascunho da NF de devolucao");
     } finally {
       setGerandoRascunhoDevolucao(false);
     }
@@ -192,11 +197,11 @@ export default function useEntradaXmlConferencia({
     if (!notaSelecionada) return;
 
     if ((resumoConferenciaAtual?.itens_com_divergencia || 0) <= 0) {
-      toast.error('Nao ha divergencias para acompanhar com o fornecedor');
+      toast.error("Nao ha divergencias para acompanhar com o fornecedor");
       return;
     }
 
-    if (notaSelecionada.status === 'pendente') {
+    if (notaSelecionada.status === "pendente") {
       const conferenciaSalva = await salvarConferenciaAtual({ silencioso: true });
       if (!conferenciaSalva) return;
     }
@@ -204,33 +209,39 @@ export default function useEntradaXmlConferencia({
     setCriandoPendenciaFornecedor(true);
     try {
       const { data } = await api.post(`/compras-pendencias/notas/${notaSelecionada.id}`, {});
-      toast.success(`Pendencia ${data?.codigo || ''} criada para acompanhamento`);
+      toast.success(`Pendencia ${data?.codigo || ""} criada para acompanhamento`);
 
       const abrirPendencias = window.confirm(
-        'Pendencia criada com relatorio e texto de e-mail sugerido. Deseja abrir a tela de pendencias agora?'
+        "Pendencia criada com relatorio e texto de e-mail sugerido. Deseja abrir a tela de pendencias agora?",
       );
 
       if (abrirPendencias) {
         setMostrarDetalhes(false);
-        navigate('/compras/pendencias');
+        navigate("/compras/pendencias");
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao criar pendencia do fornecedor');
+      toast.error(error.response?.data?.detail || "Erro ao criar pendencia do fornecedor");
     } finally {
       setCriandoPendenciaFornecedor(false);
     }
   };
 
-  const metaConferenciaAtual = CONFERENCIA_STATUS_META[resumoConferenciaAtual?.status || 'nao_iniciada'];
+  const metaConferenciaAtual =
+    CONFERENCIA_STATUS_META[resumoConferenciaAtual?.status || "nao_iniciada"];
   const itensNotaDetalhe = notaSelecionada?.itens || [];
   const itensComDivergenciaDetalhe = itensNotaDetalhe.filter((item) => {
     const conferenciaItem = calcularConferenciaItem(item, conferenciaItens[item.id]);
     const divergenciasCadastro = detectarDivergencias(item);
-    return Boolean(item.tem_divergencia) || conferenciaItem.temDivergencia || divergenciasCadastro.length > 0;
+    return (
+      Boolean(item.tem_divergencia) ||
+      conferenciaItem.temDivergencia ||
+      divergenciasCadastro.length > 0
+    );
   });
-  const itensExibidosNota = filtroItensNota === 'divergencias' && itensComDivergenciaDetalhe.length > 0
-    ? itensComDivergenciaDetalhe
-    : itensNotaDetalhe;
+  const itensExibidosNota =
+    filtroItensNota === "divergencias" && itensComDivergenciaDetalhe.length > 0
+      ? itensComDivergenciaDetalhe
+      : itensNotaDetalhe;
 
   return {
     aplicarNotaSelecionada,
