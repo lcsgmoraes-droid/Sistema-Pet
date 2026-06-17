@@ -2,9 +2,25 @@
 Modelos do Banco de Dados - Sistema Pet Shop Pro
 SQLAlchemy ORM Models
 """
+
 from enum import Enum as PyEnum
 
-from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, Date, ForeignKey, JSON, DECIMAL, Numeric, UniqueConstraint, Index
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Boolean,
+    Float,
+    Text,
+    DateTime,
+    Date,
+    ForeignKey,
+    JSON,
+    DECIMAL,
+    Numeric,
+    UniqueConstraint,
+    Index,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -17,8 +33,10 @@ import sqlalchemy as sa
 # AUTENTICAÇÃO E USUÁRIOS
 # ====================
 
+
 class User(BaseTenantModel):
     """Usuário do sistema (multi-tenant)"""
+
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -32,11 +50,15 @@ class User(BaseTenantModel):
     telefone = Column(String(50), nullable=True)
     cpf_cnpj = Column(String(20), nullable=True)
     foto_url = Column(String(500), nullable=True)
-    push_token = Column(String(500), nullable=True)  # Expo / FCM push token (App Mobile)
+    push_token = Column(
+        String(500), nullable=True
+    )  # Expo / FCM push token (App Mobile)
     vet_calendar_token = Column(String(255), nullable=True, unique=True, index=True)
 
     # LGPD Compliance
-    consent_date = Column(DateTime(timezone=True), nullable=True)  # Data de aceite dos Termos
+    consent_date = Column(
+        DateTime(timezone=True), nullable=True
+    )  # Data de aceite dos Termos
     consent_version = Column(String(50), nullable=True)
     privacy_version = Column(String(50), nullable=True)
     consent_ip = Column(String(50), nullable=True)
@@ -75,20 +97,32 @@ class User(BaseTenantModel):
     telefone_loja = Column(String(50), nullable=True)
 
     # 🚚 Custo operacional de entregador (para contas a pagar)
-    custo_operacional_tipo = Column(String(20), nullable=True)  # 'km_rodado', 'fixo', 'controla_rh'
-    custo_operacional_valor = Column(DECIMAL(10, 2), nullable=True)  # Valor fixo por entrega ou valor por KM
-    custo_operacional_controla_rh_id = Column(String(100), nullable=True)  # ID na API do Controla RH
-    periodicidade_acerto_dias = Column(Integer, nullable=True, default=7)  # Dias para acerto (7=semanal, 15=quinzenal, 30=mensal)
+    custo_operacional_tipo = Column(
+        String(20), nullable=True
+    )  # 'km_rodado', 'fixo', 'controla_rh'
+    custo_operacional_valor = Column(
+        DECIMAL(10, 2), nullable=True
+    )  # Valor fixo por entrega ou valor por KM
+    custo_operacional_controla_rh_id = Column(
+        String(100), nullable=True
+    )  # ID na API do Controla RH
+    periodicidade_acerto_dias = Column(
+        Integer, nullable=True, default=7
+    )  # Dias para acerto (7=semanal, 15=quinzenal, 30=mensal)
 
     # Configurações de comissão
-    data_fechamento_comissao = Column(Integer, nullable=True)  # Dia do mês (1-31) para fechamento
+    data_fechamento_comissao = Column(
+        Integer, nullable=True
+    )  # Dia do mês (1-31) para fechamento
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relacionamentos
-    sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
+    sessions = relationship(
+        "UserSession", back_populates="user", cascade="all, delete-orphan"
+    )
     audit_logs = relationship("AuditLog", back_populates="user")
 
     # IA - Relacionamentos ABA 7 (Extrato Bancário com IA)
@@ -103,6 +137,7 @@ class User(BaseTenantModel):
 
 class UserSession(Base):  # Não usar BaseTenantModel - sessões não são tenant-specific
     """Sessões ativas de usuários (para logout remoto)"""
+
     __tablename__ = "user_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -117,7 +152,9 @@ class UserSession(Base):  # Não usar BaseTenantModel - sessões não são tenan
 
     # Controle
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
     last_activity_at = Column(DateTime(timezone=True), server_default=func.now())
     expires_at = Column(DateTime(timezone=True), nullable=False)
     revoked = Column(Boolean, default=False)
@@ -130,14 +167,19 @@ class UserSession(Base):  # Não usar BaseTenantModel - sessões não são tenan
 
 class AuditLog(BaseTenantModel):
     """Log de auditoria (LGPD - rastreabilidade)"""
+
     __tablename__ = "audit_logs"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 
     # Ação
-    action = Column(String(100), nullable=False, index=True)  # login, create_product, etc
-    entity_type = Column(String(50), nullable=True, index=True)  # product, sale, client, etc
+    action = Column(
+        String(100), nullable=False, index=True
+    )  # login, create_product, etc
+    entity_type = Column(
+        String(50), nullable=True, index=True
+    )  # product, sale, client, etc
     entity_id = Column(Integer, nullable=True)
 
     # Detalhes
@@ -158,8 +200,10 @@ class AuditLog(BaseTenantModel):
 # CADASTROS
 # ====================
 
+
 class FornecedorGrupo(BaseTenantModel):
     """Grupo comercial de fornecedores com CNPJs separados."""
+
     __tablename__ = "fornecedor_grupos"
     __table_args__ = (
         UniqueConstraint("tenant_id", "nome", name="uq_fornecedor_grupos_tenant_nome"),
@@ -172,7 +216,9 @@ class FornecedorGrupo(BaseTenantModel):
     fornecedor_principal_id = Column(Integer, nullable=True, index=True)
     ativo = Column(Boolean, nullable=False, default=True, server_default="1")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     fornecedores = relationship(
         "Cliente",
@@ -183,19 +229,33 @@ class FornecedorGrupo(BaseTenantModel):
 
 class Cliente(BaseTenantModel):
     """Cliente (tutor dos pets)"""
+
     __tablename__ = "clientes"
     __table_args__ = (
         UniqueConstraint("tenant_id", "codigo", name="uq_clientes_tenant_codigo"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)  # Multi-tenant
-    codigo = Column(String(20), nullable=True, index=True)  # Código único do cliente por tenant (ex: 9923)
+    user_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )  # Multi-tenant
+    codigo = Column(
+        String(20), nullable=True, index=True
+    )  # Código único do cliente por tenant (ex: 9923)
 
     # Tipo de cadastro e pessoa
-    tipo_cadastro = Column(String(50), nullable=False, default="cliente", index=True)  # cliente, fornecedor, veterinario
-    tipo_pessoa = Column(String(2), nullable=False, default="PF", index=True)  # PF ou PJ
-    fornecedor_grupo_id = Column(Integer, ForeignKey("fornecedor_grupos.id", ondelete="SET NULL"), nullable=True, index=True)
+    tipo_cadastro = Column(
+        String(50), nullable=False, default="cliente", index=True
+    )  # cliente, fornecedor, veterinario
+    tipo_pessoa = Column(
+        String(2), nullable=False, default="PF", index=True
+    )  # PF ou PJ
+    fornecedor_grupo_id = Column(
+        Integer,
+        ForeignKey("fornecedor_grupos.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Dados pessoais (PF) / Nome Fantasia (PJ)
     nome = Column(String(255), nullable=False, index=True)
@@ -203,7 +263,9 @@ class Cliente(BaseTenantModel):
     telefone = Column(String(50), nullable=True)
     celular = Column(String(50), nullable=True)
     email = Column(String(255), nullable=True)
-    data_nascimento = Column(DateTime, nullable=True)  # Aniversário do cliente (usado em campanhas)
+    data_nascimento = Column(
+        DateTime, nullable=True
+    )  # Aniversário do cliente (usado em campanhas)
 
     # Dados de Pessoa Jurídica
     cnpj = Column(String(18), nullable=True, index=True)
@@ -217,28 +279,48 @@ class Cliente(BaseTenantModel):
 
     # 🤝 SISTEMA DE PARCEIROS (comissões)
     # Permite que QUALQUER pessoa (cliente, veterinário, funcionário, fornecedor) seja parceiro
-    parceiro_ativo = Column(Boolean, default=False, nullable=False, server_default='0')
-    parceiro_desde = Column(DateTime(timezone=True), nullable=True)  # Data de ativação como parceiro
+    parceiro_ativo = Column(Boolean, default=False, nullable=False, server_default="0")
+    parceiro_desde = Column(
+        DateTime(timezone=True), nullable=True
+    )  # Data de ativação como parceiro
     parceiro_observacoes = Column(Text, nullable=True)  # Observações sobre o parceiro
 
     # 📅 CONFIGURAÇÃO DE ACERTO FINANCEIRO (fechamento periódico automático)
-    parceiro_tipo_acerto = Column(String(20), nullable=False, default='mensal', server_default='mensal')  # mensal, quinzenal, semanal, manual
-    parceiro_dia_acerto = Column(Integer, nullable=False, default=1, server_default='1')  # Dia do mês/semana para acerto
-    parceiro_notificar = Column(Boolean, nullable=False, default=True, server_default='1')  # Enviar email de acerto?
-    parceiro_email_principal = Column(String(255), nullable=True)  # Email principal para acerto (sobrepõe email do cadastro)
-    parceiro_emails_copia = Column(Text, nullable=True)  # Emails adicionais separados por vírgula
+    parceiro_tipo_acerto = Column(
+        String(20), nullable=False, default="mensal", server_default="mensal"
+    )  # mensal, quinzenal, semanal, manual
+    parceiro_dia_acerto = Column(
+        Integer, nullable=False, default=1, server_default="1"
+    )  # Dia do mês/semana para acerto
+    parceiro_notificar = Column(
+        Boolean, nullable=False, default=True, server_default="1"
+    )  # Enviar email de acerto?
+    parceiro_email_principal = Column(
+        String(255), nullable=True
+    )  # Email principal para acerto (sobrepõe email do cadastro)
+    parceiro_emails_copia = Column(
+        Text, nullable=True
+    )  # Emails adicionais separados por vírgula
 
     # 👔 RH - FUNCIONÁRIOS (novo)
     # cargo_id = Column(Integer, ForeignKey("cargos.id"), nullable=True, index=True)  # FK para tabela cargos
-    cargo_id = Column(Integer, nullable=True, index=True)  # FK temporária sem constraint (tabela cargos não existe ainda)
+    cargo_id = Column(
+        Integer, nullable=True, index=True
+    )  # FK temporária sem constraint (tabela cargos não existe ainda)
     salario_base_override = Column(Numeric(10, 2), nullable=True)
     liquido_combinado = Column(Numeric(10, 2), nullable=True)
-    complemento_modo = Column(String(20), nullable=False, default="automatico", server_default="automatico")
-    complemento_fixo_valor = Column(Numeric(10, 2), nullable=False, default=0, server_default="0")
+    complemento_modo = Column(
+        String(20), nullable=False, default="automatico", server_default="automatico"
+    )
+    complemento_fixo_valor = Column(
+        Numeric(10, 2), nullable=False, default=0, server_default="0"
+    )
     remuneracao_observacoes = Column(Text, nullable=True)
 
     # 💰 CONFIGURAÇÃO DE COMISSÕES
-    data_fechamento_comissao = Column(Integer, nullable=True)  # Dia do mês (1-31) para fechamento de comissão
+    data_fechamento_comissao = Column(
+        Integer, nullable=True
+    )  # Dia do mês (1-31) para fechamento de comissão
 
     # Endereço
     cep = Column(String(10), nullable=True)
@@ -252,7 +334,9 @@ class Cliente(BaseTenantModel):
     # Endereços de entrega (alternativos ao endereço principal)
     endereco_entrega = Column(Text, nullable=True)  # Endereço de entrega principal
     endereco_entrega_2 = Column(Text, nullable=True)  # Segundo endereço de entrega
-    enderecos_adicionais = Column(JSON, nullable=True)  # Array de endereços adicionais com tipo, apelido, etc.
+    enderecos_adicionais = Column(
+        JSON, nullable=True
+    )  # Array de endereços adicionais com tipo, apelido, etc.
 
     # 🚚 ENTREGADOR (SPRINT 1)
     is_entregador = Column(Boolean, nullable=False, default=False)
@@ -260,33 +344,47 @@ class Cliente(BaseTenantModel):
     recebe_repasse = Column(Boolean, nullable=False, default=False)
     gera_conta_pagar = Column(Boolean, nullable=False, default=False)
 
-    tipo_vinculo_entrega = Column(String(20), nullable=True)  # funcionario | terceirizado | eventual
+    tipo_vinculo_entrega = Column(
+        String(20), nullable=True
+    )  # funcionario | terceirizado | eventual
     valor_padrao_entrega = Column(Numeric(10, 2), nullable=True)
     valor_por_km = Column(Numeric(10, 2), nullable=True)
     recebe_comissao_entrega = Column(Boolean, nullable=False, default=False)
 
     # 🚚 ENTREGADOR - SISTEMA COMPLETO (FASE 2)
     entregador_ativo = Column(Boolean, nullable=False, default=True)
-    entregador_padrao = Column(Boolean, nullable=False, default=False)  # Pré-selecionado nas rotas
+    entregador_padrao = Column(
+        Boolean, nullable=False, default=False
+    )  # Pré-selecionado nas rotas
     controla_rh = Column(Boolean, nullable=False, default=False)
-    gera_conta_pagar_custo_entrega = Column(Boolean, nullable=False, default=False)  # MATRIZ FINAL
+    gera_conta_pagar_custo_entrega = Column(
+        Boolean, nullable=False, default=False
+    )  # MATRIZ FINAL
     media_entregas_configurada = Column(Integer, nullable=True)
     media_entregas_real = Column(Integer, nullable=True)
     custo_rh_ajustado = Column(Numeric(10, 2), nullable=True)
-    modelo_custo_entrega = Column(String(20), nullable=True)  # rateio_rh | taxa_fixa | por_km
+    modelo_custo_entrega = Column(
+        String(20), nullable=True
+    )  # rateio_rh | taxa_fixa | por_km
     taxa_fixa_entrega = Column(Numeric(10, 2), nullable=True)
     valor_por_km_entrega = Column(Numeric(10, 2), nullable=True)
     moto_propria = Column(Boolean, nullable=False, default=True)
 
     # 📆 Acerto financeiro (ETAPA 4)
-    tipo_acerto_entrega = Column(String(20), nullable=True)  # semanal | quinzenal | mensal
-    dia_semana_acerto = Column(Integer, nullable=True)  # 1=segunda, 7=domingo (para semanal)
+    tipo_acerto_entrega = Column(
+        String(20), nullable=True
+    )  # semanal | quinzenal | mensal
+    dia_semana_acerto = Column(
+        Integer, nullable=True
+    )  # 1=segunda, 7=domingo (para semanal)
     dia_mes_acerto = Column(Integer, nullable=True)  # 1-28 (para mensal)
     data_ultimo_acerto = Column(Date, nullable=True)  # Controle interno
 
     # 📊 DRE - Controle de classificação (NOVO)
     # Para fornecedores de produtos (revenda/estoque) que não impactam DRE diretamente
-    controla_dre = Column(Boolean, nullable=False, default=True, server_default='1')  # True = vai para DRE, False = não classifica (produtos p/ revenda)
+    controla_dre = Column(
+        Boolean, nullable=False, default=True, server_default="1"
+    )  # True = vai para DRE, False = não classifica (produtos p/ revenda)
 
     # Outros
     observacoes = Column(Text, nullable=True)
@@ -294,11 +392,13 @@ class Cliente(BaseTenantModel):
     ativo = Column(Boolean, default=True)
 
     # 💰 Crédito de devoluções
-    credito = Column(DECIMAL(10, 2), nullable=False, default=0.0, server_default='0.0')
+    credito = Column(DECIMAL(10, 2), nullable=False, default=0.0, server_default="0.0")
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     # Relacionamentos
     fornecedor_grupo = relationship(
@@ -310,36 +410,49 @@ class Cliente(BaseTenantModel):
     @property
     def fornecedor_grupo_nome(self):
         return self.fornecedor_grupo.nome if self.fornecedor_grupo else None
+
     pets = relationship("Pet", back_populates="cliente", cascade="all, delete-orphan")
 
 
 class Especie(BaseTenantModel):
     """Espécies de animais (Cão, Gato, Ave, etc.)"""
+
     __tablename__ = "especies"
 
     id = Column(Integer, primary_key=True, index=True)
-    nome = Column(String(100), nullable=False, index=True)  # Cão, Gato, Ave, Réptil, etc
+    nome = Column(
+        String(100), nullable=False, index=True
+    )  # Cão, Gato, Ave, Réptil, etc
     ativo = Column(Boolean, default=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     # Relacionamentos
-    racas = relationship("Raca", back_populates="especie_obj", cascade="all, delete-orphan")
+    racas = relationship(
+        "Raca", back_populates="especie_obj", cascade="all, delete-orphan"
+    )
 
 
 class Raca(BaseTenantModel):
     """Raças de animais"""
+
     __tablename__ = "racas"
 
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(100), nullable=False, index=True)
-    especie = Column(String(50), nullable=True, index=True)  # compatibilidade com schema legado
+    especie = Column(
+        String(50), nullable=True, index=True
+    )  # compatibilidade com schema legado
     especie_id = Column(Integer, ForeignKey("especies.id"), nullable=False, index=True)
     ativo = Column(Boolean, default=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     # Relacionamentos
     especie_obj = relationship("Especie", back_populates="racas")
@@ -347,11 +460,14 @@ class Raca(BaseTenantModel):
 
 class Pet(BaseTenantModel):
     """Pet (animal de estimação)"""
+
     __tablename__ = "pets"
 
     id = Column(Integer, primary_key=True, index=True)
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)  # Multi-tenant
+    user_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )  # Multi-tenant
     codigo = Column(String(50), nullable=False, index=True)  # Código único por tenant
 
     # Dados do pet
@@ -390,7 +506,9 @@ class Pet(BaseTenantModel):
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     # Relacionamento
     cliente = relationship("Cliente", back_populates="pets")
@@ -425,6 +543,7 @@ class Pet(BaseTenantModel):
 # ACERTO FINANCEIRO DE PARCEIROS
 # ====================
 
+
 class AcertoParceiro(BaseTenantModel):
     """
     Registra eventos de acerto periódico de parceiros.
@@ -432,26 +551,47 @@ class AcertoParceiro(BaseTenantModel):
     do parceiro em uma data configurada, com aplicação de compensação automática
     de dívidas e envio de notificação por email.
     """
+
     __tablename__ = "acertos_parceiro"
 
     id = Column(Integer, primary_key=True, index=True)
     parceiro_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)  # Multi-tenant
+    user_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )  # Multi-tenant
 
     # Período do acerto
-    data_acerto = Column(DateTime(timezone=True), nullable=False, index=True)  # Data de processamento
-    periodo_inicio = Column(DateTime(timezone=True), nullable=False)  # Início do período calculado
-    periodo_fim = Column(DateTime(timezone=True), nullable=False)  # Fim do período calculado
-    tipo_acerto = Column(String(20), nullable=False)  # mensal, quinzenal, semanal, manual
+    data_acerto = Column(
+        DateTime(timezone=True), nullable=False, index=True
+    )  # Data de processamento
+    periodo_inicio = Column(
+        DateTime(timezone=True), nullable=False
+    )  # Início do período calculado
+    periodo_fim = Column(
+        DateTime(timezone=True), nullable=False
+    )  # Fim do período calculado
+    tipo_acerto = Column(
+        String(20), nullable=False
+    )  # mensal, quinzenal, semanal, manual
 
     # Valores consolidados
-    comissoes_fechadas = Column(Integer, nullable=False, default=0)  # Quantidade de comissões fechadas
-    valor_bruto = Column(DECIMAL(10, 2), nullable=False, default=0.0)  # Soma de todas as comissões
-    valor_compensado = Column(DECIMAL(10, 2), nullable=False, default=0.0)  # Total compensado com dívidas
-    valor_liquido = Column(DECIMAL(10, 2), nullable=False, default=0.0)  # valor_bruto - valor_compensado
+    comissoes_fechadas = Column(
+        Integer, nullable=False, default=0
+    )  # Quantidade de comissões fechadas
+    valor_bruto = Column(
+        DECIMAL(10, 2), nullable=False, default=0.0
+    )  # Soma de todas as comissões
+    valor_compensado = Column(
+        DECIMAL(10, 2), nullable=False, default=0.0
+    )  # Total compensado com dívidas
+    valor_liquido = Column(
+        DECIMAL(10, 2), nullable=False, default=0.0
+    )  # valor_bruto - valor_compensado
 
     # Status
-    status = Column(String(20), nullable=False, default='processado', index=True)  # processado, erro, cancelado
+    status = Column(
+        String(20), nullable=False, default="processado", index=True
+    )  # processado, erro, cancelado
     observacoes = Column(Text, nullable=True)  # Detalhes do processamento
 
     # Rastreabilidade de email
@@ -469,6 +609,7 @@ class EmailTemplate(BaseTenantModel):
     Templates reutilizáveis de email para diferentes tipos de notificação.
     Suporta placeholders Mustache-style para substituição dinâmica.
     """
+
     __tablename__ = "emails_templates"
     __table_args__ = (
         UniqueConstraint(
@@ -479,10 +620,14 @@ class EmailTemplate(BaseTenantModel):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)  # Multi-tenant
+    user_id = Column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )  # Multi-tenant
 
     # Identificação
-    codigo = Column(String(50), nullable=False, index=True)  # ACERTO_PARCEIRO, BOAS_VINDAS, etc
+    codigo = Column(
+        String(50), nullable=False, index=True
+    )  # ACERTO_PARCEIRO, BOAS_VINDAS, etc
     nome = Column(String(255), nullable=False)  # Nome descritivo
     descricao = Column(Text, nullable=True)
 
@@ -493,7 +638,9 @@ class EmailTemplate(BaseTenantModel):
 
     # Metadados
     placeholders = Column(JSON, nullable=True)  # Array de placeholders disponíveis
-    categoria = Column(String(50), nullable=True)  # financeiro, marketing, operacional, etc
+    categoria = Column(
+        String(50), nullable=True
+    )  # financeiro, marketing, operacional, etc
     ativo = Column(Boolean, nullable=False, default=True)
 
     # Timestamps
@@ -506,6 +653,7 @@ class EmailEnvio(BaseTenantModel):
     Controle de envio de emails com governança completa.
     Rastreamento de tentativas, erros e reenvios.
     """
+
     __tablename__ = "email_envios"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -523,12 +671,16 @@ class EmailEnvio(BaseTenantModel):
     corpo_texto = Column(Text, nullable=True)
 
     # Status e controle
-    status = Column(String(20), nullable=False, default='pendente', index=True)  # pendente, enviado, erro, cancelado
+    status = Column(
+        String(20), nullable=False, default="pendente", index=True
+    )  # pendente, enviado, erro, cancelado
     tentativas = Column(Integer, nullable=False, default=0)
     max_tentativas = Column(Integer, nullable=False, default=3)
 
     # Datas
-    data_enfileiramento = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    data_enfileiramento = Column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     data_envio = Column(DateTime(timezone=True), nullable=True, index=True)
     proxima_tentativa = Column(DateTime(timezone=True), nullable=True, index=True)
 
@@ -548,14 +700,17 @@ class EmailEnvio(BaseTenantModel):
 # WHATSAPP CRM
 # ====================
 
+
 class DirecaoMensagem(str, PyEnum):
     """Direção da mensagem WhatsApp"""
+
     ENVIADA = "enviada"
     RECEBIDA = "recebida"
 
 
 class StatusMensagem(str, PyEnum):
     """Status da mensagem WhatsApp"""
+
     ENVIADO = "enviado"
     LIDO = "lido"
     ERRO = "erro"
@@ -601,9 +756,11 @@ class StatusMensagem(str, PyEnum):
 # MULTI-TENANT RBAC (Etapas A1-A5)
 # ====================
 
+
 class Tenant(Base):
     """Tenant (Empresa/Organização)"""
-    __tablename__ = 'tenants'
+
+    __tablename__ = "tenants"
 
     id = Column(String(36), primary_key=True)  # UUID
     name = Column(String(255), nullable=False)  # Nome Fantasia
@@ -625,29 +782,33 @@ class Tenant(Base):
     banner_1_url = Column(String(500), nullable=True)
     banner_2_url = Column(String(500), nullable=True)
     banner_3_url = Column(String(500), nullable=True)
-    status = Column(String(50), nullable=False, server_default='active')
-    plan = Column(String(50), nullable=False, server_default='free')
-    billing_status = Column(String(20), nullable=False, server_default='active')
+    status = Column(String(50), nullable=False, server_default="active")
+    plan = Column(String(50), nullable=False, server_default="free")
+    billing_status = Column(String(20), nullable=False, server_default="active")
     trial_started_at = Column(DateTime(timezone=True), nullable=True)
     trial_ends_at = Column(DateTime(timezone=True), nullable=True)
     subscription_activated_at = Column(DateTime(timezone=True), nullable=True)
-    subscription_source = Column(String(50), nullable=False, server_default='manual')
+    subscription_source = Column(String(50), nullable=False, server_default="manual")
 
     # Configurações operacionais
-    permite_estoque_negativo = Column(Boolean, nullable=False, server_default='false')
-    protecao_validade_ativa = Column(Boolean, nullable=False, server_default='false')
-    dias_alerta_validade = Column(Integer, nullable=False, server_default='15')
-    bloquear_validade_pdv = Column(Boolean, nullable=False, server_default='true')
-    bloquear_validade_ecommerce = Column(Boolean, nullable=False, server_default='true')
-    bloquear_validade_integracoes_online = Column(Boolean, nullable=False, server_default='false')
+    permite_estoque_negativo = Column(Boolean, nullable=False, server_default="false")
+    protecao_validade_ativa = Column(Boolean, nullable=False, server_default="false")
+    dias_alerta_validade = Column(Integer, nullable=False, server_default="15")
+    bloquear_validade_pdv = Column(Boolean, nullable=False, server_default="true")
+    bloquear_validade_ecommerce = Column(Boolean, nullable=False, server_default="true")
+    bloquear_validade_integracoes_online = Column(
+        Boolean, nullable=False, server_default="false"
+    )
     ecommerce_slug = Column(String(80), nullable=True, unique=True, index=True)
 
     # Configurações da loja virtual
-    ecommerce_ativo = Column(Boolean, nullable=False, server_default='true')
+    ecommerce_ativo = Column(Boolean, nullable=False, server_default="true")
     ecommerce_descricao = Column(Text, nullable=True)
-    ecommerce_horario_abertura = Column(String(5), nullable=True)   # ex.: "08:00"
-    ecommerce_horario_fechamento = Column(String(5), nullable=True) # ex.: "18:00"
-    ecommerce_dias_funcionamento = Column(String(200), nullable=True)  # ex.: "seg,ter,qua,qui,sex"
+    ecommerce_horario_abertura = Column(String(5), nullable=True)  # ex.: "08:00"
+    ecommerce_horario_fechamento = Column(String(5), nullable=True)  # ex.: "18:00"
+    ecommerce_dias_funcionamento = Column(
+        String(200), nullable=True
+    )  # ex.: "seg,ter,qua,qui,sex"
 
     # Módulos premium ativos — JSON com lista de módulos contratados
     # Ex.: '["entregas", "campanhas"]'
@@ -657,7 +818,9 @@ class Tenant(Base):
     # petshop | veterinary_clinic | grooming | hospital
     organization_type = Column(String(50), nullable=False, server_default="petshop")
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
     # Relationships (Sprint 4 - WhatsApp)
@@ -670,18 +833,23 @@ class Tenant(Base):
 
 class AssinaturaModulo(TenantScoped, Base):
     """Assinaturas de módulos premium por tenant."""
-    __tablename__ = 'assinaturas_modulos'
+
+    __tablename__ = "assinaturas_modulos"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     # tenant_id (UUID NOT NULL, indexado) vem do mixin TenantScoped → filtro global de tenant.
     modulo = Column(String(50), nullable=False)  # entregas, campanhas, whatsapp...
-    status = Column(String(20), nullable=False, server_default='ativo')  # ativo | cancelado | expirado
+    status = Column(
+        String(20), nullable=False, server_default="ativo"
+    )  # ativo | cancelado | expirado
     valor_mensal = Column(Numeric(10, 2), nullable=True)
     data_inicio = Column(DateTime(timezone=True), nullable=True)
     data_fim = Column(DateTime(timezone=True), nullable=True)
     payment_id = Column(String(200), nullable=True)
     gateway = Column(String(50), nullable=True)  # mercadopago | pagarme | manual
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
     def __repr__(self):
@@ -690,16 +858,19 @@ class AssinaturaModulo(TenantScoped, Base):
 
 class EcommerceNotifyRequest(TenantScoped, Base):
     """Solicitações de aviso 'Avise-me quando chegar' do e-commerce."""
-    __tablename__ = 'ecommerce_notify_requests'
+
+    __tablename__ = "ecommerce_notify_requests"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     # tenant_id (UUID NOT NULL, indexado) vem do mixin TenantScoped → filtro global de tenant.
     product_id = Column(Integer, nullable=False, index=True)
     product_name = Column(String(255), nullable=True)
     email = Column(String(255), nullable=False)
-    notified = Column(Boolean, nullable=False, server_default='false')
+    notified = Column(Boolean, nullable=False, server_default="false")
     notified_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     def __repr__(self):
         return f"<EcommerceNotifyRequest(id={self.id}, email={self.email}, product_id={self.product_id})>"
@@ -707,11 +878,14 @@ class EcommerceNotifyRequest(TenantScoped, Base):
 
 class Role(BaseTenantModel):
     """Role (Função/Cargo) por tenant"""
-    __tablename__ = 'roles'
+
+    __tablename__ = "roles"
 
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False, index=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     def __repr__(self):
         return f"<Role(id={self.id}, name={self.name}, tenant_id={self.tenant_id})>"
@@ -719,12 +893,15 @@ class Role(BaseTenantModel):
 
 class Permission(Base):
     """Permission (Permissão global do sistema)"""
-    __tablename__ = 'permissions'
+
+    __tablename__ = "permissions"
 
     id = Column(Integer, primary_key=True)
     code = Column(String(100), nullable=False, unique=True, index=True)
     description = Column(String(255), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     def __repr__(self):
         return f"<Permission(id={self.id}, code={self.code})>"
@@ -732,13 +909,16 @@ class Permission(Base):
 
 class UserTenant(BaseTenantModel):
     """Vínculo User ↔ Tenant ↔ Role"""
-    __tablename__ = 'user_tenants'
+
+    __tablename__ = "user_tenants"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
-    role_id = Column(Integer, ForeignKey('roles.id'), nullable=False, index=True)
-    is_active = Column(Boolean, nullable=False, server_default='true')
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id"), nullable=False, index=True)
+    is_active = Column(Boolean, nullable=False, server_default="true")
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     def __repr__(self):
         return f"<UserTenant(user_id={self.user_id}, tenant_id={self.tenant_id}, role_id={self.role_id})>"
@@ -746,27 +926,28 @@ class UserTenant(BaseTenantModel):
 
 class AppAccessProfile(BaseTenantModel):
     """Perfil operacional do app liberado para uma pessoa."""
-    __tablename__ = 'app_access_profiles'
+
+    __tablename__ = "app_access_profiles"
     __table_args__ = (
         UniqueConstraint(
-            'tenant_id',
-            'cliente_id',
-            'profile_type',
-            name='uq_app_access_profiles_tenant_cliente_profile',
+            "tenant_id",
+            "cliente_id",
+            "profile_type",
+            name="uq_app_access_profiles_tenant_cliente_profile",
         ),
         Index(
-            'ix_app_access_profiles_tenant_user_profile',
-            'tenant_id',
-            'user_id',
-            'profile_type',
+            "ix_app_access_profiles_tenant_user_profile",
+            "tenant_id",
+            "user_id",
+            "profile_type",
         ),
     )
 
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
-    cliente_id = Column(Integer, ForeignKey('clientes.id'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
     profile_type = Column(String(30), nullable=False, index=True)
-    is_active = Column(Boolean, nullable=False, default=True, server_default='true')
-    granted_by_user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    granted_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     notes = Column(Text, nullable=True)
 
     cliente = relationship("Cliente", foreign_keys=[cliente_id])
@@ -781,11 +962,14 @@ class AppAccessProfile(BaseTenantModel):
 
 class RolePermission(BaseTenantModel):
     """Vínculo Role ↔ Permission por tenant"""
-    __tablename__ = 'role_permissions'
+
+    __tablename__ = "role_permissions"
 
     id = Column(Integer, primary_key=True)
-    role_id = Column(Integer, ForeignKey('roles.id'), nullable=False, index=True)
-    permission_id = Column(Integer, ForeignKey('permissions.id'), nullable=False, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id"), nullable=False, index=True)
+    permission_id = Column(
+        Integer, ForeignKey("permissions.id"), nullable=False, index=True
+    )
 
     def __repr__(self):
         return f"<RolePermission(role_id={self.role_id}, permission_id={self.permission_id}, tenant_id={self.tenant_id})>"
@@ -794,6 +978,7 @@ class RolePermission(BaseTenantModel):
 # ====================
 # FEATURE FLAGS
 # ====================
+
 
 class FeatureFlag(BaseTenantModel):
     """
@@ -805,24 +990,32 @@ class FeatureFlag(BaseTenantModel):
     Exemplo: PDV_IA_OPORTUNIDADES pode ser ativada apenas para tenants específicos
     durante o período de testes, sem afetar os demais usuários.
     """
-    __tablename__ = 'feature_flags'
+
+    __tablename__ = "feature_flags"
 
     feature_key = Column(
         String(100),
         nullable=False,
         index=True,
-        comment='Identificador único da feature (ex: PDV_IA_OPORTUNIDADES)'
+        comment="Identificador único da feature (ex: PDV_IA_OPORTUNIDADES)",
     )
     enabled = Column(
         Boolean,
         nullable=False,
-        server_default=sa.text('false'),
-        comment='Status da feature: true=ativa, false=desligada'
+        server_default=sa.text("false"),
+        comment="Status da feature: true=ativa, false=desligada",
     )
 
     __table_args__ = (
-        UniqueConstraint('tenant_id', 'feature_key', name='uq_feature_flags_tenant_feature'),
-        Index('ix_feature_flags_tenant_feature_lookup', 'tenant_id', 'feature_key', 'enabled'),
+        UniqueConstraint(
+            "tenant_id", "feature_key", name="uq_feature_flags_tenant_feature"
+        ),
+        Index(
+            "ix_feature_flags_tenant_feature_lookup",
+            "tenant_id",
+            "feature_key",
+            "enabled",
+        ),
     )
 
     def __repr__(self):
@@ -833,18 +1026,22 @@ class FeatureFlag(BaseTenantModel):
 # CONFIGURAÇÃO DE ENTREGAS
 # ====================
 
+
 class ConfiguracaoEntrega(BaseTenantModel):
     """
     Configuração global de entregas por tenant.
     Um único registro por tenant.
     """
+
     __tablename__ = "configuracoes_entrega"
 
     # Usuario dono da configuracao (legacy schema exige NOT NULL)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
 
     # Entregador padrão (FK para clientes.id que é Integer)
-    entregador_padrao_id = Column(Integer, ForeignKey("clientes.id", ondelete="SET NULL"), nullable=True)
+    entregador_padrao_id = Column(
+        Integer, ForeignKey("clientes.id", ondelete="SET NULL"), nullable=True
+    )
 
     # Ponto inicial da rota (endereço detalhado da loja/empresa)
     logradouro = Column(String(300), nullable=True)  # Rua/Avenida
@@ -856,7 +1053,9 @@ class ConfiguracaoEntrega(BaseTenantModel):
     estado = Column(String(2), nullable=True)  # UF
 
     # Método de registro de km ao marcar entrega: "auto_rota" | "gps" | "manual"
-    metodo_km_entrega = Column(String(20), nullable=False, default="auto_rota", server_default="auto_rota")
+    metodo_km_entrega = Column(
+        String(20), nullable=False, default="auto_rota", server_default="auto_rota"
+    )
 
     # Relacionamento com o entregador padrão
     entregador_padrao = relationship("Cliente", foreign_keys=[entregador_padrao_id])
@@ -866,16 +1065,23 @@ class ConfiguracaoEntrega(BaseTenantModel):
 # HISTÓRICO DE CRÉDITO
 # ====================
 
+
 class CreditoLog(BaseTenantModel):
     """Registro de cada movimentação de crédito de um cliente."""
+
     __tablename__ = "credito_logs"
 
-    cliente_id     = Column(Integer, ForeignKey("clientes.id", ondelete="CASCADE"), nullable=False, index=True)
-    tipo           = Column(String(30), nullable=False, index=True)
+    cliente_id = Column(
+        Integer,
+        ForeignKey("clientes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    tipo = Column(String(30), nullable=False, index=True)
     # tipos possíveis: 'adicao_manual', 'remocao_manual', 'uso_venda', 'troco', 'devolucao'
-    valor          = Column(DECIMAL(10, 2), nullable=False)      # sempre positivo
+    valor = Column(DECIMAL(10, 2), nullable=False)  # sempre positivo
     saldo_anterior = Column(DECIMAL(10, 2), nullable=False)
-    saldo_atual    = Column(DECIMAL(10, 2), nullable=False)
-    motivo         = Column(Text, nullable=True)
-    referencia_id  = Column(Integer, nullable=True)              # venda_id ou outro id relacionado
-    usuario_nome   = Column(String(255), nullable=True)          # nome de quem fez a operação
+    saldo_atual = Column(DECIMAL(10, 2), nullable=False)
+    motivo = Column(Text, nullable=True)
+    referencia_id = Column(Integer, nullable=True)  # venda_id ou outro id relacionado
+    usuario_nome = Column(String(255), nullable=True)  # nome de quem fez a operação

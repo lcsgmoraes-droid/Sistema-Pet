@@ -60,8 +60,14 @@ def normalize_pet_clinical_payload(payload: dict[str, Any]) -> dict[str, Any]:
         list_sent = list_field in normalized
         legacy_sent = legacy_field in normalized
 
-        list_items = normalize_clinical_list(normalized.get(list_field)) if list_sent else None
-        legacy_items = normalize_clinical_list(normalized.get(legacy_field)) if legacy_sent else None
+        list_items = (
+            normalize_clinical_list(normalized.get(list_field)) if list_sent else None
+        )
+        legacy_items = (
+            normalize_clinical_list(normalized.get(legacy_field))
+            if legacy_sent
+            else None
+        )
 
         merged_items = list_items if list_items is not None else legacy_items
         if merged_items is None:

@@ -19,7 +19,12 @@ from .compras_pendencias_models import (
 )
 from .db import get_session
 from .models import Cliente
-from .produtos_models import NotaEntrada, NotaEntradaItem, PedidoCompra, PedidoCompraNotaEntrada
+from .produtos_models import (
+    NotaEntrada,
+    NotaEntradaItem,
+    PedidoCompra,
+    PedidoCompraNotaEntrada,
+)
 from .services.email_service import is_email_configured, send_email
 
 
@@ -83,12 +88,16 @@ def _quantidades_conferencia_item(item: NotaEntradaItem) -> Dict[str, float]:
     quantidade_conferida = item.quantidade_conferida
     if quantidade_conferida is None:
         quantidade_conferida = quantidade_nf
-    quantidade_conferida = max(0.0, min(_round_quantity(quantidade_conferida), quantidade_nf))
+    quantidade_conferida = max(
+        0.0, min(_round_quantity(quantidade_conferida), quantidade_nf)
+    )
 
     quantidade_avariada = max(0.0, _round_quantity(item.quantidade_avariada))
     max_avariada = max(quantidade_nf - quantidade_conferida, 0.0)
     quantidade_avariada = min(quantidade_avariada, max_avariada)
-    quantidade_faltante = max(quantidade_nf - quantidade_conferida - quantidade_avariada, 0.0)
+    quantidade_faltante = max(
+        quantidade_nf - quantidade_conferida - quantidade_avariada, 0.0
+    )
 
     return {
         "quantidade_nf": quantidade_nf,
@@ -114,14 +123,17 @@ def _divergencia_item(item: NotaEntradaItem) -> Dict[str, Any]:
     quantidades = _quantidades_conferencia_item(item)
     status_conferencia = _status_conferencia_item(quantidades)
     valor_unitario = float(item.valor_unitario or 0)
-    quantidade_divergente = quantidades["quantidade_faltante"] + quantidades["quantidade_avariada"]
+    quantidade_divergente = (
+        quantidades["quantidade_faltante"] + quantidades["quantidade_avariada"]
+    )
     return {
         **quantidades,
         "status_conferencia": status_conferencia,
         "tem_divergencia": status_conferencia != "ok",
         "valor_unitario": valor_unitario,
         "valor_total_divergente": round(quantidade_divergente * valor_unitario, 2),
-        "acao_sugerida": item.acao_sugerida or ("contatar_fornecedor" if status_conferencia != "ok" else "sem_acao"),
+        "acao_sugerida": item.acao_sugerida
+        or ("contatar_fornecedor" if status_conferencia != "ok" else "sem_acao"),
         "observacao": _normalizar_texto(item.observacao_conferencia),
     }
 
@@ -131,7 +143,9 @@ def _buscar_nota(db: Session, tenant_id, nota_id: int) -> NotaEntrada:
         db.query(NotaEntrada)
         .options(
             joinedload(NotaEntrada.itens).joinedload(NotaEntradaItem.produto),
-            joinedload(NotaEntrada.pedidos_compra_vinculos).joinedload(PedidoCompraNotaEntrada.pedido),
+            joinedload(NotaEntrada.pedidos_compra_vinculos).joinedload(
+                PedidoCompraNotaEntrada.pedido
+            ),
         )
         .filter(NotaEntrada.id == nota_id, NotaEntrada.tenant_id == tenant_id)
         .first()
@@ -141,7 +155,9 @@ def _buscar_nota(db: Session, tenant_id, nota_id: int) -> NotaEntrada:
     return nota
 
 
-def _pedido_principal_da_nota(db: Session, nota: NotaEntrada, tenant_id) -> Optional[PedidoCompra]:
+def _pedido_principal_da_nota(
+    db: Session, nota: NotaEntrada, tenant_id
+) -> Optional[PedidoCompra]:
     vinculos = list(getattr(nota, "pedidos_compra_vinculos", []) or [])
     for vinculo in vinculos:
         if getattr(vinculo, "pedido", None):
@@ -251,7 +267,9 @@ def _montar_mensagem(
         ]
     )
     if prazo_previsto:
-        linhas.append(f"Prazo interno previsto para retorno: {prazo_previsto.strftime('%d/%m/%Y')}.")
+        linhas.append(
+            f"Prazo interno previsto para retorno: {prazo_previsto.strftime('%d/%m/%Y')}."
+        )
     linhas.extend(["", "Obrigado."])
     return "\n".join(linhas)
 
@@ -353,9 +371,15 @@ def _serializar_pendencia(
     itens = list(getattr(pendencia, "itens", []) or [])
     resumo = {
         "itens": len(itens),
-        "faltante": _round_quantity(sum(float(item.quantidade_faltante or 0) for item in itens)),
-        "avariada": _round_quantity(sum(float(item.quantidade_avariada or 0) for item in itens)),
-        "valor_estimado": round(sum(float(item.valor_total_divergente or 0) for item in itens), 2),
+        "faltante": _round_quantity(
+            sum(float(item.quantidade_faltante or 0) for item in itens)
+        ),
+        "avariada": _round_quantity(
+            sum(float(item.quantidade_avariada or 0) for item in itens)
+        ),
+        "valor_estimado": round(
+            sum(float(item.valor_total_divergente or 0) for item in itens), 2
+        ),
     }
     dados = {
         "id": pendencia.id,
@@ -373,30 +397,48 @@ def _serializar_pendencia(
         "pedido_compra_id": pendencia.pedido_compra_id,
         "numero_nota": pendencia.numero_nota,
         "numero_pedido": pendencia.numero_pedido,
-        "prazo_previsto": pendencia.prazo_previsto.isoformat() if pendencia.prazo_previsto else None,
+        "prazo_previsto": pendencia.prazo_previsto.isoformat()
+        if pendencia.prazo_previsto
+        else None,
         "email_destinatario": pendencia.email_destinatario,
         "email_assunto": pendencia.email_assunto,
         "email_mensagem": pendencia.email_mensagem,
-        "email_enviado_em": pendencia.email_enviado_em.isoformat() if pendencia.email_enviado_em else None,
-        "pdf_gerado_em": pendencia.pdf_gerado_em.isoformat() if pendencia.pdf_gerado_em else None,
-        "resolvida_em": pendencia.resolvida_em.isoformat() if pendencia.resolvida_em else None,
+        "email_enviado_em": pendencia.email_enviado_em.isoformat()
+        if pendencia.email_enviado_em
+        else None,
+        "pdf_gerado_em": pendencia.pdf_gerado_em.isoformat()
+        if pendencia.pdf_gerado_em
+        else None,
+        "resolvida_em": pendencia.resolvida_em.isoformat()
+        if pendencia.resolvida_em
+        else None,
         "resolucao_observacao": pendencia.resolucao_observacao,
-        "created_at": pendencia.created_at.isoformat() if pendencia.created_at else None,
-        "updated_at": pendencia.updated_at.isoformat() if pendencia.updated_at else None,
+        "created_at": pendencia.created_at.isoformat()
+        if pendencia.created_at
+        else None,
+        "updated_at": pendencia.updated_at.isoformat()
+        if pendencia.updated_at
+        else None,
     }
     if incluir_itens:
         dados["itens"] = [_serializar_item(item) for item in itens]
     if incluir_historico:
-        dados["historico"] = [_serializar_historico(item) for item in (pendencia.historico or [])]
+        dados["historico"] = [
+            _serializar_historico(item) for item in (pendencia.historico or [])
+        ]
     return dados
 
 
-def _buscar_pendencia(db: Session, tenant_id, pendencia_id: int) -> CompraPendenciaFornecedor:
+def _buscar_pendencia(
+    db: Session, tenant_id, pendencia_id: int
+) -> CompraPendenciaFornecedor:
     pendencia = (
         db.query(CompraPendenciaFornecedor)
         .options(
             joinedload(CompraPendenciaFornecedor.itens),
-            joinedload(CompraPendenciaFornecedor.historico).joinedload(CompraPendenciaFornecedorHistorico.user),
+            joinedload(CompraPendenciaFornecedor.historico).joinedload(
+                CompraPendenciaFornecedorHistorico.user
+            ),
         )
         .filter(
             CompraPendenciaFornecedor.id == pendencia_id,
@@ -415,15 +457,29 @@ def _pdf_pendencia_bytes(pendencia: CompraPendenciaFornecedor) -> bytes:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
         from reportlab.lib.units import mm
-        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from reportlab.platypus import (
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
     except ImportError:
-        raise HTTPException(status_code=500, detail="Biblioteca reportlab nao instalada.")
+        raise HTTPException(
+            status_code=500, detail="Biblioteca reportlab nao instalada."
+        )
 
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=14 * mm, bottomMargin=14 * mm)
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4, topMargin=14 * mm, bottomMargin=14 * mm
+    )
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle("Title", parent=styles["Heading1"], fontSize=15, spaceAfter=8)
-    small_style = ParagraphStyle("Small", parent=styles["Normal"], fontSize=8, leading=10)
+    title_style = ParagraphStyle(
+        "Title", parent=styles["Heading1"], fontSize=15, spaceAfter=8
+    )
+    small_style = ParagraphStyle(
+        "Small", parent=styles["Normal"], fontSize=8, leading=10
+    )
 
     def cell(valor: Any) -> Paragraph:
         return Paragraph(escape(str(valor if valor is not None else "-")), small_style)
@@ -436,47 +492,75 @@ def _pdf_pendencia_bytes(pendencia: CompraPendenciaFornecedor) -> bytes:
 
     info = [
         ["Codigo", pendencia.codigo or "-", "Status", pendencia.status],
-        ["Fornecedor", pendencia.fornecedor_nome, "CNPJ", pendencia.fornecedor_cnpj or "-"],
+        [
+            "Fornecedor",
+            pendencia.fornecedor_nome,
+            "CNPJ",
+            pendencia.fornecedor_cnpj or "-",
+        ],
         ["NF", pendencia.numero_nota or "-", "Pedido", pendencia.numero_pedido or "-"],
         [
             "Criada em",
-            pendencia.created_at.strftime("%d/%m/%Y %H:%M") if pendencia.created_at else "-",
+            pendencia.created_at.strftime("%d/%m/%Y %H:%M")
+            if pendencia.created_at
+            else "-",
             "Prazo",
-            pendencia.prazo_previsto.strftime("%d/%m/%Y") if pendencia.prazo_previsto else "-",
+            pendencia.prazo_previsto.strftime("%d/%m/%Y")
+            if pendencia.prazo_previsto
+            else "-",
         ],
     ]
-    info_table = Table([[cell(col) for col in row] for row in info], colWidths=[28 * mm, 62 * mm, 28 * mm, 62 * mm])
-    info_table.setStyle(TableStyle([
-        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#CBD5E1")),
-        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F1F5F9")),
-        ("BACKGROUND", (2, 0), (2, -1), colors.HexColor("#F1F5F9")),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 5),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-    ]))
+    info_table = Table(
+        [[cell(col) for col in row] for row in info],
+        colWidths=[28 * mm, 62 * mm, 28 * mm, 62 * mm],
+    )
+    info_table.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#CBD5E1")),
+                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F1F5F9")),
+                ("BACKGROUND", (2, 0), (2, -1), colors.HexColor("#F1F5F9")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
     elements.append(info_table)
     elements.append(Spacer(1, 10))
 
-    item_rows = [["Produto", "Qtd NF", "Recebida", "Faltante", "Avariada", "Valor div."]]
+    item_rows = [
+        ["Produto", "Qtd NF", "Recebida", "Faltante", "Avariada", "Valor div."]
+    ]
     for item in pendencia.itens or []:
-        item_rows.append([
-            item.descricao,
-            _formatar_qtd(item.quantidade_nf),
-            _formatar_qtd(item.quantidade_recebida),
-            _formatar_qtd(item.quantidade_faltante),
-            _formatar_qtd(item.quantidade_avariada),
-            _formatar_moeda(item.valor_total_divergente),
-        ])
-    item_table = Table([[cell(col) for col in row] for row in item_rows], colWidths=[70 * mm, 22 * mm, 22 * mm, 22 * mm, 22 * mm, 28 * mm], repeatRows=1)
-    item_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E2E8F0")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
-        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#CBD5E1")),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-    ]))
+        item_rows.append(
+            [
+                item.descricao,
+                _formatar_qtd(item.quantidade_nf),
+                _formatar_qtd(item.quantidade_recebida),
+                _formatar_qtd(item.quantidade_faltante),
+                _formatar_qtd(item.quantidade_avariada),
+                _formatar_moeda(item.valor_total_divergente),
+            ]
+        )
+    item_table = Table(
+        [[cell(col) for col in row] for row in item_rows],
+        colWidths=[70 * mm, 22 * mm, 22 * mm, 22 * mm, 22 * mm, 28 * mm],
+        repeatRows=1,
+    )
+    item_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E2E8F0")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#CBD5E1")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
     elements.append(item_table)
 
     if pendencia.email_mensagem:
@@ -497,12 +581,12 @@ def _html_email_pendencia(pendencia: CompraPendenciaFornecedor, mensagem: str) -
         <div style="max-width:680px;margin:0 auto;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
           <div style="background:#f8fafc;padding:18px 22px;border-bottom:1px solid #e2e8f0;">
             <div style="font-size:12px;color:#2563eb;font-weight:700;text-transform:uppercase;">Pendencia de fornecedor</div>
-            <h1 style="font-size:20px;margin:6px 0 0;">{escape(pendencia.titulo or pendencia.codigo or 'Pendencia')}</h1>
+            <h1 style="font-size:20px;margin:6px 0 0;">{escape(pendencia.titulo or pendencia.codigo or "Pendencia")}</h1>
           </div>
           <div style="padding:22px;">
-            <p><strong>NF:</strong> {escape(str(pendencia.numero_nota or '-'))}</p>
-            <p><strong>Pedido:</strong> {escape(str(pendencia.numero_pedido or '-'))}</p>
-            <p><strong>Fornecedor:</strong> {escape(str(pendencia.fornecedor_nome or '-'))}</p>
+            <p><strong>NF:</strong> {escape(str(pendencia.numero_nota or "-"))}</p>
+            <p><strong>Pedido:</strong> {escape(str(pendencia.numero_pedido or "-"))}</p>
+            <p><strong>Fornecedor:</strong> {escape(str(pendencia.fornecedor_nome or "-"))}</p>
             <div style="margin-top:18px;padding-top:18px;border-top:1px solid #e2e8f0;">{linhas}</div>
             <p style="margin-top:22px;color:#64748b;font-size:12px;">
               O relatorio em PDF segue anexo para conferencia dos itens divergentes.
@@ -532,14 +616,23 @@ def listar_pendencias(
     if status:
         query = query.filter(CompraPendenciaFornecedor.status == status)
     elif not incluir_finalizadas:
-        query = query.filter(~CompraPendenciaFornecedor.status.in_(PENDENCIA_STATUS_FINAIS))
+        query = query.filter(
+            ~CompraPendenciaFornecedor.status.in_(PENDENCIA_STATUS_FINAIS)
+        )
     if fornecedor:
         termo = f"%{fornecedor.strip()}%"
         query = query.filter(CompraPendenciaFornecedor.fornecedor_nome.ilike(termo))
     if nota_id:
         query = query.filter(CompraPendenciaFornecedor.nota_entrada_id == nota_id)
 
-    pendencias = query.order_by(desc(CompraPendenciaFornecedor.updated_at), desc(CompraPendenciaFornecedor.id)).limit(200).all()
+    pendencias = (
+        query.order_by(
+            desc(CompraPendenciaFornecedor.updated_at),
+            desc(CompraPendenciaFornecedor.id),
+        )
+        .limit(200)
+        .all()
+    )
     return [_serializar_pendencia(item) for item in pendencias]
 
 
@@ -554,7 +647,10 @@ def criar_pendencia_por_nota(
     nota = _buscar_nota(db, tenant_id, nota_id)
     itens = _itens_divergentes(nota)
     if not itens:
-        raise HTTPException(status_code=400, detail="Esta NF nao possui divergencias de conferencia para gerar pendencia.")
+        raise HTTPException(
+            status_code=400,
+            detail="Esta NF nao possui divergencias de conferencia para gerar pendencia.",
+        )
 
     pedido = _pedido_principal_da_nota(db, nota, tenant_id)
     fornecedor = _buscar_fornecedor(db, nota, tenant_id)
@@ -573,7 +669,9 @@ def criar_pendencia_por_nota(
     nova = pendencia is None
     prazo = payload.prazo_previsto or (datetime.utcnow() + timedelta(days=7))
     assunto = _normalizar_texto(payload.email_assunto) or _montar_assunto(nota, pedido)
-    mensagem = _normalizar_texto(payload.email_mensagem) or _montar_mensagem(nota, pedido, itens, prazo)
+    mensagem = _normalizar_texto(payload.email_mensagem) or _montar_mensagem(
+        nota, pedido, itens, prazo
+    )
     resumo = _resumo_pendencia(itens)
     resumo_txt = (
         f"{resumo['itens']} item(ns) com divergencia: "
@@ -602,18 +700,24 @@ def criar_pendencia_por_nota(
         pendencia.fornecedor_nome = nota.fornecedor_nome
         pendencia.fornecedor_cnpj = nota.fornecedor_cnpj
         pendencia.pedido_compra_id = pedido.id if pedido else pendencia.pedido_compra_id
-        pendencia.numero_pedido = pedido.numero_pedido if pedido else pendencia.numero_pedido
+        pendencia.numero_pedido = (
+            pedido.numero_pedido if pedido else pendencia.numero_pedido
+        )
 
     pendencia.resumo = resumo_txt
     pendencia.prazo_previsto = prazo
-    pendencia.email_destinatario = _normalizar_texto(payload.email_destinatario) or getattr(fornecedor, "email", None)
+    pendencia.email_destinatario = _normalizar_texto(
+        payload.email_destinatario
+    ) or getattr(fornecedor, "email", None)
     pendencia.email_assunto = assunto
     pendencia.email_mensagem = mensagem
     pendencia.updated_at = datetime.utcnow()
     db.flush()
 
     if not pendencia.codigo:
-        pendencia.codigo = f"CPF-{datetime.utcnow().strftime('%Y%m%d')}-{pendencia.id:05d}"
+        pendencia.codigo = (
+            f"CPF-{datetime.utcnow().strftime('%Y%m%d')}-{pendencia.id:05d}"
+        )
 
     _sincronizar_itens_pendencia(db, pendencia, itens)
     _adicionar_historico(
@@ -684,7 +788,9 @@ def atualizar_pendencia(
             pendencia.status,
         )
     elif payload.observacao:
-        _adicionar_historico(pendencia, "observacao", current_user.id, payload.observacao)
+        _adicionar_historico(
+            pendencia, "observacao", current_user.id, payload.observacao
+        )
 
     db.commit()
     pendencia = _buscar_pendencia(db, tenant_id, pendencia_id)
@@ -702,8 +808,12 @@ def registrar_email_pendencia(
     pendencia = _buscar_pendencia(db, tenant_id, pendencia_id)
     status_anterior = pendencia.status
 
-    pendencia.email_destinatario = _normalizar_texto(payload.email_destinatario) or pendencia.email_destinatario
-    pendencia.email_assunto = _normalizar_texto(payload.email_assunto) or pendencia.email_assunto
+    pendencia.email_destinatario = (
+        _normalizar_texto(payload.email_destinatario) or pendencia.email_destinatario
+    )
+    pendencia.email_assunto = (
+        _normalizar_texto(payload.email_assunto) or pendencia.email_assunto
+    )
     pendencia.email_mensagem = payload.email_mensagem.strip()
     pendencia.email_enviado_em = datetime.utcnow()
     if pendencia.status not in PENDENCIA_STATUS_FINAIS:
@@ -733,7 +843,9 @@ def enviar_email_pendencia(
     current_user, tenant_id = current_user_and_tenant
     pendencia = _buscar_pendencia(db, tenant_id, pendencia_id)
 
-    email_destino = _normalizar_texto(payload.email_destinatario) or pendencia.email_destinatario
+    email_destino = (
+        _normalizar_texto(payload.email_destinatario) or pendencia.email_destinatario
+    )
     assunto = _normalizar_texto(payload.email_assunto) or pendencia.email_assunto
     mensagem = payload.email_mensagem.strip()
 
@@ -742,7 +854,10 @@ def enviar_email_pendencia(
     if not assunto:
         raise HTTPException(status_code=400, detail="Informe o assunto do e-mail.")
     if not is_email_configured():
-        raise HTTPException(status_code=503, detail="O envio de e-mail nao esta configurado no servidor.")
+        raise HTTPException(
+            status_code=503,
+            detail="O envio de e-mail nao esta configurado no servidor.",
+        )
 
     pdf_content = _pdf_pendencia_bytes(pendencia)
     filename = f"pendencia_fornecedor_{pendencia.codigo or pendencia.id}.pdf"
@@ -751,16 +866,21 @@ def enviar_email_pendencia(
         subject=assunto,
         html_body=_html_email_pendencia(pendencia, mensagem),
         text_body=mensagem,
-        attachments=[{
-            "filename": filename,
-            "content": pdf_content,
-            "mime_subtype": "pdf",
-        }],
+        attachments=[
+            {
+                "filename": filename,
+                "content": pdf_content,
+                "mime_subtype": "pdf",
+            }
+        ],
         simulate_if_unconfigured=False,
     )
 
     if not enviado:
-        raise HTTPException(status_code=502, detail="Nao foi possivel enviar o e-mail. Revise a configuracao SMTP.")
+        raise HTTPException(
+            status_code=502,
+            detail="Nao foi possivel enviar o e-mail. Revise a configuracao SMTP.",
+        )
 
     status_anterior = pendencia.status
     pendencia.email_destinatario = email_destino
@@ -815,5 +935,7 @@ def baixar_pdf_pendencia(
     return StreamingResponse(
         BytesIO(content),
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"
+        },
     )

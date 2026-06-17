@@ -20,16 +20,16 @@ def seed_adquirentes_templates(
 ):
     """
     Cria templates básicos de operadoras (Stone, Cielo, Rede).
-    
+
     Executa UMA VEZ ao inicializar sistema.
     Não duplica se já existir.
-    
+
     Requer: usuário autenticado com tenant selecionado.
     """
     _current_user, tenant_id = user_and_tenant
-    
+
     resultado = criar_templates_adquirentes(db, tenant_id)
-    
+
     return {
         "success": True,
         "message": "Templates de adquirentes inicializados",

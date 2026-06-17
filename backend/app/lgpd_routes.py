@@ -32,7 +32,14 @@ router = APIRouter(
     dependencies=[Depends(_require_lgpd_ops_permission)],
 )
 
-REQUEST_TYPES = {"access", "export", "correction", "deletion", "revocation", "information"}
+REQUEST_TYPES = {
+    "access",
+    "export",
+    "correction",
+    "deletion",
+    "revocation",
+    "information",
+}
 
 
 class PreferencesUpdate(BaseModel):
@@ -84,7 +91,9 @@ def _get_cliente(db: Session, tenant_id: str, cliente_id: int) -> Cliente:
         .first()
     )
     if not cliente:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente nao encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente nao encontrado"
+        )
     return cliente
 
 
@@ -120,7 +129,9 @@ def exportar_dossie_cliente(
             user_agent=request.headers.get("user-agent"),
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
 
 
 @router.get("/clientes/{cliente_id}/consentimentos")
@@ -151,7 +162,10 @@ def atualizar_preferencias_cliente(
     cliente = _get_cliente(db, str(tenant_id), cliente_id)
     preferences = {key: getattr(payload, key) for key in PREFERENCE_TYPES}
     if all(value is None for value in preferences.values()):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Informe ao menos uma preferencia")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe ao menos uma preferencia",
+        )
 
     service = _service(db, tenant_id)
     service.set_customer_preferences(
@@ -179,7 +193,10 @@ def criar_solicitacao_lgpd(
     current_user, tenant_id = user_and_tenant
     request_type = payload.request_type.strip().lower()
     if request_type not in REQUEST_TYPES:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tipo de solicitacao LGPD invalido")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tipo de solicitacao LGPD invalido",
+        )
 
     service = _service(db, tenant_id)
     row = service.create_subject_request(
@@ -225,7 +242,9 @@ def anonimizar_cliente_por_solicitacao_lgpd(
             user_agent=request.headers.get("user-agent"),
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
 
     db.commit()
     return {"request": service._serialize_request(row), "operation": operation}
@@ -272,6 +291,8 @@ def processar_solicitacao_lgpd(
             user_agent=request.headers.get("user-agent"),
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
     db.commit()
     return {"request": service._serialize_request(row)}

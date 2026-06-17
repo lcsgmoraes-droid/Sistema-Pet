@@ -17,7 +17,12 @@ class DataSubjectRequest(TenantScoped, Base):
     __tablename__ = "data_subject_requests"
     __table_args__ = (
         Index("ix_data_subject_requests_tenant_status", "tenant_id", "status"),
-        Index("ix_data_subject_requests_subject", "tenant_id", "subject_type", "subject_id"),
+        Index(
+            "ix_data_subject_requests_subject",
+            "tenant_id",
+            "subject_type",
+            "subject_id",
+        ),
         Index("ix_data_subject_requests_type", "request_type"),
         {"extend_existing": True},
     )
@@ -29,7 +34,9 @@ class DataSubjectRequest(TenantScoped, Base):
 
     subject_type = Column(String(50), nullable=False)  # customer, user, contact
     subject_id = Column(String(255), nullable=False)
-    request_type = Column(String(50), nullable=False)  # access, export, correction, deletion, revoke, info
+    request_type = Column(
+        String(50), nullable=False
+    )  # access, export, correction, deletion, revoke, info
     status = Column(String(30), nullable=False, default="pending")
 
     requester_name = Column(String(255), nullable=True)
@@ -50,4 +57,6 @@ class DataSubjectRequest(TenantScoped, Base):
     due_at = Column(DateTime(timezone=True), nullable=True)
     processed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+    updated_at = Column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
