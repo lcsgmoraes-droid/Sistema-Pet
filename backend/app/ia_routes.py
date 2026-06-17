@@ -25,7 +25,7 @@ from app.ia.aba5_fluxo_caixa import (
     obter_projecoes_proximos_dias,
     simular_cenario,
     gerar_alertas_caixa,
-    registrar_movimentacao
+    registrar_movimentacao,
 )
 
 # ============================================================================
@@ -35,12 +35,13 @@ from app.ia.aba5_fluxo_caixa import (
 router = APIRouter(
     prefix="/ia/fluxo",
     tags=["IA - Fluxo de Caixa"],
-    dependencies=[Depends(get_current_user)]
+    dependencies=[Depends(get_current_user)],
 )
 
 # ============================================================================
 # SCHEMAS (REQUEST/RESPONSE)
 # ============================================================================
+
 
 class IndicesSaudeResponse(BaseModel):
     saldo_atual: float
@@ -106,20 +107,21 @@ class RegistrarMovimentacaoResponse(BaseModel):
 # ENDPOINT 1: GET ÍNDICES DE SAÚDE DO CAIXA
 # ============================================================================
 
+
 @router.get(
     "/indices-saude/{usuario_id}",
     response_model=IndicesSaudeResponse,
     summary="Índices de saúde do caixa",
-    description="Retorna índices calculados: dias de caixa, status, score, tendência"
+    description="Retorna índices calculados: dias de caixa, status, score, tendência",
 )
 async def get_indices_saude(
     usuario_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Retorna os índices de saúde do caixa.
-    
+
     **Exemplo de resposta:**
     ```json
     {
@@ -132,17 +134,17 @@ async def get_indices_saude(
     ```
     """
     current_user, tenant_id = user_and_tenant
-    
+
     # Verificar permissão
     if usuario_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Sem permissão")
-    
+
     # Calcular índices
     resultado = calcular_indices_saude(usuario_id, db, tenant_id=tenant_id)
-    
+
     if not resultado:
         raise HTTPException(status_code=500, detail="Erro ao calcular índices")
-    
+
     return resultado
 
 
@@ -150,42 +152,43 @@ async def get_indices_saude(
 # ENDPOINT 2: GET PROJEÇÕES JÁ CALCULADAS
 # ============================================================================
 
+
 @router.get(
     "/projecoes/{usuario_id}",
     response_model=List[ProjecaoResponse],
     summary="Projeções de fluxo de caixa",
-    description="Retorna projeções já calculadas para os próximos dias"
+    description="Retorna projeções já calculadas para os próximos dias",
 )
 async def get_projecoes(
     usuario_id: int,
     dias: int = Query(15, description="Quantos dias futuro"),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Retorna projeções já calculadas.
-    
+
     Se nenhuma projeção existir, retorna vazio (use POST /projetar-15-dias primeiro).
     """
     current_user, tenant_id = user_and_tenant
-    
+
     if usuario_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Sem permissão")
-    
+
     projecoes = obter_projecoes_proximos_dias(usuario_id, dias, db, tenant_id=tenant_id)
-    
+
     # Transformar para ProjecaoResponse
     return [
         ProjecaoResponse(
-            data=p['data'] if isinstance(p['data'], str) else p['data'].isoformat(),
-            dias_futuros=p['dias_futuros'],
-            saldo_estimado=p['saldo_estimado'],
-            entrada_estimada=p['entrada_estimada'],
-            saida_estimada=p['saida_estimada'],
-            limite_inferior=p['limite_inferior'],
-            limite_superior=p['limite_superior'],
-            vai_faltar_caixa=p['vai_faltar_caixa'],
-            alerta_nivel=p['alerta_nivel']
+            data=p["data"] if isinstance(p["data"], str) else p["data"].isoformat(),
+            dias_futuros=p["dias_futuros"],
+            saldo_estimado=p["saldo_estimado"],
+            entrada_estimada=p["entrada_estimada"],
+            saida_estimada=p["saida_estimada"],
+            limite_inferior=p["limite_inferior"],
+            limite_superior=p["limite_superior"],
+            vai_faltar_caixa=p["vai_faltar_caixa"],
+            alerta_nivel=p["alerta_nivel"],
         )
         for p in projecoes
     ]
@@ -195,22 +198,23 @@ async def get_projecoes(
 # ENDPOINT 3: POST PROJETAR 15 DIAS
 # ============================================================================
 
+
 @router.post(
     "/projetar-15-dias/{usuario_id}",
     response_model=List[ProjecaoResponse],
     summary="Gerar projeção 15 dias",
-    description="Treina Prophet e projeta fluxo de caixa para próximos 15 dias"
+    description="Treina Prophet e projeta fluxo de caixa para próximos 15 dias",
 )
 async def post_projetar_15_dias(
     usuario_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Calcula projeção de 15 dias usando Prophet.
-    
+
     ⚠️ **Requer mínimo 10 dias de dados históricos**
-    
+
     **Exemplo de resposta:**
     ```json
     [
@@ -225,30 +229,30 @@ async def post_projetar_15_dias(
     ```
     """
     current_user, tenant_id = user_and_tenant
-    
+
     if usuario_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Sem permissão")
-    
+
     projecoes = projetar_fluxo_15_dias(usuario_id, db, tenant_id=tenant_id)
-    
+
     if not projecoes:
         raise HTTPException(
             status_code=400,
-            detail="Dados insuficientes. Precisa mínimo 10 dias de histórico."
+            detail="Dados insuficientes. Precisa mínimo 10 dias de histórico.",
         )
-    
+
     # Transformar para ProjecaoResponse
     return [
         ProjecaoResponse(
-            data=p['data'] if isinstance(p['data'], str) else p['data'].isoformat(),
-            dias_futuros=p['dias_futuros'],
-            saldo_estimado=p['saldo_estimado'],
-            entrada_estimada=p['entrada_estimada'],
-            saida_estimada=p['saida_estimada'],
-            limite_inferior=p['limite_inferior'],
-            limite_superior=p['limite_superior'],
-            vai_faltar_caixa=p['vai_faltar_caixa'],
-            alerta_nivel=p['alerta_nivel']
+            data=p["data"] if isinstance(p["data"], str) else p["data"].isoformat(),
+            dias_futuros=p["dias_futuros"],
+            saldo_estimado=p["saldo_estimado"],
+            entrada_estimada=p["entrada_estimada"],
+            saida_estimada=p["saida_estimada"],
+            limite_inferior=p["limite_inferior"],
+            limite_superior=p["limite_superior"],
+            vai_faltar_caixa=p["vai_faltar_caixa"],
+            alerta_nivel=p["alerta_nivel"],
         )
         for p in projecoes
     ]
@@ -258,26 +262,27 @@ async def post_projetar_15_dias(
 # ENDPOINT 4: POST SIMULAR CENÁRIO
 # ============================================================================
 
+
 @router.post(
     "/simular-cenario/{usuario_id}",
     response_model=SimularCenarioResponse,
     summary="Simular cenário",
-    description="Simula cenários: otimista, pessimista, realista"
+    description="Simula cenários: otimista, pessimista, realista",
 )
 async def post_simular_cenario(
     usuario_id: int,
     request: SimularCenarioRequest,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Simula cenários diferentes sobre a projeção atual.
-    
+
     **Cenários:**
     - `otimista`: +20% entradas, -10% saídas
     - `pessimista`: -20% entradas, +10% saídas
     - `realista`: sem modificação
-    
+
     **Exemplo request:**
     ```json
     {
@@ -286,21 +291,21 @@ async def post_simular_cenario(
     ```
     """
     current_user, tenant_id = user_and_tenant
-    
+
     if usuario_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Sem permissão")
-    
+
     if request.cenario not in ["otimista", "pessimista", "realista"]:
         raise HTTPException(
             status_code=400,
-            detail="Cenário inválido. Use: otimista, pessimista ou realista"
+            detail="Cenário inválido. Use: otimista, pessimista ou realista",
         )
-    
+
     resultado = simular_cenario(usuario_id, request.cenario, db, tenant_id=tenant_id)
-    
+
     if not resultado:
         raise HTTPException(status_code=500, detail="Erro ao simular cenário")
-    
+
     return resultado
 
 
@@ -308,25 +313,26 @@ async def post_simular_cenario(
 # ENDPOINT 5: GET ALERTAS
 # ============================================================================
 
+
 @router.get(
     "/alertas/{usuario_id}",
     response_model=List[AlertaResponse],
     summary="Alertas de caixa",
-    description="Retorna alertas: caixa crítico, tendência negativa, projeção negativa"
+    description="Retorna alertas: caixa crítico, tendência negativa, projeção negativa",
 )
 async def get_alertas(
     usuario_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Retorna lista de alertas gerados.
-    
+
     **Tipos de alertas:**
     - `critico`: Caixa < 7 dias ou projeção negativa
     - `alerta`: Caixa < 15 dias
     - `aviso`: Tendência piorando
-    
+
     **Exemplo de resposta:**
     ```json
     [
@@ -339,12 +345,12 @@ async def get_alertas(
     ```
     """
     current_user, tenant_id = user_and_tenant
-    
+
     if usuario_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Sem permissão")
-    
+
     alertas = gerar_alertas_caixa(usuario_id, db, tenant_id=tenant_id)
-    
+
     return alertas
 
 
@@ -352,21 +358,22 @@ async def get_alertas(
 # ENDPOINT 6: POST REGISTRAR MOVIMENTAÇÃO
 # ============================================================================
 
+
 @router.post(
     "/registrar-movimentacao/{usuario_id}",
     response_model=RegistrarMovimentacaoResponse,
     summary="Registrar movimentação manual",
-    description="Lança uma movimentação manual de receita ou despesa"
+    description="Lança uma movimentação manual de receita ou despesa",
 )
 async def post_registrar_movimentacao(
     usuario_id: int,
     request: RegistrarMovimentacaoRequest,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Registra uma movimentação manual no fluxo de caixa.
-    
+
     **Exemplo request:**
     ```json
     {
@@ -379,19 +386,18 @@ async def post_registrar_movimentacao(
     ```
     """
     current_user, tenant_id = user_and_tenant
-    
+
     if usuario_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Sem permissão")
-    
+
     if request.tipo not in ["receita", "despesa"]:
         raise HTTPException(
-            status_code=400,
-            detail="Tipo inválido. Use: receita ou despesa"
+            status_code=400, detail="Tipo inválido. Use: receita ou despesa"
         )
-    
+
     if request.valor <= 0:
         raise HTTPException(status_code=400, detail="Valor deve ser > 0")
-    
+
     mov = registrar_movimentacao(
         usuario_id=usuario_id,
         tipo=request.tipo,
@@ -400,18 +406,18 @@ async def post_registrar_movimentacao(
         descricao=request.descricao,
         data_prevista=request.data_prevista,
         db=db,
-        tenant_id=tenant_id
+        tenant_id=tenant_id,
     )
-    
+
     if not mov:
         raise HTTPException(status_code=500, detail="Erro ao registrar movimentação")
-    
+
     return {
         "id": mov.id,
         "tipo": mov.tipo,
         "categoria": mov.categoria,
         "valor": mov.valor,
-        "status": mov.status
+        "status": mov.status,
     }
 
 
@@ -419,11 +425,12 @@ async def post_registrar_movimentacao(
 # HEALTH CHECK
 # ============================================================================
 
+
 @router.get(
     "/health",
     tags=["Health"],
     summary="Health check",
-    description="Verifica se o módulo IA está funcional"
+    description="Verifica se o módulo IA está funcional",
 )
 async def health_check():
     """
@@ -433,5 +440,5 @@ async def health_check():
         "status": "ok",
         "modulo": "ABA 5 - Fluxo de Caixa Preditivo",
         "endpoints": 6,
-        "database": "ok"
+        "database": "ok",
     }

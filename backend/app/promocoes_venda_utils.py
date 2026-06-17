@@ -44,11 +44,21 @@ def normalizar_canal_promocao(valor: Any) -> str:
 
     if any(
         chave in texto_normalizado
-        for chave in ("ecommerce", "e commerce", "loja virtual", "site", "web", "online")
+        for chave in (
+            "ecommerce",
+            "e commerce",
+            "loja virtual",
+            "site",
+            "web",
+            "online",
+        )
     ):
         return "ecommerce"
 
-    if any(chave in texto_normalizado for chave in ("loja", "pdv", "fisica", "erp", "bling")):
+    if any(
+        chave in texto_normalizado
+        for chave in ("loja", "pdv", "fisica", "erp", "bling")
+    ):
         return "loja_fisica"
 
     return texto or "loja_fisica"
@@ -108,7 +118,9 @@ def detectar_promocao_por_preco_vendido(
     preco_vendido = round(_as_float(preco_unitario), 2)
     quantidade_num = _as_float(quantidade, 1.0)
     subtotal = _as_float(subtotal_item) or round(preco_vendido * quantidade_num, 2)
-    preco_cadastro = round(_as_float(getattr(produto, "preco_venda", 0) if produto else 0), 2)
+    preco_cadastro = round(
+        _as_float(getattr(produto, "preco_venda", 0) if produto else 0), 2
+    )
 
     base = {
         "em_promocao": False,
@@ -169,16 +181,21 @@ def detectar_promocao_por_preco_vendido(
     candidatos_match = [
         candidato
         for candidato in candidatos
-        if abs(preco_vendido - candidato["preco_promocional"]) <= TOLERANCIA_PRECO_PROMOCAO
+        if abs(preco_vendido - candidato["preco_promocional"])
+        <= TOLERANCIA_PRECO_PROMOCAO
     ]
     if not candidatos_match:
         return base
 
-    preco_regular_ref = max(_as_float(candidato["preco_regular"]) for candidato in candidatos_match)
+    preco_regular_ref = max(
+        _as_float(candidato["preco_regular"]) for candidato in candidatos_match
+    )
     preco_promocional_ref = min(
         _as_float(candidato["preco_promocional"]) for candidato in candidatos_match
     )
-    desconto_promocional = max((preco_regular_ref - preco_promocional_ref) * quantidade_num, 0)
+    desconto_promocional = max(
+        (preco_regular_ref - preco_promocional_ref) * quantidade_num, 0
+    )
     origens = list(dict.fromkeys(candidato["origem"] for candidato in candidatos_match))
 
     return {

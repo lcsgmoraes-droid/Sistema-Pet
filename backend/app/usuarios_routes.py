@@ -11,7 +11,10 @@ from app.auth import get_current_user_and_tenant
 from app.auth.core import hash_password
 from app.security.permissions_decorator import require_permission
 from app.models import User, UserTenant, Role
-from app.services.business_audit_service import build_user_access_metadata, log_business_event
+from app.services.business_audit_service import (
+    build_user_access_metadata,
+    log_business_event,
+)
 from app.session_manager import revoke_all_sessions
 from app.tenancy.rls import sync_rls_auth_email, sync_rls_auth_user
 
@@ -177,6 +180,7 @@ def criar_usuario(
 # ETAPA B2 — VINCULAR USUÁRIO AO TENANT
 # ==========================================
 
+
 class VinculoCreate(BaseModel):
     role_id: int
 
@@ -196,9 +200,7 @@ def vincular_usuario(
     actor, tenant_id = user_and_tenant
 
     user = (
-        db.query(User)
-        .filter(User.id == user_id, User.tenant_id == tenant_id)
-        .first()
+        db.query(User).filter(User.id == user_id, User.tenant_id == tenant_id).first()
     )
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
@@ -220,7 +222,9 @@ def vincular_usuario(
         .first()
     )
     if existing:
-        raise HTTPException(status_code=400, detail="Usuário já vinculado a este tenant")
+        raise HTTPException(
+            status_code=400, detail="Usuário já vinculado a este tenant"
+        )
 
     vinculo = UserTenant(
         user_id=user_id,
@@ -270,7 +274,9 @@ def atualizar_status_usuario(
         .first()
     )
     if not vinculo:
-        raise HTTPException(status_code=404, detail="Usuário não vinculado a este tenant")
+        raise HTTPException(
+            status_code=404, detail="Usuário não vinculado a este tenant"
+        )
 
     previous_status = bool(vinculo.is_active)
     vinculo.is_active = payload.is_active
@@ -340,7 +346,9 @@ def forcar_logout_usuario(
         .first()
     )
     if not vinculo:
-        raise HTTPException(status_code=404, detail="Usuário não vinculado a este tenant")
+        raise HTTPException(
+            status_code=404, detail="Usuário não vinculado a este tenant"
+        )
 
     revogadas = revoke_all_sessions(
         db=db,

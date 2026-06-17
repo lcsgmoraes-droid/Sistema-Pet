@@ -1,6 +1,7 @@
 """
 Rotas para o Sistema de Controle de Caixa
 """
+
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import and_, func
@@ -17,7 +18,7 @@ from app.financeiro_models import ContaPagar, TipoDespesa
 from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from app.pdf_caixa import gerar_pdf_fechamento_caixa
 
-router = APIRouter(prefix='/caixas', tags=['caixas'])
+router = APIRouter(prefix="/caixas", tags=["caixas"])
 
 
 # Schemas
@@ -56,35 +57,41 @@ async def abrir_caixa(
     dados: AbrirCaixaSchema,
     request: Request,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Abrir um novo caixa"""
     current_user, tenant_id = current_user_and_tenant
-    
+
     # Verificar se já existe caixa aberto para o usuário
-    caixa_aberto = db.query(Caixa).filter(
-        and_(
-            Caixa.usuario_id == current_user.id,
-            Caixa.tenant_id == tenant_id,
-            Caixa.status == 'aberto'
+    caixa_aberto = (
+        db.query(Caixa)
+        .filter(
+            and_(
+                Caixa.usuario_id == current_user.id,
+                Caixa.tenant_id == tenant_id,
+                Caixa.status == "aberto",
+            )
         )
-    ).first()
-    
+        .first()
+    )
+
     if caixa_aberto:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Você já possui um caixa aberto. Feche-o antes de abrir outro."
+            detail="Você já possui um caixa aberto. Feche-o antes de abrir outro.",
         )
-    
+
     # Gerar número do caixa (próximo número disponível por tenant)
-    ultimo_caixa = db.query(func.max(Caixa.numero_caixa)).filter(
-        Caixa.tenant_id == tenant_id
-    ).scalar()
+    ultimo_caixa = (
+        db.query(func.max(Caixa.numero_caixa))
+        .filter(Caixa.tenant_id == tenant_id)
+        .scalar()
+    )
     numero_caixa = (ultimo_caixa or 0) + 1
-    
+
     # Nome do usuário (fallback para email se nome não estiver preenchido)
     usuario_nome = current_user.nome or current_user.email
-    
+
     # Criar novo caixa
     novo_caixa = Caixa(
         numero_caixa=numero_caixa,
@@ -94,36 +101,40 @@ async def abrir_caixa(
         conta_origem_id=dados.conta_origem_id,
         conta_origem_nome=dados.conta_origem_nome,
         observacoes_abertura=dados.observacoes_abertura,
-        status='aberto',
-        tenant_id=tenant_id
+        status="aberto",
+        tenant_id=tenant_id,
     )
-    
+
     db.add(novo_caixa)
     db.commit()
     db.refresh(novo_caixa)
-    
+
     return novo_caixa.to_dict()
 
 
 @router.get("/aberto")
 def obter_caixa_aberto(
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Obter caixa aberto do usuário atual"""
     current_user, tenant_id = current_user_and_tenant
-    
-    caixa = db.query(Caixa).filter(
-        and_(
-            Caixa.usuario_id == current_user.id,
-            Caixa.tenant_id == tenant_id,
-            Caixa.status == 'aberto'
+
+    caixa = (
+        db.query(Caixa)
+        .filter(
+            and_(
+                Caixa.usuario_id == current_user.id,
+                Caixa.tenant_id == tenant_id,
+                Caixa.status == "aberto",
+            )
         )
-    ).first()
-    
+        .first()
+    )
+
     if not caixa:
         return None
-    
+
     return caixa.to_dict()
 
 
@@ -133,27 +144,26 @@ def listar_caixas(
     data_fim: Optional[str] = None,
     status_filter: Optional[str] = None,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Listar caixas do usuário"""
     current_user, tenant_id = current_user_and_tenant
-    
+
     query = db.query(Caixa).filter(
-        Caixa.usuario_id == current_user.id,
-        Caixa.tenant_id == tenant_id
+        Caixa.usuario_id == current_user.id, Caixa.tenant_id == tenant_id
     )
-    
+
     if data_inicio:
         query = query.filter(Caixa.data_abertura >= datetime.fromisoformat(data_inicio))
-    
+
     if data_fim:
         query = query.filter(Caixa.data_abertura <= datetime.fromisoformat(data_fim))
-    
+
     if status_filter:
         query = query.filter(Caixa.status == status_filter)
-    
+
     caixas = query.order_by(Caixa.data_abertura.desc()).all()
-    
+
     return [caixa.to_dict() for caixa in caixas]
 
 
@@ -161,21 +171,25 @@ def listar_caixas(
 def obter_caixa(
     caixa_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Obter detalhes de um caixa específico"""
     current_user, tenant_id = current_user_and_tenant
-    
+
     # 🔒 SEGURANÇA: Validar que o caixa pertence ao usuário e tenant
-    caixa = db.query(Caixa).filter(
-        Caixa.id == caixa_id,
-        Caixa.usuario_id == current_user.id,
-        Caixa.tenant_id == tenant_id
-    ).first()
-    
+    caixa = (
+        db.query(Caixa)
+        .filter(
+            Caixa.id == caixa_id,
+            Caixa.usuario_id == current_user.id,
+            Caixa.tenant_id == tenant_id,
+        )
+        .first()
+    )
+
     if not caixa:
         raise HTTPException(status_code=404, detail="Caixa não encontrado")
-    
+
     return caixa.to_dict()
 
 
@@ -186,30 +200,33 @@ async def criar_movimentacao(
     dados: MovimentacaoSchema,
     request: Request,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Adicionar movimentação ao caixa"""
     current_user, tenant_id = current_user_and_tenant
-    
+
     # 🔒 SEGURANÇA: Validar que o caixa pertence ao usuário e tenant
-    caixa = db.query(Caixa).filter(
-        Caixa.id == caixa_id,
-        Caixa.usuario_id == current_user.id,
-        Caixa.tenant_id == tenant_id
-    ).first()
-    
+    caixa = (
+        db.query(Caixa)
+        .filter(
+            Caixa.id == caixa_id,
+            Caixa.usuario_id == current_user.id,
+            Caixa.tenant_id == tenant_id,
+        )
+        .first()
+    )
+
     if not caixa:
         raise HTTPException(status_code=404, detail="Caixa não encontrado")
-    
-    if caixa.status != 'aberto':
+
+    if caixa.status != "aberto":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Caixa não está aberto"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Caixa não está aberto"
         )
-    
+
     # Nome do usuário (fallback para email se nome não estiver preenchido)
     usuario_nome = current_user.nome or current_user.email
-    
+
     # Criar movimentação
     movimentacao = MovimentacaoCaixa(
         caixa_id=caixa_id,
@@ -227,23 +244,27 @@ async def criar_movimentacao(
         documento=dados.documento,
         usuario_id=current_user.id,
         usuario_nome=usuario_nome,
-        tenant_id=tenant_id
+        tenant_id=tenant_id,
     )
-    
+
     db.add(movimentacao)
 
     conta_pagar_gerada = None
-    if dados.tipo == 'despesa':
+    if dados.tipo == "despesa":
         hoje = date.today()
-        descricao_cp = dados.descricao or dados.categoria or 'Despesa lançada no caixa'
+        descricao_cp = dados.descricao or dados.categoria or "Despesa lançada no caixa"
         dre_subcategoria_id = 2
 
         if dados.tipo_despesa_id is not None:
-            tipo_despesa = db.query(TipoDespesa).filter(
-                TipoDespesa.id == dados.tipo_despesa_id,
-                TipoDespesa.tenant_id == tenant_id,
-                TipoDespesa.ativo.is_(True),
-            ).first()
+            tipo_despesa = (
+                db.query(TipoDespesa)
+                .filter(
+                    TipoDespesa.id == dados.tipo_despesa_id,
+                    TipoDespesa.tenant_id == tenant_id,
+                    TipoDespesa.ativo.is_(True),
+                )
+                .first()
+            )
             if not tipo_despesa:
                 raise HTTPException(status_code=400, detail="Tipo de despesa inválido")
             dre_subcategoria_id = tipo_despesa.dre_subcategoria_id or 2
@@ -258,9 +279,9 @@ async def criar_movimentacao(
             data_emissao=hoje,
             data_vencimento=hoje,
             data_pagamento=hoje,
-            status='pago',
+            status="pago",
             dre_subcategoria_id=dre_subcategoria_id,
-            canal='loja_fisica',
+            canal="loja_fisica",
             documento=dados.documento,
             observacoes=f"Gerada automaticamente pelo PDV (Caixa #{caixa.numero_caixa})",
             user_id=current_user.id,
@@ -281,11 +302,11 @@ async def criar_movimentacao(
             canal=conta_pagar_gerada.canal,
             valor=conta_pagar_gerada.valor_original,
             data_lancamento=conta_pagar_gerada.data_pagamento,
-            tipo_movimentacao='DESPESA',
+            tipo_movimentacao="DESPESA",
         )
         db.commit()
-        retorno['conta_pagar_id'] = conta_pagar_gerada.id
-        retorno['conta_pagar_status'] = conta_pagar_gerada.status
+        retorno["conta_pagar_id"] = conta_pagar_gerada.id
+        retorno["conta_pagar_status"] = conta_pagar_gerada.status
 
     return retorno
 
@@ -297,55 +318,62 @@ async def fechar_caixa(
     dados: FecharCaixaSchema,
     request: Request,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Fechar caixa"""
     current_user, tenant_id = current_user_and_tenant
-    
+
     # 🔒 SEGURANÇA: Validar que o caixa pertence ao usuário e tenant
-    caixa = db.query(Caixa).filter(
-        Caixa.id == caixa_id,
-        Caixa.usuario_id == current_user.id,
-        Caixa.tenant_id == tenant_id
-    ).first()
-    
+    caixa = (
+        db.query(Caixa)
+        .filter(
+            Caixa.id == caixa_id,
+            Caixa.usuario_id == current_user.id,
+            Caixa.tenant_id == tenant_id,
+        )
+        .first()
+    )
+
     if not caixa:
         raise HTTPException(status_code=404, detail="Caixa não encontrado")
-    
-    if caixa.status != 'aberto':
+
+    if caixa.status != "aberto":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Caixa já está fechado"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Caixa já está fechado"
         )
-    
+
     # Calcular valor esperado
-    movimentacoes = db.query(MovimentacaoCaixa).filter(
-        MovimentacaoCaixa.caixa_id == caixa_id,
-        MovimentacaoCaixa.tenant_id == tenant_id
-    ).all()
-    
+    movimentacoes = (
+        db.query(MovimentacaoCaixa)
+        .filter(
+            MovimentacaoCaixa.caixa_id == caixa_id,
+            MovimentacaoCaixa.tenant_id == tenant_id,
+        )
+        .all()
+    )
+
     valor_esperado = caixa.valor_abertura
-    
+
     for mov in movimentacoes:
-        if mov.tipo in ['venda', 'suprimento', 'devolucao']:
+        if mov.tipo in ["venda", "suprimento", "devolucao"]:
             valor_esperado += mov.valor
-        elif mov.tipo in ['sangria', 'despesa', 'transferencia']:
+        elif mov.tipo in ["sangria", "despesa", "transferencia"]:
             valor_esperado -= mov.valor
-    
+
     # Calcular diferença (registrada no banco para auditoria)
     diferenca = dados.valor_informado - valor_esperado
-    
+
     # Atualizar caixa
     caixa.data_fechamento = datetime.now()
     caixa.valor_esperado = valor_esperado
     caixa.valor_informado = dados.valor_informado
     caixa.diferenca = diferenca
     caixa.observacoes_fechamento = dados.observacoes_fechamento
-    caixa.status = 'fechado'
-    
+    caixa.status = "fechado"
+
     db.commit()
     db.refresh(caixa)
-    
+
     return caixa.to_dict()
 
 
@@ -353,53 +381,61 @@ async def fechar_caixa(
 def reabrir_caixa(
     caixa_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Reabrir um caixa fechado"""
     current_user, tenant_id = current_user_and_tenant
-    
+
     # Verificar se já existe caixa aberto
-    caixa_aberto = db.query(Caixa).filter(
-        and_(
-            Caixa.usuario_id == current_user.id,
-            Caixa.tenant_id == tenant_id,
-            Caixa.status == 'aberto'
+    caixa_aberto = (
+        db.query(Caixa)
+        .filter(
+            and_(
+                Caixa.usuario_id == current_user.id,
+                Caixa.tenant_id == tenant_id,
+                Caixa.status == "aberto",
+            )
         )
-    ).first()
-    
+        .first()
+    )
+
     if caixa_aberto:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Você já possui um caixa aberto. Feche-o antes de reabrir outro."
+            detail="Você já possui um caixa aberto. Feche-o antes de reabrir outro.",
         )
-    
+
     # 🔒 SEGURANÇA: Validar que o caixa pertence ao usuário e tenant
-    caixa = db.query(Caixa).filter(
-        Caixa.id == caixa_id,
-        Caixa.usuario_id == current_user.id,
-        Caixa.tenant_id == tenant_id
-    ).first()
-    
+    caixa = (
+        db.query(Caixa)
+        .filter(
+            Caixa.id == caixa_id,
+            Caixa.usuario_id == current_user.id,
+            Caixa.tenant_id == tenant_id,
+        )
+        .first()
+    )
+
     if not caixa:
         raise HTTPException(status_code=404, detail="Caixa não encontrado")
-    
-    if caixa.status != 'fechado':
+
+    if caixa.status != "fechado":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Apenas caixas fechados podem ser reabertos"
+            detail="Apenas caixas fechados podem ser reabertos",
         )
-    
+
     # Reabrir caixa
-    caixa.status = 'aberto'
+    caixa.status = "aberto"
     caixa.data_fechamento = None
     caixa.valor_esperado = None
     caixa.valor_informado = None
     caixa.diferenca = None
     caixa.observacoes_fechamento = None
-    
+
     db.commit()
     db.refresh(caixa)
-    
+
     return caixa.to_dict()
 
 
@@ -407,90 +443,111 @@ def reabrir_caixa(
 def obter_resumo_caixa(
     caixa_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Obter resumo do caixa com totais"""
     current_user, tenant_id = current_user_and_tenant
-    
+
     # 🔒 SEGURANÇA: Validar que o caixa pertence ao usuário e tenant
-    caixa = db.query(Caixa).filter(
-        Caixa.id == caixa_id,
-        Caixa.usuario_id == current_user.id,
-        Caixa.tenant_id == tenant_id
-    ).first()
-    
+    caixa = (
+        db.query(Caixa)
+        .filter(
+            Caixa.id == caixa_id,
+            Caixa.usuario_id == current_user.id,
+            Caixa.tenant_id == tenant_id,
+        )
+        .first()
+    )
+
     if not caixa:
         raise HTTPException(status_code=404, detail="Caixa não encontrado")
-    
+
     # Calcular totais
-    movimentacoes = db.query(MovimentacaoCaixa).filter(
-        MovimentacaoCaixa.caixa_id == caixa_id,
-        MovimentacaoCaixa.tenant_id == tenant_id
-    ).all()
-    
-    total_vendas = sum(
-        m.valor for m in movimentacoes 
-        if m.tipo == 'venda' and m.forma_pagamento == 'Dinheiro'
+    movimentacoes = (
+        db.query(MovimentacaoCaixa)
+        .filter(
+            MovimentacaoCaixa.caixa_id == caixa_id,
+            MovimentacaoCaixa.tenant_id == tenant_id,
+        )
+        .all()
     )
-    total_suprimentos = sum(m.valor for m in movimentacoes if m.tipo == 'suprimento')
-    total_sangrias = sum(m.valor for m in movimentacoes if m.tipo == 'sangria')
-    total_despesas = sum(m.valor for m in movimentacoes if m.tipo == 'despesa')
-    total_transferencias = sum(m.valor for m in movimentacoes if m.tipo == 'transferencia')
-    total_devolucoes = sum(m.valor for m in movimentacoes if m.tipo == 'devolucao')
-    
+
+    total_vendas = sum(
+        m.valor
+        for m in movimentacoes
+        if m.tipo == "venda" and m.forma_pagamento == "Dinheiro"
+    )
+    total_suprimentos = sum(m.valor for m in movimentacoes if m.tipo == "suprimento")
+    total_sangrias = sum(m.valor for m in movimentacoes if m.tipo == "sangria")
+    total_despesas = sum(m.valor for m in movimentacoes if m.tipo == "despesa")
+    total_transferencias = sum(
+        m.valor for m in movimentacoes if m.tipo == "transferencia"
+    )
+    total_devolucoes = sum(m.valor for m in movimentacoes if m.tipo == "devolucao")
+
     # 💰 Calcular totais por forma de pagamento de TODAS as vendas DESTE CAIXA
     # Buscar vendas vinculadas a este caixa específico (não apenas do dia)
     from app.vendas_models import Venda, VendaPagamento
     from sqlalchemy import func
-    
-    vendas_do_caixa = db.query(
-        VendaPagamento.forma_pagamento,
-        func.count(VendaPagamento.id).label('quantidade'),
-        func.sum(VendaPagamento.valor).label('total')
-    ).join(Venda).filter(
-        Venda.caixa_id == caixa_id,
-        Venda.tenant_id == tenant_id,
-        Venda.status.in_(['finalizada', 'baixa_parcial'])
-    ).group_by(VendaPagamento.forma_pagamento).all()
-    
+
+    vendas_do_caixa = (
+        db.query(
+            VendaPagamento.forma_pagamento,
+            func.count(VendaPagamento.id).label("quantidade"),
+            func.sum(VendaPagamento.valor).label("total"),
+        )
+        .join(Venda)
+        .filter(
+            Venda.caixa_id == caixa_id,
+            Venda.tenant_id == tenant_id,
+            Venda.status.in_(["finalizada", "baixa_parcial"]),
+        )
+        .group_by(VendaPagamento.forma_pagamento)
+        .all()
+    )
+
     vendas_por_forma = {}
     for forma_id, qtd, total in vendas_do_caixa:
         # Buscar nome da forma de pagamento
         from app.financeiro_models import FormaPagamento
+
         # forma_id é na verdade o NOME da forma (String), não o ID
-        forma = db.query(FormaPagamento).filter(
-            FormaPagamento.nome == forma_id,
-            FormaPagamento.tenant_id == tenant_id
-        ).first()
+        forma = (
+            db.query(FormaPagamento)
+            .filter(
+                FormaPagamento.nome == forma_id, FormaPagamento.tenant_id == tenant_id
+            )
+            .first()
+        )
         nome_forma = forma.nome if forma else str(forma_id)
-        
+
         vendas_por_forma[nome_forma] = {
-            'quantidade': qtd,
-            'total': float(total) if total else 0.0
+            "quantidade": qtd,
+            "total": float(total) if total else 0.0,
         }
-    
+
     saldo_atual = (
-        caixa.valor_abertura +
-        total_vendas +
-        total_suprimentos +
-        total_devolucoes -
-        total_sangrias -
-        total_despesas -
-        total_transferencias
+        caixa.valor_abertura
+        + total_vendas
+        + total_suprimentos
+        + total_devolucoes
+        - total_sangrias
+        - total_despesas
+        - total_transferencias
     )
-    
+
     return {
-        'caixa': caixa.to_dict(),
-        'totais': {
-            'vendas': total_vendas,
-            'suprimentos': total_suprimentos,
-            'sangrias': total_sangrias,
-            'despesas': total_despesas,
-            'transferencias': total_transferencias,
-            'devolucoes': total_devolucoes,
-            'saldo_atual': saldo_atual
+        "caixa": caixa.to_dict(),
+        "totais": {
+            "vendas": total_vendas,
+            "suprimentos": total_suprimentos,
+            "sangrias": total_sangrias,
+            "despesas": total_despesas,
+            "transferencias": total_transferencias,
+            "devolucoes": total_devolucoes,
+            "saldo_atual": saldo_atual,
         },
-        'vendas_por_forma_pagamento': vendas_por_forma
+        "vendas_por_forma_pagamento": vendas_por_forma,
     }
 
 
@@ -498,74 +555,79 @@ def obter_resumo_caixa(
 def listar_movimentacoes_caixa(
     caixa_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Lista todas as movimentações de um caixa (extrato completo)"""
     current_user, tenant_id = current_user_and_tenant
-    
+
     # Verificar se o caixa existe e pertence ao usuário e tenant
-    caixa = db.query(Caixa).filter_by(
-        id=caixa_id,
-        usuario_id=current_user.id,
-        tenant_id=tenant_id
-    ).first()
-    
+    caixa = (
+        db.query(Caixa)
+        .filter_by(id=caixa_id, usuario_id=current_user.id, tenant_id=tenant_id)
+        .first()
+    )
+
     if not caixa:
-        raise HTTPException(status_code=404, detail='Caixa não encontrado')
-    
+        raise HTTPException(status_code=404, detail="Caixa não encontrado")
+
     # Buscar todas as movimentações ordenadas por data (mais recentes primeiro)
-    movimentacoes = db.query(MovimentacaoCaixa).filter(
-        MovimentacaoCaixa.caixa_id == caixa_id,
-        MovimentacaoCaixa.tenant_id == tenant_id
-    ).order_by(MovimentacaoCaixa.data_movimento.desc()).all()
-    
+    movimentacoes = (
+        db.query(MovimentacaoCaixa)
+        .filter(
+            MovimentacaoCaixa.caixa_id == caixa_id,
+            MovimentacaoCaixa.tenant_id == tenant_id,
+        )
+        .order_by(MovimentacaoCaixa.data_movimento.desc())
+        .all()
+    )
+
     # Converter para dicionário com informações extras
     resultado = []
     for mov in movimentacoes:
         mov_dict = mov.to_dict()
-        
+
         # Adicionar emoji e cor baseado no tipo
-        if mov.tipo == 'venda':
-            mov_dict['emoji'] = '💰'
-            mov_dict['cor'] = 'green'
-            mov_dict['natureza'] = 'entrada'
-        elif mov.tipo == 'suprimento':
-            mov_dict['emoji'] = '➕'
-            mov_dict['cor'] = 'blue'
-            mov_dict['natureza'] = 'entrada'
-        elif mov.tipo == 'sangria':
-            mov_dict['emoji'] = '➖'
-            mov_dict['cor'] = 'orange'
-            mov_dict['natureza'] = 'saida'
-        elif mov.tipo == 'despesa':
-            mov_dict['emoji'] = '💸'
-            mov_dict['cor'] = 'red'
-            mov_dict['natureza'] = 'saida'
-        elif mov.tipo == 'devolucao':
-            mov_dict['emoji'] = '🔄'
-            mov_dict['cor'] = 'purple'
-            mov_dict['natureza'] = 'saida'
-        elif mov.tipo == 'transferencia':
-            mov_dict['emoji'] = '🔁'
-            mov_dict['cor'] = 'gray'
-            mov_dict['natureza'] = 'saida'
+        if mov.tipo == "venda":
+            mov_dict["emoji"] = "💰"
+            mov_dict["cor"] = "green"
+            mov_dict["natureza"] = "entrada"
+        elif mov.tipo == "suprimento":
+            mov_dict["emoji"] = "➕"
+            mov_dict["cor"] = "blue"
+            mov_dict["natureza"] = "entrada"
+        elif mov.tipo == "sangria":
+            mov_dict["emoji"] = "➖"
+            mov_dict["cor"] = "orange"
+            mov_dict["natureza"] = "saida"
+        elif mov.tipo == "despesa":
+            mov_dict["emoji"] = "💸"
+            mov_dict["cor"] = "red"
+            mov_dict["natureza"] = "saida"
+        elif mov.tipo == "devolucao":
+            mov_dict["emoji"] = "🔄"
+            mov_dict["cor"] = "purple"
+            mov_dict["natureza"] = "saida"
+        elif mov.tipo == "transferencia":
+            mov_dict["emoji"] = "🔁"
+            mov_dict["cor"] = "gray"
+            mov_dict["natureza"] = "saida"
         else:
-            mov_dict['emoji'] = '📝'
-            mov_dict['cor'] = 'gray'
-            mov_dict['natureza'] = 'neutro'
-        
+            mov_dict["emoji"] = "📝"
+            mov_dict["cor"] = "gray"
+            mov_dict["natureza"] = "neutro"
+
         resultado.append(mov_dict)
-    
+
     return {
-        'caixa': {
-            'id': caixa.id,
-            'numero_caixa': caixa.numero_caixa,
-            'usuario_nome': caixa.usuario_nome,
-            'status': caixa.status,
-            'valor_abertura': float(caixa.valor_abertura)
+        "caixa": {
+            "id": caixa.id,
+            "numero_caixa": caixa.numero_caixa,
+            "usuario_nome": caixa.usuario_nome,
+            "status": caixa.status,
+            "valor_abertura": float(caixa.valor_abertura),
         },
-        'movimentacoes': resultado,
-        'total_movimentacoes': len(resultado)
+        "movimentacoes": resultado,
+        "total_movimentacoes": len(resultado),
     }
 
 
@@ -574,31 +636,33 @@ def listar_vendas_caixa(
     caixa_id: int,
     forma_pagamento: str = None,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Lista as vendas de um caixa, opcionalmente filtradas por forma de pagamento"""
     current_user, tenant_id = current_user_and_tenant
 
-    caixa = db.query(Caixa).filter_by(
-        id=caixa_id,
-        usuario_id=current_user.id,
-        tenant_id=tenant_id
-    ).first()
+    caixa = (
+        db.query(Caixa)
+        .filter_by(id=caixa_id, usuario_id=current_user.id, tenant_id=tenant_id)
+        .first()
+    )
     if not caixa:
-        raise HTTPException(status_code=404, detail='Caixa não encontrado')
+        raise HTTPException(status_code=404, detail="Caixa não encontrado")
 
     from app.vendas_models import Venda, VendaPagamento
 
     query = db.query(Venda).filter(
         Venda.caixa_id == caixa_id,
         Venda.tenant_id == tenant_id,
-        Venda.status.in_(['finalizada', 'baixa_parcial'])
+        Venda.status.in_(["finalizada", "baixa_parcial"]),
     )
 
     if forma_pagamento:
-        query = query.join(VendaPagamento, VendaPagamento.venda_id == Venda.id).filter(
-            VendaPagamento.forma_pagamento == forma_pagamento
-        ).distinct()
+        query = (
+            query.join(VendaPagamento, VendaPagamento.venda_id == Venda.id)
+            .filter(VendaPagamento.forma_pagamento == forma_pagamento)
+            .distinct()
+        )
 
     vendas = query.order_by(Venda.data_venda.desc()).all()
 
@@ -606,19 +670,23 @@ def listar_vendas_caixa(
     for v in vendas:
         if forma_pagamento:
             valor_nesta_forma = sum(
-                float(p.valor) for p in v.pagamentos if p.forma_pagamento == forma_pagamento
+                float(p.valor)
+                for p in v.pagamentos
+                if p.forma_pagamento == forma_pagamento
             )
         else:
             valor_nesta_forma = float(v.total)
 
-        resultado.append({
-            'id': v.id,
-            'numero_venda': v.numero_venda,
-            'cliente_nome': v.cliente.nome if v.cliente else 'Consumidor',
-            'total': float(v.total),
-            'valor_nesta_forma': valor_nesta_forma,
-            'hora_venda': v.data_venda.strftime('%H:%M') if v.data_venda else None,
-        })
+        resultado.append(
+            {
+                "id": v.id,
+                "numero_venda": v.numero_venda,
+                "cliente_nome": v.cliente.nome if v.cliente else "Consumidor",
+                "total": float(v.total),
+                "valor_nesta_forma": valor_nesta_forma,
+                "hora_venda": v.data_venda.strftime("%H:%M") if v.data_venda else None,
+            }
+        )
 
     return resultado
 
@@ -627,66 +695,71 @@ def listar_vendas_caixa(
 def gerar_pdf_caixa(
     caixa_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Gera PDF do fechamento de caixa
     """
     current_user, tenant_id = current_user_and_tenant
-    
+
     # Buscar caixa
-    caixa = db.query(Caixa).filter_by(
-        id=caixa_id,
-        usuario_id=current_user.id,
-        tenant_id=tenant_id
-    ).first()
-    
+    caixa = (
+        db.query(Caixa)
+        .filter_by(id=caixa_id, usuario_id=current_user.id, tenant_id=tenant_id)
+        .first()
+    )
+
     if not caixa:
-        raise HTTPException(status_code=404, detail='Caixa não encontrado')
-    
+        raise HTTPException(status_code=404, detail="Caixa não encontrado")
+
     # Buscar movimentações
-    movimentacoes = db.query(MovimentacaoCaixa).filter_by(
-        caixa_id=caixa_id,
-        tenant_id=tenant_id
-    ).order_by(MovimentacaoCaixa.created_at).all()
-    
+    movimentacoes = (
+        db.query(MovimentacaoCaixa)
+        .filter_by(caixa_id=caixa_id, tenant_id=tenant_id)
+        .order_by(MovimentacaoCaixa.created_at)
+        .all()
+    )
+
     # Preparar dados do caixa
     caixa_data = {
-        'numero_caixa': caixa.numero_caixa,
-        'data_abertura': caixa.data_abertura,
-        'data_fechamento': caixa.data_fechamento,
-        'responsavel': caixa.usuario_nome,
-        'status': caixa.status,
-        'saldo_inicial': float(caixa.valor_abertura),
-        'total_entradas': float(caixa.total_entradas or 0),
-        'total_saidas': float(caixa.total_saidas or 0),
-        'saldo_final': float(caixa.saldo_final or 0),
-        'saldo_fechamento': float(caixa.valor_fechamento) if caixa.valor_fechamento else None,
-        'diferenca': float(caixa.diferenca) if caixa.diferenca else None
+        "numero_caixa": caixa.numero_caixa,
+        "data_abertura": caixa.data_abertura,
+        "data_fechamento": caixa.data_fechamento,
+        "responsavel": caixa.usuario_nome,
+        "status": caixa.status,
+        "saldo_inicial": float(caixa.valor_abertura),
+        "total_entradas": float(caixa.total_entradas or 0),
+        "total_saidas": float(caixa.total_saidas or 0),
+        "saldo_final": float(caixa.saldo_final or 0),
+        "saldo_fechamento": float(caixa.valor_fechamento)
+        if caixa.valor_fechamento
+        else None,
+        "diferenca": float(caixa.diferenca) if caixa.diferenca else None,
     }
-    
+
     # Preparar dados das movimentações
     mov_list = []
     for mov in movimentacoes:
-        mov_list.append({
-            'created_at': mov.created_at,
-            'tipo': mov.tipo,
-            'descricao': mov.descricao,
-            'forma_pagamento_nome': mov.forma_pagamento,
-            'valor': float(mov.valor)
-        })
-    
+        mov_list.append(
+            {
+                "created_at": mov.created_at,
+                "tipo": mov.tipo,
+                "descricao": mov.descricao,
+                "forma_pagamento_nome": mov.forma_pagamento,
+                "valor": float(mov.valor),
+            }
+        )
+
     # Gerar PDF
     pdf_buffer = gerar_pdf_fechamento_caixa(caixa_data, mov_list)
-    
+
     # Retornar PDF
-    filename = f"Caixa_{caixa.numero_caixa}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    
+    filename = (
+        f"Caixa_{caixa.numero_caixa}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    )
+
     return StreamingResponse(
         pdf_buffer,
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": f"attachment; filename={filename}"
-        }
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
-
