@@ -1,6 +1,10 @@
 """
 Rotas para gerenciar integração com Bling
 """
+import asyncio
+import json
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.db import get_session
@@ -19,6 +23,20 @@ from app.services.bling_flow_monitor_service import (
 )
 
 router = APIRouter(prefix="/bling", tags=["Bling"])
+
+
+def _carregar_controle_token_bling(token_control_file: Path) -> dict[str, object]:
+    token_info = {
+        "ultima_renovacao": None,
+        "proxima_renovacao": None,
+        "renovacoes_automaticas": 0,
+    }
+
+    if token_control_file.exists():
+        with token_control_file.open("r", encoding="utf-8") as f:
+            token_info = json.load(f)
+
+    return token_info
 
 
 @router.get("/naturezas-operacoes")
@@ -82,9 +100,6 @@ async def testar_conexao(
     """
     Testa a conexão com a API do Bling e retorna status + info de renovação
     """
-    from pathlib import Path
-    import json
-    
     try:
         # Tentar conectar
         bling = BlingAPI()
@@ -92,15 +107,10 @@ async def testar_conexao(
         
         # Carregar info de controle de token
         token_control_file = Path("bling_token_control.json")
-        token_info = {
-            "ultima_renovacao": None,
-            "proxima_renovacao": None,
-            "renovacoes_automaticas": 0
-        }
-        
-        if token_control_file.exists():
-            with open(token_control_file, 'r') as f:
-                token_info = json.load(f)
+        token_info = await asyncio.to_thread(
+            _carregar_controle_token_bling,
+            token_control_file,
+        )
         
         return {
             "conectado": True,
