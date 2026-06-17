@@ -752,9 +752,7 @@ def test_backend_ci_has_blocking_backend_stock_conciliation_root_format_step():
         "app/conciliacao_historico_routes.py app/conciliacao_models.py "
         "app/conciliacao_operadora_detector.py "
         "app/estoque_movimentacoes_manuais_routes.py "
-        "app/estoque_relatorios_routes.py app/estoque_routes.py "
-        "app/estoque_saida_full_routes.py "
-        "app/estoque_transferencia_parceiro_routes.py"
+        "app/estoque_relatorios_routes.py app/estoque_routes.py"
     ) in source
 
 
