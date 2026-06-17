@@ -1,7 +1,4 @@
-export default function CampanhasRankingLoteCard({
-  setResultadoLote,
-  setModalLote,
-}) {
+export default function CampanhasRankingLoteCard({ setResultadoLote, setModalLote }) {
   return (
     <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between">
       <div>

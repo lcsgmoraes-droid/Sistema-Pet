@@ -2,8 +2,7 @@ import { FRASES_ANIVERSARIO } from "./campanhasConstants";
 import { CampanhaField, CampanhaSel } from "./CampanhasParametrosFields";
 
 export function CampanhasParametrosBirthdaySection({ tipo, num, str, set }) {
-  const frases =
-    FRASES_ANIVERSARIO[tipo] || FRASES_ANIVERSARIO.birthday_customer;
+  const frases = FRASES_ANIVERSARIO[tipo] || FRASES_ANIVERSARIO.birthday_customer;
   const tipoPresente = str("tipo_presente") || "cupom";
   const fraseSugerida = frases[tipoPresente] || "";
   const isPet = tipo === "birthday_pet";
@@ -56,14 +55,10 @@ export function CampanhasParametrosBirthdaySection({ tipo, num, str, set }) {
             <option value="percent">Percentual (%)</option>
           </CampanhaSel>
           <CampanhaField
-            label={
-              str("coupon_type") === "percent" ? "Percentual (%)" : "Valor (R$)"
-            }
+            label={str("coupon_type") === "percent" ? "Percentual (%)" : "Valor (R$)"}
             id="p-bday-val"
             value={num("coupon_value")}
-            onChange={(e) =>
-              set("coupon_value", Number.parseFloat(e.target.value) || 0)
-            }
+            onChange={(e) => set("coupon_value", Number.parseFloat(e.target.value) || 0)}
           />
           <CampanhaField
             label="Validade (dias)"
@@ -71,9 +66,7 @@ export function CampanhasParametrosBirthdaySection({ tipo, num, str, set }) {
             step="1"
             min="1"
             value={num("coupon_valid_days") || 3}
-            onChange={(e) =>
-              set("coupon_valid_days", Number.parseInt(e.target.value, 10) || 3)
-            }
+            onChange={(e) => set("coupon_valid_days", Number.parseInt(e.target.value, 10) || 3)}
           />
           <CampanhaSel
             label="Canal"
@@ -91,10 +84,7 @@ export function CampanhasParametrosBirthdaySection({ tipo, num, str, set }) {
 
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label
-            htmlFor="p-bday-msg"
-            className="block text-xs font-semibold text-gray-700"
-          >
+          <label htmlFor="p-bday-msg" className="block text-xs font-semibold text-gray-700">
             Mensagem enviada ao cliente
           </label>
           <button
@@ -113,8 +103,7 @@ export function CampanhasParametrosBirthdaySection({ tipo, num, str, set }) {
           className="w-full border rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
         />
         <p className="text-xs text-gray-400 mt-1">
-          Variaveis disponiveis:{" "}
-          <code className="bg-gray-100 px-1 rounded">{"{nome}"}</code>
+          Variaveis disponiveis: <code className="bg-gray-100 px-1 rounded">{"{nome}"}</code>
           {isPet && (
             <>
               {" "}
@@ -134,11 +123,7 @@ export function CampanhasParametrosBirthdaySection({ tipo, num, str, set }) {
   );
 }
 
-export function CampanhasParametrosQuickRepurchaseSection({
-  num,
-  str,
-  set,
-}) {
+export function CampanhasParametrosQuickRepurchaseSection({ num, str, set }) {
   const cooldownRaw = num("cooldown_days");
   const cooldownDays = cooldownRaw === "" ? 60 : cooldownRaw;
 
@@ -148,9 +133,7 @@ export function CampanhasParametrosQuickRepurchaseSection({
         label="Compra minima (R$)"
         id="p-qr-min"
         value={num("min_purchase_value")}
-        onChange={(e) =>
-          set("min_purchase_value", Number.parseFloat(e.target.value) || 0)
-        }
+        onChange={(e) => set("min_purchase_value", Number.parseFloat(e.target.value) || 0)}
       />
       <CampanhaSel
         label="Tipo de desconto"
@@ -162,14 +145,10 @@ export function CampanhasParametrosQuickRepurchaseSection({
         <option value="fixed">Valor fixo (R$)</option>
       </CampanhaSel>
       <CampanhaField
-        label={
-          str("coupon_type") === "fixed" ? "Valor (R$)" : "Percentual (%)"
-        }
+        label={str("coupon_type") === "fixed" ? "Valor (R$)" : "Percentual (%)"}
         id="p-qr-val"
         value={num("coupon_value")}
-        onChange={(e) =>
-          set("coupon_value", Number.parseFloat(e.target.value) || 0)
-        }
+        onChange={(e) => set("coupon_value", Number.parseFloat(e.target.value) || 0)}
       />
       <CampanhaField
         label="Validade do cupom (dias)"
@@ -177,9 +156,7 @@ export function CampanhasParametrosQuickRepurchaseSection({
         step="1"
         min="1"
         value={num("coupon_valid_days") || 15}
-        onChange={(e) =>
-          set("coupon_valid_days", Number.parseInt(e.target.value, 10) || 15)
-        }
+        onChange={(e) => set("coupon_valid_days", Number.parseInt(e.target.value, 10) || 15)}
       />
       <CampanhaSel
         label="Canal"
@@ -200,22 +177,16 @@ export function CampanhasParametrosQuickRepurchaseSection({
           min="0"
           value={cooldownDays}
           onChange={(e) =>
-            set(
-              "cooldown_days",
-              Math.max(0, Number.parseInt(e.target.value, 10) || 0),
-            )
+            set("cooldown_days", Math.max(0, Number.parseInt(e.target.value, 10) || 0))
           }
         />
         <p className="text-[11px] text-gray-500 mt-1">
-          Ex: 60 gera no maximo um cupom para o cliente a cada 60 dias. Use 0
-          para liberar a cada compra.
+          Ex: 60 gera no maximo um cupom para o cliente a cada 60 dias. Use 0 para liberar a cada
+          compra.
         </p>
       </div>
       <div className="col-span-2">
-        <label
-          htmlFor="p-qr-msg"
-          className="block text-xs font-medium text-gray-600 mb-1"
-        >
+        <label htmlFor="p-qr-msg" className="block text-xs font-medium text-gray-600 mb-1">
           Mensagem personalizada
         </label>
         <input
@@ -240,9 +211,7 @@ export function CampanhasParametrosInactivitySection({ num, str, set }) {
         step="1"
         min="1"
         value={num("inactivity_days") || 30}
-        onChange={(e) =>
-          set("inactivity_days", Number.parseInt(e.target.value, 10) || 30)
-        }
+        onChange={(e) => set("inactivity_days", Number.parseInt(e.target.value, 10) || 30)}
       />
       <CampanhaSel
         label="Tipo de desconto"
@@ -254,14 +223,10 @@ export function CampanhasParametrosInactivitySection({ num, str, set }) {
         <option value="percent">Percentual (%)</option>
       </CampanhaSel>
       <CampanhaField
-        label={
-          str("coupon_type") === "fixed" ? "Valor (R$)" : "Percentual (%)"
-        }
+        label={str("coupon_type") === "fixed" ? "Valor (R$)" : "Percentual (%)"}
         id="p-inact-val"
         value={num("coupon_value")}
-        onChange={(e) =>
-          set("coupon_value", Number.parseFloat(e.target.value) || 0)
-        }
+        onChange={(e) => set("coupon_value", Number.parseFloat(e.target.value) || 0)}
       />
       <CampanhaField
         label="Validade do cupom (dias)"
@@ -269,15 +234,10 @@ export function CampanhasParametrosInactivitySection({ num, str, set }) {
         step="1"
         min="1"
         value={num("coupon_valid_days") || 7}
-        onChange={(e) =>
-          set("coupon_valid_days", Number.parseInt(e.target.value, 10) || 7)
-        }
+        onChange={(e) => set("coupon_valid_days", Number.parseInt(e.target.value, 10) || 7)}
       />
       <div className="col-span-2">
-        <label
-          htmlFor="p-inact-msg"
-          className="block text-xs font-medium text-gray-600 mb-1"
-        >
+        <label htmlFor="p-inact-msg" className="block text-xs font-medium text-gray-600 mb-1">
           Mensagem
         </label>
         <input
@@ -306,14 +266,10 @@ export function CampanhasParametrosWelcomeSection({ num, str, set }) {
         <option value="percent">Percentual (%)</option>
       </CampanhaSel>
       <CampanhaField
-        label={
-          str("coupon_type") === "percent" ? "Percentual (%)" : "Valor (R$)"
-        }
+        label={str("coupon_type") === "percent" ? "Percentual (%)" : "Valor (R$)"}
         id="p-wel-val"
         value={num("coupon_value")}
-        onChange={(e) =>
-          set("coupon_value", Number.parseFloat(e.target.value) || 0)
-        }
+        onChange={(e) => set("coupon_value", Number.parseFloat(e.target.value) || 0)}
       />
       <CampanhaField
         label="Validade (dias)"
@@ -321,9 +277,7 @@ export function CampanhasParametrosWelcomeSection({ num, str, set }) {
         step="1"
         min="1"
         value={num("coupon_valid_days") || 30}
-        onChange={(e) =>
-          set("coupon_valid_days", Number.parseInt(e.target.value, 10) || 30)
-        }
+        onChange={(e) => set("coupon_valid_days", Number.parseInt(e.target.value, 10) || 30)}
       />
       <CampanhaSel
         label="Canal"

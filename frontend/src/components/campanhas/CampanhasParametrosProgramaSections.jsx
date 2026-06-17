@@ -3,10 +3,7 @@ import { CampanhaField } from "./CampanhasParametrosFields";
 function CampanhaSelect({ id, label, value, onChange, children }) {
   return (
     <div>
-      <label
-        htmlFor={id}
-        className="block text-xs font-medium text-gray-600 mb-1"
-      >
+      <label htmlFor={id} className="block text-xs font-medium text-gray-600 mb-1">
         {label}
       </label>
       <select
@@ -29,9 +26,7 @@ export function CampanhasParametrosLoyaltySection({ num, str, set }) {
         id="p-min"
         min="0.01"
         value={num("min_purchase_value")}
-        onChange={(e) =>
-          set("min_purchase_value", Number.parseFloat(e.target.value) || 0)
-        }
+        onChange={(e) => set("min_purchase_value", Number.parseFloat(e.target.value) || 0)}
       />
       <CampanhaField
         label="Carimbos para completar"
@@ -39,9 +34,7 @@ export function CampanhasParametrosLoyaltySection({ num, str, set }) {
         step="1"
         min="1"
         value={num("stamps_to_complete")}
-        onChange={(e) =>
-          set("stamps_to_complete", Number.parseInt(e.target.value, 10) || 0)
-        }
+        onChange={(e) => set("stamps_to_complete", Number.parseInt(e.target.value, 10) || 0)}
       />
       <CampanhaSelect
         label="Tipo de recompensa"
@@ -56,9 +49,7 @@ export function CampanhasParametrosLoyaltySection({ num, str, set }) {
         label="Valor da recompensa (R$)"
         id="p-reward-val"
         value={num("reward_value")}
-        onChange={(e) =>
-          set("reward_value", Number.parseFloat(e.target.value) || 0)
-        }
+        onChange={(e) => set("reward_value", Number.parseFloat(e.target.value) || 0)}
       />
       <CampanhaField
         label="Carimbo intermediario (0 = sem)"
@@ -66,20 +57,13 @@ export function CampanhasParametrosLoyaltySection({ num, str, set }) {
         step="1"
         min="0"
         value={num("intermediate_stamp") || 0}
-        onChange={(e) =>
-          set("intermediate_stamp", Number.parseInt(e.target.value, 10) || 0)
-        }
+        onChange={(e) => set("intermediate_stamp", Number.parseInt(e.target.value, 10) || 0)}
       />
       <CampanhaField
         label="Recompensa intermediaria (R$)"
         id="p-inter-val"
         value={num("intermediate_reward_value") || 0}
-        onChange={(e) =>
-          set(
-            "intermediate_reward_value",
-            Number.parseFloat(e.target.value) || 0,
-          )
-        }
+        onChange={(e) => set("intermediate_reward_value", Number.parseFloat(e.target.value) || 0)}
       />
       <CampanhaField
         label="Validade do cupom (dias)"
@@ -87,14 +71,12 @@ export function CampanhasParametrosLoyaltySection({ num, str, set }) {
         step="1"
         min="1"
         value={num("coupon_days_valid") || 30}
-        onChange={(e) =>
-          set("coupon_days_valid", Number.parseInt(e.target.value, 10) || 30)
-        }
+        onChange={(e) => set("coupon_days_valid", Number.parseInt(e.target.value, 10) || 30)}
       />
       <div className="col-span-2">
         <p className="text-xs text-gray-500 -mt-1">
-          Ex.: com valor 50, compras de R$ 49,90 geram 0 carimbo, R$ 58,00
-          geram 1 e R$ 100,00 geram 2.
+          Ex.: com valor 50, compras de R$ 49,90 geram 0 carimbo, R$ 58,00 geram 1 e R$ 100,00 geram
+          2.
         </p>
       </div>
       <div className="col-span-2">
@@ -144,17 +126,15 @@ export function CampanhasParametrosCashbackSection({ num, set }) {
               label={`${level.label} (%)`}
               id={`p-${level.key}`}
               value={num(level.key)}
-              onChange={(e) =>
-                set(level.key, Number.parseFloat(e.target.value) || 0)
-              }
+              onChange={(e) => set(level.key, Number.parseFloat(e.target.value) || 0)}
             />
           ))}
         </div>
       </div>
       <div>
         <p className="text-xs text-gray-500 mb-2">
-          Bonus adicional por canal (somado ao % do nivel). Ex.: App +1%
-          incentiva o uso do aplicativo.
+          Bonus adicional por canal (somado ao % do nivel). Ex.: App +1% incentiva o uso do
+          aplicativo.
         </p>
         <div className="grid grid-cols-3 gap-3">
           {channels.map((channel) => (
@@ -163,54 +143,37 @@ export function CampanhasParametrosCashbackSection({ num, set }) {
               label={channel.label}
               id={`p-${channel.key}`}
               value={num(channel.key)}
-              onChange={(e) =>
-                set(channel.key, Number.parseFloat(e.target.value) || 0)
-              }
+              onChange={(e) => set(channel.key, Number.parseFloat(e.target.value) || 0)}
             />
           ))}
         </div>
       </div>
       <div className="border-t pt-4">
-        <p className="text-xs font-semibold text-gray-700 mb-2">
-          Validade e alertas
-        </p>
+        <p className="text-xs font-semibold text-gray-700 mb-2">Validade e alertas</p>
         <div className="grid grid-cols-2 gap-3">
           <CampanhaField
             label="Validade do cashback (dias, 0 = sem prazo)"
             id="p-cashback_valid_days"
             value={num("cashback_valid_days")}
-            onChange={(e) =>
-              set(
-                "cashback_valid_days",
-                Number.parseInt(e.target.value, 10) || 0,
-              )
-            }
+            onChange={(e) => set("cashback_valid_days", Number.parseInt(e.target.value, 10) || 0)}
           />
           <CampanhaField
             label="Alertar cliente X dias antes de expirar"
             id="p-cashback_alerta_dias"
             value={num("cashback_alerta_dias") || 7}
-            onChange={(e) =>
-              set(
-                "cashback_alerta_dias",
-                Number.parseInt(e.target.value, 10) || 7,
-              )
-            }
+            onChange={(e) => set("cashback_alerta_dias", Number.parseInt(e.target.value, 10) || 7)}
           />
         </div>
         <p className="text-xs text-gray-400 mt-1">
-          Se validade = 0, o cashback nunca expira. O alerta envia e-mail ou
-          push ao cliente quando faltar X dias para o vencimento.
+          Se validade = 0, o cashback nunca expira. O alerta envia e-mail ou push ao cliente quando
+          faltar X dias para o vencimento.
         </p>
       </div>
     </div>
   );
 }
 
-export function CampanhasParametrosRankingSection({
-  paramsEditando,
-  setParamsEditando,
-}) {
+export function CampanhasParametrosRankingSection({ paramsEditando, setParamsEditando }) {
   const levels = ["bronze", "silver", "gold", "diamond", "platinum"];
   const levelLabels = {
     bronze: "Bronze",
@@ -235,9 +198,7 @@ export function CampanhasParametrosRankingSection({
         <table className="w-full text-sm">
           <thead className="bg-gray-100">
             <tr>
-              <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
-                Nivel
-              </th>
+              <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">Nivel</th>
               <th className="px-3 py-2 text-left text-xs font-medium text-gray-600">
                 Gasto minimo (R$)
               </th>
@@ -252,9 +213,7 @@ export function CampanhasParametrosRankingSection({
           <tbody className="divide-y">
             {levels.map((level) => (
               <tr key={level}>
-                <td className="px-3 py-2 font-medium text-sm">
-                  {levelLabels[level]}
-                </td>
+                <td className="px-3 py-2 font-medium text-sm">{levelLabels[level]}</td>
                 <td className="px-3 py-2">
                   <input
                     type="number"
@@ -262,11 +221,7 @@ export function CampanhasParametrosRankingSection({
                     min="0"
                     value={getLevel(level).min_spent ?? ""}
                     onChange={(e) =>
-                      setLevel(
-                        level,
-                        "min_spent",
-                        Number.parseFloat(e.target.value) || 0,
-                      )
+                      setLevel(level, "min_spent", Number.parseFloat(e.target.value) || 0)
                     }
                     className="w-24 border rounded px-2 py-1 text-xs"
                   />
@@ -278,11 +233,7 @@ export function CampanhasParametrosRankingSection({
                     min="0"
                     value={getLevel(level).min_purchases ?? ""}
                     onChange={(e) =>
-                      setLevel(
-                        level,
-                        "min_purchases",
-                        Number.parseInt(e.target.value, 10) || 0,
-                      )
+                      setLevel(level, "min_purchases", Number.parseInt(e.target.value, 10) || 0)
                     }
                     className="w-20 border rounded px-2 py-1 text-xs"
                   />
@@ -294,11 +245,7 @@ export function CampanhasParametrosRankingSection({
                     min="0"
                     value={getLevel(level).min_active_months ?? ""}
                     onChange={(e) =>
-                      setLevel(
-                        level,
-                        "min_active_months",
-                        Number.parseInt(e.target.value, 10) || 0,
-                      )
+                      setLevel(level, "min_active_months", Number.parseInt(e.target.value, 10) || 0)
                     }
                     className="w-20 border rounded px-2 py-1 text-xs"
                   />
@@ -312,28 +259,18 @@ export function CampanhasParametrosRankingSection({
   );
 }
 
-export function CampanhasParametrosGenericoSection({
-  paramsEditando,
-  setParamsEditando,
-}) {
+export function CampanhasParametrosGenericoSection({ paramsEditando, setParamsEditando }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       {Object.entries(paramsEditando).map(([key, value]) => (
         <div key={key}>
-          <label
-            htmlFor={`param-${key}`}
-            className="block text-xs font-medium text-gray-600 mb-1"
-          >
+          <label htmlFor={`param-${key}`} className="block text-xs font-medium text-gray-600 mb-1">
             {key}
           </label>
           <input
             id={`param-${key}`}
             type="text"
-            value={
-              typeof value === "object"
-                ? JSON.stringify(value)
-                : String(value ?? "")
-            }
+            value={typeof value === "object" ? JSON.stringify(value) : String(value ?? "")}
             onChange={(e) =>
               setParamsEditando((prev) => ({
                 ...prev,

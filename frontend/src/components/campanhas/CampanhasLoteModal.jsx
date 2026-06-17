@@ -23,18 +23,13 @@ export default function CampanhasLoteModal({
         </div>
         <div className="px-6 py-4 space-y-3">
           <div>
-            <label
-              htmlFor="lote-nivel"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
+            <label htmlFor="lote-nivel" className="block text-xs font-medium text-gray-600 mb-1">
               Nivel de ranking
             </label>
             <select
               id="lote-nivel"
               value={loteForm.nivel}
-              onChange={(e) =>
-                setLoteForm((p) => ({ ...p, nivel: e.target.value }))
-              }
+              onChange={(e) => setLoteForm((p) => ({ ...p, nivel: e.target.value }))}
               className="w-full border rounded-lg px-3 py-2 text-sm"
             >
               <option value="todos">Todos os niveis</option>
@@ -46,10 +41,7 @@ export default function CampanhasLoteModal({
             </select>
           </div>
           <div>
-            <label
-              htmlFor="lote-assunto"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
+            <label htmlFor="lote-assunto" className="block text-xs font-medium text-gray-600 mb-1">
               Assunto do email
             </label>
             <input
@@ -57,17 +49,12 @@ export default function CampanhasLoteModal({
               type="text"
               placeholder="Ex: Promocao exclusiva para clientes Ouro"
               value={loteForm.assunto}
-              onChange={(e) =>
-                setLoteForm((p) => ({ ...p, assunto: e.target.value }))
-              }
+              onChange={(e) => setLoteForm((p) => ({ ...p, assunto: e.target.value }))}
               className="w-full border rounded-lg px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label
-              htmlFor="lote-msg"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
+            <label htmlFor="lote-msg" className="block text-xs font-medium text-gray-600 mb-1">
               Mensagem
             </label>
             <textarea
@@ -75,9 +62,7 @@ export default function CampanhasLoteModal({
               rows={4}
               placeholder="Escreva a mensagem que sera enviada para os clientes..."
               value={loteForm.mensagem}
-              onChange={(e) =>
-                setLoteForm((p) => ({ ...p, mensagem: e.target.value }))
-              }
+              onChange={(e) => setLoteForm((p) => ({ ...p, mensagem: e.target.value }))}
               className="w-full border rounded-lg px-3 py-2 text-sm"
             />
           </div>
@@ -88,8 +73,7 @@ export default function CampanhasLoteModal({
               </p>
               {resultadoLote.sem_email > 0 && (
                 <p className="text-green-600">
-                  {resultadoLote.sem_email} cliente(s) sem email foram
-                  ignorados.
+                  {resultadoLote.sem_email} cliente(s) sem email foram ignorados.
                 </p>
               )}
             </div>

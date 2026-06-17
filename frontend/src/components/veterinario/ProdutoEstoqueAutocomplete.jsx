@@ -59,7 +59,8 @@ export default function ProdutoEstoqueAutocomplete({
                 Código: {selectedProduct.codigo || "—"} • {estoqueLabel}
               </p>
               <p className="text-xs text-emerald-700">
-                Custo un.: {(Number(selectedProduct.preco_custo || 0)).toLocaleString("pt-BR", {
+                Custo un.:{" "}
+                {Number(selectedProduct.preco_custo || 0).toLocaleString("pt-BR", {
                   style: "currency",
                   currency: "BRL",
                 })}
@@ -82,7 +83,10 @@ export default function ProdutoEstoqueAutocomplete({
       ) : (
         <>
           <div className="relative">
-            <PackageSearch size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <PackageSearch
+              size={15}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
             <input
               type="text"
               value={busca}
@@ -111,7 +115,9 @@ export default function ProdutoEstoqueAutocomplete({
                 >
                   <p className="text-sm font-medium text-gray-800">{produto.nome}</p>
                   <p className="text-xs text-gray-500">
-                    Código: {produto.codigo || "—"} • Estoque: {Number(produto.estoque_atual || 0).toLocaleString("pt-BR")} {produto.unidade || "un"}
+                    Código: {produto.codigo || "—"} • Estoque:{" "}
+                    {Number(produto.estoque_atual || 0).toLocaleString("pt-BR")}{" "}
+                    {produto.unidade || "un"}
                   </p>
                 </button>
               ))}

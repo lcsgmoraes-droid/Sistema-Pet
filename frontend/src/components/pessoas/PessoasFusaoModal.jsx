@@ -7,7 +7,8 @@ import ActionButton from "../ui/ActionButton";
 function formatarValor(valor) {
   if (valor === null || valor === undefined || valor === "") return "-";
   if (typeof valor === "boolean") return valor ? "Sim" : "Nao";
-  if (typeof valor === "number") return Number.isInteger(valor) ? String(valor) : valor.toLocaleString("pt-BR");
+  if (typeof valor === "number")
+    return Number.isInteger(valor) ? String(valor) : valor.toLocaleString("pt-BR");
   if (Array.isArray(valor)) return valor.length ? valor.join(", ") : "-";
   if (typeof valor === "object") return JSON.stringify(valor);
   const texto = String(valor);
@@ -33,16 +34,24 @@ function PessoaResumo({ label, pessoa, selected, onSelect }) {
     >
       <div className="mb-2 flex items-center justify-between gap-3">
         <span className="text-xs font-semibold uppercase text-slate-500">{label}</span>
-        <span className={`h-3 w-3 rounded-full border ${selected ? "border-blue-600 bg-blue-600" : "border-slate-300"}`} />
+        <span
+          className={`h-3 w-3 rounded-full border ${selected ? "border-blue-600 bg-blue-600" : "border-slate-300"}`}
+        />
       </div>
       <div className="min-w-0">
-        <div className="truncate text-sm font-semibold text-slate-900">{pessoa?.nome || "Pessoa sem nome"}</div>
+        <div className="truncate text-sm font-semibold text-slate-900">
+          {pessoa?.nome || "Pessoa sem nome"}
+        </div>
         <div className="mt-1 font-mono text-xs text-slate-500">Cod: {pessoa?.codigo || "-"}</div>
         <div className="mt-1 truncate text-xs text-slate-500">{documentoPessoa(pessoa)}</div>
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
-        <span>Tipo: <strong>{pessoa?.tipo_cadastro || "-"}</strong></span>
-        <span>Status: <strong>{pessoa?.ativo === false ? "Inativo" : "Ativo"}</strong></span>
+        <span>
+          Tipo: <strong>{pessoa?.tipo_cadastro || "-"}</strong>
+        </span>
+        <span>
+          Status: <strong>{pessoa?.ativo === false ? "Inativo" : "Ativo"}</strong>
+        </span>
       </div>
     </button>
   );
@@ -121,7 +130,10 @@ export default function PessoasFusaoModal({
   );
   const conflitos = camposRelevantes.filter((campo) => campo.conflito).length;
   const automaticos = camposRelevantes.filter((campo) => campo.automatico_por_vazio).length;
-  const totalReferencias = (preview?.referencias_duplicado || []).reduce((total, item) => total + Number(item.total || 0), 0);
+  const totalReferencias = (preview?.referencias_duplicado || []).reduce(
+    (total, item) => total + Number(item.total || 0),
+    0,
+  );
 
   const executar = async () => {
     if (pessoasValidas.length !== 2 || !principalId || !duplicadoId || salvando) return;
@@ -153,10 +165,15 @@ export default function PessoasFusaoModal({
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-900">Fundir pessoas</h2>
-              <p className="text-sm text-slate-500">Escolha o cadastro principal e confira os vinculos antes de executar.</p>
+              <p className="text-sm text-slate-500">
+                Escolha o cadastro principal e confira os vinculos antes de executar.
+              </p>
             </div>
           </div>
-          <button className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700" onClick={onClose}>
+          <button
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            onClick={onClose}
+          >
             <X size={22} />
           </button>
         </div>
@@ -172,7 +189,11 @@ export default function PessoasFusaoModal({
                 {pessoasValidas.map((pessoa) => (
                   <PessoaResumo
                     key={pessoa.id}
-                    label={Number(pessoa.id) === Number(principalId) ? "Cadastro principal" : "Cadastro que sera fundido"}
+                    label={
+                      Number(pessoa.id) === Number(principalId)
+                        ? "Cadastro principal"
+                        : "Cadastro que sera fundido"
+                    }
                     onSelect={() => setPrincipalId(pessoa.id)}
                     pessoa={pessoa}
                     selected={Number(pessoa.id) === Number(principalId)}
@@ -189,21 +210,34 @@ export default function PessoasFusaoModal({
                 <>
                   <div className="mb-4 grid gap-3 md:grid-cols-4">
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <div className="text-xs font-semibold uppercase text-slate-500">Conflitos</div>
+                      <div className="text-xs font-semibold uppercase text-slate-500">
+                        Conflitos
+                      </div>
                       <div className="mt-1 text-2xl font-bold text-slate-900">{conflitos}</div>
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <div className="text-xs font-semibold uppercase text-slate-500">Dados completados</div>
+                      <div className="text-xs font-semibold uppercase text-slate-500">
+                        Dados completados
+                      </div>
                       <div className="mt-1 text-2xl font-bold text-slate-900">{automaticos}</div>
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <div className="text-xs font-semibold uppercase text-slate-500">Referencias</div>
-                      <div className="mt-1 text-2xl font-bold text-slate-900">{totalReferencias}</div>
+                      <div className="text-xs font-semibold uppercase text-slate-500">
+                        Referencias
+                      </div>
+                      <div className="mt-1 text-2xl font-bold text-slate-900">
+                        {totalReferencias}
+                      </div>
                     </div>
                     <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                      <div className="text-xs font-semibold uppercase text-emerald-700">Credito final</div>
+                      <div className="text-xs font-semibold uppercase text-emerald-700">
+                        Credito final
+                      </div>
                       <div className="mt-1 text-2xl font-bold text-emerald-900">
-                        R$ {Number(preview.credito_somado?.final || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        R${" "}
+                        {Number(preview.credito_somado?.final || 0).toLocaleString("pt-BR", {
+                          minimumFractionDigits: 2,
+                        })}
                       </div>
                     </div>
                   </div>
@@ -211,31 +245,54 @@ export default function PessoasFusaoModal({
                   <div className="mb-4 rounded-lg border border-slate-200">
                     <div className="border-b border-slate-200 px-4 py-3">
                       <h3 className="font-semibold text-slate-900">Decisoes de cadastro</h3>
-                      <p className="text-xs text-slate-500">Campos vazios sao completados automaticamente. Em conflito, escolha qual valor fica.</p>
+                      <p className="text-xs text-slate-500">
+                        Campos vazios sao completados automaticamente. Em conflito, escolha qual
+                        valor fica.
+                      </p>
                     </div>
                     <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
                       {camposRelevantes.map((campo) => (
-                        <div key={campo.campo} className="grid gap-3 px-4 py-3 text-sm md:grid-cols-[180px_1fr_1fr_160px]">
+                        <div
+                          key={campo.campo}
+                          className="grid gap-3 px-4 py-3 text-sm md:grid-cols-[180px_1fr_1fr_160px]"
+                        >
                           <div>
                             <div className="font-semibold text-slate-800">{campo.label}</div>
                             {campo.conflito ? (
-                              <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">conflito</span>
+                              <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                                conflito
+                              </span>
                             ) : campo.automatico_por_vazio ? (
-                              <span className="mt-1 inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800">completa vazio</span>
+                              <span className="mt-1 inline-flex rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-800">
+                                completa vazio
+                              </span>
                             ) : null}
                           </div>
                           <div className="rounded-md bg-slate-50 p-2">
-                            <div className="text-xs font-semibold uppercase text-slate-400">Principal</div>
-                            <div className="break-words text-slate-700">{formatarValor(campo.principal)}</div>
+                            <div className="text-xs font-semibold uppercase text-slate-400">
+                              Principal
+                            </div>
+                            <div className="break-words text-slate-700">
+                              {formatarValor(campo.principal)}
+                            </div>
                           </div>
                           <div className="rounded-md bg-slate-50 p-2">
-                            <div className="text-xs font-semibold uppercase text-slate-400">Duplicado</div>
-                            <div className="break-words text-slate-700">{formatarValor(campo.duplicado)}</div>
+                            <div className="text-xs font-semibold uppercase text-slate-400">
+                              Duplicado
+                            </div>
+                            <div className="break-words text-slate-700">
+                              {formatarValor(campo.duplicado)}
+                            </div>
                           </div>
                           <select
                             className="h-10 rounded-lg border border-slate-300 px-3 text-sm"
                             value={decisoes[campo.campo] || campo.origem_padrao || "principal"}
-                            onChange={(event) => setDecisoes((prev) => ({ ...prev, [campo.campo]: event.target.value }))}
+                            onChange={(event) =>
+                              setDecisoes((prev) => ({
+                                ...prev,
+                                [campo.campo]: event.target.value,
+                              }))
+                            }
                           >
                             <option value="principal">Manter principal</option>
                             <option value="duplicado">Usar duplicado</option>
@@ -246,15 +303,22 @@ export default function PessoasFusaoModal({
                   </div>
 
                   <div className="mb-4 rounded-lg border border-slate-200 p-3">
-                    <div className="mb-2 text-sm font-semibold text-slate-900">Historico que sera transferido</div>
+                    <div className="mb-2 text-sm font-semibold text-slate-900">
+                      Historico que sera transferido
+                    </div>
                     <div className="grid gap-2 text-xs text-slate-600 md:grid-cols-2">
                       {(preview.referencias_duplicado || []).map((item) => (
-                        <div key={`${item.tabela}-${item.campo}`} className="rounded-md bg-slate-50 px-3 py-2">
+                        <div
+                          key={`${item.tabela}-${item.campo}`}
+                          className="rounded-md bg-slate-50 px-3 py-2"
+                        >
                           {item.tabela}.{item.campo}: <strong>{item.total}</strong>
                         </div>
                       ))}
                       {totalReferencias === 0 && (
-                        <div className="rounded-md bg-slate-50 px-3 py-2">Nenhuma referencia encontrada no cadastro duplicado.</div>
+                        <div className="rounded-md bg-slate-50 px-3 py-2">
+                          Nenhuma referencia encontrada no cadastro duplicado.
+                        </div>
                       )}
                     </div>
                   </div>
@@ -274,7 +338,8 @@ export default function PessoasFusaoModal({
                       className="mt-1 h-4 w-4 rounded border-amber-300"
                     />
                     <span>
-                      Confirmo que o cadastro duplicado sera inativado e seus vinculos/historico serao transferidos para o principal.
+                      Confirmo que o cadastro duplicado sera inativado e seus vinculos/historico
+                      serao transferidos para o principal.
                     </span>
                   </label>
                 </>

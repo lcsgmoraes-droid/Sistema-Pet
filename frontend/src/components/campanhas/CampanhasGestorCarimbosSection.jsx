@@ -23,18 +23,13 @@ export default function CampanhasGestorCarimbosSection({
   const saldoAtual = Number(gestorSaldo?.total_carimbos || 0);
   const carimbosAtivos = Number(gestorSaldo?.total_carimbos_brutos || 0);
   const carimbosComprometidos = Number(
-    gestorSaldo?.carimbos_comprometidos_total ||
-      gestorSaldo?.carimbos_convertidos ||
-      0,
+    gestorSaldo?.carimbos_comprometidos_total || gestorSaldo?.carimbos_convertidos || 0,
   );
   const carimbosEmDebito = Number(gestorSaldo?.carimbos_em_debito || 0);
   const [carimbosSelecionados, setCarimbosSelecionados] = useState([]);
   const removendoLote = gestorRemovendo === "lote";
   const carimbosVisiveis = useMemo(
-    () =>
-      (gestorCarimbos || []).filter(
-        (stamp) => !stamp.voided_at || gestorIncluirEstornados,
-      ),
+    () => (gestorCarimbos || []).filter((stamp) => !stamp.voided_at || gestorIncluirEstornados),
     [gestorCarimbos, gestorIncluirEstornados],
   );
   const carimbosSelecionaveis = useMemo(
@@ -45,17 +40,13 @@ export default function CampanhasGestorCarimbosSection({
     () => carimbosSelecionaveis.map((stamp) => stamp.id),
     [carimbosSelecionaveis],
   );
-  const selecionadosVisiveis = carimbosSelecionados.filter((id) =>
-    idsSelecionaveis.includes(id),
-  );
+  const selecionadosVisiveis = carimbosSelecionados.filter((id) => idsSelecionaveis.includes(id));
   const todosVisiveisSelecionados =
     idsSelecionaveis.length > 0 &&
     idsSelecionaveis.every((id) => carimbosSelecionados.includes(id));
 
   useEffect(() => {
-    setCarimbosSelecionados((atuais) =>
-      atuais.filter((id) => idsSelecionaveis.includes(id)),
-    );
+    setCarimbosSelecionados((atuais) => atuais.filter((id) => idsSelecionaveis.includes(id)));
   }, [idsSelecionaveis]);
 
   const alternarTodosVisiveis = () => {
@@ -64,9 +55,7 @@ export default function CampanhasGestorCarimbosSection({
 
   const alternarCarimbo = (stampId) => {
     setCarimbosSelecionados((atuais) =>
-      atuais.includes(stampId)
-        ? atuais.filter((id) => id !== stampId)
-        : [...atuais, stampId],
+      atuais.includes(stampId) ? atuais.filter((id) => id !== stampId) : [...atuais, stampId],
     );
   };
 
@@ -87,12 +76,8 @@ export default function CampanhasGestorCarimbosSection({
     >
       <div className="p-6 space-y-4">
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-900 space-y-1">
-          <p className="font-medium">
-            Saldo atual de carimbos: {saldoAtual}
-          </p>
-          <p className="text-amber-800">
-            Carimbos ativos no historico: {carimbosAtivos}
-          </p>
+          <p className="font-medium">Saldo atual de carimbos: {saldoAtual}</p>
+          <p className="text-amber-800">Carimbos ativos no historico: {carimbosAtivos}</p>
           <p className="text-amber-800">
             Carimbos comprometidos por recompensa: {carimbosComprometidos}
           </p>
@@ -104,9 +89,7 @@ export default function CampanhasGestorCarimbosSection({
         </div>
 
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <p className="text-sm font-medium text-green-800 mb-3">
-            Lancar carimbo manual
-          </p>
+          <p className="text-sm font-medium text-green-800 mb-3">Lancar carimbo manual</p>
           <div className="flex gap-3 flex-wrap items-end">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -121,12 +104,12 @@ export default function CampanhasGestorCarimbosSection({
               />
             </div>
             <div className="flex flex-col">
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Quantidade
-              </label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Quantidade</label>
               <div className="flex items-center gap-2 border rounded-lg bg-white">
                 <button
-                  onClick={() => setGestorCarimboQuantidade(Math.max(1, gestorCarimboQuantidade - 1))}
+                  onClick={() =>
+                    setGestorCarimboQuantidade(Math.max(1, gestorCarimboQuantidade - 1))
+                  }
                   disabled={gestorLancandoCarimbo || gestorCarimboQuantidade <= 1}
                   className="px-3 py-2 text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
                 >
@@ -149,7 +132,9 @@ export default function CampanhasGestorCarimbosSection({
               disabled={gestorLancandoCarimbo}
               className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
             >
-              {gestorLancandoCarimbo ? `Lancando (${gestorCarimboQuantidade})...` : `Lancar ${gestorCarimboQuantidade > 1 ? gestorCarimboQuantidade + " Carimbos" : "Carimbo"}`}
+              {gestorLancandoCarimbo
+                ? `Lancando (${gestorCarimboQuantidade})...`
+                : `Lancar ${gestorCarimboQuantidade > 1 ? gestorCarimboQuantidade + " Carimbos" : "Carimbo"}`}
             </button>
           </div>
         </div>
@@ -186,49 +171,39 @@ export default function CampanhasGestorCarimbosSection({
               </div>
             </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-10">
-                    <input
-                      type="checkbox"
-                      checked={todosVisiveisSelecionados}
-                      onChange={alternarTodosVisiveis}
-                      disabled={idsSelecionaveis.length === 0 || removendoLote}
-                      className="rounded"
-                      aria-label="Selecionar carimbos visiveis"
-                    />
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
-                    #ID
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
-                    Data
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
-                    Origem
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
-                    Obs
-                  </th>
-                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-600">
-                    Status
-                  </th>
-                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-600">
-                    Acao
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {carimbosVisiveis.map((stamp) => (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-10">
+                      <input
+                        type="checkbox"
+                        checked={todosVisiveisSelecionados}
+                        onChange={alternarTodosVisiveis}
+                        disabled={idsSelecionaveis.length === 0 || removendoLote}
+                        className="rounded"
+                        aria-label="Selecionar carimbos visiveis"
+                      />
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">#ID</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">Data</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
+                      Origem
+                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">Obs</th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-600">
+                      Status
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-600">
+                      Acao
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {carimbosVisiveis.map((stamp) => (
                     <tr
                       key={stamp.id}
-                      className={
-                        stamp.voided_at
-                          ? "bg-red-50 opacity-60"
-                          : "hover:bg-gray-50"
-                      }
+                      className={stamp.voided_at ? "bg-red-50 opacity-60" : "hover:bg-gray-50"}
                     >
                       <td className="px-4 py-2">
                         <input
@@ -240,9 +215,7 @@ export default function CampanhasGestorCarimbosSection({
                           aria-label={`Selecionar carimbo ${stamp.id}`}
                         />
                       </td>
-                      <td className="px-4 py-2 text-gray-500 font-mono text-xs">
-                        {stamp.id}
-                      </td>
+                      <td className="px-4 py-2 text-gray-500 font-mono text-xs">{stamp.id}</td>
                       <td className="px-4 py-2 text-gray-700 text-xs whitespace-nowrap">
                         {new Date(stamp.created_at).toLocaleString("pt-BR")}
                       </td>
@@ -288,14 +261,12 @@ export default function CampanhasGestorCarimbosSection({
                       </td>
                     </tr>
                   ))}
-              </tbody>
-            </table>
-          </div>
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
-          <p className="text-center text-gray-400 py-4 text-sm">
-            Nenhum carimbo encontrado.
-          </p>
+          <p className="text-center text-gray-400 py-4 text-sm">Nenhum carimbo encontrado.</p>
         )}
 
         <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer select-none">

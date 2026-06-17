@@ -1,11 +1,6 @@
 import { formatBRL } from "../../utils/formatters";
 
-function DashboardMetricCard({
-  value,
-  label,
-  className = "text-blue-700",
-  extra,
-}) {
+function DashboardMetricCard({ value, label, className = "text-blue-700", extra }) {
   return (
     <div className="bg-white rounded-xl border shadow-sm p-4 text-center">
       <p className={`text-3xl font-bold ${className}`}>{value}</p>
@@ -73,12 +68,8 @@ export default function CampanhasDashboardMetricasGrid({ dashboard }) {
       </div>
       {(dashboard.cupons_expirados_hoje ?? 0) > 0 && (
         <div className="bg-red-50 rounded-xl border border-red-200 shadow-sm p-4 text-center">
-          <p className="text-3xl font-bold text-red-700">
-            {dashboard.cupons_expirados_hoje}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {"\u23F0"} Cupons expiram hoje
-          </p>
+          <p className="text-3xl font-bold text-red-700">{dashboard.cupons_expirados_hoje}</p>
+          <p className="text-xs text-gray-500 mt-1">{"\u23F0"} Cupons expiram hoje</p>
         </div>
       )}
       <DashboardMetricCard

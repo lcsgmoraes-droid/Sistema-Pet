@@ -22,8 +22,7 @@ export default function CampanhasSorteiosTab({
         <div>
           <h2 className="text-lg font-semibold text-gray-900">Sorteios</h2>
           <p className="text-sm text-gray-500">
-            Crie sorteios exclusivos por nivel de ranking. O resultado e
-            auditavel via seed UUID.
+            Crie sorteios exclusivos por nivel de ranking. O resultado e auditavel via seed UUID.
           </p>
         </div>
         <button
@@ -43,9 +42,7 @@ export default function CampanhasSorteiosTab({
       />
 
       {loadingSorteios ? (
-        <div className="p-8 text-center text-gray-400">
-          Carregando sorteios...
-        </div>
+        <div className="p-8 text-center text-gray-400">Carregando sorteios...</div>
       ) : sorteios.length === 0 ? (
         <div className="bg-white rounded-xl border shadow-sm p-8 text-center text-gray-400">
           <p className="text-3xl mb-2">S</p>

@@ -38,9 +38,7 @@ export default function CampanhasCodigosOfflineModal({
           {loadingCodigosOffline ? (
             <div className="text-center text-gray-400 py-8">Carregando...</div>
           ) : codigosOffline.length === 0 ? (
-            <div className="text-center text-gray-400 py-8">
-              Nenhum participante encontrado.
-            </div>
+            <div className="text-center text-gray-400 py-8">Nenhum participante encontrado.</div>
           ) : (
             <table className="w-full text-sm border-collapse">
               <thead>
@@ -52,16 +50,11 @@ export default function CampanhasCodigosOfflineModal({
               </thead>
               <tbody>
                 {codigosOffline.map((c) => (
-                  <tr
-                    key={c.numero}
-                    className="border-b last:border-0 hover:bg-gray-50"
-                  >
+                  <tr key={c.numero} className="border-b last:border-0 hover:bg-gray-50">
                     <td className="p-2 text-center font-mono font-semibold text-gray-700">
                       {c.numero}
                     </td>
-                    <td className="p-2 text-gray-700">
-                      {c.nome || `Cliente #${c.customer_id}`}
-                    </td>
+                    <td className="p-2 text-gray-700">{c.nome || `Cliente #${c.customer_id}`}</td>
                     <td className="p-2 text-center text-xs text-gray-500">
                       {c.rank_level
                         ? `${RANK_LABELS[c.rank_level]?.emoji || ""} ${RANK_LABELS[c.rank_level]?.label || c.rank_level}`
@@ -74,8 +67,7 @@ export default function CampanhasCodigosOfflineModal({
           )}
         </div>
         <div className="px-6 py-3 border-t text-xs text-gray-400">
-          {codigosOffline.length} participante(s) - Sorteio:{" "}
-          {modalCodigosOffline.name}
+          {codigosOffline.length} participante(s) - Sorteio: {modalCodigosOffline.name}
         </div>
       </div>
     </div>

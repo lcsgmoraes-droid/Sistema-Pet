@@ -17,9 +17,7 @@ export default function CampanhasDestaqueVencedorCard({
   return (
     <div
       className={`bg-gradient-to-br from-amber-50 to-yellow-50 border rounded-xl p-4 space-y-3 transition-opacity ${
-        selecionado
-          ? "border-amber-200 opacity-100"
-          : "border-gray-200 opacity-50"
+        selecionado ? "border-amber-200 opacity-100" : "border-gray-200 opacity-50"
       }`}
     >
       <div className="flex items-center justify-between">
@@ -72,9 +70,7 @@ export default function CampanhasDestaqueVencedorCard({
         <div className="space-y-2">
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs text-gray-500 block mb-1">
-                Valor do cupom (R$)
-              </label>
+              <label className="text-xs text-gray-500 block mb-1">Valor do cupom (R$)</label>
               <input
                 type="number"
                 min="1"
@@ -89,17 +85,14 @@ export default function CampanhasDestaqueVencedorCard({
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500 block mb-1">
-                Validade (dias)
-              </label>
+              <label className="text-xs text-gray-500 block mb-1">Validade (dias)</label>
               <input
                 type="number"
                 min="1"
                 value={premio.coupon_valid_days ?? 10}
                 onChange={(e) =>
                   onPremioChange({
-                    coupon_valid_days:
-                      Number.parseInt(e.target.value, 10) || 1,
+                    coupon_valid_days: Number.parseInt(e.target.value, 10) || 1,
                   })
                 }
                 className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-300"
@@ -107,9 +100,7 @@ export default function CampanhasDestaqueVencedorCard({
             </div>
           </div>
           <div>
-            <label className="text-xs text-gray-500 block mb-1">
-              Mensagem ao cliente
-            </label>
+            <label className="text-xs text-gray-500 block mb-1">Mensagem ao cliente</label>
             <input
               type="text"
               value={premio.mensagem ?? ""}
@@ -122,23 +113,17 @@ export default function CampanhasDestaqueVencedorCard({
       ) : (
         <div className="space-y-2">
           <div>
-            <label className="text-xs text-gray-500 block mb-1">
-              Mensagem ao cliente
-            </label>
+            <label className="text-xs text-gray-500 block mb-1">Mensagem ao cliente</label>
             <textarea
               rows={3}
               value={premio.mensagem_brinde ?? ""}
-              onChange={(e) =>
-                onPremioChange({ mensagem_brinde: e.target.value })
-              }
+              onChange={(e) => onPremioChange({ mensagem_brinde: e.target.value })}
               className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-300 resize-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-xs text-gray-500 block mb-1">
-                Retirada a partir de
-              </label>
+              <label className="text-xs text-gray-500 block mb-1">Retirada a partir de</label>
               <input
                 type="date"
                 value={premio.retirar_de ?? ""}
@@ -147,15 +132,11 @@ export default function CampanhasDestaqueVencedorCard({
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500 block mb-1">
-                Retirada ate
-              </label>
+              <label className="text-xs text-gray-500 block mb-1">Retirada ate</label>
               <input
                 type="date"
                 value={premio.retirar_ate ?? ""}
-                onChange={(e) =>
-                  onPremioChange({ retirar_ate: e.target.value })
-                }
+                onChange={(e) => onPremioChange({ retirar_ate: e.target.value })}
                 className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-300"
               />
             </div>

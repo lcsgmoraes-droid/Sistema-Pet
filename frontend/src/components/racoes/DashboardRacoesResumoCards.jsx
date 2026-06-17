@@ -1,5 +1,4 @@
-import React from 'react';
-import { Award, DollarSign, Package, Percent } from 'lucide-react';
+import { Award, DollarSign, Package, Percent } from "lucide-react";
 
 const DashboardRacoesResumoCards = ({ resumo }) => {
   if (!resumo) return null;
@@ -32,7 +31,7 @@ const DashboardRacoesResumoCards = ({ resumo }) => {
           <span className="text-xs text-gray-500">Faturamento Período</span>
         </div>
         <div className="text-2xl font-bold text-gray-900">
-          R$ {resumo.faturamento_periodo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          R$ {resumo.faturamento_periodo.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
         </div>
         <div className="text-sm text-gray-600 mt-1">{resumo.marcas_cadastradas} marcas ativas</div>
       </div>

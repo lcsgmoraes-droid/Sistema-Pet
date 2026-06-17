@@ -1,15 +1,10 @@
-export default function CampanhasConfigInactivitySection({
-  schedulerConfig,
-  setSchedulerConfig,
-}) {
+export default function CampanhasConfigInactivitySection({ schedulerConfig, setSchedulerConfig }) {
   return (
     <div className="bg-white rounded-xl border shadow-sm p-6">
       <div className="flex items-center gap-3 mb-5">
         <span className="text-2xl">{"\u{1F634}"}</span>
         <div>
-          <h3 className="font-medium text-gray-800">
-            Mensagens de Reativacao (Clientes Inativos)
-          </h3>
+          <h3 className="font-medium text-gray-800">Mensagens de Reativacao (Clientes Inativos)</h3>
           <p className="text-xs text-gray-500">
             Enviadas uma vez por semana para clientes sem compras ha muito tempo
           </p>

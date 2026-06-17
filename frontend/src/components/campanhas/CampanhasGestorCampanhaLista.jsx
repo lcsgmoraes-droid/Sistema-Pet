@@ -29,9 +29,7 @@ export default function CampanhasGestorCampanhaLista({
             ? "Nenhum cliente encontrado"
             : `${gestorCampanhaLista.length} cliente(s) encontrado(s)`}
         </p>
-        <p className="text-xs text-gray-400">
-          Clique em "Ver detalhes" para gerenciar
-        </p>
+        <p className="text-xs text-gray-400">Clique em "Ver detalhes" para gerenciar</p>
       </div>
 
       {gestorCampanhaLista.length === 0 ? (
@@ -49,9 +47,7 @@ export default function CampanhasGestorCampanhaLista({
                 {cliente.nome?.[0]?.toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {cliente.nome}
-                </p>
+                <p className="text-sm font-medium text-gray-900 truncate">{cliente.nome}</p>
                 <p className="text-xs text-gray-400">
                   {cliente.cpf ? `CPF: ${cliente.cpf}` : ""}
                   {cliente.cpf && cliente.telefone ? " · " : ""}

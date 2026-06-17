@@ -5,7 +5,9 @@ export function montarOpcoesCatalogoClinico({ medicamentos = [], procedimentos =
     valor: `med:${item.id}`,
     tipo: "medicamento",
     label: item.nome || "Medicamento sem nome",
-    meta: [item.principio_ativo, item.posologia_referencia, item.forma_farmaceutica].filter(Boolean).join(" - "),
+    meta: [item.principio_ativo, item.posologia_referencia, item.forma_farmaceutica]
+      .filter(Boolean)
+      .join(" - "),
     item,
   }));
 
@@ -13,7 +15,9 @@ export function montarOpcoesCatalogoClinico({ medicamentos = [], procedimentos =
     valor: `proc:${item.id}`,
     tipo: "procedimento",
     label: item.nome || "Procedimento sem nome",
-    meta: [item.descricao, item.duracao_minutos ? `${item.duracao_minutos} min` : null].filter(Boolean).join(" - "),
+    meta: [item.descricao, item.duracao_minutos ? `${item.duracao_minutos} min` : null]
+      .filter(Boolean)
+      .join(" - "),
     item,
   }));
 

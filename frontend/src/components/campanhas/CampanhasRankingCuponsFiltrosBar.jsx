@@ -11,10 +11,7 @@ export default function CampanhasRankingCuponsFiltrosBar({
   carregarCupons,
 }) {
   const temFiltrosAtivos =
-    filtroCupomBusca ||
-    filtroCupomDataInicio ||
-    filtroCupomDataFim ||
-    filtroCupomCampanha;
+    filtroCupomBusca || filtroCupomDataInicio || filtroCupomDataFim || filtroCupomCampanha;
 
   return (
     <div className="bg-white rounded-xl border shadow-sm p-4 flex flex-wrap gap-3 items-end">
@@ -33,9 +30,7 @@ export default function CampanhasRankingCuponsFiltrosBar({
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">
-          Criado a partir de
-        </label>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Criado a partir de</label>
         <input
           type="date"
           value={filtroCupomDataInicio}
@@ -45,9 +40,7 @@ export default function CampanhasRankingCuponsFiltrosBar({
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">
-          Criado ate
-        </label>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Criado ate</label>
         <input
           type="date"
           value={filtroCupomDataFim}
@@ -57,9 +50,7 @@ export default function CampanhasRankingCuponsFiltrosBar({
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-gray-600 mb-1">
-          Campanha
-        </label>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Campanha</label>
         <select
           value={filtroCupomCampanha}
           onChange={(e) => setFiltroCupomCampanha(e.target.value)}
