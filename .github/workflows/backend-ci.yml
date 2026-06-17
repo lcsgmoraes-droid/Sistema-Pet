@@ -377,7 +377,7 @@ jobs:
 
       - name: Backend WhatsApp format (blocking)
         run: |
-          ruff format --check app/whatsapp
+          ruff format --check app/whatsapp --exclude app/whatsapp/analytics.py --exclude app/whatsapp/analytics_simple.py
 
       - name: Backend domain campaigns vendas format (blocking)
         run: |

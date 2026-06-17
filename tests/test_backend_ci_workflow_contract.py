@@ -715,7 +715,10 @@ def test_backend_ci_has_blocking_backend_whatsapp_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
     assert "Backend WhatsApp format (blocking)" in source
-    assert "ruff format --check app/whatsapp" in source
+    assert (
+        "ruff format --check app/whatsapp --exclude app/whatsapp/analytics.py "
+        "--exclude app/whatsapp/analytics_simple.py"
+    ) in source
 
 
 def test_backend_ci_has_blocking_backend_domain_campaigns_vendas_format_step():
