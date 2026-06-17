@@ -6,7 +6,6 @@ Fluxo:
 1. Venda Loja Física (PDV) → Atualiza Sistema → Envia para Bling
 2. Venda Online (Bling) → Webhook → Atualiza Sistema
 """
-
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session, joinedload, aliased
 from sqlalchemy import and_, or_, func, desc
@@ -41,7 +40,6 @@ from .services.bling_product_image_service import (
 from .services.bling_sync_service import BlingSyncService, DIVERGENCIA_MINIMA
 
 import logging
-
 logger = logging.getLogger(__name__)
 
 
@@ -103,16 +101,14 @@ def _latest_queue_ids_subquery_route(db: Session, tenant_id) -> Any:
         db.query(
             ProdutoBlingSyncQueue.produto_id.label("produto_id"),
             ProdutoBlingSyncQueue.id.label("queue_id"),
-            func.row_number()
-            .over(
+            func.row_number().over(
                 partition_by=ProdutoBlingSyncQueue.produto_id,
                 order_by=(
                     desc(referencia_recente),
                     desc(ProdutoBlingSyncQueue.updated_at),
                     desc(ProdutoBlingSyncQueue.id),
                 ),
-            )
-            .label("rn"),
+            ).label("rn"),
         )
         .filter(ProdutoBlingSyncQueue.tenant_id == tenant_id)
         .subquery()
@@ -149,16 +145,10 @@ def _motivo_faltante_bling(item: dict) -> str:
 
 
 def _acao_faltante_bling(item: dict) -> str:
-    return (
-        "Criar e vincular"
-        if (_sku_bling(item) or _barcode_bling(item))
-        else "Revisar cadastro no Bling"
-    )
+    return "Criar e vincular" if (_sku_bling(item) or _barcode_bling(item)) else "Revisar cadastro no Bling"
 
 
-def _montar_codigos_busca(
-    codigo_principal: str, codigos_extras: Optional[list[str]] = None
-) -> list[str]:
+def _montar_codigos_busca(codigo_principal: str, codigos_extras: Optional[list[str]] = None) -> list[str]:
     codigos: list[str] = []
     vistos: set[str] = set()
 
@@ -278,14 +268,10 @@ def _extrair_lista_produtos_bling(resultado: Optional[dict]) -> list[dict]:
     return produtos
 
 
-def _buscar_produtos_bling_por_termo(
-    bling: BlingAPI, termo: str, pagina: int, limite: int
-) -> list[dict]:
+def _buscar_produtos_bling_por_termo(bling: BlingAPI, termo: str, pagina: int, limite: int) -> list[dict]:
     termo_limpo = _limpar_texto_busca(termo)
     if not termo_limpo:
-        return _extrair_lista_produtos_bling(
-            bling.listar_produtos(pagina=pagina, limite=limite)
-        )
+        return _extrair_lista_produtos_bling(bling.listar_produtos(pagina=pagina, limite=limite))
 
     resultados: list[dict] = []
     vistos: set[str] = set()
@@ -322,9 +308,7 @@ def _buscar_item_bling_com_retry(
     ultima_falha = None
     for tentativa in range(3):
         try:
-            return _buscar_item_bling_para_vinculo(
-                bling, codigo_busca, nome_busca, codigos_extras=codigos_extras
-            )
+            return _buscar_item_bling_para_vinculo(bling, codigo_busca, nome_busca, codigos_extras=codigos_extras)
         except Exception as e:
             ultima_falha = e
             msg = str(e)
@@ -346,9 +330,7 @@ def _buscar_item_bling_por_codigos_com_retry(
     ultima_falha = None
     for tentativa in range(3):
         try:
-            return _buscar_item_bling_por_codigos(
-                bling, codigo_busca, codigos_extras=codigos_extras
-            )
+            return _buscar_item_bling_por_codigos(bling, codigo_busca, codigos_extras=codigos_extras)
         except Exception as e:
             ultima_falha = e
             mensagem = str(e)
@@ -362,9 +344,7 @@ def _buscar_item_bling_por_codigos_com_retry(
     return None
 
 
-def _consultar_produto_bling_com_retry(
-    bling: BlingAPI, produto_id: str
-) -> Optional[dict]:
+def _consultar_produto_bling_com_retry(bling: BlingAPI, produto_id: str) -> Optional[dict]:
     ultima_falha = None
     for tentativa in range(3):
         try:
@@ -388,14 +368,10 @@ def _upsert_sync_vinculo(
     produto: Produto,
     bling_produto_id: str,
 ) -> None:
-    sync = (
-        db.query(ProdutoBlingSync)
-        .filter(
-            ProdutoBlingSync.produto_id == produto.id,
-            ProdutoBlingSync.tenant_id == tenant_id,
-        )
-        .first()
-    )
+    sync = db.query(ProdutoBlingSync).filter(
+        ProdutoBlingSync.produto_id == produto.id,
+        ProdutoBlingSync.tenant_id == tenant_id
+    ).first()
 
     if not sync:
         sync = ProdutoBlingSync(tenant_id=produto.tenant_id, produto_id=produto.id)
@@ -450,14 +426,12 @@ def _resolver_snapshot_storage_base() -> Path:
     if env_path:
         candidatos.append(Path(env_path))
 
-    candidatos.extend(
-        [
-            Path("/app/data/bling_snapshots"),
-            Path("/app/uploads/bling_snapshots"),
-            Path(__file__).resolve().parents[1] / "data" / "bling_snapshots",
-            _SNAPSHOT_STORAGE_FALLBACK,
-        ]
-    )
+    candidatos.extend([
+        Path("/app/data/bling_snapshots"),
+        Path("/app/uploads/bling_snapshots"),
+        Path(__file__).resolve().parents[1] / "data" / "bling_snapshots",
+        _SNAPSHOT_STORAGE_FALLBACK,
+    ])
 
     vistos: set[str] = set()
     for candidato in candidatos:
@@ -474,14 +448,9 @@ def _resolver_snapshot_storage_base() -> Path:
             logger.info("Snapshots compartilhados do Bling em %s", candidato)
             return candidato
         except Exception as error:
-            logger.warning(
-                "Snapshot compartilhado indisponivel em %s: %s", candidato, error
-            )
+            logger.warning("Snapshot compartilhado indisponivel em %s: %s", candidato, error)
 
-    logger.warning(
-        "Nenhum diretorio de snapshot compartilhado ficou gravavel. Usando fallback %s",
-        _SNAPSHOT_STORAGE_FALLBACK,
-    )
+    logger.warning("Nenhum diretorio de snapshot compartilhado ficou gravavel. Usando fallback %s", _SNAPSHOT_STORAGE_FALLBACK)
     return _SNAPSHOT_STORAGE_FALLBACK
 
 
@@ -500,12 +469,7 @@ def _read_shared_snapshot(snapshot_name: str, tenant_id: int) -> Optional[dict]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except Exception as error:
-        logger.warning(
-            "Falha ao ler snapshot compartilhado %s do tenant %s: %s",
-            snapshot_name,
-            tenant_id,
-            error,
-        )
+        logger.warning("Falha ao ler snapshot compartilhado %s do tenant %s: %s", snapshot_name, tenant_id, error)
         return None
 
     if not isinstance(data, dict) or not isinstance(data.get("payload"), dict):
@@ -523,17 +487,10 @@ def _write_shared_snapshot(snapshot_name: str, tenant_id: int, payload: dict) ->
             "payload": payload,
         }
         temp_path = path.with_suffix(".tmp")
-        temp_path.write_text(
-            json.dumps(data, default=str, ensure_ascii=False), encoding="utf-8"
-        )
+        temp_path.write_text(json.dumps(data, default=str, ensure_ascii=False), encoding="utf-8")
         os.replace(temp_path, path)
     except Exception as error:
-        logger.warning(
-            "Falha ao gravar snapshot compartilhado %s do tenant %s: %s",
-            snapshot_name,
-            tenant_id,
-            error,
-        )
+        logger.warning("Falha ao gravar snapshot compartilhado %s do tenant %s: %s", snapshot_name, tenant_id, error)
 
 
 def _delete_shared_snapshot(snapshot_name: str, tenant_id: int) -> None:
@@ -543,12 +500,7 @@ def _delete_shared_snapshot(snapshot_name: str, tenant_id: int) -> None:
     except FileNotFoundError:
         return
     except Exception as error:
-        logger.warning(
-            "Falha ao remover snapshot compartilhado %s do tenant %s: %s",
-            snapshot_name,
-            tenant_id,
-            error,
-        )
+        logger.warning("Falha ao remover snapshot compartilhado %s do tenant %s: %s", snapshot_name, tenant_id, error)
 
 
 def _shared_snapshot_age_seconds(snapshot_record: Optional[dict]) -> int:
@@ -599,8 +551,7 @@ def _build_sync_problem_query(
         ProdutoBlingSync.ultima_conferencia_bling >= cutoff,
         or_(
             ProdutoBlingSync.ultima_sincronizacao_sucesso.is_(None),
-            ProdutoBlingSync.ultima_conferencia_bling
-            >= ProdutoBlingSync.ultima_sincronizacao_sucesso,
+            ProdutoBlingSync.ultima_conferencia_bling >= ProdutoBlingSync.ultima_sincronizacao_sucesso,
         ),
     )
 
@@ -665,11 +616,11 @@ def _invalidate_bling_snapshots(tenant_id: int) -> None:
         _delete_shared_snapshot(snapshot_name, tenant_id)
 
 
-def _remover_ids_do_snapshot_sem_vinculo_cache(
-    tenant_id, produto_ids: list[int]
-) -> None:
+def _remover_ids_do_snapshot_sem_vinculo_cache(tenant_id, produto_ids: list[int]) -> None:
     ids_para_remover = {
-        int(produto_id) for produto_id in produto_ids if produto_id is not None
+        int(produto_id)
+        for produto_id in produto_ids
+        if produto_id is not None
     }
     if not ids_para_remover:
         return
@@ -703,8 +654,7 @@ def _remover_ids_do_snapshot_sem_vinculo_cache(
     payload["items"] = itens_filtrados
     payload["total"] = len(itens_filtrados)
     payload["total_sem_vinculo_universo_local"] = max(
-        int(payload.get("total_sem_vinculo_universo_local", len(itens_filtrados)))
-        - removidos,
+        int(payload.get("total_sem_vinculo_universo_local", len(itens_filtrados))) - removidos,
         0,
     )
     payload["atualizado_em"] = utc_now()
@@ -718,13 +668,9 @@ def _remover_ids_do_snapshot_sem_vinculo_cache(
     _write_shared_snapshot("sem_vinculo", tenant_id, payload)
 
 
-def _executar_reconciliacao_geral_em_background(
-    limit: Optional[int], tenant_id
-) -> None:
+def _executar_reconciliacao_geral_em_background(limit: Optional[int], tenant_id) -> None:
     try:
-        resultado = BlingSyncService.reconcile_all_products(
-            limit=limit, tenant_id=tenant_id
-        )
+        resultado = BlingSyncService.reconcile_all_products(limit=limit, tenant_id=tenant_id)
         with _reconciliacao_geral_lock:
             _reconciliacao_geral_estado["result"] = {
                 "ok": True,
@@ -793,9 +739,7 @@ def _extrair_codigos_bling_item(item: dict) -> set[str]:
     }
 
 
-def _listar_todos_produtos_bling(
-    bling: BlingAPI, limite: int = 100, max_paginas: int = 100
-) -> tuple[list[dict], bool]:
+def _listar_todos_produtos_bling(bling: BlingAPI, limite: int = 100, max_paginas: int = 100) -> tuple[list[dict], bool]:
     itens: list[dict] = []
     completo = True
 
@@ -817,9 +761,7 @@ def _listar_todos_produtos_bling(
 
         if ultima_falha:
             # Falha após retries: retorna parcial para não derrubar a tela.
-            logger.warning(
-                "⚠️ Coleta parcial no Bling (página %s): %s", pagina, ultima_falha
-            )
+            logger.warning("⚠️ Coleta parcial no Bling (página %s): %s", pagina, ultima_falha)
             completo = False
             break
 
@@ -855,9 +797,7 @@ def _get_catalogo_bling_snapshot(tenant_id: int, force_refresh: bool = False) ->
 
     if cache_compartilhado and cache_compartilhado.get("payload"):
         idade_compartilhada = _shared_snapshot_age_seconds(cache_compartilhado)
-        pode_reusar_no_force_refresh = (
-            idade_compartilhada < _CATALOGO_FORCE_REFRESH_REUSE_SECONDS
-        )
+        pode_reusar_no_force_refresh = idade_compartilhada < _CATALOGO_FORCE_REFRESH_REUSE_SECONDS
 
         if not force_refresh or pode_reusar_no_force_refresh:
             payload_compartilhado = dict(cache_compartilhado.get("payload", {}) or {})
@@ -885,9 +825,7 @@ def _get_catalogo_bling_snapshot(tenant_id: int, force_refresh: bool = False) ->
 
     try:
         bling = BlingAPI()
-        bling_itens, coleta_completa = _listar_todos_produtos_bling(
-            bling=bling, limite=100, max_paginas=100
-        )
+        bling_itens, coleta_completa = _listar_todos_produtos_bling(bling=bling, limite=100, max_paginas=100)
         payload = {
             "items": bling_itens,
             "total": len(bling_itens),
@@ -903,9 +841,7 @@ def _get_catalogo_bling_snapshot(tenant_id: int, force_refresh: bool = False) ->
             return {
                 **payload,
                 "snapshot_disponivel": True,
-                "cache_idade_segundos": _shared_snapshot_age_seconds(
-                    cache_compartilhado
-                ),
+                "cache_idade_segundos": _shared_snapshot_age_seconds(cache_compartilhado),
             }
         raise
 
@@ -929,26 +865,18 @@ def _calcular_resumo_cobertura_bling(
     bling_itens: list[dict],
     coleta_completa: bool,
 ) -> dict:
-    produtos_locais = (
-        db.query(Produto)
-        .filter(
-            Produto.tenant_id == tenant_id,
-        )
-        .all()
-    )
+    produtos_locais = db.query(Produto).filter(
+        Produto.tenant_id == tenant_id,
+    ).all()
 
     produtos_por_id = {produto.id: produto for produto in produtos_locais}
     codigos_para_produto = _indexar_produtos_locais_por_codigo(produtos_locais)
 
-    syncs = (
-        db.query(ProdutoBlingSync)
-        .filter(
-            ProdutoBlingSync.tenant_id == tenant_id,
-            ProdutoBlingSync.bling_produto_id.isnot(None),
-            ProdutoBlingSync.bling_produto_id != "",
-        )
-        .all()
-    )
+    syncs = db.query(ProdutoBlingSync).filter(
+        ProdutoBlingSync.tenant_id == tenant_id,
+        ProdutoBlingSync.bling_produto_id.isnot(None),
+        ProdutoBlingSync.bling_produto_id != "",
+    ).all()
     sync_por_produto = {sync.produto_id: sync for sync in syncs}
 
     total_bling = len(bling_itens)
@@ -1026,9 +954,7 @@ def _calcular_resumo_cobertura_bling(
     }
 
 
-def _get_resumo_cobertura_bling(
-    db: Session, tenant_id: int, force_refresh: bool = False
-) -> dict:
+def _get_resumo_cobertura_bling(db: Session, tenant_id: int, force_refresh: bool = False) -> dict:
     agora = time.monotonic()
     cache_atual = None
     cache_compartilhado = _read_shared_snapshot("cobertura", tenant_id)
@@ -1039,9 +965,7 @@ def _get_resumo_cobertura_bling(
     if not force_refresh and cache_atual:
         return {
             **cache_atual.get("payload", {}),
-            "cache_idade_segundos": int(
-                max(agora - cache_atual.get("ts_monotonic", 0), 0)
-            ),
+            "cache_idade_segundos": int(max(agora - cache_atual.get("ts_monotonic", 0), 0)),
         }
 
     if not force_refresh and cache_compartilhado and cache_compartilhado.get("payload"):
@@ -1058,9 +982,7 @@ def _get_resumo_cobertura_bling(
         }
 
     try:
-        catalogo = _get_catalogo_bling_snapshot(
-            tenant_id=tenant_id, force_refresh=force_refresh
-        )
+        catalogo = _get_catalogo_bling_snapshot(tenant_id=tenant_id, force_refresh=force_refresh)
         if not catalogo.get("snapshot_disponivel"):
             return {
                 "total_bling": 0,
@@ -1109,13 +1031,9 @@ def _calcular_snapshot_faltantes_bling(
     bling_itens: list[dict],
     coleta_completa: bool,
 ) -> dict:
-    produtos_locais = (
-        db.query(Produto)
-        .filter(
-            Produto.tenant_id == tenant_id,
-        )
-        .all()
-    )
+    produtos_locais = db.query(Produto).filter(
+        Produto.tenant_id == tenant_id,
+    ).all()
 
     codigos_locais = set(_indexar_produtos_locais_por_codigo(produtos_locais).keys())
 
@@ -1134,23 +1052,17 @@ def _calcular_snapshot_faltantes_bling(
 
         sku = _sku_bling(item)
         codigo_barras = _barcode_bling(item)
-        faltantes.append(
-            {
-                "id": bling_id,
-                "descricao": item.get("nome")
-                or item.get("descricao")
-                or "Sem descrição",
-                "codigo": item.get("codigo") or item.get("sku") or "",
-                "sku": sku,
-                "codigo_barras": codigo_barras,
-                "estoque": _coerce_float(
-                    item.get("estoque") or item.get("saldoFisicoTotal") or 0
-                ),
-                "motivo": _motivo_faltante_bling(item),
-                "acao_sugerida": _acao_faltante_bling(item),
-                "pronto_para_autocorrecao": bool(sku or codigo_barras),
-            }
-        )
+        faltantes.append({
+            "id": bling_id,
+            "descricao": item.get("nome") or item.get("descricao") or "Sem descrição",
+            "codigo": item.get("codigo") or item.get("sku") or "",
+            "sku": sku,
+            "codigo_barras": codigo_barras,
+            "estoque": _coerce_float(item.get("estoque") or item.get("saldoFisicoTotal") or 0),
+            "motivo": _motivo_faltante_bling(item),
+            "acao_sugerida": _acao_faltante_bling(item),
+            "pronto_para_autocorrecao": bool(sku or codigo_barras),
+        })
 
     return {
         "items": faltantes,
@@ -1178,9 +1090,7 @@ def _get_snapshot_faltantes_bling(
         return {
             **cache_atual.get("payload", {}),
             "snapshot_disponivel": True,
-            "cache_idade_segundos": int(
-                max(agora - cache_atual.get("ts_monotonic", 0), 0)
-            ),
+            "cache_idade_segundos": int(max(agora - cache_atual.get("ts_monotonic", 0), 0)),
         }
 
     if not force_refresh and cache_compartilhado and cache_compartilhado.get("payload"):
@@ -1198,9 +1108,7 @@ def _get_snapshot_faltantes_bling(
         }
 
     try:
-        catalogo = _get_catalogo_bling_snapshot(
-            tenant_id=tenant_id, force_refresh=force_refresh
-        )
+        catalogo = _get_catalogo_bling_snapshot(tenant_id=tenant_id, force_refresh=force_refresh)
         if not catalogo.get("snapshot_disponivel"):
             return {
                 "items": [],
@@ -1268,9 +1176,7 @@ def _origem_match_produto_bling(produto, item: dict) -> str:
 
     if codigo_local and codigo_local in chaves_sku_bling:
         return "sku"
-    if barcode_local and (
-        barcode_local in chaves_barcode_bling or barcode_local in chaves_sku_bling
-    ):
+    if barcode_local and (barcode_local in chaves_barcode_bling or barcode_local in chaves_sku_bling):
         return "codigo_barras"
     return "codigo"
 
@@ -1335,9 +1241,7 @@ def _calcular_snapshot_sem_vinculo_com_match_bling(
             match_origem = _origem_match_produto_bling(produto, item)
             detalhes_match_por_id[produto_id] = {
                 "bling_id": str(item.get("id") or "").strip(),
-                "bling_nome": item.get("nome")
-                or item.get("descricao")
-                or "Sem descricao",
+                "bling_nome": item.get("nome") or item.get("descricao") or "Sem descricao",
                 "bling_codigo": item.get("codigo") or item.get("sku") or "",
                 "bling_sku": _sku_bling(item),
                 "bling_codigo_barras": _barcode_bling(item),
@@ -1356,9 +1260,7 @@ def _calcular_snapshot_sem_vinculo_com_match_bling(
             "bling_nome": detalhes_match_por_id[produto.id]["bling_nome"],
             "bling_codigo": detalhes_match_por_id[produto.id]["bling_codigo"],
             "bling_sku": detalhes_match_por_id[produto.id]["bling_sku"],
-            "bling_codigo_barras": detalhes_match_por_id[produto.id][
-                "bling_codigo_barras"
-            ],
+            "bling_codigo_barras": detalhes_match_por_id[produto.id]["bling_codigo_barras"],
             "match_origem": detalhes_match_por_id[produto.id]["match_origem"],
             "sincroniza_estoque": _produto_sincroniza_estoque(produto),
             "motivo": (
@@ -1373,9 +1275,7 @@ def _calcular_snapshot_sem_vinculo_com_match_bling(
                     else "Encontramos esse item no Bling pelo codigo de barras, mas o vinculo ainda nao foi criado."
                 )
             ),
-            "acao_sugerida": "Vincular sem sync de estoque"
-            if _produto_eh_pai(produto)
-            else "Vincular agora",
+            "acao_sugerida": "Vincular sem sync de estoque" if _produto_eh_pai(produto) else "Vincular agora",
         }
         for produto in produtos_sem_vinculo
         if produto.id in detalhes_match_por_id
@@ -1406,9 +1306,7 @@ def _get_snapshot_sem_vinculo_com_match_bling(
     if not force_refresh and cache_atual:
         return {
             **cache_atual.get("payload", {}),
-            "cache_idade_segundos": int(
-                max(agora - cache_atual.get("ts_monotonic", 0), 0)
-            ),
+            "cache_idade_segundos": int(max(agora - cache_atual.get("ts_monotonic", 0), 0)),
         }
 
     if not force_refresh and cache_compartilhado and cache_compartilhado.get("payload"):
@@ -1425,9 +1323,7 @@ def _get_snapshot_sem_vinculo_com_match_bling(
         }
 
     try:
-        catalogo = _get_catalogo_bling_snapshot(
-            tenant_id=tenant_id, force_refresh=force_refresh
-        )
+        catalogo = _get_catalogo_bling_snapshot(tenant_id=tenant_id, force_refresh=force_refresh)
         if not catalogo.get("snapshot_disponivel"):
             return {
                 "items": [],
@@ -1452,9 +1348,7 @@ def _get_snapshot_sem_vinculo_com_match_bling(
             payload["coleta_bling_completa"] = False
             payload["cache_utilizado_por_falha"] = True
             payload["erro_coleta_bling"] = str(e)
-            payload["cache_idade_segundos"] = int(
-                max(agora - cache_atual.get("ts_monotonic", 0), 0)
-            )
+            payload["cache_idade_segundos"] = int(max(agora - cache_atual.get("ts_monotonic", 0), 0))
             return payload
         raise
 
@@ -1470,20 +1364,16 @@ def _get_snapshot_sem_vinculo_com_match_bling(
         "cache_idade_segundos": 0,
     }
 
-
 # ============================================================================
 # SCHEMAS
 # ============================================================================
 
-
 class ConfigSyncRequest(BaseModel):
     """Configurar sincronização de um produto"""
-
     produto_id: int
     bling_produto_id: Optional[str] = None
     sincronizar: bool = True
     estoque_compartilhado: bool = True
-
 
 class SyncStatusResponse(BaseModel):
     produto_id: int
@@ -1520,98 +1410,85 @@ class ReconciliarBatchRequest(BaseModel):
     limit: int = Field(default=100, ge=1, le=1000)
     minutes: int = Field(default=30, ge=5, le=1440)
 
-
 # ============================================================================
 # CONFIGURAÇÃO DE SINCRONIZAÇÃO
 # ============================================================================
-
 
 @router.post("/config")
 def configurar_sincronizacao(
     config: ConfigSyncRequest,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Configurar sincronização de produto com Bling
-
+    
     - bling_produto_id: ID do produto no Bling (ou None para buscar automaticamente)
     - sincronizar: Se TRUE, sincroniza estoque automaticamente
     - estoque_compartilhado: Se TRUE, estoque é único (loja + online)
     """
     logger.info(f"⚙️ Configurando sync - Produto {config.produto_id}")
-
+    
     _current_user, tenant_id = user_and_tenant
 
     # Verificar se produto existe
-    produto = (
-        db.query(Produto)
-        .filter(
-            Produto.id == config.produto_id,
-            Produto.tenant_id == tenant_id,
-        )
-        .first()
-    )
+    produto = db.query(Produto).filter(
+        Produto.id == config.produto_id,
+        Produto.tenant_id == tenant_id,
+    ).first()
     if not produto:
         raise HTTPException(status_code=404, detail=PRODUTO_NAO_ENCONTRADO)
-
+    
     # Buscar ou criar configuração
-    sync = (
-        db.query(ProdutoBlingSync)
-        .filter(
-            ProdutoBlingSync.produto_id == config.produto_id,
-            ProdutoBlingSync.tenant_id == tenant_id,
-        )
-        .first()
-    )
-
+    sync = db.query(ProdutoBlingSync).filter(
+        ProdutoBlingSync.produto_id == config.produto_id,
+        ProdutoBlingSync.tenant_id == tenant_id,
+    ).first()
+    
     if not sync:
-        sync = ProdutoBlingSync(
-            tenant_id=produto.tenant_id, produto_id=config.produto_id
-        )
+        sync = ProdutoBlingSync(tenant_id=produto.tenant_id, produto_id=config.produto_id)
         db.add(sync)
-
+    
     # Atualizar configuração
     sync.bling_produto_id = config.bling_produto_id
     sync.sincronizar = config.sincronizar
     sync.estoque_compartilhado = config.estoque_compartilhado
-    sync.status = "ativo" if config.sincronizar else "pausado"
+    sync.status = 'ativo' if config.sincronizar else 'pausado'
     sync.updated_at = utc_now()
-
+    
     # Se não tem bling_produto_id, tentar buscar automaticamente
     if not sync.bling_produto_id and config.sincronizar:
         try:
             # Buscar no Bling por SKU ou código de barras
             bling = BlingAPI()
             resultado = bling.listar_produtos(
-                codigo=produto.codigo_barras, sku=produto.codigo
+                codigo=produto.codigo_barras,
+                sku=produto.codigo
             )
-
-            produtos_bling = resultado.get("data", [])
+            
+            produtos_bling = resultado.get('data', [])
             if produtos_bling and len(produtos_bling) > 0:
-                sync.bling_produto_id = str(produtos_bling[0].get("id"))
-                logger.info(
-                    f"✅ Produto vinculado automaticamente: Bling ID {sync.bling_produto_id}"
-                )
+                sync.bling_produto_id = str(produtos_bling[0].get('id'))
+                logger.info(f"✅ Produto vinculado automaticamente: Bling ID {sync.bling_produto_id}")
             else:
-                sync.status = "erro"
+                sync.status = 'erro'
                 sync.erro_mensagem = "Produto não encontrado no Bling"
                 logger.warning("⚠️ Produto não encontrado no Bling")
         except Exception as e:
             logger.error(f"❌ Erro ao buscar produto no Bling: {e}")
-            sync.status = "erro"
+            sync.status = 'erro'
             sync.erro_mensagem = str(e)
-
+    
     db.commit()
     _invalidate_bling_snapshots(tenant_id)
     db.refresh(sync)
-
+    
     return {
         "message": "Sincronização configurada com sucesso",
         "produto_id": sync.produto_id,
         "bling_produto_id": sync.bling_produto_id,
         "sincronizar": sync.sincronizar,
-        "status": sync.status,
+        "status": sync.status
     }
 
 
@@ -1619,30 +1496,22 @@ def configurar_sincronizacao(
 def vincular_produto_bling(
     body: VincularProdutoRequest,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Vincula manualmente um produto local a um produto do Bling."""
     _current_user, tenant_id = user_and_tenant
 
-    produto = (
-        db.query(Produto)
-        .filter(
-            Produto.id == body.produto_id,
-            Produto.tenant_id == tenant_id,
-        )
-        .first()
-    )
+    produto = db.query(Produto).filter(
+        Produto.id == body.produto_id,
+        Produto.tenant_id == tenant_id,
+    ).first()
     if not produto:
         raise HTTPException(status_code=404, detail=PRODUTO_NAO_ENCONTRADO)
 
-    sync = (
-        db.query(ProdutoBlingSync)
-        .filter(
-            ProdutoBlingSync.produto_id == body.produto_id,
-            ProdutoBlingSync.tenant_id == tenant_id,
-        )
-        .first()
-    )
+    sync = db.query(ProdutoBlingSync).filter(
+        ProdutoBlingSync.produto_id == body.produto_id,
+        ProdutoBlingSync.tenant_id == tenant_id,
+    ).first()
 
     if not sync:
         sync = ProdutoBlingSync(
@@ -1671,16 +1540,15 @@ def vincular_produto_bling(
 def vincular_produto_bling_automatico(
     produto_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Tenta vincular automaticamente um produto local ao Bling pelo código/SKU."""
     _current_user, tenant_id = user_and_tenant
 
-    produto = (
-        db.query(Produto)
-        .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
-        .first()
-    )
+    produto = db.query(Produto).filter(
+        Produto.id == produto_id,
+        Produto.tenant_id == tenant_id
+    ).first()
     if not produto:
         raise HTTPException(status_code=404, detail=PRODUTO_NAO_ENCONTRADO)
 
@@ -1702,16 +1570,11 @@ def vincular_produto_bling_automatico(
     )
 
     if not item_escolhido:
-        raise HTTPException(
-            status_code=404,
-            detail="Produto não encontrado no Bling para vínculo automático",
-        )
+        raise HTTPException(status_code=404, detail="Produto não encontrado no Bling para vínculo automático")
 
     bling_id = str(item_escolhido.get("id") or "").strip()
     if not bling_id:
-        raise HTTPException(
-            status_code=400, detail="Resposta do Bling sem ID de produto"
-        )
+        raise HTTPException(status_code=400, detail="Resposta do Bling sem ID de produto")
 
     _upsert_sync_vinculo(db, tenant_id, produto, bling_id)
 
@@ -1736,7 +1599,7 @@ def listar_produtos_bling(
     pagina: int = Query(default=1, ge=1),
     limite: int = Query(default=50, ge=1, le=100),
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Busca produtos diretamente no Bling para facilitar vínculo manual."""
     try:
@@ -1747,24 +1610,16 @@ def listar_produtos_bling(
         # Fallback final: para termo vazio ou quando filtros específicos retornam vazio,
         # faz uma listagem padrão da página para não bloquear a tela.
         if not itens and not termo:
-            itens = _extrair_lista_produtos_bling(
-                bling.listar_produtos(pagina=pagina, limite=limite)
-            )
+            itens = _extrair_lista_produtos_bling(bling.listar_produtos(pagina=pagina, limite=limite))
 
         produtos_bling = []
         for item in itens:
-            produtos_bling.append(
-                {
-                    "id": str(item.get("id")),
-                    "descricao": item.get("nome")
-                    or item.get("descricao")
-                    or "Sem descrição",
-                    "codigo": item.get("codigo") or item.get("sku"),
-                    "estoque": _coerce_float(
-                        item.get("estoque") or item.get("saldoFisicoTotal") or 0
-                    ),
-                }
-            )
+            produtos_bling.append({
+                "id": str(item.get("id")),
+                "descricao": item.get("nome") or item.get("descricao") or "Sem descrição",
+                "codigo": item.get("codigo") or item.get("sku"),
+                "estoque": _coerce_float(item.get("estoque") or item.get("saldoFisicoTotal") or 0),
+            })
         return produtos_bling
     except Exception as e:
         mensagem = str(e)
@@ -1773,9 +1628,7 @@ def listar_produtos_bling(
                 status_code=429,
                 detail="Bling com limite temporário de consultas. Aguarde alguns segundos e tente novamente.",
             )
-        raise HTTPException(
-            status_code=500, detail=f"Erro ao consultar produtos no Bling: {mensagem}"
-        )
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar produtos no Bling: {mensagem}")
 
 
 @router.post("/importar-imagens")
@@ -1784,7 +1637,7 @@ def importar_imagens_dos_produtos_bling(
     apenas_sem_imagem: bool = Query(default=True),
     atraso_ms: int = Query(default=900, ge=300, le=5000),
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant),
 ):
     """Importa imagens do Bling para produtos locais usando o vínculo salvo ou o SKU/código atual."""
     _current_user, tenant_id = user_and_tenant
@@ -1868,9 +1721,7 @@ def importar_imagens_dos_produtos_bling(
             )
             continue
 
-        bling_id = str(
-            getattr(getattr(produto, "bling_sync", None), "bling_produto_id", "") or ""
-        ).strip()
+        bling_id = str(getattr(getattr(produto, "bling_sync", None), "bling_produto_id", "") or "").strip()
         item_bling = None
         detalhe_bling = None
 
@@ -1893,9 +1744,7 @@ def importar_imagens_dos_produtos_bling(
                 item_bling = _buscar_item_bling_por_codigos_com_retry(
                     bling,
                     produto.codigo,
-                    codigos_extras=[produto.codigo_barras]
-                    if produto.codigo_barras
-                    else None,
+                    codigos_extras=[produto.codigo_barras] if produto.codigo_barras else None,
                 )
                 if item_bling:
                     bling_id = str(item_bling.get("id") or "").strip()
@@ -1984,7 +1833,7 @@ def importar_imagens_dos_produtos_bling(
 @router.get("/health")
 def health_sincronizacao(
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Resumo operacional da integração com o Bling."""
     _current_user, tenant_id = user_and_tenant
@@ -1999,7 +1848,7 @@ def listar_produtos_sem_vinculo(
     force_refresh: bool = Query(default=False),
     apenas_com_match_bling: bool = Query(default=True),
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant),
 ):
     """Lista rápida de produtos sem vínculo, priorizando base Bling (com match no Bling)."""
     _current_user, tenant_id = user_and_tenant
@@ -2047,11 +1896,10 @@ def listar_produtos_sem_vinculo(
                 itens_base = [
                     item
                     for item in itens_base
-                    if termo in (item.get("nome") or "").lower()
-                    or termo in (item.get("codigo") or "").lower()
+                    if termo in (item.get("nome") or "").lower() or termo in (item.get("codigo") or "").lower()
                 ]
 
-            paginados = itens_base[offset : offset + limit]
+            paginados = itens_base[offset: offset + limit]
 
             return {
                 "items": paginados,
@@ -2061,23 +1909,17 @@ def listar_produtos_sem_vinculo(
                 "apenas_com_match_bling": True,
                 "snapshot_disponivel": snapshot.get("snapshot_disponivel", True),
                 "precisa_atualizar": snapshot.get("precisa_atualizar", False),
-                "total_sem_vinculo_universo_local": snapshot.get(
-                    "total_sem_vinculo_universo_local", 0
-                ),
+                "total_sem_vinculo_universo_local": snapshot.get("total_sem_vinculo_universo_local", 0),
                 "total_bling": snapshot.get("total_bling", 0),
                 "coleta_bling_completa": snapshot.get("coleta_bling_completa", True),
-                "cache_utilizado_por_falha": snapshot.get(
-                    "cache_utilizado_por_falha", False
-                ),
+                "cache_utilizado_por_falha": snapshot.get("cache_utilizado_por_falha", False),
                 "cache_idade_segundos": snapshot.get("cache_idade_segundos", 0),
                 "atualizado_em": snapshot.get("atualizado_em"),
             }
         except Exception as e:
             fallback_local = True
             erro_coleta_bling = str(e)
-            logger.warning(
-                f"⚠️ Falha ao montar snapshot de produtos sem vínculo no Bling: {e}. Aplicando fallback local."
-            )
+            logger.warning(f"⚠️ Falha ao montar snapshot de produtos sem vínculo no Bling: {e}. Aplicando fallback local.")
 
     if termo:
         like = f"%{termo}%"
@@ -2116,7 +1958,7 @@ def listar_produtos_sem_vinculo(
 def resumo_cobertura_bling(
     force_refresh: bool = Query(default=False),
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Resumo de cobertura Bling -> CorePet.
@@ -2125,16 +1967,10 @@ def resumo_cobertura_bling(
     """
     _current_user, tenant_id = user_and_tenant
     try:
-        normalizados = BlingSyncService.normalize_sync_states_from_latest_queue(
-            db, tenant_id=tenant_id
-        )
-        if (normalizados.get("repaired_active") or 0) > 0 or (
-            normalizados.get("repaired_error") or 0
-        ) > 0:
+        normalizados = BlingSyncService.normalize_sync_states_from_latest_queue(db, tenant_id=tenant_id)
+        if (normalizados.get("repaired_active") or 0) > 0 or (normalizados.get("repaired_error") or 0) > 0:
             db.commit()
-        return _get_resumo_cobertura_bling(
-            db, tenant_id=tenant_id, force_refresh=force_refresh
-        )
+        return _get_resumo_cobertura_bling(db, tenant_id=tenant_id, force_refresh=force_refresh)
     except Exception as e:
         logger.error(f"❌ Erro ao gerar resumo de cobertura Bling: {e}")
         # Não quebrar a tela: retorna payload seguro quando falhar sem cache.
@@ -2145,12 +1981,8 @@ def resumo_cobertura_bling(
             "bling_sync_ok": 0,
             "bling_com_problema": 0,
             "sync_problemas_abertos": 0,
-            "total_sistema": db.query(Produto)
-            .filter(Produto.tenant_id == tenant_id, Produto.tipo_produto != "PAI")
-            .count(),
-            "somente_sistema": db.query(Produto)
-            .filter(Produto.tenant_id == tenant_id, Produto.tipo_produto != "PAI")
-            .count(),
+            "total_sistema": db.query(Produto).filter(Produto.tenant_id == tenant_id, Produto.tipo_produto != "PAI").count(),
+            "somente_sistema": db.query(Produto).filter(Produto.tenant_id == tenant_id, Produto.tipo_produto != "PAI").count(),
             "coleta_bling_completa": False,
             "erro_coleta_bling": "Falha temporaria ao consultar Bling",
             "atualizado_em": utc_now(),
@@ -2165,7 +1997,7 @@ def listar_faltantes_bling(
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant),
 ):
     """
     Retorna snapshot dos produtos existentes no Bling que não possuem match no CorePet.
@@ -2176,9 +2008,7 @@ def listar_faltantes_bling(
     _current_user, tenant_id = user_and_tenant
 
     try:
-        snapshot = _get_snapshot_faltantes_bling(
-            db, tenant_id=tenant_id, force_refresh=force_refresh
-        )
+        snapshot = _get_snapshot_faltantes_bling(db, tenant_id=tenant_id, force_refresh=force_refresh)
     except Exception as e:
         logger.error(f"❌ Erro ao gerar snapshot de faltantes Bling: {e}")
         return {
@@ -2195,7 +2025,7 @@ def listar_faltantes_bling(
         }
 
     itens = snapshot.get("items", [])
-    paginados = itens[offset : offset + limit]
+    paginados = itens[offset: offset + limit]
 
     return {
         "items": paginados,
@@ -2217,7 +2047,7 @@ def dashboard_pendencias_bling(
     limit: int = Query(default=200, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant),
 ):
     """
     Retorna os blocos principais da central do Bling em uma única resposta.
@@ -2254,7 +2084,7 @@ def dashboard_pendencias_bling(
 def criar_produto_local_para_faltante_bling(
     body: CriarProdutoBlingFaltanteRequest,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant),
 ):
     _current_user, tenant_id = user_and_tenant
 
@@ -2265,9 +2095,7 @@ def criar_produto_local_para_faltante_bling(
     try:
         item_bling = BlingAPI().consultar_produto(bling_id)
     except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Erro ao consultar produto no Bling: {e}"
-        ) from e
+        raise HTTPException(status_code=400, detail=f"Erro ao consultar produto no Bling: {e}") from e
 
     if isinstance(item_bling, dict) and isinstance(item_bling.get("produto"), dict):
         item_bling = item_bling.get("produto") or {}
@@ -2278,9 +2106,7 @@ def criar_produto_local_para_faltante_bling(
     sku = _sku_bling(item_bling)
     codigo_barras = _barcode_bling(item_bling)
 
-    produto = (
-        buscar_produto_do_item(db=db, tenant_id=tenant_id, sku=sku) if sku else None
-    )
+    produto = buscar_produto_do_item(db=db, tenant_id=tenant_id, sku=sku) if sku else None
     correspondencia_usada = "sku" if produto else None
 
     if not produto and codigo_barras:
@@ -2297,10 +2123,7 @@ def criar_produto_local_para_faltante_bling(
         correspondencia_usada = "autocadastro"
 
     if not produto:
-        raise HTTPException(
-            status_code=400,
-            detail="Nao foi possivel criar o produto local a partir do Bling",
-        )
+        raise HTTPException(status_code=400, detail="Nao foi possivel criar o produto local a partir do Bling")
 
     conflito_bling = (
         db.query(ProdutoBlingSync)
@@ -2325,10 +2148,7 @@ def criar_produto_local_para_faltante_bling(
         )
         .first()
     )
-    if sync_existente and _texto_limpo(sync_existente.bling_produto_id) not in {
-        "",
-        bling_id,
-    }:
+    if sync_existente and _texto_limpo(sync_existente.bling_produto_id) not in {"", bling_id}:
         raise HTTPException(
             status_code=409,
             detail=(
@@ -2351,33 +2171,27 @@ def criar_produto_local_para_faltante_bling(
         "produto_codigo": produto.codigo,
         "produto_nome": produto.nome,
         "bling_produto_id": bling_id,
-        "acao": "vinculado_existente"
-        if correspondencia_usada in {"sku", "codigo_barras"}
-        else "criado_e_vinculado",
+        "acao": "vinculado_existente" if correspondencia_usada in {"sku", "codigo_barras"} else "criado_e_vinculado",
         "correspondencia_usada": correspondencia_usada,
         "sincronizar_estoque": _produto_sincroniza_estoque(produto),
     }
 
-
 # ============================================================================
 # ENVIAR ESTOQUE PARA BLING
 # ============================================================================
-
 
 @router.post("/enviar/{produto_id}")
 def enviar_estoque_para_bling(
     produto_id: int,
     force: bool = Query(default=False),
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Envia estoque atual do produto para o Bling
     Usado após vendas na loja física
     """
-    logger.info(
-        f"📤 Enviando estoque para Bling - Produto {produto_id} (force={force})"
-    )
+    logger.info(f"📤 Enviando estoque para Bling - Produto {produto_id} (force={force})")
 
     resultado = BlingSyncService.force_sync_now(
         produto_id=produto_id,
@@ -2387,8 +2201,7 @@ def enviar_estoque_para_bling(
         if resultado.get("auth_invalid"):
             raise HTTPException(
                 status_code=409,
-                detail=resultado.get("detail")
-                or "Reconecte o Bling antes de tentar novo envio.",
+                detail=resultado.get("detail") or "Reconecte o Bling antes de tentar novo envio.",
             )
         if resultado.get("rate_limited"):
             return {
@@ -2396,12 +2209,7 @@ def enviar_estoque_para_bling(
                 or "Bling limitou as requisicoes agora. O item foi reagendado automaticamente.",
                 **resultado,
             }
-        raise HTTPException(
-            status_code=400,
-            detail=resultado.get("detail")
-            or resultado.get("erro")
-            or "Falha ao sincronizar",
-        )
+        raise HTTPException(status_code=400, detail=resultado.get("detail") or resultado.get("erro") or "Falha ao sincronizar")
 
     return {
         "message": "Estoque enviado para Bling com sucesso",
@@ -2416,18 +2224,15 @@ def enviar_estoque_para_bling(
 def forcar_sincronizacao_produto(
     produto_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Força o envio imediato do estoque de um único produto."""
-    resultado = BlingSyncService.force_sync_now(
-        produto_id=produto_id, motivo="botao_forcar_sync"
-    )
+    resultado = BlingSyncService.force_sync_now(produto_id=produto_id, motivo="botao_forcar_sync")
     if not resultado.get("ok"):
         if resultado.get("auth_invalid"):
             raise HTTPException(
                 status_code=409,
-                detail=resultado.get("detail")
-                or "Reconecte o Bling antes de tentar novo envio.",
+                detail=resultado.get("detail") or "Reconecte o Bling antes de tentar novo envio.",
             )
         if resultado.get("rate_limited"):
             return {
@@ -2435,47 +2240,39 @@ def forcar_sincronizacao_produto(
                 or "Bling limitou as requisicoes agora. O item foi reagendado automaticamente.",
                 **resultado,
             }
-        raise HTTPException(
-            status_code=400,
-            detail=resultado.get("detail")
-            or resultado.get("erro")
-            or "Falha ao forçar sincronização",
-        )
+        raise HTTPException(status_code=400, detail=resultado.get("detail") or resultado.get("erro") or "Falha ao forçar sincronização")
     return {
         "message": "Sincronização forçada concluída",
         **resultado,
     }
 
-
 # ============================================================================
 # STATUS DE SINCRONIZAÇÃO
 # ============================================================================
-
 
 @router.get("/status", response_model=List[SyncStatusResponse])
 def status_sincronizacao(
     apenas_divergencias: bool = False,
     busca: Optional[str] = Query(default=None),
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Lista status de sincronização de todos os produtos
-
+    
     - apenas_divergencias: Se TRUE, mostra apenas produtos com divergência de estoque
     """
     logger.info("📊 Consultando status de sincronização")
     _current_user, tenant_id = user_and_tenant
-
+    
     # Buscar produtos com sincronização configurada
-    query = (
-        db.query(Produto, ProdutoBlingSync)
-        .join(ProdutoBlingSync, Produto.id == ProdutoBlingSync.produto_id)
-        .filter(
-            Produto.tenant_id == tenant_id,
-            ProdutoBlingSync.tenant_id == tenant_id,
-            ProdutoBlingSync.sincronizar.is_(True),
-        )
+    query = db.query(Produto, ProdutoBlingSync).join(
+        ProdutoBlingSync,
+        Produto.id == ProdutoBlingSync.produto_id
+    ).filter(
+        Produto.tenant_id == tenant_id,
+        ProdutoBlingSync.tenant_id == tenant_id,
+        ProdutoBlingSync.sincronizar.is_(True)
     )
 
     if busca:
@@ -2487,52 +2284,45 @@ def status_sincronizacao(
                 ProdutoBlingSync.bling_produto_id.ilike(termo),
             )
         )
-
+    
     resultados = []
-
+    
     for produto, sync in query.all():
-        fila = (
-            db.query(ProdutoBlingSyncQueue)
-            .filter(
-                ProdutoBlingSyncQueue.produto_id == produto.id,
-                ProdutoBlingSyncQueue.tenant_id == tenant_id,
-            )
-            .order_by(ProdutoBlingSyncQueue.updated_at.desc())
-            .first()
-        )
+        fila = db.query(ProdutoBlingSyncQueue).filter(
+            ProdutoBlingSyncQueue.produto_id == produto.id,
+            ProdutoBlingSyncQueue.tenant_id == tenant_id,
+        ).order_by(ProdutoBlingSyncQueue.updated_at.desc()).first()
 
         # Usar dados cacheados para manter endpoint rápido e evitar rate-limit/timeout.
         estoque_bling = sync.ultimo_estoque_bling
         divergencia = sync.ultima_divergencia
-
+        
         # Filtrar divergências se solicitado
         if apenas_divergencias and divergencia is not None and abs(divergencia) < 0.01:
             continue
-
-        resultados.append(
-            SyncStatusResponse(
-                produto_id=produto.id,
-                produto_nome=produto.nome,
-                sku=produto.codigo,
-                estoque_sistema=produto.estoque_atual or 0,
-                estoque_bling=estoque_bling,
-                divergencia=divergencia,
-                sincronizado=sync.sincronizar,
-                bling_produto_id=sync.bling_produto_id,
-                ultima_sincronizacao=sync.ultima_sincronizacao,
-                status=sync.status,
-                ultima_tentativa_sync=sync.ultima_tentativa_sync,
-                proxima_tentativa_sync=sync.proxima_tentativa_sync,
-                ultima_conferencia_bling=sync.ultima_conferencia_bling,
-                ultima_sincronizacao_sucesso=sync.ultima_sincronizacao_sucesso,
-                ultimo_estoque_bling=sync.ultimo_estoque_bling,
-                tentativas_sync=sync.tentativas_sync or 0,
-                ultimo_erro=sync.erro_mensagem or (fila.ultimo_erro if fila else None),
-                queue_id=fila.id if fila else None,
-                queue_status=fila.status if fila else None,
-            )
-        )
-
+        
+        resultados.append(SyncStatusResponse(
+            produto_id=produto.id,
+            produto_nome=produto.nome,
+            sku=produto.codigo,
+            estoque_sistema=produto.estoque_atual or 0,
+            estoque_bling=estoque_bling,
+            divergencia=divergencia,
+            sincronizado=sync.sincronizar,
+            bling_produto_id=sync.bling_produto_id,
+            ultima_sincronizacao=sync.ultima_sincronizacao,
+            status=sync.status,
+            ultima_tentativa_sync=sync.ultima_tentativa_sync,
+            proxima_tentativa_sync=sync.proxima_tentativa_sync,
+            ultima_conferencia_bling=sync.ultima_conferencia_bling,
+            ultima_sincronizacao_sucesso=sync.ultima_sincronizacao_sucesso,
+            ultimo_estoque_bling=sync.ultimo_estoque_bling,
+            tentativas_sync=sync.tentativas_sync or 0,
+            ultimo_erro=sync.erro_mensagem or (fila.ultimo_erro if fila else None),
+            queue_id=fila.id if fila else None,
+            queue_status=fila.status if fila else None,
+        ))
+    
     logger.info(f"✅ {len(resultados)} produtos em sincronização")
     return resultados
 
@@ -2543,18 +2333,14 @@ def status_sincronizacao_problemas(
     limit: int = Query(default=300, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Retorna apenas itens com pendencias de sincronizacao, sem N+1 de fila."""
     logger.info("Consultando status de sincronizacao com filtro de problemas")
     _current_user, tenant_id = user_and_tenant
 
-    normalizados = BlingSyncService.normalize_sync_states_from_latest_queue(
-        db, tenant_id=tenant_id
-    )
-    if (normalizados.get("repaired_active") or 0) > 0 or (
-        normalizados.get("repaired_error") or 0
-    ) > 0:
+    normalizados = BlingSyncService.normalize_sync_states_from_latest_queue(db, tenant_id=tenant_id)
+    if (normalizados.get("repaired_active") or 0) > 0 or (normalizados.get("repaired_error") or 0) > 0:
         db.commit()
 
     query, fila_atual = _build_sync_problem_query(
@@ -2564,35 +2350,28 @@ def status_sincronizacao_problemas(
     )
 
     resultados = []
-    for produto, sync, fila in (
-        query.order_by(ProdutoBlingSync.updated_at.desc(), Produto.id.asc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    ):
-        resultados.append(
-            SyncStatusResponse(
-                produto_id=produto.id,
-                produto_nome=produto.nome,
-                sku=produto.codigo,
-                estoque_sistema=produto.estoque_atual or 0,
-                estoque_bling=sync.ultimo_estoque_bling,
-                divergencia=sync.ultima_divergencia,
-                sincronizado=sync.sincronizar,
-                bling_produto_id=sync.bling_produto_id,
-                ultima_sincronizacao=sync.ultima_sincronizacao,
-                status=sync.status,
-                ultima_tentativa_sync=sync.ultima_tentativa_sync,
-                proxima_tentativa_sync=sync.proxima_tentativa_sync,
-                ultima_conferencia_bling=sync.ultima_conferencia_bling,
-                ultima_sincronizacao_sucesso=sync.ultima_sincronizacao_sucesso,
-                ultimo_estoque_bling=sync.ultimo_estoque_bling,
-                tentativas_sync=sync.tentativas_sync or 0,
-                ultimo_erro=sync.erro_mensagem or (fila.ultimo_erro if fila else None),
-                queue_id=fila.id if fila else None,
-                queue_status=fila.status if fila else None,
-            )
-        )
+    for produto, sync, fila in query.order_by(ProdutoBlingSync.updated_at.desc(), Produto.id.asc()).offset(offset).limit(limit).all():
+        resultados.append(SyncStatusResponse(
+            produto_id=produto.id,
+            produto_nome=produto.nome,
+            sku=produto.codigo,
+            estoque_sistema=produto.estoque_atual or 0,
+            estoque_bling=sync.ultimo_estoque_bling,
+            divergencia=sync.ultima_divergencia,
+            sincronizado=sync.sincronizar,
+            bling_produto_id=sync.bling_produto_id,
+            ultima_sincronizacao=sync.ultima_sincronizacao,
+            status=sync.status,
+            ultima_tentativa_sync=sync.ultima_tentativa_sync,
+            proxima_tentativa_sync=sync.proxima_tentativa_sync,
+            ultima_conferencia_bling=sync.ultima_conferencia_bling,
+            ultima_sincronizacao_sucesso=sync.ultima_sincronizacao_sucesso,
+            ultimo_estoque_bling=sync.ultimo_estoque_bling,
+            tentativas_sync=sync.tentativas_sync or 0,
+            ultimo_erro=sync.erro_mensagem or (fila.ultimo_erro if fila else None),
+            queue_id=fila.id if fila else None,
+            queue_status=fila.status if fila else None,
+        ))
 
     logger.info("Status de problemas retornado com %s item(ns)", len(resultados))
     return resultados
@@ -2602,19 +2381,16 @@ def status_sincronizacao_problemas(
 def reprocessar_falhas(
     body: Optional[ReconciliarBatchRequest] = None,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Reagenda imediatamente os itens com erro para nova tentativa."""
     limite = body.limit if body else 100
     _current_user, tenant_id = user_and_tenant
-    resultado = BlingSyncService.reprocess_failed_syncs(
-        limit=limite, tenant_id=tenant_id
-    )
+    resultado = BlingSyncService.reprocess_failed_syncs(limit=limite, tenant_id=tenant_id)
     if resultado.get("auth_invalid"):
         raise HTTPException(
             status_code=409,
-            detail=resultado.get("detail")
-            or "Reconecte o Bling antes de reprocessar as falhas.",
+            detail=resultado.get("detail") or "Reconecte o Bling antes de reprocessar as falhas.",
         )
     return resultado
 
@@ -2623,7 +2399,7 @@ def reprocessar_falhas(
 def reconciliar_recentes(
     body: ReconciliarBatchRequest,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Confere novamente produtos alterados recentemente ou com erro."""
     _current_user, tenant_id = user_and_tenant
@@ -2638,7 +2414,7 @@ def reconciliar_recentes(
 def reconciliar_geral(
     body: Optional[ReconciliarBatchRequest] = None,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Inicia auditoria ampla em segundo plano para evitar travamento por timeout."""
     limite = body.limit if body else None
@@ -2675,7 +2451,7 @@ def reconciliar_geral(
 @router.get("/reconciliar-geral/status")
 def status_reconciliar_geral(
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Retorna status da auditoria geral em background."""
     with _reconciliacao_geral_lock:
@@ -2686,27 +2462,21 @@ def status_reconciliar_geral(
             "result": _reconciliacao_geral_estado["result"],
         }
 
-
 # ============================================================================
 # RECONCILIAR DIVERGÊNCIAS
 # ============================================================================
 
-
 @router.post("/reconciliar/{produto_id}")
 def reconciliar_estoque(
     produto_id: int,
-    origem: str = Query(
-        default="sistema", description="Origem: sistema, bling ou manual"
-    ),
-    valor_manual: Optional[float] = Query(
-        default=None, description="Valor manual para ajuste"
-    ),
+    origem: str = Query(default="sistema", description="Origem: sistema, bling ou manual"),
+    valor_manual: Optional[float] = Query(default=None, description="Valor manual para ajuste"),
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Reconciliar divergência de estoque
-
+    
     Opções:
     - origem=sistema: Usa valor do sistema → envia para Bling
     - origem=bling: Busca valor do Bling → atualiza sistema
@@ -2717,115 +2487,103 @@ def reconciliar_estoque(
     current_user, _tenant = user_and_tenant
 
     if origem == "sistema":
-        resultado = BlingSyncService.reconcile_product(
-            produto_id=produto_id, force_sync=True
-        )
+        resultado = BlingSyncService.reconcile_product(produto_id=produto_id, force_sync=True)
         if not resultado.get("ok"):
-            raise HTTPException(
-                status_code=400, detail=resultado.get("detail") or "Erro ao reconciliar"
-            )
+            raise HTTPException(status_code=400, detail=resultado.get("detail") or "Erro ao reconciliar")
         return {
             "message": "Reconciliação executada com sucesso",
             **resultado,
         }
-
+    
     # Buscar produto e sync
     produto = db.query(Produto).filter(Produto.id == produto_id).first()
     if not produto:
         raise HTTPException(status_code=404, detail=PRODUTO_NAO_ENCONTRADO)
-
-    sync = (
-        db.query(ProdutoBlingSync)
-        .filter(ProdutoBlingSync.produto_id == produto_id)
-        .first()
-    )
-
+    
+    sync = db.query(ProdutoBlingSync).filter(
+        ProdutoBlingSync.produto_id == produto_id
+    ).first()
+    
     if not sync or not sync.bling_produto_id:
-        raise HTTPException(
-            status_code=400, detail="Produto não configurado para sincronização"
-        )
-
+        raise HTTPException(status_code=400, detail="Produto não configurado para sincronização")
+    
     try:
         bling = BlingAPI()
         estoque_anterior = produto.estoque_atual or 0
         estoque_novo = None
-
+        
         if origem == "sistema":
             # Usa valor do sistema
             estoque_novo = estoque_anterior
             bling.atualizar_estoque_produto(sync.bling_produto_id, estoque_novo)
             logger.info(f"✅ Sistema → Bling: {estoque_novo}")
-
+            
         elif origem == "bling":
             # Busca valor do Bling (saldo físico real)
             saldo = bling.consultar_saldo_estoque(sync.bling_produto_id)
-            estoque_novo = _coerce_float(saldo.get("saldoFisicoTotal", 0))
+            estoque_novo = _coerce_float(saldo.get('saldoFisicoTotal', 0))
             produto.estoque_atual = estoque_novo
             logger.info(f"✅ Bling → Sistema: {estoque_novo}")
-
+            
         elif origem == "manual":
             if valor_manual is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail="valor_manual é obrigatório para origem=manual",
-                )
+                raise HTTPException(status_code=400, detail="valor_manual é obrigatório para origem=manual")
             estoque_novo = valor_manual
             produto.estoque_atual = estoque_novo
             bling.atualizar_estoque_produto(sync.bling_produto_id, estoque_novo)
             logger.info(f"✅ Manual → Ambos: {estoque_novo}")
-
+            
         else:
-            raise HTTPException(
-                status_code=400, detail="origem deve ser: sistema, bling ou manual"
-            )
-
+            raise HTTPException(status_code=400, detail="origem deve ser: sistema, bling ou manual")
+        
         # Registrar movimentação de ajuste
         if origem in ["bling", "manual"] and estoque_novo != estoque_anterior:
             diferenca = estoque_novo - estoque_anterior
             movimentacao = EstoqueMovimentacao(
                 produto_id=produto.id,
-                tipo="entrada" if diferenca > 0 else "saida",
-                motivo="ajuste_reconciliacao",
+                tipo='entrada' if diferenca > 0 else 'saida',
+                motivo='ajuste_reconciliacao',
                 quantidade=abs(diferenca),
                 quantidade_anterior=estoque_anterior,
                 quantidade_nova=estoque_novo,
                 observacao=f"Reconciliação Bling - Origem: {origem}",
-                user_id=current_user.id,
+                user_id=current_user.id
             )
             db.add(movimentacao)
-
+        
         # Atualizar sync
         sync.ultima_sincronizacao = utc_now()
-        sync.status = "ativo"
+        sync.status = 'ativo'
         sync.erro_mensagem = None
-
+        
         db.commit()
-
+        
         return {
             "message": "Estoque reconciliado com sucesso",
             "produto_id": produto_id,
             "estoque_anterior": estoque_anterior,
             "estoque_novo": estoque_novo,
             "diferenca": estoque_novo - estoque_anterior,
-            "origem": origem,
+            "origem": origem
         }
-
+        
     except Exception as e:
         logger.error(f"❌ Erro ao reconciliar: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Erro ao reconciliar: {str(e)}")
 
-
 # ============================================================================
 # WEBHOOK BLING
 # ============================================================================
 
-
 @router.post("/webhook/bling")
-async def webhook_bling(request: Request, db: Session = Depends(get_session)):
+async def webhook_bling(
+    request: Request,
+    db: Session = Depends(get_session)
+):
     """
     Webhook para receber notificações do Bling
-
+    
     Eventos suportados:
     - Venda criada: Baixa estoque no sistema
     - Venda cancelada: Retorna estoque ao sistema
@@ -2833,73 +2591,68 @@ async def webhook_bling(request: Request, db: Session = Depends(get_session)):
     try:
         body = await request.json()
         logger.info(f"📥 Webhook Bling recebido: {body}")
-
-        evento = body.get("topic")
-        dados = body.get("data", {})
-
-        if evento == "vendas.created":
+        
+        evento = body.get('topic')
+        dados = body.get('data', {})
+        
+        if evento == 'vendas.created':
             # Venda online criada - baixar estoque
-            venda_id = dados.get("id")
-            itens = dados.get("itens", [])
-
+            venda_id = dados.get('id')
+            itens = dados.get('itens', [])
+            
             for item in itens:
-                produto_bling_id = str(item.get("produtoId"))
-                quantidade = float(item.get("quantidade", 0))
-
+                produto_bling_id = str(item.get('produtoId'))
+                quantidade = float(item.get('quantidade', 0))
+                
                 # Buscar produto no sistema
-                sync = (
-                    db.query(ProdutoBlingSync)
-                    .filter(ProdutoBlingSync.bling_produto_id == produto_bling_id)
-                    .first()
-                )
-
+                sync = db.query(ProdutoBlingSync).filter(
+                    ProdutoBlingSync.bling_produto_id == produto_bling_id
+                ).first()
+                
                 if sync and sync.sincronizar:
-                    produto = (
-                        db.query(Produto).filter(Produto.id == sync.produto_id).first()
-                    )
-
+                    produto = db.query(Produto).filter(
+                        Produto.id == sync.produto_id
+                    ).first()
+                    
                     if produto:
                         estoque_anterior = produto.estoque_atual or 0
                         produto.estoque_atual = max(0, estoque_anterior - quantidade)
-
+                        
                         # Registrar movimentação com status 'reservado' (pendente de NF confirmada)
                         movimentacao = EstoqueMovimentacao(
                             produto_id=produto.id,
-                            tipo="saida",
-                            motivo="venda_online",
+                            tipo='saida',
+                            motivo='venda_online',
                             quantidade=quantidade,
                             quantidade_anterior=estoque_anterior,
                             quantidade_nova=produto.estoque_atual,
                             documento=f"BLING-{venda_id}",
                             referencia_id=venda_id,
-                            referencia_tipo="venda_bling",
-                            status="reservado",  # ← NOVO: Estoque reservado até NF ser autorizada
+                            referencia_tipo='venda_bling',
+                            status='reservado',  # ← NOVO: Estoque reservado até NF ser autorizada
                             observacao="Venda online via Bling - Pendente de NF autorizada",
-                            user_id=1,  # Sistema
+                            user_id=1  # Sistema
                         )
                         db.add(movimentacao)
-
+                        
                         # Atualizar sync
                         sync.ultima_sincronizacao = utc_now()
-
-                        logger.info(
-                            f"✅ Estoque baixado - Produto {produto.id}: {estoque_anterior} → {produto.estoque_atual}"
-                        )
-
+                        
+                        logger.info(f"✅ Estoque baixado - Produto {produto.id}: {estoque_anterior} → {produto.estoque_atual}")
+            
             db.commit()
             return {"status": "success", "message": "Estoque atualizado"}
-
-        elif evento == "vendas.deleted":
+            
+        elif evento == 'vendas.deleted':
             # Venda cancelada - retornar estoque
             # Implementar lógica similar...
             pass
-
+        
         return {"status": "ignored", "message": f"Evento {evento} não processado"}
-
+        
     except Exception as e:
         logger.error(f"❌ Erro no webhook: {e}")
         return {"status": "error", "message": str(e)}
-
 
 logger.info("✅ Módulo de sincronização Bling carregado")
 
@@ -2908,13 +2661,12 @@ logger.info("✅ Módulo de sincronização Bling carregado")
 # VINCULAR TODOS POR SKU
 # ============================================================================
 
-
 @router.post("/vincular-todos")
 def vincular_todos_por_sku(
     limite: int = Query(default=20, ge=1, le=200),
     timeout_seconds: int = Query(default=15, ge=5, le=55),
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Vincula automaticamente produtos do sistema com o Bling pelo código (SKU).
@@ -2937,15 +2689,15 @@ def vincular_todos_por_sku(
 
     itens_match = list(snapshot.get("items", []) or [])
     total_sem_vinculo = len(itens_match)
-    total_universo_sem_vinculo = int(
-        snapshot.get("total_sem_vinculo_universo_local", total_sem_vinculo) or 0
-    )
+    total_universo_sem_vinculo = int(snapshot.get("total_sem_vinculo_universo_local", total_sem_vinculo) or 0)
     coleta_bling_completa = bool(snapshot.get("coleta_bling_completa", True))
     total_bling = int(snapshot.get("total_bling", 0) or 0)
 
     itens_lote = itens_match[:limite]
     ids_lote = [
-        int(item.get("id")) for item in itens_lote if item.get("id") is not None
+        int(item.get("id"))
+        for item in itens_lote
+        if item.get("id") is not None
     ]
     produtos_lote = (
         db.query(Produto)
@@ -2978,10 +2730,7 @@ def vincular_todos_por_sku(
     for item in itens_lote:
         if (time.monotonic() - inicio_execucao) >= timeout_seconds:
             interrompido_por_tempo = True
-            logger.warning(
-                "Vinculo em massa interrompido por limite de tempo (%ss)",
-                timeout_seconds,
-            )
+            logger.warning("Vinculo em massa interrompido por limite de tempo (%ss)", timeout_seconds)
             break
 
         total_processados += 1
@@ -2989,25 +2738,21 @@ def vincular_todos_por_sku(
         produto = produtos_por_id.get(produto_id)
 
         if not produto:
-            erros.append(
-                {
-                    "produto_id": produto_id or None,
-                    "codigo": item.get("codigo"),
-                    "erro": "Produto local nao encontrado para o item do snapshot.",
-                }
-            )
+            erros.append({
+                "produto_id": produto_id or None,
+                "codigo": item.get("codigo"),
+                "erro": "Produto local nao encontrado para o item do snapshot.",
+            })
             continue
 
         bling_produto_id = str(item.get("bling_id") or "").strip()
         if not bling_produto_id:
-            nao_encontrados.append(
-                {
-                    "produto_id": produto.id,
-                    "codigo": produto.codigo,
-                    "nome": produto.nome,
-                    "motivo": "Snapshot sem bling_id para esse item.",
-                }
-            )
+            nao_encontrados.append({
+                "produto_id": produto.id,
+                "codigo": produto.codigo,
+                "nome": produto.nome,
+                "motivo": "Snapshot sem bling_id para esse item.",
+            })
             continue
 
         try:
@@ -3035,32 +2780,23 @@ def vincular_todos_por_sku(
                     "detail": "Produto PAI vinculado so para catalogo. O estoque segue nas variacoes.",
                 }
 
-            vinculados.append(
-                {
-                    "produto_id": produto.id,
-                    "codigo": produto.codigo,
-                    "nome": produto.nome,
-                    "bling_produto_id": bling_produto_id,
-                    "bling_nome": item.get("bling_nome"),
-                    "match_origem": item.get("match_origem"),
-                    "tipo_produto": _tipo_produto_local(produto),
-                    "sync_ok": sync_ok,
-                    "sync_detail": resultado_sync.get("detail")
-                    or resultado_sync.get("erro"),
-                }
-            )
+            vinculados.append({
+                "produto_id": produto.id,
+                "codigo": produto.codigo,
+                "nome": produto.nome,
+                "bling_produto_id": bling_produto_id,
+                "bling_nome": item.get("bling_nome"),
+                "match_origem": item.get("match_origem"),
+                "tipo_produto": _tipo_produto_local(produto),
+                "sync_ok": sync_ok,
+                "sync_detail": resultado_sync.get("detail") or resultado_sync.get("erro"),
+            })
 
-            logger.info(
-                "Vinculado via snapshot: %s -> Bling ID %s",
-                produto.codigo,
-                bling_produto_id,
-            )
+            logger.info("Vinculado via snapshot: %s -> Bling ID %s", produto.codigo, bling_produto_id)
 
         except Exception as e:
             logger.error("Erro ao vincular produto %s: %s", produto.codigo, e)
-            erros.append(
-                {"produto_id": produto.id, "codigo": produto.codigo, "erro": str(e)}
-            )
+            erros.append({"produto_id": produto.id, "codigo": produto.codigo, "erro": str(e)})
 
     db.commit()
     _remover_ids_do_snapshot_sem_vinculo_cache(
@@ -3103,7 +2839,7 @@ def vincular_todos_por_sku(
         .filter(
             ProdutoBlingSync.tenant_id == tenant_id,
             ProdutoBlingSync.bling_produto_id.isnot(None),
-            ProdutoBlingSync.bling_produto_id != "",
+            ProdutoBlingSync.bling_produto_id != ""
         )
         .subquery()
     )
@@ -3114,7 +2850,7 @@ def vincular_todos_por_sku(
             Produto.tenant_id == tenant_id,
             Produto.codigo.isnot(None),
             Produto.codigo != "",
-            Produto.tipo_produto != "PAI",
+            Produto.tipo_produto != "PAI"
         )
         .filter(Produto.id.notin_(subq_vinculados))
     )
@@ -3139,14 +2875,10 @@ def vincular_todos_por_sku(
         ]:
             if not chave:
                 continue
-            codigos_para_produto_sem_vinculo.setdefault(chave, set()).add(
-                produto_info.id
-            )
+            codigos_para_produto_sem_vinculo.setdefault(chave, set()).add(produto_info.id)
 
     bling = BlingAPI()
-    bling_itens, coleta_bling_completa = _listar_todos_produtos_bling(
-        bling=bling, limite=100, max_paginas=100
-    )
+    bling_itens, coleta_bling_completa = _listar_todos_produtos_bling(bling=bling, limite=100, max_paginas=100)
 
     ids_sem_vinculo_com_match_bling: set[int] = set()
     for item in bling_itens:
@@ -3154,14 +2886,13 @@ def vincular_todos_por_sku(
         if not codigos_bling:
             continue
         for codigo in codigos_bling:
-            ids_sem_vinculo_com_match_bling.update(
-                codigos_para_produto_sem_vinculo.get(codigo, set())
-            )
+            ids_sem_vinculo_com_match_bling.update(codigos_para_produto_sem_vinculo.get(codigo, set()))
 
     total_sem_vinculo = len(ids_sem_vinculo_com_match_bling)
     if total_sem_vinculo > 0:
         produtos_sem_vinculo = (
-            consulta_sem_vinculo.filter(Produto.id.in_(ids_sem_vinculo_com_match_bling))
+            consulta_sem_vinculo
+            .filter(Produto.id.in_(ids_sem_vinculo_com_match_bling))
             .order_by(Produto.id.asc())
             .limit(limite)
             .all()
@@ -3188,10 +2919,7 @@ def vincular_todos_por_sku(
     for produto in produtos_sem_vinculo:
         if (time.monotonic() - inicio_execucao) >= timeout_seconds:
             interrompido_por_tempo = True
-            logger.warning(
-                "⏱️ Vínculo em massa interrompido por limite de tempo (%ss)",
-                timeout_seconds,
-            )
+            logger.warning("⏱️ Vínculo em massa interrompido por limite de tempo (%ss)", timeout_seconds)
             break
 
         try:
@@ -3210,24 +2938,12 @@ def vincular_todos_por_sku(
             )
 
             if not item_escolhido:
-                nao_encontrados.append(
-                    {
-                        "produto_id": produto.id,
-                        "codigo": produto.codigo,
-                        "nome": produto.nome,
-                    }
-                )
+                nao_encontrados.append({"produto_id": produto.id, "codigo": produto.codigo, "nome": produto.nome})
                 continue
 
             bling_produto_id = str(item_escolhido.get("id") or "").strip()
             if not bling_produto_id:
-                nao_encontrados.append(
-                    {
-                        "produto_id": produto.id,
-                        "codigo": produto.codigo,
-                        "nome": produto.nome,
-                    }
-                )
+                nao_encontrados.append({"produto_id": produto.id, "codigo": produto.codigo, "nome": produto.nome})
                 continue
 
             _upsert_sync_vinculo(db, tenant_id, produto, bling_produto_id)
@@ -3247,32 +2963,25 @@ def vincular_todos_por_sku(
             else:
                 sincronizados_erro += 1
 
-            vinculados.append(
-                {
-                    "produto_id": produto.id,
-                    "codigo": produto.codigo,
-                    "nome": produto.nome,
-                    "bling_produto_id": bling_produto_id,
-                    "sync_ok": sync_ok,
-                    "sync_detail": resultado_sync.get("detail")
-                    or resultado_sync.get("erro"),
-                }
-            )
+            vinculados.append({
+                "produto_id": produto.id,
+                "codigo": produto.codigo,
+                "nome": produto.nome,
+                "bling_produto_id": bling_produto_id,
+                "sync_ok": sync_ok,
+                "sync_detail": resultado_sync.get("detail") or resultado_sync.get("erro"),
+            })
 
             logger.info(f"✅ Vinculado: {produto.codigo} → Bling ID {bling_produto_id}")
             time.sleep(0.35)
 
         except Exception as e:
             logger.error(f"❌ Erro ao vincular produto {produto.codigo}: {e}")
-            erros.append(
-                {"produto_id": produto.id, "codigo": produto.codigo, "erro": str(e)}
-            )
+            erros.append({"produto_id": produto.id, "codigo": produto.codigo, "erro": str(e)})
 
     db.commit()
 
-    logger.info(
-        f"🔗 Vinculação concluída: {len(vinculados)} vinculados, {len(nao_encontrados)} não encontrados, {len(erros)} erros"
-    )
+    logger.info(f"🔗 Vinculação concluída: {len(vinculados)} vinculados, {len(nao_encontrados)} não encontrados, {len(erros)} erros")
 
     restantes = max(total_sem_vinculo - total, 0)
 
@@ -3293,5 +3002,5 @@ def vincular_todos_por_sku(
         "erros": len(erros),
         "detalhes_vinculados": vinculados,
         "detalhes_nao_encontrados": nao_encontrados,
-        "detalhes_erros": erros,
+        "detalhes_erros": erros
     }

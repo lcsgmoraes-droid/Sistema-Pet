@@ -18,20 +18,13 @@ from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
 from .models import Cliente
 from .vendas_models import Venda, VendaItem
-from .financeiro_models import (
-    ContaReceber,
-    ContaPagar,
-    CategoriaFinanceira,
-    TipoDespesa,
-)
+from .financeiro_models import ContaReceber, ContaPagar, CategoriaFinanceira, TipoDespesa
 from .produtos_models import Produto
 from .cargo_models import Cargo
 from .dre_plano_contas_models import DRESubcategoria
 from .ia.aba7_dre_detalhada_models import DREDetalheCanal
 from .services.remuneracao_service import calcular_composicao_remuneracao
-from .services.venda_rentabilidade_snapshot_service import (
-    build_venda_rentabilidade_snapshot,
-)
+from .services.venda_rentabilidade_snapshot_service import build_venda_rentabilidade_snapshot
 from .dre_canais_routes import (
     _bulk_cashback_por_venda,
     _bulk_comissoes_por_venda,
@@ -67,10 +60,7 @@ MARGEM_PONTO_EQUILIBRIO_OPCOES = {
     "mes_anterior_fechado": {"label": "Mes anterior fechado", "meses_fechados": 1},
     "media_3_meses_fechados": {"label": "Media 3 meses fechados", "meses_fechados": 3},
     "media_6_meses_fechados": {"label": "Media 6 meses fechados", "meses_fechados": 6},
-    "media_12_meses_fechados": {
-        "label": "Media 12 meses fechados",
-        "meses_fechados": 12,
-    },
+    "media_12_meses_fechados": {"label": "Media 12 meses fechados", "meses_fechados": 12},
 }
 
 MODO_CUSTO_FISCAL_PE_PADRAO = "gerencial_completo"
@@ -86,11 +76,11 @@ MODO_CUSTO_FISCAL_PE_OPCOES = {
 }
 
 
-def _conta_eh_compra_estoque_para_pe(
-    conta: ContaPagar, tipo_nome: str = "", categoria_nome: str = ""
-) -> bool:
+def _conta_eh_compra_estoque_para_pe(conta: ContaPagar, tipo_nome: str = "", categoria_nome: str = "") -> bool:
     texto = f"{tipo_nome or ''} {categoria_nome or ''} {conta.descricao or ''}".lower()
-    return bool(conta.nota_entrada_id) or ("produto" in texto and "revenda" in texto)
+    return bool(conta.nota_entrada_id) or (
+        "produto" in texto and "revenda" in texto
+    )
 
 
 def _normalizar_texto_pe(valor: str) -> str:
@@ -150,19 +140,11 @@ def _ajustar_snapshot_custo_fiscal_pe(
     ajustado["custo_fiscal_original"] = imposto_original
     ajustado["custo_fiscal_desconsiderado"] = 0.0
 
-    if (
-        modo_custo_fiscal == "documentos_emitidos"
-        and not venda_tem_documento
-        and imposto_original > 0
-    ):
+    if modo_custo_fiscal == "documentos_emitidos" and not venda_tem_documento and imposto_original > 0:
         ajustado["imposto"] = 0.0
         ajustado["custo_fiscal_desconsiderado"] = imposto_original
-        ajustado["venda_liquida"] = _round_money(
-            _snapshot_float(ajustado, "venda_liquida") + imposto_original
-        )
-        ajustado["lucro"] = _round_money(
-            _snapshot_float(ajustado, "lucro") + imposto_original
-        )
+        ajustado["venda_liquida"] = _round_money(_snapshot_float(ajustado, "venda_liquida") + imposto_original)
+        ajustado["lucro"] = _round_money(_snapshot_float(ajustado, "lucro") + imposto_original)
 
     return ajustado
 
@@ -233,9 +215,7 @@ def _somar_componentes_margem_vendas_pe(
         "cmv_estimado": 0.0,
     }
     componentes = {campo: [] for campo in campos}
-    componentes["outros_variaveis"] = (
-        list(detalhes_outros_variaveis or []) if incluir_detalhes else []
-    )
+    componentes["outros_variaveis"] = list(detalhes_outros_variaveis or []) if incluir_detalhes else []
 
     for venda_info in vendas_snapshot or []:
         snapshot = dict(venda_info.get("snapshot") or venda_info)
@@ -260,10 +240,7 @@ def _somar_componentes_margem_vendas_pe(
         for campo_total, (campo_snapshot, observacao) in mapa.items():
             valor = _snapshot_float(snapshot, campo_snapshot)
             campos[campo_total] = _round_money(campos[campo_total] + valor)
-            custo_fiscal_omitido = (
-                campo_total == "custo_fiscal"
-                and _snapshot_float(snapshot, "custo_fiscal_desconsiderado") > 0
-            )
+            custo_fiscal_omitido = campo_total == "custo_fiscal" and _snapshot_float(snapshot, "custo_fiscal_desconsiderado") > 0
             if incluir_detalhes and (valor > 0 or custo_fiscal_omitido):
                 componentes[campo_total].append(
                     _detalhe_venda_margem_pe(
@@ -295,67 +272,17 @@ def _somar_componentes_margem_vendas_pe(
     margem_decimal = margem_contribuicao / faturamento if faturamento > 0 else 0
 
     subtotais = [
-        {
-            "id": "receita_produtos_servicos",
-            "label": "Receita de produtos/servicos",
-            "tipo": "receita",
-            "valor": receita_produtos_servicos,
-        },
-        {
-            "id": "receita_entrega",
-            "label": "Receita de entrega",
-            "tipo": "receita",
-            "valor": receita_entrega,
-        },
-        {
-            "id": "descontos",
-            "label": "Descontos comerciais",
-            "tipo": "deducao",
-            "valor": _round_money(campos["descontos"]),
-        },
-        {
-            "id": "beneficios_campanhas",
-            "label": "Campanhas, cupons e cashback",
-            "tipo": "deducao",
-            "valor": _round_money(campos["beneficios_campanhas"]),
-        },
-        {
-            "id": "taxas_cartao",
-            "label": "Taxas de cartao/meios de pagamento",
-            "tipo": "deducao",
-            "valor": _round_money(campos["taxas_cartao"]),
-        },
-        {
-            "id": "repasse_entrega",
-            "label": "Repasse/custo de entrega",
-            "tipo": "deducao",
-            "valor": _round_money(campos["repasse_entrega"]),
-        },
-        {
-            "id": "custo_operacional_entrega",
-            "label": "Custo operacional de entrega",
-            "tipo": "deducao",
-            "valor": _round_money(campos["custo_operacional_entrega"]),
-        },
-        {
-            "id": "comissoes",
-            "label": "Comissoes de venda",
-            "tipo": "deducao",
-            "valor": _round_money(campos["comissoes"]),
-        },
-        {
-            "id": "custo_fiscal",
-            "label": "Custo fiscal gerencial",
-            "tipo": "deducao",
-            "valor": _round_money(campos["custo_fiscal"]),
-        },
+        {"id": "receita_produtos_servicos", "label": "Receita de produtos/servicos", "tipo": "receita", "valor": receita_produtos_servicos},
+        {"id": "receita_entrega", "label": "Receita de entrega", "tipo": "receita", "valor": receita_entrega},
+        {"id": "descontos", "label": "Descontos comerciais", "tipo": "deducao", "valor": _round_money(campos["descontos"])},
+        {"id": "beneficios_campanhas", "label": "Campanhas, cupons e cashback", "tipo": "deducao", "valor": _round_money(campos["beneficios_campanhas"])},
+        {"id": "taxas_cartao", "label": "Taxas de cartao/meios de pagamento", "tipo": "deducao", "valor": _round_money(campos["taxas_cartao"])},
+        {"id": "repasse_entrega", "label": "Repasse/custo de entrega", "tipo": "deducao", "valor": _round_money(campos["repasse_entrega"])},
+        {"id": "custo_operacional_entrega", "label": "Custo operacional de entrega", "tipo": "deducao", "valor": _round_money(campos["custo_operacional_entrega"])},
+        {"id": "comissoes", "label": "Comissoes de venda", "tipo": "deducao", "valor": _round_money(campos["comissoes"])},
+        {"id": "custo_fiscal", "label": "Custo fiscal gerencial", "tipo": "deducao", "valor": _round_money(campos["custo_fiscal"])},
         {"id": "cmv_estimado", "label": "CMV", "tipo": "custo", "valor": cmv_estimado},
-        {
-            "id": "outros_variaveis",
-            "label": "Outros custos variaveis",
-            "tipo": "deducao",
-            "valor": outros_variaveis,
-        },
+        {"id": "outros_variaveis", "label": "Outros custos variaveis", "tipo": "deducao", "valor": outros_variaveis},
     ]
 
     return {
@@ -490,10 +417,7 @@ def _classificar_conta_ponto_equilibrio(
 ) -> tuple[Optional[str], str]:
     dre_custo_pe_normalizado = _normalizar_texto_pe(dre_custo_pe)
     if dre_custo_pe_normalizado in {"fixo", "variavel"}:
-        return (
-            dre_custo_pe_normalizado,
-            f"PE na subcategoria DRE: {dre_subcategoria_nome or '-'}",
-        )
+        return dre_custo_pe_normalizado, f"PE na subcategoria DRE: {dre_subcategoria_nome or '-'}"
 
     if tipo_e_custo_fixo is not None:
         classificacao = "fixo" if bool(tipo_e_custo_fixo) else "variavel"
@@ -501,10 +425,7 @@ def _classificar_conta_ponto_equilibrio(
 
     categoria_tipo_normalizado = _normalizar_texto_pe(categoria_tipo_custo)
     if categoria_tipo_normalizado in {"fixo", "variavel"}:
-        return (
-            categoria_tipo_normalizado,
-            f"Categoria financeira: {categoria_nome or '-'}",
-        )
+        return categoria_tipo_normalizado, f"Categoria financeira: {categoria_nome or '-'}"
 
     texto_lancamento = " ".join(
         str(parte or "")
@@ -515,23 +436,14 @@ def _classificar_conta_ponto_equilibrio(
         return classificacao_por_lancamento, "Classificacao automatica pelo lancamento"
 
     dre_tipo_normalizado = _normalizar_tipo_custo_dre(dre_tipo_custo)
-    if dre_tipo_normalizado in {
-        "corporativo",
-        "indireto_rateavel",
-        "indireto rateavel",
-    }:
+    if dre_tipo_normalizado in {"corporativo", "indireto_rateavel", "indireto rateavel"}:
         return "fixo", f"Tipo DRE: {dre_subcategoria_nome or '-'}"
     if dre_tipo_normalizado == "direto":
         return "variavel", f"Tipo DRE: {dre_subcategoria_nome or '-'}"
 
-    classificacao_por_dre = _classificar_texto_ponto_equilibrio(
-        dre_subcategoria_nome or ""
-    )
+    classificacao_por_dre = _classificar_texto_ponto_equilibrio(dre_subcategoria_nome or "")
     if classificacao_por_dre:
-        return (
-            classificacao_por_dre,
-            f"Subcategoria DRE: {dre_subcategoria_nome or '-'}",
-        )
+        return classificacao_por_dre, f"Subcategoria DRE: {dre_subcategoria_nome or '-'}"
 
     return None, "Sem classificacao"
 
@@ -545,12 +457,7 @@ def _conta_eh_folha_para_pe(
     texto = _normalizar_texto_pe(
         " ".join(
             str(parte or "")
-            for parte in (
-                conta.descricao,
-                tipo_despesa_nome,
-                categoria_nome,
-                dre_subcategoria_nome,
-            )
+            for parte in (conta.descricao, tipo_despesa_nome, categoria_nome, dre_subcategoria_nome)
         )
     )
     return any(termo in texto for termo in PE_TERMOS_FOLHA)
@@ -562,11 +469,7 @@ def _calcular_complemento_folha_gerencial(
     total_lancado,
     total_provisoes_dre,
 ) -> float:
-    complemento = (
-        float(total_estimado or 0)
-        - float(total_lancado or 0)
-        - float(total_provisoes_dre or 0)
-    )
+    complemento = float(total_estimado or 0) - float(total_lancado or 0) - float(total_provisoes_dre or 0)
     return _round_money(max(0, complemento))
 
 
@@ -674,9 +577,7 @@ PONTO_EQUILIBRIO_GRUPOS_CLASSIFICACAO = {
 }
 
 
-def _paginar_detalhes_ponto_equilibrio(
-    items: list[dict], *, page: int = 1, page_size: int = 30
-) -> dict:
+def _paginar_detalhes_ponto_equilibrio(items: list[dict], *, page: int = 1, page_size: int = 30) -> dict:
     page_size = max(1, min(int(page_size or 30), 100))
     total_itens = len(items or [])
     pages = max(1, math.ceil(total_itens / page_size))
@@ -695,12 +596,8 @@ def _paginar_detalhes_ponto_equilibrio(
 
 def _normalizar_item_detalhe_ponto_equilibrio(item: dict, origem_label: str) -> dict:
     data = item.get("data_venda") or item.get("data_vencimento")
-    descricao = (
-        item.get("descricao") or item.get("numero_venda") or item.get("id") or "-"
-    )
-    contraparte = (
-        item.get("cliente_nome") or item.get("fornecedor_nome") or item.get("canal")
-    )
+    descricao = item.get("descricao") or item.get("numero_venda") or item.get("id") or "-"
+    contraparte = item.get("cliente_nome") or item.get("fornecedor_nome") or item.get("canal")
     return {
         **item,
         "data": data,
@@ -726,9 +623,7 @@ def _adicionar_meses(data_base: date, meses: int) -> date:
     return date(ano, mes, dia)
 
 
-def _periodo_meses_fechados_para_margem(
-    data_referencia: date, meses: int
-) -> tuple[date, date]:
+def _periodo_meses_fechados_para_margem(data_referencia: date, meses: int) -> tuple[date, date]:
     inicio_mes_referencia = data_referencia.replace(day=1)
     fim = inicio_mes_referencia - timedelta(days=1)
     inicio = _adicionar_meses(fim.replace(day=1), -(meses - 1))
@@ -742,35 +637,29 @@ def _calcular_despesas_variaveis_margem_pe(
     fim: date,
     canais_lista: list[str],
 ) -> float:
-    contas_query = (
-        db.query(
-            ContaPagar,
-            TipoDespesa.e_custo_fixo.label("tipo_e_custo_fixo"),
-            TipoDespesa.nome.label("tipo_despesa_nome"),
-            CategoriaFinanceira.tipo_custo.label("categoria_tipo_custo"),
-            CategoriaFinanceira.nome.label("categoria_nome"),
-            DRESubcategoria.custo_pe.label("dre_custo_pe"),
-            DRESubcategoria.tipo_custo.label("dre_tipo_custo"),
-            DRESubcategoria.nome.label("dre_subcategoria_nome"),
-        )
-        .outerjoin(
-            TipoDespesa,
-            ContaPagar.tipo_despesa_id == TipoDespesa.id,
-        )
-        .outerjoin(
-            CategoriaFinanceira,
-            ContaPagar.categoria_id == CategoriaFinanceira.id,
-        )
-        .outerjoin(
-            DRESubcategoria,
-            ContaPagar.dre_subcategoria_id == DRESubcategoria.id,
-        )
-        .filter(
-            ContaPagar.tenant_id == tenant_id,
-            ContaPagar.data_vencimento >= inicio,
-            ContaPagar.data_vencimento <= fim,
-            ContaPagar.status != "cancelado",
-        )
+    contas_query = db.query(
+        ContaPagar,
+        TipoDespesa.e_custo_fixo.label("tipo_e_custo_fixo"),
+        TipoDespesa.nome.label("tipo_despesa_nome"),
+        CategoriaFinanceira.tipo_custo.label("categoria_tipo_custo"),
+        CategoriaFinanceira.nome.label("categoria_nome"),
+        DRESubcategoria.custo_pe.label("dre_custo_pe"),
+        DRESubcategoria.tipo_custo.label("dre_tipo_custo"),
+        DRESubcategoria.nome.label("dre_subcategoria_nome"),
+    ).outerjoin(
+        TipoDespesa,
+        ContaPagar.tipo_despesa_id == TipoDespesa.id,
+    ).outerjoin(
+        CategoriaFinanceira,
+        ContaPagar.categoria_id == CategoriaFinanceira.id,
+    ).outerjoin(
+        DRESubcategoria,
+        ContaPagar.dre_subcategoria_id == DRESubcategoria.id,
+    ).filter(
+        ContaPagar.tenant_id == tenant_id,
+        ContaPagar.data_vencimento >= inicio,
+        ContaPagar.data_vencimento <= fim,
+        ContaPagar.status != "cancelado",
     )
     if canais_lista:
         contas_query = contas_query.filter(
@@ -822,10 +711,7 @@ def _calcular_despesas_variaveis_margem_pe(
     )
     if canais_lista:
         provisoes_dre_query = provisoes_dre_query.filter(
-            or_(
-                DREDetalheCanal.canal.in_(canais_lista),
-                DREDetalheCanal.canal == "provisao",
-            )
+            or_(DREDetalheCanal.canal.in_(canais_lista), DREDetalheCanal.canal == "provisao")
         )
 
     for provisao in provisoes_dre_query.all():
@@ -857,11 +743,7 @@ def _preparar_snapshots_margem_vendas_pe(
         custo_campanha = cupom_desconto + cashback_por_venda.get(venda_id, 0.0)
 
         snapshot = _snapshot_pronto(venda)
-        if (
-            snapshot
-            and custo_campanha > 0
-            and _snapshot_float(snapshot, "custo_campanha") <= 0
-        ):
+        if snapshot and custo_campanha > 0 and _snapshot_float(snapshot, "custo_campanha") <= 0:
             snapshot = None
 
         if snapshot is None:
@@ -943,11 +825,7 @@ def _calcular_margem_periodo_ponto_equilibrio(
         incluir_detalhes=incluir_detalhes,
     )
     quantidade_vendas = len(vendas)
-    ticket_medio = (
-        _round_money(resultado["faturamento"] / quantidade_vendas)
-        if quantidade_vendas
-        else 0
-    )
+    ticket_medio = _round_money(resultado["faturamento"] / quantidade_vendas) if quantidade_vendas else 0
 
     return {
         **resultado,
@@ -977,9 +855,7 @@ def _calcular_margem_referencia_ponto_equilibrio(
         }
 
     meses = opcao["meses_fechados"]
-    inicio_referencia, fim_referencia = _periodo_meses_fechados_para_margem(
-        inicio, meses
-    )
+    inicio_referencia, fim_referencia = _periodo_meses_fechados_para_margem(inicio, meses)
     margem = _calcular_margem_periodo_ponto_equilibrio(
         db,
         tenant_id,
@@ -1005,7 +881,7 @@ async def obter_ponto_equilibrio(
     modo_custo_fiscal: Optional[str] = MODO_CUSTO_FISCAL_PE_PADRAO,
     incluir_detalhes: bool = False,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant),
 ):
     """Calcula o ponto de equilibrio pela margem de contribuicao."""
     _, tenant_id = user_and_tenant
@@ -1015,88 +891,68 @@ async def obter_ponto_equilibrio(
     fim_padrao = hoje.replace(day=calendar.monthrange(hoje.year, hoje.month)[1])
     fim = data_fim or fim_padrao
     if fim < inicio:
-        raise HTTPException(
-            status_code=422, detail="Data final deve ser maior ou igual a data inicial"
-        )
+        raise HTTPException(status_code=422, detail="Data final deve ser maior ou igual a data inicial")
 
     inicio_dt = datetime.combine(inicio, time.min)
     fim_dt = datetime.combine(fim, time.max)
-    canais_lista = [
-        canal.strip() for canal in (canais or "").split(",") if canal.strip()
-    ]
+    canais_lista = [canal.strip() for canal in (canais or "").split(",") if canal.strip()]
     fonte_margem = (fonte_margem or MARGEM_PONTO_EQUILIBRIO_PADRAO).strip()
     if fonte_margem not in MARGEM_PONTO_EQUILIBRIO_OPCOES:
         opcoes = ", ".join(MARGEM_PONTO_EQUILIBRIO_OPCOES.keys())
-        raise HTTPException(
-            status_code=422, detail=f"Fonte da margem invalida. Use: {opcoes}"
-        )
+        raise HTTPException(status_code=422, detail=f"Fonte da margem invalida. Use: {opcoes}")
     modo_custo_fiscal = (modo_custo_fiscal or MODO_CUSTO_FISCAL_PE_PADRAO).strip()
     if modo_custo_fiscal not in MODO_CUSTO_FISCAL_PE_OPCOES:
         opcoes = ", ".join(MODO_CUSTO_FISCAL_PE_OPCOES.keys())
-        raise HTTPException(
-            status_code=422, detail=f"Modo de custo invalido. Use: {opcoes}"
-        )
+        raise HTTPException(status_code=422, detail=f"Modo de custo invalido. Use: {opcoes}")
 
-    produtos_sem_custo = (
-        db.query(func.count(func.distinct(VendaItem.produto_id)))
-        .join(
-            Venda,
-            VendaItem.venda_id == Venda.id,
-        )
-        .outerjoin(
-            Produto,
-            VendaItem.produto_id == Produto.id,
-        )
-        .filter(
-            Venda.tenant_id == tenant_id,
-            _filtro_status_venda_relatorio(),
-            Venda.data_venda >= inicio_dt,
-            Venda.data_venda <= fim_dt,
-            VendaItem.tipo == "produto",
-            VendaItem.produto_id.isnot(None),
-            or_(Produto.preco_custo.is_(None), Produto.preco_custo <= 0),
-        )
+    produtos_sem_custo = db.query(
+        func.count(func.distinct(VendaItem.produto_id))
+    ).join(
+        Venda,
+        VendaItem.venda_id == Venda.id,
+    ).outerjoin(
+        Produto,
+        VendaItem.produto_id == Produto.id,
+    ).filter(
+        Venda.tenant_id == tenant_id,
+        _filtro_status_venda_relatorio(),
+        Venda.data_venda >= inicio_dt,
+        Venda.data_venda <= fim_dt,
+        VendaItem.tipo == "produto",
+        VendaItem.produto_id.isnot(None),
+        or_(Produto.preco_custo.is_(None), Produto.preco_custo <= 0),
     )
     if canais_lista:
         produtos_sem_custo = produtos_sem_custo.filter(Venda.canal.in_(canais_lista))
     produtos_sem_custo = int(produtos_sem_custo.scalar() or 0)
 
-    contas_query = (
-        db.query(
-            ContaPagar,
-            TipoDespesa.e_custo_fixo.label("tipo_e_custo_fixo"),
-            TipoDespesa.nome.label("tipo_despesa_nome"),
-            CategoriaFinanceira.tipo_custo.label("categoria_tipo_custo"),
-            CategoriaFinanceira.nome.label("categoria_nome"),
-            DRESubcategoria.custo_pe.label("dre_custo_pe"),
-            DRESubcategoria.tipo_custo.label("dre_tipo_custo"),
-            DRESubcategoria.nome.label("dre_subcategoria_nome"),
-            Cliente.nome.label("fornecedor_nome"),
-        )
-        .outerjoin(
-            TipoDespesa,
-            ContaPagar.tipo_despesa_id == TipoDespesa.id,
-        )
-        .outerjoin(
-            CategoriaFinanceira,
-            ContaPagar.categoria_id == CategoriaFinanceira.id,
-        )
-        .outerjoin(
-            DRESubcategoria,
-            ContaPagar.dre_subcategoria_id == DRESubcategoria.id,
-        )
-        .outerjoin(
-            Cliente,
-            and_(
-                ContaPagar.fornecedor_id == Cliente.id, Cliente.tenant_id == tenant_id
-            ),
-        )
-        .filter(
-            ContaPagar.tenant_id == tenant_id,
-            ContaPagar.data_vencimento >= inicio,
-            ContaPagar.data_vencimento <= fim,
-            ContaPagar.status != "cancelado",
-        )
+    contas_query = db.query(
+        ContaPagar,
+        TipoDespesa.e_custo_fixo.label("tipo_e_custo_fixo"),
+        TipoDespesa.nome.label("tipo_despesa_nome"),
+        CategoriaFinanceira.tipo_custo.label("categoria_tipo_custo"),
+        CategoriaFinanceira.nome.label("categoria_nome"),
+        DRESubcategoria.custo_pe.label("dre_custo_pe"),
+        DRESubcategoria.tipo_custo.label("dre_tipo_custo"),
+        DRESubcategoria.nome.label("dre_subcategoria_nome"),
+        Cliente.nome.label("fornecedor_nome"),
+    ).outerjoin(
+        TipoDespesa,
+        ContaPagar.tipo_despesa_id == TipoDespesa.id,
+    ).outerjoin(
+        CategoriaFinanceira,
+        ContaPagar.categoria_id == CategoriaFinanceira.id,
+    ).outerjoin(
+        DRESubcategoria,
+        ContaPagar.dre_subcategoria_id == DRESubcategoria.id,
+    ).outerjoin(
+        Cliente,
+        and_(ContaPagar.fornecedor_id == Cliente.id, Cliente.tenant_id == tenant_id),
+    ).filter(
+        ContaPagar.tenant_id == tenant_id,
+        ContaPagar.data_vencimento >= inicio,
+        ContaPagar.data_vencimento <= fim,
+        ContaPagar.status != "cancelado",
     )
     if canais_lista:
         contas_query = contas_query.filter(
@@ -1177,9 +1033,7 @@ async def obter_ponto_equilibrio(
             )
             continue
 
-        if _conta_eh_folha_para_pe(
-            conta, tipo_despesa_nome, categoria_nome, dre_subcategoria_nome
-        ):
+        if _conta_eh_folha_para_pe(conta, tipo_despesa_nome, categoria_nome, dre_subcategoria_nome):
             folha_lancada_contas_pagar += valor
 
         classificacao, origem_classificacao = _classificar_conta_ponto_equilibrio(
@@ -1251,10 +1105,7 @@ async def obter_ponto_equilibrio(
     )
     if canais_lista:
         provisoes_dre_query = provisoes_dre_query.filter(
-            or_(
-                DREDetalheCanal.canal.in_(canais_lista),
-                DREDetalheCanal.canal == "provisao",
-            )
+            or_(DREDetalheCanal.canal.in_(canais_lista), DREDetalheCanal.canal == "provisao")
         )
 
     for provisao in provisoes_dre_query.all():
@@ -1332,9 +1183,7 @@ async def obter_ponto_equilibrio(
         canais_lista,
         modo_custo_fiscal=modo_custo_fiscal,
         outros_variaveis=outros_variaveis_contas,
-        detalhes_outros_variaveis=detalhes_classificacao["variaveis"]
-        if incluir_detalhes
-        else None,
+        detalhes_outros_variaveis=detalhes_classificacao["variaveis"] if incluir_detalhes else None,
         incluir_detalhes=incluir_detalhes,
     )
     faturamento = margem_periodo["faturamento"]
@@ -1358,11 +1207,7 @@ async def obter_ponto_equilibrio(
     )
     margem_usada_decimal = float(margem_referencia.get("margem_decimal") or 0)
     margem_usada_percentual = round(margem_usada_decimal * 100, 2)
-    ticket_medio_usado = (
-        ticket_medio
-        if ticket_medio > 0
-        else _round_money(margem_referencia.get("ticket_medio"))
-    )
+    ticket_medio_usado = ticket_medio if ticket_medio > 0 else _round_money(margem_referencia.get("ticket_medio"))
 
     ponto_equilibrio = None
     falta_faturar = None
@@ -1373,9 +1218,7 @@ async def obter_ponto_equilibrio(
     if margem_usada_decimal > 0:
         ponto_equilibrio = despesas_fixas / margem_usada_decimal
         falta_faturar = max(0, ponto_equilibrio - faturamento)
-        percentual_atingido = (
-            (faturamento / ponto_equilibrio) * 100 if ponto_equilibrio > 0 else 100
-        )
+        percentual_atingido = (faturamento / ponto_equilibrio) * 100 if ponto_equilibrio > 0 else 100
         vendas_necessarias = (
             int(math.ceil(falta_faturar / ticket_medio_usado))
             if falta_faturar and ticket_medio_usado > 0
@@ -1427,24 +1270,16 @@ async def obter_ponto_equilibrio(
         "folha_complemento_gerencial": folha_complemento_gerencial,
         "folha_funcionarios_ativos": folha_gerencial["quantidade_funcionarios"],
         "margem_contribuicao": _round_money(margem_contribuicao),
-        "margem_contribuicao_percentual": round(
-            margem_contribuicao_percentual * 100, 2
-        ),
+        "margem_contribuicao_percentual": round(margem_contribuicao_percentual * 100, 2),
         "margem_periodo_percentual": round(margem_contribuicao_percentual * 100, 2),
         "margem_periodo_valor": _round_money(margem_contribuicao),
         "margem_usada_percentual": margem_usada_percentual,
-        "margem_usada_valor": _round_money(
-            margem_referencia.get("margem_contribuicao")
-        ),
+        "margem_usada_valor": _round_money(margem_referencia.get("margem_contribuicao")),
         "margem_usada_label": margem_referencia.get("label"),
         "margem_referencia": margem_referencia,
         "detalhes_margem": margem_periodo.get("detalhes_margem", {}),
-        "ponto_equilibrio": _round_money(ponto_equilibrio)
-        if ponto_equilibrio is not None
-        else None,
-        "falta_faturar": _round_money(falta_faturar)
-        if falta_faturar is not None
-        else None,
+        "ponto_equilibrio": _round_money(ponto_equilibrio) if ponto_equilibrio is not None else None,
+        "falta_faturar": _round_money(falta_faturar) if falta_faturar is not None else None,
         "percentual_atingido": round(percentual_atingido, 2),
         "vendas_necessarias": vendas_necessarias,
         "produtos_sem_custo": produtos_sem_custo,
@@ -1464,7 +1299,7 @@ async def obter_ponto_equilibrio_detalhes(
     page: int = 1,
     page_size: int = 30,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant),
 ):
     """Carrega os lancamentos de uma linha do ponto de equilibrio sob demanda."""
     grupo = (grupo or "").strip()
@@ -1508,9 +1343,7 @@ async def obter_ponto_equilibrio_detalhes(
         ]
         total_por_grupo = {
             "fixas": dados.get("despesas_fixas"),
-            "variaveis": dados.get(
-                "outros_variaveis", dados.get("despesas_variaveis_contas")
-            ),
+            "variaveis": dados.get("outros_variaveis", dados.get("despesas_variaveis_contas")),
             "custos_venda_snapshot": dados.get("despesas_variaveis_ja_cobertas"),
             "sem_classificacao": dados.get("despesas_sem_classificacao"),
             "estoque_excluido": dados.get("despesas_estoque_excluidas"),
@@ -1519,9 +1352,7 @@ async def obter_ponto_equilibrio_detalhes(
     else:
         raise HTTPException(status_code=404, detail="Grupo de detalhes nao encontrado")
 
-    paginacao = _paginar_detalhes_ponto_equilibrio(
-        items, page=page, page_size=page_size
-    )
+    paginacao = _paginar_detalhes_ponto_equilibrio(items, page=page, page_size=page_size)
     periodo = dados.get("periodo") or {}
     inicio = periodo.get("inicio")
     fim = periodo.get("fim")
@@ -1540,7 +1371,7 @@ async def obter_ponto_equilibrio_detalhes(
 async def obter_resumo_dashboard(
     periodo_dias: int = 30,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Retorna resumo consolidado para o dashboard financeiro
@@ -1549,159 +1380,134 @@ async def obter_resumo_dashboard(
     try:
         hoje = datetime.now()
         inicio_periodo = hoje - timedelta(days=periodo_dias)
-
+        
         # ========================================
         # 1. SALDO ATUAL (Baseado em vendas pagas)
         # ========================================
-        vendas_pagas = (
-            db.query(func.sum(Venda.total))
-            .filter(and_(Venda.tenant_id == tenant_id, Venda.status == "finalizada"))
-            .scalar()
-            or 0
-        )
-
-        contas_pagas_total = (
-            db.query(func.sum(ContaPagar.valor_pago))
-            .filter(ContaPagar.tenant_id == tenant_id)
-            .scalar()
-            or 0
-        )
-
+        vendas_pagas = db.query(
+            func.sum(Venda.total)
+        ).filter(
+            and_(
+                Venda.tenant_id == tenant_id,
+                Venda.status == 'finalizada'
+            )
+        ).scalar() or 0
+        
+        contas_pagas_total = db.query(
+            func.sum(ContaPagar.valor_pago)
+        ).filter(
+            ContaPagar.tenant_id == tenant_id
+        ).scalar() or 0
+        
         saldo_atual = vendas_pagas - contas_pagas_total
-
+        
         # ========================================
         # 2. CONTAS A RECEBER
         # ========================================
-        contas_receber_total = (
-            db.query(func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido))
-            .filter(
-                and_(
-                    ContaReceber.tenant_id == tenant_id,
-                    ContaReceber.status.in_(["pendente", "parcial", "vencida"]),
-                )
+        contas_receber_total = db.query(
+            func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido)
+        ).filter(
+            and_(
+                ContaReceber.tenant_id == tenant_id,
+                ContaReceber.status.in_(['pendente', 'parcial', 'vencida'])
             )
-            .scalar()
-            or 0
-        )
-
+        ).scalar() or 0
+        
         # Contas vencidas a receber
-        contas_receber_vencidas = (
-            db.query(func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido))
-            .filter(
-                and_(
-                    ContaReceber.tenant_id == tenant_id,
-                    ContaReceber.status.in_(["pendente", "parcial", "vencida"]),
-                    ContaReceber.data_vencimento < hoje,
-                )
+        contas_receber_vencidas = db.query(
+            func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido)
+        ).filter(
+            and_(
+                ContaReceber.tenant_id == tenant_id,
+                ContaReceber.status.in_(['pendente', 'parcial', 'vencida']),
+                ContaReceber.data_vencimento < hoje
             )
-            .scalar()
-            or 0
-        )
-
+        ).scalar() or 0
+        
         # ========================================
         # 3. CONTAS A PAGAR
         # ========================================
-        contas_pagar_total = (
-            db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
-            .filter(
-                and_(
-                    ContaPagar.tenant_id == tenant_id,
-                    ContaPagar.status.in_(["pendente", "parcial", "vencida"]),
-                )
+        contas_pagar_total = db.query(
+            func.sum(ContaPagar.valor_final - ContaPagar.valor_pago)
+        ).filter(
+            and_(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.status.in_(['pendente', 'parcial', 'vencida'])
             )
-            .scalar()
-            or 0
-        )
-
+        ).scalar() or 0
+        
         # Contas vencidas a pagar
-        contas_pagar_vencidas = (
-            db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
-            .filter(
-                and_(
-                    ContaPagar.tenant_id == tenant_id,
-                    ContaPagar.status.in_(["pendente", "parcial", "vencida"]),
-                    ContaPagar.data_vencimento < hoje,
-                )
+        contas_pagar_vencidas = db.query(
+            func.sum(ContaPagar.valor_final - ContaPagar.valor_pago)
+        ).filter(
+            and_(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.status.in_(['pendente', 'parcial', 'vencida']),
+                ContaPagar.data_vencimento < hoje
             )
-            .scalar()
-            or 0
-        )
-
+        ).scalar() or 0
+        
         # ========================================
         # 4. VENDAS DO PERÍODO
         # ========================================
-        vendas_periodo = (
-            db.query(
-                func.count(Venda.id).label("quantidade"),
-                func.sum(Venda.total).label("valor_total"),
-                func.sum(Venda.subtotal).label("faturamento_bruto"),
+        vendas_periodo = db.query(
+            func.count(Venda.id).label('quantidade'),
+            func.sum(Venda.total).label('valor_total'),
+            func.sum(Venda.subtotal).label('faturamento_bruto')
+        ).filter(
+            and_(
+                Venda.tenant_id == tenant_id,
+                Venda.data_venda >= inicio_periodo
             )
-            .filter(
-                and_(Venda.tenant_id == tenant_id, Venda.data_venda >= inicio_periodo)
-            )
-            .first()
-        )
-
+        ).first()
+        
         total_vendas_periodo = vendas_periodo.valor_total or 0
         quantidade_vendas_periodo = vendas_periodo.quantidade or 0
         faturamento_bruto_periodo = vendas_periodo.faturamento_bruto or 0
-
+        
         # Vendas finalizadas
-        vendas_finalizadas = (
-            db.query(func.sum(Venda.total))
-            .filter(
-                and_(
-                    Venda.tenant_id == tenant_id,
-                    Venda.data_venda >= inicio_periodo,
-                    Venda.status == "finalizada",
-                )
+        vendas_finalizadas = db.query(
+            func.sum(Venda.total)
+        ).filter(
+            and_(
+                Venda.tenant_id == tenant_id,
+                Venda.data_venda >= inicio_periodo,
+                Venda.status == 'finalizada'
             )
-            .scalar()
-            or 0
-        )
-
+        ).scalar() or 0
+        
         # ========================================
         # 5. ENTRADAS E SAÍDAS DO PERÍODO (baseado em vendas e contas)
         # ========================================
-        entradas_periodo = (
-            db.query(func.sum(Venda.total))
-            .filter(
-                and_(
-                    Venda.tenant_id == tenant_id,
-                    Venda.data_venda >= inicio_periodo,
-                    Venda.status == "finalizada",
-                )
+        entradas_periodo = db.query(
+            func.sum(Venda.total)
+        ).filter(
+            and_(
+                Venda.tenant_id == tenant_id,
+                Venda.data_venda >= inicio_periodo,
+                Venda.status == 'finalizada'
             )
-            .scalar()
-            or 0
-        )
-
-        saidas_periodo = (
-            db.query(func.sum(ContaPagar.valor_pago))
-            .filter(
-                and_(
-                    ContaPagar.tenant_id == tenant_id,
-                    ContaPagar.data_pagamento >= inicio_periodo,
-                )
+        ).scalar() or 0
+        
+        saidas_periodo = db.query(
+            func.sum(ContaPagar.valor_pago)
+        ).filter(
+            and_(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.data_pagamento >= inicio_periodo
             )
-            .scalar()
-            or 0
-        )
-
+        ).scalar() or 0
+        
         # ========================================
         # 6. LUCRO DO PERÍODO
         # ========================================
         lucro_periodo = entradas_periodo - saidas_periodo
-
+        
         # ========================================
         # 7. TICKET MÉDIO
         # ========================================
-        ticket_medio = (
-            (total_vendas_periodo / quantidade_vendas_periodo)
-            if quantidade_vendas_periodo > 0
-            else 0
-        )
-
+        ticket_medio = (total_vendas_periodo / quantidade_vendas_periodo) if quantidade_vendas_periodo > 0 else 0
+        
         # ========================================
         # RETORNO
         # ========================================
@@ -1709,27 +1515,27 @@ async def obter_resumo_dashboard(
             "saldo_atual": round(saldo_atual, 2),
             "contas_receber": {
                 "total": round(contas_receber_total, 2),
-                "vencidas": round(contas_receber_vencidas, 2),
+                "vencidas": round(contas_receber_vencidas, 2)
             },
             "contas_pagar": {
                 "total": round(contas_pagar_total, 2),
-                "vencidas": round(contas_pagar_vencidas, 2),
+                "vencidas": round(contas_pagar_vencidas, 2)
             },
             "vendas_periodo": {
                 "quantidade": quantidade_vendas_periodo,
                 "valor_total": round(total_vendas_periodo, 2),
                 "faturamento_bruto": round(float(faturamento_bruto_periodo), 2),
                 "finalizadas": round(vendas_finalizadas, 2),
-                "ticket_medio": round(ticket_medio, 2),
+                "ticket_medio": round(ticket_medio, 2)
             },
             "fluxo_periodo": {
                 "entradas": round(entradas_periodo, 2),
                 "saidas": round(saidas_periodo, 2),
-                "lucro": round(lucro_periodo, 2),
+                "lucro": round(lucro_periodo, 2)
             },
-            "periodo_dias": periodo_dias,
+            "periodo_dias": periodo_dias
         }
-
+        
     except Exception as e:
         logger.error(f"Erro ao obter resumo do dashboard: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1739,7 +1545,7 @@ async def obter_resumo_dashboard(
 async def obter_entradas_saidas_por_dia(
     periodo_dias: int = 30,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Retorna entradas e saídas agrupadas por dia para gráfico
@@ -1748,75 +1554,65 @@ async def obter_entradas_saidas_por_dia(
     try:
         hoje = datetime.now()
         inicio_periodo = hoje - timedelta(days=periodo_dias)
-
+        
         # Buscar vendas por dia
-        vendas = (
-            db.query(
-                func.date(Venda.data_venda).label("data"),
-                func.sum(Venda.total).label("total"),
+        vendas = db.query(
+            func.date(Venda.data_venda).label('data'),
+            func.sum(Venda.total).label('total')
+        ).filter(
+            and_(
+                Venda.tenant_id == tenant_id,
+                Venda.data_venda >= inicio_periodo,
+                Venda.status == 'finalizada'
             )
-            .filter(
-                and_(
-                    Venda.tenant_id == tenant_id,
-                    Venda.data_venda >= inicio_periodo,
-                    Venda.status == "finalizada",
-                )
-            )
-            .group_by(func.date(Venda.data_venda))
-            .all()
-        )
-
+        ).group_by(
+            func.date(Venda.data_venda)
+        ).all()
+        
         # Buscar pagamentos por dia
-        pagamentos = (
-            db.query(
-                func.date(ContaPagar.data_pagamento).label("data"),
-                func.sum(ContaPagar.valor_pago).label("total"),
+        pagamentos = db.query(
+            func.date(ContaPagar.data_pagamento).label('data'),
+            func.sum(ContaPagar.valor_pago).label('total')
+        ).filter(
+            and_(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.data_pagamento >= inicio_periodo
             )
-            .filter(
-                and_(
-                    ContaPagar.tenant_id == tenant_id,
-                    ContaPagar.data_pagamento >= inicio_periodo,
-                )
-            )
-            .group_by(func.date(ContaPagar.data_pagamento))
-            .all()
-        )
-
+        ).group_by(
+            func.date(ContaPagar.data_pagamento)
+        ).all()
+        
         # Organizar por data
         dados_por_dia = {}
-
+        
         # Inicializar todos os dias com zero
         for i in range(periodo_dias + 1):
-            data = (inicio_periodo + timedelta(days=i)).strftime("%Y-%m-%d")
-            dados_por_dia[data] = {"data": data, "entradas": 0, "saidas": 0}
-
+            data = (inicio_periodo + timedelta(days=i)).strftime('%Y-%m-%d')
+            dados_por_dia[data] = {
+                'data': data,
+                'entradas': 0,
+                'saidas': 0
+            }
+        
         # Preencher com vendas
         for venda in vendas:
             data_obj = venda[0] if isinstance(venda, tuple) else venda.data
-            data_str = (
-                data_obj.strftime("%Y-%m-%d")
-                if hasattr(data_obj, "strftime")
-                else str(data_obj)
-            )
+            data_str = data_obj.strftime('%Y-%m-%d') if hasattr(data_obj, 'strftime') else str(data_obj)
             if data_str in dados_por_dia:
-                dados_por_dia[data_str]["entradas"] = float(venda.total or 0)
-
+                dados_por_dia[data_str]['entradas'] = float(venda.total or 0)
+        
         # Preencher com pagamentos
         for pagamento in pagamentos:
             data_obj = pagamento[0] if isinstance(pagamento, tuple) else pagamento.data
-            data_str = (
-                data_obj.strftime("%Y-%m-%d")
-                if hasattr(data_obj, "strftime")
-                else str(data_obj)
-            )
+            data_str = data_obj.strftime('%Y-%m-%d') if hasattr(data_obj, 'strftime') else str(data_obj)
             if data_str in dados_por_dia:
-                dados_por_dia[data_str]["saidas"] = float(pagamento.total or 0)
-
+                dados_por_dia[data_str]['saidas'] = float(pagamento.total or 0)
+        
         # Converter para lista ordenada
-        resultado = sorted(dados_por_dia.values(), key=lambda x: x["data"])
-
+        resultado = sorted(dados_por_dia.values(), key=lambda x: x['data'])
+        
         return resultado
-
+        
     except Exception as e:
         logger.error(f"Erro ao obter entradas/saídas por dia: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1826,7 +1622,7 @@ async def obter_entradas_saidas_por_dia(
 async def obter_vendas_por_dia(
     periodo_dias: int = 30,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Retorna vendas agrupadas por dia para gráfico
@@ -1835,49 +1631,47 @@ async def obter_vendas_por_dia(
     try:
         hoje = datetime.now()
         inicio_periodo = hoje - timedelta(days=periodo_dias)
-
+        
         # Buscar vendas do período
-        vendas = (
-            db.query(
-                func.date(Venda.data_venda).label("data"),
-                func.count(Venda.id).label("quantidade"),
-                func.sum(Venda.total).label("valor_total"),
+        vendas = db.query(
+            func.date(Venda.data_venda).label('data'),
+            func.count(Venda.id).label('quantidade'),
+            func.sum(Venda.total).label('valor_total')
+        ).filter(
+            and_(
+                Venda.tenant_id == tenant_id,
+                Venda.data_venda >= inicio_periodo
             )
-            .filter(
-                and_(Venda.tenant_id == tenant_id, Venda.data_venda >= inicio_periodo)
-            )
-            .group_by(func.date(Venda.data_venda))
-            .all()
-        )
-
+        ).group_by(
+            func.date(Venda.data_venda)
+        ).all()
+        
         # Organizar por data
         dados_por_dia = {}
-
+        
         # Inicializar todos os dias com zero
         for i in range(periodo_dias + 1):
-            data = (inicio_periodo + timedelta(days=i)).strftime("%Y-%m-%d")
-            dados_por_dia[data] = {"data": data, "quantidade": 0, "valor_total": 0}
-
+            data = (inicio_periodo + timedelta(days=i)).strftime('%Y-%m-%d')
+            dados_por_dia[data] = {
+                'data': data,
+                'quantidade': 0,
+                'valor_total': 0
+            }
+        
         # Preencher com dados reais
         for venda in vendas:
             # venda é um resultado de query com labels, não um objeto Venda
             data_obj = venda[0] if isinstance(venda, tuple) else venda.data
-            data_str = (
-                data_obj.strftime("%Y-%m-%d")
-                if hasattr(data_obj, "strftime")
-                else str(data_obj)
-            )
+            data_str = data_obj.strftime('%Y-%m-%d') if hasattr(data_obj, 'strftime') else str(data_obj)
             if data_str in dados_por_dia:
-                dados_por_dia[data_str]["quantidade"] = (
-                    int(venda.quantidade) if venda.quantidade else 0
-                )
-                dados_por_dia[data_str]["valor_total"] = float(venda.valor_total or 0)
-
+                dados_por_dia[data_str]['quantidade'] = int(venda.quantidade) if venda.quantidade else 0
+                dados_por_dia[data_str]['valor_total'] = float(venda.valor_total or 0)
+        
         # Converter para lista ordenada
-        resultado = sorted(dados_por_dia.values(), key=lambda x: x["data"])
-
+        resultado = sorted(dados_por_dia.values(), key=lambda x: x['data'])
+        
         return resultado
-
+        
     except Exception as e:
         logger.error(f"Erro ao obter vendas por dia: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1887,101 +1681,75 @@ async def obter_vendas_por_dia(
 async def obter_contas_vencidas(
     limite: int = 10,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Retorna contas a receber e pagar vencidas (não pagas)
     """
     current_user, tenant_id = user_and_tenant
-
+    
     try:
         hoje = datetime.now().date()
-        logger.info(
-            f"[contas-vencidas] Buscando contas vencidas para tenant {tenant_id}"
-        )
-
+        logger.info(f"[contas-vencidas] Buscando contas vencidas para tenant {tenant_id}")
+        
         # Contas a receber vencidas
         try:
-            contas_receber = (
-                db.query(ContaReceber)
-                .filter(
-                    and_(
-                        ContaReceber.tenant_id == tenant_id,
-                        ContaReceber.status.in_(["pendente", "parcial", "vencido"]),
-                        ContaReceber.data_vencimento < hoje,
-                    )
+            contas_receber = db.query(ContaReceber).filter(
+                and_(
+                    ContaReceber.tenant_id == tenant_id,
+                    ContaReceber.status.in_(['pendente', 'parcial', 'vencido']),
+                    ContaReceber.data_vencimento < hoje
                 )
-                .order_by(ContaReceber.data_vencimento.asc())
-                .limit(limite)
-                .all()
-            )
-            logger.info(
-                f"[contas-vencidas] Encontradas {len(contas_receber)} contas a receber vencidas"
-            )
+            ).order_by(ContaReceber.data_vencimento.asc()).limit(limite).all()
+            logger.info(f"[contas-vencidas] Encontradas {len(contas_receber)} contas a receber vencidas")
         except Exception as e:
             logger.error(f"[contas-vencidas] Erro ao buscar contas a receber: {e}")
             contas_receber = []
-
+        
         # Contas a pagar vencidas
         try:
-            contas_pagar = (
-                db.query(ContaPagar)
-                .filter(
-                    and_(
-                        ContaPagar.tenant_id == tenant_id,
-                        ContaPagar.status.in_(["pendente", "parcial", "vencido"]),
-                        ContaPagar.data_vencimento < hoje,
-                    )
+            contas_pagar = db.query(ContaPagar).filter(
+                and_(
+                    ContaPagar.tenant_id == tenant_id,
+                    ContaPagar.status.in_(['pendente', 'parcial', 'vencido']),
+                    ContaPagar.data_vencimento < hoje
                 )
-                .order_by(ContaPagar.data_vencimento.asc())
-                .limit(limite)
-                .all()
-            )
-            logger.info(
-                f"[contas-vencidas] Encontradas {len(contas_pagar)} contas a pagar vencidas"
-            )
+            ).order_by(ContaPagar.data_vencimento.asc()).limit(limite).all()
+            logger.info(f"[contas-vencidas] Encontradas {len(contas_pagar)} contas a pagar vencidas")
         except Exception as e:
             logger.error(f"[contas-vencidas] Erro ao buscar contas a pagar: {e}")
             contas_pagar = []
-
-        # Serializar contas a receber
+        
+        #Serializar contas a receber
         contas_receber_list = []
         for c in contas_receber:
             try:
                 # Acessar relacionamentos com segurança
                 cliente_nome = None
                 try:
-                    if hasattr(c, "cliente") and c.cliente:
+                    if hasattr(c, 'cliente') and c.cliente:
                         cliente_nome = c.cliente.nome
                 except Exception:
                     pass
-
+                
                 valor_final = float(c.valor_final) if c.valor_final else 0
                 valor_recebido = float(c.valor_recebido) if c.valor_recebido else 0
-
-                contas_receber_list.append(
-                    {
-                        "id": c.id,
-                        "descricao": c.descricao or "Sem descrição",
-                        "cliente": cliente_nome,
-                        "valor_total": valor_final,
-                        "valor_pago": valor_recebido,
-                        "saldo": valor_final - valor_recebido,
-                        "data_vencimento": c.data_vencimento.isoformat()
-                        if c.data_vencimento
-                        else None,
-                        "dias_vencido": (hoje - c.data_vencimento).days
-                        if c.data_vencimento
-                        else 0,
-                        "status": c.status,
-                    }
-                )
+                
+                contas_receber_list.append({
+                    "id": c.id,
+                    "descricao": c.descricao or "Sem descrição",
+                    "cliente": cliente_nome,
+                    "valor_total": valor_final,
+                    "valor_pago": valor_recebido,
+                    "saldo": valor_final - valor_recebido,
+                    "data_vencimento": c.data_vencimento.isoformat() if c.data_vencimento else None,
+                    "dias_vencido": (hoje - c.data_vencimento).days if c.data_vencimento else 0,
+                    "status": c.status
+                })
             except Exception as e:
-                logger.error(
-                    f"[contas-vencidas] Erro ao serializar conta a receber {c.id}: {e}"
-                )
+                logger.error(f"[contas-vencidas] Erro ao serializar conta a receber {c.id}: {e}")
                 continue
-
+        
         # Serializar contas a pagar
         contas_pagar_list = []
         for c in contas_pagar:
@@ -1989,42 +1757,34 @@ async def obter_contas_vencidas(
                 # Acessar relacionamentos com segurança
                 fornecedor_nome = None
                 try:
-                    if hasattr(c, "fornecedor") and c.fornecedor:
+                    if hasattr(c, 'fornecedor') and c.fornecedor:
                         fornecedor_nome = c.fornecedor.nome
                 except Exception:
                     pass
-
+                
                 valor_final = float(c.valor_final) if c.valor_final else 0
                 valor_pago = float(c.valor_pago) if c.valor_pago else 0
-
-                contas_pagar_list.append(
-                    {
-                        "id": c.id,
-                        "descricao": c.descricao or "Sem descrição",
-                        "fornecedor": fornecedor_nome,
-                        "valor_total": valor_final,
-                        "valor_pago": valor_pago,
-                        "saldo": valor_final - valor_pago,
-                        "data_vencimento": c.data_vencimento.isoformat()
-                        if c.data_vencimento
-                        else None,
-                        "dias_vencido": (hoje - c.data_vencimento).days
-                        if c.data_vencimento
-                        else 0,
-                        "status": c.status,
-                    }
-                )
+                
+                contas_pagar_list.append({
+                    "id": c.id,
+                    "descricao": c.descricao or "Sem descrição",
+                    "fornecedor": fornecedor_nome,
+                    "valor_total": valor_final,
+                    "valor_pago": valor_pago,
+                    "saldo": valor_final - valor_pago,
+                    "data_vencimento": c.data_vencimento.isoformat() if c.data_vencimento else None,
+                    "dias_vencido": (hoje - c.data_vencimento).days if c.data_vencimento else 0,
+                    "status": c.status
+                })
             except Exception as e:
-                logger.error(
-                    f"[contas-vencidas] Erro ao serializar conta a pagar {c.id}: {e}"
-                )
+                logger.error(f"[contas-vencidas] Erro ao serializar conta a pagar {c.id}: {e}")
                 continue
-
+        
         return {
             "contas_receber": contas_receber_list,
-            "contas_pagar": contas_pagar_list,
+            "contas_pagar": contas_pagar_list
         }
-
+        
     except Exception as e:
         logger.error(f"Erro ao obter contas vencidas: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -2033,7 +1793,7 @@ async def obter_contas_vencidas(
 @router.get("/dashboard/gerencial")
 async def obter_metricas_gerencial(
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Retorna métricas consolidadas para o Dashboard Gerencial.
@@ -2042,9 +1802,7 @@ async def obter_metricas_gerencial(
     current_user, tenant_id = user_and_tenant
     try:
         # 1. VIPs inativos — segmento VIP com mais de 20 dias sem compra
-        vips_result = _dashboard_fetchone(
-            db,
-            """
+        vips_result = _dashboard_fetchone(db, """
             SELECT
                 COUNT(*) AS qtd,
                 COALESCE(SUM(CAST(cs.metricas->>'total_compras_90d' AS FLOAT)), 0) AS impacto
@@ -2054,14 +1812,10 @@ async def obter_metricas_gerencial(
               AND cs.segmento = 'VIP'
               AND CAST(cs.metricas->>'ultima_compra_dias' AS INTEGER) > 20
               AND c.ativo = true
-        """,
-            tenant_id,
-        )
+        """, tenant_id)
 
         # 2. Clientes inativos — sem compra há mais de 90 dias
-        inativos_result = _dashboard_fetchone(
-            db,
-            """
+        inativos_result = _dashboard_fetchone(db, """
             SELECT COUNT(DISTINCT c.id) AS qtd
             FROM clientes c
             LEFT JOIN (
@@ -2074,14 +1828,10 @@ async def obter_metricas_gerencial(
               AND c.tipo_cadastro = 'cliente'
               AND c.ativo = true
               AND (v.ultima_venda IS NULL OR v.ultima_venda < NOW() - INTERVAL '90 days')
-        """,
-            tenant_id,
-        )
+        """, tenant_id)
 
         # 3. Clientes endividados — contas a receber em aberto com saldo > 0
-        endividados_result = _dashboard_fetchone(
-            db,
-            """
+        endividados_result = _dashboard_fetchone(db, """
             SELECT
                 COUNT(DISTINCT cr.cliente_id) AS qtd,
                 COALESCE(SUM(cr.valor_final - COALESCE(cr.valor_recebido, 0)), 0) AS total_dividas
@@ -2090,14 +1840,10 @@ async def obter_metricas_gerencial(
               AND cr.status IN ('pendente', 'vencido', 'parcial')
               AND cr.cliente_id IS NOT NULL
               AND (cr.valor_final - COALESCE(cr.valor_recebido, 0)) > 0
-        """,
-            tenant_id,
-        )
+        """, tenant_id)
 
         # 4. Novos promissores — segmento Novo com ticket médio > R$ 200
-        novos_result = _dashboard_fetchone(
-            db,
-            """
+        novos_result = _dashboard_fetchone(db, """
             SELECT
                 COUNT(*) AS qtd,
                 COALESCE(SUM(CAST(cs.metricas->>'ticket_medio' AS FLOAT)), 0) AS potencial
@@ -2107,67 +1853,60 @@ async def obter_metricas_gerencial(
               AND cs.segmento = 'Novo'
               AND CAST(cs.metricas->>'ticket_medio' AS FLOAT) > 200
               AND c.ativo = true
-        """,
-            tenant_id,
-        )
+        """, tenant_id)
 
         # 5. WhatsApp faltando — clientes sem celular cadastrado
-        sem_whatsapp_result = _dashboard_fetchone(
-            db,
-            """
+        sem_whatsapp_result = _dashboard_fetchone(db, """
             SELECT COUNT(*) AS qtd
             FROM clientes
             WHERE {tenant_filter}
               AND tipo_cadastro = 'cliente'
               AND ativo = true
               AND (celular IS NULL OR TRIM(celular) = '')
-        """,
-            tenant_id,
-        )
+        """, tenant_id)
 
         # 6. Total de clientes ativos (tipo cliente)
-        total_result = _dashboard_fetchone(
-            db,
-            """
+        total_result = _dashboard_fetchone(db, """
             SELECT COUNT(*) AS qtd
             FROM clientes
             WHERE {tenant_filter}
               AND tipo_cadastro = 'cliente'
               AND ativo = true
-        """,
-            tenant_id,
-        )
+        """, tenant_id)
 
         def fmt_brl(value: float) -> str:
-            return f"R$ {value:_.2f}".replace(".", ",").replace("_", ".")
+            return f"R$ {value:_.2f}".replace('.', ',').replace('_', '.')
 
         total_dividas = float(endividados_result.total_dividas or 0)
         potencial_novos = float(novos_result.potencial or 0)
         impacto_vips = float(vips_result.impacto or 0)
 
         return {
-            "vips_inativos": {
-                "quantidade": int(vips_result.qtd or 0),
-                "impacto": fmt_brl(impacto_vips),
+            'vips_inativos': {
+                'quantidade': int(vips_result.qtd or 0),
+                'impacto': fmt_brl(impacto_vips)
             },
-            "clientes_inativos": {
-                "quantidade": int(inativos_result.qtd or 0),
-                "impacto": "Reativação pendente",
+            'clientes_inativos': {
+                'quantidade': int(inativos_result.qtd or 0),
+                'impacto': 'Reativação pendente'
             },
-            "clientes_endividados": {
-                "quantidade": int(endividados_result.qtd or 0),
-                "impacto": fmt_brl(total_dividas),
+            'clientes_endividados': {
+                'quantidade': int(endividados_result.qtd or 0),
+                'impacto': fmt_brl(total_dividas)
             },
-            "oportunidades_novos": {
-                "quantidade": int(novos_result.qtd or 0),
-                "impacto": f"~R$ {potencial_novos:_.0f}/mês".replace("_", "."),
+            'oportunidades_novos': {
+                'quantidade': int(novos_result.qtd or 0),
+                'impacto': f"~R$ {potencial_novos:_.0f}/mês".replace('_', '.')
             },
-            "pets_sem_eventos": {"quantidade": 0, "impacto": "Em breve"},
-            "whatsapp_inativo": {
-                "quantidade": int(sem_whatsapp_result.qtd or 0),
-                "impacto": "Canal perdido",
+            'pets_sem_eventos': {
+                'quantidade': 0,
+                'impacto': 'Em breve'
             },
-            "total_clientes": int(total_result.qtd or 0),
+            'whatsapp_inativo': {
+                'quantidade': int(sem_whatsapp_result.qtd or 0),
+                'impacto': 'Canal perdido'
+            },
+            'total_clientes': int(total_result.qtd or 0)
         }
 
     except Exception as e:
@@ -2180,7 +1919,7 @@ async def obter_top_produtos(
     periodo_dias: int = 30,
     limite: int = 10,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Retorna os produtos mais vendidos no período
@@ -2189,41 +1928,40 @@ async def obter_top_produtos(
     try:
         from .vendas_models import VendaItem
         from .produtos_models import Produto
-
+        
         hoje = datetime.now()
         inicio_periodo = hoje - timedelta(days=periodo_dias)
-
+        
         # Buscar produtos mais vendidos
-        top_produtos = (
-            db.query(
-                Produto.nome,
-                func.sum(VendaItem.quantidade).label("total_vendido"),
-                func.sum(VendaItem.subtotal).label("receita_total"),
+        top_produtos = db.query(
+            Produto.nome,
+            func.sum(VendaItem.quantidade).label('total_vendido'),
+            func.sum(VendaItem.subtotal).label('receita_total')
+        ).join(
+            VendaItem, Produto.id == VendaItem.produto_id
+        ).join(
+            Venda, VendaItem.venda_id == Venda.id
+        ).filter(
+            and_(
+                Venda.tenant_id == tenant_id,
+                Produto.tenant_id == tenant_id,
+                Venda.data_venda >= inicio_periodo
             )
-            .join(VendaItem, Produto.id == VendaItem.produto_id)
-            .join(Venda, VendaItem.venda_id == Venda.id)
-            .filter(
-                and_(
-                    Venda.tenant_id == tenant_id,
-                    Produto.tenant_id == tenant_id,
-                    Venda.data_venda >= inicio_periodo,
-                )
-            )
-            .group_by(Produto.id, Produto.nome)
-            .order_by(func.sum(VendaItem.quantidade).desc())
-            .limit(limite)
-            .all()
-        )
-
+        ).group_by(
+            Produto.id, Produto.nome
+        ).order_by(
+            func.sum(VendaItem.quantidade).desc()
+        ).limit(limite).all()
+        
         return [
             {
                 "nome": p.nome,
                 "quantidade_vendida": int(p.total_vendido),
-                "receita_total": float(p.receita_total or 0),
+                "receita_total": float(p.receita_total or 0)
             }
             for p in top_produtos
         ]
-
+        
     except Exception as e:
         logger.error(f"Erro ao obter top produtos: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,3 +1,4 @@
+
 import os
 import re
 from uuid import UUID
@@ -57,13 +58,15 @@ def _set_bling_request_tenant(request: Request | None = None) -> UUID | None:
             request.state.tenant_source = "bling_webhook_env"
     return tenant_id
 
-
-router = APIRouter(prefix="/integracoes/bling", tags=["Integração Bling - NF"])
+router = APIRouter(
+    prefix="/integracoes/bling",
+    tags=["Integração Bling - NF"]
+)
 
 # Situações de NF no Bling (campo situacao é um número)
 # 1=Pendente, 2=Emitida DANFE, 4=Cancelada, 5=Autorizada, 9=Autorizada
 _NF_SITUACAO_AUTORIZADA = {2, 5, 9}
-_NF_SITUACAO_CANCELADA = {4}
+_NF_SITUACAO_CANCELADA  = {4}
 
 
 def _dict(value) -> dict:
@@ -99,9 +102,7 @@ def _normalizar_resumo_nf(resumo_nf: dict | None) -> dict | None:
     if not resumo_nf:
         return None
 
-    nf_id = _nf_id_valido(
-        _primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id"))
-    )
+    nf_id = _nf_id_valido(_primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id")))
     if nf_id:
         if "id" in resumo_nf or "nfe_id" not in resumo_nf:
             resumo_nf["id"] = nf_id
@@ -114,17 +115,9 @@ def _normalizar_resumo_nf(resumo_nf: dict | None) -> dict | None:
     possui_referencia_util = bool(
         nf_id
         or _texto(resumo_nf.get("numero"))
-        or _texto(
-            _primeiro_preenchido(resumo_nf.get("chaveAcesso"), resumo_nf.get("chave"))
-        )
-        or _texto(
-            _primeiro_preenchido(resumo_nf.get("situacao"), resumo_nf.get("status"))
-        )
-        or _texto(
-            _primeiro_preenchido(
-                resumo_nf.get("data_emissao"), resumo_nf.get("dataEmissao")
-            )
-        )
+        or _texto(_primeiro_preenchido(resumo_nf.get("chaveAcesso"), resumo_nf.get("chave")))
+        or _texto(_primeiro_preenchido(resumo_nf.get("situacao"), resumo_nf.get("status")))
+        or _texto(_primeiro_preenchido(resumo_nf.get("data_emissao"), resumo_nf.get("dataEmissao")))
         or resumo_nf.get("valor_total") not in (None, "")
     )
 
@@ -181,17 +174,11 @@ def _nova_nf_deve_substituir(atual: dict | None, nova: dict | None) -> bool:
     atual_numero = _texto(atual.get("numero"))
     nova_numero = _texto(nova.get("numero"))
 
-    if (atual_id and nova_id and atual_id == nova_id) or (
-        atual_numero and nova_numero and atual_numero == nova_numero
-    ):
+    if (atual_id and nova_id and atual_id == nova_id) or (atual_numero and nova_numero and atual_numero == nova_numero):
         return True
 
-    atual_data = _coerce_data_nf(
-        _primeiro_preenchido(atual.get("data_emissao"), atual.get("dataEmissao"))
-    )
-    nova_data = _coerce_data_nf(
-        _primeiro_preenchido(nova.get("data_emissao"), nova.get("dataEmissao"))
-    )
+    atual_data = _coerce_data_nf(_primeiro_preenchido(atual.get("data_emissao"), atual.get("dataEmissao")))
+    nova_data = _coerce_data_nf(_primeiro_preenchido(nova.get("data_emissao"), nova.get("dataEmissao")))
     if atual_data and nova_data and atual_data != nova_data:
         return nova_data > atual_data
     if nova_data and not atual_data:
@@ -201,11 +188,7 @@ def _nova_nf_deve_substituir(atual: dict | None, nova: dict | None) -> bool:
 
     atual_numero_int = _numero_nf_int(atual)
     nova_numero_int = _numero_nf_int(nova)
-    if (
-        atual_numero_int is not None
-        and nova_numero_int is not None
-        and atual_numero_int != nova_numero_int
-    ):
+    if atual_numero_int is not None and nova_numero_int is not None and atual_numero_int != nova_numero_int:
         return nova_numero_int > atual_numero_int
 
     return False
@@ -238,9 +221,7 @@ def _modelo_nota_bling(nf_data: dict | None) -> int:
     return 55
 
 
-def _status_nota_webhook(
-    nf_data: dict | None, situacao_num: int | None = None
-) -> str | None:
+def _status_nota_webhook(nf_data: dict | None, situacao_num: int | None = None) -> str | None:
     nf_data = _dict(nf_data)
     try:
         from app.nfe_routes import _status_nota_bling
@@ -258,27 +239,15 @@ def _status_nota_webhook(
         return "Autorizada"
     if situacao_num == 1:
         return "Pendente"
-    return (
-        _texto(_dict(nf_data.get("situacao")).get("descricao"))
-        or _texto(nf_data.get("status"))
-        or "Pendente"
-    )
+    return _texto(_dict(nf_data.get("situacao")).get("descricao")) or _texto(nf_data.get("status")) or "Pendente"
 
 
-def _nf_webhook_autorizada(
-    nf_data: dict | None, situacao_num: int | None = None
-) -> bool:
-    return (
-        _status_nota_webhook(nf_data, situacao_num) or ""
-    ).strip().lower() == "autorizada"
+def _nf_webhook_autorizada(nf_data: dict | None, situacao_num: int | None = None) -> bool:
+    return (_status_nota_webhook(nf_data, situacao_num) or "").strip().lower() == "autorizada"
 
 
-def _nf_webhook_cancelada(
-    nf_data: dict | None, situacao_num: int | None = None
-) -> bool:
-    return (
-        _status_nota_webhook(nf_data, situacao_num) or ""
-    ).strip().lower() == "cancelada"
+def _nf_webhook_cancelada(nf_data: dict | None, situacao_num: int | None = None) -> bool:
+    return (_status_nota_webhook(nf_data, situacao_num) or "").strip().lower() == "cancelada"
 
 
 def _atualizar_cache_nota_webhook(
@@ -307,9 +276,7 @@ def _atualizar_cache_nota_webhook(
             detalhe_payload=nf_data,
         )
     except Exception as exc:
-        logger.warning(
-            f"[BLING NF] Falha ao atualizar cache local da NF {nf_id}: {exc}"
-        )
+        logger.warning(f"[BLING NF] Falha ao atualizar cache local da NF {nf_id}: {exc}")
 
 
 def _query_itens_sem_produto(db: Session, tenant_id):
@@ -325,10 +292,7 @@ def _query_itens_sem_produto(db: Session, tenant_id):
 
     return (
         db.query(PedidoIntegradoItem, PedidoIntegrado)
-        .join(
-            PedidoIntegrado,
-            PedidoIntegrado.id == PedidoIntegradoItem.pedido_integrado_id,
-        )
+        .join(PedidoIntegrado, PedidoIntegrado.id == PedidoIntegradoItem.pedido_integrado_id)
         .filter(
             PedidoIntegradoItem.tenant_id == tenant_id,
             not_(produto_existe),
@@ -337,9 +301,7 @@ def _query_itens_sem_produto(db: Session, tenant_id):
     )
 
 
-def _executar_autocadastro_skus(
-    db: Session, tenant_id, rows, max_skus_autocadastro: int
-):
+def _executar_autocadastro_skus(db: Session, tenant_id, rows, max_skus_autocadastro: int):
     skus = []
     vistos = set()
 
@@ -401,18 +363,12 @@ def _serializar_itens_sem_produto(rows):
 
 
 def _obter_pedido_bling_id_por_nf(nf_id: str, situacao_num: int) -> str | None:
-    return (
-        _consultar_relacao_nf_bling(nf_id=nf_id, situacao_num=situacao_num) or {}
-    ).get("pedido_bling_id")
+    return (_consultar_relacao_nf_bling(nf_id=nf_id, situacao_num=situacao_num) or {}).get("pedido_bling_id")
 
 
 def _extrair_numero_pedido_loja_nf(data: dict | None) -> str | None:
     data = data or {}
-    info_adicionais = (
-        data.get("informacoesAdicionais")
-        if isinstance(data.get("informacoesAdicionais"), dict)
-        else {}
-    )
+    info_adicionais = data.get("informacoesAdicionais") if isinstance(data.get("informacoesAdicionais"), dict) else {}
     texto_complementar = (
         info_adicionais.get("informacoesComplementares")
         or data.get("informacoesComplementares")
@@ -446,12 +402,8 @@ def _extrair_numero_pedido_loja_nf(data: dict | None) -> str | None:
 
 def _numero_pedido_loja_do_payload(pedido: PedidoIntegrado) -> str | None:
     payload = pedido.payload if isinstance(pedido.payload, dict) else {}
-    pedido_payload = (
-        payload.get("pedido") if isinstance(payload.get("pedido"), dict) else {}
-    )
-    webhook_payload = (
-        payload.get("webhook") if isinstance(payload.get("webhook"), dict) else {}
-    )
+    pedido_payload = payload.get("pedido") if isinstance(payload.get("pedido"), dict) else {}
+    webhook_payload = payload.get("webhook") if isinstance(payload.get("webhook"), dict) else {}
 
     for candidato in (
         pedido_payload.get("numeroLoja"),
@@ -471,14 +423,8 @@ def _numero_pedido_loja_do_payload(pedido: PedidoIntegrado) -> str | None:
 def _loja_id_nf_payload(data: dict | None) -> str | None:
     data = data if isinstance(data, dict) else {}
     loja = data.get("loja") if isinstance(data.get("loja"), dict) else {}
-    loja_virtual = (
-        data.get("lojaVirtual") if isinstance(data.get("lojaVirtual"), dict) else {}
-    )
-    unidade = (
-        data.get("unidadeNegocio")
-        if isinstance(data.get("unidadeNegocio"), dict)
-        else {}
-    )
+    loja_virtual = data.get("lojaVirtual") if isinstance(data.get("lojaVirtual"), dict) else {}
+    unidade = data.get("unidadeNegocio") if isinstance(data.get("unidadeNegocio"), dict) else {}
 
     return _texto(
         _primeiro_preenchido(
@@ -493,28 +439,12 @@ def _loja_id_nf_payload(data: dict | None) -> str | None:
 
 def _loja_id_pedido(pedido: PedidoIntegrado) -> str | None:
     payload = pedido.payload if isinstance(pedido.payload, dict) else {}
-    pedido_payload = (
-        payload.get("pedido") if isinstance(payload.get("pedido"), dict) else {}
-    )
-    webhook_payload = (
-        payload.get("webhook") if isinstance(payload.get("webhook"), dict) else {}
-    )
+    pedido_payload = payload.get("pedido") if isinstance(payload.get("pedido"), dict) else {}
+    webhook_payload = payload.get("webhook") if isinstance(payload.get("webhook"), dict) else {}
 
-    pedido_loja = (
-        pedido_payload.get("loja")
-        if isinstance(pedido_payload.get("loja"), dict)
-        else {}
-    )
-    webhook_loja = (
-        webhook_payload.get("loja")
-        if isinstance(webhook_payload.get("loja"), dict)
-        else {}
-    )
-    loja_virtual = (
-        pedido_payload.get("lojaVirtual")
-        if isinstance(pedido_payload.get("lojaVirtual"), dict)
-        else {}
-    )
+    pedido_loja = pedido_payload.get("loja") if isinstance(pedido_payload.get("loja"), dict) else {}
+    webhook_loja = webhook_payload.get("loja") if isinstance(webhook_payload.get("loja"), dict) else {}
+    loja_virtual = pedido_payload.get("lojaVirtual") if isinstance(pedido_payload.get("lojaVirtual"), dict) else {}
 
     return _texto(
         _primeiro_preenchido(
@@ -607,12 +537,7 @@ def _consultar_relacao_nf_bling(nf_id: str, situacao_num: int) -> dict:
             f"numero_pedido_loja={numero_pedido_loja}"
         )
 
-        if (
-            not pedido_bling_id
-            and not pedido_bling_numero
-            and not numero_pedido_loja
-            and ultima_falha
-        ):
+        if not pedido_bling_id and not pedido_bling_numero and not numero_pedido_loja and ultima_falha:
             raise ultima_falha
     except Exception as e:
         logger.warning(f"[BLING NF] Falha ao buscar NF {nf_id} na API: {e}")
@@ -625,9 +550,7 @@ def _consultar_relacao_nf_bling(nf_id: str, situacao_num: int) -> dict:
     }
 
 
-def _registrar_nf_no_pedido(
-    pedido: PedidoIntegrado, data: dict, nf_id: str, situacao_num: int
-) -> None:
+def _registrar_nf_no_pedido(pedido: PedidoIntegrado, data: dict, nf_id: str, situacao_num: int) -> None:
     payload_atual = pedido.payload if isinstance(pedido.payload, dict) else {}
     ultima_nf_atual = _dict(payload_atual.get("ultima_nf"))
     status_nf = _status_nota_webhook(data, situacao_num)
@@ -656,15 +579,11 @@ def _registrar_nf_no_pedido(
     }
 
 
-def _nf_resumo_corresponde(
-    resumo_nf: dict | None, *, nf_id: str | None, nf_numero: str | None
-) -> bool:
+def _nf_resumo_corresponde(resumo_nf: dict | None, *, nf_id: str | None, nf_numero: str | None) -> bool:
     resumo_nf = _dict(resumo_nf)
     nf_id = _texto(nf_id)
     nf_numero = _texto(nf_numero)
-    resumo_id = _texto(
-        _primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id"))
-    )
+    resumo_id = _texto(_primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id")))
     resumo_numero = _texto(resumo_nf.get("numero"))
 
     return bool(
@@ -683,21 +602,15 @@ def _remover_nf_do_pedido(
     payload = dict(payload_atual)
     alterado = False
 
-    if _nf_resumo_corresponde(
-        payload.get("ultima_nf"), nf_id=nf_id, nf_numero=nf_numero
-    ):
+    if _nf_resumo_corresponde(payload.get("ultima_nf"), nf_id=nf_id, nf_numero=nf_numero):
         payload.pop("ultima_nf", None)
         alterado = True
 
-    pedido_payload = (
-        payload.get("pedido") if isinstance(payload.get("pedido"), dict) else None
-    )
+    pedido_payload = payload.get("pedido") if isinstance(payload.get("pedido"), dict) else None
     if pedido_payload is not None:
         pedido_payload = dict(pedido_payload)
         for chave in ("notaFiscal", "nota", "nfe"):
-            if _nf_resumo_corresponde(
-                pedido_payload.get(chave), nf_id=nf_id, nf_numero=nf_numero
-            ):
+            if _nf_resumo_corresponde(pedido_payload.get(chave), nf_id=nf_id, nf_numero=nf_numero):
                 pedido_payload.pop(chave, None)
                 alterado = True
         payload["pedido"] = pedido_payload
@@ -707,9 +620,7 @@ def _remover_nf_do_pedido(
     return alterado
 
 
-def _gerar_provisao_simples_se_aplicavel(
-    db: Session, pedido: PedidoIntegrado, data: dict
-) -> None:
+def _gerar_provisao_simples_se_aplicavel(db: Session, pedido: PedidoIntegrado, data: dict) -> None:
     try:
         valor_total_nf = data.get("valorTotalNf") or data.get("valor_total", 0)
         data_emissao = data.get("dataEmissao") or data.get("data_emissao")
@@ -794,12 +705,8 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         or _dict(data).get("pedidoVenda")
         or _dict(data).get("pedidoCompra")
     )
-    pedido_bling_id = nf_relacao.get("pedido_bling_id") or _texto(
-        pedido_ref_nf.get("id")
-    )
-    pedido_bling_numero = nf_relacao.get("pedido_bling_numero") or _texto(
-        pedido_ref_nf.get("numero")
-    )
+    pedido_bling_id = nf_relacao.get("pedido_bling_id") or _texto(pedido_ref_nf.get("id"))
+    pedido_bling_numero = nf_relacao.get("pedido_bling_numero") or _texto(pedido_ref_nf.get("numero"))
     numero_pedido_loja = (
         nf_relacao.get("numero_pedido_loja")
         or _extrair_numero_pedido_loja_nf(nf_dados)
@@ -869,10 +776,12 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
             pedido_bling_id_atual=pedido.pedido_bling_id,
         )
         if pedido_ref_conflitante and pedido_ref_conflitante != pedido.pedido_bling_id:
-            pedido_correto = localizar_pedido_por_bling_id(
-                db,
-                tenant_id=pedido.tenant_id,
-                pedido_bling_id=pedido_ref_conflitante,
+            pedido_correto = (
+                localizar_pedido_por_bling_id(
+                    db,
+                    tenant_id=pedido.tenant_id,
+                    pedido_bling_id=pedido_ref_conflitante,
+                )
             )
             if pedido_correto:
                 pedido = pedido_correto
@@ -998,11 +907,9 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
         resolution_note="NF vinculada posteriormente ao pedido correspondente.",
     )
 
-    itens = (
-        db.query(PedidoIntegradoItem)
-        .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
-        .all()
-    )
+    itens = db.query(PedidoIntegradoItem).filter(
+        PedidoIntegradoItem.pedido_integrado_id == pedido.id
+    ).all()
 
     # ============================
     # NF EMITIDA / AUTORIZADA
@@ -1010,18 +917,12 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     if _nf_webhook_autorizada(nf_dados, situacao_num):
         acao = processar_nf_autorizada(db=db, pedido=pedido, itens=itens, nf_id=nf_id)
         _gerar_provisao_simples_se_aplicavel(db=db, pedido=pedido, data=nf_dados)
-        status_evento = (
-            "ok" if acao in {"venda_confirmada", "venda_ja_confirmada"} else "error"
-        )
+        status_evento = "ok" if acao in {"venda_confirmada", "venda_ja_confirmada"} else "error"
         severidade_evento = "info" if status_evento == "ok" else "critical"
         if acao == "venda_confirmada":
-            mensagem_evento = (
-                "NF autorizada processada, pedido vinculado e estoque reconciliado."
-            )
+            mensagem_evento = "NF autorizada processada, pedido vinculado e estoque reconciliado."
         elif acao == "venda_ja_confirmada":
-            mensagem_evento = (
-                "NF autorizada processada; o pedido ja estava conciliado anteriormente."
-            )
+            mensagem_evento = "NF autorizada processada; o pedido ja estava conciliado anteriormente."
         elif acao == "nf_vinculada_outro_pedido":
             mensagem_evento = "NF autorizada recebida; o vinculo incorreto foi removido automaticamente e a baixa ficou bloqueada neste pedido."
         else:
@@ -1110,7 +1011,6 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
 # Itens de pedidos Bling cujo SKU não existe no cadastro local.
 # Serve como painel de monitoramento para identificar SKUs órfãos.
 # ============================================================
-
 
 @router.get("/nf/itens-sem-produto")
 def listar_itens_sem_produto(

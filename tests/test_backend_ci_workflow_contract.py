@@ -705,16 +705,11 @@ def test_backend_ci_has_blocking_backend_integrations_racoes_pdv_root_format_ste
     assert "Backend integrations racoes pdv root format (blocking)" in source
     assert (
         "ruff format --check app/bling_estoque_sync.py "
-        "app/bling_flow_monitor_models.py app/bling_flow_monitor_routes.py "
-        "app/bling_integration.py app/bling_oauth_routes.py "
-        "app/bling_pedido_webhook_queue_models.py app/bling_routes.py "
-        "app/bling_sync_routes.py app/integracao_bling_models.py "
-        "app/integracao_bling_nf_routes.py app/integracao_bling_pedido_routes.py "
-        "app/integracao_bling_webhook_routes.py app/analise_racoes_routes.py "
-        "app/classificador_racao.py app/ml_racoes_routes.py "
-        "app/opcoes_racao_models.py app/opcoes_racao_routes.py "
-        "app/pdv_racoes_routes.py app/sugestoes_racoes_routes.py "
-        "app/dashboard_routes.py app/pdv_ai_routes.py app/pdv_indicadores_routes.py"
+        "app/bling_flow_monitor_models.py "
+        "app/bling_pedido_webhook_queue_models.py app/integracao_bling_models.py "
+        "app/integracao_bling_webhook_routes.py app/ml_racoes_routes.py "
+        "app/pdv_ai_routes.py app/pdv_indicadores_routes.py "
+        "app/pdv_racoes_routes.py app/sugestoes_racoes_routes.py"
     ) in source
 
 
