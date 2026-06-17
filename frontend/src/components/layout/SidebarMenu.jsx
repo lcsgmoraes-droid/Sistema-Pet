@@ -1,9 +1,4 @@
-import {
-  FiChevronDown,
-  FiChevronRight,
-  FiLock,
-  FiUnlock,
-} from "react-icons/fi";
+import { FiChevronDown, FiChevronRight, FiLock, FiUnlock } from "react-icons/fi";
 import { Link } from "react-router-dom";
 import TooltipPremium from "../TooltipPremium";
 
@@ -34,15 +29,9 @@ function ModuloMenuIndicator({
         title="DEV: clicar para travar/destravar modulo"
       >
         {moduloAtivo(modulo) ? (
-          <FiUnlock
-            className={`${iconClassName} text-green-500`}
-            title={unlockedTitle}
-          />
+          <FiUnlock className={`${iconClassName} text-green-500`} title={unlockedTitle} />
         ) : (
-          <FiLock
-            className={`${iconClassName} text-amber-400`}
-            title={lockedTitle}
-          />
+          <FiLock className={`${iconClassName} text-amber-400`} title={lockedTitle} />
         )}
       </span>
     );
@@ -51,10 +40,7 @@ function ModuloMenuIndicator({
   if (!moduloAtivo(modulo)) {
     return (
       <TooltipPremium modulo={modulo} placement="right">
-        <FiLock
-          className={`${iconClassName} text-amber-400`}
-          aria-label="Módulo premium"
-        />
+        <FiLock className={`${iconClassName} text-amber-400`} aria-label="Módulo premium" />
       </TooltipPremium>
     );
   }
@@ -92,9 +78,7 @@ export default function SidebarMenu({
                   <div className="flex items-center gap-2 md:gap-3">
                     <item.icon className="text-base md:text-lg flex-shrink-0" />
                     {sidebarOpen && (
-                      <span className="font-medium text-xs md:text-sm">
-                        {item.label}
-                      </span>
+                      <span className="font-medium text-xs md:text-sm">{item.label}</span>
                     )}
                   </div>
                   {sidebarOpen &&
@@ -137,9 +121,7 @@ export default function SidebarMenu({
                           }`}
                         >
                           {sidebarOpen && <span>{subitem.label}</span>}
-                          {!sidebarOpen && (
-                            <span className="sr-only">{subitem.label}</span>
-                          )}
+                          {!sidebarOpen && <span className="sr-only">{subitem.label}</span>}
                           {subitem.modulo && sidebarOpen && (
                             <ModuloMenuIndicator
                               modulo={subitem.modulo}
@@ -169,9 +151,7 @@ export default function SidebarMenu({
                 <item.icon className="text-base md:text-lg flex-shrink-0" />
                 {sidebarOpen && (
                   <div className="flex items-center justify-between flex-1">
-                    <span className="font-medium text-xs md:text-sm">
-                      {item.label}
-                    </span>
+                    <span className="font-medium text-xs md:text-sm">{item.label}</span>
                     {item.modulo ? (
                       <ModuloMenuIndicator
                         modulo={item.modulo}

@@ -24,5 +24,8 @@ test("filtrarOpcoesAutocomplete filtra por texto digitado em label e meta", () =
     getOptionMeta: (opcao) => opcao.principio_ativo,
   });
 
-  assert.deepEqual(filtradas.map((opcao) => opcao.nome), ["Amoxicilina"]);
+  assert.deepEqual(
+    filtradas.map((opcao) => opcao.nome),
+    ["Amoxicilina"],
+  );
 });

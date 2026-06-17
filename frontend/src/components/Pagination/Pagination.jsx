@@ -1,10 +1,9 @@
-import React from 'react';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
-import './Pagination.css';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import "./Pagination.css";
 
 /**
  * Componente de paginação reutilizável
- * 
+ *
  * @param {number} page - Página atual
  * @param {number} pages - Total de páginas
  * @param {number} total - Total de registros
@@ -13,15 +12,7 @@ import './Pagination.css';
  * @param {Function} onNextPage - Callback próxima página
  * @param {Function} onPreviousPage - Callback página anterior
  */
-const Pagination = ({
-  page,
-  pages,
-  total,
-  pageSize,
-  onPageChange,
-  onNextPage,
-  onPreviousPage,
-}) => {
+const Pagination = ({ page, pages, total, pageSize, onPageChange, onNextPage, onPreviousPage }) => {
   if (pages <= 1) return null;
 
   const startItem = (page - 1) * pageSize + 1;
@@ -33,16 +24,12 @@ const Pagination = ({
     const range = [];
     const rangeWithDots = [];
 
-    for (
-      let i = Math.max(2, page - delta);
-      i <= Math.min(pages - 1, page + delta);
-      i++
-    ) {
+    for (let i = Math.max(2, page - delta); i <= Math.min(pages - 1, page + delta); i++) {
       range.push(i);
     }
 
     if (page - delta > 2) {
-      rangeWithDots.push(1, '...');
+      rangeWithDots.push(1, "...");
     } else {
       rangeWithDots.push(1);
     }
@@ -50,7 +37,7 @@ const Pagination = ({
     rangeWithDots.push(...range);
 
     if (page + delta < pages - 1) {
-      rangeWithDots.push('...', pages);
+      rangeWithDots.push("...", pages);
     } else if (pages > 1) {
       rangeWithDots.push(pages);
     }
@@ -63,7 +50,7 @@ const Pagination = ({
   return (
     <div className="pagination-container">
       <div className="pagination-info">
-        Mostrando <strong>{startItem}</strong> a <strong>{endItem}</strong> de{' '}
+        Mostrando <strong>{startItem}</strong> a <strong>{endItem}</strong> de{" "}
         <strong>{total}</strong> produtos
       </div>
 
@@ -90,7 +77,7 @@ const Pagination = ({
 
         {/* Números das páginas */}
         {pageNumbers.map((num, idx) => {
-          if (num === '...') {
+          if (num === "...") {
             return (
               <span key={`dots-${idx}`} className="pagination-dots">
                 ...
@@ -102,9 +89,7 @@ const Pagination = ({
             <button
               key={num}
               onClick={() => onPageChange(num)}
-              className={`pagination-btn ${
-                page === num ? 'pagination-btn-active' : ''
-              }`}
+              className={`pagination-btn ${page === num ? "pagination-btn-active" : ""}`}
             >
               {num}
             </button>

@@ -15,9 +15,7 @@ function ClientesNovoEnderecoModal({
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
           <h3 className="text-xl font-bold text-gray-900">
-            {enderecoAtual.index !== undefined
-              ? "Editar Endereco"
-              : "Adicionar Novo Endereco"}
+            {enderecoAtual.index !== undefined ? "Editar Endereco" : "Adicionar Novo Endereco"}
           </h3>
           <button
             onClick={fecharModalEndereco}
@@ -72,9 +70,7 @@ function ClientesNovoEnderecoModal({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                CEP *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CEP *</label>
               <div className="relative">
                 <input
                   type="text"
@@ -82,9 +78,7 @@ function ClientesNovoEnderecoModal({
                   onChange={(e) => {
                     const value = e.target.value.replace(/\D/g, "");
                     const formatted =
-                      value.length > 5
-                        ? `${value.slice(0, 5)}-${value.slice(5, 8)}`
-                        : value;
+                      value.length > 5 ? `${value.slice(0, 5)}-${value.slice(5, 8)}` : value;
                     setEnderecoAtual({ ...enderecoAtual, cep: formatted });
                   }}
                   onBlur={(e) => buscarCepModal(e.target.value)}
@@ -103,9 +97,7 @@ function ClientesNovoEnderecoModal({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Endereco *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Endereco *</label>
               <input
                 type="text"
                 value={enderecoAtual.endereco}
@@ -121,9 +113,7 @@ function ClientesNovoEnderecoModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Numero
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Numero</label>
               <input
                 type="text"
                 value={enderecoAtual.numero}
@@ -141,9 +131,7 @@ function ClientesNovoEnderecoModal({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Complemento
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Complemento</label>
               <input
                 type="text"
                 value={enderecoAtual.complemento}
@@ -159,9 +147,7 @@ function ClientesNovoEnderecoModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Bairro
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
               <input
                 type="text"
                 value={enderecoAtual.bairro}
@@ -179,9 +165,7 @@ function ClientesNovoEnderecoModal({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Cidade *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cidade *</label>
               <input
                 type="text"
                 value={enderecoAtual.cidade}
@@ -197,9 +181,7 @@ function ClientesNovoEnderecoModal({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Estado
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
               <input
                 type="text"
                 value={enderecoAtual.estado}

@@ -2,12 +2,7 @@ import CopyableValue from "./CopyableValue";
 
 export function getSaleReferenceNumber(sale) {
   const value =
-    sale?.numero_venda ??
-    sale?.venda_numero ??
-    sale?.numero ??
-    sale?.venda_id ??
-    sale?.id ??
-    "";
+    sale?.numero_venda ?? sale?.venda_numero ?? sale?.numero ?? sale?.venda_id ?? sale?.id ?? "";
 
   return value == null ? "" : String(value);
 }

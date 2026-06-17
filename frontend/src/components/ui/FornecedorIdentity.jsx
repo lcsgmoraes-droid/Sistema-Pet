@@ -119,13 +119,9 @@ export default function FornecedorIdentity({
     return (
       <span className="inline-flex min-w-0 items-center gap-1">
         {itemLabel ? (
-          <span className="shrink-0 text-xs font-medium text-slate-500">
-            {itemLabel}:
-          </span>
+          <span className="shrink-0 text-xs font-medium text-slate-500">{itemLabel}:</span>
         ) : null}
-        <span className={`min-w-0 truncate ${textClassName}`}>
-          {value}
-        </span>
+        <span className={`min-w-0 truncate ${textClassName}`}>{value}</span>
       </span>
     );
   };
@@ -134,12 +130,7 @@ export default function FornecedorIdentity({
     if (!value) return null;
     if (copyable) {
       return (
-        <CopyableCode
-          className={itemClassName}
-          label={itemLabel}
-          title={title}
-          value={value}
-        />
+        <CopyableCode className={itemClassName} label={itemLabel} title={title} value={value} />
       );
     }
 
@@ -169,12 +160,7 @@ export default function FornecedorIdentity({
           )
         : null}
       {showCode
-        ? renderCode(
-            fornecedorCode,
-            codeLabel,
-            "Copiar codigo do fornecedor",
-            codeClassName,
-          )
+        ? renderCode(fornecedorCode, codeLabel, "Copiar codigo do fornecedor", codeClassName)
         : null}
     </span>
   );

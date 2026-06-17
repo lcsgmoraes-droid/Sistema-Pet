@@ -21,13 +21,10 @@ const ClientesNovoPetsStep = ({ pets, editingCliente, navigate }) => {
         <div className="flex items-start gap-3">
           <PawPrint className="text-blue-600 flex-shrink-0 mt-1" size={24} />
           <div>
-            <h4 className="font-semibold text-blue-900 mb-2">
-              Gestao profissional de pets
-            </h4>
+            <h4 className="font-semibold text-blue-900 mb-2">Gestao profissional de pets</h4>
             <p className="text-sm text-blue-800 mb-3">
-              Agora os pets possuem um <strong>modulo dedicado</strong> com
-              funcionalidades completas: historico medico, vacinas, consultas,
-              servicos e muito mais.
+              Agora os pets possuem um <strong>modulo dedicado</strong> com funcionalidades
+              completas: historico medico, vacinas, consultas, servicos e muito mais.
             </p>
             <ul className="text-sm text-blue-800 space-y-1 mb-4">
               <li>Cadastro completo com campos veterinarios</li>
@@ -42,9 +39,7 @@ const ClientesNovoPetsStep = ({ pets, editingCliente, navigate }) => {
 
       {pets.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <h4 className="font-medium text-gray-900 mb-3">
-            Pets cadastrados ({pets.length})
-          </h4>
+          <h4 className="font-medium text-gray-900 mb-3">Pets cadastrados ({pets.length})</h4>
           <div className="space-y-2">
             {pets.map((pet) => (
               <div
@@ -89,9 +84,7 @@ const ClientesNovoPetsStep = ({ pets, editingCliente, navigate }) => {
           <PawPrint size={24} />
           <div className="text-left">
             <div>Gerenciar pets</div>
-            <div className="text-xs font-normal opacity-90">
-              Modulo completo de gestao
-            </div>
+            <div className="text-xs font-normal opacity-90">Modulo completo de gestao</div>
           </div>
         </button>
 
@@ -103,7 +96,7 @@ const ClientesNovoPetsStep = ({ pets, editingCliente, navigate }) => {
                 buildNovoPetPath({
                   tutorId: editingCliente.id,
                   tutorNome: editingCliente.nome,
-                })
+                }),
               );
             } else {
               alert("Salve o cliente primeiro para adicionar pets");
@@ -114,26 +107,23 @@ const ClientesNovoPetsStep = ({ pets, editingCliente, navigate }) => {
           <FiPlus size={24} />
           <div className="text-left">
             <div>Adicionar pet</div>
-            <div className="text-xs font-normal opacity-90">
-              Cadastro completo
-            </div>
+            <div className="text-xs font-normal opacity-90">Cadastro completo</div>
           </div>
         </button>
       </div>
 
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
         <p className="text-sm text-yellow-800">
-          <strong>Dica:</strong> Pets podem ser adicionados agora ou depois.
-          Todas as informacoes medicas e historico ficam no modulo dedicado de
-          pets.
+          <strong>Dica:</strong> Pets podem ser adicionados agora ou depois. Todas as informacoes
+          medicas e historico ficam no modulo dedicado de pets.
         </p>
       </div>
 
       {!editingCliente && (
         <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
           <p className="text-sm text-orange-800">
-            <strong>Atencao:</strong> Salve o cliente primeiro (etapa 6) para
-            poder gerenciar seus pets.
+            <strong>Atencao:</strong> Salve o cliente primeiro (etapa 6) para poder gerenciar seus
+            pets.
           </p>
         </div>
       )}

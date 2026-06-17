@@ -179,7 +179,9 @@ export default function AutocompleteSelect({
                   }`}
                 >
                   <div className="truncate text-sm font-medium">{getOptionLabel(option)}</div>
-                  {meta ? <div className="mt-0.5 truncate text-xs text-slate-500">{meta}</div> : null}
+                  {meta ? (
+                    <div className="mt-0.5 truncate text-xs text-slate-500">{meta}</div>
+                  ) : null}
                 </button>
               );
             })

@@ -3,7 +3,13 @@ import { ClienteSegmentos } from "../ClienteSegmentos";
 import ClienteTimeline from "../ClienteTimeline";
 import ExtratoCredito from "../ExtratoCredito";
 import WhatsAppHistorico from "../WhatsAppHistorico";
-import { FiCreditCard, FiDollarSign, FiMessageCircle, FiTrendingDown, FiTrendingUp } from "react-icons/fi";
+import {
+  FiCreditCard,
+  FiDollarSign,
+  FiMessageCircle,
+  FiTrendingDown,
+  FiTrendingUp,
+} from "react-icons/fi";
 import { formatBRL } from "../../utils/formatters";
 
 const ClientesNovoFinanceiroStep = ({
@@ -26,18 +32,14 @@ const ClientesNovoFinanceiroStep = ({
       <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-xl p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-green-800 mb-1">
-              Saldo de credito
-            </p>
+            <p className="text-sm font-medium text-green-800 mb-1">Saldo de credito</p>
             <p className="text-3xl font-bold text-green-600">
               R${" "}
               {editingCliente?.credito
                 ? parseFloat(editingCliente.credito).toFixed(2).replace(".", ",")
                 : "0,00"}
             </p>
-            <p className="text-xs text-green-700 mt-1">
-              Disponivel para uso em compras
-            </p>
+            <p className="text-xs text-green-700 mt-1">Disponivel para uso em compras</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -61,10 +63,7 @@ const ClientesNovoFinanceiroStep = ({
       </div>
 
       {editingCliente?.id && (
-        <ExtratoCredito
-          clienteId={editingCliente.id}
-          refreshKey={refreshKeyCredito}
-        />
+        <ExtratoCredito clienteId={editingCliente.id} refreshKey={refreshKeyCredito} />
       )}
 
       {editingCliente && saldoCampanhas && (
@@ -93,9 +92,7 @@ const ClientesNovoFinanceiroStep = ({
                     : "🥉"}
           </span>
           <div className="flex-1">
-            <p className="text-xs text-gray-500 font-medium">
-              Nivel de fidelidade
-            </p>
+            <p className="text-xs text-gray-500 font-medium">Nivel de fidelidade</p>
             <p
               className={`text-lg font-bold ${
                 saldoCampanhas.rank_level === "platinum"
@@ -127,9 +124,7 @@ const ClientesNovoFinanceiroStep = ({
               </p>
             )}
             {saldoCampanhas.total_carimbos > 0 && (
-              <p className="text-sm text-blue-700">
-                {saldoCampanhas.total_carimbos} carimbo(s)
-              </p>
+              <p className="text-sm text-blue-700">{saldoCampanhas.total_carimbos} carimbo(s)</p>
             )}
             {saldoCampanhas.cupons_ativos?.length > 0 && (
               <p className="text-sm text-orange-700">
@@ -151,9 +146,7 @@ const ClientesNovoFinanceiroStep = ({
             {loadingResumo ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
-                <p className="mt-2 text-gray-600 text-sm">
-                  Carregando resumo...
-                </p>
+                <p className="mt-2 text-gray-600 text-sm">Carregando resumo...</p>
               </div>
             ) : (
               <>
@@ -162,10 +155,7 @@ const ClientesNovoFinanceiroStep = ({
                     <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                       <p className="text-xs text-gray-600 mb-1">Total comprado</p>
                       <p className="text-2xl font-bold text-blue-600">
-                        R${" "}
-                        {resumoFinanceiro.total_vendas
-                          ?.toFixed(2)
-                          .replace(".", ",") || "0,00"}
+                        R$ {resumoFinanceiro.total_vendas?.toFixed(2).replace(".", ",") || "0,00"}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
                         {resumoFinanceiro.quantidade_vendas || 0} vendas
@@ -192,16 +182,12 @@ const ClientesNovoFinanceiroStep = ({
                         }`}
                       >
                         R${" "}
-                        {resumoFinanceiro.total_em_aberto
-                          ?.toFixed(2)
-                          .replace(".", ",") || "0,00"}
+                        {resumoFinanceiro.total_em_aberto?.toFixed(2).replace(".", ",") || "0,00"}
                       </p>
                       {resumoFinanceiro.tem_debitos_vencidos && (
                         <p className="text-xs text-red-600 font-semibold mt-1">
                           R${" "}
-                          {resumoFinanceiro.total_vencido
-                            ?.toFixed(2)
-                            .replace(".", ",") || "0,00"}{" "}
+                          {resumoFinanceiro.total_vencido?.toFixed(2).replace(".", ",") || "0,00"}{" "}
                           vencido
                         </p>
                       )}
@@ -210,10 +196,7 @@ const ClientesNovoFinanceiroStep = ({
                     <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
                       <p className="text-xs text-gray-600 mb-1">Ticket medio</p>
                       <p className="text-2xl font-bold text-purple-600">
-                        R${" "}
-                        {resumoFinanceiro.ticket_medio
-                          ?.toFixed(2)
-                          .replace(".", ",") || "0,00"}
+                        R$ {resumoFinanceiro.ticket_medio?.toFixed(2).replace(".", ",") || "0,00"}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">por compra</p>
                     </div>
@@ -224,38 +207,31 @@ const ClientesNovoFinanceiroStep = ({
                         <>
                           <p className="text-2xl font-bold text-gray-700">
                             R${" "}
-                            {resumoFinanceiro.ultima_compra.valor
-                              ?.toFixed(2)
-                              .replace(".", ",") || "0,00"}
+                            {resumoFinanceiro.ultima_compra.valor?.toFixed(2).replace(".", ",") ||
+                              "0,00"}
                           </p>
                           <p className="text-xs text-gray-500 mt-1">
-                            {new Date(
-                              resumoFinanceiro.ultima_compra.data,
-                            ).toLocaleDateString("pt-BR")}{" "}
+                            {new Date(resumoFinanceiro.ultima_compra.data).toLocaleDateString(
+                              "pt-BR",
+                            )}{" "}
                             (ha {resumoFinanceiro.ultima_compra.dias_atras} dias)
                           </p>
                         </>
                       ) : (
-                        <p className="text-sm text-gray-500 mt-2">
-                          Nenhuma compra
-                        </p>
+                        <p className="text-sm text-gray-500 mt-2">Nenhuma compra</p>
                       )}
                     </div>
                   </div>
                 ) : (
                   <div className="text-center py-6 text-gray-500">
                     <p className="mb-2">Nenhuma informacao financeira</p>
-                    <p className="text-sm">
-                      Dados aparecerao apos a primeira venda
-                    </p>
+                    <p className="text-sm">Dados aparecerao apos a primeira venda</p>
                   </div>
                 )}
 
                 <button
                   type="button"
-                  onClick={() =>
-                    navigate(`/clientes/${editingCliente.id}/financeiro`)
-                  }
+                  onClick={() => navigate(`/clientes/${editingCliente.id}/financeiro`)}
                   className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg transition-all flex items-center justify-center gap-2 font-semibold shadow-md"
                 >
                   <FiCreditCard />
@@ -280,8 +256,8 @@ const ClientesNovoFinanceiroStep = ({
 
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
         <p className="text-sm text-yellow-800">
-          <strong>Dica:</strong> O credito pode ser gerado automaticamente nas
-          devolucoes de produtos e utilizado como forma de pagamento no PDV.
+          <strong>Dica:</strong> O credito pode ser gerado automaticamente nas devolucoes de
+          produtos e utilizado como forma de pagamento no PDV.
         </p>
       </div>
 
@@ -322,19 +298,9 @@ const ClientesNovoFinanceiroStep = ({
       {editingCliente && (
         <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
           <ClienteTimeline
-            clienteId={
-              editingCliente.tipo_cadastro === "cliente" ? editingCliente.id : null
-            }
-            fornecedorId={
-              editingCliente.tipo_cadastro === "fornecedor"
-                ? editingCliente.id
-                : null
-            }
-            tipo={
-              editingCliente.tipo_cadastro === "fornecedor"
-                ? "fornecedor"
-                : "cliente"
-            }
+            clienteId={editingCliente.tipo_cadastro === "cliente" ? editingCliente.id : null}
+            fornecedorId={editingCliente.tipo_cadastro === "fornecedor" ? editingCliente.id : null}
+            tipo={editingCliente.tipo_cadastro === "fornecedor" ? "fornecedor" : "cliente"}
             limit={5}
             showHeader={true}
             onVerMais={() => navigate(`/clientes/${editingCliente.id}/timeline`)}

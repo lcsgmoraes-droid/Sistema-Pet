@@ -1,27 +1,24 @@
 /**
  * Componente para cadastro inline de variações de produto
  * Sprint 2: Produtos com Variação
- * 
+ *
  * Uso:
- * <VariacoesGrid 
- *   variacoes={variacoes} 
+ * <VariacoesGrid
+ *   variacoes={variacoes}
  *   onChange={setVariacoes}
  *   produtoBase={dadosProduto}
  * />
  */
-import { useState } from 'react';
-import { Trash2, Plus } from 'lucide-react';
-import './VariacoesGrid.css';
+import { Trash2, Plus } from "lucide-react";
+import "./VariacoesGrid.css";
 
 export default function VariacoesGrid({ variacoes = [], onChange, produtoBase }) {
-  const [editando, setEditando] = useState(null);
-
   const adicionarVariacao = () => {
     const novaVariacao = {
       id: `temp-${Date.now()}`, // ID temporário até salvar no backend
-      nome_complementar: '',
+      nome_complementar: "",
       sku: `${produtoBase.codigo}-VAR${variacoes.length + 1}`,
-      codigo_barras: '',
+      codigo_barras: "",
       preco_custo: produtoBase.preco_custo || 0,
       preco_venda: produtoBase.preco_venda || 0,
       estoque_inicial: 0,
@@ -40,7 +37,7 @@ export default function VariacoesGrid({ variacoes = [], onChange, produtoBase })
     const novasVariacoes = [...variacoes];
     novasVariacoes[index] = {
       ...novasVariacoes[index],
-      [campo]: valor
+      [campo]: valor,
     };
     onChange(novasVariacoes);
   };
@@ -49,11 +46,7 @@ export default function VariacoesGrid({ variacoes = [], onChange, produtoBase })
     <div className="variacoes-grid">
       <div className="variacoes-header">
         <h3>Variações do Produto</h3>
-        <button
-          type="button"
-          onClick={adicionarVariacao}
-          className="btn btn-sm btn-primary"
-        >
+        <button type="button" onClick={adicionarVariacao} className="btn btn-sm btn-primary">
           <Plus size={16} />
           Adicionar Variação
         </button>
@@ -88,7 +81,9 @@ export default function VariacoesGrid({ variacoes = [], onChange, produtoBase })
                     <input
                       type="text"
                       value={variacao.nome_complementar}
-                      onChange={(e) => atualizarVariacao(index, 'nome_complementar', e.target.value)}
+                      onChange={(e) =>
+                        atualizarVariacao(index, "nome_complementar", e.target.value)
+                      }
                       placeholder="Ex: 1kg, 3kg, 15kg"
                       className="form-input"
                       required
@@ -98,7 +93,7 @@ export default function VariacoesGrid({ variacoes = [], onChange, produtoBase })
                     <input
                       type="text"
                       value={variacao.sku}
-                      onChange={(e) => atualizarVariacao(index, 'sku', e.target.value)}
+                      onChange={(e) => atualizarVariacao(index, "sku", e.target.value)}
                       placeholder="SKU único"
                       className="form-input"
                       required
@@ -108,7 +103,7 @@ export default function VariacoesGrid({ variacoes = [], onChange, produtoBase })
                     <input
                       type="text"
                       value={variacao.codigo_barras}
-                      onChange={(e) => atualizarVariacao(index, 'codigo_barras', e.target.value)}
+                      onChange={(e) => atualizarVariacao(index, "codigo_barras", e.target.value)}
                       placeholder="EAN13"
                       className="form-input"
                       maxLength="13"
@@ -118,7 +113,9 @@ export default function VariacoesGrid({ variacoes = [], onChange, produtoBase })
                     <input
                       type="number"
                       value={variacao.preco_custo}
-                      onChange={(e) => atualizarVariacao(index, 'preco_custo', parseFloat(e.target.value) || 0)}
+                      onChange={(e) =>
+                        atualizarVariacao(index, "preco_custo", parseFloat(e.target.value) || 0)
+                      }
                       step="0.01"
                       min="0"
                       className="form-input"
@@ -128,7 +125,9 @@ export default function VariacoesGrid({ variacoes = [], onChange, produtoBase })
                     <input
                       type="number"
                       value={variacao.preco_venda}
-                      onChange={(e) => atualizarVariacao(index, 'preco_venda', parseFloat(e.target.value) || 0)}
+                      onChange={(e) =>
+                        atualizarVariacao(index, "preco_venda", parseFloat(e.target.value) || 0)
+                      }
                       step="0.01"
                       min="0"
                       className="form-input"
@@ -139,7 +138,9 @@ export default function VariacoesGrid({ variacoes = [], onChange, produtoBase })
                     <input
                       type="number"
                       value={variacao.estoque_inicial}
-                      onChange={(e) => atualizarVariacao(index, 'estoque_inicial', parseInt(e.target.value) || 0)}
+                      onChange={(e) =>
+                        atualizarVariacao(index, "estoque_inicial", parseInt(e.target.value) || 0)
+                      }
                       min="0"
                       className="form-input"
                     />
@@ -148,7 +149,9 @@ export default function VariacoesGrid({ variacoes = [], onChange, produtoBase })
                     <input
                       type="number"
                       value={variacao.estoque_minimo}
-                      onChange={(e) => atualizarVariacao(index, 'estoque_minimo', parseInt(e.target.value) || 0)}
+                      onChange={(e) =>
+                        atualizarVariacao(index, "estoque_minimo", parseInt(e.target.value) || 0)
+                      }
                       min="0"
                       className="form-input"
                     />
@@ -176,9 +179,9 @@ export default function VariacoesGrid({ variacoes = [], onChange, produtoBase })
             <strong>{variacoes.length}</strong> variação(ões) cadastrada(s)
           </p>
           <p className="text-sm text-gray-600">
-            Estoque total: <strong>
-              {variacoes.reduce((sum, v) => sum + (v.estoque_inicial || 0), 0)}
-            </strong> unidades
+            Estoque total:{" "}
+            <strong>{variacoes.reduce((sum, v) => sum + (v.estoque_inicial || 0), 0)}</strong>{" "}
+            unidades
           </p>
         </div>
       )}

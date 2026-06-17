@@ -1,18 +1,10 @@
-const ClientesNovoEnderecoStep = ({
-  formData,
-  setFormData,
-  buscarCep,
-  loadingCep,
-  cepError,
-}) => {
+const ClientesNovoEnderecoStep = ({ formData, setFormData, buscarCep, loadingCep, cepError }) => {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Endereco</h3>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          CEP
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">CEP</label>
         <div className="flex gap-2">
           <input
             type="text"
@@ -44,9 +36,7 @@ const ClientesNovoEnderecoStep = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Endereco
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Endereco</label>
         <input
           type="text"
           value={formData.endereco}
@@ -58,9 +48,7 @@ const ClientesNovoEnderecoStep = ({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Numero
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Numero</label>
           <input
             type="text"
             value={formData.numero}
@@ -71,9 +59,7 @@ const ClientesNovoEnderecoStep = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Complemento
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Complemento</label>
           <input
             type="text"
             value={formData.complemento}
@@ -90,9 +76,7 @@ const ClientesNovoEnderecoStep = ({
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Bairro
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Bairro</label>
         <input
           type="text"
           value={formData.bairro}
@@ -103,9 +87,7 @@ const ClientesNovoEnderecoStep = ({
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Cidade
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
           <input
             type="text"
             value={formData.cidade}
@@ -115,9 +97,7 @@ const ClientesNovoEnderecoStep = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Estado
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
           <input
             type="text"
             value={formData.estado}

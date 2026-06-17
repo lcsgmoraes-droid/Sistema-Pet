@@ -55,11 +55,7 @@ export default function ProductIdentity({
   return (
     <span className={`inline-flex min-w-0 flex-wrap items-center gap-1.5 ${className}`}>
       {productName ? (
-        <CopyableValue
-          title="Copiar produto"
-          value={productName}
-          valueClassName={nameClassName}
-        />
+        <CopyableValue title="Copiar produto" value={productName} valueClassName={nameClassName} />
       ) : null}
       <CopyableCode className={codeClassName} label={codeLabel} value={productCode} />
       {children}

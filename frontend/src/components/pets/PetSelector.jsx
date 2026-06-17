@@ -73,9 +73,7 @@ export default function PetSelector({
     const petTutorId = petCriadoLocal.cliente_id || petCriadoLocal.tutor_id || tutorId;
     if (String(petTutorId) !== String(tutorId)) return listaPetsOriginal;
 
-    const jaExiste = listaPetsOriginal.some(
-      (pet) => String(pet.id) === String(petCriadoLocal.id),
-    );
+    const jaExiste = listaPetsOriginal.some((pet) => String(pet.id) === String(petCriadoLocal.id));
     if (jaExiste) return listaPetsOriginal;
 
     return [petCriadoLocal, ...listaPetsOriginal];
@@ -90,9 +88,7 @@ export default function PetSelector({
 
   function setExpandedValue(valueOrUpdater) {
     const nextValue =
-      typeof valueOrUpdater === "function"
-        ? valueOrUpdater(expanded)
-        : valueOrUpdater;
+      typeof valueOrUpdater === "function" ? valueOrUpdater(expanded) : valueOrUpdater;
 
     if (isExpandedControlled) {
       onExpandedChange?.(nextValue);
@@ -144,9 +140,7 @@ export default function PetSelector({
             disabled={!canSelectPet}
             className="min-w-0 flex-1 text-left text-sm text-slate-900 disabled:text-slate-400"
           >
-            <span className="block truncate font-semibold">
-              {resolvePetLabel()}
-            </span>
+            <span className="block truncate font-semibold">{resolvePetLabel()}</span>
             {petSelecionado ? (
               <span className="block truncate text-xs font-normal text-slate-500">
                 {describePet(petSelecionado)}
@@ -201,17 +195,13 @@ export default function PetSelector({
                       }`}
                     >
                       <span className="block font-semibold">{pet.nome}</span>
-                      <span className="block text-xs text-slate-500">
-                        {describePet(pet)}
-                      </span>
+                      <span className="block text-xs text-slate-500">{describePet(pet)}</span>
                     </button>
                   );
                 })}
               </div>
             ) : (
-              <p className="px-2 py-3 text-xs text-amber-600">
-                {emptyStateLabel}
-              </p>
+              <p className="px-2 py-3 text-xs text-amber-600">{emptyStateLabel}</p>
             )}
           </div>
         ) : null}
