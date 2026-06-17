@@ -56,7 +56,9 @@ class MaoObraEtapa:
 
 @dataclass(frozen=True)
 class ComissaoRegra:
-    modelo: Literal["nenhum", "percentual_valor", "valor_fixo", "percentual_margem"] = "nenhum"
+    modelo: Literal["nenhum", "percentual_valor", "valor_fixo", "percentual_margem"] = (
+        "nenhum"
+    )
     valor_base: Decimal | int | float | str = Decimal("0")
     percentual: Decimal | int | float | str = Decimal("0")
     valor_fixo: Decimal | int | float | str = Decimal("0")
@@ -93,7 +95,9 @@ class CustoSnapshot:
 def calcular_custo_insumos(insumos: Iterable[InsumoCusto]) -> Decimal:
     total = Decimal("0")
     for item in insumos:
-        quantidade = _decimal(item.quantidade_usada) + _decimal(item.quantidade_desperdicio)
+        quantidade = _decimal(item.quantidade_usada) + _decimal(
+            item.quantidade_desperdicio
+        )
         total += quantidade * _decimal(item.custo_unitario_snapshot)
     return _moeda(total)
 
@@ -123,7 +127,9 @@ def calcular_custo_energia(usos: Iterable[EquipamentoUso]) -> Decimal:
         if uso.kwh_real is not None:
             kwh = _decimal(uso.kwh_real)
         else:
-            kwh = (_decimal(uso.potencia_watts) / Decimal("1000")) * (minutos / Decimal("60"))
+            kwh = (_decimal(uso.potencia_watts) / Decimal("1000")) * (
+                minutos / Decimal("60")
+            )
         manutencao = _decimal(uso.custo_manutencao_hora) * (minutos / Decimal("60"))
         total += (kwh * _decimal(uso.custo_kwh)) + manutencao
     return _moeda(total)
@@ -149,7 +155,11 @@ def calcular_custo_mensal_colaborador(
     gera_decimo_terceiro=True,
 ) -> Decimal:
     salario = _decimal(salario_base)
-    encargos = salario * (_decimal(inss_patronal_percentual) + _decimal(fgts_percentual)) / Decimal("100")
+    encargos = (
+        salario
+        * (_decimal(inss_patronal_percentual) + _decimal(fgts_percentual))
+        / Decimal("100")
+    )
     provisoes = Decimal("0")
     if gera_ferias:
         provisoes += salario / Decimal("12")
@@ -162,9 +172,13 @@ def calcular_custo_mensal_colaborador(
 def calcular_custo_comissao(regra: ComissaoRegra) -> Decimal:
     modelo = regra.modelo or "nenhum"
     if modelo == "percentual_valor":
-        return _moeda(_decimal(regra.valor_base) * _decimal(regra.percentual) / Decimal("100"))
+        return _moeda(
+            _decimal(regra.valor_base) * _decimal(regra.percentual) / Decimal("100")
+        )
     if modelo == "percentual_margem":
-        return _moeda(_decimal(regra.valor_base) * _decimal(regra.percentual) / Decimal("100"))
+        return _moeda(
+            _decimal(regra.valor_base) * _decimal(regra.percentual) / Decimal("100")
+        )
     if modelo == "valor_fixo":
         return _moeda(_decimal(regra.valor_fixo))
     return Decimal("0.00")
@@ -206,7 +220,11 @@ def calcular_snapshot_custo(
     }
     custo_total = _moeda(sum(custos.values(), Decimal("0")))
     margem_valor = _moeda(valor - custo_total)
-    margem_percentual = Decimal("0.0000") if valor == 0 else _percentual((margem_valor / valor) * Decimal("100"))
+    margem_percentual = (
+        Decimal("0.0000")
+        if valor == 0
+        else _percentual((margem_valor / valor) * Decimal("100"))
+    )
 
     return CustoSnapshot(
         valor_cobrado=valor,
@@ -230,5 +248,7 @@ def validar_transicao_status(
     if atual == novo:
         return novo
     if atual in STATUS_FINAIS and not permitir_reabrir_finalizado:
-        raise ValueError("Atendimento finalizado nao pode ser reaberto sem permissao de gestor.")
+        raise ValueError(
+            "Atendimento finalizado nao pode ser reaberto sem permissao de gestor."
+        )
     return novo

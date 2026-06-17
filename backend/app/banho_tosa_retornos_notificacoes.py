@@ -25,9 +25,15 @@ def enfileirar_notificacoes_retorno(
     canal: str = "app",
     template_id: int | None = None,
 ) -> dict:
-    template = obter_template_retorno(db, tenant_id, template_id, ativo=True) if template_id else None
+    template = (
+        obter_template_retorno(db, tenant_id, template_id, ativo=True)
+        if template_id
+        else None
+    )
     canal = template.canal if template else normalizar_canal(canal)
-    sugestoes = listar_sugestoes_retorno(db, tenant_id, dias=max(dias_antecedencia, 0), limit=limit)["itens"]
+    sugestoes = listar_sugestoes_retorno(
+        db, tenant_id, dias=max(dias_antecedencia, 0), limit=limit
+    )["itens"]
     emails = _emails_clientes(db, tenant_id, sugestoes) if canal == "email" else {}
     tipos_set = set(tipos or [])
     resultado = {"processados": 0, "enfileirados": 0, "ignorados": 0, "sem_destino": 0}
@@ -42,52 +48,73 @@ def enfileirar_notificacoes_retorno(
             resultado["sem_destino"] += 1
             continue
         keys = _idempotency_keys(tenant_id, item, canal, template_id)
-        if db.query(NotificationQueue.id).filter(NotificationQueue.idempotency_key.in_(keys)).first():
+        if (
+            db.query(NotificationQueue.id)
+            .filter(NotificationQueue.idempotency_key.in_(keys))
+            .first()
+        ):
             resultado["ignorados"] += 1
             continue
         assunto, mensagem = renderizar_template_retorno(template, item)
-        db.add(NotificationQueue(
-            tenant_id=tenant_id,
-            idempotency_key=keys[0],
-            customer_id=item["cliente_id"],
-            channel=_canal_fila(canal),
-            subject=assunto,
-            body=mensagem,
-            email_address=email,
-            scheduled_at=agora,
-        ))
+        db.add(
+            NotificationQueue(
+                tenant_id=tenant_id,
+                idempotency_key=keys[0],
+                customer_id=item["cliente_id"],
+                channel=_canal_fila(canal),
+                subject=assunto,
+                body=mensagem,
+                email_address=email,
+                scheduled_at=agora,
+            )
+        )
         resultado["enfileirados"] += 1
 
     db.commit()
     return resultado
 
 
-def _deve_processar(item: dict, tipos_set: set[str], dias_antecedencia: int, template) -> bool:
+def _deve_processar(
+    item: dict, tipos_set: set[str], dias_antecedencia: int, template
+) -> bool:
     if tipos_set and item["tipo"] not in tipos_set:
         return False
     if not template_aplicavel(template, item["tipo"]):
         return False
-    if item.get("dias_para_acao") is not None and item["dias_para_acao"] > dias_antecedencia:
+    if (
+        item.get("dias_para_acao") is not None
+        and item["dias_para_acao"] > dias_antecedencia
+    ):
         return False
     return True
 
 
 def _canal_fila(canal: str):
-    return NotificationChannelEnum.email if canal == "email" else NotificationChannelEnum.push
+    return (
+        NotificationChannelEnum.email
+        if canal == "email"
+        else NotificationChannelEnum.push
+    )
 
 
 def _emails_clientes(db: Session, tenant_id, sugestoes: list[dict]) -> dict[int, str]:
     ids = {item["cliente_id"] for item in sugestoes if item.get("cliente_id")}
     if not ids:
         return {}
-    rows = db.query(Cliente.id, Cliente.email).filter(
-        Cliente.tenant_id == tenant_id,
-        Cliente.id.in_(ids),
-    ).all()
+    rows = (
+        db.query(Cliente.id, Cliente.email)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.id.in_(ids),
+        )
+        .all()
+    )
     return {cliente_id: email for cliente_id, email in rows if email}
 
 
-def _idempotency_keys(tenant_id, item: dict, canal: str, template_id: int | None) -> list[str]:
+def _idempotency_keys(
+    tenant_id, item: dict, canal: str, template_id: int | None
+) -> list[str]:
     ref = item.get("referencia_id") or item["id"]
     data = item.get("data_referencia")
     base = f"bt-retorno:{tenant_id}:{item['tipo']}:{ref}:{data}"

@@ -16,13 +16,17 @@ from app.banho_tosa_api.dashboard_routes import router as dashboard_router
 from app.banho_tosa_api.defaults_routes import router as defaults_router
 from app.banho_tosa_api.insumos_routes import router as insumos_router
 from app.banho_tosa_api.ocorrencias_routes import router as ocorrencias_router
-from app.banho_tosa_api.pacotes_recorrencias_routes import router as pacotes_recorrencias_router
+from app.banho_tosa_api.pacotes_recorrencias_routes import (
+    router as pacotes_recorrencias_router,
+)
 from app.banho_tosa_api.pacotes_routes import router as pacotes_router
 from app.banho_tosa_api.parametros_routes import router as parametros_router
 from app.banho_tosa_api.recursos_routes import router as recursos_router
 from app.banho_tosa_api.relatorios_routes import router as relatorios_router
 from app.banho_tosa_api.retornos_routes import router as retornos_router
-from app.banho_tosa_api.retornos_templates_routes import router as retornos_templates_router
+from app.banho_tosa_api.retornos_templates_routes import (
+    router as retornos_templates_router,
+)
 from app.banho_tosa_api.servicos_routes import router as servicos_router
 from app.banho_tosa_api.taxi_routes import router as taxi_router
 from app.banho_tosa_api.vendas_routes import router as vendas_router

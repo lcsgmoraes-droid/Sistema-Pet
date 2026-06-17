@@ -21,13 +21,19 @@ def minutos_etapa(etapa) -> int:
     return 0
 
 
-def montar_detalhes_snapshot(atendimento, parametro, mao_obra_detalhes, taxi_detalhes) -> dict:
+def montar_detalhes_snapshot(
+    atendimento, parametro, mao_obra_detalhes, taxi_detalhes
+) -> dict:
     return {
         "origem": "operacional",
         "atendimento_status": atendimento.status,
         "porte_usado": getattr(parametro, "porte", None) or atendimento.porte_snapshot,
         "etapas": [
-            {"tipo": etapa.tipo, "minutos": minutos_etapa(etapa), "recurso_id": etapa.recurso_id}
+            {
+                "tipo": etapa.tipo,
+                "minutos": minutos_etapa(etapa),
+                "recurso_id": etapa.recurso_id,
+            }
             for etapa in atendimento.etapas or []
         ],
         "mao_obra": mao_obra_detalhes,

@@ -5,7 +5,13 @@ from app.banho_tosa_custos_helpers import dec
 
 
 def grupo_margem():
-    return {"chave": "", "nome": "", "atendimentos": 0, "receita": Decimal("0"), "custo_total": Decimal("0")}
+    return {
+        "chave": "",
+        "nome": "",
+        "atendimentos": 0,
+        "receita": Decimal("0"),
+        "custo_total": Decimal("0"),
+    }
 
 
 def grupo_ocupacao(recurso, minutos_base: int):
@@ -20,7 +26,12 @@ def grupo_ocupacao(recurso, minutos_base: int):
 
 
 def serializar_ocupacao(item: dict) -> dict:
-    return {**item, "ocupacao_percentual": percentual(dec(item["minutos_ocupados"]), dec(item["minutos_disponiveis"]))}
+    return {
+        **item,
+        "ocupacao_percentual": percentual(
+            dec(item["minutos_ocupados"]), dec(item["minutos_disponiveis"])
+        ),
+    }
 
 
 def serializar_produtividade(item: dict) -> dict:
@@ -36,7 +47,9 @@ def total_servicos(servicos) -> Decimal:
 
 
 def valor_servico(servico) -> Decimal:
-    return (dec(servico.quantidade) * dec(servico.valor_unitario)) - dec(servico.desconto)
+    return (dec(servico.quantidade) * dec(servico.valor_unitario)) - dec(
+        servico.desconto
+    )
 
 
 def proporcao_servico(servico, total: Decimal, quantidade_servicos: int) -> Decimal:
@@ -47,7 +60,15 @@ def proporcao_servico(servico, total: Decimal, quantidade_servicos: int) -> Deci
 
 def minutos_agendamento(agendamento) -> int:
     if agendamento.data_hora_inicio and agendamento.data_hora_fim_prevista:
-        return max(0, int((agendamento.data_hora_fim_prevista - agendamento.data_hora_inicio).total_seconds() // 60))
+        return max(
+            0,
+            int(
+                (
+                    agendamento.data_hora_fim_prevista - agendamento.data_hora_inicio
+                ).total_seconds()
+                // 60
+            ),
+        )
     return 60
 
 
@@ -83,7 +104,9 @@ def montar_alertas(atendimentos, snapshots, agendamentos) -> list[str]:
     sem_snapshot = len([item for item in atendimentos if item.id not in snapshots])
     sem_recurso = len([item for item in agendamentos if not item.recurso_id])
     if sem_snapshot:
-        alertas.append(f"{sem_snapshot} atendimento(s) sem snapshot de custo recalculado.")
+        alertas.append(
+            f"{sem_snapshot} atendimento(s) sem snapshot de custo recalculado."
+        )
     if sem_recurso:
         alertas.append(f"{sem_recurso} agendamento(s) sem recurso/box definido.")
     return alertas
