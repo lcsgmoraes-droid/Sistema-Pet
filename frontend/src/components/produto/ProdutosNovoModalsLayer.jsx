@@ -1,6 +1,6 @@
-import ProdutosNovoEntradaModal from './ProdutosNovoEntradaModal';
-import ProdutosNovoFornecedorModal from './ProdutosNovoFornecedorModal';
-import ProdutosNovoLoteModal from './ProdutosNovoLoteModal';
+import ProdutosNovoEntradaModal from "./ProdutosNovoEntradaModal";
+import ProdutosNovoFornecedorModal from "./ProdutosNovoFornecedorModal";
+import ProdutosNovoLoteModal from "./ProdutosNovoLoteModal";
 
 export default function ProdutosNovoModalsLayer({
   entradaModalProps,

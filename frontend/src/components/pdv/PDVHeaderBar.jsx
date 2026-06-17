@@ -118,9 +118,7 @@ export default function PDVHeaderBar({
               icon={Star}
               intent="warning"
               size="lg"
-              badge={
-                opportunitiesCount > 0 ? Math.min(opportunitiesCount, 6) : null
-              }
+              badge={opportunitiesCount > 0 ? Math.min(opportunitiesCount, 6) : null}
               title="Ver oportunidades de venda"
             />
           )}

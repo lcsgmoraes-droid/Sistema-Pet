@@ -1,4 +1,3 @@
-import React from "react";
 import ProdutosFiltrosPanel from "./ProdutosFiltrosPanel";
 import ProdutosHeaderActions from "./ProdutosHeaderActions";
 import ProdutosTabelaSection from "./ProdutosTabelaSection";

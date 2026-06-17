@@ -10,10 +10,7 @@ import PDVObservacoesCard from "./PDVObservacoesCard";
 import PDVProdutosCard from "./PDVProdutosCard";
 import PDVResumoFinanceiroCard from "./PDVResumoFinanceiroCard";
 import api from "../../api";
-import {
-  buildValidadePdvQuery,
-  extractProdutoIdsCarrinho,
-} from "./pdvValidadeAlertUtils";
+import { buildValidadePdvQuery, extractProdutoIdsCarrinho } from "./pdvValidadeAlertUtils";
 
 export default function PDVMainArea(props) {
   const {
@@ -121,9 +118,7 @@ export default function PDVMainArea(props) {
   } = props;
 
   const [validadeAlertas, setValidadeAlertas] = useState([]);
-  const validadeQuery = buildValidadePdvQuery(
-    extractProdutoIdsCarrinho(vendaAtual.itens)
-  );
+  const validadeQuery = buildValidadePdvQuery(extractProdutoIdsCarrinho(vendaAtual.itens));
 
   useEffect(() => {
     let cancelado = false;

@@ -1,25 +1,21 @@
 export default function PromocaoFields({
-  title = 'Promocao',
+  title = "Promocao",
   description,
   priceControl,
-  startLabel = 'Inicio',
-  endLabel = 'Fim',
+  startLabel = "Inicio",
+  endLabel = "Fim",
   startValue,
   endValue,
   onStartChange,
   onEndChange,
 }) {
-  const normalizarDateTimeLocal = (value) => (
-    value ? String(value).slice(0, 16) : ''
-  );
+  const normalizarDateTimeLocal = (value) => (value ? String(value).slice(0, 16) : "");
 
   return (
     <div className="rounded-lg border border-amber-100 bg-amber-50/40 p-4">
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-amber-900">{title}</h3>
-        {description && (
-          <p className="mt-1 text-xs text-amber-700">{description}</p>
-        )}
+        {description && <p className="mt-1 text-xs text-amber-700">{description}</p>}
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

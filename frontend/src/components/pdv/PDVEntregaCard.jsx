@@ -29,9 +29,7 @@ export default function PDVEntregaCard({
             disabled={modoVisualizacao}
             className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed"
           />
-          <span className="text-sm font-medium text-gray-700">
-            Tem entrega?
-          </span>
+          <span className="text-sm font-medium text-gray-700">Tem entrega?</span>
         </label>
       </div>
 
@@ -45,9 +43,7 @@ export default function PDVEntregaCard({
             {cliente && (
               <div className="mb-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium text-blue-900">
-                    Endereços cadastrados:
-                  </p>
+                  <p className="text-sm font-medium text-blue-900">Endereços cadastrados:</p>
                   <button
                     type="button"
                     onClick={(e) => {
@@ -76,9 +72,7 @@ export default function PDVEntregaCard({
                       disabled={modoVisualizacao}
                       className="w-full text-left px-3 py-2 bg-white hover:bg-blue-100 border border-blue-300 rounded text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <span className="font-medium text-blue-700">
-                        🏠 Cadastro Principal:
-                      </span>{" "}
+                      <span className="font-medium text-blue-700">🏠 Cadastro Principal:</span>{" "}
                       <span className="text-gray-700">
                         {cliente.endereco}, {cliente.numero} - {cliente.bairro}
                       </span>
@@ -134,8 +128,7 @@ export default function PDVEntregaCard({
                     (!cliente.enderecos_adicionais ||
                       cliente.enderecos_adicionais.length === 0) && (
                       <p className="text-sm text-gray-600 italic">
-                        Nenhum endereço cadastrado. Clique em "+ Adicionar
-                        Endereço"
+                        Nenhum endereço cadastrado. Clique em "+ Adicionar Endereço"
                       </p>
                     )}
                 </div>
@@ -153,9 +146,7 @@ export default function PDVEntregaCard({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Entregador
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Entregador</label>
             <select
               value={entregadorSelecionado?.id || ""}
               onChange={(e) => onSelecionarEntregador(e.target.value)}
@@ -190,9 +181,7 @@ export default function PDVEntregaCard({
                 Taxa de Entrega Total
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
-                  R$
-                </span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
                 <input
                   type="number"
                   step="0.01"
@@ -207,21 +196,15 @@ export default function PDVEntregaCard({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Taxa Loja
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Taxa Loja</label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
-                    R$
-                  </span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
                     max={vendaAtual.entrega?.taxa_entrega_total ?? 0}
-                    value={parseFloat(
-                      (vendaAtual.entrega?.taxa_loja ?? 0).toFixed(2),
-                    )}
+                    value={parseFloat((vendaAtual.entrega?.taxa_loja ?? 0).toFixed(2))}
                     onChange={(e) => onTaxaLojaChange(e.target.value)}
                     disabled={modoVisualizacao}
                     className="w-full pl-12 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
@@ -234,17 +217,13 @@ export default function PDVEntregaCard({
                   Taxa Entregador
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">
-                    R$
-                  </span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
                   <input
                     type="number"
                     step="0.01"
                     min="0"
                     max={vendaAtual.entrega?.taxa_entrega_total ?? 0}
-                    value={parseFloat(
-                      (vendaAtual.entrega?.taxa_entregador ?? 0).toFixed(2),
-                    )}
+                    value={parseFloat((vendaAtual.entrega?.taxa_entregador ?? 0).toFixed(2))}
                     onChange={(e) => onTaxaEntregadorChange(e.target.value)}
                     disabled={modoVisualizacao}
                     className="w-full pl-12 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
@@ -254,8 +233,8 @@ export default function PDVEntregaCard({
             </div>
 
             <p className="text-xs text-gray-500 italic">
-              Preencha a taxa total e depois divida entre loja e entregador. Ao
-              alterar uma, a outra é calculada automaticamente.
+              Preencha a taxa total e depois divida entre loja e entregador. Ao alterar uma, a outra
+              é calculada automaticamente.
             </p>
           </div>
 

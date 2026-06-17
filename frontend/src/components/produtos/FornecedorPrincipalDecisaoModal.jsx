@@ -1,5 +1,3 @@
-import React from "react";
-
 export default function FornecedorPrincipalDecisaoModal({
   decisaoFornecedor,
   isOpen,
@@ -36,7 +34,12 @@ export default function FornecedorPrincipalDecisaoModal({
               aria-label="Fechar"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -66,8 +69,8 @@ export default function FornecedorPrincipalDecisaoModal({
               Manter alternativos
             </span>
             <span className="mt-2 block text-sm leading-5 text-slate-600">
-              O novo fornecedor vira principal, e os fornecedores atuais continuam vinculados para consulta,
-              historico e futuras compras.
+              O novo fornecedor vira principal, e os fornecedores atuais continuam vinculados para
+              consulta, historico e futuras compras.
             </span>
           </button>
 
@@ -94,8 +97,8 @@ export default function FornecedorPrincipalDecisaoModal({
               Remover os outros
             </span>
             <span className="mt-2 block text-sm leading-5 text-emerald-900">
-              Mantem somente o fornecedor escolhido. Bom para limpar linhas antigas ou fornecedores que nao
-              devem mais aparecer nas sugestoes.
+              Mantem somente o fornecedor escolhido. Bom para limpar linhas antigas ou fornecedores
+              que nao devem mais aparecer nas sugestoes.
             </span>
           </button>
         </div>

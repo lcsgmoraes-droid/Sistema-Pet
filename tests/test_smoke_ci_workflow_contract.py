@@ -33,10 +33,10 @@ def test_frontend_package_exposes_core_lint_and_format_scripts():
 
     assert (
         package["scripts"]["lint:core"]
-        == "eslint src/api src/components/ui src/components/layout src/components/clientes src/components/operadorasCartao src/components/roles src/components/usuarios src/components/pedidosBling src/components/pets src/components/fornecedores src/components/ColumnSelector src/components/Pagination src/components/VariacoesGrid src/components/ModalNovaContaReceber.jsx src/hooks src/utils src/helpers scripts --max-warnings=0"
+        == "eslint src/api src/components/ui src/components/layout src/components/clientes src/components/operadorasCartao src/components/roles src/components/usuarios src/components/pedidosBling src/components/pets src/components/fornecedores src/components/ColumnSelector src/components/Pagination src/components/VariacoesGrid src/components/ModalNovaContaReceber.jsx src/components/pdv src/components/PDVAlertasRacao.jsx src/components/produto src/components/produtos src/components/produtoBalanco src/hooks src/utils src/helpers scripts --max-warnings=0"
     )
     assert (
         package["scripts"]["format:core:check"]
-        == "prettier --check src/api src/components/ui src/components/layout src/components/clientes src/components/operadorasCartao src/components/roles src/components/usuarios src/components/pedidosBling src/components/pets src/components/fornecedores src/components/ColumnSelector src/components/Pagination src/components/VariacoesGrid src/components/ModalNovaContaReceber.jsx src/hooks src/utils src/helpers scripts"
+        == "prettier --check src/api src/components/ui src/components/layout src/components/clientes src/components/operadorasCartao src/components/roles src/components/usuarios src/components/pedidosBling src/components/pets src/components/fornecedores src/components/ColumnSelector src/components/Pagination src/components/VariacoesGrid src/components/ModalNovaContaReceber.jsx src/components/pdv src/components/PDVAlertasRacao.jsx src/components/produto src/components/produtos src/components/produtoBalanco src/hooks src/utils src/helpers scripts"
     )
     assert "eslint-plugin-react-hooks" in package["devDependencies"]

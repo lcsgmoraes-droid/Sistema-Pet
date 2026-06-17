@@ -1,4 +1,4 @@
-import { resolveMediaUrl } from '../../utils/mediaUrl';
+import { resolveMediaUrl } from "../../utils/mediaUrl";
 
 export default function ProdutosNovoImagensTab({
   handleDeleteImagem,
@@ -11,7 +11,12 @@ export default function ProdutosNovoImagensTab({
   if (!isEdicao) {
     return (
       <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
-        <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg
+          className="mx-auto h-12 w-12 text-gray-400"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -19,7 +24,9 @@ export default function ProdutosNovoImagensTab({
             d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
           />
         </svg>
-        <p className="mt-2 text-sm text-gray-600">Salve o produto primeiro para adicionar imagens</p>
+        <p className="mt-2 text-sm text-gray-600">
+          Salve o produto primeiro para adicionar imagens
+        </p>
       </div>
     );
   }
@@ -30,7 +37,7 @@ export default function ProdutosNovoImagensTab({
         <h3 className="text-lg font-semibold text-gray-900">Imagens do Produto</h3>
 
         <label className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer">
-          {uploadingImage ? 'Enviando...' : '+ Adicionar Imagens'}
+          {uploadingImage ? "Enviando..." : "+ Adicionar Imagens"}
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"
@@ -91,8 +98,9 @@ export default function ProdutosNovoImagensTab({
 
       <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <p className="text-sm text-blue-800">
-          <strong>Dica:</strong> A primeira imagem marcada como "Principal" será exibida na listagem de produtos.
-          Formatos aceitos: JPG, PNG, WebP (máx. 10MB). O sistema converte para WebP e gera miniaturas automaticamente.
+          <strong>Dica:</strong> A primeira imagem marcada como "Principal" será exibida na listagem
+          de produtos. Formatos aceitos: JPG, PNG, WebP (máx. 10MB). O sistema converte para WebP e
+          gera miniaturas automaticamente.
         </p>
       </div>
     </div>
