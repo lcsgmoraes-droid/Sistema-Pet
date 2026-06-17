@@ -41,7 +41,9 @@ from app.banho_tosa_models import (
 from app.cargo_models import Cargo
 
 
-def obter_snapshot_existente_ou_previa(db: Session, tenant_id, atendimento_id: int) -> Optional[dict]:
+def obter_snapshot_existente_ou_previa(
+    db: Session, tenant_id, atendimento_id: int
+) -> Optional[dict]:
     registro = _obter_snapshot(db, tenant_id, atendimento_id)
     if registro:
         return serializar_snapshot_custo(registro)
@@ -59,7 +61,9 @@ def obter_snapshot_existente_ou_previa(db: Session, tenant_id, atendimento_id: i
     }
 
 
-def recalcular_snapshot_atendimento(db: Session, tenant_id, atendimento_id: int) -> Optional[BanhoTosaCustoSnapshot]:
+def recalcular_snapshot_atendimento(
+    db: Session, tenant_id, atendimento_id: int
+) -> Optional[BanhoTosaCustoSnapshot]:
     calculado = montar_snapshot_atendimento(db, tenant_id, atendimento_id)
     if not calculado:
         return None
@@ -67,7 +71,9 @@ def recalcular_snapshot_atendimento(db: Session, tenant_id, atendimento_id: int)
     atendimento, snapshot, detalhes = calculado
     registro = _obter_snapshot(db, tenant_id, atendimento_id)
     if not registro:
-        registro = BanhoTosaCustoSnapshot(tenant_id=tenant_id, atendimento_id=atendimento.id)
+        registro = BanhoTosaCustoSnapshot(
+            tenant_id=tenant_id, atendimento_id=atendimento.id
+        )
         db.add(registro)
 
     for campo, valor in snapshot.as_dict().items():
@@ -86,10 +92,16 @@ def montar_snapshot_atendimento(db: Session, tenant_id, atendimento_id: int):
     config = obter_ou_criar_configuracao(db, tenant_id)
     parametro = _obter_parametro_porte(db, tenant_id, atendimento)
     valor_cobrado = valor_cobrado_atendimento(atendimento)
-    custo_insumos = calcular_custo_insumos(mapear_insumos_custo(atendimento.insumos_usados))
+    custo_insumos = calcular_custo_insumos(
+        mapear_insumos_custo(atendimento.insumos_usados)
+    )
     custo_agua = calcular_agua_atendimento(atendimento, config, parametro)
-    custo_energia = calcular_custo_energia(mapear_equipamentos_custo(atendimento, config, parametro))
-    custo_mao_obra, mao_obra_detalhes = _calcular_mao_obra(db, tenant_id, atendimento, config)
+    custo_energia = calcular_custo_energia(
+        mapear_equipamentos_custo(atendimento, config, parametro)
+    )
+    custo_mao_obra, mao_obra_detalhes = _calcular_mao_obra(
+        db, tenant_id, atendimento, config
+    )
     custo_taxi_dog, taxi_detalhes = _calcular_taxi_dog(db, tenant_id, atendimento)
     custo_taxas = valor_cobrado * dec(config.percentual_taxas_padrao) / Decimal("100")
     custo_rateio = (
@@ -108,43 +120,72 @@ def montar_snapshot_atendimento(db: Session, tenant_id, atendimento_id: int):
         custo_taxas_pagamento=custo_taxas,
         custo_rateio_operacional=custo_rateio,
     )
-    detalhes = montar_detalhes_snapshot(atendimento, parametro, mao_obra_detalhes, taxi_detalhes)
+    detalhes = montar_detalhes_snapshot(
+        atendimento, parametro, mao_obra_detalhes, taxi_detalhes
+    )
     return atendimento, snapshot, detalhes
 
 
-def _obter_snapshot(db: Session, tenant_id, atendimento_id: int) -> Optional[BanhoTosaCustoSnapshot]:
-    return db.query(BanhoTosaCustoSnapshot).filter(
-        BanhoTosaCustoSnapshot.tenant_id == tenant_id,
-        BanhoTosaCustoSnapshot.atendimento_id == atendimento_id,
-    ).first()
+def _obter_snapshot(
+    db: Session, tenant_id, atendimento_id: int
+) -> Optional[BanhoTosaCustoSnapshot]:
+    return (
+        db.query(BanhoTosaCustoSnapshot)
+        .filter(
+            BanhoTosaCustoSnapshot.tenant_id == tenant_id,
+            BanhoTosaCustoSnapshot.atendimento_id == atendimento_id,
+        )
+        .first()
+    )
 
 
-def _obter_atendimento(db: Session, tenant_id, atendimento_id: int) -> Optional[BanhoTosaAtendimento]:
+def _obter_atendimento(
+    db: Session, tenant_id, atendimento_id: int
+) -> Optional[BanhoTosaAtendimento]:
     return (
         db.query(BanhoTosaAtendimento)
         .options(
-            joinedload(BanhoTosaAtendimento.agendamento).joinedload(BanhoTosaAgendamento.servicos),
-            joinedload(BanhoTosaAtendimento.etapas).joinedload(BanhoTosaEtapa.responsavel),
+            joinedload(BanhoTosaAtendimento.agendamento).joinedload(
+                BanhoTosaAgendamento.servicos
+            ),
+            joinedload(BanhoTosaAtendimento.etapas).joinedload(
+                BanhoTosaEtapa.responsavel
+            ),
             joinedload(BanhoTosaAtendimento.etapas).joinedload(BanhoTosaEtapa.recurso),
-            joinedload(BanhoTosaAtendimento.insumos_usados).joinedload(BanhoTosaInsumoUsado.produto),
+            joinedload(BanhoTosaAtendimento.insumos_usados).joinedload(
+                BanhoTosaInsumoUsado.produto
+            ),
         )
-        .filter(BanhoTosaAtendimento.tenant_id == tenant_id, BanhoTosaAtendimento.id == atendimento_id)
+        .filter(
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+            BanhoTosaAtendimento.id == atendimento_id,
+        )
         .first()
     )
 
 
 def _obter_parametro_porte(db: Session, tenant_id, atendimento: BanhoTosaAtendimento):
-    porte = (atendimento.porte_snapshot or getattr(atendimento.pet, "porte", None) or "").strip().lower()
+    porte = (
+        (atendimento.porte_snapshot or getattr(atendimento.pet, "porte", None) or "")
+        .strip()
+        .lower()
+    )
     if not porte:
         return None
-    return db.query(BanhoTosaParametroPorte).filter(
-        BanhoTosaParametroPorte.tenant_id == tenant_id,
-        BanhoTosaParametroPorte.ativo.is_(True),
-        func.lower(BanhoTosaParametroPorte.porte) == porte,
-    ).first()
+    return (
+        db.query(BanhoTosaParametroPorte)
+        .filter(
+            BanhoTosaParametroPorte.tenant_id == tenant_id,
+            BanhoTosaParametroPorte.ativo.is_(True),
+            func.lower(BanhoTosaParametroPorte.porte) == porte,
+        )
+        .first()
+    )
 
 
-def _calcular_mao_obra(db: Session, tenant_id, atendimento, config) -> tuple[Decimal, list[dict]]:
+def _calcular_mao_obra(
+    db: Session, tenant_id, atendimento, config
+) -> tuple[Decimal, list[dict]]:
     itens = []
     detalhes = []
     horas_produtivas = dec(config.horas_produtivas_mes_padrao, "176")
@@ -153,7 +194,11 @@ def _calcular_mao_obra(db: Session, tenant_id, atendimento, config) -> tuple[Dec
         responsavel = etapa.responsavel
         if minutos <= 0 or not responsavel or not responsavel.cargo_id:
             continue
-        cargo = db.query(Cargo).filter(Cargo.id == responsavel.cargo_id, Cargo.tenant_id == tenant_id).first()
+        cargo = (
+            db.query(Cargo)
+            .filter(Cargo.id == responsavel.cargo_id, Cargo.tenant_id == tenant_id)
+            .first()
+        )
         if not cargo:
             continue
         custo_mensal = calcular_custo_mensal_colaborador(
@@ -163,7 +208,13 @@ def _calcular_mao_obra(db: Session, tenant_id, atendimento, config) -> tuple[Dec
             gera_ferias=cargo.gera_ferias,
             gera_decimo_terceiro=cargo.gera_decimo_terceiro,
         )
-        itens.append(MaoObraEtapa(custo_mensal_funcionario=custo_mensal, horas_produtivas_mes=horas_produtivas, minutos_trabalhados=minutos))
+        itens.append(
+            MaoObraEtapa(
+                custo_mensal_funcionario=custo_mensal,
+                horas_produtivas_mes=horas_produtivas,
+                minutos_trabalhados=minutos,
+            )
+        )
         detalhes.append(
             {
                 "etapa": etapa.tipo,
@@ -178,14 +229,20 @@ def _calcular_mao_obra(db: Session, tenant_id, atendimento, config) -> tuple[Dec
     return calcular_custo_mao_obra(itens), detalhes
 
 
-def _calcular_taxi_dog(db: Session, tenant_id, atendimento) -> tuple[Decimal, Optional[dict]]:
+def _calcular_taxi_dog(
+    db: Session, tenant_id, atendimento
+) -> tuple[Decimal, Optional[dict]]:
     agendamento = atendimento.agendamento
     if not agendamento or not agendamento.taxi_dog_id:
         return Decimal("0.00"), None
-    taxi = db.query(BanhoTosaTaxiDog).filter(
-        BanhoTosaTaxiDog.id == agendamento.taxi_dog_id,
-        BanhoTosaTaxiDog.tenant_id == tenant_id,
-    ).first()
+    taxi = (
+        db.query(BanhoTosaTaxiDog)
+        .filter(
+            BanhoTosaTaxiDog.id == agendamento.taxi_dog_id,
+            BanhoTosaTaxiDog.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not taxi:
         return Decimal("0.00"), None
     custo = calcular_custo_taxi_dog(
@@ -194,4 +251,9 @@ def _calcular_taxi_dog(db: Session, tenant_id, atendimento) -> tuple[Decimal, Op
             custo_real_informado=taxi.custo_real if dec(taxi.custo_real) > 0 else None,
         )
     )
-    return custo, {"taxi_dog_id": taxi.id, "status": taxi.status, "km_real": str(taxi.km_real), "custo": str(custo)}
+    return custo, {
+        "taxi_dog_id": taxi.id,
+        "status": taxi.status,
+        "km_real": str(taxi.km_real),
+        "custo": str(custo),
+    }

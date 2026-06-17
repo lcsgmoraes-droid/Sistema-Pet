@@ -9,14 +9,31 @@ from sqlalchemy.orm import Session
 from app.banho_tosa_models import BanhoTosaRetornoTemplate
 
 
-TIPOS_RETORNO = {"todos", "recorrencia", "pacote_vencendo", "pacote_saldo_baixo", "sem_banho"}
+TIPOS_RETORNO = {
+    "todos",
+    "recorrencia",
+    "pacote_vencendo",
+    "pacote_saldo_baixo",
+    "sem_banho",
+}
 CANAIS_RETORNO = {"app", "email"}
 
 
-def listar_templates_retorno(db: Session, tenant_id, *, tipo_retorno: str | None = None, canal: str | None = None, ativos_only: bool = False):
-    query = db.query(BanhoTosaRetornoTemplate).filter(BanhoTosaRetornoTemplate.tenant_id == tenant_id)
+def listar_templates_retorno(
+    db: Session,
+    tenant_id,
+    *,
+    tipo_retorno: str | None = None,
+    canal: str | None = None,
+    ativos_only: bool = False,
+):
+    query = db.query(BanhoTosaRetornoTemplate).filter(
+        BanhoTosaRetornoTemplate.tenant_id == tenant_id
+    )
     if tipo_retorno:
-        query = query.filter(BanhoTosaRetornoTemplate.tipo_retorno == normalizar_tipo(tipo_retorno))
+        query = query.filter(
+            BanhoTosaRetornoTemplate.tipo_retorno == normalizar_tipo(tipo_retorno)
+        )
     if canal:
         query = query.filter(BanhoTosaRetornoTemplate.canal == normalizar_canal(canal))
     if ativos_only:
@@ -34,7 +51,9 @@ def criar_template_retorno(db: Session, tenant_id, payload: dict) -> dict:
     return serializar_template_retorno(template)
 
 
-def atualizar_template_retorno(db: Session, tenant_id, template_id: int, payload: dict) -> dict:
+def atualizar_template_retorno(
+    db: Session, tenant_id, template_id: int, payload: dict
+) -> dict:
     template = obter_template_retorno(db, tenant_id, template_id)
     payload = _normalizar_payload(payload, parcial=True)
     nome = payload.get("nome", template.nome)
@@ -48,7 +67,9 @@ def atualizar_template_retorno(db: Session, tenant_id, template_id: int, payload
     return serializar_template_retorno(template)
 
 
-def obter_template_retorno(db: Session, tenant_id, template_id: int, *, ativo: bool = False):
+def obter_template_retorno(
+    db: Session, tenant_id, template_id: int, *, ativo: bool = False
+):
     query = db.query(BanhoTosaRetornoTemplate).filter(
         BanhoTosaRetornoTemplate.id == template_id,
         BanhoTosaRetornoTemplate.tenant_id == tenant_id,
@@ -57,7 +78,9 @@ def obter_template_retorno(db: Session, tenant_id, template_id: int, *, ativo: b
         query = query.filter(BanhoTosaRetornoTemplate.ativo.is_(True))
     template = query.first()
     if not template:
-        raise HTTPException(status_code=404, detail="Template de retorno nao encontrado.")
+        raise HTTPException(
+            status_code=404, detail="Template de retorno nao encontrado."
+        )
     return template
 
 
@@ -74,7 +97,11 @@ def serializar_template_retorno(template) -> dict:
 
 
 def renderizar_template_retorno(template, item: dict) -> tuple[str, str]:
-    assunto = getattr(template, "assunto", None) or item.get("titulo") or "Retorno de Banho & Tosa"
+    assunto = (
+        getattr(template, "assunto", None)
+        or item.get("titulo")
+        or "Retorno de Banho & Tosa"
+    )
     mensagem = getattr(template, "mensagem", None) or item.get("mensagem") or ""
     contexto = _contexto_item(item)
     return _substituir(assunto, contexto), _substituir(mensagem, contexto)
@@ -117,7 +144,9 @@ def _normalizar_payload(payload: dict, *, parcial: bool = False) -> dict:
     return data
 
 
-def _validar_nome_disponivel(db: Session, tenant_id, nome: str, canal: str, ignorar_id: int | None = None) -> None:
+def _validar_nome_disponivel(
+    db: Session, tenant_id, nome: str, canal: str, ignorar_id: int | None = None
+) -> None:
     query = db.query(BanhoTosaRetornoTemplate.id).filter(
         BanhoTosaRetornoTemplate.tenant_id == tenant_id,
         BanhoTosaRetornoTemplate.canal == canal,
@@ -126,7 +155,9 @@ def _validar_nome_disponivel(db: Session, tenant_id, nome: str, canal: str, igno
     if ignorar_id:
         query = query.filter(BanhoTosaRetornoTemplate.id != ignorar_id)
     if query.first():
-        raise HTTPException(status_code=409, detail="Ja existe template com esse nome e canal.")
+        raise HTTPException(
+            status_code=409, detail="Ja existe template com esse nome e canal."
+        )
 
 
 def _contexto_item(item: dict) -> dict:

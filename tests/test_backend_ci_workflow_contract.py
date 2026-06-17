@@ -702,6 +702,13 @@ def test_backend_ci_has_blocking_backend_model_read_packages_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_banho_tosa_root_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend banho tosa root format (blocking)" in source
+    assert "ruff format --check app/banho_tosa*.py" in source
+
+
 def test_backend_ci_has_blocking_backend_routers_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

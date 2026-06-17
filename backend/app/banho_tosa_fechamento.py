@@ -11,7 +11,9 @@ from app.financeiro_models import ContaReceber
 from app.vendas_models import Venda
 
 
-def sincronizar_fechamento_atendimento(db: Session, tenant_id, atendimento_id: int) -> dict:
+def sincronizar_fechamento_atendimento(
+    db: Session, tenant_id, atendimento_id: int
+) -> dict:
     atendimento = _obter_atendimento(db, tenant_id, atendimento_id)
     if not atendimento:
         raise HTTPException(status_code=404, detail="Atendimento nao encontrado")
@@ -29,13 +31,20 @@ def sincronizar_fechamento_atendimento(db: Session, tenant_id, atendimento_id: i
         db.commit()
         sincronizado = True
 
-    return montar_resumo_fechamento(atendimento, venda, contas, sincronizado=sincronizado)
+    return montar_resumo_fechamento(
+        atendimento, venda, contas, sincronizado=sincronizado
+    )
 
 
 def listar_pendencias_fechamento(db: Session, tenant_id, limit: int = 200) -> dict:
     atendimentos = _query_pendencias(db, tenant_id).limit(limit).all()
-    contas_por_venda = _contas_por_venda(db, tenant_id, [item.venda_id for item in atendimentos if item.venda_id])
-    itens = [_montar_pendencia(item, contas_por_venda.get(item.venda_id, [])) for item in atendimentos]
+    contas_por_venda = _contas_por_venda(
+        db, tenant_id, [item.venda_id for item in atendimentos if item.venda_id]
+    )
+    itens = [
+        _montar_pendencia(item, contas_por_venda.get(item.venda_id, []))
+        for item in atendimentos
+    ]
     return {"total": len(itens), "itens": itens}
 
 
@@ -47,7 +56,9 @@ def sincronizar_pendencias_fechamento(db: Session, tenant_id, limit: int = 200) 
         if not item["venda_id"]:
             sem_venda += 1
             continue
-        resumo = sincronizar_fechamento_atendimento(db, tenant_id, item["atendimento_id"])
+        resumo = sincronizar_fechamento_atendimento(
+            db, tenant_id, item["atendimento_id"]
+        )
         if resumo.get("sincronizado"):
             sincronizados += 1
 
@@ -60,7 +71,9 @@ def sincronizar_pendencias_fechamento(db: Session, tenant_id, limit: int = 200) 
     }
 
 
-def montar_resumo_fechamento(atendimento, venda=None, contas=None, sincronizado=False) -> dict:
+def montar_resumo_fechamento(
+    atendimento, venda=None, contas=None, sincronizado=False
+) -> dict:
     venda = venda or getattr(atendimento, "venda", None)
     contas = contas if contas is not None else []
     if not venda:
@@ -82,7 +95,9 @@ def montar_resumo_fechamento(atendimento, venda=None, contas=None, sincronizado=
         "total_pago": total_pago,
         "valor_restante": valor_restante,
         "contas_receber_total": len(contas),
-        "contas_receber_pendentes": len([c for c in contas if c.status in {"pendente", "parcial", "vencido"}]),
+        "contas_receber_pendentes": len(
+            [c for c in contas if c.status in {"pendente", "parcial", "vencido"}]
+        ),
         "contas_receber_recebidas": len([c for c in contas if c.status == "recebido"]),
         "sincronizado": sincronizado,
         "alertas": alertas,
@@ -112,12 +127,16 @@ def _query_pendencias(db: Session, tenant_id):
     )
 
 
-def _contas_por_venda(db: Session, tenant_id, venda_ids: list[int]) -> dict[int, list[ContaReceber]]:
+def _contas_por_venda(
+    db: Session, tenant_id, venda_ids: list[int]
+) -> dict[int, list[ContaReceber]]:
     if not venda_ids:
         return {}
     contas = (
         db.query(ContaReceber)
-        .filter(ContaReceber.tenant_id == tenant_id, ContaReceber.venda_id.in_(venda_ids))
+        .filter(
+            ContaReceber.tenant_id == tenant_id, ContaReceber.venda_id.in_(venda_ids)
+        )
         .order_by(ContaReceber.data_vencimento.asc(), ContaReceber.id.asc())
         .all()
     )
@@ -128,7 +147,9 @@ def _contas_por_venda(db: Session, tenant_id, venda_ids: list[int]) -> dict[int,
 
 
 def _montar_pendencia(atendimento, contas: list[ContaReceber]) -> dict:
-    resumo = montar_resumo_fechamento(atendimento, atendimento.venda, contas, sincronizado=False)
+    resumo = montar_resumo_fechamento(
+        atendimento, atendimento.venda, contas, sincronizado=False
+    )
     venda = atendimento.venda
     return {
         **resumo,
@@ -141,7 +162,9 @@ def _montar_pendencia(atendimento, contas: list[ContaReceber]) -> dict:
         "fim_em": atendimento.fim_em,
         "entregue_em": atendimento.entregue_em,
         "venda_numero": venda.numero_venda if venda else None,
-        "pdv_url": f"/pdv?venda_id={atendimento.venda_id}" if atendimento.venda_id else None,
+        "pdv_url": f"/pdv?venda_id={atendimento.venda_id}"
+        if atendimento.venda_id
+        else None,
     }
 
 
@@ -149,7 +172,10 @@ def _obter_atendimento(db: Session, tenant_id, atendimento_id: int):
     return (
         db.query(BanhoTosaAtendimento)
         .options(joinedload(BanhoTosaAtendimento.venda).joinedload(Venda.pagamentos))
-        .filter(BanhoTosaAtendimento.id == atendimento_id, BanhoTosaAtendimento.tenant_id == tenant_id)
+        .filter(
+            BanhoTosaAtendimento.id == atendimento_id,
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+        )
         .first()
     )
 
@@ -166,7 +192,9 @@ def _listar_contas_receber(db: Session, tenant_id, venda_id: int) -> list[ContaR
 def _escolher_conta_referencia(contas: list[ContaReceber]):
     if not contas:
         return None
-    pendentes = [conta for conta in contas if conta.status in {"pendente", "parcial", "vencido"}]
+    pendentes = [
+        conta for conta in contas if conta.status in {"pendente", "parcial", "vencido"}
+    ]
     return pendentes[0] if pendentes else contas[0]
 
 
@@ -180,16 +208,25 @@ def _status_pagamento(total: Decimal, total_pago: Decimal) -> str:
     return "pendente"
 
 
-def _montar_alertas(atendimento, venda, status_pagamento: str, contas: list[ContaReceber]) -> list[str]:
+def _montar_alertas(
+    atendimento, venda, status_pagamento: str, contas: list[ContaReceber]
+) -> list[str]:
     alertas = []
     if venda.status == "cancelada":
         alertas.append("Venda vinculada foi cancelada.")
-    if atendimento.status in {"pronto", "entregue"} and venda.status in {"aberta", "baixa_parcial"}:
-        alertas.append("Atendimento pronto/entregue com cobranca ainda nao finalizada no PDV.")
+    if atendimento.status in {"pronto", "entregue"} and venda.status in {
+        "aberta",
+        "baixa_parcial",
+    }:
+        alertas.append(
+            "Atendimento pronto/entregue com cobranca ainda nao finalizada no PDV."
+        )
     if status_pagamento in {"pendente", "parcial"}:
         alertas.append("Pagamento ainda nao cobre o valor total do atendimento.")
     if venda.status == "finalizada" and not contas:
-        alertas.append("Venda finalizada sem conta a receber localizada; sincronize/valide o financeiro.")
+        alertas.append(
+            "Venda finalizada sem conta a receber localizada; sincronize/valide o financeiro."
+        )
     return alertas
 
 

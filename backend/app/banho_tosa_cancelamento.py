@@ -13,10 +13,14 @@ from app.vendas.service import VendaService
 from app.vendas_models import Venda
 
 
-def cancelar_processo_atendimento(db: Session, tenant_id, user_id: int, atendimento_id: int, motivo: str) -> dict:
+def cancelar_processo_atendimento(
+    db: Session, tenant_id, user_id: int, atendimento_id: int, motivo: str
+) -> dict:
     motivo_limpo = (motivo or "").strip()
     if len(motivo_limpo) < 3:
-        raise HTTPException(status_code=422, detail="Informe um motivo para o cancelamento.")
+        raise HTTPException(
+            status_code=422, detail="Informe um motivo para o cancelamento."
+        )
 
     atendimento = _obter_atendimento(db, tenant_id, atendimento_id)
     if not atendimento:
@@ -79,7 +83,9 @@ def cancelar_processo_atendimento(db: Session, tenant_id, user_id: int, atendime
         "atendimento_id": atendimento.id,
         "status_atendimento": atendimento.status,
         "agendamento_id": atendimento.agendamento_id,
-        "status_agendamento": atendimento.agendamento.status if atendimento.agendamento else None,
+        "status_agendamento": atendimento.agendamento.status
+        if atendimento.agendamento
+        else None,
         "venda_ids": venda_ids,
         "vendas_canceladas": vendas_canceladas,
         "vendas_ja_canceladas": vendas_ja_canceladas,
@@ -96,12 +102,17 @@ def _obter_atendimento(db: Session, tenant_id, atendimento_id: int):
             joinedload(BanhoTosaAtendimento.venda),
             joinedload(BanhoTosaAtendimento.etapas),
         )
-        .filter(BanhoTosaAtendimento.id == atendimento_id, BanhoTosaAtendimento.tenant_id == tenant_id)
+        .filter(
+            BanhoTosaAtendimento.id == atendimento_id,
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+        )
         .first()
     )
 
 
-def _listar_vendas_vinculadas(db: Session, tenant_id, atendimento: BanhoTosaAtendimento) -> list[Venda]:
+def _listar_vendas_vinculadas(
+    db: Session, tenant_id, atendimento: BanhoTosaAtendimento
+) -> list[Venda]:
     filtros = []
     if atendimento.venda_id:
         filtros.append(Venda.id == atendimento.venda_id)
@@ -143,4 +154,6 @@ def _finalizar_etapas_abertas(etapas: Iterable[BanhoTosaEtapa], fim: datetime) -
             continue
         etapa.fim_em = fim
         if etapa.inicio_em:
-            etapa.duracao_minutos = max(0, int((fim - etapa.inicio_em).total_seconds() // 60))
+            etapa.duracao_minutos = max(
+                0, int((fim - etapa.inicio_em).total_seconds() // 60)
+            )

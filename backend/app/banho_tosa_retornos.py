@@ -26,19 +26,41 @@ def listar_sugestoes_retorno(
     hoje = date.today()
     itens = []
     itens.extend(_sugestoes_recorrencias(db, tenant_id, hoje, dias))
-    itens.extend(_sugestoes_pacotes(db, tenant_id, hoje, pacote_vencendo_dias, saldo_baixo_creditos))
+    itens.extend(
+        _sugestoes_pacotes(
+            db, tenant_id, hoje, pacote_vencendo_dias, saldo_baixo_creditos
+        )
+    )
     itens.extend(_sugestoes_sem_banho(db, tenant_id, hoje, sem_banho_dias))
-    itens = sorted(itens, key=lambda item: (_ordem_prioridade(item["prioridade"]), item.get("dias_para_acao") or 9999))
+    itens = sorted(
+        itens,
+        key=lambda item: (
+            _ordem_prioridade(item["prioridade"]),
+            item.get("dias_para_acao") or 9999,
+        ),
+    )
     itens = _deduplicar_sugestoes(itens)[:limit]
     return {"total": len(itens), "itens": itens}
 
 
-def avancar_recorrencia(db: Session, tenant_id, recorrencia_id: int, data_base: date | None = None, observacoes: str | None = None) -> dict:
-    recorrencia = query_recorrencias(db, tenant_id).filter(BanhoTosaRecorrencia.id == recorrencia_id).first()
+def avancar_recorrencia(
+    db: Session,
+    tenant_id,
+    recorrencia_id: int,
+    data_base: date | None = None,
+    observacoes: str | None = None,
+) -> dict:
+    recorrencia = (
+        query_recorrencias(db, tenant_id)
+        .filter(BanhoTosaRecorrencia.id == recorrencia_id)
+        .first()
+    )
     if not recorrencia:
         raise HTTPException(status_code=404, detail="Recorrencia nao encontrada.")
     base = data_base or date.today()
-    recorrencia.proxima_execucao = base + timedelta(days=max(int(recorrencia.intervalo_dias or 1), 1))
+    recorrencia.proxima_execucao = base + timedelta(
+        days=max(int(recorrencia.intervalo_dias or 1), 1)
+    )
     if observacoes is not None:
         recorrencia.observacoes = observacoes
     db.commit()
@@ -50,96 +72,130 @@ def avancar_recorrencia(db: Session, tenant_id, recorrencia_id: int, data_base: 
     }
 
 
-def _sugestoes_recorrencias(db: Session, tenant_id, hoje: date, dias: int) -> list[dict]:
+def _sugestoes_recorrencias(
+    db: Session, tenant_id, hoje: date, dias: int
+) -> list[dict]:
     limite = hoje + timedelta(days=max(dias, 0))
-    recorrencias = query_recorrencias(db, tenant_id).filter(
-        BanhoTosaRecorrencia.ativo.is_(True),
-        BanhoTosaRecorrencia.proxima_execucao <= limite,
-    ).order_by(BanhoTosaRecorrencia.proxima_execucao.asc()).limit(200).all()
+    recorrencias = (
+        query_recorrencias(db, tenant_id)
+        .filter(
+            BanhoTosaRecorrencia.ativo.is_(True),
+            BanhoTosaRecorrencia.proxima_execucao <= limite,
+        )
+        .order_by(BanhoTosaRecorrencia.proxima_execucao.asc())
+        .limit(200)
+        .all()
+    )
     itens = []
     for item in recorrencias:
         dias_para = _dias(hoje, item.proxima_execucao)
-        itens.append(_base_sugestao(
-            tipo="recorrencia",
-            referencia_id=item.id,
-            cliente=item.cliente,
-            pet=item.pet,
-            data_referencia=item.proxima_execucao,
-            dias_para_acao=dias_para,
-            titulo=f"Retorno de {item.pet.nome if item.pet else 'pet'}",
-            mensagem=f"Esta na hora de agendar o retorno de Banho & Tosa de {item.pet.nome if item.pet else 'seu pet'}.",
-            acao="Contato para reagendar e manter recorrencia ativa.",
-            prioridade=_prioridade_por_dias(dias_para),
-            recorrencia_id=item.id,
-            servico_id=item.servico_id,
-            servico_nome=item.servico.nome if item.servico else None,
-            canal=item.canal_lembrete or "app",
-        ))
+        itens.append(
+            _base_sugestao(
+                tipo="recorrencia",
+                referencia_id=item.id,
+                cliente=item.cliente,
+                pet=item.pet,
+                data_referencia=item.proxima_execucao,
+                dias_para_acao=dias_para,
+                titulo=f"Retorno de {item.pet.nome if item.pet else 'pet'}",
+                mensagem=f"Esta na hora de agendar o retorno de Banho & Tosa de {item.pet.nome if item.pet else 'seu pet'}.",
+                acao="Contato para reagendar e manter recorrencia ativa.",
+                prioridade=_prioridade_por_dias(dias_para),
+                recorrencia_id=item.id,
+                servico_id=item.servico_id,
+                servico_nome=item.servico.nome if item.servico else None,
+                canal=item.canal_lembrete or "app",
+            )
+        )
     return itens
 
-def _sugestoes_pacotes(db: Session, tenant_id, hoje: date, vencendo_dias: int, saldo_baixo_creditos) -> list[dict]:
+
+def _sugestoes_pacotes(
+    db: Session, tenant_id, hoje: date, vencendo_dias: int, saldo_baixo_creditos
+) -> list[dict]:
     limite = hoje + timedelta(days=max(vencendo_dias, 0))
     creditos = query_creditos(db, tenant_id)
     itens = []
     for credito in creditos.filter_by(status="ativo").limit(300).all():
-        saldo = calcular_saldo_creditos(credito.creditos_total, credito.creditos_usados, credito.creditos_cancelados)
+        saldo = calcular_saldo_creditos(
+            credito.creditos_total, credito.creditos_usados, credito.creditos_cancelados
+        )
         vencendo = credito.data_validade <= limite
         saldo_baixo = saldo <= Decimal(str(saldo_baixo_creditos))
         if not vencendo and not saldo_baixo:
             continue
         dias_para = _dias(hoje, credito.data_validade)
         motivo = "pacote_vencendo" if vencendo else "pacote_saldo_baixo"
-        itens.append(_base_sugestao(
-            tipo=motivo,
-            referencia_id=credito.id,
-            cliente=credito.cliente,
-            pet=credito.pet,
-            data_referencia=credito.data_validade,
-            dias_para_acao=dias_para,
-            titulo=f"{credito.pacote.nome if credito.pacote else 'Pacote'} em atencao",
-            mensagem=_mensagem_pacote(credito, saldo, vencendo),
-            acao="Oferecer renovacao de pacote ou agendar uso dos creditos restantes.",
-            prioridade="alta" if dias_para <= 7 or saldo <= 0 else "media",
-            pacote_credito_id=credito.id,
-            pacote_nome=credito.pacote.nome if credito.pacote else None,
-            servico_id=credito.pacote.servico_id if credito.pacote else None,
-            servico_nome=credito.pacote.servico.nome if credito.pacote and credito.pacote.servico else None,
-        ))
+        itens.append(
+            _base_sugestao(
+                tipo=motivo,
+                referencia_id=credito.id,
+                cliente=credito.cliente,
+                pet=credito.pet,
+                data_referencia=credito.data_validade,
+                dias_para_acao=dias_para,
+                titulo=f"{credito.pacote.nome if credito.pacote else 'Pacote'} em atencao",
+                mensagem=_mensagem_pacote(credito, saldo, vencendo),
+                acao="Oferecer renovacao de pacote ou agendar uso dos creditos restantes.",
+                prioridade="alta" if dias_para <= 7 or saldo <= 0 else "media",
+                pacote_credito_id=credito.id,
+                pacote_nome=credito.pacote.nome if credito.pacote else None,
+                servico_id=credito.pacote.servico_id if credito.pacote else None,
+                servico_nome=credito.pacote.servico.nome
+                if credito.pacote and credito.pacote.servico
+                else None,
+            )
+        )
     return itens
 
-def _sugestoes_sem_banho(db: Session, tenant_id, hoje: date, sem_banho_dias: int) -> list[dict]:
-    corte = datetime.combine(hoje - timedelta(days=sem_banho_dias), time.max)
-    ultimos = db.query(
-        BanhoTosaAtendimento.pet_id.label("pet_id"),
-        func.max(BanhoTosaAtendimento.entregue_em).label("ultima_entrega"),
-    ).filter(
-        BanhoTosaAtendimento.tenant_id == tenant_id,
-        BanhoTosaAtendimento.status == "entregue",
-        BanhoTosaAtendimento.entregue_em.isnot(None),
-    ).group_by(BanhoTosaAtendimento.pet_id).subquery()
 
-    rows = db.query(Pet, Cliente, ultimos.c.ultima_entrega).join(
-        ultimos, ultimos.c.pet_id == Pet.id
-    ).join(Cliente, Cliente.id == Pet.cliente_id).filter(
-        Pet.tenant_id == tenant_id,
-        Cliente.tenant_id == tenant_id,
-        ultimos.c.ultima_entrega <= corte,
-    ).limit(200).all()
+def _sugestoes_sem_banho(
+    db: Session, tenant_id, hoje: date, sem_banho_dias: int
+) -> list[dict]:
+    corte = datetime.combine(hoje - timedelta(days=sem_banho_dias), time.max)
+    ultimos = (
+        db.query(
+            BanhoTosaAtendimento.pet_id.label("pet_id"),
+            func.max(BanhoTosaAtendimento.entregue_em).label("ultima_entrega"),
+        )
+        .filter(
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+            BanhoTosaAtendimento.status == "entregue",
+            BanhoTosaAtendimento.entregue_em.isnot(None),
+        )
+        .group_by(BanhoTosaAtendimento.pet_id)
+        .subquery()
+    )
+
+    rows = (
+        db.query(Pet, Cliente, ultimos.c.ultima_entrega)
+        .join(ultimos, ultimos.c.pet_id == Pet.id)
+        .join(Cliente, Cliente.id == Pet.cliente_id)
+        .filter(
+            Pet.tenant_id == tenant_id,
+            Cliente.tenant_id == tenant_id,
+            ultimos.c.ultima_entrega <= corte,
+        )
+        .limit(200)
+        .all()
+    )
     itens = []
     for pet, cliente, ultima in rows:
         dias_sem = (hoje - ultima.date()).days
-        itens.append(_base_sugestao(
-            tipo="sem_banho",
-            referencia_id=pet.id,
-            cliente=cliente,
-            pet=pet,
-            data_referencia=ultima.date(),
-            dias_para_acao=-dias_sem,
-            titulo=f"{pet.nome} sem banho ha {dias_sem} dias",
-            mensagem=f"{pet.nome} nao tem atendimento de Banho & Tosa registrado ha {dias_sem} dias.",
-            acao="Sugerir novo agendamento ou campanha de retorno.",
-            prioridade="media" if dias_sem < sem_banho_dias + 20 else "alta",
-        ))
+        itens.append(
+            _base_sugestao(
+                tipo="sem_banho",
+                referencia_id=pet.id,
+                cliente=cliente,
+                pet=pet,
+                data_referencia=ultima.date(),
+                dias_para_acao=-dias_sem,
+                titulo=f"{pet.nome} sem banho ha {dias_sem} dias",
+                mensagem=f"{pet.nome} nao tem atendimento de Banho & Tosa registrado ha {dias_sem} dias.",
+                acao="Sugerir novo agendamento ou campanha de retorno.",
+                prioridade="media" if dias_sem < sem_banho_dias + 20 else "alta",
+            )
+        )
     return itens
 
 
@@ -184,7 +240,12 @@ def _deduplicar_sugestoes(itens: list[dict]) -> list[dict]:
     vistos = set()
     resultado = []
     for item in itens:
-        chave = (item["tipo"], item.get("cliente_id"), item.get("pet_id"), item.get("referencia_id"))
+        chave = (
+            item["tipo"],
+            item.get("cliente_id"),
+            item.get("pet_id"),
+            item.get("referencia_id"),
+        )
         if chave in vistos:
             continue
         vistos.add(chave)

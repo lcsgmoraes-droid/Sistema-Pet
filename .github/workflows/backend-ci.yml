@@ -367,6 +367,10 @@ jobs:
         run: |
           ruff format --check app/fiscal_models app/read_models app/banho_tosa_model_parts app/banho_tosa_schema_parts app/dre
 
+      - name: Backend banho tosa root format (blocking)
+        run: |
+          ruff format --check app/banho_tosa*.py
+
       - name: Backend routers format (blocking)
         run: |
           ruff format --check app/routers

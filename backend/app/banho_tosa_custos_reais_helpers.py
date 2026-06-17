@@ -32,7 +32,11 @@ def mapear_insumos_custo(insumos):
 
 
 def calcular_agua_atendimento(atendimento, config, parametro) -> Decimal:
-    minutos_banho = sum(minutos_etapa(etapa) for etapa in atendimento.etapas or [] if etapa.tipo in ETAPAS_COM_AGUA)
+    minutos_banho = sum(
+        minutos_etapa(etapa)
+        for etapa in atendimento.etapas or []
+        if etapa.tipo in ETAPAS_COM_AGUA
+    )
     if minutos_banho > 0:
         return calcular_custo_agua(
             custo_litro_agua=config.custo_litro_agua,
@@ -61,5 +65,9 @@ def mapear_equipamentos_custo(atendimento, config, parametro):
             )
         )
     if not usos and parametro and dec(parametro.energia_padrao_kwh) > 0:
-        usos.append(EquipamentoUso(kwh_real=parametro.energia_padrao_kwh, custo_kwh=config.custo_kwh))
+        usos.append(
+            EquipamentoUso(
+                kwh_real=parametro.energia_padrao_kwh, custo_kwh=config.custo_kwh
+            )
+        )
     return usos

@@ -7,7 +7,10 @@ from fastapi import HTTPException
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.banho_tosa_api.utils import STATUS_AGENDAMENTO_FINAIS, obter_ou_criar_configuracao
+from app.banho_tosa_api.utils import (
+    STATUS_AGENDAMENTO_FINAIS,
+    obter_ou_criar_configuracao,
+)
 from app.banho_tosa_datetime import normalizar_data_operacional
 from app.banho_tosa_models import BanhoTosaAgendamento, BanhoTosaRecurso
 
@@ -30,9 +33,13 @@ def validar_capacidade_agenda(
 
     conflito_pet = query.filter(BanhoTosaAgendamento.pet_id == pet_id).first()
     if conflito_pet:
-        raise HTTPException(status_code=409, detail="Pet ja possui agendamento nesse horario")
+        raise HTTPException(
+            status_code=409, detail="Pet ja possui agendamento nesse horario"
+        )
 
-    equipe_ids = {item for item in [profissional_principal_id, banhista_id, tosador_id] if item}
+    equipe_ids = {
+        item for item in [profissional_principal_id, banhista_id, tosador_id] if item
+    }
     if equipe_ids:
         conflito_equipe = query.filter(
             or_(
@@ -42,23 +49,34 @@ def validar_capacidade_agenda(
             )
         ).first()
         if conflito_equipe:
-            raise HTTPException(status_code=409, detail="Profissional ja possui agendamento nesse horario")
+            raise HTTPException(
+                status_code=409,
+                detail="Profissional ja possui agendamento nesse horario",
+            )
 
     if not recurso_id:
         return None
 
-    recurso = db.query(BanhoTosaRecurso).filter(
-        BanhoTosaRecurso.id == recurso_id,
-        BanhoTosaRecurso.tenant_id == tenant_id,
-        BanhoTosaRecurso.ativo.is_(True),
-    ).first()
+    recurso = (
+        db.query(BanhoTosaRecurso)
+        .filter(
+            BanhoTosaRecurso.id == recurso_id,
+            BanhoTosaRecurso.tenant_id == tenant_id,
+            BanhoTosaRecurso.ativo.is_(True),
+        )
+        .first()
+    )
     if not recurso:
         raise HTTPException(status_code=404, detail="Recurso nao encontrado ou inativo")
 
-    ocupacao_recurso = query.filter(BanhoTosaAgendamento.recurso_id == recurso.id).count()
+    ocupacao_recurso = query.filter(
+        BanhoTosaAgendamento.recurso_id == recurso.id
+    ).count()
     capacidade = max(int(recurso.capacidade_simultanea or 1), 1)
     if ocupacao_recurso >= capacidade:
-        raise HTTPException(status_code=409, detail="Recurso sem capacidade nesse horario")
+        raise HTTPException(
+            status_code=409, detail="Recurso sem capacidade nesse horario"
+        )
 
     return recurso
 
@@ -69,10 +87,15 @@ def montar_capacidade_dia(db: Session, tenant_id, data_ref: date) -> dict:
     fim_dia = datetime.combine(data_ref, time.max)
     janela_inicio, janela_fim, minutos_disponiveis = _janela_operacional(config)
 
-    recursos = db.query(BanhoTosaRecurso).filter(
-        BanhoTosaRecurso.tenant_id == tenant_id,
-        BanhoTosaRecurso.ativo.is_(True),
-    ).order_by(BanhoTosaRecurso.tipo.asc(), BanhoTosaRecurso.nome.asc()).all()
+    recursos = (
+        db.query(BanhoTosaRecurso)
+        .filter(
+            BanhoTosaRecurso.tenant_id == tenant_id,
+            BanhoTosaRecurso.ativo.is_(True),
+        )
+        .order_by(BanhoTosaRecurso.tipo.asc(), BanhoTosaRecurso.nome.asc())
+        .all()
+    )
 
     agendamentos = (
         db.query(BanhoTosaAgendamento)
@@ -87,8 +110,7 @@ def montar_capacidade_dia(db: Session, tenant_id, data_ref: date) -> dict:
     )
 
     por_recurso = {
-        recurso.id: _base_recurso(recurso, minutos_disponiveis)
-        for recurso in recursos
+        recurso.id: _base_recurso(recurso, minutos_disponiveis) for recurso in recursos
     }
     janelas_por_recurso = {recurso.id: [] for recurso in recursos}
     sem_recurso = 0
@@ -111,10 +133,14 @@ def montar_capacidade_dia(db: Session, tenant_id, data_ref: date) -> dict:
         capacidade = max(int(item["capacidade_simultanea"] or 1), 1)
         disponivel = max(minutos_disponiveis * capacidade, 1)
         item["pico_simultaneo"] = _calcular_pico(janelas_por_recurso[recurso_id])
-        item["ocupacao_percentual"] = round((item["minutos_ocupados"] / disponivel) * 100, 2)
+        item["ocupacao_percentual"] = round(
+            (item["minutos_ocupados"] / disponivel) * 100, 2
+        )
         item["capacidade_excedida"] = item["pico_simultaneo"] > capacidade
         if item["capacidade_excedida"]:
-            alertas.append(f"{item['recurso_nome']} ultrapassou a capacidade simultanea")
+            alertas.append(
+                f"{item['recurso_nome']} ultrapassou a capacidade simultanea"
+            )
 
     if not recursos:
         alertas.append("Cadastre recursos para controlar capacidade da agenda")
@@ -132,12 +158,18 @@ def montar_capacidade_dia(db: Session, tenant_id, data_ref: date) -> dict:
     }
 
 
-def _query_sobreposicao(db: Session, tenant_id, inicio: datetime, fim: datetime, ignorar_id: Optional[int]):
+def _query_sobreposicao(
+    db: Session, tenant_id, inicio: datetime, fim: datetime, ignorar_id: Optional[int]
+):
     query = db.query(BanhoTosaAgendamento).filter(
         BanhoTosaAgendamento.tenant_id == tenant_id,
         BanhoTosaAgendamento.status.notin_(list(STATUS_AGENDAMENTO_FINAIS)),
         BanhoTosaAgendamento.data_hora_inicio < fim,
-        func.coalesce(BanhoTosaAgendamento.data_hora_fim_prevista, BanhoTosaAgendamento.data_hora_inicio) > inicio,
+        func.coalesce(
+            BanhoTosaAgendamento.data_hora_fim_prevista,
+            BanhoTosaAgendamento.data_hora_inicio,
+        )
+        > inicio,
     )
     if ignorar_id:
         query = query.filter(BanhoTosaAgendamento.id != ignorar_id)
@@ -147,7 +179,16 @@ def _query_sobreposicao(db: Session, tenant_id, inicio: datetime, fim: datetime,
 def _janela_operacional(config) -> tuple[str, str, int]:
     inicio = _parse_hora(config.horario_inicio, time(8, 0))
     fim = _parse_hora(config.horario_fim, time(18, 0))
-    minutos = max(int((datetime.combine(date.today(), fim) - datetime.combine(date.today(), inicio)).total_seconds() // 60), 60)
+    minutos = max(
+        int(
+            (
+                datetime.combine(date.today(), fim)
+                - datetime.combine(date.today(), inicio)
+            ).total_seconds()
+            // 60
+        ),
+        60,
+    )
     return inicio.strftime("%H:%M"), fim.strftime("%H:%M"), minutos
 
 

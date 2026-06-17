@@ -20,7 +20,9 @@ def serializar_pacote(pacote) -> dict:
 
 
 def serializar_credito(credito) -> dict:
-    saldo = calcular_saldo_creditos(credito.creditos_total, credito.creditos_usados, credito.creditos_cancelados)
+    saldo = calcular_saldo_creditos(
+        credito.creditos_total, credito.creditos_usados, credito.creditos_cancelados
+    )
     vencido = credito.data_validade < date.today()
     pacote = credito.pacote
     return {

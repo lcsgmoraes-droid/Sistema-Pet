@@ -20,13 +20,17 @@ async def salvar_foto_banho_tosa_upload(
     tipo: str,
 ) -> dict:
     if arquivo.content_type not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=400, detail="Formato nao aceito. Use JPG, PNG ou WebP.")
+        raise HTTPException(
+            status_code=400, detail="Formato nao aceito. Use JPG, PNG ou WebP."
+        )
 
     conteudo = await arquivo.read()
     if not conteudo:
         raise HTTPException(status_code=400, detail="Arquivo vazio.")
     if len(conteudo) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=400, detail="Arquivo muito grande. Maximo: 8 MB.")
+        raise HTTPException(
+            status_code=400, detail="Arquivo muito grande. Maximo: 8 MB."
+        )
 
     original_bytes, thumb_bytes = _preparar_variantes(conteudo)
     token = uuid4().hex
@@ -71,12 +75,16 @@ def _preparar_variantes(conteudo: bytes) -> tuple[bytes, bytes]:
                 image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
 
             original = image.copy()
-            original.thumbnail((MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION), Image.Resampling.LANCZOS)
+            original.thumbnail(
+                (MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION), Image.Resampling.LANCZOS
+            )
             thumb = image.copy()
             thumb.thumbnail((THUMBNAIL_SIZE, THUMBNAIL_SIZE), Image.Resampling.LANCZOS)
             return _to_webp(original, quality=82), _to_webp(thumb, quality=72)
     except UnidentifiedImageError as exc:
-        raise HTTPException(status_code=400, detail="Arquivo enviado nao e uma imagem valida.") from exc
+        raise HTTPException(
+            status_code=400, detail="Arquivo enviado nao e uma imagem valida."
+        ) from exc
 
 
 def _to_webp(image: Image.Image, quality: int) -> bytes:
@@ -110,5 +118,7 @@ def _local_path_from_public_url(url: str) -> Path | None:
 
 
 def _slug_tipo(tipo: str) -> str:
-    valor = "".join(char if char.isalnum() else "-" for char in str(tipo or "foto").lower())
+    valor = "".join(
+        char if char.isalnum() else "-" for char in str(tipo or "foto").lower()
+    )
     return valor.strip("-") or "foto"
