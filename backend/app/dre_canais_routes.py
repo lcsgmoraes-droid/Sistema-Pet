@@ -1,6 +1,7 @@
 """
 Endpoint DRE por Canal - Retorna dados estruturados com nome e cor por canal
 """
+
 import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -31,43 +32,45 @@ router = APIRouter(prefix="/financeiro/dre/canais", tags=["DRE por Canal"])
 # ==================== CONFIGURAÇÃO DE CANAIS ====================
 
 CANAIS_CONFIG = {
-    'loja_fisica': {
-        'nome': 'Loja Física',
-        'cor': '#3b82f6',  # Azul
-        'cor_bg': '#eff6ff'
+    "loja_fisica": {
+        "nome": "Loja Física",
+        "cor": "#3b82f6",  # Azul
+        "cor_bg": "#eff6ff",
     },
-    'mercado_livre': {
-        'nome': 'Mercado Livre',
-        'cor': '#fbbf24',  # Amarelo
-        'cor_bg': '#fef3c7'
+    "mercado_livre": {
+        "nome": "Mercado Livre",
+        "cor": "#fbbf24",  # Amarelo
+        "cor_bg": "#fef3c7",
     },
-    'shopee': {
-        'nome': 'Shopee',
-        'cor': '#f97316',  # Laranja
-        'cor_bg': '#ffedd5'
+    "shopee": {
+        "nome": "Shopee",
+        "cor": "#f97316",  # Laranja
+        "cor_bg": "#ffedd5",
     },
-    'amazon': {
-        'nome': 'Amazon',
-        'cor': '#16a34a',  # Verde
-        'cor_bg': '#dcfce7'
+    "amazon": {
+        "nome": "Amazon",
+        "cor": "#16a34a",  # Verde
+        "cor_bg": "#dcfce7",
     },
-    'ecommerce': {
-        'nome': 'E-commerce',
-        'cor': '#9333ea',  # Roxo
-        'cor_bg': '#faf5ff'
+    "ecommerce": {
+        "nome": "E-commerce",
+        "cor": "#9333ea",  # Roxo
+        "cor_bg": "#faf5ff",
     },
-    'app': {
-        'nome': 'App',
-        'cor': '#4f46e5',  # Índigo
-        'cor_bg': '#eef2ff'
-    }
+    "app": {
+        "nome": "App",
+        "cor": "#4f46e5",  # Índigo
+        "cor_bg": "#eef2ff",
+    },
 }
 
 
 # ==================== SCHEMAS ====================
 
+
 class LinhaCanal(BaseModel):
     """Uma linha da DRE de um canal específico"""
+
     descricao: str  # Ex: "Faturamento Mercado Livre"
     valor: float
     percentual: float
@@ -84,6 +87,7 @@ class LinhaCanal(BaseModel):
 
 class DREPorCanalResponse(BaseModel):
     """DRE completa com linhas separadas por canal"""
+
     periodo: str
     mes: int
     ano: int
@@ -123,50 +127,57 @@ class DREDetalheResponse(BaseModel):
 
 # ==================== FUNÇÕES AUXILIARES ====================
 
-def _obter_vendas_por_canal_legacy(db: Session, mes: int, ano: int, user_id: int) -> Dict:
+
+def _obter_vendas_por_canal_legacy(
+    db: Session, mes: int, ano: int, user_id: int
+) -> Dict:
     """Retorna vendas agrupadas por canal"""
-    vendas = db.query(Venda).filter(
-        and_(
-            Venda.user_id == user_id,
-            extract('month', Venda.data_venda) == mes,
-            extract('year', Venda.data_venda) == ano,
-            _filtro_status_venda_dre()
+    vendas = (
+        db.query(Venda)
+        .filter(
+            and_(
+                Venda.user_id == user_id,
+                extract("month", Venda.data_venda) == mes,
+                extract("year", Venda.data_venda) == ano,
+                _filtro_status_venda_dre(),
+            )
         )
-    ).all()
-    
+        .all()
+    )
+
     # Agrupar por canal
     dados_por_canal = {}
-    
+
     for venda in vendas:
-        canal = venda.canal or 'loja_fisica'  # Default para loja física
-        
+        canal = venda.canal or "loja_fisica"  # Default para loja física
+
         if canal not in dados_por_canal:
             dados_por_canal[canal] = {
-                'receita_produtos': Decimal('0'),  # subtotal (só produtos)
-                'taxa_entrega': Decimal('0'),  # frete cobrado do cliente
-                'descontos': Decimal('0'),
-                'cmv': Decimal('0'),
-                'vendas': []
+                "receita_produtos": Decimal("0"),  # subtotal (só produtos)
+                "taxa_entrega": Decimal("0"),  # frete cobrado do cliente
+                "descontos": Decimal("0"),
+                "cmv": Decimal("0"),
+                "vendas": [],
             }
-        
+
         # Receita de Produtos (apenas subtotal, sem frete)
-        dados_por_canal[canal]['receita_produtos'] += venda.subtotal
-        
+        dados_por_canal[canal]["receita_produtos"] += venda.subtotal
+
         # Taxa de Frete (o que o cliente pagou)
         if venda.taxa_entrega:
-            dados_por_canal[canal]['taxa_entrega'] += venda.taxa_entrega
-        
-        dados_por_canal[canal]['descontos'] += (venda.desconto_valor or 0)
-        dados_por_canal[canal]['vendas'].append(venda)
-        
+            dados_por_canal[canal]["taxa_entrega"] += venda.taxa_entrega
+
+        dados_por_canal[canal]["descontos"] += venda.desconto_valor or 0
+        dados_por_canal[canal]["vendas"].append(venda)
+
         # CMV
         itens = db.query(VendaItem).filter(VendaItem.venda_id == venda.id).all()
         for item in itens:
             produto = db.query(Produto).filter(Produto.id == item.produto_id).first()
             if produto and produto.preco_custo:
                 custo = Decimal(str(produto.preco_custo)) * item.quantidade
-                dados_por_canal[canal]['cmv'] += custo
-    
+                dados_por_canal[canal]["cmv"] += custo
+
     return dados_por_canal
 
 
@@ -185,7 +196,7 @@ def _decimal(valor) -> Decimal:
 
 
 def _canal_expr():
-    return func.coalesce(Venda.canal, 'loja_fisica')
+    return func.coalesce(Venda.canal, "loja_fisica")
 
 
 CANAL_ALIASES = {
@@ -229,7 +240,9 @@ def _load_rentabilidade_snapshot(snapshot_raw: Any) -> Optional[Dict[str, Any]]:
 
 
 def _snapshot_pronto(venda: Venda) -> Optional[Dict[str, Any]]:
-    snapshot = _load_rentabilidade_snapshot(getattr(venda, "rentabilidade_snapshot", None))
+    snapshot = _load_rentabilidade_snapshot(
+        getattr(venda, "rentabilidade_snapshot", None)
+    )
     if not snapshot:
         return None
     try:
@@ -240,23 +253,31 @@ def _snapshot_pronto(venda: Venda) -> Optional[Dict[str, Any]]:
 
 
 def _formas_pagamento_map(db: Session, tenant_id: str) -> Dict[str, FormaPagamento]:
-    formas = db.query(FormaPagamento).filter(
-        and_(FormaPagamento.tenant_id == tenant_id, FormaPagamento.ativo.is_(True))
-    ).all()
+    formas = (
+        db.query(FormaPagamento)
+        .filter(
+            and_(FormaPagamento.tenant_id == tenant_id, FormaPagamento.ativo.is_(True))
+        )
+        .all()
+    )
     return {_normalizar_forma_pagamento(forma.nome): forma for forma in formas}
 
 
 def _impostos_percentual(db: Session, tenant_id: str) -> float:
     try:
-        config_fiscal = db.query(EmpresaConfigFiscal).filter(
-            EmpresaConfigFiscal.tenant_id == tenant_id
-        ).first()
+        config_fiscal = (
+            db.query(EmpresaConfigFiscal)
+            .filter(EmpresaConfigFiscal.tenant_id == tenant_id)
+            .first()
+        )
         return float(getattr(config_fiscal, "aliquota_simples_vigente", 0) or 0)
     except Exception:
         return 0.0
 
 
-def _bulk_comissoes_por_venda(db: Session, tenant_id: str, venda_ids: List[int]) -> Dict[int, float]:
+def _bulk_comissoes_por_venda(
+    db: Session, tenant_id: str, venda_ids: List[int]
+) -> Dict[int, float]:
     if not venda_ids:
         return {}
     try:
@@ -264,11 +285,22 @@ def _bulk_comissoes_por_venda(db: Session, tenant_id: str, venda_ids: List[int])
             db.query(
                 ComissaoItem.venda_id,
                 func.coalesce(
-                    func.sum(func.coalesce(ComissaoItem.valor_comissao, ComissaoItem.valor_comissao_gerada, 0)),
+                    func.sum(
+                        func.coalesce(
+                            ComissaoItem.valor_comissao,
+                            ComissaoItem.valor_comissao_gerada,
+                            0,
+                        )
+                    ),
                     0,
                 ),
             )
-            .filter(and_(ComissaoItem.tenant_id == tenant_id, ComissaoItem.venda_id.in_(venda_ids)))
+            .filter(
+                and_(
+                    ComissaoItem.tenant_id == tenant_id,
+                    ComissaoItem.venda_id.in_(venda_ids),
+                )
+            )
             .group_by(ComissaoItem.venda_id)
             .all()
         )
@@ -277,20 +309,29 @@ def _bulk_comissoes_por_venda(db: Session, tenant_id: str, venda_ids: List[int])
         return {}
 
 
-def _bulk_cupons_por_venda(db: Session, tenant_id: str, vendas: List[Venda]) -> Dict[int, float]:
+def _bulk_cupons_por_venda(
+    db: Session, tenant_id: str, vendas: List[Venda]
+) -> Dict[int, float]:
     resultado = {
         venda.id: float(_decimal(getattr(venda, "cupom_discount_applied", 0)))
         for venda in vendas
         if getattr(venda, "id", None)
     }
-    ids_sem_valor = [venda.id for venda in vendas if getattr(venda, "id", None) and resultado.get(venda.id, 0) <= 0]
+    ids_sem_valor = [
+        venda.id
+        for venda in vendas
+        if getattr(venda, "id", None) and resultado.get(venda.id, 0) <= 0
+    ]
     if not ids_sem_valor:
         return resultado
     try:
         from app.campaigns.models import CouponRedemption
 
         rows = (
-            db.query(CouponRedemption.venda_id, func.coalesce(func.sum(CouponRedemption.discount_applied), 0))
+            db.query(
+                CouponRedemption.venda_id,
+                func.coalesce(func.sum(CouponRedemption.discount_applied), 0),
+            )
             .filter(
                 CouponRedemption.tenant_id == tenant_id,
                 CouponRedemption.venda_id.in_(ids_sem_valor),
@@ -306,14 +347,19 @@ def _bulk_cupons_por_venda(db: Session, tenant_id: str, vendas: List[Venda]) -> 
     return resultado
 
 
-def _bulk_cashback_por_venda(db: Session, tenant_id: str, venda_ids: List[int]) -> Dict[int, float]:
+def _bulk_cashback_por_venda(
+    db: Session, tenant_id: str, venda_ids: List[int]
+) -> Dict[int, float]:
     if not venda_ids:
         return {}
     try:
         from app.campaigns.models import CashbackTransaction
 
         rows = (
-            db.query(CashbackTransaction.source_id, func.coalesce(func.sum(CashbackTransaction.amount), 0))
+            db.query(
+                CashbackTransaction.source_id,
+                func.coalesce(func.sum(CashbackTransaction.amount), 0),
+            )
             .filter(
                 CashbackTransaction.tenant_id == tenant_id,
                 CashbackTransaction.amount < 0,
@@ -322,28 +368,42 @@ def _bulk_cashback_por_venda(db: Session, tenant_id: str, venda_ids: List[int]) 
             .group_by(CashbackTransaction.source_id)
             .all()
         )
-        return {int(venda_id): abs(float(total or 0)) for venda_id, total in rows if venda_id}
+        return {
+            int(venda_id): abs(float(total or 0))
+            for venda_id, total in rows
+            if venda_id
+        }
     except Exception:
         return {}
 
 
-def _bulk_taxa_operacional_por_venda(db: Session, tenant_id: str, vendas: List[Venda]) -> Dict[int, float]:
+def _bulk_taxa_operacional_por_venda(
+    db: Session, tenant_id: str, vendas: List[Venda]
+) -> Dict[int, float]:
     entregador_ids = {
         venda.entregador_id
         for venda in vendas
-        if getattr(venda, "tem_entrega", False) and getattr(venda, "entregador_id", None)
+        if getattr(venda, "tem_entrega", False)
+        and getattr(venda, "entregador_id", None)
     }
     if not entregador_ids:
         return {}
     try:
-        entregadores = db.query(Cliente.id, Cliente.taxa_fixa_entrega).filter(
-            and_(Cliente.tenant_id == tenant_id, Cliente.id.in_(entregador_ids))
-        ).all()
-        taxas = {entregador_id: float(taxa or 0) for entregador_id, taxa in entregadores}
+        entregadores = (
+            db.query(Cliente.id, Cliente.taxa_fixa_entrega)
+            .filter(
+                and_(Cliente.tenant_id == tenant_id, Cliente.id.in_(entregador_ids))
+            )
+            .all()
+        )
+        taxas = {
+            entregador_id: float(taxa or 0) for entregador_id, taxa in entregadores
+        }
         return {
             venda.id: taxas.get(venda.entregador_id, 0.0)
             for venda in vendas
-            if getattr(venda, "tem_entrega", False) and getattr(venda, "entregador_id", None)
+            if getattr(venda, "tem_entrega", False)
+            and getattr(venda, "entregador_id", None)
         }
     except Exception:
         return {}
@@ -357,28 +417,38 @@ def _bulk_estoque_custos_por_venda(
     if not venda_ids:
         return {}
     try:
-        movimentos = db.query(EstoqueMovimentacao).filter(
-            and_(
-                EstoqueMovimentacao.tenant_id == tenant_id,
-                EstoqueMovimentacao.referencia_tipo == "venda",
-                EstoqueMovimentacao.referencia_id.in_(venda_ids),
-                EstoqueMovimentacao.tipo == "saida",
+        movimentos = (
+            db.query(EstoqueMovimentacao)
+            .filter(
+                and_(
+                    EstoqueMovimentacao.tenant_id == tenant_id,
+                    EstoqueMovimentacao.referencia_tipo == "venda",
+                    EstoqueMovimentacao.referencia_id.in_(venda_ids),
+                    EstoqueMovimentacao.tipo == "saida",
+                )
             )
-        ).all()
+            .all()
+        )
     except Exception:
         return {}
 
     resultado: Dict[int, Dict[int, Dict[str, float]]] = {}
     for movimento in movimentos:
-        if not getattr(movimento, "referencia_id", None) or not getattr(movimento, "produto_id", None):
+        if not getattr(movimento, "referencia_id", None) or not getattr(
+            movimento, "produto_id", None
+        ):
             continue
         mapa_venda = resultado.setdefault(int(movimento.referencia_id), {})
         mapa_produto = mapa_venda.setdefault(
             int(movimento.produto_id),
             {"quantidade": 0.0, "valor_total": 0.0},
         )
-        mapa_produto["quantidade"] += abs(float(getattr(movimento, "quantidade", 0) or 0))
-        mapa_produto["valor_total"] += abs(float(getattr(movimento, "valor_total", 0) or 0))
+        mapa_produto["quantidade"] += abs(
+            float(getattr(movimento, "quantidade", 0) or 0)
+        )
+        mapa_produto["valor_total"] += abs(
+            float(getattr(movimento, "valor_total", 0) or 0)
+        )
     return resultado
 
 
@@ -388,25 +458,25 @@ def _campo_zero() -> Decimal:
 
 def _novo_canal() -> Dict:
     return {
-        'receita_produtos': _campo_zero(),
-        'receita_servicos': _campo_zero(),
-        'receita_frete': _campo_zero(),
-        'descontos': _campo_zero(),
-        'impostos': _campo_zero(),
-        'cmv': _campo_zero(),
-        'fretes_compras': _campo_zero(),
-        'taxas_cartao': _campo_zero(),
-        'taxas_marketplace': _campo_zero(),
-        'repasse_entrega': _campo_zero(),
-        'taxa_operacional_entrega': _campo_zero(),
-        'comissoes': _campo_zero(),
-        'campanhas': _campo_zero(),
-        'despesas_pessoal': _campo_zero(),
-        'despesas_administrativas': _campo_zero(),
-        'despesas_comerciais': _campo_zero(),
-        'despesas_financeiras': _campo_zero(),
-        'outras_despesas': _campo_zero(),
-        'vendas': [],
+        "receita_produtos": _campo_zero(),
+        "receita_servicos": _campo_zero(),
+        "receita_frete": _campo_zero(),
+        "descontos": _campo_zero(),
+        "impostos": _campo_zero(),
+        "cmv": _campo_zero(),
+        "fretes_compras": _campo_zero(),
+        "taxas_cartao": _campo_zero(),
+        "taxas_marketplace": _campo_zero(),
+        "repasse_entrega": _campo_zero(),
+        "taxa_operacional_entrega": _campo_zero(),
+        "comissoes": _campo_zero(),
+        "campanhas": _campo_zero(),
+        "despesas_pessoal": _campo_zero(),
+        "despesas_administrativas": _campo_zero(),
+        "despesas_comerciais": _campo_zero(),
+        "despesas_financeiras": _campo_zero(),
+        "outras_despesas": _campo_zero(),
+        "vendas": [],
     }
 
 
@@ -414,10 +484,14 @@ def _valor_item_bruto(item: VendaItem) -> Decimal:
     subtotal = _decimal(getattr(item, "subtotal", 0))
     if subtotal:
         return subtotal
-    return _decimal(getattr(item, "quantidade", 0)) * _decimal(getattr(item, "preco_unitario", 0))
+    return _decimal(getattr(item, "quantidade", 0)) * _decimal(
+        getattr(item, "preco_unitario", 0)
+    )
 
 
-def _separar_receita_produto_servico(venda: Venda, receita_bruta: Decimal) -> tuple[Decimal, Decimal]:
+def _separar_receita_produto_servico(
+    venda: Venda, receita_bruta: Decimal
+) -> tuple[Decimal, Decimal]:
     total_produtos = Decimal("0")
     total_servicos = Decimal("0")
 
@@ -442,7 +516,11 @@ def _conta_valor(conta: ContaPagar) -> Decimal:
 
 
 def _texto_conta(conta: ContaPagar, subcategoria: Optional[DRESubcategoria]) -> str:
-    categoria_nome = getattr(getattr(subcategoria, "categoria", None), "nome", "") if subcategoria else ""
+    categoria_nome = (
+        getattr(getattr(subcategoria, "categoria", None), "nome", "")
+        if subcategoria
+        else ""
+    )
     partes = [
         getattr(conta, "descricao", "") or "",
         getattr(subcategoria, "nome", "") if subcategoria else "",
@@ -471,15 +549,79 @@ def _eh_custo_de_venda_ja_vindo_da_venda(texto: str) -> bool:
 
 
 def _classificar_conta_dre(texto: str) -> str:
-    if "marketplace" in texto or "mercado livre" in texto or "shopee" in texto or "amazon" in texto:
+    if (
+        "marketplace" in texto
+        or "mercado livre" in texto
+        or "shopee" in texto
+        or "amazon" in texto
+    ):
         return "taxas_marketplace"
-    if any(t in texto for t in ["salario", "salário", "folha", "fgts", "inss", "vale ", "ferias", "férias", "13", "rescis"]):
+    if any(
+        t in texto
+        for t in [
+            "salario",
+            "salário",
+            "folha",
+            "fgts",
+            "inss",
+            "vale ",
+            "ferias",
+            "férias",
+            "13",
+            "rescis",
+        ]
+    ):
         return "despesas_pessoal"
-    if any(t in texto for t in ["aluguel", "condominio", "condomínio", "iptu", "energia", "eletrica", "elétrica", "agua", "água", "internet", "telefonia", "telefone", "seguranca", "segurança", "limpeza", "manutencao", "manutenção"]):
+    if any(
+        t in texto
+        for t in [
+            "aluguel",
+            "condominio",
+            "condomínio",
+            "iptu",
+            "energia",
+            "eletrica",
+            "elétrica",
+            "agua",
+            "água",
+            "internet",
+            "telefonia",
+            "telefone",
+            "seguranca",
+            "segurança",
+            "limpeza",
+            "manutencao",
+            "manutenção",
+        ]
+    ):
         return "despesas_administrativas"
-    if any(t in texto for t in ["marketing", "ads", "propaganda", "anuncio", "anúncio", "brinde", "fidelidade", "campanha", "evento", "patrocin"]):
+    if any(
+        t in texto
+        for t in [
+            "marketing",
+            "ads",
+            "propaganda",
+            "anuncio",
+            "anúncio",
+            "brinde",
+            "fidelidade",
+            "campanha",
+            "evento",
+            "patrocin",
+        ]
+    ):
         return "despesas_comerciais"
-    if any(t in texto for t in ["juros", "tarifa bancaria", "tarifa bancária", "iof", "financeir", "banco"]):
+    if any(
+        t in texto
+        for t in [
+            "juros",
+            "tarifa bancaria",
+            "tarifa bancária",
+            "iof",
+            "financeir",
+            "banco",
+        ]
+    ):
         return "despesas_financeiras"
     return "outras_despesas"
 
@@ -521,7 +663,11 @@ def obter_vendas_por_canal(db: Session, mes: int, ano: int, tenant_id: str) -> D
         cupom_desconto = cupons_por_venda.get(venda.id, 0.0)
         custo_campanha = cupom_desconto + cashback_por_venda.get(venda.id, 0.0)
         snapshot = _snapshot_pronto(venda)
-        if snapshot and custo_campanha > 0 and _decimal(snapshot.get("custo_campanha", 0)) <= 0:
+        if (
+            snapshot
+            and custo_campanha > 0
+            and _decimal(snapshot.get("custo_campanha", 0)) <= 0
+        ):
             snapshot = None
         if snapshot is None:
             snapshot = build_venda_rentabilidade_snapshot(
@@ -538,35 +684,43 @@ def obter_vendas_por_canal(db: Session, mes: int, ano: int, tenant_id: str) -> D
             )
 
         receita_bruta = _decimal(snapshot.get("venda_bruta", 0))
-        receita_produtos, receita_servicos = _separar_receita_produto_servico(venda, receita_bruta)
+        receita_produtos, receita_servicos = _separar_receita_produto_servico(
+            venda, receita_bruta
+        )
 
-        dados['receita_produtos'] += receita_produtos
-        dados['receita_servicos'] += receita_servicos
-        dados['receita_frete'] += _decimal(snapshot.get("taxa_loja", 0))
-        dados['descontos'] += _decimal(snapshot.get("desconto", 0))
-        dados['impostos'] += _decimal(snapshot.get("imposto", 0))
-        dados['cmv'] += _decimal(snapshot.get("custo_produtos", 0))
-        dados['taxas_cartao'] += _decimal(snapshot.get("taxa_cartao", 0))
-        dados['repasse_entrega'] += _decimal(snapshot.get("taxa_entrega", 0))
-        dados['taxa_operacional_entrega'] += _decimal(snapshot.get("taxa_operacional", 0))
-        dados['comissoes'] += _decimal(snapshot.get("comissao", 0))
-        dados['campanhas'] += _decimal(snapshot.get("custo_campanha", 0))
-        dados['vendas'].append(venda)
+        dados["receita_produtos"] += receita_produtos
+        dados["receita_servicos"] += receita_servicos
+        dados["receita_frete"] += _decimal(snapshot.get("taxa_loja", 0))
+        dados["descontos"] += _decimal(snapshot.get("desconto", 0))
+        dados["impostos"] += _decimal(snapshot.get("imposto", 0))
+        dados["cmv"] += _decimal(snapshot.get("custo_produtos", 0))
+        dados["taxas_cartao"] += _decimal(snapshot.get("taxa_cartao", 0))
+        dados["repasse_entrega"] += _decimal(snapshot.get("taxa_entrega", 0))
+        dados["taxa_operacional_entrega"] += _decimal(
+            snapshot.get("taxa_operacional", 0)
+        )
+        dados["comissoes"] += _decimal(snapshot.get("comissao", 0))
+        dados["campanhas"] += _decimal(snapshot.get("custo_campanha", 0))
+        dados["vendas"].append(venda)
 
     return dados_por_canal
 
 
-def agregar_contas_pagar_por_canal(db: Session, mes: int, ano: int, tenant_id: str, dados_canais: Dict[str, Dict]) -> None:
+def agregar_contas_pagar_por_canal(
+    db: Session, mes: int, ano: int, tenant_id: str, dados_canais: Dict[str, Dict]
+) -> None:
     """Agrega despesas por competencia. Sem canal informado vai para Loja Fisica."""
     contas = (
         db.query(ContaPagar)
-        .outerjoin(DRESubcategoria, ContaPagar.dre_subcategoria_id == DRESubcategoria.id)
+        .outerjoin(
+            DRESubcategoria, ContaPagar.dre_subcategoria_id == DRESubcategoria.id
+        )
         .filter(
             and_(
                 ContaPagar.tenant_id == tenant_id,
-                extract('month', ContaPagar.data_emissao) == mes,
-                extract('year', ContaPagar.data_emissao) == ano,
-                ContaPagar.status != 'cancelado',
+                extract("month", ContaPagar.data_emissao) == mes,
+                extract("year", ContaPagar.data_emissao) == ano,
+                ContaPagar.status != "cancelado",
                 ContaPagar.nota_entrada_id.is_(None),
             )
         )
@@ -604,31 +758,45 @@ def agregar_contas_pagar_por_canal(db: Session, mes: int, ano: int, tenant_id: s
         dados[campo] += _conta_valor(conta)
 
 
-def agregar_fretes_sobre_compras(db: Session, mes: int, ano: int, tenant_id: str, dados_canais: Dict[str, Dict]) -> None:
-    subcategoria_frete_compras = db.query(DRESubcategoria).filter(
-        DRESubcategoria.tenant_id == tenant_id,
-        DRESubcategoria.nome == "Fretes sobre Compras",
-    ).first()
+def agregar_fretes_sobre_compras(
+    db: Session, mes: int, ano: int, tenant_id: str, dados_canais: Dict[str, Dict]
+) -> None:
+    subcategoria_frete_compras = (
+        db.query(DRESubcategoria)
+        .filter(
+            DRESubcategoria.tenant_id == tenant_id,
+            DRESubcategoria.nome == "Fretes sobre Compras",
+        )
+        .first()
+    )
 
     if not subcategoria_frete_compras:
         return
 
-    total = db.query(func.coalesce(func.sum(ContaPagar.valor_original), 0)).filter(
-        and_(
-            ContaPagar.tenant_id == tenant_id,
-            extract('month', ContaPagar.data_emissao) == mes,
-            extract('year', ContaPagar.data_emissao) == ano,
-            ContaPagar.status != 'cancelado',
-            ContaPagar.dre_subcategoria_id == subcategoria_frete_compras.id,
+    total = (
+        db.query(func.coalesce(func.sum(ContaPagar.valor_original), 0))
+        .filter(
+            and_(
+                ContaPagar.tenant_id == tenant_id,
+                extract("month", ContaPagar.data_emissao) == mes,
+                extract("year", ContaPagar.data_emissao) == ano,
+                ContaPagar.status != "cancelado",
+                ContaPagar.dre_subcategoria_id == subcategoria_frete_compras.id,
+            )
         )
-    ).scalar()
+        .scalar()
+    )
 
     if total:
-        dados_canais.setdefault("loja_fisica", _novo_canal())["fretes_compras"] += _decimal(total)
+        dados_canais.setdefault("loja_fisica", _novo_canal())["fretes_compras"] += (
+            _decimal(total)
+        )
 
 
 def _somar(dados_canais: Dict[str, Dict], campo: str) -> Decimal:
-    return sum((_decimal(dados.get(campo, 0)) for dados in dados_canais.values()), Decimal("0"))
+    return sum(
+        (_decimal(dados.get(campo, 0)) for dados in dados_canais.values()), Decimal("0")
+    )
 
 
 def _percentual(valor: Decimal, receita_bruta_total: Decimal) -> float:
@@ -678,7 +846,11 @@ def _linha_total(
     origem: Optional[str] = None,
     campo: Optional[str] = None,
 ) -> LinhaCanal:
-    percentual = Decimal("100") if descricao.startswith("(+)") and receita_bruta_total > 0 else Decimal(str(_percentual(valor, receita_bruta_total)))
+    percentual = (
+        Decimal("100")
+        if descricao.startswith("(+)") and receita_bruta_total > 0
+        else Decimal(str(_percentual(valor, receita_bruta_total)))
+    )
     return LinhaCanal(
         descricao=descricao,
         valor=float(valor),
@@ -732,14 +904,28 @@ def _adicionar_linhas_campo(
 ) -> None:
     origem_linha = origem or ORIGENS_DRE.get(campo)
     for canal in sorted(dados_canais.keys()):
-        linhas.append(_linha_canal(canal, descricao, _decimal(dados_canais[canal].get(campo, 0)), receita_bruta_total, tipo, origem_linha, campo))
+        linhas.append(
+            _linha_canal(
+                canal,
+                descricao,
+                _decimal(dados_canais[canal].get(campo, 0)),
+                receita_bruta_total,
+                tipo,
+                origem_linha,
+                campo,
+            )
+        )
 
 
-def montar_linhas_dre_competencia(dados_canais: Dict[str, Dict]) -> tuple[List[LinhaCanal], Dict[str, Any]]:
+def montar_linhas_dre_competencia(
+    dados_canais: Dict[str, Dict],
+) -> tuple[List[LinhaCanal], Dict[str, Any]]:
     receita_produtos_total = _somar(dados_canais, "receita_produtos")
     receita_servicos_total = _somar(dados_canais, "receita_servicos")
     receita_frete_total = _somar(dados_canais, "receita_frete")
-    receita_bruta_total = receita_produtos_total + receita_servicos_total + receita_frete_total
+    receita_bruta_total = (
+        receita_produtos_total + receita_servicos_total + receita_frete_total
+    )
 
     descontos_total = _somar(dados_canais, "descontos")
     impostos_total = _somar(dados_canais, "impostos")
@@ -770,40 +956,251 @@ def montar_linhas_dre_competencia(dados_canais: Dict[str, Dict]) -> tuple[List[L
 
     linhas: List[LinhaCanal] = []
 
-    linhas.append(_linha_total("(+) RECEITA BRUTA", receita_bruta_total, receita_bruta_total, "receita", "#111827", "#f3f4f6", ORIGENS_DRE["receita_bruta_total"]))
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "receita_produtos", "Vendas de Produtos", "receita")
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "receita_servicos", "Vendas de Servicos", "receita")
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "receita_frete", "Receita de Frete", "receita")
+    linhas.append(
+        _linha_total(
+            "(+) RECEITA BRUTA",
+            receita_bruta_total,
+            receita_bruta_total,
+            "receita",
+            "#111827",
+            "#f3f4f6",
+            ORIGENS_DRE["receita_bruta_total"],
+        )
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "receita_produtos",
+        "Vendas de Produtos",
+        "receita",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "receita_servicos",
+        "Vendas de Servicos",
+        "receita",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "receita_frete",
+        "Receita de Frete",
+        "receita",
+    )
 
-    linhas.append(_linha_total("(-) DEDUCOES DA RECEITA", deducoes_total, receita_bruta_total, "deducao", "#dc2626", "#fef2f2", ORIGENS_DRE["deducoes_total"]))
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "descontos", "Descontos Concedidos", "deducao")
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "impostos", "Impostos sobre Vendas", "deducao")
+    linhas.append(
+        _linha_total(
+            "(-) DEDUCOES DA RECEITA",
+            deducoes_total,
+            receita_bruta_total,
+            "deducao",
+            "#dc2626",
+            "#fef2f2",
+            ORIGENS_DRE["deducoes_total"],
+        )
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "descontos",
+        "Descontos Concedidos",
+        "deducao",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "impostos",
+        "Impostos sobre Vendas",
+        "deducao",
+    )
 
-    linhas.append(_linha_total("(=) RECEITA LIQUIDA", receita_liquida_total, receita_bruta_total, "receita", "#059669", "#d1fae5", ORIGENS_DRE["receita_liquida_total"]))
+    linhas.append(
+        _linha_total(
+            "(=) RECEITA LIQUIDA",
+            receita_liquida_total,
+            receita_bruta_total,
+            "receita",
+            "#059669",
+            "#d1fae5",
+            ORIGENS_DRE["receita_liquida_total"],
+        )
+    )
 
-    linhas.append(_linha_total("(-) CUSTO DAS MERCADORIAS VENDIDAS (CMV)", cmv_total, receita_bruta_total, "custo", "#dc2626", "#fef2f2", ORIGENS_DRE["cmv_total"]))
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "cmv", "CMV", "custo")
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "fretes_compras", "Fretes sobre Compras", "custo")
+    linhas.append(
+        _linha_total(
+            "(-) CUSTO DAS MERCADORIAS VENDIDAS (CMV)",
+            cmv_total,
+            receita_bruta_total,
+            "custo",
+            "#dc2626",
+            "#fef2f2",
+            ORIGENS_DRE["cmv_total"],
+        )
+    )
+    _adicionar_linhas_campo(
+        linhas, dados_canais, receita_bruta_total, "cmv", "CMV", "custo"
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "fretes_compras",
+        "Fretes sobre Compras",
+        "custo",
+    )
 
-    linhas.append(_linha_total("(=) LUCRO BRUTO", lucro_bruto_total, receita_bruta_total, "lucro", "#059669", "#d1fae5", ORIGENS_DRE["lucro_bruto_total"]))
+    linhas.append(
+        _linha_total(
+            "(=) LUCRO BRUTO",
+            lucro_bruto_total,
+            receita_bruta_total,
+            "lucro",
+            "#059669",
+            "#d1fae5",
+            ORIGENS_DRE["lucro_bruto_total"],
+        )
+    )
 
-    linhas.append(_linha_total("(-) CUSTOS E DESPESAS VARIAVEIS DE VENDA", despesas_variaveis_total, receita_bruta_total, "despesa", "#dc2626", "#fff7ed", ORIGENS_DRE["despesas_variaveis_total"]))
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "taxas_cartao", "Taxas de Cartao/Meios de Pagamento", "despesa")
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "taxas_marketplace", "Taxas de Marketplace", "despesa")
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "repasse_entrega", "Repasse/Custo de Entrega", "despesa")
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "taxa_operacional_entrega", "Custo Operacional de Entrega", "despesa")
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "comissoes", "Comissoes de Venda", "despesa")
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "campanhas", "Campanhas, Cupons e Cashback", "despesa")
+    linhas.append(
+        _linha_total(
+            "(-) CUSTOS E DESPESAS VARIAVEIS DE VENDA",
+            despesas_variaveis_total,
+            receita_bruta_total,
+            "despesa",
+            "#dc2626",
+            "#fff7ed",
+            ORIGENS_DRE["despesas_variaveis_total"],
+        )
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "taxas_cartao",
+        "Taxas de Cartao/Meios de Pagamento",
+        "despesa",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "taxas_marketplace",
+        "Taxas de Marketplace",
+        "despesa",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "repasse_entrega",
+        "Repasse/Custo de Entrega",
+        "despesa",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "taxa_operacional_entrega",
+        "Custo Operacional de Entrega",
+        "despesa",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "comissoes",
+        "Comissoes de Venda",
+        "despesa",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "campanhas",
+        "Campanhas, Cupons e Cashback",
+        "despesa",
+    )
 
-    linhas.append(_linha_total("(-) DESPESAS OPERACIONAIS FIXAS/ADMINISTRATIVAS", despesas_fixas_total, receita_bruta_total, "despesa", "#dc2626", "#fef2f2", ORIGENS_DRE["despesas_fixas_total"]))
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "despesas_pessoal", "Folha, Salarios e Encargos", "despesa")
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "despesas_administrativas", "Aluguel/Ocupacao e Administrativo", "despesa")
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "despesas_comerciais", "Marketing e Comercial", "despesa")
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "despesas_financeiras", "Despesas Financeiras", "despesa")
-    _adicionar_linhas_campo(linhas, dados_canais, receita_bruta_total, "outras_despesas", "Outras Despesas", "despesa")
+    linhas.append(
+        _linha_total(
+            "(-) DESPESAS OPERACIONAIS FIXAS/ADMINISTRATIVAS",
+            despesas_fixas_total,
+            receita_bruta_total,
+            "despesa",
+            "#dc2626",
+            "#fef2f2",
+            ORIGENS_DRE["despesas_fixas_total"],
+        )
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "despesas_pessoal",
+        "Folha, Salarios e Encargos",
+        "despesa",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "despesas_administrativas",
+        "Aluguel/Ocupacao e Administrativo",
+        "despesa",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "despesas_comerciais",
+        "Marketing e Comercial",
+        "despesa",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "despesas_financeiras",
+        "Despesas Financeiras",
+        "despesa",
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "outras_despesas",
+        "Outras Despesas",
+        "despesa",
+    )
 
-    linhas.append(_linha_total("(=) RESULTADO OPERACIONAL", resultado_operacional_total, receita_bruta_total, "lucro", "#059669", "#d1fae5", ORIGENS_DRE["resultado_operacional_total"]))
-    linhas.append(_linha_total("(=) LUCRO/PREJUIZO LIQUIDO", lucro_liquido_total, receita_bruta_total, "lucro", "#059669", "#d1fae5", ORIGENS_DRE["lucro_liquido_total"]))
+    linhas.append(
+        _linha_total(
+            "(=) RESULTADO OPERACIONAL",
+            resultado_operacional_total,
+            receita_bruta_total,
+            "lucro",
+            "#059669",
+            "#d1fae5",
+            ORIGENS_DRE["resultado_operacional_total"],
+        )
+    )
+    linhas.append(
+        _linha_total(
+            "(=) LUCRO/PREJUIZO LIQUIDO",
+            lucro_liquido_total,
+            receita_bruta_total,
+            "lucro",
+            "#059669",
+            "#d1fae5",
+            ORIGENS_DRE["lucro_liquido_total"],
+        )
+    )
 
     totais = {
         "receita_bruta": float(receita_bruta_total),
@@ -821,55 +1218,90 @@ def montar_linhas_dre_competencia(dados_canais: Dict[str, Dict]) -> tuple[List[L
         "resultado_operacional": float(resultado_operacional_total),
         "resultado_financeiro": 0.0,
         "lucro_liquido": float(lucro_liquido_total),
-        "margem_bruta": round((float(lucro_bruto_total) / float(receita_liquida_total) * 100) if receita_liquida_total > 0 else 0, 2),
-        "margem_liquida": round((float(lucro_liquido_total) / float(receita_liquida_total) * 100) if receita_liquida_total > 0 else 0, 2),
+        "margem_bruta": round(
+            (float(lucro_bruto_total) / float(receita_liquida_total) * 100)
+            if receita_liquida_total > 0
+            else 0,
+            2,
+        ),
+        "margem_liquida": round(
+            (float(lucro_liquido_total) / float(receita_liquida_total) * 100)
+            if receita_liquida_total > 0
+            else 0,
+            2,
+        ),
     }
 
     return linhas, totais
 
 
-def obter_despesas_operacionais(db: Session, mes: int, ano: int, tenant_id: str) -> Decimal:
+def obter_despesas_operacionais(
+    db: Session, mes: int, ano: int, tenant_id: str
+) -> Decimal:
     """
     Calcula o total de despesas operacionais do período
     Inclui: TODAS as despesas operacionais (salários, fretes, comissões, administrativas, etc.)
     Exclui: Apenas compras de mercadorias (que vão para CMV)
     """
     from app.produtos_models import NotaEntrada
-    
+
     # Buscar contas a pagar do período (TODAS, exceto compras de mercadorias)
     # ✅ USA DATA_EMISSAO (regime de competência)
-    contas_pagar = db.query(ContaPagar).filter(
-        and_(
-            ContaPagar.tenant_id == tenant_id,
-            extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
-            extract('year', ContaPagar.data_emissao) == ano,
-            ContaPagar.nota_entrada_id.is_(None)  # Exclui compras de mercadorias (CMV)
+    contas_pagar = (
+        db.query(ContaPagar)
+        .filter(
+            and_(
+                ContaPagar.tenant_id == tenant_id,
+                extract("month", ContaPagar.data_emissao) == mes,  # ✅ Competência
+                extract("year", ContaPagar.data_emissao) == ano,
+                ContaPagar.nota_entrada_id.is_(
+                    None
+                ),  # Exclui compras de mercadorias (CMV)
+            )
         )
-    ).all()
-    
-    total_despesas = Decimal('0')
+        .all()
+    )
+
+    total_despesas = Decimal("0")
     for conta in contas_pagar:
         total_despesas += conta.valor_original
-    
+
     # Adicionar fretes de notas de entrada (despesa operacional, não CMV)
-    notas = db.query(NotaEntrada).filter(
-        and_(
-            NotaEntrada.tenant_id == tenant_id,
-            extract('month', NotaEntrada.data_emissao) == mes,
-            extract('year', NotaEntrada.data_emissao) == ano
+    notas = (
+        db.query(NotaEntrada)
+        .filter(
+            and_(
+                NotaEntrada.tenant_id == tenant_id,
+                extract("month", NotaEntrada.data_emissao) == mes,
+                extract("year", NotaEntrada.data_emissao) == ano,
+            )
         )
-    ).all()
-    
+        .all()
+    )
+
     for nota in notas:
         if nota.valor_frete:
             total_despesas += Decimal(str(nota.valor_frete))
-    
+
     return total_despesas
 
 
 def _periodo_label(mes: int, ano: int) -> str:
-    meses = ['', 'Janeiro', 'Fevereiro', 'MarÃ§o', 'Abril', 'Maio', 'Junho',
-             'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+    meses = [
+        "",
+        "Janeiro",
+        "Fevereiro",
+        "MarÃ§o",
+        "Abril",
+        "Maio",
+        "Junho",
+        "Julho",
+        "Agosto",
+        "Setembro",
+        "Outubro",
+        "Novembro",
+        "Dezembro",
+    ]
     return f"{meses[mes]}/{ano}" if 1 <= mes <= 12 else f"{mes}/{ano}"
 
 
@@ -893,7 +1325,7 @@ def _paginar_detalhes(
     total_itens = len(items)
     pages = (total_itens + page_size - 1) // page_size if total_itens else 0
     inicio = (page - 1) * page_size
-    return items[inicio:inicio + page_size], page_size, pages
+    return items[inicio : inicio + page_size], page_size, pages
 
 
 def _preparar_snapshots_vendas(
@@ -915,7 +1347,11 @@ def _preparar_snapshots_vendas(
         cupom_desconto = cupons_por_venda.get(venda.id, 0.0)
         custo_campanha = cupom_desconto + cashback_por_venda.get(venda.id, 0.0)
         snapshot = _snapshot_pronto(venda)
-        if snapshot and custo_campanha > 0 and _decimal(snapshot.get("custo_campanha", 0)) <= 0:
+        if (
+            snapshot
+            and custo_campanha > 0
+            and _decimal(snapshot.get("custo_campanha", 0)) <= 0
+        ):
             snapshot = None
         if snapshot is None:
             snapshot = build_venda_rentabilidade_snapshot(
@@ -934,7 +1370,9 @@ def _preparar_snapshots_vendas(
     return snapshots
 
 
-def _valor_snapshot_campo(campo: str, venda: Venda, snapshot: Dict[str, Any]) -> Decimal:
+def _valor_snapshot_campo(
+    campo: str, venda: Venda, snapshot: Dict[str, Any]
+) -> Decimal:
     if campo in {"receita_produtos", "receita_servicos"}:
         receita_produtos, receita_servicos = _separar_receita_produto_servico(
             venda,
@@ -1008,7 +1446,11 @@ def _detalhes_vendas_campo(
         )
         .all()
     )
-    vendas = [venda for venda in vendas if _normalizar_canal(getattr(venda, "canal", None)) == canal]
+    vendas = [
+        venda
+        for venda in vendas
+        if _normalizar_canal(getattr(venda, "canal", None)) == canal
+    ]
     snapshots = _preparar_snapshots_vendas(db, tenant_id, vendas)
 
     detalhes: List[DREDetalheItem] = []
@@ -1020,11 +1462,15 @@ def _detalhes_vendas_campo(
 
         pagamentos = []
         for pagamento in list(getattr(venda, "pagamentos", []) or []):
-            forma = getattr(pagamento, "forma_pagamento", None) or getattr(pagamento, "tipo", None)
+            forma = getattr(pagamento, "forma_pagamento", None) or getattr(
+                pagamento, "tipo", None
+            )
             if forma:
                 pagamentos.append(str(forma))
 
-        cliente_nome = getattr(getattr(venda, "cliente", None), "nome", None) or "Sem cliente"
+        cliente_nome = (
+            getattr(getattr(venda, "cliente", None), "nome", None) or "Sem cliente"
+        )
         numero = getattr(venda, "numero_venda", None) or f"#{venda.id}"
         detalhes.append(
             DREDetalheItem(
@@ -1086,10 +1532,14 @@ def _detalhes_contas_campo(
     if campo == "fretes_compras":
         if canal != "loja_fisica":
             return []
-        subcategoria_frete_compras = db.query(DRESubcategoria).filter(
-            DRESubcategoria.tenant_id == tenant_id,
-            DRESubcategoria.nome == "Fretes sobre Compras",
-        ).first()
+        subcategoria_frete_compras = (
+            db.query(DRESubcategoria)
+            .filter(
+                DRESubcategoria.tenant_id == tenant_id,
+                DRESubcategoria.nome == "Fretes sobre Compras",
+            )
+            .first()
+        )
         if not subcategoria_frete_compras:
             return []
         contas = (
@@ -1098,9 +1548,9 @@ def _detalhes_contas_campo(
             .filter(
                 and_(
                     ContaPagar.tenant_id == tenant_id,
-                    extract('month', ContaPagar.data_emissao) == mes,
-                    extract('year', ContaPagar.data_emissao) == ano,
-                    ContaPagar.status != 'cancelado',
+                    extract("month", ContaPagar.data_emissao) == mes,
+                    extract("year", ContaPagar.data_emissao) == ano,
+                    ContaPagar.status != "cancelado",
                     ContaPagar.dre_subcategoria_id == subcategoria_frete_compras.id,
                 )
             )
@@ -1114,9 +1564,9 @@ def _detalhes_contas_campo(
             .filter(
                 and_(
                     ContaPagar.tenant_id == tenant_id,
-                    extract('month', ContaPagar.data_emissao) == mes,
-                    extract('year', ContaPagar.data_emissao) == ano,
-                    ContaPagar.status != 'cancelado',
+                    extract("month", ContaPagar.data_emissao) == mes,
+                    extract("year", ContaPagar.data_emissao) == ano,
+                    ContaPagar.status != "cancelado",
                     ContaPagar.nota_entrada_id.is_(None),
                 )
             )
@@ -1127,10 +1577,15 @@ def _detalhes_contas_campo(
         for conta in contas_base:
             if _normalizar_canal(getattr(conta, "canal", None)) != canal:
                 continue
-            subcategoria = subcategorias.get(getattr(conta, "dre_subcategoria_id", None))
+            subcategoria = subcategorias.get(
+                getattr(conta, "dre_subcategoria_id", None)
+            )
             texto = _texto_conta(conta, subcategoria)
             campo_conta = _classificar_conta_dre(texto)
-            if campo_conta != "taxas_marketplace" and _eh_custo_de_venda_ja_vindo_da_venda(texto):
+            if (
+                campo_conta != "taxas_marketplace"
+                and _eh_custo_de_venda_ja_vindo_da_venda(texto)
+            ):
                 continue
             if campo_conta == campo:
                 contas.append(conta)
@@ -1138,9 +1593,15 @@ def _detalhes_contas_campo(
     detalhes: List[DREDetalheItem] = []
     for conta in contas:
         fornecedor_nome = getattr(getattr(conta, "fornecedor", None), "nome", None)
-        documento = getattr(conta, "documento", None) or getattr(conta, "nfe_numero", None)
+        documento = getattr(conta, "documento", None) or getattr(
+            conta, "nfe_numero", None
+        )
         subcategoria = subcategorias.get(getattr(conta, "dre_subcategoria_id", None))
-        valor = _decimal(getattr(conta, "valor_original", 0)) if campo == "fretes_compras" else _conta_valor(conta)
+        valor = (
+            _decimal(getattr(conta, "valor_original", 0))
+            if campo == "fretes_compras"
+            else _conta_valor(conta)
+        )
         if abs(valor) <= Decimal("0.004"):
             continue
         detalhes.append(
@@ -1170,6 +1631,7 @@ def _detalhes_contas_campo(
 
 # ==================== ENDPOINT PRINCIPAL ====================
 
+
 @router.get("/detalhes", response_model=DREDetalheResponse)
 def detalhar_linha_dre_por_canal(
     ano: int = Query(..., description="Ano do DRE"),
@@ -1179,7 +1641,7 @@ def detalhar_linha_dre_por_canal(
     page: int = Query(1, ge=1),
     page_size: int = Query(30, ge=1, le=100),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     if mes < 1 or mes > 12:
         raise HTTPException(status_code=400, detail="MÃªs deve estar entre 1 e 12")
@@ -1187,7 +1649,9 @@ def detalhar_linha_dre_por_canal(
     campo = (campo or "").strip()
     canal = _normalizar_canal(canal)
     if campo not in CAMPOS_DETALHE_VENDAS and campo not in CAMPOS_DETALHE_CONTAS:
-        raise HTTPException(status_code=400, detail="Linha da DRE sem detalhamento disponivel")
+        raise HTTPException(
+            status_code=400, detail="Linha da DRE sem detalhamento disponivel"
+        )
 
     _, tenant_id = user_and_tenant
     if campo in CAMPOS_DETALHE_VENDAS:
@@ -1213,35 +1677,54 @@ def detalhar_linha_dre_por_canal(
         items=pagina_items,
     )
 
+
 @router.get("", response_model=DREPorCanalResponse)
 def gerar_dre_por_canais(
     ano: int = Query(..., description="Ano do DRE"),
     mes: int = Query(..., description="Mês do DRE (1-12)"),
-    canais: str = Query("", description="Canais selecionados separados por vírgula (ex: loja_fisica,mercado_livre)"),
+    canais: str = Query(
+        "",
+        description="Canais selecionados separados por vírgula (ex: loja_fisica,mercado_livre)",
+    ),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Gera DRE com cada canal em linhas separadas
-    
+
     Cada linha terá:
     - Nome do canal na descrição (ex: "Descontos Concedidos Loja Física")
     - Cor específica do canal
     - Valores individuais
     """
-    
+
     if mes < 1 or mes > 12:
         raise HTTPException(status_code=400, detail="Mês deve estar entre 1 e 12")
-    
+
     # Processar canais selecionados
-    canais_selecionados = [_normalizar_canal(c.strip()) for c in canais.split(',') if c.strip()]
+    canais_selecionados = [
+        _normalizar_canal(c.strip()) for c in canais.split(",") if c.strip()
+    ]
     if not canais_selecionados:
         canais_selecionados = list(CANAIS_CONFIG.keys())
-    
-    meses = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-             'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+
+    meses = [
+        "",
+        "Janeiro",
+        "Fevereiro",
+        "Março",
+        "Abril",
+        "Maio",
+        "Junho",
+        "Julho",
+        "Agosto",
+        "Setembro",
+        "Outubro",
+        "Novembro",
+        "Dezembro",
+    ]
     periodo = f"{meses[mes]}/{ano}"
-    
+
     # Extrair user e tenant
     _, tenant_id = user_and_tenant
 
@@ -1262,12 +1745,12 @@ def gerar_dre_por_canais(
         ano=ano,
         linhas=linhas,
         totais=totais,
-        canais_encontrados=list(dados_canais_resultado.keys())
+        canais_encontrados=list(dados_canais_resultado.keys()),
     )
-    
+
     # Obter dados por canal
     dados_canais = obter_vendas_por_canal(db, mes, ano, tenant_id)
-    
+
     # Filtrar apenas os canais selecionados e garantir que existam
     dados_canais_filtrados = {}
     for canal_id in canais_selecionados:
@@ -1276,479 +1759,645 @@ def gerar_dre_por_canais(
         else:
             # Canal selecionado mas sem vendas - adicionar com valores zerados
             dados_canais_filtrados[canal_id] = {
-                'receita_produtos': Decimal('0'),
-                'taxa_entrega': Decimal('0'),
-                'descontos': Decimal('0'),
-                'cmv': Decimal('0'),
-                'vendas': []
+                "receita_produtos": Decimal("0"),
+                "taxa_entrega": Decimal("0"),
+                "descontos": Decimal("0"),
+                "cmv": Decimal("0"),
+                "vendas": [],
             }
-    
+
     # Usar apenas os canais filtrados
     dados_canais = dados_canais_filtrados
-    
+
     # Calcular totais
-    receita_produtos_total = sum(d['receita_produtos'] for d in dados_canais.values())
-    taxa_entrega_total = sum(d['taxa_entrega'] for d in dados_canais.values())
+    receita_produtos_total = sum(d["receita_produtos"] for d in dados_canais.values())
+    taxa_entrega_total = sum(d["taxa_entrega"] for d in dados_canais.values())
     receita_bruta_total = receita_produtos_total + taxa_entrega_total
-    descontos_total = sum(d['descontos'] for d in dados_canais.values())
-    cmv_total = sum(d['cmv'] for d in dados_canais.values())
+    descontos_total = sum(d["descontos"] for d in dados_canais.values())
+    cmv_total = sum(d["cmv"] for d in dados_canais.values())
     receita_liquida_total = receita_bruta_total - descontos_total
     lucro_bruto_total = receita_liquida_total - cmv_total
-    
+
     # Montar linhas
     linhas = []
-    
+
     # ========== RECEITA BRUTA ==========
-    linhas.append(LinhaCanal(
-        descricao="(+) RECEITA BRUTA",
-        valor=float(receita_bruta_total),
-        percentual=100.0,
-        cor="#000000",
-        cor_bg="#f3f4f6",
-        canal="total",
-        canal_nome="Total",
-        nivel=0,
-        tipo="receita"
-    ))
-    
+    linhas.append(
+        LinhaCanal(
+            descricao="(+) RECEITA BRUTA",
+            valor=float(receita_bruta_total),
+            percentual=100.0,
+            cor="#000000",
+            cor_bg="#f3f4f6",
+            canal="total",
+            canal_nome="Total",
+            nivel=0,
+            tipo="receita",
+        )
+    )
+
     # Linhas por canal - Vendas de Produtos (apenas subtotal, sem frete)
     for canal, dados in sorted(dados_canais.items()):
-        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG['loja_fisica'])
-        receita_produtos = float(dados['receita_produtos'])
-        percentual = (receita_produtos / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
-        
-        linhas.append(LinhaCanal(
-            descricao=f"Vendas de Produtos {config['nome']}",
-            valor=receita_produtos,
-            percentual=round(percentual, 2),
-            cor=config['cor'],
-            cor_bg="#ffffff",
-            canal=canal,
-            canal_nome=config['nome'],
-            nivel=1,
-            tipo="receita"
-        ))
-    
+        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
+        receita_produtos = float(dados["receita_produtos"])
+        percentual = (
+            (receita_produtos / float(receita_bruta_total) * 100)
+            if receita_bruta_total > 0
+            else 0
+        )
+
+        linhas.append(
+            LinhaCanal(
+                descricao=f"Vendas de Produtos {config['nome']}",
+                valor=receita_produtos,
+                percentual=round(percentual, 2),
+                cor=config["cor"],
+                cor_bg="#ffffff",
+                canal=canal,
+                canal_nome=config["nome"],
+                nivel=1,
+                tipo="receita",
+            )
+        )
+
     # ========== TAXA DE FRETE (RECEITA) POR CANAL ==========
     # Taxa de frete paga pelo cliente, entra como receita
     # Vem diretamente do campo taxa_entrega das vendas
-    
+
     from app.dre_plano_contas_models import DRESubcategoria
-    
+
     for canal in sorted(dados_canais.keys()):
-        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG['loja_fisica'])
-        taxa_frete_canal = float(dados_canais[canal]['taxa_entrega'])
-        
+        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
+        taxa_frete_canal = float(dados_canais[canal]["taxa_entrega"])
+
         if taxa_frete_canal > 0:
-            percentual = (taxa_frete_canal / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
-            
-            linhas.append(LinhaCanal(
-                descricao=f"Taxa de Frete {config['nome']}",
-                valor=taxa_frete_canal,
-                percentual=round(percentual, 2),
-                cor=config['cor'],
-                cor_bg="#ffffff",
-                canal=canal,
-                canal_nome=config['nome'],
-                nivel=1,
-                tipo="receita"
-            ))
-    
-    # Vendas de Serviços por canal (REMOVIDO - será adicionado apenas se houver valores reais)
-    
-    # ========== DEDUÇÕES ==========
-    linhas.append(LinhaCanal(
-        descricao="(-) DEDUÇÕES DA RECEITA",
-        valor=float(descontos_total),
-        percentual=round((float(descontos_total) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0, 2),
-        cor="#dc2626",
-        cor_bg="#fef2f2",
-        canal="total",
-        canal_nome="Total",
-        nivel=0,
-        tipo="deducao"
-    ))
-    
-    # Descontos por canal
-    for canal, dados in sorted(dados_canais.items()):
-        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG['loja_fisica'])
-        desconto = float(dados['descontos'])
-        percentual = (desconto / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
-        
-        linhas.append(LinhaCanal(
-            descricao=f"Descontos Concedidos {config['nome']}",  # ← Nome do canal na descrição
-            valor=desconto,
-            percentual=round(percentual, 2),
-            cor=config['cor'],
-            cor_bg="#ffffff",
-            canal=canal,
-            canal_nome=config['nome'],
-            nivel=1,
-            tipo="deducao"
-        ))
-    
-    # Devoluções por canal (REMOVIDO - será adicionado apenas se houver valores reais)
-    
-    # ========== RECEITA LÍQUIDA ==========
-    linhas.append(LinhaCanal(
-        descricao="(=) RECEITA LÍQUIDA",
-        valor=float(receita_liquida_total),
-        percentual=round((float(receita_liquida_total) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0, 2),
-        cor="#059669",
-        cor_bg="#d1fae5",
-        canal="total",
-        canal_nome="Total",
-        nivel=0,
-        tipo="receita"
-    ))
-    
-    # ========== CMV ==========
-    linhas.append(LinhaCanal(
-        descricao="(-) CUSTO DAS MERCADORIAS VENDIDAS (CMV)",
-        valor=float(cmv_total),
-        percentual=round((float(cmv_total) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0, 2),
-        cor="#dc2626",
-        cor_bg="#fef2f2",
-        canal="total",
-        canal_nome="Total",
-        nivel=0,
-        tipo="custo"
-    ))
-    
-    # CMV por canal
-    for canal, dados in sorted(dados_canais.items()):
-        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG['loja_fisica'])
-        cmv = float(dados['cmv'])
-        percentual = (cmv / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
-        
-        linhas.append(LinhaCanal(
-            descricao=f"CMV {config['nome']}",  # ← Nome do canal na descrição
-            valor=cmv,
-            percentual=round(percentual, 2),
-            cor=config['cor'],
-            cor_bg="#ffffff",
-            canal=canal,
-            canal_nome=config['nome'],
-            nivel=1,
-            tipo="custo"
-        ))
-    
-    # ========== FRETES SOBRE COMPRAS (CMV) ==========
-    # Frete pago na compra de mercadorias
-    
-    subcategoria_frete_compras = db.query(DRESubcategoria).filter(
-        DRESubcategoria.tenant_id == tenant_id,
-        DRESubcategoria.nome == "Fretes sobre Compras"
-    ).first()
-    
-    if subcategoria_frete_compras:
-        contas_frete_compras = db.query(ContaPagar).filter(
-            and_(
-                ContaPagar.tenant_id == tenant_id,
-                extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
-                extract('year', ContaPagar.data_emissao) == ano,
-                ContaPagar.dre_subcategoria_id == subcategoria_frete_compras.id
+            percentual = (
+                (taxa_frete_canal / float(receita_bruta_total) * 100)
+                if receita_bruta_total > 0
+                else 0
             )
-        ).all()
-        
-        total_frete_compras = sum(conta.valor_original for conta in contas_frete_compras)
-        
-        if total_frete_compras > 0:
-            cmv_total += total_frete_compras
-            percentual = (float(total_frete_compras) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
-            
-            linhas.append(LinhaCanal(
-                descricao="   Fretes sobre Compras",
-                valor=float(total_frete_compras),
-                percentual=round(percentual, 2),
-                cor="#6b7280",
-                cor_bg="#ffffff",
-                canal="total",
-                canal_nome="Total",
-                nivel=1,
-                tipo="custo"
-            ))
-    
-    # Recalcular lucro bruto com frete de compras
-    lucro_bruto_total = receita_liquida_total - cmv_total
-    
-    # ========== LUCRO BRUTO ==========
-    linhas.append(LinhaCanal(
-        descricao="(=) LUCRO BRUTO",
-        valor=float(lucro_bruto_total),
-        percentual=round((float(lucro_bruto_total) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0, 2),
-        cor="#059669",
-        cor_bg="#d1fae5",
-        canal="total",
-        canal_nome="Total",
-        nivel=0,
-        tipo="lucro"
-    ))
-    
-    # ========== DESPESAS OPERACIONAIS ==========
-    # Primeiro, buscar subcategoria antiga "Fretes sobre Vendas" para contas legadas
-    subcategoria_antiga = db.query(DRESubcategoria).filter(
-        DRESubcategoria.tenant_id == tenant_id,
-        DRESubcategoria.nome.like('Fretes sobre Vendas%')
-    ).first()
-    
-    # Calcular Frete Operacional por canal
-    total_frete_op_geral = Decimal('0')
-    detalhes_frete_op = []
-    
-    for canal in sorted(dados_canais.keys()):
-            config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG['loja_fisica'])
-            total_frete_op_canal = Decimal('0')
-            
-            # Buscar subcategoria específica do canal (nova, sem acentos)
-            nome_canal = config['nome'].replace('í', 'i')
-            subcategoria_frete_op = db.query(DRESubcategoria).filter(
-                DRESubcategoria.tenant_id == tenant_id,
-                DRESubcategoria.nome == f"Frete Operacional - {nome_canal}"
-            ).first()
-            
-            # Buscar contas com a subcategoria nova
-            if subcategoria_frete_op:
-                contas_frete_op = db.query(ContaPagar).filter(
-                    and_(
-                        ContaPagar.tenant_id == tenant_id,
-                        extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
-                        extract('year', ContaPagar.data_emissao) == ano,
-                        ContaPagar.dre_subcategoria_id == subcategoria_frete_op.id,
-                        ContaPagar.canal == canal
-                    )
-                ).all()
-                total_frete_op_canal += sum(conta.valor_original for conta in contas_frete_op)
-            
-            # ✅ INCLUIR contas antigas com "Fretes sobre Vendas" que sejam "Custo fixo entrega"
-            # (apenas no canal loja_fisica, pois vendas antigas não tinham campo canal preenchido)
-            if subcategoria_antiga and canal == 'loja_fisica':
-                contas_antigas_frete = db.query(ContaPagar).filter(
-                    and_(
-                        ContaPagar.tenant_id == tenant_id,
-                        extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
-                        extract('year', ContaPagar.data_emissao) == ano,
-                        ContaPagar.dre_subcategoria_id == subcategoria_antiga.id,
-                        or_(
-                            ContaPagar.descricao.like('Custo fixo entrega%'),
-                            ContaPagar.descricao.like('Controla RH entrega%')
-                        ),
-                        ContaPagar.canal.is_(None)  # Apenas contas sem canal (antigas)
-                    )
-                ).all()
-                total_frete_op_canal += sum(conta.valor_original for conta in contas_antigas_frete)
-            
-            total_frete_op_geral += total_frete_op_canal
-            
-            if total_frete_op_canal > 0:
-                percentual = (float(total_frete_op_canal) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
-                
-                detalhes_frete_op.append(LinhaCanal(
-                    descricao=f"   Frete Operacional {config['nome']}",
-                    valor=float(total_frete_op_canal),
+
+            linhas.append(
+                LinhaCanal(
+                    descricao=f"Taxa de Frete {config['nome']}",
+                    valor=taxa_frete_canal,
                     percentual=round(percentual, 2),
-                    cor=config['cor'],
+                    cor=config["cor"],
                     cor_bg="#ffffff",
                     canal=canal,
-                    canal_nome=config['nome'],
+                    canal_nome=config["nome"],
                     nivel=1,
-                    tipo="despesa"
-                ))
-    
-    # Calcular Comissão Entregador por canal
-    total_comissao_geral = Decimal('0')
-    detalhes_comissao = []
-    
-    for canal in sorted(dados_canais.keys()):
-            config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG['loja_fisica'])
-            total_comissao_canal = Decimal('0')
-            
-            # Buscar subcategoria específica do canal (nova, sem acentos)
-            nome_canal = config['nome'].replace('í', 'i')
-            subcategoria_comissao = db.query(DRESubcategoria).filter(
-                DRESubcategoria.tenant_id == tenant_id,
-                DRESubcategoria.nome == f"Comissao Entregador - {nome_canal}"
-            ).first()
-            
-            # Buscar contas com a subcategoria nova
-            if subcategoria_comissao:
-                contas_comissao = db.query(ContaPagar).filter(
-                    and_(
-                        ContaPagar.tenant_id == tenant_id,
-                        extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
-                        extract('year', ContaPagar.data_emissao) == ano,
-                        ContaPagar.dre_subcategoria_id == subcategoria_comissao.id,
-                        ContaPagar.canal == canal
-                    )
-                ).all()
-                total_comissao_canal += sum(conta.valor_original for conta in contas_comissao)
-            
-            # ✅ INCLUIR contas antigas com "Fretes sobre Vendas" que sejam "Taxa de entrega"
-            # (apenas no canal loja_fisica, pois vendas antigas não tinham campo canal preenchido)
-            if subcategoria_antiga and canal == 'loja_fisica':
-                contas_antigas_comissao = db.query(ContaPagar).filter(
-                    and_(
-                        ContaPagar.tenant_id == tenant_id,
-                        extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência
-                        extract('year', ContaPagar.data_emissao) == ano,
-                        ContaPagar.dre_subcategoria_id == subcategoria_antiga.id,
-                        ContaPagar.descricao.like('Taxa de entrega%'),
-                        ContaPagar.canal.is_(None)  # Apenas contas sem canal (antigas)
-                    )
-                ).all()
-                total_comissao_canal += sum(conta.valor_original for conta in contas_antigas_comissao)
-            
-            total_comissao_geral += total_comissao_canal
-            
-            if total_comissao_canal > 0:
-                percentual = (float(total_comissao_canal) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
-                
-                detalhes_comissao.append(LinhaCanal(
-                    descricao=f"   Comissão Entregador {config['nome']}",
-                    valor=float(total_comissao_canal),
-                    percentual=round(percentual, 2),
-                    cor=config['cor'],
-                    cor_bg="#ffffff",
-                    canal=canal,
-                    canal_nome=config['nome'],
-                    nivel=1,
-                    tipo="despesa"
-                ))
-    
-    # Calcular Comissões de Vendas - Vendedores por canal
-    total_comissao_vendedores_geral = Decimal('0')
-    detalhes_comissao_vendedores = []
-    
-    for canal in sorted(dados_canais.keys()):
-        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG['loja_fisica'])
-        total_comissao_vendedores_canal = Decimal('0')
-        
-        # Buscar subcategoria "Comissões de Vendas - Vendedores"
-        subcategoria_comissao_vendedores = db.query(DRESubcategoria).filter(
-            DRESubcategoria.tenant_id == tenant_id,
-            DRESubcategoria.nome.like('Comiss%es de Vendas - Vendedores')
-        ).first()
-        
-        # Buscar contas
-        if subcategoria_comissao_vendedores:
-            contas_comissao_vendedores = db.query(ContaPagar).filter(
-                and_(
-                    ContaPagar.tenant_id == tenant_id,
-                    extract('month', ContaPagar.data_emissao) == mes,  # ✅ Competência (data da venda)
-                    extract('year', ContaPagar.data_emissao) == ano,
-                    ContaPagar.dre_subcategoria_id == subcategoria_comissao_vendedores.id,
-                    or_(ContaPagar.canal == canal, ContaPagar.canal.is_(None))
+                    tipo="receita",
                 )
-            ).all()
-            total_comissao_vendedores_canal += sum(conta.valor_original for conta in contas_comissao_vendedores)
-        
-        total_comissao_vendedores_geral += total_comissao_vendedores_canal
-        
-        if total_comissao_vendedores_canal > 0:
-            percentual = (float(total_comissao_vendedores_canal) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
-            
-            detalhes_comissao_vendedores.append(LinhaCanal(
-                descricao=f"   Comissões de Vendas {config['nome']}",
-                valor=float(total_comissao_vendedores_canal),
-                percentual=round(percentual, 2),
-                cor=config['cor'],
-                cor_bg="#ffffff",
-                canal=canal,
-                canal_nome=config['nome'],
-                nivel=1,
-                tipo="despesa"
-            ))
-    
-    # Calcular Taxas de Cartao/PIX por canal e tipo
-    total_taxas_cartao_geral = Decimal('0')
-    detalhes_taxas_cartao = []
+            )
 
-    tipos_taxas = [
-        ("Taxas de Cartão de Crédito", "Taxas de Cartão de Crédito"),
-        ("Taxas de Cartão de Débito", "Taxas de Cartão de Débito"),
-        ("Taxa de PIX", "Taxa de PIX")
-    ]
+    # Vendas de Serviços por canal (REMOVIDO - será adicionado apenas se houver valores reais)
 
-    for canal in sorted(dados_canais.keys()):
-        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG['loja_fisica'])
-
-        for nome_base, label in tipos_taxas:
-            total_taxa_tipo = Decimal('0')
-
-            nomes_taxas = [
-                f"{nome_base} - {config['nome']}",
-                nome_base
-            ]
-
-            subcategorias_taxas = db.query(DRESubcategoria).filter(
-                and_(
-                    DRESubcategoria.tenant_id == tenant_id,
-                    DRESubcategoria.nome.in_(nomes_taxas)
-                )
-            ).all()
-
-            if subcategorias_taxas:
-                ids_taxas = [s.id for s in subcategorias_taxas]
-                contas_taxas = db.query(ContaPagar).filter(
-                    and_(
-                        ContaPagar.tenant_id == tenant_id,
-                        extract('month', ContaPagar.data_emissao) == mes,
-                        extract('year', ContaPagar.data_emissao) == ano,
-                        ContaPagar.dre_subcategoria_id.in_(ids_taxas),
-                        or_(ContaPagar.canal == canal, ContaPagar.canal.is_(None))
-                    )
-                ).all()
-                total_taxa_tipo += sum(conta.valor_original for conta in contas_taxas)
-
-            if total_taxa_tipo > 0:
-                total_taxas_cartao_geral += total_taxa_tipo
-                percentual = (float(total_taxa_tipo) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
-                detalhes_taxas_cartao.append(LinhaCanal(
-                    descricao=f"   {label} {config['nome']}",
-                    valor=float(total_taxa_tipo),
-                    percentual=round(percentual, 2),
-                    cor=config['cor'],
-                    cor_bg="#ffffff",
-                    canal=canal,
-                    canal_nome=config['nome'],
-                    nivel=1,
-                    tipo="despesa"
-                ))
-
-    # Calcular total de despesas operacionais (soma dos detalhes)
-    despesas_operacionais_total = (
-        total_frete_op_geral +
-        total_comissao_geral +
-        total_comissao_vendedores_geral +
-        total_taxas_cartao_geral
-    )
-    
-    # Calcular resultado operacional e lucro líquido
-    resultado_operacional_total = lucro_bruto_total - despesas_operacionais_total
-    lucro_liquido_total = resultado_operacional_total  # Por enquanto, sem resultado financeiro
-    
-    # Inserir linha principal de DESPESAS OPERACIONAIS
-    if despesas_operacionais_total > 0:
-        linhas.append(LinhaCanal(
-            descricao="(-) DESPESAS OPERACIONAIS",
-            valor=float(despesas_operacionais_total),
-            percentual=round((float(despesas_operacionais_total) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0, 2),
+    # ========== DEDUÇÕES ==========
+    linhas.append(
+        LinhaCanal(
+            descricao="(-) DEDUÇÕES DA RECEITA",
+            valor=float(descontos_total),
+            percentual=round(
+                (float(descontos_total) / float(receita_bruta_total) * 100)
+                if receita_bruta_total > 0
+                else 0,
+                2,
+            ),
             cor="#dc2626",
             cor_bg="#fef2f2",
             canal="total",
             canal_nome="Total",
             nivel=0,
-            tipo="despesa"
-        ))
-        
+            tipo="deducao",
+        )
+    )
+
+    # Descontos por canal
+    for canal, dados in sorted(dados_canais.items()):
+        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
+        desconto = float(dados["descontos"])
+        percentual = (
+            (desconto / float(receita_bruta_total) * 100)
+            if receita_bruta_total > 0
+            else 0
+        )
+
+        linhas.append(
+            LinhaCanal(
+                descricao=f"Descontos Concedidos {config['nome']}",  # ← Nome do canal na descrição
+                valor=desconto,
+                percentual=round(percentual, 2),
+                cor=config["cor"],
+                cor_bg="#ffffff",
+                canal=canal,
+                canal_nome=config["nome"],
+                nivel=1,
+                tipo="deducao",
+            )
+        )
+
+    # Devoluções por canal (REMOVIDO - será adicionado apenas se houver valores reais)
+
+    # ========== RECEITA LÍQUIDA ==========
+    linhas.append(
+        LinhaCanal(
+            descricao="(=) RECEITA LÍQUIDA",
+            valor=float(receita_liquida_total),
+            percentual=round(
+                (float(receita_liquida_total) / float(receita_bruta_total) * 100)
+                if receita_bruta_total > 0
+                else 0,
+                2,
+            ),
+            cor="#059669",
+            cor_bg="#d1fae5",
+            canal="total",
+            canal_nome="Total",
+            nivel=0,
+            tipo="receita",
+        )
+    )
+
+    # ========== CMV ==========
+    linhas.append(
+        LinhaCanal(
+            descricao="(-) CUSTO DAS MERCADORIAS VENDIDAS (CMV)",
+            valor=float(cmv_total),
+            percentual=round(
+                (float(cmv_total) / float(receita_bruta_total) * 100)
+                if receita_bruta_total > 0
+                else 0,
+                2,
+            ),
+            cor="#dc2626",
+            cor_bg="#fef2f2",
+            canal="total",
+            canal_nome="Total",
+            nivel=0,
+            tipo="custo",
+        )
+    )
+
+    # CMV por canal
+    for canal, dados in sorted(dados_canais.items()):
+        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
+        cmv = float(dados["cmv"])
+        percentual = (
+            (cmv / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0
+        )
+
+        linhas.append(
+            LinhaCanal(
+                descricao=f"CMV {config['nome']}",  # ← Nome do canal na descrição
+                valor=cmv,
+                percentual=round(percentual, 2),
+                cor=config["cor"],
+                cor_bg="#ffffff",
+                canal=canal,
+                canal_nome=config["nome"],
+                nivel=1,
+                tipo="custo",
+            )
+        )
+
+    # ========== FRETES SOBRE COMPRAS (CMV) ==========
+    # Frete pago na compra de mercadorias
+
+    subcategoria_frete_compras = (
+        db.query(DRESubcategoria)
+        .filter(
+            DRESubcategoria.tenant_id == tenant_id,
+            DRESubcategoria.nome == "Fretes sobre Compras",
+        )
+        .first()
+    )
+
+    if subcategoria_frete_compras:
+        contas_frete_compras = (
+            db.query(ContaPagar)
+            .filter(
+                and_(
+                    ContaPagar.tenant_id == tenant_id,
+                    extract("month", ContaPagar.data_emissao) == mes,  # ✅ Competência
+                    extract("year", ContaPagar.data_emissao) == ano,
+                    ContaPagar.dre_subcategoria_id == subcategoria_frete_compras.id,
+                )
+            )
+            .all()
+        )
+
+        total_frete_compras = sum(
+            conta.valor_original for conta in contas_frete_compras
+        )
+
+        if total_frete_compras > 0:
+            cmv_total += total_frete_compras
+            percentual = (
+                (float(total_frete_compras) / float(receita_bruta_total) * 100)
+                if receita_bruta_total > 0
+                else 0
+            )
+
+            linhas.append(
+                LinhaCanal(
+                    descricao="   Fretes sobre Compras",
+                    valor=float(total_frete_compras),
+                    percentual=round(percentual, 2),
+                    cor="#6b7280",
+                    cor_bg="#ffffff",
+                    canal="total",
+                    canal_nome="Total",
+                    nivel=1,
+                    tipo="custo",
+                )
+            )
+
+    # Recalcular lucro bruto com frete de compras
+    lucro_bruto_total = receita_liquida_total - cmv_total
+
+    # ========== LUCRO BRUTO ==========
+    linhas.append(
+        LinhaCanal(
+            descricao="(=) LUCRO BRUTO",
+            valor=float(lucro_bruto_total),
+            percentual=round(
+                (float(lucro_bruto_total) / float(receita_bruta_total) * 100)
+                if receita_bruta_total > 0
+                else 0,
+                2,
+            ),
+            cor="#059669",
+            cor_bg="#d1fae5",
+            canal="total",
+            canal_nome="Total",
+            nivel=0,
+            tipo="lucro",
+        )
+    )
+
+    # ========== DESPESAS OPERACIONAIS ==========
+    # Primeiro, buscar subcategoria antiga "Fretes sobre Vendas" para contas legadas
+    subcategoria_antiga = (
+        db.query(DRESubcategoria)
+        .filter(
+            DRESubcategoria.tenant_id == tenant_id,
+            DRESubcategoria.nome.like("Fretes sobre Vendas%"),
+        )
+        .first()
+    )
+
+    # Calcular Frete Operacional por canal
+    total_frete_op_geral = Decimal("0")
+    detalhes_frete_op = []
+
+    for canal in sorted(dados_canais.keys()):
+        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
+        total_frete_op_canal = Decimal("0")
+
+        # Buscar subcategoria específica do canal (nova, sem acentos)
+        nome_canal = config["nome"].replace("í", "i")
+        subcategoria_frete_op = (
+            db.query(DRESubcategoria)
+            .filter(
+                DRESubcategoria.tenant_id == tenant_id,
+                DRESubcategoria.nome == f"Frete Operacional - {nome_canal}",
+            )
+            .first()
+        )
+
+        # Buscar contas com a subcategoria nova
+        if subcategoria_frete_op:
+            contas_frete_op = (
+                db.query(ContaPagar)
+                .filter(
+                    and_(
+                        ContaPagar.tenant_id == tenant_id,
+                        extract("month", ContaPagar.data_emissao)
+                        == mes,  # ✅ Competência
+                        extract("year", ContaPagar.data_emissao) == ano,
+                        ContaPagar.dre_subcategoria_id == subcategoria_frete_op.id,
+                        ContaPagar.canal == canal,
+                    )
+                )
+                .all()
+            )
+            total_frete_op_canal += sum(
+                conta.valor_original for conta in contas_frete_op
+            )
+
+        # ✅ INCLUIR contas antigas com "Fretes sobre Vendas" que sejam "Custo fixo entrega"
+        # (apenas no canal loja_fisica, pois vendas antigas não tinham campo canal preenchido)
+        if subcategoria_antiga and canal == "loja_fisica":
+            contas_antigas_frete = (
+                db.query(ContaPagar)
+                .filter(
+                    and_(
+                        ContaPagar.tenant_id == tenant_id,
+                        extract("month", ContaPagar.data_emissao)
+                        == mes,  # ✅ Competência
+                        extract("year", ContaPagar.data_emissao) == ano,
+                        ContaPagar.dre_subcategoria_id == subcategoria_antiga.id,
+                        or_(
+                            ContaPagar.descricao.like("Custo fixo entrega%"),
+                            ContaPagar.descricao.like("Controla RH entrega%"),
+                        ),
+                        ContaPagar.canal.is_(None),  # Apenas contas sem canal (antigas)
+                    )
+                )
+                .all()
+            )
+            total_frete_op_canal += sum(
+                conta.valor_original for conta in contas_antigas_frete
+            )
+
+        total_frete_op_geral += total_frete_op_canal
+
+        if total_frete_op_canal > 0:
+            percentual = (
+                (float(total_frete_op_canal) / float(receita_bruta_total) * 100)
+                if receita_bruta_total > 0
+                else 0
+            )
+
+            detalhes_frete_op.append(
+                LinhaCanal(
+                    descricao=f"   Frete Operacional {config['nome']}",
+                    valor=float(total_frete_op_canal),
+                    percentual=round(percentual, 2),
+                    cor=config["cor"],
+                    cor_bg="#ffffff",
+                    canal=canal,
+                    canal_nome=config["nome"],
+                    nivel=1,
+                    tipo="despesa",
+                )
+            )
+
+    # Calcular Comissão Entregador por canal
+    total_comissao_geral = Decimal("0")
+    detalhes_comissao = []
+
+    for canal in sorted(dados_canais.keys()):
+        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
+        total_comissao_canal = Decimal("0")
+
+        # Buscar subcategoria específica do canal (nova, sem acentos)
+        nome_canal = config["nome"].replace("í", "i")
+        subcategoria_comissao = (
+            db.query(DRESubcategoria)
+            .filter(
+                DRESubcategoria.tenant_id == tenant_id,
+                DRESubcategoria.nome == f"Comissao Entregador - {nome_canal}",
+            )
+            .first()
+        )
+
+        # Buscar contas com a subcategoria nova
+        if subcategoria_comissao:
+            contas_comissao = (
+                db.query(ContaPagar)
+                .filter(
+                    and_(
+                        ContaPagar.tenant_id == tenant_id,
+                        extract("month", ContaPagar.data_emissao)
+                        == mes,  # ✅ Competência
+                        extract("year", ContaPagar.data_emissao) == ano,
+                        ContaPagar.dre_subcategoria_id == subcategoria_comissao.id,
+                        ContaPagar.canal == canal,
+                    )
+                )
+                .all()
+            )
+            total_comissao_canal += sum(
+                conta.valor_original for conta in contas_comissao
+            )
+
+        # ✅ INCLUIR contas antigas com "Fretes sobre Vendas" que sejam "Taxa de entrega"
+        # (apenas no canal loja_fisica, pois vendas antigas não tinham campo canal preenchido)
+        if subcategoria_antiga and canal == "loja_fisica":
+            contas_antigas_comissao = (
+                db.query(ContaPagar)
+                .filter(
+                    and_(
+                        ContaPagar.tenant_id == tenant_id,
+                        extract("month", ContaPagar.data_emissao)
+                        == mes,  # ✅ Competência
+                        extract("year", ContaPagar.data_emissao) == ano,
+                        ContaPagar.dre_subcategoria_id == subcategoria_antiga.id,
+                        ContaPagar.descricao.like("Taxa de entrega%"),
+                        ContaPagar.canal.is_(None),  # Apenas contas sem canal (antigas)
+                    )
+                )
+                .all()
+            )
+            total_comissao_canal += sum(
+                conta.valor_original for conta in contas_antigas_comissao
+            )
+
+        total_comissao_geral += total_comissao_canal
+
+        if total_comissao_canal > 0:
+            percentual = (
+                (float(total_comissao_canal) / float(receita_bruta_total) * 100)
+                if receita_bruta_total > 0
+                else 0
+            )
+
+            detalhes_comissao.append(
+                LinhaCanal(
+                    descricao=f"   Comissão Entregador {config['nome']}",
+                    valor=float(total_comissao_canal),
+                    percentual=round(percentual, 2),
+                    cor=config["cor"],
+                    cor_bg="#ffffff",
+                    canal=canal,
+                    canal_nome=config["nome"],
+                    nivel=1,
+                    tipo="despesa",
+                )
+            )
+
+    # Calcular Comissões de Vendas - Vendedores por canal
+    total_comissao_vendedores_geral = Decimal("0")
+    detalhes_comissao_vendedores = []
+
+    for canal in sorted(dados_canais.keys()):
+        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
+        total_comissao_vendedores_canal = Decimal("0")
+
+        # Buscar subcategoria "Comissões de Vendas - Vendedores"
+        subcategoria_comissao_vendedores = (
+            db.query(DRESubcategoria)
+            .filter(
+                DRESubcategoria.tenant_id == tenant_id,
+                DRESubcategoria.nome.like("Comiss%es de Vendas - Vendedores"),
+            )
+            .first()
+        )
+
+        # Buscar contas
+        if subcategoria_comissao_vendedores:
+            contas_comissao_vendedores = (
+                db.query(ContaPagar)
+                .filter(
+                    and_(
+                        ContaPagar.tenant_id == tenant_id,
+                        extract("month", ContaPagar.data_emissao)
+                        == mes,  # ✅ Competência (data da venda)
+                        extract("year", ContaPagar.data_emissao) == ano,
+                        ContaPagar.dre_subcategoria_id
+                        == subcategoria_comissao_vendedores.id,
+                        or_(ContaPagar.canal == canal, ContaPagar.canal.is_(None)),
+                    )
+                )
+                .all()
+            )
+            total_comissao_vendedores_canal += sum(
+                conta.valor_original for conta in contas_comissao_vendedores
+            )
+
+        total_comissao_vendedores_geral += total_comissao_vendedores_canal
+
+        if total_comissao_vendedores_canal > 0:
+            percentual = (
+                (
+                    float(total_comissao_vendedores_canal)
+                    / float(receita_bruta_total)
+                    * 100
+                )
+                if receita_bruta_total > 0
+                else 0
+            )
+
+            detalhes_comissao_vendedores.append(
+                LinhaCanal(
+                    descricao=f"   Comissões de Vendas {config['nome']}",
+                    valor=float(total_comissao_vendedores_canal),
+                    percentual=round(percentual, 2),
+                    cor=config["cor"],
+                    cor_bg="#ffffff",
+                    canal=canal,
+                    canal_nome=config["nome"],
+                    nivel=1,
+                    tipo="despesa",
+                )
+            )
+
+    # Calcular Taxas de Cartao/PIX por canal e tipo
+    total_taxas_cartao_geral = Decimal("0")
+    detalhes_taxas_cartao = []
+
+    tipos_taxas = [
+        ("Taxas de Cartão de Crédito", "Taxas de Cartão de Crédito"),
+        ("Taxas de Cartão de Débito", "Taxas de Cartão de Débito"),
+        ("Taxa de PIX", "Taxa de PIX"),
+    ]
+
+    for canal in sorted(dados_canais.keys()):
+        config = CANAIS_CONFIG.get(canal, CANAIS_CONFIG["loja_fisica"])
+
+        for nome_base, label in tipos_taxas:
+            total_taxa_tipo = Decimal("0")
+
+            nomes_taxas = [f"{nome_base} - {config['nome']}", nome_base]
+
+            subcategorias_taxas = (
+                db.query(DRESubcategoria)
+                .filter(
+                    and_(
+                        DRESubcategoria.tenant_id == tenant_id,
+                        DRESubcategoria.nome.in_(nomes_taxas),
+                    )
+                )
+                .all()
+            )
+
+            if subcategorias_taxas:
+                ids_taxas = [s.id for s in subcategorias_taxas]
+                contas_taxas = (
+                    db.query(ContaPagar)
+                    .filter(
+                        and_(
+                            ContaPagar.tenant_id == tenant_id,
+                            extract("month", ContaPagar.data_emissao) == mes,
+                            extract("year", ContaPagar.data_emissao) == ano,
+                            ContaPagar.dre_subcategoria_id.in_(ids_taxas),
+                            or_(ContaPagar.canal == canal, ContaPagar.canal.is_(None)),
+                        )
+                    )
+                    .all()
+                )
+                total_taxa_tipo += sum(conta.valor_original for conta in contas_taxas)
+
+            if total_taxa_tipo > 0:
+                total_taxas_cartao_geral += total_taxa_tipo
+                percentual = (
+                    (float(total_taxa_tipo) / float(receita_bruta_total) * 100)
+                    if receita_bruta_total > 0
+                    else 0
+                )
+                detalhes_taxas_cartao.append(
+                    LinhaCanal(
+                        descricao=f"   {label} {config['nome']}",
+                        valor=float(total_taxa_tipo),
+                        percentual=round(percentual, 2),
+                        cor=config["cor"],
+                        cor_bg="#ffffff",
+                        canal=canal,
+                        canal_nome=config["nome"],
+                        nivel=1,
+                        tipo="despesa",
+                    )
+                )
+
+    # Calcular total de despesas operacionais (soma dos detalhes)
+    despesas_operacionais_total = (
+        total_frete_op_geral
+        + total_comissao_geral
+        + total_comissao_vendedores_geral
+        + total_taxas_cartao_geral
+    )
+
+    # Calcular resultado operacional e lucro líquido
+    resultado_operacional_total = lucro_bruto_total - despesas_operacionais_total
+    lucro_liquido_total = (
+        resultado_operacional_total  # Por enquanto, sem resultado financeiro
+    )
+
+    # Inserir linha principal de DESPESAS OPERACIONAIS
+    if despesas_operacionais_total > 0:
+        linhas.append(
+            LinhaCanal(
+                descricao="(-) DESPESAS OPERACIONAIS",
+                valor=float(despesas_operacionais_total),
+                percentual=round(
+                    (
+                        float(despesas_operacionais_total)
+                        / float(receita_bruta_total)
+                        * 100
+                    )
+                    if receita_bruta_total > 0
+                    else 0,
+                    2,
+                ),
+                cor="#dc2626",
+                cor_bg="#fef2f2",
+                canal="total",
+                canal_nome="Total",
+                nivel=0,
+                tipo="despesa",
+            )
+        )
+
         # Adicionar detalhes de Frete Operacional
         for detalhe in detalhes_frete_op:
             linhas.append(detalhe)
-        
+
         # Adicionar detalhes de Comissão Entregador
         for detalhe in detalhes_comissao:
             linhas.append(detalhe)
-        
+
         # Adicionar detalhes de Comissões de Vendas - Vendedores
         for detalhe in detalhes_comissao_vendedores:
             linhas.append(detalhe)
@@ -1756,57 +2405,81 @@ def gerar_dre_por_canais(
         # Adicionar detalhes de Taxas de Cartao
         for detalhe in detalhes_taxas_cartao:
             linhas.append(detalhe)
-    
+
     # ========== RESULTADO OPERACIONAL ==========
-    linhas.append(LinhaCanal(
-        descricao="(=) RESULTADO OPERACIONAL",
-        valor=float(resultado_operacional_total),
-        percentual=round((float(resultado_operacional_total) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0, 2),
-        cor="#059669",
-        cor_bg="#d1fae5",
-        canal="total",
-        canal_nome="Total",
-        nivel=0,
-        tipo="lucro"
-    ))
-    
+    linhas.append(
+        LinhaCanal(
+            descricao="(=) RESULTADO OPERACIONAL",
+            valor=float(resultado_operacional_total),
+            percentual=round(
+                (float(resultado_operacional_total) / float(receita_bruta_total) * 100)
+                if receita_bruta_total > 0
+                else 0,
+                2,
+            ),
+            cor="#059669",
+            cor_bg="#d1fae5",
+            canal="total",
+            canal_nome="Total",
+            nivel=0,
+            tipo="lucro",
+        )
+    )
+
     # ========== RESULTADO FINANCEIRO ==========
     # TODO: Buscar receitas/despesas financeiras de contas_receber/pagar
     # Por enquanto, não exibir seção se não houver valores
-    
+
     # ========== LUCRO LÍQUIDO ==========
-    linhas.append(LinhaCanal(
-        descricao="(=) LUCRO/PREJUÍZO LÍQUIDO",
-        valor=float(lucro_liquido_total),
-        percentual=round((float(lucro_liquido_total) / float(receita_bruta_total) * 100) if receita_bruta_total > 0 else 0, 2),
-        cor="#059669",
-        cor_bg="#d1fae5",
-        canal="total",
-        canal_nome="Total",
-        nivel=0,
-        tipo="lucro"
-    ))
-    
+    linhas.append(
+        LinhaCanal(
+            descricao="(=) LUCRO/PREJUÍZO LÍQUIDO",
+            valor=float(lucro_liquido_total),
+            percentual=round(
+                (float(lucro_liquido_total) / float(receita_bruta_total) * 100)
+                if receita_bruta_total > 0
+                else 0,
+                2,
+            ),
+            cor="#059669",
+            cor_bg="#d1fae5",
+            canal="total",
+            canal_nome="Total",
+            nivel=0,
+            tipo="lucro",
+        )
+    )
+
     # Totais
     totais = {
-        'receita_bruta': float(receita_bruta_total),
-        'descontos': float(descontos_total),
-        'receita_liquida': float(receita_liquida_total),
-        'cmv': float(cmv_total),
-        'lucro_bruto': float(lucro_bruto_total),
-        'despesas_operacionais': float(despesas_operacionais_total),
-        'resultado_operacional': float(resultado_operacional_total),
-        'resultado_financeiro': 0.0,
-        'lucro_liquido': float(lucro_liquido_total),
-        'margem_bruta': round((float(lucro_bruto_total) / float(receita_liquida_total) * 100) if receita_liquida_total > 0 else 0, 2),
-        'margem_liquida': round((float(lucro_liquido_total) / float(receita_liquida_total) * 100) if receita_liquida_total > 0 else 0, 2)
+        "receita_bruta": float(receita_bruta_total),
+        "descontos": float(descontos_total),
+        "receita_liquida": float(receita_liquida_total),
+        "cmv": float(cmv_total),
+        "lucro_bruto": float(lucro_bruto_total),
+        "despesas_operacionais": float(despesas_operacionais_total),
+        "resultado_operacional": float(resultado_operacional_total),
+        "resultado_financeiro": 0.0,
+        "lucro_liquido": float(lucro_liquido_total),
+        "margem_bruta": round(
+            (float(lucro_bruto_total) / float(receita_liquida_total) * 100)
+            if receita_liquida_total > 0
+            else 0,
+            2,
+        ),
+        "margem_liquida": round(
+            (float(lucro_liquido_total) / float(receita_liquida_total) * 100)
+            if receita_liquida_total > 0
+            else 0,
+            2,
+        ),
     }
-    
+
     return DREPorCanalResponse(
         periodo=periodo,
         mes=mes,
         ano=ano,
         linhas=linhas,
         totais=totais,
-        canais_encontrados=list(dados_canais.keys())
+        canais_encontrados=list(dados_canais.keys()),
     )
