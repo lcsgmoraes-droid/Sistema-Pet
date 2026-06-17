@@ -43,9 +43,7 @@ export function usePDVSalvarVenda({
     }
 
     if (!temCaixaAberto) {
-      alert(
-        "❌ Não é possível salvar venda sem caixa aberto. Abra um caixa primeiro.",
-      );
+      alert("❌ Não é possível salvar venda sem caixa aberto. Abra um caixa primeiro.");
       return;
     }
 
@@ -55,14 +53,9 @@ export function usePDVSalvarVenda({
     try {
       const vendaParaPayload = {
         ...vendaAtual,
-        funcionario_id: vendaComissionada
-          ? funcionarioComissao?.id || null
-          : null,
+        funcionario_id: vendaComissionada ? funcionarioComissao?.id || null : null,
       };
-      const payloadVenda = montarPayloadVenda(
-        vendaParaPayload,
-        entregadorSelecionado,
-      );
+      const payloadVenda = montarPayloadVenda(vendaParaPayload, entregadorSelecionado);
 
       if (vendaAtual.id) {
         await api.put(`/vendas/${vendaAtual.id}`, payloadVenda);
@@ -79,9 +72,7 @@ export function usePDVSalvarVenda({
           await api.patch(`/vendas/${vendaAtual.id}/status`, {
             status: novoStatus,
           });
-          debugLog(
-            `✅ Status atualizado: ${vendaAtual.status} → ${novoStatus}`,
-          );
+          debugLog(`✅ Status atualizado: ${vendaAtual.status} → ${novoStatus}`);
         }
 
         alert("Venda atualizada com sucesso!");
@@ -95,15 +86,10 @@ export function usePDVSalvarVenda({
         debugLog("📋 Funcionário ID enviado:", funcionarioComissao?.id || null);
 
         if (vendaComissionada && !funcionarioComissao) {
-          console.error(
-            "⚠️ ERRO: Checkbox marcado mas funcionário não selecionado!",
-          );
+          console.error("⚠️ ERRO: Checkbox marcado mas funcionário não selecionado!");
         }
 
-        debugLog(
-          "📦 PAYLOAD COMPLETO antes de enviar:",
-          JSON.stringify(payloadVenda, null, 2),
-        );
+        debugLog("📦 PAYLOAD COMPLETO antes de enviar:", JSON.stringify(payloadVenda, null, 2));
         debugLog("🚚 Dados de entrega:", {
           tem_entrega: payloadVenda.tem_entrega,
           entregador_id: payloadVenda.entregador_id,
@@ -125,9 +111,7 @@ export function usePDVSalvarVenda({
       console.error("❌ Status:", error.response?.status);
       console.error("❌ Headers:", error.response?.headers);
       const errorDetail =
-        error.response?.data?.detail ||
-        error.response?.data?.message ||
-        "Erro ao salvar venda";
+        error.response?.data?.detail || error.response?.data?.message || "Erro ao salvar venda";
       console.error("❌ Detalhes do erro:", errorDetail);
       alert(`Erro ao salvar venda: ${errorDetail}`);
     } finally {

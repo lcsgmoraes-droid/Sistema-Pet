@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { deleteLote, entradaEstoque, getLotes, updateLote } from '../api/produtos';
+import { useState } from "react";
+import { deleteLote, entradaEstoque, getLotes, updateLote } from "../api/produtos";
 
 const ENTRADA_INICIAL = {
-  quantidade: '',
-  nome_lote: '',
-  data_fabricacao: '',
-  data_validade: '',
-  preco_custo: '',
+  quantidade: "",
+  nome_lote: "",
+  data_fabricacao: "",
+  data_validade: "",
+  preco_custo: "",
 };
 
 export default function useProdutosNovoLotes({ id }) {
@@ -23,7 +23,7 @@ export default function useProdutosNovoLotes({ id }) {
 
   const handleEntradaEstoque = async () => {
     if (!entradaData.quantidade || !entradaData.preco_custo) {
-      alert('Preencha quantidade e preÃ§o de custo!');
+      alert("Preencha quantidade e preÃ§o de custo!");
       return;
     }
 
@@ -45,13 +45,13 @@ export default function useProdutosNovoLotes({ id }) {
         observacoes: entradaData.observacoes || null,
       });
 
-      alert('Entrada de estoque realizada com sucesso!');
+      alert("Entrada de estoque realizada com sucesso!");
       setModalEntrada(false);
       setEntradaData(ENTRADA_INICIAL);
       await recarregarLotes();
     } catch (error) {
-      console.error('Erro ao registrar entrada:', error);
-      alert(error.response?.data?.detail || 'Erro ao registrar entrada de estoque');
+      console.error("Erro ao registrar entrada:", error);
+      alert(error.response?.data?.detail || "Erro ao registrar entrada de estoque");
     }
   };
 
@@ -60,8 +60,8 @@ export default function useProdutosNovoLotes({ id }) {
       id: lote.id,
       nome_lote: lote.nome_lote,
       quantidade_inicial: lote.quantidade_inicial,
-      data_fabricacao: lote.data_fabricacao?.split('T')[0] || '',
-      data_validade: lote.data_validade?.split('T')[0] || '',
+      data_fabricacao: lote.data_fabricacao?.split("T")[0] || "",
+      data_validade: lote.data_validade?.split("T")[0] || "",
       custo_unitario: lote.custo_unitario,
     });
     setModalEdicaoLote(true);
@@ -84,13 +84,13 @@ export default function useProdutosNovoLotes({ id }) {
         custo_unitario: parseFloat(loteEmEdicao.custo_unitario),
       });
 
-      alert('Lote atualizado com sucesso!');
+      alert("Lote atualizado com sucesso!");
       setModalEdicaoLote(false);
       setLoteEmEdicao(null);
       await recarregarLotes();
     } catch (error) {
-      console.error('Erro ao atualizar lote:', error);
-      alert(error.response?.data?.detail || 'Erro ao atualizar lote');
+      console.error("Erro ao atualizar lote:", error);
+      alert(error.response?.data?.detail || "Erro ao atualizar lote");
     }
   };
 
@@ -105,11 +105,11 @@ export default function useProdutosNovoLotes({ id }) {
 
     try {
       await deleteLote(id, lote.id);
-      alert('Lote excluído com sucesso!');
+      alert("Lote excluído com sucesso!");
       await recarregarLotes();
     } catch (error) {
-      console.error('Erro ao excluir lote:', error);
-      alert(error.response?.data?.detail || 'Erro ao excluir lote');
+      console.error("Erro ao excluir lote:", error);
+      alert(error.response?.data?.detail || "Erro ao excluir lote");
     }
   };
 

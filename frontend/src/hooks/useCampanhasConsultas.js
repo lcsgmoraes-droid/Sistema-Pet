@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import api from "../api";
 
-export function useCampanhasConsultas({
-  createDefaultPremio,
-  hoje,
-  primeiroDiaMes,
-}) {
+export function useCampanhasConsultas({ createDefaultPremio, hoje, primeiroDiaMes }) {
   const [aba, setAba] = useState("dashboard");
 
   const [campanhas, setCampanhas] = useState([]);

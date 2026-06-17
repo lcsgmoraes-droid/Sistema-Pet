@@ -1,8 +1,7 @@
 import { useState } from "react";
 
 export function usePDVDescontoTotal({ vendaAtual, recalcularTotais }) {
-  const [mostrarModalDescontoTotal, setMostrarModalDescontoTotal] =
-    useState(false);
+  const [mostrarModalDescontoTotal, setMostrarModalDescontoTotal] = useState(false);
   const [tipoDescontoTotal, setTipoDescontoTotal] = useState("valor");
   const [valorDescontoTotal, setValorDescontoTotal] = useState(0);
 
@@ -50,8 +49,7 @@ export function usePDVDescontoTotal({ vendaAtual, recalcularTotais }) {
       const descontoPercentual =
         subtotalBrutoItem > 0 ? (descontoItem / subtotalBrutoItem) * 100 : 0;
       const subtotal = subtotalBrutoItem - descontoItem;
-      const precoComDesconto =
-        item.quantidade > 0 ? subtotal / item.quantidade : 0;
+      const precoComDesconto = item.quantidade > 0 ? subtotal / item.quantidade : 0;
 
       return {
         ...item,
@@ -69,8 +67,7 @@ export function usePDVDescontoTotal({ vendaAtual, recalcularTotais }) {
 
   const removerDescontoTotal = (extras = {}) => {
     const itensAtualizados = vendaAtual.itens.map((item) => {
-      const subtotalBruto =
-        (item.preco_unitario || item.preco_venda) * item.quantidade;
+      const subtotalBruto = (item.preco_unitario || item.preco_venda) * item.quantidade;
       return {
         ...item,
         desconto_valor: 0,

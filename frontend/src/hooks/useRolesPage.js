@@ -68,10 +68,7 @@ export default function useRolesPage() {
   const carregarDados = useCallback(async () => {
     setLoading(true);
     try {
-      const [rolesRes, permsRes] = await Promise.all([
-        api.get("/roles"),
-        api.get("/permissions"),
-      ]);
+      const [rolesRes, permsRes] = await Promise.all([api.get("/roles"), api.get("/permissions")]);
       setRoles(Array.isArray(rolesRes.data) ? rolesRes.data : []);
       setPermissions(Array.isArray(permsRes.data) ? permsRes.data : []);
     } catch (error) {

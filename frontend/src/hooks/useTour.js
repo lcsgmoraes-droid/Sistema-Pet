@@ -36,10 +36,7 @@ export function useTour(tourKey, steps, { delay = 600 } = {}) {
     const stepsValidos = currentSteps.filter((step) => {
       if (!step.element) return true; // passos de intro (sem elemento) sempre ok
       const found = !!document.querySelector(step.element);
-      if (!found)
-        console.warn(
-          `[Tour:${currentKey}] elemento não encontrado: ${step.element}`,
-        );
+      if (!found) console.warn(`[Tour:${currentKey}] elemento não encontrado: ${step.element}`);
       return found;
     });
 
@@ -63,7 +60,6 @@ export function useTour(tourKey, steps, { delay = 600 } = {}) {
     });
 
     driverRef.current.drive();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // deps vazio: usa refs para acessar valores atuais
 
   // Auto-start: roda UMA vez após montagem real.

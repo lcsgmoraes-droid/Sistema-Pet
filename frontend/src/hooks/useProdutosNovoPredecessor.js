@@ -1,10 +1,10 @@
-import { useState } from 'react';
-import api from '../api';
+import { useState } from "react";
+import api from "../api";
 
 export default function useProdutosNovoPredecessor({ handleChange }) {
   const [mostrarBuscaPredecessor, setMostrarBuscaPredecessor] = useState(false);
   const [produtosBusca, setProdutosBusca] = useState([]);
-  const [buscaPredecessor, setBuscaPredecessor] = useState('');
+  const [buscaPredecessor, setBuscaPredecessor] = useState("");
   const [predecessorSelecionado, setPredecessorSelecionado] = useState(null);
   const [predecessorInfo, setPredecessorInfo] = useState(null);
   const [sucessorInfo, setSucessorInfo] = useState(null);
@@ -14,10 +14,10 @@ export default function useProdutosNovoPredecessor({ handleChange }) {
 
     if (!checked) {
       setPredecessorSelecionado(null);
-      setBuscaPredecessor('');
+      setBuscaPredecessor("");
       setProdutosBusca([]);
-      handleChange('produto_predecessor_id', null);
-      handleChange('motivo_descontinuacao', '');
+      handleChange("produto_predecessor_id", null);
+      handleChange("motivo_descontinuacao", "");
     }
   };
 
@@ -26,12 +26,12 @@ export default function useProdutosNovoPredecessor({ handleChange }) {
 
     if (value.length >= 2) {
       try {
-        const response = await api.get('/produtos/', {
+        const response = await api.get("/produtos/", {
           params: { busca: value, page_size: 10 },
         });
         setProdutosBusca(response.data.items || []);
       } catch (error) {
-        console.error('Erro ao buscar produtos:', error);
+        console.error("Erro ao buscar produtos:", error);
       }
       return;
     }
@@ -41,14 +41,14 @@ export default function useProdutosNovoPredecessor({ handleChange }) {
 
   const handleSelecionarPredecessor = (produto) => {
     setPredecessorSelecionado(produto);
-    handleChange('produto_predecessor_id', produto.id);
-    setBuscaPredecessor('');
+    handleChange("produto_predecessor_id", produto.id);
+    setBuscaPredecessor("");
     setProdutosBusca([]);
   };
 
   const handleRemoverPredecessor = () => {
     setPredecessorSelecionado(null);
-    handleChange('produto_predecessor_id', null);
+    handleChange("produto_predecessor_id", null);
   };
 
   return {

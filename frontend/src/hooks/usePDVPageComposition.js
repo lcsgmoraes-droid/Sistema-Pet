@@ -137,6 +137,7 @@ export function usePDVPageComposition({
   itemEditando,
   loadingCep,
   mostrarAnaliseVenda,
+  setMostrarAnaliseVenda,
   mostrarCalculadoraRacao,
   mostrarHistoricoCliente,
   mostrarModalAbrirCaixa,
@@ -187,9 +188,7 @@ export function usePDVPageComposition({
   };
 
   const containerStyle =
-    driveAlertVisible && driveAguardando.length > 0
-      ? { paddingTop: "52px" }
-      : {};
+    driveAlertVisible && driveAguardando.length > 0 ? { paddingTop: "52px" } : {};
 
   const mainAreaProps = {
     destaqueAbrirCaixa,

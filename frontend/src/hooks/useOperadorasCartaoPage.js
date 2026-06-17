@@ -62,7 +62,7 @@ export function useOperadorasCartaoPage() {
 
   const operadoraPadrao = useMemo(
     () => operadoras.find((operadora) => operadora.padrao && operadora.ativo),
-    [operadoras]
+    [operadoras],
   );
 
   const abrirModal = (operadora = null) => {
@@ -123,7 +123,7 @@ export function useOperadorasCartaoPage() {
 
   const excluirOperadora = async (id) => {
     const confirmar = window.confirm(
-      "Deseja realmente excluir esta operadora? Ela sera desativada se houver vendas vinculadas."
+      "Deseja realmente excluir esta operadora? Ela sera desativada se houver vendas vinculadas.",
     );
     if (!confirmar) return;
 

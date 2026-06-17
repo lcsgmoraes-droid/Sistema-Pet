@@ -2,11 +2,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
 
-export default function useProdutosEdicao({
-  carregarDados,
-  selecionados,
-  setSelecionados,
-}) {
+export default function useProdutosEdicao({ carregarDados, selecionados, setSelecionados }) {
   const [editandoPreco, setEditandoPreco] = useState(null);
   const [novoPreco, setNovoPreco] = useState("");
   const [editandoMargem, setEditandoMargem] = useState(null);
@@ -55,10 +51,10 @@ export default function useProdutosEdicao({
     try {
       if (!editandoMargem) return;
       let novoPrecoCalculado;
-      if (editandoMargem.modo === 'margem') {
+      if (editandoMargem.modo === "margem") {
         const margem = Number(editandoMargem.valor);
         if (margem >= 100 || margem < 0) {
-          toast.error('Margem inválida. Use um valor entre 0 e 99.');
+          toast.error("Margem inválida. Use um valor entre 0 e 99.");
           return;
         }
         novoPrecoCalculado = custo / (1 - margem / 100);
@@ -67,12 +63,12 @@ export default function useProdutosEdicao({
       }
       novoPrecoCalculado = Math.round(novoPrecoCalculado * 100) / 100;
       await api.patch(`/produtos/${produtoId}?preco_venda=${novoPrecoCalculado}`, {});
-      toast.success('Preço atualizado!');
+      toast.success("Preço atualizado!");
       setEditandoMargem(null);
       carregarDados();
     } catch (error) {
-      console.error('Erro ao atualizar preço pela margem:', error);
-      toast.error('Erro ao atualizar preço');
+      console.error("Erro ao atualizar preço pela margem:", error);
+      toast.error("Erro ao atualizar preço");
     }
   };
 
@@ -113,9 +109,7 @@ export default function useProdutosEdicao({
 
   const handleSalvarEdicaoLote = async (opcoes = {}) => {
     try {
-      const camposPreenchidos = Object.values(dadosEdicaoLote).filter(
-        (value) => value !== "",
-      );
+      const camposPreenchidos = Object.values(dadosEdicaoLote).filter((value) => value !== "");
       if (camposPreenchidos.length === 0) {
         toast.error("Preencha pelo menos um campo para atualizar");
         return;
@@ -142,9 +136,9 @@ export default function useProdutosEdicao({
         return;
       }
       if (
-        dadosEdicaoLote.fornecedor_operacao
-        && dadosEdicaoLote.fornecedor_operacao !== "remover"
-        && !dadosEdicaoLote.fornecedor_id
+        dadosEdicaoLote.fornecedor_operacao &&
+        dadosEdicaoLote.fornecedor_operacao !== "remover" &&
+        !dadosEdicaoLote.fornecedor_id
       ) {
         toast.error("Selecione o fornecedor para aplicar em lote");
         return;
@@ -225,9 +219,7 @@ export default function useProdutosEdicao({
         ...dadosEnvio,
       });
 
-      toast.success(
-        `${selecionados.length} produto(s) atualizado(s) com sucesso!`,
-      );
+      toast.success(`${selecionados.length} produto(s) atualizado(s) com sucesso!`);
       setModalEdicaoLote(false);
       setSelecionados([]);
       carregarDados();

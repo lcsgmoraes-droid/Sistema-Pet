@@ -4,10 +4,7 @@ import { formatBRL } from "../utils/formatters";
 import { FRASES_ANIVERSARIO } from "../components/campanhas/campanhasConstants";
 import { formatBenefitChannelsSummary } from "../utils/campaignChannelScope";
 
-export default function useCampanhasGestao({
-  setCampanhas,
-  carregarCampanhas,
-}) {
+export default function useCampanhasGestao({ setCampanhas, carregarCampanhas }) {
   const [toggling, setToggling] = useState(null);
   const [campanhaEditando, setCampanhaEditando] = useState(null);
   const [nomeEditando, setNomeEditando] = useState("");
@@ -41,9 +38,7 @@ export default function useCampanhasGestao({
       setNovaCampanha({ name: "", campaign_type: "inactivity", params: {} });
       carregarCampanhas();
     } catch (e) {
-      setErroCriarCampanha(
-        e?.response?.data?.detail || "Erro ao criar campanha.",
-      );
+      setErroCriarCampanha(e?.response?.data?.detail || "Erro ao criar campanha.");
     } finally {
       setCriandoCampanha(false);
     }
@@ -77,9 +72,7 @@ export default function useCampanhasGestao({
     try {
       const res = await api.post(`/campanhas/${campanha.id}/pausar`);
       setCampanhas((prev) =>
-        prev.map((c) =>
-          c.id === campanha.id ? { ...c, status: res.data.status } : c,
-        ),
+        prev.map((c) => (c.id === campanha.id ? { ...c, status: res.data.status } : c)),
       );
     } catch (e) {
       console.error("Erro ao alterar status:", e);
@@ -98,8 +91,7 @@ export default function useCampanhasGestao({
     ) {
       const tipoPresente = params.tipo_presente || "cupom";
       const frases =
-        FRASES_ANIVERSARIO[campanha.campaign_type] ||
-        FRASES_ANIVERSARIO.birthday_customer;
+        FRASES_ANIVERSARIO[campanha.campaign_type] || FRASES_ANIVERSARIO.birthday_customer;
       params.notification_message = frases[tipoPresente] || "";
     }
     setParamsEditando(params);
@@ -121,9 +113,7 @@ export default function useCampanhasGestao({
       });
       setCampanhas((prev) =>
         prev.map((item) =>
-          item.id === campanha.id
-            ? { ...item, name: nomeCampanha, params: paramsEditando }
-            : item,
+          item.id === campanha.id ? { ...item, name: nomeCampanha, params: paramsEditando } : item,
         ),
       );
       fecharEdicao();

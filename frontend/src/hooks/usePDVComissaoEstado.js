@@ -94,11 +94,7 @@ export function usePDVComissaoEstado({
         setFuncionarioComissao(funcionarioCarregado);
         debugLog("Funcionario comissao carregado:", funcionarioCarregado);
       } else {
-        debugWarn(
-          "Funcionario ID",
-          funcionarioId,
-          "nao encontrado na lista",
-        );
+        debugWarn("Funcionario ID", funcionarioId, "nao encontrado na lista");
       }
     } catch (error) {
       console.error("Erro ao carregar funcionario de comissao:", error);

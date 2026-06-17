@@ -15,18 +15,17 @@ export function usePDVVendaAtual({
   sincronizarEntregadorDaVenda,
   recarregarContextoClientePorId,
 }) {
-  const { carregarVendaEspecifica, handleBuscarVenda, reabrirVenda } =
-    usePDVVendaCarregamento({
-      setVendaAtual,
-      searchVendaQuery,
-      setSearchVendaQuery,
-      setLoading,
-      setModoVisualizacao,
-      setMostrarModalPagamento,
-      sincronizarComissaoDaVenda,
-      sincronizarEntregadorDaVenda,
-      recarregarContextoClientePorId,
-    });
+  const { carregarVendaEspecifica, handleBuscarVenda, reabrirVenda } = usePDVVendaCarregamento({
+    setVendaAtual,
+    searchVendaQuery,
+    setSearchVendaQuery,
+    setLoading,
+    setModoVisualizacao,
+    setMostrarModalPagamento,
+    sincronizarComissaoDaVenda,
+    sincronizarEntregadorDaVenda,
+    recarregarContextoClientePorId,
+  });
   const { abrirModalPagamento, limparVenda } = usePDVVendaAcoes({
     vendaAtual,
     setVendaAtual,

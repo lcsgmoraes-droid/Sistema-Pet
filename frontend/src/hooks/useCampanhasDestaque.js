@@ -27,9 +27,7 @@ export default function useCampanhasDestaque({
           coupon_value: premio.coupon_value,
           coupon_valid_days: premio.coupon_valid_days,
           mensagem:
-            premio.tipo_premio === "cupom"
-              ? premio.mensagem || ""
-              : premio.mensagem_brinde || "",
+            premio.tipo_premio === "cupom" ? premio.mensagem || "" : premio.mensagem_brinde || "",
           mensagem_brinde: premio.mensagem_brinde || "",
           retirar_de: premio.retirar_de || "",
           retirar_ate: premio.retirar_ate || "",
@@ -41,9 +39,7 @@ export default function useCampanhasDestaque({
       });
       setDestaqueResultado(res.data);
     } catch (e) {
-      alert(
-        "Erro ao enviar prêmios: " + (e?.response?.data?.detail || e.message),
-      );
+      alert("Erro ao enviar prêmios: " + (e?.response?.data?.detail || e.message));
     } finally {
       setEnviandoDestaque(false);
     }
