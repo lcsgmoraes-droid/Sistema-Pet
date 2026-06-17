@@ -41,7 +41,9 @@ def listar_drive_aguardando(
                 "cliente_id": p.cliente_id,
                 "total": float(p.total or 0.0),
                 "palavra_chave_retirada": p.palavra_chave_retirada,
-                "drive_chegou_at": p.drive_chegou_at.isoformat() if p.drive_chegou_at else None,
+                "drive_chegou_at": p.drive_chegou_at.isoformat()
+                if p.drive_chegou_at
+                else None,
                 "status": p.status,
             }
             for p in pedidos
@@ -66,10 +68,14 @@ def confirmar_drive_entregue(
         .first()
     )
     if not pedido:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Pedido não encontrado"
+        )
 
     if not pedido.is_drive:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Este pedido não é drive")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Este pedido não é drive"
+        )
 
     if pedido.drive_entregue_at:
         return {

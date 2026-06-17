@@ -30,8 +30,12 @@ from app.ecommerce_payment_models import EcommercePaymentGatewayConfig
 from app.tenancy.context import set_current_tenant
 
 
-router = APIRouter(prefix="/ecommerce-payment-config", tags=["ecommerce-payment-config"])
-public_router = APIRouter(prefix="/ecommerce-payment-config", tags=["ecommerce-payment-config"])
+router = APIRouter(
+    prefix="/ecommerce-payment-config", tags=["ecommerce-payment-config"]
+)
+public_router = APIRouter(
+    prefix="/ecommerce-payment-config", tags=["ecommerce-payment-config"]
+)
 
 
 class MercadoPagoConfigResponse(BaseModel):
@@ -151,7 +155,9 @@ def callback_oauth_mercado_pago(
     state_payload = validate_mercado_pago_oauth_state(state)
     if not state_payload:
         return RedirectResponse(
-            build_mercado_pago_oauth_return_url("error", message="state invalido ou expirado"),
+            build_mercado_pago_oauth_return_url(
+                "error", message="state invalido ou expirado"
+            ),
             status_code=status.HTTP_303_SEE_OTHER,
         )
     if not code:
@@ -172,7 +178,8 @@ def callback_oauth_mercado_pago(
         )
         save_mercado_pago_oauth_tokens(config, token_payload)
         if config.access_token_encrypted and (
-            config.webhook_secret_encrypted or serialize_mercado_pago_config(config)["webhook_secret_configured"]
+            config.webhook_secret_encrypted
+            or serialize_mercado_pago_config(config)["webhook_secret_configured"]
         ):
             config.enabled = True
         db.commit()

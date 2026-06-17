@@ -6,13 +6,23 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.models import Cliente, User
-from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
+from app.routes.ecommerce_auth import (
+    _activate_user_tenant_context,
+    _get_current_ecommerce_user,
+)
 from app.services.lgpd_service import PREFERENCE_TYPES, PrivacyOpsService
 
 
 router = APIRouter(prefix="/app/privacidade", tags=["App Mobile - Privacidade"])
 
-REQUEST_TYPES = {"access", "export", "correction", "deletion", "revocation", "information"}
+REQUEST_TYPES = {
+    "access",
+    "export",
+    "correction",
+    "deletion",
+    "revocation",
+    "information",
+}
 
 
 class AppPreferencesUpdate(BaseModel):
@@ -79,7 +89,10 @@ def atualizar_minhas_preferencias_privacidade(
     cliente = _get_cliente_or_404(db, current_user)
     preferences = {key: getattr(payload, key) for key in PREFERENCE_TYPES}
     if all(value is None for value in preferences.values()):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Informe ao menos uma preferencia")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe ao menos uma preferencia",
+        )
 
     service = _service(db, current_user)
     service.set_customer_preferences(
@@ -123,7 +136,10 @@ def criar_minha_solicitacao_privacidade(
     cliente = _get_cliente_or_404(db, current_user)
     request_type = payload.request_type.strip().lower()
     if request_type not in REQUEST_TYPES:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tipo de solicitacao LGPD invalido")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tipo de solicitacao LGPD invalido",
+        )
 
     service = _service(db, current_user)
     row = service.create_subject_request(

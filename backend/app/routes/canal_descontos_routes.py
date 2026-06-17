@@ -24,6 +24,7 @@ router = APIRouter(prefix="/canal-descontos", tags=["canal-descontos"])
 
 # ─────────────────────── Schemas ───────────────────────
 
+
 class CanalDescontoCreate(BaseModel):
     canal: str  # 'ecommerce' | 'app'
     nome: str
@@ -52,10 +53,15 @@ class CanalDescontoResponse(BaseModel):
     created_at: datetime
 
 
-def _validar_periodo(data_inicio: Optional[datetime], data_fim: Optional[datetime]) -> None:
+def _validar_periodo(
+    data_inicio: Optional[datetime], data_fim: Optional[datetime]
+) -> None:
     """Valida período básico informado pelo usuário."""
     if data_inicio and data_fim and data_inicio > data_fim:
-        raise HTTPException(status_code=422, detail="Data de início não pode ser maior que a data de fim.")
+        raise HTTPException(
+            status_code=422,
+            detail="Data de início não pode ser maior que a data de fim.",
+        )
 
 
 def _campanha_ativa_conflitante(
@@ -116,8 +122,16 @@ def _validar_conflito_ativo(
     if not conflito:
         return
 
-    inicio = conflito.data_inicio.isoformat(sep=" ", timespec="minutes") if conflito.data_inicio else "sem início"
-    fim = conflito.data_fim.isoformat(sep=" ", timespec="minutes") if conflito.data_fim else "sem fim"
+    inicio = (
+        conflito.data_inicio.isoformat(sep=" ", timespec="minutes")
+        if conflito.data_inicio
+        else "sem início"
+    )
+    fim = (
+        conflito.data_fim.isoformat(sep=" ", timespec="minutes")
+        if conflito.data_fim
+        else "sem fim"
+    )
     raise HTTPException(
         status_code=409,
         detail=(
@@ -129,6 +143,7 @@ def _validar_conflito_ativo(
 
 
 # ─────────────────────── Endpoints ───────────────────────
+
 
 @router.get("", response_model=List[CanalDescontoResponse])
 def listar_descontos(
@@ -157,9 +172,13 @@ def criar_desconto(
     """Cria um novo desconto global para um canal."""
     _, tenant_id = auth
     if payload.canal not in ("ecommerce", "app"):
-        raise HTTPException(status_code=422, detail="Canal deve ser 'ecommerce' ou 'app'.")
+        raise HTTPException(
+            status_code=422, detail="Canal deve ser 'ecommerce' ou 'app'."
+        )
     if not (0 <= payload.desconto_pct <= 100):
-        raise HTTPException(status_code=422, detail="desconto_pct deve estar entre 0 e 100.")
+        raise HTTPException(
+            status_code=422, detail="desconto_pct deve estar entre 0 e 100."
+        )
 
     _validar_periodo(payload.data_inicio, payload.data_fim)
 
@@ -218,7 +237,9 @@ def atualizar_desconto(
         raise HTTPException(status_code=404, detail="Desconto não encontrado.")
 
     novo_ativo = payload.ativo if payload.ativo is not None else existing.ativo
-    novo_inicio = payload.data_inicio if payload.data_inicio is not None else existing.data_inicio
+    novo_inicio = (
+        payload.data_inicio if payload.data_inicio is not None else existing.data_inicio
+    )
     novo_fim = payload.data_fim if payload.data_fim is not None else existing.data_fim
 
     _validar_periodo(novo_inicio, novo_fim)

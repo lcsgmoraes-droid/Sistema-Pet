@@ -46,7 +46,9 @@ security = HTTPBearer()
 
 RESET_TOKEN_MINUTES = 30
 EMAIL_VERIFICATION_TOKEN_HOURS = int(os.getenv("EMAIL_VERIFICATION_TOKEN_HOURS", "24"))
-EMAIL_VERIFICATION_REQUIRED = os.getenv("EMAIL_VERIFICATION_REQUIRED", "true").strip().lower() not in {"0", "false", "no"}
+EMAIL_VERIFICATION_REQUIRED = os.getenv(
+    "EMAIL_VERIFICATION_REQUIRED", "true"
+).strip().lower() not in {"0", "false", "no"}
 TERMS_VERSION = os.getenv("TERMS_VERSION", "termos-2026-05-08")
 PRIVACY_VERSION = os.getenv("PRIVACY_VERSION", "privacidade-2026-05-08")
 
@@ -55,13 +57,19 @@ class EcommerceRegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
     nome: str | None = None
-    telefone: str = Field(min_length=8, max_length=20, description="Telefone obrigatorio")
+    telefone: str = Field(
+        min_length=8, max_length=20, description="Telefone obrigatorio"
+    )
     canal: str | None = None
     accepted_terms: bool = False
     accepted_privacy: bool = False
     terms_version: str | None = None
     privacy_version: str | None = None
-    cpf: str = Field(min_length=11, max_length=14, description='CPF obrigatório (11 dígitos, com ou sem formatação)')
+    cpf: str = Field(
+        min_length=11,
+        max_length=14,
+        description="CPF obrigatório (11 dígitos, com ou sem formatação)",
+    )
 
 
 class EcommerceLoginRequest(BaseModel):
@@ -104,7 +112,9 @@ class EcommerceProfileUpdateRequest(BaseModel):
 
 
 class EcommerceSelectProfileRequest(BaseModel):
-    profile_type: str = Field(description="cliente | funcionario | entregador | veterinario")
+    profile_type: str = Field(
+        description="cliente | funcionario | entregador | veterinario"
+    )
 
 
 def _normalize_tenant_uuid(raw_tenant_id: str | None) -> UUID | None:
@@ -178,7 +188,9 @@ def _activate_user_tenant_context(user: User) -> str:
     return str(tenant_id)
 
 
-def _build_storefront_reset_link(tenant: Tenant | None, user_email: str, reset_token: str) -> str:
+def _build_storefront_reset_link(
+    tenant: Tenant | None, user_email: str, reset_token: str
+) -> str:
     base_url = (os.getenv("ECOMMERCE_BASE_URL") or "https://corepet.com.br").rstrip("/")
     store_ref = None
     if tenant:
@@ -211,7 +223,9 @@ def _issue_password_reset_tokens() -> tuple[str, str, str]:
     return numeric_code, link_token, stored_token
 
 
-def _password_reset_token_matches(stored_token: str | None, received_token: str | None) -> bool:
+def _password_reset_token_matches(
+    stored_token: str | None, received_token: str | None
+) -> bool:
     if not stored_token or not received_token:
         return False
 
@@ -235,7 +249,9 @@ def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _mark_user_consent(user: User, request: Request, terms_version: str | None, privacy_version: str | None) -> None:
+def _mark_user_consent(
+    user: User, request: Request, terms_version: str | None, privacy_version: str | None
+) -> None:
     user.consent_date = _now_utc()
     user.consent_version = terms_version or TERMS_VERSION
     user.privacy_version = privacy_version or PRIVACY_VERSION
@@ -246,13 +262,21 @@ def _mark_user_consent(user: User, request: Request, terms_version: str | None, 
 def _issue_email_verification_token(user: User) -> str:
     raw_token = _issue_numeric_code()
     user.email_verification_token_hash = _hash_token(raw_token)
-    user.email_verification_token_expires = _now_utc() + timedelta(hours=EMAIL_VERIFICATION_TOKEN_HOURS)
+    user.email_verification_token_expires = _now_utc() + timedelta(
+        hours=EMAIL_VERIFICATION_TOKEN_HOURS
+    )
     user.email_verification_sent_at = _now_utc()
     return raw_token
 
 
-def _build_email_verification_link(user_email: str, raw_token: str, canal: str | None = None) -> str:
-    base_url = (os.getenv("FRONTEND_URL") or os.getenv("ECOMMERCE_BASE_URL") or "https://corepet.com.br").rstrip("/")
+def _build_email_verification_link(
+    user_email: str, raw_token: str, canal: str | None = None
+) -> str:
+    base_url = (
+        os.getenv("FRONTEND_URL")
+        or os.getenv("ECOMMERCE_BASE_URL")
+        or "https://corepet.com.br"
+    ).rstrip("/")
     canal_query = f"&canal={quote(canal)}" if canal else ""
     return f"{base_url}/verificar-email?email={quote(user_email)}&token={quote(raw_token)}{canal_query}"
 
@@ -302,14 +326,18 @@ def _send_email_verification(user: User, canal: str | None = None) -> bool:
 
 
 def _email_verification_block(user: User) -> bool:
-    return EMAIL_VERIFICATION_REQUIRED and not bool(getattr(user, "email_verified", False))
+    return EMAIL_VERIFICATION_REQUIRED and not bool(
+        getattr(user, "email_verified", False)
+    )
 
 
 def _tenant_status_is_active(status_value: object) -> bool:
     return str(status_value or "").strip().lower() in {"active", "ativo"}
 
 
-def _resolve_password_recovery_channel(request: Request, payload: EcommerceForgotPasswordRequest) -> str:
+def _resolve_password_recovery_channel(
+    request: Request, payload: EcommerceForgotPasswordRequest
+) -> str:
     raw_canal = payload.canal or request.headers.get("X-Client-Channel") or ""
     if str(raw_canal or "").strip():
         canal = normalize_online_sales_channel(raw_canal)
@@ -327,10 +355,12 @@ def _resolve_password_recovery_channel(request: Request, payload: EcommerceForgo
     return "app"
 
 
-def _build_reset_password_email_for_app(user: User, reset_token: str) -> tuple[str, str, str]:
-        saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
-        subject = "Recuperacao de senha do app - CorePet"
-        html_body = f"""
+def _build_reset_password_email_for_app(
+    user: User, reset_token: str
+) -> tuple[str, str, str]:
+    saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
+    subject = "Recuperacao de senha do app - CorePet"
+    html_body = f"""
         <html>
             <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
                 <div style="background: #2563eb; color: #ffffff; padding: 20px 24px; border-radius: 12px 12px 0 0;">
@@ -351,20 +381,22 @@ def _build_reset_password_email_for_app(user: User, reset_token: str) -> tuple[s
             </body>
         </html>
         """
-        text_body = (
-                "Recuperacao de senha do app - CorePet\n\n"
-                "Abra o app e use este codigo na tela Recuperar senha:\n"
-                f"{reset_token}\n\n"
-                f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
-                "Se voce nao pediu essa alteracao, ignore este e-mail."
-        )
-        return subject, html_body, text_body
+    text_body = (
+        "Recuperacao de senha do app - CorePet\n\n"
+        "Abra o app e use este codigo na tela Recuperar senha:\n"
+        f"{reset_token}\n\n"
+        f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
+        "Se voce nao pediu essa alteracao, ignore este e-mail."
+    )
+    return subject, html_body, text_body
 
 
-def _build_reset_password_email_for_site(user: User, reset_token: str, reset_link: str) -> tuple[str, str, str]:
-        saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
-        subject = "Recuperacao de senha da loja - CorePet"
-        html_body = f"""
+def _build_reset_password_email_for_site(
+    user: User, reset_token: str, reset_link: str
+) -> tuple[str, str, str]:
+    saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
+    subject = "Recuperacao de senha da loja - CorePet"
+    html_body = f"""
         <html>
             <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
                 <div style="background: #2563eb; color: #ffffff; padding: 20px 24px; border-radius: 12px 12px 0 0;">
@@ -393,15 +425,15 @@ def _build_reset_password_email_for_site(user: User, reset_token: str, reset_lin
             </body>
         </html>
         """
-        text_body = (
-                "Recuperacao de senha da loja - CorePet\n\n"
-                "Clique no botao do e-mail para redefinir sua senha.\n\n"
-                "Ou use este codigo na tela de recuperacao da loja online:\n"
-                f"{reset_token}\n\n"
-                f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
-                "Se voce nao pediu essa alteracao, ignore este e-mail."
-        )
-        return subject, html_body, text_body
+    text_body = (
+        "Recuperacao de senha da loja - CorePet\n\n"
+        "Clique no botao do e-mail para redefinir sua senha.\n\n"
+        "Ou use este codigo na tela de recuperacao da loja online:\n"
+        f"{reset_token}\n\n"
+        f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
+        "Se voce nao pediu essa alteracao, ignore este e-mail."
+    )
+    return subject, html_body, text_body
 
 
 def _get_current_ecommerce_user(
@@ -415,7 +447,9 @@ def _get_current_ecommerce_user(
     )
 
     try:
-        payload = jwt.decode(credentials.credentials, JWT_SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            credentials.credentials, JWT_SECRET_KEY, algorithms=[ALGORITHM]
+        )
         user_id = int(payload.get("sub"))
         token_type = payload.get("token_type")
         tenant_id = _normalize_tenant_uuid(payload.get("tenant_id"))
@@ -430,9 +464,7 @@ def _get_current_ecommerce_user(
     sync_rls_auth_user(db, user_id)
 
     user = (
-        db.query(User)
-        .filter(User.id == user_id, User.tenant_id == tenant_id)
-        .first()
+        db.query(User).filter(User.id == user_id, User.tenant_id == tenant_id).first()
     )
     if not user or not user.is_active:
         raise credentials_exception
@@ -599,9 +631,17 @@ def _select_preferred_cliente(
 def _select_linked_cliente_fallback(clientes: list[Cliente]) -> Cliente | None:
     if not clientes:
         return None
-    active = [cliente for cliente in clientes if getattr(cliente, "ativo", True) is not False]
+    active = [
+        cliente for cliente in clientes if getattr(cliente, "ativo", True) is not False
+    ]
     pool = active or clientes
-    return sorted(pool, key=lambda cliente: (_codigo_sort_value(cliente), int(getattr(cliente, "id", 0) or 0)))[0]
+    return sorted(
+        pool,
+        key=lambda cliente: (
+            _codigo_sort_value(cliente),
+            int(getattr(cliente, "id", 0) or 0),
+        ),
+    )[0]
 
 
 def _copy_missing_cliente_fields(target: Cliente, source: Cliente) -> None:
@@ -748,7 +788,11 @@ def _upsert_delivery_details(cliente: Cliente, details: dict, enabled: bool) -> 
     current = cliente.enderecos_adicionais
     items = []
     if isinstance(current, list):
-        items = [item for item in current if not (isinstance(item, dict) and item.get("tipo") == "ecommerce_entrega")]
+        items = [
+            item
+            for item in current
+            if not (isinstance(item, dict) and item.get("tipo") == "ecommerce_entrega")
+        ]
 
     if enabled:
         items.append({"tipo": "ecommerce_entrega", **details})
@@ -757,7 +801,12 @@ def _upsert_delivery_details(cliente: Cliente, details: dict, enabled: bool) -> 
         cliente.enderecos_adicionais = items if items else None
 
 
-_CLIENTE_RELATIONSHIPS_TO_TRANSFER = ("pets", "pendencias_estoque", "vendas", "contas_receber")
+_CLIENTE_RELATIONSHIPS_TO_TRANSFER = (
+    "pets",
+    "pendencias_estoque",
+    "vendas",
+    "contas_receber",
+)
 
 
 def _transfer_cliente_relations_for_ecommerce_merge(
@@ -765,16 +814,24 @@ def _transfer_cliente_relations_for_ecommerce_merge(
     previous_cliente: Cliente | None,
     target_cliente: Cliente | None,
 ) -> int:
-    if not previous_cliente or not target_cliente or previous_cliente.id == target_cliente.id:
+    if (
+        not previous_cliente
+        or not target_cliente
+        or previous_cliente.id == target_cliente.id
+    ):
         return 0
 
     transferencias = transferir_referencias_pessoa(
         db,
-        tenant_id=getattr(target_cliente, "tenant_id", None) or getattr(previous_cliente, "tenant_id", None),
+        tenant_id=getattr(target_cliente, "tenant_id", None)
+        or getattr(previous_cliente, "tenant_id", None),
         principal_id=target_cliente.id,
         duplicado_id=previous_cliente.id,
     )
-    transferred = int(transferencias.get("transferidos_especiais", {}).get("produto_fornecedores") or 0)
+    transferred = int(
+        transferencias.get("transferidos_especiais", {}).get("produto_fornecedores")
+        or 0
+    )
     transferred += sum(
         int(item.get("total") or 0)
         for item in transferencias.get("transferidos_genericos", [])
@@ -804,7 +861,9 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
     cpf_usuario = getattr(user, "cpf_cnpj", None)
     email_usuario = (getattr(user, "email", None) or "").strip().lower()
     telefone_usuario = getattr(user, "telefone", None)
-    cliente_operacional = _find_operational_cliente_match(db, tenant_id=tenant_id, user=user)
+    cliente_operacional = _find_operational_cliente_match(
+        db, tenant_id=tenant_id, user=user
+    )
     if cliente_operacional:
         cliente = cliente_operacional
 
@@ -914,9 +973,13 @@ def _serialize_profile(
 ) -> dict:
     delivery = _extract_ecommerce_delivery_details(cliente)
     if db is not None:
-        available_profiles = resolve_user_app_profiles(db, user, include_cliente=cliente)
+        available_profiles = resolve_user_app_profiles(
+            db, user, include_cliente=cliente
+        )
     else:
-        available_profiles = build_available_profiles_for_clientes(user, [cliente] if cliente else [])
+        available_profiles = build_available_profiles_for_clientes(
+            user, [cliente] if cliente else []
+        )
     is_entregador = bool(getattr(cliente, "is_entregador", False)) if cliente else False
     is_veterinario = bool(
         cliente
@@ -951,7 +1014,9 @@ def _serialize_profile(
         "cidade": cliente.cidade if cliente else None,
         "estado": cliente.estado if cliente else None,
         "endereco_entrega": cliente.endereco_entrega if cliente else None,
-        "usar_endereco_entrega_diferente": delivery.get("usar_endereco_entrega_diferente", False),
+        "usar_endereco_entrega_diferente": delivery.get(
+            "usar_endereco_entrega_diferente", False
+        ),
         "endereco_entrega_detalhado": {
             "entrega_nome": delivery.get("entrega_nome", ""),
             "entrega_cep": delivery.get("entrega_cep", ""),
@@ -966,21 +1031,31 @@ def _serialize_profile(
         # Perfil entregador — usado pelo app mobile para mostrar interface correta
         "is_entregador": is_entregador,
         "is_funcionario": is_funcionario,
-        "funcionario_id": cliente.id if (cliente and (is_entregador or is_funcionario)) else None,
+        "funcionario_id": cliente.id
+        if (cliente and (is_entregador or is_funcionario))
+        else None,
         "is_veterinario": is_veterinario,
         "veterinario_id": cliente.id if (cliente and is_veterinario) else None,
         "perfil_operacional": perfil_operacional,
         "selected_profile": perfil_operacional,
         "available_profiles": available_profiles,
     }
-    return apply_selected_profile_flags(payload, available_profiles, selected_profile or perfil_operacional)
+    return apply_selected_profile_flags(
+        payload, available_profiles, selected_profile or perfil_operacional
+    )
 
 
 @router.post("/registrar")
-def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: Session = Depends(get_session)):
+def registrar_cliente(
+    payload: EcommerceRegisterRequest,
+    request: Request,
+    db: Session = Depends(get_session),
+):
     tenant_id = _extract_tenant_id_from_request(request)
     email = payload.email.strip().lower()
-    canal_registro = normalize_online_sales_channel(payload.canal or request.headers.get("X-Client-Channel") or "")
+    canal_registro = normalize_online_sales_channel(
+        payload.canal or request.headers.get("X-Client-Channel") or ""
+    )
 
     if not payload.accepted_terms or not payload.accepted_privacy:
         raise HTTPException(
@@ -991,13 +1066,17 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
     sync_rls_auth_email(db, email)
     existing = db.query(User).filter(User.email == email).first()
     if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email já cadastrado")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Email já cadastrado"
+        )
 
     # Normaliza CPF para apenas dígitos antes de salvar e de buscar o Cliente
     cpf_normalizado = re.sub(r"\D+", "", str(payload.cpf or "")).strip() or None
     telefone = (payload.telefone or "").strip()
     if len(_digits_only(telefone)) < 10:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Telefone obrigatorio")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Telefone obrigatorio"
+        )
 
     user = User(
         email=email,
@@ -1040,6 +1119,7 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
     # Ativa WelcomeHandler (cupom de boas-vindas) se houver campanha ativa
     try:
         from app.campaigns.models import CampaignEventQueue, EventOriginEnum
+
         evento_campanha = CampaignEventQueue(
             tenant_id=tenant_id,
             event_type="customer_registered",
@@ -1055,7 +1135,10 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
         db.commit()
     except Exception as e_camp:
         import logging
-        logging.getLogger(__name__).error("[Campanhas] Erro ao publicar customer_registered: %s", e_camp)
+
+        logging.getLogger(__name__).error(
+            "[Campanhas] Erro ao publicar customer_registered: %s", e_camp
+        )
 
     if EMAIL_VERIFICATION_REQUIRED:
         return {
@@ -1084,14 +1167,14 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
 
 
 @router.post("/login")
-def login_cliente(payload: EcommerceLoginRequest, request: Request, db: Session = Depends(get_session)):
+def login_cliente(
+    payload: EcommerceLoginRequest, request: Request, db: Session = Depends(get_session)
+):
     tenant_id = _extract_tenant_id_from_request(request)
     email = payload.email.strip().lower()
 
     user = (
-        db.query(User)
-        .filter(User.email == email, User.tenant_id == tenant_id)
-        .first()
+        db.query(User).filter(User.email == email, User.tenant_id == tenant_id).first()
     )
 
     if user and is_user_locked(user):
@@ -1112,7 +1195,9 @@ def login_cliente(payload: EcommerceLoginRequest, request: Request, db: Session 
         )
 
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Conta inativa")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Conta inativa"
+        )
 
     if _email_verification_block(user):
         raise HTTPException(
@@ -1145,27 +1230,37 @@ def login_cliente(payload: EcommerceLoginRequest, request: Request, db: Session 
 
 
 @router.post("/esqueci-senha")
-def esqueci_senha(payload: EcommerceForgotPasswordRequest, request: Request, db: Session = Depends(get_session)):
+def esqueci_senha(
+    payload: EcommerceForgotPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_session),
+):
     tenant_id = _extract_tenant_id_from_request(request)
     email = payload.email.strip().lower()
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
 
     user = (
-        db.query(User)
-        .filter(User.email == email, User.tenant_id == tenant_id)
-        .first()
+        db.query(User).filter(User.email == email, User.tenant_id == tenant_id).first()
     )
 
     if user and user.is_active:
-        reset_code, reset_link_token, stored_reset_token = _issue_password_reset_tokens()
+        reset_code, reset_link_token, stored_reset_token = (
+            _issue_password_reset_tokens()
+        )
         user.reset_token = stored_reset_token
-        user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_MINUTES)
+        user.reset_token_expires = datetime.now(timezone.utc) + timedelta(
+            minutes=RESET_TOKEN_MINUTES
+        )
         reset_link = _build_storefront_reset_link(tenant, user.email, reset_link_token)
         canal = _resolve_password_recovery_channel(request, payload)
         if canal == "site":
-            subject, html_body, text_body = _build_reset_password_email_for_site(user, reset_code, reset_link)
+            subject, html_body, text_body = _build_reset_password_email_for_site(
+                user, reset_code, reset_link
+            )
         else:
-            subject, html_body, text_body = _build_reset_password_email_for_app(user, reset_code)
+            subject, html_body, text_body = _build_reset_password_email_for_app(
+                user, reset_code
+            )
         enviado = send_email(
             to=user.email,
             subject=subject,
@@ -1190,7 +1285,11 @@ def esqueci_senha(payload: EcommerceForgotPasswordRequest, request: Request, db:
 
 
 @router.post("/resetar-senha")
-def resetar_senha(payload: EcommerceResetPasswordRequest, request: Request, db: Session = Depends(get_session)):
+def resetar_senha(
+    payload: EcommerceResetPasswordRequest,
+    request: Request,
+    db: Session = Depends(get_session),
+):
     tenant_id = _extract_tenant_id_from_request(request)
     email = (payload.email or "").strip().lower()
     if not email:
@@ -1200,19 +1299,26 @@ def resetar_senha(payload: EcommerceResetPasswordRequest, request: Request, db: 
         )
 
     user = (
-        db.query(User)
-        .filter(User.email == email, User.tenant_id == tenant_id)
-        .first()
+        db.query(User).filter(User.email == email, User.tenant_id == tenant_id).first()
     )
 
     if not user or not user.reset_token_expires:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo ou link de recuperacao invalido")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Codigo ou link de recuperacao invalido",
+        )
 
     if not _password_reset_token_matches(user.reset_token, payload.token):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo ou link de recuperacao invalido")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Codigo ou link de recuperacao invalido",
+        )
 
     if _is_expired(user.reset_token_expires, datetime.now(timezone.utc)):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo ou link de recuperacao expirado")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Codigo ou link de recuperacao expirado",
+        )
 
     user.hashed_password = hash_password(payload.nova_senha)
     user.reset_token = None
@@ -1226,7 +1332,10 @@ def resetar_senha(payload: EcommerceResetPasswordRequest, request: Request, db: 
 
 
 @router.get("/me")
-def me(current_user: User = Depends(_get_current_ecommerce_user), db: Session = Depends(get_session)):
+def me(
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
     tenant_id = _activate_user_tenant_context(current_user)
     cliente = (
         db.query(Cliente)
@@ -1244,7 +1353,10 @@ def me(current_user: User = Depends(_get_current_ecommerce_user), db: Session = 
 
 
 @router.get("/perfil")
-def obter_perfil(current_user: User = Depends(_get_current_ecommerce_user), db: Session = Depends(get_session)):
+def obter_perfil(
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
     cliente = _get_or_create_cliente_for_user(db, current_user)
     db.commit()
     return _serialize_profile(
@@ -1263,15 +1375,21 @@ def selecionar_perfil_app(
 ):
     profile_type = normalize_profile_type(payload.profile_type)
     if not profile_type:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Perfil de app invalido")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Perfil de app invalido"
+        )
 
     cliente = _get_or_create_cliente_for_user(db, current_user)
     db.commit()
     db.refresh(cliente)
 
-    available_profiles = resolve_user_app_profiles(db, current_user, include_cliente=cliente)
+    available_profiles = resolve_user_app_profiles(
+        db, current_user, include_cliente=cliente
+    )
     if profile_type not in {profile["type"] for profile in available_profiles}:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil de app nao liberado")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Perfil de app nao liberado"
+        )
 
     access_token = create_access_token(
         data={
@@ -1287,7 +1405,9 @@ def selecionar_perfil_app(
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": _serialize_profile(current_user, cliente, db, selected_profile=profile_type),
+        "user": _serialize_profile(
+            current_user, cliente, db, selected_profile=profile_type
+        ),
     }
 
 
@@ -1303,9 +1423,14 @@ def atualizar_perfil(
     nome_atual = (current_user.nome or "").strip()
     nome_final = nome_informado or nome_atual
     if not nome_final:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nome completo obrigatório")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Nome completo obrigatório"
+        )
     if nome_informado and nome_informado != nome_atual and " " not in nome_final:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Informe nome completo (nome e sobrenome)")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe nome completo (nome e sobrenome)",
+        )
 
     current_user.nome = nome_final
     cliente.nome = nome_final
@@ -1313,11 +1438,15 @@ def atualizar_perfil(
     if payload.telefone is not None:
         telefone = payload.telefone.strip()
         if len(_digits_only(telefone)) < 10:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Telefone obrigatorio")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Telefone obrigatorio"
+            )
         current_user.telefone = telefone or None
         cliente.telefone = telefone or None
     elif len(_digits_only(current_user.telefone or cliente.telefone)) < 10:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Telefone obrigatorio")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Telefone obrigatorio"
+        )
 
     if payload.cpf is not None:
         cpf = payload.cpf.strip()
@@ -1335,19 +1464,26 @@ def atualizar_perfil(
     )
 
     if potential_match and potential_match.id != cliente.id:
-        canonical_cliente = _select_preferred_cliente(
-            [cliente, potential_match],
-            email=current_user.email,
-            cpf=current_user.cpf_cnpj,
-            telefone=current_user.telefone,
-            prefer_operational=True,
-        ) or cliente
-        previous_cliente = potential_match if canonical_cliente.id == cliente.id else cliente
+        canonical_cliente = (
+            _select_preferred_cliente(
+                [cliente, potential_match],
+                email=current_user.email,
+                cpf=current_user.cpf_cnpj,
+                telefone=current_user.telefone,
+                prefer_operational=True,
+            )
+            or cliente
+        )
+        previous_cliente = (
+            potential_match if canonical_cliente.id == cliente.id else cliente
+        )
 
         _copy_missing_cliente_fields(canonical_cliente, previous_cliente)
         canonical_cliente.user_id = current_user.id
         canonical_cliente.ativo = True
-        _transfer_cliente_relations_for_ecommerce_merge(db, previous_cliente, canonical_cliente)
+        _transfer_cliente_relations_for_ecommerce_merge(
+            db, previous_cliente, canonical_cliente
+        )
         cliente = canonical_cliente
         previous_cliente.ativo = False
         nota_fusao = (
@@ -1387,9 +1523,21 @@ def atualizar_perfil(
             entrega_complemento = (payload.entrega_complemento or "").strip()
 
             if not entrega_nome:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Informe o nome completo para entrega")
-            if not entrega_endereco or not entrega_numero or not entrega_bairro or not entrega_cidade or not entrega_estado:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Preencha o endereço de entrega completo")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Informe o nome completo para entrega",
+                )
+            if (
+                not entrega_endereco
+                or not entrega_numero
+                or not entrega_bairro
+                or not entrega_cidade
+                or not entrega_estado
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Preencha o endereço de entrega completo",
+                )
 
             address_line = f"{entrega_endereco}, {entrega_numero}"
             tail = " | ".join(
@@ -1401,7 +1549,9 @@ def atualizar_perfil(
                     f"Destinatário: {entrega_nome}",
                 ]
             )
-            cliente.endereco_entrega = " | ".join([address_line, *[part for part in tail.split(" | ") if part]])
+            cliente.endereco_entrega = " | ".join(
+                [address_line, *[part for part in tail.split(" | ") if part]]
+            )
 
             _upsert_delivery_details(
                 cliente,
@@ -1458,16 +1608,22 @@ def meus_cupons(
     resultado = []
     for c in cupons:
         expirado = _is_expired(c.valid_until, now)
-        resultado.append({
-            "id": c.id,
-            "code": c.code,
-            "coupon_type": c.coupon_type.value,
-            "discount_value": float(c.discount_value) if c.discount_value else None,
-            "discount_percent": float(c.discount_percent) if c.discount_percent else None,
-            "valid_until": c.valid_until.isoformat() if c.valid_until else None,
-            "expirado": expirado,
-            "min_purchase_value": float(c.min_purchase_value) if c.min_purchase_value else None,
-        })
+        resultado.append(
+            {
+                "id": c.id,
+                "code": c.code,
+                "coupon_type": c.coupon_type.value,
+                "discount_value": float(c.discount_value) if c.discount_value else None,
+                "discount_percent": float(c.discount_percent)
+                if c.discount_percent
+                else None,
+                "valid_until": c.valid_until.isoformat() if c.valid_until else None,
+                "expirado": expirado,
+                "min_purchase_value": float(c.min_purchase_value)
+                if c.min_purchase_value
+                else None,
+            }
+        )
 
     return resultado
 
@@ -1522,8 +1678,16 @@ def meus_beneficios(
         )
         .first()
     )
-    stamps_to_complete = int((loyalty_campaign.params or {}).get("stamps_to_complete", 10)) if loyalty_campaign else 10
-    min_purchase_value = float((loyalty_campaign.params or {}).get("min_purchase_value", 0) or 0) if loyalty_campaign else 0.0
+    stamps_to_complete = (
+        int((loyalty_campaign.params or {}).get("stamps_to_complete", 10))
+        if loyalty_campaign
+        else 10
+    )
+    min_purchase_value = (
+        float((loyalty_campaign.params or {}).get("min_purchase_value", 0) or 0)
+        if loyalty_campaign
+        else 0.0
+    )
     saldo_total_carimbos = int(loyalty_summary.get("total_carimbos") or 0)
     carimbos_no_cartao = max(saldo_total_carimbos, 0)
 
@@ -1579,16 +1743,22 @@ def meus_beneficios(
     cupons_lista = []
     for c in cupons:
         expirado = _is_expired(c.valid_until, now)
-        cupons_lista.append({
-            "id": c.id,
-            "code": c.code,
-            "coupon_type": c.coupon_type.value,
-            "discount_value": float(c.discount_value) if c.discount_value else None,
-            "discount_percent": float(c.discount_percent) if c.discount_percent else None,
-            "valid_until": c.valid_until.isoformat() if c.valid_until else None,
-            "expirado": expirado,
-            "min_purchase_value": float(c.min_purchase_value) if c.min_purchase_value else None,
-        })
+        cupons_lista.append(
+            {
+                "id": c.id,
+                "code": c.code,
+                "coupon_type": c.coupon_type.value,
+                "discount_value": float(c.discount_value) if c.discount_value else None,
+                "discount_percent": float(c.discount_percent)
+                if c.discount_percent
+                else None,
+                "valid_until": c.valid_until.isoformat() if c.valid_until else None,
+                "expirado": expirado,
+                "min_purchase_value": float(c.min_purchase_value)
+                if c.min_purchase_value
+                else None,
+            }
+        )
 
     return {
         "cashback": {
@@ -1597,9 +1767,15 @@ def meus_beneficios(
         "carimbos": {
             "total_geral": saldo_total_carimbos,
             "carimbos_no_cartao": carimbos_no_cartao,
-            "carimbos_ativos_brutos": int(loyalty_summary.get("total_carimbos_brutos") or 0),
-            "carimbos_comprometidos_total": int(loyalty_summary.get("carimbos_comprometidos_total") or 0),
-            "carimbos_convertidos": int(loyalty_summary.get("carimbos_convertidos") or 0),
+            "carimbos_ativos_brutos": int(
+                loyalty_summary.get("total_carimbos_brutos") or 0
+            ),
+            "carimbos_comprometidos_total": int(
+                loyalty_summary.get("carimbos_comprometidos_total") or 0
+            ),
+            "carimbos_convertidos": int(
+                loyalty_summary.get("carimbos_convertidos") or 0
+            ),
             "carimbos_em_debito": int(loyalty_summary.get("carimbos_em_debito") or 0),
             "meta": stamps_to_complete,
             "min_purchase_value": min_purchase_value,
@@ -1617,6 +1793,7 @@ def meus_beneficios(
 # ---------------------------------------------------------------------------
 # Cashback — extrato (app mobile)
 # ---------------------------------------------------------------------------
+
 
 @router.get("/cashback/extrato")
 def meu_extrato_cashback(
@@ -1663,16 +1840,18 @@ def meu_extrato_cashback(
             and t.expires_at is not None
             and _is_expired_or_equal(t.expires_at, now)
         )
-        items.append({
-            "id": t.id,
-            "amount": float(t.amount),
-            "tx_type": getattr(t, "tx_type", "credit"),
-            "source_type": t.source_type.value,
-            "description": t.description,
-            "created_at": t.created_at.isoformat() if t.created_at else None,
-            "expires_at": t.expires_at.isoformat() if t.expires_at else None,
-            "expired": is_expired_credit,
-        })
+        items.append(
+            {
+                "id": t.id,
+                "amount": float(t.amount),
+                "tx_type": getattr(t, "tx_type", "credit"),
+                "source_type": t.source_type.value,
+                "description": t.description,
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+                "expires_at": t.expires_at.isoformat() if t.expires_at else None,
+                "expired": is_expired_credit,
+            }
+        )
 
     return {"saldo_atual": saldo_atual, "transacoes": items}
 
@@ -1680,6 +1859,7 @@ def meu_extrato_cashback(
 # ---------------------------------------------------------------------------
 # Cashback — sugestão inteligente de pedido (app mobile)
 # ---------------------------------------------------------------------------
+
 
 @router.get("/cashback/sugestao")
 def minha_sugestao_cashback(
@@ -1713,16 +1893,20 @@ def minha_sugestao_cashback(
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == cliente.id,
-            CashbackTransaction.tx_type == "credit" if hasattr(CashbackTransaction, "tx_type") else True,
+            CashbackTransaction.tx_type == "credit"
+            if hasattr(CashbackTransaction, "tx_type")
+            else True,
             CashbackTransaction.source_type == CashbackSourceTypeEnum.campaign,
         )
         .order_by(CashbackTransaction.created_at.desc())
         .limit(10)
         .all()
     )
-    ticket_sugerido = round(
-        sum(float(t.amount) for t in ultimas) / len(ultimas) * 50, 2
-    ) if ultimas else 100.0
+    ticket_sugerido = (
+        round(sum(float(t.amount) for t in ultimas) / len(ultimas) * 50, 2)
+        if ultimas
+        else 100.0
+    )
 
     valor_com_cashback = max(0.0, round(ticket_sugerido - saldo, 2))
 
@@ -1731,7 +1915,9 @@ def minha_sugestao_cashback(
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == cliente.id,
-            CashbackTransaction.tx_type == "credit" if hasattr(CashbackTransaction, "tx_type") else True,
+            CashbackTransaction.tx_type == "credit"
+            if hasattr(CashbackTransaction, "tx_type")
+            else True,
             CashbackTransaction.expires_at.isnot(None),
             CashbackTransaction.expires_at > now,
         )
@@ -1748,6 +1934,7 @@ def minha_sugestao_cashback(
             "amount": float(proximo_expirando.amount),
             "expires_at": proximo_expirando.expires_at.isoformat(),
             "dias_restantes": _remaining_days_until(proximo_expirando.expires_at, now),
-        } if proximo_expirando else None,
+        }
+        if proximo_expirando
+        else None,
     }
-

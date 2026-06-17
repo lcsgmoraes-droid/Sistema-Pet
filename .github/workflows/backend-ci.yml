@@ -367,6 +367,10 @@ jobs:
         run: |
           ruff format --check app/routers
 
+      - name: Backend routes format (blocking)
+        run: |
+          ruff format --check app/routes
+
       - name: Backend AI packages format (blocking)
         run: |
           ruff format --check app/ai app/ai_core

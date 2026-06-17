@@ -15,14 +15,21 @@ from app.financeiro_models import FormaPagamento
 from app.idempotency_models import IdempotencyKey
 from app.models import ConfiguracaoEntrega, Tenant, User
 from app.pedido_models import Pedido, PedidoItem
-from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
+from app.routes.ecommerce_auth import (
+    _activate_user_tenant_context,
+    _get_current_ecommerce_user,
+)
 from app.services.ecommerce_payment_config import get_active_mercado_pago_runtime_config
 from app.services.mercado_pago_checkout import (
     create_preference,
     is_mercado_pago_provider,
 )
 from app.services.sales_channel import resolve_checkout_sales_channel
-from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
+from app.tenancy.context import (
+    clear_current_tenant,
+    get_current_tenant,
+    set_current_tenant,
+)
 from app.utils.timezone import now_brasilia
 
 
@@ -36,14 +43,54 @@ FORMAS_PAGAMENTO_ONLINE = ("pix", "cartao_debito", "cartao_credito")
 
 # Palavras do mundo pet para código de retirada por terceiro
 _PALAVRAS_PET = [
-    "patinha", "focinho", "coleira", "bigodinho", "rabinho", "pelagem",
-    "latido", "miado", "ronronar", "arranhado", "mordisco", "felpudo",
-    "manchado", "listrado", "tigrao", "leaozinho", "pompom", "bolota",
-    "amendoim", "biscoito", "caramelo", "chocolate", "baunilha", "canela",
-    "malhado", "pintado", "bolinha", "fralda", "petisco", "ossinhos",
-    "aquario", "gaiola", "gambito", "pinscher", "vira-lata", "siames",
-    "labrador", "poodle", "bulldog", "dachshund", "beagle", "shih-tzu",
-    "periquito", "calopsita", "hamster", "coelho", "porquinho", "tartaruga",
+    "patinha",
+    "focinho",
+    "coleira",
+    "bigodinho",
+    "rabinho",
+    "pelagem",
+    "latido",
+    "miado",
+    "ronronar",
+    "arranhado",
+    "mordisco",
+    "felpudo",
+    "manchado",
+    "listrado",
+    "tigrao",
+    "leaozinho",
+    "pompom",
+    "bolota",
+    "amendoim",
+    "biscoito",
+    "caramelo",
+    "chocolate",
+    "baunilha",
+    "canela",
+    "malhado",
+    "pintado",
+    "bolinha",
+    "fralda",
+    "petisco",
+    "ossinhos",
+    "aquario",
+    "gaiola",
+    "gambito",
+    "pinscher",
+    "vira-lata",
+    "siames",
+    "labrador",
+    "poodle",
+    "bulldog",
+    "dachshund",
+    "beagle",
+    "shih-tzu",
+    "periquito",
+    "calopsita",
+    "hamster",
+    "coelho",
+    "porquinho",
+    "tartaruga",
 ]
 
 
@@ -65,15 +112,25 @@ class CheckoutFinalizarRequest(BaseModel):
     cidade_destino: str = Field(min_length=2)
     endereco_entrega: str | None = None
     cupom: str | None = None
-    tipo_retirada: str | None = None  # proprio, terceiro (usado quando delivery_mode=retirada)
-    is_drive: bool = False  # Cliente quer usar drive (avisa quando chega no estacionamento)
-    forma_pagamento_nome: str | None = None  # Nome da forma de pagamento selecionada pelo cliente
+    tipo_retirada: str | None = (
+        None  # proprio, terceiro (usado quando delivery_mode=retirada)
+    )
+    is_drive: bool = (
+        False  # Cliente quer usar drive (avisa quando chega no estacionamento)
+    )
+    forma_pagamento_nome: str | None = (
+        None  # Nome da forma de pagamento selecionada pelo cliente
+    )
     origem: str | None = None  # 'app' | 'web' — canal de origem do pedido
 
 
-def _current_identity(current_user: User = Depends(_get_current_ecommerce_user)) -> EcommerceIdentity:
+def _current_identity(
+    current_user: User = Depends(_get_current_ecommerce_user),
+) -> EcommerceIdentity:
     tenant_id = _activate_user_tenant_context(current_user)
-    return EcommerceIdentity(user_id=current_user.id, tenant_id=str(UUID(str(tenant_id))))
+    return EcommerceIdentity(
+        user_id=current_user.id, tenant_id=str(UUID(str(tenant_id)))
+    )
 
 
 def _activate_checkout_tenant_context(identity: EcommerceIdentity) -> str:
@@ -118,7 +175,10 @@ def _frete_local_por_cidade(db: Session, tenant_id: str, cidade_destino: str) ->
     destino = _normalize_text(cidade_destino)
 
     if not destino:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cidade de destino obrigatória")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cidade de destino obrigatória",
+        )
 
     if not cidade_loja:
         return {
@@ -237,7 +297,8 @@ def _venda_info_for_pedido(db: Session, pedido: Pedido) -> dict[str, str | bool 
                 IdempotencyKey.user_id == 0,
                 IdempotencyKey.tenant_id == pedido.tenant_id,
                 IdempotencyKey.endpoint == "POST /api/ecommerce/integracao/venda",
-                IdempotencyKey.chave_idempotencia == f"ecommerce-venda:{pedido.pedido_id}",
+                IdempotencyKey.chave_idempotencia
+                == f"ecommerce-venda:{pedido.pedido_id}",
                 IdempotencyKey.status == "completed",
                 IdempotencyKey.response_body.isnot(None),
             )
@@ -250,7 +311,11 @@ def _venda_info_for_pedido(db: Session, pedido: Pedido) -> dict[str, str | bool 
 
         try:
             response_body = json.loads(registry.response_body or "{}")
-            venda_id = int(response_body.get("venda_id")) if response_body.get("venda_id") else None
+            venda_id = (
+                int(response_body.get("venda_id"))
+                if response_body.get("venda_id")
+                else None
+            )
         except (TypeError, ValueError, json.JSONDecodeError):
             venda_id = None
 
@@ -319,7 +384,9 @@ def _request_hash(data: dict) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
-def _pagamento_online_configurado(db: Session | None = None, tenant_id: str | None = None) -> bool:
+def _pagamento_online_configurado(
+    db: Session | None = None, tenant_id: str | None = None
+) -> bool:
     if db is not None and tenant_id is not None:
         return get_active_mercado_pago_runtime_config(db, tenant_id) is not None
 
@@ -334,11 +401,15 @@ def _payment_provider() -> str:
 
 def _public_base_url() -> str:
     return (
-        os.getenv("ECOMMERCE_PUBLIC_BASE_URL")
-        or os.getenv("ECOMMERCE_BASE_URL")
-        or os.getenv("FRONTEND_URL")
-        or "https://corepet.com.br"
-    ).strip().rstrip("/")
+        (
+            os.getenv("ECOMMERCE_PUBLIC_BASE_URL")
+            or os.getenv("ECOMMERCE_BASE_URL")
+            or os.getenv("FRONTEND_URL")
+            or "https://corepet.com.br"
+        )
+        .strip()
+        .rstrip("/")
+    )
 
 
 def _classificar_forma_pagamento_online(nome: str | None) -> str | None:
@@ -364,7 +435,9 @@ def _validar_forma_pagamento_online(nome: str | None) -> str:
     return tipo
 
 
-def _resolver_origem_checkout(payload: CheckoutFinalizarRequest, request: Request) -> str:
+def _resolver_origem_checkout(
+    payload: CheckoutFinalizarRequest, request: Request
+) -> str:
     return resolve_checkout_sales_channel(payload, request)
 
 
@@ -386,7 +459,9 @@ def _checkout_idempotency_payload(
     }
 
 
-def _calcular_desconto(subtotal: float, cupom: str | None) -> tuple[str | None, int, float]:
+def _calcular_desconto(
+    subtotal: float, cupom: str | None
+) -> tuple[str | None, int, float]:
     if not cupom:
         return None, 0, 0.0
 
@@ -421,8 +496,7 @@ def listar_formas_pagamento(
     )
     return {
         "formas_pagamento": [
-            {"id": f.id, "nome": f.nome, "tipo": f.tipo}
-            for f in formas
+            {"id": f.id, "nome": f.nome, "tipo": f.tipo} for f in formas
         ]
     }
 
@@ -449,11 +523,15 @@ def resumo_checkout(
 
     carrinho = _buscar_carrinho(db, identity)
     if not carrinho:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio"
+        )
 
     itens = _buscar_itens(db, carrinho.pedido_id)
     if not itens:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio"
+        )
 
     subtotal = round(sum(float(item.subtotal or 0.0) for item in itens), 2)
     frete = _frete_local_por_cidade(db, tenant_id, cidade_destino)
@@ -518,7 +596,10 @@ def finalizar_checkout(
 
         if idem_row:
             if idem_row.request_hash != request_hash:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Conflito de idempotência")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Conflito de idempotência",
+                )
             if idem_row.status == "completed" and idem_row.response_body:
                 return json.loads(idem_row.response_body)
         else:
@@ -535,13 +616,17 @@ def finalizar_checkout(
 
     carrinho = _buscar_carrinho(db, identity)
     if not carrinho:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio"
+        )
 
     carrinho.origem = origem_checkout
 
     itens = _buscar_itens(db, carrinho.pedido_id)
     if not itens:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio"
+        )
 
     subtotal = round(sum(float(item.subtotal or 0.0) for item in itens), 2)
 
@@ -558,7 +643,9 @@ def finalizar_checkout(
     else:
         frete = _frete_local_por_cidade(db, tenant_id, payload.cidade_destino)
 
-    cupom_codigo, cupom_percentual, desconto = _calcular_desconto(subtotal, payload.cupom)
+    cupom_codigo, cupom_percentual, desconto = _calcular_desconto(
+        subtotal, payload.cupom
+    )
     total = round(max(subtotal - desconto, 0.0) + float(frete["valor_frete"]), 2)
 
     carrinho.total = total
@@ -601,7 +688,9 @@ def finalizar_checkout(
     response["payment_provider"] = provider
     if is_mercado_pago_provider(provider):
         tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
-        storefront_ref = str(getattr(tenant, "ecommerce_slug", None) or tenant_id).strip("/")
+        storefront_ref = str(
+            getattr(tenant, "ecommerce_slug", None) or tenant_id
+        ).strip("/")
         return_url_params = None
         if origem_checkout == "app":
             return_url_base = f"{_public_base_url()}/app/retorno-pagamento"
@@ -628,13 +717,15 @@ def finalizar_checkout(
         carrinho.payment_provider = "mercadopago"
         carrinho.payment_preference_id = preference.get("preference_id")
         carrinho.payment_url = preference.get("payment_url")
-        response.update({
-            "payment_provider": carrinho.payment_provider,
-            "payment_preference_id": carrinho.payment_preference_id,
-            "payment_url": carrinho.payment_url,
-            "init_point": preference.get("init_point"),
-            "sandbox_init_point": preference.get("sandbox_init_point"),
-        })
+        response.update(
+            {
+                "payment_provider": carrinho.payment_provider,
+                "payment_preference_id": carrinho.payment_preference_id,
+                "payment_url": carrinho.payment_url,
+                "init_point": preference.get("init_point"),
+                "sandbox_init_point": preference.get("sandbox_init_point"),
+            }
+        )
 
     if idem_row:
         idem_row.status = "completed"
@@ -677,33 +768,37 @@ def listar_pedidos_cliente(
         itens = _buscar_itens(db, pedido.pedido_id)
         payment_info = _payment_info_for_pedido(db, pedido)
         venda_info = _venda_info_for_pedido(db, pedido)
-        resultado.append({
-            "pedido_id": pedido.pedido_id,
-            "status": pedido.status,
-            "total": float(pedido.total or 0.0),
-            "origem": pedido.origem or venda_info["canal"] or '-',
-            "venda_id": venda_info["venda_id"],
-            "status_entrega": venda_info["status_entrega"],
-            "retirado_por": venda_info["retirado_por"],
-            "tem_entrega": venda_info["tem_entrega"],
-            "tipo_retirada": pedido.tipo_retirada,
-            "palavra_chave_retirada": pedido.palavra_chave_retirada,
-            "payment_provider": payment_info["payment_provider"],
-            "payment_preference_id": payment_info["payment_preference_id"],
-            "payment_url": payment_info["payment_url"],
-            "created_at": pedido.created_at.isoformat() if pedido.created_at else None,
-            "itens_count": len(itens),
-            "itens": [
-                {
-                    "produto_id": item.produto_id,
-                    "nome": item.nome,
-                    "quantidade": item.quantidade,
-                    "preco_unitario": float(item.preco_unitario or 0.0),
-                    "subtotal": float(item.subtotal or 0.0),
-                }
-                for item in itens
-            ],
-        })
+        resultado.append(
+            {
+                "pedido_id": pedido.pedido_id,
+                "status": pedido.status,
+                "total": float(pedido.total or 0.0),
+                "origem": pedido.origem or venda_info["canal"] or "-",
+                "venda_id": venda_info["venda_id"],
+                "status_entrega": venda_info["status_entrega"],
+                "retirado_por": venda_info["retirado_por"],
+                "tem_entrega": venda_info["tem_entrega"],
+                "tipo_retirada": pedido.tipo_retirada,
+                "palavra_chave_retirada": pedido.palavra_chave_retirada,
+                "payment_provider": payment_info["payment_provider"],
+                "payment_preference_id": payment_info["payment_preference_id"],
+                "payment_url": payment_info["payment_url"],
+                "created_at": pedido.created_at.isoformat()
+                if pedido.created_at
+                else None,
+                "itens_count": len(itens),
+                "itens": [
+                    {
+                        "produto_id": item.produto_id,
+                        "nome": item.nome,
+                        "quantidade": item.quantidade,
+                        "preco_unitario": float(item.preco_unitario or 0.0),
+                        "subtotal": float(item.subtotal or 0.0),
+                    }
+                    for item in itens
+                ],
+            }
+        )
 
     return {"pedidos": resultado}
 
@@ -726,7 +821,9 @@ def consultar_status_pedido(
         .first()
     )
     if not pedido:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Pedido não encontrado"
+        )
 
     payment_info = _payment_info_for_pedido(db, pedido)
     venda_info = _venda_info_for_pedido(db, pedido)
@@ -734,15 +831,19 @@ def consultar_status_pedido(
         "pedido_id": pedido.pedido_id,
         "status": pedido.status,
         "total": float(pedido.total or 0.0),
-        "origem": pedido.origem or venda_info["canal"] or '-',
+        "origem": pedido.origem or venda_info["canal"] or "-",
         "venda_id": venda_info["venda_id"],
         "status_entrega": venda_info["status_entrega"],
         "retirado_por": venda_info["retirado_por"],
         "tem_entrega": venda_info["tem_entrega"],
         "tipo_retirada": pedido.tipo_retirada,
         "is_drive": pedido.is_drive,
-        "drive_chegou_at": pedido.drive_chegou_at.isoformat() if pedido.drive_chegou_at else None,
-        "drive_entregue_at": pedido.drive_entregue_at.isoformat() if pedido.drive_entregue_at else None,
+        "drive_chegou_at": pedido.drive_chegou_at.isoformat()
+        if pedido.drive_chegou_at
+        else None,
+        "drive_entregue_at": pedido.drive_entregue_at.isoformat()
+        if pedido.drive_entregue_at
+        else None,
         "palavra_chave_retirada": pedido.palavra_chave_retirada,
         "payment_provider": payment_info["payment_provider"],
         "payment_preference_id": payment_info["payment_preference_id"],
@@ -769,10 +870,15 @@ def cancelar_pedido(
         .first()
     )
     if not pedido:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Pedido não encontrado"
+        )
 
     if pedido.status not in ("carrinho", "pendente"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Pedido não pode ser cancelado")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Pedido não pode ser cancelado",
+        )
 
     pedido.status = "cancelado"
     db.commit()
@@ -801,13 +907,21 @@ def drive_cheguei(
         .first()
     )
     if not pedido:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido não encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Pedido não encontrado"
+        )
 
     if not pedido.is_drive:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Este pedido não é drive")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Este pedido não é drive"
+        )
 
     if pedido.drive_chegou_at:
-        return {"pedido_id": pedido.pedido_id, "drive_chegou_at": pedido.drive_chegou_at.isoformat(), "message": "Chegada já registrada"}
+        return {
+            "pedido_id": pedido.pedido_id,
+            "drive_chegou_at": pedido.drive_chegou_at.isoformat(),
+            "message": "Chegada já registrada",
+        }
 
     pedido.drive_chegou_at = now_brasilia()
     db.commit()

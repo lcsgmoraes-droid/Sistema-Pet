@@ -1,4 +1,5 @@
 """Rotas de Configuração da Loja Virtual (E-commerce)."""
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -13,6 +14,7 @@ router = APIRouter(prefix="/ecommerce-config", tags=["ecommerce-config"])
 
 
 # ─── Schemas ───────────────────────────────────────────────────────────────
+
 
 class EcommerceConfigResponse(BaseModel):
     ecommerce_ativo: bool
@@ -35,6 +37,7 @@ class EcommerceConfigUpdate(BaseModel):
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────
 
+
 @router.get("", response_model=EcommerceConfigResponse)
 def buscar_config(
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -46,7 +49,9 @@ def buscar_config(
     if not tenant:
         raise HTTPException(status_code=404, detail="Tenant não encontrado")
     return EcommerceConfigResponse(
-        ecommerce_ativo=tenant.ecommerce_ativo if tenant.ecommerce_ativo is not None else True,
+        ecommerce_ativo=tenant.ecommerce_ativo
+        if tenant.ecommerce_ativo is not None
+        else True,
         ecommerce_descricao=tenant.ecommerce_descricao,
         ecommerce_horario_abertura=tenant.ecommerce_horario_abertura,
         ecommerce_horario_fechamento=tenant.ecommerce_horario_fechamento,
@@ -81,7 +86,9 @@ def atualizar_config(
     db.refresh(tenant)
 
     return EcommerceConfigResponse(
-        ecommerce_ativo=tenant.ecommerce_ativo if tenant.ecommerce_ativo is not None else True,
+        ecommerce_ativo=tenant.ecommerce_ativo
+        if tenant.ecommerce_ativo is not None
+        else True,
         ecommerce_descricao=tenant.ecommerce_descricao,
         ecommerce_horario_abertura=tenant.ecommerce_horario_abertura,
         ecommerce_horario_fechamento=tenant.ecommerce_horario_fechamento,

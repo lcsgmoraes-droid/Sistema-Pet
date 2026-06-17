@@ -690,6 +690,13 @@ def test_backend_ci_has_blocking_backend_routers_format_step():
     assert "ruff format --check app/routers" in source
 
 
+def test_backend_ci_has_blocking_backend_routes_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend routes format (blocking)" in source
+    assert "ruff format --check app/routes" in source
+
+
 def test_backend_ci_has_blocking_backend_ai_packages_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

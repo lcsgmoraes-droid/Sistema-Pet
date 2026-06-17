@@ -1,4 +1,5 @@
 """Rotas de Analytics do E-commerce."""
+
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
@@ -38,10 +39,11 @@ def get_resumo(
     ticket_medio = receita_total / total_pedidos if total_pedidos > 0 else 0
 
     # Pedidos hoje
-    hoje_inicio = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    hoje_inicio = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     pedidos_hoje = sum(
-        1 for p in pedidos_validos
-        if p.created_at and p.created_at >= hoje_inicio
+        1 for p in pedidos_validos if p.created_at and p.created_at >= hoje_inicio
     )
 
     # Carrinhos abandonados (status = 'carrinho', criados há mais de 1 hora, só e-commerce)
@@ -71,7 +73,10 @@ def get_resumo(
     # Pedidos por status (apenas e-commerce)
     status_counts = (
         db.query(Pedido.status, func.count(Pedido.id))
-        .filter(Pedido.tenant_id == tid, Pedido.origem.in_(("web", "app", "marketplace", "ecommerce")))
+        .filter(
+            Pedido.tenant_id == tid,
+            Pedido.origem.in_(("web", "app", "marketplace", "ecommerce")),
+        )
         .group_by(Pedido.status)
         .all()
     )
@@ -108,7 +113,9 @@ def get_demanda(
             ).label("pendentes"),
         )
         .filter(EcommerceNotifyRequest.tenant_id == tid)
-        .group_by(EcommerceNotifyRequest.product_id, EcommerceNotifyRequest.product_name)
+        .group_by(
+            EcommerceNotifyRequest.product_id, EcommerceNotifyRequest.product_name
+        )
         .order_by(func.count(EcommerceNotifyRequest.id).desc())
         .limit(20)
         .all()
@@ -116,6 +123,7 @@ def get_demanda(
 
     # Buscar codigo (SKU) dos produtos
     from app.produtos_models import Produto
+
     result = []
     for row in rows:
         pendentes = (
@@ -125,17 +133,20 @@ def get_demanda(
                 EcommerceNotifyRequest.product_id == row.product_id,
                 EcommerceNotifyRequest.notified.is_(False),
             )
-            .scalar() or 0
+            .scalar()
+            or 0
         )
         prod = db.query(Produto).filter(Produto.id == row.product_id).first()
-        result.append({
-            "product_id": row.product_id,
-            "product_name": row.product_name,
-            "codigo": prod.codigo if prod else None,
-            "estoque_atual": float(prod.estoque_atual or 0) if prod else 0,
-            "total_pedidos": row.total_pedidos,
-            "pendentes": pendentes,
-        })
+        result.append(
+            {
+                "product_id": row.product_id,
+                "product_name": row.product_name,
+                "codigo": prod.codigo if prod else None,
+                "estoque_atual": float(prod.estoque_atual or 0) if prod else 0,
+                "total_pedidos": row.total_pedidos,
+                "pendentes": pendentes,
+            }
+        )
 
     return result
 
@@ -205,17 +216,15 @@ def get_pedidos_recentes(
 
     result = []
     for p in pedidos:
-        itens = (
-            db.query(PedidoItem)
-            .filter(PedidoItem.pedido_id == p.pedido_id)
-            .all()
+        itens = db.query(PedidoItem).filter(PedidoItem.pedido_id == p.pedido_id).all()
+        result.append(
+            {
+                "pedido_id": p.pedido_id,
+                "status": p.status,
+                "total": round(float(p.total or 0), 2),
+                "qtd_itens": sum(int(i.quantidade or 0) for i in itens),
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+            }
         )
-        result.append({
-            "pedido_id": p.pedido_id,
-            "status": p.status,
-            "total": round(float(p.total or 0), 2),
-            "qtd_itens": sum(int(i.quantidade or 0) for i in itens),
-            "created_at": p.created_at.isoformat() if p.created_at else None,
-        })
 
     return result

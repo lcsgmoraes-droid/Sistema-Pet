@@ -68,10 +68,15 @@ def obter_calendario_banho_tosa(
     """Mostra disponibilidade para o app sem revelar pets/tutores agendados."""
     tenant_id = current_user.tenant_id
     config = obter_ou_criar_configuracao(db, tenant_id)
-    servicos = db.query(BanhoTosaServico).filter(
-        BanhoTosaServico.tenant_id == tenant_id,
-        BanhoTosaServico.ativo.is_(True),
-    ).order_by(BanhoTosaServico.nome.asc()).all()
+    servicos = (
+        db.query(BanhoTosaServico)
+        .filter(
+            BanhoTosaServico.tenant_id == tenant_id,
+            BanhoTosaServico.ativo.is_(True),
+        )
+        .order_by(BanhoTosaServico.nome.asc())
+        .all()
+    )
 
     if not getattr(config, "mostrar_calendario_cliente", False):
         return {
@@ -83,21 +88,36 @@ def obter_calendario_banho_tosa(
 
     dias = max(1, min(int(dias or 7), 14))
     inicio = _parse_data(data_inicio) or date.today()
-    servico = next((item for item in servicos if item.id == servico_id), None) if servico_id else None
+    servico = (
+        next((item for item in servicos if item.id == servico_id), None)
+        if servico_id
+        else None
+    )
     duracao_minutos = int(getattr(servico, "duracao_padrao_minutos", None) or 60)
     slot_minutos = max(int(getattr(config, "intervalo_slot_minutos", None) or 30), 5)
-    recursos = db.query(BanhoTosaRecurso).filter(
-        BanhoTosaRecurso.tenant_id == tenant_id,
-        BanhoTosaRecurso.ativo.is_(True),
-    ).all()
-    capacidade_total = sum(max(int(item.capacidade_simultanea or 1), 1) for item in recursos) or 1
+    recursos = (
+        db.query(BanhoTosaRecurso)
+        .filter(
+            BanhoTosaRecurso.tenant_id == tenant_id,
+            BanhoTosaRecurso.ativo.is_(True),
+        )
+        .all()
+    )
+    capacidade_total = (
+        sum(max(int(item.capacidade_simultanea or 1), 1) for item in recursos) or 1
+    )
     data_fim = inicio + timedelta(days=dias)
-    agendamentos = db.query(BanhoTosaAgendamento).filter(
-        BanhoTosaAgendamento.tenant_id == tenant_id,
-        BanhoTosaAgendamento.status.notin_(["cancelado", "no_show", "entregue"]),
-        BanhoTosaAgendamento.data_hora_inicio >= datetime.combine(inicio, time.min),
-        BanhoTosaAgendamento.data_hora_inicio < datetime.combine(data_fim, time.min),
-    ).all()
+    agendamentos = (
+        db.query(BanhoTosaAgendamento)
+        .filter(
+            BanhoTosaAgendamento.tenant_id == tenant_id,
+            BanhoTosaAgendamento.status.notin_(["cancelado", "no_show", "entregue"]),
+            BanhoTosaAgendamento.data_hora_inicio >= datetime.combine(inicio, time.min),
+            BanhoTosaAgendamento.data_hora_inicio
+            < datetime.combine(data_fim, time.min),
+        )
+        .all()
+    )
 
     calendario = []
     for offset in range(dias):
@@ -110,14 +130,20 @@ def obter_calendario_banho_tosa(
         fim_dia = datetime.combine(dia, _parse_hora(config.horario_fim) or time(18, 0))
         while cursor + timedelta(minutes=duracao_minutos) <= fim_dia:
             slot_fim = cursor + timedelta(minutes=duracao_minutos)
-            ocupados = sum(1 for item in agendamentos if _intervalos_sobrepoem(cursor, slot_fim, item))
+            ocupados = sum(
+                1
+                for item in agendamentos
+                if _intervalos_sobrepoem(cursor, slot_fim, item)
+            )
             vagas = max(capacidade_total - ocupados, 0)
-            slots.append({
-                "horario_inicio": cursor.strftime("%H:%M"),
-                "horario_fim": slot_fim.strftime("%H:%M"),
-                "status": "disponivel" if vagas > 0 else "ocupado",
-                "vagas": vagas,
-            })
+            slots.append(
+                {
+                    "horario_inicio": cursor.strftime("%H:%M"),
+                    "horario_fim": slot_fim.strftime("%H:%M"),
+                    "status": "disponivel" if vagas > 0 else "ocupado",
+                    "vagas": vagas,
+                }
+            )
             cursor += timedelta(minutes=slot_minutos)
         calendario.append({"data": dia.isoformat(), "funciona": True, "slots": slots})
 
@@ -138,12 +164,21 @@ def listar_status_banho_tosa(
     tenant_id = current_user.tenant_id
     config = obter_ou_criar_configuracao(db, tenant_id)
     atendimentos = _listar_atendimentos_visiveis(db, tenant_id, cliente.id)
-    agendamento_ids = {item.agendamento_id for item in atendimentos if item.agendamento_id}
-    agendamentos = _listar_agendamentos_visiveis(db, tenant_id, cliente.id, agendamento_ids)
+    agendamento_ids = {
+        item.agendamento_id for item in atendimentos if item.agendamento_id
+    }
+    agendamentos = _listar_agendamentos_visiveis(
+        db, tenant_id, cliente.id, agendamento_ids
+    )
     itens = [_serializar_atendimento(item, config) for item in atendimentos]
     itens.extend(_serializar_agendamento(item) for item in agendamentos)
     itens = sorted(itens, key=lambda item: item.get("ordenacao") or "", reverse=True)
-    return {"total": len(itens), "itens": [{k: v for k, v in item.items() if k != "ordenacao"} for item in itens]}
+    return {
+        "total": len(itens),
+        "itens": [
+            {k: v for k, v in item.items() if k != "ordenacao"} for item in itens
+        ],
+    }
 
 
 @router.post("/atendimentos/{atendimento_id}/avaliacao")
@@ -154,20 +189,30 @@ def avaliar_atendimento_banho_tosa(
     db: Session = Depends(get_session),
 ):
     cliente = _get_cliente_or_404(db, current_user)
-    atendimento = db.query(BanhoTosaAtendimento).filter(
-        BanhoTosaAtendimento.tenant_id == current_user.tenant_id,
-        BanhoTosaAtendimento.id == atendimento_id,
-        BanhoTosaAtendimento.cliente_id == cliente.id,
-    ).first()
+    atendimento = (
+        db.query(BanhoTosaAtendimento)
+        .filter(
+            BanhoTosaAtendimento.tenant_id == current_user.tenant_id,
+            BanhoTosaAtendimento.id == atendimento_id,
+            BanhoTosaAtendimento.cliente_id == cliente.id,
+        )
+        .first()
+    )
     if not atendimento:
         raise HTTPException(status_code=404, detail="Atendimento nao encontrado.")
     if atendimento.status != "entregue":
-        raise HTTPException(status_code=422, detail="Avaliacao liberada apenas apos a entrega do pet.")
-    avaliacao = db.query(BanhoTosaAvaliacao).filter(
-        BanhoTosaAvaliacao.tenant_id == current_user.tenant_id,
-        BanhoTosaAvaliacao.atendimento_id == atendimento.id,
-        BanhoTosaAvaliacao.cliente_id == cliente.id,
-    ).first()
+        raise HTTPException(
+            status_code=422, detail="Avaliacao liberada apenas apos a entrega do pet."
+        )
+    avaliacao = (
+        db.query(BanhoTosaAvaliacao)
+        .filter(
+            BanhoTosaAvaliacao.tenant_id == current_user.tenant_id,
+            BanhoTosaAvaliacao.atendimento_id == atendimento.id,
+            BanhoTosaAvaliacao.cliente_id == cliente.id,
+        )
+        .first()
+    )
     if not avaliacao:
         avaliacao = BanhoTosaAvaliacao(
             tenant_id=current_user.tenant_id,
@@ -230,7 +275,9 @@ def _dia_funciona(config, dia: date) -> bool:
     return bool(nomes.get(dia.weekday(), set()) & configurados)
 
 
-def _intervalos_sobrepoem(inicio: datetime, fim: datetime, agendamento: BanhoTosaAgendamento) -> bool:
+def _intervalos_sobrepoem(
+    inicio: datetime, fim: datetime, agendamento: BanhoTosaAgendamento
+) -> bool:
     ag_inicio = agendamento.data_hora_inicio
     if not ag_inicio:
         return False
@@ -243,7 +290,9 @@ def _intervalos_sobrepoem(inicio: datetime, fim: datetime, agendamento: BanhoTos
 def _datetime_compativel(valor: datetime, referencia: datetime) -> datetime:
     """Evita erro ao comparar datas timezone-aware do banco com slots locais do calendario."""
     valor_tem_tz = valor.tzinfo is not None and valor.utcoffset() is not None
-    referencia_tem_tz = referencia.tzinfo is not None and referencia.utcoffset() is not None
+    referencia_tem_tz = (
+        referencia.tzinfo is not None and referencia.utcoffset() is not None
+    )
     if valor_tem_tz == referencia_tem_tz:
         return valor
     if referencia_tem_tz:
@@ -253,29 +302,44 @@ def _datetime_compativel(valor: datetime, referencia: datetime) -> datetime:
 
 def _listar_atendimentos_visiveis(db: Session, tenant_id, cliente_id: int):
     corte = datetime.now() - timedelta(days=45)
-    return db.query(BanhoTosaAtendimento).options(
-        joinedload(BanhoTosaAtendimento.pet),
-        joinedload(BanhoTosaAtendimento.avaliacoes),
-        joinedload(BanhoTosaAtendimento.etapas),
-        joinedload(BanhoTosaAtendimento.agendamento).joinedload(BanhoTosaAgendamento.servicos),
-    ).filter(
-        BanhoTosaAtendimento.tenant_id == tenant_id,
-        BanhoTosaAtendimento.cliente_id == cliente_id,
-        BanhoTosaAtendimento.status.notin_(["cancelado", "no_show"]),
-        BanhoTosaAtendimento.checkin_em >= corte,
-    ).order_by(BanhoTosaAtendimento.checkin_em.desc()).limit(20).all()
+    return (
+        db.query(BanhoTosaAtendimento)
+        .options(
+            joinedload(BanhoTosaAtendimento.pet),
+            joinedload(BanhoTosaAtendimento.avaliacoes),
+            joinedload(BanhoTosaAtendimento.etapas),
+            joinedload(BanhoTosaAtendimento.agendamento).joinedload(
+                BanhoTosaAgendamento.servicos
+            ),
+        )
+        .filter(
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+            BanhoTosaAtendimento.cliente_id == cliente_id,
+            BanhoTosaAtendimento.status.notin_(["cancelado", "no_show"]),
+            BanhoTosaAtendimento.checkin_em >= corte,
+        )
+        .order_by(BanhoTosaAtendimento.checkin_em.desc())
+        .limit(20)
+        .all()
+    )
 
 
-def _listar_agendamentos_visiveis(db: Session, tenant_id, cliente_id: int, ignorar_ids: set[int]):
+def _listar_agendamentos_visiveis(
+    db: Session, tenant_id, cliente_id: int, ignorar_ids: set[int]
+):
     inicio = datetime.now() - timedelta(hours=12)
-    query = db.query(BanhoTosaAgendamento).options(
-        joinedload(BanhoTosaAgendamento.pet),
-        joinedload(BanhoTosaAgendamento.servicos),
-    ).filter(
-        BanhoTosaAgendamento.tenant_id == tenant_id,
-        BanhoTosaAgendamento.cliente_id == cliente_id,
-        BanhoTosaAgendamento.status.in_(["agendado", "confirmado"]),
-        BanhoTosaAgendamento.data_hora_inicio >= inicio,
+    query = (
+        db.query(BanhoTosaAgendamento)
+        .options(
+            joinedload(BanhoTosaAgendamento.pet),
+            joinedload(BanhoTosaAgendamento.servicos),
+        )
+        .filter(
+            BanhoTosaAgendamento.tenant_id == tenant_id,
+            BanhoTosaAgendamento.cliente_id == cliente_id,
+            BanhoTosaAgendamento.status.in_(["agendado", "confirmado"]),
+            BanhoTosaAgendamento.data_hora_inicio >= inicio,
+        )
     )
     if ignorar_ids:
         query = query.filter(BanhoTosaAgendamento.id.notin_(ignorar_ids))
@@ -283,7 +347,9 @@ def _listar_agendamentos_visiveis(db: Session, tenant_id, cliente_id: int, ignor
 
 
 def _serializar_atendimento(item: BanhoTosaAtendimento, config=None) -> dict:
-    avaliacao = next((av for av in item.avaliacoes or [] if av.cliente_id == item.cliente_id), None)
+    avaliacao = next(
+        (av for av in item.avaliacoes or [] if av.cliente_id == item.cliente_id), None
+    )
     agendamento = item.agendamento
     estado = estado_operacional_atendimento(item, config)
     ativa = etapa_ativa(item)
@@ -308,7 +374,9 @@ def _serializar_atendimento(item: BanhoTosaAtendimento, config=None) -> dict:
         "etapa_atraso_segundos": estado.get("atraso_segundos"),
         "etapa_atrasada": estado.get("atrasado"),
         "data_hora_inicio": _iso(getattr(agendamento, "data_hora_inicio", None)),
-        "data_hora_fim_prevista": _iso(getattr(agendamento, "data_hora_fim_prevista", None)),
+        "data_hora_fim_prevista": _iso(
+            getattr(agendamento, "data_hora_fim_prevista", None)
+        ),
         "checkin_em": _iso(item.checkin_em),
         "inicio_em": _iso(item.inicio_em),
         "fim_em": _iso(item.fim_em),
@@ -345,12 +413,21 @@ def _serializar_agendamento(item: BanhoTosaAgendamento) -> dict:
 def _servicos(agendamento) -> list[dict]:
     if not agendamento:
         return []
-    return [{"nome": item.nome_servico_snapshot, "quantidade": _decimal(item.quantidade)} for item in agendamento.servicos or []]
+    return [
+        {"nome": item.nome_servico_snapshot, "quantidade": _decimal(item.quantidade)}
+        for item in agendamento.servicos or []
+    ]
 
 
 def _etapa_atual(atendimento: BanhoTosaAtendimento) -> str:
-    ativa = next((et for et in atendimento.etapas or [] if et.inicio_em and not et.fim_em), None)
-    return STATUS_LABELS.get(atendimento.status, atendimento.status) if not ativa else ativa.tipo.replace("_", " ").title()
+    ativa = next(
+        (et for et in atendimento.etapas or [] if et.inicio_em and not et.fim_em), None
+    )
+    return (
+        STATUS_LABELS.get(atendimento.status, atendimento.status)
+        if not ativa
+        else ativa.tipo.replace("_", " ").title()
+    )
 
 
 def _serializar_avaliacao(avaliacao) -> Optional[dict]:

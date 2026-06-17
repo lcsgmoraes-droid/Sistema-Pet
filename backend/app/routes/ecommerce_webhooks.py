@@ -24,7 +24,10 @@ from app.services.mercado_pago_checkout import (
     validate_webhook_signature,
     validate_webhook_signature_from_env,
 )
-from app.services.sales_channel import benefit_channel_from_sales_channel, normalize_sales_channel
+from app.services.sales_channel import (
+    benefit_channel_from_sales_channel,
+    normalize_sales_channel,
+)
 from app.tenancy.context import set_current_tenant
 
 
@@ -39,6 +42,7 @@ PAYMENT_METHODS_ONLINE_ACEITOS = {
 
 def _normalizar_canal_venda_online(canal: str | None) -> str:
     return normalize_sales_channel(canal)
+
 
 TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 PAGARME_SIGNATURE_HEADERS = (
@@ -132,13 +136,19 @@ def _validate_optional_signature(raw_body: bytes, request: Request) -> str:
             break
 
     if not signature_header:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Assinatura do webhook ausente")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Assinatura do webhook ausente",
+        )
 
     expected = hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
     received = signature_header.split("=")[-1].strip()
 
     if not hmac.compare_digest(expected, received):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Assinatura do webhook inválida")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Assinatura do webhook inválida",
+        )
 
     return "validated"
 
@@ -226,7 +236,9 @@ def _extrair_pagamento_do_webhook(payload: dict) -> tuple:
 
     if payment_method:
         try:
-            installments = max(1, int(payload.get("installments") or data.get("installments") or 1))
+            installments = max(
+                1, int(payload.get("installments") or data.get("installments") or 1)
+            )
         except (TypeError, ValueError):
             installments = 1
 
@@ -271,8 +283,14 @@ def _extrair_financeiro_gateway_online(payload: dict) -> dict:
     if not isinstance(payload, dict):
         return {}
 
-    provider = str(payload.get("gateway_provider") or payload.get("provider") or "").strip().lower()
-    if provider not in {"mercadopago", "mercado_pago"} and not isinstance(payload.get("mercadopago"), dict):
+    provider = (
+        str(payload.get("gateway_provider") or payload.get("provider") or "")
+        .strip()
+        .lower()
+    )
+    if provider not in {"mercadopago", "mercado_pago"} and not isinstance(
+        payload.get("mercadopago"), dict
+    ):
         return {}
 
     return extract_gateway_financials(payload)
@@ -325,11 +343,15 @@ def _mapear_forma_pagamento_ecommerce(
 
     if not forma:
         # Fallback final: qualquer forma de PIX ativa
-        forma = db.query(FormaPagamento).filter(
-            FormaPagamento.tenant_id == tenant_id,
-            FormaPagamento.tipo == "pix",
-            FormaPagamento.ativo.is_(True),
-        ).first()
+        forma = (
+            db.query(FormaPagamento)
+            .filter(
+                FormaPagamento.tenant_id == tenant_id,
+                FormaPagamento.tipo == "pix",
+                FormaPagamento.ativo.is_(True),
+            )
+            .first()
+        )
 
     if forma:
         return forma.nome, installments
@@ -356,6 +378,7 @@ def _processar_pos_venda_ecommerce(
     Erros em cada etapa são logados mas NÃO abortam o fluxo.
     """
     import logging
+
     log = logging.getLogger(__name__)
 
     from app.vendas_models import VendaPagamento
@@ -392,13 +415,16 @@ def _processar_pos_venda_ecommerce(
         db.flush()
         venda_row.rentabilidade_snapshot = None
         venda_row.rentabilidade_snapshot_em = None
-        log.info(f"  ✅ VendaPagamento criado: '{forma_pag_nome}' R$ {float(venda_row.total):.2f}")
+        log.info(
+            f"  ✅ VendaPagamento criado: '{forma_pag_nome}' R$ {float(venda_row.total):.2f}"
+        )
     except Exception as e:
         log.error(f"  ❌ Erro ao criar VendaPagamento (ecommerce): {e}", exc_info=True)
 
     # ─── 2. DRE por competência ───────────────────────────────────────────────
     try:
         from app.vendas.service import gerar_dre_competencia_venda
+
         resultado_dre = gerar_dre_competencia_venda(
             venda_id=venda_row.id,
             user_id=vendedor.id,
@@ -418,24 +444,30 @@ def _processar_pos_venda_ecommerce(
     # ─── 3. Contas a Receber ──────────────────────────────────────────────────
     try:
         from app.financeiro import ContasReceberService
+
         ContasReceberService.criar_de_venda(
             venda=venda_row,
-            pagamentos=[{
-                "forma_pagamento": forma_pag_nome,
-                "valor": float(venda_row.total),
-                "numero_parcelas": parcelas,
-            }],
+            pagamentos=[
+                {
+                    "forma_pagamento": forma_pag_nome,
+                    "valor": float(venda_row.total),
+                    "numero_parcelas": parcelas,
+                }
+            ],
             user_id=vendedor.id,
             db=db,
         )
         log.info("  ✅ Contas a receber criadas")
     except Exception as e:
-        log.error(f"  ❌ Erro ao criar contas a receber (ecommerce): {e}", exc_info=True)
+        log.error(
+            f"  ❌ Erro ao criar contas a receber (ecommerce): {e}", exc_info=True
+        )
 
     # ─── 4. Contas a Pagar — taxas da operadora (PIX/cartão) ─────────────────
     if pagamento_obj is not None:
         try:
             from app.vendas.service import processar_contas_pagar_taxas
+
             resultado_taxas = processar_contas_pagar_taxas(
                 venda=venda_row,
                 pagamentos=[pagamento_obj],
@@ -443,7 +475,10 @@ def _processar_pos_venda_ecommerce(
                 tenant_id=tenant_id,
                 db=db,
             )
-            if resultado_taxas.get("success") and resultado_taxas.get("total_contas", 0) > 0:
+            if (
+                resultado_taxas.get("success")
+                and resultado_taxas.get("total_contas", 0) > 0
+            ):
                 log.info(
                     f"  ✅ Contas a pagar (taxas): {resultado_taxas['total_contas']} "
                     f"conta(s) | R$ {resultado_taxas['valor_total']:.2f}"
@@ -453,18 +488,29 @@ def _processar_pos_venda_ecommerce(
                     f"  ℹ️  Taxas: {resultado_taxas.get('detalhes') or resultado_taxas.get('error', 'sem taxa configurada')}"
                 )
         except Exception as e:
-            log.error(f"  ❌ Erro ao criar contas a pagar taxas (ecommerce): {e}", exc_info=True)
+            log.error(
+                f"  ❌ Erro ao criar contas a pagar taxas (ecommerce): {e}",
+                exc_info=True,
+            )
 
 
-def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = None) -> int | None:
+def _integrar_venda_ao_motor(
+    db, pedido: Pedido, webhook_payload: dict | None = None
+) -> int | None:
     from app.vendas.service import VendaService
     from app.vendas_models import Venda
 
     set_current_tenant(UUID(str(pedido.tenant_id)))
 
     payload_data = webhook_payload or {}
-    metadata = (payload_data.get("metadata") or {}) if isinstance(payload_data, dict) else {}
-    nested_metadata = ((payload_data.get("data") or {}).get("metadata") or {}) if isinstance(payload_data, dict) else {}
+    metadata = (
+        (payload_data.get("metadata") or {}) if isinstance(payload_data, dict) else {}
+    )
+    nested_metadata = (
+        ((payload_data.get("data") or {}).get("metadata") or {})
+        if isinstance(payload_data, dict)
+        else {}
+    )
 
     canal_origem = normalize_sales_channel(
         metadata.get("canal")
@@ -475,12 +521,16 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
     )
     origem_label = "app" if canal_origem == "app" else "e-commerce"
 
-    entrega_mode = str(
-        metadata.get("delivery_mode")
-        or nested_metadata.get("delivery_mode")
-        or payload_data.get("delivery_mode")
-        or ""
-    ).strip().lower()
+    entrega_mode = (
+        str(
+            metadata.get("delivery_mode")
+            or nested_metadata.get("delivery_mode")
+            or payload_data.get("delivery_mode")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
 
     entregador_payload = (
         metadata.get("entregador_id")
@@ -510,7 +560,12 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
             tem_entrega = entrega_mode == "entrega"
     else:
         if isinstance(tem_entrega_payload, str):
-            tem_entrega = tem_entrega_payload.strip().lower() in {"1", "true", "yes", "sim"}
+            tem_entrega = tem_entrega_payload.strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "sim",
+            }
         else:
             tem_entrega = bool(tem_entrega_payload)
 
@@ -563,7 +618,9 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
 
     primeiro_produto = (
         db.query(Produto)
-        .filter(Produto.id == itens[0].produto_id, Produto.tenant_id == pedido.tenant_id)
+        .filter(
+            Produto.id == itens[0].produto_id, Produto.tenant_id == pedido.tenant_id
+        )
         .first()
     )
 
@@ -660,7 +717,11 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
     venda_id = int(venda.get("id")) if venda.get("id") else None
 
     if venda_id:
-        venda_row = db.query(Venda).filter(Venda.id == venda_id, Venda.tenant_id == pedido.tenant_id).first()
+        venda_row = (
+            db.query(Venda)
+            .filter(Venda.id == venda_id, Venda.tenant_id == pedido.tenant_id)
+            .first()
+        )
         if venda_row:
             venda_row.status = "finalizada"
             venda_row.data_finalizacao = datetime.utcnow()
@@ -673,7 +734,9 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
                 and venda_row.tipo_retirada in {"proprio", "terceiro", "app_loja"}
                 and canal_origem in {"app", "ecommerce"}
             )
-            if (venda_row.tem_entrega or online_retirada) and not venda_row.status_entrega:
+            if (
+                venda_row.tem_entrega or online_retirada
+            ) and not venda_row.status_entrega:
                 venda_row.status_entrega = "pendente"
 
             # ── Efeitos colaterais completos (espelha finalização do PDV) ───────
@@ -689,6 +752,7 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
         if venda_id and cliente_id:
             try:
                 from app.campaigns.models import CampaignEventQueue, EventOriginEnum
+
                 canal_campanha = benefit_channel_from_sales_channel(canal_origem)
                 evento_campanha = CampaignEventQueue(
                     tenant_id=pedido.tenant_id,
@@ -704,14 +768,19 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
                 )
                 db.add(evento_campanha)
                 import logging
+
                 logging.getLogger(__name__).info(
                     "[Campanhas] purchase_completed publicado venda_id=%d cliente_id=%d canal=%s",
-                    venda_id, cliente_id, canal_campanha,
+                    venda_id,
+                    cliente_id,
+                    canal_campanha,
                 )
             except Exception as e_camp:
                 import logging
+
                 logging.getLogger(__name__).error(
-                    "[Campanhas] Erro ao publicar purchase_completed webhook: %s", e_camp
+                    "[Campanhas] Erro ao publicar purchase_completed webhook: %s",
+                    e_camp,
                 )
 
     registry = IdempotencyKey(
@@ -736,7 +805,9 @@ async def webhook_pagarme(request: Request):
     try:
         payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
     except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payload JSON inválido")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Payload JSON inválido"
+        )
 
     signature_status = _validate_optional_signature(raw_body, request)
     tenant_id = _find_tenant_id(payload, request)
@@ -825,7 +896,9 @@ async def webhook_pagarme(request: Request):
         raise
     except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Erro ao processar webhook Pagar.me: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao processar webhook Pagar.me: {exc}"
+        )
     finally:
         db.close()
 
@@ -836,13 +909,17 @@ async def webhook_mercadopago_tenant(webhook_token: str, request: Request):
     try:
         notification_payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
     except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payload JSON invalido")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Payload JSON invalido"
+        )
 
     payment_id = extract_notification_payment_id(notification_payload, request)
 
     db = SessionLocal()
     try:
-        webhook_tenant_id = resolve_mercado_pago_tenant_id_from_webhook_token(db, webhook_token)
+        webhook_tenant_id = resolve_mercado_pago_tenant_id_from_webhook_token(
+            db, webhook_token
+        )
         if not webhook_tenant_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -884,7 +961,9 @@ async def webhook_mercadopago_tenant(webhook_token: str, request: Request):
         tenant_id = payment_config.tenant_id
         set_current_tenant(UUID(tenant_id))
 
-        event_id, event_type, request_hash = _extract_event_info(notification_payload, raw_body)
+        event_id, event_type, request_hash = _extract_event_info(
+            notification_payload, raw_body
+        )
         payment_status = str(payload.get("status") or "unknown").strip().lower()
 
         endpoint_name = "POST /api/webhooks/mercadopago/{webhook_token}"
@@ -973,7 +1052,9 @@ async def webhook_mercadopago_tenant(webhook_token: str, request: Request):
         raise
     except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Erro ao processar webhook Mercado Pago: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao processar webhook Mercado Pago: {exc}"
+        )
     finally:
         db.close()
 
@@ -984,7 +1065,9 @@ async def webhook_mercadopago(request: Request):
     try:
         notification_payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
     except Exception:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payload JSON invalido")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Payload JSON invalido"
+        )
 
     payment_id = extract_notification_payment_id(notification_payload, request)
     signature_status = validate_webhook_signature_from_env(request, data_id=payment_id)
@@ -1007,7 +1090,9 @@ async def webhook_mercadopago(request: Request):
     tenant_id = _find_tenant_id(payload, request)
     set_current_tenant(UUID(tenant_id))
 
-    event_id, event_type, request_hash = _extract_event_info(notification_payload, raw_body)
+    event_id, event_type, request_hash = _extract_event_info(
+        notification_payload, raw_body
+    )
     payment_status = str(payload.get("status") or "unknown").strip().lower()
 
     db = SessionLocal()
@@ -1098,6 +1183,8 @@ async def webhook_mercadopago(request: Request):
         raise
     except Exception as exc:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Erro ao processar webhook Mercado Pago: {exc}")
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao processar webhook Mercado Pago: {exc}"
+        )
     finally:
         db.close()

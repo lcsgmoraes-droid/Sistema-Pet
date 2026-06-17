@@ -18,7 +18,10 @@ from sqlalchemy import and_, case, func, or_, text, true
 from sqlalchemy.orm import Session
 
 from app.caixa_models import Caixa
-from app.campaigns.channel_scope import campaign_allows_sale_channel, normalize_benefit_channel
+from app.campaigns.channel_scope import (
+    campaign_allows_sale_channel,
+    normalize_benefit_channel,
+)
 from app.campaigns.coupon_service import preview_coupon_redemption
 from app.campaigns.models import (
     Campaign,
@@ -58,6 +61,7 @@ PET_UPLOAD_DIR = Path("uploads/pets")
 # Importante: evita vazar campos internos do banco.
 # ─────────────────────────────────────────
 
+
 class PetResponse(BaseModel):
     id: int
     codigo: str
@@ -66,7 +70,7 @@ class PetResponse(BaseModel):
     raca: Optional[str]
     sexo: Optional[str]
     castrado: bool
-    data_nascimento: Optional[str]   # ISO 8601 string
+    data_nascimento: Optional[str]  # ISO 8601 string
     idade_aproximada: Optional[int] = None
     peso: Optional[float]
     porte: Optional[str]
@@ -253,7 +257,9 @@ class FuncionarioPdvBeneficiosPreviewResponse(BaseModel):
     cashback_valor: float
     total_venda: float
     valor_pagamento: float
-    cupons_disponiveis: list[FuncionarioPdvBeneficioCupomResponse] = Field(default_factory=list)
+    cupons_disponiveis: list[FuncionarioPdvBeneficioCupomResponse] = Field(
+        default_factory=list
+    )
     beneficios_gerados: list[dict] = Field(default_factory=list)
     mensagens: list[str] = Field(default_factory=list)
 
@@ -280,6 +286,7 @@ class FuncionarioPdvSalvarResponse(BaseModel):
 # Helpers
 # ─────────────────────────────────────────
 
+
 def _get_cliente_or_404(db: Session, user: User) -> Cliente:
     """Retorna o Cliente ligado a este usuário ecommerce ou lança 404."""
     cliente = _get_or_create_cliente_for_user(db, user)
@@ -302,7 +309,9 @@ def _get_funcionario_operacional_or_403(db: Session, user: User) -> tuple[Client
     return funcionario, tenant_id
 
 
-def _produto_permite_balanco_funcionario(produto: Produto) -> tuple[bool, Optional[str]]:
+def _produto_permite_balanco_funcionario(
+    produto: Produto,
+) -> tuple[bool, Optional[str]]:
     if getattr(produto, "is_parent", False):
         return False, "Produto pai: ajuste o estoque nas variacoes individuais."
     if produto.tipo_produto == "KIT" and produto.tipo_kit == "VIRTUAL":
@@ -334,9 +343,15 @@ def _serialize_funcionario_produto_estoque(produto: Produto) -> dict:
 def _barcode_filters_for_produto(barcode: str) -> list:
     barcode = (barcode or "").strip()
     barcode_digits = "".join(ch for ch in barcode if ch.isdigit())
-    codigo_barras_digits = func.regexp_replace(func.coalesce(Produto.codigo_barras, ""), r"\D", "", "g")
-    gtin_digits = func.regexp_replace(func.coalesce(Produto.gtin_ean, ""), r"\D", "", "g")
-    gtin_tributario_digits = func.regexp_replace(func.coalesce(Produto.gtin_ean_tributario, ""), r"\D", "", "g")
+    codigo_barras_digits = func.regexp_replace(
+        func.coalesce(Produto.codigo_barras, ""), r"\D", "", "g"
+    )
+    gtin_digits = func.regexp_replace(
+        func.coalesce(Produto.gtin_ean, ""), r"\D", "", "g"
+    )
+    gtin_tributario_digits = func.regexp_replace(
+        func.coalesce(Produto.gtin_ean_tributario, ""), r"\D", "", "g"
+    )
     filtros_codigo = [
         Produto.codigo_barras == barcode,
         Produto.gtin_ean == barcode,
@@ -345,13 +360,15 @@ def _barcode_filters_for_produto(barcode: str) -> list:
         Produto.codigos_barras_alternativos.ilike(f"%{barcode}%"),
     ]
     if barcode_digits:
-        filtros_codigo.extend([
-            codigo_barras_digits == barcode_digits,
-            gtin_digits == barcode_digits,
-            gtin_tributario_digits == barcode_digits,
-            Produto.codigo == barcode_digits,
-            Produto.codigos_barras_alternativos.ilike(f"%{barcode_digits}%"),
-        ])
+        filtros_codigo.extend(
+            [
+                codigo_barras_digits == barcode_digits,
+                gtin_digits == barcode_digits,
+                gtin_tributario_digits == barcode_digits,
+                Produto.codigo == barcode_digits,
+                Produto.codigos_barras_alternativos.ilike(f"%{barcode_digits}%"),
+            ]
+        )
     return filtros_codigo
 
 
@@ -386,7 +403,9 @@ def _produto_busca_filtros_funcionario(termo: str) -> list:
     filtros = [_produto_busca_texto_funcionario(termo)]
 
     if len(tokens) > 1:
-        filtros.append(and_(*[_produto_busca_texto_funcionario(token) for token in tokens]))
+        filtros.append(
+            and_(*[_produto_busca_texto_funcionario(token) for token in tokens])
+        )
 
     if _termo_parece_codigo_produto_funcionario(termo):
         filtros.extend(_barcode_filters_for_produto(termo))
@@ -400,24 +419,32 @@ def _produto_busca_rank_funcionario(termo: str):
     condicoes = []
 
     if _termo_parece_codigo_produto_funcionario(termo):
-        condicoes.extend([
-            (Produto.codigo == termo, 0),
-            (Produto.codigo_barras == termo, 0),
-            (Produto.gtin_ean == termo, 0),
-            (Produto.gtin_ean_tributario == termo, 0),
-        ])
+        condicoes.extend(
+            [
+                (Produto.codigo == termo, 0),
+                (Produto.codigo_barras == termo, 0),
+                (Produto.gtin_ean == termo, 0),
+                (Produto.gtin_ean_tributario == termo, 0),
+            ]
+        )
 
     condicoes.append((Produto.nome.ilike(f"%{termo}%"), 1))
     if len(tokens) > 1:
-        condicoes.append((and_(*[Produto.nome.ilike(f"%{token}%") for token in tokens]), 2))
-        condicoes.append((and_(*[_produto_busca_texto_funcionario(token) for token in tokens]), 3))
+        condicoes.append(
+            (and_(*[Produto.nome.ilike(f"%{token}%") for token in tokens]), 2)
+        )
+        condicoes.append(
+            (and_(*[_produto_busca_texto_funcionario(token) for token in tokens]), 3)
+        )
 
-    condicoes.extend([
-        (Produto.codigo.ilike(f"%{termo}%"), 4),
-        (Produto.codigo_barras.ilike(f"%{termo}%"), 5),
-        (Produto.gtin_ean.ilike(f"%{termo}%"), 5),
-        (Produto.codigos_barras_alternativos.ilike(f"%{termo}%"), 6),
-    ])
+    condicoes.extend(
+        [
+            (Produto.codigo.ilike(f"%{termo}%"), 4),
+            (Produto.codigo_barras.ilike(f"%{termo}%"), 5),
+            (Produto.gtin_ean.ilike(f"%{termo}%"), 5),
+            (Produto.codigos_barras_alternativos.ilike(f"%{termo}%"), 6),
+        ]
+    )
     return case(*condicoes, else_=9)
 
 
@@ -456,7 +483,12 @@ def _serialize_funcionario_pdv_cliente(cliente: Cliente) -> dict:
         getattr(cliente, "cidade", None),
         getattr(cliente, "estado", None),
     ]
-    endereco = ", ".join(str(parte).strip() for parte in partes_endereco if str(parte or "").strip()) or None
+    endereco = (
+        ", ".join(
+            str(parte).strip() for parte in partes_endereco if str(parte or "").strip()
+        )
+        or None
+    )
     credito = (
         getattr(cliente, "credito", None)
         or getattr(cliente, "saldo_credito", None)
@@ -464,13 +496,24 @@ def _serialize_funcionario_pdv_cliente(cliente: Cliente) -> dict:
         or 0
     )
     fidelidade = {
-        "pontos": int(getattr(cliente, "pontos_fidelidade", None) or getattr(cliente, "pontos", None) or 0),
-        "carimbos": int(getattr(cliente, "carimbos_fidelidade", None) or getattr(cliente, "carimbos", None) or 0),
+        "pontos": int(
+            getattr(cliente, "pontos_fidelidade", None)
+            or getattr(cliente, "pontos", None)
+            or 0
+        ),
+        "carimbos": int(
+            getattr(cliente, "carimbos_fidelidade", None)
+            or getattr(cliente, "carimbos", None)
+            or 0
+        ),
     }
     return {
         "id": cliente.id,
         "codigo": cliente.codigo,
-        "nome": cliente.nome or cliente.nome_fantasia or cliente.razao_social or f"Cliente #{cliente.id}",
+        "nome": cliente.nome
+        or cliente.nome_fantasia
+        or cliente.razao_social
+        or f"Cliente #{cliente.id}",
         "telefone": cliente.telefone,
         "celular": cliente.celular,
         "documento": documento,
@@ -483,7 +526,9 @@ def _serialize_funcionario_pdv_cliente(cliente: Cliente) -> dict:
     }
 
 
-def _obter_caixa_aberto_funcionario_pdv(db: Session, tenant_id: str, current_user: User) -> Optional[Caixa]:
+def _obter_caixa_aberto_funcionario_pdv(
+    db: Session, tenant_id: str, current_user: User
+) -> Optional[Caixa]:
     prioridade_usuario_atual = case((Caixa.usuario_id == current_user.id, 0), else_=1)
     return (
         db.query(Caixa)
@@ -510,11 +555,15 @@ def _normalizar_forma_pagamento_pdv(forma_pagamento: str) -> str:
         "cashback": "Cashback",
     }
     if forma not in mapa:
-        raise HTTPException(status_code=400, detail="Forma de pagamento invalida para o PDV mobile.")
+        raise HTTPException(
+            status_code=400, detail="Forma de pagamento invalida para o PDV mobile."
+        )
     return mapa[forma]
 
 
-def _forma_pagamento_key_funcionario_pdv(forma_pagamento: FormaPagamento) -> Optional[str]:
+def _forma_pagamento_key_funcionario_pdv(
+    forma_pagamento: FormaPagamento,
+) -> Optional[str]:
     texto = f"{forma_pagamento.tipo or ''} {forma_pagamento.nome or ''} {forma_pagamento.tipo_cartao or ''}".lower()
     if "credito" in texto or "crédito" in texto:
         return "credito"
@@ -545,9 +594,14 @@ def _resolver_forma_pagamento_cartao_funcionario_pdv(
     if pagamento.forma_pagamento_id:
         forma = query.filter(FormaPagamento.id == pagamento.forma_pagamento_id).first()
         if not forma:
-            raise HTTPException(status_code=400, detail="Forma de pagamento do cartao nao encontrada.")
+            raise HTTPException(
+                status_code=400, detail="Forma de pagamento do cartao nao encontrada."
+            )
         if _forma_pagamento_key_funcionario_pdv(forma) != forma_normalizada:
-            raise HTTPException(status_code=400, detail="Forma de pagamento nao corresponde ao tipo de cartao selecionado.")
+            raise HTTPException(
+                status_code=400,
+                detail="Forma de pagamento nao corresponde ao tipo de cartao selecionado.",
+            )
     else:
         formas_cartao = [
             forma
@@ -555,19 +609,30 @@ def _resolver_forma_pagamento_cartao_funcionario_pdv(
             if _forma_pagamento_key_funcionario_pdv(forma) == forma_normalizada
         ]
         if len(formas_cartao) != 1:
-            raise HTTPException(status_code=400, detail="Selecione a bandeira/operadora do cartao.")
+            raise HTTPException(
+                status_code=400, detail="Selecione a bandeira/operadora do cartao."
+            )
         forma = formas_cartao[0]
 
     max_parcelas = max(1, int(forma.parcelas_maximas or forma.max_parcelas or 1))
     numero_parcelas = max(1, int(pagamento.numero_parcelas or 1))
-    pode_parcelar = forma_normalizada == "credito" and (bool(forma.permite_parcelamento) or bool(forma.split_parcelas))
+    pode_parcelar = forma_normalizada == "credito" and (
+        bool(forma.permite_parcelamento) or bool(forma.split_parcelas)
+    )
 
     if forma_normalizada == "debito" and numero_parcelas != 1:
-        raise HTTPException(status_code=400, detail="Cartao de debito deve ser registrado em 1 parcela.")
+        raise HTTPException(
+            status_code=400, detail="Cartao de debito deve ser registrado em 1 parcela."
+        )
     if forma_normalizada == "credito" and numero_parcelas > 1 and not pode_parcelar:
-        raise HTTPException(status_code=400, detail="Esta forma de credito nao permite parcelamento.")
+        raise HTTPException(
+            status_code=400, detail="Esta forma de credito nao permite parcelamento."
+        )
     if forma_normalizada == "credito" and numero_parcelas > max_parcelas:
-        raise HTTPException(status_code=400, detail=f"Esta forma de credito permite no maximo {max_parcelas}x.")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Esta forma de credito permite no maximo {max_parcelas}x.",
+        )
 
     return forma
 
@@ -576,7 +641,9 @@ def _round_money_funcionario_pdv(valor) -> float:
     return round(float(valor or 0), 2)
 
 
-def _buscar_cliente_pdv_funcionario(db: Session, tenant_id: str, cliente_id: Optional[int]) -> Optional[Cliente]:
+def _buscar_cliente_pdv_funcionario(
+    db: Session, tenant_id: str, cliente_id: Optional[int]
+) -> Optional[Cliente]:
     if not cliente_id:
         return None
     cliente = (
@@ -636,11 +703,17 @@ def _listar_cupons_disponiveis_funcionario_pdv(
                 "coupon_type": preview["coupon_type"],
                 "discount_value": preview.get("discount_value"),
                 "discount_percent": preview.get("discount_percent"),
-                "discount_applied": _round_money_funcionario_pdv(preview.get("discount_applied")),
-                "min_purchase_value": (
-                    float(cupom.min_purchase_value) if cupom.min_purchase_value else None
+                "discount_applied": _round_money_funcionario_pdv(
+                    preview.get("discount_applied")
                 ),
-                "valid_until": cupom.valid_until.isoformat() if cupom.valid_until else None,
+                "min_purchase_value": (
+                    float(cupom.min_purchase_value)
+                    if cupom.min_purchase_value
+                    else None
+                ),
+                "valid_until": cupom.valid_until.isoformat()
+                if cupom.valid_until
+                else None,
             }
         )
     return disponiveis
@@ -659,7 +732,9 @@ def _saldo_cashback_funcionario_pdv(
         .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == cliente_id,
-            _cashback_disponivel_clause(CashbackTransaction, datetime.now(timezone.utc)),
+            _cashback_disponivel_clause(
+                CashbackTransaction, datetime.now(timezone.utc)
+            ),
         )
         .scalar()
     )
@@ -715,11 +790,13 @@ def _calcular_beneficios_gerados_funcionario_pdv(
         .filter(
             Campaign.tenant_id == tenant_id,
             Campaign.status == CampaignStatusEnum.active,
-            Campaign.campaign_type.in_([
-                CampaignTypeEnum.cashback,
-                CampaignTypeEnum.loyalty_stamp,
-                CampaignTypeEnum.quick_repurchase,
-            ]),
+            Campaign.campaign_type.in_(
+                [
+                    CampaignTypeEnum.cashback,
+                    CampaignTypeEnum.loyalty_stamp,
+                    CampaignTypeEnum.quick_repurchase,
+                ]
+            ),
         )
         .order_by(Campaign.priority.asc(), Campaign.id.asc())
         .all()
@@ -755,36 +832,47 @@ def _calcular_beneficios_gerados_funcionario_pdv(
                 _cashback_bonus_param_key_funcionario_pdv(sale_channel),
                 default=0,
             )
-            valor_cashback = _round_money_funcionario_pdv(total_venda * percentual / 100)
+            valor_cashback = _round_money_funcionario_pdv(
+                total_venda * percentual / 100
+            )
             if valor_cashback > 0:
-                beneficios.append({
-                    "tipo": "cashback",
-                    "titulo": campanha.name or "Cashback",
-                    "valor": valor_cashback,
-                    "descricao": f"{percentual:.2f}% sobre a venda",
-                    "cliente_id": cliente_id,
-                })
+                beneficios.append(
+                    {
+                        "tipo": "cashback",
+                        "titulo": campanha.name or "Cashback",
+                        "valor": valor_cashback,
+                        "descricao": f"{percentual:.2f}% sobre a venda",
+                        "cliente_id": cliente_id,
+                    }
+                )
             continue
 
         if tipo_campanha == CampaignTypeEnum.loyalty_stamp:
-            stamps_per_purchase = max(1, _param_int_funcionario_pdv(
-                params,
-                "stamps_per_purchase",
-                "carimbos_por_compra",
-                "stamp_count",
-                default=1,
-            ))
+            stamps_per_purchase = max(
+                1,
+                _param_int_funcionario_pdv(
+                    params,
+                    "stamps_per_purchase",
+                    "carimbos_por_compra",
+                    "stamp_count",
+                    default=1,
+                ),
+            )
             if min_purchase_value > 0:
-                quantidade = max(1, int(total_venda // min_purchase_value)) * stamps_per_purchase
+                quantidade = (
+                    max(1, int(total_venda // min_purchase_value)) * stamps_per_purchase
+                )
             else:
                 quantidade = stamps_per_purchase
-            beneficios.append({
-                "tipo": "fidelidade",
-                "titulo": campanha.name or "Cartao fidelidade",
-                "quantidade": quantidade,
-                "descricao": f"{quantidade} carimbo(s) previstos",
-                "cliente_id": cliente_id,
-            })
+            beneficios.append(
+                {
+                    "tipo": "fidelidade",
+                    "titulo": campanha.name or "Cartao fidelidade",
+                    "quantidade": quantidade,
+                    "descricao": f"{quantidade} carimbo(s) previstos",
+                    "cliente_id": cliente_id,
+                }
+            )
             continue
 
         if tipo_campanha == CampaignTypeEnum.quick_repurchase:
@@ -803,14 +891,16 @@ def _calcular_beneficios_gerados_funcionario_pdv(
                 default=0,
             )
             if valor_cupom > 0 or percentual_cupom > 0:
-                beneficios.append({
-                    "tipo": "cupom",
-                    "titulo": campanha.name or "Cupom de recompra",
-                    "valor": valor_cupom,
-                    "percentual": percentual_cupom,
-                    "descricao": "Cupom previsto apos a venda",
-                    "cliente_id": cliente_id,
-                })
+                beneficios.append(
+                    {
+                        "tipo": "cupom",
+                        "titulo": campanha.name or "Cupom de recompra",
+                        "valor": valor_cupom,
+                        "percentual": percentual_cupom,
+                        "descricao": "Cupom previsto apos a venda",
+                        "cliente_id": cliente_id,
+                    }
+                )
 
     return beneficios
 
@@ -819,7 +909,10 @@ def _aplicar_desconto_cupom_nos_itens_funcionario_pdv(
     itens_payload: list[dict],
     desconto_total: float,
 ) -> list[dict]:
-    desconto_total = min(_round_money_funcionario_pdv(desconto_total), sum(item["subtotal"] for item in itens_payload))
+    desconto_total = min(
+        _round_money_funcionario_pdv(desconto_total),
+        sum(item["subtotal"] for item in itens_payload),
+    )
     if desconto_total <= 0:
         return itens_payload
 
@@ -831,14 +924,18 @@ def _aplicar_desconto_cupom_nos_itens_funcionario_pdv(
         if indice == len(itens_payload) - 1:
             desconto_item = restante
         else:
-            desconto_item = _round_money_funcionario_pdv(desconto_total * item["subtotal"] / total_bruto)
+            desconto_item = _round_money_funcionario_pdv(
+                desconto_total * item["subtotal"] / total_bruto
+            )
             desconto_item = min(desconto_item, item["subtotal"], restante)
             restante = _round_money_funcionario_pdv(restante - desconto_item)
 
         item_ajustado["desconto_item"] = _round_money_funcionario_pdv(
             float(item_ajustado.get("desconto_item") or 0) + desconto_item
         )
-        item_ajustado["subtotal"] = _round_money_funcionario_pdv(item_ajustado["subtotal"] - desconto_item)
+        item_ajustado["subtotal"] = _round_money_funcionario_pdv(
+            item_ajustado["subtotal"] - desconto_item
+        )
         itens_com_desconto.append(item_ajustado)
 
     return itens_com_desconto
@@ -854,7 +951,9 @@ def _calcular_beneficios_funcionario_pdv(
     cashback_valor: Optional[float] = None,
 ) -> dict:
     if not itens:
-        raise HTTPException(status_code=400, detail="Adicione ao menos um item para vender.")
+        raise HTTPException(
+            status_code=400, detail="Adicione ao menos um item para vender."
+        )
 
     _buscar_cliente_pdv_funcionario(db, tenant_id, cliente_id)
 
@@ -873,11 +972,16 @@ def _calcular_beneficios_funcionario_pdv(
             .first()
         )
         if not produto:
-            raise HTTPException(status_code=404, detail=f"Produto ID {item.produto_id} nao encontrado.")
+            raise HTTPException(
+                status_code=404, detail=f"Produto ID {item.produto_id} nao encontrado."
+            )
 
         preco_unitario = float(produto.preco_venda or item.preco_unitario or 0)
         if preco_unitario <= 0:
-            raise HTTPException(status_code=400, detail=f"Produto '{produto.nome}' esta sem preco de venda.")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Produto '{produto.nome}' esta sem preco de venda.",
+            )
 
         quantidade = float(item.quantidade)
         subtotal_item = _round_money_funcionario_pdv(quantidade * preco_unitario)
@@ -904,10 +1008,16 @@ def _calcular_beneficios_funcionario_pdv(
             customer_id=cliente_id,
         )
         cupom_code = preview_cupom["code"]
-        desconto_cupom = _round_money_funcionario_pdv(preview_cupom.get("discount_applied"))
+        desconto_cupom = _round_money_funcionario_pdv(
+            preview_cupom.get("discount_applied")
+        )
 
-    itens_payload = _aplicar_desconto_cupom_nos_itens_funcionario_pdv(itens_payload, desconto_cupom)
-    total_venda = _round_money_funcionario_pdv(sum(item["subtotal"] for item in itens_payload))
+    itens_payload = _aplicar_desconto_cupom_nos_itens_funcionario_pdv(
+        itens_payload, desconto_cupom
+    )
+    total_venda = _round_money_funcionario_pdv(
+        sum(item["subtotal"] for item in itens_payload)
+    )
 
     cashback_disponivel = _saldo_cashback_funcionario_pdv(
         db,
@@ -917,9 +1027,13 @@ def _calcular_beneficios_funcionario_pdv(
     cashback_solicitado = _round_money_funcionario_pdv(cashback_valor)
     mensagens: list[str] = []
     if cashback_solicitado > 0 and not cliente_id:
-        raise HTTPException(status_code=400, detail="Selecione um cliente para usar cashback.")
+        raise HTTPException(
+            status_code=400, detail="Selecione um cliente para usar cashback."
+        )
     if cashback_solicitado > cashback_disponivel + 0.01:
-        raise HTTPException(status_code=400, detail="Cashback solicitado maior que o saldo disponivel.")
+        raise HTTPException(
+            status_code=400, detail="Cashback solicitado maior que o saldo disponivel."
+        )
 
     cashback_usado = min(cashback_solicitado, total_venda)
     if cashback_solicitado > total_venda:
@@ -989,7 +1103,9 @@ def _registrar_lote_balanco_funcionario(
     if quantidade <= 0 or not (numero_lote or data_validade):
         return None
 
-    nome_lote = (numero_lote or f"{produto.codigo}-{datetime.now().strftime('%Y%m%d%H%M%S')}").strip()
+    nome_lote = (
+        numero_lote or f"{produto.codigo}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    ).strip()
     data_val = _parse_data_validade_funcionario(data_validade)
     produto.controle_lote = True
 
@@ -1024,7 +1140,9 @@ def _registrar_lote_balanco_funcionario(
     return lote.id
 
 
-def _consumir_lotes_balanco_funcionario(db: Session, produto: Produto, quantidade: float) -> str | None:
+def _consumir_lotes_balanco_funcionario(
+    db: Session, produto: Produto, quantidade: float
+) -> str | None:
     lotes_consumidos = []
     quantidade_restante = quantidade
     lotes_ativos = (
@@ -1069,6 +1187,7 @@ def _gerar_codigo_pet(db: Session, user_id: int) -> str:
 # ─────────────────────────────────────────
 # Schemas
 # ─────────────────────────────────────────
+
 
 class PetCreate(BaseModel):
     nome: str
@@ -1119,6 +1238,7 @@ class PetCarteirinhaResponse(BaseModel):
 # Serialização
 # ─────────────────────────────────────────
 
+
 def _serialize_pet(pet: Pet) -> dict:
     return {
         "id": pet.id,
@@ -1128,7 +1248,9 @@ def _serialize_pet(pet: Pet) -> dict:
         "raca": pet.raca,
         "sexo": pet.sexo,
         "castrado": pet.castrado,
-        "data_nascimento": pet.data_nascimento.isoformat() if pet.data_nascimento else None,
+        "data_nascimento": pet.data_nascimento.isoformat()
+        if pet.data_nascimento
+        else None,
         "idade_aproximada": pet.idade_aproximada,
         "peso": pet.peso,
         "porte": pet.porte,
@@ -1136,9 +1258,16 @@ def _serialize_pet(pet: Pet) -> dict:
         "alergias": pet.alergias,
         "alergias_lista": getattr(pet, "alergias_lista", None) or [],
         "observacoes": pet.observacoes,
-        "restricoes_alimentares_lista": getattr(pet, "restricoes_alimentares_lista", None) or [],
-        "condicoes_cronicas_lista": getattr(pet, "condicoes_cronicas_lista", None) or [],
-        "medicamentos_continuos_lista": getattr(pet, "medicamentos_continuos_lista", None) or [],
+        "restricoes_alimentares_lista": getattr(
+            pet, "restricoes_alimentares_lista", None
+        )
+        or [],
+        "condicoes_cronicas_lista": getattr(pet, "condicoes_cronicas_lista", None)
+        or [],
+        "medicamentos_continuos_lista": getattr(
+            pet, "medicamentos_continuos_lista", None
+        )
+        or [],
         "tipo_sanguineo": getattr(pet, "tipo_sanguineo", None),
         "foto_url": pet.foto_url,
     }
@@ -1164,6 +1293,7 @@ def _get_pet_owned_or_404(db: Session, pet_id: int, current_user: User) -> Pet:
 # ─────────────────────────────────────────
 # PETS — CRUD
 # ─────────────────────────────────────────
+
 
 @router.get("/pets", response_model=list[PetResponse])
 def listar_pets(
@@ -1265,7 +1395,10 @@ async def upload_foto_pet(
     # Valida tipo de arquivo
     allowed = {"image/jpeg", "image/png", "image/webp", "image/gif"}
     if file.content_type not in allowed:
-        raise HTTPException(status_code=400, detail="Tipo de arquivo não suportado. Use JPG, PNG ou WebP.")
+        raise HTTPException(
+            status_code=400,
+            detail="Tipo de arquivo não suportado. Use JPG, PNG ou WebP.",
+        )
 
     # Salva o arquivo em uploads/pets/{tenant_id}/
     ext = Path(file.filename or "foto.jpg").suffix or ".jpg"
@@ -1300,14 +1433,26 @@ def obter_carteirinha_pet_app(
 
     tenant_id = str(current_user.tenant_id)
     status_vacinal = _status_vacinal_pet(db, pet, tenant_id)
-    consultas = db.query(ConsultaVet).filter(
-        ConsultaVet.pet_id == pet.id,
-        ConsultaVet.tenant_id == tenant_id,
-    ).order_by(ConsultaVet.created_at.desc()).limit(10).all()
-    exames = db.query(ExameVet).filter(
-        ExameVet.pet_id == pet.id,
-        ExameVet.tenant_id == tenant_id,
-    ).order_by(ExameVet.created_at.desc()).limit(10).all()
+    consultas = (
+        db.query(ConsultaVet)
+        .filter(
+            ConsultaVet.pet_id == pet.id,
+            ConsultaVet.tenant_id == tenant_id,
+        )
+        .order_by(ConsultaVet.created_at.desc())
+        .limit(10)
+        .all()
+    )
+    exames = (
+        db.query(ExameVet)
+        .filter(
+            ExameVet.pet_id == pet.id,
+            ExameVet.tenant_id == tenant_id,
+        )
+        .order_by(ExameVet.created_at.desc())
+        .limit(10)
+        .all()
+    )
 
     return {
         "pet": _serialize_pet(pet),
@@ -1316,7 +1461,9 @@ def obter_carteirinha_pet_app(
         "consultas": [
             {
                 "id": consulta.id,
-                "data": consulta.created_at.isoformat() if consulta.created_at else None,
+                "data": consulta.created_at.isoformat()
+                if consulta.created_at
+                else None,
                 "tipo": consulta.tipo,
                 "status": consulta.status,
                 "diagnostico": consulta.diagnostico,
@@ -1330,7 +1477,9 @@ def obter_carteirinha_pet_app(
                 "nome": exame.nome,
                 "tipo": exame.tipo,
                 "status": exame.status,
-                "data_resultado": exame.data_resultado.isoformat() if exame.data_resultado else None,
+                "data_resultado": exame.data_resultado.isoformat()
+                if exame.data_resultado
+                else None,
                 "interpretacao_ia_resumo": exame.interpretacao_ia_resumo,
                 "arquivo_url": exame.arquivo_url,
             }
@@ -1347,18 +1496,32 @@ def obter_status_push(
     from app.campaigns.models import NotificationQueue, NotificationStatusEnum
 
     cliente = _get_cliente_or_404(db, current_user)
-    pendentes = db.query(NotificationQueue).filter(
-        NotificationQueue.tenant_id == str(current_user.tenant_id),
-        NotificationQueue.customer_id == cliente.id,
-        NotificationQueue.status == NotificationStatusEnum.pending,
-    ).order_by(NotificationQueue.scheduled_at.asc(), NotificationQueue.created_at.desc()).limit(10).all()
+    pendentes = (
+        db.query(NotificationQueue)
+        .filter(
+            NotificationQueue.tenant_id == str(current_user.tenant_id),
+            NotificationQueue.customer_id == cliente.id,
+            NotificationQueue.status == NotificationStatusEnum.pending,
+        )
+        .order_by(
+            NotificationQueue.scheduled_at.asc(), NotificationQueue.created_at.desc()
+        )
+        .limit(10)
+        .all()
+    )
 
-    proximos_agendamentos = db.query(AgendamentoVet).filter(
-        AgendamentoVet.tenant_id == str(current_user.tenant_id),
-        AgendamentoVet.cliente_id == cliente.id,
-        AgendamentoVet.status.in_(["agendado", "confirmado", "em_atendimento"]),
-        AgendamentoVet.data_hora >= datetime.now(),
-    ).order_by(AgendamentoVet.data_hora.asc()).limit(5).all()
+    proximos_agendamentos = (
+        db.query(AgendamentoVet)
+        .filter(
+            AgendamentoVet.tenant_id == str(current_user.tenant_id),
+            AgendamentoVet.cliente_id == cliente.id,
+            AgendamentoVet.status.in_(["agendado", "confirmado", "em_atendimento"]),
+            AgendamentoVet.data_hora >= datetime.now(),
+        )
+        .order_by(AgendamentoVet.data_hora.asc())
+        .limit(5)
+        .all()
+    )
 
     push_token = getattr(current_user, "push_token", None)
     return {
@@ -1369,7 +1532,9 @@ def obter_status_push(
                 "id": item.id,
                 "assunto": item.subject,
                 "mensagem": item.body,
-                "scheduled_at": item.scheduled_at.isoformat() if item.scheduled_at else None,
+                "scheduled_at": item.scheduled_at.isoformat()
+                if item.scheduled_at
+                else None,
             }
             for item in pendentes
         ],
@@ -1391,7 +1556,11 @@ def obter_status_push(
 # PRODUTO POR CÓDIGO DE BARRAS
 # ─────────────────────────────────────────
 
-@router.get("/funcionario/estoque/produtos/buscar", response_model=list[FuncionarioProdutoEstoqueResponse])
+
+@router.get(
+    "/funcionario/estoque/produtos/buscar",
+    response_model=list[FuncionarioProdutoEstoqueResponse],
+)
 def buscar_produtos_funcionario_estoque(
     q: str = "",
     current_user: User = Depends(_get_current_ecommerce_user),
@@ -1413,14 +1582,22 @@ def buscar_produtos_funcionario_estoque(
             Produto.situacao.is_not(False),
             or_(*filtros_busca),
         )
-        .order_by(rank_busca.asc(), prioridade_estoque.asc(), Produto.is_parent.asc(), Produto.nome.asc())
+        .order_by(
+            rank_busca.asc(),
+            prioridade_estoque.asc(),
+            Produto.is_parent.asc(),
+            Produto.nome.asc(),
+        )
         .limit(20)
         .all()
     )
     return [_serialize_funcionario_produto_estoque(produto) for produto in produtos]
 
 
-@router.get("/funcionario/estoque/produtos/barcode/{barcode}", response_model=FuncionarioProdutoEstoqueResponse)
+@router.get(
+    "/funcionario/estoque/produtos/barcode/{barcode}",
+    response_model=FuncionarioProdutoEstoqueResponse,
+)
 def buscar_produto_funcionario_barcode(
     barcode: str,
     current_user: User = Depends(_get_current_ecommerce_user),
@@ -1480,7 +1657,11 @@ def registrar_balanco_funcionario_estoque(
     diferenca = round(saldo_final - estoque_atual, 6)
     documento = f"APP-FUNC-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     observacao_base = "App funcionario - balanco por camera"
-    observacao = observacao_base if not payload.observacao else f"{observacao_base}: {payload.observacao.strip()}"
+    observacao = (
+        observacao_base
+        if not payload.observacao
+        else f"{observacao_base}: {payload.observacao.strip()}"
+    )
 
     if abs(diferenca) < 0.000001:
         return {
@@ -1508,7 +1689,9 @@ def registrar_balanco_funcionario_estoque(
             payload.data_validade,
         )
     else:
-        lotes_consumidos = _consumir_lotes_balanco_funcionario(db, produto, quantidade_movimentada)
+        lotes_consumidos = _consumir_lotes_balanco_funcionario(
+            db, produto, quantidade_movimentada
+        )
 
     produto.estoque_atual = saldo_final
     movimentacao = EstoqueMovimentacao(
@@ -1550,7 +1733,10 @@ def registrar_balanco_funcionario_estoque(
     }
 
 
-@router.get("/funcionario/pdv/produtos/buscar", response_model=list[FuncionarioPdvProdutoResponse])
+@router.get(
+    "/funcionario/pdv/produtos/buscar",
+    response_model=list[FuncionarioPdvProdutoResponse],
+)
 def buscar_produtos_funcionario_pdv(
     q: str = "",
     current_user: User = Depends(_get_current_ecommerce_user),
@@ -1580,7 +1766,10 @@ def buscar_produtos_funcionario_pdv(
     return [_serialize_funcionario_pdv_produto(produto) for produto in produtos]
 
 
-@router.get("/funcionario/pdv/produtos/barcode/{barcode}", response_model=FuncionarioPdvProdutoResponse)
+@router.get(
+    "/funcionario/pdv/produtos/barcode/{barcode}",
+    response_model=FuncionarioPdvProdutoResponse,
+)
 def buscar_produto_funcionario_pdv_barcode(
     barcode: str,
     current_user: User = Depends(_get_current_ecommerce_user),
@@ -1605,11 +1794,16 @@ def buscar_produto_funcionario_pdv_barcode(
         .first()
     )
     if not produto:
-        raise HTTPException(status_code=404, detail="Produto ERP nao encontrado para este codigo.")
+        raise HTTPException(
+            status_code=404, detail="Produto ERP nao encontrado para este codigo."
+        )
     return _serialize_funcionario_pdv_produto(produto)
 
 
-@router.get("/funcionario/pdv/clientes/buscar", response_model=list[FuncionarioPdvClienteResponse])
+@router.get(
+    "/funcionario/pdv/clientes/buscar",
+    response_model=list[FuncionarioPdvClienteResponse],
+)
 def buscar_clientes_funcionario_pdv(
     q: str = "",
     current_user: User = Depends(_get_current_ecommerce_user),
@@ -1623,8 +1817,12 @@ def buscar_clientes_funcionario_pdv(
     termo_digits = _somente_digitos_funcionario_pdv(termo)
     cpf_digits = func.regexp_replace(func.coalesce(Cliente.cpf, ""), r"\D", "", "g")
     cnpj_digits = func.regexp_replace(func.coalesce(Cliente.cnpj, ""), r"\D", "", "g")
-    telefone_digits = func.regexp_replace(func.coalesce(Cliente.telefone, ""), r"\D", "", "g")
-    celular_digits = func.regexp_replace(func.coalesce(Cliente.celular, ""), r"\D", "", "g")
+    telefone_digits = func.regexp_replace(
+        func.coalesce(Cliente.telefone, ""), r"\D", "", "g"
+    )
+    celular_digits = func.regexp_replace(
+        func.coalesce(Cliente.celular, ""), r"\D", "", "g"
+    )
     filtros = [
         Cliente.codigo.ilike(f"%{termo}%"),
         Cliente.nome.ilike(f"%{termo}%"),
@@ -1681,7 +1879,10 @@ def obter_caixa_aberto_funcionario_pdv(
     }
 
 
-@router.get("/funcionario/pdv/formas-pagamento", response_model=list[FuncionarioPdvFormaPagamentoResponse])
+@router.get(
+    "/funcionario/pdv/formas-pagamento",
+    response_model=list[FuncionarioPdvFormaPagamentoResponse],
+)
 def listar_formas_pagamento_funcionario_pdv(
     current_user: User = Depends(_get_current_ecommerce_user),
     db: Session = Depends(get_session),
@@ -1705,27 +1906,34 @@ def listar_formas_pagamento_funcionario_pdv(
         parcelas_maximas = int(forma.parcelas_maximas or forma.max_parcelas or 1)
         max_parcelas = int(forma.max_parcelas or parcelas_maximas or 1)
         numero_parcelas = max(1, parcelas_maximas, max_parcelas)
-        permite_parcelamento = key == "credito" and (bool(forma.permite_parcelamento) or bool(forma.split_parcelas))
-        resposta.append({
-            "id": forma.id,
-            "nome": forma.nome,
-            "tipo": forma.tipo,
-            "key": key,
-            "taxa_percentual": float(forma.taxa_percentual or 0),
-            "permite_parcelamento": permite_parcelamento,
-            "numero_parcelas": numero_parcelas if permite_parcelamento else 1,
-            "max_parcelas": numero_parcelas if permite_parcelamento else 1,
-            "parcelas_maximas": numero_parcelas if permite_parcelamento else 1,
-            "operadora": forma.operadora,
-            "requer_nsu": bool(forma.requer_nsu),
-            "tipo_cartao": forma.tipo_cartao,
-            "bandeira": forma.bandeira,
-            "split_parcelas": bool(forma.split_parcelas),
-        })
+        permite_parcelamento = key == "credito" and (
+            bool(forma.permite_parcelamento) or bool(forma.split_parcelas)
+        )
+        resposta.append(
+            {
+                "id": forma.id,
+                "nome": forma.nome,
+                "tipo": forma.tipo,
+                "key": key,
+                "taxa_percentual": float(forma.taxa_percentual or 0),
+                "permite_parcelamento": permite_parcelamento,
+                "numero_parcelas": numero_parcelas if permite_parcelamento else 1,
+                "max_parcelas": numero_parcelas if permite_parcelamento else 1,
+                "parcelas_maximas": numero_parcelas if permite_parcelamento else 1,
+                "operadora": forma.operadora,
+                "requer_nsu": bool(forma.requer_nsu),
+                "tipo_cartao": forma.tipo_cartao,
+                "bandeira": forma.bandeira,
+                "split_parcelas": bool(forma.split_parcelas),
+            }
+        )
     return resposta
 
 
-@router.post("/funcionario/pdv/beneficios/preview", response_model=FuncionarioPdvBeneficiosPreviewResponse)
+@router.post(
+    "/funcionario/pdv/beneficios/preview",
+    response_model=FuncionarioPdvBeneficiosPreviewResponse,
+)
 def preview_beneficios_funcionario_pdv(
     dados: FuncionarioPdvBeneficiosPreviewRequest,
     current_user: User = Depends(_get_current_ecommerce_user),
@@ -1754,7 +1962,9 @@ def preview_beneficios_funcionario_pdv(
     }
 
 
-@router.post("/funcionario/pdv/vendas/salvar", response_model=FuncionarioPdvSalvarResponse)
+@router.post(
+    "/funcionario/pdv/vendas/salvar", response_model=FuncionarioPdvSalvarResponse
+)
 def salvar_venda_funcionario_pdv(
     dados: FuncionarioPdvSalvarRequest,
     current_user: User = Depends(_get_current_ecommerce_user),
@@ -1764,11 +1974,15 @@ def salvar_venda_funcionario_pdv(
 
     funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
     if not dados.itens:
-        raise HTTPException(status_code=400, detail="Adicione ao menos um item para vender.")
+        raise HTTPException(
+            status_code=400, detail="Adicione ao menos um item para vender."
+        )
 
     caixa = _obter_caixa_aberto_funcionario_pdv(db, tenant_id, current_user)
     if not caixa:
-        raise HTTPException(status_code=400, detail="Abra um caixa no ERP web antes de salvar pelo app.")
+        raise HTTPException(
+            status_code=400, detail="Abra um caixa no ERP web antes de salvar pelo app."
+        )
 
     beneficios = _calcular_beneficios_funcionario_pdv(
         db,
@@ -1796,7 +2010,9 @@ def salvar_venda_funcionario_pdv(
         "percentual_taxa_entregador": 0,
         "canal": "app_funcionario",
     }
-    venda_criada = VendaService.criar_venda(payload=criar_payload, user_id=current_user.id, db=db)
+    venda_criada = VendaService.criar_venda(
+        payload=criar_payload, user_id=current_user.id, db=db
+    )
     return {
         "status": "aberta",
         "venda_id": venda_criada["id"],
@@ -1806,7 +2022,9 @@ def salvar_venda_funcionario_pdv(
     }
 
 
-@router.post("/funcionario/pdv/vendas/finalizar", response_model=FuncionarioPdvFinalizarResponse)
+@router.post(
+    "/funcionario/pdv/vendas/finalizar", response_model=FuncionarioPdvFinalizarResponse
+)
 def finalizar_venda_funcionario_pdv(
     dados: FuncionarioPdvFinalizarRequest,
     current_user: User = Depends(_get_current_ecommerce_user),
@@ -1817,11 +2035,15 @@ def finalizar_venda_funcionario_pdv(
 
     funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
     if not dados.itens:
-        raise HTTPException(status_code=400, detail="Adicione ao menos um item para vender.")
+        raise HTTPException(
+            status_code=400, detail="Adicione ao menos um item para vender."
+        )
 
     caixa = _obter_caixa_aberto_funcionario_pdv(db, tenant_id, current_user)
     if not caixa:
-        raise HTTPException(status_code=400, detail="Abra um caixa no ERP web antes de vender pelo app.")
+        raise HTTPException(
+            status_code=400, detail="Abra um caixa no ERP web antes de vender pelo app."
+        )
 
     beneficios = _calcular_beneficios_funcionario_pdv(
         db,
@@ -1834,11 +2056,15 @@ def finalizar_venda_funcionario_pdv(
 
     valor_pagamento = round(float(dados.pagamento.valor), 2)
     if abs(valor_pagamento - beneficios["valor_pagamento"]) > 0.01:
-        raise HTTPException(status_code=400, detail="Valor do pagamento deve fechar o total da venda.")
+        raise HTTPException(
+            status_code=400, detail="Valor do pagamento deve fechar o total da venda."
+        )
 
     forma_pagamento = _normalizar_forma_pagamento_pdv(dados.pagamento.forma_pagamento)
     numero_parcelas = max(1, int(dados.pagamento.numero_parcelas or 1))
-    forma_pagamento_selecionada = _resolver_forma_pagamento_cartao_funcionario_pdv(db, tenant_id, dados.pagamento)
+    forma_pagamento_selecionada = _resolver_forma_pagamento_cartao_funcionario_pdv(
+        db, tenant_id, dados.pagamento
+    )
     if forma_pagamento != "cartao_credito":
         numero_parcelas = max(1, min(numero_parcelas, 1))
     criar_payload = {
@@ -1858,7 +2084,9 @@ def finalizar_venda_funcionario_pdv(
         "percentual_taxa_entregador": 0,
         "canal": "app_funcionario",
     }
-    venda_criada = VendaService.criar_venda(payload=criar_payload, user_id=current_user.id, db=db)
+    venda_criada = VendaService.criar_venda(
+        payload=criar_payload, user_id=current_user.id, db=db
+    )
 
     pagamentos_payload = []
     if valor_pagamento > 0:
@@ -1867,8 +2095,18 @@ def finalizar_venda_funcionario_pdv(
             "valor": valor_pagamento,
             "numero_parcelas": numero_parcelas,
             "forma_pagamento_id": dados.pagamento.forma_pagamento_id,
-            "bandeira": dados.pagamento.bandeira or (forma_pagamento_selecionada.bandeira if forma_pagamento_selecionada else None),
-            "operadora": dados.pagamento.operadora or (forma_pagamento_selecionada.operadora if forma_pagamento_selecionada else None),
+            "bandeira": dados.pagamento.bandeira
+            or (
+                forma_pagamento_selecionada.bandeira
+                if forma_pagamento_selecionada
+                else None
+            ),
+            "operadora": dados.pagamento.operadora
+            or (
+                forma_pagamento_selecionada.operadora
+                if forma_pagamento_selecionada
+                else None
+            ),
             "nsu_cartao": dados.pagamento.nsu_cartao,
         }
         if dados.pagamento.valor_recebido is not None:
@@ -1888,7 +2126,9 @@ def finalizar_venda_funcionario_pdv(
         )
 
     if not pagamentos_payload:
-        raise HTTPException(status_code=400, detail="Informe uma forma de pagamento valida.")
+        raise HTTPException(
+            status_code=400, detail="Informe uma forma de pagamento valida."
+        )
 
     resultado = VendaService.finalizar_venda(
         venda_id=venda_criada["id"],
@@ -1913,9 +2153,12 @@ def finalizar_venda_funcionario_pdv(
     return {
         "status": venda_resultado.get("status", "finalizada"),
         "venda_id": venda_criada["id"],
-        "numero_venda": venda_resultado.get("numero_venda") or venda_criada.get("numero_venda"),
+        "numero_venda": venda_resultado.get("numero_venda")
+        or venda_criada.get("numero_venda"),
         "total": float(venda_resultado.get("total") or beneficios["total_venda"]),
-        "total_pago": float(venda_resultado.get("total_pago") or beneficios["total_venda"]),
+        "total_pago": float(
+            venda_resultado.get("total_pago") or beneficios["total_venda"]
+        ),
         "forma_pagamento": " + ".join(p["forma_pagamento"] for p in pagamentos_payload),
         "mensagem": "Venda registrada pelo app.",
     }
@@ -1936,9 +2179,15 @@ def buscar_produto_barcode(
     tenant_id = _activate_user_tenant_context(current_user)
     barcode = (barcode or "").strip()
     barcode_digits = "".join(ch for ch in barcode if ch.isdigit())
-    codigo_barras_digits = func.regexp_replace(func.coalesce(Produto.codigo_barras, ""), r"\D", "", "g")
-    gtin_digits = func.regexp_replace(func.coalesce(Produto.gtin_ean, ""), r"\D", "", "g")
-    gtin_tributario_digits = func.regexp_replace(func.coalesce(Produto.gtin_ean_tributario, ""), r"\D", "", "g")
+    codigo_barras_digits = func.regexp_replace(
+        func.coalesce(Produto.codigo_barras, ""), r"\D", "", "g"
+    )
+    gtin_digits = func.regexp_replace(
+        func.coalesce(Produto.gtin_ean, ""), r"\D", "", "g"
+    )
+    gtin_tributario_digits = func.regexp_replace(
+        func.coalesce(Produto.gtin_ean_tributario, ""), r"\D", "", "g"
+    )
     filtros_codigo = [
         Produto.codigo_barras == barcode,
         Produto.gtin_ean == barcode,
@@ -1947,13 +2196,15 @@ def buscar_produto_barcode(
         Produto.codigos_barras_alternativos.ilike(f"%{barcode}%"),
     ]
     if barcode_digits:
-        filtros_codigo.extend([
-            codigo_barras_digits == barcode_digits,
-            gtin_digits == barcode_digits,
-            gtin_tributario_digits == barcode_digits,
-            Produto.codigo == barcode_digits,
-            Produto.codigos_barras_alternativos.ilike(f"%{barcode_digits}%"),
-        ])
+        filtros_codigo.extend(
+            [
+                codigo_barras_digits == barcode_digits,
+                gtin_digits == barcode_digits,
+                gtin_tributario_digits == barcode_digits,
+                Produto.codigo == barcode_digits,
+                Produto.codigos_barras_alternativos.ilike(f"%{barcode_digits}%"),
+            ]
+        )
 
     prioridade_estoque = case((func.coalesce(Produto.estoque_atual, 0) > 0, 0), else_=1)
 
@@ -1977,13 +2228,19 @@ def buscar_produto_barcode(
             detail="Produto não encontrado para este código de barras.",
         )
 
-    oferta_validade = mapear_ofertas_validade_por_produto(db, [produto], "app").get(produto.id)
+    oferta_validade = mapear_ofertas_validade_por_produto(db, [produto], "app").get(
+        produto.id
+    )
     pricing = resolver_preco_publico_produto(
         produto,
         "app",
         validity_offer=oferta_validade,
     )
-    preco = float(pricing.promotional_price if pricing.promotional_price is not None else pricing.regular_price or 0)
+    preco = float(
+        pricing.promotional_price
+        if pricing.promotional_price is not None
+        else pricing.regular_price or 0
+    )
     preco_original = float(pricing.regular_price or 0)
 
     return {
@@ -2002,18 +2259,29 @@ def buscar_produto_barcode(
             "ativa": bool(oferta_validade and oferta_validade.active),
             "lote_id": oferta_validade.lote_id if oferta_validade else None,
             "nome_lote": oferta_validade.lote_nome if oferta_validade else None,
-            "dias_para_vencer": oferta_validade.dias_para_vencer if oferta_validade else None,
-            "quantidade_promocional": oferta_validade.quantity_available if oferta_validade else None,
-            "percentual_desconto": oferta_validade.percentual_desconto if oferta_validade else None,
-            "preco_promocional": oferta_validade.promotional_price if oferta_validade else None,
+            "dias_para_vencer": oferta_validade.dias_para_vencer
+            if oferta_validade
+            else None,
+            "quantidade_promocional": oferta_validade.quantity_available
+            if oferta_validade
+            else None,
+            "percentual_desconto": oferta_validade.percentual_desconto
+            if oferta_validade
+            else None,
+            "preco_promocional": oferta_validade.promotional_price
+            if oferta_validade
+            else None,
             "mensagem": oferta_validade.message if oferta_validade else None,
-        } if oferta_validade else None,
+        }
+        if oferta_validade
+        else None,
     }
 
 
 # ─────────────────────────────────────────
 # PUSH TOKEN
 # ─────────────────────────────────────────
+
 
 @router.post("/push-token")
 def registrar_push_token(
@@ -2031,7 +2299,10 @@ def registrar_push_token(
     """
     if not hasattr(current_user, "push_token"):
         # Coluna ainda não existe (migration pendente)
-        return {"status": "ignored", "motivo": "Migration pendente: coluna push_token não existe."}
+        return {
+            "status": "ignored",
+            "motivo": "Migration pendente: coluna push_token não existe.",
+        }
 
     current_user.push_token = payload.token
     db.commit()
@@ -2041,6 +2312,7 @@ def registrar_push_token(
 # ─────────────────────────────────────────
 # RASTREIO DE ENTREGA
 # ─────────────────────────────────────────
+
 
 @router.get("/pedidos/{pedido_id}/rastreio")
 def rastreio_entrega(
@@ -2173,7 +2445,9 @@ def rastreio_entrega(
             ultima_posicao = {
                 "lat": float(rota_posicao[0]),
                 "lon": float(rota_posicao[1]),
-                "atualizada_em": rota_posicao[2].isoformat() if rota_posicao[2] else None,
+                "atualizada_em": rota_posicao[2].isoformat()
+                if rota_posicao[2]
+                else None,
                 "fonte": "rota_atual",
             }
         else:
@@ -2190,7 +2464,9 @@ def rastreio_entrega(
                     ultima_posicao = {
                         "lat": float(result[0]),
                         "lon": float(result[1]),
-                        "atualizada_em": p.data_entrega.isoformat() if p.data_entrega else None,
+                        "atualizada_em": p.data_entrega.isoformat()
+                        if p.data_entrega
+                        else None,
                         "fonte": "ultima_parada",
                     }
                     break
@@ -2224,7 +2500,9 @@ def rastreio_entrega(
             "paradas_antes": max(0, (posicao_cliente or 1) - 1 - entregues),
             "status_parada": parada.status,
             "endereco_entrega": parada.endereco or venda.endereco_entrega,
-            "data_entrega": parada.data_entrega.isoformat() if parada.data_entrega else None,
+            "data_entrega": parada.data_entrega.isoformat()
+            if parada.data_entrega
+            else None,
             "ultima_posicao_gps": ultima_posicao,
         },
         "mensagem": _rastreio_mensagem_parada(parada.status, rota.status),

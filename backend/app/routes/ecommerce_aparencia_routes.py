@@ -2,6 +2,7 @@
 Rotas de Aparência do E-commerce por lojista.
 Permite upload de logo e até 3 banners rotativos para a loja virtual.
 """
+
 import logging
 import re
 import shutil
@@ -25,6 +26,7 @@ try:
 except PermissionError:
     # O diretório é criado via volume montado; se já existir, não há problema.
     import logging
+
     logging.getLogger(__name__).warning(
         "Não foi possível criar %s (PermissionError). "
         "Certifique-se de que o diretório existe no host com chown 1000:1000.",
@@ -39,6 +41,7 @@ TIPOS_VALIDOS = {"logo", "banner_1", "banner_2", "banner_3"}
 
 # ─── Schemas ───────────────────────────────────────────────────────────────
 
+
 class AparenciaResponse(BaseModel):
     logo_url: str | None = None
     banner_1_url: str | None = None
@@ -48,6 +51,7 @@ class AparenciaResponse(BaseModel):
 
 class AparenciaUrlUpdate(BaseModel):
     """Para quem prefere colar uma URL externa em vez de fazer upload."""
+
     logo_url: str | None = None
     banner_1_url: str | None = None
     banner_2_url: str | None = None
@@ -59,6 +63,7 @@ class SlugUpdate(BaseModel):
 
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────
+
 
 @router.get("/tenant-context")
 def tenant_context_logado(
@@ -140,7 +145,9 @@ async def upload_imagem_aparencia(
     file_size = file.file.tell()
     file.file.seek(0)
     if file_size > MAX_SIZE:
-        raise HTTPException(status_code=400, detail="Arquivo muito grande. Máximo: 5 MB.")
+        raise HTTPException(
+            status_code=400, detail="Arquivo muito grande. Máximo: 5 MB."
+        )
 
     _, tenant_id = user_and_tenant
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
@@ -161,6 +168,7 @@ async def upload_imagem_aparencia(
             # Tentamos corrigir a permissão e deletar novamente
             try:
                 import os as _os
+
                 _os.chmod(old, 0o666)
                 old.unlink(missing_ok=True)
             except (PermissionError, OSError):
@@ -175,7 +183,7 @@ async def upload_imagem_aparencia(
     except PermissionError:
         raise HTTPException(
             status_code=500,
-            detail="Erro de permissão no servidor ao salvar o arquivo. Execute: docker exec -u root petshop-dev-backend chown -R 999:999 /app/uploads"
+            detail="Erro de permissão no servidor ao salvar o arquivo. Execute: docker exec -u root petshop-dev-backend chown -R 999:999 /app/uploads",
         )
 
     url = f"/uploads/ecommerce/{tenant_id}/{filename}"
@@ -246,16 +254,26 @@ def atualizar_slug(
                 detail="Slug inválido. Use apenas letras minúsculas, números e hífens (ex: minha-loja).",
             )
         if len(slug) < 3:
-            raise HTTPException(status_code=400, detail="Slug muito curto. Use pelo menos 3 caracteres.")
+            raise HTTPException(
+                status_code=400, detail="Slug muito curto. Use pelo menos 3 caracteres."
+            )
         if len(slug) > 80:
-            raise HTTPException(status_code=400, detail="Slug muito longo. Máximo 80 caracteres.")
+            raise HTTPException(
+                status_code=400, detail="Slug muito longo. Máximo 80 caracteres."
+            )
         # Verificar unicidade
-        existing = db.query(Tenant).filter(
-            Tenant.ecommerce_slug == slug,
-            Tenant.id != tenant_id,
-        ).first()
+        existing = (
+            db.query(Tenant)
+            .filter(
+                Tenant.ecommerce_slug == slug,
+                Tenant.id != tenant_id,
+            )
+            .first()
+        )
         if existing:
-            raise HTTPException(status_code=409, detail="Este slug já está em uso. Escolha outro.")
+            raise HTTPException(
+                status_code=409, detail="Este slug já está em uso. Escolha outro."
+            )
         tenant.ecommerce_slug = slug
     else:
         tenant.ecommerce_slug = None
@@ -291,7 +309,9 @@ def remover_imagem_aparencia(
             file_path = Path(url_atual.lstrip("/"))
             file_path.unlink(missing_ok=True)
         except Exception as exc:
-            logger.warning("Não foi possível remover arquivo físico '%s': %s", url_atual, exc)
+            logger.warning(
+                "Não foi possível remover arquivo físico '%s': %s", url_atual, exc
+            )
 
     try:
         setattr(tenant, campo, None)
@@ -299,8 +319,16 @@ def remover_imagem_aparencia(
         db.refresh(tenant)
     except Exception as exc:
         db.rollback()
-        logger.error("Erro ao remover campo '%s' do tenant %s: %s", campo, tenant_id, exc, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Erro interno ao remover imagem: {exc}")
+        logger.error(
+            "Erro ao remover campo '%s' do tenant %s: %s",
+            campo,
+            tenant_id,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail=f"Erro interno ao remover imagem: {exc}"
+        )
 
     return AparenciaResponse(
         logo_url=tenant.logo_url,

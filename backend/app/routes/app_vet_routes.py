@@ -14,7 +14,10 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.db import get_session
 from app.models import Cliente, Pet, User
-from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
+from app.routes.ecommerce_auth import (
+    _activate_user_tenant_context,
+    _get_current_ecommerce_user,
+)
 from app.services.app_access_profile_service import get_cliente_for_app_profile_or_none
 from app.veterinario_agendamentos import (
     _agendamento_to_dict,
@@ -22,7 +25,11 @@ from app.veterinario_agendamentos import (
     _validar_consultorio_agendamento,
 )
 from app.veterinario_clinico import _upsert_lembretes_push_agendamento
-from app.veterinario_core import _normalizar_datetime_local_brasilia, _serializar_datetime_vet, _vet_now
+from app.veterinario_core import (
+    _normalizar_datetime_local_brasilia,
+    _serializar_datetime_vet,
+    _vet_now,
+)
 from app.veterinario_core import _all_accessible_tenant_ids
 from app.veterinario_internacao import (
     _separar_evolucoes_e_procedimentos,
@@ -56,11 +63,15 @@ class CriarAgendamentoConsultaMobilePayload(BaseModel):
     observacoes: Optional[str] = None
 
 
-def _get_mobile_veterinario_or_403(db: Session, current_user: User) -> tuple[Cliente, str]:
+def _get_mobile_veterinario_or_403(
+    db: Session, current_user: User
+) -> tuple[Cliente, str]:
     tenant_id = str(_activate_user_tenant_context(current_user))
     veterinario = get_cliente_for_app_profile_or_none(db, current_user, "veterinario")
     if not veterinario:
-        raise HTTPException(status_code=403, detail="Usuario nao possui perfil veterinario neste tenant")
+        raise HTTPException(
+            status_code=403, detail="Usuario nao possui perfil veterinario neste tenant"
+        )
 
     return veterinario, tenant_id
 
@@ -88,13 +99,17 @@ def _range_bounds(
 
 def _agendamento_mobile_dict(ag: AgendamentoVet) -> dict:
     item = _agendamento_to_dict(ag)
-    item.update({
-        "pet_codigo": getattr(ag.pet, "codigo", None) if ag.pet else None,
-        "pet_especie": getattr(ag.pet, "especie", None) if ag.pet else None,
-        "pet_raca": getattr(ag.pet, "raca", None) if ag.pet else None,
-        "cliente_telefone": getattr(ag.cliente, "telefone", None) if ag.cliente else None,
-        "cliente_email": getattr(ag.cliente, "email", None) if ag.cliente else None,
-    })
+    item.update(
+        {
+            "pet_codigo": getattr(ag.pet, "codigo", None) if ag.pet else None,
+            "pet_especie": getattr(ag.pet, "especie", None) if ag.pet else None,
+            "pet_raca": getattr(ag.pet, "raca", None) if ag.pet else None,
+            "cliente_telefone": getattr(ag.cliente, "telefone", None)
+            if ag.cliente
+            else None,
+            "cliente_email": getattr(ag.cliente, "email", None) if ag.cliente else None,
+        }
+    )
     return item
 
 
@@ -188,8 +203,7 @@ def resumo_veterinario_mobile(
         "agendamentos_hoje": [_agendamento_mobile_dict(ag) for ag in agendamentos],
         "internacoes_ativas": [_internacao_mobile_dict(item) for item in internacoes],
         "procedimentos_pendentes": [
-            _serializar_procedimento_agenda_internacao(item)
-            for item in procedimentos
+            _serializar_procedimento_agenda_internacao(item) for item in procedimentos
         ],
     }
 
@@ -290,11 +304,15 @@ def criar_agendamento_consulta_vet_mobile(
         .first()
     )
     if not pet:
-        raise HTTPException(status_code=404, detail="Pet nao encontrado para este veterinario")
+        raise HTTPException(
+            status_code=404, detail="Pet nao encontrado para este veterinario"
+        )
 
     tipo = (body.tipo or "consulta").strip().lower()
     if tipo not in {"consulta", "retorno", "vacina", "exame"}:
-        raise HTTPException(status_code=422, detail="Tipo de agendamento invalido para o app mobile")
+        raise HTTPException(
+            status_code=422, detail="Tipo de agendamento invalido para o app mobile"
+        )
 
     _validar_consultorio_agendamento(db, tenant_id, body.consultorio_id)
     _garantir_sem_conflitos_agendamento(
@@ -367,7 +385,9 @@ def obter_internacao_vet_mobile(
         .order_by(EvolucaoInternacao.data_hora.desc())
         .all()
     )
-    evolucoes_formatadas, procedimentos_realizados = _separar_evolucoes_e_procedimentos(evolucoes)
+    evolucoes_formatadas, procedimentos_realizados = _separar_evolucoes_e_procedimentos(
+        evolucoes
+    )
 
     procedimentos_agenda = (
         db.query(InternacaoProcedimentoAgenda)
@@ -386,17 +406,19 @@ def obter_internacao_vet_mobile(
     pet = internacao.pet
     tutor = getattr(pet, "cliente", None) if pet else None
     payload = _internacao_mobile_dict(internacao)
-    payload.update({
-        "tutor_id": getattr(tutor, "id", None),
-        "tutor_nome": getattr(tutor, "nome", None),
-        "pet_raca": getattr(pet, "raca", None) if pet else None,
-        "evolucoes": evolucoes_formatadas,
-        "procedimentos_realizados": procedimentos_realizados,
-        "procedimentos_agenda": [
-            _serializar_procedimento_agenda_internacao(item)
-            for item in procedimentos_agenda
-        ],
-    })
+    payload.update(
+        {
+            "tutor_id": getattr(tutor, "id", None),
+            "tutor_nome": getattr(tutor, "nome", None),
+            "pet_raca": getattr(pet, "raca", None) if pet else None,
+            "evolucoes": evolucoes_formatadas,
+            "procedimentos_realizados": procedimentos_realizados,
+            "procedimentos_agenda": [
+                _serializar_procedimento_agenda_internacao(item)
+                for item in procedimentos_agenda
+            ],
+        }
+    )
     return payload
 
 
@@ -406,7 +428,9 @@ def listar_procedimentos_agenda_vet_mobile(
     current_user: User = Depends(_get_current_ecommerce_user),
 ):
     veterinario, tenant_id = _get_mobile_veterinario_or_403(db, current_user)
-    procedimentos = _query_procedimentos_agenda(db, tenant_id, veterinario.id).limit(50).all()
+    procedimentos = (
+        _query_procedimentos_agenda(db, tenant_id, veterinario.id).limit(50).all()
+    )
     return [_serializar_procedimento_agenda_internacao(item) for item in procedimentos]
 
 
@@ -418,15 +442,24 @@ def criar_procedimento_agenda_vet_mobile(
     current_user: User = Depends(_get_current_ecommerce_user),
 ):
     veterinario, tenant_id = _get_mobile_veterinario_or_403(db, current_user)
-    internacao = _query_internacoes(db, tenant_id, veterinario.id).filter(
-        InternacaoVet.id == internacao_id,
-    ).first()
+    internacao = (
+        _query_internacoes(db, tenant_id, veterinario.id)
+        .filter(
+            InternacaoVet.id == internacao_id,
+        )
+        .first()
+    )
     if not internacao:
-        raise HTTPException(status_code=404, detail="Internacao ativa nao encontrada para este veterinario")
+        raise HTTPException(
+            status_code=404,
+            detail="Internacao ativa nao encontrada para este veterinario",
+        )
 
     medicamento = (body.medicamento or "").strip()
     if not medicamento:
-        raise HTTPException(status_code=422, detail="Medicamento/procedimento e obrigatorio")
+        raise HTTPException(
+            status_code=422, detail="Medicamento/procedimento e obrigatorio"
+        )
 
     horario_agendado = _normalizar_datetime_local_brasilia(body.horario_agendado)
     if not horario_agendado:
@@ -464,15 +497,23 @@ def concluir_procedimento_agenda_vet_mobile(
     current_user: User = Depends(_get_current_ecommerce_user),
 ):
     veterinario, tenant_id = _get_mobile_veterinario_or_403(db, current_user)
-    item = _query_procedimentos_agenda(db, tenant_id, veterinario.id).filter(
-        InternacaoProcedimentoAgenda.id == agenda_id,
-    ).first()
+    item = (
+        _query_procedimentos_agenda(db, tenant_id, veterinario.id)
+        .filter(
+            InternacaoProcedimentoAgenda.id == agenda_id,
+        )
+        .first()
+    )
     if not item:
-        raise HTTPException(status_code=404, detail="Procedimento pendente nao encontrado")
+        raise HTTPException(
+            status_code=404, detail="Procedimento pendente nao encontrado"
+        )
 
     item.status = "concluido"
     item.horario_execucao = _vet_now()
-    item.executado_por = veterinario.nome or getattr(current_user, "nome", None) or current_user.email
+    item.executado_por = (
+        veterinario.nome or getattr(current_user, "nome", None) or current_user.email
+    )
     item.observacao_execucao = payload.observacao_execucao if payload else None
     if item.quantidade_executada is None:
         item.quantidade_executada = item.quantidade_prevista
@@ -540,7 +581,10 @@ def _query_internacoes(db: Session, tenant_id: str, veterinario_id: int):
         .filter(
             InternacaoVet.tenant_id == tenant_id,
             InternacaoVet.status == "internado",
-            or_(InternacaoVet.veterinario_id == veterinario_id, InternacaoVet.veterinario_id.is_(None)),
+            or_(
+                InternacaoVet.veterinario_id == veterinario_id,
+                InternacaoVet.veterinario_id.is_(None),
+            ),
         )
         .order_by(InternacaoVet.data_entrada.asc())
     )
@@ -553,12 +597,18 @@ def _query_procedimentos_agenda(db: Session, tenant_id: str, veterinario_id: int
             joinedload(InternacaoProcedimentoAgenda.internacao),
             joinedload(InternacaoProcedimentoAgenda.pet),
         )
-        .join(InternacaoVet, InternacaoVet.id == InternacaoProcedimentoAgenda.internacao_id)
+        .join(
+            InternacaoVet,
+            InternacaoVet.id == InternacaoProcedimentoAgenda.internacao_id,
+        )
         .filter(
             InternacaoProcedimentoAgenda.tenant_id == tenant_id,
             InternacaoProcedimentoAgenda.status == "agendado",
             InternacaoVet.status == "internado",
-            or_(InternacaoVet.veterinario_id == veterinario_id, InternacaoVet.veterinario_id.is_(None)),
+            or_(
+                InternacaoVet.veterinario_id == veterinario_id,
+                InternacaoVet.veterinario_id.is_(None),
+            ),
         )
         .order_by(InternacaoProcedimentoAgenda.horario_agendado.asc())
     )

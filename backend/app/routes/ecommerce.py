@@ -108,7 +108,7 @@ async def checkout_real(request: Request):
             payload = json.loads(raw_body.decode("utf-8"))
     except Exception:
         payload = {}
-    
+
     db = SessionLocal()
 
     try:
@@ -122,11 +122,7 @@ async def checkout_real(request: Request):
         cliente_id = payload.get("cliente_id", 1)
         origem = payload.get("origem", "web")
 
-        log_event(
-            stage="checkout",
-            event="PedidoCriadoEvent",
-            source="checkout_route"
-        )
+        log_event(stage="checkout", event="PedidoCriadoEvent", source="checkout_route")
 
         command = CheckoutCommand(
             cliente_id=cliente_id,
@@ -189,18 +185,14 @@ def dispatcher_map():
         return {
             "total_event_types": len(subscribers),
             "events": {
-                str(k.__name__): [h.__name__ for h in v]
-                for k, v in subscribers.items()
+                str(k.__name__): [h.__name__ for h in v] for k, v in subscribers.items()
             },
         }
 
     handlers = getattr(event_dispatcher, "_handlers", {})
     return {
         "total_event_types": len(handlers),
-        "events": {
-            str(k): [h.__name__ for h in v]
-            for k, v in handlers.items()
-        },
+        "events": {str(k): [h.__name__ for h in v] for k, v in handlers.items()},
     }
 
 

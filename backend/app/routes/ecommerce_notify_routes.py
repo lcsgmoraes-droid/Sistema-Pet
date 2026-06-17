@@ -3,6 +3,7 @@
 Endpoints públicos para registro de interesse e função auxiliar
 chamada por produtos_routes quando estoque volta ao positivo.
 """
+
 import logging
 import os
 from datetime import datetime, timezone
@@ -52,6 +53,7 @@ def _resolve_notify_tenant(db: Session, tenant_ref: str | None) -> Tenant | None
 
 # ─── Schemas ───────────────────────────────────────────────────────────────
 
+
 class NotifyMeRequest(BaseModel):
     email: str
     product_id: int
@@ -65,6 +67,7 @@ class NotifyMeResponse(BaseModel):
 
 
 # ─── Endpoint público — registrar interesse ────────────────────────────────
+
 
 @router.post("/registrar", response_model=NotifyMeResponse)
 def registrar_avise_me(
@@ -95,7 +98,9 @@ def registrar_avise_me(
         .first()
     )
     if existing:
-        return NotifyMeResponse(ok=True, message="Você já está na lista de avisos para este produto.")
+        return NotifyMeResponse(
+            ok=True, message="Você já está na lista de avisos para este produto."
+        )
 
     entry = EcommerceNotifyRequest(
         tenant_id=tenant_id,
@@ -114,6 +119,7 @@ def registrar_avise_me(
 
 
 # ─── Admin — listar solicitações pendentes ─────────────────────────────────
+
 
 @router.get("/pendentes")
 def listar_pendentes(
@@ -145,6 +151,7 @@ def listar_pendentes(
 
 # ─── Função auxiliar — chamada pelo produtos_routes ────────────────────────
 
+
 def notificar_clientes_estoque_disponivel(
     db: Session,
     tenant_id: str,
@@ -156,6 +163,7 @@ def notificar_clientes_estoque_disponivel(
     Retorna a quantidade de notificações enviadas.
     """
     from app.services.email_service import send_notify_me_email
+
     tenant_id = _set_tenant_context(tenant_id)
 
     # Buscar tenant para montar URL da loja
@@ -166,6 +174,7 @@ def notificar_clientes_estoque_disponivel(
 
     # Buscar SKU do produto para incluir na URL (link direto filtrado)
     from app.produtos_models import Produto
+
     produto_obj = (
         db.query(Produto)
         .filter(Produto.id == product_id, Produto.tenant_id == tenant_id)
@@ -238,11 +247,15 @@ def notificar_clientes_estoque_disponivel(
             count += 1
 
         # Coletar push token do usuário (se tiver)
-        user = db.query(User).filter(
-            User.tenant_id == tenant_id,
-            User.email == req.email,
-        ).first()
-        if user and getattr(user, 'push_token', None):
+        user = (
+            db.query(User)
+            .filter(
+                User.tenant_id == tenant_id,
+                User.email == req.email,
+            )
+            .first()
+        )
+        if user and getattr(user, "push_token", None):
             push_tokens.append(user.push_token)
 
     db.commit()
