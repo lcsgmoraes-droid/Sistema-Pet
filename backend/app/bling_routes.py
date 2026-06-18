@@ -1,6 +1,7 @@
 """
 Rotas para gerenciar integração com Bling
 """
+
 import asyncio
 import json
 from pathlib import Path
@@ -10,16 +11,13 @@ from sqlalchemy.orm import Session
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.bling_integration import BlingAPI
-from app.bling_flow_monitor_models import BlingFlowEvent, BlingFlowIncident
 from app.bling_flow_monitor_routes import (
-    _enriquecer_registros_contexto,
-    _serializar_data_monitor,
-)
-from app.services.bling_flow_monitor_service import (
-    auditar_fluxo_bling,
-    autocorrigir_incidente,
-    obter_resumo_monitoramento,
-    resolver_incidente_por_id,
+    corrigir_incidente as corrigir_incidente_monitor,
+    executar_auditoria as executar_auditoria_monitor,
+    listar_eventos as listar_eventos_monitor,
+    listar_incidentes as listar_incidentes_monitor,
+    resolver_incidente as resolver_incidente_monitor,
+    resumo_monitor as resumo_monitor_base,
 )
 
 router = APIRouter(prefix="/bling", tags=["Bling"])
@@ -42,7 +40,7 @@ def _carregar_controle_token_bling(token_control_file: Path) -> dict[str, object
 @router.get("/naturezas-operacoes")
 async def listar_naturezas(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Lista todas as naturezas de operação cadastradas no Bling
@@ -51,27 +49,29 @@ async def listar_naturezas(
     try:
         bling = BlingAPI()
         resultado = bling.listar_naturezas_operacoes()
-        
+
         # Extrair dados da resposta
-        naturezas = resultado.get('data', [])
-        
+        naturezas = resultado.get("data", [])
+
         return {
             "success": True,
             "total": len(naturezas),
             "naturezas": naturezas,
             "instrucoes": {
                 "como_usar": "Copie o 'id' da natureza desejada e configure em BLING_NATUREZA_OPERACAO_ID no .env",
-                "sugestao": "Procure por 'Venda de mercadoria' ou 'Venda presencial' ou 'Venda ao consumidor'"
-            }
+                "sugestao": "Procure por 'Venda de mercadoria' ou 'Venda presencial' ou 'Venda ao consumidor'",
+            },
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao listar naturezas: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao listar naturezas: {str(e)}"
+        )
 
 
 @router.post("/renovar-token")
 async def renovar_token(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Renova o access token do Bling usando o refresh token
@@ -80,13 +80,13 @@ async def renovar_token(
     try:
         bling = BlingAPI()
         tokens = bling.renovar_access_token()
-        
+
         return {
             "success": True,
             "message": "Token renovado com sucesso!",
-            "expires_in_hours": tokens.get('expires_in', 21600) / 3600,
-            "new_access_token": tokens['access_token'][:50] + "...",
-            "new_refresh_token": tokens['refresh_token'][:50] + "..."
+            "expires_in_hours": tokens.get("expires_in", 21600) / 3600,
+            "new_access_token": tokens["access_token"][:50] + "...",
+            "new_refresh_token": tokens["refresh_token"][:50] + "...",
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao renovar token: {str(e)}")
@@ -95,7 +95,7 @@ async def renovar_token(
 @router.get("/teste-conexao")
 async def testar_conexao(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Testa a conexão com a API do Bling e retorna status + info de renovação
@@ -104,39 +104,49 @@ async def testar_conexao(
         # Tentar conectar
         bling = BlingAPI()
         resultado = bling.listar_naturezas_operacoes()
-        
+
         # Carregar info de controle de token
         token_control_file = Path("bling_token_control.json")
         token_info = await asyncio.to_thread(
             _carregar_controle_token_bling,
             token_control_file,
         )
-        
+
         return {
             "conectado": True,
             "message": "✅ Conexão com Bling OK!",
-            "total_produtos_bling": resultado.get('data', []) and len(resultado.get('data', [])) or 0,
-            "ultima_renovacao": token_info.get('ultima_renovacao'),
-            "proxima_renovacao": token_info.get('proxima_renovacao'),
-            "renovacoes_automaticas": token_info.get('renovacoes_automaticas', 0),
-            "temp_acesso_horas": 6
+            "total_produtos_bling": resultado.get("data", [])
+            and len(resultado.get("data", []))
+            or 0,
+            "ultima_renovacao": token_info.get("ultima_renovacao"),
+            "proxima_renovacao": token_info.get("proxima_renovacao"),
+            "renovacoes_automaticas": token_info.get("renovacoes_automaticas", 0),
+            "temp_acesso_horas": 6,
         }
     except Exception as e:
         # Verificar se é erro de token expirado
         error_msg = str(e)
-        if "429" in error_msg or "TOO_MANY_REQUESTS" in error_msg or "Limite de requisi" in error_msg:
+        if (
+            "429" in error_msg
+            or "TOO_MANY_REQUESTS" in error_msg
+            or "Limite de requisi" in error_msg
+        ):
             return {
                 "conectado": True,
                 "rate_limited": True,
                 "message": "Conexao com o Bling valida, mas a API pediu uma pausa temporaria.",
-                "detail": "A API do Bling respondeu com limite temporario de requisicoes. Isso nao significa token vencido."
+                "detail": "A API do Bling respondeu com limite temporario de requisicoes. Isso nao significa token vencido.",
             }
-        if "401" in error_msg or "Unauthorized" in error_msg or "invalid_token" in error_msg:
+        if (
+            "401" in error_msg
+            or "Unauthorized" in error_msg
+            or "invalid_token" in error_msg
+        ):
             return {
                 "conectado": False,
                 "message": "❌ Token expirado",
                 "error": "Token expirado ou inválido",
-                "detail": "Use o botão 'Renovar Token' para reconectar"
+                "detail": "Use o botão 'Renovar Token' para reconectar",
             }
         raise HTTPException(status_code=500, detail=f"Erro na conexão: {error_msg}")
 
@@ -146,8 +156,7 @@ def resumo_monitor_compat(
     db: Session = Depends(get_session),
     user_tenant=Depends(get_current_user_and_tenant),
 ):
-    tenant_id = user_tenant[1]
-    return obter_resumo_monitoramento(db, tenant_id=tenant_id)
+    return resumo_monitor_base(db=db, user_tenant=user_tenant)
 
 
 @router.get("/monitor/incidentes")
@@ -158,42 +167,13 @@ def listar_incidentes_compat(
     db: Session = Depends(get_session),
     user_tenant=Depends(get_current_user_and_tenant),
 ):
-    tenant_id = user_tenant[1]
-    query = db.query(BlingFlowIncident).filter(BlingFlowIncident.tenant_id == tenant_id)
-    if status:
-        query = query.filter(BlingFlowIncident.status == status)
-    if severidade:
-        query = query.filter(BlingFlowIncident.severity == severidade)
-
-    incidentes = (
-        query.order_by(BlingFlowIncident.last_seen_em.desc(), BlingFlowIncident.id.desc())
-        .limit(limite)
-        .all()
+    return listar_incidentes_monitor(
+        status=status,
+        severidade=severidade,
+        limite=limite,
+        db=db,
+        user_tenant=user_tenant,
     )
-    registros = [
-        {
-            "id": incidente.id,
-            "code": incidente.code,
-            "severity": incidente.severity,
-            "status": incidente.status,
-            "title": incidente.title,
-            "message": incidente.message,
-            "suggested_action": incidente.suggested_action,
-            "auto_fixable": incidente.auto_fixable,
-            "auto_fix_status": incidente.auto_fix_status,
-            "pedido_integrado_id": incidente.pedido_integrado_id,
-            "pedido_bling_id": incidente.pedido_bling_id,
-            "nf_bling_id": None if str(incidente.nf_bling_id or "").strip() in {"", "0", "-1"} else incidente.nf_bling_id,
-            "sku": incidente.sku,
-            "occurrences": incidente.occurrences,
-            "first_seen_em": _serializar_data_monitor(incidente.first_seen_em),
-            "last_seen_em": _serializar_data_monitor(incidente.last_seen_em),
-            "resolved_em": _serializar_data_monitor(incidente.resolved_em),
-            "details": incidente.details or {},
-        }
-        for incidente in incidentes
-    ]
-    return _enriquecer_registros_contexto(db, tenant_id, registros)
 
 
 @router.get("/monitor/eventos")
@@ -203,37 +183,12 @@ def listar_eventos_compat(
     db: Session = Depends(get_session),
     user_tenant=Depends(get_current_user_and_tenant),
 ):
-    tenant_id = user_tenant[1]
-    query = db.query(BlingFlowEvent).filter(BlingFlowEvent.tenant_id == tenant_id)
-    if tipo:
-        query = query.filter(BlingFlowEvent.event_type == tipo)
-
-    eventos = (
-        query.order_by(BlingFlowEvent.processed_at.desc(), BlingFlowEvent.id.desc())
-        .limit(limite)
-        .all()
+    return listar_eventos_monitor(
+        limite=limite,
+        tipo=tipo,
+        db=db,
+        user_tenant=user_tenant,
     )
-    registros = [
-        {
-            "id": evento.id,
-            "source": evento.source,
-            "event_type": evento.event_type,
-            "entity_type": evento.entity_type,
-            "status": evento.status,
-            "severity": evento.severity,
-            "message": evento.message,
-            "error_message": evento.error_message,
-            "pedido_integrado_id": evento.pedido_integrado_id,
-            "pedido_bling_id": evento.pedido_bling_id,
-            "nf_bling_id": None if str(evento.nf_bling_id or "").strip() in {"", "0", "-1"} else evento.nf_bling_id,
-            "sku": evento.sku,
-            "auto_fix_applied": evento.auto_fix_applied,
-            "processed_at": _serializar_data_monitor(evento.processed_at),
-            "payload": evento.payload or {},
-        }
-        for evento in eventos
-    ]
-    return _enriquecer_registros_contexto(db, tenant_id, registros)
 
 
 @router.post("/monitor/auditar")
@@ -244,13 +199,12 @@ def executar_auditoria_compat(
     db: Session = Depends(get_session),
     user_tenant=Depends(get_current_user_and_tenant),
 ):
-    tenant_id = user_tenant[1]
-    return auditar_fluxo_bling(
-        db,
-        tenant_id=tenant_id,
+    return executar_auditoria_monitor(
         dias=dias,
         limite=limite,
         auto_fix=auto_fix,
+        db=db,
+        user_tenant=user_tenant,
     )
 
 
@@ -260,16 +214,11 @@ def corrigir_incidente_compat(
     db: Session = Depends(get_session),
     user_tenant=Depends(get_current_user_and_tenant),
 ):
-    tenant_id = user_tenant[1]
-    incidente = db.query(BlingFlowIncident).filter(
-        BlingFlowIncident.id == incidente_id,
-        BlingFlowIncident.tenant_id == tenant_id,
-    ).first()
-    if not incidente:
-        raise HTTPException(status_code=404, detail="Incidente nao encontrado")
-    if not incidente.auto_fixable:
-        raise HTTPException(status_code=400, detail="Incidente sem autocorrecao disponivel")
-    return autocorrigir_incidente(db, incidente)
+    return corrigir_incidente_monitor(
+        incidente_id=incidente_id,
+        db=db,
+        user_tenant=user_tenant,
+    )
 
 
 @router.post("/monitor/incidentes/{incidente_id}/resolver")
@@ -279,12 +228,9 @@ def resolver_incidente_compat(
     db: Session = Depends(get_session),
     user_tenant=Depends(get_current_user_and_tenant),
 ):
-    tenant_id = user_tenant[1]
-    incidente = resolver_incidente_por_id(db, tenant_id, incidente_id, resolution_note=nota)
-    if not incidente:
-        raise HTTPException(status_code=404, detail="Incidente nao encontrado")
-    return {
-        "status": "ok",
-        "incidente_id": incidente.id,
-        "resolved_em": _serializar_data_monitor(incidente.resolved_em),
-    }
+    return resolver_incidente_monitor(
+        incidente_id=incidente_id,
+        nota=nota,
+        db=db,
+        user_tenant=user_tenant,
+    )
