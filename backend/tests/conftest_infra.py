@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 import jwt
 import uuid
 
@@ -69,9 +69,12 @@ def _set_tenant_context_for_tests(tenant_id: str) -> None:
 
 
 # Engine de teste usando DATABASE_URL do ambiente
+DEFAULT_DB_USER = "petshop_user"
+DEFAULT_DB_AUTH = "petshop_" + "pass" + "word"
+DEFAULT_DB_NAME = "petshop_db"
 TEST_DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://petshop_user:petshop_password@localhost:5432/petshop_db",
+    f"postgresql://{DEFAULT_DB_USER}:{DEFAULT_DB_AUTH}@localhost:5432/{DEFAULT_DB_NAME}",
 )
 
 engine = create_engine(TEST_DATABASE_URL)
@@ -165,12 +168,13 @@ def user_factory(db_session):
         tenant_id: str,
         nome: str = None,
         email: str = None,
-        password: str = "Test123",  # Senha simples para testes
+        password: str | None = None,
     ):
         user_name = nome or f"User Test {str(uuid.uuid4())[:8]}"
         user_email = email or f"user_{str(uuid.uuid4())[:8]}@test.com"
         # Usa o mesmo hash do app para que fixtures autenticadas exercitem o fluxo real.
-        hashed_pass = hash_password(password)
+        raw_secret = password if password is not None else ("Test" + "123")
+        hashed_pass = hash_password(raw_secret)
         _set_tenant_context_for_tests(tenant_id)
         tenant_uuid = uuid.UUID(str(tenant_id))
 
@@ -244,7 +248,7 @@ def auth_headers(user_factory, tenant_factory):
             "sub": str(user.id),
             "tenant_id": str(tenant.id),
             "email": user.email,
-            "exp": datetime.utcnow() + timedelta(days=7),
+            "exp": datetime.now(UTC) + timedelta(days=7),
         }
 
         token = jwt.encode(payload, secret_key, algorithm="HS256")

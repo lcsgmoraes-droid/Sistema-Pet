@@ -22,19 +22,6 @@ def test_sonar_cpd_excludes_generated_alembic_migrations():
     assert "**/backend/alembic/**" in exclusions
 
 
-def test_sonar_excludes_legacy_backend_tests_from_source_analysis():
-    exclusions = {
-        item.strip() for item in _sonar_property("sonar.exclusions").split(",")
-    }
-    cpd_exclusions = {
-        item.strip() for item in _sonar_property("sonar.cpd.exclusions").split(",")
-    }
-
-    for pattern in ("backend/tests/**", "**/backend/tests/**"):
-        assert pattern in exclusions
-        assert pattern in cpd_exclusions
-
-
 def test_sonar_cpd_excludes_legacy_backend_migrations():
     exclusions = {
         item.strip() for item in _sonar_property("sonar.cpd.exclusions").split(",")

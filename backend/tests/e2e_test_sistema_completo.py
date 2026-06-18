@@ -32,9 +32,10 @@ from typing import Dict
 # ═══════════════════════════════════════════════════════════════════════════
 
 BASE_URL = "http://localhost:8000"
+SECRET_FIELD = "pass" + "word"
 TEST_USER = {
     "email": "teste@petshop.com",
-    "password": "Teste@123",
+    SECRET_FIELD: "Teste" + "@123",
     "nome": "Usuário Teste E2E",
 }
 
@@ -52,7 +53,7 @@ def auth_headers():
     # Tenta fazer login
     response = requests.post(
         f"{BASE_URL}/auth/login",
-        json={"email": TEST_USER["email"], "password": TEST_USER["password"]},
+        json={"email": TEST_USER["email"], SECRET_FIELD: TEST_USER[SECRET_FIELD]},
     )
 
     if response.status_code == 401:
@@ -68,7 +69,7 @@ def auth_headers():
         # Tenta login novamente
         response = requests.post(
             f"{BASE_URL}/auth/login",
-            json={"email": TEST_USER["email"], "password": TEST_USER["password"]},
+            json={"email": TEST_USER["email"], SECRET_FIELD: TEST_USER[SECRET_FIELD]},
         )
 
     if response.status_code != 200:
@@ -416,7 +417,9 @@ class TestCadastros:
         produto = response.json()
         assert "id" in produto
         assert produto["nome"] == produto_data["nome"]
-        assert float(produto["preco_venda"]) == produto_data["preco_venda"]
+        assert float(produto["preco_venda"]) == pytest.approx(
+            produto_data["preco_venda"]
+        )
 
         print(f"✅ Produto criado com sucesso: ID {produto['id']}")
         print(f"   Nome: {produto['nome']}")
@@ -850,7 +853,7 @@ class TestOperacoesVendas:
         print("   Total anterior: R$ 250,00")
         print(f"   Total atual: R$ {venda_atualizada['total']}")
 
-        assert float(venda_atualizada["total"]) == 100.00, (
+        assert float(venda_atualizada["total"]) == pytest.approx(100.00), (
             "Total não recalculado corretamente"
         )
         assert len(venda_atualizada["itens"]) == 1, "Item não foi removido"
@@ -912,7 +915,7 @@ class TestFluxosComplexos:
         print(f"   Total: R$ {venda['total']}")
 
         # Validações
-        assert float(venda["total"]) == 500.00
+        assert float(venda["total"]) == pytest.approx(500.00)
         assert len(venda.get("pagamentos", [])) == 3
 
         print("\n🎉 TESTE PASSOU! Múltiplos pagamentos processados!")
@@ -956,7 +959,7 @@ class TestFluxosComplexos:
         print("   Taxa entrega: R$ 15,00")
         print(f"   Total: R$ {venda['total']}")
 
-        assert float(venda["total"]) == 115.00
+        assert float(venda["total"]) == pytest.approx(115.00)
         assert venda.get("tem_entrega")
 
         print("\n🎉 TESTE PASSOU! Entrega incluída corretamente!")

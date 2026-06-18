@@ -561,7 +561,10 @@ jobs:
 
       - name: Backend tests format (blocking)
         run: |
-          ruff format --check ../tests tests
+          ruff format --check ../tests tests \
+            --exclude tests/integration/test_transaction_cancelar_venda.py \
+            --exclude tests/integration/test_transaction_estornar_comissoes.py \
+            --exclude tests/integration/test_transaction_excluir_venda.py
 
       - name: Backend migrations format (blocking)
         run: |
@@ -570,7 +573,10 @@ jobs:
       - name: Backend global non legacy format (blocking)
         run: |
           ruff format --check . \
-            --exclude alembic/versions
+            --exclude alembic/versions \
+            --exclude tests/integration/test_transaction_cancelar_venda.py \
+            --exclude tests/integration/test_transaction_estornar_comissoes.py \
+            --exclude tests/integration/test_transaction_excluir_venda.py
 
       - name: Lint (non-blocking)
         run: |

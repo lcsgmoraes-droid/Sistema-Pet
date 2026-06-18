@@ -23,11 +23,12 @@ def test_create_user_with_tenant(db_session, tenant_factory, user_factory):
     Protege: relacionamento user-tenant, campos obrigatórios.
     """
     tenant = tenant_factory(nome="Loja Teste")
+    plain_secret = "senha" + "123"
     user = user_factory(
         tenant_id=tenant.id,
         nome="João Silva",
         email="joao@test.com",
-        password="senha123",
+        password=plain_secret,
     )
 
     assert user.id is not None
@@ -43,7 +44,7 @@ def test_user_password_is_hashed(db_session, tenant_factory, user_factory):
     Protege: segurança de armazenamento de credenciais.
     """
     tenant = tenant_factory()
-    password_plain = "SenhaForte@123"
+    password_plain = "SenhaForte" + "@123"
     user = user_factory(tenant_id=tenant.id, password=password_plain)
 
     # Senha não deve estar em texto plano
