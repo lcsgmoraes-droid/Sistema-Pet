@@ -8,7 +8,9 @@ from app.bling_flow_monitor_models import BlingFlowEvent, BlingFlowIncident
 from app.db import get_session
 from app.nfe_cache_models import BlingNotaFiscalCache
 from app.pedido_integrado_models import PedidoIntegrado
-from app.services.pedido_integrado_duplicate_review_service import mapear_duplicidade_por_pedido_ids
+from app.services.pedido_integrado_duplicate_review_service import (
+    mapear_duplicidade_por_pedido_ids,
+)
 from app.services.bling_flow_monitor_service import (
     auditar_fluxo_bling,
     autocorrigir_incidente,
@@ -17,7 +19,9 @@ from app.services.bling_flow_monitor_service import (
 )
 
 
-router = APIRouter(prefix="/integracoes/bling/monitor", tags=["Integracao Bling - Monitor"])
+router = APIRouter(
+    prefix="/integracoes/bling/monitor", tags=["Integracao Bling - Monitor"]
+)
 
 
 def _texto(value):
@@ -119,9 +123,19 @@ def _nf_numero_payload(payload: dict | None) -> str | None:
     )
 
 
-def _mapa_numeros_pedidos(db: Session, tenant_id, registros: list[dict]) -> dict[tuple[int | None, str | None], dict[str, str | None]]:
-    pedido_ids = {registro.get("pedido_integrado_id") for registro in registros if registro.get("pedido_integrado_id")}
-    pedido_bling_ids = {registro.get("pedido_bling_id") for registro in registros if registro.get("pedido_bling_id")}
+def _mapa_numeros_pedidos(
+    db: Session, tenant_id, registros: list[dict]
+) -> dict[tuple[int | None, str | None], dict[str, str | None]]:
+    pedido_ids = {
+        registro.get("pedido_integrado_id")
+        for registro in registros
+        if registro.get("pedido_integrado_id")
+    }
+    pedido_bling_ids = {
+        registro.get("pedido_bling_id")
+        for registro in registros
+        if registro.get("pedido_bling_id")
+    }
 
     if not pedido_ids and not pedido_bling_ids:
         return {}
@@ -129,7 +143,8 @@ def _mapa_numeros_pedidos(db: Session, tenant_id, registros: list[dict]) -> dict
     query = db.query(PedidoIntegrado).filter(PedidoIntegrado.tenant_id == tenant_id)
     if pedido_ids:
         query = query.filter(
-            (PedidoIntegrado.id.in_(pedido_ids)) | (PedidoIntegrado.pedido_bling_id.in_(pedido_bling_ids))
+            (PedidoIntegrado.id.in_(pedido_ids))
+            | (PedidoIntegrado.pedido_bling_id.in_(pedido_bling_ids))
         )
     else:
         query = query.filter(PedidoIntegrado.pedido_bling_id.in_(pedido_bling_ids))
@@ -148,7 +163,9 @@ def _mapa_numeros_pedidos(db: Session, tenant_id, registros: list[dict]) -> dict
     return mapa
 
 
-def _mapa_numeros_notas_cache(db: Session, tenant_id, registros: list[dict]) -> dict[str, dict[str, str | None]]:
+def _mapa_numeros_notas_cache(
+    db: Session, tenant_id, registros: list[dict]
+) -> dict[str, dict[str, str | None]]:
     nf_bling_ids = {
         _texto(registro.get("nf_bling_id"))
         for registro in registros
@@ -199,10 +216,16 @@ def _acoes_operacionais_monitor(registro: dict) -> dict:
     }
 
 
-def _enriquecer_registros_contexto(db: Session, tenant_id, registros: list[dict]) -> list[dict]:
+def _enriquecer_registros_contexto(
+    db: Session, tenant_id, registros: list[dict]
+) -> list[dict]:
     mapa_numeros = _mapa_numeros_pedidos(db, tenant_id, registros)
     mapa_notas = _mapa_numeros_notas_cache(db, tenant_id, registros)
-    pedido_ids = [int(registro["pedido_integrado_id"]) for registro in registros if registro.get("pedido_integrado_id")]
+    pedido_ids = [
+        int(registro["pedido_integrado_id"])
+        for registro in registros
+        if registro.get("pedido_integrado_id")
+    ]
     duplicidade_por_pedido = mapear_duplicidade_por_pedido_ids(
         db,
         tenant_id=tenant_id,
@@ -210,24 +233,31 @@ def _enriquecer_registros_contexto(db: Session, tenant_id, registros: list[dict]
     )
 
     for registro in registros:
-        info = mapa_numeros.get(
-            (registro.get("pedido_integrado_id"), registro.get("pedido_bling_id"))
-        ) or mapa_numeros.get((registro.get("pedido_integrado_id"), None)) or mapa_numeros.get(
-            (None, registro.get("pedido_bling_id"))
+        info = (
+            mapa_numeros.get(
+                (registro.get("pedido_integrado_id"), registro.get("pedido_bling_id"))
+            )
+            or mapa_numeros.get((registro.get("pedido_integrado_id"), None))
+            or mapa_numeros.get((None, registro.get("pedido_bling_id")))
         )
         info_nf = mapa_notas.get(_texto(registro.get("nf_bling_id")) or "") or {}
         detalhes = _dict(registro.get("details")) or _dict(registro.get("payload"))
-        duplicidade = duplicidade_por_pedido.get(int(registro.get("pedido_integrado_id"))) if registro.get("pedido_integrado_id") else None
+        duplicidade = (
+            duplicidade_por_pedido.get(int(registro.get("pedido_integrado_id")))
+            if registro.get("pedido_integrado_id")
+            else None
+        )
 
-        registro["pedido_bling_numero"] = (
-            _dict(info).get("pedido_bling_numero")
-            or _texto(
-                _primeiro_preenchido(
-                    detalhes.get("pedido_bling_numero"),
-                    _dict(detalhes.get("nf_detectada")).get("pedido_bling_numero"),
-                    _dict(_dict(duplicidade).get("pedido_canonico")).get("pedido_bling_numero"),
-                    _dict(_dict(duplicidade).get("pedido_canonico")).get("pedido_bling_id"),
-                )
+        registro["pedido_bling_numero"] = _dict(info).get(
+            "pedido_bling_numero"
+        ) or _texto(
+            _primeiro_preenchido(
+                detalhes.get("pedido_bling_numero"),
+                _dict(detalhes.get("nf_detectada")).get("pedido_bling_numero"),
+                _dict(_dict(duplicidade).get("pedido_canonico")).get(
+                    "pedido_bling_numero"
+                ),
+                _dict(_dict(duplicidade).get("pedido_canonico")).get("pedido_bling_id"),
             )
         )
         registro["numero_pedido_loja"] = (
@@ -252,7 +282,9 @@ def _enriquecer_registros_contexto(db: Session, tenant_id, registros: list[dict]
             or _dict(info_nf).get("nf_numero")
             or _dict(info).get("nf_numero")
         )
-        registro["pedido_status_atual"] = _dict(info).get("pedido_status_atual") or _texto(detalhes.get("pedido_status_atual"))
+        registro["pedido_status_atual"] = _dict(info).get(
+            "pedido_status_atual"
+        ) or _texto(detalhes.get("pedido_status_atual"))
         registro["duplicidade"] = duplicidade or {
             "tem_duplicados": False,
             "pedido_atual_eh_canonico": True,
@@ -293,7 +325,9 @@ def listar_incidentes(
         query = query.filter(BlingFlowIncident.severity == severidade)
 
     incidentes = (
-        query.order_by(BlingFlowIncident.last_seen_em.desc(), BlingFlowIncident.id.desc())
+        query.order_by(
+            BlingFlowIncident.last_seen_em.desc(), BlingFlowIncident.id.desc()
+        )
         .limit(limite)
         .all()
     )
@@ -388,14 +422,20 @@ def corrigir_incidente(
     user_tenant=Depends(get_current_user_and_tenant),
 ):
     tenant_id = user_tenant[1]
-    incidente = db.query(BlingFlowIncident).filter(
-        BlingFlowIncident.id == incidente_id,
-        BlingFlowIncident.tenant_id == tenant_id,
-    ).first()
+    incidente = (
+        db.query(BlingFlowIncident)
+        .filter(
+            BlingFlowIncident.id == incidente_id,
+            BlingFlowIncident.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not incidente:
         raise HTTPException(status_code=404, detail="Incidente nao encontrado")
     if not incidente.auto_fixable:
-        raise HTTPException(status_code=400, detail="Incidente sem autocorrecao disponivel")
+        raise HTTPException(
+            status_code=400, detail="Incidente sem autocorrecao disponivel"
+        )
     return autocorrigir_incidente(db, incidente)
 
 
@@ -407,7 +447,9 @@ def resolver_incidente(
     user_tenant=Depends(get_current_user_and_tenant),
 ):
     tenant_id = user_tenant[1]
-    incidente = resolver_incidente_por_id(db, tenant_id, incidente_id, resolution_note=nota)
+    incidente = resolver_incidente_por_id(
+        db, tenant_id, incidente_id, resolution_note=nota
+    )
     if not incidente:
         raise HTTPException(status_code=404, detail="Incidente nao encontrado")
     return {
