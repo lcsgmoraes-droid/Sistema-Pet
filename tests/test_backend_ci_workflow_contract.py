@@ -1081,6 +1081,16 @@ def test_backend_ci_has_blocking_backend_ia_finance_parsers_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_racao_ia_reports_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend racao IA reports format (blocking)" in source
+    assert (
+        "ruff format --check app/classificador_racao.py "
+        "app/ia/aba5_fluxo_caixa.py app/ia/aba7_dre.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_backend_commissions_diagnostic_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

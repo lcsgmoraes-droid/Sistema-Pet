@@ -15,13 +15,13 @@ class ClassificadorRacao:
     """
     Classifica automaticamente produtos de ração baseado no nome
     Extrai: espécie, linha, porte, fase, tratamento, sabor e peso
-    
+
     Atributos:
         VERSION: Versão do algoritmo de classificação
     """
-    
+
     VERSION = "v1.0.0"  # Versionamento para auditoria e evolução
-    
+
     # Padrões de Espécie
     ESPECIES = {
         "Cães": [
@@ -68,7 +68,7 @@ class ClassificadorRacao:
             r"\bornamental\b",
         ],
     }
-    
+
     # Padrões de Linha/Categoria da Ração
     LINHAS_RACAO = {
         "Super Premium": [
@@ -99,7 +99,7 @@ class ClassificadorRacao:
             r"\bclassic[oa]\b",
         ],
     }
-    
+
     # Padrões de Porte
     PORTES = {
         "Pequeno": [
@@ -138,7 +138,7 @@ class ClassificadorRacao:
             r"\ball\s+sizes\b",
         ],
     }
-    
+
     # Padrões de Fase/Público
     FASES = {
         "Filhote": [
@@ -174,7 +174,7 @@ class ClassificadorRacao:
             r"\ball\s+life\s+stages\b",
         ],
     }
-    
+
     # Padrões de Tratamento/Condição Especial
     TRATAMENTOS = {
         "Obesidade": [
@@ -229,12 +229,19 @@ class ClassificadorRacao:
             r"\bpelo\b",
         ],
     }
-    
+
     # Padrões de Sabor/Proteína
     SABORES = {
         "Frango": [r"\bfrango\b", r"\bchicken\b", r"\bgalinha\b"],
         "Carne": [r"\bcarne\b", r"\bbeef\b", r"\bbovina\b", r"\bbovino\b"],
-        "Peixe": [r"\bpeixe\b", r"\bfish\b", r"\bsalm[ãa]o\b", r"\bsalmon\b", r"\batum\b", r"\btuna\b"],
+        "Peixe": [
+            r"\bpeixe\b",
+            r"\bfish\b",
+            r"\bsalm[ãa]o\b",
+            r"\bsalmon\b",
+            r"\batum\b",
+            r"\btuna\b",
+        ],
         "Cordeiro": [r"\bcordeiro\b", r"\blamb\b"],
         "Peru": [r"\bperu\b", r"\bturkey\b"],
         "Pato": [r"\bpato\b", r"\bduck\b"],
@@ -242,59 +249,77 @@ class ClassificadorRacao:
         "Soja": [r"\bsoja\b", r"\bsoy\b"],
         "Mix": [r"\bmix\b", r"\bmisto\b", r"\bvariado\b"],
     }
-    
+
     def __init__(self):
         """Inicializa o classificador compilando os regex patterns"""
-        self.especies_compiled = {k: [re.compile(p, re.IGNORECASE) for p in v] for k, v in self.ESPECIES.items()}
-        self.linhas_compiled = {k: [re.compile(p, re.IGNORECASE) for p in v] for k, v in self.LINHAS_RACAO.items()}
-        self.portes_compiled = {k: [re.compile(p, re.IGNORECASE) for p in v] for k, v in self.PORTES.items()}
-        self.fases_compiled = {k: [re.compile(p, re.IGNORECASE) for p in v] for k, v in self.FASES.items()}
-        self.tratamentos_compiled = {k: [re.compile(p, re.IGNORECASE) for p in v] for k, v in self.TRATAMENTOS.items()}
-        self.sabores_compiled = {k: [re.compile(p, re.IGNORECASE) for p in v] for k, v in self.SABORES.items()}
-    
+        self.especies_compiled = {
+            k: [re.compile(p, re.IGNORECASE) for p in v]
+            for k, v in self.ESPECIES.items()
+        }
+        self.linhas_compiled = {
+            k: [re.compile(p, re.IGNORECASE) for p in v]
+            for k, v in self.LINHAS_RACAO.items()
+        }
+        self.portes_compiled = {
+            k: [re.compile(p, re.IGNORECASE) for p in v] for k, v in self.PORTES.items()
+        }
+        self.fases_compiled = {
+            k: [re.compile(p, re.IGNORECASE) for p in v] for k, v in self.FASES.items()
+        }
+        self.tratamentos_compiled = {
+            k: [re.compile(p, re.IGNORECASE) for p in v]
+            for k, v in self.TRATAMENTOS.items()
+        }
+        self.sabores_compiled = {
+            k: [re.compile(p, re.IGNORECASE) for p in v]
+            for k, v in self.SABORES.items()
+        }
+
     def extrair_peso(self, nome: str) -> Optional[float]:
         """
         Extrai o peso da embalagem do nome do produto
         Exemplos: "15kg", "10 kg", "1.5kg", "500g"
         """
         # Padrão para kg
-        match_kg = re.search(r'(\d+(?:[.,]\d+)?)\s*kg', nome, re.IGNORECASE)
+        match_kg = re.search(r"(\d+(?:[.,]\d+)?)\s*kg", nome, re.IGNORECASE)
         if match_kg:
-            peso_str = match_kg.group(1).replace(',', '.')
+            peso_str = match_kg.group(1).replace(",", ".")
             return float(peso_str)
-        
+
         # Padrão para g (converte para kg)
-        match_g = re.search(r'(\d+(?:[.,]\d+)?)\s*g\b', nome, re.IGNORECASE)
+        match_g = re.search(r"(\d+(?:[.,]\d+)?)\s*g\b", nome, re.IGNORECASE)
         if match_g:
-            peso_str = match_g.group(1).replace(',', '.')
+            peso_str = match_g.group(1).replace(",", ".")
             return float(peso_str) / 1000
-        
+
         return None
-    
-    def _classificar_categoria(self, nome: str, patterns_dict: Dict[str, List]) -> List[str]:
+
+    def _classificar_categoria(
+        self, nome: str, patterns_dict: Dict[str, List]
+    ) -> List[str]:
         """
         Classifica nome em uma categoria usando dicionário de patterns
         Retorna lista de matches encontrados
         """
         matches = []
         nome_lower = nome.lower()
-        
+
         for categoria, patterns in patterns_dict.items():
             for pattern in patterns:
                 if pattern.search(nome_lower):
                     matches.append(categoria)
                     break  # Já encontrou, não precisa testar outros patterns desta categoria
-        
+
         return matches if matches else None
-    
+
     def classificar(self, nome: str, peso_atual: Optional[float] = None) -> Dict:
         """
         Classifica produto baseado no nome
-        
+
         Args:
             nome: Nome do produto
             peso_atual: Peso já cadastrado (opcional, não sobrescreve se existir)
-        
+
         Returns:
             Dict com: especie_indicada, linha_racao, porte_animal, fase_publico, tipo_tratamento, sabor_proteina, peso_embalagem
         """
@@ -307,12 +332,14 @@ class ClassificadorRacao:
             "sabor_proteina": None,
             "peso_embalagem": None,
         }
-        
+
         # Classificar espécie
         especies = self._classificar_categoria(nome, self.especies_compiled)
         if especies:
-            resultado["especie_indicada"] = especies[0]  # Pega primeira espécie identificada
-        
+            resultado["especie_indicada"] = especies[
+                0
+            ]  # Pega primeira espécie identificada
+
         # Classificar linha/categoria (Premium, Super Premium, etc.)
         linhas = self._classificar_categoria(nome, self.linhas_compiled)
         if linhas:
@@ -322,33 +349,39 @@ class ClassificadorRacao:
                 if linha in linhas:
                     resultado["linha_racao"] = linha
                     break
-        
+
         # Classificar porte
-        resultado["porte_animal"] = self._classificar_categoria(nome, self.portes_compiled)
-        
+        resultado["porte_animal"] = self._classificar_categoria(
+            nome, self.portes_compiled
+        )
+
         # Classificar fase
-        resultado["fase_publico"] = self._classificar_categoria(nome, self.fases_compiled)
-        
+        resultado["fase_publico"] = self._classificar_categoria(
+            nome, self.fases_compiled
+        )
+
         # Classificar tratamento
-        resultado["tipo_tratamento"] = self._classificar_categoria(nome, self.tratamentos_compiled)
-        
+        resultado["tipo_tratamento"] = self._classificar_categoria(
+            nome, self.tratamentos_compiled
+        )
+
         # Classificar sabor (retorna único, não array)
         sabores = self._classificar_categoria(nome, self.sabores_compiled)
         if sabores:
             resultado["sabor_proteina"] = sabores[0]  # Pega primeiro match
-        
+
         # Extrair peso (só se não tiver peso_atual)
         if not peso_atual:
             peso_extraido = self.extrair_peso(nome)
             if peso_extraido:
                 resultado["peso_embalagem"] = peso_extraido
-        
+
         return resultado
-    
+
     def analisar_confianca(self, resultado: Dict) -> Dict:
         """
         Analisa a confiança da classificação
-        
+
         Returns:
             {
                 "completo": bool,
@@ -356,34 +389,40 @@ class ClassificadorRacao:
                 "score": float (0-100)
             }
         """
-        campos_importantes = ["porte_animal", "fase_publico", "sabor_proteina", "peso_embalagem"]
-        campos_preenchidos = sum(1 for campo in campos_importantes if resultado.get(campo))
-        
-        campos_faltantes = [
-            campo for campo in campos_importantes 
-            if not resultado.get(campo)
+        campos_importantes = [
+            "porte_animal",
+            "fase_publico",
+            "sabor_proteina",
+            "peso_embalagem",
         ]
-        
+        campos_preenchidos = sum(
+            1 for campo in campos_importantes if resultado.get(campo)
+        )
+
+        campos_faltantes = [
+            campo for campo in campos_importantes if not resultado.get(campo)
+        ]
+
         score = (campos_preenchidos / len(campos_importantes)) * 100
-        
+
         return {
             "completo": score == 100,
             "campos_faltantes": campos_faltantes,
-            "score": round(score, 1)
+            "score": round(score, 1),
         }
-    
+
     def gerar_origem_campos(self, resultado: Dict) -> Dict[str, str]:
         """
         Gera dict com origem de cada campo classificado pela IA
-        
+
         Args:
             resultado: Resultado da classificação
-        
+
         Returns:
             Dict mapeando campo -> origem ("IA" para campos identificados automaticamente)
         """
         origem = {}
-        
+
         # Todos os campos identificados pela IA são marcados como "IA"
         campos_ia = [
             "especie_indicada",
@@ -392,13 +431,13 @@ class ClassificadorRacao:
             "fase_publico",
             "tipo_tratamento",
             "sabor_proteina",
-            "peso_embalagem"
+            "peso_embalagem",
         ]
-        
+
         for campo in campos_ia:
             if resultado.get(campo) is not None:
                 origem[campo] = "IA"
-        
+
         return origem
 
 
@@ -406,10 +445,12 @@ class ClassificadorRacao:
 classificador = ClassificadorRacao()
 
 
-def classificar_produto(nome: str, peso_atual: Optional[float] = None) -> Tuple[Dict, Dict, Dict]:
+def classificar_produto(
+    nome: str, peso_atual: Optional[float] = None
+) -> Tuple[Dict, Dict, Dict]:
     """
     Função helper para classificar produto
-    
+
     Returns:
         (resultado_classificacao, analise_confianca, metadata)
         metadata contém: {"versao": "v1.0.0", "origem": {...}}
@@ -417,10 +458,7 @@ def classificar_produto(nome: str, peso_atual: Optional[float] = None) -> Tuple[
     resultado = classificador.classificar(nome, peso_atual)
     confianca = classificador.analisar_confianca(resultado)
     origem = classificador.gerar_origem_campos(resultado)
-    
-    metadata = {
-        "versao": ClassificadorRacao.VERSION,
-        "origem": origem
-    }
-    
+
+    metadata = {"versao": ClassificadorRacao.VERSION, "origem": origem}
+
     return resultado, confianca, metadata
