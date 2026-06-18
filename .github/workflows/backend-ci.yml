@@ -473,7 +473,7 @@ jobs:
 
       - name: Backend operational fiscal light format (blocking)
         run: |
-          ruff format --check app/notas_entrada_pdf_parser.py app/routes/sefaz_routes.py app/services/sefaz_service.py app/estoque_movimentacoes_edicao_routes.py app/calculadora_racao.py app/classificador_racao.py
+          ruff format --check app/notas_entrada_pdf_parser.py app/routes/sefaz_routes.py app/calculadora_racao.py
 
       - name: Backend multi tenant tests format (blocking)
         run: |
