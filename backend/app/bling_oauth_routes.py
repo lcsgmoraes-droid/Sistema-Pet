@@ -1,23 +1,27 @@
 """
-Bling OAuth2 - Callback e renovação automática de tokens
+Bling OAuth2 - callback e renovacao automatica de tokens.
 """
-import os
+
 import base64
 import json
 import logging
-from pathlib import Path
+import os
+import secrets
 from datetime import datetime, timedelta
+from html import escape
+from pathlib import Path
+from typing import Annotated
 from urllib.parse import quote
 
 import requests
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth/bling", tags=["Bling OAuth"])
 
-# Onde ficam os .env (tenta os dois caminhos)
 ENV_PATHS = [
     Path("/opt/petshop/.env"),
     Path(__file__).parent.parent.parent / ".env",
@@ -34,10 +38,9 @@ LAST_RENEWAL_PATH = Path("/tmp/bling_token_last_renewal.txt")
 
 
 def _get_env_path() -> Path:
-    for p in ENV_PATHS:
-        if p.exists():
-            return p
-    # fallback: raiz do projeto
+    for path in ENV_PATHS:
+        if path.exists():
+            return path
     return Path(".env")
 
 
@@ -58,7 +61,9 @@ def _sincronizar_controle_token(expires_in: int = 21600) -> None:
     if token_control_path.exists():
         try:
             dados_atuais = json.loads(token_control_path.read_text(encoding="utf-8"))
-            renovacoes_automaticas = int(dados_atuais.get("renovacoes_automaticas") or 0)
+            renovacoes_automaticas = int(
+                dados_atuais.get("renovacoes_automaticas") or 0
+            )
         except Exception:
             renovacoes_automaticas = 0
 
@@ -75,16 +80,16 @@ def _sincronizar_controle_token(expires_in: int = 21600) -> None:
     )
 
     LAST_RENEWAL_PATH.write_text(str(agora.timestamp()), encoding="utf-8")
-    logger.info("Controle local do token Bling sincronizado para a nova autorizacao")
+    logger.info("Controle local do token Bling sincronizado")
 
 
 def _salvar_tokens(access_token: str, refresh_token: str, expires_in: int = 21600):
-    """Salva tokens no arquivo .env"""
+    """Salva tokens no arquivo .env."""
     env_path = _get_env_path()
-    logger.info(f"Salvando tokens em: {env_path}")
+    logger.info("Salvando tokens Bling")
 
     if not env_path.exists():
-        logger.warning(f"Arquivo .env não encontrado em {env_path}, criando...")
+        logger.warning("Arquivo .env nao encontrado, criando")
         env_path.write_text("")
 
     linhas = env_path.read_text(encoding="utf-8").splitlines()
@@ -109,21 +114,20 @@ def _salvar_tokens(access_token: str, refresh_token: str, expires_in: int = 2160
 
     env_path.write_text("\n".join(novas_linhas) + "\n", encoding="utf-8")
 
-    # Atualizar variáveis de ambiente em memória para uso imediato
     os.environ["BLING_ACCESS_TOKEN"] = access_token
     os.environ["BLING_REFRESH_TOKEN"] = refresh_token
     _sincronizar_controle_token(expires_in=expires_in)
 
-    logger.info("✅ Tokens Bling salvos com sucesso")
+    logger.info("Tokens Bling salvos com sucesso")
 
 
 def _trocar_code_por_tokens(code: str, redirect_uri: str) -> dict:
-    """Troca o authorization code pelos tokens de acesso"""
+    """Troca o authorization code pelos tokens de acesso."""
     client_id = os.getenv("BLING_CLIENT_ID", "").strip()
     client_secret = os.getenv("BLING_CLIENT_SECRET", "").strip()
 
     if not client_id or not client_secret:
-        raise ValueError("BLING_CLIENT_ID ou BLING_CLIENT_SECRET não configurados")
+        raise RuntimeError("BLING_CLIENT_ID ou BLING_CLIENT_SECRET nao configurados")
 
     creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
 
@@ -143,30 +147,40 @@ def _trocar_code_por_tokens(code: str, redirect_uri: str) -> dict:
     )
 
     if response.status_code != 200:
-        raise Exception(f"Erro Bling OAuth: {response.status_code} - {response.text}")
+        raise RuntimeError(f"Erro Bling OAuth: HTTP {response.status_code}")
 
     return response.json()
 
 
 @router.get("/callback", response_class=HTMLResponse)
-async def bling_oauth_callback(request: Request, code: str = None, error: str = None, state: str = None):
+def bling_oauth_callback(
+    request: Request,
+    code: str | None = None,
+    error: str | None = None,
+    state: str | None = None,
+):
     """
     Endpoint de callback OAuth do Bling.
-    O Bling redireciona aqui após o usuário autorizar o aplicativo.
+    O Bling redireciona aqui apos o usuario autorizar o aplicativo.
     """
     if error:
-        logger.error(f"Bling OAuth erro: {error}")
-        return HTMLResponse(content=_html_erro(f"Bling retornou erro: {error}"), status_code=400)
+        logger.error("Bling OAuth retornou erro no callback")
+        return HTMLResponse(
+            content=_html_erro("Bling retornou erro de autorizacao"),
+            status_code=400,
+        )
 
     if not code:
-        return HTMLResponse(content=_html_erro("Código de autorização não recebido"), status_code=400)
+        return HTMLResponse(
+            content=_html_erro("Codigo de autorizacao nao recebido"),
+            status_code=400,
+        )
 
     try:
-        # Montar redirect_uri com base na request atual
         base_url = str(request.base_url).rstrip("/")
         redirect_uri = f"{base_url}/auth/bling/callback"
 
-        logger.info(f"Trocando code por tokens (redirect_uri={redirect_uri})")
+        logger.info("Trocando code por tokens Bling")
         tokens = _trocar_code_por_tokens(code, redirect_uri)
 
         access_token = tokens.get("access_token")
@@ -174,42 +188,48 @@ async def bling_oauth_callback(request: Request, code: str = None, error: str = 
         expires_in = tokens.get("expires_in", 21600)
 
         if not access_token or not refresh_token:
-            raise Exception(f"Resposta inválida: {tokens}")
+            raise RuntimeError("Resposta invalida do Bling OAuth")
 
         _salvar_tokens(access_token, refresh_token, expires_in=expires_in)
 
         expira_em = datetime.now() + timedelta(seconds=expires_in)
-        logger.info(f"✅ Bling OAuth concluído. Token expira em: {expira_em.strftime('%d/%m/%Y %H:%M')}")
+        logger.info("Bling OAuth concluido")
 
-        return HTMLResponse(content=_html_sucesso(expira_em, access_token))
+        return HTMLResponse(content=_html_sucesso(expira_em))
 
-    except Exception as e:
-        logger.error(f"Erro no callback OAuth Bling: {e}")
-        return HTMLResponse(content=_html_erro(str(e)), status_code=500)
+    except Exception:
+        logger.exception("Erro no callback OAuth Bling")
+        return HTMLResponse(
+            content=_html_erro("Nao foi possivel concluir a autorizacao do Bling"),
+            status_code=500,
+        )
 
 
 @router.get("/link-autorizacao")
-async def gerar_link_autorizacao(
+def gerar_link_autorizacao(
     request: Request,
-    redirect: bool = Query(False, description="Quando true, redireciona direto para a autorizacao do Bling."),
+    redirect: Annotated[
+        bool,
+        Query(
+            description="Quando true, redireciona direto para a autorizacao do Bling."
+        ),
+    ] = False,
 ):
     """
-    Retorna o link para o usuário autorizar o aplicativo no Bling.
-    Acesse este endpoint para obter a URL de autorização.
+    Retorna o link para o usuario autorizar o aplicativo no Bling.
+    Acesse este endpoint para obter a URL de autorizacao.
     """
     client_id = os.getenv("BLING_CLIENT_ID", "").strip()
     if not client_id:
-        return {"erro": "BLING_CLIENT_ID não configurado"}
+        return {"erro": "BLING_CLIENT_ID nao configurado"}
 
     base_url = str(request.base_url).rstrip("/")
     redirect_uri = f"{base_url}/auth/bling/callback"
-
-    import secrets
     state = secrets.token_hex(16)
 
     auth_url = (
-        f"https://www.bling.com.br/Api/v3/oauth/authorize"
-        f"?response_type=code"
+        "https://www.bling.com.br/Api/v3/oauth/authorize"
+        "?response_type=code"
         f"&client_id={client_id}"
         f"&redirect_uri={quote(redirect_uri, safe='')}"
         f"&state={state}"
@@ -222,47 +242,59 @@ async def gerar_link_autorizacao(
         "instrucao": "Acesse a URL abaixo no navegador para autorizar o Bling",
         "url_autorizacao": auth_url,
         "redirect_uri_configurado": redirect_uri,
-        "importante": "O 'Link de redirecionamento' no cadastro do app Bling deve ser: " + redirect_uri,
+        "importante": (
+            "O 'Link de redirecionamento' no cadastro do app Bling deve ser: "
+            + redirect_uri
+        ),
     }
 
 
 @router.get("/status-token")
-async def status_token():
-    """Verifica se o token está configurado e tenta uma chamada de teste"""
+def status_token():
+    """Verifica se o token esta configurado e tenta uma chamada de teste."""
     token = os.getenv("BLING_ACCESS_TOKEN", "").strip()
     refresh = os.getenv("BLING_REFRESH_TOKEN", "").strip()
 
     if not token:
-        return {"status": "sem_token", "mensagem": "BLING_ACCESS_TOKEN não configurado"}
+        return {"status": "sem_token", "mensagem": "BLING_ACCESS_TOKEN nao configurado"}
 
-    # Testar token fazendo uma chamada simples
     try:
-        r = requests.get(
+        response = requests.get(
             "https://api.bling.com.br/Api/v3/situacoes/modulos",
-            headers={"Authorization": f"Bearer {token}", "Accept": "application/json", "enable-jwt": "1"},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+                "enable-jwt": "1",
+            },
             timeout=10,
         )
-        if r.status_code == 200:
+        if response.status_code == 200:
             return {
                 "status": "ok",
                 "token_valido": True,
                 "token_preview": token[:15] + "...",
                 "refresh_token_configurado": bool(refresh),
             }
-        elif r.status_code == 401:
+        if response.status_code == 401:
             return {
                 "status": "expirado",
                 "token_valido": False,
-                "mensagem": "Token expirado. Acesse GET /auth/bling/link-autorizacao para renovar.",
+                "mensagem": (
+                    "Token expirado. Acesse GET /auth/bling/link-autorizacao para "
+                    "renovar."
+                ),
                 "refresh_token_configurado": bool(refresh),
             }
-        else:
-            return {"status": "erro", "http_status": r.status_code, "detalhe": r.text[:200]}
-    except Exception as e:
-        return {"status": "erro", "mensagem": str(e)}
+        return {
+            "status": "erro",
+            "http_status": response.status_code,
+            "detalhe": response.text[:200],
+        }
+    except Exception as exc:
+        return {"status": "erro", "mensagem": str(exc)}
 
 
-def _html_sucesso(expira_em: datetime, token: str) -> str:
+def _html_sucesso(expira_em: datetime) -> str:
     return f"""
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -271,34 +303,35 @@ def _html_sucesso(expira_em: datetime, token: str) -> str:
     .box{{background:white;padding:40px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.1);text-align:center;max-width:480px}}
     h1{{color:#2e7d32;font-size:2em}}p{{color:#555;line-height:1.6}}
     .badge{{background:#e8f5e9;color:#2e7d32;padding:8px 16px;border-radius:20px;font-weight:bold;display:inline-block;margin:10px 0}}
-        .btn{{display:inline-block;margin-top:14px;background:#1976d2;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:600}}
+    .btn{{display:inline-block;margin-top:14px;background:#1976d2;color:#fff;text-decoration:none;padding:10px 14px;border-radius:8px;font-weight:600}}
     </style></head>
     <body><div class="box">
-    <h1>✅ Bling Autorizado!</h1>
+    <h1>Bling Autorizado!</h1>
     <p>O token foi salvo com sucesso no sistema.</p>
-    <div class="badge">Token expira em: {expira_em.strftime('%d/%m/%Y às %H:%M')}</div>
-        <p style="margin-top:20px">Redirecionando para o sistema em <span id="contador">3</span> segundos...</p>
-        <a class="btn" href="/configuracoes/integracoes">Voltar agora</a>
-        </div>
-        <script>
-            (function() {{
-                var segundos = 3;
-                var el = document.getElementById('contador');
-                var timer = setInterval(function() {{
-                    segundos -= 1;
-                    if (el && segundos >= 0) el.textContent = String(segundos);
-                    if (segundos <= 0) {{
-                        clearInterval(timer);
-                        window.location.href = '/configuracoes/integracoes';
-                    }}
-                }}, 1000);
-            }})();
-        </script>
-        </body></html>
+    <div class="badge">Token expira em: {expira_em.strftime("%d/%m/%Y as %H:%M")}</div>
+    <p style="margin-top:20px">Redirecionando para o sistema em <span id="contador">3</span> segundos...</p>
+    <a class="btn" href="/configuracoes/integracoes">Voltar agora</a>
+    </div>
+    <script>
+        (function() {{
+            var segundos = 3;
+            var el = document.getElementById('contador');
+            var timer = setInterval(function() {{
+                segundos -= 1;
+                if (el && segundos >= 0) el.textContent = String(segundos);
+                if (segundos <= 0) {{
+                    clearInterval(timer);
+                    window.location.href = '/configuracoes/integracoes';
+                }}
+            }}, 1000);
+        }})();
+    </script>
+    </body></html>
     """
 
 
 def _html_erro(mensagem: str) -> str:
+    mensagem_segura = escape(mensagem, quote=True)
     return f"""
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -309,8 +342,8 @@ def _html_erro(mensagem: str) -> str:
     .erro{{background:#ffebee;color:#c62828;padding:12px;border-radius:8px;font-family:monospace;font-size:.85em;margin:16px 0;word-break:break-all}}
     </style></head>
     <body><div class="box">
-    <h1>❌ Erro na autorização</h1>
-    <div class="erro">{mensagem}</div>
+    <h1>Erro na autorizacao</h1>
+    <div class="erro">{mensagem_segura}</div>
     <p>Tente novamente acessando <strong>GET /auth/bling/link-autorizacao</strong></p>
     </div></body></html>
     """
