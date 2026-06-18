@@ -487,6 +487,10 @@ jobs:
         run: |
           ruff format --check app/conciliacao_services.py app/integracao_bling_nf_routes.py
 
+      - name: Backend WhatsApp analytics simple format (blocking)
+        run: |
+          ruff format --check app/whatsapp/analytics_simple.py
+
       - name: Backend analysis dashboard sales format (blocking)
         run: |
           ruff format --check app/analise_racoes_routes.py app/dashboard_routes.py app/relatorio_vendas_routes.py
