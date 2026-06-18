@@ -2,7 +2,7 @@ import requests
 import pytest
 from types import SimpleNamespace
 
-from app.bling_integration import BlingAPI, prevalidar_fiscal_venda
+from app.bling_integration import BlingAPI, _montar_url_bling, prevalidar_fiscal_venda
 
 
 class _FakeResponse:
@@ -183,6 +183,79 @@ def test_request_nao_renova_para_erro_diferente_de_invalid_token(monkeypatch):
         assert "429" in str(exc)
 
     assert renovacoes == []
+
+
+def test_montar_url_bling_exige_endpoint_relativo_seguro():
+    assert (
+        _montar_url_bling("https://api.bling.com.br/Api/v3/", "/nfe/123")
+        == "https://api.bling.com.br/Api/v3/nfe/123"
+    )
+
+    for endpoint in ("https://evil.test/nfe", "nfe/123", "/../nfe", "/nfe\\123"):
+        with pytest.raises(ValueError, match="Endpoint Bling invalido"):
+            _montar_url_bling("https://api.bling.com.br/Api/v3", endpoint)
+
+
+def test_baixar_danfe_usa_timeout(monkeypatch):
+    api = _make_api()
+    chamadas = []
+
+    class FakeResponse:
+        content = b"%PDF"
+
+        def raise_for_status(self):
+            return None
+
+    def fake_get(url, headers=None, timeout=None):
+        chamadas.append({"url": url, "headers": headers, "timeout": timeout})
+        return FakeResponse()
+
+    monkeypatch.setattr("requests.get", fake_get)
+
+    assert api.baixar_danfe(123) == b"%PDF"
+    assert chamadas == [
+        {
+            "url": "https://api.bling.com.br/Api/v3/nfe/123/danfe",
+            "headers": api._get_headers(),
+            "timeout": 30,
+        }
+    ]
+
+
+def test_renovar_access_token_usa_timeout(monkeypatch):
+    api = _make_api()
+    api.client_id = "client-id"
+    api.client_secret = "client-secret"
+    api.refresh_token = "refresh-token"
+    chamadas = []
+
+    class FakeResponse:
+        status_code = 200
+        text = "ok"
+
+        def json(self):
+            return {
+                "access_token": "token-novo",
+                "refresh_token": "refresh-novo",
+                "expires_in": 21600,
+            }
+
+    def fake_post(url, headers=None, data=None, timeout=None):
+        chamadas.append(
+            {"url": url, "headers": headers, "data": data, "timeout": timeout}
+        )
+        return FakeResponse()
+
+    monkeypatch.setattr("requests.post", fake_post)
+    monkeypatch.setattr("app.bling_oauth_routes._salvar_tokens", lambda *_args: None)
+
+    assert api.renovar_access_token()["access_token"] == "token-novo"
+    assert chamadas[0]["url"] == "https://www.bling.com.br/Api/v3/oauth/token"
+    assert chamadas[0]["data"] == {
+        "grant_type": "refresh_token",
+        "refresh_token": "refresh-token",
+    }
+    assert chamadas[0]["timeout"] == 30
 
 
 def test_payload_nfce_usa_serie_3_e_deixa_numero_para_sequencia_do_bling():
