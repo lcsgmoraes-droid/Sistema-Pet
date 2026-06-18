@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Request, HTTPException, Depends, Query, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 from app.db import get_session
@@ -14,6 +14,14 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.pedido_integrado_models import PedidoIntegrado
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.estoque_reserva_service import EstoqueReservaService
+from app.integracao_bling_nf_routes import (
+    _consolidar_ultima_nf,
+    _dict,
+    _nf_id_valido,
+    _normalizar_resumo_nf,
+    _primeiro_preenchido,
+    _texto,
+)
 from app.services.bling_flow_monitor_service import (
     abrir_incidente,
     registrar_evento,
@@ -75,27 +83,6 @@ def _coerce_float(valor, default: float | None = None) -> float | None:
         return float(valor)
     except (TypeError, ValueError):
         return default
-
-
-def _texto(valor) -> str | None:
-    if valor is None:
-        return None
-    texto = str(valor).strip()
-    return texto or None
-
-
-def _primeiro_preenchido(*valores):
-    for valor in valores:
-        if valor is None:
-            continue
-        if isinstance(valor, str) and not valor.strip():
-            continue
-        return valor
-    return None
-
-
-def _dict(valor) -> dict:
-    return valor if isinstance(valor, dict) else {}
 
 
 def _dt_iso(dt):
@@ -162,50 +149,6 @@ def _payload_principal(payload: dict | None) -> dict:
     return payload
 
 
-def _nf_id_valido(value) -> str | None:
-    texto = _texto(value)
-    if not texto or texto in {"0", "-1"}:
-        return None
-    return texto
-
-
-def _normalizar_resumo_nf(resumo_nf: dict | None) -> dict | None:
-    resumo_nf = dict(_dict(resumo_nf))
-    if not resumo_nf:
-        return None
-
-    nf_id = _nf_id_valido(
-        _primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id"))
-    )
-    if nf_id:
-        if "id" in resumo_nf or "nfe_id" not in resumo_nf:
-            resumo_nf["id"] = nf_id
-        else:
-            resumo_nf["nfe_id"] = nf_id
-    else:
-        resumo_nf.pop("id", None)
-        resumo_nf.pop("nfe_id", None)
-
-    possui_referencia_util = bool(
-        nf_id
-        or _texto(resumo_nf.get("numero"))
-        or _texto(
-            _primeiro_preenchido(resumo_nf.get("chaveAcesso"), resumo_nf.get("chave"))
-        )
-        or _texto(
-            _primeiro_preenchido(resumo_nf.get("situacao"), resumo_nf.get("status"))
-        )
-        or _texto(
-            _primeiro_preenchido(
-                resumo_nf.get("data_emissao"), resumo_nf.get("dataEmissao")
-            )
-        )
-        or resumo_nf.get("valor_total") not in (None, "")
-    )
-
-    return resumo_nf if possui_referencia_util else None
-
-
 def _ultima_nf_payload_efetiva(payload: dict | None) -> dict:
     payload = _dict(payload)
     pedido_payload = _payload_principal(payload)
@@ -220,97 +163,6 @@ def _ultima_nf_payload_efetiva(payload: dict | None) -> dict:
         if resumo_nf:
             return resumo_nf
     return {}
-
-
-def _mesclar_ultima_nf(atual: dict | None, nova: dict | None) -> dict | None:
-    atual = _normalizar_resumo_nf(atual) or {}
-    nova = _normalizar_resumo_nf(nova) or {}
-    if not atual and not nova:
-        return None
-
-    mesclada = dict(atual)
-    for chave, valor in nova.items():
-        if valor in (None, "", [], {}):
-            continue
-        mesclada[chave] = valor
-    return mesclada
-
-
-def _coerce_data_nf(value) -> datetime | None:
-    texto = _texto(value)
-    if not texto:
-        return None
-    texto = texto.replace("Z", "+00:00")
-    try:
-        if "T" not in texto and " " in texto:
-            texto = texto.replace(" ", "T", 1)
-        dt = datetime.fromisoformat(texto)
-        if dt.tzinfo is not None:
-            return dt.astimezone(timezone.utc).replace(tzinfo=None)
-        return dt
-    except ValueError:
-        try:
-            return datetime.fromisoformat(texto.split("T")[0])
-        except ValueError:
-            return None
-
-
-def _numero_nf_int(nf: dict | None) -> int | None:
-    numero = _texto(_dict(nf).get("numero"))
-    if not numero or not numero.isdigit():
-        return None
-    return int(numero)
-
-
-def _nova_nf_deve_substituir(atual: dict | None, nova: dict | None) -> bool:
-    atual = _normalizar_resumo_nf(atual) or {}
-    nova = _normalizar_resumo_nf(nova) or {}
-    if not atual:
-        return True
-    if not nova:
-        return False
-
-    atual_id = _nf_id_valido(_primeiro_preenchido(atual.get("id"), atual.get("nfe_id")))
-    nova_id = _nf_id_valido(_primeiro_preenchido(nova.get("id"), nova.get("nfe_id")))
-    atual_numero = _texto(atual.get("numero"))
-    nova_numero = _texto(nova.get("numero"))
-
-    if (atual_id and nova_id and atual_id == nova_id) or (
-        atual_numero and nova_numero and atual_numero == nova_numero
-    ):
-        return True
-
-    atual_data = _coerce_data_nf(
-        _primeiro_preenchido(atual.get("data_emissao"), atual.get("dataEmissao"))
-    )
-    nova_data = _coerce_data_nf(
-        _primeiro_preenchido(nova.get("data_emissao"), nova.get("dataEmissao"))
-    )
-    if atual_data and nova_data and atual_data != nova_data:
-        return nova_data > atual_data
-    if nova_data and not atual_data:
-        return True
-    if atual_data and not nova_data:
-        return False
-
-    atual_numero_int = _numero_nf_int(atual)
-    nova_numero_int = _numero_nf_int(nova)
-    if (
-        atual_numero_int is not None
-        and nova_numero_int is not None
-        and atual_numero_int != nova_numero_int
-    ):
-        return nova_numero_int > atual_numero_int
-
-    return False
-
-
-def _consolidar_ultima_nf(atual: dict | None, nova: dict | None) -> dict | None:
-    if not atual and not nova:
-        return None
-    if _nova_nf_deve_substituir(atual, nova):
-        return _mesclar_ultima_nf(atual, nova)
-    return _mesclar_ultima_nf(nova, atual)
 
 
 def _montar_payload_pedido(
