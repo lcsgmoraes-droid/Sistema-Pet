@@ -51,7 +51,7 @@ def test_backend_ci_has_blocking_python_dependency_audit_step():
     assert "pip-audit" in source
     assert "Python dependency audit (blocking)" in source
     assert (
-        "pip-audit -r requirements.txt -s osv --progress-spinner off --timeout 60"
+        "pip-audit -r requirements.lock -s osv --progress-spinner off --timeout 60"
         in source
     )
 

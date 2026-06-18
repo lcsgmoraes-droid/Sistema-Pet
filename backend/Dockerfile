@@ -29,11 +29,11 @@ RUN apt-get update && apt-get install -y \
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 # Copiar requirements primeiro (cache de layers do Docker)
-COPY requirements.txt .
+COPY requirements.txt requirements.lock ./
 
 # Instalar dependências Python
 RUN pip install --upgrade pip && \
-    pip install -r requirements.txt
+    pip install -r requirements.txt -c requirements.lock
 
 # Copiar código da aplicação
 COPY --chown=appuser:appuser . .

@@ -158,7 +158,7 @@ Complete-Step `
     }
 
 $backendPythonForCommand = Get-BackendPythonPath
-$backendDepsCommand = '.\backend\.venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt'
+$backendDepsCommand = '.\backend\.venv\Scripts\python.exe -m pip install -r .\backend\requirements.txt -c .\backend\requirements.lock'
 Complete-Step `
     -Id 'backend.dependencies' `
     -Name 'Dependencias backend' `
@@ -170,7 +170,7 @@ Complete-Step `
         if (-not (Test-Path $backendPython)) {
             throw 'Backend venv nao encontrado; rode a etapa backend.venv primeiro.'
         }
-        Invoke-Native -Executable $backendPython -Arguments @('-m', 'pip', 'install', '-r', (Join-Path $root 'backend/requirements.txt'))
+        Invoke-Native -Executable $backendPython -Arguments @('-m', 'pip', 'install', '-r', (Join-Path $root 'backend/requirements.txt'), '-c', (Join-Path $root 'backend/requirements.lock'))
     } `
     -Details @{
         python = $backendPythonForCommand
