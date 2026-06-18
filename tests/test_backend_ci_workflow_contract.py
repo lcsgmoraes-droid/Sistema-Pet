@@ -1158,6 +1158,13 @@ def test_backend_ci_has_blocking_backend_commerce_routes_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_app_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend app format (blocking)" in source
+    assert "ruff format --check app" in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
