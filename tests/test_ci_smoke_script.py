@@ -37,6 +37,22 @@ def test_assert_route_exists_accepts_registered_method():
     smoke.assert_route_exists(FakeApp(), "/auth/login-multitenant", "POST")
 
 
+def test_assert_route_exists_accepts_fastapi_included_router():
+    from fastapi import APIRouter, FastAPI
+
+    smoke = _load_smoke_module()
+    router = APIRouter(prefix="/auth")
+
+    @router.post("/login-multitenant")
+    def login_multitenant():
+        return {"ok": True}
+
+    app = FastAPI()
+    app.include_router(router)
+
+    smoke.assert_route_exists(app, "/auth/login-multitenant", "POST")
+
+
 def test_assert_route_exists_rejects_missing_method():
     smoke = _load_smoke_module()
 

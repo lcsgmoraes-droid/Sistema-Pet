@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from jose import jwt
+from app.security.jwt_compat import jwt
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 

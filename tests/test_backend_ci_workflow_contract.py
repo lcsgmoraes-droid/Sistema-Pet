@@ -45,6 +45,17 @@ def test_backend_ci_has_blocking_security_lint_step():
     assert "ruff check app/security" in source
 
 
+def test_backend_ci_has_blocking_python_dependency_audit_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "pip-audit" in source
+    assert "Python dependency audit (blocking)" in source
+    assert (
+        "pip-audit -r requirements.txt -s osv --progress-spinner off --timeout 60"
+        in source
+    )
+
+
 def test_backend_ci_has_blocking_core_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

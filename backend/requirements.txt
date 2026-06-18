@@ -4,9 +4,10 @@
 # ============================================================================
 
 # Framework Web
-fastapi==0.109.2
+fastapi==0.137.2
+starlette==1.3.1
 uvicorn[standard]==0.27.1
-pydantic==2.6.1
+pydantic==2.13.4
 pydantic-settings==2.1.0
 email-validator==2.2.0
 
@@ -16,10 +17,9 @@ psycopg2-binary==2.9.9
 alembic==1.13.1
 
 # Autenticação e Segurança
-python-jose[cryptography]==3.4.0
-PyJWT==2.8.0
+PyJWT==2.13.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.18
+python-multipart==0.0.32
 bcrypt==4.1.2
 
 # Rate Limiting
@@ -27,7 +27,7 @@ slowapi==0.1.9
 
 # HTTP e Requisições
 httpx==0.26.0
-requests==2.32.4
+requests==2.34.2
 chardet==5.2.0
 boto3==1.34.34
 
@@ -38,7 +38,7 @@ pycryptodome==3.20.0
 openai==1.12.0
 
 # Utilitários
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 python-dateutil==2.8.2
 
 # Excel e Planilhas (para relatórios)
@@ -46,11 +46,11 @@ openpyxl==3.1.2
 pandas==2.2.0
 
 # Imagens e Processamento
-pillow==10.4.0
+pillow==12.2.0
 
 # PDF
 reportlab==4.0.9
-pdfplumber==0.11.4
+pdfplumber==0.11.10
 
 # Gráficos (opcional)
 matplotlib==3.8.2
@@ -70,9 +70,9 @@ pytz==2024.1
 tzlocal==5.3.1
 
 # Testing
-pytest==7.4.4
-pytest-asyncio==0.23.4
-pytest-cov==4.1.0
+pytest==9.1.0
+pytest-asyncio==1.4.0
+pytest-cov==7.1.0
 
 # Previsão e Séries Temporais (opcional para IA)
 prophet==1.1.5
