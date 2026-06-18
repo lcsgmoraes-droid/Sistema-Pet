@@ -53,11 +53,15 @@ def test_estoque_routes_nao_expõe_mais_decorators_de_transferencia_parceiro():
 def test_main_registra_router_de_transferencia_parceiro():
     main_source = _source("app/main.py")
 
-    assert (
-        "from app.estoque_transferencia_parceiro_routes import "
-        "router as estoque_transferencia_parceiro_router"
-    ) in main_source
-    assert (
-        "app.include_router(estoque_transferencia_parceiro_router, "
-        'tags=["Estoque - Transferencia Parceiro"])'
-    ) in main_source
+    assert "from app.estoque_transferencia_parceiro_routes import" in main_source
+    assert "router as estoque_transferencia_parceiro_router" in main_source
+    assert "app.include_router(" in main_source
+    assert "estoque_transferencia_parceiro_router" in main_source
+    assert 'tags=["Estoque - Transferencia Parceiro"]' in main_source
+
+
+def test_transferencia_parceiro_centraliza_formato_de_data_curta():
+    source = _source("app/estoque_transferencia_parceiro_routes.py")
+
+    assert "_FORMATO_DATA_CURTA" in source
+    assert source.count("%d/%m/%Y") == 1

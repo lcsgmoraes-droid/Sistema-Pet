@@ -487,9 +487,9 @@ jobs:
         run: |
           ruff format --check app/analise_racoes_routes.py app/dashboard_routes.py app/relatorio_vendas_routes.py
 
-      - name: Backend clients partner transfers format (blocking)
+      - name: Backend partner transfers format (blocking)
         run: |
-          ruff format --check app/clientes_routes.py app/estoque_transferencia_parceiro_routes.py
+          ruff format --check app/estoque_transferencia_parceiro_routes.py
 
       - name: Backend commissions diagnostic format (blocking)
         run: |

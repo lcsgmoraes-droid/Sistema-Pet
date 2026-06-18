@@ -49,6 +49,7 @@ _MOTIVO_TRANSFERENCIA_PARCEIRO_EXCLUSAO = "transf_exc"
 _MOTIVO_TRANSFERENCIA_PARCEIRO_EDICAO = "transf_edit"
 _REFERENCIA_TRANSFERENCIA_PARCEIRO_EXCLUSAO = "transf_excl"
 _REFERENCIA_TRANSFERENCIA_PARCEIRO_EDICAO = "transf_edit"
+_FORMATO_DATA_CURTA = "%d/%m/%Y"
 _MODO_BAIXA_TRANSFERENCIA_LABELS = {
     "recebimento": "Recebimento",
     "acerto": "Acerto / Compensacao",
@@ -864,9 +865,11 @@ def _gerar_pdf_transferencia_parceiro_bytes(
             ],
             [
                 "Emissao",
-                conta.data_emissao.strftime("%d/%m/%Y") if conta.data_emissao else "-",
+                conta.data_emissao.strftime(_FORMATO_DATA_CURTA)
+                if conta.data_emissao
+                else "-",
                 "Vencimento",
-                conta.data_vencimento.strftime("%d/%m/%Y")
+                conta.data_vencimento.strftime(_FORMATO_DATA_CURTA)
                 if conta.data_vencimento
                 else "-",
             ],
@@ -1091,8 +1094,8 @@ def _gerar_pdf_transferencias_parceiro_consolidado_bytes(
     periodo_texto = "-"
     if datas_emissao:
         periodo_texto = (
-            f"{min(datas_emissao).strftime('%d/%m/%Y')} ate "
-            f"{max(datas_emissao).strftime('%d/%m/%Y')}"
+            f"{min(datas_emissao).strftime(_FORMATO_DATA_CURTA)} ate "
+            f"{max(datas_emissao).strftime(_FORMATO_DATA_CURTA)}"
         )
 
     elements = [
@@ -1152,7 +1155,9 @@ def _gerar_pdf_transferencias_parceiro_consolidado_bytes(
         linha_documento = [
             conta.documento or f"TRP-{conta.id:06d}",
             Paragraph(pessoa, styles["BodyText"]),
-            conta.data_emissao.strftime("%d/%m/%Y") if conta.data_emissao else "-",
+            conta.data_emissao.strftime(_FORMATO_DATA_CURTA)
+            if conta.data_emissao
+            else "-",
             status_label,
         ]
         if opcoes["mostrar_totais"]:
@@ -1202,8 +1207,8 @@ def _gerar_pdf_transferencias_parceiro_consolidado_bytes(
             )
         )
         elementos_info = [
-            f"Emissao: {conta.data_emissao.strftime('%d/%m/%Y') if conta.data_emissao else '-'}",
-            f"Vencimento: {conta.data_vencimento.strftime('%d/%m/%Y') if conta.data_vencimento else '-'}",
+            f"Emissao: {conta.data_emissao.strftime(_FORMATO_DATA_CURTA) if conta.data_emissao else '-'}",
+            f"Vencimento: {conta.data_vencimento.strftime(_FORMATO_DATA_CURTA) if conta.data_vencimento else '-'}",
         ]
         if opcoes["mostrar_totais"]:
             elementos_info.extend(
@@ -1376,8 +1381,8 @@ def _montar_email_transferencia_parceiro(
           <p>Segue em anexo o PDF da transferencia de estoque{(" com ressarcimento pelo custo" if mostra_valores else " para conferencia da retirada")}.</p>
           <ul>
             <li><strong>Status:</strong> {status_label}</li>
-            <li><strong>Emissao:</strong> {conta.data_emissao.strftime("%d/%m/%Y") if conta.data_emissao else "-"}</li>
-            <li><strong>Vencimento:</strong> {conta.data_vencimento.strftime("%d/%m/%Y") if conta.data_vencimento else "-"}</li>
+            <li><strong>Emissao:</strong> {conta.data_emissao.strftime(_FORMATO_DATA_CURTA) if conta.data_emissao else "-"}</li>
+            <li><strong>Vencimento:</strong> {conta.data_vencimento.strftime(_FORMATO_DATA_CURTA) if conta.data_vencimento else "-"}</li>
             {total_html}
           </ul>
           <table style="width:100%;border-collapse:collapse;margin-top:16px;">
@@ -1408,8 +1413,8 @@ def _montar_email_transferencia_parceiro(
         f"Documento: {documento}\n"
         f"Pessoa: {parceiro_nome}\n"
         f"Status: {status_label}\n"
-        f"Emissao: {conta.data_emissao.strftime('%d/%m/%Y') if conta.data_emissao else '-'}\n"
-        f"Vencimento: {conta.data_vencimento.strftime('%d/%m/%Y') if conta.data_vencimento else '-'}\n"
+        f"Emissao: {conta.data_emissao.strftime(_FORMATO_DATA_CURTA) if conta.data_emissao else '-'}\n"
+        f"Vencimento: {conta.data_vencimento.strftime(_FORMATO_DATA_CURTA) if conta.data_vencimento else '-'}\n"
         + (f"Total: R$ {valor_original:.2f}\n" if opcoes["mostrar_totais"] else "")
         + "\n"
         "Itens:\n" + "\n".join(linhas_itens)
@@ -2597,7 +2602,7 @@ def registrar_recebimento_transferencia_parceiro(
         f" - {observacao_recebimento}" if observacao_recebimento else ""
     )
     historico = (
-        f"{modo_label} {conta.data_recebimento.strftime('%d/%m/%Y')}: "
+        f"{modo_label} {conta.data_recebimento.strftime(_FORMATO_DATA_CURTA)}: "
         f"R$ {valor_recebido:.2f}{detalhe_forma}{detalhe_compensacao}{detalhe_observacao}"
     )
     conta.observacoes = (
