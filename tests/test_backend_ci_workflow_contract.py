@@ -1005,6 +1005,8 @@ def test_backend_ci_has_blocking_backend_global_non_legacy_format_step():
         "tests/integration/test_transaction_estornar_comissoes.py",
         "tests/integration/test_transaction_excluir_venda.py",
         "tests/test_02_user.py",
+    )
+    cleaned_root_scripts = (
         "atualizar_template_stone.py",
         "corrigir_template_stone.py",
         "criar_admin_prod.py",
@@ -1021,6 +1023,8 @@ def test_backend_ci_has_blocking_backend_global_non_legacy_format_step():
     assert "ruff format --check ." in source
     for path in exclusions:
         assert f"--exclude {path}" in source
+    for path in cleaned_root_scripts:
+        assert f"--exclude {path}" not in source
 
 
 def test_backend_ci_has_blocking_backend_operational_stock_cash_format_step():

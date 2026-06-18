@@ -1,16 +1,11 @@
 # Script simplificado - Criar apenas usuário admin
-import psycopg2
+from legacy_script_env import connect_database, required_env
 
 print("\n🔗 Conectando no banco PROD...")
 
 try:
-    conn_prod = psycopg2.connect(
-        host='localhost',
-        port=5434,
-        database='petshop_prod',
-        user='petshop_user',
-        password='petshop_pass_2026'
-    )
+    conn_prod = connect_database("PROD_DATABASE_URL", "DATABASE_URL")
+    admin_password_hash = required_env("ADMIN_PASSWORD_HASH")
     print("✅ Conectado!")
 except Exception as e:
     print(f"❌ Erro: {e}")
@@ -28,21 +23,22 @@ try:
         )
     """)
     tabela_existe = cur.fetchone()[0]
-    
+
     if not tabela_existe:
         print("❌ Tabela 'users' não existe!")
         print("⚠️  Execute as migrations primeiro!")
         exit(1)
-    
+
     # Verificar se admin já existe
     cur.execute("SELECT id FROM users WHERE email = 'admin@petshop.com'")
     admin_existente = cur.fetchone()
-    
+
     if admin_existente:
         print(f"✅ Usuário admin já existe com ID: {admin_existente[0]}")
     else:
         # Criar usuário admin
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO users (
                 email, 
                 hashed_password, 
@@ -53,7 +49,7 @@ try:
                 nome_loja
             ) VALUES (
                 'admin@petshop.com',
-                '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY.6GZjMe/.hizq',
+                %s,
                 'Administrador',
                 true,
                 true,
@@ -61,15 +57,17 @@ try:
                 'Pet Shop - Piloto'
             )
             RETURNING id
-        """)
+        """,
+            (admin_password_hash,),
+        )
         result = cur.fetchone()
         conn_prod.commit()
-        
+
         if result:
             print(f"✅ Usuário admin criado com ID: {result[0]}")
         else:
             print("❌ Falha ao criar admin")
-        
+
 except Exception as e:
     print(f"❌ Erro: {e}")
     conn_prod.rollback()
@@ -78,12 +76,12 @@ except Exception as e:
 cur.close()
 conn_prod.close()
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print("   ✅ BANCO DE PRODUÇÃO PRONTO!")
-print("="*60)
+print("=" * 60)
 print("\n📋 Login inicial:")
 print("   Email: admin@petshop.com")
-print("   Senha: admin123")
+print("   Senha: definida pelo hash em ADMIN_PASSWORD_HASH")
 print("\n🔴 IMPORTANTE:")
 print("   1. Altere a senha após o primeiro login")
 print("   2. Configure formas de pagamento, DRE, etc no sistema")
