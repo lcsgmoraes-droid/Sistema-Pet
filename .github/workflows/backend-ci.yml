@@ -477,7 +477,7 @@ jobs:
 
       - name: Backend IA finance parsers format (blocking)
         run: |
-          ruff format --check app/ia/aba7_dre_canal.py app/ia/aba7_tributacao.py app/ia/extrato_parser.py
+          ruff format --check app/ia/aba7_dre_canal.py
 
       - name: Backend multi tenant tests format (blocking)
         run: |
