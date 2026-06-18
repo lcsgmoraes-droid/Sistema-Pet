@@ -479,6 +479,10 @@ jobs:
         run: |
           ruff format --check app/ia/aba7_dre_canal.py
 
+      - name: Backend IA cashflow format (blocking)
+        run: |
+          ruff format --check app/ia/aba5_fluxo_caixa.py
+
       - name: Backend commissions diagnostic format (blocking)
         run: |
           ruff format --check app/comissoes_diagnostico_routes.py
