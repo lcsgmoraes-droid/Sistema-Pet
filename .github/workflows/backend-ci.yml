@@ -9,11 +9,6 @@ on:
   pull_request:
     branches: [main, develop]
 
-permissions:
-  contents: read
-  checks: read
-  pull-requests: read
-
 jobs:
   tests:
     name: Tests & Quality
@@ -654,6 +649,10 @@ jobs:
     name: Quality Gate
     needs: [tests, migration-smoke]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: read
 
     steps:
       - name: Ensure SonarCloud external check passed
