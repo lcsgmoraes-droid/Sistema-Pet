@@ -876,6 +876,13 @@ def test_backend_ci_has_blocking_backend_services_format_step():
     )
 
 
+def test_backend_ci_has_blocking_backend_sefaz_service_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend SEFAZ service format (blocking)" in source
+    assert "ruff format --check app/services/sefaz_service.py" in source
+
+
 def test_backend_ci_has_blocking_backend_business_support_scripts_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

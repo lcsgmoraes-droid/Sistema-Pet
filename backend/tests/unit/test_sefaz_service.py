@@ -208,3 +208,21 @@ def test_falha_cloudflare_na_sefaz_retorna_mensagem_operacional() -> None:
     assert "tente novamente em alguns minutos" in detail
     assert "Cloudflare" not in detail
     assert "origin web server" not in detail
+
+
+def test_parse_nfe_documento_rejeita_xml_com_entidade_interna() -> None:
+    xml = """<?xml version="1.0"?>
+    <!DOCTYPE nfeProc [<!ENTITY entidade "Fornecedor Injetado">]>
+    <nfeProc>
+      <NFe>
+        <infNFe Id="NFe35250112345678000195550010000001231234567890">
+          <ide><nNF>123</nNF><serie>1</serie><dhEmi>2026-03-09</dhEmi></ide>
+          <emit><CNPJ>12345678000195</CNPJ><xNome>&entidade;</xNome></emit>
+          <dest><CNPJ>12345678000195</CNPJ><xNome>Petshop</xNome></dest>
+          <total><ICMSTot><vNF>10.00</vNF></ICMSTot></total>
+        </infNFe>
+      </NFe>
+    </nfeProc>
+    """
+
+    assert SefazService._parse_nfe_documento(xml) is None
