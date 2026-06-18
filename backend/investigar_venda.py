@@ -3,7 +3,10 @@ Investigar campos da venda 202602130001
 """
 
 import sys
-sys.path.insert(0, r"c:\Users\Lucas\OneDrive\Área de Trabalho\Programa\Sistema Pet\backend")
+
+sys.path.insert(
+    0, r"c:\Users\Lucas\OneDrive\Área de Trabalho\Programa\Sistema Pet\backend"
+)
 
 from app.db import SessionLocal
 from sqlalchemy import text
@@ -12,13 +15,14 @@ db = SessionLocal()
 
 numero_venda = "202602130001"
 
-print("="*80)
+print("=" * 80)
 print(f"INVESTIGAÇÃO DA VENDA {numero_venda}".center(80))
-print("="*80)
+print("=" * 80)
 
 # 1. Buscar dados da venda
 print("\n[1] DADOS DA VENDA:")
-venda = db.execute(text("""
+venda = db.execute(
+    text("""
     SELECT 
         id, numero_venda, data_venda, cliente_id, vendedor_id, funcionario_id,
         subtotal, desconto_valor, desconto_percentual, total,
@@ -28,7 +32,9 @@ venda = db.execute(text("""
         entregador_id, status
     FROM vendas
     WHERE numero_venda = :numero
-"""), {"numero": numero_venda}).fetchone()
+"""),
+    {"numero": numero_venda},
+).fetchone()
 
 if not venda:
     print(f"❌ Venda {numero_venda} não encontrada!")
@@ -57,28 +63,36 @@ venda_id = venda[0]
 
 # 2. Buscar itens da venda
 print("\n[2] ITENS DA VENDA:")
-itens = db.execute(text("""
+itens = db.execute(
+    text("""
     SELECT 
         vi.id, vi.produto_id, p.nome, vi.quantidade, 
         vi.preco_unitario, vi.subtotal, p.preco_custo
     FROM venda_itens vi
     LEFT JOIN produtos p ON p.id = vi.produto_id
     WHERE vi.venda_id = :venda_id
-"""), {"venda_id": venda_id}).fetchall()
+"""),
+    {"venda_id": venda_id},
+).fetchall()
 
 print(f"   Total de itens: {len(itens)}")
 for item in itens:
-    print(f"   - {item[2]}: {item[3]} x R$ {item[4]} = R$ {item[5]} (custo: R$ {item[6]})")
+    print(
+        f"   - {item[2]}: {item[3]} x R$ {item[4]} = R$ {item[5]} (custo: R$ {item[6]})"
+    )
 
 # 3. Buscar pagamentos
 print("\n[3] FORMAS DE PAGAMENTO:")
-pagamentos = db.execute(text("""
+pagamentos = db.execute(
+    text("""
     SELECT 
         id, forma_pagamento, valor, numero_parcelas,
         operadora_id, nsu_cartao, bandeira
     FROM venda_pagamentos
     WHERE venda_id = :venda_id
-"""), {"venda_id": venda_id}).fetchall()
+"""),
+    {"venda_id": venda_id},
+).fetchall()
 
 print(f"   Total de pagamentos: {len(pagamentos)}")
 for pag in pagamentos:
@@ -92,13 +106,16 @@ for pag in pagamentos:
 # 4. Buscar comissões
 print("\n[4] COMISSÕES DA VENDA:")
 try:
-    comissoes = db.execute(text("""
+    comissoes = db.execute(
+        text("""
         SELECT 
             id, funcionario_id, valor_venda, valor_comissao, 
             percentual, status
         FROM comissoes_vendas
         WHERE venda_id = :venda_id
-    """), {"venda_id": venda_id}).fetchall()
+    """),
+        {"venda_id": venda_id},
+    ).fetchall()
 
     print(f"   Total de comissões: {len(comissoes)}")
     for com in comissoes:
@@ -114,13 +131,16 @@ except Exception:
 # 5. Buscar dados do entregador (se houver)
 if venda[16]:  # entregador_id
     print("\n[5] DADOS DO ENTREGADOR:")
-    entregador = db.execute(text("""
+    entregador = db.execute(
+        text("""
         SELECT 
             id, nome, taxa_fixa_entrega
         FROM clientes
         WHERE id = :entregador_id
-    """), {"entregador_id": venda[16]}).fetchone()
-    
+    """),
+        {"entregador_id": venda[16]},
+    ).fetchone()
+
     if entregador:
         print(f"   ID: {entregador[0]}")
         print(f"   Nome: {entregador[1]}")
@@ -130,12 +150,14 @@ if venda[16]:  # entregador_id
 
 # 6. Buscar configuração fiscal
 print("\n[6] CONFIGURAÇÃO FISCAL:")
-config_fiscal = db.execute(text("""
+config_fiscal = db.execute(
+    text("""
     SELECT 
         id, simples_ativo, simples_anexo, aliquota_simples_vigente
     FROM empresa_config_fiscal
     LIMIT 1
-""")).fetchone()
+""")
+).fetchone()
 
 if config_fiscal:
     print(f"   ID: {config_fiscal[0]}")
@@ -147,18 +169,22 @@ else:
 
 # 7. Buscar operadoras de cartão (se houver taxa_percentual nos pagamentos)
 print("\n[7] OPERADORAS DE CARTÃO:")
-operadoras = db.execute(text("""
+operadoras = db.execute(
+    text("""
     SELECT 
         id, nome, taxa_debito, taxa_credito_vista, taxa_credito_parcelado
     FROM operadoras_cartao
-""")).fetchall()
+""")
+).fetchall()
 
 print(f"   Total de operadoras cadastradas: {len(operadoras)}")
 for op in operadoras:
-    print(f"   - {op[1]}: Débito {op[2]}% | Crédito à vista {op[3]}% | Crédito parcelado {op[4]}%")
+    print(
+        f"   - {op[1]}: Débito {op[2]}% | Crédito à vista {op[3]}% | Crédito parcelado {op[4]}%"
+    )
 
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 print("FIM DA INVESTIGAÇÃO".center(80))
-print("="*80)
+print("=" * 80)
 
 db.close()

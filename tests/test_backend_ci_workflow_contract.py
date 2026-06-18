@@ -915,6 +915,48 @@ def test_backend_ci_has_blocking_backend_business_support_scripts_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_safe_root_scripts_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+    root_scripts = (
+        "analisar_produtos_simplesvet.py",
+        "buscar_taxas.py",
+        "check_contas_receber.py",
+        "check_migration_status.py",
+        "corrigir_codigo_barras.py",
+        "criar_alertas_retroativos.py",
+        "criar_tabelas_local.py",
+        "debug_importacao.py",
+        "deduplicar_clientes.py",
+        "importador_pets.py",
+        "importador_producao.py",
+        "importador_produtos.py",
+        "importar_simplesvet.py",
+        "importar_simplesvet_direto.py",
+        "investigar_comissoes_imposto.py",
+        "investigar_formas_pagamento.py",
+        "investigar_importacao.py",
+        "investigar_templates.py",
+        "investigar_venda.py",
+        "investigar_venda_pagamentos.py",
+        "limpar_codigo_barras_producao.py",
+        "reprocessar_venda.py",
+        "reset_nsu_status.py",
+        "reverter_sql_manual.py",
+        "seed_opcoes_racao.py",
+        "test_migration.py",
+        "test_processar_taxas.py",
+        "test_single_import.py",
+        "ver_colunas.py",
+        "verificar_dados_importados.py",
+        "verificar_produtos_banco.py",
+        "verificar_produtos_tenant.py",
+        "verificar_tipos_produtos.py",
+    )
+
+    assert "Backend safe root scripts format (blocking)" in source
+    assert f"ruff format --check {' '.join(root_scripts)}" in source
+
+
 def test_backend_ci_has_blocking_backend_multi_tenant_tests_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
