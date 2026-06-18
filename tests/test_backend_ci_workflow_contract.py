@@ -1146,6 +1146,18 @@ def test_backend_ci_has_blocking_backend_analysis_dashboard_sales_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_commerce_routes_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend commerce routes format (blocking)" in source
+    assert (
+        "ruff format --check app/clientes_routes.py "
+        "app/estoque_transferencia_parceiro_routes.py "
+        "app/integracao_bling_pedido_routes.py app/notas_entrada_routes.py "
+        "app/pedidos_compra_routes.py app/produtos_routes.py app/vendas_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
