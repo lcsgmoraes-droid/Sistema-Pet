@@ -5,6 +5,7 @@ Script para atualizar template Stone com colunas corretas do CSV
 from psycopg2.extras import Json
 
 from legacy_script_env import connect_database
+from legacy_stone_template_mapping import stone_template_mapping
 
 
 def atualizar_template_stone():
@@ -31,54 +32,10 @@ def atualizar_template_stone():
         print(f"✅ Template encontrado: {template_id} - {nome_adquirente}")
 
         # Novo mapeamento correto
-        novo_mapeamento = {
-            "nsu": {"coluna": "STONE ID", "transformacao": "nsu", "obrigatorio": True},
-            "data_venda": {
-                "coluna": "DATA DA VENDA",
-                "transformacao": "data_br",
-                "obrigatorio": True,
-            },
-            "data_pagamento": {
-                "coluna": "DATA DO ULTIMO STATUS",
-                "transformacao": "data_br",
-                "obrigatorio": False,
-            },
-            "valor_bruto": {
-                "coluna": "VALOR BRUTO",
-                "transformacao": "monetario_br",
-                "obrigatorio": True,
-            },
-            "taxa_mdr": {
-                "coluna": "DESCONTO DE MDR",
-                "transformacao": "monetario_br",
-                "obrigatorio": False,
-            },
-            "valor_taxa": {
-                "coluna": "DESCONTO UNIFICADO",
-                "transformacao": "monetario_br",
-                "obrigatorio": False,
-            },
-            "valor_liquido": {
-                "coluna": "VALOR LIQUIDO",
-                "transformacao": "monetario_br",
-                "obrigatorio": True,
-            },
-            "parcela": {
-                "coluna": "N DE PARCELAS",
-                "transformacao": "texto",
-                "obrigatorio": False,
-            },
-            "tipo_transacao": {
-                "coluna": "PRODUTO",
-                "transformacao": "texto",
-                "obrigatorio": False,
-            },
-            "bandeira": {
-                "coluna": "BANDEIRA",
-                "transformacao": "texto",
-                "obrigatorio": False,
-            },
-        }
+        novo_mapeamento = stone_template_mapping(
+            parcela_key="parcela",
+            parcela_transformacao="texto",
+        )
 
         # Atualizar template
         cur.execute(

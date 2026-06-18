@@ -3,6 +3,7 @@
 import json
 
 from legacy_script_env import connect_database
+from legacy_stone_template_mapping import stone_template_mapping
 
 # Conectar ao banco
 conn = connect_database("STONE_TEMPLATE_DATABASE_URL", "DATABASE_URL")
@@ -10,50 +11,10 @@ conn = connect_database("STONE_TEMPLATE_DATABASE_URL", "DATABASE_URL")
 cur = conn.cursor()
 
 # Mapeamento correto
-mapeamento_correto = {
-    "nsu": {"coluna": "STONE ID", "transformacao": "nsu", "obrigatorio": True},
-    "data_venda": {
-        "coluna": "DATA DA VENDA",
-        "transformacao": "data_br",
-        "obrigatorio": True,
-    },
-    "data_pagamento": {
-        "coluna": "DATA DO ULTIMO STATUS",
-        "transformacao": "data_br",
-        "obrigatorio": False,
-    },
-    "valor_bruto": {
-        "coluna": "VALOR BRUTO",
-        "transformacao": "monetario_br",
-        "obrigatorio": True,
-    },
-    "taxa_mdr": {
-        "coluna": "DESCONTO DE MDR",
-        "transformacao": "monetario_br",
-        "obrigatorio": False,
-    },
-    "valor_taxa": {
-        "coluna": "DESCONTO UNIFICADO",
-        "transformacao": "monetario_br",
-        "obrigatorio": False,
-    },
-    "valor_liquido": {
-        "coluna": "VALOR LIQUIDO",
-        "transformacao": "monetario_br",
-        "obrigatorio": True,
-    },
-    "parcelas": {
-        "coluna": "N DE PARCELAS",
-        "transformacao": "inteiro",
-        "obrigatorio": False,
-    },
-    "tipo_transacao": {
-        "coluna": "PRODUTO",
-        "transformacao": "texto",
-        "obrigatorio": False,
-    },
-    "bandeira": {"coluna": "BANDEIRA", "transformacao": "texto", "obrigatorio": False},
-}
+mapeamento_correto = stone_template_mapping(
+    parcela_key="parcelas",
+    parcela_transformacao="inteiro",
+)
 
 # Atualizar template
 try:
