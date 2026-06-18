@@ -7,6 +7,16 @@ from backend_legacy_root_scripts import CLEANED_LEGACY_ROOT_SCRIPTS
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND_CI_WORKFLOW = ROOT / ".github" / "workflows" / "backend-ci.yml"
+FORMATTED_LEGACY_TESTS = (
+    "tests/conftest_infra.py",
+    "tests/e2e_test_sistema_completo.py",
+    "tests/test_02_user.py",
+)
+LEGACY_TRANSACTION_TESTS = (
+    "tests/integration/test_transaction_cancelar_venda.py",
+    "tests/integration/test_transaction_estornar_comissoes.py",
+    "tests/integration/test_transaction_excluir_venda.py",
+)
 
 
 def test_backend_ci_has_blocking_tenancy_lint_step():
@@ -978,15 +988,9 @@ def test_backend_ci_has_blocking_backend_tests_format_step():
 
     assert "Backend tests format (blocking)" in source
     assert "ruff format --check ../tests tests" in source
-    legacy_sonar_exclusions = (
-        "tests/conftest_infra.py",
-        "tests/e2e_test_sistema_completo.py",
-        "tests/integration/test_transaction_cancelar_venda.py",
-        "tests/integration/test_transaction_estornar_comissoes.py",
-        "tests/integration/test_transaction_excluir_venda.py",
-        "tests/test_02_user.py",
-    )
-    for path in legacy_sonar_exclusions:
+    for path in FORMATTED_LEGACY_TESTS:
+        assert f"--exclude {path}" not in source
+    for path in LEGACY_TRANSACTION_TESTS:
         assert f"--exclude {path}" in source
 
 
@@ -999,19 +1003,13 @@ def test_backend_ci_has_blocking_backend_migrations_format_step():
 
 def test_backend_ci_has_blocking_backend_global_non_legacy_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
-    exclusions = (
-        "alembic/versions",
-        "tests/conftest_infra.py",
-        "tests/e2e_test_sistema_completo.py",
-        "tests/integration/test_transaction_cancelar_venda.py",
-        "tests/integration/test_transaction_estornar_comissoes.py",
-        "tests/integration/test_transaction_excluir_venda.py",
-        "tests/test_02_user.py",
-    )
 
     assert "Backend global non legacy format (blocking)" in source
     assert "ruff format --check ." in source
-    for path in exclusions:
+    assert "--exclude alembic/versions" in source
+    for path in FORMATTED_LEGACY_TESTS:
+        assert f"--exclude {path}" not in source
+    for path in LEGACY_TRANSACTION_TESTS:
         assert f"--exclude {path}" in source
     for path in CLEANED_LEGACY_ROOT_SCRIPTS:
         assert f"--exclude {path}" not in source
