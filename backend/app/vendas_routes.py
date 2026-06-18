@@ -14,7 +14,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func, desc
-from datetime import datetime, timedelta, date
+from datetime import UTC, datetime, timedelta, date
 from decimal import Decimal
 from typing import List, Optional
 from pydantic import BaseModel
@@ -24,9 +24,7 @@ from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
 from .idempotency import idempotent  # ← IDEMPOTÊNCIA
 from .security.permissions_decorator import require_permission
-from .vendas_models import (
-    Venda, VendaItem, VendaPagamento
-)
+from .vendas_models import Venda, VendaItem, VendaPagamento
 from .models import Cliente
 from .produtos_models import Produto
 from .financeiro_models import ContaReceber
@@ -50,9 +48,14 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+def _utcnow_naive() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
 # ============================================================================
 # FUNÇÕES AUXILIARES - CONSOLIDAÇÃO DE LÓGICA REPETIDA
 # ============================================================================
+
 
 def _validar_tenant_e_obter_usuario(user_and_tenant):
     """Desempacota e valida user_and_tenant (padrão repetido 13x)"""
@@ -65,10 +68,7 @@ def _validar_tenant_e_obter_usuario(user_and_tenant):
 
 def _obter_venda_ou_404(db: Session, venda_id: int, tenant_id: str):
     """Busca venda com validação de tenant e retorna 404 se não encontrada"""
-    venda = db.query(Venda).filter_by(
-        id=venda_id,
-        tenant_id=tenant_id
-    ).first()
+    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
 
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
@@ -78,10 +78,7 @@ def _obter_venda_ou_404(db: Session, venda_id: int, tenant_id: str):
 
 def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
     """Busca cliente com validação de tenant e retorna 404 se não encontrado"""
-    cliente = db.query(Cliente).filter_by(
-        id=cliente_id,
-        tenant_id=tenant_id
-    ).first()
+    cliente = db.query(Cliente).filter_by(id=cliente_id, tenant_id=tenant_id).first()
 
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
@@ -90,13 +87,18 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
 
 
 def _listar_pagamentos_venda_para_comissao(db: Session, venda_id: int, tenant_id):
-    return execute_tenant_safe(db, """
+    return execute_tenant_safe(
+        db,
+        """
         SELECT vp.id, vp.forma_pagamento, vp.valor, vp.data_pagamento
         FROM venda_pagamentos vp
         WHERE vp.venda_id = :venda_id
           AND vp.{tenant_filter}
         ORDER BY vp.data_pagamento ASC
-    """, {"venda_id": venda_id}, tenant_id=tenant_id).fetchall()
+    """,
+        {"venda_id": venda_id},
+        tenant_id=tenant_id,
+    ).fetchall()
 
 
 def _parcelas_com_comissao_funcionario(
@@ -105,16 +107,21 @@ def _parcelas_com_comissao_funcionario(
     funcionario_id: int,
     tenant_id,
 ) -> set:
-    rows = execute_tenant_safe(db, """
+    rows = execute_tenant_safe(
+        db,
+        """
         SELECT DISTINCT parcela_numero
         FROM comissoes_itens
         WHERE venda_id = :venda_id
           AND funcionario_id = :funcionario_id
           AND {tenant_filter}
-    """, {
-        "venda_id": venda_id,
-        "funcionario_id": funcionario_id,
-    }, tenant_id=tenant_id).fetchall()
+    """,
+        {
+            "venda_id": venda_id,
+            "funcionario_id": funcionario_id,
+        },
+        tenant_id=tenant_id,
+    ).fetchall()
     return {row[0] for row in rows}
 
 
@@ -132,7 +139,9 @@ def _gerar_comissoes_pendentes_venda(
 
     todos_pagamentos = _listar_pagamentos_venda_para_comissao(db, venda.id, tenant_id)
     if not todos_pagamentos:
-        logger.info("Nenhum pagamento encontrado na venda %s para gerar comissao", venda.id)
+        logger.info(
+            "Nenhum pagamento encontrado na venda %s para gerar comissao", venda.id
+        )
         return {"comissoes_geradas": 0, "total_comissoes": 0.0}
 
     parcelas_com_comissao = _parcelas_com_comissao_funcionario(
@@ -185,43 +194,67 @@ def _gerar_comissoes_pendentes_venda(
 
 
 def _total_pago_venda(db: Session, venda_id: int, tenant_id) -> Decimal:
-    row = execute_tenant_safe(db, """
+    row = execute_tenant_safe(
+        db,
+        """
         SELECT COALESCE(SUM(valor), 0) as total_pago
         FROM venda_pagamentos
         WHERE venda_id = :venda_id
           AND {tenant_filter}
-    """, {"venda_id": venda_id}, tenant_id=tenant_id).fetchone()
+    """,
+        {"venda_id": venda_id},
+        tenant_id=tenant_id,
+    ).fetchone()
     return Decimal(str(row[0])) if row else Decimal("0")
 
 
 def _contar_comissoes_venda(db: Session, venda_id: int, tenant_id) -> int:
-    return execute_tenant_safe(db, """
+    return (
+        execute_tenant_safe(
+            db,
+            """
         SELECT COUNT(*) FROM comissoes_itens
         WHERE venda_id = :venda_id
           AND {tenant_filter}
-    """, {"venda_id": venda_id}, tenant_id=tenant_id).scalar() or 0
+    """,
+            {"venda_id": venda_id},
+            tenant_id=tenant_id,
+        ).scalar()
+        or 0
+    )
 
 
 def _remover_comissoes_venda(db: Session, venda_id: int, tenant_id) -> None:
-    execute_tenant_safe(db, """
+    execute_tenant_safe(
+        db,
+        """
         DELETE FROM comissoes_itens
         WHERE venda_id = :venda_id
           AND {tenant_filter}
-    """, {"venda_id": venda_id}, tenant_id=tenant_id)
+    """,
+        {"venda_id": venda_id},
+        tenant_id=tenant_id,
+    )
 
 
 def _remover_provisoes_comissao_venda(db: Session, venda_id: int, tenant_id) -> None:
-    execute_tenant_safe(db, """
+    execute_tenant_safe(
+        db,
+        """
         DELETE FROM contas_pagar
         WHERE {tenant_filter}
           AND descricao LIKE :descricao
           AND status = 'pendente'
-    """, {"descricao": f"%Comissão - Venda #{venda_id}%"}, tenant_id=tenant_id)
+    """,
+        {"descricao": f"%Comissão - Venda #{venda_id}%"},
+        tenant_id=tenant_id,
+    )
 
 
 # ============================================================================
 # SCHEMAS PYDANTIC
 # ============================================================================
+
 
 class VendaItemSchema(BaseModel):
     tipo: str  # 'produto' ou 'servico'
@@ -235,6 +268,7 @@ class VendaItemSchema(BaseModel):
     pet_id: Optional[int] = None  # Vincular item a um pet específico
     is_kit: Optional[bool] = None  # Identificar se o item é um KIT
 
+
 class VendaPagamentoSchema(BaseModel):
     forma_pagamento: str
     valor: float
@@ -246,6 +280,7 @@ class VendaPagamentoSchema(BaseModel):
     operadora_id: Optional[int] = None  # 🆕 ID da operadora de cartão
     valor_recebido: Optional[float] = None
     troco: Optional[float] = None
+
 
 class CriarVendaRequest(BaseModel):
     cliente_id: Optional[int] = None
@@ -268,10 +303,12 @@ class CriarVendaRequest(BaseModel):
     valor_por_km: Optional[float] = None
     observacoes_entrega: Optional[str] = None
 
+
 class FinalizarVendaRequest(BaseModel):
     pagamentos: List[VendaPagamentoSchema]
     cupom_code: Optional[str] = None
     cupom_discount_applied: Optional[float] = None
+
 
 class CancelarVendaRequest(BaseModel):
     motivo: Optional[str] = None
@@ -290,6 +327,7 @@ def _normalizar_motivo_exclusao_venda(motivo: Optional[str]) -> str:
             detail="Informe uma justificativa com pelo menos 10 caracteres para excluir/cancelar a venda.",
         )
     return motivo_normalizado
+
 
 # [DEPRECATED - Sprint 1 BLOCO 3] Movido para app/api/endpoints/configuracoes_entrega.py
 # class ConfiguracaoEntregaSchema(BaseModel):
@@ -316,7 +354,8 @@ def _normalizar_motivo_exclusao_venda(motivo: Optional[str]) -> str:
 # ENDPOINTS - VENDAS CRUD
 # ============================================================================
 
-@router.get('')
+
+@router.get("")
 def listar_vendas(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=5000),  # Aumentado limite para relatórios
@@ -328,19 +367,23 @@ def listar_vendas(
     tem_entrega: Optional[bool] = None,
     sem_rota: Optional[bool] = None,  # Filtrar vendas sem rota de entrega
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Lista as vendas com filtros - OTIMIZADO com eager loading"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     try:
         # EAGER LOADING: Carregar todas as relações de uma vez (evita N+1 queries)
-        query = db.query(Venda).options(
-            joinedload(Venda.cliente),          # Cliente da venda
-            joinedload(Venda.pagamentos),       # Pagamentos da venda
-            joinedload(Venda.itens).joinedload(VendaItem.produto)  # Itens + Produtos
-        ).filter_by(
-            tenant_id=tenant_id
+        query = (
+            db.query(Venda)
+            .options(
+                joinedload(Venda.cliente),  # Cliente da venda
+                joinedload(Venda.pagamentos),  # Pagamentos da venda
+                joinedload(Venda.itens).joinedload(
+                    VendaItem.produto
+                ),  # Itens + Produtos
+            )
+            .filter_by(tenant_id=tenant_id)
         )
     except Exception as e:
         logger.error(f"❌ Erro ao criar query base: {str(e)}")
@@ -359,21 +402,24 @@ def listar_vendas(
     # Filtrar vendas sem rota de entrega
     if sem_rota:
         from app.rotas_entrega_models import RotaEntrega
+
         # Buscar vendas que não têm rota associada
-        subquery = db.query(RotaEntrega.venda_id).filter(
-            RotaEntrega.tenant_id == tenant_id
-        ).subquery()
+        subquery = (
+            db.query(RotaEntrega.venda_id)
+            .filter(RotaEntrega.tenant_id == tenant_id)
+            .subquery()
+        )
         query = query.filter(~Venda.id.in_(subquery))
 
     if data_inicio:
         # Datas no banco são naive (sem timezone) em horário de Brasília
-        data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d')
+        data_inicio_dt = datetime.strptime(data_inicio, "%Y-%m-%d")
         data_inicio_dt = data_inicio_dt.replace(hour=0, minute=0, second=0)
         query = query.filter(Venda.data_venda >= data_inicio_dt)
 
     if data_fim:
         # Datas no banco são naive (sem timezone) em horário de Brasília
-        data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d')
+        data_fim_dt = datetime.strptime(data_fim, "%Y-%m-%d")
         data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
         query = query.filter(Venda.data_venda <= data_fim_dt)
 
@@ -381,11 +427,11 @@ def listar_vendas(
         try:
             # Buscar por número da venda, observações OU nome do cliente
             # SQLite: usar LIKE com lower() para case-insensitive
-            busca_lower = f'%{busca.lower()}%'
+            busca_lower = f"%{busca.lower()}%"
             query = query.outerjoin(Cliente, Venda.cliente_id == Cliente.id).filter(
                 or_(
                     Venda.numero_venda.contains(busca),
-                    func.lower(Cliente.nome).like(busca_lower)
+                    func.lower(Cliente.nome).like(busca_lower),
                 )
             )
         except Exception as e:
@@ -402,31 +448,31 @@ def listar_vendas(
     vendas = query.offset((page - 1) * per_page).limit(per_page).all()
 
     return {
-        'vendas': [v.to_dict() for v in vendas],
-        'total': total,
-        'pages': (total + per_page - 1) // per_page,
-        'current_page': page
+        "vendas": [v.to_dict() for v in vendas],
+        "total": total,
+        "pages": (total + per_page - 1) // per_page,
+        "current_page": page,
     }
 
 
-@router.get('/{venda_id}')
+@router.get("/{venda_id}")
 def buscar_venda(
     venda_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Busca uma venda específica"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    venda = db.query(Venda).options(
-        joinedload(Venda.itens).joinedload(VendaItem.produto)
-    ).filter_by(
-        id=venda_id,
-        tenant_id=tenant_id
-    ).first()
+    venda = (
+        db.query(Venda)
+        .options(joinedload(Venda.itens).joinedload(VendaItem.produto))
+        .filter_by(id=venda_id, tenant_id=tenant_id)
+        .first()
+    )
 
     if not venda:
-        raise HTTPException(status_code=404, detail='Venda não encontrada')
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
 
     # 🐛 DEBUG: Log dos valores de entrega
     logger.info(
@@ -438,14 +484,14 @@ def buscar_venda(
     return venda.to_dict()
 
 
-@router.post('')
+@router.post("")
 @idempotent()  # 🔒 IDEMPOTÊNCIA: evita criação duplicada de vendas
 @require_permission("vendas.criar")
 async def criar_venda(
     dados: CriarVendaRequest,
     request: Request,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Cria uma nova venda.
@@ -454,6 +500,7 @@ async def criar_venda(
     A rota apenas valida o request e chama o service.
     """
     from app.vendas.service import VendaService
+
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     # ========================================
@@ -461,15 +508,16 @@ async def criar_venda(
     # ========================================
     for item in dados.itens:
         if item.produto_id:
-            produto = db.query(Produto).filter(
-                Produto.id == item.produto_id,
-                Produto.tenant_id == tenant_id
-            ).first()
+            produto = (
+                db.query(Produto)
+                .filter(Produto.id == item.produto_id, Produto.tenant_id == tenant_id)
+                .first()
+            )
 
             if produto and produto.is_parent:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"❌ Produto '{produto.nome}' possui variações e não pode ser vendido diretamente. Selecione uma variação específica (cor, tamanho, etc.) para adicionar ao carrinho."
+                    detail=f"❌ Produto '{produto.nome}' possui variações e não pode ser vendido diretamente. Selecione uma variação específica (cor, tamanho, etc.) para adicionar ao carrinho.",
                 )
 
     # ========================================
@@ -478,7 +526,7 @@ async def criar_venda(
     if dados.tem_entrega and not dados.endereco_entrega:
         raise HTTPException(
             status_code=400,
-            detail="❌ Endereço de entrega é obrigatório quando a venda tem entrega. Selecione o endereço do cliente ou digite um novo."
+            detail="❌ Endereço de entrega é obrigatório quando a venda tem entrega. Selecione o endereço do cliente ou digite um novo.",
         )
 
     # ========================================
@@ -487,38 +535,36 @@ async def criar_venda(
     if dados.tem_entrega and not dados.entregador_id:
         raise HTTPException(
             status_code=400,
-            detail="❌ Entregador é obrigatório quando a venda tem entrega. Selecione um entregador antes de salvar."
+            detail="❌ Entregador é obrigatório quando a venda tem entrega. Selecione um entregador antes de salvar.",
         )
 
     # Preparar payload para o service
     payload = {
-        'cliente_id': dados.cliente_id,
-        'vendedor_id': dados.vendedor_id,
-        'funcionario_id': dados.funcionario_id,
-        'itens': [item.dict() for item in dados.itens],
-        'desconto_valor': dados.desconto_valor,
-        'desconto_percentual': dados.desconto_percentual,
-        'cupom_code': dados.cupom_code.strip().upper() if dados.cupom_code else None,
-        'cupom_discount_applied': dados.cupom_discount_applied,
-        'observacoes': dados.observacoes,
-        'tem_entrega': dados.tem_entrega,
-        'taxa_entrega': dados.taxa_entrega,
-        'percentual_taxa_loja': dados.percentual_taxa_loja,
-        'percentual_taxa_entregador': dados.percentual_taxa_entregador,
-        'entregador_id': dados.entregador_id,
-        'loja_origem': dados.loja_origem,
-        'endereco_entrega': dados.endereco_entrega,
-        'distancia_km': dados.distancia_km,
-        'valor_por_km': dados.valor_por_km,
-        'observacoes_entrega': dados.observacoes_entrega,
-        'tenant_id': tenant_id
+        "cliente_id": dados.cliente_id,
+        "vendedor_id": dados.vendedor_id,
+        "funcionario_id": dados.funcionario_id,
+        "itens": [item.dict() for item in dados.itens],
+        "desconto_valor": dados.desconto_valor,
+        "desconto_percentual": dados.desconto_percentual,
+        "cupom_code": dados.cupom_code.strip().upper() if dados.cupom_code else None,
+        "cupom_discount_applied": dados.cupom_discount_applied,
+        "observacoes": dados.observacoes,
+        "tem_entrega": dados.tem_entrega,
+        "taxa_entrega": dados.taxa_entrega,
+        "percentual_taxa_loja": dados.percentual_taxa_loja,
+        "percentual_taxa_entregador": dados.percentual_taxa_entregador,
+        "entregador_id": dados.entregador_id,
+        "loja_origem": dados.loja_origem,
+        "endereco_entrega": dados.endereco_entrega,
+        "distancia_km": dados.distancia_km,
+        "valor_por_km": dados.valor_por_km,
+        "observacoes_entrega": dados.observacoes_entrega,
+        "tenant_id": tenant_id,
     }
 
     # Chamar service (toda lógica de negócio está lá)
     venda_dict = VendaService.criar_venda(
-        payload=payload,
-        user_id=current_user.id,
-        db=db
+        payload=payload, user_id=current_user.id, db=db
     )
 
     # ============================================================================
@@ -530,8 +576,7 @@ async def criar_venda(
         # Obter processador para sessão (tenant + session_id único)
         session_id = f"venda_{venda_dict['id']}"
         processor = get_opportunity_processor(
-            tenant_id=UUID(str(tenant_id)),
-            session_id=session_id
+            tenant_id=UUID(str(tenant_id)), session_id=session_id
         )
 
         # GATILHO 1: Cliente selecionado (se houver cliente)
@@ -546,13 +591,13 @@ async def criar_venda(
                     "produto_id": item.produto_id,
                     "quantidade": float(item.quantidade),
                     "preco": float(item.preco_unitario),
-                    "categoria": None  # Placeholder - expandir com dados do produto se necessário
+                    "categoria": None,  # Placeholder - expandir com dados do produto se necessário
                 }
                 for item in dados.itens
             ]
             processor.on_item_added(
                 cliente_id=UUID(str(dados.cliente_id)) if dados.cliente_id else None,
-                itens_carrinho=itens_contexto
+                itens_carrinho=itens_contexto,
             )
     except Exception as e:
         # Fail-safe: Nunca deixar background processor afetar fluxo principal
@@ -562,41 +607,40 @@ async def criar_venda(
     return venda_dict
 
 
-@router.put('/{venda_id}')
+@router.put("/{venda_id}")
 def atualizar_venda(
     venda_id: int,
     dados: CriarVendaRequest,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Atualiza uma venda existente (somente vendas abertas)"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     # Buscar venda
-    venda = db.query(Venda).filter_by(
-        id=venda_id,
-        tenant_id=tenant_id
-    ).first()
+    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
 
     if not venda:
-        raise HTTPException(status_code=404, detail='Venda não encontrada')
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
 
     # Só permite atualizar vendas abertas
-    if venda.status != 'aberta':
+    if venda.status != "aberta":
         raise HTTPException(
             status_code=400,
-            detail=f'Não é possível atualizar venda com status "{venda.status}". Apenas vendas abertas podem ser atualizadas.'
+            detail=f'Não é possível atualizar venda com status "{venda.status}". Apenas vendas abertas podem ser atualizadas.',
         )
 
     # Validações
     if not dados.itens or len(dados.itens) == 0:
-        raise HTTPException(status_code=400, detail='A venda deve ter pelo menos um item')
+        raise HTTPException(
+            status_code=400, detail="A venda deve ter pelo menos um item"
+        )
 
     # Validar endereço obrigatório quando tem entrega
     if dados.tem_entrega and not dados.endereco_entrega:
         raise HTTPException(
             status_code=400,
-            detail="❌ Endereço de entrega é obrigatório quando a venda tem entrega. Selecione o endereço do cliente ou digite um novo."
+            detail="❌ Endereço de entrega é obrigatório quando a venda tem entrega. Selecione o endereço do cliente ou digite um novo.",
         )
 
     # Validar entregador obrigatório quando tem entrega
@@ -614,7 +658,12 @@ def atualizar_venda(
         if tem_entrega
         else 0.0
     )
-    if tem_entrega and taxa_entrega > 0 and percentual_taxa_entregador == 0 and percentual_taxa_loja == 0:
+    if (
+        tem_entrega
+        and taxa_entrega > 0
+        and percentual_taxa_entregador == 0
+        and percentual_taxa_loja == 0
+    ):
         percentual_taxa_loja = 100.0
     valor_taxa_entregador = (
         taxa_entrega * percentual_taxa_entregador / 100 if taxa_entrega > 0 else 0.0
@@ -622,12 +671,14 @@ def atualizar_venda(
     valor_taxa_loja = (
         taxa_entrega * percentual_taxa_loja / 100 if taxa_entrega > 0 else 0.0
     )
-    entregador_id_resolvido = (dados.entregador_id or venda.entregador_id) if tem_entrega else None
+    entregador_id_resolvido = (
+        (dados.entregador_id or venda.entregador_id) if tem_entrega else None
+    )
 
     if tem_entrega and not entregador_id_resolvido:
         raise HTTPException(
             status_code=400,
-            detail="❌ Entregador é obrigatório quando a venda tem entrega. Selecione um entregador antes de salvar."
+            detail="❌ Entregador é obrigatório quando a venda tem entrega. Selecione um entregador antes de salvar.",
         )
 
     # Calcular novos totais
@@ -635,7 +686,7 @@ def atualizar_venda(
         dados.itens,
         dados.desconto_valor or 0,
         dados.desconto_percentual or 0,
-        taxa_entrega
+        taxa_entrega,
     )
 
     logger.info(f"\n🔄 ATUALIZANDO VENDA {venda_id}:")
@@ -645,16 +696,18 @@ def atualizar_venda(
     # Atualizar campos da venda
     venda.cliente_id = dados.cliente_id
     venda.vendedor_id = dados.vendedor_id or current_user.id
-    venda.funcionario_id = dados.funcionario_id  # ✅ Funcionário/Veterinário que recebe comissão
+    venda.funcionario_id = (
+        dados.funcionario_id
+    )  # ✅ Funcionário/Veterinário que recebe comissão
 
     logger.info(f"   funcionario_id novo: {venda.funcionario_id}")
 
-    venda.subtotal = totais['subtotal']
-    venda.desconto_valor = totais['desconto_valor']
+    venda.subtotal = totais["subtotal"]
+    venda.desconto_valor = totais["desconto_valor"]
     venda.desconto_percentual = dados.desconto_percentual or 0
     venda.cupom_code = dados.cupom_code.strip().upper() if dados.cupom_code else None
     venda.cupom_discount_applied = dados.cupom_discount_applied
-    venda.total = totais['total']
+    venda.total = totais["total"]
     venda.observacoes = dados.observacoes
     venda.tem_entrega = tem_entrega
     venda.taxa_entrega = taxa_entrega
@@ -668,7 +721,9 @@ def atualizar_venda(
     venda.distancia_km = dados.distancia_km if tem_entrega else None
     venda.valor_por_km = dados.valor_por_km if tem_entrega else None
     venda.observacoes_entrega = dados.observacoes_entrega if tem_entrega else None
-    venda.status_entrega = _resolver_status_entrega_atualizacao(tem_entrega, venda.status_entrega)
+    venda.status_entrega = _resolver_status_entrega_atualizacao(
+        tem_entrega, venda.status_entrega
+    )
     if not tem_entrega:
         venda.data_entrega = None
     venda.updated_at = datetime.now()
@@ -676,7 +731,9 @@ def atualizar_venda(
     # 🔄 DEVOLVER ESTOQUE dos produtos REMOVIDOS
     # Compara itens antigos com novos e devolve o que foi removido
     itens_antigos = db.query(VendaItem).filter_by(venda_id=venda.id).all()
-    produtos_antigos_ids = {item.produto_id for item in itens_antigos if item.produto_id}
+    produtos_antigos_ids = {
+        item.produto_id for item in itens_antigos if item.produto_id
+    }
     produtos_novos_ids = {item.produto_id for item in dados.itens if item.produto_id}
     produtos_removidos_ids = produtos_antigos_ids - produtos_novos_ids
 
@@ -684,26 +741,28 @@ def atualizar_venda(
     for item_antigo in itens_antigos:
         if item_antigo.produto_id in produtos_removidos_ids:
             try:
-                logger.info(f"📦 Devolvendo estoque (produto removido): Produto {item_antigo.produto_id} +{item_antigo.quantidade}")
+                logger.info(
+                    f"📦 Devolvendo estoque (produto removido): Produto {item_antigo.produto_id} +{item_antigo.quantidade}"
+                )
                 EstoqueService.estornar_estoque(
                     produto_id=item_antigo.produto_id,
                     quantidade=float(item_antigo.quantidade),
-                    motivo='ajuste',
+                    motivo="ajuste",
                     referencia_id=venda.id,
-                    referencia_tipo='venda_editada',
+                    referencia_tipo="venda_editada",
                     user_id=current_user.id,
                     tenant_id=tenant_id,
                     db=db,
                     documento=None,
-                    observacao=f'Produto removido da venda #{venda.id}'
+                    observacao=f"Produto removido da venda #{venda.id}",
                 )
                 log_action(
                     db=db,
                     user_id=current_user.id,
-                    action='update',
-                    entity_type='produtos',
+                    action="update",
+                    entity_type="produtos",
                     entity_id=item_antigo.produto_id,
-                    details=f'Estorno (+{item_antigo.quantidade}) - Produto removido da venda #{venda.id}'
+                    details=f"Estorno (+{item_antigo.quantidade}) - Produto removido da venda #{venda.id}",
                 )
             except ValueError as e:
                 logger.error(f"❌ Erro ao estornar estoque: {e}")
@@ -725,15 +784,21 @@ def atualizar_venda(
             desconto_item=item_data.desconto_item or 0,
             subtotal=item_data.subtotal,
             lote_id=item_data.lote_id,
-            pet_id=item_data.pet_id
+            pet_id=item_data.pet_id,
         )
         db.add(item)
 
     db.commit()
     db.refresh(venda)
 
-    log_action(db, current_user.id, 'update', 'vendas', venda.id,
-               details=f'Venda {venda.numero_venda} atualizada - Total: R$ {totais["total"]:.2f}')
+    log_action(
+        db,
+        current_user.id,
+        "update",
+        "vendas",
+        venda.id,
+        details=f"Venda {venda.numero_venda} atualizada - Total: R$ {totais['total']:.2f}",
+    )
 
     # ============================================================================
     # ❌ IMPORTANTE: rota NÃO é criada automaticamente na edição da venda
@@ -762,8 +827,7 @@ def atualizar_venda(
         # Obter processador para sessão
         session_id = f"venda_{venda.id}"
         processor = get_opportunity_processor(
-            tenant_id=UUID(str(tenant_id)),
-            session_id=session_id
+            tenant_id=UUID(str(tenant_id)), session_id=session_id
         )
 
         # 🔴 CASO ESPECIAL: Cliente removido da venda
@@ -783,7 +847,7 @@ def atualizar_venda(
                         "produto_id": item.produto_id,
                         "quantidade": float(item.quantidade),
                         "preco": float(item.preco_unitario),
-                        "categoria": None
+                        "categoria": None,
                     }
                     for item in dados.itens
                 ]
@@ -791,8 +855,10 @@ def atualizar_venda(
                 # Atualização: pode ser adição ou remoção, usar on_item_added genericamente
                 # (background processor analisa contexto internamente)
                 processor.on_item_added(
-                    cliente_id=UUID(str(dados.cliente_id)) if dados.cliente_id else None,
-                    itens_carrinho=itens_contexto
+                    cliente_id=UUID(str(dados.cliente_id))
+                    if dados.cliente_id
+                    else None,
+                    itens_carrinho=itens_contexto,
                 )
     except Exception as e:
         # Fail-safe: Nunca deixar background processor afetar fluxo principal
@@ -814,11 +880,13 @@ def atualizar_venda(
             logger.info(f"📊 Venda {venda.id}: Total={total_venda}, Pago={total_pago}")
 
             # Se está totalmente paga, finalizar e gerar comissões
-            if total_pago >= total_venda - Decimal('0.01'):  # Margem de 1 centavo
-                logger.info(f"✅ Venda {venda.id} está totalmente paga, finalizando e gerando comissões...")
+            if total_pago >= total_venda - Decimal("0.01"):  # Margem de 1 centavo
+                logger.info(
+                    f"✅ Venda {venda.id} está totalmente paga, finalizando e gerando comissões..."
+                )
 
                 # Atualizar status
-                venda.status = 'finalizada'
+                venda.status = "finalizada"
                 venda.updated_at = datetime.now()
                 get_or_build_venda_rentabilidade_snapshot(
                     venda,
@@ -830,7 +898,7 @@ def atualizar_venda(
                 db.commit()
                 db.refresh(venda)
 
-            if venda.status in ['baixa_parcial', 'finalizada']:
+            if venda.status in ["baixa_parcial", "finalizada"]:
                 resultado_comissoes = _gerar_comissoes_pendentes_venda(
                     db=db,
                     venda=venda,
@@ -855,7 +923,10 @@ def atualizar_venda(
                     )
 
         except Exception as e:
-            logger.error(f"❌ Erro ao verificar pagamentos e gerar comissões: {str(e)}", exc_info=True)
+            logger.error(
+                f"❌ Erro ao verificar pagamentos e gerar comissões: {str(e)}",
+                exc_info=True,
+            )
             # Não falha a atualização por erro nas comissões
 
     return venda.to_dict()
@@ -865,16 +936,20 @@ class MarcarEntregueRequest(BaseModel):
     retirado_por: str | None = None
 
 
-@router.post('/{venda_id}/marcar-entregue')
+@router.post("/{venda_id}/marcar-entregue")
 async def marcar_venda_entregue(
     venda_id: int,
     dados: MarcarEntregueRequest = MarcarEntregueRequest(),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Confirma que o cliente retirou o pedido na loja (ou terceiro apresentou a palavra-chave)."""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    venda = db.query(Venda).filter(Venda.id == venda_id, Venda.tenant_id == tenant_id).first()
+    venda = (
+        db.query(Venda)
+        .filter(Venda.id == venda_id, Venda.tenant_id == tenant_id)
+        .first()
+    )
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
     venda.status_entrega = "entregue"
@@ -882,18 +957,27 @@ async def marcar_venda_entregue(
     if dados.retirado_por:
         venda.retirado_por = dados.retirado_por.strip()
     db.commit()
-    return {"id": venda_id, "status_entrega": "entregue", "data_entrega": venda.data_entrega.isoformat(), "retirado_por": venda.retirado_por}
+    return {
+        "id": venda_id,
+        "status_entrega": "entregue",
+        "data_entrega": venda.data_entrega.isoformat(),
+        "retirado_por": venda.retirado_por,
+    }
 
 
-@router.post('/{venda_id}/marcar-pronto-retirada')
+@router.post("/{venda_id}/marcar-pronto-retirada")
 async def marcar_venda_pronta_retirada(
     venda_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Marca pedido de retirada/app/e-commerce como separado e pronto para o cliente."""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    venda = db.query(Venda).filter(Venda.id == venda_id, Venda.tenant_id == tenant_id).first()
+    venda = (
+        db.query(Venda)
+        .filter(Venda.id == venda_id, Venda.tenant_id == tenant_id)
+        .first()
+    )
     if not venda:
         raise HTTPException(status_code=404, detail="Venda nao encontrada")
     if venda.status_entrega == "entregue":
@@ -903,14 +987,14 @@ async def marcar_venda_pronta_retirada(
     return {"id": venda_id, "status_entrega": "pronto"}
 
 
-@router.post('/{venda_id}/finalizar')
+@router.post("/{venda_id}/finalizar")
 @idempotent()  # 🔒 IDEMPOTÊNCIA: evita finalização duplicada
 async def finalizar_venda(
     venda_id: int,
     dados: FinalizarVendaRequest,
     request: Request,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Finaliza uma venda com os pagamentos.
@@ -926,7 +1010,7 @@ async def finalizar_venda(
         event="FINALIZE_START",
         message=f"Iniciando finalização da venda #{venda_id}",
         venda_id=venda_id,
-        total_pagamentos=len(dados.pagamentos) if dados and dados.pagamentos else 0
+        total_pagamentos=len(dados.pagamentos) if dados and dados.pagamentos else 0,
     )
 
     # ========================================
@@ -936,7 +1020,7 @@ async def finalizar_venda(
     if venda_temp and venda_temp.tem_entrega and not venda_temp.entregador_id:
         raise HTTPException(
             status_code=400,
-            detail="❌ Não é possível finalizar. Entregador é obrigatório quando a venda tem entrega. Atribua um entregador antes de finalizar."
+            detail="❌ Não é possível finalizar. Entregador é obrigatório quando a venda tem entrega. Atribua um entregador antes de finalizar.",
         )
 
     # ============================================================
@@ -946,28 +1030,34 @@ async def finalizar_venda(
     from app.vendas import VendaService
 
     # Converter pagamentos do request para formato do service
-    pagamentos_list = [
-        {
-            'forma_pagamento': p.forma_pagamento,
-            'valor': p.valor,
-            'numero_parcelas': p.numero_parcelas,
-            'bandeira': getattr(p, 'bandeira', None),
-            'nsu_cartao': getattr(p, 'nsu_cartao', None),
-            'operadora_id': getattr(p, 'operadora_id', None)  # 🆕 Capturar operadora
-        }
-        for p in dados.pagamentos
-    ] if dados.pagamentos else []
+    pagamentos_list = (
+        [
+            {
+                "forma_pagamento": p.forma_pagamento,
+                "valor": p.valor,
+                "numero_parcelas": p.numero_parcelas,
+                "bandeira": getattr(p, "bandeira", None),
+                "nsu_cartao": getattr(p, "nsu_cartao", None),
+                "operadora_id": getattr(
+                    p, "operadora_id", None
+                ),  # 🆕 Capturar operadora
+            }
+            for p in dados.pagamentos
+        ]
+        if dados.pagamentos
+        else []
+    )
 
     # Executar finalização com transação atômica única
     resultado = VendaService.finalizar_venda(
         venda_id=venda_id,
         pagamentos=pagamentos_list,
         user_id=current_user.id,
-        user_nome=current_user.nome or current_user.email or 'Usuário',
+        user_nome=current_user.nome or current_user.email or "Usuário",
         tenant_id=tenant_id,
         cupom_code=dados.cupom_code,
         cupom_discount_applied=dados.cupom_discount_applied,
-        db=db
+        db=db,
     )
 
     # Log de sucesso
@@ -975,9 +1065,9 @@ async def finalizar_venda(
         event="FINALIZE_SUCCESS",
         message="Venda finalizada com sucesso",
         venda_id=venda_id,
-        numero_venda=resultado['venda']['numero_venda'],
-        status=resultado['venda']['status'],
-        total_pago=resultado['venda']['total_pago']
+        numero_venda=resultado["venda"]["numero_venda"],
+        status=resultado["venda"]["status"],
+        total_pago=resultado["venda"]["total_pago"],
     )
 
     # ============================================================
@@ -985,12 +1075,11 @@ async def finalizar_venda(
     # ============================================================
 
     # Recarregar venda para ter dados atualizados após commit
-    venda = db.query(Venda).filter_by(
-        id=venda_id,
-        tenant_id=tenant_id
-    ).first()
+    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
     if not venda:
-        raise HTTPException(status_code=404, detail='Venda não encontrada após finalização')
+        raise HTTPException(
+            status_code=404, detail="Venda não encontrada após finalização"
+        )
 
     # 🆕 GERAR COMISSÕES AUTOMATICAMENTE (apenas se funcionário/veterinário foi selecionado)
     if venda.funcionario_id:
@@ -999,7 +1088,9 @@ async def finalizar_venda(
 
             # � BUSCAR TODOS OS PAGAMENTOS DA VENDA (não só os novos!)
             # Precisamos gerar comissões para TODOS os pagamentos que ainda não têm comissão
-            todos_pagamentos = _listar_pagamentos_venda_para_comissao(db, venda.id, tenant_id)
+            todos_pagamentos = _listar_pagamentos_venda_para_comissao(
+                db, venda.id, tenant_id
+            )
 
             if not todos_pagamentos:
                 logger.info("ℹ️  Nenhum pagamento encontrado na venda")
@@ -1011,18 +1102,22 @@ async def finalizar_venda(
                     venda.funcionario_id,
                     tenant_id,
                 )
-                logger.info(f"📊 Pagamentos: {len(todos_pagamentos)} total, {len(parcelas_com_comissao)} já com comissão")
+                logger.info(
+                    f"📊 Pagamentos: {len(todos_pagamentos)} total, {len(parcelas_com_comissao)} já com comissão"
+                )
 
                 # 🔄 GERAR UMA COMISSÃO PARA CADA PAGAMENTO SEM COMISSÃO
                 comissoes_geradas = 0
-                total_comissoes = Decimal('0')
+                total_comissoes = Decimal("0")
 
                 for idx, pagamento_row in enumerate(todos_pagamentos, start=1):
                     parcela_numero = idx
 
                     # Pular se já tem comissão
                     if parcela_numero in parcelas_com_comissao:
-                        logger.info(f"⏭️  Parcela {parcela_numero} já tem comissão - pulando")
+                        logger.info(
+                            f"⏭️  Parcela {parcela_numero} já tem comissão - pulando"
+                        )
                         continue
 
                     valor_pagamento = Decimal(str(pagamento_row[2]))
@@ -1035,7 +1130,7 @@ async def finalizar_venda(
                         funcionario_id=venda.funcionario_id,
                         valor_pago=float(valor_pagamento),
                         forma_pagamento=forma_pagamento,
-                        parcela_numero=parcela_numero
+                        parcela_numero=parcela_numero,
                     )
 
                     resultado = gerar_comissoes_venda(
@@ -1044,35 +1139,43 @@ async def finalizar_venda(
                         valor_pago=valor_pagamento,
                         forma_pagamento=forma_pagamento,  # ✅ Passa forma de pagamento correta
                         parcela_numero=parcela_numero,
-                        db=db
+                        db=db,
                     )
 
-                    if resultado and resultado.get('success'):
-                        if not resultado.get('duplicated'):
+                    if resultado and resultado.get("success"):
+                        if not resultado.get("duplicated"):
                             comissoes_geradas += 1
-                            total_comissoes += Decimal(str(resultado.get('total_comissao', 0)))
+                            total_comissoes += Decimal(
+                                str(resultado.get("total_comissao", 0))
+                            )
                             struct_logger.info(
                                 event="COMMISSION_GENERATED",
                                 message="Comissão gerada para pagamento",
                                 venda_id=venda.id,
                                 parcela_numero=parcela_numero,
-                                valor_comissao=float(resultado.get('total_comissao', 0))
+                                valor_comissao=float(
+                                    resultado.get("total_comissao", 0)
+                                ),
                             )
                         else:
                             struct_logger.warning(
                                 event="COMMISSION_DUPLICATED",
                                 message="Comissão já existia (proteção idempotente)",
                                 venda_id=venda.id,
-                                parcela_numero=parcela_numero
+                                parcela_numero=parcela_numero,
                             )
 
                 if comissoes_geradas > 0:
-                    logger.info(f"✅ {comissoes_geradas} comissões geradas - Total: R$ {total_comissoes}")
+                    logger.info(
+                        f"✅ {comissoes_geradas} comissões geradas - Total: R$ {total_comissoes}"
+                    )
                 else:
                     logger.info("ℹ️  Nenhuma comissão nova gerada (todas já existiam)")
 
         except Exception as e:
-            logger.error(f"⚠️ Erro ao gerar comissões (venda {venda.id}): {str(e)}", exc_info=True)
+            logger.error(
+                f"⚠️ Erro ao gerar comissões (venda {venda.id}): {str(e)}", exc_info=True
+            )
             # Não abortar a finalização da venda por erro nas comissões
     else:
         logger.info("ℹ️  Venda sem funcionário - comissões não geradas")
@@ -1087,57 +1190,81 @@ async def finalizar_venda(
     try:
         for item in venda.itens:
             # Apenas produtos com pet_id vinculado e que tenham recorrência
-            if item.tipo == 'produto' and item.produto_id and item.pet_id:
+            if item.tipo == "produto" and item.produto_id and item.pet_id:
                 # 🔒 SEGURANÇA: Validar que produto pertence ao usuário
                 produto = safe_get_produto(db, item.produto_id, current_user.id)
 
                 # 🔒 SEGURANÇA: Validar que pet pertence ao cliente do usuário
-                pet = db.query(Pet).filter(
-                    Pet.id == item.pet_id,
-                    Pet.cliente_id == venda.cliente_id
-                ).first()
+                pet = (
+                    db.query(Pet)
+                    .filter(Pet.id == item.pet_id, Pet.cliente_id == venda.cliente_id)
+                    .first()
+                )
 
                 if not produto or not pet:
                     continue  # Ignorar se não encontrado (segurança)
 
-                if produto and pet and produto.tem_recorrencia and produto.intervalo_dias:
+                if (
+                    produto
+                    and pet
+                    and produto.tem_recorrencia
+                    and produto.intervalo_dias
+                ):
                     # Verificar se já existe lembrete PENDENTE para este produto+pet
-                    lembrete_existente = db.query(Lembrete).filter(
-                        Lembrete.tenant_id == tenant_id,
-                        Lembrete.cliente_id == venda.cliente_id,
-                        Lembrete.pet_id == item.pet_id,
-                        Lembrete.produto_id == item.produto_id,
-                        Lembrete.status.in_(['pendente', 'notificado'])
-                    ).first()
+                    lembrete_existente = (
+                        db.query(Lembrete)
+                        .filter(
+                            Lembrete.tenant_id == tenant_id,
+                            Lembrete.cliente_id == venda.cliente_id,
+                            Lembrete.pet_id == item.pet_id,
+                            Lembrete.produto_id == item.produto_id,
+                            Lembrete.status.in_(["pendente", "notificado"]),
+                        )
+                        .first()
+                    )
 
                     if lembrete_existente:
                         # ✅ CLIENTE JÁ TINHA LEMBRETE - DAR CHECK AUTOMÁTICO
-                        historico = json.loads(lembrete_existente.historico_doses) if lembrete_existente.historico_doses else []
-                        historico.append({
-                            "dose": lembrete_existente.dose_atual,
-                            "data": datetime.utcnow().isoformat(),
-                            "comprou": True,
-                            "status": "completado",
-                            "venda_id": venda.id
-                        })
+                        historico = (
+                            json.loads(lembrete_existente.historico_doses)
+                            if lembrete_existente.historico_doses
+                            else []
+                        )
+                        historico.append(
+                            {
+                                "dose": lembrete_existente.dose_atual,
+                                "data": _utcnow_naive().isoformat(),
+                                "comprou": True,
+                                "status": "completado",
+                                "venda_id": venda.id,
+                            }
+                        )
 
                         # Marcar como completado
-                        lembrete_existente.status = 'completado'
-                        lembrete_existente.data_completado = datetime.utcnow()
+                        lembrete_existente.status = "completado"
+                        lembrete_existente.data_completado = _utcnow_naive()
                         lembrete_existente.historico_doses = json.dumps(historico)
 
                         # Verificar se é a última dose
-                        if lembrete_existente.dose_total and lembrete_existente.dose_atual >= lembrete_existente.dose_total:
+                        if (
+                            lembrete_existente.dose_total
+                            and lembrete_existente.dose_atual
+                            >= lembrete_existente.dose_total
+                        ):
                             # Última dose - NÃO criar novo lembrete
-                            lembretes_atualizados.append({
-                                "acao": "finalizado",
-                                "produto": produto.nome,
-                                "pet": pet.nome,
-                                "dose": f"{lembrete_existente.dose_atual}/{lembrete_existente.dose_total}"
-                            })
+                            lembretes_atualizados.append(
+                                {
+                                    "acao": "finalizado",
+                                    "produto": produto.nome,
+                                    "pet": pet.nome,
+                                    "dose": f"{lembrete_existente.dose_atual}/{lembrete_existente.dose_total}",
+                                }
+                            )
                         else:
                             # Criar novo lembrete para próxima dose
-                            data_proxima = datetime.utcnow() + timedelta(days=produto.intervalo_dias)
+                            data_proxima = _utcnow_naive() + timedelta(
+                                days=produto.intervalo_dias
+                            )
                             data_notificacao = data_proxima - timedelta(days=7)
 
                             novo_lembrete = Lembrete(
@@ -1147,36 +1274,42 @@ async def finalizar_venda(
                                 pet_id=item.pet_id,
                                 produto_id=item.produto_id,
                                 venda_id=venda.id,
-                                data_compra=datetime.utcnow(),
+                                data_compra=_utcnow_naive(),
                                 data_proxima_dose=data_proxima,
                                 data_notificacao_7_dias=data_notificacao,
-                                status='pendente',
+                                status="pendente",
                                 quantidade_recomendada=float(item.quantidade),
                                 preco_estimado=produto.preco_venda,
                                 dose_atual=lembrete_existente.dose_atual + 1,
                                 dose_total=lembrete_existente.dose_total,
-                                historico_doses=json.dumps(historico)
+                                historico_doses=json.dumps(historico),
                             )
                             db.add(novo_lembrete)
 
-                            lembretes_atualizados.append({
-                                "acao": "renovado",
-                                "produto": produto.nome,
-                                "pet": pet.nome,
-                                "dose": f"{novo_lembrete.dose_atual}/{novo_lembrete.dose_total or '∞'}"
-                            })
+                            lembretes_atualizados.append(
+                                {
+                                    "acao": "renovado",
+                                    "produto": produto.nome,
+                                    "pet": pet.nome,
+                                    "dose": f"{novo_lembrete.dose_atual}/{novo_lembrete.dose_total or '∞'}",
+                                }
+                            )
                     else:
                         # ✨ PRIMEIRA VENDA COM RECORRÊNCIA - CRIAR LEMBRETE
-                        data_proxima = datetime.utcnow() + timedelta(days=produto.intervalo_dias)
+                        data_proxima = _utcnow_naive() + timedelta(
+                            days=produto.intervalo_dias
+                        )
                         data_notificacao = data_proxima - timedelta(days=7)
 
-                        historico_inicial = [{
-                            "dose": 1,
-                            "data": datetime.utcnow().isoformat(),
-                            "comprou": True,
-                            "status": "criado",
-                            "venda_id": venda.id
-                        }]
+                        historico_inicial = [
+                            {
+                                "dose": 1,
+                                "data": _utcnow_naive().isoformat(),
+                                "comprou": True,
+                                "status": "criado",
+                                "venda_id": venda.id,
+                            }
+                        ]
 
                         novo_lembrete = Lembrete(
                             tenant_id=tenant_id,
@@ -1185,27 +1318,31 @@ async def finalizar_venda(
                             pet_id=item.pet_id,
                             produto_id=item.produto_id,
                             venda_id=venda.id,
-                            data_compra=datetime.utcnow(),
+                            data_compra=_utcnow_naive(),
                             data_proxima_dose=data_proxima,
                             data_notificacao_7_dias=data_notificacao,
-                            status='pendente',
+                            status="pendente",
                             quantidade_recomendada=float(item.quantidade),
                             preco_estimado=produto.preco_venda,
                             dose_atual=1,
                             dose_total=produto.numero_doses,
-                            historico_doses=json.dumps(historico_inicial)
+                            historico_doses=json.dumps(historico_inicial),
                         )
                         db.add(novo_lembrete)
 
-                        lembretes_criados.append({
-                            "produto": produto.nome,
-                            "pet": pet.nome,
-                            "proxima_dose": data_proxima.strftime("%d/%m/%Y"),
-                            "dose_total": produto.numero_doses or "∞"
-                        })
+                        lembretes_criados.append(
+                            {
+                                "produto": produto.nome,
+                                "pet": pet.nome,
+                                "proxima_dose": data_proxima.strftime("%d/%m/%Y"),
+                                "dose_total": produto.numero_doses or "∞",
+                            }
+                        )
 
         if lembretes_criados or lembretes_atualizados:
-            logger.info(f"🔔 Lembretes: {len(lembretes_criados)} criados, {len(lembretes_atualizados)} atualizados")
+            logger.info(
+                f"🔔 Lembretes: {len(lembretes_criados)} criados, {len(lembretes_atualizados)} atualizados"
+            )
 
     except Exception as e:
         logger.error(f"⚠️ Erro ao processar lembretes: {str(e)}")
@@ -1213,18 +1350,24 @@ async def finalizar_venda(
 
     db.commit()
 
-    log_action(db, current_user.id, 'UPDATE', 'vendas', venda.id,
-               details=f'Venda {venda.numero_venda} finalizada - Total: R$ {float(venda.total):.2f}')
+    log_action(
+        db,
+        current_user.id,
+        "UPDATE",
+        "vendas",
+        venda.id,
+        details=f"Venda {venda.numero_venda} finalizada - Total: R$ {float(venda.total):.2f}",
+    )
 
     # ============================================================================
     # 💾 INVALIDAR CACHE DE OPORTUNIDADES (venda finalizada)
     # ============================================================================
     try:
         from uuid import UUID
+
         session_id = f"venda_{venda.id}"
         processor = get_opportunity_processor(
-            tenant_id=UUID(str(tenant_id)),
-            session_id=session_id
+            tenant_id=UUID(str(tenant_id)), session_id=session_id
         )
         processor.cleanup()  # Limpa processador e invalida cache
     except Exception as e:
@@ -1232,7 +1375,9 @@ async def finalizar_venda(
         pass
 
     # ✅ LOG DE SUCESSO ESTRUTURADO
-    total_pago = sum(float(p.valor) for p in venda.pagamentos) if venda.pagamentos else 0
+    total_pago = (
+        sum(float(p.valor) for p in venda.pagamentos) if venda.pagamentos else 0
+    )
     struct_logger.info(
         event="FINALIZE_COMPLETE",
         message="Venda finalizada completamente (com comissões e lembretes)",
@@ -1241,22 +1386,24 @@ async def finalizar_venda(
         status_final=venda.status,
         total_venda=float(venda.total),
         total_pagamentos=total_pago,
-        forma_pagamento=dados.pagamentos[0].forma_pagamento if dados.pagamentos else None,
+        forma_pagamento=dados.pagamentos[0].forma_pagamento
+        if dados.pagamentos
+        else None,
         lembretes_criados=len(lembretes_criados),
-        lembretes_atualizados=len(lembretes_atualizados)
+        lembretes_atualizados=len(lembretes_atualizados),
     )
 
     # Adicionar informações de lembretes no retorno
     venda_dict = venda.to_dict()
     if lembretes_criados or lembretes_atualizados:
-        venda_dict['lembretes'] = {
+        venda_dict["lembretes"] = {
             "criados": lembretes_criados,
-            "atualizados": lembretes_atualizados
+            "atualizados": lembretes_atualizados,
         }
 
     # Adicionar dados do resultado do VendaService (se disponível)
-    if 'operacoes' in resultado:
-        venda_dict['resultado_operacoes'] = resultado['operacoes']
+    if "operacoes" in resultado:
+        venda_dict["resultado_operacoes"] = resultado["operacoes"]
 
     # ============================================================
     # 🎯 CAMPANHAS — Publicar evento purchase_completed na fila
@@ -1265,6 +1412,7 @@ async def finalizar_venda(
     if venda.cliente_id:
         try:
             from app.campaigns.models import CampaignEventQueue, EventOriginEnum
+
             canal_venda = venda.canal or "loja_fisica"
             evento_campanha = CampaignEventQueue(
                 tenant_id=tenant_id,
@@ -1282,7 +1430,8 @@ async def finalizar_venda(
             db.commit()
             logger.info(
                 "[Campanhas] purchase_completed publicado venda_id=%d cliente_id=%d",
-                venda.id, venda.cliente_id,
+                venda.id,
+                venda.cliente_id,
             )
         except Exception as e_camp:
             logger.error("[Campanhas] Erro ao publicar purchase_completed: %s", e_camp)
@@ -1290,14 +1439,14 @@ async def finalizar_venda(
     return venda_dict
 
 
-@router.post('/{venda_id}/cancelar')
+@router.post("/{venda_id}/cancelar")
 @idempotent()  # 🔒 IDEMPOTÊNCIA: evita cancelamento duplicado
 async def cancelar_venda(
     venda_id: int,
     dados: CancelarVendaRequest,
     request: Request,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Cancela uma venda realizando estorno completo.
@@ -1306,6 +1455,7 @@ async def cancelar_venda(
     A rota apenas valida o request e chama o service.
     """
     from app.vendas.service import VendaService
+
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     motivo_final = _normalizar_motivo_exclusao_venda(dados.motivo)
 
@@ -1314,7 +1464,7 @@ async def cancelar_venda(
         event="VENDA_CANCELAMENTO_START",
         message="Iniciando cancelamento de venda via service",
         venda_id=venda_id,
-        motivo=motivo_final
+        motivo=motivo_final,
     )
 
     # Chamar service (toda lógica de negócio está lá)
@@ -1323,15 +1473,15 @@ async def cancelar_venda(
         motivo=motivo_final,
         user_id=current_user.id,
         tenant_id=tenant_id,
-        db=db
+        db=db,
     )
 
     struct_logger.info(
         event="VENDA_CANCELADA_SUCESSO",
         message="Cancelamento concluído com sucesso",
         venda_id=venda_id,
-        numero_venda=resultado['venda']['numero_venda'],
-        itens_estornados=resultado['estornos']['itens_estornados']
+        numero_venda=resultado["venda"]["numero_venda"],
+        itens_estornados=resultado["estornos"]["itens_estornados"],
     )
 
     # ============================================================================
@@ -1339,48 +1489,45 @@ async def cancelar_venda(
     # ============================================================================
     try:
         from uuid import UUID
+
         session_id = f"venda_{venda_id}"
         processor = get_opportunity_processor(
-            tenant_id=UUID(str(tenant_id)),
-            session_id=session_id
+            tenant_id=UUID(str(tenant_id)), session_id=session_id
         )
         processor.cleanup()  # Limpa processador e invalida cache
     except Exception as e:
         logger.debug(f"Cache cleanup (cancelar): {str(e)}")
         pass
 
-    return resultado['venda']
+    return resultado["venda"]
 
 
-@router.post('/{venda_id}/reabrir')
+@router.post("/{venda_id}/reabrir")
 def reabrir_venda(
     venda_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Reabre uma venda finalizada (muda status para aberta)"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    venda = db.query(Venda).filter_by(
-        id=venda_id,
-        tenant_id=tenant_id
-    ).first()
+    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
 
     if not venda:
-        raise HTTPException(status_code=404, detail='Venda não encontrada')
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
 
     # Impedir reabertura de vendas com NF emitida
-    if venda.status == 'pago_nf':
+    if venda.status == "pago_nf":
         raise HTTPException(
             status_code=400,
-            detail='Não é possível reabrir uma venda com NF-e emitida. Cancele a nota fiscal primeiro.'
+            detail="Não é possível reabrir uma venda com NF-e emitida. Cancele a nota fiscal primeiro.",
         )
 
     # Permitir reabrir vendas finalizadas ou parcialmente pagas
-    if venda.status not in ['finalizada', 'baixa_parcial']:
+    if venda.status not in ["finalizada", "baixa_parcial"]:
         raise HTTPException(
             status_code=400,
-            detail='Apenas vendas finalizadas ou com baixa parcial podem ser reabertas'
+            detail="Apenas vendas finalizadas ou com baixa parcial podem ser reabertas",
         )
 
     # Guardar status anterior para log
@@ -1401,7 +1548,7 @@ def reabrir_venda(
                     message=f"Cancelando {comissoes_removidas} comissões por reabertura de venda",
                     venda_id=venda.id,
                     funcionario_id=venda.funcionario_id,
-                    count=comissoes_removidas
+                    count=comissoes_removidas,
                 )
 
                 # Remover comissões
@@ -1414,18 +1561,20 @@ def reabrir_venda(
                     event="COMMISSION_CANCELLED",
                     message="Comissões canceladas com sucesso",
                     venda_id=venda.id,
-                    count=comissoes_removidas
+                    count=comissoes_removidas,
                 )
             else:
                 logger.info(f"ℹ️  Venda #{venda.id} não tinha comissões para cancelar")
 
         except Exception as e:
-            logger.error(f"❌ Erro ao cancelar comissões da venda {venda.id}: {e}", exc_info=True)
+            logger.error(
+                f"❌ Erro ao cancelar comissões da venda {venda.id}: {e}", exc_info=True
+            )
             struct_logger.error(
                 event="COMMISSION_CANCEL_ERROR",
                 message=f"Erro ao cancelar comissões: {str(e)}",
                 venda_id=venda.id,
-                error=str(e)
+                error=str(e),
             )
             # Prosseguir com reabertura mesmo se falhar cancelamento de comissões
 
@@ -1436,14 +1585,17 @@ def reabrir_venda(
     # Reabrir serve apenas para alterar forma de pagamento, não mexe em produtos
 
     # Mudar status para aberta
-    venda.status = 'aberta'
+    venda.status = "aberta"
     venda.data_finalizacao = None
     venda.updated_at = datetime.now()
     invalidate_venda_rentabilidade_snapshot(venda)
 
     from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
     from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
-    from app.services.business_audit_service import build_sale_reopened_metadata, log_business_event
+    from app.services.business_audit_service import (
+        build_sale_reopened_metadata,
+        log_business_event,
+    )
 
     coupon_reversal_result = reverse_coupon_redemptions_for_sale(
         db,
@@ -1484,44 +1636,41 @@ def reabrir_venda(
     log_action(
         db=db,
         user_id=current_user.id,
-        action='update',
-        entity_type='vendas',
+        action="update",
+        entity_type="vendas",
         entity_id=venda.id,
-        details=f'Venda #{venda.id} reaberta (status: {status_anterior} → aberta, comissões canceladas: {comissoes_removidas})'
+        details=f"Venda #{venda.id} reaberta (status: {status_anterior} → aberta, comissões canceladas: {comissoes_removidas})",
     )
 
     return venda.to_dict()
 
 
-@router.patch('/{venda_id}/status')
+@router.patch("/{venda_id}/status")
 def atualizar_status_venda(
     venda_id: int,
     status_data: dict,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Atualiza apenas o status da venda"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     # Buscar a venda
-    venda = db.query(Venda).filter_by(
-        id=venda_id,
-        tenant_id=tenant_id
-    ).first()
+    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
 
     if not venda:
-        raise HTTPException(status_code=404, detail='Venda não encontrada')
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
 
     # Extrair status do body
-    novo_status = status_data.get('status')
+    novo_status = status_data.get("status")
     if not novo_status:
-        raise HTTPException(status_code=400, detail='Status não informado')
+        raise HTTPException(status_code=400, detail="Status não informado")
 
     status_anterior = venda.status
     venda.status = novo_status
     venda.updated_at = datetime.now()
 
-    if novo_status in ['finalizada', 'baixa_parcial']:
+    if novo_status in ["finalizada", "baixa_parcial"]:
         get_or_build_venda_rentabilidade_snapshot(
             venda,
             db,
@@ -1529,13 +1678,13 @@ def atualizar_status_venda(
             persist_if_missing=True,
             force_refresh=True,
         )
-    elif novo_status == 'aberta':
+    elif novo_status == "aberta":
         invalidate_venda_rentabilidade_snapshot(venda)
 
-    if (
-        status_anterior in ['finalizada', 'baixa_parcial']
-        and novo_status not in ['finalizada', 'baixa_parcial']
-    ):
+    if status_anterior in ["finalizada", "baixa_parcial"] and novo_status not in [
+        "finalizada",
+        "baixa_parcial",
+    ]:
         from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
         from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
 
@@ -1552,7 +1701,11 @@ def atualizar_status_venda(
             reason=f"Status alterado para {novo_status}",
         )
     # 🆕 GERAR COMISSÕES se estiver finalizando a venda (apenas se funcionário/veterinário foi selecionado)
-    if novo_status == 'finalizada' and status_anterior != 'finalizada' and venda.funcionario_id:
+    if (
+        novo_status == "finalizada"
+        and status_anterior != "finalizada"
+        and venda.funcionario_id
+    ):
         try:
             from app.comissoes_service import gerar_comissoes_venda
 
@@ -1561,12 +1714,14 @@ def atualizar_status_venda(
                 message=f"Gerando comissões via PATCH /status (status: {status_anterior} → {novo_status})",
                 venda_id=venda.id,
                 funcionario_id=venda.funcionario_id,
-                trigger="status_change"
+                trigger="status_change",
             )
 
             # 🔍 BUSCAR TODOS OS PAGAMENTOS DA VENDA
             # Precisamos gerar comissões para TODOS os pagamentos que ainda não têm comissão
-            todos_pagamentos = _listar_pagamentos_venda_para_comissao(db, venda.id, tenant_id)
+            todos_pagamentos = _listar_pagamentos_venda_para_comissao(
+                db, venda.id, tenant_id
+            )
 
             if not todos_pagamentos:
                 logger.info("ℹ️  Nenhum pagamento encontrado na venda")
@@ -1578,18 +1733,22 @@ def atualizar_status_venda(
                     venda.funcionario_id,
                     tenant_id,
                 )
-                logger.info(f"📊 Pagamentos: {len(todos_pagamentos)} total, {len(parcelas_com_comissao)} já com comissão")
+                logger.info(
+                    f"📊 Pagamentos: {len(todos_pagamentos)} total, {len(parcelas_com_comissao)} já com comissão"
+                )
 
                 # 🔄 GERAR UMA COMISSÃO PARA CADA PAGAMENTO SEM COMISSÃO
                 comissoes_geradas = 0
-                total_comissoes = Decimal('0')
+                total_comissoes = Decimal("0")
 
                 for idx, pagamento_row in enumerate(todos_pagamentos, start=1):
                     parcela_numero = idx
 
                     # Pular se já tem comissão
                     if parcela_numero in parcelas_com_comissao:
-                        logger.info(f"⏭️  Parcela {parcela_numero} já tem comissão - pulando")
+                        logger.info(
+                            f"⏭️  Parcela {parcela_numero} já tem comissão - pulando"
+                        )
                         continue
 
                     valor_pagamento = Decimal(str(pagamento_row[2]))
@@ -1602,7 +1761,7 @@ def atualizar_status_venda(
                         funcionario_id=venda.funcionario_id,
                         valor_pago=float(valor_pagamento),
                         forma_pagamento=forma_pagamento,
-                        parcela_numero=parcela_numero
+                        parcela_numero=parcela_numero,
                     )
 
                     resultado = gerar_comissoes_venda(
@@ -1611,34 +1770,45 @@ def atualizar_status_venda(
                         valor_pago=valor_pagamento,
                         forma_pagamento=forma_pagamento,
                         parcela_numero=parcela_numero,
-                        db=db
+                        db=db,
                     )
 
-                    if resultado and resultado.get('success'):
-                        if not resultado.get('duplicated'):
+                    if resultado and resultado.get("success"):
+                        if not resultado.get("duplicated"):
                             comissoes_geradas += 1
-                            total_comissoes += Decimal(str(resultado.get('total_comissao', 0)))
+                            total_comissoes += Decimal(
+                                str(resultado.get("total_comissao", 0))
+                            )
                             struct_logger.info(
                                 event="COMMISSION_GENERATED",
                                 message="Comissão gerada com sucesso",
                                 venda_id=venda.id,
                                 parcela_numero=parcela_numero,
-                                total_comissao=float(resultado.get('total_comissao', 0))
+                                total_comissao=float(
+                                    resultado.get("total_comissao", 0)
+                                ),
                             )
 
                 if comissoes_geradas > 0:
-                    logger.info(f"✅ {comissoes_geradas} comissões geradas - Total: R$ {total_comissoes:.2f}")
+                    logger.info(
+                        f"✅ {comissoes_geradas} comissões geradas - Total: R$ {total_comissoes:.2f}"
+                    )
                 else:
-                    logger.info("ℹ️  Nenhuma comissão nova gerada (todas já existiam ou sem configuração)")
+                    logger.info(
+                        "ℹ️  Nenhuma comissão nova gerada (todas já existiam ou sem configuração)"
+                    )
 
         except Exception as e:
-            logger.error(f"❌ Erro ao gerar comissões para venda {venda.id}: {str(e)}", exc_info=True)
+            logger.error(
+                f"❌ Erro ao gerar comissões para venda {venda.id}: {str(e)}",
+                exc_info=True,
+            )
             struct_logger.error(
                 event="COMMISSION_ERROR",
                 message=f"Erro ao gerar comissões: {str(e)}",
                 venda_id=venda.id,
                 error=str(e),
-                trigger="status_change"
+                trigger="status_change",
             )
             # Não abortar a atualização por erro nas comissões
 
@@ -1648,24 +1818,24 @@ def atualizar_status_venda(
     log_action(
         db=db,
         user_id=current_user.id,
-        action='update',
-        entity_type='vendas',
+        action="update",
+        entity_type="vendas",
         entity_id=venda.id,
-        details=f'Status da venda #{venda.id} alterado: {status_anterior} → {novo_status}'
+        details=f"Status da venda #{venda.id} alterado: {status_anterior} → {novo_status}",
     )
 
-    return {'success': True, 'status': novo_status}
+    return {"success": True, "status": novo_status}
 
-    return {'message': 'Status atualizado com sucesso', 'status': venda.status}
+    return {"message": "Status atualizado com sucesso", "status": venda.status}
 
 
-@router.patch('/{venda_id}/pagamento/{pagamento_id}/nsu')
+@router.patch("/{venda_id}/pagamento/{pagamento_id}/nsu")
 def atualizar_nsu_pagamento(
     venda_id: int,
     pagamento_id: int,
     nsu_data: dict,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Atualiza apenas o NSU de um pagamento em cartão.
@@ -1674,45 +1844,48 @@ def atualizar_nsu_pagamento(
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     # Buscar a venda
-    venda = db.query(Venda).filter_by(
-        id=venda_id,
-        tenant_id=tenant_id
-    ).first()
+    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
 
     if not venda:
-        raise HTTPException(status_code=404, detail='Venda não encontrada')
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
 
     # Buscar o pagamento
-    pagamento = db.query(VendaPagamento).filter_by(
-        id=pagamento_id,
-        venda_id=venda_id,
-        tenant_id=tenant_id
-    ).first()
+    pagamento = (
+        db.query(VendaPagamento)
+        .filter_by(id=pagamento_id, venda_id=venda_id, tenant_id=tenant_id)
+        .first()
+    )
 
     if not pagamento:
-        raise HTTPException(status_code=404, detail='Pagamento não encontrado')
+        raise HTTPException(status_code=404, detail="Pagamento não encontrado")
 
     # Extrair NSU do body
-    novo_nsu = nsu_data.get('nsu_cartao', '').strip()
+    novo_nsu = nsu_data.get("nsu_cartao", "").strip()
     if not novo_nsu:
-        raise HTTPException(status_code=400, detail='NSU não informado')
+        raise HTTPException(status_code=400, detail="NSU não informado")
 
     # VALIDAR NSU DUPLICADO (mesma lógica do VendaService)
     if pagamento.operadora_id:
-        nsu_duplicado = db.query(VendaPagamento).filter(
-            VendaPagamento.tenant_id == tenant_id,
-            VendaPagamento.nsu_cartao == novo_nsu,
-            VendaPagamento.operadora_id == pagamento.operadora_id,
-            VendaPagamento.id != pagamento_id  # Excluir o próprio pagamento
-        ).first()
+        nsu_duplicado = (
+            db.query(VendaPagamento)
+            .filter(
+                VendaPagamento.tenant_id == tenant_id,
+                VendaPagamento.nsu_cartao == novo_nsu,
+                VendaPagamento.operadora_id == pagamento.operadora_id,
+                VendaPagamento.id != pagamento_id,  # Excluir o próprio pagamento
+            )
+            .first()
+        )
 
         if nsu_duplicado:
-            venda_duplicada = db.query(Venda).filter_by(id=nsu_duplicado.venda_id).first()
+            venda_duplicada = (
+                db.query(Venda).filter_by(id=nsu_duplicado.venda_id).first()
+            )
             raise HTTPException(
                 status_code=400,
                 detail=f"❌ NSU DUPLICADO: O NSU '{novo_nsu}' já está vinculado à "
-                       f"Venda {venda_duplicada.numero_venda if venda_duplicada else nsu_duplicado.venda_id}. "
-                       f"Cada NSU deve ser usado apenas uma vez por operadora."
+                f"Venda {venda_duplicada.numero_venda if venda_duplicada else nsu_duplicado.venda_id}. "
+                f"Cada NSU deve ser usado apenas uma vez por operadora.",
             )
 
     # Atualizar NSU
@@ -1726,57 +1899,59 @@ def atualizar_nsu_pagamento(
     log_action(
         db=db,
         user_id=current_user.id,
-        action='update',
-        entity_type='venda_pagamento',
+        action="update",
+        entity_type="venda_pagamento",
         entity_id=pagamento.id,
-        details=f'NSU do pagamento atualizado: {nsu_anterior} → {novo_nsu} (Venda {venda.numero_venda})'
+        details=f"NSU do pagamento atualizado: {nsu_anterior} → {novo_nsu} (Venda {venda.numero_venda})",
     )
 
     return {
-        'success': True,
-        'nsu_cartao': novo_nsu,
-        'mensagem': f'NSU atualizado para {novo_nsu}'
+        "success": True,
+        "nsu_cartao": novo_nsu,
+        "mensagem": f"NSU atualizado para {novo_nsu}",
     }
 
 
-@router.get('/{venda_id}/pagamentos')
+@router.get("/{venda_id}/pagamentos")
 def listar_pagamentos_venda(
     venda_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Lista todos os pagamentos de uma venda"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    venda = db.query(Venda).filter_by(
-        id=venda_id,
-        tenant_id=tenant_id
-    ).first()
+    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
 
     if not venda:
-        raise HTTPException(status_code=404, detail='Venda não encontrada')
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
 
-    pagamentos = db.query(VendaPagamento).filter_by(venda_id=venda.id).order_by(VendaPagamento.data_pagamento).all()
+    pagamentos = (
+        db.query(VendaPagamento)
+        .filter_by(venda_id=venda.id)
+        .order_by(VendaPagamento.data_pagamento)
+        .all()
+    )
 
     total_pago = sum(float(p.valor) for p in pagamentos)
     valor_restante = float(venda.total) - total_pago
 
     return {
-        'venda_id': venda.id,
-        'numero_venda': venda.numero_venda,
-        'total_venda': float(venda.total),
-        'total_pago': total_pago,
-        'valor_restante': max(0, valor_restante),
-        'status': venda.status,
-        'pagamentos': [p.to_dict() for p in pagamentos]
+        "venda_id": venda.id,
+        "numero_venda": venda.numero_venda,
+        "total_venda": float(venda.total),
+        "total_pago": total_pago,
+        "valor_restante": max(0, valor_restante),
+        "status": venda.status,
+        "pagamentos": [p.to_dict() for p in pagamentos],
     }
 
 
-@router.delete('/pagamentos/{pagamento_id}')
+@router.delete("/pagamentos/{pagamento_id}")
 def excluir_pagamento(
     pagamento_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Excluir um pagamento de uma venda"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
@@ -1786,30 +1961,29 @@ def excluir_pagamento(
     pagamento = db.query(VendaPagamento).filter_by(id=pagamento_id).first()
 
     if not pagamento:
-        raise HTTPException(status_code=404, detail='Pagamento não encontrado')
+        raise HTTPException(status_code=404, detail="Pagamento não encontrado")
 
     # 🔒 SEGURANÇA: Validar que a venda do pagamento pertence ao tenant
-    venda = db.query(Venda).filter_by(
-        id=pagamento.venda_id,
-        tenant_id=tenant_id
-    ).first()
+    venda = (
+        db.query(Venda).filter_by(id=pagamento.venda_id, tenant_id=tenant_id).first()
+    )
 
     if not venda:
-        raise HTTPException(status_code=404, detail='Venda não encontrada')
+        raise HTTPException(status_code=404, detail="Venda não encontrada")
 
     # Impedir exclusão de pagamento em vendas com NF emitida
-    if venda.status == 'pago_nf':
+    if venda.status == "pago_nf":
         raise HTTPException(
             status_code=400,
-            detail='Não é possível excluir pagamentos de uma venda com NF-e emitida. Cancele a nota fiscal primeiro.'
+            detail="Não é possível excluir pagamentos de uma venda com NF-e emitida. Cancele a nota fiscal primeiro.",
         )
 
     # ⚠️ IMPORTANTE: Se venda está finalizada/baixa_parcial, não pode excluir pagamento
     # Usuário deve REABRIR a venda primeiro!
-    if venda.status in ['finalizada', 'baixa_parcial']:
+    if venda.status in ["finalizada", "baixa_parcial"]:
         raise HTTPException(
             status_code=400,
-            detail='Não é possível excluir pagamentos de uma venda finalizada. Reabra a venda primeiro através do botão "Reabrir Venda".'
+            detail='Não é possível excluir pagamentos de uma venda finalizada. Reabra a venda primeiro através do botão "Reabrir Venda".',
         )
 
     # Registrar auditoria
@@ -1817,10 +1991,10 @@ def excluir_pagamento(
         log_action(
             db=db,
             user_id=current_user.id,
-            action='delete',
-            entity_type='venda_pagamentos',
+            action="delete",
+            entity_type="venda_pagamentos",
             entity_id=pagamento.id,
-            details=f'Excluído pagamento de R$ {pagamento.valor} ({pagamento.forma_pagamento}) da venda #{venda.id}'
+            details=f"Excluído pagamento de R$ {pagamento.valor} ({pagamento.forma_pagamento}) da venda #{venda.id}",
         )
     except Exception as e:
         logger.info(f"⚠️ Erro ao registrar auditoria: {e}")
@@ -1848,15 +2022,17 @@ def excluir_pagamento(
     total_pago = sum(float(p.valor) for p in pagamentos_restantes)
     total_venda = float(venda.total)
 
-    logger.info(f"DEBUG excluir_pagamento: total_pago={total_pago}, total_venda={total_venda}")
+    logger.info(
+        f"DEBUG excluir_pagamento: total_pago={total_pago}, total_venda={total_venda}"
+    )
 
     # Atualizar status da venda
     if total_pago == 0:
-        venda.status = 'aberta'
+        venda.status = "aberta"
         logger.info("DEBUG: Mudou status para ABERTA (total_pago = 0)")
         invalidate_venda_rentabilidade_snapshot(venda)
     elif total_pago >= total_venda:
-        venda.status = 'finalizada'
+        venda.status = "finalizada"
         logger.info("DEBUG: Mudou status para FINALIZADA (total_pago >= total_venda)")
         get_or_build_venda_rentabilidade_snapshot(
             venda,
@@ -1866,7 +2042,7 @@ def excluir_pagamento(
             force_refresh=True,
         )
     else:
-        venda.status = 'baixa_parcial'
+        venda.status = "baixa_parcial"
         logger.info("DEBUG: Mudou status para BAIXA_PARCIAL")
         get_or_build_venda_rentabilidade_snapshot(
             venda,
@@ -1879,21 +2055,23 @@ def excluir_pagamento(
     db.commit()
 
     return {
-        'message': 'Pagamento excluído com sucesso',
-        'venda_id': venda.id,
-        'novo_status': venda.status,
-        'total_pago': total_pago,
-        'valor_restante': max(0, total_venda - total_pago)
+        "message": "Pagamento excluído com sucesso",
+        "venda_id": venda.id,
+        "novo_status": venda.status,
+        "total_pago": total_pago,
+        "valor_restante": max(0, total_venda - total_pago),
     }
 
 
-@router.delete('/{venda_id}')
+@router.delete("/{venda_id}")
 def excluir_venda(
     venda_id: int,
     dados: Optional[ExcluirVendaRequest] = None,
-    motivo: Optional[str] = Query(None, description="Justificativa para cancelar/excluir a venda"),
+    motivo: Optional[str] = Query(
+        None, description="Justificativa para cancelar/excluir a venda"
+    ),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Cancelar uma venda mantendo rastreabilidade para auditoria."""
     from app.rotas_entrega_models import RotaEntrega
@@ -1906,18 +2084,15 @@ def excluir_venda(
         motivo_payload = motivo_payload or dados.motivo or dados.justificativa
     motivo_final = _normalizar_motivo_exclusao_venda(motivo_payload)
 
-    venda = db.query(Venda).filter_by(
-        id=venda_id,
-        tenant_id=tenant_id
-    ).first()
+    venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
 
     if not venda:
-        raise HTTPException(status_code=404, detail='Venda nao encontrada')
+        raise HTTPException(status_code=404, detail="Venda nao encontrada")
 
-    if venda.status == 'pago_nf':
+    if venda.status == "pago_nf":
         raise HTTPException(
             status_code=400,
-            detail='Nao e possivel cancelar/excluir uma venda com NF-e emitida. Cancele a nota fiscal primeiro.'
+            detail="Nao e possivel cancelar/excluir uma venda com NF-e emitida. Cancele a nota fiscal primeiro.",
         )
 
     rota_vinculada = db.query(RotaEntrega).filter_by(venda_id=venda_id).first()
@@ -1930,13 +2105,13 @@ def excluir_venda(
         raise HTTPException(
             status_code=400,
             detail={
-                'erro': 'Venda vinculada a uma rota de entrega',
-                'mensagem': f'Esta venda esta associada a Rota #{rota_vinculada.id} (Status: {rota_vinculada.status})',
-                'solucao': 'Para cancelar/excluir esta venda, primeiro remova-a da rota de entrega.',
-                'passos': passos_resolucao,
-                'rota_id': rota_vinculada.id,
-                'rota_status': rota_vinculada.status
-            }
+                "erro": "Venda vinculada a uma rota de entrega",
+                "mensagem": f"Esta venda esta associada a Rota #{rota_vinculada.id} (Status: {rota_vinculada.status})",
+                "solucao": "Para cancelar/excluir esta venda, primeiro remova-a da rota de entrega.",
+                "passos": passos_resolucao,
+                "rota_id": rota_vinculada.id,
+                "rota_status": rota_vinculada.status,
+            },
         )
 
     logger.info("Cancelando venda por rota DELETE preservando auditoria")
@@ -1949,23 +2124,24 @@ def excluir_venda(
     )
 
     return {
-        'message': 'Venda cancelada com sucesso e mantida no historico',
-        'venda': resultado['venda'],
-        'itens_devolvidos': resultado['estornos'].get('itens_estornados', 0),
+        "message": "Venda cancelada com sucesso e mantida no historico",
+        "venda": resultado["venda"],
+        "itens_devolvidos": resultado["estornos"].get("itens_estornados", 0),
     }
 
-@router.post('/{venda_id}/devolucao')
+
+@router.post("/{venda_id}/devolucao")
 def registrar_devolucao(
     venda_id: int,
     dados: dict,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Registrar devolução de itens de uma venda"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     try:
-        logger.info(f"\n{'='*80}")
+        logger.info(f"\n{'=' * 80}")
         logger.info(f"🔄 INICIANDO DEVOLUÇÃO - Venda #{venda_id}")
         logger.info("=" * 80)
         logger.info("Dados de devolucao recebidos")
@@ -1973,21 +2149,20 @@ def registrar_devolucao(
         logger.info("Tenant validado para devolucao")
 
         # Buscar a venda
-        venda = db.query(Venda).filter_by(
-            id=venda_id,
-            tenant_id=tenant_id
-        ).first()
+        venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
 
         if not venda:
             logger.info(f"❌ Venda #{venda_id} não encontrada")
-            raise HTTPException(status_code=404, detail='Venda não encontrada')
+            raise HTTPException(status_code=404, detail="Venda não encontrada")
 
-        logger.info(f"✅ Venda encontrada: #{venda.numero_venda} - Total: R$ {venda.total}")
+        logger.info(
+            f"✅ Venda encontrada: #{venda.numero_venda} - Total: R$ {venda.total}"
+        )
 
-        caixa_id = dados.get('caixa_id')
-        itens_devolucao = dados.get('itens', [])
-        motivo = dados.get('motivo', '')
-        gerar_credito = dados.get('gerar_credito', False)  # 🆕 Nova opção
+        caixa_id = dados.get("caixa_id")
+        itens_devolucao = dados.get("itens", [])
+        motivo = dados.get("motivo", "")
+        gerar_credito = dados.get("gerar_credito", False)  # 🆕 Nova opção
 
         logger.info(f"💰 Modo: {'CRÉDITO ao cliente' if gerar_credito else 'DINHEIRO'}")
         logger.info(f"📝 Motivo: {motivo}")
@@ -1995,24 +2170,34 @@ def registrar_devolucao(
 
         if not caixa_id and not gerar_credito:
             logger.info("❌ Caixa ID não fornecido para devolução em dinheiro")
-            raise HTTPException(status_code=400, detail='ID do caixa é obrigatório para devolução em dinheiro')
+            raise HTTPException(
+                status_code=400,
+                detail="ID do caixa é obrigatório para devolução em dinheiro",
+            )
 
         if not itens_devolucao:
             logger.info("❌ Nenhum item selecionado")
-            raise HTTPException(status_code=400, detail='Nenhum item selecionado para devolução')
+            raise HTTPException(
+                status_code=400, detail="Nenhum item selecionado para devolução"
+            )
 
         if not motivo:
             logger.info("❌ Motivo não fornecido")
-            raise HTTPException(status_code=400, detail='Motivo da devolução é obrigatório')
+            raise HTTPException(
+                status_code=400, detail="Motivo da devolução é obrigatório"
+            )
 
         # Verificar se o caixa existe e está aberto (apenas se for devolução em dinheiro)
         from app.caixa_models import Caixa
+
         caixa = None
         if not gerar_credito:
-            caixa = db.query(Caixa).filter_by(id=caixa_id, status='aberto').first()
+            caixa = db.query(Caixa).filter_by(id=caixa_id, status="aberto").first()
 
             if not caixa:
-                raise HTTPException(status_code=400, detail='Caixa não encontrado ou não está aberto')
+                raise HTTPException(
+                    status_code=400, detail="Caixa não encontrado ou não está aberto"
+                )
 
         valor_total_devolucao = 0
         itens_devolvidos = []
@@ -2020,85 +2205,99 @@ def registrar_devolucao(
         # Processar cada item devolvido
         for item_dev in itens_devolucao:
             # 🆕 Verificar se é componente de KIT
-            is_componente_kit = item_dev.get('is_componente_kit', False)
+            is_componente_kit = item_dev.get("is_componente_kit", False)
 
             if is_componente_kit:
                 # 🔥 DEVOLUÇÃO DE COMPONENTE DE KIT
-                produto_id = item_dev.get('produto_id')
-                quantidade_devolvida = float(item_dev.get('quantidade', 0))
-                preco_unitario_componente = float(item_dev.get('preco_unitario', 0))
-                kit_item_id = item_dev.get('kit_item_id')
+                produto_id = item_dev.get("produto_id")
+                quantidade_devolvida = float(item_dev.get("quantidade", 0))
+                preco_unitario_componente = float(item_dev.get("preco_unitario", 0))
+                kit_item_id = item_dev.get("kit_item_id")
 
                 if quantidade_devolvida <= 0:
                     continue
 
-                logger.info(f"📦 Devolvendo componente do KIT - Produto ID: {produto_id}, Quantidade: {quantidade_devolvida}")
+                logger.info(
+                    f"📦 Devolvendo componente do KIT - Produto ID: {produto_id}, Quantidade: {quantidade_devolvida}"
+                )
 
                 # Devolver componente ao estoque
                 try:
                     EstoqueService.estornar_estoque(
                         produto_id=produto_id,
                         quantidade=quantidade_devolvida,
-                        motivo='devolucao',
+                        motivo="devolucao",
                         referencia_id=venda_id,
-                        referencia_tipo='venda',
+                        referencia_tipo="venda",
                         user_id=current_user.id,
                         tenant_id=tenant_id,
                         db=db,
                         documento=None,
-                        observacao=f"{motivo} - Componente de KIT (Item #{kit_item_id})"
+                        observacao=f"{motivo} - Componente de KIT (Item #{kit_item_id})",
                     )
 
                     # Buscar nome do produto
                     from app.produtos_models import Produto
+
                     produto = db.query(Produto).filter_by(id=produto_id).first()
                     produto_nome = produto.nome if produto else f"Produto #{produto_id}"
 
-                    logger.info(f"  ✅ Componente estornado: {produto_nome} +{quantidade_devolvida}")
+                    logger.info(
+                        f"  ✅ Componente estornado: {produto_nome} +{quantidade_devolvida}"
+                    )
 
                     # Registrar auditoria
                     log_action(
                         db=db,
                         user_id=current_user.id,
-                        action='update',
-                        entity_type='produtos',
+                        action="update",
+                        entity_type="produtos",
                         entity_id=produto_id,
-                        details=f'Devolução de componente de KIT (+{quantidade_devolvida}) - Venda #{venda_id} - Motivo: {motivo}'
+                        details=f"Devolução de componente de KIT (+{quantidade_devolvida}) - Venda #{venda_id} - Motivo: {motivo}",
                     )
                 except ValueError as e:
                     logger.error(f"Erro ao devolver componente de KIT: {e}")
 
                 # Calcular valor devolvido do componente
-                valor_componente = Decimal(str(preco_unitario_componente)) * Decimal(str(quantidade_devolvida))
+                valor_componente = Decimal(str(preco_unitario_componente)) * Decimal(
+                    str(quantidade_devolvida)
+                )
                 valor_total_devolucao += valor_componente
 
-                itens_devolvidos.append({
-                    'produto_id': produto_id,
-                    'produto_nome': produto_nome,
-                    'quantidade': quantidade_devolvida,
-                    'valor_unitario': preco_unitario_componente,
-                    'valor_total': valor_componente,
-                    'tipo': 'componente_kit'
-                })
+                itens_devolvidos.append(
+                    {
+                        "produto_id": produto_id,
+                        "produto_nome": produto_nome,
+                        "quantidade": quantidade_devolvida,
+                        "valor_unitario": preco_unitario_componente,
+                        "valor_total": valor_componente,
+                        "tipo": "componente_kit",
+                    }
+                )
 
             else:
                 # 🔹 DEVOLUÇÃO NORMAL (Item inteiro - pode ser KIT inteiro ou produto simples)
-                item_id = item_dev.get('item_id')
-                quantidade_devolvida = float(item_dev.get('quantidade', 0))
+                item_id = item_dev.get("item_id")
+                quantidade_devolvida = float(item_dev.get("quantidade", 0))
 
                 if quantidade_devolvida <= 0:
                     continue
 
                 # Buscar o item da venda
-                item_venda = db.query(VendaItem).filter_by(id=item_id, venda_id=venda_id).first()
+                item_venda = (
+                    db.query(VendaItem).filter_by(id=item_id, venda_id=venda_id).first()
+                )
 
                 if not item_venda:
-                    raise HTTPException(status_code=404, detail=f'Item {item_id} não encontrado na venda')
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Item {item_id} não encontrado na venda",
+                    )
 
                 if quantidade_devolvida > item_venda.quantidade:
                     raise HTTPException(
                         status_code=400,
-                        detail=f'Quantidade devolvida ({quantidade_devolvida}) maior que quantidade vendida ({item_venda.quantidade})'
+                        detail=f"Quantidade devolvida ({quantidade_devolvida}) maior que quantidade vendida ({item_venda.quantidade})",
                     )
 
                 # Devolver ao estoque
@@ -2107,54 +2306,64 @@ def registrar_devolucao(
                         EstoqueService.estornar_estoque(
                             produto_id=item_venda.produto_id,
                             quantidade=quantidade_devolvida,
-                            motivo='devolucao',
+                            motivo="devolucao",
                             referencia_id=venda_id,
-                            referencia_tipo='venda',
+                            referencia_tipo="venda",
                             user_id=current_user.id,
                             tenant_id=tenant_id,
                             db=db,
                             documento=None,
-                            observacao=motivo
+                            observacao=motivo,
                         )
                         # Registrar auditoria
                         log_action(
                             db=db,
                             user_id=current_user.id,
-                            action='update',
-                            entity_type='produtos',
+                            action="update",
+                            entity_type="produtos",
                             entity_id=item_venda.produto_id,
-                            details=f'Devolução de estoque (+{quantidade_devolvida}) - Venda #{venda_id} - Motivo: {motivo}'
+                            details=f"Devolução de estoque (+{quantidade_devolvida}) - Venda #{venda_id} - Motivo: {motivo}",
                         )
                     except ValueError as e:
                         logger.error(f"Erro ao devolver estoque: {e}")
 
                 # Calcular valor devolvido
-                valor_item = item_venda.preco_unitario * Decimal(str(quantidade_devolvida))
+                valor_item = item_venda.preco_unitario * Decimal(
+                    str(quantidade_devolvida)
+                )
                 valor_total_devolucao += valor_item
 
-                itens_devolvidos.append({
-                    'produto_id': item_venda.produto_id,
-                    'produto_nome': item_venda.produto.nome if item_venda.produto else item_venda.servico_descricao,
-                    'quantidade': quantidade_devolvida,
-                    'valor_unitario': item_venda.preco_unitario,
-                    'valor_total': valor_item,
-                    'tipo': 'item_normal'
-                })
+                itens_devolvidos.append(
+                    {
+                        "produto_id": item_venda.produto_id,
+                        "produto_nome": item_venda.produto.nome
+                        if item_venda.produto
+                        else item_venda.servico_descricao,
+                        "quantidade": quantidade_devolvida,
+                        "valor_unitario": item_venda.preco_unitario,
+                        "valor_total": valor_item,
+                        "tipo": "item_normal",
+                    }
+                )
 
         # 💰 OPÇÃO 1: GERAR CRÉDITO PARA O CLIENTE
         if gerar_credito:
             if not venda.cliente_id:
                 raise HTTPException(
                     status_code=400,
-                    detail='Não é possível gerar crédito para venda sem cliente cadastrado'
+                    detail="Não é possível gerar crédito para venda sem cliente cadastrado",
                 )
 
             # 🔒 SEGURANÇA: Validar que o cliente pertence ao usuário
             cliente = safe_get_cliente(db, venda.cliente_id, current_user.id)
 
             # Adicionar crédito ao cliente
-            cliente.credito = (cliente.credito or Decimal('0')) + Decimal(str(valor_total_devolucao))
-            logger.info(f"💰 Crédito adicionado ao cliente {cliente.nome}: +R$ {valor_total_devolucao:.2f} (Total: R$ {cliente.credito:.2f})")
+            cliente.credito = (cliente.credito or Decimal("0")) + Decimal(
+                str(valor_total_devolucao)
+            )
+            logger.info(
+                f"💰 Crédito adicionado ao cliente {cliente.nome}: +R$ {valor_total_devolucao:.2f} (Total: R$ {cliente.credito:.2f})"
+            )
 
             # Não cria MovimentacaoCaixa nem LancamentoManual (apenas crédito)
 
@@ -2162,10 +2371,13 @@ def registrar_devolucao(
         else:
             # Verificar se o caixa existe e está aberto
             from app.caixa_models import Caixa
-            caixa = db.query(Caixa).filter_by(id=caixa_id, status='aberto').first()
+
+            caixa = db.query(Caixa).filter_by(id=caixa_id, status="aberto").first()
 
             if not caixa:
-                raise HTTPException(status_code=400, detail='Caixa não encontrado ou não está aberto')
+                raise HTTPException(
+                    status_code=400, detail="Caixa não encontrado ou não está aberto"
+                )
 
             # Registrar devolução no caixa usando o service
             movimentacao = CaixaService.registrar_devolucao(
@@ -2177,51 +2389,63 @@ def registrar_devolucao(
                 user_id=current_user.id,
                 user_nome=current_user.nome,
                 tenant_id=tenant_id,  # 🔒 Isolamento multi-tenant
-                db=db
+                db=db,
             )
 
             # Criar lançamento manual de saída (estorno no fluxo de caixa)
             from app.financeiro_models import LancamentoManual, CategoriaFinanceira
 
-            categoria_devolucoes = db.query(CategoriaFinanceira).filter(
-                CategoriaFinanceira.nome.ilike('%devolução%'),
-                CategoriaFinanceira.tipo == 'despesa',
-                CategoriaFinanceira.tenant_id == tenant_id
-            ).first()
+            categoria_devolucoes = (
+                db.query(CategoriaFinanceira)
+                .filter(
+                    CategoriaFinanceira.nome.ilike("%devolução%"),
+                    CategoriaFinanceira.tipo == "despesa",
+                    CategoriaFinanceira.tenant_id == tenant_id,
+                )
+                .first()
+            )
 
             if not categoria_devolucoes:
                 categoria_devolucoes = CategoriaFinanceira(
                     nome="Devoluções de Vendas",
                     tipo="despesa",
                     user_id=current_user.id,
-                    tenant_id=tenant_id
+                    tenant_id=tenant_id,
                 )
                 db.add(categoria_devolucoes)
                 db.flush()
 
             lancamento_devolucao = LancamentoManual(
-                tipo='saida',
+                tipo="saida",
                 valor=Decimal(str(valor_total_devolucao)),
                 descricao=f"Devolução venda {venda.numero_venda} - {motivo}",
                 data_lancamento=date.today(),
-                status='realizado',
+                status="realizado",
                 categoria_id=categoria_devolucoes.id,
                 documento=f"DEVOLUCAO-{venda_id}",
-                fornecedor_cliente=venda.cliente.nome if venda.cliente else "Cliente Avulso",
+                fornecedor_cliente=venda.cliente.nome
+                if venda.cliente
+                else "Cliente Avulso",
                 user_id=current_user.id,
-                tenant_id=tenant_id
+                tenant_id=tenant_id,
             )
             db.add(lancamento_devolucao)
-            logger.info(f"📊 Lançamento de devolução criado: R$ {valor_total_devolucao:.2f}")
+            logger.info(
+                f"📊 Lançamento de devolução criado: R$ {valor_total_devolucao:.2f}"
+            )
 
         # 🆕 AJUSTAR CONTAS A RECEBER (sempre, independente de crédito ou dinheiro)
-        from app.financeiro_models import ContaReceber, LancamentoManual, CategoriaFinanceira
+        from app.financeiro_models import (
+            ContaReceber,
+            LancamentoManual,
+            CategoriaFinanceira,
+        )
 
         contas_receber = db.query(ContaReceber).filter_by(venda_id=venda_id).all()
         if contas_receber:
             # Reduzir proporcionalmente o valor das contas pendentes ou estornar pagas
             for conta in contas_receber:
-                if conta.status in ['pendente', 'parcial']:
+                if conta.status in ["pendente", "parcial"]:
                     proporcao = float(valor_total_devolucao) / float(venda.total)
                     reducao = float(conta.valor_original) * proporcao
 
@@ -2230,31 +2454,39 @@ def registrar_devolucao(
 
                     # Se ficou zerada, marcar como cancelada
                     if conta.valor_final <= 0:
-                        conta.status = 'cancelada'
+                        conta.status = "cancelada"
 
-                    logger.info(f"💳 Ajustando ContaReceber #{conta.id}: -R$ {reducao:.2f}")
-                elif conta.status == 'pago':
+                    logger.info(
+                        f"💳 Ajustando ContaReceber #{conta.id}: -R$ {reducao:.2f}"
+                    )
+                elif conta.status == "pago":
                     # Cancelar a conta paga (estorno)
-                    conta.status = 'estornada'
+                    conta.status = "estornada"
                     logger.info(f"💳 Estornando ContaReceber #{conta.id} (paga)")
 
         # 🆕 MARCAR LANÇAMENTOS MANUAIS REALIZADOS COMO ESTORNADOS (Fluxo de Caixa)
         # Não criar novos lançamentos de estorno — o DEVOLUCAO acima já registra a saída.
         # Apenas marcar os lançamentos de entrada da venda como estornados para controle.
-        lancamentos_entrada = db.query(LancamentoManual).filter(
-            LancamentoManual.documento == f"VENDA-{venda_id}",
-            LancamentoManual.tipo == 'entrada',
-            LancamentoManual.status == 'realizado'
-        ).all()
+        lancamentos_entrada = (
+            db.query(LancamentoManual)
+            .filter(
+                LancamentoManual.documento == f"VENDA-{venda_id}",
+                LancamentoManual.tipo == "entrada",
+                LancamentoManual.status == "realizado",
+            )
+            .all()
+        )
         for lanc in lancamentos_entrada:
-            lanc.status = 'estornado'
+            lanc.status = "estornado"
             logger.info(f"💸 LancamentoManual #{lanc.id} marcado como estornado")
 
         # 🆕 ATUALIZAR STATUS DA VENDA
-        if float(valor_total_devolucao) >= float(venda.total) * 0.99:  # 99% devolvido = total
-            venda.status = 'devolvida_total'
+        if (
+            float(valor_total_devolucao) >= float(venda.total) * 0.99
+        ):  # 99% devolvido = total
+            venda.status = "devolvida_total"
         else:
-            venda.status = 'finalizada_devolucao'
+            venda.status = "finalizada_devolucao"
 
         # 📝 GERAR HISTÓRICO DE DEVOLUÇÃO NA OBSERVAÇÃO
         from datetime import datetime
@@ -2264,21 +2496,25 @@ def registrar_devolucao(
             tipo_desc = "Devolução total"
         else:
             # Verificar se tem componentes de KIT
-            tem_componentes = any(item.get('tipo') == 'componente_kit' for item in itens_devolvidos)
+            tem_componentes = any(
+                item.get("tipo") == "componente_kit" for item in itens_devolvidos
+            )
             if tem_componentes:
                 tipo_desc = "Devolução parcial por componentes de KIT"
             else:
                 tipo_desc = "Devolução parcial"
 
         # Montar histórico
-        historico = f"\n\n{'='*60}\n"
+        historico = f"\n\n{'=' * 60}\n"
         historico += f"[DEVOLUÇÃO | {datetime.now().strftime('%d/%m/%Y %H:%M')}]\n"
         historico += f"Usuário: {current_user.nome}\n"
         historico += f"Tipo: {tipo_desc}\n"
 
         # Agrupar itens por tipo
-        itens_kit = [i for i in itens_devolvidos if i.get('tipo') == 'componente_kit']
-        itens_normais = [i for i in itens_devolvidos if i.get('tipo') != 'componente_kit']
+        itens_kit = [i for i in itens_devolvidos if i.get("tipo") == "componente_kit"]
+        itens_normais = [
+            i for i in itens_devolvidos if i.get("tipo") != "componente_kit"
+        ]
 
         # Listar itens normais
         if itens_normais:
@@ -2296,12 +2532,16 @@ def registrar_devolucao(
         historico += "Forma de estorno:\n"
 
         if gerar_credito:
-            historico += f"  • Crédito em cliente → R$ {float(valor_total_devolucao):.2f}\n"
+            historico += (
+                f"  • Crédito em cliente → R$ {float(valor_total_devolucao):.2f}\n"
+            )
         else:
-            historico += f"  • Dinheiro (Caixa) → R$ {float(valor_total_devolucao):.2f}\n"
+            historico += (
+                f"  • Dinheiro (Caixa) → R$ {float(valor_total_devolucao):.2f}\n"
+            )
 
         historico += f"Valor total estornado: R$ {float(valor_total_devolucao):.2f}\n"
-        historico += f"{'='*60}"
+        historico += f"{'=' * 60}"
 
         # Anexar histórico à observação (APPEND, nunca sobrescrever)
         if venda.observacoes:
@@ -2316,61 +2556,65 @@ def registrar_devolucao(
         log_action(
             db=db,
             user_id=current_user.id,
-            action='devolucao',
-            entity_type='vendas',
+            action="devolucao",
+            entity_type="vendas",
             entity_id=venda_id,
-            details=f'Devolução registrada ({tipo_devolucao}) - Venda #{venda_id} - R$ {valor_total_devolucao:.2f} - Motivo: {motivo}'
+            details=f"Devolução registrada ({tipo_devolucao}) - Venda #{venda_id} - R$ {valor_total_devolucao:.2f} - Motivo: {motivo}",
         )
 
         db.commit()
 
         resultado = {
-            'message': 'Devolução registrada com sucesso',
-            'venda_id': venda_id,
-            'valor_total_devolucao': float(valor_total_devolucao),
-            'tipo_devolucao': tipo_devolucao,
-            'status_venda': venda.status,
-            'itens_devolvidos': itens_devolvidos
+            "message": "Devolução registrada com sucesso",
+            "venda_id": venda_id,
+            "valor_total_devolucao": float(valor_total_devolucao),
+            "tipo_devolucao": tipo_devolucao,
+            "status_venda": venda.status,
+            "itens_devolvidos": itens_devolvidos,
         }
 
         if gerar_credito:
             # 🔒 SEGURANÇA: Validar que o cliente pertence ao usuário
             cliente = safe_get_cliente(db, venda.cliente_id, current_user.id)
-            resultado['credito_cliente'] = float(cliente.credito)
-            resultado['cliente_nome'] = cliente.nome
+            resultado["credito_cliente"] = float(cliente.credito)
+            resultado["cliente_nome"] = cliente.nome
         else:
-            resultado['movimentacao_caixa_id'] = movimentacao['movimentacao_id']
+            resultado["movimentacao_caixa_id"] = movimentacao["movimentacao_id"]
 
         logger.info("✅ Devolução concluída com sucesso!")
-        logger.info(f"{'='*80}\n")
+        logger.info(f"{'=' * 80}\n")
         return resultado
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.info(f"\n{'='*80}")
+        logger.info(f"\n{'=' * 80}")
         logger.info("🚨 ERRO CRÍTICO NA DEVOLUÇÃO:")
-        logger.info(f"{'='*80}")
+        logger.info(f"{'=' * 80}")
         logger.info(f"Tipo: {type(e).__name__}")
         logger.info(f"Mensagem: {str(e)}")
         import traceback
+
         logger.info("Traceback completo:")
         traceback.print_exc()
-        logger.info(f"{'='*80}\n")
+        logger.info(f"{'=' * 80}\n")
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Erro ao processar devolução: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Erro ao processar devolução: {str(e)}"
+        )
 
 
 # ============================================================================
 # ENDPOINTS - RELATÓRIOS
 # ============================================================================
 
-@router.get('/relatorios/resumo')
+
+@router.get("/relatorios/resumo")
 def relatorio_resumo(
     data_inicio: Optional[str] = None,
     data_fim: Optional[str] = None,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Relatório resumo de vendas"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
@@ -2379,13 +2623,13 @@ def relatorio_resumo(
 
     if data_inicio:
         # Datas no banco são naive (sem timezone) em horário de Brasília
-        data_inicio_dt = datetime.strptime(data_inicio, '%Y-%m-%d')
+        data_inicio_dt = datetime.strptime(data_inicio, "%Y-%m-%d")
         data_inicio_dt = data_inicio_dt.replace(hour=0, minute=0, second=0)
         query = query.filter(Venda.data_venda >= data_inicio_dt)
 
     if data_fim:
         # Datas no banco são naive (sem timezone) em horário de Brasília
-        data_fim_dt = datetime.strptime(data_fim, '%Y-%m-%d')
+        data_fim_dt = datetime.strptime(data_fim, "%Y-%m-%d")
         data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
         query = query.filter(Venda.data_venda <= data_fim_dt)
 
@@ -2393,13 +2637,13 @@ def relatorio_resumo(
 
     # Calcular resumo
     total_vendas = len(vendas)
-    total_valor = sum(float(v.total) for v in vendas if v.status != 'cancelada')
-    total_canceladas = sum(1 for v in vendas if v.status == 'cancelada')
+    total_valor = sum(float(v.total) for v in vendas if v.status != "cancelada")
+    total_canceladas = sum(1 for v in vendas if v.status == "cancelada")
 
     # Por forma de pagamento
     pagamentos_resumo = {}
     for venda in vendas:
-        if venda.status != 'cancelada':
+        if venda.status != "cancelada":
             for pag in venda.pagamentos:
                 forma = pag.forma_pagamento
                 if forma not in pagamentos_resumo:
@@ -2407,13 +2651,12 @@ def relatorio_resumo(
                 pagamentos_resumo[forma] += float(pag.valor)
 
     return {
-        'total_vendas': total_vendas,
-        'total_valor': total_valor,
-        'total_canceladas': total_canceladas,
-        'pagamentos_resumo': pagamentos_resumo,
-        'periodo': {
-            'inicio': data_inicio if data_inicio else None,
-            'fim': data_fim if data_fim else None
-        }
+        "total_vendas": total_vendas,
+        "total_valor": total_valor,
+        "total_canceladas": total_canceladas,
+        "pagamentos_resumo": pagamentos_resumo,
+        "periodo": {
+            "inicio": data_inicio if data_inicio else None,
+            "fim": data_fim if data_fim else None,
+        },
     }
-

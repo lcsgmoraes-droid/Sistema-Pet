@@ -14,8 +14,8 @@ def _recurrence_block() -> str:
 
 def test_venda_recurrence_query_scopes_existing_reminder_by_tenant():
     block = _recurrence_block()
-    query_start = block.index("lembrete_existente = db.query(Lembrete).filter(")
-    query_end = block.index(").first()", query_start)
+    query_start = block.index("lembrete_existente =")
+    query_end = block.index("if lembrete_existente:", query_start)
     query_block = block[query_start:query_end]
 
     assert "Lembrete.tenant_id == tenant_id" in query_block
