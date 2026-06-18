@@ -479,6 +479,10 @@ jobs:
         run: |
           ruff format --check app/ia/aba7_dre_canal.py
 
+      - name: Backend IA DRE format (blocking)
+        run: |
+          ruff format --check app/ia/aba7_dre.py
+
       - name: Backend stock full exit format (blocking)
         run: |
           ruff format --check app/estoque_saida_full_routes.py
