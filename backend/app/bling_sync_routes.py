@@ -440,15 +440,34 @@ _CATALOGO_FORCE_REFRESH_REUSE_SECONDS = 15
 
 _SNAPSHOT_STORAGE_ENV = "BLING_SNAPSHOT_DIR"
 _SNAPSHOT_STORAGE_FALLBACK = Path("/tmp/petshop/bling_snapshots")
+_SNAPSHOT_STORAGE_ALLOWED_ENV_PATHS = {
+    "/app/data/bling_snapshots": Path("/app/data/bling_snapshots"),
+    "/app/uploads/bling_snapshots": Path("/app/uploads/bling_snapshots"),
+    "/tmp/petshop/bling_snapshots": _SNAPSHOT_STORAGE_FALLBACK,
+}
+_SNAPSHOT_NAME_ALLOWLIST = frozenset(
+    {"catalogo", "cobertura", "faltantes", "sem_vinculo"}
+)
+_SNAPSHOT_TENANT_DIR_RE = re.compile(r"\A[A-Za-z0-9_-]{1,80}\Z")
 _SYNC_PROBLEMS_FRESHNESS_HOURS = 24
+
+
+def _snapshot_storage_env_candidate(env_path: Optional[str]) -> Optional[Path]:
+    normalized = (env_path or "").strip().rstrip("/\\")
+    if not normalized:
+        return None
+    return _SNAPSHOT_STORAGE_ALLOWED_ENV_PATHS.get(normalized)
 
 
 def _resolver_snapshot_storage_base() -> Path:
     candidatos: list[Path] = []
 
     env_path = os.getenv(_SNAPSHOT_STORAGE_ENV)
-    if env_path:
-        candidatos.append(Path(env_path))
+    env_candidate = _snapshot_storage_env_candidate(env_path)
+    if env_candidate:
+        candidatos.append(env_candidate)
+    elif env_path:
+        logger.warning("BLING_SNAPSHOT_DIR ignorado porque nao esta na lista permitida")
 
     candidatos.extend(
         [
@@ -489,7 +508,17 @@ _SNAPSHOT_STORAGE_BASE = _resolver_snapshot_storage_base()
 
 
 def _snapshot_file_path(snapshot_name: str, tenant_id: int) -> Path:
-    return _SNAPSHOT_STORAGE_BASE / str(tenant_id) / f"{snapshot_name}.json"
+    if snapshot_name not in _SNAPSHOT_NAME_ALLOWLIST:
+        raise ValueError("Nome de snapshot invalido")
+
+    tenant_dir = str(tenant_id).strip()
+    if not _SNAPSHOT_TENANT_DIR_RE.fullmatch(tenant_dir):
+        raise ValueError("Tenant invalido para caminho de snapshot")
+
+    base_path = _SNAPSHOT_STORAGE_BASE.resolve(strict=False)
+    snapshot_path = base_path / tenant_dir / f"{snapshot_name}.json"
+    snapshot_path.resolve(strict=False).relative_to(base_path)
+    return snapshot_path
 
 
 def _read_shared_snapshot(snapshot_name: str, tenant_id: int) -> Optional[dict]:
