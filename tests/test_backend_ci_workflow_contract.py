@@ -807,6 +807,13 @@ def test_backend_ci_has_blocking_backend_integrations_racoes_pdv_root_format_ste
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_bling_flow_monitor_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend Bling flow monitor format (blocking)" in source
+    assert "ruff format --check app/bling_flow_monitor_routes.py" in source
+
+
 def test_backend_ci_has_blocking_backend_ai_packages_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
