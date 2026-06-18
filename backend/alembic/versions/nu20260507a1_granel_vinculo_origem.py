@@ -28,11 +28,23 @@ def upgrade() -> None:
             sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
             sa.Column("produto_origem_id", sa.Integer(), nullable=False),
             sa.Column("produto_granel_id", sa.Integer(), nullable=False),
-            sa.Column("ativo", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+            sa.Column(
+                "ativo", sa.Boolean(), nullable=False, server_default=sa.text("true")
+            ),
             sa.Column("observacao", sa.Text(), nullable=True),
             sa.Column("user_id", sa.Integer(), nullable=True),
-            sa.Column("created_at", sa.DateTime(), nullable=True, server_default=sa.text("now()")),
-            sa.Column("updated_at", sa.DateTime(), nullable=True, server_default=sa.text("now()")),
+            sa.Column(
+                "created_at",
+                sa.DateTime(),
+                nullable=True,
+                server_default=sa.text("now()"),
+            ),
+            sa.Column(
+                "updated_at",
+                sa.DateTime(),
+                nullable=True,
+                server_default=sa.text("now()"),
+            ),
             sa.ForeignKeyConstraint(["produto_origem_id"], ["produtos.id"]),
             sa.ForeignKeyConstraint(["produto_granel_id"], ["produtos.id"]),
             sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
@@ -56,7 +68,8 @@ def upgrade() -> None:
         )
 
     if "produto_kit_componentes" in tabelas:
-        bind.execute(sa.text("""
+        bind.execute(
+            sa.text("""
             INSERT INTO produto_granel_vinculos (
                 tenant_id,
                 produto_origem_id,
@@ -81,17 +94,21 @@ def upgrade() -> None:
               AND c.produto_componente_id IS NOT NULL
             ON CONFLICT (tenant_id, produto_origem_id, produto_granel_id)
             DO UPDATE SET ativo = true, updated_at = now()
-        """))
+        """)
+        )
 
-        bind.execute(sa.text("""
+        bind.execute(
+            sa.text("""
             DELETE FROM produto_kit_componentes c
             USING produtos g
             WHERE g.id = c.kit_id
               AND g.tenant_id = c.tenant_id
               AND (COALESCE(g.e_granel, false) = true OR lower(COALESCE(g.nome, '')) LIKE '%granel%')
-        """))
+        """)
+        )
 
-    bind.execute(sa.text("""
+    bind.execute(
+        sa.text("""
         UPDATE produtos
            SET e_granel = true,
                unidade = 'KG',
@@ -99,10 +116,15 @@ def upgrade() -> None:
                tipo_kit = NULL
          WHERE COALESCE(e_granel, false) = true
             OR lower(COALESCE(nome, '')) LIKE '%granel%'
-    """))
+    """)
+    )
 
 
 def downgrade() -> None:
-    op.drop_index("idx_produto_granel_vinculo_granel", table_name="produto_granel_vinculos")
-    op.drop_index("idx_produto_granel_vinculo_origem", table_name="produto_granel_vinculos")
+    op.drop_index(
+        "idx_produto_granel_vinculo_granel", table_name="produto_granel_vinculos"
+    )
+    op.drop_index(
+        "idx_produto_granel_vinculo_origem", table_name="produto_granel_vinculos"
+    )
     op.drop_table("produto_granel_vinculos")

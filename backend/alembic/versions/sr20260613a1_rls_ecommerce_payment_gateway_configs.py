@@ -53,8 +53,12 @@ def upgrade() -> None:
     if not _is_postgresql_table_present():
         return
 
-    op.execute(f"ALTER TABLE {PAYMENT_GATEWAY_CONFIGS_RLS_TABLE} ENABLE ROW LEVEL SECURITY")
-    op.execute(f"ALTER TABLE {PAYMENT_GATEWAY_CONFIGS_RLS_TABLE} FORCE ROW LEVEL SECURITY")
+    op.execute(
+        f"ALTER TABLE {PAYMENT_GATEWAY_CONFIGS_RLS_TABLE} ENABLE ROW LEVEL SECURITY"
+    )
+    op.execute(
+        f"ALTER TABLE {PAYMENT_GATEWAY_CONFIGS_RLS_TABLE} FORCE ROW LEVEL SECURITY"
+    )
     _drop_policies()
 
     op.execute(
@@ -85,5 +89,9 @@ def downgrade() -> None:
         return
 
     _drop_policies(tuple(reversed(POLICY_NAMES)))
-    op.execute(f"ALTER TABLE {PAYMENT_GATEWAY_CONFIGS_RLS_TABLE} NO FORCE ROW LEVEL SECURITY")
-    op.execute(f"ALTER TABLE {PAYMENT_GATEWAY_CONFIGS_RLS_TABLE} DISABLE ROW LEVEL SECURITY")
+    op.execute(
+        f"ALTER TABLE {PAYMENT_GATEWAY_CONFIGS_RLS_TABLE} NO FORCE ROW LEVEL SECURITY"
+    )
+    op.execute(
+        f"ALTER TABLE {PAYMENT_GATEWAY_CONFIGS_RLS_TABLE} DISABLE ROW LEVEL SECURITY"
+    )

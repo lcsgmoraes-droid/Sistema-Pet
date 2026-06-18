@@ -9,6 +9,7 @@ its purpose and attempted to recreate tables that already belong to earlier
 migrations. Keep the revision ID for graph compatibility, but limit the upgrade
 to the intended pedidos drive columns.
 """
+
 from typing import Sequence, Union
 
 from alembic import op

@@ -43,21 +43,65 @@ def upgrade() -> None:
         sa.Column("resolvida_em", sa.DateTime(), nullable=True),
         sa.Column("resolucao_observacao", sa.Text(), nullable=True),
         sa.Column("user_id", sa.Integer(), nullable=False),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
+        ),
         sa.ForeignKeyConstraint(["nota_entrada_id"], ["notas_entrada.id"]),
         sa.ForeignKeyConstraint(["pedido_compra_id"], ["pedidos_compra.id"]),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_id"), "compras_pendencias_fornecedor", ["id"], unique=False)
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_tenant_id"), "compras_pendencias_fornecedor", ["tenant_id"], unique=False)
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_codigo"), "compras_pendencias_fornecedor", ["codigo"], unique=False)
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_status"), "compras_pendencias_fornecedor", ["status"], unique=False)
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_fornecedor_id"), "compras_pendencias_fornecedor", ["fornecedor_id"], unique=False)
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_nota_entrada_id"), "compras_pendencias_fornecedor", ["nota_entrada_id"], unique=False)
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_pedido_compra_id"), "compras_pendencias_fornecedor", ["pedido_compra_id"], unique=False)
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_user_id"), "compras_pendencias_fornecedor", ["user_id"], unique=False)
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_id"),
+        "compras_pendencias_fornecedor",
+        ["id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_tenant_id"),
+        "compras_pendencias_fornecedor",
+        ["tenant_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_codigo"),
+        "compras_pendencias_fornecedor",
+        ["codigo"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_status"),
+        "compras_pendencias_fornecedor",
+        ["status"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_fornecedor_id"),
+        "compras_pendencias_fornecedor",
+        ["fornecedor_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_nota_entrada_id"),
+        "compras_pendencias_fornecedor",
+        ["nota_entrada_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_pedido_compra_id"),
+        "compras_pendencias_fornecedor",
+        ["pedido_compra_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_user_id"),
+        "compras_pendencias_fornecedor",
+        ["user_id"],
+        unique=False,
+    )
     op.create_index(
         "ix_compras_pendencias_fornecedor_tenant_status",
         "compras_pendencias_fornecedor",
@@ -91,18 +135,47 @@ def upgrade() -> None:
         sa.Column("acao_sugerida", sa.String(length=40), nullable=False),
         sa.Column("observacao", sa.Text(), nullable=True),
         sa.Column("resolvido", sa.Boolean(), nullable=False),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
+        ),
         sa.ForeignKeyConstraint(["pendencia_id"], ["compras_pendencias_fornecedor.id"]),
         sa.ForeignKeyConstraint(["nota_entrada_item_id"], ["notas_entrada_itens.id"]),
         sa.ForeignKeyConstraint(["produto_id"], ["produtos.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_itens_id"), "compras_pendencias_fornecedor_itens", ["id"], unique=False)
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_itens_tenant_id"), "compras_pendencias_fornecedor_itens", ["tenant_id"], unique=False)
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_itens_pendencia_id"), "compras_pendencias_fornecedor_itens", ["pendencia_id"], unique=False)
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_itens_nota_entrada_item_id"), "compras_pendencias_fornecedor_itens", ["nota_entrada_item_id"], unique=False)
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_itens_produto_id"), "compras_pendencias_fornecedor_itens", ["produto_id"], unique=False)
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_itens_id"),
+        "compras_pendencias_fornecedor_itens",
+        ["id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_itens_tenant_id"),
+        "compras_pendencias_fornecedor_itens",
+        ["tenant_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_itens_pendencia_id"),
+        "compras_pendencias_fornecedor_itens",
+        ["pendencia_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_itens_nota_entrada_item_id"),
+        "compras_pendencias_fornecedor_itens",
+        ["nota_entrada_item_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_itens_produto_id"),
+        "compras_pendencias_fornecedor_itens",
+        ["produto_id"],
+        unique=False,
+    )
     op.create_index(
         "ix_compras_pendencias_fornecedor_itens_tenant_pendencia",
         "compras_pendencias_fornecedor_itens",
@@ -120,16 +193,40 @@ def upgrade() -> None:
         sa.Column("status_anterior", sa.String(length=30), nullable=True),
         sa.Column("status_novo", sa.String(length=30), nullable=True),
         sa.Column("user_id", sa.Integer(), nullable=False),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False
+        ),
         sa.ForeignKeyConstraint(["pendencia_id"], ["compras_pendencias_fornecedor.id"]),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_historico_id"), "compras_pendencias_fornecedor_historico", ["id"], unique=False)
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_historico_tenant_id"), "compras_pendencias_fornecedor_historico", ["tenant_id"], unique=False)
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_historico_pendencia_id"), "compras_pendencias_fornecedor_historico", ["pendencia_id"], unique=False)
-    op.create_index(op.f("ix_compras_pendencias_fornecedor_historico_user_id"), "compras_pendencias_fornecedor_historico", ["user_id"], unique=False)
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_historico_id"),
+        "compras_pendencias_fornecedor_historico",
+        ["id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_historico_tenant_id"),
+        "compras_pendencias_fornecedor_historico",
+        ["tenant_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_historico_pendencia_id"),
+        "compras_pendencias_fornecedor_historico",
+        ["pendencia_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_compras_pendencias_fornecedor_historico_user_id"),
+        "compras_pendencias_fornecedor_historico",
+        ["user_id"],
+        unique=False,
+    )
     op.create_index(
         "ix_compras_pendencias_fornecedor_hist_tenant_pendencia",
         "compras_pendencias_fornecedor_historico",
@@ -139,29 +236,92 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_compras_pendencias_fornecedor_hist_tenant_pendencia", table_name="compras_pendencias_fornecedor_historico")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_historico_user_id"), table_name="compras_pendencias_fornecedor_historico")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_historico_pendencia_id"), table_name="compras_pendencias_fornecedor_historico")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_historico_tenant_id"), table_name="compras_pendencias_fornecedor_historico")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_historico_id"), table_name="compras_pendencias_fornecedor_historico")
+    op.drop_index(
+        "ix_compras_pendencias_fornecedor_hist_tenant_pendencia",
+        table_name="compras_pendencias_fornecedor_historico",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_historico_user_id"),
+        table_name="compras_pendencias_fornecedor_historico",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_historico_pendencia_id"),
+        table_name="compras_pendencias_fornecedor_historico",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_historico_tenant_id"),
+        table_name="compras_pendencias_fornecedor_historico",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_historico_id"),
+        table_name="compras_pendencias_fornecedor_historico",
+    )
     op.drop_table("compras_pendencias_fornecedor_historico")
 
-    op.drop_index("ix_compras_pendencias_fornecedor_itens_tenant_pendencia", table_name="compras_pendencias_fornecedor_itens")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_itens_produto_id"), table_name="compras_pendencias_fornecedor_itens")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_itens_nota_entrada_item_id"), table_name="compras_pendencias_fornecedor_itens")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_itens_pendencia_id"), table_name="compras_pendencias_fornecedor_itens")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_itens_tenant_id"), table_name="compras_pendencias_fornecedor_itens")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_itens_id"), table_name="compras_pendencias_fornecedor_itens")
+    op.drop_index(
+        "ix_compras_pendencias_fornecedor_itens_tenant_pendencia",
+        table_name="compras_pendencias_fornecedor_itens",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_itens_produto_id"),
+        table_name="compras_pendencias_fornecedor_itens",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_itens_nota_entrada_item_id"),
+        table_name="compras_pendencias_fornecedor_itens",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_itens_pendencia_id"),
+        table_name="compras_pendencias_fornecedor_itens",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_itens_tenant_id"),
+        table_name="compras_pendencias_fornecedor_itens",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_itens_id"),
+        table_name="compras_pendencias_fornecedor_itens",
+    )
     op.drop_table("compras_pendencias_fornecedor_itens")
 
-    op.drop_index("ix_compras_pendencias_fornecedor_tenant_nota", table_name="compras_pendencias_fornecedor")
-    op.drop_index("ix_compras_pendencias_fornecedor_tenant_status", table_name="compras_pendencias_fornecedor")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_user_id"), table_name="compras_pendencias_fornecedor")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_pedido_compra_id"), table_name="compras_pendencias_fornecedor")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_nota_entrada_id"), table_name="compras_pendencias_fornecedor")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_fornecedor_id"), table_name="compras_pendencias_fornecedor")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_status"), table_name="compras_pendencias_fornecedor")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_codigo"), table_name="compras_pendencias_fornecedor")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_tenant_id"), table_name="compras_pendencias_fornecedor")
-    op.drop_index(op.f("ix_compras_pendencias_fornecedor_id"), table_name="compras_pendencias_fornecedor")
+    op.drop_index(
+        "ix_compras_pendencias_fornecedor_tenant_nota",
+        table_name="compras_pendencias_fornecedor",
+    )
+    op.drop_index(
+        "ix_compras_pendencias_fornecedor_tenant_status",
+        table_name="compras_pendencias_fornecedor",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_user_id"),
+        table_name="compras_pendencias_fornecedor",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_pedido_compra_id"),
+        table_name="compras_pendencias_fornecedor",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_nota_entrada_id"),
+        table_name="compras_pendencias_fornecedor",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_fornecedor_id"),
+        table_name="compras_pendencias_fornecedor",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_status"),
+        table_name="compras_pendencias_fornecedor",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_codigo"),
+        table_name="compras_pendencias_fornecedor",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_tenant_id"),
+        table_name="compras_pendencias_fornecedor",
+    )
+    op.drop_index(
+        op.f("ix_compras_pendencias_fornecedor_id"),
+        table_name="compras_pendencias_fornecedor",
+    )
     op.drop_table("compras_pendencias_fornecedor")

@@ -28,7 +28,9 @@ def upgrade() -> None:
         sa.Column("subject_type", sa.String(length=50), nullable=False),
         sa.Column("subject_id", sa.String(length=255), nullable=False),
         sa.Column("request_type", sa.String(length=50), nullable=False),
-        sa.Column("status", sa.String(length=30), nullable=False, server_default="pending"),
+        sa.Column(
+            "status", sa.String(length=30), nullable=False, server_default="pending"
+        ),
         sa.Column("requester_name", sa.String(length=255), nullable=True),
         sa.Column("requester_email", sa.String(length=255), nullable=True),
         sa.Column("requester_phone", sa.String(length=50), nullable=True),
@@ -43,8 +45,18 @@ def upgrade() -> None:
         sa.Column("user_agent", sa.Text(), nullable=True),
         sa.Column("due_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("processed_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(
@@ -74,6 +86,10 @@ def downgrade() -> None:
         return
 
     op.drop_index("ix_data_subject_requests_type", table_name="data_subject_requests")
-    op.drop_index("ix_data_subject_requests_subject", table_name="data_subject_requests")
-    op.drop_index("ix_data_subject_requests_tenant_status", table_name="data_subject_requests")
+    op.drop_index(
+        "ix_data_subject_requests_subject", table_name="data_subject_requests"
+    )
+    op.drop_index(
+        "ix_data_subject_requests_tenant_status", table_name="data_subject_requests"
+    )
     op.drop_table("data_subject_requests")

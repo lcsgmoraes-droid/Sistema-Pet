@@ -28,25 +28,43 @@ def upgrade() -> None:
     if "billing_status" not in columns:
         op.add_column(
             "tenants",
-            sa.Column("billing_status", sa.String(length=20), nullable=False, server_default="active"),
+            sa.Column(
+                "billing_status",
+                sa.String(length=20),
+                nullable=False,
+                server_default="active",
+            ),
         )
 
     if "trial_started_at" not in columns:
-        op.add_column("tenants", sa.Column("trial_started_at", sa.DateTime(timezone=True), nullable=True))
+        op.add_column(
+            "tenants",
+            sa.Column("trial_started_at", sa.DateTime(timezone=True), nullable=True),
+        )
 
     if "trial_ends_at" not in columns:
-        op.add_column("tenants", sa.Column("trial_ends_at", sa.DateTime(timezone=True), nullable=True))
+        op.add_column(
+            "tenants",
+            sa.Column("trial_ends_at", sa.DateTime(timezone=True), nullable=True),
+        )
 
     if "subscription_activated_at" not in columns:
         op.add_column(
             "tenants",
-            sa.Column("subscription_activated_at", sa.DateTime(timezone=True), nullable=True),
+            sa.Column(
+                "subscription_activated_at", sa.DateTime(timezone=True), nullable=True
+            ),
         )
 
     if "subscription_source" not in columns:
         op.add_column(
             "tenants",
-            sa.Column("subscription_source", sa.String(length=50), nullable=False, server_default="manual"),
+            sa.Column(
+                "subscription_source",
+                sa.String(length=50),
+                nullable=False,
+                server_default="manual",
+            ),
         )
 
 

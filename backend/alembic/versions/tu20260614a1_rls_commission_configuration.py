@@ -35,7 +35,9 @@ def _prepare_commission_configuration_tenant_column() -> None:
     if not _has_commission_configuration_table():
         return
 
-    op.execute("ALTER TABLE comissoes_configuracao ADD COLUMN IF NOT EXISTS tenant_id uuid")
+    op.execute(
+        "ALTER TABLE comissoes_configuracao ADD COLUMN IF NOT EXISTS tenant_id uuid"
+    )
     op.execute(
         """
         UPDATE comissoes_configuracao cc

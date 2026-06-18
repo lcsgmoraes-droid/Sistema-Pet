@@ -18,9 +18,16 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("pedidos", sa.Column("payment_provider", sa.String(length=50), nullable=True))
-    op.add_column("pedidos", sa.Column("payment_preference_id", sa.String(length=255), nullable=True))
-    op.add_column("pedidos", sa.Column("payment_url", sa.String(length=1000), nullable=True))
+    op.add_column(
+        "pedidos", sa.Column("payment_provider", sa.String(length=50), nullable=True)
+    )
+    op.add_column(
+        "pedidos",
+        sa.Column("payment_preference_id", sa.String(length=255), nullable=True),
+    )
+    op.add_column(
+        "pedidos", sa.Column("payment_url", sa.String(length=1000), nullable=True)
+    )
 
 
 def downgrade() -> None:
