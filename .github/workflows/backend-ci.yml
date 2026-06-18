@@ -471,6 +471,10 @@ jobs:
         run: |
           ruff format --check app/__init__.py app/auth.py app/auth_routes_multitenant.py app/db.py app/ia/__init__.py app/ia/aba8_entregas.py app/main.py
 
+      - name: Backend operational fiscal light format (blocking)
+        run: |
+          ruff format --check app/notas_entrada_pdf_parser.py app/routes/sefaz_routes.py app/services/sefaz_service.py app/estoque_movimentacoes_edicao_routes.py app/calculadora_racao.py app/classificador_racao.py
+
       - name: Backend multi tenant tests format (blocking)
         run: |
           ruff format --check tests/multi_tenant
