@@ -40,12 +40,12 @@ def test_estoque_routes_nao_expoe_mais_edicao_movimentacoes():
 
 def test_main_registra_router_de_edicao_movimentacoes():
     main_source = _source("app/main.py")
+    normalized_source = " ".join(main_source.split())
 
+    assert "from app.estoque_movimentacoes_edicao_routes import (" in main_source
+    assert "router as estoque_movimentacoes_edicao_router" in main_source
+    assert "app.include_router(" in main_source
     assert (
-        "from app.estoque_movimentacoes_edicao_routes import router as estoque_movimentacoes_edicao_router"
-        in main_source
-    )
-    assert (
-        'app.include_router(estoque_movimentacoes_edicao_router, tags=["Estoque - Movimentacoes Edicao"])'
-        in main_source
+        'estoque_movimentacoes_edicao_router, tags=["Estoque - Movimentacoes Edicao"]'
+        in normalized_source
     )

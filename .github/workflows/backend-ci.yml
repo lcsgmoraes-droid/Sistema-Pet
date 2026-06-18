@@ -487,6 +487,10 @@ jobs:
         run: |
           ruff format --check app/estoque_saida_full_routes.py
 
+      - name: Backend stock movement edit format (blocking)
+        run: |
+          ruff format --check app/estoque_movimentacoes_edicao_routes.py
+
       - name: Backend conciliation bling nf format (blocking)
         run: |
           ruff format --check app/conciliacao_services.py app/integracao_bling_nf_routes.py
