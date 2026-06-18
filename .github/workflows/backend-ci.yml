@@ -411,6 +411,10 @@ jobs:
         run: |
           ruff format --check app/bling_flow_monitor_routes.py
 
+      - name: Backend Bling routes format (blocking)
+        run: |
+          ruff format --check app/bling_routes.py
+
       - name: Backend AI packages format (blocking)
         run: |
           ruff format --check app/ai app/ai_core

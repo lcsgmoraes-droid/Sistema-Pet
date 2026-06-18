@@ -814,6 +814,13 @@ def test_backend_ci_has_blocking_backend_bling_flow_monitor_format_step():
     assert "ruff format --check app/bling_flow_monitor_routes.py" in source
 
 
+def test_backend_ci_has_blocking_backend_bling_routes_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend Bling routes format (blocking)" in source
+    assert "ruff format --check app/bling_routes.py" in source
+
+
 def test_backend_ci_has_blocking_backend_ai_packages_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
