@@ -2874,6 +2874,104 @@ def _preco_custo_final_item_nf(
     return _float_confronto(getattr(item_nf, "valor_unitario", 0))
 
 
+def _status_item_confronto(
+    dif_qtd: float, dif_preco_pct: float
+) -> tuple[str, bool, bool]:
+    divergiu_qtd = abs(dif_qtd) > 0.001
+    divergiu_preco = abs(dif_preco_pct) > 0.5
+
+    if divergiu_qtd and divergiu_preco:
+        status_item = "divergencia_mista"
+    elif divergiu_qtd:
+        status_item = "divergencia_quantidade"
+    elif divergiu_preco:
+        status_item = "divergencia_preco"
+    else:
+        status_item = "ok"
+
+    return status_item, divergiu_qtd, divergiu_preco
+
+
+def _montar_item_confronto_encontrado(
+    item_pedido,
+    nome_produto,
+    codigo_produto,
+    item_nf_id,
+    qtd_pedida,
+    qtd_nf,
+    preco_pedido,
+    preco_nf,
+    valor_pedido,
+    valor_nf,
+    extras: dict | None = None,
+) -> tuple[dict, bool, bool]:
+    dif_qtd = qtd_nf - qtd_pedida
+    dif_preco_unit = preco_nf - preco_pedido
+    dif_preco_pct = (
+        ((preco_nf - preco_pedido) / preco_pedido * 100) if preco_pedido else 0
+    )
+    dif_valor = valor_nf - valor_pedido
+    status_item, divergiu_qtd, divergiu_preco = _status_item_confronto(
+        dif_qtd, dif_preco_pct
+    )
+
+    item = {
+        "produto_id": item_pedido.produto_id,
+        "produto_nome": nome_produto,
+        "produto_codigo": codigo_produto,
+        "item_pedido_id": item_pedido.id,
+        "item_nf_id": item_nf_id,
+        "qtd_pedida": qtd_pedida,
+        "qtd_nf": qtd_nf,
+        "dif_qtd": round(dif_qtd, 3),
+        "preco_pedido": round(preco_pedido, 4),
+        "preco_nf": round(preco_nf, 4),
+        "dif_preco_unit": round(dif_preco_unit, 4),
+        "dif_preco_pct": round(dif_preco_pct, 2),
+        "valor_pedido": round(valor_pedido, 2),
+        "valor_nf": round(valor_nf, 2),
+        "dif_valor": round(dif_valor, 2),
+        "status": status_item,
+        "encontrado_na_nf": True,
+    }
+    if extras:
+        item.update(extras)
+    return item, divergiu_qtd, divergiu_preco
+
+
+def _montar_item_confronto_nao_encontrado(
+    item_pedido,
+    nome_produto,
+    codigo_produto,
+    qtd_pedida,
+    preco_pedido,
+    valor_pedido,
+    extras: dict | None = None,
+) -> dict:
+    item = {
+        "produto_id": item_pedido.produto_id,
+        "produto_nome": nome_produto,
+        "produto_codigo": codigo_produto,
+        "item_pedido_id": item_pedido.id,
+        "item_nf_id": None,
+        "qtd_pedida": qtd_pedida,
+        "qtd_nf": 0,
+        "dif_qtd": -qtd_pedida,
+        "preco_pedido": round(preco_pedido, 4),
+        "preco_nf": 0,
+        "dif_preco_unit": None,
+        "dif_preco_pct": 0,
+        "valor_pedido": round(valor_pedido, 2),
+        "valor_nf": 0,
+        "dif_valor": -round(valor_pedido, 2),
+        "status": "nao_encontrado",
+        "encontrado_na_nf": False,
+    }
+    if extras:
+        item.update(extras)
+    return item
+
+
 def _realizar_confronto_legado(
     pedido: PedidoCompra, nota, db: Session, tenant_id: int
 ) -> dict:
@@ -2929,71 +3027,38 @@ def _realizar_confronto_legado(
             valor_nf = item_nf.valor_total
             total_nf += valor_nf
 
-            dif_qtd = qtd_nf - qtd_pedida
-            dif_preco_unit = preco_nf - preco_pedido
-            dif_preco_pct = (
-                ((preco_nf - preco_pedido) / preco_pedido * 100) if preco_pedido else 0
+            item_confronto, divergiu_qtd, divergiu_preco = (
+                _montar_item_confronto_encontrado(
+                    item_pedido,
+                    nome_produto,
+                    codigo_produto,
+                    item_nf.id,
+                    qtd_pedida,
+                    qtd_nf,
+                    preco_pedido,
+                    preco_nf,
+                    valor_pedido,
+                    valor_nf,
+                )
             )
-            dif_valor = valor_nf - valor_pedido
-
-            if abs(dif_qtd) > 0.001:
+            if divergiu_qtd:
                 tem_divergencia_qtd = True
-            if abs(dif_preco_pct) > 0.5:
+            if divergiu_preco:
                 tem_divergencia_preco = True
 
-            status_item = "ok"
-            if abs(dif_qtd) > 0.001 and abs(dif_preco_pct) > 0.5:
-                status_item = "divergencia_mista"
-            elif abs(dif_qtd) > 0.001:
-                status_item = "divergencia_quantidade"
-            elif abs(dif_preco_pct) > 0.5:
-                status_item = "divergencia_preco"
-
-            itens_confronto.append(
-                {
-                    "produto_id": item_pedido.produto_id,
-                    "produto_nome": nome_produto,
-                    "produto_codigo": codigo_produto,
-                    "item_pedido_id": item_pedido.id,
-                    "item_nf_id": item_nf.id,
-                    "qtd_pedida": qtd_pedida,
-                    "qtd_nf": qtd_nf,
-                    "dif_qtd": round(dif_qtd, 3),
-                    "preco_pedido": round(preco_pedido, 4),
-                    "preco_nf": round(preco_nf, 4),
-                    "dif_preco_unit": round(dif_preco_unit, 4),
-                    "dif_preco_pct": round(dif_preco_pct, 2),
-                    "valor_pedido": round(valor_pedido, 2),
-                    "valor_nf": round(valor_nf, 2),
-                    "dif_valor": round(dif_valor, 2),
-                    "status": status_item,
-                    "encontrado_na_nf": True,
-                }
-            )
+            itens_confronto.append(item_confronto)
         else:
             # Item do pedido não encontrado na NF
             tem_divergencia_qtd = True
-            itens_confronto.append(
-                {
-                    "produto_id": item_pedido.produto_id,
-                    "produto_nome": nome_produto,
-                    "produto_codigo": codigo_produto,
-                    "item_pedido_id": item_pedido.id,
-                    "item_nf_id": None,
-                    "qtd_pedida": qtd_pedida,
-                    "qtd_nf": 0,
-                    "dif_qtd": -qtd_pedida,
-                    "preco_pedido": round(preco_pedido, 4),
-                    "preco_nf": 0,
-                    "dif_preco_unit": None,
-                    "dif_preco_pct": 0,
-                    "valor_pedido": round(valor_pedido, 2),
-                    "valor_nf": 0,
-                    "dif_valor": -round(valor_pedido, 2),
-                    "status": "nao_encontrado",
-                    "encontrado_na_nf": False,
-                }
+            item_confronto = _montar_item_confronto_nao_encontrado(
+                item_pedido,
+                nome_produto,
+                codigo_produto,
+                qtd_pedida,
+                preco_pedido,
+                valor_pedido,
             )
+            itens_confronto.append(item_confronto)
 
     # Itens na NF que não estavam no pedido
     ids_pedido_produto = {i.produto_id for i in pedido.itens}
@@ -3164,76 +3229,48 @@ def _realizar_confronto(
             )
             total_nf += valor_nf
 
-            dif_qtd = qtd_nf - qtd_pedida
-            dif_preco_unit = preco_nf - preco_pedido
-            dif_preco_pct = (
-                ((preco_nf - preco_pedido) / preco_pedido * 100) if preco_pedido else 0
+            item_confronto, divergiu_qtd, divergiu_preco = (
+                _montar_item_confronto_encontrado(
+                    item_pedido,
+                    nome_produto,
+                    codigo_produto,
+                    itens_match[0].id,
+                    qtd_pedida,
+                    qtd_nf,
+                    preco_pedido,
+                    preco_nf,
+                    valor_pedido,
+                    valor_nf,
+                    extras={
+                        "item_nf_ids": [it.id for it in itens_match],
+                        "nota_entrada_ids": sorted(
+                            {
+                                it.nota_entrada_id
+                                for it in itens_match
+                                if it.nota_entrada_id
+                            }
+                        ),
+                    },
+                )
             )
-            dif_valor = valor_nf - valor_pedido
-
-            if abs(dif_qtd) > 0.001:
+            if divergiu_qtd:
                 tem_divergencia_qtd = True
-            if abs(dif_preco_pct) > 0.5:
+            if divergiu_preco:
                 tem_divergencia_preco = True
 
-            status_item = "ok"
-            if abs(dif_qtd) > 0.001 and abs(dif_preco_pct) > 0.5:
-                status_item = "divergencia_mista"
-            elif abs(dif_qtd) > 0.001:
-                status_item = "divergencia_quantidade"
-            elif abs(dif_preco_pct) > 0.5:
-                status_item = "divergencia_preco"
-
-            itens_confronto.append(
-                {
-                    "produto_id": item_pedido.produto_id,
-                    "produto_nome": nome_produto,
-                    "produto_codigo": codigo_produto,
-                    "item_pedido_id": item_pedido.id,
-                    "item_nf_id": itens_match[0].id,
-                    "item_nf_ids": [it.id for it in itens_match],
-                    "nota_entrada_ids": sorted(
-                        {it.nota_entrada_id for it in itens_match if it.nota_entrada_id}
-                    ),
-                    "qtd_pedida": qtd_pedida,
-                    "qtd_nf": qtd_nf,
-                    "dif_qtd": round(dif_qtd, 3),
-                    "preco_pedido": round(preco_pedido, 4),
-                    "preco_nf": round(preco_nf, 4),
-                    "dif_preco_unit": round(dif_preco_unit, 4),
-                    "dif_preco_pct": round(dif_preco_pct, 2),
-                    "valor_pedido": round(valor_pedido, 2),
-                    "valor_nf": round(valor_nf, 2),
-                    "dif_valor": round(dif_valor, 2),
-                    "status": status_item,
-                    "encontrado_na_nf": True,
-                }
-            )
+            itens_confronto.append(item_confronto)
         else:
             tem_divergencia_qtd = True
-            itens_confronto.append(
-                {
-                    "produto_id": item_pedido.produto_id,
-                    "produto_nome": nome_produto,
-                    "produto_codigo": codigo_produto,
-                    "item_pedido_id": item_pedido.id,
-                    "item_nf_id": None,
-                    "item_nf_ids": [],
-                    "nota_entrada_ids": [],
-                    "qtd_pedida": qtd_pedida,
-                    "qtd_nf": 0,
-                    "dif_qtd": -qtd_pedida,
-                    "preco_pedido": round(preco_pedido, 4),
-                    "preco_nf": 0,
-                    "dif_preco_unit": None,
-                    "dif_preco_pct": 0,
-                    "valor_pedido": round(valor_pedido, 2),
-                    "valor_nf": 0,
-                    "dif_valor": -round(valor_pedido, 2),
-                    "status": "nao_encontrado",
-                    "encontrado_na_nf": False,
-                }
+            item_confronto = _montar_item_confronto_nao_encontrado(
+                item_pedido,
+                nome_produto,
+                codigo_produto,
+                qtd_pedida,
+                preco_pedido,
+                valor_pedido,
+                extras={"item_nf_ids": [], "nota_entrada_ids": []},
             )
+            itens_confronto.append(item_confronto)
 
     for it in itens_nf:
         if it.id in itens_nf_usados:
