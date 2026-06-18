@@ -1050,6 +1050,16 @@ def test_backend_ci_has_blocking_backend_stock_full_exit_format_step():
     assert "ruff format --check app/estoque_saida_full_routes.py" in source
 
 
+def test_backend_ci_has_blocking_backend_conciliation_bling_nf_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend conciliation bling nf format (blocking)" in source
+    assert (
+        "ruff format --check app/conciliacao_services.py "
+        "app/integracao_bling_nf_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_backend_analysis_dashboard_sales_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
