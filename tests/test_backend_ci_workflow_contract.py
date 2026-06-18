@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from backend_legacy_root_scripts import CLEANED_LEGACY_ROOT_SCRIPTS
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND_CI_WORKFLOW = ROOT / ".github" / "workflows" / "backend-ci.yml"
@@ -1006,24 +1008,12 @@ def test_backend_ci_has_blocking_backend_global_non_legacy_format_step():
         "tests/integration/test_transaction_excluir_venda.py",
         "tests/test_02_user.py",
     )
-    cleaned_root_scripts = (
-        "atualizar_template_stone.py",
-        "corrigir_template_stone.py",
-        "criar_admin_prod.py",
-        "criar_banco_producao.py",
-        "dar_full_permissoes.py",
-        "importar_producao_lotes.py",
-        "seed_opcoes_racao_standalone.py",
-        "seed_templates.py",
-        "temp_seed_prod.py",
-        "testar_api_produtos.py",
-    )
 
     assert "Backend global non legacy format (blocking)" in source
     assert "ruff format --check ." in source
     for path in exclusions:
         assert f"--exclude {path}" in source
-    for path in cleaned_root_scripts:
+    for path in CLEANED_LEGACY_ROOT_SCRIPTS:
         assert f"--exclude {path}" not in source
 
 

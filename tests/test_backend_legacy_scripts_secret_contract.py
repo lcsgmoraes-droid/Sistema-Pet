@@ -2,22 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from backend_legacy_root_scripts import CLEANED_LEGACY_ROOT_SCRIPTS
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
-
-LEGACY_ROOT_SCRIPTS = (
-    "atualizar_template_stone.py",
-    "corrigir_template_stone.py",
-    "criar_admin_prod.py",
-    "criar_banco_producao.py",
-    "dar_full_permissoes.py",
-    "importar_producao_lotes.py",
-    "seed_opcoes_racao_standalone.py",
-    "seed_templates.py",
-    "temp_seed_prod.py",
-    "testar_api_produtos.py",
-)
 
 
 def test_legacy_root_scripts_do_not_embed_known_credentials():
@@ -35,7 +24,7 @@ def test_legacy_root_scripts_do_not_embed_known_credentials():
     )
 
     offenders: list[str] = []
-    for script in LEGACY_ROOT_SCRIPTS:
+    for script in CLEANED_LEGACY_ROOT_SCRIPTS:
         source = (BACKEND / script).read_text(encoding="utf-8")
         for fragment in forbidden_fragments:
             if fragment in source:
