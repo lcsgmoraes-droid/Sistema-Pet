@@ -5,7 +5,7 @@
   .whatsapp-dashboard-sidebar {
     width: 320px;
   }
-  
+
   .stats-cards-grid {
     grid-template-columns: repeat(3, 1fr);
   }
@@ -20,16 +20,16 @@
     z-index: 40;
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
   }
-  
+
   .whatsapp-dashboard-sidebar.closed {
     transform: translateX(-100%);
   }
-  
+
   .stats-cards-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 8px;
   }
-  
+
   .bot-assist-panel {
     position: fixed;
     right: 0;
@@ -48,19 +48,19 @@
     grid-template-columns: repeat(2, 1fr);
     font-size: 0.75rem;
   }
-  
+
   .stats-card-value {
     font-size: 1.25rem;
   }
-  
+
   .conversation-card {
     padding: 12px;
   }
-  
+
   .chat-input-area textarea {
     font-size: 16px; /* Evita zoom no iOS */
   }
-  
+
   .notification-toast {
     max-width: calc(100vw - 32px);
   }
@@ -72,11 +72,11 @@
     grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
-  
+
   .whatsapp-dashboard-header {
     padding: 12px;
   }
-  
+
   .chat-message-bubble {
     max-width: 85%;
   }
@@ -87,7 +87,7 @@
   .whatsapp-dashboard-sidebar {
     width: 280px;
   }
-  
+
   .conversation-queue {
     max-height: calc(100vh - 200px);
   }
@@ -98,7 +98,7 @@
   .whatsapp-dashboard {
     background-color: #1a1a1a;
   }
-  
+
   .card-bg {
     background-color: #2d2d2d;
     border-color: #404040;
@@ -110,7 +110,7 @@
   .card-border {
     border-width: 2px;
   }
-  
+
   .button-primary {
     font-weight: 600;
   }
@@ -132,7 +132,7 @@
   .notification-toast {
     display: none;
   }
-  
+
   .chat-interface {
     width: 100%;
   }

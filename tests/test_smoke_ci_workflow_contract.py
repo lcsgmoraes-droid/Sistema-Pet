@@ -37,6 +37,6 @@ def test_frontend_package_exposes_core_lint_and_format_scripts():
     )
     assert (
         package["scripts"]["format:core:check"]
-        == 'prettier --check "src/**/*.{js,jsx,ts,tsx,mjs,cjs}" scripts'
+        == 'prettier --check "src/**/*.{js,jsx,ts,tsx,mjs,cjs,css,md}" scripts'
     )
     assert "eslint-plugin-react-hooks" in package["devDependencies"]
