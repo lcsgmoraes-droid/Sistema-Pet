@@ -1,7 +1,7 @@
 import json
 
 from fastapi import APIRouter, Request, HTTPException
-from jose import jwt, JWTError
+from app.security.jwt_compat import JWTError, jwt
 from uuid import UUID
 from app.domain.events.ecommerce_events import PedidoCriadoEvent
 from app.domain.events.dispatcher import event_dispatcher

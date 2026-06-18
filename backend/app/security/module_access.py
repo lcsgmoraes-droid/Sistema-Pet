@@ -5,7 +5,7 @@ from typing import Callable
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
+from app.security.jwt_compat import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app.auth.core import ALGORITHM, get_current_user

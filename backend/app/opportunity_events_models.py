@@ -60,7 +60,6 @@ class OpportunityEvent(BaseTenantModel):
     opportunity_id = Column(
         PostgresUUID(as_uuid=True),
         nullable=False,
-        index=True,
         comment="ID da oportunidade relacionada",
     )
 

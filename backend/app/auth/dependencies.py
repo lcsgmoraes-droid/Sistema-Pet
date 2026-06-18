@@ -9,7 +9,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from uuid import UUID
-from jose import jwt, JWTError
+from app.security.jwt_compat import JWTError, jwt
 from .core import get_current_user  # Importa do módulo local core.py
 from app.db import get_session
 from app.models import Tenant, User, UserTenant
