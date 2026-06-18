@@ -489,7 +489,7 @@ jobs:
 
       - name: Backend IA finance parsers format (blocking)
         run: |
-          ruff format --check app/ia/aba7_dre_canal.py
+          ruff format --check app/ia/aba7_dre_canal.py app/ia/aba7_tributacao.py app/ia/extrato_parser.py
 
       - name: Backend stock full exit format (blocking)
         run: |

@@ -12,10 +12,10 @@ from app.ia.aba7_extrato_models import ConfiguracaoTributaria
 
 class CalculadoraTributaria:
     """Calcula impostos baseado no regime tributário configurado"""
-    
+
     def __init__(self, db: Session):
         self.db = db
-    
+
     def obter_configuracao(self, tenant_id) -> Optional[ConfiguracaoTributaria]:
         """Busca configuração tributária do usuário"""
         return (
@@ -23,17 +23,17 @@ class CalculadoraTributaria:
             .filter(ConfiguracaoTributaria.tenant_id == tenant_id)
             .first()
         )
-    
+
     def calcular_impostos(
         self,
         tenant_id,
         receita_bruta: float,
         receita_liquida: float,
-        lucro_operacional: float
+        lucro_operacional: float,
     ) -> Dict:
         """
         Calcula todos os impostos baseado no regime
-        
+
         Returns:
             {
                 'impostos': float,
@@ -51,43 +51,41 @@ class CalculadoraTributaria:
             }
         """
         config = self.obter_configuracao(tenant_id=tenant_id)
-        
+
         if not config:
             # Sem configuração, estima 8% (Simples Nacional médio)
             impostos_estimados = receita_bruta * 0.08
             return {
-                'impostos': impostos_estimados,
-                'detalhamento': {'estimado': impostos_estimados},
-                'aliquota_efetiva': 8.0,
-                'regime': 'nao_configurado'
+                "impostos": impostos_estimados,
+                "detalhamento": {"estimado": impostos_estimados},
+                "aliquota_efetiva": 8.0,
+                "regime": "nao_configurado",
             }
-        
-        if config.regime == 'simples_nacional':
+
+        if config.regime == "simples_nacional":
             return self._calcular_simples_nacional(config, receita_bruta)
-        
-        elif config.regime == 'lucro_presumido':
+
+        elif config.regime == "lucro_presumido":
             return self._calcular_lucro_presumido(config, receita_bruta)
-        
-        elif config.regime == 'lucro_real':
+
+        elif config.regime == "lucro_real":
             return self._calcular_lucro_real(config, receita_bruta, lucro_operacional)
-        
-        elif config.regime == 'mei':
+
+        elif config.regime == "mei":
             return self._calcular_mei(config, receita_bruta)
-        
+
         else:
             # Fallback
             impostos_estimados = receita_bruta * 0.08
             return {
-                'impostos': impostos_estimados,
-                'detalhamento': {'estimado': impostos_estimados},
-                'aliquota_efetiva': 8.0,
-                'regime': config.regime
+                "impostos": impostos_estimados,
+                "detalhamento": {"estimado": impostos_estimados},
+                "aliquota_efetiva": 8.0,
+                "regime": config.regime,
             }
-    
+
     def _calcular_simples_nacional(
-        self,
-        config: ConfiguracaoTributaria,
-        receita_bruta: float
+        self, config: ConfiguracaoTributaria, receita_bruta: float
     ) -> Dict:
         """
         Simples Nacional - Alíquota única progressiva
@@ -96,22 +94,51 @@ class CalculadoraTributaria:
         # Usa alíquota efetiva configurada
         aliquota = config.aliquota_efetiva_simples or 8.54  # Média do Anexo I
         impostos = receita_bruta * (aliquota / 100)
-        
+
         return {
-            'impostos': impostos,
-            'detalhamento': {
-                'simples_nacional': impostos
-            },
-            'aliquota_efetiva': aliquota,
-            'regime': 'simples_nacional',
-            'anexo': config.anexo_simples,
-            'faixa': config.faixa_simples
+            "impostos": impostos,
+            "detalhamento": {"simples_nacional": impostos},
+            "aliquota_efetiva": aliquota,
+            "regime": "simples_nacional",
+            "anexo": config.anexo_simples,
+            "faixa": config.faixa_simples,
         }
-    
+
+    @staticmethod
+    def _calcular_iss_icms(
+        config: ConfiguracaoTributaria, receita_bruta: float
+    ) -> Dict:
+        iss = 0
+        if config.incluir_iss_dre and config.aliquota_iss:
+            iss = receita_bruta * (config.aliquota_iss / 100)
+
+        icms = 0
+        if config.incluir_icms_dre and config.aliquota_icms:
+            icms = receita_bruta * (config.aliquota_icms / 100)
+
+        return {"iss": iss, "icms": icms}
+
+    @staticmethod
+    def _resultado_com_detalhamento(
+        total_impostos: float,
+        receita_bruta: float,
+        regime: str,
+        detalhamento: Dict,
+        extra: Dict,
+    ) -> Dict:
+        resultado = {
+            "impostos": total_impostos,
+            "detalhamento": detalhamento,
+            "aliquota_efetiva": (total_impostos / receita_bruta * 100)
+            if receita_bruta > 0
+            else 0,
+            "regime": regime,
+        }
+        resultado.update(extra)
+        return resultado
+
     def _calcular_lucro_presumido(
-        self,
-        config: ConfiguracaoTributaria,
-        receita_bruta: float
+        self, config: ConfiguracaoTributaria, receita_bruta: float
     ) -> Dict:
         """
         Lucro Presumido - Cálculo separado de cada tributo
@@ -123,58 +150,53 @@ class CalculadoraTributaria:
         # PIS e COFINS
         pis = receita_bruta * (config.aliquota_pis or 0.0065)
         cofins = receita_bruta * (config.aliquota_cofins or 0.03)
-        
+
         # Lucro presumido
         presuncao = config.presuncao_lucro_percentual or 8.0  # 8% para comércio
         lucro_presumido = receita_bruta * (presuncao / 100)
-        
+
         # IRPJ (15% + adicional de 10% acima de R$ 60k trimestral)
         irpj_base = lucro_presumido * (config.aliquota_irpj or 0.15)
-        
+
         # Adicional de IRPJ (10% sobre o que exceder R$ 60k no trimestre)
         limite_trimestral = 60000
         if lucro_presumido > limite_trimestral:
-            irpj_adicional = (lucro_presumido - limite_trimestral) * (config.aliquota_adicional_irpj or 0.10)
+            irpj_adicional = (lucro_presumido - limite_trimestral) * (
+                config.aliquota_adicional_irpj or 0.10
+            )
             irpj = irpj_base + irpj_adicional
         else:
             irpj = irpj_base
-        
+
         # CSLL
         csll = lucro_presumido * (config.aliquota_csll or 0.09)
-        
-        # ISS (se aplicável - para serviços)
-        iss = 0
-        if config.incluir_iss_dre and config.aliquota_iss:
-            iss = receita_bruta * (config.aliquota_iss / 100)
-        
-        # ICMS (se aplicável - estadual)
-        icms = 0
-        if config.incluir_icms_dre and config.aliquota_icms:
-            icms = receita_bruta * (config.aliquota_icms / 100)
-        
+
+        impostos_indiretos = self._calcular_iss_icms(config, receita_bruta)
+        iss = impostos_indiretos["iss"]
+        icms = impostos_indiretos["icms"]
+
         total_impostos = pis + cofins + irpj + csll + iss + icms
-        aliquota_efetiva = (total_impostos / receita_bruta * 100) if receita_bruta > 0 else 0
-        
-        return {
-            'impostos': total_impostos,
-            'detalhamento': {
-                'pis': pis,
-                'cofins': cofins,
-                'irpj': irpj,
-                'csll': csll,
-                'iss': iss,
-                'icms': icms
+
+        return self._resultado_com_detalhamento(
+            total_impostos=total_impostos,
+            receita_bruta=receita_bruta,
+            regime="lucro_presumido",
+            detalhamento={
+                "pis": pis,
+                "cofins": cofins,
+                "irpj": irpj,
+                "csll": csll,
+                "iss": iss,
+                "icms": icms,
             },
-            'aliquota_efetiva': aliquota_efetiva,
-            'regime': 'lucro_presumido',
-            'lucro_presumido': lucro_presumido
-        }
-    
+            extra={"lucro_presumido": lucro_presumido},
+        )
+
     def _calcular_lucro_real(
         self,
         config: ConfiguracaoTributaria,
         receita_bruta: float,
-        lucro_operacional: float
+        lucro_operacional: float,
     ) -> Dict:
         """
         Lucro Real - Cálculo sobre lucro efetivo
@@ -183,12 +205,12 @@ class CalculadoraTributaria:
         # PIS e COFINS (não cumulativo)
         pis = receita_bruta * 0.0165  # 1.65%
         cofins = receita_bruta * 0.076  # 7.6%
-        
+
         # IRPJ e CSLL sobre lucro real
         lucro_real = max(0, lucro_operacional)  # Não tributa prejuízo
-        
+
         irpj_base = lucro_real * 0.15
-        
+
         # Adicional de IRPJ (10% acima de R$ 60k trimestral)
         limite_trimestral = 60000
         if lucro_real > limite_trimestral:
@@ -196,40 +218,32 @@ class CalculadoraTributaria:
             irpj = irpj_base + irpj_adicional
         else:
             irpj = irpj_base
-        
+
         csll = lucro_real * 0.09
-        
-        # ISS/ICMS
-        iss = 0
-        if config.incluir_iss_dre and config.aliquota_iss:
-            iss = receita_bruta * (config.aliquota_iss / 100)
-        
-        icms = 0
-        if config.incluir_icms_dre and config.aliquota_icms:
-            icms = receita_bruta * (config.aliquota_icms / 100)
-        
+
+        impostos_indiretos = self._calcular_iss_icms(config, receita_bruta)
+        iss = impostos_indiretos["iss"]
+        icms = impostos_indiretos["icms"]
+
         total_impostos = pis + cofins + irpj + csll + iss + icms
-        aliquota_efetiva = (total_impostos / receita_bruta * 100) if receita_bruta > 0 else 0
-        
-        return {
-            'impostos': total_impostos,
-            'detalhamento': {
-                'pis': pis,
-                'cofins': cofins,
-                'irpj': irpj,
-                'csll': csll,
-                'iss': iss,
-                'icms': icms
+
+        return self._resultado_com_detalhamento(
+            total_impostos=total_impostos,
+            receita_bruta=receita_bruta,
+            regime="lucro_real",
+            detalhamento={
+                "pis": pis,
+                "cofins": cofins,
+                "irpj": irpj,
+                "csll": csll,
+                "iss": iss,
+                "icms": icms,
             },
-            'aliquota_efetiva': aliquota_efetiva,
-            'regime': 'lucro_real',
-            'lucro_real': lucro_real
-        }
-    
+            extra={"lucro_real": lucro_real},
+        )
+
     def _calcular_mei(
-        self,
-        config: ConfiguracaoTributaria,
-        receita_bruta: float
+        self, config: ConfiguracaoTributaria, receita_bruta: float
     ) -> Dict:
         """
         MEI - Valor fixo mensal
@@ -239,73 +253,69 @@ class CalculadoraTributaria:
         if receita_bruta > 81000 / 12:  # Se ultrapassar no mês
             # Desenquadramento automático, usar Simples
             return self._calcular_simples_nacional(config, receita_bruta)
-        
+
         # Valor fixo do DAS-MEI
         valor_mensal = 71.00  # Média (pode ser configurável)
-        
+
         return {
-            'impostos': valor_mensal,
-            'detalhamento': {
-                'das_mei': valor_mensal
-            },
-            'aliquota_efetiva': (valor_mensal / receita_bruta * 100) if receita_bruta > 0 else 0,
-            'regime': 'mei'
+            "impostos": valor_mensal,
+            "detalhamento": {"das_mei": valor_mensal},
+            "aliquota_efetiva": (valor_mensal / receita_bruta * 100)
+            if receita_bruta > 0
+            else 0,
+            "regime": "mei",
         }
-    
+
     def salvar_configuracao(
-        self,
-        tenant_id,
-        user_id: int,
-        regime: str,
-        **kwargs
+        self, tenant_id, user_id: int, regime: str, **kwargs
     ) -> ConfiguracaoTributaria:
         """Cria ou atualiza configuração tributária"""
         config = self.obter_configuracao(tenant_id=tenant_id)
-        
+
         if not config:
             config = ConfiguracaoTributaria(
                 tenant_id=tenant_id,
                 usuario_id=user_id,
             )
             self.db.add(config)
-        
+
         # Atualizar campos
         config.regime = regime
-        
+
         # Simples Nacional
-        if 'anexo_simples' in kwargs:
-            config.anexo_simples = kwargs['anexo_simples']
-        if 'faixa_simples' in kwargs:
-            config.faixa_simples = kwargs['faixa_simples']
-        if 'aliquota_efetiva_simples' in kwargs:
-            config.aliquota_efetiva_simples = kwargs['aliquota_efetiva_simples']
-        
+        if "anexo_simples" in kwargs:
+            config.anexo_simples = kwargs["anexo_simples"]
+        if "faixa_simples" in kwargs:
+            config.faixa_simples = kwargs["faixa_simples"]
+        if "aliquota_efetiva_simples" in kwargs:
+            config.aliquota_efetiva_simples = kwargs["aliquota_efetiva_simples"]
+
         # Lucro Presumido
-        if 'presuncao_lucro_percentual' in kwargs:
-            config.presuncao_lucro_percentual = kwargs['presuncao_lucro_percentual']
-        if 'aliquota_irpj' in kwargs:
-            config.aliquota_irpj = kwargs['aliquota_irpj']
-        if 'aliquota_adicional_irpj' in kwargs:
-            config.aliquota_adicional_irpj = kwargs['aliquota_adicional_irpj']
-        if 'aliquota_csll' in kwargs:
-            config.aliquota_csll = kwargs['aliquota_csll']
-        if 'aliquota_pis' in kwargs:
-            config.aliquota_pis = kwargs['aliquota_pis']
-        if 'aliquota_cofins' in kwargs:
-            config.aliquota_cofins = kwargs['aliquota_cofins']
-        
+        if "presuncao_lucro_percentual" in kwargs:
+            config.presuncao_lucro_percentual = kwargs["presuncao_lucro_percentual"]
+        if "aliquota_irpj" in kwargs:
+            config.aliquota_irpj = kwargs["aliquota_irpj"]
+        if "aliquota_adicional_irpj" in kwargs:
+            config.aliquota_adicional_irpj = kwargs["aliquota_adicional_irpj"]
+        if "aliquota_csll" in kwargs:
+            config.aliquota_csll = kwargs["aliquota_csll"]
+        if "aliquota_pis" in kwargs:
+            config.aliquota_pis = kwargs["aliquota_pis"]
+        if "aliquota_cofins" in kwargs:
+            config.aliquota_cofins = kwargs["aliquota_cofins"]
+
         # ICMS/ISS
-        if 'estado' in kwargs:
-            config.estado = kwargs['estado']
-        if 'aliquota_icms' in kwargs:
-            config.aliquota_icms = kwargs['aliquota_icms']
-        if 'incluir_icms_dre' in kwargs:
-            config.incluir_icms_dre = kwargs['incluir_icms_dre']
-        if 'aliquota_iss' in kwargs:
-            config.aliquota_iss = kwargs['aliquota_iss']
-        if 'incluir_iss_dre' in kwargs:
-            config.incluir_iss_dre = kwargs['incluir_iss_dre']
-        
+        if "estado" in kwargs:
+            config.estado = kwargs["estado"]
+        if "aliquota_icms" in kwargs:
+            config.aliquota_icms = kwargs["aliquota_icms"]
+        if "incluir_icms_dre" in kwargs:
+            config.incluir_icms_dre = kwargs["incluir_icms_dre"]
+        if "aliquota_iss" in kwargs:
+            config.aliquota_iss = kwargs["aliquota_iss"]
+        if "incluir_iss_dre" in kwargs:
+            config.incluir_iss_dre = kwargs["incluir_iss_dre"]
+
         self.db.commit()
         self.db.refresh(config)
         return config
@@ -330,16 +340,13 @@ class CalculadoraTributaria:
         dados = {campo: getattr(config, campo, None) for campo in campos}
         dados["regime"] = regime
         return SimpleNamespace(**dados)
-    
+
     def estimar_economia_regime(
-        self,
-        tenant_id,
-        receita_bruta: float,
-        lucro_operacional: float
+        self, tenant_id, receita_bruta: float, lucro_operacional: float
     ) -> Dict:
         """
         Compara todos os regimes e sugere o mais econômico
-        
+
         Returns:
             {
                 'simples_nacional': {'impostos': 1000, 'aliquota': 8.5},
@@ -351,11 +358,11 @@ class CalculadoraTributaria:
         """
         config = self.obter_configuracao(tenant_id=tenant_id)
         regime_atual = config.regime if config else None
-        
+
         if not config:
             # Criar config temporária com valores padrão
             config = SimpleNamespace(
-                regime='simples_nacional',
+                regime="simples_nacional",
                 anexo_simples=None,
                 faixa_simples=None,
                 aliquota_efetiva_simples=8.54,
@@ -370,50 +377,50 @@ class CalculadoraTributaria:
                 aliquota_icms=None,
                 aliquota_iss=None,
             )
-        
+
         # Simular cada regime
         simples = self._calcular_simples_nacional(
-            self._configuracao_simulada(config, 'simples_nacional'),
+            self._configuracao_simulada(config, "simples_nacional"),
             receita_bruta,
         )
         presumido = self._calcular_lucro_presumido(
-            self._configuracao_simulada(config, 'lucro_presumido'),
+            self._configuracao_simulada(config, "lucro_presumido"),
             receita_bruta,
         )
         real = self._calcular_lucro_real(
-            self._configuracao_simulada(config, 'lucro_real'),
+            self._configuracao_simulada(config, "lucro_real"),
             receita_bruta,
             lucro_operacional,
         )
-        
+
         # Encontrar o melhor
         opcoes = {
-            'simples_nacional': simples['impostos'],
-            'lucro_presumido': presumido['impostos'],
-            'lucro_real': real['impostos']
+            "simples_nacional": simples["impostos"],
+            "lucro_presumido": presumido["impostos"],
+            "lucro_real": real["impostos"],
         }
-        
+
         melhor_regime = min(opcoes, key=opcoes.get)
         menor_imposto = opcoes[melhor_regime]
         maior_imposto = max(opcoes.values())
         economia_mensal = maior_imposto - menor_imposto
         economia_anual = economia_mensal * 12
-        
+
         return {
-            'simples_nacional': {
-                'impostos': simples['impostos'],
-                'aliquota': simples['aliquota_efetiva']
+            "simples_nacional": {
+                "impostos": simples["impostos"],
+                "aliquota": simples["aliquota_efetiva"],
             },
-            'lucro_presumido': {
-                'impostos': presumido['impostos'],
-                'aliquota': presumido['aliquota_efetiva']
+            "lucro_presumido": {
+                "impostos": presumido["impostos"],
+                "aliquota": presumido["aliquota_efetiva"],
             },
-            'lucro_real': {
-                'impostos': real['impostos'],
-                'aliquota': real['aliquota_efetiva']
+            "lucro_real": {
+                "impostos": real["impostos"],
+                "aliquota": real["aliquota_efetiva"],
             },
-            'recomendacao': melhor_regime,
-            'economia_mensal_estimada': economia_mensal,
-            'economia_anual_estimada': economia_anual,
-            'regime_atual': regime_atual
+            "recomendacao": melhor_regime,
+            "economia_mensal_estimada": economia_mensal,
+            "economia_anual_estimada": economia_anual,
+            "regime_atual": regime_atual,
         }
