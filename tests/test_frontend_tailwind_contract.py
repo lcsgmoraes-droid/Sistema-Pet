@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FRONTEND_PACKAGE_JSON = ROOT / "frontend" / "package.json"
 FRONTEND_INDEX_CSS = ROOT / "frontend" / "src" / "index.css"
+FRONTEND_POSTCSS_CONFIG = ROOT / "frontend" / "postcss.config.js"
 
 
 def _dependency_major_version(package: dict[str, object], name: str) -> int:
@@ -20,25 +21,26 @@ def _dependency_major_version(package: dict[str, object], name: str) -> int:
     return int(match.group(0))
 
 
-def test_tailwind_4_uses_v4_css_entrypoint_and_loads_legacy_js_config():
+def test_frontend_visual_stack_stays_on_migrated_versions_only():
+    package = json.loads(FRONTEND_PACKAGE_JSON.read_text(encoding="utf-8"))
+
+    assert _dependency_major_version(package, "react") == 18
+    assert _dependency_major_version(package, "react-dom") == 18
+    assert _dependency_major_version(package, "react-router-dom") == 6
+    assert _dependency_major_version(package, "tailwindcss") == 3
+    assert "@tailwindcss/postcss" not in package.get("devDependencies", {})
+
+
+def test_tailwind_3_uses_stable_css_entrypoint_and_postcss_plugin():
     package = json.loads(FRONTEND_PACKAGE_JSON.read_text(encoding="utf-8"))
     css_source = FRONTEND_INDEX_CSS.read_text(encoding="utf-8")
+    postcss_source = FRONTEND_POSTCSS_CONFIG.read_text(encoding="utf-8")
 
-    assert _dependency_major_version(package, "tailwindcss") >= 4
-    assert '@import "tailwindcss";' in css_source
-    assert '@config "../tailwind.config.js";' in css_source
-    assert "@tailwind base;" not in css_source
-    assert "@tailwind components;" not in css_source
-    assert "@tailwind utilities;" not in css_source
-
-
-def test_tailwind_4_preserves_legacy_visual_defaults_used_by_erp():
-    package = json.loads(FRONTEND_PACKAGE_JSON.read_text(encoding="utf-8"))
-    css_source = FRONTEND_INDEX_CSS.read_text(encoding="utf-8")
-
-    assert _dependency_major_version(package, "tailwindcss") >= 4
-    assert "--default-ring-width: 3px;" in css_source
-    assert "--default-ring-color: var(--color-blue-500);" in css_source
-    assert "border-color: var(--color-gray-200, currentColor);" in css_source
-    assert "input::placeholder" in css_source
-    assert "color: var(--color-gray-400);" in css_source
+    assert _dependency_major_version(package, "tailwindcss") == 3
+    assert "@tailwind base;" in css_source
+    assert "@tailwind components;" in css_source
+    assert "@tailwind utilities;" in css_source
+    assert '@import "tailwindcss";' not in css_source
+    assert '@config "../tailwind.config.js";' not in css_source
+    assert "tailwindcss: {}" in postcss_source
+    assert "'@tailwindcss/postcss'" not in postcss_source
