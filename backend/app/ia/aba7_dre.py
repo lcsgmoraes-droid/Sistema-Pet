@@ -54,28 +54,34 @@ class DREService:
         self.db = db
 
     def _buscar_vendas_periodo(
-        self, Venda, usuario_id: int, data_inicio: date, data_fim: date
+        self, venda_model, usuario_id: int, data_inicio: date, data_fim: date
     ):
         return (
-            self.db.query(Venda)
+            self.db.query(venda_model)
             .filter(
-                Venda.user_id == usuario_id,
-                Venda.criado_em >= data_inicio,
-                Venda.criado_em <= data_fim,
-                Venda.status.in_(["finalizada", "paga"]),
+                venda_model.user_id == usuario_id,
+                venda_model.criado_em >= data_inicio,
+                venda_model.criado_em <= data_fim,
+                venda_model.status.in_(["finalizada", "paga"]),
             )
             .all()
         )
 
-    def _calcular_custo_produtos(self, vendas, VendaItem, Produto) -> float:
+    def _calcular_custo_produtos(
+        self, vendas, venda_item_model, produto_model
+    ) -> float:
         custo_produtos = 0
         for venda in vendas:
             itens = (
-                self.db.query(VendaItem).filter(VendaItem.venda_id == venda.id).all()
+                self.db.query(venda_item_model)
+                .filter(venda_item_model.venda_id == venda.id)
+                .all()
             )
             for item in itens:
                 produto = (
-                    self.db.query(Produto).filter(Produto.id == item.produto_id).first()
+                    self.db.query(produto_model)
+                    .filter(produto_model.id == item.produto_id)
+                    .first()
                 )
                 if produto and produto.preco_custo:
                     custo_produtos += produto.preco_custo * item.quantidade
@@ -83,7 +89,7 @@ class DREService:
 
     def _somar_lancamentos_saida_periodo(
         self,
-        LancamentoFluxoCaixa,
+        lancamento_model,
         usuario_id: int,
         data_inicio: date,
         data_fim: date,
@@ -91,22 +97,58 @@ class DREService:
         *,
         excluir_categorias: bool = False,
     ) -> float:
-        filtro_categorias = LancamentoFluxoCaixa.categoria.in_(categorias)
+        filtro_categorias = lancamento_model.categoria.in_(categorias)
         if excluir_categorias:
             filtro_categorias = ~filtro_categorias
 
         return (
-            self.db.query(func.sum(LancamentoFluxoCaixa.valor))
+            self.db.query(func.sum(lancamento_model.valor))
             .filter(
-                LancamentoFluxoCaixa.user_id == usuario_id,
-                LancamentoFluxoCaixa.data >= data_inicio,
-                LancamentoFluxoCaixa.data <= data_fim,
-                LancamentoFluxoCaixa.tipo == "saida",
+                lancamento_model.user_id == usuario_id,
+                lancamento_model.data >= data_inicio,
+                lancamento_model.data <= data_fim,
+                lancamento_model.tipo == "saida",
                 filtro_categorias,
             )
             .scalar()
             or 0
         )
+
+    def _calcular_resultado_com_impostos(
+        self,
+        usuario_id: int,
+        receita_bruta: float,
+        receita_liquida: float,
+        lucro_bruto: float,
+        despesas: dict[str, float],
+    ) -> dict:
+        total_despesas = sum(despesas.values())
+        lucro_operacional = lucro_bruto - total_despesas
+        margem_operacional = (
+            (lucro_operacional / receita_liquida * 100) if receita_liquida > 0 else 0
+        )
+
+        from app.ia.aba7_tributacao import CalculadoraTributaria
+
+        resultado_impostos = CalculadoraTributaria(self.db).calcular_impostos(
+            tenant_id=tenant_id_para_escrita_dre(self.db, usuario_id),
+            receita_bruta=receita_bruta,
+            receita_liquida=receita_liquida,
+            lucro_operacional=lucro_operacional,
+        )
+        lucro_liquido = lucro_operacional - resultado_impostos["impostos"]
+        margem_liquida = (
+            (lucro_liquido / receita_liquida * 100) if receita_liquida > 0 else 0
+        )
+
+        return {
+            "total_despesas": total_despesas,
+            "lucro_operacional": lucro_operacional,
+            "margem_operacional": margem_operacional,
+            "resultado_impostos": resultado_impostos,
+            "lucro_liquido": lucro_liquido,
+            "margem_liquida": margem_liquida,
+        }
 
     # ==================== CÁLCULO DO DRE ====================
 
@@ -161,36 +203,26 @@ class DREService:
             excluir_categorias=True,
         )
 
-        total_despesas = (
-            despesas_vendas
-            + despesas_administrativas
-            + despesas_financeiras
-            + outras_despesas
-        )
-
-        # 5. Calcular resultados
-        lucro_operacional = lucro_bruto - total_despesas
-        margem_operacional = (
-            (lucro_operacional / receita_liquida * 100) if receita_liquida > 0 else 0
-        )
-
-        # 5.1 Calcular impostos (se configurado)
-        from app.ia.aba7_tributacao import CalculadoraTributaria
-
-        calculadora_impostos = CalculadoraTributaria(self.db)
-        resultado_impostos = calculadora_impostos.calcular_impostos(
-            tenant_id=tenant_id_para_escrita_dre(self.db, usuario_id),
+        despesas = {
+            "vendas": despesas_vendas,
+            "administrativas": despesas_administrativas,
+            "financeiras": despesas_financeiras,
+            "outras": outras_despesas,
+        }
+        resultado = self._calcular_resultado_com_impostos(
+            usuario_id=usuario_id,
             receita_bruta=receita_bruta,
             receita_liquida=receita_liquida,
-            lucro_operacional=lucro_operacional,
+            lucro_bruto=lucro_bruto,
+            despesas=despesas,
         )
-
+        total_despesas = resultado["total_despesas"]
+        lucro_operacional = resultado["lucro_operacional"]
+        margem_operacional = resultado["margem_operacional"]
+        resultado_impostos = resultado["resultado_impostos"]
         impostos_totais = resultado_impostos["impostos"]
-
-        lucro_liquido = lucro_operacional - impostos_totais
-        margem_liquida = (
-            (lucro_liquido / receita_liquida * 100) if receita_liquida > 0 else 0
-        )
+        lucro_liquido = resultado["lucro_liquido"]
+        margem_liquida = resultado["margem_liquida"]
 
         # 6. Determinar status e score de saúde (0-100)
         status = _status_resultado(lucro_liquido)
@@ -220,28 +252,31 @@ class DREService:
             )
             self.db.add(dre)
 
-        # Atualizar valores
-        dre.receita_bruta = receita_bruta
-        dre.deducoes_receita = deducoes_receita
-        dre.receita_liquida = receita_liquida
-        dre.custo_produtos_vendidos = custo_produtos
-        dre.lucro_bruto = lucro_bruto
-        dre.margem_bruta_percent = margem_bruta
-        dre.despesas_vendas = despesas_vendas
-        dre.despesas_administrativas = despesas_administrativas
-        dre.despesas_financeiras = despesas_financeiras
-        dre.outras_despesas = outras_despesas
-        dre.total_despesas_operacionais = total_despesas
-        dre.lucro_operacional = lucro_operacional
-        dre.margem_operacional_percent = margem_operacional
-        dre.impostos = impostos_totais
-        dre.impostos_detalhamento = json.dumps(resultado_impostos["detalhamento"])
-        dre.aliquota_efetiva_percent = resultado_impostos["aliquota_efetiva"]
-        dre.regime_tributario = resultado_impostos["regime"]
-        dre.lucro_liquido = lucro_liquido
-        dre.margem_liquida_percent = margem_liquida
-        dre.status = status
-        dre.score_saude = score
+        valores_dre = {
+            "receita_bruta": receita_bruta,
+            "deducoes_receita": deducoes_receita,
+            "receita_liquida": receita_liquida,
+            "custo_produtos_vendidos": custo_produtos,
+            "lucro_bruto": lucro_bruto,
+            "margem_bruta_percent": margem_bruta,
+            "despesas_vendas": despesas_vendas,
+            "despesas_administrativas": despesas_administrativas,
+            "despesas_financeiras": despesas_financeiras,
+            "outras_despesas": outras_despesas,
+            "total_despesas_operacionais": total_despesas,
+            "lucro_operacional": lucro_operacional,
+            "margem_operacional_percent": margem_operacional,
+            "impostos": impostos_totais,
+            "impostos_detalhamento": json.dumps(resultado_impostos["detalhamento"]),
+            "aliquota_efetiva_percent": resultado_impostos["aliquota_efetiva"],
+            "regime_tributario": resultado_impostos["regime"],
+            "lucro_liquido": lucro_liquido,
+            "margem_liquida_percent": margem_liquida,
+            "status": status,
+            "score_saude": score,
+        }
+        for campo, valor in valores_dre.items():
+            setattr(dre, campo, valor)
         dre.atualizado_em = _utcnow_naive()
 
         self.db.commit()

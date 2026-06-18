@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from app.classificador_racao import ClassificadorRacao
 
 
@@ -23,8 +25,8 @@ def test_racao_weight_extraction_keeps_common_formats():
 
     assert classificador.extrair_peso("Racao Premium 15kg") == 15
     assert classificador.extrair_peso("Racao Premium 10 kg") == 10
-    assert classificador.extrair_peso("Sachê gato 500g") == 0.5
-    assert classificador.extrair_peso("Racao 1,5 kg") == 1.5
+    assert classificador.extrair_peso("Sachê gato 500g") == pytest.approx(0.5)
+    assert classificador.extrair_peso("Racao 1,5 kg") == pytest.approx(1.5)
 
 
 def test_dre_category_period_args_are_explicitly_unused():
