@@ -649,10 +649,59 @@ jobs:
     name: Quality Gate
     needs: [tests, migration-smoke]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: read
 
     steps:
+      - name: Ensure SonarCloud external check passed
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          SONAR_CHECK_NAME: SonarCloud Code Analysis
+          SONAR_WAIT_SECONDS: "240"
+        run: |
+          deadline=$((SECONDS + SONAR_WAIT_SECONDS))
+
+          while true; do
+            check_state="$(
+              gh api "repos/${GITHUB_REPOSITORY}/commits/${HEAD_SHA}/check-runs" \
+                --jq ".check_runs[] | select(.name == \"${SONAR_CHECK_NAME}\") | [.status, (.conclusion // \"\")] | @tsv" \
+                | tail -n 1 || true
+            )"
+
+            if [ -n "$check_state" ]; then
+              status="$(printf '%s' "$check_state" | cut -f1)"
+              conclusion="$(printf '%s' "$check_state" | cut -f2)"
+
+              if [ "$status" = "completed" ]; then
+                if [ "$conclusion" = "success" ]; then
+                  echo "${SONAR_CHECK_NAME} passed"
+                  exit 0
+                fi
+
+                echo "${SONAR_CHECK_NAME} finished with conclusion: ${conclusion:-unknown}" >&2
+                exit 1
+              fi
+
+              echo "Waiting for ${SONAR_CHECK_NAME}: ${status}"
+            else
+              echo "Waiting for ${SONAR_CHECK_NAME} check-run to be created"
+            fi
+
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "Timed out waiting for ${SONAR_CHECK_NAME}" >&2
+              exit 1
+            fi
+
+            sleep 10
+          done
+
       - name: All required checks passed
         run: |
           echo "Multitenant safety suite passed"
+          echo "SonarCloud external check passed"
           echo "Startup import passed"
           echo "Migration smoke passed"

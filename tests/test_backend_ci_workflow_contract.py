@@ -1270,3 +1270,13 @@ def test_backend_ci_has_blocking_ai_core_lint_step():
 
     assert "AI Core lint (blocking)" in source
     assert "ruff check app/ai_core" in source
+
+
+def test_backend_ci_quality_gate_mirrors_sonarcloud_external_check():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Quality Gate" in source
+    assert "Ensure SonarCloud external check passed" in source
+    assert "SonarCloud Code Analysis" in source
+    assert "check-runs" in source
+    assert "SONAR_WAIT_SECONDS" in source
