@@ -1,9 +1,9 @@
-import { useState } from 'react';
-import FornecedorSelector from '../../components/fornecedores/FornecedorSelector';
+import { useState } from "react";
+import FornecedorSelector from "../../components/fornecedores/FornecedorSelector";
 import {
   montarEstadoFornecedorProduto,
   montarPayloadFornecedorProduto,
-} from '../produtosFormUtils';
+} from "../produtosFormUtils";
 
 export default function ModalFornecedorProduto({ fornecedor, clientes, onSave, onClose }) {
   const [dados, setDados] = useState(() => montarEstadoFornecedorProduto(fornecedor));
@@ -21,16 +21,16 @@ export default function ModalFornecedorProduto({ fornecedor, clientes, onSave, o
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
         <div className="flex justify-between items-center p-6 border-b">
           <h3 className="text-lg font-semibold">
-            {fornecedor ? 'Editar Fornecedor' : 'Adicionar Fornecedor'}
+            {fornecedor ? "Editar Fornecedor" : "Adicionar Fornecedor"}
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            ✕
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Fornecedor *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Fornecedor *</label>
             <FornecedorSelector
               fornecedores={clientes}
               fornecedorId={dados.fornecedor_id}
@@ -42,13 +42,13 @@ export default function ModalFornecedorProduto({ fornecedor, clientes, onSave, o
               inputClassName="rounded-lg border-gray-300"
               onInputChange={(termo) => {
                 if (!termo || dados.fornecedor_id) {
-                  setDados({ ...dados, fornecedor_id: '' });
+                  setDados({ ...dados, fornecedor_id: "" });
                 }
               }}
               onSelect={(fornecedorSelecionado) =>
                 setDados({ ...dados, fornecedor_id: String(fornecedorSelecionado.id) })
               }
-              onClear={() => setDados({ ...dados, fornecedor_id: '' })}
+              onClear={() => setDados({ ...dados, fornecedor_id: "" })}
               onFornecedorCriado={(fornecedorSelecionado) =>
                 setDados({ ...dados, fornecedor_id: String(fornecedorSelecionado.id) })
               }
@@ -69,9 +69,7 @@ export default function ModalFornecedorProduto({ fornecedor, clientes, onSave, o
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Preço de Custo
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Preço de Custo</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
               <input
@@ -122,9 +120,7 @@ export default function ModalFornecedorProduto({ fornecedor, clientes, onSave, o
               onChange={(e) => setDados({ ...dados, e_principal: e.target.checked })}
               className="w-4 h-4 text-blue-600 border-gray-300 rounded"
             />
-            <label className="text-sm font-medium text-gray-700">
-              Fornecedor Principal
-            </label>
+            <label className="text-sm font-medium text-gray-700">Fornecedor Principal</label>
           </div>
 
           <div className="flex justify-end gap-3 pt-4">

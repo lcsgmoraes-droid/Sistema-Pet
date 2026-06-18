@@ -44,14 +44,8 @@ export default function CopyableValue({
 
   return (
     <span className={`inline-flex min-w-0 items-center gap-1 ${className}`}>
-      {label ? (
-        <span className="shrink-0 text-xs font-medium text-slate-500">
-          {label}:
-        </span>
-      ) : null}
-      <span className={`min-w-0 truncate ${valueClassName}`}>
-        {displayValue}
-      </span>
+      {label ? <span className="shrink-0 text-xs font-medium text-slate-500">{label}:</span> : null}
+      <span className={`min-w-0 truncate ${valueClassName}`}>{displayValue}</span>
       <button
         type="button"
         onClick={handleCopy}

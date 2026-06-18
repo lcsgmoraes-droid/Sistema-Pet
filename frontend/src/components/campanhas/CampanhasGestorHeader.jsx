@@ -78,9 +78,7 @@ export default function CampanhasGestorHeader({
                   onClick={() => selecionarClienteGestor(cliente)}
                   className="w-full text-left px-4 py-3 hover:bg-blue-50 transition-colors border-b last:border-b-0"
                 >
-                  <p className="text-sm font-medium text-gray-900">
-                    {cliente.nome}
-                  </p>
+                  <p className="text-sm font-medium text-gray-900">{cliente.nome}</p>
                   <p className="text-xs text-gray-400">
                     {cliente.codigo ? `Cod.: ${cliente.codigo}` : ""}
                     {cliente.codigo && (cliente.cpf || cliente.telefone) ? " - " : ""}

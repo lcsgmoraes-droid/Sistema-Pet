@@ -37,9 +37,7 @@ export function useClientesNovoEnderecos() {
 
     setLoadingCepEndereco(true);
     try {
-      const response = await fetch(
-        `https://viacep.com.br/ws/${cep.replace("-", "")}/json/`,
-      );
+      const response = await fetch(`https://viacep.com.br/ws/${cep.replace("-", "")}/json/`);
       const data = await response.json();
 
       if (data.erro) {
@@ -63,11 +61,7 @@ export function useClientesNovoEnderecos() {
   };
 
   const salvarEndereco = () => {
-    if (
-      !enderecoAtual?.cep ||
-      !enderecoAtual?.endereco ||
-      !enderecoAtual?.cidade
-    ) {
+    if (!enderecoAtual?.cep || !enderecoAtual?.endereco || !enderecoAtual?.cidade) {
       alert("Preencha pelo menos CEP, Endereco e Cidade");
       return;
     }

@@ -13,7 +13,9 @@ export default function AltaInternacaoModal({
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
         <h2 className="font-bold text-gray-800">Dar alta</h2>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Observações de alta</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Observações de alta
+          </label>
           <textarea
             value={formAlta}
             onChange={(e) => setFormAlta(e.target.value)}
@@ -22,7 +24,10 @@ export default function AltaInternacaoModal({
           />
         </div>
         <div className="flex gap-3 pt-1">
-          <button onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+          >
             Cancelar
           </button>
           <button

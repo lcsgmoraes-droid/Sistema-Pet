@@ -4,7 +4,11 @@ const CAMPOS_TEXTO = [
   { campo: "nome_comercial", label: "Nome comercial" },
   { campo: "principio_ativo", label: "Principio ativo" },
   { campo: "fabricante", label: "Fabricante" },
-  { campo: "forma_farmaceutica", label: "Forma farmaceutica", placeholder: "Comprimido, solucao, pomada..." },
+  {
+    campo: "forma_farmaceutica",
+    label: "Forma farmaceutica",
+    placeholder: "Comprimido, solucao, pomada...",
+  },
   { campo: "concentracao", label: "Concentracao", placeholder: "250 mg, 5%, 10 mg/ml..." },
   { campo: "especies_indicadas", label: "Especies indicadas", placeholder: "cao, gato, aves..." },
   {
@@ -123,7 +127,11 @@ function CampoTextarea({ config, form, setCampo }) {
 function CampoBoolean({ checked, label, onChange }) {
   return (
     <label className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm">
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
       {label}
     </label>
   );

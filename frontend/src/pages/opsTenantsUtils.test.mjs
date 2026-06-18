@@ -40,7 +40,11 @@ test("buildOpsTenantTabSummaries resume tenants por aba do MVP Ops", () => {
     },
   ];
 
-  const summaries = buildOpsTenantTabSummaries(items, { total: 2, active: 1, with_base_catalog: 1 });
+  const summaries = buildOpsTenantTabSummaries(items, {
+    total: 2,
+    active: 1,
+    with_base_catalog: 1,
+  });
 
   assert.deepEqual(summaries.tenants, {
     total: 2,

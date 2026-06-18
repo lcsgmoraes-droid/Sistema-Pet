@@ -138,9 +138,8 @@ const Pessoas = () => {
       paginaAtual: 1,
     });
     const clienteCodigoExato =
-      clientesEncontrados.find(
-        (cliente) => String(cliente?.codigo || "").trim() === termo,
-      ) || getClientePorCodigoExato(termo);
+      clientesEncontrados.find((cliente) => String(cliente?.codigo || "").trim() === termo) ||
+      getClientePorCodigoExato(termo);
 
     if (clienteCodigoExato) {
       setPaginaAtual(1);
@@ -291,14 +290,10 @@ const Pessoas = () => {
   useEffect(() => {
     if (!clienteRecemCriado?.id || loading) return;
 
-    const clienteNaLista = filteredClientes.some(
-      (cliente) => cliente.id === clienteRecemCriado.id,
-    );
+    const clienteNaLista = filteredClientes.some((cliente) => cliente.id === clienteRecemCriado.id);
     if (!clienteNaLista) return;
 
-    const elemento = document.getElementById(
-      `cliente-${clienteRecemCriado.id}`,
-    );
+    const elemento = document.getElementById(`cliente-${clienteRecemCriado.id}`);
     if (!elemento) return;
 
     elemento.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -415,6 +410,3 @@ const Pessoas = () => {
 };
 
 export default Pessoas;
-
-
-

@@ -10,7 +10,9 @@ export default function NovaInternacaoBaiasSection({
   return (
     <div>
       <div className="flex items-end justify-between mb-2">
-        <label className="block text-xs font-medium text-gray-600">Mapa de baias (selecione uma livre) *</label>
+        <label className="block text-xs font-medium text-gray-600">
+          Mapa de baias (selecione uma livre) *
+        </label>
         <div className="w-28">
           <input
             type="number"
@@ -43,7 +45,8 @@ export default function NovaInternacaoBaiasSection({
         </div>
       </div>
       <p className="text-xs mt-1 text-gray-500">
-        Selecionada: <span className="font-semibold text-gray-800">{formNova.box || "nenhuma"}</span>
+        Selecionada:{" "}
+        <span className="font-semibold text-gray-800">{formNova.box || "nenhuma"}</span>
       </p>
     </div>
   );
@@ -63,8 +66,8 @@ function BaiaButton({ baia, formNova, setFormNova }) {
         ocupadaPorOutro
           ? "bg-red-50 border-red-200 text-red-700 cursor-not-allowed"
           : selecionada
-          ? "bg-purple-600 border-purple-600 text-white"
-          : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+            ? "bg-purple-600 border-purple-600 text-white"
+            : "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
       }`}
     >
       <p className="text-xs font-bold">Baia {numero}</p>

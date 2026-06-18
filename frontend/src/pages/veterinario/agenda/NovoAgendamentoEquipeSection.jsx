@@ -22,7 +22,9 @@ export default function NovoAgendamentoEquipeSection({
         label="Veterinario*"
         onChange={(valor) => onChangeCampo("veterinario_id", valor)}
         options={veterinarios}
-        placeholder={veterinarios.length > 0 ? "Selecione o veterinario..." : "Nenhum veterinario cadastrado"}
+        placeholder={
+          veterinarios.length > 0 ? "Selecione o veterinario..." : "Nenhum veterinario cadastrado"
+        }
         value={formNovo.veterinario_id}
       />
 
@@ -43,7 +45,9 @@ export default function NovoAgendamentoEquipeSection({
           label="Consultorio*"
           onChange={(valor) => onChangeCampo("consultorio_id", valor)}
           options={consultorios}
-          placeholder={consultorios.length > 0 ? "Selecione o consultorio..." : "Nenhum consultorio cadastrado"}
+          placeholder={
+            consultorios.length > 0 ? "Selecione o consultorio..." : "Nenhum consultorio cadastrado"
+          }
           value={formNovo.consultorio_id}
         />
         {consultorios.length === 0 && (

@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import FornecedorSelector, { getFornecedorNome } from '../fornecedores/FornecedorSelector';
+import { useMemo, useState } from "react";
+import FornecedorSelector, { getFornecedorNome } from "../fornecedores/FornecedorSelector";
 
 const ModalGruposFornecedores = ({
   grupos,
@@ -15,14 +15,15 @@ const ModalGruposFornecedores = ({
   onFornecedorCriado,
   onToggleFornecedor,
 }) => {
-  const [buscaFornecedor, setBuscaFornecedor] = useState('');
-  const [fornecedorBuscaRapida, setFornecedorBuscaRapida] = useState('');
+  const [buscaFornecedor, setBuscaFornecedor] = useState("");
+  const [fornecedorBuscaRapida, setFornecedorBuscaRapida] = useState("");
   const fornecedoresSelecionadosSet = useMemo(
     () => new Set((form.fornecedor_ids || []).map((id) => Number(id))),
     [form.fornecedor_ids],
   );
   const fornecedoresSelecionados = useMemo(
-    () => fornecedores.filter((fornecedor) => fornecedoresSelecionadosSet.has(Number(fornecedor.id))),
+    () =>
+      fornecedores.filter((fornecedor) => fornecedoresSelecionadosSet.has(Number(fornecedor.id))),
     [fornecedores, fornecedoresSelecionadosSet],
   );
   const fornecedorPrincipalSelecionado = fornecedoresSelecionados.find(
@@ -35,24 +36,29 @@ const ModalGruposFornecedores = ({
       onToggleFornecedor(fornecedor.id);
     }
 
-    setFornecedorBuscaRapida('');
+    setFornecedorBuscaRapida("");
   };
-  const normalizar = (texto = '') => texto
-    .toLowerCase()
-    .normalize('NFD')
-    .replaceAll(/[\u0300-\u036f]/g, '');
+  const normalizar = (texto = "") =>
+    texto
+      .toLowerCase()
+      .normalize("NFD")
+      .replaceAll(/[\u0300-\u036f]/g, "");
   const fornecedoresFiltrados = useMemo(() => {
     const termo = normalizar(buscaFornecedor.trim());
     return fornecedores
       .filter((fornecedor) => {
         if (!termo) return true;
-        return normalizar([
-          getFornecedorNome(fornecedor),
-          fornecedor.cnpj,
-          fornecedor.cpf,
-          fornecedor.razao_social,
-          fornecedor.nome_fantasia,
-        ].filter(Boolean).join(' ')).includes(termo);
+        return normalizar(
+          [
+            getFornecedorNome(fornecedor),
+            fornecedor.cnpj,
+            fornecedor.cpf,
+            fornecedor.razao_social,
+            fornecedor.nome_fantasia,
+          ]
+            .filter(Boolean)
+            .join(" "),
+        ).includes(termo);
       })
       .slice(0, 120);
   }, [fornecedores, buscaFornecedor]);
@@ -65,7 +71,8 @@ const ModalGruposFornecedores = ({
             <div>
               <h2 className="text-2xl font-bold text-slate-900">Grupos de fornecedor</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Una CNPJs do mesmo fornecedor comercial sem alterar o cadastro fiscal de cada empresa.
+                Una CNPJs do mesmo fornecedor comercial sem alterar o cadastro fiscal de cada
+                empresa.
               </p>
             </div>
             <button
@@ -82,7 +89,9 @@ const ModalGruposFornecedores = ({
           <div className="border-r border-slate-200 bg-slate-50 p-6">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Cadastrados</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Cadastrados
+                </div>
                 <div className="text-sm text-slate-600">{grupos.length} grupo(s)</div>
               </div>
               <button
@@ -106,8 +115,8 @@ const ModalGruposFornecedores = ({
                   key={grupo.id}
                   className={`rounded-xl border p-4 ${
                     Number(form.id) === Number(grupo.id)
-                      ? 'border-blue-300 bg-blue-50'
-                      : 'border-slate-200 bg-white'
+                      ? "border-blue-300 bg-blue-50"
+                      : "border-slate-200 bg-white"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -147,14 +156,16 @@ const ModalGruposFornecedores = ({
           <form onSubmit={onSubmit} className="space-y-5 p-6">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-600">
-                {form.id ? 'Editar grupo' : 'Novo grupo'}
+                {form.id ? "Editar grupo" : "Novo grupo"}
               </div>
               <h3 className="text-xl font-bold text-slate-900">Unificacao comercial de CNPJs</h3>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">Nome do grupo</label>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  Nome do grupo
+                </label>
                 <input
                   value={form.nome}
                   onChange={(event) => setForm((prev) => ({ ...prev, nome: event.target.value }))}
@@ -163,7 +174,9 @@ const ModalGruposFornecedores = ({
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">Fornecedor principal</label>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  Fornecedor principal
+                </label>
                 <FornecedorSelector
                   fornecedores={fornecedoresSelecionados}
                   fornecedorId={form.fornecedor_principal_id}
@@ -174,23 +187,27 @@ const ModalGruposFornecedores = ({
                   showLabel={false}
                   placeholder={
                     fornecedoresSelecionados.length === 0
-                      ? 'Adicione fornecedores ao grupo'
-                      : 'Digite o fornecedor principal'
+                      ? "Adicione fornecedores ao grupo"
+                      : "Digite o fornecedor principal"
                   }
                   inputClassName="border-slate-300"
                   onSelect={(fornecedor) =>
                     setForm((prev) => ({ ...prev, fornecedor_principal_id: String(fornecedor.id) }))
                   }
-                  onClear={() => setForm((prev) => ({ ...prev, fornecedor_principal_id: '' }))}
+                  onClear={() => setForm((prev) => ({ ...prev, fornecedor_principal_id: "" }))}
                 />
               </div>
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-semibold text-slate-700">Descricao interna</label>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">
+                Descricao interna
+              </label>
               <textarea
                 value={form.descricao}
-                onChange={(event) => setForm((prev) => ({ ...prev, descricao: event.target.value }))}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, descricao: event.target.value }))
+                }
                 placeholder="Observacao opcional para compras, condicoes comerciais ou contatos."
                 className="h-20 w-full rounded-lg border border-slate-300 px-4 py-2 focus:ring-2 focus:ring-blue-400"
               />
@@ -214,7 +231,7 @@ const ModalGruposFornecedores = ({
                       inputClassName="border-slate-300"
                       onInputChange={setFornecedorBuscaRapida}
                       onSelect={adicionarFornecedorAoGrupo}
-                      onClear={() => setFornecedorBuscaRapida('')}
+                      onClear={() => setFornecedorBuscaRapida("")}
                       onFornecedorCriado={(fornecedor) => {
                         onFornecedorCriado?.(fornecedor);
                       }}
@@ -236,7 +253,7 @@ const ModalGruposFornecedores = ({
                     <label
                       key={fornecedor.id}
                       className={`flex cursor-pointer items-start gap-3 px-4 py-3 hover:bg-blue-50 ${
-                        selecionado ? 'bg-blue-50/70' : 'bg-white'
+                        selecionado ? "bg-blue-50/70" : "bg-white"
                       }`}
                     >
                       <input
@@ -246,10 +263,12 @@ const ModalGruposFornecedores = ({
                         className="mt-1 h-4 w-4 rounded"
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block font-semibold text-slate-900">{getFornecedorNome(fornecedor)}</span>
+                        <span className="block font-semibold text-slate-900">
+                          {getFornecedorNome(fornecedor)}
+                        </span>
                         <span className="block text-xs text-slate-500">
-                          {fornecedor.cnpj || fornecedor.cpf || 'Sem CNPJ/CPF informado'}
-                          {fornecedor.razao_social ? ` | ${fornecedor.razao_social}` : ''}
+                          {fornecedor.cnpj || fornecedor.cpf || "Sem CNPJ/CPF informado"}
+                          {fornecedor.razao_social ? ` | ${fornecedor.razao_social}` : ""}
                         </span>
                       </span>
                     </label>
@@ -271,7 +290,7 @@ const ModalGruposFornecedores = ({
                 disabled={salvando}
                 className="rounded-lg bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
               >
-                {salvando ? 'Salvando...' : 'Salvar grupo'}
+                {salvando ? "Salvando..." : "Salvar grupo"}
               </button>
             </div>
           </form>

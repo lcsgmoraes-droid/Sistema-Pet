@@ -31,14 +31,14 @@ export function useVacinasRegistroActions({
       const pet = pets.find((item) => String(item.id) === String(petId));
       return pet?.cliente_id ? String(pet.cliente_id) : "";
     },
-    [pets]
+    [pets],
   );
 
   const setCampo = useCallback(
     (campo, valor) => {
       setForm((prev) => ({ ...prev, [campo]: valor }));
     },
-    [setForm]
+    [setForm],
   );
 
   const selecionarTutorFiltro = useCallback(
@@ -47,7 +47,7 @@ export function useVacinasRegistroActions({
       setPessoaFiltro(cliente?.id ? String(cliente.id) : "");
       setPetSelecionado("");
     },
-    [setPessoaFiltro, setPetSelecionado, setTutorFiltroSelecionado]
+    [setPessoaFiltro, setPetSelecionado, setTutorFiltroSelecionado],
   );
 
   const selecionarTutorForm = useCallback(
@@ -59,7 +59,7 @@ export function useVacinasRegistroActions({
         pet_id: "",
       }));
     },
-    [setForm, setTutorFormSelecionado]
+    [setForm, setTutorFormSelecionado],
   );
 
   const fecharModalVacina = useCallback(() => {
@@ -67,7 +67,13 @@ export function useVacinasRegistroActions({
     setTutorFormSelecionado(null);
     setForm(criarFormVacinaInicial());
 
-    if (acaoQuery === "novo" || petIdQuery || novoPetIdQuery || agendamentoIdQuery || consultaIdQuery) {
+    if (
+      acaoQuery === "novo" ||
+      petIdQuery ||
+      novoPetIdQuery ||
+      agendamentoIdQuery ||
+      consultaIdQuery
+    ) {
       navigate("/veterinario/vacinas", { replace: true });
     }
   }, [
@@ -89,7 +95,7 @@ export function useVacinasRegistroActions({
     setTutorFormSelecionado(
       pessoaIdAtual
         ? { id: pessoaIdAtual, nome: petAtual?.cliente_nome ?? `Pessoa #${pessoaIdAtual}` }
-        : null
+        : null,
     );
 
     setForm((prev) => ({

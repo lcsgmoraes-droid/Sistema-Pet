@@ -1,11 +1,11 @@
-import PropTypes from 'prop-types';
-import { Link } from 'react-router-dom';
-import { Save, Search } from 'lucide-react';
-import ActionButton from '../ui/ActionButton';
-import Panel from '../ui/Panel';
+import PropTypes from "prop-types";
+import { Link } from "react-router-dom";
+import { Save, Search } from "lucide-react";
+import ActionButton from "../ui/ActionButton";
+import Panel from "../ui/Panel";
 
 function formatarChaveAcesso(valor) {
-  return String(valor).replaceAll(/\D/g, '').slice(0, 44);
+  return String(valor).replaceAll(/\D/g, "").slice(0, 44);
 }
 
 export default function EntradaXmlSefazPanels({
@@ -45,7 +45,7 @@ export default function EntradaXmlSefazPanels({
               onChange={(event) => setChaveSefaz(formatarChaveAcesso(event.target.value))}
               onPaste={(event) => {
                 event.preventDefault();
-                setChaveSefaz(formatarChaveAcesso(event.clipboardData?.getData('text') || ''));
+                setChaveSefaz(formatarChaveAcesso(event.clipboardData?.getData("text") || ""));
               }}
               placeholder="Chave de acesso (44 digitos)"
               className="flex-1 rounded-lg border border-gray-300 px-4 py-2 font-mono text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
@@ -59,7 +59,7 @@ export default function EntradaXmlSefazPanels({
               loading={loadingSefaz}
               disabled={loadingSefaz || chaveSefaz.length !== 44}
             >
-              {loadingSefaz ? 'Consultando...' : 'Consultar'}
+              {loadingSefaz ? "Consultando..." : "Consultar"}
             </ActionButton>
           </form>
 
@@ -87,7 +87,10 @@ export default function EntradaXmlSefazPanels({
                 const dados = consulta.dados;
 
                 return (
-                  <div key={consulta.id} className="overflow-hidden rounded-lg border border-gray-200">
+                  <div
+                    key={consulta.id}
+                    className="overflow-hidden rounded-lg border border-gray-200"
+                  >
                     <button
                       type="button"
                       onClick={() => setConsultaExpandidaId(expandida ? null : consulta.id)}
@@ -113,7 +116,9 @@ export default function EntradaXmlSefazPanels({
                         disabled={importandoConsultaId === consulta.id}
                         onClick={() => usarNaEntrada(consulta)}
                       >
-                        {importandoConsultaId === consulta.id ? 'Importando...' : 'Usar esta NF na Entrada'}
+                        {importandoConsultaId === consulta.id
+                          ? "Importando..."
+                          : "Usar esta NF na Entrada"}
                       </ActionButton>
                     </div>
 
@@ -135,7 +140,9 @@ export default function EntradaXmlSefazPanels({
                                 <td className="px-2 py-1 font-mono">{item.codigo_produto}</td>
                                 <td className="px-2 py-1">{item.descricao}</td>
                                 <td className="px-2 py-1 text-right">{item.quantidade}</td>
-                                <td className="px-2 py-1 text-right">{formatMoneyBRL(item.valor_unitario)}</td>
+                                <td className="px-2 py-1 text-right">
+                                  {formatMoneyBRL(item.valor_unitario)}
+                                </td>
                                 <td className="px-2 py-1 text-right font-semibold">
                                   {formatMoneyBRL(item.valor_total)}
                                 </td>
@@ -158,15 +165,15 @@ export default function EntradaXmlSefazPanels({
           className="mb-6 border-l-4 border-l-slate-500"
           padding="lg"
           title="Configurar SEFAZ"
-          subtitle={(
+          subtitle={
             <>
-              Certificado digital e parametros ficam em{' '}
+              Certificado digital e parametros ficam em{" "}
               <Link to="/configuracoes/integracoes" className="font-semibold text-indigo-600">
                 Configuracoes &gt; Integracoes
               </Link>
               . Aqui configure apenas a rotina automatica.
             </>
-          )}
+          }
         >
           {configSefazLoading ? (
             <p className="text-sm text-gray-500">Carregando configuracao...</p>
@@ -174,7 +181,8 @@ export default function EntradaXmlSefazPanels({
             <>
               {(!cfgSefaz.enabled || !cfgSefaz.cert_ok) && (
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                  Integracao ainda nao esta pronta para rotina automatica. Finalize em Configuracoes &gt; Integracoes.
+                  Integracao ainda nao esta pronta para rotina automatica. Finalize em Configuracoes
+                  &gt; Integracoes.
                 </div>
               )}
 
@@ -183,10 +191,12 @@ export default function EntradaXmlSefazPanels({
                   <input
                     type="checkbox"
                     checked={cfgSefaz.importacao_automatica}
-                    onChange={(event) => setCfgSefaz((prev) => ({
-                      ...prev,
-                      importacao_automatica: event.target.checked,
-                    }))}
+                    onChange={(event) =>
+                      setCfgSefaz((prev) => ({
+                        ...prev,
+                        importacao_automatica: event.target.checked,
+                      }))
+                    }
                   />
                   <span>Ativar importacao automatica</span>
                 </label>
@@ -194,17 +204,27 @@ export default function EntradaXmlSefazPanels({
 
               <div className="mb-4 grid grid-cols-1 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 sm:grid-cols-2">
                 <div>
-                  Ultima sincronizacao:{' '}
+                  Ultima sincronizacao:{" "}
                   <strong>
                     {cfgSefaz.ultimo_sync_at
-                      ? new Date(cfgSefaz.ultimo_sync_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
-                      : '-'}
+                      ? new Date(cfgSefaz.ultimo_sync_at).toLocaleString("pt-BR", {
+                          timeZone: "America/Sao_Paulo",
+                        })
+                      : "-"}
                   </strong>
                 </div>
-                <div>Status: <strong>{cfgSefaz.ultimo_sync_status}</strong></div>
-                <div>Documentos trazidos: <strong>{cfgSefaz.ultimo_sync_documentos}</strong></div>
-                <div>Modo atual: <strong>{cfgSefaz.modo}</strong></div>
-                <div className="sm:col-span-2">Mensagem: <strong>{cfgSefaz.ultimo_sync_mensagem}</strong></div>
+                <div>
+                  Status: <strong>{cfgSefaz.ultimo_sync_status}</strong>
+                </div>
+                <div>
+                  Documentos trazidos: <strong>{cfgSefaz.ultimo_sync_documentos}</strong>
+                </div>
+                <div>
+                  Modo atual: <strong>{cfgSefaz.modo}</strong>
+                </div>
+                <div className="sm:col-span-2">
+                  Mensagem: <strong>{cfgSefaz.ultimo_sync_mensagem}</strong>
+                </div>
               </div>
 
               {mensagemRotina && (
@@ -223,7 +243,7 @@ export default function EntradaXmlSefazPanels({
                   disabled={salvandoRotina}
                   onClick={salvarRotinaSefaz}
                 >
-                  {salvandoRotina ? 'Salvando...' : 'Salvar configuracao'}
+                  {salvandoRotina ? "Salvando..." : "Salvar configuracao"}
                 </ActionButton>
               </div>
             </>
@@ -249,23 +269,27 @@ EntradaXmlSefazPanels.propTypes = {
   }).isRequired,
   configSefazLoading: PropTypes.bool.isRequired,
   consultaExpandidaId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-  consultasSefaz: PropTypes.arrayOf(PropTypes.shape({
-    dados: PropTypes.shape({
-      emitente_nome: PropTypes.string,
-      itens: PropTypes.arrayOf(PropTypes.shape({
-        codigo_produto: PropTypes.string,
-        descricao: PropTypes.string,
-        numero_item: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-        quantidade: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-        valor_total: PropTypes.number,
-        valor_unitario: PropTypes.number,
-      })),
-      numero_nf: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-      serie: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
-      valor_total_nf: PropTypes.number,
-    }).isRequired,
-    id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
-  })).isRequired,
+  consultasSefaz: PropTypes.arrayOf(
+    PropTypes.shape({
+      dados: PropTypes.shape({
+        emitente_nome: PropTypes.string,
+        itens: PropTypes.arrayOf(
+          PropTypes.shape({
+            codigo_produto: PropTypes.string,
+            descricao: PropTypes.string,
+            numero_item: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+            quantidade: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+            valor_total: PropTypes.number,
+            valor_unitario: PropTypes.number,
+          }),
+        ),
+        numero_nf: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+        serie: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+        valor_total_nf: PropTypes.number,
+      }).isRequired,
+      id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
+    }),
+  ).isRequired,
   consultarSefaz: PropTypes.func.isRequired,
   erroSefaz: PropTypes.string,
   formatMoneyBRL: PropTypes.func.isRequired,
@@ -283,9 +307,9 @@ EntradaXmlSefazPanels.propTypes = {
 };
 
 EntradaXmlSefazPanels.defaultProps = {
-  avisoConectorSefaz: '',
+  avisoConectorSefaz: "",
   consultaExpandidaId: null,
-  erroSefaz: '',
+  erroSefaz: "",
   importandoConsultaId: null,
-  mensagemRotina: '',
+  mensagemRotina: "",
 };

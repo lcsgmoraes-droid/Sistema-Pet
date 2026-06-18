@@ -42,7 +42,9 @@ export default function InternacaoAcoes({
       </button>
       <button
         type="button"
-        onClick={() => onAbrirHistoricoPet(internacao.pet_id, internacao.pet_nome ?? `Pet #${internacao.pet_id}`)}
+        onClick={() =>
+          onAbrirHistoricoPet(internacao.pet_id, internacao.pet_nome ?? `Pet #${internacao.pet_id}`)
+        }
         className="flex items-center gap-1 text-xs px-2 py-1 border border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50"
       >
         Detalhes

@@ -1,6 +1,6 @@
-import { createProduto, updateProduto } from '../api/produtos';
-import { debugLog } from '../utils/debug';
-import { normalizeMarkdownContent } from '../utils/safeMarkdown';
+import { createProduto, updateProduto } from "../api/produtos";
+import { debugLog } from "../utils/debug";
+import { normalizeMarkdownContent } from "../utils/safeMarkdown";
 
 export default function useProdutosNovoSubmit({
   id,
@@ -15,23 +15,23 @@ export default function useProdutosNovoSubmit({
     e.preventDefault();
 
     if (!formData.nome) {
-      alert('Preencha o campo Nome');
+      alert("Preencha o campo Nome");
       return;
     }
 
-    if (formData.tipo_produto !== 'PAI' && !formData.preco_venda) {
-      alert('Preencha o Preço de Venda');
+    if (formData.tipo_produto !== "PAI" && !formData.preco_venda) {
+      alert("Preencha o Preço de Venda");
       return;
     }
 
     if (!formData.codigo && !formData.sku) {
-      alert('Preencha o campo SKU/Código');
+      alert("Preencha o campo SKU/Código");
       return;
     }
 
     try {
       setSalvando(true);
-      const skuNormalizado = (formData.sku || formData.codigo || '').trim().toUpperCase();
+      const skuNormalizado = (formData.sku || formData.codigo || "").trim().toUpperCase();
       const descricaoNormalizada = normalizeMarkdownContent(formData.descricao);
 
       const composicaoKitNormalizada = (formData.composicao_kit || []).map((item) => ({
@@ -41,20 +41,23 @@ export default function useProdutosNovoSubmit({
         opcional: Boolean(item.opcional),
       }));
       const lojaFisicaAtiva = formData.ativo !== false && formData.situacao !== false;
-      const produtoEhGranel = Boolean(formData.e_granel) || (formData.nome || '').toLowerCase().includes('granel');
+      const produtoEhGranel =
+        Boolean(formData.e_granel) || (formData.nome || "").toLowerCase().includes("granel");
       const produtoComComposicao =
-        formData.tipo_produto === 'KIT' ||
-        (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit);
+        formData.tipo_produto === "KIT" ||
+        (formData.tipo_produto === "VARIACAO" && formData.tipo_kit);
 
       const dados = {
         codigo: skuNormalizado,
         nome: formData.nome,
         descricao_curta: descricaoNormalizada || null,
         codigo_barras: formData.codigo_barras || null,
-        unidade: produtoEhGranel ? 'KG' : formData.unidade || 'UN',
+        unidade: produtoEhGranel ? "KG" : formData.unidade || "UN",
         preco_custo: formData.preco_custo ? parseFloat(formData.preco_custo) : 0,
         preco_venda: parseFloat(formData.preco_venda),
-        preco_promocional: formData.preco_promocional ? parseFloat(formData.preco_promocional) : null,
+        preco_promocional: formData.preco_promocional
+          ? parseFloat(formData.preco_promocional)
+          : null,
         promocao_inicio: formData.data_inicio_promocao || null,
         promocao_fim: formData.data_fim_promocao || null,
         preco_ecommerce: formData.preco_ecommerce ? parseFloat(formData.preco_ecommerce) : null,
@@ -78,22 +81,11 @@ export default function useProdutosNovoSubmit({
         categoria_id: formData.categoria_id ? parseInt(formData.categoria_id) : null,
         marca_id: formData.marca_id ? parseInt(formData.marca_id) : null,
         departamento_id: formData.departamento_id ? parseInt(formData.departamento_id) : null,
-        tipo_produto: produtoEhGranel ? 'SIMPLES' : formData.tipo_produto || 'SIMPLES',
+        tipo_produto: produtoEhGranel ? "SIMPLES" : formData.tipo_produto || "SIMPLES",
         produto_pai_id: formData.produto_pai_id || null,
-        tipo_kit:
-          produtoComComposicao
-            ? (formData.e_kit_fisico)
-              ? 'FISICO'
-              : 'VIRTUAL'
-            : null,
-        e_kit_fisico:
-          produtoComComposicao
-            ? formData.e_kit_fisico
-            : null,
-        composicao_kit:
-          produtoComComposicao
-            ? composicaoKitNormalizada
-            : null,
+        tipo_kit: produtoComComposicao ? (formData.e_kit_fisico ? "FISICO" : "VIRTUAL") : null,
+        e_kit_fisico: produtoComComposicao ? formData.e_kit_fisico : null,
+        composicao_kit: produtoComComposicao ? composicaoKitNormalizada : null,
         e_granel: produtoEhGranel,
         produto_predecessor_id: formData.produto_predecessor_id || null,
         motivo_descontinuacao: formData.motivo_descontinuacao || null,
@@ -108,31 +100,21 @@ export default function useProdutosNovoSubmit({
             ? parseInt(formData.numero_doses)
             : null,
         especie_compativel: formData.tem_recorrencia ? formData.especie_compativel : null,
-        observacoes_recorrencia: formData.tem_recorrencia
-          ? formData.observacoes_recorrencia
-          : null,
+        observacoes_recorrencia: formData.tem_recorrencia ? formData.observacoes_recorrencia : null,
         eh_racao: Boolean(formData.eh_racao),
         classificacao_racao: formData.eh_racao ? formData.classificacao_racao || null : null,
         peso_embalagem:
-          formData.eh_racao && formData.peso_embalagem
-            ? parseFloat(formData.peso_embalagem)
-            : null,
+          formData.eh_racao && formData.peso_embalagem ? parseFloat(formData.peso_embalagem) : null,
         tabela_nutricional: formData.eh_racao ? formData.tabela_nutricional || null : null,
         tabela_consumo: formData.eh_racao ? formData.tabela_consumo || null : null,
         categoria_racao: formData.eh_racao ? formData.categoria_racao || null : null,
         especies_indicadas: formData.eh_racao ? formData.especies_indicadas || null : null,
         linha_racao_id:
-          formData.eh_racao && formData.linha_racao_id
-            ? parseInt(formData.linha_racao_id)
-            : null,
+          formData.eh_racao && formData.linha_racao_id ? parseInt(formData.linha_racao_id) : null,
         porte_animal_id:
-          formData.eh_racao && formData.porte_animal_id
-            ? parseInt(formData.porte_animal_id)
-            : null,
+          formData.eh_racao && formData.porte_animal_id ? parseInt(formData.porte_animal_id) : null,
         fase_publico_id:
-          formData.eh_racao && formData.fase_publico_id
-            ? parseInt(formData.fase_publico_id)
-            : null,
+          formData.eh_racao && formData.fase_publico_id ? parseInt(formData.fase_publico_id) : null,
         tipo_tratamento_id:
           formData.eh_racao && formData.tipo_tratamento_id
             ? parseInt(formData.tipo_tratamento_id)
@@ -147,30 +129,30 @@ export default function useProdutosNovoSubmit({
             : null,
       };
 
-      debugLog('Enviando dados para API:', dados);
+      debugLog("Enviando dados para API:", dados);
 
       if (isEdicao) {
         await salvarFiscal({ id, tipo_produto: formData.tipo_produto });
         await updateProduto(id, dados);
-        alert('Produto atualizado com sucesso!');
-        navigate('/produtos');
+        alert("Produto atualizado com sucesso!");
+        navigate("/produtos");
         return;
       }
 
       const response = await createProduto(dados);
       const produtoId = response.data.id;
 
-      if (formData.tipo_produto === 'PAI') {
-        alert('Produto PAI criado com sucesso! Agora cadastre as variações.');
+      if (formData.tipo_produto === "PAI") {
+        alert("Produto PAI criado com sucesso! Agora cadastre as variações.");
         navigate(`/produtos/${produtoId}/editar?aba=8`);
         return;
       }
 
-      alert(isClone ? 'Produto clonado com sucesso!' : 'Produto cadastrado com sucesso!');
-      navigate('/produtos');
+      alert(isClone ? "Produto clonado com sucesso!" : "Produto cadastrado com sucesso!");
+      navigate("/produtos");
     } catch (error) {
-      console.error('Erro ao salvar produto:', error);
-      alert(error.response?.data?.detail || 'Erro ao salvar produto');
+      console.error("Erro ao salvar produto:", error);
+      alert(error.response?.data?.detail || "Erro ao salvar produto");
     } finally {
       setSalvando(false);
     }

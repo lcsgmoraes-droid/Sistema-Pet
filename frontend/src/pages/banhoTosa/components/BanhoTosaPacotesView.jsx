@@ -112,10 +112,24 @@ export default function BanhoTosaPacotesView({ servicos = [], onChanged }) {
       />
 
       <MetricGrid>
-        <MetricCard icon={<PackageCheck size={18} />} intent="blue" label="Pacotes" value={pacotes.length} />
+        <MetricCard
+          icon={<PackageCheck size={18} />}
+          intent="blue"
+          label="Pacotes"
+          value={pacotes.length}
+        />
         <MetricCard intent="emerald" label="Ativos" value={resumo.ativos} />
-        <MetricCard icon={<Coins size={18} />} intent="cyan" label="Creditos em aberto" value={formatNumber(resumo.creditosDisponiveis, 0)} />
-        <MetricCard intent="violet" label="Receita cadastrada" value={formatCurrency(resumo.valorPacotes)} />
+        <MetricCard
+          icon={<Coins size={18} />}
+          intent="cyan"
+          label="Creditos em aberto"
+          value={formatNumber(resumo.creditosDisponiveis, 0)}
+        />
+        <MetricCard
+          intent="violet"
+          label="Receita cadastrada"
+          value={formatCurrency(resumo.valorPacotes)}
+        />
       </MetricGrid>
 
       {(showPacoteForm || editingPacote || showCreditoForm) && (
@@ -166,9 +180,6 @@ function montarResumo(pacotes, creditos) {
       (total, credito) => total + Number(credito.saldo_creditos || 0),
       0,
     ),
-    valorPacotes: pacotes.reduce(
-      (total, pacote) => total + Number(pacote.preco || 0),
-      0,
-    ),
+    valorPacotes: pacotes.reduce((total, pacote) => total + Number(pacote.preco || 0), 0),
   };
 }

@@ -29,11 +29,7 @@ export default function PDVClienteSidebar({
         }
         type="button"
       >
-        {painelClienteAberto ? (
-          <ChevronRight className="w-5 h-5" />
-        ) : (
-          <User className="w-5 h-5" />
-        )}
+        {painelClienteAberto ? <ChevronRight className="w-5 h-5" /> : <User className="w-5 h-5" />}
       </button>
     </>
   );

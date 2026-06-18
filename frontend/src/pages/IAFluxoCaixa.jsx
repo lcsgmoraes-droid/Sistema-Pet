@@ -3,9 +3,8 @@
  * ABA 5: Dashboard principal da IA
  */
 
-import React from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import DashboardFluxoCaixa from '../components/IA/DashboardFluxoCaixa';
+import { useAuth } from "../contexts/AuthContext";
+import DashboardFluxoCaixa from "../components/IA/DashboardFluxoCaixa";
 
 export default function IAFluxoCaixa() {
   const { user } = useAuth();

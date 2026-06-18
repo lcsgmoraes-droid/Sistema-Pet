@@ -23,7 +23,9 @@ function getFornecedorMeta(fornecedor) {
 function getGrupoFornecedorMeta(grupo) {
   const total = Array.isArray(grupo?.fornecedor_ids)
     ? grupo.fornecedor_ids.length
-    : (Array.isArray(grupo?.fornecedores) ? grupo.fornecedores.length : 0);
+    : Array.isArray(grupo?.fornecedores)
+      ? grupo.fornecedores.length
+      : 0;
   const partes = [];
 
   if (grupo?.fornecedor_principal_nome) {
@@ -46,11 +48,7 @@ function mergeFornecedores(...listas) {
   return Array.from(porId.values());
 }
 
-function NovoFornecedorRapidoModal({
-  nomeInicial,
-  onClose,
-  onCreated,
-}) {
+function NovoFornecedorRapidoModal({ nomeInicial, onClose, onCreated }) {
   const [formData, setFormData] = useState({
     nome: nomeInicial || "",
     cpf: "",
@@ -114,12 +112,8 @@ function NovoFornecedorRapidoModal({
               <Building2 className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-slate-900">
-                Novo fornecedor
-              </h3>
-              <p className="text-xs text-slate-500">
-                Cadastro rápido para continuar o fluxo.
-              </p>
+              <h3 className="text-base font-semibold text-slate-900">Novo fornecedor</h3>
+              <p className="text-xs text-slate-500">Cadastro rápido para continuar o fluxo.</p>
             </div>
           </div>
           <button
@@ -146,17 +140,13 @@ function NovoFornecedorRapidoModal({
               autoFocus
               type="text"
               value={formData.nome}
-              onChange={(event) =>
-                setFormData((prev) => ({ ...prev, nome: event.target.value }))
-              }
+              onChange={(event) => setFormData((prev) => ({ ...prev, nome: event.target.value }))}
               className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-700">
-              Tipo de pessoa
-            </label>
+            <label className="mb-2 block text-sm font-medium text-slate-700">Tipo de pessoa</label>
             <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
               {[
                 { value: "PF", label: "Pessoa Física" },
@@ -201,9 +191,7 @@ function NovoFornecedorRapidoModal({
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Telefone
-              </label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Telefone</label>
               <input
                 type="text"
                 value={formData.telefone}
@@ -219,15 +207,11 @@ function NovoFornecedorRapidoModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              E-mail
-            </label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">E-mail</label>
             <input
               type="email"
               value={formData.email}
-              onChange={(event) =>
-                setFormData((prev) => ({ ...prev, email: event.target.value }))
-              }
+              onChange={(event) => setFormData((prev) => ({ ...prev, email: event.target.value }))}
               className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             />
           </div>
@@ -242,12 +226,7 @@ function NovoFornecedorRapidoModal({
             >
               Cancelar
             </ActionButton>
-            <ActionButton
-              type="submit"
-              intent="create"
-              icon={Plus}
-              loading={loading}
-            >
+            <ActionButton type="submit" intent="create" icon={Plus} loading={loading}>
               Cadastrar
             </ActionButton>
           </div>
@@ -394,9 +373,7 @@ export default function FornecedorSelector({
 
     return base
       .filter((grupo) => {
-        const fornecedoresGrupo = Array.isArray(grupo?.fornecedores)
-          ? grupo.fornecedores
-          : [];
+        const fornecedoresGrupo = Array.isArray(grupo?.fornecedores) ? grupo.fornecedores : [];
         const haystack = [
           grupo?.nome,
           grupo?.descricao,
@@ -421,22 +398,22 @@ export default function FornecedorSelector({
     [sugestoesLocais, sugestoesRemotas],
   );
   const termoLimpo = termo.trim();
-  const existeExato = sugestoes.some(
-    (fornecedor) =>
-      getFornecedorNome(fornecedor).toLocaleLowerCase("pt-BR") ===
-      termoLimpo.toLocaleLowerCase("pt-BR"),
-  ) || sugestoesGrupos.some(
-    (grupo) =>
-      String(grupo?.nome || "").toLocaleLowerCase("pt-BR") ===
-      termoLimpo.toLocaleLowerCase("pt-BR"),
-  );
+  const existeExato =
+    sugestoes.some(
+      (fornecedor) =>
+        getFornecedorNome(fornecedor).toLocaleLowerCase("pt-BR") ===
+        termoLimpo.toLocaleLowerCase("pt-BR"),
+    ) ||
+    sugestoesGrupos.some(
+      (grupo) =>
+        String(grupo?.nome || "").toLocaleLowerCase("pt-BR") ===
+        termoLimpo.toLocaleLowerCase("pt-BR"),
+    );
   const mostrarNovo = allowCreate && termoLimpo.length >= minChars && !existeExato;
-  const mostrarSugestoes = aberto && !disabled && (
-    sugestoesGrupos.length > 0 ||
-    sugestoes.length > 0 ||
-    mostrarNovo ||
-    buscando
-  );
+  const mostrarSugestoes =
+    aberto &&
+    !disabled &&
+    (sugestoesGrupos.length > 0 || sugestoes.length > 0 || mostrarNovo || buscando);
 
   const selecionarFornecedor = (fornecedor) => {
     const nome = getFornecedorNome(fornecedor);
@@ -541,9 +518,7 @@ export default function FornecedorSelector({
       {mostrarSugestoes ? (
         <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
           {buscando ? (
-            <div className="px-4 py-3 text-sm text-slate-500">
-              Buscando fornecedores...
-            </div>
+            <div className="px-4 py-3 text-sm text-slate-500">Buscando fornecedores...</div>
           ) : null}
 
           {sugestoesGrupos.map((grupo) => (
@@ -587,9 +562,7 @@ export default function FornecedorSelector({
                 ) : null}
               </div>
               {getFornecedorMeta(fornecedor) ? (
-                <div className="mt-0.5 text-xs text-slate-500">
-                  {getFornecedorMeta(fornecedor)}
-                </div>
+                <div className="mt-0.5 text-xs text-slate-500">{getFornecedorMeta(fornecedor)}</div>
               ) : null}
             </button>
           ))}
@@ -607,14 +580,16 @@ export default function FornecedorSelector({
         </div>
       ) : null}
 
-      {modalNovoAberto && portalRoot ? createPortal(
-        <NovoFornecedorRapidoModal
-          nomeInicial={termo}
-          onClose={() => setModalNovoAberto(false)}
-          onCreated={handleFornecedorCriado}
-        />,
-        portalRoot,
-      ) : null}
+      {modalNovoAberto && portalRoot
+        ? createPortal(
+            <NovoFornecedorRapidoModal
+              nomeInicial={termo}
+              onClose={() => setModalNovoAberto(false)}
+              onCreated={handleFornecedorCriado}
+            />,
+            portalRoot,
+          )
+        : null}
     </div>
   );
 }

@@ -1,10 +1,7 @@
 import { useState } from "react";
 import api from "../api";
 
-export default function useCampanhasUnificacao({
-  setSugestoes,
-  carregarSugestoes,
-}) {
+export default function useCampanhasUnificacao({ setSugestoes, carregarSugestoes }) {
   const [confirmandoMerge, setConfirmandoMerge] = useState(null);
   const [resultadoMerge, setResultadoMerge] = useState(null);
 
@@ -40,11 +37,7 @@ export default function useCampanhasUnificacao({
   };
 
   const desfazerMerge = async (mergeId) => {
-    if (
-      !globalThis.confirm(
-        "Desfazer esta unificacao? Os dados de campanhas serao restaurados.",
-      )
-    ) {
+    if (!globalThis.confirm("Desfazer esta unificacao? Os dados de campanhas serao restaurados.")) {
       return;
     }
     try {

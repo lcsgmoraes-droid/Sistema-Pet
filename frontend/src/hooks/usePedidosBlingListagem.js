@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
-import api from '../api';
-import { PEDIDOS_BLING_ABAS } from '../components/pedidosBling/pedidoBlingUtils';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { toast } from "react-hot-toast";
+import api from "../api";
+import { PEDIDOS_BLING_ABAS } from "../components/pedidosBling/pedidoBlingUtils";
 
 export default function usePedidosBlingListagem() {
   const [searchParams] = useSearchParams();
@@ -10,9 +10,9 @@ export default function usePedidosBlingListagem() {
   const [total, setTotal] = useState(0);
   const [paginas, setPaginas] = useState(1);
   const [pagina, setPagina] = useState(1);
-  const [statusFiltro, setStatusFiltro] = useState('');
+  const [statusFiltro, setStatusFiltro] = useState("");
   const [carregando, setCarregando] = useState(false);
-  const buscaPedido = useMemo(() => (searchParams.get('pedido') || '').trim(), [searchParams]);
+  const buscaPedido = useMemo(() => (searchParams.get("pedido") || "").trim(), [searchParams]);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -20,12 +20,12 @@ export default function usePedidosBlingListagem() {
       const params = { pagina, por_pagina: 20 };
       if (statusFiltro) params.status = statusFiltro;
       if (buscaPedido) params.busca = buscaPedido;
-      const res = await api.get('/integracoes/bling/pedidos', { params });
+      const res = await api.get("/integracoes/bling/pedidos", { params });
       setPedidos(res.data.pedidos || []);
       setTotal(res.data.total || 0);
       setPaginas(res.data.paginas || 1);
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao carregar pedidos');
+      toast.error(e.response?.data?.detail || "Erro ao carregar pedidos");
     } finally {
       setCarregando(false);
     }
@@ -46,15 +46,17 @@ export default function usePedidosBlingListagem() {
 
   async function consolidarDuplicidade(pedido) {
     try {
-      const response = await api.post(`/integracoes/bling/pedidos/${pedido.id}/consolidar-duplicidade`);
+      const response = await api.post(
+        `/integracoes/bling/pedidos/${pedido.id}/consolidar-duplicidade`,
+      );
       const totalMesclados = response.data?.pedidos_mesclados?.length || 0;
       toast.success(`Duplicidade consolidada. ${totalMesclados} pedido(s) incorporado(s).`);
       await carregar();
     } catch (e) {
       const detail =
-        typeof e.response?.data?.detail === 'string'
+        typeof e.response?.data?.detail === "string"
           ? e.response.data.detail
-          : e.response?.data?.detail?.motivo || 'Erro ao consolidar duplicidade';
+          : e.response?.data?.detail?.motivo || "Erro ao consolidar duplicidade";
       toast.error(detail);
     }
   }
@@ -65,14 +67,14 @@ export default function usePedidosBlingListagem() {
       toast.success(
         response.data?.nf_numero
           ? `Fluxo reconciliado com a NF ${response.data.nf_numero}.`
-          : 'Fluxo reconciliado com sucesso.'
+          : "Fluxo reconciliado com sucesso.",
       );
       await carregar();
     } catch (e) {
       const detail =
-        typeof e.response?.data?.detail === 'string'
+        typeof e.response?.data?.detail === "string"
           ? e.response.data.detail
-          : e.response?.data?.detail?.motivo || 'Erro ao reconciliar fluxo do pedido';
+          : e.response?.data?.detail?.motivo || "Erro ao reconciliar fluxo do pedido";
       toast.error(detail);
     }
   }

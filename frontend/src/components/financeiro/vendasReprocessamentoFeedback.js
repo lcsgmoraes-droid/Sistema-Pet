@@ -14,10 +14,7 @@ export function normalizarVendaIdsFeedback(vendaIds = []) {
   return ids;
 }
 
-export function montarFeedbackReprocessamentoVendas({
-  vendaIds = [],
-  vendasVisiveis = [],
-} = {}) {
+export function montarFeedbackReprocessamentoVendas({ vendaIds = [], vendasVisiveis = [] } = {}) {
   const ids = normalizarVendaIdsFeedback(vendaIds);
   if (!ids.length) return { ids: [], focoId: null };
 

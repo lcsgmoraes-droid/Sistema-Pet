@@ -62,7 +62,7 @@ export function sugerirHoraLivreAgenda(agendamentosDia) {
     agendamentosDia
       .filter((agendamento) => agendamento.status !== "cancelado")
       .map((agendamento) => String(agendamento.data_hora || "").slice(11, 16))
-      .filter(Boolean)
+      .filter(Boolean),
   );
 
   return HORARIOS_BASE.find((horario) => !ocupados.has(horario)) || "09:00";
@@ -104,19 +104,20 @@ export function diagnosticarConflitoAgendamento({
 
   const ocupadosMesmoHorario = agendaDiaModal.filter((agendamento) => {
     if (agendamento.status === "cancelado") return false;
-    if (agendamentoEditandoId && Number(agendamento.id) === Number(agendamentoEditandoId)) return false;
+    if (agendamentoEditandoId && Number(agendamento.id) === Number(agendamentoEditandoId))
+      return false;
     return String(agendamento.data_hora || "").slice(11, 16) === hora;
   });
 
   const conflitosVeterinario = veterinarioId
     ? ocupadosMesmoHorario.filter(
-        (agendamento) => String(agendamento.veterinario_id || "") === String(veterinarioId)
+        (agendamento) => String(agendamento.veterinario_id || "") === String(veterinarioId),
       )
     : [];
 
   const conflitosConsultorio = consultorioId
     ? ocupadosMesmoHorario.filter(
-        (agendamento) => String(agendamento.consultorio_id || "") === String(consultorioId)
+        (agendamento) => String(agendamento.consultorio_id || "") === String(consultorioId),
       )
     : [];
 

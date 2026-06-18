@@ -219,11 +219,20 @@ test("monta estado de produto clonado sem copiar identidade ou estoque", () => {
 });
 
 test("mantem seletor de tipo disponivel para produto existente que nao seja variacao", () => {
-  assert.equal(deveMostrarTipoProdutoNoFormulario({ isEdicao: false, tipoProduto: "SIMPLES" }), true);
-  assert.equal(deveMostrarTipoProdutoNoFormulario({ isEdicao: true, tipoProduto: "SIMPLES" }), true);
+  assert.equal(
+    deveMostrarTipoProdutoNoFormulario({ isEdicao: false, tipoProduto: "SIMPLES" }),
+    true,
+  );
+  assert.equal(
+    deveMostrarTipoProdutoNoFormulario({ isEdicao: true, tipoProduto: "SIMPLES" }),
+    true,
+  );
   assert.equal(deveMostrarTipoProdutoNoFormulario({ isEdicao: true, tipoProduto: "KIT" }), true);
   assert.equal(deveMostrarTipoProdutoNoFormulario({ isEdicao: true, tipoProduto: "PAI" }), true);
-  assert.equal(deveMostrarTipoProdutoNoFormulario({ isEdicao: true, tipoProduto: "VARIACAO" }), false);
+  assert.equal(
+    deveMostrarTipoProdutoNoFormulario({ isEdicao: true, tipoProduto: "VARIACAO" }),
+    false,
+  );
 });
 
 test("valida dados obrigatorios antes de salvar produto", () => {
@@ -235,10 +244,7 @@ test("valida dados obrigatorios antes de salvar produto", () => {
     validarProdutoParaSalvar({ nome: "Racao", preco_venda: "0" }),
     "Preço de venda é obrigatório e deve ser maior que zero",
   );
-  assert.equal(
-    validarProdutoParaSalvar({ nome: "Racao", preco_venda: "10" }),
-    null,
-  );
+  assert.equal(validarProdutoParaSalvar({ nome: "Racao", preco_venda: "10" }), null);
 });
 
 test("monta payload numerico para salvar produto respeitando canais ativos", () => {
@@ -274,10 +280,7 @@ test("monta payload numerico para salvar produto respeitando canais ativos", () 
 });
 
 test("valida arquivo de imagem permitido para upload do produto", () => {
-  assert.equal(
-    validarArquivoImagemProduto({ type: "image/webp", size: 1024 }),
-    null,
-  );
+  assert.equal(validarArquivoImagemProduto({ type: "image/webp", size: 1024 }), null);
   assert.equal(
     validarArquivoImagemProduto({ type: "application/pdf", size: 1024 }),
     "Apenas JPG, PNG e WebP são permitidos",

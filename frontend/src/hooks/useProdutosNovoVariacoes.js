@@ -1,25 +1,19 @@
-import { useEffect, useState } from 'react';
-import { createProduto, deleteProduto, getProdutoVariacoes } from '../api/produtos';
+import { useEffect, useState } from "react";
+import { createProduto, deleteProduto, getProdutoVariacoes } from "../api/produtos";
 
 const VARIACAO_INICIAL = {
-  sku: '',
-  nome: '',
-  codigo_barras: '',
-  preco_custo: '',
-  preco_venda: '',
+  sku: "",
+  nome: "",
+  codigo_barras: "",
+  preco_custo: "",
+  preco_venda: "",
   estoque_minimo: 0,
   e_kit: false,
   e_kit_fisico: false,
   composicao_kit: [],
 };
 
-export default function useProdutosNovoVariacoes({
-  id,
-  isEdicao,
-  abaAtiva,
-  formData,
-  navigate,
-}) {
+export default function useProdutosNovoVariacoes({ id, isEdicao, abaAtiva, formData, navigate }) {
   const [variacoes, setVariacoes] = useState([]);
   const [novaVariacao, setNovaVariacao] = useState(VARIACAO_INICIAL);
   const [mostrarFormVariacao, setMostrarFormVariacao] = useState(false);
@@ -29,7 +23,7 @@ export default function useProdutosNovoVariacoes({
       const response = await getProdutoVariacoes(id);
       setVariacoes(response.data || []);
     } catch (error) {
-      console.error('Erro ao carregar variações:', error);
+      console.error("Erro ao carregar variações:", error);
     }
   };
 
@@ -48,7 +42,7 @@ export default function useProdutosNovoVariacoes({
 
   const handleSalvarVariacao = async () => {
     if (!novaVariacao.sku || !novaVariacao.nome || !novaVariacao.preco_venda) {
-      alert('Preencha SKU, Nome e Preço de Venda');
+      alert("Preencha SKU, Nome e Preço de Venda");
       return;
     }
 
@@ -60,15 +54,15 @@ export default function useProdutosNovoVariacoes({
         preco_custo: parseFloat(novaVariacao.preco_custo) || 0,
         preco_venda: parseFloat(novaVariacao.preco_venda),
         estoque_minimo: parseInt(novaVariacao.estoque_minimo, 10) || 0,
-        tipo_produto: 'VARIACAO',
+        tipo_produto: "VARIACAO",
         produto_pai_id: parseInt(id, 10),
         categoria_id: formData.categoria_id || null,
         marca_id: formData.marca_id || null,
-        unidade: formData.unidade || 'UN',
+        unidade: formData.unidade || "UN",
       };
 
       if (novaVariacao.e_kit) {
-        dadosVariacao.tipo_kit = 'VIRTUAL';
+        dadosVariacao.tipo_kit = "VIRTUAL";
         dadosVariacao.e_kit_fisico = false;
       }
 
@@ -76,18 +70,18 @@ export default function useProdutosNovoVariacoes({
       const variacaoCriada = respostaCriacao?.data;
 
       if (novaVariacao.e_kit && variacaoCriada?.id) {
-        alert('Variação-kit cadastrada com sucesso! Agora defina a composição.');
+        alert("Variação-kit cadastrada com sucesso! Agora defina a composição.");
         navigate(`/produtos/${variacaoCriada.id}/editar?aba=9`);
         return;
       }
 
-      alert('Variação cadastrada com sucesso!');
+      alert("Variação cadastrada com sucesso!");
       setMostrarFormVariacao(false);
       resetNovaVariacao();
       await carregarVariacoes();
     } catch (error) {
-      console.error('Erro ao cadastrar variação:', error);
-      alert(error.response?.data?.detail || 'Erro ao cadastrar variação');
+      console.error("Erro ao cadastrar variação:", error);
+      alert(error.response?.data?.detail || "Erro ao cadastrar variação");
     }
   };
 
@@ -98,16 +92,16 @@ export default function useProdutosNovoVariacoes({
 
     try {
       await deleteProduto(variacao.id);
-      alert('Variação excluída com sucesso!');
+      alert("Variação excluída com sucesso!");
       await carregarVariacoes();
     } catch (error) {
-      console.error('Erro ao excluir variação:', error);
-      alert('Erro ao excluir variação');
+      console.error("Erro ao excluir variação:", error);
+      alert("Erro ao excluir variação");
     }
   };
 
   useEffect(() => {
-    if (isEdicao && abaAtiva === 8 && formData.tipo_produto === 'PAI') {
+    if (isEdicao && abaAtiva === 8 && formData.tipo_produto === "PAI") {
       carregarVariacoes();
     }
   }, [abaAtiva, formData.tipo_produto, id, isEdicao]);

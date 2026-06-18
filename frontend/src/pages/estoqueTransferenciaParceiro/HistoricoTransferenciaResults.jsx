@@ -1,17 +1,11 @@
 import { formatarMoeda } from "../../api/produtos";
-import {
-  formatarData,
-  formatarQuantidade,
-  normalizarNumero,
-} from "./transferenciaParceiroUtils";
+import { formatarData, formatarQuantidade, normalizarNumero } from "./transferenciaParceiroUtils";
 import { StatusTransferenciaBadge } from "./transferenciaParceiroComponents";
 
 function ResumoValorRegistro({ titulo, valor, destaque }) {
   return (
     <div className="min-w-0 rounded-2xl bg-white px-4 py-3 text-right shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-        {titulo}
-      </p>
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{titulo}</p>
       <p
         className={`mt-1 break-words text-sm font-semibold md:text-base ${
           destaque || "text-gray-900"
@@ -39,12 +33,8 @@ function ItensTransferenciaTable({ registro }) {
           {(registro.itens || []).map((item, index) => (
             <tr key={`${registro.conta_receber_id}-${item.produto_id}-${index}`}>
               <td className="px-4 py-3">
-                <p className="text-sm font-medium text-gray-900">
-                  {item.produto_nome}
-                </p>
-                <p className="mt-1 text-xs text-gray-500">
-                  Codigo: {item.codigo || "-"}
-                </p>
+                <p className="text-sm font-medium text-gray-900">{item.produto_nome}</p>
+                <p className="mt-1 text-xs text-gray-500">Codigo: {item.codigo || "-"}</p>
               </td>
               <td className="px-4 py-3 text-right text-sm text-gray-700">
                 {formatarQuantidade(item.quantidade)}
@@ -97,26 +87,19 @@ function CompensacaoContasPagar({
               <p className="text-sm font-semibold text-slate-900">
                 {contaPagar.documento || `Conta #${contaPagar.conta_pagar_id}`}
               </p>
-              <p className="mt-1 text-sm text-slate-700">
-                {contaPagar.descricao}
-              </p>
+              <p className="mt-1 text-sm text-slate-700">{contaPagar.descricao}</p>
               <p className="mt-1 text-xs text-slate-500">
-                Vencimento: {formatarData(contaPagar.data_vencimento)} |{" "}
-                {contaPagar.status_label}
+                Vencimento: {formatarData(contaPagar.data_vencimento)} | {contaPagar.status_label}
               </p>
             </div>
             <div className="text-sm text-slate-700">
-              <p className="text-xs uppercase tracking-wide text-slate-500">
-                Saldo
-              </p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Saldo</p>
               <p className="mt-1 font-semibold text-slate-900">
                 {formatarMoeda(contaPagar.saldo_aberto)}
               </p>
             </div>
             <div className="text-sm text-slate-700">
-              <p className="text-xs uppercase tracking-wide text-slate-500">
-                Ja pago
-              </p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Ja pago</p>
               <p className="mt-1 font-semibold text-slate-900">
                 {formatarMoeda(contaPagar.valor_pago)}
               </p>
@@ -131,10 +114,7 @@ function CompensacaoContasPagar({
                 step="0.01"
                 value={formBaixa.compensacoes?.[contaPagar.conta_pagar_id] || ""}
                 onChange={(event) =>
-                  onAtualizarValorCompensacao(
-                    contaPagar.conta_pagar_id,
-                    event.target.value,
-                  )
+                  onAtualizarValorCompensacao(contaPagar.conta_pagar_id, event.target.value)
                 }
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
               />
@@ -169,9 +149,7 @@ function BaixaTransferenciaPanel({
       <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
         <div className="space-y-4">
           <div>
-            <label className="mb-2 block text-sm font-medium text-emerald-900">
-              Tipo de baixa
-            </label>
+            <label className="mb-2 block text-sm font-medium text-emerald-900">Tipo de baixa</label>
             <div className="grid gap-3 md:grid-cols-2">
               <button
                 type="button"
@@ -188,9 +166,7 @@ function BaixaTransferenciaPanel({
                     : "border-emerald-200 bg-emerald-50 hover:bg-white"
                 }`}
               >
-                <p className="text-sm font-semibold text-emerald-900">
-                  Recebimento normal
-                </p>
+                <p className="text-sm font-semibold text-emerald-900">Recebimento normal</p>
                 <p className="mt-1 text-xs text-emerald-800">
                   Usa o contas a receber e pode vincular uma forma de pagamento.
                 </p>
@@ -211,9 +187,7 @@ function BaixaTransferenciaPanel({
                     : "border-amber-200 bg-amber-50 hover:bg-white"
                 }`}
               >
-                <p className="text-sm font-semibold text-amber-900">
-                  Acerto / compensacao
-                </p>
+                <p className="text-sm font-semibold text-amber-900">Acerto / compensacao</p>
                 <p className="mt-1 text-xs text-amber-800">
                   Ideal para o mata quando a pessoa tambem tem contas com voce.
                 </p>
@@ -237,9 +211,7 @@ function BaixaTransferenciaPanel({
                 className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
               >
                 <option value="">
-                  {loadingFormasPagamento
-                    ? "Carregando formas..."
-                    : "Sem forma especifica"}
+                  {loadingFormasPagamento ? "Carregando formas..." : "Sem forma especifica"}
                 </option>
                 {formasPagamento.map((forma) => (
                   <option key={forma.id} value={forma.id}>
@@ -265,8 +237,8 @@ function BaixaTransferenciaPanel({
                       Contas a pagar em aberto da mesma pessoa
                     </p>
                     <p className="mt-1 text-xs text-amber-800">
-                      Se preencher valores aqui, o sistema baixa a transferencia e
-                      tambem compensa esses titulos no contas a pagar.
+                      Se preencher valores aqui, o sistema baixa a transferencia e tambem compensa
+                      esses titulos no contas a pagar.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -327,9 +299,7 @@ function BaixaTransferenciaPanel({
 
         <div className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm text-emerald-900">
           <p className="font-semibold">Saldo atual</p>
-          <p className="mt-1 text-lg font-bold">
-            {formatarMoeda(registro.saldo_aberto)}
-          </p>
+          <p className="mt-1 text-lg font-bold">{formatarMoeda(registro.saldo_aberto)}</p>
           <p className="mt-2 text-xs text-emerald-700">
             Pode ser baixa total ou parcial, conforme o valor informado.
           </p>
@@ -338,9 +308,7 @@ function BaixaTransferenciaPanel({
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <div>
-          <label className="mb-2 block text-sm font-medium text-emerald-900">
-            Valor recebido
-          </label>
+          <label className="mb-2 block text-sm font-medium text-emerald-900">Valor recebido</label>
           <input
             type="number"
             min="0.01"
@@ -465,10 +433,7 @@ function HistoricoTransferenciaCard({
             <h3 className="text-base font-semibold text-gray-900">
               {registro.documento || `Transferencia #${registro.conta_receber_id}`}
             </h3>
-            <StatusTransferenciaBadge
-              status={registro.status}
-              label={registro.status_label}
-            />
+            <StatusTransferenciaBadge status={registro.status} label={registro.status_label} />
           </div>
           <p className="text-sm text-gray-700">
             {registro.parceiro_nome}
@@ -553,9 +518,7 @@ function HistoricoTransferenciaCard({
               disabled={contaGerandoPdf === registro.conta_receber_id}
               className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {contaGerandoPdf === registro.conta_receber_id
-                ? "Gerando PDF..."
-                : "Gerar PDF"}
+              {contaGerandoPdf === registro.conta_receber_id ? "Gerando PDF..." : "Gerar PDF"}
             </button>
             <button
               type="button"
@@ -568,8 +531,7 @@ function HistoricoTransferenciaCard({
               type="button"
               onClick={() => onAbrirModalDocumentoTransferencia(registro, "email")}
               disabled={
-                contaEnviandoEmail === registro.conta_receber_id ||
-                !registro.parceiro_email
+                contaEnviandoEmail === registro.conta_receber_id || !registro.parceiro_email
               }
               className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -588,9 +550,7 @@ function HistoricoTransferenciaCard({
               }
               className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {contaExcluindo === registro.conta_receber_id
-                ? "Excluindo..."
-                : "Excluir lancamento"}
+              {contaExcluindo === registro.conta_receber_id ? "Excluindo..." : "Excluir lancamento"}
             </button>
           </div>
 
@@ -667,9 +627,7 @@ export default function HistoricoTransferenciaResults({
   if (historico.items.length === 0) {
     return (
       <div className="px-6 py-12 text-center">
-        <p className="text-base font-semibold text-gray-900">
-          Nenhuma transferencia encontrada
-        </p>
+        <p className="text-base font-semibold text-gray-900">Nenhuma transferencia encontrada</p>
         <p className="mt-2 text-sm text-gray-500">
           Ajuste os filtros acima ou registre uma nova transferencia para comecar o historico.
         </p>
@@ -681,9 +639,7 @@ export default function HistoricoTransferenciaResults({
     <div className="space-y-4 px-6 py-5">
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-sm font-semibold text-slate-900">
-            PDF consolidado do acerto
-          </p>
+          <p className="text-sm font-semibold text-slate-900">PDF consolidado do acerto</p>
           <p className="mt-1 text-xs text-slate-600">
             Marque lancamentos especificos ou gere um PDF unico com todo o filtro atual.
           </p>

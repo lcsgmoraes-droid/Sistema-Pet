@@ -89,80 +89,75 @@ export default function CampanhasGestorTab({
         </div>
       )}
 
-      {gestorModo === "cliente" &&
-        gestorCliente &&
-        gestorSaldo &&
-        !gestorCarregando && (
-          <>
-            <CampanhasGestorClienteResumo
-              gestorCliente={gestorCliente}
-              gestorSaldo={gestorSaldo}
-              rankLabels={RANK_LABELS}
-            />
+      {gestorModo === "cliente" && gestorCliente && gestorSaldo && !gestorCarregando && (
+        <>
+          <CampanhasGestorClienteResumo
+            gestorCliente={gestorCliente}
+            gestorSaldo={gestorSaldo}
+            rankLabels={RANK_LABELS}
+          />
 
-            <CampanhasGestorExtratoSection
-              gestorExtrato={gestorExtrato}
-              gestorSecao={gestorSecao}
-              setGestorSecao={setGestorSecao}
-              formatBRL={formatBRL}
-            />
+          <CampanhasGestorExtratoSection
+            gestorExtrato={gestorExtrato}
+            gestorSecao={gestorSecao}
+            setGestorSecao={setGestorSecao}
+            formatBRL={formatBRL}
+          />
 
-            <CampanhasGestorCarimbosSection
-              gestorSaldo={gestorSaldo}
-              gestorSecao={gestorSecao}
-              setGestorSecao={setGestorSecao}
-              gestorCarimboNota={gestorCarimboNota}
-              setGestorCarimboNota={setGestorCarimboNota}
-              gestorCarimboQuantidade={gestorCarimboQuantidade}
-              setGestorCarimboQuantidade={setGestorCarimboQuantidade}
-              gestorLancandoCarimbo={gestorLancandoCarimbo}
-              lancarCarimboGestor={lancarCarimboGestor}
-              gestorCarimbos={gestorCarimbos}
-              gestorIncluirEstornados={gestorIncluirEstornados}
-              setGestorIncluirEstornados={setGestorIncluirEstornados}
-              gestorRemovendo={gestorRemovendo}
-              estornarCarimboGestor={estornarCarimboGestor}
-              estornarCarimbosSelecionadosGestor={
-                estornarCarimbosSelecionadosGestor
-              }
-            />
+          <CampanhasGestorCarimbosSection
+            gestorSaldo={gestorSaldo}
+            gestorSecao={gestorSecao}
+            setGestorSecao={setGestorSecao}
+            gestorCarimboNota={gestorCarimboNota}
+            setGestorCarimboNota={setGestorCarimboNota}
+            gestorCarimboQuantidade={gestorCarimboQuantidade}
+            setGestorCarimboQuantidade={setGestorCarimboQuantidade}
+            gestorLancandoCarimbo={gestorLancandoCarimbo}
+            lancarCarimboGestor={lancarCarimboGestor}
+            gestorCarimbos={gestorCarimbos}
+            gestorIncluirEstornados={gestorIncluirEstornados}
+            setGestorIncluirEstornados={setGestorIncluirEstornados}
+            gestorRemovendo={gestorRemovendo}
+            estornarCarimboGestor={estornarCarimboGestor}
+            estornarCarimbosSelecionadosGestor={estornarCarimbosSelecionadosGestor}
+          />
 
-            <CampanhasGestorCashbackSection
-              gestorSaldo={gestorSaldo}
-              gestorSecao={gestorSecao}
-              setGestorSecao={setGestorSecao}
-              formatBRL={formatBRL}
-              gestorCashbackTipo={gestorCashbackTipo}
-              setGestorCashbackTipo={setGestorCashbackTipo}
-              gestorCashbackValor={gestorCashbackValor}
-              setGestorCashbackValor={setGestorCashbackValor}
-              gestorCashbackDesc={gestorCashbackDesc}
-              setGestorCashbackDesc={setGestorCashbackDesc}
-              gestorLancandoCashback={gestorLancandoCashback}
-              ajustarCashbackGestor={ajustarCashbackGestor}
-            />
+          <CampanhasGestorCashbackSection
+            gestorSaldo={gestorSaldo}
+            gestorSecao={gestorSecao}
+            setGestorSecao={setGestorSecao}
+            formatBRL={formatBRL}
+            gestorCashbackTipo={gestorCashbackTipo}
+            setGestorCashbackTipo={setGestorCashbackTipo}
+            gestorCashbackValor={gestorCashbackValor}
+            setGestorCashbackValor={setGestorCashbackValor}
+            gestorCashbackDesc={gestorCashbackDesc}
+            setGestorCashbackDesc={setGestorCashbackDesc}
+            gestorLancandoCashback={gestorLancandoCashback}
+            ajustarCashbackGestor={ajustarCashbackGestor}
+          />
 
-            <CampanhasGestorCuponsSection
-              gestorSecao={gestorSecao}
-              setGestorSecao={setGestorSecao}
-              gestorCupons={gestorCupons}
-              cupomStatus={CUPOM_STATUS}
-              formatBRL={formatBRL}
-              anularCupomGestor={anularCupomGestor}
-              gestorAnulando={gestorAnulando}
-              abrirCupomManual={abrirCupomManual}
-              gestorCliente={gestorCliente}
-            />
+          <CampanhasGestorCuponsSection
+            gestorSecao={gestorSecao}
+            setGestorSecao={setGestorSecao}
+            gestorCupons={gestorCupons}
+            cupomStatus={CUPOM_STATUS}
+            formatBRL={formatBRL}
+            anularCupomGestor={anularCupomGestor}
+            gestorAnulando={gestorAnulando}
+            abrirCupomManual={abrirCupomManual}
+            gestorCliente={gestorCliente}
+          />
 
-            <CampanhasGestorRankingSection
-              gestorSaldo={gestorSaldo}
-              gestorSecao={gestorSecao}
-              setGestorSecao={setGestorSecao}
-              rankLabels={RANK_LABELS}
-              formatBRL={formatBRL}
-            />
-          </>
-        )}
+          <CampanhasGestorRankingSection
+            gestorSaldo={gestorSaldo}
+            gestorSecao={gestorSecao}
+            setGestorSecao={setGestorSecao}
+            rankLabels={RANK_LABELS}
+            formatBRL={formatBRL}
+          />
+        </>
+      )}
     </div>
   );
 }

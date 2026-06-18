@@ -13,15 +13,11 @@ export default function CampanhasDestaqueDesempateInfo({ desempateInfo }) {
       {desempateInfo.map((desempate, index) => (
         <div key={index} className="text-sm text-yellow-700 leading-relaxed">
           <span className="font-medium">{getCategoriaLabel(desempate.categoria)}:</span>{" "}
-          <span className="line-through text-yellow-500">
-            {desempate.pulado?.nome}
-          </span>{" "}
-          (1o lugar) ja ganhou em outra categoria - o{" "}
+          <span className="line-through text-yellow-500">{desempate.pulado?.nome}</span> (1o lugar)
+          ja ganhou em outra categoria - o{" "}
           <span className="font-medium">{desempate.posicao_eleito}o colocado</span>{" "}
-          <span className="font-semibold text-yellow-800">
-            {desempate.eleito?.nome}
-          </span>{" "}
-          foi selecionado no lugar.
+          <span className="font-semibold text-yellow-800">{desempate.eleito?.nome}</span> foi
+          selecionado no lugar.
         </div>
       ))}
     </div>

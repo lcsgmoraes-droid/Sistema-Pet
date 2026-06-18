@@ -1,5 +1,5 @@
-import { Trash2, Wallet, X } from 'lucide-react';
-import { formatBRL, formatMoneyBRL } from '../utils/formatters';
+import { Trash2, Wallet, X } from "lucide-react";
+import { formatBRL, formatMoneyBRL } from "../utils/formatters";
 
 export default function ModalPagamentoResumoLateral({
   valorTotal,
@@ -42,48 +42,63 @@ export default function ModalPagamentoResumoLateral({
 
       {moduloCampanhasAtivo && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-          <h3 className="font-semibold text-indigo-900 mb-2">Benefícios que esta venda pode gerar</h3>
+          <h3 className="font-semibold text-indigo-900 mb-2">
+            Benefícios que esta venda pode gerar
+          </h3>
           <p className="text-xs text-indigo-700 mb-3">
             Prévia para o cliente com base nas campanhas ativas no momento.
           </p>
 
           {!clienteId ? (
-            <p className="text-sm text-indigo-800">Associe um cliente para visualizar os benefícios de campanhas.</p>
+            <p className="text-sm text-indigo-800">
+              Associe um cliente para visualizar os benefícios de campanhas.
+            </p>
           ) : loadingBeneficiosCampanha ? (
             <p className="text-sm text-indigo-800">Carregando campanhas ativas...</p>
           ) : (
             <div className="space-y-1.5 text-sm text-indigo-900">
-              {carimbosPrevistos.length > 0 && carimbosPrevistos.map((item) => (
-                <div key={`carimbo-modal-${item.campanha}`}>
-                  {item.campanha}: esta venda está gerando <strong>{item.quantidade}</strong> carimbo(s).
-                </div>
-              ))}
+              {carimbosPrevistos.length > 0 &&
+                carimbosPrevistos.map((item) => (
+                  <div key={`carimbo-modal-${item.campanha}`}>
+                    {item.campanha}: esta venda está gerando <strong>{item.quantidade}</strong>{" "}
+                    carimbo(s).
+                  </div>
+                ))}
 
-              {cashbackPrevisto.length > 0 && cashbackPrevisto.map((item) => (
-                <div key={`cashback-modal-${item.campanha}`}>
-                  {item.campanha}: cashback previsto de <strong>{formatMoneyBRL(item.valor)}</strong> ({formatBRL(item.percentual)}%).
-                </div>
-              ))}
+              {cashbackPrevisto.length > 0 &&
+                cashbackPrevisto.map((item) => (
+                  <div key={`cashback-modal-${item.campanha}`}>
+                    {item.campanha}: cashback previsto de{" "}
+                    <strong>{formatMoneyBRL(item.valor)}</strong> ({formatBRL(item.percentual)}%).
+                  </div>
+                ))}
 
-              {recompraPrevista.length > 0 && recompraPrevista.map((item) => (
-                <div key={`recompra-modal-${item.campanha}`}>
-                  {item.campanha}: pode gerar 1 cupom de recompra de
-                  <strong> {item.tipo === 'fixed' ? formatMoneyBRL(item.valor) : `${formatBRL(item.valor)}%`}</strong>.
-                </div>
-              ))}
+              {recompraPrevista.length > 0 &&
+                recompraPrevista.map((item) => (
+                  <div key={`recompra-modal-${item.campanha}`}>
+                    {item.campanha}: pode gerar 1 cupom de recompra de
+                    <strong>
+                      {" "}
+                      {item.tipo === "fixed"
+                        ? formatMoneyBRL(item.valor)
+                        : `${formatBRL(item.valor)}%`}
+                    </strong>
+                    .
+                  </div>
+                ))}
 
-              {carimbosPrevistos.length === 0 && cashbackPrevisto.length === 0 && recompraPrevista.length === 0 && (
-                <div>Nenhum benefício de campanha previsto para esta venda.</div>
-              )}
+              {carimbosPrevistos.length === 0 &&
+                cashbackPrevisto.length === 0 &&
+                recompraPrevista.length === 0 && (
+                  <div>Nenhum benefício de campanha previsto para esta venda.</div>
+                )}
             </div>
           )}
         </div>
       )}
 
       <div>
-        <h3 className="font-semibold text-gray-900 mb-4">
-          Formas de Pagamento
-        </h3>
+        <h3 className="font-semibold text-gray-900 mb-4">Formas de Pagamento</h3>
 
         {pagamentosExistentes.length > 0 && (
           <div className="mb-4">
@@ -99,12 +114,17 @@ export default function ModalPagamentoResumoLateral({
                   <div className="flex-1">
                     <div className="flex items-center space-x-2">
                       <div className="font-medium text-gray-900">
-                        {pag.forma_pagamento === 'dinheiro' ? '💵 Dinheiro' :
-                          pag.forma_pagamento === 'pix' ? '📱 PIX' :
-                            pag.forma_pagamento === 'credito' ? '💳 Cartão de Crédito' :
-                              pag.forma_pagamento === 'debito' ? '💳 Cartão de Débito' :
-                                pag.forma_pagamento === 'boleto' ? '📄 Boleto' :
-                                  pag.forma_pagamento}
+                        {pag.forma_pagamento === "dinheiro"
+                          ? "💵 Dinheiro"
+                          : pag.forma_pagamento === "pix"
+                            ? "📱 PIX"
+                            : pag.forma_pagamento === "credito"
+                              ? "💳 Cartão de Crédito"
+                              : pag.forma_pagamento === "debito"
+                                ? "💳 Cartão de Débito"
+                                : pag.forma_pagamento === "boleto"
+                                  ? "📄 Boleto"
+                                  : pag.forma_pagamento}
                       </div>
                       <span className="px-2 py-0.5 bg-green-200 text-green-800 text-xs rounded-full font-medium">
                         Pagamento {idx + 1}
@@ -114,15 +134,18 @@ export default function ModalPagamentoResumoLateral({
                       <div className="text-sm text-gray-500 mt-1">Bandeira: {pag.bandeira}</div>
                     )}
                     {pag.nsu_cartao && (
-                      <div className="text-sm text-gray-600 mt-1 font-mono">🔢 NSU: {pag.nsu_cartao}</div>
+                      <div className="text-sm text-gray-600 mt-1 font-mono">
+                        🔢 NSU: {pag.nsu_cartao}
+                      </div>
                     )}
                     {pag.numero_parcelas && pag.numero_parcelas > 1 && (
                       <div className="text-sm text-blue-600 mt-1 font-medium">
-                        🔢 Parcelado em {pag.numero_parcelas}x de R$ {(parseFloat(pag.valor) / pag.numero_parcelas).toFixed(2)}
+                        🔢 Parcelado em {pag.numero_parcelas}x de R${" "}
+                        {(parseFloat(pag.valor) / pag.numero_parcelas).toFixed(2)}
                       </div>
                     )}
                     <div className="text-xs text-gray-400 mt-1">
-                      📅 {new Date(pag.data_pagamento).toLocaleString('pt-BR')}
+                      📅 {new Date(pag.data_pagamento).toLocaleString("pt-BR")}
                     </div>
                   </div>
                   <div className="flex items-center space-x-3">
@@ -167,31 +190,37 @@ export default function ModalPagamentoResumoLateral({
                 <div
                   key={index}
                   className={`flex items-center justify-between p-4 rounded-lg border ${
-                    pag.is_cashback
-                      ? 'bg-green-50 border-green-200'
-                      : 'bg-blue-50 border-blue-200'
+                    pag.is_cashback ? "bg-green-50 border-green-200" : "bg-blue-50 border-blue-200"
                   }`}
                 >
                   <div className="flex-1">
                     <div className="flex items-center space-x-2">
-                      <div className="font-medium text-gray-900">{pag.is_cashback ? '💰 ' : ''}{pag.nome}</div>
-                      <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
-                        pag.is_cashback
-                          ? 'bg-green-200 text-green-800'
-                          : 'bg-blue-200 text-blue-800'
-                      }`}>
-                        {pag.is_cashback ? 'Cashback' : 'Novo'}
+                      <div className="font-medium text-gray-900">
+                        {pag.is_cashback ? "💰 " : ""}
+                        {pag.nome}
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 text-xs rounded-full font-medium ${
+                          pag.is_cashback
+                            ? "bg-green-200 text-green-800"
+                            : "bg-blue-200 text-blue-800"
+                        }`}
+                      >
+                        {pag.is_cashback ? "Cashback" : "Novo"}
                       </span>
                     </div>
                     {pag.bandeira && (
                       <div className="text-sm text-gray-500 mt-1">Bandeira: {pag.bandeira}</div>
                     )}
                     {pag.nsu_cartao && (
-                      <div className="text-sm text-gray-600 mt-1 font-mono">🔢 NSU: {pag.nsu_cartao}</div>
+                      <div className="text-sm text-gray-600 mt-1 font-mono">
+                        🔢 NSU: {pag.nsu_cartao}
+                      </div>
                     )}
                     {pag.numero_parcelas > 1 && (
                       <div className="text-sm text-blue-600 mt-1 font-medium">
-                        🔢 {pag.numero_parcelas}x de R$ {(pag.valor / pag.numero_parcelas).toFixed(2)}
+                        🔢 {pag.numero_parcelas}x de R${" "}
+                        {(pag.valor / pag.numero_parcelas).toFixed(2)}
                       </div>
                     )}
                     {pag.troco && pag.troco > 0 && (
@@ -201,7 +230,9 @@ export default function ModalPagamentoResumoLateral({
                     )}
                   </div>
                   <div className="flex items-center space-x-3">
-                    <span className={`font-semibold text-lg ${pag.is_cashback ? 'text-green-700' : 'text-blue-700'}`}>
+                    <span
+                      className={`font-semibold text-lg ${pag.is_cashback ? "text-green-700" : "text-blue-700"}`}
+                    >
                       R$ {pag.valor.toFixed(2)}
                     </span>
                     <button

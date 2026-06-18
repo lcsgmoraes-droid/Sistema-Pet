@@ -44,7 +44,9 @@ export default function NovaInternacaoModal({
           />
 
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Motivo da internacao *</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Motivo da internacao *
+            </label>
             <textarea
               value={formNova.motivo}
               onChange={(event) => setFormNova((prev) => ({ ...prev, motivo: event.target.value }))}

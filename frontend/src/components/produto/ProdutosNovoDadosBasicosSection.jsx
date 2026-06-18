@@ -1,12 +1,12 @@
-import { useMemo, useState } from 'react';
-import SafeMarkdown from '../ui/SafeMarkdown';
+import { useMemo, useState } from "react";
+import SafeMarkdown from "../ui/SafeMarkdown";
 import {
   CategoriaProdutoSelector,
   MarcaProdutoSelector,
-} from '../produtos/CatalogoProdutoSelectors';
-import ActionButton from '../ui/ActionButton';
-import SegmentedControl from '../ui/SegmentedControl';
-import { normalizeMarkdownContent } from '../../utils/safeMarkdown';
+} from "../produtos/CatalogoProdutoSelectors";
+import ActionButton from "../ui/ActionButton";
+import SegmentedControl from "../ui/SegmentedControl";
+import { normalizeMarkdownContent } from "../../utils/safeMarkdown";
 
 export default function ProdutosNovoDadosBasicosSection({
   categoriasHierarquicas,
@@ -17,15 +17,15 @@ export default function ProdutosNovoDadosBasicosSection({
   handleGerarSKU,
   marcas,
 }) {
-  const [descricaoModo, setDescricaoModo] = useState('editar');
+  const [descricaoModo, setDescricaoModo] = useState("editar");
   const descricaoNormalizada = useMemo(
     () => normalizeMarkdownContent(formData.descricao),
     [formData.descricao],
   );
 
   function handleDescricaoBlur() {
-    if (descricaoNormalizada !== (formData.descricao || '')) {
-      handleChange('descricao', descricaoNormalizada);
+    if (descricaoNormalizada !== (formData.descricao || "")) {
+      handleChange("descricao", descricaoNormalizada);
     }
   }
 
@@ -38,7 +38,7 @@ export default function ProdutosNovoDadosBasicosSection({
             <input
               type="text"
               value={formData.sku}
-              onChange={(e) => handleChange('sku', e.target.value)}
+              onChange={(e) => handleChange("sku", e.target.value)}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Ex: PROD0001"
             />
@@ -48,7 +48,7 @@ export default function ProdutosNovoDadosBasicosSection({
           </div>
           <p className="mt-1 text-xs text-gray-500">
             Esse valor e salvo como o SKU oficial do produto.
-            {formData.codigo ? ` Atual: ${formData.codigo}` : ''}
+            {formData.codigo ? ` Atual: ${formData.codigo}` : ""}
           </p>
         </div>
 
@@ -58,7 +58,7 @@ export default function ProdutosNovoDadosBasicosSection({
             <input
               type="text"
               value={formData.codigo_barras}
-              onChange={(e) => handleChange('codigo_barras', e.target.value)}
+              onChange={(e) => handleChange("codigo_barras", e.target.value)}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="EAN-13"
             />
@@ -74,7 +74,7 @@ export default function ProdutosNovoDadosBasicosSection({
         <input
           type="text"
           value={formData.nome}
-          onChange={(e) => handleChange('nome', e.target.value)}
+          onChange={(e) => handleChange("nome", e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="Ex: Racao Golden para Caes Adultos 15kg"
           required
@@ -84,7 +84,11 @@ export default function ProdutosNovoDadosBasicosSection({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-          <select value={formData.tipo} onChange={(e) => handleChange('tipo', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <select
+            value={formData.tipo}
+            onChange={(e) => handleChange("tipo", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
             <option value="produto">Produto</option>
             <option value="servico">Servico</option>
             <option value="ambos">Produto e Servico</option>
@@ -93,10 +97,16 @@ export default function ProdutosNovoDadosBasicosSection({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
-          <select value={formData.departamento_id} onChange={(e) => handleChange('departamento_id', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <select
+            value={formData.departamento_id}
+            onChange={(e) => handleChange("departamento_id", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
             <option value="">Selecione...</option>
             {departamentos.map((dep) => (
-              <option key={dep.id} value={dep.id}>{dep.nome}</option>
+              <option key={dep.id} value={dep.id}>
+                {dep.nome}
+              </option>
             ))}
           </select>
         </div>
@@ -106,7 +116,7 @@ export default function ProdutosNovoDadosBasicosSection({
             label="Categoria"
             categorias={categoriasHierarquicas}
             value={formData.categoria_id}
-            onChange={(valor) => handleChange('categoria_id', valor)}
+            onChange={(valor) => handleChange("categoria_id", valor)}
             placeholder="Selecione..."
             searchPlaceholder="Digite para buscar categoria..."
             inputClassName="border-gray-300"
@@ -118,7 +128,7 @@ export default function ProdutosNovoDadosBasicosSection({
             label="Marca"
             marcas={marcas}
             value={formData.marca_id}
-            onChange={(valor) => handleChange('marca_id', valor)}
+            onChange={(valor) => handleChange("marca_id", valor)}
             placeholder="Selecione..."
             searchPlaceholder="Digite para buscar marca..."
             inputClassName="border-gray-300"
@@ -129,7 +139,11 @@ export default function ProdutosNovoDadosBasicosSection({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Unidade</label>
-          <select value={formData.unidade} onChange={(e) => handleChange('unidade', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+          <select
+            value={formData.unidade}
+            onChange={(e) => handleChange("unidade", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
             <option value="UN">UN - Unidade</option>
             <option value="KG">KG - Quilograma</option>
             <option value="G">G - Grama</option>
@@ -149,16 +163,16 @@ export default function ProdutosNovoDadosBasicosSection({
               value={descricaoModo}
               onChange={setDescricaoModo}
               options={[
-                { value: 'editar', label: 'Editar' },
-                { value: 'previa', label: 'Previa' },
+                { value: "editar", label: "Editar" },
+                { value: "previa", label: "Previa" },
               ]}
             />
           </div>
 
-          {descricaoModo === 'editar' ? (
+          {descricaoModo === "editar" ? (
             <textarea
               value={formData.descricao}
-              onChange={(e) => handleChange('descricao', e.target.value)}
+              onChange={(e) => handleChange("descricao", e.target.value)}
               onBlur={handleDescricaoBlur}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows="4"

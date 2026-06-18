@@ -1,20 +1,20 @@
-import { useState } from 'react';
-import { FiAlertCircle, FiSave, FiX } from 'react-icons/fi';
-import api from '../api';
-import './QuickAddModal.css';
+import { useState } from "react";
+import { FiAlertCircle, FiSave, FiX } from "react-icons/fi";
+import api from "../api";
+import "./QuickAddModal.css";
 
 /**
  * Modal rapido para adicionar especie ou raca sem sair do formulario de Pet.
  */
 const QuickAddModal = ({ tipo, especieId, especieNome, onSuccess, onClose }) => {
-  const [nome, setNome] = useState('');
+  const [nome, setNome] = useState("");
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
-  const isRaca = tipo === 'raca';
+  const isRaca = tipo === "raca";
   const especieIdNormalizado = Number.parseInt(especieId, 10);
   const especieValida = Number.isInteger(especieIdNormalizado) && especieIdNormalizado > 0;
-  const fieldId = `quick-add-${tipo || 'item'}-nome`;
+  const fieldId = `quick-add-${tipo || "item"}-nome`;
 
   const getApiErrorMessage = (err) => {
     const detail = err.response?.data?.detail;
@@ -22,24 +22,26 @@ const QuickAddModal = ({ tipo, especieId, especieNome, onSuccess, onClose }) => 
       const messages = detail
         .map((item) => item?.msg || item?.message)
         .filter(Boolean)
-        .join(' ');
+        .join(" ");
       if (messages) return messages;
     }
-    if (typeof detail === 'string') return detail;
-    return 'Nao foi possivel salvar agora. Revise os dados e tente novamente.';
+    if (typeof detail === "string") return detail;
+    return "Nao foi possivel salvar agora. Revise os dados e tente novamente.";
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
-    if (!nome || nome.trim() === '') {
-      setError(`O nome ${tipo === 'especie' ? 'da especie' : 'da raca'} e obrigatorio.`);
+    if (!nome || nome.trim() === "") {
+      setError(`O nome ${tipo === "especie" ? "da especie" : "da raca"} e obrigatorio.`);
       return;
     }
 
     if (isRaca && !especieValida) {
-      setError('Selecione uma especie antes de cadastrar a raca. Escolha uma especie no campo anterior e tente novamente.');
+      setError(
+        "Selecione uma especie antes de cadastrar a raca. Escolha uma especie no campo anterior e tente novamente.",
+      );
       return;
     }
 
@@ -47,13 +49,13 @@ const QuickAddModal = ({ tipo, especieId, especieNome, onSuccess, onClose }) => 
       setSaving(true);
       let response;
 
-      if (tipo === 'especie') {
-        response = await api.post('/cadastros/especies', {
+      if (tipo === "especie") {
+        response = await api.post("/cadastros/especies", {
           nome: nome.trim(),
           ativo: true,
         });
       } else {
-        response = await api.post('/cadastros/racas', {
+        response = await api.post("/cadastros/racas", {
           nome: nome.trim(),
           especie_id: especieIdNormalizado,
           ativo: true,
@@ -66,7 +68,7 @@ const QuickAddModal = ({ tipo, especieId, especieNome, onSuccess, onClose }) => 
 
       onClose();
     } catch (err) {
-      console.error('Erro ao salvar:', err);
+      console.error("Erro ao salvar:", err);
       setError(getApiErrorMessage(err));
     } finally {
       setSaving(false);
@@ -78,10 +80,8 @@ const QuickAddModal = ({ tipo, especieId, especieNome, onSuccess, onClose }) => 
       <div className="quick-modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="quick-modal-header">
           <h3>
-            {tipo === 'especie' ? 'Nova especie' : 'Nova raca'}
-            {isRaca && especieNome && (
-              <span className="quick-subtitle"> - {especieNome}</span>
-            )}
+            {tipo === "especie" ? "Nova especie" : "Nova raca"}
+            {isRaca && especieNome && <span className="quick-subtitle"> - {especieNome}</span>}
           </h3>
           <button className="quick-btn-close" type="button" onClick={onClose}>
             <FiX />
@@ -98,7 +98,7 @@ const QuickAddModal = ({ tipo, especieId, especieNome, onSuccess, onClose }) => 
 
             <div className="quick-form-group">
               <label htmlFor={fieldId}>
-                Nome {tipo === 'especie' ? 'da especie' : 'da raca'} *
+                Nome {tipo === "especie" ? "da especie" : "da raca"} *
               </label>
               <input
                 id={fieldId}
@@ -106,7 +106,9 @@ const QuickAddModal = ({ tipo, especieId, especieNome, onSuccess, onClose }) => 
                 type="text"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                placeholder={tipo === 'especie' ? 'Ex: Cao, Gato, Ave...' : 'Ex: Labrador, SRD, Siames...'}
+                placeholder={
+                  tipo === "especie" ? "Ex: Cao, Gato, Ave..." : "Ex: Labrador, SRD, Siames..."
+                }
                 required
                 autoFocus
                 disabled={saving}
@@ -115,9 +117,9 @@ const QuickAddModal = ({ tipo, especieId, especieNome, onSuccess, onClose }) => 
 
             <div className="quick-info">
               <p>
-                {tipo === 'especie'
-                  ? 'Esta especie ficara disponivel para todos os pets.'
-                  : `Esta raca sera adicionada a especie "${especieNome || 'selecionada'}".`}
+                {tipo === "especie"
+                  ? "Esta especie ficara disponivel para todos os pets."
+                  : `Esta raca sera adicionada a especie "${especieNome || "selecionada"}".`}
               </p>
             </div>
           </div>
@@ -136,7 +138,7 @@ const QuickAddModal = ({ tipo, especieId, especieNome, onSuccess, onClose }) => 
               className="quick-btn quick-btn-primary"
               disabled={saving || (isRaca && !especieValida)}
             >
-              <FiSave /> {saving ? 'Salvando...' : 'Salvar'}
+              <FiSave /> {saving ? "Salvando..." : "Salvar"}
             </button>
           </div>
         </form>

@@ -33,25 +33,41 @@ export default function ProdutosNovoFornecedoresTab({
       {fornecedores.length === 0 ? (
         <div className="text-center py-12 text-gray-500">
           <p className="text-lg mb-2">🏭 Nenhum fornecedor vinculado</p>
-          <p className="text-sm">Clique em "Adicionar Fornecedor" para vincular fornecedores a este produto</p>
+          <p className="text-sm">
+            Clique em "Adicionar Fornecedor" para vincular fornecedores a este produto
+          </p>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fornecedor</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Preço Custo</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Prazo (dias)</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estoque</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Principal</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Fornecedor
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Código
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Preço Custo
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                  Prazo (dias)
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                  Estoque
+                </th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                  Principal
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  Ações
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {fornecedores.map((forn) => (
-                <tr key={forn.id} className={!forn.ativo ? 'opacity-50' : ''}>
+                <tr key={forn.id} className={!forn.ativo ? "opacity-50" : ""}>
                   <td className="px-4 py-3">
                     <FornecedorIdentity
                       document={forn.fornecedor_cpf_cnpj}
@@ -59,15 +75,23 @@ export default function ProdutosNovoFornecedoresTab({
                       record={forn}
                     />
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900">{forn.codigo_fornecedor || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                    {forn.preco_custo ? formatarMoeda(forn.preco_custo) : '-'}
+                  <td className="px-4 py-3 text-sm text-gray-900">
+                    {forn.codigo_fornecedor || "-"}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-center">{forn.prazo_entrega || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 text-center">{forn.estoque_fornecedor || '-'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                    {forn.preco_custo ? formatarMoeda(forn.preco_custo) : "-"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-center">
+                    {forn.prazo_entrega || "-"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900 text-center">
+                    {forn.estoque_fornecedor || "-"}
+                  </td>
                   <td className="px-4 py-3 text-center">
                     {forn.e_principal && (
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">Principal</span>
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                        Principal
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right space-x-2">

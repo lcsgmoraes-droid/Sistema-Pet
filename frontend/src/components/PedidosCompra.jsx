@@ -1,16 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import api from '../api';
-import { toast } from 'react-hot-toast';
-import PedidoCompraFormulario from './compras/PedidoCompraFormulario';
-import PedidosCompraFiltros from './compras/PedidosCompraFiltros';
-import PedidosCompraModalsLayer from './compras/PedidosCompraModalsLayer';
-import PedidosCompraTabela from './compras/PedidosCompraTabela';
-import usePedidosCompraGruposFornecedores from './compras/usePedidosCompraGruposFornecedores';
-import usePedidosCompraSugestao from './compras/usePedidosCompraSugestao';
+import { useState, useEffect, useMemo } from "react";
+import api from "../api";
+import { toast } from "react-hot-toast";
+import PedidoCompraFormulario from "./compras/PedidoCompraFormulario";
+import PedidosCompraFiltros from "./compras/PedidosCompraFiltros";
+import PedidosCompraModalsLayer from "./compras/PedidosCompraModalsLayer";
+import PedidosCompraTabela from "./compras/PedidosCompraTabela";
+import usePedidosCompraGruposFornecedores from "./compras/usePedidosCompraGruposFornecedores";
+import usePedidosCompraSugestao from "./compras/usePedidosCompraSugestao";
 import {
   COLUNAS_DOCUMENTO_COMPLETO,
   normalizarColunasDocumentoPedido,
-} from './compras/pedidoDocumentoColunas';
+} from "./compras/pedidoDocumentoColunas";
 import {
   baixarArquivoResposta,
   clonarItensPedido,
@@ -18,29 +18,29 @@ import {
   numeroSeguro,
   textoContemTokens,
   textoNumeroSeguro,
-} from './compras/pedidoCompraUtils';
+} from "./compras/pedidoCompraUtils";
 
 const FORM_DATA_INICIAL = {
-  fornecedor_id: '',
-  data_prevista_entrega: '',
-  valor_frete: '0',
-  valor_desconto: '0',
-  observacoes: '',
-  itens: []
+  fornecedor_id: "",
+  data_prevista_entrega: "",
+  valor_frete: "0",
+  valor_desconto: "0",
+  observacoes: "",
+  itens: [],
 };
 
 const ITEM_FORM_INICIAL = {
-  produto_id: '',
-  quantidade_pedida: '',
-  preco_unitario: ''
+  produto_id: "",
+  quantidade_pedida: "",
+  preco_unitario: "",
 };
 
 const FILTROS_PEDIDOS_INICIAL = {
-  status: '',
-  fornecedor_id: '',
-  busca: '',
-  data_inicio: '',
-  data_fim: ''
+  status: "",
+  fornecedor_id: "",
+  busca: "",
+  data_inicio: "",
+  data_fim: "",
 };
 
 const PedidosCompra = () => {
@@ -58,7 +58,7 @@ const PedidosCompra = () => {
   const [mostrarRecebimento, setMostrarRecebimento] = useState(false);
   const [mostrarConfronto, setMostrarConfronto] = useState(false);
   const [pedidoConfronto, setPedidoConfronto] = useState(null);
-  
+
   // Modal de envio
   const [mostrarModalEnvio, setMostrarModalEnvio] = useState(false);
   const [pedidoParaEnviar, setPedidoParaEnviar] = useState(null);
@@ -68,12 +68,12 @@ const PedidosCompra = () => {
   const [exportandoArquivo, setExportandoArquivo] = useState(false);
   const [colunasDocumentoPedido, setColunasDocumentoPedido] = useState(COLUNAS_DOCUMENTO_COMPLETO);
   const [dadosEnvio, setDadosEnvio] = useState({
-    email: '',
-    whatsapp: '',
+    email: "",
+    whatsapp: "",
     formatos: {
       pdf: true,
-      excel: false
-    }
+      excel: false,
+    },
   });
 
   const [formData, setFormData] = useState(FORM_DATA_INICIAL);
@@ -81,8 +81,8 @@ const PedidosCompra = () => {
   const [itemForm, setItemForm] = useState(ITEM_FORM_INICIAL);
 
   // Estados para inputs digitáveis
-  const [fornecedorTexto, setFornecedorTexto] = useState('');
-  const [produtoTexto, setProdutoTexto] = useState('');
+  const [fornecedorTexto, setFornecedorTexto] = useState("");
+  const [produtoTexto, setProdutoTexto] = useState("");
   const [mostrarSugestoesProduto, setMostrarSugestoesProduto] = useState(false);
   const [incluirGrupoFornecedor, setIncluirGrupoFornecedor] = useState(false);
 
@@ -91,19 +91,22 @@ const PedidosCompra = () => {
     if (!termo) return produtos.slice(0, 15);
 
     return produtos
-      .filter((p) => textoContemTokens([
-        p.nome,
-        p.codigo,
-        p.sku,
-        p.codigo_barras,
-        p.marca_nome,
-        p.marca?.nome,
-      ].filter(Boolean).join(' '), termo))
+      .filter((p) =>
+        textoContemTokens(
+          [p.nome, p.codigo, p.sku, p.codigo_barras, p.marca_nome, p.marca?.nome]
+            .filter(Boolean)
+            .join(" "),
+          termo,
+        ),
+      )
       .slice(0, 15);
   }, [produtos, produtoTexto]);
 
   const fornecedoresOrdenados = useMemo(
-    () => [...fornecedores].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR')),
+    () =>
+      [...fornecedores].sort((a, b) =>
+        String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"),
+      ),
     [fornecedores],
   );
 
@@ -117,20 +120,20 @@ const PedidosCompra = () => {
         : [...prev, fornecedor];
 
       return proximaLista.sort((a, b) =>
-        String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'),
+        String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"),
       );
     });
   };
 
   const filtrosPedidosAtivos = useMemo(
-    () => Object.values(filtrosPedidos).filter((valor) => String(valor || '').trim()).length,
+    () => Object.values(filtrosPedidos).filter((valor) => String(valor || "").trim()).length,
     [filtrosPedidos],
   );
 
   const montarParametrosPedidos = (filtros = FILTROS_PEDIDOS_INICIAL) => {
     const params = { limit: 100 };
     Object.entries(filtros).forEach(([chave, valor]) => {
-      const texto = String(valor || '').trim();
+      const texto = String(valor || "").trim();
       if (texto) {
         params[chave] = texto;
       }
@@ -170,11 +173,11 @@ const PedidosCompra = () => {
 
   const selecionarFornecedor = (fornecedor) => {
     const grupo = obterGrupoDoFornecedor(fornecedor.id);
-    setFornecedorTexto(fornecedor.nome || '');
+    setFornecedorTexto(fornecedor.nome || "");
     setFormData((prev) => ({ ...prev, fornecedor_id: fornecedor.id.toString(), itens: [] }));
     setIncluirGrupoFornecedor(Boolean(grupo));
     setItemForm(ITEM_FORM_INICIAL);
-    setProdutoTexto('');
+    setProdutoTexto("");
     // Limpar sugestões do fornecedor anterior
     limparEstadosSugestao();
     carregarProdutosFornecedor(fornecedor.id, { fornecedorGrupoId: grupo?.id });
@@ -199,23 +202,25 @@ const PedidosCompra = () => {
       return null;
     }
 
-    return obterFornecedorPorId(fornecedorId)
-      || fornecedoresGrupo.find((fornecedor) => Number(fornecedor.id) === fornecedorId)
-      || null;
+    return (
+      obterFornecedorPorId(fornecedorId) ||
+      fornecedoresGrupo.find((fornecedor) => Number(fornecedor.id) === fornecedorId) ||
+      null
+    );
   };
 
   const selecionarGrupoFornecedor = (grupo) => {
     const fornecedorBase = obterFornecedorPreferencialDoGrupo(grupo);
 
     if (!fornecedorBase?.id) {
-      toast.error('Grupo de fornecedor sem fornecedor vinculado');
+      toast.error("Grupo de fornecedor sem fornecedor vinculado");
       return;
     }
 
     if (!obterFornecedorPorId(fornecedorBase.id)) {
       registrarFornecedorCriado(fornecedorBase);
     }
-    setFornecedorTexto(grupo.nome || fornecedorBase.nome || '');
+    setFornecedorTexto(grupo.nome || fornecedorBase.nome || "");
     setFormData((prev) => ({
       ...prev,
       fornecedor_id: fornecedorBase.id.toString(),
@@ -223,7 +228,7 @@ const PedidosCompra = () => {
     }));
     setIncluirGrupoFornecedor(true);
     setItemForm(ITEM_FORM_INICIAL);
-    setProdutoTexto('');
+    setProdutoTexto("");
     limparEstadosSugestao();
     carregarProdutosFornecedor(fornecedorBase.id, { fornecedorGrupoId: grupo.id });
   };
@@ -240,10 +245,13 @@ const PedidosCompra = () => {
       return gruposFornecedores.find((grupo) => Number(grupo.id) === grupoIdDireto) || null;
     }
 
-    return gruposFornecedores.find((grupo) => (
-      Array.isArray(grupo.fornecedor_ids)
-      && grupo.fornecedor_ids.some((grupoFornecedorId) => Number(grupoFornecedorId) === id)
-    )) || null;
+    return (
+      gruposFornecedores.find(
+        (grupo) =>
+          Array.isArray(grupo.fornecedor_ids) &&
+          grupo.fornecedor_ids.some((grupoFornecedorId) => Number(grupoFornecedorId) === id),
+      ) || null
+    );
   };
 
   const grupoFornecedorAtual = useMemo(
@@ -264,7 +272,7 @@ const PedidosCompra = () => {
   };
 
   const extrairEmailFornecedor = (fornecedor) => {
-    if (!fornecedor) return '';
+    if (!fornecedor) return "";
 
     const candidatos = [
       fornecedor.email,
@@ -275,19 +283,19 @@ const PedidosCompra = () => {
     ];
 
     const emailValido = candidatos.find(
-      (valor) => typeof valor === 'string' && valor.includes('@'),
+      (valor) => typeof valor === "string" && valor.includes("@"),
     );
 
-    return (emailValido || '').trim();
+    return (emailValido || "").trim();
   };
 
   const obterSnapshotFormularioAtual = () => ({
     ...formData,
-    fornecedor_id: formData.fornecedor_id?.toString() || '',
-    data_prevista_entrega: formData.data_prevista_entrega || '',
-    valor_frete: textoNumeroSeguro(formData.valor_frete, '0'),
-    valor_desconto: textoNumeroSeguro(formData.valor_desconto, '0'),
-    observacoes: formData.observacoes || '',
+    fornecedor_id: formData.fornecedor_id?.toString() || "",
+    data_prevista_entrega: formData.data_prevista_entrega || "",
+    valor_frete: textoNumeroSeguro(formData.valor_frete, "0"),
+    valor_desconto: textoNumeroSeguro(formData.valor_desconto, "0"),
+    observacoes: formData.observacoes || "",
     itens: clonarItensPedido(formData.itens),
   });
 
@@ -361,9 +369,9 @@ const PedidosCompra = () => {
   const limparFormularioPedido = () => {
     setFormData(FORM_DATA_INICIAL);
     setItemForm(ITEM_FORM_INICIAL);
-    setEstrategiaMesclaItens('somar');
-    setFornecedorTexto('');
-    setProdutoTexto('');
+    setEstrategiaMesclaItens("somar");
+    setFornecedorTexto("");
+    setProdutoTexto("");
     setProdutos([]);
     setIncluirGrupoFornecedor(false);
     setMostrarSugestoesProduto(false);
@@ -385,17 +393,17 @@ const PedidosCompra = () => {
   };
 
   const combinarCabecalhoPedido = (formBase, formAtual) => ({
-    fornecedor_id: formBase.fornecedor_id || formAtual.fornecedor_id || '',
-    data_prevista_entrega: formAtual.data_prevista_entrega || formBase.data_prevista_entrega || '',
+    fornecedor_id: formBase.fornecedor_id || formAtual.fornecedor_id || "",
+    data_prevista_entrega: formAtual.data_prevista_entrega || formBase.data_prevista_entrega || "",
     valor_frete:
       numeroSeguro(formAtual.valor_frete) > 0
-        ? textoNumeroSeguro(formAtual.valor_frete, '0')
-        : textoNumeroSeguro(formBase.valor_frete, '0'),
+        ? textoNumeroSeguro(formAtual.valor_frete, "0")
+        : textoNumeroSeguro(formBase.valor_frete, "0"),
     valor_desconto:
       numeroSeguro(formAtual.valor_desconto) > 0
-        ? textoNumeroSeguro(formAtual.valor_desconto, '0')
-        : textoNumeroSeguro(formBase.valor_desconto, '0'),
-    observacoes: formAtual.observacoes?.trim() || formBase.observacoes || '',
+        ? textoNumeroSeguro(formAtual.valor_desconto, "0")
+        : textoNumeroSeguro(formBase.valor_desconto, "0"),
+    observacoes: formAtual.observacoes?.trim() || formBase.observacoes || "",
   });
 
   const aplicarPedidoNoFormulario = async (
@@ -403,7 +411,7 @@ const PedidosCompra = () => {
     formDataOverride = null,
     options = {},
   ) => {
-    const { mensagemSucesso = '', mostrarToast = false } = options;
+    const { mensagemSucesso = "", mostrarToast = false } = options;
     const fornecedorId = Number(pedidoCompleto?.fornecedor_id);
     const fornecedorSelecionado = obterFornecedorPorId(fornecedorId);
     const proximoFormData = formDataOverride || converterPedidoParaFormData(pedidoCompleto);
@@ -411,10 +419,10 @@ const PedidosCompra = () => {
     setModoEdicao(true);
     setPedidoEditando(pedidoCompleto);
     setFormData(proximoFormData);
-    setFornecedorTexto(fornecedorSelecionado?.nome || '');
+    setFornecedorTexto(fornecedorSelecionado?.nome || "");
     setIncluirGrupoFornecedor(Boolean(obterGrupoDoFornecedor(fornecedorId)));
     setItemForm(ITEM_FORM_INICIAL);
-    setProdutoTexto('');
+    setProdutoTexto("");
     setMostrarSugestoesProduto(false);
     setMostrarForm(true);
     limparEstadosSugestao();
@@ -433,17 +441,17 @@ const PedidosCompra = () => {
     const proximoFormData = {
       ...FORM_DATA_INICIAL,
       ...snapshot,
-      fornecedor_id: fornecedorId ? String(fornecedorId) : '',
+      fornecedor_id: fornecedorId ? String(fornecedorId) : "",
       itens: clonarItensPedido(snapshot?.itens || []),
     };
 
     setModoEdicao(false);
     setPedidoEditando(null);
     setFormData(proximoFormData);
-    setFornecedorTexto(fornecedorSelecionado?.nome || '');
+    setFornecedorTexto(fornecedorSelecionado?.nome || "");
     setIncluirGrupoFornecedor(Boolean(obterGrupoDoFornecedor(fornecedorId)));
     setItemForm(ITEM_FORM_INICIAL);
-    setProdutoTexto('');
+    setProdutoTexto("");
     setMostrarSugestoesProduto(false);
     setMostrarForm(true);
     limparEstadosSugestao();
@@ -453,28 +461,28 @@ const PedidosCompra = () => {
     }
 
     if (abrirSugestao) {
-      await abrirModalSugestao(fornecedorId, 'merge');
+      await abrirModalSugestao(fornecedorId, "merge");
     }
   };
 
   const abrirFluxoSugestaoInteligente = async () => {
     if (!formData.fornecedor_id) {
-      toast.error('Selecione um fornecedor primeiro');
+      toast.error("Selecione um fornecedor primeiro");
       return;
     }
 
     const fornecedorId = Number(formData.fornecedor_id);
     const snapshotFormulario = obterSnapshotFormularioAtual();
     const editandoMesmoRascunho =
-      modoEdicao
-      && pedidoEditando
-      && Number(pedidoEditando.id) > 0
-      && Number(pedidoEditando.fornecedor_id) === fornecedorId
-      && pedidoEditando.status === 'rascunho';
+      modoEdicao &&
+      pedidoEditando &&
+      Number(pedidoEditando.id) > 0 &&
+      Number(pedidoEditando.fornecedor_id) === fornecedorId &&
+      pedidoEditando.status === "rascunho";
 
     if (editandoMesmoRascunho) {
       setContextoRascunhoSugestao({
-        tipo: 'atual',
+        tipo: "atual",
         pedidoRascunho: pedidoEditando,
         pedidoNovo: snapshotFormulario,
         totalRascunhos: 1,
@@ -485,15 +493,14 @@ const PedidosCompra = () => {
 
     setLoadingPrepararSugestao(true);
     try {
-      const response = await api.get(
-        `/pedidos-compra/rascunho/fornecedor/${fornecedorId}`,
-        { params: obterParametrosGrupoFornecedor(fornecedorId) },
-      );
+      const response = await api.get(`/pedidos-compra/rascunho/fornecedor/${fornecedorId}`, {
+        params: obterParametrosGrupoFornecedor(fornecedorId),
+      });
       const pedidoRascunho = response?.data?.pedido || null;
 
       if (pedidoRascunho) {
         setContextoRascunhoSugestao({
-          tipo: 'externo',
+          tipo: "externo",
           pedidoRascunho,
           pedidoNovo: snapshotFormulario,
           totalRascunhos: Number(response?.data?.total_rascunhos || 1),
@@ -504,8 +511,8 @@ const PedidosCompra = () => {
 
       await abrirModalSugestao(fornecedorId);
     } catch (error) {
-      console.error('Erro ao verificar rascunho do fornecedor:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao verificar rascunho do fornecedor');
+      console.error("Erro ao verificar rascunho do fornecedor:", error);
+      toast.error(error.response?.data?.detail || "Erro ao verificar rascunho do fornecedor");
     } finally {
       setLoadingPrepararSugestao(false);
     }
@@ -529,33 +536,33 @@ const PedidosCompra = () => {
     setLoadingPrepararSugestao(true);
 
     try {
-      if (acao === 'carregar' || acao === 'manter') {
-        if (tipo === 'externo' && pedidoRascunho) {
+      if (acao === "carregar" || acao === "manter") {
+        if (tipo === "externo" && pedidoRascunho) {
           await aplicarPedidoNoFormulario(
             pedidoRascunho,
             converterPedidoParaFormData(pedidoRascunho),
             {
               mostrarToast: true,
-              mensagemSucesso: 'Rascunho existente carregado.',
+              mensagemSucesso: "Rascunho existente carregado.",
             },
           );
         } else {
-          toast('O rascunho atual foi mantido sem aplicar nova sugestao.');
+          toast("O rascunho atual foi mantido sem aplicar nova sugestao.");
         }
         return;
       }
 
-      if (acao === 'novo') {
+      if (acao === "novo") {
         await iniciarPedidoSeparadoComSnapshot(pedidoNovo, fornecedorId, true);
-        toast.success('Novo pedido iniciado para o mesmo fornecedor.');
+        toast.success("Novo pedido iniciado para o mesmo fornecedor.");
         return;
       }
 
-      const preservarQuantidades = acao === 'analisar_preservar' || acao === 'mesclar';
-      const substituirItens = acao === 'analisar_substituir' || acao === 'substituir';
-      setEstrategiaMesclaItens(preservarQuantidades ? 'manter_existente' : 'somar');
+      const preservarQuantidades = acao === "analisar_preservar" || acao === "mesclar";
+      const substituirItens = acao === "analisar_substituir" || acao === "substituir";
+      setEstrategiaMesclaItens(preservarQuantidades ? "manter_existente" : "somar");
 
-      if (tipo === 'externo' && pedidoRascunho) {
+      if (tipo === "externo" && pedidoRascunho) {
         const formRascunho = converterPedidoParaFormData(pedidoRascunho);
         const itensConsolidados = clonarItensPedido(formRascunho.itens);
         const cabecalhoConsolidado = combinarCabecalhoPedido(formRascunho, pedidoNovo);
@@ -570,27 +577,21 @@ const PedidosCompra = () => {
           {
             mostrarToast: true,
             mensagemSucesso: preservarQuantidades
-              ? 'Rascunho carregado. A sugestao vai manter quantidades ja preenchidas.'
-              : 'Rascunho carregado. A sugestao vai substituir os itens ao confirmar.',
+              ? "Rascunho carregado. A sugestao vai manter quantidades ja preenchidas."
+              : "Rascunho carregado. A sugestao vai substituir os itens ao confirmar.",
           },
         );
 
-        setEstrategiaMesclaItens(preservarQuantidades ? 'manter_existente' : 'somar');
-        await abrirModalSugestao(
-          fornecedorId,
-          substituirItens ? 'replace' : 'merge',
-        );
+        setEstrategiaMesclaItens(preservarQuantidades ? "manter_existente" : "somar");
+        await abrirModalSugestao(fornecedorId, substituirItens ? "replace" : "merge");
         return;
       }
 
-      setEstrategiaMesclaItens(preservarQuantidades ? 'manter_existente' : 'somar');
-      await abrirModalSugestao(
-        fornecedorId,
-        substituirItens ? 'replace' : 'merge',
-      );
+      setEstrategiaMesclaItens(preservarQuantidades ? "manter_existente" : "somar");
+      await abrirModalSugestao(fornecedorId, substituirItens ? "replace" : "merge");
     } catch (error) {
-      console.error('Erro ao preparar consolidação do rascunho:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao preparar a sugestão inteligente');
+      console.error("Erro ao preparar consolidação do rascunho:", error);
+      toast.error(error.response?.data?.detail || "Erro ao preparar a sugestão inteligente");
     } finally {
       setLoadingPrepararSugestao(false);
     }
@@ -605,24 +606,26 @@ const PedidosCompra = () => {
     setLoadingListaPedidos(true);
     try {
       if (opcoes.apenasPedidos) {
-        const pedidosRes = await api.get('/pedidos-compra/', { params });
-        setPedidos(extrairListaResposta(pedidosRes.data, ['pedidos']));
+        const pedidosRes = await api.get("/pedidos-compra/", { params });
+        setPedidos(extrairListaResposta(pedidosRes.data, ["pedidos"]));
         return;
       }
 
       const [pedidosRes, fornecedoresRes, gruposRes, envioStatusRes] = await Promise.all([
-        api.get('/pedidos-compra/', { params }),
-        api.get('/clientes/?tipo_cadastro=fornecedor&apenas_ativos=true'),
-        api.get('/fornecedor-grupos/'),
-        api.get('/pedidos-compra/envio/status').catch(() => ({ data: { email_configurado: false } }))
+        api.get("/pedidos-compra/", { params }),
+        api.get("/clientes/?tipo_cadastro=fornecedor&apenas_ativos=true"),
+        api.get("/fornecedor-grupos/"),
+        api
+          .get("/pedidos-compra/envio/status")
+          .catch(() => ({ data: { email_configurado: false } })),
       ]);
 
       // Tratar resposta dos pedidos (pode ser array direto ou objeto paginado)
-      const pedidosData = extrairListaResposta(pedidosRes.data, ['pedidos']);
-      
+      const pedidosData = extrairListaResposta(pedidosRes.data, ["pedidos"]);
+
       // Tratar resposta dos fornecedores
-      const fornecedoresData = extrairListaResposta(fornecedoresRes.data, ['clientes']);
-      const gruposData = extrairListaResposta(gruposRes.data, ['grupos']);
+      const fornecedoresData = extrairListaResposta(fornecedoresRes.data, ["clientes"]);
+      const gruposData = extrairListaResposta(gruposRes.data, ["grupos"]);
 
       setPedidos(pedidosData);
       setFornecedores(fornecedoresData);
@@ -630,8 +633,8 @@ const PedidosCompra = () => {
       setEmailEnvioDisponivel(Boolean(envioStatusRes?.data?.email_configurado));
       // NÃO carregar produtos aqui - apenas quando fornecedor for selecionado
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
-      toast.error('Erro ao carregar dados');
+      console.error("Erro ao carregar dados:", error);
+      toast.error("Erro ao carregar dados");
     } finally {
       setLoadingListaPedidos(false);
     }
@@ -662,11 +665,11 @@ const PedidosCompra = () => {
     try {
       const params = new URLSearchParams({ fornecedor_id: fornecedorId });
       if (opcoes.fornecedorGrupoId) {
-        params.set('fornecedor_grupo_id', opcoes.fornecedorGrupoId);
+        params.set("fornecedor_grupo_id", opcoes.fornecedorGrupoId);
       }
 
       const response = await api.get(`/produtos/?${params.toString()}`);
-      
+
       // API pode retornar array direto ou objeto paginado
       let produtosData;
       if (Array.isArray(response.data)) {
@@ -678,27 +681,29 @@ const PedidosCompra = () => {
       } else {
         produtosData = [];
       }
-      
+
       if (produtosData.length === 0) {
-        toast('⚠️ Este fornecedor não possui produtos vinculados. Edite os produtos para vincular ao fornecedor.');
+        toast(
+          "⚠️ Este fornecedor não possui produtos vinculados. Edite os produtos para vincular ao fornecedor.",
+        );
       }
-      
+
       setProdutos(produtosData);
     } catch (error) {
-      console.error('Erro ao carregar produtos:', error);
-      toast.error('Erro ao carregar produtos do fornecedor');
+      console.error("Erro ao carregar produtos:", error);
+      toast.error("Erro ao carregar produtos do fornecedor");
     }
   };
 
   const preencherPreco = (produtoId) => {
-    const produto = produtos.find(p => p.id === parseInt(produtoId));
+    const produto = produtos.find((p) => p.id === parseInt(produtoId));
     if (produto) {
       setProdutoTexto(produto.nome);
       if (produto.preco_custo) {
         setItemForm({
           ...itemForm,
           produto_id: produtoId,
-          preco_unitario: produto.preco_custo.toFixed(2)
+          preco_unitario: produto.preco_custo.toFixed(2),
         });
       } else {
         setItemForm({ ...itemForm, produto_id: produtoId });
@@ -708,31 +713,31 @@ const PedidosCompra = () => {
 
   const adicionarItem = () => {
     if (!itemForm.produto_id || !itemForm.quantidade_pedida || !itemForm.preco_unitario) {
-      toast.error('Preencha todos os campos do item');
+      toast.error("Preencha todos os campos do item");
       return;
     }
 
-    const produto = produtos.find(p => p.id === parseInt(itemForm.produto_id));
+    const produto = produtos.find((p) => p.id === parseInt(itemForm.produto_id));
     const quantidade = parseFloat(itemForm.quantidade_pedida);
     const preco = parseFloat(itemForm.preco_unitario);
     const produtoId = parseInt(itemForm.produto_id);
-    const produtoCodigo = produto?.codigo || produto?.sku || '';
+    const produtoCodigo = produto?.codigo || produto?.sku || "";
 
     // Verificar se produto já existe no pedido
-    const itemExistenteIndex = formData.itens.findIndex(item => item.produto_id === produtoId);
-    
+    const itemExistenteIndex = formData.itens.findIndex((item) => item.produto_id === produtoId);
+
     if (itemExistenteIndex !== -1) {
       // Produto já existe - perguntar ao usuário
       const itemExistente = formData.itens[itemExistenteIndex];
       const confirmar = window.confirm(
         `⚠️ O produto "${produto.nome}" já está no pedido!\n\n` +
-        `Quantidade atual: ${itemExistente.quantidade_pedida}\n` +
-        `Preço atual: R$ ${itemExistente.preco_unitario.toFixed(2)}\n\n` +
-        `Nova quantidade: ${quantidade}\n` +
-        `Novo preço: R$ ${preco.toFixed(2)}\n\n` +
-        `Deseja SOMAR a quantidade ao item existente?\n\n` +
-        `✅ OK = Somar quantidade (${itemExistente.quantidade_pedida} + ${quantidade} = ${itemExistente.quantidade_pedida + quantidade})\n` +
-        `❌ CANCELAR = Não adicionar`
+          `Quantidade atual: ${itemExistente.quantidade_pedida}\n` +
+          `Preço atual: R$ ${itemExistente.preco_unitario.toFixed(2)}\n\n` +
+          `Nova quantidade: ${quantidade}\n` +
+          `Novo preço: R$ ${preco.toFixed(2)}\n\n` +
+          `Deseja SOMAR a quantidade ao item existente?\n\n` +
+          `✅ OK = Somar quantidade (${itemExistente.quantidade_pedida} + ${quantidade} = ${itemExistente.quantidade_pedida + quantidade})\n` +
+          `❌ CANCELAR = Não adicionar`,
       );
 
       if (confirmar) {
@@ -743,21 +748,23 @@ const PedidosCompra = () => {
           produto_codigo: itemExistente.produto_codigo || produtoCodigo,
           quantidade_pedida: itemExistente.quantidade_pedida + quantidade,
           preco_unitario: preco, // Atualiza com o novo preço
-          total: (itemExistente.quantidade_pedida + quantidade) * preco
+          total: (itemExistente.quantidade_pedida + quantidade) * preco,
         };
 
         setFormData({
           ...formData,
-          itens: novosItens
+          itens: novosItens,
         });
 
-        toast.success(`✅ Quantidade somada! Total: ${itemExistente.quantidade_pedida + quantidade}`);
+        toast.success(
+          `✅ Quantidade somada! Total: ${itemExistente.quantidade_pedida + quantidade}`,
+        );
       } else {
-        toast('Adição cancelada');
+        toast("Adição cancelada");
       }
 
       // Limpar form
-      setProdutoTexto('');
+      setProdutoTexto("");
       setMostrarSugestoesProduto(false);
       setItemForm(ITEM_FORM_INICIAL);
       return;
@@ -775,13 +782,13 @@ const PedidosCompra = () => {
           quantidade_pedida: quantidade,
           preco_unitario: preco,
           desconto_item: 0,
-          total: quantidade * preco
-        }
-      ]
+          total: quantidade * preco,
+        },
+      ],
     });
 
     // Limpar apenas os campos do item, mantendo o texto do produto limpo
-    setProdutoTexto('');
+    setProdutoTexto("");
     setMostrarSugestoesProduto(false);
     setItemForm(ITEM_FORM_INICIAL);
   };
@@ -789,7 +796,7 @@ const PedidosCompra = () => {
   const removerItem = (index) => {
     setFormData({
       ...formData,
-      itens: formData.itens.filter((_, i) => i !== index)
+      itens: formData.itens.filter((_, i) => i !== index),
     });
   };
 
@@ -802,7 +809,7 @@ const PedidosCompra = () => {
 
         const proximoItem = {
           ...item,
-          [campo]: numeroSeguro(valor)
+          [campo]: numeroSeguro(valor),
         };
         const quantidade = numeroSeguro(proximoItem.quantidade_pedida);
         const preco = numeroSeguro(proximoItem.preco_unitario);
@@ -813,13 +820,13 @@ const PedidosCompra = () => {
           quantidade_pedida: quantidade,
           preco_unitario: preco,
           desconto_item: desconto,
-          total: (preco - desconto) * quantidade
+          total: (preco - desconto) * quantidade,
         };
       });
 
       return {
         ...prev,
-        itens
+        itens,
       };
     });
   };
@@ -830,30 +837,14 @@ const PedidosCompra = () => {
     }
 
     const produto = produtos.find((produtoAtual) => produtoAtual.id === Number(item?.produto_id));
-    return produto?.codigo || produto?.sku || '';
-  };
-
-  const copiarSkuItemPedido = async (item) => {
-    const sku = obterSkuItemPedido(item);
-
-    if (!sku) {
-      toast.error('SKU não disponível para este item');
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(sku);
-      toast.success(`SKU ${sku} copiado`);
-    } catch (_error) {
-      toast.error('Não foi possível copiar o SKU');
-    }
+    return produto?.codigo || produto?.sku || "";
   };
 
   const copiarSkuSugestao = async (sugestao) => {
-    const sku = sugestao?.produto_sku || sugestao?.sku || sugestao?.codigo || '';
+    const sku = sugestao?.produto_sku || sugestao?.sku || sugestao?.codigo || "";
 
     if (!sku) {
-      toast.error('SKU não disponível para este produto');
+      toast.error("SKU não disponível para este produto");
       return;
     }
 
@@ -861,7 +852,7 @@ const PedidosCompra = () => {
       await navigator.clipboard.writeText(String(sku));
       toast.success(`SKU ${sku} copiado`);
     } catch (_error) {
-      toast.error('Não foi possível copiar o SKU');
+      toast.error("Não foi possível copiar o SKU");
     }
   };
 
@@ -875,7 +866,7 @@ const PedidosCompra = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (formData.itens.length === 0) {
-      toast.error('Adicione pelo menos 1 item ao pedido');
+      toast.error("Adicione pelo menos 1 item ao pedido");
       return;
     }
 
@@ -886,21 +877,23 @@ const PedidosCompra = () => {
         fornecedor_id: parseInt(formData.fornecedor_id),
         valor_frete: parseFloat(formData.valor_frete),
         valor_desconto: parseFloat(formData.valor_desconto),
-        data_prevista_entrega: formData.data_prevista_entrega ? `${formData.data_prevista_entrega}T12:00:00` : null,
+        data_prevista_entrega: formData.data_prevista_entrega
+          ? `${formData.data_prevista_entrega}T12:00:00`
+          : null,
         itens: formData.itens.map((item) => ({
           produto_id: item.produto_id,
           quantidade_pedida: parseFloat(item.quantidade_pedida),
           preco_unitario: parseFloat(item.preco_unitario),
-          desconto_item: parseFloat(item.desconto_item || 0)
-        }))
+          desconto_item: parseFloat(item.desconto_item || 0),
+        })),
       };
-      await api.post('/pedidos-compra/', dadosEnvio);
+      await api.post("/pedidos-compra/", dadosEnvio);
 
-      toast.success('✅ Pedido criado com sucesso!');
+      toast.success("✅ Pedido criado com sucesso!");
       fecharFormularioPedido();
       carregarDados();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao criar pedido');
+      toast.error(error.response?.data?.detail || "Erro ao criar pedido");
     } finally {
       setLoading(false);
     }
@@ -914,11 +907,11 @@ const PedidosCompra = () => {
     setPedidoParaEnviar(pedido.id);
     setDadosEnvio({
       email: emailFornecedor,
-      whatsapp: '',
+      whatsapp: "",
       formatos: {
         pdf: true,
-        excel: false
-      }
+        excel: false,
+      },
     });
     setMostrarModalEnvio(true);
   };
@@ -943,94 +936,94 @@ const PedidosCompra = () => {
     setMostrarModalExportacao(false);
     setPedidoParaExportar(null);
   };
-  
+
   const confirmarEnvioPedido = async () => {
     if (!dadosEnvio.email && !dadosEnvio.whatsapp) {
-      toast.error('Informe um e-mail ou WhatsApp');
+      toast.error("Informe um e-mail ou WhatsApp");
       return;
     }
 
     if (!emailEnvioDisponivel) {
-      toast.error('O servidor ainda não está configurado para enviar e-mails');
+      toast.error("O servidor ainda não está configurado para enviar e-mails");
       return;
     }
-    
+
     if (!dadosEnvio.formatos.pdf && !dadosEnvio.formatos.excel) {
-      toast.error('Selecione pelo menos um formato (PDF ou Excel)');
+      toast.error("Selecione pelo menos um formato (PDF ou Excel)");
       return;
     }
 
     if (normalizarColunasDocumentoPedido(colunasDocumentoPedido).length === 0) {
-      toast.error('Selecione pelo menos uma coluna para o documento');
+      toast.error("Selecione pelo menos uma coluna para o documento");
       return;
     }
 
     try {
-            // Aqui você pode implementar o envio real por e-mail/WhatsApp no futuro
+      // Aqui você pode implementar o envio real por e-mail/WhatsApp no futuro
       // Por enquanto, apenas marca como enviado
       const response = await api.post(`/pedidos-compra/${pedidoParaEnviar}/enviar`, {
         email: dadosEnvio.email,
         whatsapp: dadosEnvio.whatsapp,
         formatos: dadosEnvio.formatos,
-        colunas_exportacao: normalizarColunasDocumentoPedido(colunasDocumentoPedido)
+        colunas_exportacao: normalizarColunasDocumentoPedido(colunasDocumentoPedido),
       });
 
       const tipoEnvio = response?.data?.tipo_envio;
-      if (tipoEnvio === 'email') {
-        toast.success('Pedido enviado por e-mail com sucesso');
-      } else if (tipoEnvio === 'manual') {
-        toast.success('Pedido marcado como enviado manualmente');
+      if (tipoEnvio === "email") {
+        toast.success("Pedido enviado por e-mail com sucesso");
+      } else if (tipoEnvio === "manual") {
+        toast.success("Pedido marcado como enviado manualmente");
       } else {
-        toast.success(response?.data?.message || 'Pedido processado com sucesso');
+        toast.success(response?.data?.message || "Pedido processado com sucesso");
       }
 
       setMostrarModalEnvio(false);
       carregarDados();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao enviar pedido');
+      toast.error(error.response?.data?.detail || "Erro ao enviar pedido");
     }
   };
-  
+
   const marcarComoEnviadoManualmente = async () => {
     try {
-      const response = await api.post(`/pedidos-compra/${pedidoParaEnviar}/enviar`, {
-        envio_manual: true
+      await api.post(`/pedidos-compra/${pedidoParaEnviar}/enviar`, {
+        envio_manual: true,
       });
-      
-      toast.success('✅ Pedido marcado como enviado manualmente!');
+
+      toast.success("✅ Pedido marcado como enviado manualmente!");
       setMostrarModalEnvio(false);
       carregarDados();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao marcar pedido');
+      toast.error(error.response?.data?.detail || "Erro ao marcar pedido");
     }
   };
 
   const confirmarPedido = async (id) => {
     try {
       await api.post(`/pedidos-compra/${id}/confirmar`, {});
-      toast.success('✅ Pedido confirmado!');
+      toast.success("✅ Pedido confirmado!");
       carregarDados();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao confirmar pedido');
+      toast.error(error.response?.data?.detail || "Erro ao confirmar pedido");
     }
   };
 
   const exportarPDF = async (id) => {
     const pedido = pedidos.find((item) => Number(item.id) === Number(id));
     if (!pedido) {
-      toast.error('Pedido nao encontrado para exportacao');
+      toast.error("Pedido nao encontrado para exportacao");
       return;
     }
-    abrirModalExportacao(pedido, 'pdf');
+    abrirModalExportacao(pedido, "pdf");
   };
 
   const exportarExcel = async (id) => {
     const pedido = pedidos.find((item) => Number(item.id) === Number(id));
     if (!pedido) {
-      toast.error('Pedido nao encontrado para exportacao');
+      toast.error("Pedido nao encontrado para exportacao");
       return;
     }
-    abrirModalExportacao(pedido, 'excel');
+    abrirModalExportacao(pedido, "excel");
   };
 
   const confirmarExportacaoPedido = async () => {
@@ -1040,33 +1033,27 @@ const PedidosCompra = () => {
 
     const colunasNormalizadas = normalizarColunasDocumentoPedido(colunasDocumentoPedido);
     if (colunasNormalizadas.length === 0) {
-      toast.error('Selecione pelo menos uma coluna para o documento');
+      toast.error("Selecione pelo menos uma coluna para o documento");
       return;
     }
 
     const { id, formato } = pedidoParaExportar;
-    const rota = formato === 'pdf'
-      ? `/pedidos-compra/${id}/export/pdf`
-      : `/pedidos-compra/${id}/export/excel`;
-    const fallback = formato === 'pdf'
-      ? `pedido_${id}.pdf`
-      : `pedido_${id}.xlsx`;
+    const rota =
+      formato === "pdf" ? `/pedidos-compra/${id}/export/pdf` : `/pedidos-compra/${id}/export/excel`;
+    const fallback = formato === "pdf" ? `pedido_${id}.pdf` : `pedido_${id}.xlsx`;
 
     setExportandoArquivo(true);
     try {
-      const response = await api.get(
-        rota,
-        {
-          params: {
-            colunas: colunasNormalizadas.join(','),
-          },
-          responseType: 'blob'
-        }
-      );
+      const response = await api.get(rota, {
+        params: {
+          colunas: colunasNormalizadas.join(","),
+        },
+        responseType: "blob",
+      });
       baixarArquivoResposta(response, fallback);
       toast.success(`${formato.toUpperCase()} exportado com sucesso!`);
       fecharModalExportacao();
-    } catch (error) {
+    } catch {
       toast.error(`Erro ao exportar ${formato.toUpperCase()}`);
     } finally {
       setExportandoArquivo(false);
@@ -1078,39 +1065,38 @@ const PedidosCompra = () => {
       const response = await api.get(`/pedidos-compra/${pedido.id}`);
       setPedidoSelecionado(response.data);
       setMostrarRecebimento(true);
-    } catch (error) {
-      toast.error('Erro ao carregar detalhes do pedido');
+    } catch {
+      toast.error("Erro ao carregar detalhes do pedido");
     }
   };
 
   const reverterStatus = async (id) => {
-    if (!confirm('⚠️ Deseja reverter o status deste pedido para a etapa anterior?')) {
+    if (!confirm("⚠️ Deseja reverter o status deste pedido para a etapa anterior?")) {
       return;
     }
     try {
-      const response = await api.post(
-        `/pedidos-compra/${id}/reverter`,
-        {}
+      const response = await api.post(`/pedidos-compra/${id}/reverter`, {});
+      toast.success(
+        `⏪ Status revertido: ${response.data.status_anterior} → ${response.data.status_atual}`,
       );
-      toast.success(`⏪ Status revertido: ${response.data.status_anterior} → ${response.data.status_atual}`);
       carregarDados();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao reverter status');
+      toast.error(error.response?.data?.detail || "Erro ao reverter status");
     }
   };
 
   const cancelarPedido = async (pedido) => {
-    const acao = pedido.status === 'rascunho' ? 'cancelar/excluir' : 'cancelar';
+    const acao = pedido.status === "rascunho" ? "cancelar/excluir" : "cancelar";
     const motivo = window.prompt(
       `Informe o motivo para ${acao} o pedido ${pedido.numero_pedido}:`,
-      'Cancelado pelo usuário',
+      "Cancelado pelo usuário",
     );
 
     if (!motivo) return;
 
     const motivoLimpo = motivo.trim();
     if (motivoLimpo.length < 10) {
-      toast.error('Informe um motivo com pelo menos 10 caracteres');
+      toast.error("Informe um motivo com pelo menos 10 caracteres");
       return;
     }
 
@@ -1118,102 +1104,67 @@ const PedidosCompra = () => {
       await api.post(`/pedidos-compra/${pedido.id}/cancelar`, null, {
         params: { motivo: motivoLimpo },
       });
-      toast.success('✅ Pedido cancelado com sucesso');
+      toast.success("✅ Pedido cancelado com sucesso");
       carregarDados();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao cancelar pedido');
+      toast.error(error.response?.data?.detail || "Erro ao cancelar pedido");
     }
   };
 
   const abrirEdicao = async (pedido) => {
-    if (pedido.status !== 'rascunho') {
-      toast.error('⚠️ Apenas pedidos em rascunho podem ser editados');
+    if (pedido.status !== "rascunho") {
+      toast.error("⚠️ Apenas pedidos em rascunho podem ser editados");
       return;
     }
 
     try {
       const response = await api.get(`/pedidos-compra/${pedido.id}`);
-      
+
       const pedidoCompleto = response.data;
       await aplicarPedidoNoFormulario(pedidoCompleto, null, {
         mostrarToast: true,
-        mensagemSucesso: 'Modo de edição ativado',
+        mensagemSucesso: "Modo de edição ativado",
       });
       return;
-      
-      setModoEdicao(true);
-      setPedidoEditando(pedidoCompleto);
-      setFormData({
-        fornecedor_id: pedidoCompleto.fornecedor_id?.toString() || '',
-        data_prevista_entrega: pedidoCompleto.data_prevista_entrega 
-          ? new Date(pedidoCompleto.data_prevista_entrega).toISOString().split('T')[0] 
-          : '',
-        valor_frete: pedidoCompleto.valor_frete?.toString() || '0',
-        valor_desconto: pedidoCompleto.valor_desconto?.toString() || '0',
-        observacoes: pedidoCompleto.observacoes || '',
-        itens: pedidoCompleto.itens.map(item => ({
-          produto_id: item.produto_id,
-          produto_nome: item.produto_nome || `Produto ${item.produto_id}`,
-          quantidade_pedida: item.quantidade_pedida,
-          preco_unitario: item.preco_unitario,
-          desconto_item: item.desconto_item || 0,
-          total: (item.quantidade_pedida * item.preco_unitario) - (item.desconto_item || 0)
-        }))
-      });
-      
-      // Carregar produtos do fornecedor
-      if (pedidoCompleto.fornecedor_id) {
-        const fornecedorSelecionado = fornecedores.find(
-          (f) => f.id === pedidoCompleto.fornecedor_id,
-        );
-        setFornecedorTexto(fornecedorSelecionado?.nome || '');
-        carregarProdutosFornecedor(pedidoCompleto.fornecedor_id);
-      }
-      
-      setMostrarForm(true);
-      toast.success('📝 Modo de edição ativado');
-    } catch (error) {
-      toast.error('Erro ao carregar pedido para edição');
+    } catch {
+      toast.error("Erro ao carregar pedido para edição");
     }
   };
 
   const editarPedido = async (e) => {
     e.preventDefault();
-    
+
     if (formData.itens.length === 0) {
-      toast.error('⚠️ Adicione pelo menos um item ao pedido');
+      toast.error("⚠️ Adicione pelo menos um item ao pedido");
       return;
     }
 
     try {
       setLoading(true);
-      
+
       const dadosEnvio = {
         ...formData,
         fornecedor_id: parseInt(formData.fornecedor_id),
         valor_frete: parseFloat(formData.valor_frete),
         valor_desconto: parseFloat(formData.valor_desconto),
-        data_prevista_entrega: formData.data_prevista_entrega 
-          ? `${formData.data_prevista_entrega}T12:00:00` 
+        data_prevista_entrega: formData.data_prevista_entrega
+          ? `${formData.data_prevista_entrega}T12:00:00`
           : null,
-        itens: formData.itens.map(item => ({
+        itens: formData.itens.map((item) => ({
           produto_id: item.produto_id,
           quantidade_pedida: parseFloat(item.quantidade_pedida),
           preco_unitario: parseFloat(item.preco_unitario),
-          desconto_item: parseFloat(item.desconto_item || 0)
-        }))
+          desconto_item: parseFloat(item.desconto_item || 0),
+        })),
       };
 
-      await api.put(
-        `/pedidos-compra/${pedidoEditando.id}`, 
-        dadosEnvio
-      );
+      await api.put(`/pedidos-compra/${pedidoEditando.id}`, dadosEnvio);
 
-      toast.success('✏️ Pedido atualizado com sucesso!');
+      toast.success("✏️ Pedido atualizado com sucesso!");
       fecharFormularioPedido();
       carregarDados();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao atualizar pedido');
+      toast.error(error.response?.data?.detail || "Erro ao atualizar pedido");
     } finally {
       setLoading(false);
     }
@@ -1224,8 +1175,8 @@ const PedidosCompra = () => {
       const response = await api.get(`/pedidos-compra/${pedido.id}`);
       setPedidoSelecionado(response.data);
       setMostrarRecebimento(true);
-    } catch (error) {
-      toast.error('Erro ao carregar detalhes do pedido');
+    } catch {
+      toast.error("Erro ao carregar detalhes do pedido");
     }
   };
 
@@ -1234,23 +1185,22 @@ const PedidosCompra = () => {
       const response = await api.get(`/pedidos-compra/${pedido.id}`);
       setPedidoConfronto(response.data);
       setMostrarConfronto(true);
-    } catch (error) {
-      toast.error('Erro ao carregar detalhes do pedido');
+    } catch {
+      toast.error("Erro ao carregar detalhes do pedido");
     }
   };
 
   const receberPedido = async (itensRecebimento) => {
     try {
-      await api.post(
-        `/pedidos-compra/${pedidoSelecionado.id}/receber`,
-        { itens: itensRecebimento }
-      );
-      toast.success('✅ Recebimento processado com sucesso!');
+      await api.post(`/pedidos-compra/${pedidoSelecionado.id}/receber`, {
+        itens: itensRecebimento,
+      });
+      toast.success("✅ Recebimento processado com sucesso!");
       setMostrarRecebimento(false);
       setPedidoSelecionado(null);
       carregarDados();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao processar recebimento');
+      toast.error(error.response?.data?.detail || "Erro ao processar recebimento");
     }
   };
 
@@ -1272,7 +1222,7 @@ const PedidosCompra = () => {
           }}
           className="inline-flex items-center gap-2 border border-blue-200 bg-blue-50 text-blue-700 px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-100 transition-colors"
         >
-          {mostrarForm ? '❌ Cancelar' : '➕ Novo Pedido'}
+          {mostrarForm ? "❌ Cancelar" : "➕ Novo Pedido"}
         </button>
       </div>
 

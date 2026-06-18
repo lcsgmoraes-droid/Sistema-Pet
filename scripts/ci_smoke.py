@@ -63,17 +63,47 @@ def install_sqlite_type_support() -> None:
 
 def assert_route_exists(app: Any, path: str, method: str) -> None:
     expected_method = method.upper()
-    for route in app.routes:
-        if getattr(route, "path", None) == path and expected_method in getattr(route, "methods", set()):
+    for route_path, route_methods in _iter_registered_routes(app.routes):
+        if route_path == path and expected_method in route_methods:
             return
     raise AssertionError(f"Rota obrigatoria ausente: {expected_method} {path}")
+
+
+def _join_route_paths(prefix: str, path: str) -> str:
+    if not prefix:
+        return path
+    if not path:
+        return prefix
+    return f"{prefix.rstrip('/')}/{path.lstrip('/')}"
+
+
+def _iter_registered_routes(routes: Any, prefix: str = ""):
+    for route in routes:
+        route_path = getattr(route, "path", None)
+        route_methods = getattr(route, "methods", None)
+        if route_path is not None and route_methods is not None:
+            yield _join_route_paths(prefix, route_path), route_methods
+
+        original_router = getattr(route, "original_router", None)
+        nested_routes = getattr(original_router, "routes", None)
+        if nested_routes is None:
+            continue
+
+        include_context = getattr(route, "include_context", None)
+        nested_prefix = getattr(include_context, "prefix", "")
+        yield from _iter_registered_routes(
+            nested_routes,
+            _join_route_paths(prefix, nested_prefix),
+        )
 
 
 def configure_backend_smoke_env() -> None:
     os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
     os.environ.setdefault("ENVIRONMENT", "testing")
     os.environ.setdefault("DEBUG", "false")
-    os.environ.setdefault("JWT_SECRET_KEY", "ci-smoke-secret-key-with-more-than-32-characters")
+    os.environ.setdefault(
+        "JWT_SECRET_KEY", "ci-smoke-secret-key-with-more-than-32-characters"
+    )
     os.environ.setdefault("EMAIL_VERIFICATION_REQUIRED", "false")
     os.environ.setdefault("BLING_SYNC_SCHEDULER_ENABLED", "false")
     os.environ.setdefault("SEFAZ_IMPORTACAO_AUTOMATICA", "false")
@@ -179,7 +209,9 @@ def run_backend_smoke() -> None:
 
     run_audit_request_id_smoke()
 
-    print("Backend smoke OK: /health, /auth/login-multitenant e auditoria com request_id")
+    print(
+        "Backend smoke OK: /health, /auth/login-multitenant e auditoria com request_id"
+    )
 
 
 def main() -> int:

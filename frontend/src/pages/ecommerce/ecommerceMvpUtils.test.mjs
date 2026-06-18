@@ -73,19 +73,26 @@ test("filterCatalogProducts filtra por busca, categoria, estoque e imagem", () =
       somenteComEstoque: true,
       somenteComImagem: true,
     }).map((product) => product.id),
-    [3]
+    [3],
   );
 });
 
 test("filterCatalogProducts ordena por prontidao e por preco", () => {
-  assert.deepEqual(filterCatalogProducts(products).map((product) => product.id), [1, 3, 2]);
   assert.deepEqual(
-    filterCatalogProducts(products, { ordenacaoCatalogo: "menor_preco" }).map((product) => product.id),
-    [2, 3, 1]
+    filterCatalogProducts(products).map((product) => product.id),
+    [1, 3, 2],
   );
   assert.deepEqual(
-    filterCatalogProducts(products, { ordenacaoCatalogo: "maior_preco" }).map((product) => product.id),
-    [1, 3, 2]
+    filterCatalogProducts(products, { ordenacaoCatalogo: "menor_preco" }).map(
+      (product) => product.id,
+    ),
+    [2, 3, 1],
+  );
+  assert.deepEqual(
+    filterCatalogProducts(products, { ordenacaoCatalogo: "maior_preco" }).map(
+      (product) => product.id,
+    ),
+    [1, 3, 2],
   );
 });
 
@@ -109,9 +116,15 @@ test("buildCatalogCategoryOptions usa categorias da API com nomes limpos", () =>
     }),
     [
       { id: "todas", value: "todas", label: "Todas as categorias", total: 8 },
-      { id: "10", value: "10", label: "Areia Higi\u00eanicas", rawLabel: "Gatos>>Higiene>>Areia Higi\u00eanicas", total: 3 },
+      {
+        id: "10",
+        value: "10",
+        label: "Areia Higi\u00eanicas",
+        rawLabel: "Gatos>>Higiene>>Areia Higi\u00eanicas",
+        total: 3,
+      },
       { id: "11", value: "11", label: "Ra\u00e7\u00f5es", rawLabel: "Ra\u00e7\u00f5es", total: 5 },
-    ]
+    ],
   );
 });
 
@@ -134,9 +147,12 @@ test("buildCatalogQueryParams combina busca categoria ordenacao e paginacao", ()
       offset: 48,
       limit: 24,
       canal: "ecommerce",
-    }
+    },
   );
-  assert.equal(buildCatalogQueryParams({ tenant: "atacadao", order: "relevancia" }).ordenacao, "prontos");
+  assert.equal(
+    buildCatalogQueryParams({ tenant: "atacadao", order: "relevancia" }).ordenacao,
+    "prontos",
+  );
 });
 
 test("normalizeCatalogPayload padroniza itens, total e limite", () => {
@@ -172,9 +188,12 @@ test("isCustomerProfileComplete exige nome completo, telefone, cpf e endereco", 
       cpf: "123.456.789-00",
       endereco: "Rua A",
     }),
-    true
+    true,
   );
-  assert.equal(isCustomerProfileComplete({ nome: "Maria", telefone: "18", cpf: "1", endereco: "" }), false);
+  assert.equal(
+    isCustomerProfileComplete({ nome: "Maria", telefone: "18", cpf: "1", endereco: "" }),
+    false,
+  );
 });
 
 test("buildProductMap indexa produtos por id", () => {
@@ -184,8 +203,14 @@ test("buildProductMap indexa produtos por id", () => {
 });
 
 test("resolveStoreDisplayName usa nome valido, slug ou fallback", () => {
-  assert.equal(resolveStoreDisplayName({ tenantContext: { name: "Pet Feliz" }, storefrontRef: "loja-teste" }), "Pet Feliz");
-  assert.equal(resolveStoreDisplayName({ tenantContext: { name: "Nome ??" }, storefrontRef: "pet-feliz" }), "Pet Feliz");
+  assert.equal(
+    resolveStoreDisplayName({ tenantContext: { name: "Pet Feliz" }, storefrontRef: "loja-teste" }),
+    "Pet Feliz",
+  );
+  assert.equal(
+    resolveStoreDisplayName({ tenantContext: { name: "Nome ??" }, storefrontRef: "pet-feliz" }),
+    "Pet Feliz",
+  );
   assert.equal(resolveStoreDisplayName({ tenantContext: {}, storefrontRef: "" }), "Loja online");
 });
 

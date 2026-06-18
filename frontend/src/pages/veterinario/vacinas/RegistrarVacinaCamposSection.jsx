@@ -16,7 +16,10 @@ export default function RegistrarVacinaCamposSection({ form, onSetCampo, veterin
       </div>
 
       <div>
-        <label htmlFor="vacinas-fabricante" className="block text-xs font-medium text-gray-600 mb-1">
+        <label
+          htmlFor="vacinas-fabricante"
+          className="block text-xs font-medium text-gray-600 mb-1"
+        >
           Fabricante
         </label>
         <input
@@ -42,7 +45,10 @@ export default function RegistrarVacinaCamposSection({ form, onSetCampo, veterin
       </div>
 
       <div>
-        <label htmlFor="vacinas-data-aplicacao" className="block text-xs font-medium text-gray-600 mb-1">
+        <label
+          htmlFor="vacinas-data-aplicacao"
+          className="block text-xs font-medium text-gray-600 mb-1"
+        >
           Data de aplicacao *
         </label>
         <input
@@ -55,7 +61,10 @@ export default function RegistrarVacinaCamposSection({ form, onSetCampo, veterin
       </div>
 
       <div>
-        <label htmlFor="vacinas-proxima-dose" className="block text-xs font-medium text-gray-600 mb-1">
+        <label
+          htmlFor="vacinas-proxima-dose"
+          className="block text-xs font-medium text-gray-600 mb-1"
+        >
           Proxima dose
         </label>
         <input
@@ -68,7 +77,10 @@ export default function RegistrarVacinaCamposSection({ form, onSetCampo, veterin
       </div>
 
       <div className="col-span-2">
-        <label htmlFor="vacinas-veterinario" className="block text-xs font-medium text-gray-600 mb-1">
+        <label
+          htmlFor="vacinas-veterinario"
+          className="block text-xs font-medium text-gray-600 mb-1"
+        >
           Veterinario responsavel
         </label>
         <select
@@ -88,7 +100,10 @@ export default function RegistrarVacinaCamposSection({ form, onSetCampo, veterin
       </div>
 
       <div className="col-span-2">
-        <label htmlFor="vacinas-observacoes" className="block text-xs font-medium text-gray-600 mb-1">
+        <label
+          htmlFor="vacinas-observacoes"
+          className="block text-xs font-medium text-gray-600 mb-1"
+        >
           Observacoes
         </label>
         <textarea

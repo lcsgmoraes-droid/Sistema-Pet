@@ -1,19 +1,19 @@
 /**
  * SPRINT 6 - PASSO 1/5: COMISSÕES EM ABERTO
- * 
+ *
  * Tela inicial do fluxo de fechamento de comissões.
  * Lista funcionários com comissões pendentes e resumo financeiro.
- * 
+ *
  * Criado em: 22/01/2026
  */
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../../api';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../../api";
 
 const ComissoesAbertas = () => {
   const navigate = useNavigate();
-  
+
   // Estados
   const [funcionarios, setFuncionarios] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,17 +28,17 @@ const ComissoesAbertas = () => {
     try {
       setLoading(true);
       setErro(null);
-      
-      const response = await api.get('/comissoes/abertas');
-      
+
+      const response = await api.get("/comissoes/abertas");
+
       if (response.data.success) {
         setFuncionarios(response.data.funcionarios || []);
       } else {
-        setErro('Erro ao carregar comissões em aberto');
+        setErro("Erro ao carregar comissões em aberto");
       }
     } catch (error) {
-      console.error('Erro ao carregar comissões abertas:', error);
-      setErro(error.response?.data?.detail || 'Erro ao carregar comissões em aberto');
+      console.error("Erro ao carregar comissões abertas:", error);
+      setErro(error.response?.data?.detail || "Erro ao carregar comissões em aberto");
     } finally {
       setLoading(false);
     }
@@ -49,16 +49,16 @@ const ComissoesAbertas = () => {
   };
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(valor);
   };
 
   const formatarData = (data) => {
-    if (!data) return '-';
-    const dataObj = new Date(data + 'T00:00:00');
-    return dataObj.toLocaleDateString('pt-BR');
+    if (!data) return "-";
+    const dataObj = new Date(data + "T00:00:00");
+    return dataObj.toLocaleDateString("pt-BR");
   };
 
   // Loading
@@ -81,8 +81,18 @@ const ComissoesAbertas = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
           <div className="flex items-center">
-            <svg className="h-6 w-6 text-red-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="h-6 w-6 text-red-500 mr-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             <div>
               <h3 className="text-red-800 font-medium">Erro ao carregar dados</h3>
@@ -106,14 +116,22 @@ const ComissoesAbertas = () => {
       <div className="container mx-auto px-4 py-8">
         <div className="bg-white shadow-md rounded-lg p-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-6">Comissões em Aberto</h1>
-          
+
           <div className="bg-green-50 border border-green-200 rounded-lg p-8 text-center">
-            <svg className="h-16 w-16 text-green-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="h-16 w-16 text-green-500 mx-auto mb-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
-            <h3 className="text-xl font-semibold text-green-800 mb-2">
-              Nenhuma comissão pendente
-            </h3>
+            <h3 className="text-xl font-semibold text-green-800 mb-2">Nenhuma comissão pendente</h3>
             <p className="text-green-600">
               Não há funcionários com comissões em aberto no momento.
             </p>
@@ -131,16 +149,19 @@ const ComissoesAbertas = () => {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Comissões em Aberto</h1>
-            <p className="text-gray-600">
-              Funcionários com comissões pendentes de pagamento
-            </p>
+            <p className="text-gray-600">Funcionários com comissões pendentes de pagamento</p>
           </div>
           <button
-            onClick={() => navigate('/comissoes/fechamentos')}
+            onClick={() => navigate("/comissoes/fechamentos")}
             className="inline-flex items-center px-4 py-2 border border-purple-300 rounded-md shadow-sm text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
           >
             <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
             Ver Histórico
           </button>
@@ -156,9 +177,7 @@ const ComissoesAbertas = () => {
             <div>
               <p className="text-sm text-blue-600 font-medium">Total Pendente</p>
               <p className="text-2xl font-bold text-blue-800">
-                {formatarMoeda(
-                  funcionarios.reduce((acc, f) => acc + f.total_pendente, 0)
-                )}
+                {formatarMoeda(funcionarios.reduce((acc, f) => acc + f.total_pendente, 0))}
               </p>
             </div>
             <div>
@@ -230,8 +249,18 @@ const ComissoesAbertas = () => {
                       onClick={() => handleConferir(funcionario.funcionario_id)}
                       className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                     >
-                      <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      <svg
+                        className="h-4 w-4 mr-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M9 5l7 7-7 7"
+                        />
                       </svg>
                       Conferir
                     </button>

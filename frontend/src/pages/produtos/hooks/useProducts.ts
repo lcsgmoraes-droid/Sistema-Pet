@@ -3,10 +3,10 @@
  * Sistema ERP Pet Shop
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import api from '../../../api';
-import toast from 'react-hot-toast';
-import type { Product, ProductFilters, ProductListResponse } from '../types';
+import { useState, useEffect, useCallback } from "react";
+import api from "../../../api";
+import toast from "react-hot-toast";
+import type { Product, ProductFilters, ProductListResponse } from "../types";
 
 interface UseProductsReturn {
   products: Product[];
@@ -31,30 +31,30 @@ export const useProducts = (): UseProductsReturn => {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [filters, setFilters] = useState<ProductFilters>({
-    busca: '',
-    status: ''
+    busca: "",
+    status: "",
   });
 
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Construir query params
       const params: any = {
         pagina: currentPage,
-        limite: 20
+        limite: 20,
       };
-      
+
       if (filters.busca) {
         params.busca = filters.busca;
       }
-      
+
       if (filters.status) {
         params.status = filters.status;
       }
 
-      const response = await api.get<ProductListResponse>('/produtos', { params });
+      const response = await api.get<ProductListResponse>("/produtos", { params });
 
       // Normalizar resposta da API
       let productData: Product[] = [];
@@ -78,10 +78,10 @@ export const useProducts = (): UseProductsReturn => {
       setTotal(totalItems);
       setTotalPages(totalPgs);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Erro ao carregar produtos';
+      const errorMessage = err.response?.data?.detail || "Erro ao carregar produtos";
       setError(errorMessage);
       toast.error(errorMessage);
-      console.error('Erro ao carregar produtos:', err);
+      console.error("Erro ao carregar produtos:", err);
     } finally {
       setLoading(false);
     }
@@ -94,11 +94,11 @@ export const useProducts = (): UseProductsReturn => {
   const deleteProduct = async (id: number) => {
     try {
       await api.delete(`/produtos/${id}`);
-      
-      toast.success('Produto excluído com sucesso');
+
+      toast.success("Produto excluído com sucesso");
       fetchProducts();
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Erro ao excluir produto';
+      const errorMessage = err.response?.data?.detail || "Erro ao excluir produto";
       toast.error(errorMessage);
       throw err;
     }
@@ -106,14 +106,14 @@ export const useProducts = (): UseProductsReturn => {
 
   const toggleProductStatus = async (id: number, currentStatus: string) => {
     try {
-      const newStatus = currentStatus === 'ativo' ? 'inativo' : 'ativo';
-      
+      const newStatus = currentStatus === "ativo" ? "inativo" : "ativo";
+
       await api.patch(`/produtos/${id}`, { status: newStatus });
-      
-      toast.success(`Produto ${newStatus === 'ativo' ? 'ativado' : 'inativado'} com sucesso`);
+
+      toast.success(`Produto ${newStatus === "ativo" ? "ativado" : "inativado"} com sucesso`);
       fetchProducts();
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Erro ao atualizar status';
+      const errorMessage = err.response?.data?.detail || "Erro ao atualizar status";
       toast.error(errorMessage);
       throw err;
     }
@@ -131,6 +131,6 @@ export const useProducts = (): UseProductsReturn => {
     setCurrentPage,
     refetch: fetchProducts,
     deleteProduct,
-    toggleProductStatus
+    toggleProductStatus,
   };
 };

@@ -82,8 +82,7 @@ export default function CampanhasValidadeTab() {
     } catch (error) {
       console.error("Erro ao salvar campanha de validade:", error);
       toast.error(
-        error?.response?.data?.detail ||
-          "Nao foi possivel salvar a campanha de validade.",
+        error?.response?.data?.detail || "Nao foi possivel salvar a campanha de validade.",
       );
     } finally {
       setSalvando(false);
@@ -99,9 +98,9 @@ export default function CampanhasValidadeTab() {
               Campanha automatica por validade
             </h2>
             <p className="mt-2 text-sm text-gray-600">
-              Todo lote dentro da janela entra sozinho na oferta de app/site,
-              com limite pela quantidade do proprio lote. Se pausar a campanha,
-              remover a validade ou zerar o lote, o item sai automaticamente.
+              Todo lote dentro da janela entra sozinho na oferta de app/site, com limite pela
+              quantidade do proprio lote. Se pausar a campanha, remover a validade ou zerar o lote,
+              o item sai automaticamente.
             </p>
           </div>
 
@@ -144,12 +143,11 @@ export default function CampanhasValidadeTab() {
         />
         <CardResumo
           titulo="Canais"
-          valor={[
-            form.aplicar_app ? "App" : null,
-            form.aplicar_ecommerce ? "Site" : null,
-          ]
-            .filter(Boolean)
-            .join(" + ") || "Nenhum"}
+          valor={
+            [form.aplicar_app ? "App" : null, form.aplicar_ecommerce ? "Site" : null]
+              .filter(Boolean)
+              .join(" + ") || "Nenhum"
+          }
           descricao="A campanha so publica desconto nos canais marcados."
         />
         <CardResumo
@@ -176,9 +174,7 @@ export default function CampanhasValidadeTab() {
                 <input
                   type="checkbox"
                   checked={Boolean(form.aplicar_app)}
-                  onChange={(event) =>
-                    atualizarCampo("aplicar_app", event.target.checked)
-                  }
+                  onChange={(event) => atualizarCampo("aplicar_app", event.target.checked)}
                   className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                 />
                 Aplicar no app
@@ -187,9 +183,7 @@ export default function CampanhasValidadeTab() {
                 <input
                   type="checkbox"
                   checked={Boolean(form.aplicar_ecommerce)}
-                  onChange={(event) =>
-                    atualizarCampo("aplicar_ecommerce", event.target.checked)
-                  }
+                  onChange={(event) => atualizarCampo("aplicar_ecommerce", event.target.checked)}
                   className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                 />
                 Aplicar no site
@@ -213,9 +207,7 @@ export default function CampanhasValidadeTab() {
                       max="95"
                       step="0.1"
                       value={form[campo]}
-                      onChange={(event) =>
-                        atualizarCampo(campo, event.target.value)
-                      }
+                      onChange={(event) => atualizarCampo(campo, event.target.value)}
                       className="w-full border-0 p-0 text-sm focus:outline-none focus:ring-0"
                     />
                     <span className="text-sm text-gray-500">%</span>
@@ -227,30 +219,22 @@ export default function CampanhasValidadeTab() {
 
           <div className="space-y-4">
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-gray-700">
-                Rotulo publico
-              </span>
+              <span className="mb-1 block text-sm font-medium text-gray-700">Rotulo publico</span>
               <input
                 type="text"
                 value={form.rotulo_publico || ""}
-                onChange={(event) =>
-                  atualizarCampo("rotulo_publico", event.target.value)
-                }
+                onChange={(event) => atualizarCampo("rotulo_publico", event.target.value)}
                 className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                 placeholder="Ex.: Validade proxima"
               />
             </label>
 
             <label className="block">
-              <span className="mb-1 block text-sm font-medium text-gray-700">
-                Mensagem publica
-              </span>
+              <span className="mb-1 block text-sm font-medium text-gray-700">Mensagem publica</span>
               <textarea
                 rows={4}
                 value={form.mensagem_publica || ""}
-                onChange={(event) =>
-                  atualizarCampo("mensagem_publica", event.target.value)
-                }
+                onChange={(event) => atualizarCampo("mensagem_publica", event.target.value)}
                 className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-100"
                 placeholder="Mensagem curta para app/site."
               />

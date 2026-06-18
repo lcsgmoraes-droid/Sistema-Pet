@@ -134,7 +134,9 @@ function catalogBadge(catalog) {
 
 function Badge({ children, className = "" }) {
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${className}`}>
+    <span
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${className}`}
+    >
       {children}
     </span>
   );
@@ -173,7 +175,13 @@ function TabButton({ tab, active, badge, onClick }) {
     >
       <span>{tab.label}</span>
       {badge ? (
-        <span className={active ? "rounded-full bg-white/20 px-2 py-0.5 text-xs" : "rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"}>
+        <span
+          className={
+            active
+              ? "rounded-full bg-white/20 px-2 py-0.5 text-xs"
+              : "rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"
+          }
+        >
           {badge}
         </span>
       ) : null}
@@ -185,7 +193,9 @@ function TabsNav({ activeTab, summaries, onChange }) {
   const badges = {
     tenants: `${formatNumber(summaries.tenants.active)}/${formatNumber(summaries.tenants.total)}`,
     catalog: summaries.catalog.pending ? `${formatNumber(summaries.catalog.pending)} pend.` : "ok",
-    billing: summaries.billing.attention ? `${formatNumber(summaries.billing.attention)} atencao` : "ok",
+    billing: summaries.billing.attention
+      ? `${formatNumber(summaries.billing.attention)} atencao`
+      : "ok",
     usage: summaries.usage.imageStorage,
   };
 
@@ -216,7 +226,10 @@ function ImportSummary({ title, values }) {
       ) : (
         <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-700">
           {entries.map(([key, value]) => (
-            <div key={key} className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1.5">
+            <div
+              key={key}
+              className="flex items-center justify-between gap-2 rounded-md bg-white px-2 py-1.5"
+            >
               <span className="truncate">{key}</span>
               <b>{formatNumber(value)}</b>
             </div>
@@ -248,7 +261,8 @@ function ImportResultPanel({ tenant, preview, applyResult, actionError }) {
             Catalogo base
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            {tenant.name} recebe uma copia separada da loja base, com estoque e precos operacionais zerados.
+            {tenant.name} recebe uma copia separada da loja base, com estoque e precos operacionais
+            zerados.
           </p>
         </div>
         <Badge className={catalogBadge(tenant.base_catalog)}>
@@ -263,11 +277,15 @@ function ImportResultPanel({ tenant, preview, applyResult, actionError }) {
           <div className="mt-1 font-mono text-xs text-slate-500">{tenant.id}</div>
         </div>
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-          <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Usuario principal</div>
+          <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            Usuario principal
+          </div>
           <div className="mt-1 truncate text-sm font-semibold text-slate-900">
             {tenant.principal_user?.nome || tenant.principal_user?.email || "-"}
           </div>
-          <div className="mt-1 truncate text-xs text-slate-500">{tenant.principal_user?.email || "-"}</div>
+          <div className="mt-1 truncate text-xs text-slate-500">
+            {tenant.principal_user?.email || "-"}
+          </div>
         </div>
       </div>
 
@@ -279,24 +297,36 @@ function ImportResultPanel({ tenant, preview, applyResult, actionError }) {
 
       {!result ? (
         <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-3 text-sm text-blue-800">
-          Rode uma simulacao para conferir quantos departamentos, categorias, marcas, produtos e imagens seriam criados.
+          Rode uma simulacao para conferir quantos departamentos, categorias, marcas, produtos e
+          imagens seriam criados.
         </div>
       ) : (
         <div className="mt-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
             <div>
-              <div className="text-xs font-bold uppercase tracking-wide text-slate-500">{source}</div>
+              <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                {source}
+              </div>
               <div className="mt-1 text-sm font-semibold text-slate-900">
                 {result.ok ? "Sem erro retornado" : "Importacao com pendencias"}
               </div>
             </div>
-            <Badge className={result.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-rose-200 bg-rose-50 text-rose-700"}>
+            <Badge
+              className={
+                result.ok
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-rose-200 bg-rose-50 text-rose-700"
+              }
+            >
               {result.dry_run ? "simulacao" : "aplicado"}
             </Badge>
           </div>
 
           <div className="grid gap-3">
-            <ImportSummary title={result.dry_run ? "Seriam criados" : "Criados"} values={result.dry_run ? result.would_create : result.created} />
+            <ImportSummary
+              title={result.dry_run ? "Seriam criados" : "Criados"}
+              values={result.dry_run ? result.would_create : result.created}
+            />
             <ImportSummary title="Ignorados por ja existirem" values={result.skipped} />
           </div>
 
@@ -338,7 +368,11 @@ function TenantRow({
   return (
     <tr className={selected ? "bg-blue-50" : "bg-white hover:bg-slate-50"}>
       <td className="w-[28%] px-4 py-3 align-top">
-        <button type="button" onClick={() => onSelect(tenant.id)} className="block min-w-0 text-left">
+        <button
+          type="button"
+          onClick={() => onSelect(tenant.id)}
+          className="block min-w-0 text-left"
+        >
           <div className="truncate text-sm font-bold text-slate-900" title={tenant.name}>
             {tenant.name}
           </div>
@@ -350,15 +384,23 @@ function TenantRow({
       </td>
       <td className="px-4 py-3 align-top">
         <div className="flex flex-wrap gap-2">
-          <Badge className="border-blue-200 bg-blue-50 text-blue-700">{tenant.plan || "free"}</Badge>
-          <Badge className={billingBadge(tenant.billing_status)}>{tenant.billing_status || "active"}</Badge>
+          <Badge className="border-blue-200 bg-blue-50 text-blue-700">
+            {tenant.plan || "free"}
+          </Badge>
+          <Badge className={billingBadge(tenant.billing_status)}>
+            {tenant.billing_status || "active"}
+          </Badge>
         </div>
         <div className="mt-2 text-xs text-slate-500">
-          Origem {tenant.subscription_source || "manual"} | {formatDate(tenant.subscription_activated_at || tenant.created_at)}
+          Origem {tenant.subscription_source || "manual"} |{" "}
+          {formatDate(tenant.subscription_activated_at || tenant.created_at)}
         </div>
       </td>
       <td className="px-4 py-3 align-top">
-        <div className="max-w-[210px] truncate text-sm font-semibold text-slate-800" title={tenant.principal_user?.email}>
+        <div
+          className="max-w-[210px] truncate text-sm font-semibold text-slate-800"
+          title={tenant.principal_user?.email}
+        >
           {tenant.principal_user?.nome || tenant.principal_user?.email || "-"}
         </div>
         <div className="mt-1 max-w-[210px] truncate text-xs text-slate-500">
@@ -367,19 +409,33 @@ function TenantRow({
       </td>
       <td className="px-4 py-3 align-top">
         <div className="grid min-w-[260px] grid-cols-5 gap-2 text-xs">
-          <span>Prod <b>{formatNumber(counts.produtos)}</b></span>
-          <span>Img <b>{formatNumber(counts.produto_imagens)}</b></span>
-          <span>Cli <b>{formatNumber(counts.clientes)}</b></span>
-          <span>Pets <b>{formatNumber(counts.pets)}</b></span>
-          <span>Vendas <b>{formatNumber(counts.vendas)}</b></span>
+          <span>
+            Prod <b>{formatNumber(counts.produtos)}</b>
+          </span>
+          <span>
+            Img <b>{formatNumber(counts.produto_imagens)}</b>
+          </span>
+          <span>
+            Cli <b>{formatNumber(counts.clientes)}</b>
+          </span>
+          <span>
+            Pets <b>{formatNumber(counts.pets)}</b>
+          </span>
+          <span>
+            Vendas <b>{formatNumber(counts.vendas)}</b>
+          </span>
         </div>
       </td>
       <td className="px-4 py-3 align-top">
         <Badge className={catalogBadge(tenant.base_catalog)}>
-          {tenant.base_catalog?.installed ? tenant.base_catalog?.status || "instalado" : "nao importado"}
+          {tenant.base_catalog?.installed
+            ? tenant.base_catalog?.status || "instalado"
+            : "nao importado"}
         </Badge>
         {tenant.base_catalog?.updated_at ? (
-          <div className="mt-2 text-xs text-slate-500">{formatDate(tenant.base_catalog.updated_at)}</div>
+          <div className="mt-2 text-xs text-slate-500">
+            {formatDate(tenant.base_catalog.updated_at)}
+          </div>
         ) : null}
       </td>
       <td className="px-4 py-3 align-top">
@@ -434,19 +490,13 @@ function SelectField({ label, value, onChange, options }) {
   );
 }
 
-function CommercialEditPanel({
-  tenant,
-  form,
-  error,
-  success,
-  saving,
-  onChange,
-  onSubmit,
-}) {
+function CommercialEditPanel({ tenant, form, error, success, saving, onChange, onSubmit }) {
   if (!tenant) {
     return (
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="text-sm text-slate-500">Selecione um tenant para editar plano e cobranca.</div>
+        <div className="text-sm text-slate-500">
+          Selecione um tenant para editar plano e cobranca.
+        </div>
       </section>
     );
   }
@@ -467,25 +517,53 @@ function CommercialEditPanel({
             Ajuste status, plano e cobranca sem entrar no tenant do cliente.
           </p>
         </div>
-        <Badge className={billingBadge(tenant.billing_status)}>{tenant.billing_status || "active"}</Badge>
+        <Badge className={billingBadge(tenant.billing_status)}>
+          {tenant.billing_status || "active"}
+        </Badge>
       </div>
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
         <div className="truncate text-sm font-bold text-slate-900">{tenant.name}</div>
-        <div className="mt-1 truncate text-xs text-slate-500">{tenant.principal_user?.email || tenant.id}</div>
+        <div className="mt-1 truncate text-xs text-slate-500">
+          {tenant.principal_user?.email || tenant.id}
+        </div>
       </div>
 
       <form onSubmit={onSubmit} className="mt-4 space-y-3">
-        <SelectField label="Status tenant" value={form.status} options={TENANT_STATUS_EDIT_OPTIONS} onChange={(value) => onChange("status", value)} />
-        <SelectField label="Plano" value={form.plan} options={PLAN_EDIT_OPTIONS} onChange={(value) => onChange("plan", value)} />
-        <SelectField label="Cobranca" value={form.billing_status} options={BILLING_EDIT_OPTIONS} onChange={(value) => onChange("billing_status", value)} />
-        <SelectField label="Origem" value={form.subscription_source} options={SOURCE_EDIT_OPTIONS} onChange={(value) => onChange("subscription_source", value)} />
+        <SelectField
+          label="Status tenant"
+          value={form.status}
+          options={TENANT_STATUS_EDIT_OPTIONS}
+          onChange={(value) => onChange("status", value)}
+        />
+        <SelectField
+          label="Plano"
+          value={form.plan}
+          options={PLAN_EDIT_OPTIONS}
+          onChange={(value) => onChange("plan", value)}
+        />
+        <SelectField
+          label="Cobranca"
+          value={form.billing_status}
+          options={BILLING_EDIT_OPTIONS}
+          onChange={(value) => onChange("billing_status", value)}
+        />
+        <SelectField
+          label="Origem"
+          value={form.subscription_source}
+          options={SOURCE_EDIT_OPTIONS}
+          onChange={(value) => onChange("subscription_source", value)}
+        />
 
         {error ? (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>
+          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            {error}
+          </div>
         ) : null}
         {success ? (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</div>
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            {success}
+          </div>
         ) : null}
 
         <button
@@ -519,12 +597,16 @@ function BillingTab({
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
           <div>
             <h2 className="text-base font-bold text-slate-900">Planos e pagamentos</h2>
-            <p className="text-sm text-slate-500">Status comercial dos tenants ativos no filtro atual.</p>
+            <p className="text-sm text-slate-500">
+              Status comercial dos tenants ativos no filtro atual.
+            </p>
           </div>
           {loading ? (
             <Badge className="border-blue-200 bg-blue-50 text-blue-700">carregando</Badge>
           ) : (
-            <Badge className="border-slate-200 bg-slate-50 text-slate-700">{items.length} exibido(s)</Badge>
+            <Badge className="border-slate-200 bg-slate-50 text-slate-700">
+              {items.length} exibido(s)
+            </Badge>
           )}
         </div>
 
@@ -552,24 +634,49 @@ function BillingTab({
                   const attention = isBillingAttention(tenant.billing_status);
                   const selected = selectedTenant?.id === tenant.id;
                   return (
-                    <tr key={tenant.id} className={selected ? "bg-blue-50" : attention ? "bg-amber-50" : "bg-white hover:bg-slate-50"}>
+                    <tr
+                      key={tenant.id}
+                      className={
+                        selected
+                          ? "bg-blue-50"
+                          : attention
+                            ? "bg-amber-50"
+                            : "bg-white hover:bg-slate-50"
+                      }
+                    >
                       <td className="px-4 py-3">
-                        <button type="button" onClick={() => onSelectTenant(tenant.id)} className="block text-left">
+                        <button
+                          type="button"
+                          onClick={() => onSelectTenant(tenant.id)}
+                          className="block text-left"
+                        >
                           <div className="text-sm font-bold text-slate-900">{tenant.name}</div>
-                          <div className="mt-1 font-mono text-[11px] text-slate-500">{shortId(tenant.id)}</div>
+                          <div className="mt-1 font-mono text-[11px] text-slate-500">
+                            {shortId(tenant.id)}
+                          </div>
                         </button>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge className="border-blue-200 bg-blue-50 text-blue-700">{tenant.plan || "free"}</Badge>
+                        <Badge className="border-blue-200 bg-blue-50 text-blue-700">
+                          {tenant.plan || "free"}
+                        </Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge className={attention ? "border-amber-200 bg-amber-100 text-amber-800" : billingBadge(tenant.billing_status)}>
+                        <Badge
+                          className={
+                            attention
+                              ? "border-amber-200 bg-amber-100 text-amber-800"
+                              : billingBadge(tenant.billing_status)
+                          }
+                        >
                           {tenant.billing_status || "active"}
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-600">
                         <div>{tenant.subscription_source || "manual"}</div>
-                        <div className="mt-1 text-xs text-slate-500">{formatDate(tenant.subscription_activated_at || tenant.created_at)}</div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {formatDate(tenant.subscription_activated_at || tenant.created_at)}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="max-w-[260px] truncate text-sm font-semibold text-slate-800">
@@ -615,21 +722,45 @@ function UsageTab({ items, summaries, loading }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-3">
-        <MetricCard icon={FiDatabase} label="Registros" value={formatNumber(summaries.usage.recordsTotal)} detail="Cadastros somados no filtro" tone="slate" />
-        <MetricCard icon={FiBox} label="Imagens" value={formatNumber(items.reduce((total, item) => total + Number(item?.usage?.image_count || 0), 0))} detail="Produto_imagens registradas" tone="blue" />
-        <MetricCard icon={FiHardDrive} label="Uso imagens" value={summaries.usage.imageStorage} detail="Somatorio do campo tamanho" tone="amber" />
+        <MetricCard
+          icon={FiDatabase}
+          label="Registros"
+          value={formatNumber(summaries.usage.recordsTotal)}
+          detail="Cadastros somados no filtro"
+          tone="slate"
+        />
+        <MetricCard
+          icon={FiBox}
+          label="Imagens"
+          value={formatNumber(
+            items.reduce((total, item) => total + Number(item?.usage?.image_count || 0), 0),
+          )}
+          detail="Produto_imagens registradas"
+          tone="blue"
+        />
+        <MetricCard
+          icon={FiHardDrive}
+          label="Uso imagens"
+          value={summaries.usage.imageStorage}
+          detail="Somatorio do campo tamanho"
+          tone="amber"
+        />
       </div>
 
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
           <div>
             <h2 className="text-base font-bold text-slate-900">Uso e cadastros</h2>
-            <p className="text-sm text-slate-500">Volume operacional por tenant dentro do filtro atual.</p>
+            <p className="text-sm text-slate-500">
+              Volume operacional por tenant dentro do filtro atual.
+            </p>
           </div>
           {loading ? (
             <Badge className="border-blue-200 bg-blue-50 text-blue-700">carregando</Badge>
           ) : (
-            <Badge className="border-slate-200 bg-slate-50 text-slate-700">{items.length} exibido(s)</Badge>
+            <Badge className="border-slate-200 bg-slate-50 text-slate-700">
+              {items.length} exibido(s)
+            </Badge>
           )}
         </div>
 
@@ -663,16 +794,34 @@ function UsageTab({ items, summaries, loading }) {
                     <tr key={tenant.id} className="bg-white hover:bg-slate-50">
                       <td className="px-4 py-3">
                         <div className="text-sm font-bold text-slate-900">{tenant.name}</div>
-                        <div className="mt-1 font-mono text-[11px] text-slate-500">{shortId(tenant.id)}</div>
+                        <div className="mt-1 font-mono text-[11px] text-slate-500">
+                          {shortId(tenant.id)}
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-sm font-bold text-slate-900">{formatNumber(usage.records_total)}</td>
-                      <td className="px-4 py-3 text-sm text-slate-700">{formatNumber(counts.produtos)}</td>
-                      <td className="px-4 py-3 text-sm text-slate-700">{formatNumber(counts.clientes)}</td>
-                      <td className="px-4 py-3 text-sm text-slate-700">{formatNumber(counts.pets)}</td>
-                      <td className="px-4 py-3 text-sm text-slate-700">{formatNumber(counts.vendas)}</td>
-                      <td className="px-4 py-3 text-sm text-slate-700">{formatNumber(counts.usuarios)}</td>
-                      <td className="px-4 py-3 text-sm text-slate-700">{formatNumber(usage.image_count)}</td>
-                      <td className="px-4 py-3 text-sm font-semibold text-slate-900">{formatStorageMb(usage.image_bytes)}</td>
+                      <td className="px-4 py-3 text-sm font-bold text-slate-900">
+                        {formatNumber(usage.records_total)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-700">
+                        {formatNumber(counts.produtos)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-700">
+                        {formatNumber(counts.clientes)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-700">
+                        {formatNumber(counts.pets)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-700">
+                        {formatNumber(counts.vendas)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-700">
+                        {formatNumber(counts.usuarios)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-700">
+                        {formatNumber(usage.image_count)}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-semibold text-slate-900">
+                        {formatStorageMb(usage.image_bytes)}
+                      </td>
                     </tr>
                   );
                 })
@@ -746,8 +895,13 @@ export default function OpsTenants() {
   const totals = useMemo(
     () => ({
       tenants: summary?.total ?? items.length,
-      active: summary?.active ?? items.filter((item) => ["active", "ativo"].includes(String(item.status || "").toLowerCase())).length,
-      withCatalog: summary?.with_base_catalog ?? items.filter((item) => item.base_catalog?.installed).length,
+      active:
+        summary?.active ??
+        items.filter((item) =>
+          ["active", "ativo"].includes(String(item.status || "").toLowerCase()),
+        ).length,
+      withCatalog:
+        summary?.with_base_catalog ?? items.filter((item) => item.base_catalog?.installed).length,
       products: sumCounts(items, "produtos"),
     }),
     [items, summary],
@@ -786,7 +940,9 @@ export default function OpsTenants() {
     setActionError("");
     setSelectedTenantId(tenant.id);
     try {
-      const response = await api.post(`/admin/tenants/${tenant.id}/catalog-import/apply`, { confirm: true });
+      const response = await api.post(`/admin/tenants/${tenant.id}/catalog-import/apply`, {
+        confirm: true,
+      });
       setApplyByTenant((current) => ({ ...current, [tenant.id]: response.data }));
       await loadTenants();
     } catch (err) {
@@ -821,7 +977,9 @@ export default function OpsTenants() {
     setCommercialSuccess("");
     try {
       const response = await api.patch(`/admin/tenants/${selectedTenant.id}/commercial`, payload);
-      setItems((current) => current.map((item) => (item.id === selectedTenant.id ? response.data : item)));
+      setItems((current) =>
+        current.map((item) => (item.id === selectedTenant.id ? response.data : item)),
+      );
       setCommercialSuccess("Manutencao salva.");
       await loadTenants();
       setSelectedTenantId(response.data.id);
@@ -843,7 +1001,8 @@ export default function OpsTenants() {
             </div>
             <h1 className="mt-1 text-2xl font-bold text-slate-950">Clientes e catalogo base</h1>
             <p className="mt-1 text-sm text-slate-500">
-              Visao operacional dos tenants e comando controlado para copiar o cadastro base da loja Lucas.
+              Visao operacional dos tenants e comando controlado para copiar o cadastro base da loja
+              Lucas.
             </p>
           </div>
           <button
@@ -864,11 +1023,41 @@ export default function OpsTenants() {
         ) : null}
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <MetricCard icon={FiUsers} label="Tenants" value={formatNumber(totals.tenants)} detail="Resultado do filtro atual" tone="slate" />
-          <MetricCard icon={FiCheckCircle} label="Ativos" value={formatNumber(totals.active)} detail="Clientes liberados para uso" tone="green" />
-          <MetricCard icon={FiBox} label="Com catalogo base" value={formatNumber(totals.withCatalog)} detail="Ja receberam o pacote padrao" tone="blue" />
-          <MetricCard icon={FiDatabase} label="Produtos somados" value={formatNumber(totals.products)} detail="Total visivel nesta lista" tone="amber" />
-          <MetricCard icon={FiCreditCard} label="Atencao cobranca" value={formatNumber(tabSummaries.billing.attention)} detail="Status pendente no filtro" tone={tabSummaries.billing.attention ? "amber" : "green"} />
+          <MetricCard
+            icon={FiUsers}
+            label="Tenants"
+            value={formatNumber(totals.tenants)}
+            detail="Resultado do filtro atual"
+            tone="slate"
+          />
+          <MetricCard
+            icon={FiCheckCircle}
+            label="Ativos"
+            value={formatNumber(totals.active)}
+            detail="Clientes liberados para uso"
+            tone="green"
+          />
+          <MetricCard
+            icon={FiBox}
+            label="Com catalogo base"
+            value={formatNumber(totals.withCatalog)}
+            detail="Ja receberam o pacote padrao"
+            tone="blue"
+          />
+          <MetricCard
+            icon={FiDatabase}
+            label="Produtos somados"
+            value={formatNumber(totals.products)}
+            detail="Total visivel nesta lista"
+            tone="amber"
+          />
+          <MetricCard
+            icon={FiCreditCard}
+            label="Atencao cobranca"
+            value={formatNumber(tabSummaries.billing.attention)}
+            detail="Status pendente no filtro"
+            tone={tabSummaries.billing.attention ? "amber" : "green"}
+          />
         </div>
 
         <TabsNav activeTab={activeTab} summaries={tabSummaries} onChange={setActiveTab} />
@@ -900,84 +1089,91 @@ export default function OpsTenants() {
         </section>
 
         {showTenantTable ? (
-        <div className="grid gap-4 xl:grid-cols-[1fr_410px]">
-          <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-              <div>
-                <h2 className="text-base font-bold text-slate-900">
-                  {activeTab === "catalog" ? "Importacao de catalogo base" : "Tenants"}
-                </h2>
-                <p className="text-sm text-slate-500">
-                  {activeTab === "catalog" ? "Simulacao e aplicacao controlada por tenant." : "Contagens basicas, cobranca e cadastro padrao."}
-                </p>
+          <div className="grid gap-4 xl:grid-cols-[1fr_410px]">
+            <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    {activeTab === "catalog" ? "Importacao de catalogo base" : "Tenants"}
+                  </h2>
+                  <p className="text-sm text-slate-500">
+                    {activeTab === "catalog"
+                      ? "Simulacao e aplicacao controlada por tenant."
+                      : "Contagens basicas, cobranca e cadastro padrao."}
+                  </p>
+                </div>
+                {loading ? (
+                  <Badge className="border-blue-200 bg-blue-50 text-blue-700">carregando</Badge>
+                ) : (
+                  <Badge className="border-slate-200 bg-slate-50 text-slate-700">
+                    {items.length} exibido(s)
+                  </Badge>
+                )}
               </div>
-              {loading ? (
-                <Badge className="border-blue-200 bg-blue-50 text-blue-700">carregando</Badge>
-              ) : (
-                <Badge className="border-slate-200 bg-slate-50 text-slate-700">{items.length} exibido(s)</Badge>
-              )}
-            </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-[1180px] w-full divide-y divide-slate-200 text-left">
-                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3 font-bold">Tenant</th>
-                    <th className="px-4 py-3 font-bold">Plano</th>
-                    <th className="px-4 py-3 font-bold">Principal</th>
-                    <th className="px-4 py-3 font-bold">Cadastros</th>
-                    <th className="px-4 py-3 font-bold">Catalogo</th>
-                    <th className="px-4 py-3 font-bold">Acoes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {items.length === 0 && !loading ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-[1180px] w-full divide-y divide-slate-200 text-left">
+                  <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
-                      <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
-                        Nenhum tenant encontrado para o filtro atual.
-                      </td>
+                      <th className="px-4 py-3 font-bold">Tenant</th>
+                      <th className="px-4 py-3 font-bold">Plano</th>
+                      <th className="px-4 py-3 font-bold">Principal</th>
+                      <th className="px-4 py-3 font-bold">Cadastros</th>
+                      <th className="px-4 py-3 font-bold">Catalogo</th>
+                      <th className="px-4 py-3 font-bold">Acoes</th>
                     </tr>
-                  ) : (
-                    items.map((tenant) => (
-                      <TenantRow
-                        key={tenant.id}
-                        tenant={tenant}
-                        selected={selectedTenant?.id === tenant.id}
-                        preview={previewByTenant[tenant.id]}
-                        applying={busyKey === `apply:${tenant.id}`}
-                        previewing={busyKey === `preview:${tenant.id}`}
-                        onSelect={setSelectedTenantId}
-                        onPreview={handlePreview}
-                        onApply={handleApply}
-                      />
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-
-          <div className="space-y-4">
-            <ImportResultPanel
-              tenant={selectedTenant}
-              preview={selectedTenant ? previewByTenant[selectedTenant.id] : null}
-              applyResult={selectedTenant ? applyByTenant[selectedTenant.id] : null}
-              actionError={actionError}
-            />
-
-            <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
-                <FiAlertTriangle className="h-4 w-4 text-amber-600" />
-                Guardrails do MVP
-              </div>
-              <div className="mt-3 space-y-2 text-sm text-slate-600">
-                <p>O comando copia dados para outro tenant, mantendo cada cliente separado.</p>
-                <p>Estoque, custo, margem, fornecedores e precos operacionais entram zerados ou vazios pela rotina de catalogo base.</p>
-                <p>A importacao real so fica habilitada depois de uma simulacao sem erro.</p>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {items.length === 0 && !loading ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
+                          Nenhum tenant encontrado para o filtro atual.
+                        </td>
+                      </tr>
+                    ) : (
+                      items.map((tenant) => (
+                        <TenantRow
+                          key={tenant.id}
+                          tenant={tenant}
+                          selected={selectedTenant?.id === tenant.id}
+                          preview={previewByTenant[tenant.id]}
+                          applying={busyKey === `apply:${tenant.id}`}
+                          previewing={busyKey === `preview:${tenant.id}`}
+                          onSelect={setSelectedTenantId}
+                          onPreview={handlePreview}
+                          onApply={handleApply}
+                        />
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </section>
+
+            <div className="space-y-4">
+              <ImportResultPanel
+                tenant={selectedTenant}
+                preview={selectedTenant ? previewByTenant[selectedTenant.id] : null}
+                applyResult={selectedTenant ? applyByTenant[selectedTenant.id] : null}
+                actionError={actionError}
+              />
+
+              <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <FiAlertTriangle className="h-4 w-4 text-amber-600" />
+                  Guardrails do MVP
+                </div>
+                <div className="mt-3 space-y-2 text-sm text-slate-600">
+                  <p>O comando copia dados para outro tenant, mantendo cada cliente separado.</p>
+                  <p>
+                    Estoque, custo, margem, fornecedores e precos operacionais entram zerados ou
+                    vazios pela rotina de catalogo base.
+                  </p>
+                  <p>A importacao real so fica habilitada depois de uma simulacao sem erro.</p>
+                </div>
+              </section>
+            </div>
           </div>
-        </div>
         ) : null}
 
         {activeTab === "billing" ? (
@@ -994,7 +1190,9 @@ export default function OpsTenants() {
             onEditSubmit={handleCommercialSubmit}
           />
         ) : null}
-        {activeTab === "usage" ? <UsageTab items={items} summaries={tabSummaries} loading={loading} /> : null}
+        {activeTab === "usage" ? (
+          <UsageTab items={items} summaries={tabSummaries} loading={loading} />
+        ) : null}
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import toast from 'react-hot-toast';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import api from '../api';
+import { useState, useEffect } from "react";
+import toast from "react-hot-toast";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import api from "../api";
 import {
   AlertCircle,
   CheckCircle2,
@@ -13,37 +13,37 @@ import {
   Search,
   X,
   XCircle,
-} from 'lucide-react';
-import ActionButton from '../components/ui/ActionButton';
-import CustomerIdentity from '../components/ui/CustomerIdentity';
-import EmptyState from '../components/ui/EmptyState';
-import IconActionButton from '../components/ui/IconActionButton';
-import LoadingState from '../components/ui/LoadingState';
-import PageHeader from '../components/ui/PageHeader';
-import Panel from '../components/ui/Panel';
-import EntityCard, { EntityInfoRow } from '../components/ui/EntityCard';
-import FilterBar, { FilterAdvanced, FilterRow } from '../components/ui/FilterBar';
-import PessoaSelector from '../components/clientes/PessoaSelector';
-import { formatarIdadeMeses } from '../helpers/idadeHelper';
+} from "lucide-react";
+import ActionButton from "../components/ui/ActionButton";
+import CustomerIdentity from "../components/ui/CustomerIdentity";
+import EmptyState from "../components/ui/EmptyState";
+import IconActionButton from "../components/ui/IconActionButton";
+import LoadingState from "../components/ui/LoadingState";
+import PageHeader from "../components/ui/PageHeader";
+import Panel from "../components/ui/Panel";
+import EntityCard, { EntityInfoRow } from "../components/ui/EntityCard";
+import FilterBar, { FilterAdvanced, FilterRow } from "../components/ui/FilterBar";
+import PessoaSelector from "../components/clientes/PessoaSelector";
+import { formatarIdadeMeses } from "../helpers/idadeHelper";
 
 const GerenciamentoPets = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const clienteIdParam = searchParams.get('cliente_id');
+  const clienteIdParam = searchParams.get("cliente_id");
 
   const [pets, setPets] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  
+  const [error, setError] = useState("");
+
   // Filtros
-  const [buscaTutor, setBuscaTutor] = useState('');
-  const [busca, setBusca] = useState('');
+  const [buscaTutor, setBuscaTutor] = useState("");
+  const [busca, setBusca] = useState("");
   const [clientesSugeridos, setClientesSugeridos] = useState([]);
   const [sugestaoCongelada, setSugestaoCongelada] = useState(false);
-  const [clienteFiltro, setClienteFiltro] = useState(clienteIdParam || '');
-  const [especieFiltro, setEspecieFiltro] = useState('');
-  const [statusFiltro, setStatusFiltro] = useState(''); // '', 'ativo', 'inativo'
+  const [clienteFiltro, setClienteFiltro] = useState(clienteIdParam || "");
+  const [especieFiltro, setEspecieFiltro] = useState("");
+  const [statusFiltro, setStatusFiltro] = useState(""); // '', 'ativo', 'inativo'
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
   // Carregar dados
@@ -55,26 +55,26 @@ const GerenciamentoPets = () => {
   const loadPets = async () => {
     if (busca.trim() && !clienteFiltro) {
       setPets([]);
-      setError('Para pesquisar pet, primeiro selecione o tutor (nome, telefone ou CPF).');
+      setError("Para pesquisar pet, primeiro selecione o tutor (nome, telefone ou CPF).");
       return;
     }
 
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      
-      if (busca) params.append('busca', busca);
-      if (clienteFiltro) params.append('cliente_id', clienteFiltro);
-      if (especieFiltro) params.append('especie', especieFiltro);
-      if (statusFiltro) params.append('ativo', statusFiltro === 'ativo' ? 'true' : 'false');
-      
+
+      if (busca) params.append("busca", busca);
+      if (clienteFiltro) params.append("cliente_id", clienteFiltro);
+      if (especieFiltro) params.append("especie", especieFiltro);
+      if (statusFiltro) params.append("ativo", statusFiltro === "ativo" ? "true" : "false");
+
       const response = await api.get(`/pets?${params.toString()}`);
       const lista = response.data?.items || response.data?.pets || response.data || [];
       setPets(Array.isArray(lista) ? lista : []);
-      setError('');
+      setError("");
     } catch (err) {
-      console.error('Erro ao carregar pets:', err);
-      setError('Erro ao carregar pets');
+      console.error("Erro ao carregar pets:", err);
+      setError("Erro ao carregar pets");
     } finally {
       setLoading(false);
     }
@@ -82,11 +82,11 @@ const GerenciamentoPets = () => {
 
   const loadClientes = async () => {
     try {
-      const response = await api.get('/clientes/');
+      const response = await api.get("/clientes/");
       const lista = response.data?.items || response.data?.clientes || response.data || [];
       setClientes(Array.isArray(lista) ? lista : []);
     } catch (err) {
-      console.error('Erro ao carregar clientes:', err);
+      console.error("Erro ao carregar clientes:", err);
       setClientes([]);
     }
   };
@@ -100,10 +100,10 @@ const GerenciamentoPets = () => {
 
     const timer = setTimeout(async () => {
       try {
-        const termoDigitos = termo.replace(/\D/g, '');
+        const termoDigitos = termo.replace(/\D/g, "");
         const termoBusca = termoDigitos.length >= 8 ? termoDigitos : termo;
-        const response = await api.get('/clientes/', {
-          params: { search: termoBusca, limit: 20 }
+        const response = await api.get("/clientes/", {
+          params: { search: termoBusca, limit: 20 },
         });
         const lista = response.data?.items || response.data?.clientes || response.data || [];
         setClientesSugeridos(Array.isArray(lista) ? lista : []);
@@ -117,10 +117,10 @@ const GerenciamentoPets = () => {
 
   const selecionarTutor = (cliente) => {
     setClienteFiltro(String(cliente.id));
-    setBuscaTutor(cliente.nome || '');
+    setBuscaTutor(cliente.nome || "");
     setSugestaoCongelada(true);
     setClientesSugeridos([]);
-    setError('');
+    setError("");
   };
 
   const handleBusca = (e) => {
@@ -129,14 +129,14 @@ const GerenciamentoPets = () => {
   };
 
   const limparFiltros = () => {
-    setBuscaTutor('');
-    setBusca('');
+    setBuscaTutor("");
+    setBusca("");
     setSugestaoCongelada(false);
-    setClienteFiltro('');
-    setEspecieFiltro('');
-    setStatusFiltro('');
+    setClienteFiltro("");
+    setEspecieFiltro("");
+    setStatusFiltro("");
     setClientesSugeridos([]);
-    setError('');
+    setError("");
   };
 
   const calcularIdade = (dataNascimento) => {
@@ -145,22 +145,22 @@ const GerenciamentoPets = () => {
     const nascimento = new Date(dataNascimento);
     const anos = hoje.getFullYear() - nascimento.getFullYear();
     const meses = hoje.getMonth() - nascimento.getMonth();
-    
+
     if (anos === 0) {
-      return `${meses} ${meses === 1 ? 'mês' : 'meses'}`;
+      return `${meses} ${meses === 1 ? "mês" : "meses"}`;
     }
-    return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+    return `${anos} ${anos === 1 ? "ano" : "anos"}`;
   };
 
   const obterIdadePet = (pet) => {
     const idadeMeses = pet.idade_meses ?? pet.idade_aproximada;
 
-    if (idadeMeses !== null && idadeMeses !== undefined && idadeMeses !== '') {
+    if (idadeMeses !== null && idadeMeses !== undefined && idadeMeses !== "") {
       const meses = Number(idadeMeses);
       return Number.isFinite(meses) ? formatarIdadeMeses(meses) : String(idadeMeses);
     }
 
-    return pet.data_nascimento ? calcularIdade(pet.data_nascimento) : '';
+    return pet.data_nascimento ? calcularIdade(pet.data_nascimento) : "";
   };
 
   const toggleAtivacao = async (pet) => {
@@ -174,8 +174,8 @@ const GerenciamentoPets = () => {
       }
       loadPets();
     } catch (err) {
-      console.error('Erro ao alterar status do pet:', err);
-      toast.error('Nao foi possivel alterar o status do pet.');
+      console.error("Erro ao alterar status do pet:", err);
+      toast.error("Nao foi possivel alterar o status do pet.");
     }
   };
 
@@ -196,12 +196,12 @@ const GerenciamentoPets = () => {
         title="Gerenciamento de Pets"
         subtitle={
           clienteFiltro
-            ? `Pets do cliente: ${clientes.find(c => String(c.id) === String(clienteFiltro))?.nome || ''}`
-            : 'Gestao completa dos animais de estimacao'
+            ? `Pets do cliente: ${clientes.find((c) => String(c.id) === String(clienteFiltro))?.nome || ""}`
+            : "Gestao completa dos animais de estimacao"
         }
         actions={
           <ActionButton
-            onClick={() => navigate('/pets/novo')}
+            onClick={() => navigate("/pets/novo")}
             intent="create"
             icon={Plus}
             size="md"
@@ -213,138 +213,132 @@ const GerenciamentoPets = () => {
 
       {/* Barra de busca e filtros */}
       <FilterBar onSubmit={handleBusca}>
-          {/* Busca principal */}
-          <FilterRow className="items-stretch">
-            <div className="relative w-full md:min-w-64 md:flex-1">
-              <PessoaSelector
-                minChars={0}
-                onChange={(value) => {
-                  setBuscaTutor(value);
-                  setSugestaoCongelada(false);
-                  if (!value.trim()) {
-                    setClienteFiltro('');
+        {/* Busca principal */}
+        <FilterRow className="items-stretch">
+          <div className="relative w-full md:min-w-64 md:flex-1">
+            <PessoaSelector
+              minChars={0}
+              onChange={(value) => {
+                setBuscaTutor(value);
+                setSugestaoCongelada(false);
+                if (!value.trim()) {
+                  setClienteFiltro("");
+                }
+              }}
+              onSelect={selecionarTutor}
+              placeholder="Buscar tutor por nome, telefone ou CPF..."
+              showSuggestions={Boolean(clientesSugeridos.length > 0 && buscaTutor.trim())}
+              suggestions={clientesSugeridos}
+              value={buscaTutor}
+            />
+          </div>
+
+          <div className="relative w-full md:min-w-64 md:flex-1">
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+            />
+            <input
+              type="text"
+              placeholder={clienteFiltro ? "Buscar pet pelo nome..." : "Primeiro selecione o tutor"}
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              disabled={!clienteFiltro}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            />
+          </div>
+          <ActionButton type="submit" intent="neutral" className="w-full md:w-auto" size="md">
+            Buscar
+          </ActionButton>
+          <ActionButton
+            type="button"
+            onClick={() => setMostrarFiltros(!mostrarFiltros)}
+            intent="neutral"
+            tone="soft"
+            icon={Filter}
+            className="w-full md:w-auto"
+            size="md"
+          >
+            Filtros
+          </ActionButton>
+        </FilterRow>
+
+        {/* Filtros avançados */}
+        {mostrarFiltros && (
+          <FilterAdvanced className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cliente (Tutor)
+              </label>
+              <select
+                value={clienteFiltro}
+                onChange={(e) => {
+                  setClienteFiltro(e.target.value);
+                  if (!e.target.value) {
+                    setBuscaTutor("");
+                    return;
+                  }
+                  const encontrado = clientes.find((c) => String(c.id) === String(e.target.value));
+                  if (encontrado?.nome) {
+                    setBuscaTutor(encontrado.nome);
                   }
                 }}
-                onSelect={selecionarTutor}
-                placeholder="Buscar tutor por nome, telefone ou CPF..."
-                showSuggestions={Boolean(clientesSugeridos.length > 0 && buscaTutor.trim())}
-                suggestions={clientesSugeridos}
-                value={buscaTutor}
-              />
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              >
+                <option value="">Todos os clientes</option>
+                {clientes.map((cliente) => (
+                  <option key={cliente.id} value={cliente.id}>
+                    {cliente.nome}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="relative w-full md:min-w-64 md:flex-1">
-              <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder={clienteFiltro ? 'Buscar pet pelo nome...' : 'Primeiro selecione o tutor'}
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                disabled={!clienteFiltro}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Espécie</label>
+              <select
+                value={especieFiltro}
+                onChange={(e) => setEspecieFiltro(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              >
+                <option value="">Todas as espécies</option>
+                <option value="Cão">Cão</option>
+                <option value="Gato">Gato</option>
+                <option value="Ave">Ave</option>
+                <option value="Roedor">Roedor</option>
+                <option value="Réptil">Réptil</option>
+                <option value="Outro">Outro</option>
+              </select>
             </div>
-            <ActionButton
-              type="submit"
-              intent="neutral"
-              className="w-full md:w-auto"
-              size="md"
-            >
-              Buscar
-            </ActionButton>
-            <ActionButton
-              type="button"
-              onClick={() => setMostrarFiltros(!mostrarFiltros)}
-              intent="neutral"
-              tone="soft"
-              icon={Filter}
-              className="w-full md:w-auto"
-              size="md"
-            >
-              Filtros
-            </ActionButton>
-          </FilterRow>
 
-          {/* Filtros avançados */}
-          {mostrarFiltros && (
-            <FilterAdvanced className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cliente (Tutor)
-                </label>
-                <select
-                  value={clienteFiltro}
-                  onChange={(e) => {
-                    setClienteFiltro(e.target.value);
-                    if (!e.target.value) {
-                      setBuscaTutor('');
-                      return;
-                    }
-                    const encontrado = clientes.find((c) => String(c.id) === String(e.target.value));
-                    if (encontrado?.nome) {
-                      setBuscaTutor(encontrado.nome);
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                >
-                  <option value="">Todos os clientes</option>
-                  {clientes.map(cliente => (
-                    <option key={cliente.id} value={cliente.id}>
-                      {cliente.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select
+                value={statusFiltro}
+                onChange={(e) => setStatusFiltro(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              >
+                <option value="">Todos</option>
+                <option value="ativo">Ativos</option>
+                <option value="inativo">Inativos</option>
+              </select>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Espécie
-                </label>
-                <select
-                  value={especieFiltro}
-                  onChange={(e) => setEspecieFiltro(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                >
-                  <option value="">Todas as espécies</option>
-                  <option value="Cão">Cão</option>
-                  <option value="Gato">Gato</option>
-                  <option value="Ave">Ave</option>
-                  <option value="Roedor">Roedor</option>
-                  <option value="Réptil">Réptil</option>
-                  <option value="Outro">Outro</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Status
-                </label>
-                <select
-                  value={statusFiltro}
-                  onChange={(e) => setStatusFiltro(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                >
-                  <option value="">Todos</option>
-                  <option value="ativo">Ativos</option>
-                  <option value="inativo">Inativos</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end md:col-span-3">
-                <ActionButton
-                  type="button"
-                  onClick={limparFiltros}
-                  intent="neutral"
-                  tone="ghost"
-                  icon={X}
-                  className="w-full md:w-auto"
-                  size="sm"
-                >
-                  Limpar filtros
-                </ActionButton>
-              </div>
-            </FilterAdvanced>
-          )}
+            <div className="flex justify-end md:col-span-3">
+              <ActionButton
+                type="button"
+                onClick={limparFiltros}
+                intent="neutral"
+                tone="ghost"
+                icon={X}
+                className="w-full md:w-auto"
+                size="sm"
+              >
+                Limpar filtros
+              </ActionButton>
+            </div>
+          </FilterAdvanced>
+        )}
       </FilterBar>
 
       {/* Erro */}
@@ -362,12 +356,12 @@ const GerenciamentoPets = () => {
           title="Nenhum pet encontrado"
           description={
             busca || clienteFiltro || especieFiltro || statusFiltro
-              ? 'Tente ajustar os filtros ou fazer uma nova busca.'
-              : 'Comece adicionando o primeiro pet deste tenant.'
+              ? "Tente ajustar os filtros ou fazer uma nova busca."
+              : "Comece adicionando o primeiro pet deste tenant."
           }
           action={
             <ActionButton
-              onClick={() => navigate('/pets/novo')}
+              onClick={() => navigate("/pets/novo")}
               intent="create"
               icon={Plus}
               size="lg"
@@ -378,12 +372,12 @@ const GerenciamentoPets = () => {
         />
       ) : (
         <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {pets.map(pet => {
+          {pets.map((pet) => {
             const infoRows = [
-              { label: 'Espécie:', value: pet.especie || '' },
-              { label: 'Raça:', value: pet.raca || '' },
-              { label: 'Sexo:', value: pet.sexo || '' },
-              { label: 'Idade:', value: obterIdadePet(pet) },
+              { label: "Espécie:", value: pet.especie || "" },
+              { label: "Raça:", value: pet.raca || "" },
+              { label: "Sexo:", value: pet.sexo || "" },
+              { label: "Idade:", value: obterIdadePet(pet) },
             ];
 
             return (
@@ -429,10 +423,10 @@ const GerenciamentoPets = () => {
                     />
                     <IconActionButton
                       onClick={() => toggleAtivacao(pet)}
-                      intent={pet.ativo ? 'delete' : 'create'}
+                      intent={pet.ativo ? "delete" : "create"}
                       icon={pet.ativo ? XCircle : CheckCircle2}
                       size="sm"
-                      title={pet.ativo ? 'Desativar' : 'Reativar'}
+                      title={pet.ativo ? "Desativar" : "Reativar"}
                       aria-label={pet.ativo ? `Desativar ${pet.nome}` : `Reativar ${pet.nome}`}
                     />
                   </>
@@ -446,7 +440,7 @@ const GerenciamentoPets = () => {
                 <div className="mt-3 border-t border-slate-100 pt-3">
                   <EntityInfoRow
                     label="Tutor:"
-                    value={(
+                    value={
                       <CustomerIdentity
                         codeLabel="Cod. tutor"
                         fallback={`Tutor #${pet.cliente_id || "-"}`}
@@ -455,7 +449,7 @@ const GerenciamentoPets = () => {
                         nameWrapperClassName="max-w-full"
                         record={pet}
                       />
-                    )}
+                    }
                   />
                 </div>
               </EntityCard>
@@ -468,16 +462,14 @@ const GerenciamentoPets = () => {
       {pets.length > 0 && (
         <div className="mt-6 text-center text-sm text-gray-600">
           Total: <strong>{pets.length}</strong> pet(s) encontrado(s)
-          {statusFiltro === '' && (
+          {statusFiltro === "" && (
             <>
-              {' • '}
-              <strong className="text-green-600">
-                {pets.filter(p => p.ativo).length}
-              </strong> ativo(s)
-              {' • '}
-              <strong className="text-red-600">
-                {pets.filter(p => !p.ativo).length}
-              </strong> inativo(s)
+              {" • "}
+              <strong className="text-green-600">{pets.filter((p) => p.ativo).length}</strong>{" "}
+              ativo(s)
+              {" • "}
+              <strong className="text-red-600">{pets.filter((p) => !p.ativo).length}</strong>{" "}
+              inativo(s)
             </>
           )}
         </div>

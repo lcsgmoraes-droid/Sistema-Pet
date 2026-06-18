@@ -23,9 +23,7 @@ export function usePDVVendaAcoes({
     }
 
     if (vendaAtual.status === "finalizada" || vendaAtual.status === "pago_nf") {
-      alert(
-        'Esta venda esta finalizada. Clique em "Reabrir Venda" para modificar.',
-      );
+      alert('Esta venda esta finalizada. Clique em "Reabrir Venda" para modificar.');
       return;
     }
 

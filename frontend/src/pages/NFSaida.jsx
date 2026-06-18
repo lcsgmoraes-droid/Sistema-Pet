@@ -1,5 +1,5 @@
-import { FileOutput } from 'lucide-react';
-import SEFAZImportacao from './SEFAZImportacao';
+import { FileOutput } from "lucide-react";
+import SEFAZImportacao from "./SEFAZImportacao";
 
 export default function NFSaida() {
   return (
@@ -10,7 +10,8 @@ export default function NFSaida() {
           NF de Saída
         </h1>
         <p className="text-gray-600 mt-1">
-          Consulte notas fiscais de saída emitidas por terceiros diretamente na SEFAZ pela chave de acesso.
+          Consulte notas fiscais de saída emitidas por terceiros diretamente na SEFAZ pela chave de
+          acesso.
         </p>
       </div>
       <SEFAZImportacao />

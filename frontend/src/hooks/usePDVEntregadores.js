@@ -29,7 +29,7 @@ export function usePDVEntregadores(vendaAtual, setVendaAtual) {
 
   useEffect(() => {
     void carregarEntregadores();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (vendaAtual.tem_entrega && entregadorSelecionado) {
@@ -37,7 +37,7 @@ export function usePDVEntregadores(vendaAtual, setVendaAtual) {
     } else {
       setCustoOperacionalEntrega(0);
     }
-  }, [entregadorSelecionado, vendaAtual.tem_entrega]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entregadorSelecionado, vendaAtual.tem_entrega]);
 
   const calcularCustoOperacional = async (entregador) => {
     if (!entregador) {
@@ -45,26 +45,15 @@ export function usePDVEntregadores(vendaAtual, setVendaAtual) {
       return;
     }
 
-    let custo = 0;
+    let custo;
 
-    if (
-      entregador.modelo_custo_entrega === "taxa_fixa" &&
-      entregador.taxa_fixa_entrega
-    ) {
+    if (entregador.modelo_custo_entrega === "taxa_fixa" && entregador.taxa_fixa_entrega) {
       custo = Number(entregador.taxa_fixa_entrega);
-    } else if (
-      entregador.modelo_custo_entrega === "por_km" &&
-      entregador.valor_por_km_entrega
-    ) {
+    } else if (entregador.modelo_custo_entrega === "por_km" && entregador.valor_por_km_entrega) {
       custo = 0;
-    } else if (
-      entregador.modelo_custo_entrega === "rateio_rh" &&
-      entregador.controla_rh
-    ) {
+    } else if (entregador.modelo_custo_entrega === "rateio_rh" && entregador.controla_rh) {
       try {
-        const response = await api.get(
-          `/entregadores/${entregador.id}/custo-operacional`,
-        );
+        const response = await api.get(`/entregadores/${entregador.id}/custo-operacional`);
         custo = response.data.custo_por_entrega || 0;
       } catch (error) {
         console.error("Erro ao buscar custo RH:", error);
@@ -107,8 +96,7 @@ export function usePDVEntregadores(vendaAtual, setVendaAtual) {
         },
       });
 
-      let entregadoresList =
-        response.data.items || response.data.clientes || response.data || [];
+      let entregadoresList = response.data.items || response.data.clientes || response.data || [];
 
       if (!Array.isArray(entregadoresList)) {
         console.error("Resposta da API nao e um array:", entregadoresList);
@@ -149,11 +137,7 @@ export function usePDVEntregadores(vendaAtual, setVendaAtual) {
         return;
       }
 
-      debugWarn(
-        "Cliente ID",
-        entregadorId,
-        "nao e um entregador valido",
-      );
+      debugWarn("Cliente ID", entregadorId, "nao e um entregador valido");
     } catch (error) {
       console.error("Erro ao carregar entregador:", error);
     }
@@ -163,10 +147,7 @@ export function usePDVEntregadores(vendaAtual, setVendaAtual) {
     );
 
     if (entregadorFallback) {
-      debugLog(
-        "Entregador encontrado no array (fallback):",
-        entregadorFallback.nome,
-      );
+      debugLog("Entregador encontrado no array (fallback):", entregadorFallback.nome);
       selecionarEntregador(entregadorFallback);
     }
   };

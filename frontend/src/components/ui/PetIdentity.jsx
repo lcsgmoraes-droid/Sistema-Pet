@@ -58,18 +58,8 @@ export default function PetIdentity({
   showCode = true,
   showLabel = false,
 }) {
-  const petName = firstText(
-    name,
-    getPetIdentityName(pet),
-    getPetIdentityName(record),
-    fallback,
-  );
-  const petCode = firstText(
-    code,
-    getPetIdentityCode(pet),
-    getPetIdentityCode(record),
-    id,
-  );
+  const petName = firstText(name, getPetIdentityName(pet), getPetIdentityName(record), fallback);
+  const petCode = firstText(code, getPetIdentityCode(pet), getPetIdentityCode(record), id);
 
   if (!petName && !petCode) {
     return empty;
@@ -93,13 +83,9 @@ export default function PetIdentity({
         ) : (
           <span className="inline-flex min-w-0 items-center gap-1">
             {showLabel ? (
-              <span className="shrink-0 text-xs font-medium text-slate-500">
-                {label}:
-              </span>
+              <span className="shrink-0 text-xs font-medium text-slate-500">{label}:</span>
             ) : null}
-            <span className={`min-w-0 truncate ${nameClassName}`}>
-              {petName}
-            </span>
+            <span className={`min-w-0 truncate ${nameClassName}`}>{petName}</span>
           </span>
         )
       ) : null}

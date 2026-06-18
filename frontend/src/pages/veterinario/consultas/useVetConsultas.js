@@ -41,12 +41,16 @@ export function useVetConsultas() {
       if (Array.isArray(data)) {
         setConsultas(data);
         setTotal(data.length);
-        setConsultasSelecionadas((atuais) => atuais.filter((id) => data.some((consulta) => Number(consulta.id) === id)));
+        setConsultasSelecionadas((atuais) =>
+          atuais.filter((id) => data.some((consulta) => Number(consulta.id) === id)),
+        );
       } else {
         const items = data.items ?? [];
         setConsultas(items);
         setTotal(data.total ?? 0);
-        setConsultasSelecionadas((atuais) => atuais.filter((id) => items.some((consulta) => Number(consulta.id) === id)));
+        setConsultasSelecionadas((atuais) =>
+          atuais.filter((id) => items.some((consulta) => Number(consulta.id) === id)),
+        );
       }
     } catch {
       setErro("Nao foi possivel carregar as consultas.");
@@ -77,14 +81,11 @@ export function useVetConsultas() {
     carregarAgendamentosHoje();
   }, [carregarAgendamentosHoje]);
 
-  const consultasFiltradas = useMemo(
-    () => filtrarConsultas(consultas, busca),
-    [busca, consultas]
-  );
+  const consultasFiltradas = useMemo(() => filtrarConsultas(consultas, busca), [busca, consultas]);
   const totalPaginas = Math.ceil(total / CONSULTAS_POR_PAGINA);
   const todasSelecionadas = useMemo(
     () => todasConsultasVisiveisSelecionadas(consultasSelecionadas, consultasFiltradas),
-    [consultasFiltradas, consultasSelecionadas]
+    [consultasFiltradas, consultasSelecionadas],
   );
 
   function alterarStatus(status) {
@@ -98,7 +99,9 @@ export function useVetConsultas() {
   }
 
   function alternarTodasConsultasSelecionadas() {
-    setConsultasSelecionadas((atuais) => toggleTodasConsultasSelecionadas(atuais, consultasFiltradas));
+    setConsultasSelecionadas((atuais) =>
+      toggleTodasConsultasSelecionadas(atuais, consultasFiltradas),
+    );
   }
 
   const excluirConsultasSelecionadas = useCallback(async () => {
@@ -106,7 +109,7 @@ export function useVetConsultas() {
 
     const totalSelecionado = consultasSelecionadas.length;
     const confirmado = window.confirm(
-      `Deseja excluir ${totalSelecionado} consulta${totalSelecionado > 1 ? "s" : ""} selecionada${totalSelecionado > 1 ? "s" : ""}?`
+      `Deseja excluir ${totalSelecionado} consulta${totalSelecionado > 1 ? "s" : ""} selecionada${totalSelecionado > 1 ? "s" : ""}?`,
     );
     if (!confirmado) return;
 
@@ -121,7 +124,9 @@ export function useVetConsultas() {
       await carregar();
       await carregarAgendamentosHoje();
     } catch (error) {
-      setErroExclusao(error?.response?.data?.detail ?? "Nao foi possivel excluir as consultas selecionadas.");
+      setErroExclusao(
+        error?.response?.data?.detail ?? "Nao foi possivel excluir as consultas selecionadas.",
+      );
     } finally {
       setExcluindoConsultas(false);
     }

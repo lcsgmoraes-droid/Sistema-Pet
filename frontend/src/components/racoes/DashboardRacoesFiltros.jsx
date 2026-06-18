@@ -1,5 +1,4 @@
-import React from 'react';
-import { Filter } from 'lucide-react';
+import { Filter } from "lucide-react";
 
 const DashboardRacoesFiltros = ({
   filtros,
@@ -9,7 +8,7 @@ const DashboardRacoesFiltros = ({
   onFiltroChange,
   onLimparFiltros,
   onToggleFiltroMultiplo,
-  onToggleMostrarFiltros
+  onToggleMostrarFiltros,
 }) => {
   const totalFiltrosAtivos =
     filtros.marca_ids.length +
@@ -33,7 +32,7 @@ const DashboardRacoesFiltros = ({
           onClick={onToggleMostrarFiltros}
           className="text-sm text-blue-600 hover:text-blue-700 font-medium"
         >
-          {mostrarFiltros ? 'Ocultar ▲' : 'Mostrar ▼'}
+          {mostrarFiltros ? "Ocultar ▲" : "Mostrar ▼"}
         </button>
       </div>
 
@@ -46,11 +45,11 @@ const DashboardRacoesFiltros = ({
                 {opcoesFiltros.marcas.map((marca) => (
                   <button
                     key={marca.id}
-                    onClick={() => onToggleFiltroMultiplo('marca_ids', marca.id)}
+                    onClick={() => onToggleFiltroMultiplo("marca_ids", marca.id)}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                       filtros.marca_ids.includes(marca.id)
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? "bg-blue-600 text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
                     {marca.nome}
@@ -60,16 +59,18 @@ const DashboardRacoesFiltros = ({
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Linha de Ração</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Linha de Ração
+              </label>
               <div className="flex flex-wrap gap-2">
                 {opcoesFiltros.linhas.map((linha) => (
                   <button
                     key={linha.id}
-                    onClick={() => onToggleFiltroMultiplo('linhas', linha.id)}
+                    onClick={() => onToggleFiltroMultiplo("linhas", linha.id)}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                       filtros.linhas.includes(linha.id)
-                        ? 'bg-purple-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? "bg-purple-600 text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
                     {linha.nome}
@@ -79,16 +80,18 @@ const DashboardRacoesFiltros = ({
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Porte do Animal</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Porte do Animal
+              </label>
               <div className="flex flex-wrap gap-2">
                 {opcoesFiltros.portes.map((porte) => (
                   <button
                     key={porte.id}
-                    onClick={() => onToggleFiltroMultiplo('portes', porte.id)}
+                    onClick={() => onToggleFiltroMultiplo("portes", porte.id)}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                       filtros.portes.includes(porte.id)
-                        ? 'bg-green-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? "bg-green-600 text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
                     {porte.nome}
@@ -103,11 +106,11 @@ const DashboardRacoesFiltros = ({
                 {opcoesFiltros.fases.map((fase) => (
                   <button
                     key={fase.id}
-                    onClick={() => onToggleFiltroMultiplo('fases', fase.id)}
+                    onClick={() => onToggleFiltroMultiplo("fases", fase.id)}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                       filtros.fases.includes(fase.id)
-                        ? 'bg-amber-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? "bg-amber-600 text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
                     {fase.nome}
@@ -117,16 +120,18 @@ const DashboardRacoesFiltros = ({
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Sabor/Proteína</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Sabor/Proteína
+              </label>
               <div className="flex flex-wrap gap-2">
                 {opcoesFiltros.sabores.map((sabor) => (
                   <button
                     key={sabor}
-                    onClick={() => onToggleFiltroMultiplo('sabores', sabor)}
+                    onClick={() => onToggleFiltroMultiplo("sabores", sabor)}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                       filtros.sabores.includes(sabor)
-                        ? 'bg-pink-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? "bg-pink-600 text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
                     {sabor}
@@ -136,16 +141,18 @@ const DashboardRacoesFiltros = ({
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Peso da Embalagem</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Peso da Embalagem
+              </label>
               <div className="flex flex-wrap gap-2">
                 {opcoesFiltros.pesos.map((peso) => (
                   <button
                     key={peso}
-                    onClick={() => onToggleFiltroMultiplo('pesos', peso)}
+                    onClick={() => onToggleFiltroMultiplo("pesos", peso)}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                       filtros.pesos.includes(peso)
-                        ? 'bg-indigo-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? "bg-indigo-600 text-white shadow-md"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
                     {peso} kg
@@ -156,13 +163,15 @@ const DashboardRacoesFiltros = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Margem Mínima (%)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Margem Mínima (%)
+                </label>
                 <input
                   type="number"
                   step="0.01"
-                  value={filtros.margem_min || ''}
+                  value={filtros.margem_min || ""}
                   onChange={(event) =>
-                    onFiltroChange('margem_min', parseFloat(event.target.value) || null)
+                    onFiltroChange("margem_min", parseFloat(event.target.value) || null)
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   placeholder="Ex: 25"
@@ -170,13 +179,15 @@ const DashboardRacoesFiltros = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Margem Máxima (%)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Margem Máxima (%)
+                </label>
                 <input
                   type="number"
                   step="0.01"
-                  value={filtros.margem_max || ''}
+                  value={filtros.margem_max || ""}
                   onChange={(event) =>
-                    onFiltroChange('margem_max', parseFloat(event.target.value) || null)
+                    onFiltroChange("margem_max", parseFloat(event.target.value) || null)
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   placeholder="Ex: 50"
@@ -189,8 +200,8 @@ const DashboardRacoesFiltros = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data Início</label>
                 <input
                   type="date"
-                  value={filtros.data_inicio || ''}
-                  onChange={(event) => onFiltroChange('data_inicio', event.target.value)}
+                  value={filtros.data_inicio || ""}
+                  onChange={(event) => onFiltroChange("data_inicio", event.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                 />
               </div>
@@ -199,8 +210,8 @@ const DashboardRacoesFiltros = ({
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data Fim</label>
                 <input
                   type="date"
-                  value={filtros.data_fim || ''}
-                  onChange={(event) => onFiltroChange('data_fim', event.target.value)}
+                  value={filtros.data_fim || ""}
+                  onChange={(event) => onFiltroChange("data_fim", event.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                 />
               </div>

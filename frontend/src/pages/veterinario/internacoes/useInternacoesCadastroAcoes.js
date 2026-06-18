@@ -1,10 +1,7 @@
 import { useCallback } from "react";
 
 import { vetApi } from "../vetApi";
-import {
-  FORM_EVOLUCAO_INICIAL,
-  FORM_NOVA_INTERNACAO_INICIAL,
-} from "./internacoesInitialState";
+import { FORM_EVOLUCAO_INICIAL, FORM_NOVA_INTERNACAO_INICIAL } from "./internacoesInitialState";
 
 export function useInternacoesCadastroAcoes({
   abrirDetalhe,
@@ -43,7 +40,7 @@ export function useInternacoesCadastroAcoes({
       setCentroAba("lista");
       abrirDetalhe(internacaoId);
     },
-    [abrirDetalhe, setAba, setCentroAba]
+    [abrirDetalhe, setAba, setCentroAba],
   );
 
   const selecionarPessoaHistorico = useCallback(
@@ -51,7 +48,7 @@ export function useInternacoesCadastroAcoes({
       setFiltroPessoaHistorico(pessoaId);
       setFiltroPetHistorico("");
     },
-    [setFiltroPessoaHistorico, setFiltroPetHistorico]
+    [setFiltroPessoaHistorico, setFiltroPetHistorico],
   );
 
   const criarInternacao = useCallback(async () => {
@@ -112,7 +109,9 @@ export function useInternacoesCadastroAcoes({
     setSalvando(true);
     try {
       await vetApi.registrarEvolucao(internacaoId, {
-        temperatura: formEvolucao.temperatura ? Number.parseFloat(formEvolucao.temperatura) : undefined,
+        temperatura: formEvolucao.temperatura
+          ? Number.parseFloat(formEvolucao.temperatura)
+          : undefined,
         frequencia_cardiaca: formEvolucao.fc ? Number.parseInt(formEvolucao.fc, 10) : undefined,
         frequencia_respiratoria: formEvolucao.fr ? Number.parseInt(formEvolucao.fr, 10) : undefined,
         observacoes: formEvolucao.observacoes || undefined,

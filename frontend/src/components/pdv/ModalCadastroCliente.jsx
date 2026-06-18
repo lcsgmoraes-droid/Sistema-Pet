@@ -66,9 +66,7 @@ function extrairMensagemErroCadastroCliente(error) {
   }
 
   if (Array.isArray(detail) && detail.length > 0) {
-    const mensagens = detail
-      .map((item) => item?.msg || item?.message)
-      .filter(Boolean);
+    const mensagens = detail.map((item) => item?.msg || item?.message).filter(Boolean);
     if (mensagens.length > 0) {
       return mensagens.join("; ");
     }
@@ -138,30 +136,22 @@ export default function ModalCadastroCliente({ onClose, onClienteCriado, valorBu
           )}
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Nome *
-            </label>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Nome *</label>
             <input
               type="text"
               value={formData.nome}
-              onChange={(event) =>
-                setFormData({ ...formData, nome: event.target.value })
-              }
+              onChange={(event) => setFormData({ ...formData, nome: event.target.value })}
               className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               required
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Celular *
-            </label>
+            <label className="mb-2 block text-sm font-medium text-gray-700">Celular *</label>
             <input
               type="tel"
               value={formData.celular}
-              onChange={(event) =>
-                setFormData({ ...formData, celular: event.target.value })
-              }
+              onChange={(event) => setFormData({ ...formData, celular: event.target.value })}
               placeholder="(00) 00000-0000"
               className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
               required
@@ -169,15 +159,11 @@ export default function ModalCadastroCliente({ onClose, onClienteCriado, valorBu
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              CPF
-            </label>
+            <label className="mb-2 block text-sm font-medium text-gray-700">CPF</label>
             <input
               type="text"
               value={formData.cpf}
-              onChange={(event) =>
-                setFormData({ ...formData, cpf: event.target.value })
-              }
+              onChange={(event) => setFormData({ ...formData, cpf: event.target.value })}
               placeholder="000.000.000-00"
               className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             />
@@ -201,15 +187,11 @@ export default function ModalCadastroCliente({ onClose, onClienteCriado, valorBu
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              E-mail
-            </label>
+            <label className="mb-2 block text-sm font-medium text-gray-700">E-mail</label>
             <input
               type="email"
               value={formData.email}
-              onChange={(event) =>
-                setFormData({ ...formData, email: event.target.value })
-              }
+              onChange={(event) => setFormData({ ...formData, email: event.target.value })}
               placeholder="cliente@email.com"
               className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
             />

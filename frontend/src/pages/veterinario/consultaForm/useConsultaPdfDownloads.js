@@ -13,10 +13,7 @@ function baixarArquivo(blob, nomeArquivo) {
   window.URL.revokeObjectURL(url);
 }
 
-export default function useConsultaPdfDownloads({
-  consultaIdAtual,
-  setErro,
-}) {
+export default function useConsultaPdfDownloads({ consultaIdAtual, setErro }) {
   const [baixandoPdf, setBaixandoPdf] = useState(false);
 
   async function baixarProntuarioPdf() {

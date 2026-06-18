@@ -25,9 +25,7 @@ export default function ProdutoSelector({
   const panelRef = useRef(null);
   const searchValue = String(value || "");
   const shouldShowSuggestions =
-    showSuggestions &&
-    searchValue.trim().length >= minChars &&
-    suggestions.length > 0;
+    showSuggestions && searchValue.trim().length >= minChars && suggestions.length > 0;
 
   useRevealFloatingPanel({
     enabled: shouldShowSuggestions && !disabled,

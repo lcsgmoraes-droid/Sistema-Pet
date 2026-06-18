@@ -1,9 +1,6 @@
 import FilterBar from "../ui/FilterBar";
 import FornecedorSelector from "../fornecedores/FornecedorSelector";
-import {
-  CategoriaProdutoSelector,
-  MarcaProdutoSelector,
-} from "./CatalogoProdutoSelectors";
+import { CategoriaProdutoSelector, MarcaProdutoSelector } from "./CatalogoProdutoSelectors";
 
 export default function ProdutosFiltrosPanel({
   categorias,
@@ -15,20 +12,15 @@ export default function ProdutosFiltrosPanel({
   setPersistirBusca,
 }) {
   const fornecedorSelecionado =
-    fornecedores.find(
-      (fornecedor) => String(fornecedor.id) === String(filtros.fornecedor_id),
-    ) || null;
+    fornecedores.find((fornecedor) => String(fornecedor.id) === String(filtros.fornecedor_id)) ||
+    null;
 
   const handleSubmit = (event) => {
     event.preventDefault();
   };
 
   return (
-    <FilterBar
-      id="tour-produtos-filtros"
-      className="mb-4 md:mb-6"
-      onSubmit={handleSubmit}
-    >
+    <FilterBar id="tour-produtos-filtros" className="mb-4 md:mb-6" onSubmit={handleSubmit}>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-7 md:gap-4">
         <div id="tour-produtos-busca" className="md:col-span-2">
           <input
@@ -120,9 +112,7 @@ export default function ProdutosFiltrosPanel({
             <input
               type="checkbox"
               checked={filtros.mostrarPaisVariacoes}
-              onChange={(event) =>
-                handleFiltroChange("mostrarPaisVariacoes", event.target.checked)
-              }
+              onChange={(event) => handleFiltroChange("mostrarPaisVariacoes", event.target.checked)}
               className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
             />
             <span className="text-sm text-gray-700">Incluir pais, variacoes e kits</span>

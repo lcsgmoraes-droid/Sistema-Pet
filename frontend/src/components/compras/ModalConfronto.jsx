@@ -1,43 +1,63 @@
-import React, { useState, useEffect } from 'react';
-import api from '../../api';
-import { toast } from 'react-hot-toast';
-import ExportActionButton from '../ui/ExportActionButton';
-import FornecedorIdentity from '../ui/FornecedorIdentity';
+import { useState, useEffect } from "react";
+import api from "../../api";
+import { toast } from "react-hot-toast";
+import ExportActionButton from "../ui/ExportActionButton";
+import FornecedorIdentity from "../ui/FornecedorIdentity";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 const STATUS_LABELS = {
-  ok: { label: 'OK', cls: 'bg-green-100 text-green-800' },
-  divergencia_quantidade: { label: 'Dif. Qtd', cls: 'bg-yellow-100 text-yellow-800' },
-  divergencia_preco: { label: 'Dif. Preço', cls: 'bg-yellow-100 text-yellow-800' },
-  divergencia_mista: { label: 'Dif. Mista', cls: 'bg-red-100 text-red-800' },
-  nao_encontrado: { label: 'Não Recebido', cls: 'bg-red-100 text-red-800' },
-  nao_pedido: { label: 'Não Pedido', cls: 'bg-purple-100 text-purple-800' },
+  ok: { label: "OK", cls: "bg-green-100 text-green-800" },
+  divergencia_quantidade: { label: "Dif. Qtd", cls: "bg-yellow-100 text-yellow-800" },
+  divergencia_preco: { label: "Dif. Preço", cls: "bg-yellow-100 text-yellow-800" },
+  divergencia_mista: { label: "Dif. Mista", cls: "bg-red-100 text-red-800" },
+  nao_encontrado: { label: "Não Recebido", cls: "bg-red-100 text-red-800" },
+  nao_pedido: { label: "Não Pedido", cls: "bg-purple-100 text-purple-800" },
 };
 
 const CONFRONTO_LABELS = {
-  sem_divergencia: { label: '✅ Sem divergências', cls: 'bg-green-100 text-green-800 border-green-300' },
-  divergencia_quantidade: { label: '⚠️ Divergência de quantidade', cls: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-  divergencia_preco: { label: '⚠️ Divergência de preço', cls: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-  divergencia_mista: { label: '🔴 Divergência de quantidade e preço', cls: 'bg-red-100 text-red-800 border-red-300' },
+  sem_divergencia: {
+    label: "✅ Sem divergências",
+    cls: "bg-green-100 text-green-800 border-green-300",
+  },
+  divergencia_quantidade: {
+    label: "⚠️ Divergência de quantidade",
+    cls: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  },
+  divergencia_preco: {
+    label: "⚠️ Divergência de preço",
+    cls: "bg-yellow-100 text-yellow-800 border-yellow-300",
+  },
+  divergencia_mista: {
+    label: "🔴 Divergência de quantidade e preço",
+    cls: "bg-red-100 text-red-800 border-red-300",
+  },
 };
 
 function fmt(v, decimals = 2) {
   const n = Number(v || 0);
-  return n.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  return n.toLocaleString("pt-BR", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
 }
 
-function fmtMoeda(v) { return `R$ ${fmt(v)}`; }
-function fmtSinal(v, decimals = 2) { const n = Number(v || 0); return (n >= 0 ? '+' : '') + fmt(n, decimals); }
+function fmtMoeda(v) {
+  return `R$ ${fmt(v)}`;
+}
+function fmtSinal(v, decimals = 2) {
+  const n = Number(v || 0);
+  return (n >= 0 ? "+" : "") + fmt(n, decimals);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Modal principal
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
-  const [etapa, setEtapa] = useState('selecionar'); // 'selecionar' | 'confronto'
+  const [etapa, setEtapa] = useState("selecionar"); // 'selecionar' | 'confronto'
   const [notas, setNotas] = useState([]);
   const [notasVinculadasIds, setNotasVinculadasIds] = useState([]);
   const [loadingNotas, setLoadingNotas] = useState(true);
@@ -51,7 +71,14 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
   const [loadingFinalizar, setLoadingFinalizar] = useState(false);
   const [numeroNotasVinculadas, setNumeroNotasVinculadas] = useState(null);
 
-  const ALL_STATUS = ['ok', 'divergencia_quantidade', 'divergencia_preco', 'divergencia_mista', 'nao_encontrado', 'nao_pedido'];
+  const ALL_STATUS = [
+    "ok",
+    "divergencia_quantidade",
+    "divergencia_preco",
+    "divergencia_mista",
+    "nao_encontrado",
+    "nao_pedido",
+  ];
   const [filtrosSelecionados, setFiltrosSelecionados] = useState(new Set(ALL_STATUS));
 
   useEffect(() => {
@@ -63,16 +90,18 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
       setLoadingNotas(true);
       const res = await api.get(`/pedidos-compra/${pedido.id}/notas-candidatas`);
       setNotas(res.data.notas || []);
-      const ids = res.data.nota_vinculada_ids || (res.data.nota_vinculada_id ? [res.data.nota_vinculada_id] : []);
+      const ids =
+        res.data.nota_vinculada_ids ||
+        (res.data.nota_vinculada_id ? [res.data.nota_vinculada_id] : []);
       setNotasVinculadasIds(ids);
 
       // Se já tem NF vinculada, ir direto pro confronto
       if (ids.length > 0) {
         await carregarConfrontoSalvo();
-        setEtapa('confronto');
+        setEtapa("confronto");
       }
     } catch {
-      toast.error('Erro ao carregar notas fiscais');
+      toast.error("Erro ao carregar notas fiscais");
     } finally {
       setLoadingNotas(false);
     }
@@ -82,7 +111,9 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
     try {
       const res = await api.get(`/pedidos-compra/${pedido.id}/confronto`);
       setConfronto(res.data.confronto);
-      setNotasVinculadasIds(res.data.nota_entrada_ids || (res.data.nota_entrada_id ? [res.data.nota_entrada_id] : []));
+      setNotasVinculadasIds(
+        res.data.nota_entrada_ids || (res.data.nota_entrada_id ? [res.data.nota_entrada_id] : []),
+      );
       setNumeroNotasVinculadas(res.data.numero_nota || null);
       if (res.data.confronto_finalizado) setConfrontoFinalizado(true);
     } catch {
@@ -99,39 +130,53 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
         : await api.post(`/pedidos-compra/${pedido.id}/vincular-nota/${nota.id}`);
       setConfronto(res.data.confronto);
       setNotasVinculadasIds(res.data.nota_ids || []);
-      setNumeroNotasVinculadas((res.data.notas_entrada || []).map(n => n.numero_nota).filter(Boolean).join(', '));
-      setNotas(prev => prev.map(n => (
-        n.id === nota.id ? { ...n, ja_vinculada: !jaVinculada } : n
-      )));
+      setNumeroNotasVinculadas(
+        (res.data.notas_entrada || [])
+          .map((n) => n.numero_nota)
+          .filter(Boolean)
+          .join(", "),
+      );
+      setNotas((prev) =>
+        prev.map((n) => (n.id === nota.id ? { ...n, ja_vinculada: !jaVinculada } : n)),
+      );
       if (res.data.confronto) {
-        setEtapa('confronto');
+        setEtapa("confronto");
       }
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao realizar confronto');
+      toast.error(e.response?.data?.detail || "Erro ao realizar confronto");
     } finally {
       setLoadingConfronto(false);
     }
   };
 
-  const filtrosParam = [...filtrosSelecionados].join(',');
+  const filtrosParam = [...filtrosSelecionados].join(",");
 
   const toggleFiltro = (status) => {
-    setFiltrosSelecionados(prev => {
+    setFiltrosSelecionados((prev) => {
       const next = new Set(prev);
-      if (next.has(status)) { next.delete(status); } else { next.add(status); }
+      if (next.has(status)) {
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
       return next;
     });
   };
 
   const finalizarConfronto = async () => {
-    if (!window.confirm('Finalizar a conferencia? Isso cria um vinculo permanente entre este pedido e as NFs selecionadas. Nao sera possivel revincular depois.')) return;
+    if (
+      !window.confirm(
+        "Finalizar a conferencia? Isso cria um vinculo permanente entre este pedido e as NFs selecionadas. Nao sera possivel revincular depois.",
+      )
+    )
+      return;
     setLoadingFinalizar(true);
     try {
       await api.post(`/pedidos-compra/${pedido.id}/finalizar-confronto`);
       setConfrontoFinalizado(true);
-      toast.success('Conferência finalizada! Vínculo permanente criado.');
+      toast.success("Conferência finalizada! Vínculo permanente criado.");
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao finalizar confronto');
+      toast.error(e.response?.data?.detail || "Erro ao finalizar confronto");
     } finally {
       setLoadingFinalizar(false);
     }
@@ -139,39 +184,47 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
 
   const baixarCSV = async () => {
     try {
-      const res = await api.get(`/pedidos-compra/${pedido.id}/confronto/csv?filtros=${filtrosParam}`, { responseType: 'blob' });
+      const res = await api.get(
+        `/pedidos-compra/${pedido.id}/confronto/csv?filtros=${filtrosParam}`,
+        { responseType: "blob" },
+      );
       const url = window.URL.createObjectURL(new Blob([res.data]));
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = `confronto_${pedido.numero_pedido}.csv`;
       a.click();
       window.URL.revokeObjectURL(url);
     } catch {
-      toast.error('Erro ao baixar CSV');
+      toast.error("Erro ao baixar CSV");
     }
   };
 
   const baixarPDF = async () => {
     try {
-      const res = await api.get(`/pedidos-compra/${pedido.id}/confronto/pdf?filtros=${filtrosParam}`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-      const a = document.createElement('a');
+      const res = await api.get(
+        `/pedidos-compra/${pedido.id}/confronto/pdf?filtros=${filtrosParam}`,
+        { responseType: "blob" },
+      );
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const a = document.createElement("a");
       a.href = url;
       a.download = `confronto_${pedido.numero_pedido}.pdf`;
       a.click();
       window.URL.revokeObjectURL(url);
     } catch {
-      toast.error('Erro ao gerar PDF');
+      toast.error("Erro ao gerar PDF");
     }
   };
 
   const gerarEmail = async () => {
     try {
-      const res = await api.get(`/pedidos-compra/${pedido.id}/confronto/email-texto?filtros=${filtrosParam}`);
+      const res = await api.get(
+        `/pedidos-compra/${pedido.id}/confronto/email-texto?filtros=${filtrosParam}`,
+      );
       setEmailTexto(res.data.texto);
       setMostrarEmail(true);
     } catch {
-      toast.error('Erro ao gerar texto do e-mail');
+      toast.error("Erro ao gerar texto do e-mail");
     }
   };
 
@@ -183,29 +236,36 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
       toast.success(`Pedido complementar ${res.data.numero_pedido} criado em rascunho!`);
       if (onPedidoComplementarCriado) onPedidoComplementarCriado();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erro ao criar pedido complementar');
+      toast.error(e.response?.data?.detail || "Erro ao criar pedido complementar");
     } finally {
       setLoadingAcao(false);
     }
   };
 
   const temFaltantes = confronto?.itens?.some(
-    i => ['nao_encontrado', 'divergencia_quantidade'].includes(i.status) && (i.dif_qtd || 0) < 0
+    (i) => ["nao_encontrado", "divergencia_quantidade"].includes(i.status) && (i.dif_qtd || 0) < 0,
   );
 
-  const temDivergencia = confronto && confronto.status_confronto !== 'sem_divergencia';
+  const temDivergencia = confronto && confronto.status_confronto !== "sem_divergencia";
 
   // ── Etapa 1: selecionar NF ──────────────────────────────────────────────────
-  if (etapa === 'selecionar') {
+  if (etapa === "selecionar") {
     return (
       <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
           <div className="p-5 border-b flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-gray-900">🔍 Selecionar Nota Fiscal</h2>
-              <p className="text-sm text-gray-500 mt-0.5">Pedido {pedido.numero_pedido} — escolha a NF para confronto</p>
+              <p className="text-sm text-gray-500 mt-0.5">
+                Pedido {pedido.numero_pedido} — escolha a NF para confronto
+              </p>
             </div>
-            <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+            >
+              &times;
+            </button>
           </div>
 
           <div className="flex-1 overflow-y-auto p-5">
@@ -214,20 +274,24 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
             ) : notas.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-4xl mb-3">📭</div>
-                <p className="text-gray-600 font-medium">Nenhuma NF importada para este fornecedor</p>
-                <p className="text-sm text-gray-500 mt-1">Importe o XML na <b>Central NF Entradas</b> e volte aqui</p>
+                <p className="text-gray-600 font-medium">
+                  Nenhuma NF importada para este fornecedor
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Importe o XML na <b>Central NF Entradas</b> e volte aqui
+                </p>
               </div>
             ) : (
               <div className="space-y-2">
-                {notas.map(nota => (
+                {notas.map((nota) => (
                   <button
                     key={nota.id}
                     onClick={() => alternarNota(nota)}
                     disabled={loadingConfronto}
                     className={`w-full text-left p-4 rounded-lg border-2 transition-all hover:shadow-md ${
-                      (notasVinculadasIds.includes(nota.id) || nota.ja_vinculada)
-                        ? 'border-blue-400 bg-blue-50'
-                        : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/30'
+                      notasVinculadasIds.includes(nota.id) || nota.ja_vinculada
+                        ? "border-blue-400 bg-blue-50"
+                        : "border-gray-200 hover:border-blue-300 hover:bg-blue-50/30"
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -235,7 +299,9 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
                         <span className="font-semibold text-gray-900">NF {nota.numero_nota}</span>
                         <span className="text-gray-500 text-sm ml-2">Série {nota.serie}</span>
                         {(notasVinculadasIds.includes(nota.id) || nota.ja_vinculada) && (
-                          <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">Selecionada</span>
+                          <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">
+                            Selecionada
+                          </span>
                         )}
                       </div>
                       <span className="font-bold text-green-700">{fmtMoeda(nota.valor_total)}</span>
@@ -248,14 +314,20 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
                         nameClassName="font-medium text-gray-600"
                         record={nota}
                         showDocument={false}
-                      /> · {nota.data_emissao ? new Date(nota.data_emissao).toLocaleDateString('pt-BR') : ''}
+                      />{" "}
+                      ·{" "}
+                      {nota.data_emissao
+                        ? new Date(nota.data_emissao).toLocaleDateString("pt-BR")
+                        : ""}
                     </div>
                   </button>
                 ))}
               </div>
             )}
             {loadingConfronto && (
-              <div className="text-center py-6 text-blue-600 font-medium animate-pulse">Realizando confronto...</div>
+              <div className="text-center py-6 text-blue-600 font-medium animate-pulse">
+                Realizando confronto...
+              </div>
             )}
           </div>
         </div>
@@ -264,10 +336,11 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
   }
 
   // ── Etapa 2: confronto ─────────────────────────────────────────────────────
-  const statusInfo = CONFRONTO_LABELS[confronto?.status_confronto] || CONFRONTO_LABELS.sem_divergencia;
+  const statusInfo =
+    CONFRONTO_LABELS[confronto?.status_confronto] || CONFRONTO_LABELS.sem_divergencia;
   const resumo = confronto?.resumo || {};
   const itens = confronto?.itens || [];
-  const itensFiltrados = itens.filter(it => filtrosSelecionados.has(it.status));
+  const itensFiltrados = itens.filter((it) => filtrosSelecionados.has(it.status));
   const resumoFiltrado = {
     total_pedido: itensFiltrados.reduce((acc, it) => acc + Number(it.valor_pedido || 0), 0),
     total_nf: itensFiltrados.reduce((acc, it) => acc + Number(it.valor_nf || 0), 0),
@@ -278,7 +351,6 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col">
-
         {/* Header */}
         <div className="p-5 border-b flex items-start justify-between">
           <div>
@@ -291,21 +363,30 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
               )}
             </div>
             <p className="text-sm text-gray-500 mt-0.5">
-              Pedido <b>{pedido.numero_pedido}</b> · NFs <b>{numeroNotasVinculadas || '—'}</b>
+              Pedido <b>{pedido.numero_pedido}</b> · NFs <b>{numeroNotasVinculadas || "—"}</b>
               {!confrontoFinalizado && (
                 <button
-                  onClick={() => setEtapa('selecionar')}
+                  onClick={() => setEtapa("selecionar")}
                   className="ml-2 inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100"
-                >adicionar/remover NFs</button>
+                >
+                  adicionar/remover NFs
+                </button>
               )}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+          >
+            &times;
+          </button>
         </div>
 
         {/* Status badge + ações */}
         <div className="px-5 py-3 border-b flex items-center justify-between flex-wrap gap-2">
-          <span className={`px-4 py-1.5 rounded-full text-sm font-semibold border ${statusInfo.cls}`}>
+          <span
+            className={`px-4 py-1.5 rounded-full text-sm font-semibold border ${statusInfo.cls}`}
+          >
             {statusInfo.label}
           </span>
           <div className="flex items-center gap-2 flex-wrap">
@@ -318,18 +399,10 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
                 🔒 Finalizar Conferência
               </button>
             )}
-            <ExportActionButton
-              type="csv"
-              onClick={baixarCSV}
-              title="Exportar confronto em CSV"
-            >
+            <ExportActionButton type="csv" onClick={baixarCSV} title="Exportar confronto em CSV">
               CSV
             </ExportActionButton>
-            <ExportActionButton
-              type="pdf"
-              onClick={baixarPDF}
-              title="Exportar confronto em PDF"
-            >
+            <ExportActionButton type="pdf" onClick={baixarPDF} title="Exportar confronto em PDF">
               PDF
             </ExportActionButton>
             {temDivergencia && (
@@ -360,43 +433,81 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
         {/* Resumo financeiro */}
         <div className="px-5 py-3 bg-gray-50 border-b grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
           <div>
-            <div className="text-gray-500 text-xs font-medium uppercase tracking-wide">Total Pedido</div>
-            <div className="font-bold text-gray-900 mt-0.5">{fmtMoeda(resumoFiltrado.total_pedido)}</div>
+            <div className="text-gray-500 text-xs font-medium uppercase tracking-wide">
+              Total Pedido
+            </div>
+            <div className="font-bold text-gray-900 mt-0.5">
+              {fmtMoeda(resumoFiltrado.total_pedido)}
+            </div>
           </div>
           <div>
-            <div className="text-gray-500 text-xs font-medium uppercase tracking-wide">Total NF</div>
-            <div className="font-bold text-gray-900 mt-0.5">{fmtMoeda(resumoFiltrado.total_nf)}</div>
+            <div className="text-gray-500 text-xs font-medium uppercase tracking-wide">
+              Total NF
+            </div>
+            <div className="font-bold text-gray-900 mt-0.5">
+              {fmtMoeda(resumoFiltrado.total_nf)}
+            </div>
           </div>
           <div>
-            <div className="text-gray-500 text-xs font-medium uppercase tracking-wide">Diferença</div>
-            <div className={`font-bold mt-0.5 ${(resumoFiltrado.dif_total || 0) > 0 ? 'text-red-600' : (resumoFiltrado.dif_total || 0) < 0 ? 'text-yellow-600' : 'text-green-600'}`}>
+            <div className="text-gray-500 text-xs font-medium uppercase tracking-wide">
+              Diferença
+            </div>
+            <div
+              className={`font-bold mt-0.5 ${(resumoFiltrado.dif_total || 0) > 0 ? "text-red-600" : (resumoFiltrado.dif_total || 0) < 0 ? "text-yellow-600" : "text-green-600"}`}
+            >
               {fmtSinal(resumoFiltrado.dif_total)} R$
             </div>
           </div>
           <div>
-            <div className="text-gray-500 text-xs font-medium uppercase tracking-wide">Frete NF</div>
-            <div className="font-bold text-gray-900 mt-0.5">{fmtMoeda(resumoFiltrado.frete_nf)}</div>
+            <div className="text-gray-500 text-xs font-medium uppercase tracking-wide">
+              Frete NF
+            </div>
+            <div className="font-bold text-gray-900 mt-0.5">
+              {fmtMoeda(resumoFiltrado.frete_nf)}
+            </div>
           </div>
         </div>
 
         {/* Filtros de status */}
         <div className="px-5 py-2 border-b bg-gray-50 flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Filtrar:</span>
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Filtrar:
+          </span>
           {[
-            { key: 'ok', label: '✅ OK', cls: 'bg-green-100 text-green-800 border-green-300' },
-            { key: 'divergencia_quantidade', label: '⚠️ Dif. Qtd', cls: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-            { key: 'divergencia_preco', label: '⚠️ Dif. Preço', cls: 'bg-yellow-100 text-yellow-800 border-yellow-300' },
-            { key: 'divergencia_mista', label: '🔴 Dif. Mista', cls: 'bg-red-100 text-red-800 border-red-300' },
-            { key: 'nao_encontrado', label: '🔴 Não Recebido', cls: 'bg-red-100 text-red-800 border-red-300' },
-            { key: 'nao_pedido', label: '🟣 Não Pedido', cls: 'bg-purple-100 text-purple-800 border-purple-300' },
-          ].map(f => (
+            { key: "ok", label: "✅ OK", cls: "bg-green-100 text-green-800 border-green-300" },
+            {
+              key: "divergencia_quantidade",
+              label: "⚠️ Dif. Qtd",
+              cls: "bg-yellow-100 text-yellow-800 border-yellow-300",
+            },
+            {
+              key: "divergencia_preco",
+              label: "⚠️ Dif. Preço",
+              cls: "bg-yellow-100 text-yellow-800 border-yellow-300",
+            },
+            {
+              key: "divergencia_mista",
+              label: "🔴 Dif. Mista",
+              cls: "bg-red-100 text-red-800 border-red-300",
+            },
+            {
+              key: "nao_encontrado",
+              label: "🔴 Não Recebido",
+              cls: "bg-red-100 text-red-800 border-red-300",
+            },
+            {
+              key: "nao_pedido",
+              label: "🟣 Não Pedido",
+              cls: "bg-purple-100 text-purple-800 border-purple-300",
+            },
+          ].map((f) => (
             <button
               key={f.key}
               onClick={() => toggleFiltro(f.key)}
               className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
                 filtrosSelecionados.has(f.key)
                   ? f.cls
-                  : 'bg-gray-100 text-gray-400 border-gray-200 line-through opacity-60'
+                  : "bg-gray-100 text-gray-400 border-gray-200 line-through opacity-60"
               }`}
             >
               {f.label}
@@ -428,39 +539,92 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {itensFiltrados.map((it, idx) => {
-                const st = STATUS_LABELS[it.status] || { label: it.status, cls: 'bg-gray-100 text-gray-700' };
-                const rowBg = it.status === 'ok' ? '' :
-                  ['nao_encontrado', 'divergencia_mista'].includes(it.status) ? 'bg-red-50' :
-                  it.status === 'nao_pedido' ? 'bg-purple-50' : 'bg-yellow-50';
-                const difUnit = (it.dif_preco_unit !== undefined && it.dif_preco_unit !== null)
-                  ? Number(it.dif_preco_unit)
-                  : Number(it.preco_nf || 0) - Number(it.preco_pedido || 0);
+                const st = STATUS_LABELS[it.status] || {
+                  label: it.status,
+                  cls: "bg-gray-100 text-gray-700",
+                };
+                const rowBg =
+                  it.status === "ok"
+                    ? ""
+                    : ["nao_encontrado", "divergencia_mista"].includes(it.status)
+                      ? "bg-red-50"
+                      : it.status === "nao_pedido"
+                        ? "bg-purple-50"
+                        : "bg-yellow-50";
+                const difUnit =
+                  it.dif_preco_unit !== undefined && it.dif_preco_unit !== null
+                    ? Number(it.dif_preco_unit)
+                    : Number(it.preco_nf || 0) - Number(it.preco_pedido || 0);
                 return (
                   <tr key={idx} className={`${rowBg} hover:brightness-95`}>
                     <td className="px-3 py-2">
                       <div className="font-medium text-gray-900">{it.produto_nome}</div>
-                      {it.produto_codigo && <div className="text-xs text-gray-400">{it.produto_codigo}</div>}
+                      {it.produto_codigo && (
+                        <div className="text-xs text-gray-400">{it.produto_codigo}</div>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-center">{fmt(it.qtd_pedida, 0)}</td>
-                    <td className="px-3 py-2 text-center">{it.encontrado_na_nf ? fmt(it.qtd_nf, 0) : <span className="text-gray-400">—</span>}</td>
-                    <td className={`px-3 py-2 text-center font-semibold ${it.dif_qtd < 0 ? 'text-red-600' : it.dif_qtd > 0 ? 'text-blue-600' : 'text-green-600'}`}>
-                      {it.dif_qtd === 0 ? '—' : fmtSinal(it.dif_qtd, 0)}
+                    <td className="px-3 py-2 text-center">
+                      {it.encontrado_na_nf ? (
+                        fmt(it.qtd_nf, 0)
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td
+                      className={`px-3 py-2 text-center font-semibold ${it.dif_qtd < 0 ? "text-red-600" : it.dif_qtd > 0 ? "text-blue-600" : "text-green-600"}`}
+                    >
+                      {it.dif_qtd === 0 ? "—" : fmtSinal(it.dif_qtd, 0)}
                     </td>
                     <td className="px-3 py-2 text-right">{fmtMoeda(it.preco_pedido)}</td>
-                    <td className="px-3 py-2 text-right">{it.encontrado_na_nf ? fmtMoeda(it.preco_nf) : <span className="text-gray-400">—</span>}</td>
-                    <td className={`px-3 py-2 text-right font-semibold ${difUnit > 0 ? 'text-red-600' : difUnit < 0 ? 'text-yellow-600' : 'text-gray-400'}`}>
-                      {it.encontrado_na_nf ? (Math.abs(difUnit) < 0.0001 ? '—' : `${difUnit > 0 ? '+' : ''}${fmtMoeda(difUnit)}`) : <span className="text-gray-400">—</span>}
+                    <td className="px-3 py-2 text-right">
+                      {it.encontrado_na_nf ? (
+                        fmtMoeda(it.preco_nf)
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
                     </td>
-                    <td className={`px-3 py-2 text-center font-semibold ${it.dif_preco_pct > 0.5 ? 'text-red-600' : it.dif_preco_pct < -0.5 ? 'text-green-600' : 'text-gray-400'}`}>
-                      {Math.abs(it.dif_preco_pct) < 0.5 ? '—' : `${it.dif_preco_pct > 0 ? '+' : ''}${fmt(it.dif_preco_pct, 1)}%`}
+                    <td
+                      className={`px-3 py-2 text-right font-semibold ${difUnit > 0 ? "text-red-600" : difUnit < 0 ? "text-yellow-600" : "text-gray-400"}`}
+                    >
+                      {it.encontrado_na_nf ? (
+                        Math.abs(difUnit) < 0.0001 ? (
+                          "—"
+                        ) : (
+                          `${difUnit > 0 ? "+" : ""}${fmtMoeda(difUnit)}`
+                        )
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td
+                      className={`px-3 py-2 text-center font-semibold ${it.dif_preco_pct > 0.5 ? "text-red-600" : it.dif_preco_pct < -0.5 ? "text-green-600" : "text-gray-400"}`}
+                    >
+                      {Math.abs(it.dif_preco_pct) < 0.5
+                        ? "—"
+                        : `${it.dif_preco_pct > 0 ? "+" : ""}${fmt(it.dif_preco_pct, 1)}%`}
                     </td>
                     <td className="px-3 py-2 text-right">{fmtMoeda(it.valor_pedido)}</td>
-                    <td className="px-3 py-2 text-right">{it.encontrado_na_nf ? fmtMoeda(it.valor_nf) : <span className="text-gray-400">—</span>}</td>
-                    <td className={`px-3 py-2 text-right font-semibold ${it.dif_valor > 0 ? 'text-red-600' : it.dif_valor < 0 ? 'text-yellow-600' : 'text-gray-400'}`}>
-                      {it.dif_valor === 0 ? '—' : `${it.dif_valor > 0 ? '+' : ''}${fmtMoeda(it.dif_valor)}`}
+                    <td className="px-3 py-2 text-right">
+                      {it.encontrado_na_nf ? (
+                        fmtMoeda(it.valor_nf)
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td
+                      className={`px-3 py-2 text-right font-semibold ${it.dif_valor > 0 ? "text-red-600" : it.dif_valor < 0 ? "text-yellow-600" : "text-gray-400"}`}
+                    >
+                      {it.dif_valor === 0
+                        ? "—"
+                        : `${it.dif_valor > 0 ? "+" : ""}${fmtMoeda(it.dif_valor)}`}
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${st.cls}`}>{st.label}</span>
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${st.cls}`}
+                      >
+                        {st.label}
+                      </span>
                     </td>
                   </tr>
                 );
@@ -476,18 +640,26 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
             <div className="p-4 border-b flex items-center justify-between">
               <h3 className="font-bold text-gray-900">✉️ Texto para E-mail ao Fornecedor</h3>
-              <button onClick={() => setMostrarEmail(false)} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+              <button
+                onClick={() => setMostrarEmail(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                &times;
+              </button>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
               <textarea
                 className="w-full h-72 p-3 border border-gray-300 rounded-lg text-sm font-mono resize-none focus:ring-2 focus:ring-blue-500"
                 value={emailTexto}
-                onChange={e => setEmailTexto(e.target.value)}
+                onChange={(e) => setEmailTexto(e.target.value)}
               />
             </div>
             <div className="p-4 border-t flex gap-2 justify-end">
               <button
-                onClick={() => { navigator.clipboard.writeText(emailTexto); toast.success('Copiado!'); }}
+                onClick={() => {
+                  navigator.clipboard.writeText(emailTexto);
+                  toast.success("Copiado!");
+                }}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
               >
                 📋 Copiar Texto

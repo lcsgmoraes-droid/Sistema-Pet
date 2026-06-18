@@ -146,7 +146,9 @@ export default function ProdutosNovoRacaoTab({
               className="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
             />
             <span>
-              <span className="block text-sm font-semibold text-slate-800">Produto vendido a granel</span>
+              <span className="block text-sm font-semibold text-slate-800">
+                Produto vendido a granel
+              </span>
               <span className="mt-1 block text-xs text-slate-600">
                 O estoque fica em kg. O abastecimento parte do produto fechado em Movimentacoes.
               </span>
@@ -157,14 +159,17 @@ export default function ProdutosNovoRacaoTab({
 
       {formData.e_granel && (
         <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-800">
-          Para abastecer este granel, abra o produto fechado de origem e use "Lancar granel".
-          O sistema baixa pacote(s) do produto fechado e entra kg aqui usando o peso da embalagem da racao.
+          Para abastecer este granel, abra o produto fechado de origem e use "Lancar granel". O
+          sistema baixa pacote(s) do produto fechado e entra kg aqui usando o peso da embalagem da
+          racao.
         </div>
       )}
 
       {formData.eh_racao && (
         <div className="border-l-4 border-blue-500 bg-blue-50 p-4">
-          <h4 className="mb-4 text-sm font-semibold text-blue-900">Informacoes detalhadas da racao</h4>
+          <h4 className="mb-4 text-sm font-semibold text-blue-900">
+            Informacoes detalhadas da racao
+          </h4>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
               <LabelComNovo tipo="linha" titulo="Nova linha">
@@ -174,9 +179,7 @@ export default function ProdutosNovoRacaoTab({
                 value={formData.linha_racao_id}
                 onChange={(e) => {
                   const linhaId = e.target.value;
-                  const linha = opcoesLinhas.find(
-                    (item) => String(item.id) === String(linhaId),
-                  );
+                  const linha = opcoesLinhas.find((item) => String(item.id) === String(linhaId));
                   handleChange("linha_racao_id", linhaId);
                   handleChange("classificacao_racao", linha?.nome || "");
                 }}
@@ -283,8 +286,9 @@ export default function ProdutosNovoRacaoTab({
           </div>
 
           <p className="mt-3 text-xs text-blue-600">
-            <strong>Dica:</strong> Essas informacoes ajudam a IA a recomendar a racao ideal para cada pet no PDV.
-            Voce pode gerenciar as opcoes disponiveis em <strong>Cadastros &gt; Opcoes de Racao</strong>.
+            <strong>Dica:</strong> Essas informacoes ajudam a IA a recomendar a racao ideal para
+            cada pet no PDV. Voce pode gerenciar as opcoes disponiveis em{" "}
+            <strong>Cadastros &gt; Opcoes de Racao</strong>.
           </p>
         </div>
       )}
@@ -363,7 +367,9 @@ export default function ProdutosNovoRacaoTab({
             ) : (
               <p className="text-yellow-600">Sem tabela de consumo (usara calculo generico)</p>
             )}
-            <p className="mt-2 text-orange-800">Use a Calculadora de Racao para ver duracao e custo/dia.</p>
+            <p className="mt-2 text-orange-800">
+              Use a Calculadora de Racao para ver duracao e custo/dia.
+            </p>
           </div>
         </div>
       )}
@@ -389,7 +395,9 @@ export default function ProdutosNovoRacaoTab({
             <div className="space-y-4 px-5 py-4">
               {modalOpcao.tipo === "apresentacao" ? (
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">Peso em kg</label>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Peso em kg
+                  </label>
                   <input
                     type="number"
                     step="0.01"

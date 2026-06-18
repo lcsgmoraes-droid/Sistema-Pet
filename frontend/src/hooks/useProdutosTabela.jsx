@@ -23,9 +23,7 @@ function carregarColunasVisiveisSalvas(colunasTabela) {
 
     const colunasConhecidas = new Set(colunasTabela.map((coluna) => coluna.key));
     const normalizadas = parsed.filter((key) => colunasConhecidas.has(key));
-    const versaoSalva = Number(
-      localStorage.getItem(PRODUTOS_COLUNAS_VERSION_KEY) || 1,
-    );
+    const versaoSalva = Number(localStorage.getItem(PRODUTOS_COLUNAS_VERSION_KEY) || 1);
 
     if (versaoSalva < PRODUTOS_COLUNAS_VERSION) {
       COLUNAS_PADRAO_MIGRACAO.forEach((key) => {
@@ -60,22 +58,14 @@ export default function useProdutosTabela({
   const setPaisExpandidos = setPaisExpandidosExterno ?? setPaisExpandidosInterno;
 
   useEffect(() => {
-    const versaoSalva = Number(
-      localStorage.getItem(PRODUTOS_COLUNAS_VERSION_KEY) || 0,
-    );
+    const versaoSalva = Number(localStorage.getItem(PRODUTOS_COLUNAS_VERSION_KEY) || 0);
 
     if (versaoSalva >= PRODUTOS_COLUNAS_VERSION) return;
 
     if (colunasVisiveis) {
-      localStorage.setItem(
-        PRODUTOS_COLUNAS_STORAGE_KEY,
-        JSON.stringify(colunasVisiveis),
-      );
+      localStorage.setItem(PRODUTOS_COLUNAS_STORAGE_KEY, JSON.stringify(colunasVisiveis));
     }
-    localStorage.setItem(
-      PRODUTOS_COLUNAS_VERSION_KEY,
-      String(PRODUTOS_COLUNAS_VERSION),
-    );
+    localStorage.setItem(PRODUTOS_COLUNAS_VERSION_KEY, String(PRODUTOS_COLUNAS_VERSION));
   }, [colunasVisiveis]);
 
   const getCorEstoque = (produto) => {
@@ -107,9 +97,7 @@ export default function useProdutosTabela({
       );
     }
 
-    const dias = Math.floor(
-      (new Date(proximaValidade) - new Date()) / (1000 * 60 * 60 * 24),
-    );
+    const dias = Math.floor((new Date(proximaValidade) - new Date()) / (1000 * 60 * 60 * 24));
 
     let cor = "text-gray-700";
     if (dias < 0) cor = "text-red-600 font-bold";
@@ -137,8 +125,7 @@ export default function useProdutosTabela({
   const garantirGrupoPaiVisivel = (produtoId) => {
     const produtosVisiveis = produtosVisiveisRef?.current || [];
     const variacoesVisiveis = produtosVisiveis.filter(
-      (produto) =>
-        produto.tipo_produto === "VARIACAO" && produto.produto_pai_id === produtoId,
+      (produto) => produto.tipo_produto === "VARIACAO" && produto.produto_pai_id === produtoId,
     );
 
     const ultimoProdutoVisivel =
@@ -204,14 +191,8 @@ export default function useProdutosTabela({
   };
 
   const salvarColunas = () => {
-    localStorage.setItem(
-      PRODUTOS_COLUNAS_STORAGE_KEY,
-      JSON.stringify(colunasTemporarias),
-    );
-    localStorage.setItem(
-      PRODUTOS_COLUNAS_VERSION_KEY,
-      String(PRODUTOS_COLUNAS_VERSION),
-    );
+    localStorage.setItem(PRODUTOS_COLUNAS_STORAGE_KEY, JSON.stringify(colunasTemporarias));
+    localStorage.setItem(PRODUTOS_COLUNAS_VERSION_KEY, String(PRODUTOS_COLUNAS_VERSION));
     setColunasVisiveis(colunasTemporarias);
     setModalColunas(false);
     toast.success("Preferencias de colunas salvas!");
@@ -219,10 +200,7 @@ export default function useProdutosTabela({
 
   const restaurarColunasPadrao = () => {
     localStorage.removeItem(PRODUTOS_COLUNAS_STORAGE_KEY);
-    localStorage.setItem(
-      PRODUTOS_COLUNAS_VERSION_KEY,
-      String(PRODUTOS_COLUNAS_VERSION),
-    );
+    localStorage.setItem(PRODUTOS_COLUNAS_VERSION_KEY, String(PRODUTOS_COLUNAS_VERSION));
     setColunasVisiveis(null);
     setColunasTemporarias(colunasTabela.map((coluna) => coluna.key));
     toast.success("Colunas restauradas para o padrao!");

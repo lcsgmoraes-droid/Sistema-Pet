@@ -1,4 +1,3 @@
-import React from "react";
 import FornecedorSelector from "../fornecedores/FornecedorSelector";
 
 function CampoSelect({ children, disabled = false, label, onChange, value }) {
@@ -72,13 +71,16 @@ export default function ProdutosFornecedoresLoteSection({
           }
           onSelect={(fornecedor) => onAtualizarCampo("fornecedor_id", String(fornecedor.id))}
           onClear={() => onAtualizarCampo("fornecedor_id", "")}
-          onFornecedorCriado={(fornecedor) => onAtualizarCampo("fornecedor_id", String(fornecedor.id))}
+          onFornecedorCriado={(fornecedor) =>
+            onAtualizarCampo("fornecedor_id", String(fornecedor.id))
+          }
         />
       </div>
 
       {dadosEdicaoLote.fornecedor_operacao === "definir_principal" && (
         <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-emerald-800">
-          O fornecedor selecionado sera vinculado, ativado e marcado como principal. Ao salvar, voce escolhe se remove os outros fornecedores ou se mantem como alternativos.
+          O fornecedor selecionado sera vinculado, ativado e marcado como principal. Ao salvar, voce
+          escolhe se remove os outros fornecedores ou se mantem como alternativos.
         </div>
       )}
       {dadosEdicaoLote.fornecedor_operacao === "adicionar" && (
@@ -88,7 +90,8 @@ export default function ProdutosFornecedoresLoteSection({
       )}
       {dadosEdicaoLote.fornecedor_operacao === "remover" && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          Remove os fornecedores vinculados dos produtos selecionados. Para trocar por um novo principal, use "Definir como principal" e escolha remover os outros ao salvar.
+          Remove os fornecedores vinculados dos produtos selecionados. Para trocar por um novo
+          principal, use "Definir como principal" e escolha remover os outros ao salvar.
         </div>
       )}
     </section>

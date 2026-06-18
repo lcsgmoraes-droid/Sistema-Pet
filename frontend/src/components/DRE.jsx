@@ -26,7 +26,7 @@ import ExportActionButton from "./ui/ExportActionButton";
 import LoadingState from "./ui/LoadingState";
 import MetricCard from "./ui/MetricCard";
 import MetricGrid from "./ui/MetricGrid";
-import MoneyCell, { formatMoneyCellValue } from "./ui/MoneyCell";
+import MoneyCell from "./ui/MoneyCell";
 import ModuleTabs from "./ui/ModuleTabs";
 import NumberCell from "./ui/NumberCell";
 
@@ -48,13 +48,7 @@ const DRE_TABLE_COLUMNS = [
     render: (linha) => (
       <span className="inline-flex items-center gap-2">
         <span>{linha.descricao}</span>
-        {linha.origem && (
-          <Info
-            size={14}
-            className="text-gray-400"
-            title={linha.origem}
-          />
-        )}
+        {linha.origem && <Info size={14} className="text-gray-400" title={linha.origem} />}
         {linha.detalhavel && (
           <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
             detalhes
@@ -73,9 +67,7 @@ const DRE_TABLE_COLUMNS = [
     key: "percentual",
     header: "% Receita",
     align: "right",
-    render: (linha) => (
-      <NumberCell value={linha.percentual} decimals={2} suffix="%" zeroAsDash />
-    ),
+    render: (linha) => <NumberCell value={linha.percentual} decimals={2} suffix="%" zeroAsDash />,
   },
 ];
 
@@ -91,9 +83,7 @@ const DRE_DETAIL_COLUMNS = [
     render: (item) => (
       <div>
         <div className="text-sm font-medium text-gray-900">{item.descricao}</div>
-        <div className="text-xs text-gray-500">
-          {item.contraparte || item.documento || "-"}
-        </div>
+        <div className="text-xs text-gray-500">{item.contraparte || item.documento || "-"}</div>
       </div>
     ),
   },
@@ -168,7 +158,7 @@ const DRE = () => {
   // Canais de venda (ABA 7)
   const [canaisDisponiveis] = useState(CANAIS_DRE_PADRAO);
   const [canaisSelecionados, setCanaisSelecionados] = useState(
-    CANAIS_DRE_PADRAO.map((canal) => canal.id)
+    CANAIS_DRE_PADRAO.map((canal) => canal.id),
   );
 
   // Filtros
@@ -216,20 +206,13 @@ const DRE = () => {
       }
       console.error("Erro ao carregar DRE:", error);
       if (requestId === dreRequestIdRef.current) {
-        toast.error(
-          "Erro ao carregar DRE: " +
-            (error.response?.data?.detail || error.message),
-        );
+        toast.error("Erro ao carregar DRE: " + (error.response?.data?.detail || error.message));
       }
     } finally {
       if (requestId === dreRequestIdRef.current) {
         setLoading(false);
       }
     }
-  };
-
-  const formatarMoeda = (valor) => {
-    return formatMoneyCellValue(valor);
   };
 
   const formatarPercentual = (valor) => {
@@ -275,10 +258,7 @@ const DRE = () => {
       setDetalhesLinha(response.data);
     } catch (error) {
       console.error("Erro ao carregar detalhes da DRE:", error);
-      toast.error(
-        "Erro ao carregar detalhes: " +
-          (error.response?.data?.detail || error.message),
-      );
+      toast.error("Erro ao carregar detalhes: " + (error.response?.data?.detail || error.message));
     } finally {
       setLoadingDetalhes(false);
     }
@@ -319,10 +299,11 @@ const DRE = () => {
       case "mes_atual":
         novaData = obterDataLocal();
         break;
-      case "mes_anterior":
+      case "mes_anterior": {
         const mesPassado = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
         novaData = `${mesPassado.getFullYear()}-${String(mesPassado.getMonth() + 1).padStart(2, "0")}`;
         break;
+      }
       case "ano_atual":
         novaData = `${hoje.getFullYear()}-01`;
         break;
@@ -397,9 +378,7 @@ const DRE = () => {
           <h1 className="text-2xl font-bold text-gray-800 md:text-3xl">
             📊 DRE - Demonstração do Resultado
           </h1>
-          <p className="text-gray-600 mt-1">
-            Análise gerencial de receitas, custos e lucro
-          </p>
+          <p className="text-gray-600 mt-1">Análise gerencial de receitas, custos e lucro</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -425,18 +404,10 @@ const DRE = () => {
             <span className="font-medium">Chat IA</span>
             <Sparkles size={16} className="animate-pulse" />
           </ActionButton>
-          <ExportActionButton
-            type="pdf"
-            onClick={exportarPDF}
-            title="Exportar para PDF"
-          >
+          <ExportActionButton type="pdf" onClick={exportarPDF} title="Exportar para PDF">
             PDF
           </ExportActionButton>
-          <ExportActionButton
-            type="excel"
-            onClick={exportarExcel}
-            title="Exportar para Excel"
-          >
+          <ExportActionButton type="excel" onClick={exportarExcel} title="Exportar para Excel">
             Excel
           </ExportActionButton>
         </div>
@@ -516,10 +487,7 @@ const DRE = () => {
                   label="CMV"
                   value={<MoneyCell value={dados.totais?.cmv || 0} />}
                   subtitle={`${formatarPercentual(
-                    calcularPercentual(
-                      dados.totais?.cmv,
-                      dados.totais?.receita_bruta,
-                    ),
+                    calcularPercentual(dados.totais?.cmv, dados.totais?.receita_bruta),
                   )} da receita`}
                 />
                 <MetricCard
@@ -533,7 +501,9 @@ const DRE = () => {
                   intent="violet"
                   icon={<Percent className="h-5 w-5" />}
                   label="Margem Bruta"
-                  value={<NumberCell value={dados.totais?.margem_bruta || 0} decimals={2} suffix="%" />}
+                  value={
+                    <NumberCell value={dados.totais?.margem_bruta || 0} decimals={2} suffix="%" />
+                  }
                   subtitle="Rentabilidade"
                 />
               </MetricGrid>
@@ -547,8 +517,7 @@ const DRE = () => {
                       Análise por Canal de Vendas
                     </h3>
                     <p className="text-sm text-gray-600 mt-1">
-                      Selecione os canais para adicionar suas métricas na tabela
-                      DRE
+                      Selecione os canais para adicionar suas métricas na tabela DRE
                     </p>
                   </div>
                   {canaisSelecionados.length > 0 && (
@@ -592,21 +561,15 @@ const DRE = () => {
                         key={canal.id}
                         onClick={() => toggleCanal(canal.id)}
                         className={`${corClasses[canal.cor]} border-2 rounded-lg p-3 transition-all duration-200 transform md:p-4 ${
-                          selecionado
-                            ? "scale-105 shadow-lg"
-                            : "hover:scale-102"
+                          selecionado ? "scale-105 shadow-lg" : "hover:scale-102"
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-semibold">{canal.nome}</span>
-                          {selecionado && (
-                            <CheckCircle size={20} className="flex-shrink-0" />
-                          )}
+                          {selecionado && <CheckCircle size={20} className="flex-shrink-0" />}
                         </div>
                         {selecionado && (
-                          <div className="text-xs mt-1 opacity-90">
-                            Ativo na tabela
-                          </div>
+                          <div className="text-xs mt-1 opacity-90">Ativo na tabela</div>
                         )}
                       </button>
                     );
@@ -616,17 +579,13 @@ const DRE = () => {
                 {canaisSelecionados.length > 0 && (
                   <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-start gap-2">
-                      <Brain
-                        size={18}
-                        className="text-blue-600 flex-shrink-0 mt-0.5"
-                      />
+                      <Brain size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
                       <div className="text-sm text-blue-800">
                         <span className="font-semibold">
                           {canaisSelecionados.length} canal(is) selecionado(s).
                         </span>{" "}
-                        As métricas de cada canal serão adicionadas na tabela
-                        DRE abaixo com suas respectivas receitas, custos e
-                        lucros.
+                        As métricas de cada canal serão adicionadas na tabela DRE abaixo com suas
+                        respectivas receitas, custos e lucros.
                       </div>
                     </div>
                   </div>
@@ -659,13 +618,14 @@ const DRE = () => {
                   tbodyClassName="divide-y divide-gray-200"
                   columns={DRE_TABLE_COLUMNS.map((column) => ({
                     ...column,
-                    className: (linha) => [
-                      column.className,
-                      linha.nivel === 1 && column.key === "descricao" ? "pl-12" : "",
-                      linha.nivel === 0 ? "font-bold" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" "),
+                    className: (linha) =>
+                      [
+                        column.className,
+                        linha.nivel === 1 && column.key === "descricao" ? "pl-12" : "",
+                        linha.nivel === 0 ? "font-bold" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" "),
                     cellStyle: (linha) =>
                       linha.cor_bg && linha.cor_bg !== "#ffffff"
                         ? { backgroundColor: linha.cor_bg, color: linha.cor }
@@ -682,8 +642,8 @@ const DRE = () => {
               {canaisSelecionados.length === 0 && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm text-blue-800">
-                    ðŸ’¡ A DRE agora mostra automaticamente todos os canais com
-                    vendas no perÃ­odo selecionado.
+                    ðŸ’¡ A DRE agora mostra automaticamente todos os canais com vendas no perÃ­odo
+                    selecionado.
                   </p>
                 </div>
               )}
@@ -693,9 +653,7 @@ const DRE = () => {
           {!dados && !loading && (
             <div className="bg-gray-50 rounded-lg p-12 text-center">
               <FileText className="mx-auto mb-4 text-gray-400" size={64} />
-              <p className="text-gray-600 text-lg">
-                Selecione um período para visualizar a DRE
-              </p>
+              <p className="text-gray-600 text-lg">Selecione um período para visualizar a DRE</p>
             </div>
           )}
         </>
@@ -706,10 +664,7 @@ const DRE = () => {
 
       {/* Conteúdo da Tab Análise Inteligente */}
       {tabAtiva === "analise" && (
-        <AnaliseInteligente
-          dados={dados}
-          periodo={{ mes: periodo.mes, ano: periodo.ano }}
-        />
+        <AnaliseInteligente dados={dados} periodo={{ mes: periodo.mes, ano: periodo.ano }} />
       )}
 
       {/* Modal Chat IA */}
@@ -731,10 +686,7 @@ const DRE = () => {
       />
 
       {linhaDetalhe && (
-        <div
-          className="fixed inset-0 z-[70] bg-slate-900/30"
-          onClick={fecharDetalhesLinha}
-        >
+        <div className="fixed inset-0 z-[70] bg-slate-900/30" onClick={fecharDetalhesLinha}>
           <aside
             className="fixed inset-x-0 bottom-0 max-h-[86dvh] overflow-hidden rounded-t-2xl bg-white shadow-2xl md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-[760px] md:rounded-none"
             onClick={(event) => event.stopPropagation()}
@@ -767,25 +719,19 @@ const DRE = () => {
 
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <p className="text-xs font-medium uppercase text-gray-500">
-                      Total da linha
-                    </p>
+                    <p className="text-xs font-medium uppercase text-gray-500">Total da linha</p>
                     <p className="mt-1 text-lg font-bold text-gray-900">
                       <MoneyCell value={detalhesLinha?.total ?? linhaDetalhe.valor} />
                     </p>
                   </div>
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <p className="text-xs font-medium uppercase text-gray-500">
-                      Lancamentos
-                    </p>
+                    <p className="text-xs font-medium uppercase text-gray-500">Lancamentos</p>
                     <p className="mt-1 text-lg font-bold text-gray-900">
                       <NumberCell value={detalhesLinha?.total_itens} zeroAsDash />
                     </p>
                   </div>
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <p className="text-xs font-medium uppercase text-gray-500">
-                      Fonte
-                    </p>
+                    <p className="text-xs font-medium uppercase text-gray-500">Fonte</p>
                     <p className="mt-1 text-sm font-semibold text-gray-800">
                       {detalhesLinha?.items?.[0]?.origem_label || "Aguardando dados"}
                     </p>
@@ -838,9 +784,7 @@ const DRE = () => {
                                 {item.descricao}
                               </h3>
                               {item.contraparte && (
-                                <p className="mt-1 text-xs text-gray-500">
-                                  {item.contraparte}
-                                </p>
+                                <p className="mt-1 text-xs text-gray-500">{item.contraparte}</p>
                               )}
                             </div>
                             <p className="shrink-0 text-sm font-bold text-gray-900">

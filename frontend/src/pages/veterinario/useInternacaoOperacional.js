@@ -16,7 +16,9 @@ export function useInternacaoOperacional({ setErro }) {
       setAgendaProcedimentos(Array.isArray(res.data) ? res.data : []);
     } catch (e) {
       setAgendaProcedimentos([]);
-      setErro(e?.response?.data?.detail ?? "Erro ao carregar agenda de procedimentos da internacao.");
+      setErro(
+        e?.response?.data?.detail ?? "Erro ao carregar agenda de procedimentos da internacao.",
+      );
     } finally {
       setAgendaCarregando(false);
     }
@@ -38,7 +40,9 @@ export function useInternacaoOperacional({ setErro }) {
         }
       } catch (e) {
         if (ativo) {
-          setErro(e?.response?.data?.detail ?? "Erro ao carregar configuracao de baias da internacao.");
+          setErro(
+            e?.response?.data?.detail ?? "Erro ao carregar configuracao de baias da internacao.",
+          );
         }
       } finally {
         if (ativo) setConfigInternacaoCarregada(true);

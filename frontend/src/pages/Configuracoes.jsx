@@ -1,11 +1,4 @@
-import {
-  FiCreditCard,
-  FiPackage,
-  FiSettings,
-  FiShield,
-  FiTruck,
-  FiUsers,
-} from "react-icons/fi";
+import { FiCreditCard, FiPackage, FiSettings, FiShield, FiTruck, FiUsers } from "react-icons/fi";
 import { Link } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader";
 import Panel from "../components/ui/Panel";
@@ -98,8 +91,7 @@ export default function Configuracoes() {
   const roleName = user?.role?.name?.toLowerCase();
   const isAdmin = roleName === "admin";
 
-  const hasPermission = (permission) =>
-    !permission || isAdmin || permissions.includes(permission);
+  const hasPermission = (permission) => !permission || isAdmin || permissions.includes(permission);
 
   const hasAnyPermission = (required = []) =>
     required.length === 0 || isAdmin || required.some((item) => permissions.includes(item));

@@ -22,14 +22,17 @@ export function EntityInfoRow({
         {label}
       </span>
       <span
-        className={[
-          "min-h-[20px] min-w-0 break-words text-slate-900",
-          valueClassName,
-        ]
+        className={["min-h-[20px] min-w-0 break-words text-slate-900", valueClassName]
           .filter(Boolean)
           .join(" ")}
       >
-        {hasContent(value) ? value : <span aria-hidden="true" className="invisible">-</span>}
+        {hasContent(value) ? (
+          value
+        ) : (
+          <span aria-hidden="true" className="invisible">
+            -
+          </span>
+        )}
       </span>
     </div>
   );
@@ -64,7 +67,9 @@ export default function EntityCard({
         <div className="mb-3 flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
-              {title ? <h3 className="truncate text-lg font-bold text-slate-950">{title}</h3> : null}
+              {title ? (
+                <h3 className="truncate text-lg font-bold text-slate-950">{title}</h3>
+              ) : null}
               {statusIcon ? <span className="shrink-0">{statusIcon}</span> : null}
             </div>
             {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}

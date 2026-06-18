@@ -45,5 +45,5 @@ def test_bling_worker_declares_tzlocal_runtime_dependency():
     requirements_source = BACKEND_REQUIREMENTS.read_text(encoding="utf-8")
 
     assert "APScheduler" in requirements_source
-    assert "tzlocal==5.3.1" in requirements_source
+    assert "tzlocal==5.4.3" in requirements_source
     assert "tzlocal==5.4.1" not in requirements_source

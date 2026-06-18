@@ -1,6 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { FiPlus, FiEdit2, FiTrash2, FiChevronDown, FiChevronRight, FiAlertCircle } from 'react-icons/fi';
-import api from '../../api';
+import React, { useState, useEffect } from "react";
+import {
+  FiPlus,
+  FiEdit2,
+  FiTrash2,
+  FiChevronDown,
+  FiChevronRight,
+  FiAlertCircle,
+} from "react-icons/fi";
+import api from "../../api";
 
 const Categorias = () => {
   const [categorias, setCategorias] = useState([]);
@@ -10,11 +17,11 @@ const Categorias = () => {
   const [editando, setEditando] = useState(null);
   const [expandidas, setExpandidas] = useState(new Set());
   const [formData, setFormData] = useState({
-    nome: '',
-    descricao: '',
+    nome: "",
+    descricao: "",
     categoria_pai_id: null,
     departamento_id: null,
-    ordem: 0
+    ordem: 0,
   });
 
   const MAX_NIVEL = 4; // Limite de 4 níveis
@@ -27,11 +34,11 @@ const Categorias = () => {
   const carregarCategorias = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/produtos/categorias');
+      const response = await api.get("/produtos/categorias");
       setCategorias(response.data);
     } catch (error) {
-      console.error('Erro ao carregar categorias:', error);
-      alert('Erro ao carregar categorias');
+      console.error("Erro ao carregar categorias:", error);
+      alert("Erro ao carregar categorias");
     } finally {
       setLoading(false);
     }
@@ -39,10 +46,10 @@ const Categorias = () => {
 
   const carregarDepartamentos = async () => {
     try {
-      const response = await api.get('/produtos/departamentos');
+      const response = await api.get("/produtos/departamentos");
       setDepartamentos(response.data);
     } catch (error) {
-      console.error('Erro ao carregar departamentos:', error);
+      console.error("Erro ao carregar departamentos:", error);
     }
   };
 
@@ -57,30 +64,36 @@ const Categorias = () => {
   };
 
   const limparCachesCatalogos = () => {
-    sessionStorage.removeItem('produtos_catalogos_cache_v1');
+    sessionStorage.removeItem("produtos_catalogos_cache_v1");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     try {
       if (editando) {
         await api.put(`/produtos/categorias/${editando}`, formData);
       } else {
-        await api.post('/produtos/categorias', formData);
+        await api.post("/produtos/categorias", formData);
       }
-      
+
       limparCachesCatalogos();
       setShowModal(false);
       setEditando(null);
-      setFormData({ nome: '', descricao: '', categoria_pai_id: null, departamento_id: null, ordem: 0 });
+      setFormData({
+        nome: "",
+        descricao: "",
+        categoria_pai_id: null,
+        departamento_id: null,
+        ordem: 0,
+      });
       carregarCategorias();
     } catch (error) {
-      console.error('Erro ao salvar categoria:', error);
+      console.error("Erro ao salvar categoria:", error);
       if (error.response?.data?.detail) {
         alert(error.response.data.detail);
       } else {
-        alert('Erro ao salvar categoria');
+        alert("Erro ao salvar categoria");
       }
     }
   };
@@ -89,10 +102,10 @@ const Categorias = () => {
     setEditando(categoria.id);
     setFormData({
       nome: categoria.nome,
-      descricao: categoria.descricao || '',
+      descricao: categoria.descricao || "",
       categoria_pai_id: categoria.categoria_pai_id,
       departamento_id: categoria.departamento_id || null,
-      ordem: categoria.ordem
+      ordem: categoria.ordem,
     });
     setShowModal(true);
   };
@@ -104,7 +117,11 @@ const Categorias = () => {
     }
 
     if (categoria.total_produtos > 0) {
-      if (!confirm(`Esta categoria possui ${categoria.total_produtos} produto(s). Deseja realmente excluir?`)) {
+      if (
+        !confirm(
+          `Esta categoria possui ${categoria.total_produtos} produto(s). Deseja realmente excluir?`,
+        )
+      ) {
         return;
       }
     }
@@ -114,8 +131,8 @@ const Categorias = () => {
       limparCachesCatalogos();
       carregarCategorias();
     } catch (error) {
-      console.error('Erro ao excluir categoria:', error);
-      alert(error.response?.data?.detail || 'Erro ao excluir categoria');
+      console.error("Erro ao excluir categoria:", error);
+      alert(error.response?.data?.detail || "Erro ao excluir categoria");
     }
   };
 
@@ -127,11 +144,11 @@ const Categorias = () => {
 
     setEditando(null);
     setFormData({
-      nome: '',
-      descricao: '',
+      nome: "",
+      descricao: "",
       categoria_pai_id: categoriaPai.id,
       departamento_id: categoriaPai.departamento_id || null,
-      ordem: 0
+      ordem: 0,
     });
     setShowModal(true);
   };
@@ -139,11 +156,11 @@ const Categorias = () => {
   const handleNovaCategoriaRaiz = () => {
     setEditando(null);
     setFormData({
-      nome: '',
-      descricao: '',
+      nome: "",
+      descricao: "",
       categoria_pai_id: null,
       departamento_id: null,
-      ordem: 0
+      ordem: 0,
     });
     setShowModal(true);
   };
@@ -151,12 +168,12 @@ const Categorias = () => {
   // Construir árvore hierárquica
   const construirArvore = (parentId = null, nivel = 1) => {
     return categorias
-      .filter(cat => cat.categoria_pai_id === parentId)
+      .filter((cat) => cat.categoria_pai_id === parentId)
       .sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome))
-      .map(categoria => ({
+      .map((categoria) => ({
         ...categoria,
         nivel,
-        filhos: construirArvore(categoria.id, nivel + 1)
+        filhos: construirArvore(categoria.id, nivel + 1),
       }));
   };
 
@@ -165,13 +182,13 @@ const Categorias = () => {
     const temFilhos = categoria.filhos && categoria.filhos.length > 0;
     const estaExpandida = expandidas.has(categoria.id);
     const podeAdicionarFilho = nivel < MAX_NIVEL;
-    
+
     // Calcula a indentação
     const indentacao = (nivel - 1) * 30;
 
     return (
       <React.Fragment key={categoria.id}>
-        <div 
+        <div
           className="flex items-center gap-3 p-3 bg-white hover:bg-gray-50 border-b"
           style={{ paddingLeft: `${20 + indentacao}px` }}
         >
@@ -193,9 +210,7 @@ const Categorias = () => {
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <span className="font-medium text-gray-800">{categoria.nome}</span>
-              <span className="text-xs text-gray-500">
-                Nível {nivel}
-              </span>
+              <span className="text-xs text-gray-500">Nível {nivel}</span>
               {categoria.departamento_nome && (
                 <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
                   {categoria.departamento_nome}
@@ -229,8 +244,8 @@ const Categorias = () => {
               </button>
             )}
             {!podeAdicionarFilho && (
-              <span 
-                className="p-2 text-gray-300 cursor-not-allowed" 
+              <span
+                className="p-2 text-gray-300 cursor-not-allowed"
                 title={`Limite de ${MAX_NIVEL} níveis atingido`}
               >
                 <FiAlertCircle size={18} />
@@ -255,9 +270,7 @@ const Categorias = () => {
 
         {/* Renderizar filhos se expandido */}
         {temFilhos && estaExpandida && (
-          <div>
-            {categoria.filhos.map(filho => renderCategoria(filho, nivel + 1))}
-          </div>
+          <div>{categoria.filhos.map((filho) => renderCategoria(filho, nivel + 1))}</div>
         )}
       </React.Fragment>
     );
@@ -304,9 +317,7 @@ const Categorias = () => {
             </button>
           </div>
         ) : (
-          <div>
-            {arvore.map(categoria => renderCategoria(categoria))}
-          </div>
+          <div>{arvore.map((categoria) => renderCategoria(categoria))}</div>
         )}
       </div>
 
@@ -315,14 +326,16 @@ const Categorias = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">
-              {editando ? 'Editar Categoria' : formData.categoria_pai_id ? 'Nova Subcategoria' : 'Nova Categoria'}
+              {editando
+                ? "Editar Categoria"
+                : formData.categoria_pai_id
+                  ? "Nova Subcategoria"
+                  : "Nova Categoria"}
             </h2>
-            
+
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
                 <input
                   type="text"
                   value={formData.nome}
@@ -334,30 +347,36 @@ const Categorias = () => {
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Departamento
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
                 <select
-                  value={formData.departamento_id || ''}
-                  onChange={(e) => setFormData({ ...formData, departamento_id: e.target.value ? parseInt(e.target.value) : null })}
+                  value={formData.departamento_id || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      departamento_id: e.target.value ? parseInt(e.target.value) : null,
+                    })
+                  }
                   className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Sem departamento</option>
                   {departamentos.map((dep) => (
-                    <option key={dep.id} value={dep.id}>{dep.nome}</option>
+                    <option key={dep.id} value={dep.id}>
+                      {dep.nome}
+                    </option>
                   ))}
                 </select>
                 {departamentos.length === 0 && (
                   <p className="text-xs text-amber-600 mt-1">
-                    Nenhum departamento cadastrado ainda. <a href="/cadastros/departamentos" className="underline">Criar departamentos</a>
+                    Nenhum departamento cadastrado ainda.{" "}
+                    <a href="/cadastros/departamentos" className="underline">
+                      Criar departamentos
+                    </a>
                   </p>
                 )}
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descrição
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
                 <textarea
                   value={formData.descricao}
                   onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
@@ -367,19 +386,17 @@ const Categorias = () => {
               </div>
 
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Ordem
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ordem</label>
                 <input
                   type="number"
                   value={formData.ordem}
-                  onChange={(e) => setFormData({ ...formData, ordem: parseInt(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, ordem: parseInt(e.target.value) || 0 })
+                  }
                   className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   min="0"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Menor valor aparece primeiro
-                </p>
+                <p className="text-xs text-gray-500 mt-1">Menor valor aparece primeiro</p>
               </div>
 
               {formData.categoria_pai_id && (
@@ -397,7 +414,13 @@ const Categorias = () => {
                   onClick={() => {
                     setShowModal(false);
                     setEditando(null);
-                    setFormData({ nome: '', descricao: '', categoria_pai_id: null, departamento_id: null, ordem: 0 });
+                    setFormData({
+                      nome: "",
+                      descricao: "",
+                      categoria_pai_id: null,
+                      departamento_id: null,
+                      ordem: 0,
+                    });
                   }}
                   className="px-4 py-2 text-gray-700 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
                 >
@@ -407,7 +430,7 @@ const Categorias = () => {
                   type="submit"
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                 >
-                  {editando ? 'Salvar' : 'Criar'}
+                  {editando ? "Salvar" : "Criar"}
                 </button>
               </div>
             </form>

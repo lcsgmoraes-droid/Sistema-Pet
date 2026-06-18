@@ -1,7 +1,5 @@
 function toggleFlag(setRankingConfig, key) {
-  setRankingConfig((prev) =>
-    prev ? { ...prev, [key]: !prev[key] } : prev,
-  );
+  setRankingConfig((prev) => (prev ? { ...prev, [key]: !prev[key] } : prev));
 }
 
 export default function CampanhasRankingConfigPanels({
@@ -20,9 +18,7 @@ export default function CampanhasRankingConfigPanels({
           className="w-full px-6 py-4 flex items-center justify-between text-left"
           onClick={() => toggleFlag(setRankingConfig, "_aberto")}
         >
-          <span className="font-semibold text-gray-800">
-            Configurar criterios de ranking
-          </span>
+          <span className="font-semibold text-gray-800">Configurar criterios de ranking</span>
           <span className="text-gray-400 text-sm">
             {rankingConfig?._aberto ? "Fechar" : "Expandir"}
           </span>
@@ -32,14 +28,12 @@ export default function CampanhasRankingConfigPanels({
             {rankingConfigLoading ? (
               <div className="text-center text-gray-400 py-4">Carregando...</div>
             ) : !rankingConfig ? (
-              <div className="text-center text-gray-400 py-4">
-                Nao foi possivel carregar.
-              </div>
+              <div className="text-center text-gray-400 py-4">Nao foi possivel carregar.</div>
             ) : (
               <>
                 <p className="text-xs text-gray-500">
-                  O cliente precisa atingir <strong>todos</strong> os criterios
-                  de um nivel para alcanca-lo.
+                  O cliente precisa atingir <strong>todos</strong> os criterios de um nivel para
+                  alcanca-lo.
                 </p>
                 {[
                   { key: "silver", label: "Prata" },
@@ -67,9 +61,7 @@ export default function CampanhasRankingConfigPanels({
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">
-                          Compras minimas
-                        </label>
+                        <label className="block text-xs text-gray-500 mb-1">Compras minimas</label>
                         <input
                           type="number"
                           value={rankingConfig[`${key}_min_purchases`] ?? ""}
@@ -121,9 +113,7 @@ export default function CampanhasRankingConfigPanels({
           className="w-full px-6 py-4 flex items-center justify-between text-left"
           onClick={() => toggleFlag(setRankingConfig, "_beneficios_aberto")}
         >
-          <span className="font-semibold text-gray-800">
-            Beneficios por nivel
-          </span>
+          <span className="font-semibold text-gray-800">Beneficios por nivel</span>
           <span className="text-gray-400 text-sm">
             {rankingConfig?._beneficios_aberto ? "Fechar" : "Expandir"}
           </span>
@@ -160,14 +150,8 @@ export default function CampanhasRankingConfigPanels({
                         ? `R$ ${formatBRL(rankingConfig[`${key}_min_spent`] ?? 0)}`
                         : "..."}
                     </div>
-                    <div>
-                      Compras minimas:{" "}
-                      {rankingConfig?.[`${key}_min_purchases`] ?? "..."}
-                    </div>
-                    <div>
-                      Meses ativos:{" "}
-                      {rankingConfig?.[`${key}_min_months`] ?? "..."}
-                    </div>
+                    <div>Compras minimas: {rankingConfig?.[`${key}_min_purchases`] ?? "..."}</div>
+                    <div>Meses ativos: {rankingConfig?.[`${key}_min_months`] ?? "..."}</div>
                   </div>
                 </div>
               );

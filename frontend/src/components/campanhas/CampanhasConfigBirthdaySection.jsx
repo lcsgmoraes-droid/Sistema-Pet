@@ -1,7 +1,4 @@
-export default function CampanhasConfigBirthdaySection({
-  schedulerConfig,
-  setSchedulerConfig,
-}) {
+export default function CampanhasConfigBirthdaySection({ schedulerConfig, setSchedulerConfig }) {
   return (
     <div className="bg-white rounded-xl border shadow-sm p-6">
       <div className="flex items-center gap-3 mb-5">

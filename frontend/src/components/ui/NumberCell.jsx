@@ -5,13 +5,7 @@ export function isZeroNumberValue(value) {
 
 export function formatNumberCellValue(
   value,
-  {
-    decimals = 0,
-    locale = "pt-BR",
-    prefix = "",
-    suffix = "",
-    zeroAsDash = false,
-  } = {},
+  { decimals = 0, locale = "pt-BR", prefix = "", suffix = "", zeroAsDash = false } = {},
 ) {
   const numericValue = Number(value || 0);
   const isZero = isZeroNumberValue(numericValue);

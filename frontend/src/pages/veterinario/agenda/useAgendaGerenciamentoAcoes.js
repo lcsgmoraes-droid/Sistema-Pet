@@ -19,7 +19,7 @@ export function useAgendaGerenciamentoAcoes({
       setErro(null);
       setAgendamentoSelecionado(ag);
     },
-    [setAgendamentoSelecionado, setErro]
+    [setAgendamentoSelecionado, setErro],
   );
 
   const fecharGerenciarAgendamento = useCallback(() => {
@@ -68,7 +68,7 @@ export function useAgendaGerenciamentoAcoes({
         setAbrindoAgendamentoId(null);
       }
     },
-    [carregar, navigate, setAbrindoAgendamentoId, setErro, setErroNovo]
+    [carregar, navigate, setAbrindoAgendamentoId, setErro, setErroNovo],
   );
 
   const iniciarAgendamentoSelecionado = useCallback(async () => {
@@ -112,7 +112,7 @@ export function useAgendaGerenciamentoAcoes({
     } catch (e) {
       setErro(
         e?.response?.data?.detail ||
-          "Nao foi possivel excluir o agendamento. Se ele ja gerou atendimento, desfaca o inicio primeiro."
+          "Nao foi possivel excluir o agendamento. Se ele ja gerou atendimento, desfaca o inicio primeiro.",
       );
     } finally {
       setProcessandoAgendamentoId(null);

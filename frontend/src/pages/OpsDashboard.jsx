@@ -96,7 +96,10 @@ function AlertPanel({ alerts }) {
       </div>
       <div className="mt-4 space-y-3">
         {(alerts || []).map((alert) => (
-          <div key={`${alert.title}-${alert.source}`} className={`rounded-lg border px-4 py-3 ${toneClasses(alert.tone)}`}>
+          <div
+            key={`${alert.title}-${alert.source}`}
+            className={`rounded-lg border px-4 py-3 ${toneClasses(alert.tone)}`}
+          >
             <div className="flex items-start gap-3">
               {alert.tone === "green" ? (
                 <FiCheckCircle className="mt-0.5 h-5 w-5 shrink-0" />
@@ -106,7 +109,9 @@ function AlertPanel({ alerts }) {
               <div className="min-w-0">
                 <div className="text-sm font-bold">{alert.title}</div>
                 <div className="mt-0.5 text-xs text-slate-600">{alert.detail}</div>
-                {alert.action ? <div className="mt-2 text-xs font-semibold text-slate-800">{alert.action}</div> : null}
+                {alert.action ? (
+                  <div className="mt-2 text-xs font-semibold text-slate-800">{alert.action}</div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -128,9 +133,15 @@ function CurrentStatusPanel({ currentStatus, watchdog }) {
             <FiCheckCircle className="h-4 w-4" />
             Agora
           </div>
-          <h2 className="mt-2 text-2xl font-black text-slate-950">{currentStatus?.title || "Status atual"}</h2>
-          <p className="mt-1 max-w-3xl text-sm text-slate-700">{currentStatus?.detail || "Health em tempo real."}</p>
-          {currentStatus?.action ? <p className="mt-2 text-sm font-semibold text-slate-900">{currentStatus.action}</p> : null}
+          <h2 className="mt-2 text-2xl font-black text-slate-950">
+            {currentStatus?.title || "Status atual"}
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm text-slate-700">
+            {currentStatus?.detail || "Health em tempo real."}
+          </p>
+          {currentStatus?.action ? (
+            <p className="mt-2 text-sm font-semibold text-slate-900">{currentStatus.action}</p>
+          ) : null}
         </div>
         <div className="grid min-w-[280px] grid-cols-3 gap-2 text-sm">
           <div className="rounded-lg bg-white/70 px-3 py-2">
@@ -143,7 +154,9 @@ function CurrentStatusPanel({ currentStatus, watchdog }) {
           </div>
           <div className="rounded-lg bg-white/70 px-3 py-2">
             <div className="text-xs font-semibold uppercase text-slate-500">Banco</div>
-            <div className="mt-1 font-bold">{watchdog?.latency_ms ? formatMs(watchdog.latency_ms) : statusLabel(watchdog?.status)}</div>
+            <div className="mt-1 font-bold">
+              {watchdog?.latency_ms ? formatMs(watchdog.latency_ms) : statusLabel(watchdog?.status)}
+            </div>
           </div>
         </div>
       </div>
@@ -165,7 +178,9 @@ function BlingQueuePanel({ queue }) {
         <FiDatabase className="h-5 w-5 text-slate-500" />
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-4">
-        <div className={`rounded-lg px-3 py-3 text-sm ${Number(queue?.pending || 0) ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-900"}`}>
+        <div
+          className={`rounded-lg px-3 py-3 text-sm ${Number(queue?.pending || 0) ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-900"}`}
+        >
           <div className="text-xs font-semibold uppercase opacity-70">Pendentes</div>
           <div className="mt-1 text-lg font-bold">{queue?.pending ?? 0}</div>
         </div>
@@ -173,34 +188,59 @@ function BlingQueuePanel({ queue }) {
           <div className="text-xs font-semibold uppercase opacity-70">Processando</div>
           <div className="mt-1 text-lg font-bold">{queue?.processing ?? 0}</div>
         </div>
-        <div className={`rounded-lg px-3 py-3 text-sm ${Number(queue?.failed || 0) ? "bg-amber-50 text-amber-900" : "bg-slate-50 text-slate-800"}`}>
+        <div
+          className={`rounded-lg px-3 py-3 text-sm ${Number(queue?.failed || 0) ? "bg-amber-50 text-amber-900" : "bg-slate-50 text-slate-800"}`}
+        >
           <div className="text-xs font-semibold uppercase opacity-70">Retry</div>
           <div className="mt-1 text-lg font-bold">{queue?.failed ?? 0}</div>
         </div>
-        <div className={`rounded-lg px-3 py-3 text-sm ${Number(queue?.dead || 0) ? "bg-rose-50 text-rose-900" : "bg-slate-50 text-slate-800"}`}>
+        <div
+          className={`rounded-lg px-3 py-3 text-sm ${Number(queue?.dead || 0) ? "bg-rose-50 text-rose-900" : "bg-slate-50 text-slate-800"}`}
+        >
           <div className="text-xs font-semibold uppercase opacity-70">Dead</div>
           <div className="mt-1 text-lg font-bold">{queue?.dead ?? 0}</div>
         </div>
       </div>
       <div className="mt-4 space-y-2">
         {!hasBacklog ? (
-          <div className="rounded-lg bg-emerald-50 px-3 py-3 text-sm font-semibold text-emerald-800">Nenhuma pendencia aberta na fila.</div>
+          <div className="rounded-lg bg-emerald-50 px-3 py-3 text-sm font-semibold text-emerald-800">
+            Nenhuma pendencia aberta na fila.
+          </div>
         ) : (
           tenants.slice(0, 8).map((item) => {
-            const tenantName = item.tenant_name || (item.tenant_id ? `Tenant ${String(item.tenant_id).slice(0, 8)}` : "Sem tenant identificado");
+            const tenantName =
+              item.tenant_name ||
+              (item.tenant_id
+                ? `Tenant ${String(item.tenant_id).slice(0, 8)}`
+                : "Sem tenant identificado");
             return (
-              <div key={item.tenant_key || item.tenant_id || tenantName} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3">
+              <div
+                key={item.tenant_key || item.tenant_id || tenantName}
+                className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3"
+              >
                 <div className="flex items-center justify-between gap-3">
-                  <span className="truncate text-sm font-bold text-slate-800" title={tenantName}>{tenantName}</span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${toneClasses(Number(item.dead || 0) ? "red" : Number(item.failed || 0) ? "amber" : "blue")}`}>
+                  <span className="truncate text-sm font-bold text-slate-800" title={tenantName}>
+                    {tenantName}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${toneClasses(Number(item.dead || 0) ? "red" : Number(item.failed || 0) ? "amber" : "blue")}`}
+                  >
                     {item.total_open || 0}
                   </span>
                 </div>
                 <div className="mt-2 grid grid-cols-4 gap-2 text-xs text-slate-600">
-                  <span>Pend: <b>{item.pending || 0}</b></span>
-                  <span>Proc: <b>{item.processing || 0}</b></span>
-                  <span>Retry: <b>{item.failed || 0}</b></span>
-                  <span>Dead: <b>{item.dead || 0}</b></span>
+                  <span>
+                    Pend: <b>{item.pending || 0}</b>
+                  </span>
+                  <span>
+                    Proc: <b>{item.processing || 0}</b>
+                  </span>
+                  <span>
+                    Retry: <b>{item.failed || 0}</b>
+                  </span>
+                  <span>
+                    Dead: <b>{item.dead || 0}</b>
+                  </span>
                 </div>
               </div>
             );
@@ -225,14 +265,21 @@ function DeployPanel({ deploys }) {
       </div>
       <div className="mt-4 space-y-2">
         {items.length === 0 ? (
-          <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">Nenhum deploy registrado.</div>
+          <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">
+            Nenhum deploy registrado.
+          </div>
         ) : (
           items.map((item) => {
             const success = item.status === "success";
             return (
-              <div key={`${item.created_at}-${item.head_after}`} className="rounded-lg border border-slate-100 px-3 py-3">
+              <div
+                key={`${item.created_at}-${item.head_after}`}
+                className="rounded-lg border border-slate-100 px-3 py-3"
+              >
                 <div className="flex items-center justify-between gap-3">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${success ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${success ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}
+                  >
                     {success ? "sucesso" : "falha"}
                   </span>
                   <span className="text-xs text-slate-500">{formatDate(item.created_at)}</span>
@@ -241,7 +288,9 @@ function DeployPanel({ deploys }) {
                   <span className="font-mono text-slate-700">{shortHash(item.head_after)}</span>
                   <span className="truncate text-xs text-slate-500">{item.step || "-"}</span>
                 </div>
-                {item.message ? <div className="mt-1 truncate text-xs text-slate-500">{item.message}</div> : null}
+                {item.message ? (
+                  <div className="mt-1 truncate text-xs text-slate-500">{item.message}</div>
+                ) : null}
               </div>
             );
           })
@@ -258,25 +307,40 @@ function TenantIncidentsPanel({ items }) {
       <p className="mt-1 text-sm text-slate-500">Quem mais sofreu erro ou lentidao no periodo.</p>
       <div className="mt-4 space-y-2">
         {(items || []).length === 0 ? (
-          <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">Nenhum tenant com evento.</div>
+          <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">
+            Nenhum tenant com evento.
+          </div>
         ) : (
           items.slice(0, 8).map((item) => (
-            <div key={item.tenant_id || item.tenant_name} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3">
+            <div
+              key={item.tenant_id || item.tenant_name}
+              className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3"
+            >
               <div className="flex items-center justify-between gap-3">
-                <span className="truncate text-sm font-bold text-slate-800" title={item.tenant_name}>
+                <span
+                  className="truncate text-sm font-bold text-slate-800"
+                  title={item.tenant_name}
+                >
                   {item.tenant_name}
                 </span>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${toneClasses(statusTone(item.severity))}`}>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-bold ${toneClasses(statusTone(item.severity))}`}
+                >
                   {item.total}
                 </span>
               </div>
               <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-slate-600">
-                <span>5xx: <b>{item.errors_5xx}</b></span>
-                <span>Lentas: <b>{item.slow_requests}</b></span>
+                <span>
+                  5xx: <b>{item.errors_5xx}</b>
+                </span>
+                <span>
+                  Lentas: <b>{item.slow_requests}</b>
+                </span>
                 <span>{formatDate(item.latest_at)}</span>
               </div>
               <div className="mt-2 truncate text-xs text-slate-500">
-                {(item.top_paths || []).map((path) => `${path.path} (${path.total})`).join(" | ") || "Sem rota dominante"}
+                {(item.top_paths || []).map((path) => `${path.path} (${path.total})`).join(" | ") ||
+                  "Sem rota dominante"}
               </div>
             </div>
           ))
@@ -293,23 +357,38 @@ function RouteIncidentsPanel({ items }) {
       <p className="mt-1 text-sm text-slate-500">Onde atacar causa raiz primeiro.</p>
       <div className="mt-4 space-y-2">
         {(items || []).length === 0 ? (
-          <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">Nenhuma rota com evento.</div>
+          <div className="rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">
+            Nenhuma rota com evento.
+          </div>
         ) : (
           items.slice(0, 8).map((item) => (
-            <div key={item.path} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3">
+            <div
+              key={item.path}
+              className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3"
+            >
               <div className="flex items-center justify-between gap-3">
                 <span className="truncate font-mono text-xs text-slate-800" title={item.path}>
                   {item.path}
                 </span>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${toneClasses(statusTone(item.severity))}`}>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-bold ${toneClasses(statusTone(item.severity))}`}
+                >
                   {item.total}
                 </span>
               </div>
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600 md:grid-cols-4">
-                <span>5xx: <b>{item.errors_5xx}</b></span>
-                <span>Lentas: <b>{item.slow_requests}</b></span>
-                <span>Max: <b>{formatMs(item.max_duration_ms)}</b></span>
-                <span>Tenants: <b>{item.tenant_count}</b></span>
+                <span>
+                  5xx: <b>{item.errors_5xx}</b>
+                </span>
+                <span>
+                  Lentas: <b>{item.slow_requests}</b>
+                </span>
+                <span>
+                  Max: <b>{formatMs(item.max_duration_ms)}</b>
+                </span>
+                <span>
+                  Tenants: <b>{item.tenant_count}</b>
+                </span>
               </div>
             </div>
           ))
@@ -352,7 +431,9 @@ function SelfHealingPanel({ selfHealing, watchdogEvents }) {
       <div className="mt-4 grid gap-3 xl:grid-cols-2">
         <div className="rounded-lg bg-slate-50 px-3 py-3 text-xs text-slate-600">
           {(selfHealing?.capabilities || []).map((item) => (
-            <div key={item} className="py-1">- {item}</div>
+            <div key={item} className="py-1">
+              - {item}
+            </div>
           ))}
         </div>
         <div className="rounded-lg bg-slate-50 px-3 py-3 text-xs text-slate-600">
@@ -360,8 +441,13 @@ function SelfHealingPanel({ selfHealing, watchdogEvents }) {
             <div>Nenhuma recuperacao automatica registrada no periodo.</div>
           ) : (
             latest.map((item) => (
-              <div key={`${item.created_at}-${item.event_type}`} className="flex justify-between gap-3 py-1">
-                <span className="truncate">{item.event_type}: {item.message}</span>
+              <div
+                key={`${item.created_at}-${item.event_type}`}
+                className="flex justify-between gap-3 py-1"
+              >
+                <span className="truncate">
+                  {item.event_type}: {item.message}
+                </span>
                 <span className="shrink-0">{formatDate(item.created_at)}</span>
               </div>
             ))
@@ -474,7 +560,11 @@ export default function OpsDashboard() {
             icon={FiDatabase}
             label="Watchdog"
             value={statusLabel(watchdog?.status)}
-            detail={watchdog?.latency_ms ? `${formatMs(watchdog.latency_ms)} no banco` : "Health operacional"}
+            detail={
+              watchdog?.latency_ms
+                ? `${formatMs(watchdog.latency_ms)} no banco`
+                : "Health operacional"
+            }
             tone={statusTone(watchdog?.status)}
           />
           <MetricCard
@@ -495,7 +585,11 @@ export default function OpsDashboard() {
             icon={FiGitBranch}
             label="Ultimo deploy"
             value={lastDeploy?.status || "-"}
-            detail={lastDeploy ? `${shortHash(lastDeploy.head_after)} em ${formatDate(lastDeploy.created_at)}` : "Sem registro"}
+            detail={
+              lastDeploy
+                ? `${shortHash(lastDeploy.head_after)} em ${formatDate(lastDeploy.created_at)}`
+                : "Sem registro"
+            }
             tone={lastDeploy?.status === "failed" ? "red" : "slate"}
           />
         </div>

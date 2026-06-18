@@ -1,9 +1,9 @@
-import ActionButton from '../ui/ActionButton';
+import ActionButton from "../ui/ActionButton";
 
 const RATEIO_OPCOES = [
-  { value: 'loja', label: 'Loja' },
-  { value: 'online', label: 'Online' },
-  { value: 'parcial', label: 'Parcial' },
+  { value: "loja", label: "Loja" },
+  { value: "online", label: "Online" },
+  { value: "parcial", label: "Parcial" },
 ];
 
 function EntradaXmlDetalhesFooter({
@@ -18,7 +18,7 @@ function EntradaXmlDetalhesFooter({
   setNotaSelecionada,
   tipoRateio,
 }) {
-  if (notaSelecionada.status !== 'pendente') {
+  if (notaSelecionada.status !== "pendente") {
     return null;
   }
 
@@ -48,7 +48,7 @@ function EntradaXmlDetalhesFooter({
                 intent="neutral"
                 onClick={() => salvarTipoRateio(notaSelecionada.id, opcao.value)}
                 size="xs"
-                tone={ativo ? 'solid' : 'soft'}
+                tone={ativo ? "solid" : "soft"}
               >
                 {opcao.label}
               </ActionButton>
@@ -63,7 +63,7 @@ function EntradaXmlDetalhesFooter({
           )}
         </div>
 
-        {tipoRateio === 'parcial' && (
+        {tipoRateio === "parcial" && (
           <div className="mt-2 rounded bg-gray-100 p-2 text-xs text-gray-600">
             Defina a quantidade destinada ao <strong>estoque online</strong> em cada produto acima.
             O sistema calcula automaticamente a % baseado nos valores.
@@ -84,7 +84,7 @@ function EntradaXmlDetalhesFooter({
               onClick={() => reverterNota(notaSelecionada.id, notaSelecionada.numero_nota)}
               size="md"
             >
-              {loading ? 'Revertendo...' : 'Reverter Entrada'}
+              {loading ? "Revertendo..." : "Reverter Entrada"}
             </ActionButton>
           ) : (
             <>
@@ -113,7 +113,7 @@ function EntradaXmlDetalhesFooter({
                     onClick={() => processarNota(notaSelecionada.id)}
                     size="md"
                   >
-                    {loading ? 'Processando...' : 'Processar Nota'}
+                    {loading ? "Processando..." : "Processar Nota"}
                   </ActionButton>
                 </>
               )}

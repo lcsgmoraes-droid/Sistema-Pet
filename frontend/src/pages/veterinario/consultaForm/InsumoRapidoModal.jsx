@@ -45,24 +45,32 @@ export default function InsumoRapidoModal({
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Quantidade utilizada *</label>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                Quantidade utilizada *
+              </label>
               <input
                 type="number"
                 min="0"
                 step="0.01"
                 value={insumoForm.quantidade_utilizada}
-                onChange={(e) => setInsumoForm((prev) => ({ ...prev, quantidade_utilizada: e.target.value }))}
+                onChange={(e) =>
+                  setInsumoForm((prev) => ({ ...prev, quantidade_utilizada: e.target.value }))
+                }
                 className={css.input}
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Desperdício / perda</label>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                Desperdício / perda
+              </label>
               <input
                 type="number"
                 min="0"
                 step="0.01"
                 value={insumoForm.quantidade_desperdicio}
-                onChange={(e) => setInsumoForm((prev) => ({ ...prev, quantidade_desperdicio: e.target.value }))}
+                onChange={(e) =>
+                  setInsumoForm((prev) => ({ ...prev, quantidade_desperdicio: e.target.value }))
+                }
                 className={css.input}
               />
             </div>

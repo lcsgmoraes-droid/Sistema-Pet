@@ -1,1 +1,1 @@
-export { default } from './VariacoesGrid';
+export { default } from "./VariacoesGrid";

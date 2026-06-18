@@ -45,19 +45,13 @@ export default function useCampanhasCupons({
 
   const anularCupom = useCallback(
     async (code) => {
-      if (
-        !window.confirm(
-          `Anular o cupom ${code}? Esta acao nao pode ser desfeita.`,
-        )
-      ) {
+      if (!window.confirm(`Anular o cupom ${code}? Esta acao nao pode ser desfeita.`)) {
         return;
       }
       setAnulando(code);
       try {
         await api.delete(`/campanhas/cupons/${code}`);
-        setCupons((prev) =>
-          prev.map((c) => (c.code === code ? { ...c, status: "voided" } : c)),
-        );
+        setCupons((prev) => prev.map((c) => (c.code === code ? { ...c, status: "voided" } : c)));
       } catch (e) {
         alert(e?.response?.data?.detail || "Erro ao anular cupom.");
       } finally {
@@ -79,9 +73,7 @@ export default function useCampanhasCupons({
       if (novoCupom.descricao) body.descricao = novoCupom.descricao;
       if (novoCupom.regras_resumo) body.regras_resumo = novoCupom.regras_resumo;
       if (novoCupom.coupon_type === "fixed" && novoCupom.discount_value) {
-        body.discount_value = Number.parseFloat(
-          String(novoCupom.discount_value).replace(",", "."),
-        );
+        body.discount_value = Number.parseFloat(String(novoCupom.discount_value).replace(",", "."));
       }
       if (novoCupom.coupon_type === "percent" && novoCupom.discount_percent) {
         body.discount_percent = Number.parseFloat(novoCupom.discount_percent);

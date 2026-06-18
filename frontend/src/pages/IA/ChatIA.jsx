@@ -3,32 +3,32 @@
  * Chat com assistente financeiro inteligente
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
-import api from '../../api';
-import { toast } from 'react-hot-toast';
-import { Send, Loader, MessageSquare, Plus, Trash2, Bot, User } from 'lucide-react';
+import { useState, useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
+import api from "../../api";
+import { toast } from "react-hot-toast";
+import { Send, Loader, MessageSquare, Plus, Trash2, Bot, User } from "lucide-react";
 
 export default function ChatIA() {
   const location = useLocation();
   const [conversas, setConversas] = useState([]);
   const [conversaAtiva, setConversaAtiva] = useState(null);
   const [mensagens, setMensagens] = useState([]);
-  const [mensagemInput, setMensagemInput] = useState('');
+  const [mensagemInput, setMensagemInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [perguntaInicialAplicada, setPerguntaInicialAplicada] = useState(false);
   const messagesEndRef = useRef(null);
 
   const perguntasRapidas = [
-    'Vendas do dia',
-    'Vendas do mês',
-    'Compare este mês com o mês anterior',
-    'Compare por canal este mês com o mês anterior',
-    'Produto mais vendido no mês',
-    'Produtos com melhor margem',
-    'DRE do mês',
-    'Como está meu fluxo de caixa hoje?',
+    "Vendas do dia",
+    "Vendas do mês",
+    "Compare este mês com o mês anterior",
+    "Compare por canal este mês com o mês anterior",
+    "Produto mais vendido no mês",
+    "Produtos com melhor margem",
+    "DRE do mês",
+    "Como está meu fluxo de caixa hoje?",
   ];
 
   const semConversaAtiva = conversaAtiva === null;
@@ -56,15 +56,15 @@ export default function ChatIA() {
   }, [location?.state, perguntaInicialAplicada]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   const carregarConversas = async () => {
     try {
-      const response = await api.get('/chat/conversas');
+      const response = await api.get("/chat/conversas");
       setConversas(response.data);
     } catch (error) {
-      console.error('Erro ao carregar conversas:', error);
+      console.error("Erro ao carregar conversas:", error);
     }
   };
 
@@ -74,8 +74,8 @@ export default function ChatIA() {
       const response = await api.get(`/chat/conversa/${conversaId}/mensagens`);
       setMensagens(response.data);
     } catch (error) {
-      console.error('Erro ao carregar mensagens:', error);
-      toast.error('Erro ao carregar mensagens');
+      console.error("Erro ao carregar mensagens:", error);
+      toast.error("Erro ao carregar mensagens");
     } finally {
       setLoading(false);
     }
@@ -83,15 +83,15 @@ export default function ChatIA() {
 
   const novaConversa = async () => {
     try {
-      const response = await api.post('/chat/nova-conversa', {});
-      
+      const response = await api.post("/chat/nova-conversa", {});
+
       setConversas([response.data, ...conversas]);
       setConversaAtiva(response.data.id);
       setMensagens([]);
-      toast.success('Nova conversa criada!');
+      toast.success("Nova conversa criada!");
     } catch (error) {
-      console.error('Erro ao criar conversa:', error);
-      toast.error('Erro ao criar conversa');
+      console.error("Erro ao criar conversa:", error);
+      toast.error("Erro ao criar conversa");
     }
   };
 
@@ -99,12 +99,12 @@ export default function ChatIA() {
     if (!mensagemTexto.trim() || !conversaAtiva) return;
 
     setEnviando(true);
-    setMensagemInput('');
+    setMensagemInput("");
 
     try {
-      const response = await api.post('/chat/enviar', {
+      const response = await api.post("/chat/enviar", {
         conversa_id: conversaAtiva,
-        mensagem: mensagemTexto
+        mensagem: mensagemTexto,
       });
 
       // Adicionar ambas mensagens ao estado
@@ -112,23 +112,23 @@ export default function ChatIA() {
         ...prev,
         {
           id: response.data.mensagem_usuario.id,
-          tipo: 'usuario',
+          tipo: "usuario",
           conteudo: response.data.mensagem_usuario.conteudo,
-          criado_em: response.data.mensagem_usuario.criado_em
+          criado_em: response.data.mensagem_usuario.criado_em,
         },
         {
           id: response.data.mensagem_ia.id,
-          tipo: 'assistente',
+          tipo: "assistente",
           conteudo: response.data.mensagem_ia.conteudo,
-          criado_em: response.data.mensagem_ia.criado_em
-        }
+          criado_em: response.data.mensagem_ia.criado_em,
+        },
       ]);
 
       // Atualizar lista de conversas
       carregarConversas();
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
-      toast.error('Erro ao enviar mensagem');
+      console.error("Erro ao enviar mensagem:", error);
+      toast.error("Erro ao enviar mensagem");
       setMensagemInput(mensagemTexto); // Restaurar mensagem
     } finally {
       setEnviando(false);
@@ -152,31 +152,25 @@ export default function ChatIA() {
   let conteudoMensagens = mensagens.map((msg) => (
     <div
       key={msg.id}
-      className={`flex ${msg.tipo === 'usuario' ? 'justify-end' : 'justify-start'}`}
+      className={`flex ${msg.tipo === "usuario" ? "justify-end" : "justify-start"}`}
     >
       <div
         className={`flex gap-3 max-w-3xl ${
-          msg.tipo === 'usuario' ? 'flex-row-reverse' : 'flex-row'
+          msg.tipo === "usuario" ? "flex-row-reverse" : "flex-row"
         }`}
       >
         <div
           className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-            msg.tipo === 'usuario'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-200 text-gray-700'
+            msg.tipo === "usuario" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"
           }`}
         >
-          {msg.tipo === 'usuario' ? (
-            <User className="w-5 h-5" />
-          ) : (
-            <Bot className="w-5 h-5" />
-          )}
+          {msg.tipo === "usuario" ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
         </div>
         <div
           className={`px-4 py-3 rounded-lg ${
-            msg.tipo === 'usuario'
-              ? 'bg-blue-600 text-white'
-              : 'bg-white text-gray-900 border border-gray-200'
+            msg.tipo === "usuario"
+              ? "bg-blue-600 text-white"
+              : "bg-white text-gray-900 border border-gray-200"
           }`}
         >
           <p className="text-sm whitespace-pre-wrap">{msg.conteudo}</p>
@@ -209,20 +203,20 @@ export default function ChatIA() {
   }
 
   const deletarConversa = async (conversaId) => {
-    if (!confirm('Deseja deletar esta conversa?')) return;
+    if (!confirm("Deseja deletar esta conversa?")) return;
 
     try {
       await api.delete(`/chat/conversa/${conversaId}`);
 
-      setConversas(conversas.filter(c => c.id !== conversaId));
+      setConversas(conversas.filter((c) => c.id !== conversaId));
       if (conversaAtiva === conversaId) {
         setConversaAtiva(null);
         setMensagens([]);
       }
-      toast.success('Conversa deletada');
+      toast.success("Conversa deletada");
     } catch (error) {
-      console.error('Erro ao deletar conversa:', error);
-      toast.error('Erro ao deletar conversa');
+      console.error("Erro ao deletar conversa:", error);
+      toast.error("Erro ao deletar conversa");
     }
   };
 
@@ -254,10 +248,8 @@ export default function ChatIA() {
         {/* Sidebar - Lista de conversas */}
         <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto">
           <div className="p-4">
-            <h2 className="text-sm font-semibold text-gray-700 mb-3">
-              Conversas Recentes
-            </h2>
-            
+            <h2 className="text-sm font-semibold text-gray-700 mb-3">Conversas Recentes</h2>
+
             {conversas.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-50" />
@@ -276,8 +268,8 @@ export default function ChatIA() {
                     key={conversa.id}
                     className={`p-3 rounded-lg transition-colors group ${
                       conversaAtiva === conversa.id
-                        ? 'bg-blue-50 border-2 border-blue-200'
-                        : 'bg-gray-50 hover:bg-gray-100'
+                        ? "bg-blue-50 border-2 border-blue-200"
+                        : "bg-gray-50 hover:bg-gray-100"
                     }`}
                   >
                     <div className="flex items-start justify-between">
@@ -287,7 +279,7 @@ export default function ChatIA() {
                         className="flex-1 min-w-0 text-left"
                       >
                         <p className="text-sm font-medium text-gray-900 truncate">
-                          {conversa.titulo || 'Nova conversa'}
+                          {conversa.titulo || "Nova conversa"}
                         </p>
                         <p className="text-xs text-gray-500 mt-1">
                           {conversa.total_mensagens} mensagens

@@ -2,8 +2,8 @@
  * Formulário de Cadastro/Edição de Produtos
  * Com abas: Dados, Imagens, Fornecedores, Lotes
  */
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   getProduto,
   createProduto,
@@ -22,14 +22,14 @@ import {
   entradaEstoque,
   saidaFIFO,
   formatarMoeda,
-  formatarData
-} from '../api/produtos';
-import api from '../api';
-import ResponsiveTabs, { TabContent } from '../components/ResponsiveTabs';
-import FornecedorIdentity from '../components/ui/FornecedorIdentity';
-import { resolveMediaUrl } from '../utils/mediaUrl';
-import ModalFornecedor from './produtos/ModalFornecedorProduto';
-import ModalMovimentoEstoque from './produtos/ModalMovimentoEstoqueProduto';
+  formatarData,
+} from "../api/produtos";
+import api from "../api";
+import ResponsiveTabs, { TabContent } from "../components/ResponsiveTabs";
+import FornecedorIdentity from "../components/ui/FornecedorIdentity";
+import { resolveMediaUrl } from "../utils/mediaUrl";
+import ModalFornecedor from "./produtos/ModalFornecedorProduto";
+import ModalMovimentoEstoque from "./produtos/ModalMovimentoEstoqueProduto";
 import {
   formatarPorcentagemProduto as formatarPorcentagem,
   formatarValorMonetarioProduto as formatarValorMonetario,
@@ -40,341 +40,338 @@ import {
   organizarCategoriasHierarquicas,
   validarArquivoImagemProduto,
   validarProdutoParaSalvar,
-} from './produtosFormUtils';
+} from "./produtosFormUtils";
 
 export default function ProdutosForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = Boolean(id);
-  
-  const [abaAtiva, setAbaAtiva] = useState('dados');
+
+  const [abaAtiva, setAbaAtiva] = useState("dados");
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  
+
   // Listas auxiliares
   const [categorias, setCategorias] = useState([]);
   const [marcas, setMarcas] = useState([]);
   const [departamentos, setDepartamentos] = useState([]);
   const [clientes, setClientes] = useState([]);
-  
+
   // Dados do produto
   const [produto, setProduto] = useState(() => montarEstadoProdutoFormulario());
-  
+
   // Imagens
   const [imagens, setImagens] = useState([]);
   const [uploadingImage, setUploadingImage] = useState(false);
-  
+
   // Fornecedores
   const [fornecedores, setFornecedores] = useState([]);
   const [showModalFornecedor, setShowModalFornecedor] = useState(false);
   const [fornecedorEdit, setFornecedorEdit] = useState(null);
-  
+
   // Lotes
   const [lotes, setLotes] = useState([]);
   const [showModalLote, setShowModalLote] = useState(false);
-  const [tipoMovimento, setTipoMovimento] = useState('entrada');
-  
+  const [tipoMovimento, setTipoMovimento] = useState("entrada");
+
   // Variações (Sprint 2)
   const [variacoes, setVariacoes] = useState([]);
   const [loadingVariacoes, setLoadingVariacoes] = useState(false);
-  
+
   // Carregar dados iniciais
   useEffect(() => {
     carregarCategorias();
     carregarMarcas();
     carregarDepartamentos();
     carregarClientes();
-    
+
     if (isEdit) {
       carregarProduto();
     }
   }, [id]);
-  
+
   const carregarCategorias = async () => {
     try {
       const response = await getCategorias({ apenas_ativas: true });
       setCategorias(response.data);
     } catch (error) {
-      console.error('Erro ao carregar categorias:', error);
+      console.error("Erro ao carregar categorias:", error);
     }
   };
-  
+
   const carregarMarcas = async () => {
     try {
       const response = await getMarcas({ apenas_ativas: true });
       setMarcas(response.data);
     } catch (error) {
-      console.error('Erro ao carregar marcas:', error);
+      console.error("Erro ao carregar marcas:", error);
     }
   };
-  
+
   const carregarDepartamentos = async () => {
     try {
       const response = await getDepartamentos({ apenas_ativos: true });
       setDepartamentos(response.data);
     } catch (error) {
-      console.error('Erro ao carregar departamentos:', error);
+      console.error("Erro ao carregar departamentos:", error);
     }
   };
-  
+
   const carregarClientes = async () => {
     try {
-      const response = await api.get('/clientes/', {
-        params: { tipo: 'fornecedor', apenas_ativos: true }
+      const response = await api.get("/clientes/", {
+        params: { tipo: "fornecedor", apenas_ativos: true },
       });
       setClientes(response.data);
     } catch (error) {
-      console.error('Erro ao carregar clientes:', error);
+      console.error("Erro ao carregar clientes:", error);
     }
   };
-  
+
   const carregarProduto = async () => {
     try {
       setLoading(true);
       const response = await getProduto(id);
       const prod = response.data;
-      
+
       setProduto(montarEstadoProdutoFormulario(prod));
-      
+
       // Carregar imagens
       if (prod.imagens && prod.imagens.length > 0) {
         setImagens(prod.imagens);
       }
-      
+
       // Carregar fornecedores
       carregarFornecedores();
-      
+
       // Carregar lotes se tiver controle
       if (prod.controle_lote) {
         carregarLotes();
       }
-      
+
       // 🔒 SPRINT 2: Carregar variações se for produto PAI
-      if (prod.tipo_produto === 'PAI') {
+      if (prod.tipo_produto === "PAI") {
         carregarVariacoes();
       }
-      
     } catch (error) {
-      console.error('Erro ao carregar produto:', error);
-      alert('Erro ao carregar produto');
-      navigate('/produtos');
+      console.error("Erro ao carregar produto:", error);
+      alert("Erro ao carregar produto");
+      navigate("/produtos");
     } finally {
       setLoading(false);
     }
   };
-  
+
   const carregarFornecedores = async () => {
     if (!id) return;
     try {
       const response = await getFornecedoresProduto(id);
       setFornecedores(response.data);
     } catch (error) {
-      console.error('Erro ao carregar fornecedores:', error);
+      console.error("Erro ao carregar fornecedores:", error);
     }
   };
-  
+
   const carregarLotes = async () => {
     if (!id) return;
     try {
       const response = await getLotes(id);
       setLotes(response.data);
     } catch (error) {
-      console.error('Erro ao carregar lotes:', error);
+      console.error("Erro ao carregar lotes:", error);
     }
   };
-  
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setProduto(prev => montarProdutoComAlteracao(prev, { name, value, type, checked }));
+    setProduto((prev) => montarProdutoComAlteracao(prev, { name, value, type, checked }));
   };
-  
+
   // 🔒 SPRINT 2: Carregar variações do produto PAI
   const carregarVariacoes = async () => {
     if (!id) return;
-    
+
     try {
       setLoadingVariacoes(true);
       const response = await api.get(`/produtos/${id}/variacoes`);
       setVariacoes(response.data || []);
     } catch (error) {
-      console.error('Erro ao carregar variações:', error);
+      console.error("Erro ao carregar variações:", error);
       setVariacoes([]);
     } finally {
       setLoadingVariacoes(false);
     }
   };
-  
+
   const handleGerarCodigo = async () => {
     try {
       const response = await gerarSKU();
-      setProduto(prev => ({ ...prev, codigo: response.data.sku }));
+      setProduto((prev) => ({ ...prev, codigo: response.data.sku }));
     } catch (error) {
-      console.error('Erro ao gerar código:', error);
-      alert('Erro ao gerar código');
+      console.error("Erro ao gerar código:", error);
+      alert("Erro ao gerar código");
     }
   };
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     const mensagemValidacao = validarProdutoParaSalvar(produto);
     if (mensagemValidacao) {
       alert(mensagemValidacao);
       return;
     }
-    
+
     try {
       setSalvando(true);
-      
+
       const dados = montarPayloadProdutoParaSalvar(produto);
-      
+
       if (isEdit) {
         await updateProduto(id, dados);
-        alert('Produto atualizado com sucesso!');
+        alert("Produto atualizado com sucesso!");
       } else {
         const response = await createProduto(dados);
-        alert('Produto cadastrado com sucesso!');
+        alert("Produto cadastrado com sucesso!");
         navigate(`/produtos/${response.data.id}/editar`);
       }
-      
     } catch (error) {
-      console.error('Erro ao salvar produto:', error);
-      alert(error.response?.data?.detail || 'Erro ao salvar produto');
+      console.error("Erro ao salvar produto:", error);
+      alert(error.response?.data?.detail || "Erro ao salvar produto");
     } finally {
       setSalvando(false);
     }
   };
-  
+
   // ==================== IMAGENS ====================
-  
+
   const handleUploadImagem = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    
+
     const mensagemValidacao = validarArquivoImagemProduto(file);
     if (mensagemValidacao) {
       alert(mensagemValidacao);
       return;
     }
-    
+
     try {
       setUploadingImage(true);
-      
+
       const formData = new FormData();
-      formData.append('file', file);
-      
+      formData.append("file", file);
+
       const response = await uploadImagemProduto(id, formData);
-      setImagens(prev => [...prev, response.data]);
-      
-      alert('Imagem enviada com sucesso!');
-      
+      setImagens((prev) => [...prev, response.data]);
+
+      alert("Imagem enviada com sucesso!");
     } catch (error) {
-      console.error('Erro ao enviar imagem:', error);
-      alert(error.response?.data?.detail || 'Erro ao enviar imagem');
+      console.error("Erro ao enviar imagem:", error);
+      alert(error.response?.data?.detail || "Erro ao enviar imagem");
     } finally {
       setUploadingImage(false);
-      e.target.value = '';
+      e.target.value = "";
     }
   };
-  
+
   const handleDeleteImagem = async (imagemId) => {
-    if (!confirm('Deseja realmente excluir esta imagem?')) return;
-    
+    if (!confirm("Deseja realmente excluir esta imagem?")) return;
+
     try {
       await deleteImagemProduto(imagemId);
-      setImagens(prev => prev.filter(img => img.id !== imagemId));
-      alert('Imagem excluída com sucesso!');
+      setImagens((prev) => prev.filter((img) => img.id !== imagemId));
+      alert("Imagem excluída com sucesso!");
     } catch (error) {
-      console.error('Erro ao excluir imagem:', error);
-      alert('Erro ao excluir imagem');
+      console.error("Erro ao excluir imagem:", error);
+      alert("Erro ao excluir imagem");
     }
   };
-  
+
   const handleSetPrincipal = async (imagemId) => {
     try {
       await api.put(`/produtos/imagens/${imagemId}`, { principal: true });
-      setImagens(prev => prev.map(img => ({
-        ...img,
-        e_principal: img.id === imagemId
-      })));
-      alert('Imagem principal atualizada!');
+      setImagens((prev) =>
+        prev.map((img) => ({
+          ...img,
+          e_principal: img.id === imagemId,
+        })),
+      );
+      alert("Imagem principal atualizada!");
     } catch (error) {
-      console.error('Erro ao definir imagem principal:', error);
-      alert('Erro ao definir imagem principal');
+      console.error("Erro ao definir imagem principal:", error);
+      alert("Erro ao definir imagem principal");
     }
   };
-  
+
   // ==================== FORNECEDORES ====================
-  
+
   const handleAddFornecedor = () => {
     setFornecedorEdit(null);
     setShowModalFornecedor(true);
   };
-  
+
   const handleEditFornecedor = (fornecedor) => {
     setFornecedorEdit(fornecedor);
     setShowModalFornecedor(true);
   };
-  
+
   const handleSaveFornecedor = async (dados) => {
     try {
       if (fornecedorEdit) {
         await updateFornecedorProduto(fornecedorEdit.id, dados);
-        alert('Fornecedor atualizado!');
+        alert("Fornecedor atualizado!");
       } else {
         await addFornecedorProduto(id, dados);
-        alert('Fornecedor vinculado!');
+        alert("Fornecedor vinculado!");
       }
-      
+
       carregarFornecedores();
       setShowModalFornecedor(false);
-      
     } catch (error) {
-      console.error('Erro ao salvar fornecedor:', error);
-      alert(error.response?.data?.detail || 'Erro ao salvar fornecedor');
+      console.error("Erro ao salvar fornecedor:", error);
+      alert(error.response?.data?.detail || "Erro ao salvar fornecedor");
     }
   };
-  
+
   const handleDeleteFornecedor = async (fornecedorId) => {
-    if (!confirm('Deseja realmente desvincular este fornecedor?')) return;
-    
+    if (!confirm("Deseja realmente desvincular este fornecedor?")) return;
+
     try {
       await deleteFornecedorProduto(fornecedorId);
       carregarFornecedores();
-      alert('Fornecedor desvinculado!');
+      alert("Fornecedor desvinculado!");
     } catch (error) {
-      console.error('Erro ao desvincular fornecedor:', error);
-      alert('Erro ao desvincular fornecedor');
+      console.error("Erro ao desvincular fornecedor:", error);
+      alert("Erro ao desvincular fornecedor");
     }
   };
-  
+
   // ==================== LOTES ====================
-  
+
   const handleMovimentoEstoque = (tipo) => {
     setTipoMovimento(tipo);
     setShowModalLote(true);
   };
-  
+
   const handleSaveMovimento = async (dados) => {
     try {
-      if (tipoMovimento === 'entrada') {
+      if (tipoMovimento === "entrada") {
         await entradaEstoque(id, dados);
-        alert('Entrada registrada com sucesso!');
+        alert("Entrada registrada com sucesso!");
       } else {
         await saidaFIFO(id, dados);
-        alert('Saída registrada com sucesso!');
+        alert("Saída registrada com sucesso!");
       }
-      
+
       carregarLotes();
       carregarProduto();
       setShowModalLote(false);
-      
     } catch (error) {
-      console.error('Erro ao registrar movimento:', error);
-      alert(error.response?.data?.detail || 'Erro ao registrar movimento');
+      console.error("Erro ao registrar movimento:", error);
+      alert(error.response?.data?.detail || "Erro ao registrar movimento");
     }
   };
-  
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -385,7 +382,7 @@ export default function ProdutosForm() {
       </div>
     );
   }
-  
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       {/* Header */}
@@ -393,22 +390,22 @@ export default function ProdutosForm() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {isEdit ? 'Editar Produto' : 'Novo Produto'}
+              {isEdit ? "Editar Produto" : "Novo Produto"}
             </h1>
             <p className="text-gray-600 mt-1">
-              {isEdit ? `Código: ${produto.codigo}` : 'Preencha os dados do produto'}
+              {isEdit ? `Código: ${produto.codigo}` : "Preencha os dados do produto"}
             </p>
           </div>
-          
+
           <button
-            onClick={() => navigate('/produtos')}
+            onClick={() => navigate("/produtos")}
             className="px-4 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition"
           >
             ✕ Fechar
           </button>
         </div>
       </div>
-      
+
       {/* Abas */}
       <ResponsiveTabs
         tabs={montarAbasProdutoFormulario({
@@ -422,797 +419,923 @@ export default function ProdutosForm() {
         activeTab={abaAtiva}
         onChange={setAbaAtiva}
       />
-      
+
       {/* Conteúdo das Abas */}
-      {abaAtiva === 'dados' && (
+      {abaAtiva === "dados" && (
         <TabContent>
-        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-6">
-          {/* Código e Nome */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Código / SKU
-              </label>
-              <div className="flex gap-2">
+          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-6">
+            {/* Código e Nome */}
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Código / SKU</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    name="codigo"
+                    value={produto.codigo}
+                    onChange={handleChange}
+                    className="flex-1 px-3 py-2 border-4 border-red-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="SKU-001"
+                    style={{ borderColor: "red", borderWidth: "3px" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGerarCodigo}
+                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition"
+                    title="Gerar código automaticamente"
+                  >
+                    🔄
+                  </button>
+                </div>
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nome do Produto *
+                </label>
                 <input
                   type="text"
-                  name="codigo"
-                  value={produto.codigo}
+                  name="nome"
+                  value={produto.nome}
                   onChange={handleChange}
-                  className="flex-1 px-3 py-2 border-4 border-red-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="SKU-001"
-                  style={{ borderColor: 'red', borderWidth: '3px' }}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ex: Ração Premium para Cães Adultos 15kg"
                 />
-                <button
-                  type="button"
-                  onClick={handleGerarCodigo}
-                  className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition"
-                  title="Gerar código automaticamente"
-                >
-                  🔄
-                </button>
               </div>
             </div>
-            
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nome do Produto *
-              </label>
-              <input
-                type="text"
-                name="nome"
-                value={produto.nome}
-                onChange={handleChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Ex: Ração Premium para Cães Adultos 15kg"
-              />
-            </div>
-          </div>
-          
-          {/* Descrição */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Descrição
-            </label>
-            <textarea
-              name="descricao"
-              value={produto.descricao}
-              onChange={handleChange}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Descrição detalhada do produto..."
-            />
-          </div>
-          
-          {/* Categoria, Marca, Departamento e Tipo */}
-          <div className="grid grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Categoria
-              </label>
-              <select
-                name="categoria_id"
-                value={produto.categoria_id}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Selecione...</option>
-                {organizarCategoriasHierarquicas(categorias).map(cat => (
-                  <option key={cat.id} value={cat.id}>
-                    {'\u00a0\u00a0\u00a0\u00a0'.repeat(cat.nivel)}{cat.nivel > 0 ? '\u2192 ' : ''}{cat.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Marca
-              </label>
-              <select
-                name="marca_id"
-                value={produto.marca_id}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Selecione...</option>
-                {marcas.map(marca => (
-                  <option key={marca.id} value={marca.id}>
-                    {marca.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Departamento
-              </label>
-              <select
-                name="departamento_id"
-                value={produto.departamento_id}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Selecione...</option>
-                {departamentos.map(depto => (
-                  <option key={depto.id} value={depto.id}>
-                    {depto.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tipo
-              </label>
-              <select
-                name="tipo"
-                value={produto.tipo}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="produto">Produto</option>
-                <option value="servico">Serviço</option>
-                <option value="produto_servico">Produto e Serviço</option>
-              </select>
-            </div>
-          </div>
-          
-          {/* Preços e Margem */}
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Preço de Custo
-              </label>
-              <input
-                type="text"
-                name="preco_custo"
-                value={formatarValorMonetario(produto.preco_custo)}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/[^\d.,]/g, '').replace(',', '.');
-                  setProduto({ ...produto, preco_custo: value || '' });
-                }}
-                onFocus={(e) => {
-                  if (produto.preco_custo) {
-                    const numero = parseFloat(produto.preco_custo);
-                    e.target.value = isNaN(numero) ? '' : numero.toFixed(2).replace('.', ',');
-                    e.target.select();
-                  }
-                }}
-                onBlur={(e) => {
-                  const value = e.target.value.replace(',', '.');
-                  setProduto({ ...produto, preco_custo: value || '' });
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="R$ 0,00"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Preço de Venda *
-              </label>
-              <input
-                type="text"
-                name="preco_venda"
-                value={formatarValorMonetario(produto.preco_venda)}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/[^\d.,]/g, '').replace(',', '.');
-                  setProduto({ ...produto, preco_venda: value || '' });
-                }}
-                onFocus={(e) => {
-                  if (produto.preco_venda) {
-                    const numero = parseFloat(produto.preco_venda);
-                    e.target.value = isNaN(numero) ? '' : numero.toFixed(2).replace('.', ',');
-                    e.target.select();
-                  }
-                }}
-                onBlur={(e) => {
-                  const value = e.target.value.replace(',', '.');
-                  setProduto({ ...produto, preco_venda: value || '' });
-                }}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="R$ 0,00"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Margem de Lucro
-              </label>
-              <input
-                type="text"
-                name="margem_lucro"
-                value={formatarPorcentagem(produto.margem_lucro)}
-                readOnly
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
-                placeholder="0,00%"
-              />
-            </div>
-          </div>
 
-          {/* 💰 Preços por Canal */}
-          <div className="border border-gray-100 rounded-lg p-4 bg-gray-50 space-y-4">
+            {/* Descrição */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-700">💰 Preços por Canal (Ecommerce / App Móvel)</h3>
-              <p className="text-xs text-gray-500 mt-1">Se vazio, o sistema usa o <strong>Preço de Venda padrão</strong>. Preencha apenas se quiser um preço diferente por canal.</p>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
+              <textarea
+                name="descricao"
+                value={produto.descricao}
+                onChange={handleChange}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Descrição detalhada do produto..."
+              />
             </div>
 
-                {/* Ecommerce */}
-                <div>
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <div className="text-xs font-bold text-purple-700 uppercase">🛒 Ecommerce</div>
-                    <label className="flex items-center gap-2 text-xs text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={produto.status !== 'inativo' && produto.anunciar_ecommerce !== false}
-                        onChange={e => setProduto(prev => ({ ...prev, anunciar_ecommerce: e.target.checked }))}
-                        disabled={produto.status === 'inativo'}
-                      />
-                      Exibir no canal
-                    </label>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Preço normal</label>
-                      <input type="number" step="0.01" min="0" placeholder="R$ 0,00"
-                        value={produto.preco_ecommerce || ''}
-                        onChange={e => setProduto(prev => ({ ...prev, preco_ecommerce: e.target.value || null }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Preço promocional</label>
-                      <input type="number" step="0.01" min="0" placeholder="R$ 0,00"
-                        value={produto.preco_ecommerce_promo || ''}
-                        onChange={e => setProduto(prev => ({ ...prev, preco_ecommerce_promo: e.target.value || null }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Promoção início</label>
-                      <input type="datetime-local"
-                        value={produto.preco_ecommerce_promo_inicio ? produto.preco_ecommerce_promo_inicio.toString().slice(0, 16) : ''}
-                        onChange={e => setProduto(prev => ({ ...prev, preco_ecommerce_promo_inicio: e.target.value || null }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Promoção fim</label>
-                      <input type="datetime-local"
-                        value={produto.preco_ecommerce_promo_fim ? produto.preco_ecommerce_promo_fim.toString().slice(0, 16) : ''}
-                        onChange={e => setProduto(prev => ({ ...prev, preco_ecommerce_promo_fim: e.target.value || null }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* App Móvel (Aplicativo) */}
-                <div>
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <div className="text-xs font-bold text-green-700 uppercase">📱 App Móvel (Aplicativo)</div>
-                    <label className="flex items-center gap-2 text-xs text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={produto.status !== 'inativo' && produto.anunciar_app !== false}
-                        onChange={e => setProduto(prev => ({ ...prev, anunciar_app: e.target.checked }))}
-                        disabled={produto.status === 'inativo'}
-                      />
-                      Exibir no canal
-                    </label>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Preço normal</label>
-                      <input type="number" step="0.01" min="0" placeholder="R$ 0,00"
-                        value={produto.preco_app || ''}
-                        onChange={e => setProduto(prev => ({ ...prev, preco_app: e.target.value || null }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Preço promocional</label>
-                      <input type="number" step="0.01" min="0" placeholder="R$ 0,00"
-                        value={produto.preco_app_promo || ''}
-                        onChange={e => setProduto(prev => ({ ...prev, preco_app_promo: e.target.value || null }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Promoção início</label>
-                      <input type="datetime-local"
-                        value={produto.preco_app_promo_inicio ? produto.preco_app_promo_inicio.toString().slice(0, 16) : ''}
-                        onChange={e => setProduto(prev => ({ ...prev, preco_app_promo_inicio: e.target.value || null }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Promoção fim</label>
-                      <input type="datetime-local"
-                        value={produto.preco_app_promo_fim ? produto.preco_app_promo_fim.toString().slice(0, 16) : ''}
-                        onChange={e => setProduto(prev => ({ ...prev, preco_app_promo_fim: e.target.value || null }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {produto.status === 'inativo' && (
-                  <p className="text-xs text-amber-700">
-                    Produto inativo na loja fisica: anuncio em Ecommerce e App Movel fica desativado automaticamente.
-                  </p>
-                )}
-          </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Estoque Mínimo
-              </label>
-              <input
-                type="number"
-                name="estoque_minimo"
-                value={produto.estoque_minimo}
-                onChange={handleChange}
-                step="0.01"
-                min="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="0"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Estoque Máximo
-              </label>
-              <input
-                type="number"
-                name="estoque_maximo"
-                value={produto.estoque_maximo}
-                onChange={handleChange}
-                step="0.01"
-                min="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="0"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Localização
-              </label>
-              <input
-                type="text"
-                name="localizacao"
-                value={produto.localizacao}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Ex: Prateleira A1"
-              />
-            </div>
-          </div>
-          
-          {/* Controle de Lote e Status */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
-              <input
-                type="checkbox"
-                name="controle_lote"
-                checked={produto.controle_lote}
-                onChange={handleChange}
-                className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
-              />
+            {/* Categoria, Marca, Departamento e Tipo */}
+            <div className="grid grid-cols-4 gap-4">
               <div>
-                <label className="text-sm font-medium text-gray-700 cursor-pointer">
-                  Controlar por Lotes
+                <label className="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
+                <select
+                  name="categoria_id"
+                  value={produto.categoria_id}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Selecione...</option>
+                  {organizarCategoriasHierarquicas(categorias).map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {"\u00a0\u00a0\u00a0\u00a0".repeat(cat.nivel)}
+                      {cat.nivel > 0 ? "\u2192 " : ""}
+                      {cat.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Marca</label>
+                <select
+                  name="marca_id"
+                  value={produto.marca_id}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Selecione...</option>
+                  {marcas.map((marca) => (
+                    <option key={marca.id} value={marca.id}>
+                      {marca.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Departamento</label>
+                <select
+                  name="departamento_id"
+                  value={produto.departamento_id}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Selecione...</option>
+                  {departamentos.map((depto) => (
+                    <option key={depto.id} value={depto.id}>
+                      {depto.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
+                <select
+                  name="tipo"
+                  value={produto.tipo}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="produto">Produto</option>
+                  <option value="servico">Serviço</option>
+                  <option value="produto_servico">Produto e Serviço</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Preços e Margem */}
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Preço de Custo
                 </label>
-                <p className="text-xs text-gray-500">
-                  Ativa o sistema FIFO de estoque por lotes
+                <input
+                  type="text"
+                  name="preco_custo"
+                  value={formatarValorMonetario(produto.preco_custo)}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^\d.,]/g, "").replace(",", ".");
+                    setProduto({ ...produto, preco_custo: value || "" });
+                  }}
+                  onFocus={(e) => {
+                    if (produto.preco_custo) {
+                      const numero = parseFloat(produto.preco_custo);
+                      e.target.value = isNaN(numero) ? "" : numero.toFixed(2).replace(".", ",");
+                      e.target.select();
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value = e.target.value.replace(",", ".");
+                    setProduto({ ...produto, preco_custo: value || "" });
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="R$ 0,00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Preço de Venda *
+                </label>
+                <input
+                  type="text"
+                  name="preco_venda"
+                  value={formatarValorMonetario(produto.preco_venda)}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^\d.,]/g, "").replace(",", ".");
+                    setProduto({ ...produto, preco_venda: value || "" });
+                  }}
+                  onFocus={(e) => {
+                    if (produto.preco_venda) {
+                      const numero = parseFloat(produto.preco_venda);
+                      e.target.value = isNaN(numero) ? "" : numero.toFixed(2).replace(".", ",");
+                      e.target.select();
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value = e.target.value.replace(",", ".");
+                    setProduto({ ...produto, preco_venda: value || "" });
+                  }}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="R$ 0,00"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Margem de Lucro
+                </label>
+                <input
+                  type="text"
+                  name="margem_lucro"
+                  value={formatarPorcentagem(produto.margem_lucro)}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                  placeholder="0,00%"
+                />
+              </div>
+            </div>
+
+            {/* 💰 Preços por Canal */}
+            <div className="border border-gray-100 rounded-lg p-4 bg-gray-50 space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">
+                  💰 Preços por Canal (Ecommerce / App Móvel)
+                </h3>
+                <p className="text-xs text-gray-500 mt-1">
+                  Se vazio, o sistema usa o <strong>Preço de Venda padrão</strong>. Preencha apenas
+                  se quiser um preço diferente por canal.
                 </p>
               </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status
-              </label>
-              <select
-                name="status"
-                value={produto.status}
-                onChange={handleChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="ativo">Ativo</option>
-                <option value="inativo">Inativo</option>
-              </select>
-            </div>
-          </div>
-          
-          {/* Observações */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Observações
-            </label>
-            <textarea
-              name="observacoes"
-              value={produto.observacoes}
-              onChange={handleChange}
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Observações internas..."
-            />
-          </div>
-          
-          {/* Botões */}
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <button
-              type="button"
-              onClick={() => navigate('/produtos')}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
-            >
-              Cancelar
-            </button>
-            
-            <button
-              type="submit"
-              disabled={salvando}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400"
-            >
-              {salvando ? 'Salvando...' : (isEdit ? 'Atualizar' : 'Cadastrar')}
-            </button>
-          </div>
-        </form>
-        </TabContent>
-      )}
-      
-      {abaAtiva === 'imagens' && isEdit && (
-        <TabContent>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">Imagens do Produto</h2>
-            
-            <label className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer">
-              {uploadingImage ? 'Enviando...' : '+ Adicionar Imagem'}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={handleUploadImagem}
-                disabled={uploadingImage}
-                className="hidden"
-              />
-            </label>
-          </div>
-          
-          {imagens.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <p className="text-lg mb-2">📷 Nenhuma imagem cadastrada</p>
-              <p className="text-sm">Clique em "Adicionar Imagem" para enviar fotos do produto</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-4 gap-4">
-              {imagens.map(img => (
-                <div key={img.id} className="relative group border rounded-lg overflow-hidden">
-                  <img
-                    src={resolveMediaUrl(img.thumbnail_url || img.url)}
-                    alt={img.descricao || 'Imagem do produto'}
-                    className="w-full h-48 object-cover"
-                  />
-                  
-                  {img.e_principal && (
-                    <div className="absolute top-2 left-2 px-2 py-1 bg-blue-600 text-white text-xs rounded">
-                      Principal
-                    </div>
-                  )}
-                  
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                    {!img.e_principal && (
-                      <button
-                        onClick={() => handleSetPrincipal(img.id)}
-                        className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-                        title="Definir como principal"
-                      >
-                        ⭐ Principal
-                      </button>
-                    )}
-                    
-                    <button
-                      onClick={() => handleDeleteImagem(img.id)}
-                      className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
-                      title="Excluir"
-                    >
-                      🗑️ Excluir
-                    </button>
+
+              {/* Ecommerce */}
+              <div>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <div className="text-xs font-bold text-purple-700 uppercase">🛒 Ecommerce</div>
+                  <label className="flex items-center gap-2 text-xs text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={produto.status !== "inativo" && produto.anunciar_ecommerce !== false}
+                      onChange={(e) =>
+                        setProduto((prev) => ({ ...prev, anunciar_ecommerce: e.target.checked }))
+                      }
+                      disabled={produto.status === "inativo"}
+                    />
+                    Exibir no canal
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Preço normal</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="R$ 0,00"
+                      value={produto.preco_ecommerce || ""}
+                      onChange={(e) =>
+                        setProduto((prev) => ({ ...prev, preco_ecommerce: e.target.value || null }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Preço promocional</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="R$ 0,00"
+                      value={produto.preco_ecommerce_promo || ""}
+                      onChange={(e) =>
+                        setProduto((prev) => ({
+                          ...prev,
+                          preco_ecommerce_promo: e.target.value || null,
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Promoção início</label>
+                    <input
+                      type="datetime-local"
+                      value={
+                        produto.preco_ecommerce_promo_inicio
+                          ? produto.preco_ecommerce_promo_inicio.toString().slice(0, 16)
+                          : ""
+                      }
+                      onChange={(e) =>
+                        setProduto((prev) => ({
+                          ...prev,
+                          preco_ecommerce_promo_inicio: e.target.value || null,
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Promoção fim</label>
+                    <input
+                      type="datetime-local"
+                      value={
+                        produto.preco_ecommerce_promo_fim
+                          ? produto.preco_ecommerce_promo_fim.toString().slice(0, 16)
+                          : ""
+                      }
+                      onChange={(e) =>
+                        setProduto((prev) => ({
+                          ...prev,
+                          preco_ecommerce_promo_fim: e.target.value || null,
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+                    />
                   </div>
                 </div>
-              ))}
+              </div>
+
+              {/* App Móvel (Aplicativo) */}
+              <div>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <div className="text-xs font-bold text-green-700 uppercase">
+                    📱 App Móvel (Aplicativo)
+                  </div>
+                  <label className="flex items-center gap-2 text-xs text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={produto.status !== "inativo" && produto.anunciar_app !== false}
+                      onChange={(e) =>
+                        setProduto((prev) => ({ ...prev, anunciar_app: e.target.checked }))
+                      }
+                      disabled={produto.status === "inativo"}
+                    />
+                    Exibir no canal
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Preço normal</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="R$ 0,00"
+                      value={produto.preco_app || ""}
+                      onChange={(e) =>
+                        setProduto((prev) => ({ ...prev, preco_app: e.target.value || null }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Preço promocional</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="R$ 0,00"
+                      value={produto.preco_app_promo || ""}
+                      onChange={(e) =>
+                        setProduto((prev) => ({ ...prev, preco_app_promo: e.target.value || null }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Promoção início</label>
+                    <input
+                      type="datetime-local"
+                      value={
+                        produto.preco_app_promo_inicio
+                          ? produto.preco_app_promo_inicio.toString().slice(0, 16)
+                          : ""
+                      }
+                      onChange={(e) =>
+                        setProduto((prev) => ({
+                          ...prev,
+                          preco_app_promo_inicio: e.target.value || null,
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Promoção fim</label>
+                    <input
+                      type="datetime-local"
+                      value={
+                        produto.preco_app_promo_fim
+                          ? produto.preco_app_promo_fim.toString().slice(0, 16)
+                          : ""
+                      }
+                      onChange={(e) =>
+                        setProduto((prev) => ({
+                          ...prev,
+                          preco_app_promo_fim: e.target.value || null,
+                        }))
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {produto.status === "inativo" && (
+                <p className="text-xs text-amber-700">
+                  Produto inativo na loja fisica: anuncio em Ecommerce e App Movel fica desativado
+                  automaticamente.
+                </p>
+              )}
             </div>
-          )}
-          
-          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
-              <strong>Dica:</strong> A primeira imagem marcada como "Principal" será exibida na listagem de produtos. 
-              Formatos aceitos: JPG, PNG, WebP (max. 10MB) com otimizacao automatica e thumbnail.
-            </p>
-          </div>
-        </div>
-        </TabContent>
-      )}
-      
-      {abaAtiva === 'fornecedores' && isEdit && (
-        <TabContent>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">Fornecedores do Produto</h2>
-            
-            <button
-              onClick={handleAddFornecedor}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-            >
-              + Adicionar Fornecedor
-            </button>
-          </div>
-          
-          {fornecedores.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <p className="text-lg mb-2">🏭 Nenhum fornecedor vinculado</p>
-              <p className="text-sm">Clique em "Adicionar Fornecedor" para vincular fornecedores a este produto</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Estoque Mínimo
+                </label>
+                <input
+                  type="number"
+                  name="estoque_minimo"
+                  value={produto.estoque_minimo}
+                  onChange={handleChange}
+                  step="0.01"
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Estoque Máximo
+                </label>
+                <input
+                  type="number"
+                  name="estoque_maximo"
+                  value={produto.estoque_maximo}
+                  onChange={handleChange}
+                  step="0.01"
+                  min="0"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Localização</label>
+                <input
+                  type="text"
+                  name="localizacao"
+                  value={produto.localizacao}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Ex: Prateleira A1"
+                />
+              </div>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fornecedor</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Preço Custo</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Prazo (dias)</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estoque</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Principal</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {fornecedores.map(forn => (
-                    <tr key={forn.id} className={!forn.ativo ? 'opacity-50' : ''}>
-                      <td className="px-4 py-3">
-                        <FornecedorIdentity
-                          document={forn.fornecedor_cpf_cnpj}
-                          nameClassName="font-medium text-gray-900"
-                          record={forn}
-                        />
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{forn.codigo_fornecedor || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                        {forn.preco_custo ? formatarMoeda(forn.preco_custo) : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-center">{forn.prazo_entrega || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-center">{forn.estoque_fornecedor || '-'}</td>
-                      <td className="px-4 py-3 text-center">
-                        {forn.e_principal && (
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">Principal</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right space-x-2">
-                        <button
-                          onClick={() => handleEditFornecedor(forn)}
-                          className="text-blue-600 hover:text-blue-800 text-sm"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleDeleteFornecedor(forn.id)}
-                          className="text-red-600 hover:text-red-800 text-sm"
-                        >
-                          Excluir
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+
+            {/* Controle de Lote e Status */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
+                <input
+                  type="checkbox"
+                  name="controle_lote"
+                  checked={produto.controle_lote}
+                  onChange={handleChange}
+                  className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                />
+                <div>
+                  <label className="text-sm font-medium text-gray-700 cursor-pointer">
+                    Controlar por Lotes
+                  </label>
+                  <p className="text-xs text-gray-500">Ativa o sistema FIFO de estoque por lotes</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <select
+                  name="status"
+                  value={produto.status}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="ativo">Ativo</option>
+                  <option value="inativo">Inativo</option>
+                </select>
+              </div>
             </div>
-          )}
-        </div>
-        </TabContent>
-      )}
-      
-      {abaAtiva === 'lotes' && isEdit && produto.controle_lote && (
-        <TabContent>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-semibold text-gray-900">Controle de Lotes (FIFO)</h2>
-            
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleMovimentoEstoque('entrada')}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-              >
-                ➕ Entrada
-              </button>
-              <button
-                onClick={() => handleMovimentoEstoque('saida')}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
-              >
-                ➖ Saída
-              </button>
-            </div>
-          </div>
-          
-          {lotes.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <p className="text-lg mb-2">📦 Nenhum lote cadastrado</p>
-              <p className="text-sm">Registre uma entrada de estoque para criar o primeiro lote</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lote</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qtd Atual</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Qtd Inicial</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Custo Unit.</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Validade</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Data Entrada</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {lotes.map(lote => (
-                    <tr key={lote.id} className={lote.quantidade_atual === 0 ? 'opacity-50' : ''}>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{lote.numero_lote}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-center font-semibold">
-                        {lote.quantidade_atual}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 text-center">{lote.quantidade_inicial}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-right">
-                        {formatarMoeda(lote.preco_custo)}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900 text-center">
-                        {lote.data_validade ? formatarData(lote.data_validade) : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-500 text-center">
-                        {formatarData(lote.data_entrada)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-sm text-green-800">
-              <strong>FIFO:</strong> As saídas de estoque consomem automaticamente os lotes mais antigos primeiro (First In, First Out).
-            </p>
-          </div>
-        </div>
-        </TabContent>
-      )}
-      
-      {/* 🔒 SPRINT 2: Aba de Variações para produtos PAI */}
-      {abaAtiva === 'variacoes' && isEdit && produto.tipo_produto === 'PAI' && (
-        <TabContent>
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-6">
+
+            {/* Observações */}
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Variações do Produto</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                Gerencie as variações deste produto (cor, tamanho, etc.)
+              <label className="block text-sm font-medium text-gray-700 mb-2">Observações</label>
+              <textarea
+                name="observacoes"
+                value={produto.observacoes}
+                onChange={handleChange}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="Observações internas..."
+              />
+            </div>
+
+            {/* Botões */}
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <button
+                type="button"
+                onClick={() => navigate("/produtos")}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="submit"
+                disabled={salvando}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400"
+              >
+                {salvando ? "Salvando..." : isEdit ? "Atualizar" : "Cadastrar"}
+              </button>
+            </div>
+          </form>
+        </TabContent>
+      )}
+
+      {abaAtiva === "imagens" && isEdit && (
+        <TabContent>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-semibold text-gray-900">Imagens do Produto</h2>
+
+              <label className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer">
+                {uploadingImage ? "Enviando..." : "+ Adicionar Imagem"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleUploadImagem}
+                  disabled={uploadingImage}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {imagens.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <p className="text-lg mb-2">📷 Nenhuma imagem cadastrada</p>
+                <p className="text-sm">Clique em "Adicionar Imagem" para enviar fotos do produto</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 gap-4">
+                {imagens.map((img) => (
+                  <div key={img.id} className="relative group border rounded-lg overflow-hidden">
+                    <img
+                      src={resolveMediaUrl(img.thumbnail_url || img.url)}
+                      alt={img.descricao || "Imagem do produto"}
+                      className="w-full h-48 object-cover"
+                    />
+
+                    {img.e_principal && (
+                      <div className="absolute top-2 left-2 px-2 py-1 bg-blue-600 text-white text-xs rounded">
+                        Principal
+                      </div>
+                    )}
+
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
+                      {!img.e_principal && (
+                        <button
+                          onClick={() => handleSetPrincipal(img.id)}
+                          className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                          title="Definir como principal"
+                        >
+                          ⭐ Principal
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => handleDeleteImagem(img.id)}
+                        className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                        title="Excluir"
+                      >
+                        🗑️ Excluir
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Dica:</strong> A primeira imagem marcada como "Principal" será exibida na
+                listagem de produtos. Formatos aceitos: JPG, PNG, WebP (max. 10MB) com otimizacao
+                automatica e thumbnail.
               </p>
             </div>
-            
-            <button
-              onClick={() => navigate(`/produtos/novo?produto_pai_id=${id}`)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
-            >
-              <span>➕</span> Nova Variação
-            </button>
           </div>
-          
-          {loadingVariacoes ? (
-            <div className="text-center py-12 text-gray-500">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-4">Carregando variações...</p>
-            </div>
-          ) : variacoes.length === 0 ? (
-            <div className="text-center py-12 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
-              <p className="text-lg mb-2">🔹 Nenhuma variação cadastrada</p>
-              <p className="text-sm mb-4">Este produto não possui variações ainda</p>
+        </TabContent>
+      )}
+
+      {abaAtiva === "fornecedores" && isEdit && (
+        <TabContent>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-semibold text-gray-900">Fornecedores do Produto</h2>
+
               <button
-                onClick={() => navigate(`/produtos/novo?produto_pai_id=${id}`)}
-                className="text-blue-600 hover:underline font-medium"
+                onClick={handleAddFornecedor}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
               >
-                Criar primeira variação →
+                + Adicionar Fornecedor
               </button>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Tabela de Variações */}
-              <div className="overflow-x-auto border border-gray-200 rounded-lg">
+
+            {fornecedores.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <p className="text-lg mb-2">🏭 Nenhum fornecedor vinculado</p>
+                <p className="text-sm">
+                  Clique em "Adicionar Fornecedor" para vincular fornecedores a este produto
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Variação</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Código</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Preço</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estoque</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Ações</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Fornecedor
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Código
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Preço Custo
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                        Prazo (dias)
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                        Estoque
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                        Principal
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Ações
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {variacoes.map(variacao => (
-                      <tr key={variacao.id} className="hover:bg-gray-50 transition">
+                    {fornecedores.map((forn) => (
+                      <tr key={forn.id} className={!forn.ativo ? "opacity-50" : ""}>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900">{variacao.nome}</span>
-                          </div>
-                          {variacao.variation_signature && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              {variacao.variation_signature.split('|').join(' • ')}
-                            </div>
+                          <FornecedorIdentity
+                            document={forn.fornecedor_cpf_cnpj}
+                            nameClassName="font-medium text-gray-900"
+                            record={forn}
+                          />
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          {forn.codigo_fornecedor || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                          {forn.preco_custo ? formatarMoeda(forn.preco_custo) : "-"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 text-center">
+                          {forn.prazo_entrega || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 text-center">
+                          {forn.estoque_fornecedor || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {forn.e_principal && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                              Principal
+                            </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className="text-sm font-mono text-gray-600">{variacao.codigo}</span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="text-sm font-semibold text-gray-900">
-                            {formatarMoeda(variacao.preco_venda)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            (variacao.estoque_atual || 0) > 0 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {variacao.estoque_atual || 0}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            variacao.ativo 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {variacao.ativo ? 'Ativo' : 'Inativo'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <div className="flex justify-center gap-2">
-                            <button
-                              onClick={() => navigate(`/produtos/${variacao.id}/editar`)}
-                              className="text-blue-600 hover:text-blue-900 transition"
-                              title="Editar variação"
-                            >
-                              ✏️
-                            </button>
-                          </div>
+                        <td className="px-4 py-3 text-right space-x-2">
+                          <button
+                            onClick={() => handleEditFornecedor(forn)}
+                            className="text-blue-600 hover:text-blue-800 text-sm"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleDeleteFornecedor(forn.id)}
+                            className="text-red-600 hover:text-red-800 text-sm"
+                          >
+                            Excluir
+                          </button>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              
-              {/* Informações */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-800">
-                  <strong>💡 Dica:</strong> Cada variação funciona como um produto independente com preço e estoque próprios.
-                  O produto pai serve apenas como agrupador e não pode ser vendido diretamente.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
         </TabContent>
       )}
-      
+
+      {abaAtiva === "lotes" && isEdit && produto.controle_lote && (
+        <TabContent>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-semibold text-gray-900">Controle de Lotes (FIFO)</h2>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleMovimentoEstoque("entrada")}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                >
+                  ➕ Entrada
+                </button>
+                <button
+                  onClick={() => handleMovimentoEstoque("saida")}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                >
+                  ➖ Saída
+                </button>
+              </div>
+            </div>
+
+            {lotes.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <p className="text-lg mb-2">📦 Nenhum lote cadastrado</p>
+                <p className="text-sm">
+                  Registre uma entrada de estoque para criar o primeiro lote
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Lote
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                        Qtd Atual
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                        Qtd Inicial
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Custo Unit.
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                        Validade
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                        Data Entrada
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {lotes.map((lote) => (
+                      <tr key={lote.id} className={lote.quantidade_atual === 0 ? "opacity-50" : ""}>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                          {lote.numero_lote}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 text-center font-semibold">
+                          {lote.quantidade_atual}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500 text-center">
+                          {lote.quantidade_inicial}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 text-right">
+                          {formatarMoeda(lote.preco_custo)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 text-center">
+                          {lote.data_validade ? formatarData(lote.data_validade) : "-"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500 text-center">
+                          {formatarData(lote.data_entrada)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-800">
+                <strong>FIFO:</strong> As saídas de estoque consomem automaticamente os lotes mais
+                antigos primeiro (First In, First Out).
+              </p>
+            </div>
+          </div>
+        </TabContent>
+      )}
+
+      {/* 🔒 SPRINT 2: Aba de Variações para produtos PAI */}
+      {abaAtiva === "variacoes" && isEdit && produto.tipo_produto === "PAI" && (
+        <TabContent>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Variações do Produto</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Gerencie as variações deste produto (cor, tamanho, etc.)
+                </p>
+              </div>
+
+              <button
+                onClick={() => navigate(`/produtos/novo?produto_pai_id=${id}`)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
+              >
+                <span>➕</span> Nova Variação
+              </button>
+            </div>
+
+            {loadingVariacoes ? (
+              <div className="text-center py-12 text-gray-500">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-4">Carregando variações...</p>
+              </div>
+            ) : variacoes.length === 0 ? (
+              <div className="text-center py-12 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
+                <p className="text-lg mb-2">🔹 Nenhuma variação cadastrada</p>
+                <p className="text-sm mb-4">Este produto não possui variações ainda</p>
+                <button
+                  onClick={() => navigate(`/produtos/novo?produto_pai_id=${id}`)}
+                  className="text-blue-600 hover:underline font-medium"
+                >
+                  Criar primeira variação →
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Tabela de Variações */}
+                <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                          Variação
+                        </th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                          Código
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                          Preço
+                        </th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                          Estoque
+                        </th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                          Ações
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {variacoes.map((variacao) => (
+                        <tr key={variacao.id} className="hover:bg-gray-50 transition">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-gray-900">
+                                {variacao.nome}
+                              </span>
+                            </div>
+                            {variacao.variation_signature && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {variacao.variation_signature.split("|").join(" • ")}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="text-sm font-mono text-gray-600">
+                              {variacao.codigo}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <span className="text-sm font-semibold text-gray-900">
+                              {formatarMoeda(variacao.preco_venda)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span
+                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                (variacao.estoque_atual || 0) > 0
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {variacao.estoque_atual || 0}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span
+                              className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                variacao.ativo
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {variacao.ativo ? "Ativo" : "Inativo"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <div className="flex justify-center gap-2">
+                              <button
+                                onClick={() => navigate(`/produtos/${variacao.id}/editar`)}
+                                className="text-blue-600 hover:text-blue-900 transition"
+                                title="Editar variação"
+                              >
+                                ✏️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Informações */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>💡 Dica:</strong> Cada variação funciona como um produto independente
+                    com preço e estoque próprios. O produto pai serve apenas como agrupador e não
+                    pode ser vendido diretamente.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </TabContent>
+      )}
+
       {/* Modais */}
       {showModalFornecedor && (
         <ModalFornecedor
@@ -1222,7 +1345,7 @@ export default function ProdutosForm() {
           onClose={() => setShowModalFornecedor(false)}
         />
       )}
-      
+
       {showModalLote && (
         <ModalMovimentoEstoque
           tipo={tipoMovimento}

@@ -1,21 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Sparkles, MessageCircle, Loader } from 'lucide-react';
-import api from '../api';
+import { useState, useEffect, useRef } from "react";
+import { X, Send, Sparkles, MessageCircle, Loader } from "lucide-react";
+import api from "../api";
 
 const ChatIAModal = ({ isOpen, onClose, contexto }) => {
   const [mensagens, setMensagens] = useState([]);
-  const [inputMensagem, setInputMensagem] = useState('');
+  const [inputMensagem, setInputMensagem] = useState("");
   const [enviando, setEnviando] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
     if (isOpen && mensagens.length === 0) {
       // Mensagem de boas-vindas
-      setMensagens([{
-        tipo: 'ia',
-        conteudo: `Olá! Sou seu especialista financeiro com IA. Analisando seu ${contexto?.tipo || 'relatório'}...\n\nPosso ajudar com:\n• Análise de resultados\n• Sugestões de melhoria\n• Comparações de períodos\n• Projeções financeiras\n\nO que deseja saber?`,
-        timestamp: new Date()
-      }]);
+      setMensagens([
+        {
+          tipo: "ia",
+          conteudo: `Olá! Sou seu especialista financeiro com IA. Analisando seu ${contexto?.tipo || "relatório"}...\n\nPosso ajudar com:\n• Análise de resultados\n• Sugestões de melhoria\n• Comparações de períodos\n• Projeções financeiras\n\nO que deseja saber?`,
+          timestamp: new Date(),
+        },
+      ]);
     }
   }, [isOpen, mensagens.length, contexto]);
 
@@ -24,60 +26,60 @@ const ChatIAModal = ({ isOpen, onClose, contexto }) => {
   }, [mensagens]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   const enviarMensagem = async () => {
     if (!inputMensagem.trim()) return;
 
     const novaMensagem = {
-      tipo: 'usuario',
+      tipo: "usuario",
       conteudo: inputMensagem,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
 
-    setMensagens(prev => [...prev, novaMensagem]);
-    setInputMensagem('');
+    setMensagens((prev) => [...prev, novaMensagem]);
+    setInputMensagem("");
     setEnviando(true);
 
     try {
-      const response = await api.post('/ia/chat', {
+      const response = await api.post("/ia/chat", {
         mensagem: inputMensagem,
-        contexto: contexto
+        contexto: contexto,
       });
 
       const respostaIA = {
-        tipo: 'ia',
+        tipo: "ia",
         conteudo: response.data.resposta,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
 
-      setMensagens(prev => [...prev, respostaIA]);
+      setMensagens((prev) => [...prev, respostaIA]);
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
+      console.error("Erro ao enviar mensagem:", error);
       const erroMsg = {
-        tipo: 'ia',
-        conteudo: 'Desculpe, houve um erro ao processar sua mensagem. Tente novamente.',
-        timestamp: new Date()
+        tipo: "ia",
+        conteudo: "Desculpe, houve um erro ao processar sua mensagem. Tente novamente.",
+        timestamp: new Date(),
       };
-      setMensagens(prev => [...prev, erroMsg]);
+      setMensagens((prev) => [...prev, erroMsg]);
     } finally {
       setEnviando(false);
     }
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       enviarMensagem();
     }
   };
 
   const sugestoesPergunta = [
-    'Como melhorar minha margem de lucro?',
-    'Quais são os principais gastos?',
-    'Compare com o mês anterior',
-    'Há despesas atípicas?'
+    "Como melhorar minha margem de lucro?",
+    "Quais são os principais gastos?",
+    "Compare com o mês anterior",
+    "Há despesas atípicas?",
   ];
 
   const usarSugestao = (sugestao) => {
@@ -113,11 +115,11 @@ const ChatIAModal = ({ isOpen, onClose, contexto }) => {
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-indigo-200 p-3">
             <div className="text-sm text-indigo-800">
               📊 Analisando: <span className="font-semibold">{contexto.tipo}</span>
-              {contexto.periodo && (
-                <span className="ml-2">• {contexto.periodo}</span>
-              )}
+              {contexto.periodo && <span className="ml-2">• {contexto.periodo}</span>}
               {contexto.valor && (
-                <span className="ml-2">• Valor: R$ {contexto.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                <span className="ml-2">
+                  • Valor: R$ {contexto.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                </span>
               )}
             </div>
           </div>
@@ -128,16 +130,16 @@ const ChatIAModal = ({ isOpen, onClose, contexto }) => {
           {mensagens.map((msg, index) => (
             <div
               key={index}
-              className={`flex ${msg.tipo === 'usuario' ? 'justify-end' : 'justify-start'}`}
+              className={`flex ${msg.tipo === "usuario" ? "justify-end" : "justify-start"}`}
             >
               <div
                 className={`max-w-[80%] rounded-2xl p-4 ${
-                  msg.tipo === 'usuario'
-                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-800'
+                  msg.tipo === "usuario"
+                    ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white"
+                    : "bg-gray-100 text-gray-800"
                 }`}
               >
-                {msg.tipo === 'ia' && (
+                {msg.tipo === "ia" && (
                   <div className="flex items-center gap-2 mb-2">
                     <MessageCircle size={16} className="text-purple-600" />
                     <span className="text-xs font-semibold text-purple-600">IA Especialista</span>
@@ -145,7 +147,10 @@ const ChatIAModal = ({ isOpen, onClose, contexto }) => {
                 )}
                 <p className="whitespace-pre-wrap">{msg.conteudo}</p>
                 <span className="text-xs opacity-70 mt-2 block">
-                  {msg.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  {msg.timestamp.toLocaleTimeString("pt-BR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
               </div>
             </div>

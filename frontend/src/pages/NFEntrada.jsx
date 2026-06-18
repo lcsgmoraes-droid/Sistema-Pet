@@ -1,5 +1,5 @@
-import { FileInput } from 'lucide-react';
-import SEFAZImportacao from './SEFAZImportacao';
+import { FileInput } from "lucide-react";
+import SEFAZImportacao from "./SEFAZImportacao";
 
 export default function NFEntrada() {
   return (
@@ -10,7 +10,8 @@ export default function NFEntrada() {
           NF de Entrada
         </h1>
         <p className="text-gray-600 mt-1">
-          Consulte notas fiscais de entrada (compras de fornecedores) diretamente na SEFAZ pela chave de acesso.
+          Consulte notas fiscais de entrada (compras de fornecedores) diretamente na SEFAZ pela
+          chave de acesso.
         </p>
       </div>
       <SEFAZImportacao />

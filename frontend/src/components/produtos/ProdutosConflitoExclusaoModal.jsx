@@ -1,5 +1,3 @@
-import React from "react";
-
 export default function ProdutosConflitoExclusaoModal({
   autoSelecionarConflito,
   bloqueiosExclusao,
@@ -22,12 +20,10 @@ export default function ProdutosConflitoExclusaoModal({
       <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-3xl max-h-[85vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">
-              Produtos com bloqueio para exclusao
-            </h2>
+            <h2 className="text-xl font-bold text-gray-900">Produtos com bloqueio para exclusao</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Selecione as variacoes que deseja desativar agora para o sistema tentar
-              excluir os produtos pai automaticamente.
+              Selecione as variacoes que deseja desativar agora para o sistema tentar excluir os
+              produtos pai automaticamente.
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -93,10 +89,7 @@ export default function ProdutosConflitoExclusaoModal({
                         type="checkbox"
                         checked={idsDoPai.length > 0 && qtdSelecionada === idsDoPai.length}
                         onChange={(event) =>
-                          onSelecionarTodasVariacoesDoPai(
-                            bloqueio.parentId,
-                            event.target.checked,
-                          )
+                          onSelecionarTodasVariacoesDoPai(bloqueio.parentId, event.target.checked)
                         }
                         className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                       />
@@ -114,17 +107,12 @@ export default function ProdutosConflitoExclusaoModal({
                               type="checkbox"
                               checked={variacoesSelecionadasConflito.includes(variacao.id)}
                               onChange={(event) =>
-                                onSelecionarVariacaoConflito(
-                                  variacao.id,
-                                  event.target.checked,
-                                )
+                                onSelecionarVariacaoConflito(variacao.id, event.target.checked)
                               }
                               className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
                             />
                             <span className="text-sm text-gray-800">
-                              {corrigirTextoQuebrado(
-                                variacao.nome || `Variacao #${variacao.id}`,
-                              )}
+                              {corrigirTextoQuebrado(variacao.nome || `Variacao #${variacao.id}`)}
                             </span>
                           </div>
                           <span className="text-xs text-gray-500 font-mono">
@@ -136,8 +124,8 @@ export default function ProdutosConflitoExclusaoModal({
                   </>
                 ) : (
                   <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-                    Nao foi possivel listar variacoes automaticamente para este item.
-                    Tente atualizar a tela e repetir.
+                    Nao foi possivel listar variacoes automaticamente para este item. Tente
+                    atualizar a tela e repetir.
                   </div>
                 )}
               </div>
@@ -158,9 +146,7 @@ export default function ProdutosConflitoExclusaoModal({
             disabled={resolvendoConflitoExclusao}
             className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
           >
-            {resolvendoConflitoExclusao
-              ? "Aplicando resolucao..."
-              : "Resolver rapido e excluir"}
+            {resolvendoConflitoExclusao ? "Aplicando resolucao..." : "Resolver rapido e excluir"}
           </button>
         </div>
       </div>

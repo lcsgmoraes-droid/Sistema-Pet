@@ -3,15 +3,11 @@ export default function CampanhasDashboardProximosEventosSection({ dashboard }) 
 
   return (
     <div className="space-y-3">
-      <h2 className="font-semibold text-gray-800">
-        {"\u{1F4C5}"} Proximos Eventos
-      </h2>
+      <h2 className="font-semibold text-gray-800">{"\u{1F4C5}"} Proximos Eventos</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b bg-pink-50 flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-800">
-              {"\u{1F382}"} Aniversarios Amanha
-            </p>
+            <p className="text-sm font-semibold text-gray-800">{"\u{1F382}"} Aniversarios Amanha</p>
             <span className="text-xs text-pink-600 font-medium">
               {dashboard.proximos_eventos.total_aniversarios_amanha} pessoa(s)
             </span>
@@ -57,15 +53,10 @@ export default function CampanhasDashboardProximosEventosSection({ dashboard }) 
               </div>
               <div className="divide-y">
                 {dashboard.proximos_eventos.sorteios_esta_semana.map((s) => (
-                  <div
-                    key={s.id}
-                    className="px-4 py-2.5 flex items-center justify-between"
-                  >
+                  <div key={s.id} className="px-4 py-2.5 flex items-center justify-between">
                     <span className="text-sm text-gray-800">{s.name}</span>
                     <span className="text-xs text-gray-500">
-                      {s.draw_date
-                        ? new Date(s.draw_date).toLocaleDateString("pt-BR")
-                        : "-"}
+                      {s.draw_date ? new Date(s.draw_date).toLocaleDateString("pt-BR") : "-"}
                     </span>
                   </div>
                 ))}

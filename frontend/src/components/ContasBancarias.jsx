@@ -1,28 +1,57 @@
-import { useState, useEffect } from 'react';
-import { 
-  Plus, Edit2, Trash2, AlertCircle,
-  Building2, Wallet, CreditCard, X, Save, Banknote, Landmark
-} from 'lucide-react';
-import api from '../api';
-import { getGuiaClassNames } from '../utils/guiaHighlight';
+import { useState, useEffect } from "react";
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  AlertCircle,
+  Building2,
+  Wallet,
+  CreditCard,
+  X,
+  Save,
+  Banknote,
+  Landmark,
+} from "lucide-react";
+import api from "../api";
+import { getGuiaClassNames } from "../utils/guiaHighlight";
 
 const TIPOS_CONTA = [
-  { value: 'banco', label: 'Banco', icon: Building2, cor_padrao: '#dc2626' },
-  { value: 'caixa', label: 'Caixa Físico', icon: Wallet, cor_padrao: '#16a34a' },
-  { value: 'digital', label: 'Carteira Digital', icon: CreditCard, cor_padrao: '#2563eb' }
+  { value: "banco", label: "Banco", icon: Building2, cor_padrao: "#dc2626" },
+  { value: "caixa", label: "Caixa Físico", icon: Wallet, cor_padrao: "#16a34a" },
+  { value: "digital", label: "Carteira Digital", icon: CreditCard, cor_padrao: "#2563eb" },
 ];
 
 const ICONES_DISPONIVEIS = [
-  '\uD83C\uDFE6', '\uD83D\uDCB0', '\uD83D\uDCB3', '\uD83D\uDCB5', '\uD83D\uDCB8', '\uD83C\uDFE7',
-  '\uD83E\uDE99', '\uD83D\uDCB4', '\uD83D\uDCB6', '\uD83D\uDCB7', '\uD83E\uDD11', '\uD83D\uDCB2',
-  '\uD83D\uDD12', '\uD83C\uDFE6', '\uD83C\uDFEA', '\uD83C\uDFE2', '\uD83C\uDFED', '\uD83C\uDFAF',
-  '\uD83D\uDCCA', '\uD83D\uDCC8', '\uD83D\uDCBC', '\uD83D\uDC5B', '\uD83C\uDF81', '\u26A1'
+  "\uD83C\uDFE6",
+  "\uD83D\uDCB0",
+  "\uD83D\uDCB3",
+  "\uD83D\uDCB5",
+  "\uD83D\uDCB8",
+  "\uD83C\uDFE7",
+  "\uD83E\uDE99",
+  "\uD83D\uDCB4",
+  "\uD83D\uDCB6",
+  "\uD83D\uDCB7",
+  "\uD83E\uDD11",
+  "\uD83D\uDCB2",
+  "\uD83D\uDD12",
+  "\uD83C\uDFE6",
+  "\uD83C\uDFEA",
+  "\uD83C\uDFE2",
+  "\uD83C\uDFED",
+  "\uD83C\uDFAF",
+  "\uD83D\uDCCA",
+  "\uD83D\uDCC8",
+  "\uD83D\uDCBC",
+  "\uD83D\uDC5B",
+  "\uD83C\uDF81",
+  "\u26A1",
 ];
 
 const DEFAULT_ICON_BY_TIPO = {
-  banco: '\uD83C\uDFE6',
-  caixa: '\uD83D\uDCB0',
-  digital: '\uD83D\uDCB3'
+  banco: "\uD83C\uDFE6",
+  caixa: "\uD83D\uDCB0",
+  digital: "\uD83D\uDCB3",
 };
 
 const LUCIDE_ICON_BY_NAME = {
@@ -35,11 +64,11 @@ const LUCIDE_ICON_BY_NAME = {
   caixa: Wallet,
   creditcard: CreditCard,
   card: CreditCard,
-  digital: CreditCard
+  digital: CreditCard,
 };
 
 const tryRepairMojibake = (value) => {
-  if (typeof value !== 'string' || !value) return '';
+  if (typeof value !== "string" || !value) return "";
   try {
     return decodeURIComponent(escape(value));
   } catch {
@@ -47,16 +76,16 @@ const tryRepairMojibake = (value) => {
   }
 };
 
-const normalizeContaIcon = (rawIcon, tipo = 'banco') => {
+const normalizeContaIcon = (rawIcon, tipo = "banco") => {
   const repaired = tryRepairMojibake(rawIcon).trim();
-  const fallback = DEFAULT_ICON_BY_TIPO[tipo] || '\uD83C\uDFE6';
+  const fallback = DEFAULT_ICON_BY_TIPO[tipo] || "\uD83C\uDFE6";
 
   if (!repaired) return fallback;
   if (
-    repaired.includes('?') ||
-    repaired.includes('\uFFFD') ||
-    repaired.includes('ð') ||
-    repaired.includes('Ã')
+    repaired.includes("?") ||
+    repaired.includes("\uFFFD") ||
+    repaired.includes("ð") ||
+    repaired.includes("Ã")
   ) {
     return fallback;
   }
@@ -65,12 +94,12 @@ const normalizeContaIcon = (rawIcon, tipo = 'banco') => {
 };
 
 const normalizeIconKey = (value) =>
-  String(value || '')
+  String(value || "")
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '');
+    .replace(/[^a-z0-9]+/g, "");
 
-const resolveContaIcon = (rawIcon, tipo = 'banco') => {
+const resolveContaIcon = (rawIcon, tipo = "banco") => {
   const repaired = tryRepairMojibake(rawIcon).trim();
   const ContaIconComponent = LUCIDE_ICON_BY_NAME[normalizeIconKey(repaired)];
 
@@ -82,25 +111,25 @@ const resolveContaIcon = (rawIcon, tipo = 'banco') => {
 };
 
 function ContasBancarias() {
-  const guiaAtiva = new URLSearchParams(window.location.search).get('guia');
-  const destacarContasBancarias = guiaAtiva === 'contas-bancarias';
+  const guiaAtiva = new URLSearchParams(window.location.search).get("guia");
+  const destacarContasBancarias = guiaAtiva === "contas-bancarias";
   const guiaClasses = getGuiaClassNames(destacarContasBancarias);
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
   const [contaSelecionada, setContaSelecionada] = useState(null);
-  const [erro, setErro] = useState('');
-  
+  const [erro, setErro] = useState("");
+
   // Form states
   const [formData, setFormData] = useState({
-    nome: '',
-    tipo: 'banco',
-    banco: '',
+    nome: "",
+    tipo: "banco",
+    banco: "",
     saldo_inicial: 0,
-    cor: '#dc2626',
+    cor: "#dc2626",
     icone: DEFAULT_ICON_BY_TIPO.banco,
     instituicao_bancaria: false,
-    ativa: true
+    ativa: true,
   });
 
   useEffect(() => {
@@ -110,15 +139,15 @@ function ContasBancarias() {
   const carregarContas = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/contas-bancarias');
+      const response = await api.get("/contas-bancarias");
       const contasNormalizadas = (response.data || []).map((conta) => ({
         ...conta,
         icone: normalizeContaIcon(conta.icone, conta.tipo),
       }));
       setContas(contasNormalizadas);
     } catch (error) {
-      console.error('Erro:', error);
-      setErro('Erro ao carregar contas bancárias');
+      console.error("Erro:", error);
+      setErro("Erro ao carregar contas bancárias");
     } finally {
       setLoading(false);
     }
@@ -129,35 +158,35 @@ function ContasBancarias() {
       setFormData({
         nome: conta.nome,
         tipo: conta.tipo,
-        banco: conta.banco || '',
+        banco: conta.banco || "",
         saldo_inicial: conta.saldo_inicial,
-        cor: conta.cor || '#dc2626',
+        cor: conta.cor || "#dc2626",
         icone: normalizeContaIcon(conta.icone, conta.tipo),
         instituicao_bancaria: conta.instituicao_bancaria || false,
-        ativa: conta.ativa
+        ativa: conta.ativa,
       });
       setContaSelecionada(conta);
     } else {
       const tipoPadrao = TIPOS_CONTA[0];
       setFormData({
-        nome: '',
-        tipo: 'banco',
-        banco: '',
+        nome: "",
+        tipo: "banco",
+        banco: "",
         saldo_inicial: 0,
         cor: tipoPadrao.cor_padrao,
         icone: DEFAULT_ICON_BY_TIPO.banco,
         instituicao_bancaria: false,
-        ativa: true
+        ativa: true,
       });
       setContaSelecionada(null);
     }
     setModalAberto(true);
-    setErro('');
+    setErro("");
   };
 
   const salvarConta = async (e) => {
     e.preventDefault();
-    
+
     try {
       // Garantir que os dados estão no formato correto
       const dadosEnvio = {
@@ -168,36 +197,36 @@ function ContasBancarias() {
         cor: formData.cor,
         icone: normalizeContaIcon(formData.icone, formData.tipo),
         instituicao_bancaria: Boolean(formData.instituicao_bancaria),
-        ativa: Boolean(formData.ativa)
+        ativa: Boolean(formData.ativa),
       };
 
-      console.log('Enviando dados:', dadosEnvio);
-      
+      console.log("Enviando dados:", dadosEnvio);
+
       if (contaSelecionada) {
         await api.put(`/contas-bancarias/${contaSelecionada.id}`, dadosEnvio);
       } else {
-        await api.post('/contas-bancarias', dadosEnvio);
+        await api.post("/contas-bancarias", dadosEnvio);
       }
-      
+
       await carregarContas();
       setModalAberto(false);
-      setErro('');
+      setErro("");
     } catch (error) {
-      console.error('Erro completo:', error);
-      console.error('Response:', error.response);
-      setErro(error.response?.data?.detail || error.message || 'Erro ao salvar conta');
+      console.error("Erro completo:", error);
+      console.error("Response:", error.response);
+      setErro(error.response?.data?.detail || error.message || "Erro ao salvar conta");
     }
   };
 
   const excluirConta = async (id) => {
-    if (!confirm('Deseja realmente excluir esta conta?')) return;
-    
+    if (!confirm("Deseja realmente excluir esta conta?")) return;
+
     try {
       await api.delete(`/contas-bancarias/${id}`);
       await carregarContas();
     } catch (error) {
-      console.error('Erro:', error);
-      setErro(error.response?.data?.detail || 'Erro ao excluir conta');
+      console.error("Erro:", error);
+      setErro(error.response?.data?.detail || "Erro ao excluir conta");
     }
   };
 
@@ -213,7 +242,8 @@ function ContasBancarias() {
     <div className="p-6 max-w-7xl mx-auto">
       {destacarContasBancarias && (
         <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
-          Etapa da introducao guiada: use o botao <strong>Nova Conta</strong> para cadastrar banco, caixa ou carteira digital.
+          Etapa da introducao guiada: use o botao <strong>Nova Conta</strong> para cadastrar banco,
+          caixa ou carteira digital.
         </div>
       )}
 
@@ -222,14 +252,16 @@ function ContasBancarias() {
         <div className="flex justify-between items-center mb-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Cadastro de Bancos</h1>
-            <p className="text-gray-600">Configure as contas bancárias, caixas e carteiras digitais do sistema</p>
+            <p className="text-gray-600">
+              Configure as contas bancárias, caixas e carteiras digitais do sistema
+            </p>
           </div>
           <button
             onClick={() => abrirModal()}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
               destacarContasBancarias
                 ? `bg-amber-600 text-white hover:bg-amber-700 ${guiaClasses.action}`
-                : 'bg-blue-600 text-white hover:bg-blue-700'
+                : "bg-blue-600 text-white hover:bg-blue-700"
             }`}
           >
             <Plus className="w-5 h-5" />
@@ -247,44 +279,46 @@ function ContasBancarias() {
 
       {/* Lista de Contas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {contas.map(conta => {
-          const TipoIcon = TIPOS_CONTA.find(t => t.value === conta.tipo)?.icon || Building2;
+        {contas.map((conta) => {
+          const TipoIcon = TIPOS_CONTA.find((t) => t.value === conta.tipo)?.icon || Building2;
           const { ContaIconComponent, emoji } = resolveContaIcon(conta.icone, conta.tipo);
-          
+
           return (
             <div
               key={conta.id}
               className={`bg-white rounded-xl border-2 p-4 transition ${
-                conta.ativa ? 'border-gray-200 hover:border-blue-300' : 'border-gray-100 opacity-60'
+                conta.ativa ? "border-gray-200 hover:border-blue-300" : "border-gray-100 opacity-60"
               }`}
             >
               {/* Header do Card */}
               <div className="flex min-w-0 items-start justify-between gap-3 mb-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div 
+                  <div
                     className="w-12 h-12 shrink-0 rounded-full flex items-center justify-center overflow-hidden text-2xl"
                     style={{ backgroundColor: `${conta.cor}20` }}
                   >
                     {ContaIconComponent ? (
                       <ContaIconComponent
                         className="h-6 w-6"
-                        style={{ color: conta.cor || '#4b5563' }}
+                        style={{ color: conta.cor || "#4b5563" }}
                       />
                     ) : (
                       <span className="leading-none">{emoji}</span>
                     )}
                   </div>
                   <div className="min-w-0">
-                    <h3 title={conta.nome} className="truncate font-bold text-gray-800">{conta.nome}</h3>
+                    <h3 title={conta.nome} className="truncate font-bold text-gray-800">
+                      {conta.nome}
+                    </h3>
                     <p className="flex min-w-0 items-center gap-1 text-sm text-gray-500">
                       <TipoIcon className="w-3 h-3 shrink-0" />
                       <span className="truncate">
-                        {TIPOS_CONTA.find(t => t.value === conta.tipo)?.label}
+                        {TIPOS_CONTA.find((t) => t.value === conta.tipo)?.label}
                       </span>
                     </p>
                   </div>
                 </div>
-                
+
                 {!conta.ativa && (
                   <span className="shrink-0 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
                     Inativa
@@ -297,12 +331,14 @@ function ContasBancarias() {
                 <p className="text-sm text-gray-600 mb-1">Tipo de Conta</p>
                 <p
                   className="truncate text-lg font-semibold text-gray-800"
-                  title={TIPOS_CONTA.find(t => t.value === conta.tipo)?.label}
+                  title={TIPOS_CONTA.find((t) => t.value === conta.tipo)?.label}
                 >
-                  {TIPOS_CONTA.find(t => t.value === conta.tipo)?.label}
+                  {TIPOS_CONTA.find((t) => t.value === conta.tipo)?.label}
                 </p>
                 {conta.banco && (
-                  <p title={conta.banco} className="truncate text-sm text-gray-500 mt-1">{conta.banco}</p>
+                  <p title={conta.banco} className="truncate text-sm text-gray-500 mt-1">
+                    {conta.banco}
+                  </p>
                 )}
               </div>
 
@@ -345,9 +381,12 @@ function ContasBancarias() {
           <div className="bg-white rounded-xl max-w-md w-full p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-gray-800">
-                {contaSelecionada ? 'Editar Conta' : 'Nova Conta'}
+                {contaSelecionada ? "Editar Conta" : "Nova Conta"}
               </h2>
-              <button onClick={() => setModalAberto(false)} className="text-gray-500 hover:text-gray-700">
+              <button
+                onClick={() => setModalAberto(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -375,24 +414,28 @@ function ContasBancarias() {
                 <select
                   value={formData.tipo}
                   onChange={(e) => {
-                    const tipo = TIPOS_CONTA.find(t => t.value === e.target.value);
-                    setFormData({ 
-                      ...formData, 
+                    const tipo = TIPOS_CONTA.find((t) => t.value === e.target.value);
+                    setFormData({
+                      ...formData,
                       tipo: e.target.value,
-                      cor: tipo?.cor_padrao || formData.cor
+                      cor: tipo?.cor_padrao || formData.cor,
                     });
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  {TIPOS_CONTA.map(tipo => (
-                    <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+                  {TIPOS_CONTA.map((tipo) => (
+                    <option key={tipo.value} value={tipo.value}>
+                      {tipo.label}
+                    </option>
                   ))}
                 </select>
               </div>
 
-              {formData.tipo === 'banco' && (
+              {formData.tipo === "banco" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nome do Banco</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nome do Banco
+                  </label>
                   <input
                     type="text"
                     value={formData.banco}
@@ -405,12 +448,16 @@ function ContasBancarias() {
 
               {!contaSelecionada && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Saldo Inicial</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Saldo Inicial
+                  </label>
                   <input
                     type="number"
                     step="0.01"
                     value={formData.saldo_inicial}
-                    onChange={(e) => setFormData({ ...formData, saldo_inicial: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, saldo_inicial: parseFloat(e.target.value) || 0 })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -428,8 +475,10 @@ function ContasBancarias() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ícone Atual</label>
-                  <div 
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ícone Atual
+                  </label>
+                  <div
                     className="w-full h-10 border border-gray-300 rounded-lg flex items-center justify-center text-2xl bg-white"
                     style={{ backgroundColor: `${formData.cor}10` }}
                   >
@@ -439,7 +488,9 @@ function ContasBancarias() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Escolher Ícone</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Escolher Ícone
+                </label>
                 <div className="grid grid-cols-8 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200 max-h-32 overflow-y-auto">
                   {ICONES_DISPONIVEIS.map((icone, index) => (
                     <button
@@ -447,9 +498,9 @@ function ContasBancarias() {
                       type="button"
                       onClick={() => setFormData({ ...formData, icone })}
                       className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl transition hover:scale-110 ${
-                        formData.icone === icone 
-                          ? 'bg-blue-100 border-2 border-blue-500 ring-2 ring-blue-200' 
-                          : 'bg-white border border-gray-200 hover:border-blue-300'
+                        formData.icone === icone
+                          ? "bg-blue-100 border-2 border-blue-500 ring-2 ring-blue-200"
+                          : "bg-white border border-gray-200 hover:border-blue-300"
                       }`}
                     >
                       {icone}
@@ -463,7 +514,9 @@ function ContasBancarias() {
                   type="checkbox"
                   id="instituicao_bancaria"
                   checked={formData.instituicao_bancaria}
-                  onChange={(e) => setFormData({ ...formData, instituicao_bancaria: e.target.checked })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, instituicao_bancaria: e.target.checked })
+                  }
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <label htmlFor="instituicao_bancaria" className="text-sm text-gray-700">
@@ -479,7 +532,9 @@ function ContasBancarias() {
                   onChange={(e) => setFormData({ ...formData, ativa: e.target.checked })}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <label htmlFor="ativa" className="text-sm text-gray-700">Conta ativa</label>
+                <label htmlFor="ativa" className="text-sm text-gray-700">
+                  Conta ativa
+                </label>
               </div>
 
               <div className="flex gap-2 pt-4">
@@ -502,7 +557,6 @@ function ContasBancarias() {
           </div>
         </div>
       )}
-
     </div>
   );
 }

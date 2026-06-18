@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import api from '../api';
-import { toast } from 'react-hot-toast';
-import { X, Calendar, DollarSign, FileText, User, Tag, Repeat, Plus } from 'lucide-react';
+import { useState, useEffect } from "react";
+import api from "../api";
+import { toast } from "react-hot-toast";
+import { X, Calendar, DollarSign, FileText, User, Tag, Repeat, Plus } from "lucide-react";
 
 const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
   const [loading, setLoading] = useState(false);
@@ -12,37 +12,37 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
   const [intervaloParcelas, setIntervaloParcelas] = useState(30);
   const [showModalCategoria, setShowModalCategoria] = useState(false);
   const [formCategoria, setFormCategoria] = useState({
-    nome: '',
-    tipo: 'receita',
-    cor: '#10b981',
-    icone: '\ud83d\udcb0',
-    descricao: '',
+    nome: "",
+    tipo: "receita",
+    cor: "#10b981",
+    icone: "\ud83d\udcb0",
+    descricao: "",
     ativo: true,
-    novasSubcategorias: []
+    novasSubcategorias: [],
   });
-  
+
   const [dados, setDados] = useState({
-    descricao: '',
+    descricao: "",
     cliente_id: null,
     categoria_id: null,
     dre_subcategoria_id: null,
-    valor_original: '',
-    data_emissao: new Date().toISOString().split('T')[0],
-    data_vencimento: new Date().toISOString().split('T')[0],
-    documento: '',
-    observacoes: '',
-    
+    valor_original: "",
+    data_emissao: new Date().toISOString().split("T")[0],
+    data_vencimento: new Date().toISOString().split("T")[0],
+    documento: "",
+    observacoes: "",
+
     // Parcelamento
     eh_parcelado: false,
     total_parcelas: 1,
-    
+
     // Recorrência
     eh_recorrente: false,
-    tipo_recorrencia: 'mensal',
+    tipo_recorrencia: "mensal",
     intervalo_dias: null,
     data_inicio_recorrencia: null,
     data_fim_recorrencia: null,
-    numero_repeticoes: null
+    numero_repeticoes: null,
   });
 
   useEffect(() => {
@@ -54,44 +54,49 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
   const carregarDados = async () => {
     try {
       const [clientesRes, categoriasRes, subcategoriasDRERes] = await Promise.all([
-        api.get('/clientes/?tipo_cadastro=cliente'),
-        api.get('/categorias-financeiras'),
-        api.get('/dre/subcategorias')
+        api.get("/clientes/?tipo_cadastro=cliente"),
+        api.get("/categorias-financeiras"),
+        api.get("/dre/subcategorias"),
       ]);
-      
-      console.log('📦 Categorias recebidas:', categoriasRes.data);
-      
+
+      console.log("📦 Categorias recebidas:", categoriasRes.data);
+
       setClientes(clientesRes.data);
-      
+
       // Filtrar categorias: Mostrar APENAS receitas/entradas
-      const categoriasReceita = categoriasRes.data.filter(c => {
-        const tipo = c.tipo ? c.tipo.toLowerCase() : '';
-        const nome = c.nome ? c.nome.toLowerCase() : '';
-        
+      const categoriasReceita = categoriasRes.data.filter((c) => {
+        const tipo = c.tipo ? c.tipo.toLowerCase() : "";
+        const nome = c.nome ? c.nome.toLowerCase() : "";
+
         // ACEITAR se for receita ou entrada
-        const ehReceita = tipo === 'receita' || tipo === 'entrada';
-        const temReceitaNoNome = nome.includes('receita') || nome.includes('venda');
-        
+        const ehReceita = tipo === "receita" || tipo === "entrada";
+        const temReceitaNoNome = nome.includes("receita") || nome.includes("venda");
+
         // BLOQUEAR despesas explícitas
-        const ehDespesa = tipo === 'despesa' || tipo === 'saida' || tipo === 'saída';
-        
+        const ehDespesa = tipo === "despesa" || tipo === "saida" || tipo === "saída";
+
         return (ehReceita || temReceitaNoNome) && !ehDespesa;
       });
-      
+
       setCategorias(categoriasReceita);
       setSubcategoriasDRE(subcategoriasDRERes.data || []);
-      
-      console.log('✅ Categorias de RECEITA setadas:', categoriasReceita.length);
-      console.log('📋 Lista completa:', categoriasReceita);
-      console.log('📊 Subcategorias DRE carregadas:', subcategoriasDRERes.data?.length);
+
+      console.log("✅ Categorias de RECEITA setadas:", categoriasReceita.length);
+      console.log("📋 Lista completa:", categoriasReceita);
+      console.log("📊 Subcategorias DRE carregadas:", subcategoriasDRERes.data?.length);
     } catch (error) {
-      console.error('❌ Erro ao carregar dados:', error);
-      toast.error('Erro ao carregar formulário');
+      console.error("❌ Erro ao carregar dados:", error);
+      toast.error("Erro ao carregar formulário");
     }
   };
 
   const gerarPreviewParcelas = () => {
-    if (!dados.eh_parcelado || !dados.total_parcelas || !dados.data_vencimento || !dados.valor_original) {
+    if (
+      !dados.eh_parcelado ||
+      !dados.total_parcelas ||
+      !dados.data_vencimento ||
+      !dados.valor_original
+    ) {
       setPreviewParcelas([]);
       return;
     }
@@ -100,33 +105,36 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
     const valorTotal = parseFloat(dados.valor_original);
     const valorParcela = (valorTotal / numParcelas).toFixed(2);
     const dataBase = new Date(dados.data_vencimento);
-    
+
     const parcelas = [];
     for (let i = 0; i < numParcelas; i++) {
       const dataVencimento = new Date(dataBase);
-      dataVencimento.setDate(dataBase.getDate() + (i * intervaloParcelas));
-      
+      dataVencimento.setDate(dataBase.getDate() + i * intervaloParcelas);
+
       parcelas.push({
         numero: i + 1,
         valor: parseFloat(valorParcela),
-        data_vencimento: dataVencimento.toISOString().split('T')[0]
+        data_vencimento: dataVencimento.toISOString().split("T")[0],
       });
     }
-    
+
     // Ajustar última parcela
     const somaCalculada = parcelas.reduce((sum, p) => sum + p.valor, 0);
     const diferenca = valorTotal - somaCalculada;
     if (Math.abs(diferenca) > 0.01) {
       parcelas[parcelas.length - 1].valor += diferenca;
     }
-    
+
     setPreviewParcelas(parcelas);
   };
 
   const adicionarSubcategoriaNova = () => {
     setFormCategoria({
       ...formCategoria,
-      novasSubcategorias: [...formCategoria.novasSubcategorias, { nome: '', descricao: '', ativo: true }]
+      novasSubcategorias: [
+        ...formCategoria.novasSubcategorias,
+        { nome: "", descricao: "", ativo: true },
+      ],
     });
   };
 
@@ -142,7 +150,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
   };
 
   const handleKeyDownSubcategoria = (e, index) => {
-    if (e.key === 'Tab' && !e.shiftKey && index === formCategoria.novasSubcategorias.length - 1) {
+    if (e.key === "Tab" && !e.shiftKey && index === formCategoria.novasSubcategorias.length - 1) {
       e.preventDefault();
       adicionarSubcategoriaNova();
     }
@@ -150,80 +158,62 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
 
   const handleSubmitCategoria = async (e) => {
     e.preventDefault();
-    
+
     if (!formCategoria.nome) {
-      toast.error('Preencha o nome da categoria');
+      toast.error("Preencha o nome da categoria");
       return;
     }
 
     try {
-      const response = await api.post('/categorias-financeiras', {
+      const response = await api.post("/categorias-financeiras", {
         nome: formCategoria.nome,
         tipo: formCategoria.tipo,
         cor: formCategoria.cor,
         icone: formCategoria.icone,
         descricao: formCategoria.descricao,
-        ativo: formCategoria.ativo
+        ativo: formCategoria.ativo,
       });
-      
+
       const categoriaId = response.data.id;
-      toast.success('Categoria criada com sucesso!');
+      toast.success("Categoria criada com sucesso!");
 
       // Criar subcategorias se houver
       if (formCategoria.novasSubcategorias.length > 0) {
-        const subsValidas = formCategoria.novasSubcategorias.filter(sub => sub.nome.trim());
+        const subsValidas = formCategoria.novasSubcategorias.filter((sub) => sub.nome.trim());
         for (const sub of subsValidas) {
           try {
-            await api.post('/dre/subcategorias', {
+            await api.post("/dre/subcategorias", {
               categoria_id: categoriaId,
               nome: sub.nome,
-              tipo_custo: 'direto',
-              escopo_rateio: 'ambos'
+              tipo_custo: "direto",
+              escopo_rateio: "ambos",
             });
           } catch (subError) {
-            console.error('Erro ao criar subcategoria:', subError);
+            console.error("Erro ao criar subcategoria:", subError);
           }
         }
         if (subsValidas.length > 0) {
           toast.success(`${subsValidas.length} subcategoria(s) criada(s)!`);
         }
       }
-      
+
       // Atualizar lista de categorias e selecionar a nova
       await carregarDados();
-      setDados({...dados, categoria_id: categoriaId});
+      setDados({ ...dados, categoria_id: categoriaId });
       setShowModalCategoria(false);
       setFormCategoria({
-        nome: '',
-        tipo: 'receita',
-        cor: '#10b981',
-        icone: '\ud83d\udcb0',
-        descricao: '',
+        nome: "",
+        tipo: "receita",
+        cor: "#10b981",
+        icone: "\ud83d\udcb0",
+        descricao: "",
         ativo: true,
-        novasSubcategorias: []
+        novasSubcategorias: [],
       });
     } catch (error) {
-      console.error('Erro ao salvar categoria:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao salvar categoria');
+      console.error("Erro ao salvar categoria:", error);
+      toast.error(error.response?.data?.detail || "Erro ao salvar categoria");
     }
-  };
-      const dataVencimento = new Date(dataBase);
-      dataVencimento.setDate(dataBase.getDate() + (i * intervaloParcelas));
-      
-      parcelas.push({
-        numero: i + 1,
-        valor: parseFloat(valorParcela),
-        data_vencimento: dataVencimento.toISOString().split('T')[0]
-      });
-    }
-    
-    const somaCalculada = parcelas.reduce((sum, p) => sum + p.valor, 0);
-    const diferenca = valorTotal - somaCalculada;
-    if (Math.abs(diferenca) > 0.01) {
-      parcelas[parcelas.length - 1].valor += diferenca;
-    }
-    
-    setPreviewParcelas(parcelas);
   };
 
   const atualizarDataParcela = (index, novaData) => {
@@ -240,30 +230,33 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!dados.descricao || !dados.valor_original || !dados.data_vencimento) {
-      toast.error('Preencha todos os campos obrigatórios');
+      toast.error("Preencha todos os campos obrigatórios");
       return;
     }
-    
+
     setLoading(true);
-    
+
     try {
-      await api.post('/contas-receber/', {
+      await api.post("/contas-receber/", {
         ...dados,
         valor_original: parseFloat(dados.valor_original),
         total_parcelas: dados.eh_parcelado ? parseInt(dados.total_parcelas) : 1,
-        intervalo_dias: dados.tipo_recorrencia === 'personalizado' ? parseInt(dados.intervalo_dias) : null,
-        numero_repeticoes: dados.numero_repeticoes ? parseInt(dados.numero_repeticoes) : null
+        intervalo_dias:
+          dados.tipo_recorrencia === "personalizado" ? parseInt(dados.intervalo_dias) : null,
+        numero_repeticoes: dados.numero_repeticoes ? parseInt(dados.numero_repeticoes) : null,
       });
-      
-      toast.success(dados.eh_recorrente ? 'Conta recorrente criada com sucesso!' : 'Conta criada com sucesso!');
+
+      toast.success(
+        dados.eh_recorrente ? "Conta recorrente criada com sucesso!" : "Conta criada com sucesso!",
+      );
       onSave();
       onClose();
       resetForm();
     } catch (error) {
-      console.error('Erro ao criar conta:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao criar conta a receber');
+      console.error("Erro ao criar conta:", error);
+      toast.error(error.response?.data?.detail || "Erro ao criar conta a receber");
     } finally {
       setLoading(false);
     }
@@ -271,22 +264,22 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
 
   const resetForm = () => {
     setDados({
-      descricao: '',
+      descricao: "",
       cliente_id: null,
       categoria_id: null,
-      valor_original: '',
-      data_emissao: new Date().toISOString().split('T')[0],
-      data_vencimento: new Date().toISOString().split('T')[0],
-      documento: '',
-      observacoes: '',
+      valor_original: "",
+      data_emissao: new Date().toISOString().split("T")[0],
+      data_vencimento: new Date().toISOString().split("T")[0],
+      documento: "",
+      observacoes: "",
       eh_parcelado: false,
       total_parcelas: 1,
       eh_recorrente: false,
-      tipo_recorrencia: 'mensal',
+      tipo_recorrencia: "mensal",
       intervalo_dias: null,
       data_inicio_recorrencia: null,
       data_fim_recorrencia: null,
-      numero_repeticoes: null
+      numero_repeticoes: null,
     });
     setPreviewParcelas([]);
   };
@@ -312,16 +305,14 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
               <FileText size={20} className="text-blue-600" />
               Informações Básicas
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descrição *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição *</label>
                 <input
                   type="text"
                   value={dados.descricao}
-                  onChange={(e) => setDados({...dados, descricao: e.target.value})}
+                  onChange={(e) => setDados({ ...dados, descricao: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                   placeholder="Ex: Venda #123, Serviço prestado..."
                   required
@@ -334,13 +325,20 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                   Cliente
                 </label>
                 <select
-                  value={dados.cliente_id || ''}
-                  onChange={(e) => setDados({...dados, cliente_id: e.target.value ? parseInt(e.target.value) : null})}
+                  value={dados.cliente_id || ""}
+                  onChange={(e) =>
+                    setDados({
+                      ...dados,
+                      cliente_id: e.target.value ? parseInt(e.target.value) : null,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Selecione...</option>
-                  {clientes.map(c => (
-                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  {clientes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nome}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -352,13 +350,20 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                 </label>
                 <div className="flex gap-2">
                   <select
-                    value={dados.categoria_id || ''}
-                    onChange={(e) => setDados({...dados, categoria_id: e.target.value ? parseInt(e.target.value) : null})}
+                    value={dados.categoria_id || ""}
+                    onChange={(e) =>
+                      setDados({
+                        ...dados,
+                        categoria_id: e.target.value ? parseInt(e.target.value) : null,
+                      })
+                    }
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Selecione...</option>
-                    {categorias.map(c => (
-                      <option key={c.id} value={c.id}>{c.nome}</option>
+                    {categorias.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nome}
+                      </option>
                     ))}
                   </select>
                   <button
@@ -377,16 +382,25 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                   🏷️ Subcategoria DRE (Demonstrativo de Resultado)
                 </label>
                 <select
-                  value={dados.dre_subcategoria_id || ''}
-                  onChange={(e) => setDados({...dados, dre_subcategoria_id: e.target.value ? parseInt(e.target.value) : null})}
+                  value={dados.dre_subcategoria_id || ""}
+                  onChange={(e) =>
+                    setDados({
+                      ...dados,
+                      dre_subcategoria_id: e.target.value ? parseInt(e.target.value) : null,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Sem classificação DRE</option>
-                  {subcategoriasDRE.map(sub => (
-                    <option key={sub.id} value={sub.id}>{sub.nome}</option>
+                  {subcategoriasDRE.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.nome}
+                    </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">Classifique para melhor análise gerencial</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Classifique para melhor análise gerencial
+                </p>
               </div>
 
               <div>
@@ -398,7 +412,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                   type="number"
                   step="0.01"
                   value={dados.valor_original}
-                  onChange={(e) => setDados({...dados, valor_original: e.target.value})}
+                  onChange={(e) => setDados({ ...dados, valor_original: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                   placeholder="0.00"
                   required
@@ -413,20 +427,18 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                 <input
                   type="date"
                   value={dados.data_vencimento}
-                  onChange={(e) => setDados({...dados, data_vencimento: e.target.value})}
+                  onChange={(e) => setDados({ ...dados, data_vencimento: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Documento/NF
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Documento/NF</label>
                 <input
                   type="text"
                   value={dados.documento}
-                  onChange={(e) => setDados({...dados, documento: e.target.value})}
+                  onChange={(e) => setDados({ ...dados, documento: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                   placeholder="Número do documento"
                 />
@@ -441,10 +453,13 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                 type="checkbox"
                 id="eh_recorrente"
                 checked={dados.eh_recorrente}
-                onChange={(e) => setDados({...dados, eh_recorrente: e.target.checked})}
+                onChange={(e) => setDados({ ...dados, eh_recorrente: e.target.checked })}
                 className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
               />
-              <label htmlFor="eh_recorrente" className="text-lg font-semibold text-gray-700 flex items-center gap-2 cursor-pointer">
+              <label
+                htmlFor="eh_recorrente"
+                className="text-lg font-semibold text-gray-700 flex items-center gap-2 cursor-pointer"
+              >
                 <Repeat size={20} className="text-purple-600" />
                 Receita Recorrente
               </label>
@@ -459,7 +474,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                     </label>
                     <select
                       value={dados.tipo_recorrencia}
-                      onChange={(e) => setDados({...dados, tipo_recorrencia: e.target.value})}
+                      onChange={(e) => setDados({ ...dados, tipo_recorrencia: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500"
                     >
                       <option value="semanal">📅 Semanal (7 em 7 dias)</option>
@@ -469,7 +484,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                     </select>
                   </div>
 
-                  {dados.tipo_recorrencia === 'personalizado' && (
+                  {dados.tipo_recorrencia === "personalizado" && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Intervalo (em dias) *
@@ -477,8 +492,8 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                       <input
                         type="number"
                         min="1"
-                        value={dados.intervalo_dias || ''}
-                        onChange={(e) => setDados({...dados, intervalo_dias: e.target.value})}
+                        value={dados.intervalo_dias || ""}
+                        onChange={(e) => setDados({ ...dados, intervalo_dias: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500"
                         placeholder="Ex: 10, 20, 45..."
                         required
@@ -493,8 +508,8 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                     <input
                       type="number"
                       min="1"
-                      value={dados.numero_repeticoes || ''}
-                      onChange={(e) => setDados({...dados, numero_repeticoes: e.target.value})}
+                      value={dados.numero_repeticoes || ""}
+                      onChange={(e) => setDados({ ...dados, numero_repeticoes: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500"
                       placeholder="Ex: 12 (deixe vazio para infinito)"
                     />
@@ -506,8 +521,8 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                     </label>
                     <input
                       type="date"
-                      value={dados.data_fim_recorrencia || ''}
-                      onChange={(e) => setDados({...dados, data_fim_recorrencia: e.target.value})}
+                      value={dados.data_fim_recorrencia || ""}
+                      onChange={(e) => setDados({ ...dados, data_fim_recorrencia: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500"
                     />
                   </div>
@@ -524,13 +539,16 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                 id="eh_parcelado_receber"
                 checked={dados.eh_parcelado}
                 onChange={(e) => {
-                  setDados({...dados, eh_parcelado: e.target.checked});
+                  setDados({ ...dados, eh_parcelado: e.target.checked });
                   if (!e.target.checked) setPreviewParcelas([]);
                 }}
                 disabled={dados.eh_recorrente}
                 className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
               />
-              <label htmlFor="eh_parcelado_receber" className="text-lg font-semibold text-gray-700 cursor-pointer">
+              <label
+                htmlFor="eh_parcelado_receber"
+                className="text-lg font-semibold text-gray-700 cursor-pointer"
+              >
                 💳 Parcelar esta conta
               </label>
             </div>
@@ -547,7 +565,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                       min="2"
                       max="120"
                       value={dados.total_parcelas}
-                      onChange={(e) => setDados({...dados, total_parcelas: e.target.value})}
+                      onChange={(e) => setDados({ ...dados, total_parcelas: e.target.value })}
                       onBlur={gerarPreviewParcelas}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                     />
@@ -591,7 +609,10 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                     <h4 className="font-semibold text-gray-700 mb-3">📅 Preview das Parcelas</h4>
                     <div className="space-y-2 max-h-64 overflow-y-auto">
                       {previewParcelas.map((parcela, index) => (
-                        <div key={index} className="flex items-center gap-3 p-2 bg-white rounded border">
+                        <div
+                          key={index}
+                          className="flex items-center gap-3 p-2 bg-white rounded border"
+                        >
                           <span className="font-semibold text-gray-600 min-w-[80px]">
                             Parcela {parcela.numero}/{previewParcelas.length}
                           </span>
@@ -612,7 +633,9 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                       ))}
                     </div>
                     <div className="mt-3 p-2 bg-gray-100 rounded">
-                      <strong>Total: R$ {previewParcelas.reduce((sum, p) => sum + p.valor, 0).toFixed(2)}</strong>
+                      <strong>
+                        Total: R$ {previewParcelas.reduce((sum, p) => sum + p.valor, 0).toFixed(2)}
+                      </strong>
                     </div>
                   </div>
                 )}
@@ -621,12 +644,10 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Observações
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
             <textarea
               value={dados.observacoes}
-              onChange={(e) => setDados({...dados, observacoes: e.target.value})}
+              onChange={(e) => setDados({ ...dados, observacoes: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
               rows="3"
             />
@@ -635,7 +656,10 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
           <div className="flex justify-end gap-3 border-t pt-4">
             <button
               type="button"
-              onClick={() => { onClose(); resetForm(); }}
+              onClick={() => {
+                onClose();
+                resetForm();
+              }}
               className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
             >
               Cancelar
@@ -645,7 +669,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
               disabled={loading}
               className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
             >
-              {loading ? 'Salvando...' : 'Salvar Conta'}
+              {loading ? "Salvando..." : "Salvar Conta"}
             </button>
           </div>
         </form>
@@ -674,7 +698,7 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                 <input
                   type="text"
                   value={formCategoria.nome}
-                  onChange={(e) => setFormCategoria({...formCategoria, nome: e.target.value})}
+                  onChange={(e) => setFormCategoria({ ...formCategoria, nome: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
                   required
                   placeholder="Ex: Vendas, Serviços, Mensalidades..."
@@ -683,40 +707,40 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ícone
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ícone</label>
                   <select
                     value={formCategoria.icone}
-                    onChange={(e) => setFormCategoria({...formCategoria, icone: e.target.value})}
+                    onChange={(e) => setFormCategoria({ ...formCategoria, icone: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
-                    {['💰', '📋', '✨', '🐕', '🩺', '🏨', '🎓', '💼', '🛍️', '🎁', '💵', '📈'].map(i => (
-                      <option key={i} value={i}>{i}</option>
-                    ))}
+                    {["💰", "📋", "✨", "🐕", "🩺", "🏨", "🎓", "💼", "🛍️", "🎁", "💵", "📈"].map(
+                      (i) => (
+                        <option key={i} value={i}>
+                          {i}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Cor
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cor</label>
                   <input
                     type="color"
                     value={formCategoria.cor}
-                    onChange={(e) => setFormCategoria({...formCategoria, cor: e.target.value})}
+                    onChange={(e) => setFormCategoria({ ...formCategoria, cor: e.target.value })}
                     className="w-full h-10 border border-gray-300 rounded-md"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descrição
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
                 <textarea
                   value={formCategoria.descricao}
-                  onChange={(e) => setFormCategoria({...formCategoria, descricao: e.target.value})}
+                  onChange={(e) =>
+                    setFormCategoria({ ...formCategoria, descricao: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   rows="2"
                 />
@@ -740,11 +764,14 @@ const ModalNovaContaReceber = ({ isOpen, onClose, onSave }) => {
                 {formCategoria.novasSubcategorias.length > 0 && (
                   <div className="space-y-2 max-h-40 overflow-y-auto">
                     {formCategoria.novasSubcategorias.map((sub, index) => (
-                      <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
+                      <div
+                        key={index}
+                        className="flex items-center gap-2 p-2 bg-gray-50 rounded-md"
+                      >
                         <input
                           type="text"
                           value={sub.nome}
-                          onChange={(e) => atualizarSubcategoriaNova(index, 'nome', e.target.value)}
+                          onChange={(e) => atualizarSubcategoriaNova(index, "nome", e.target.value)}
                           onKeyDown={(e) => handleKeyDownSubcategoria(e, index)}
                           placeholder="Nome (Tab para adicionar mais)"
                           className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-sm"

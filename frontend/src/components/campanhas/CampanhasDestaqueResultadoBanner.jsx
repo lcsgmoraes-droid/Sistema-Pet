@@ -2,10 +2,7 @@ function getCategoriaLabel(categoria) {
   return categoria === "maior_gasto" ? "Maior Gasto" : "Mais Compras";
 }
 
-export default function CampanhasDestaqueResultadoBanner({
-  destaqueResultado,
-  onReset,
-}) {
+export default function CampanhasDestaqueResultadoBanner({ destaqueResultado, onReset }) {
   if (!destaqueResultado) {
     return null;
   }
@@ -16,10 +13,7 @@ export default function CampanhasDestaqueResultadoBanner({
         <p className="font-semibold text-green-800">
           Premios enviados! ({destaqueResultado.enviados} vencedor(es))
         </p>
-        <button
-          onClick={onReset}
-          className="text-xs text-gray-400 hover:text-gray-600 underline"
-        >
+        <button onClick={onReset} className="text-xs text-gray-400 hover:text-gray-600 underline">
           Enviar novamente
         </button>
       </div>

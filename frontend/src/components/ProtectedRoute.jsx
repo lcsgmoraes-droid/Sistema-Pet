@@ -1,12 +1,7 @@
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
-const ProtectedRoute = ({
-  children,
-  permission,
-  requiredPermissions,
-  anyOfPermissions,
-}) => {
+const ProtectedRoute = ({ children, permission, requiredPermissions, anyOfPermissions }) => {
   const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
@@ -27,7 +22,7 @@ const ProtectedRoute = ({
     const roleName = user?.role?.name?.toLowerCase();
 
     // Admin tem acesso a tudo
-    if (roleName === 'admin') {
+    if (roleName === "admin") {
       return children;
     }
 
@@ -56,8 +51,8 @@ const ProtectedRoute = ({
 
     // Verifica múltiplas permissões (todas necessárias)
     if (requiredPermissions && requiredPermissions.length > 0) {
-      const hasAllPermissions = requiredPermissions.every(
-        reqPerm => userPermissions.includes(reqPerm)
+      const hasAllPermissions = requiredPermissions.every((reqPerm) =>
+        userPermissions.includes(reqPerm),
       );
       if (!hasAllPermissions) {
         return (
@@ -66,7 +61,9 @@ const ProtectedRoute = ({
               <div className="text-6xl mb-4">🔒</div>
               <h1 className="text-2xl font-bold text-gray-800 mb-2">Acesso Negado</h1>
               <p className="text-gray-600 mb-4">Você não tem permissão para acessar esta página.</p>
-              <p className="text-sm text-gray-500">Permissões necessárias: {requiredPermissions.join(', ')}</p>
+              <p className="text-sm text-gray-500">
+                Permissões necessárias: {requiredPermissions.join(", ")}
+              </p>
               <button
                 onClick={() => window.history.back()}
                 className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -81,8 +78,8 @@ const ProtectedRoute = ({
 
     // Verifica múltiplas permissões (pelo menos uma necessária)
     if (anyOfPermissions && anyOfPermissions.length > 0) {
-      const hasAnyPermission = anyOfPermissions.some(
-        reqPerm => userPermissions.includes(reqPerm)
+      const hasAnyPermission = anyOfPermissions.some((reqPerm) =>
+        userPermissions.includes(reqPerm),
       );
       if (!hasAnyPermission) {
         return (
@@ -91,7 +88,9 @@ const ProtectedRoute = ({
               <div className="text-6xl mb-4">🔒</div>
               <h1 className="text-2xl font-bold text-gray-800 mb-2">Acesso Negado</h1>
               <p className="text-gray-600 mb-4">Você não tem permissão para acessar esta página.</p>
-              <p className="text-sm text-gray-500">Permissões aceitas: {anyOfPermissions.join(', ')}</p>
+              <p className="text-sm text-gray-500">
+                Permissões aceitas: {anyOfPermissions.join(", ")}
+              </p>
               <button
                 onClick={() => window.history.back()}
                 className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"

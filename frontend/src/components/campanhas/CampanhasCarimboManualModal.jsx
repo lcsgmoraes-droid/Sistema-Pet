@@ -13,9 +13,7 @@ export default function CampanhasCarimboManualModal({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
         <div className="px-6 py-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold text-gray-900">
-            Lancar carimbo manual
-          </h3>
+          <h3 className="font-semibold text-gray-900">Lancar carimbo manual</h3>
           <button
             onClick={() => setFidModalManual(false)}
             className="text-gray-400 hover:text-gray-600 text-xl"
@@ -25,14 +23,11 @@ export default function CampanhasCarimboManualModal({
         </div>
         <div className="px-6 py-4 space-y-3">
           <p className="text-sm text-gray-500">
-            Cliente <strong>#{fidClienteId}</strong> - esse carimbo sera
-            registrado como manual, sem vinculo com uma venda.
+            Cliente <strong>#{fidClienteId}</strong> - esse carimbo sera registrado como manual, sem
+            vinculo com uma venda.
           </p>
           <div>
-            <label
-              htmlFor="fid-nota"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
+            <label htmlFor="fid-nota" className="block text-xs font-medium text-gray-600 mb-1">
               Observacao (opcional)
             </label>
             <input

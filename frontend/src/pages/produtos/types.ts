@@ -4,14 +4,14 @@
  */
 
 export enum ProductType {
-  SIMPLE = 'simples',
-  VARIATION = 'variacao',
-  KIT = 'kit'
+  SIMPLE = "simples",
+  VARIATION = "variacao",
+  KIT = "kit",
 }
 
 export enum ProductStatus {
-  ACTIVE = 'ativo',
-  INACTIVE = 'inativo'
+  ACTIVE = "ativo",
+  INACTIVE = "inativo",
 }
 
 export interface Product {
@@ -34,7 +34,7 @@ export interface Product {
 
 export interface ProductFilters {
   busca: string;
-  status: ProductStatus | '';
+  status: ProductStatus | "";
 }
 
 export interface ProductListResponse {
@@ -57,9 +57,9 @@ export interface ProductFormData {
   nome: string;
   sku: string;
   tipo: ProductType;
-  preco_custo: string;  // String para controlar formatação no input
-  markup: string;       // String para cálculo automático
-  preco: string;        // Preço de venda
+  preco_custo: string; // String para controlar formatação no input
+  markup: string; // String para cálculo automático
+  preco: string; // Preço de venda
   preco_promocional: string;
   estoque: string;
   status: ProductStatus;
@@ -74,7 +74,7 @@ export interface CreateProductPayload {
   sku: string;
   tipo: ProductType;
   preco_custo: number;
-  preco: number;        // Preço de venda
+  preco: number; // Preço de venda
   preco_promocional?: number;
   estoque: number;
   status: ProductStatus;

@@ -99,9 +99,9 @@ export default function Planos() {
             Teste o Básico completo e conheça os próximos módulos.
           </h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-            Novas empresas começam com 30 dias grátis do que está sendo vendido agora:
-            o Plano Básico completo. Módulos avançados aparecem como Beta ou piloto e
-            podem ser solicitados caso a caso.
+            Novas empresas começam com 30 dias grátis do que está sendo vendido agora: o Plano
+            Básico completo. Módulos avançados aparecem como Beta ou piloto e podem ser solicitados
+            caso a caso.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -127,8 +127,8 @@ export default function Planos() {
               <p className="text-sm font-bold uppercase text-emerald-700">Plano Básico</p>
               <h2 className="mt-2 text-2xl font-extrabold text-slate-950">Operação essencial</h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                Depois da experiência gratuita, este é o plano inicial de contratação para
-                operar o dia a dia com segurança.
+                Depois da experiência gratuita, este é o plano inicial de contratação para operar o
+                dia a dia com segurança.
               </p>
             </div>
             <div className="rounded-md bg-emerald-50 p-3 text-emerald-700">
@@ -159,7 +159,9 @@ export default function Planos() {
         <div className="mx-auto max-w-6xl px-4 py-12">
           <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
             <div>
-              <h2 className="text-2xl font-extrabold text-slate-950">O que o cliente faz primeiro</h2>
+              <h2 className="text-2xl font-extrabold text-slate-950">
+                O que o cliente faz primeiro
+              </h2>
               <p className="mt-2 max-w-2xl text-slate-600">
                 Esses são os blocos do uso inicial que precisam estar claros para quem contrata.
               </p>
@@ -188,8 +190,8 @@ export default function Planos() {
             <div>
               <h2 className="text-2xl font-extrabold">Recursos em validação</h2>
               <p className="mt-2 max-w-2xl text-slate-300">
-                Eles mostram o caminho do produto, mas não entram automaticamente no trial padrão.
-                O cliente pode solicitar acesso Beta para um piloto acompanhado.
+                Eles mostram o caminho do produto, mas não entram automaticamente no trial padrão. O
+                cliente pode solicitar acesso Beta para um piloto acompanhado.
               </p>
             </div>
             <span className="inline-flex w-fit items-center gap-2 rounded-md bg-amber-300/15 px-3 py-2 text-sm font-bold text-amber-200">

@@ -23,17 +23,10 @@ export default function PDVDriveAlertBanner({
             </div>
             <div className="text-xs text-red-100 flex flex-wrap gap-3 mt-0.5">
               {driveAguardando.map((pedido) => (
-                <span
-                  key={pedido.pedido_id}
-                  className="flex items-center gap-1.5"
-                >
-                  <span className="font-semibold">
-                    #{pedido.pedido_id.slice(-6)}
-                  </span>
+                <span key={pedido.pedido_id} className="flex items-center gap-1.5">
+                  <span className="font-semibold">#{pedido.pedido_id.slice(-6)}</span>
                   {pedido.palavra_chave_retirada && (
-                    <span className="bg-red-700 px-1 rounded">
-                      {pedido.palavra_chave_retirada}
-                    </span>
+                    <span className="bg-red-700 px-1 rounded">{pedido.palavra_chave_retirada}</span>
                   )}
                   <button
                     onClick={() => onConfirmarEntregue(pedido.pedido_id)}

@@ -25,7 +25,9 @@ export function useAgendaCalendarioAcoes({ calendarioMeta, setMensagemCalendario
     if (!calendarioMeta?.feed_url) return;
     try {
       await navigator.clipboard.writeText(calendarioMeta.feed_url);
-      setMensagemCalendario("Link privado copiado. Agora voce pode assinar no calendario do celular.");
+      setMensagemCalendario(
+        "Link privado copiado. Agora voce pode assinar no calendario do celular.",
+      );
     } catch {
       setMensagemCalendario("Nao foi possivel copiar o link automaticamente.");
     }

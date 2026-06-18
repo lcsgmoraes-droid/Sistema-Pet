@@ -20,9 +20,7 @@ export function usePDVInicializacao({
   carregarVendaRef.current = carregarVendaEspecifica;
 
   const vendaIdUrl =
-    searchParams.get("venda") ||
-    searchParams.get("vendaId") ||
-    searchParams.get("venda_id");
+    searchParams.get("venda") || searchParams.get("vendaId") || searchParams.get("venda_id");
 
   useEffect(() => {
     const vendaId = normalizarVendaId(vendaIdUrl);

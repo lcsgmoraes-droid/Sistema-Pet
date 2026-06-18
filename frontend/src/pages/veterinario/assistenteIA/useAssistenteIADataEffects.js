@@ -60,7 +60,7 @@ export default function useAssistenteIADataEffects({
             id: String(pet.cliente_id),
             nome: pet.cliente_nome ?? `Pessoa #${pet.cliente_id}`,
           }
-        : null
+        : null,
     );
   }, [pets, petIdQuery, novoPetIdQuery]);
 

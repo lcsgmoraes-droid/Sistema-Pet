@@ -13,10 +13,7 @@ import {
 } from "recharts";
 
 function percentualFormaPagamento(valor, formasRecebimentoFiltradas) {
-  const total = formasRecebimentoFiltradas.reduce(
-    (sum, item) => sum + item.valor_total,
-    0,
-  );
+  const total = formasRecebimentoFiltradas.reduce((sum, item) => sum + item.valor_total, 0);
 
   if (!total) return "0.0";
 
@@ -42,9 +39,7 @@ export default function VendasFinanceiroGraficosResumo({
   return (
     <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2 xl:gap-6">
       <div className="rounded-lg bg-white p-3 shadow sm:p-4">
-        <h3 className="mb-4 text-base font-semibold text-gray-800 sm:text-lg">
-          Vendas no Periodo
-        </h3>
+        <h3 className="mb-4 text-base font-semibold text-gray-800 sm:text-lg">Vendas no Periodo</h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={vendasPorDataCalendario}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -54,9 +49,7 @@ export default function VendasFinanceiroGraficosResumo({
                 formatarDataLocal(value, { day: "2-digit", month: "2-digit" })
               }
             />
-            <YAxis
-              tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-            />
+            <YAxis tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
             <Tooltip
               formatter={(value) => formatarMoeda(value)}
               labelFormatter={(label) => formatarData(label)}
@@ -91,10 +84,7 @@ export default function VendasFinanceiroGraficosResumo({
             margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              type="number"
-              tickFormatter={(value) => formatarMoeda(value)}
-            />
+            <XAxis type="number" tickFormatter={(value) => formatarMoeda(value)} />
             <YAxis
               type="category"
               dataKey="forma_pagamento"
@@ -146,9 +136,7 @@ export default function VendasFinanceiroGraficosResumo({
           <BarChart data={produtosDetalhadosFiltrados.slice(0, 10)}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="categoria" />
-            <YAxis
-              tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`}
-            />
+            <YAxis tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
             <Tooltip formatter={(value) => formatarMoeda(value)} />
             <Legend />
             <Bar dataKey="total_liquido" fill="#3B82F6" name="Valor Liquido" />
@@ -178,8 +166,7 @@ export default function VendasFinanceiroGraficosResumo({
             <YAxis tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
             <Tooltip
               formatter={(value, name, props) => {
-                const isQuantidade =
-                  props?.dataKey === "quantidade" || name === "Vendas";
+                const isQuantidade = props?.dataKey === "quantidade" || name === "Vendas";
 
                 return [
                   isQuantidade ? value : formatarMoeda(value),
@@ -187,9 +174,7 @@ export default function VendasFinanceiroGraficosResumo({
                 ];
               }}
               labelFormatter={(label) => {
-                const dia = vendasPorDiaSemanaResumo.find(
-                  (item) => item.curto === label,
-                );
+                const dia = vendasPorDiaSemanaResumo.find((item) => item.curto === label);
                 return dia?.nome || label;
               }}
             />
@@ -200,21 +185,14 @@ export default function VendasFinanceiroGraficosResumo({
               name="Valor liquido"
               radius={[6, 6, 0, 0]}
             />
-            <Bar
-              dataKey="quantidade"
-              fill="#94A3B8"
-              name="Vendas"
-              radius={[6, 6, 0, 0]}
-            />
+            <Bar dataKey="quantidade" fill="#94A3B8" name="Vendas" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
       <div className="rounded-lg bg-white p-3 shadow sm:p-4">
         <div className="mb-4">
-          <h3 className="text-base font-semibold text-gray-800 sm:text-lg">
-            Vendas por horario
-          </h3>
+          <h3 className="text-base font-semibold text-gray-800 sm:text-lg">Vendas por horario</h3>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
             <span>
               Pico: {melhorHorario?.faixa || "-"} com{" "}
@@ -232,8 +210,7 @@ export default function VendasFinanceiroGraficosResumo({
             <YAxis tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
             <Tooltip
               formatter={(value, name, props) => {
-                const isQuantidade =
-                  props?.dataKey === "quantidade" || name === "Vendas";
+                const isQuantidade = props?.dataKey === "quantidade" || name === "Vendas";
 
                 return [
                   isQuantidade ? value : formatarMoeda(value),
@@ -248,12 +225,7 @@ export default function VendasFinanceiroGraficosResumo({
               name="Valor liquido"
               radius={[6, 6, 0, 0]}
             />
-            <Bar
-              dataKey="quantidade"
-              fill="#F59E0B"
-              name="Vendas"
-              radius={[6, 6, 0, 0]}
-            />
+            <Bar dataKey="quantidade" fill="#F59E0B" name="Vendas" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

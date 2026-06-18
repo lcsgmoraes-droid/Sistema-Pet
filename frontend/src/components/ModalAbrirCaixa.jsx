@@ -1,33 +1,35 @@
-import { useState } from 'react';
-import { X, DollarSign, Calculator, AlertCircle } from 'lucide-react';
-import { abrirCaixa } from '../api/caixa';
-
-const CEDULAS = [
-  { valor: 200, cor: 'yellow' },
-  { valor: 100, cor: 'blue' },
-  { valor: 50, cor: 'orange' },
-  { valor: 20, cor: 'yellow' },
-  { valor: 10, cor: 'red' },
-  { valor: 5, cor: 'purple' },
-  { valor: 2, cor: 'blue' }
-];
+import { useState } from "react";
+import { X, DollarSign, Calculator, AlertCircle } from "lucide-react";
+import { abrirCaixa } from "../api/caixa";
 
 export default function ModalAbrirCaixa({ onClose, onSucesso }) {
-  const [valorAbertura, setValorAbertura] = useState('');
-  const [contaOrigem, setContaOrigem] = useState('');
-  const [observacoes, setObservacoes] = useState('');
+  const [valorAbertura, setValorAbertura] = useState("");
+  const [contaOrigem, setContaOrigem] = useState("");
+  const [observacoes, setObservacoes] = useState("");
   const [notas, setNotas] = useState({
-    n2: 0, n5: 0, n10: 0, n20: 0, n50: 0, n100: 0, n200: 0, moedas: 0
+    n2: 0,
+    n5: 0,
+    n10: 0,
+    n20: 0,
+    n50: 0,
+    n100: 0,
+    n200: 0,
+    moedas: 0,
   });
   const [mostrarContagem, setMostrarContagem] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState('');
+  const [erro, setErro] = useState("");
 
   // Calcular total das notas
   const calcularTotalNotas = () => {
     return (
-      (notas.n200 * 200) + (notas.n100 * 100) + (notas.n50 * 50) +
-      (notas.n20 * 20) + (notas.n10 * 10) + (notas.n5 * 5) + (notas.n2 * 2) +
+      notas.n200 * 200 +
+      notas.n100 * 100 +
+      notas.n50 * 50 +
+      notas.n20 * 20 +
+      notas.n10 * 10 +
+      notas.n5 * 5 +
+      notas.n2 * 2 +
       parseFloat(notas.moedas || 0)
     );
   };
@@ -41,7 +43,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
 
   // Limpar contagem
   const limparContagem = () => {
-    setNotas({n2: 0, n5: 0, n10: 0, n20: 0, n50: 0, n100: 0, n200: 0, moedas: 0});
+    setNotas({ n2: 0, n5: 0, n10: 0, n20: 0, n50: 0, n100: 0, n200: 0, moedas: 0 });
   };
 
   // Abrir caixa
@@ -49,25 +51,25 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
     const valor = parseFloat(valorAbertura);
 
     if (!valor || valor < 0) {
-      setErro('Informe um valor válido para abertura');
+      setErro("Informe um valor válido para abertura");
       return;
     }
 
     setLoading(true);
-    setErro('');
+    setErro("");
 
     try {
       const dados = {
         valor_abertura: valor,
-        conta_origem_nome: contaOrigem || 'Dinheiro em mãos',
-        observacoes_abertura: observacoes
+        conta_origem_nome: contaOrigem || "Dinheiro em mãos",
+        observacoes_abertura: observacoes,
       };
 
       await abrirCaixa(dados);
       onSucesso();
     } catch (error) {
-      console.error('Erro ao abrir caixa:', error);
-      setErro(error.response?.data?.detail || 'Erro ao abrir caixa');
+      console.error("Erro ao abrir caixa:", error);
+      setErro(error.response?.data?.detail || "Erro ao abrir caixa");
     } finally {
       setLoading(false);
     }
@@ -84,15 +86,10 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Abrir Caixa</h2>
-              <p className="text-sm text-gray-500">
-                Informe o valor inicial do caixa
-              </p>
+              <p className="text-sm text-gray-500">Informe o valor inicial do caixa</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -101,9 +98,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Botão Auxiliar Contagem */}
           <div className="flex items-center justify-between">
-            <label className="block text-sm font-medium text-gray-700">
-              Valor de Abertura *
-            </label>
+            <label className="block text-sm font-medium text-gray-700">Valor de Abertura *</label>
             <button
               type="button"
               onClick={() => setMostrarContagem(!mostrarContagem)}
@@ -143,7 +138,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                         type="number"
                         min="0"
                         value={notas.n2}
-                        onChange={(e) => setNotas({...notas, n2: parseInt(e.target.value) || 0})}
+                        onChange={(e) => setNotas({ ...notas, n2: parseInt(e.target.value) || 0 })}
                         className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
                         placeholder="0"
                       />
@@ -166,7 +161,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                         type="number"
                         min="0"
                         value={notas.n5}
-                        onChange={(e) => setNotas({...notas, n5: parseInt(e.target.value) || 0})}
+                        onChange={(e) => setNotas({ ...notas, n5: parseInt(e.target.value) || 0 })}
                         className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
                         placeholder="0"
                       />
@@ -189,7 +184,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                         type="number"
                         min="0"
                         value={notas.n10}
-                        onChange={(e) => setNotas({...notas, n10: parseInt(e.target.value) || 0})}
+                        onChange={(e) => setNotas({ ...notas, n10: parseInt(e.target.value) || 0 })}
                         className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-red-500 focus:ring-2 focus:ring-red-200"
                         placeholder="0"
                       />
@@ -212,7 +207,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                         type="number"
                         min="0"
                         value={notas.n20}
-                        onChange={(e) => setNotas({...notas, n20: parseInt(e.target.value) || 0})}
+                        onChange={(e) => setNotas({ ...notas, n20: parseInt(e.target.value) || 0 })}
                         className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
                         placeholder="0"
                       />
@@ -235,7 +230,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                         type="number"
                         min="0"
                         value={notas.n50}
-                        onChange={(e) => setNotas({...notas, n50: parseInt(e.target.value) || 0})}
+                        onChange={(e) => setNotas({ ...notas, n50: parseInt(e.target.value) || 0 })}
                         className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                         placeholder="0"
                       />
@@ -258,7 +253,9 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                         type="number"
                         min="0"
                         value={notas.n100}
-                        onChange={(e) => setNotas({...notas, n100: parseInt(e.target.value) || 0})}
+                        onChange={(e) =>
+                          setNotas({ ...notas, n100: parseInt(e.target.value) || 0 })
+                        }
                         className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-green-500 focus:ring-2 focus:ring-green-200"
                         placeholder="0"
                       />
@@ -281,7 +278,9 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                         type="number"
                         min="0"
                         value={notas.n200}
-                        onChange={(e) => setNotas({...notas, n200: parseInt(e.target.value) || 0})}
+                        onChange={(e) =>
+                          setNotas({ ...notas, n200: parseInt(e.target.value) || 0 })
+                        }
                         className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                         placeholder="0"
                       />
@@ -312,7 +311,9 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
                     step="0.01"
                     min="0"
                     value={notas.moedas}
-                    onChange={(e) => setNotas({...notas, moedas: parseFloat(e.target.value) || 0})}
+                    onChange={(e) =>
+                      setNotas({ ...notas, moedas: parseFloat(e.target.value) || 0 })
+                    }
                     className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
                     placeholder="0.00"
                   />
@@ -351,9 +352,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
 
           {/* Campo de Valor de Abertura */}
           <div className="relative mt-2">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-              R$
-            </span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
             <input
               type="number"
               step="0.01"
@@ -367,9 +366,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
 
           {/* Conta de Origem */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Conta de Origem
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Conta de Origem</label>
             <select
               value={contaOrigem}
               onChange={(e) => setContaOrigem(e.target.value)}
@@ -419,7 +416,7 @@ export default function ModalAbrirCaixa({ onClose, onSucesso }) {
               disabled={loading || !valorAbertura}
               className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Abrindo...' : 'Abrir Caixa'}
+              {loading ? "Abrindo..." : "Abrir Caixa"}
             </button>
           </div>
         </div>

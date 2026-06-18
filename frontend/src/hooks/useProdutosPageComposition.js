@@ -10,12 +10,7 @@ export default function useProdutosPageComposition({
   tableState,
   utilsState,
 }) {
-  const {
-    categorias,
-    departamentos,
-    fornecedores,
-    marcas,
-  } = catalogosState;
+  const { categorias, departamentos, fornecedores, marcas } = catalogosState;
   const {
     abrirModalColunas,
     colunasRelatorio,
@@ -49,12 +44,7 @@ export default function useProdutosPageComposition({
     resolvendoConflitoExclusao,
     variacoesSelecionadasConflito,
   } = conflictState;
-  const {
-    filtros,
-    handleFiltroChange,
-    persistirBusca,
-    setPersistirBusca,
-  } = filtersState;
+  const { filtros, handleFiltroChange, persistirBusca, setPersistirBusca } = filtersState;
   const {
     iniciarTour,
     menuRelatoriosAberto,
@@ -69,11 +59,7 @@ export default function useProdutosPageComposition({
     onToggleMenuRelatorios,
     selecionadosCount,
   } = headerState;
-  const {
-    modalImportacao,
-    onCloseImportacao,
-    onImportacaoSucesso,
-  } = importState;
+  const { modalImportacao, onCloseImportacao, onImportacaoSucesso } = importState;
   const {
     dadosEdicaoLote,
     modalEdicaoLote,
@@ -121,8 +107,7 @@ export default function useProdutosPageComposition({
     totalItens,
     totalPaginas,
   } = tableState;
-  const { copiarTexto, corrigirTextoQuebrado, isProdutoComComposicao } =
-    utilsState;
+  const { copiarTexto, corrigirTextoQuebrado, isProdutoComComposicao } = utilsState;
 
   return {
     mainContentProps: {

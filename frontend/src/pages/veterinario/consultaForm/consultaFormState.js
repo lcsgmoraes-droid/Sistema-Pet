@@ -7,9 +7,7 @@ export {
   criarProcedimentoRealizadoInicial,
 } from "./consultaFormInitialState";
 
-export {
-  mapConsultaParaForm,
-} from "./consultaFormMappers";
+export { mapConsultaParaForm } from "./consultaFormMappers";
 
 export {
   buildConsultaPayload,

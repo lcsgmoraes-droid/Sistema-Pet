@@ -1,28 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
-import PropTypes from 'prop-types';
-import { AlertTriangle, FileText, Upload, X } from 'lucide-react';
-import ActionButton from '../ui/ActionButton';
-import IconActionButton from '../ui/IconActionButton';
-import FornecedorSelector, { getFornecedorNome } from '../fornecedores/FornecedorSelector';
+import { useEffect, useRef, useState } from "react";
+import PropTypes from "prop-types";
+import { AlertTriangle, FileText, Upload, X } from "lucide-react";
+import ActionButton from "../ui/ActionButton";
+import IconActionButton from "../ui/IconActionButton";
+import FornecedorSelector, { getFornecedorNome } from "../fornecedores/FornecedorSelector";
 
-export default function EntradaPdfUploadModal({
-  aberto,
-  loading,
-  onClose,
-  onImportar,
-}) {
+export default function EntradaPdfUploadModal({ aberto, loading, onClose, onImportar }) {
   const [arquivo, setArquivo] = useState(null);
-  const [erro, setErro] = useState('');
+  const [erro, setErro] = useState("");
   const [fornecedorSelecionado, setFornecedorSelecionado] = useState(null);
   const inputRef = useRef(null);
 
   useEffect(() => {
     if (!aberto) {
       setArquivo(null);
-      setErro('');
+      setErro("");
       setFornecedorSelecionado(null);
       if (inputRef.current) {
-        inputRef.current.value = '';
+        inputRef.current.value = "";
       }
     }
   }, [aberto]);
@@ -31,10 +26,10 @@ export default function EntradaPdfUploadModal({
 
   const handleArquivoChange = (event) => {
     const file = event.target.files?.[0] || null;
-    setErro('');
-    if (file && !file.name.toLowerCase().endsWith('.pdf')) {
+    setErro("");
+    if (file && !file.name.toLowerCase().endsWith(".pdf")) {
       setArquivo(null);
-      setErro('Selecione um arquivo PDF.');
+      setErro("Selecione um arquivo PDF.");
       return;
     }
     setArquivo(file);
@@ -42,15 +37,15 @@ export default function EntradaPdfUploadModal({
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setErro('');
+    setErro("");
 
     if (!fornecedorSelecionado?.id) {
-      setErro('Selecione o fornecedor antes de importar.');
+      setErro("Selecione o fornecedor antes de importar.");
       return;
     }
 
     if (!arquivo) {
-      setErro('Selecione o arquivo PDF do pedido.');
+      setErro("Selecione o arquivo PDF do pedido.");
       return;
     }
 
@@ -78,7 +73,9 @@ export default function EntradaPdfUploadModal({
             </div>
             <div className="min-w-0">
               <h2 className="text-xl font-bold text-slate-900">Importar pedido em PDF</h2>
-              <p className="text-sm text-slate-500">Entrada de produtos a partir de pedido ou romaneio.</p>
+              <p className="text-sm text-slate-500">
+                Entrada de produtos a partir de pedido ou romaneio.
+              </p>
             </div>
           </div>
           <IconActionButton
@@ -94,12 +91,11 @@ export default function EntradaPdfUploadModal({
         <div className="space-y-5 overflow-y-auto px-6 py-5">
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <div className="mb-2 flex items-center gap-2 font-semibold">
-              <AlertTriangle className="h-4 w-4" />
-              O PDF nao substitui a NF-e
+              <AlertTriangle className="h-4 w-4" />O PDF nao substitui a NF-e
             </div>
             <p>
-              O sistema importa itens, quantidades, valores e parcelas quando existirem. Chave fiscal,
-              CFOP, NCM, impostos, lotes e validacao SEFAZ nao vem automaticamente pelo PDF.
+              O sistema importa itens, quantidades, valores e parcelas quando existirem. Chave
+              fiscal, CFOP, NCM, impostos, lotes e validacao SEFAZ nao vem automaticamente pelo PDF.
             </p>
           </div>
 
@@ -136,10 +132,12 @@ export default function EntradaPdfUploadModal({
                 </div>
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-slate-900">
-                    {arquivo ? arquivo.name : 'Selecionar PDF'}
+                    {arquivo ? arquivo.name : "Selecionar PDF"}
                   </div>
                   <div className="text-xs text-slate-500">
-                    {arquivo ? `${(arquivo.size / 1024).toFixed(1)} KB` : 'Pedido digital enviado pelo fornecedor'}
+                    {arquivo
+                      ? `${(arquivo.size / 1024).toFixed(1)} KB`
+                      : "Pedido digital enviado pelo fornecedor"}
                   </div>
                 </div>
               </div>
@@ -172,12 +170,7 @@ export default function EntradaPdfUploadModal({
           >
             Cancelar
           </ActionButton>
-          <ActionButton
-            type="submit"
-            icon={Upload}
-            intent="pdf"
-            loading={loading}
-          >
+          <ActionButton type="submit" icon={Upload} intent="pdf" loading={loading}>
             Importar PDF
           </ActionButton>
         </div>

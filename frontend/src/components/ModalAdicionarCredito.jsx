@@ -14,38 +14,38 @@
  *   onClose       () => void
  */
 
-import { useState } from 'react';
-import { X, Wallet, AlertCircle, Info } from 'lucide-react';
-import CurrencyInput from './CurrencyInput';
-import CustomerIdentity from './ui/CustomerIdentity';
-import { formatBRL } from '../utils/formatters';
-import api from '../api';
+import { useState } from "react";
+import { X, Wallet, AlertCircle, Info } from "lucide-react";
+import CurrencyInput from "./CurrencyInput";
+import CustomerIdentity from "./ui/CustomerIdentity";
+import { formatBRL } from "../utils/formatters";
+import api from "../api";
 
 export default function ModalAdicionarCredito({
   cliente,
   valorInicial = 0,
-  motivoPadrao = '',
+  motivoPadrao = "",
   onConfirmar,
   onClose,
 }) {
   const [valor, setValor] = useState(valorInicial);
-  const [motivo, setMotivo] = useState(motivoPadrao || 'Ajuste manual');
+  const [motivo, setMotivo] = useState(motivoPadrao || "Ajuste manual");
   const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState('');
+  const [erro, setErro] = useState("");
 
   const creditoAtual = parseFloat(cliente?.credito || 0);
 
   const handleConfirmar = async () => {
     if (!valor || valor <= 0) {
-      setErro('Informe um valor maior que zero.');
+      setErro("Informe um valor maior que zero.");
       return;
     }
     if (!motivo.trim()) {
-      setErro('Informe o motivo da adição de crédito.');
+      setErro("Informe o motivo da adição de crédito.");
       return;
     }
 
-    setErro('');
+    setErro("");
     setLoading(true);
 
     try {
@@ -57,10 +57,7 @@ export default function ModalAdicionarCredito({
       onConfirmar && onConfirmar(response.data.credito_atual);
       onClose(); // fecha automaticamente após confirmar
     } catch (error) {
-      setErro(
-        error.response?.data?.detail ||
-          'Erro ao adicionar crédito. Tente novamente.'
-      );
+      setErro(error.response?.data?.detail || "Erro ao adicionar crédito. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -83,10 +80,7 @@ export default function ModalAdicionarCredito({
               />
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-white/20 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -97,8 +91,7 @@ export default function ModalAdicionarCredito({
             <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
               <Info className="w-4 h-4 text-green-600 flex-shrink-0" />
               <span className="text-sm text-green-800">
-                Saldo atual:{' '}
-                <strong>R$ {formatBRL(creditoAtual)}</strong>
+                Saldo atual: <strong>R$ {formatBRL(creditoAtual)}</strong>
               </span>
             </div>
           )}
@@ -124,9 +117,7 @@ export default function ModalAdicionarCredito({
 
           {/* Campo motivo */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Motivo
-            </label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Motivo</label>
             <input
               type="text"
               value={motivo}
@@ -163,7 +154,14 @@ export default function ModalAdicionarCredito({
             {loading ? (
               <>
                 <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
                 Salvando...

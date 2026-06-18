@@ -1,15 +1,15 @@
-import { useEffect, useState } from 'react';
-import { formatBRL } from '../../utils/formatters';
+import { useEffect, useState } from "react";
+import { formatBRL } from "../../utils/formatters";
 import {
   exportarRelatorioCustosMaioresCSV as exportarRelatorioCustosMaioresCSVArquivo,
   exportarRelatorioCustosMaioresPDF as exportarRelatorioCustosMaioresPDFArquivo,
-} from './entradaXmlRelatorioCustos';
+} from "./entradaXmlRelatorioCustos";
 import {
   BASE_CALCULO_MARGEM_OPCOES,
   aplicarOverridesPackNoPreview,
   normalizarProdutoPreview,
   obterCustoBasePreviewItem,
-} from './entradaXmlUtils';
+} from "./entradaXmlUtils";
 
 export default function useEntradaXmlRevisaoPrecos({
   api,
@@ -29,9 +29,9 @@ export default function useEntradaXmlRevisaoPrecos({
   const [inputsRevisaoCustos, setInputsRevisaoCustos] = useState({});
   const [precosAjustados, setPrecosAjustados] = useState({});
   const [inputsRevisaoPrecos, setInputsRevisaoPrecos] = useState({});
-  const [filtroCusto, setFiltroCusto] = useState('todos');
+  const [filtroCusto, setFiltroCusto] = useState("todos");
   const [gerandoRelatorioCustos, setGerandoRelatorioCustos] = useState(false);
-  const [baseCalculoMargem, setBaseCalculoMargem] = useState('nf');
+  const [baseCalculoMargem, setBaseCalculoMargem] = useState("nf");
 
   const calcularPrecoVenda = (custoNovo, margemDesejada) => {
     if (margemDesejada >= 100) return custoNovo * 2;
@@ -39,24 +39,24 @@ export default function useEntradaXmlRevisaoPrecos({
   };
 
   const parseNumeroFlexivel = (valor) => {
-    if (typeof valor === 'number') {
+    if (typeof valor === "number") {
       return Number.isFinite(valor) ? valor : 0;
     }
 
-    let texto = String(valor || '').trim();
+    let texto = String(valor || "").trim();
     if (!texto) return 0;
 
-    texto = texto.replaceAll(/\s+/g, '');
-    texto = texto.replaceAll(/[^\d,.-]/g, '');
+    texto = texto.replaceAll(/\s+/g, "");
+    texto = texto.replaceAll(/[^\d,.-]/g, "");
 
-    if (texto.includes(',') && texto.includes('.')) {
-      if (texto.lastIndexOf(',') > texto.lastIndexOf('.')) {
-        texto = texto.replaceAll('.', '').replace(',', '.');
+    if (texto.includes(",") && texto.includes(".")) {
+      if (texto.lastIndexOf(",") > texto.lastIndexOf(".")) {
+        texto = texto.replaceAll(".", "").replace(",", ".");
       } else {
-        texto = texto.replaceAll(',', '');
+        texto = texto.replaceAll(",", "");
       }
-    } else if (texto.includes(',')) {
-      texto = texto.replaceAll('.', '').replace(',', '.');
+    } else if (texto.includes(",")) {
+      texto = texto.replaceAll(".", "").replace(",", ".");
     }
 
     const numero = Number.parseFloat(texto);
@@ -82,24 +82,25 @@ export default function useEntradaXmlRevisaoPrecos({
     const custoNFNormalizado = Number(custoNF || 0);
     const custoSistemaNormalizado = Number(custoSistema || 0);
 
-    if (baseCalculoMargem === 'sistema') {
+    if (baseCalculoMargem === "sistema") {
       return {
-        value: 'sistema',
-        label: 'Custo no sistema',
+        value: "sistema",
+        label: "Custo no sistema",
         valor: custoSistemaNormalizado > 0 ? custoSistemaNormalizado : custoNFNormalizado,
         fallback: !(custoSistemaNormalizado > 0),
-        descricao: custoSistemaNormalizado > 0
-          ? 'Calculando sobre o custo informado no sistema.'
-          : 'Sem custo informado no sistema; usando o custo da NF.',
+        descricao:
+          custoSistemaNormalizado > 0
+            ? "Calculando sobre o custo informado no sistema."
+            : "Sem custo informado no sistema; usando o custo da NF.",
       };
     }
 
     return {
-      value: 'nf',
-      label: 'Custo da NF',
+      value: "nf",
+      label: "Custo da NF",
       valor: custoNFNormalizado,
       fallback: false,
-      descricao: 'Calculando sobre o custo fiscal da NF.',
+      descricao: "Calculando sobre o custo fiscal da NF.",
     };
   };
 
@@ -110,12 +111,12 @@ export default function useEntradaXmlRevisaoPrecos({
     const custoSistema = obterCustoSistemaItem(item);
     const precoVendaAtual = Number(produto.preco_venda_atual || 0);
     const baseMargem = obterInfoBaseCalculoMargem({ custoNF, custoSistema });
-    const variacaoCustoPercentual = custoAnterior > 0
-      ? Number((((custoSistema - custoAnterior) / custoAnterior) * 100).toFixed(2))
-      : 0;
+    const variacaoCustoPercentual =
+      custoAnterior > 0
+        ? Number((((custoSistema - custoAnterior) / custoAnterior) * 100).toFixed(2))
+        : 0;
     const margemReferencia = Number(
-      produto.margem_atual ??
-      calcularMargem(precoVendaAtual, custoAnterior)
+      produto.margem_atual ?? calcularMargem(precoVendaAtual, custoAnterior),
     );
     const margemProjetada = calcularMargem(precoVendaAtual, baseMargem.valor);
 
@@ -142,13 +143,11 @@ export default function useEntradaXmlRevisaoPrecos({
         }
       }
 
-      const response = await api.get(
-        `/notas-entrada/${notaId}/preview-processamento`
-      );
+      const response = await api.get(`/notas-entrada/${notaId}/preview-processamento`);
 
       const previewComOverrides = aplicarOverridesPackNoPreview(response.data, multiplicadoresPack);
 
-      setBaseCalculoMargem('nf');
+      setBaseCalculoMargem("nf");
       setPreviewProcessamento(previewComOverrides);
       setMostrarRevisaoPrecos(true);
       setMostrarDetalhes(false);
@@ -160,12 +159,9 @@ export default function useEntradaXmlRevisaoPrecos({
       previewComOverrides.itens.forEach((item) => {
         const itemId = item.item_id ?? item.id;
         const custoBase = obterCustoBasePreviewItem(item);
-        const custoExistente = Number(
-          custosAjustados[itemId] ?? custosAjustados[String(itemId)]
-        );
-        const custoInicial = Number.isFinite(custoExistente) && custoExistente > 0
-          ? custoExistente
-          : custoBase;
+        const custoExistente = Number(custosAjustados[itemId] ?? custosAjustados[String(itemId)]);
+        const custoInicial =
+          Number.isFinite(custoExistente) && custoExistente > 0 ? custoExistente : custoBase;
 
         custosIniciais[itemId] = custoInicial;
         inputsCustosIniciais[itemId] = formatBRL(custoInicial);
@@ -173,7 +169,7 @@ export default function useEntradaXmlRevisaoPrecos({
         if (item.produto_vinculado) {
           const margemProjetada = Number(
             item.produto_vinculado.margem_projetada_custo_novo ??
-            calcularMargem(item.produto_vinculado.preco_venda_atual, custoInicial)
+              calcularMargem(item.produto_vinculado.preco_venda_atual, custoInicial),
           );
           precosIniciais[item.produto_vinculado.produto_id] = {
             preco_venda: item.produto_vinculado.preco_venda_atual,
@@ -190,7 +186,7 @@ export default function useEntradaXmlRevisaoPrecos({
       setPrecosAjustados(precosIniciais);
       setInputsRevisaoPrecos(inputsIniciais);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao carregar preview');
+      toast.error(error.response?.data?.detail || "Erro ao carregar preview");
     }
   };
 
@@ -199,11 +195,14 @@ export default function useEntradaXmlRevisaoPrecos({
     try {
       const precosParaAtualizar = [];
       Object.entries(precosAjustados).forEach(([produtoId, dados]) => {
-        const itemOriginal = previewProcessamento.itens.find((i) =>
-          i.produto_vinculado && i.produto_vinculado.produto_id == produtoId
+        const itemOriginal = previewProcessamento.itens.find(
+          (i) => i.produto_vinculado && i.produto_vinculado.produto_id == produtoId,
         );
-        if (itemOriginal && itemOriginal.produto_vinculado &&
-            dados.preco_venda !== itemOriginal.produto_vinculado.preco_venda_atual) {
+        if (
+          itemOriginal &&
+          itemOriginal.produto_vinculado &&
+          dados.preco_venda !== itemOriginal.produto_vinculado.preco_venda_atual
+        ) {
           precosParaAtualizar.push({
             produto_id: Number.parseInt(produtoId),
             preco_venda: dados.preco_venda,
@@ -214,7 +213,7 @@ export default function useEntradaXmlRevisaoPrecos({
       if (precosParaAtualizar.length > 0) {
         await api.post(
           `/notas-entrada/${previewProcessamento.nota_id}/atualizar-precos`,
-          precosParaAtualizar
+          precosParaAtualizar,
         );
       }
 
@@ -227,7 +226,7 @@ export default function useEntradaXmlRevisaoPrecos({
           }
 
           return [[itemId, multiplicador]];
-        })
+        }),
       );
       const custosOverride = Object.fromEntries(
         (previewProcessamento.itens || []).flatMap((item) => {
@@ -244,32 +243,31 @@ export default function useEntradaXmlRevisaoPrecos({
           }
 
           return [[itemId, Number(custoSistema.toFixed(4))]];
-        })
+        }),
       );
-      const response = await api.post(
-        `/notas-entrada/${previewProcessamento.nota_id}/processar`,
-        {
-          ...(Object.keys(overridesNaoDefault).length > 0 ? { multiplicadores_override: overridesNaoDefault } : {}),
-          ...(Object.keys(custosOverride).length > 0 ? { custos_override: custosOverride } : {}),
-        }
-      );
+      const response = await api.post(`/notas-entrada/${previewProcessamento.nota_id}/processar`, {
+        ...(Object.keys(overridesNaoDefault).length > 0
+          ? { multiplicadores_override: overridesNaoDefault }
+          : {}),
+        ...(Object.keys(custosOverride).length > 0 ? { custos_override: custosOverride } : {}),
+      });
 
       toast.success(
         `✅ Nota processada! ${response.data.itens_processados} itens lançados no estoque`,
-        { duration: 5000 }
+        { duration: 5000 },
       );
 
       setMostrarDetalhes(false);
       setNotaSelecionada(null);
       setMostrarRevisaoPrecos(false);
       setPreviewProcessamento(null);
-      setBaseCalculoMargem('nf');
+      setBaseCalculoMargem("nf");
       setCustosAjustados({});
       setInputsRevisaoCustos({});
       setInputsRevisaoPrecos({});
       carregarDados();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao processar nota');
+      toast.error(error.response?.data?.detail || "Erro ao processar nota");
     } finally {
       setLoading(false);
     }
@@ -288,7 +286,7 @@ export default function useEntradaXmlRevisaoPrecos({
     setInputsRevisaoPrecos((prev) => ({
       ...prev,
       [produtoId]: {
-        preco_venda: String(novoPrecoEntrada ?? ''),
+        preco_venda: String(novoPrecoEntrada ?? ""),
         margem: formatBRL(novaMargem),
       },
     }));
@@ -308,7 +306,7 @@ export default function useEntradaXmlRevisaoPrecos({
       ...prev,
       [produtoId]: {
         preco_venda: formatBRL(novoPreco),
-        margem: String(novaMargemEntrada ?? ''),
+        margem: String(novaMargemEntrada ?? ""),
       },
     }));
   };
@@ -338,7 +336,7 @@ export default function useEntradaXmlRevisaoPrecos({
     }));
     setInputsRevisaoCustos((prev) => ({
       ...prev,
-      [itemId]: String(novoCustoEntrada ?? ''),
+      [itemId]: String(novoCustoEntrada ?? ""),
     }));
 
     const produto = normalizarProdutoPreview(item);
@@ -347,9 +345,7 @@ export default function useEntradaXmlRevisaoPrecos({
     }
 
     const precoAtual = Number(
-      precosAjustados[produto.produto_id]?.preco_venda ??
-      produto.preco_venda_atual ??
-      0
+      precosAjustados[produto.produto_id]?.preco_venda ?? produto.preco_venda_atual ?? 0,
     );
     const baseMargem = obterInfoBaseCalculoMargem({
       custoNF: custoBase,
@@ -394,9 +390,7 @@ export default function useEntradaXmlRevisaoPrecos({
     }
 
     const precoAtual = Number(
-      precosAjustados[produto.produto_id]?.preco_venda ??
-      produto.preco_venda_atual ??
-      0
+      precosAjustados[produto.produto_id]?.preco_venda ?? produto.preco_venda_atual ?? 0,
     );
     const baseMargem = obterInfoBaseCalculoMargem({
       custoNF: custoBase,
@@ -434,9 +428,7 @@ export default function useEntradaXmlRevisaoPrecos({
 
         const resumoCusto = obterResumoCustoItem(item);
         const precoAtual = Number(
-          prev[produto.produto_id]?.preco_venda ??
-          produto.preco_venda_atual ??
-          0
+          prev[produto.produto_id]?.preco_venda ?? produto.preco_venda_atual ?? 0,
         );
         const margemAtualizada = calcularMargem(precoAtual, resumoCusto.baseMargem.valor);
         const atual = prev[produto.produto_id];
@@ -467,9 +459,7 @@ export default function useEntradaXmlRevisaoPrecos({
 
         const resumoCusto = obterResumoCustoItem(item);
         const precoAtual = Number(
-          precosAjustados[produto.produto_id]?.preco_venda ??
-          produto.preco_venda_atual ??
-          0
+          precosAjustados[produto.produto_id]?.preco_venda ?? produto.preco_venda_atual ?? 0,
         );
         const margemAtualizada = calcularMargem(precoAtual, resumoCusto.baseMargem.valor);
         const precoTextoAtual = prev?.[produto.produto_id]?.preco_venda ?? formatBRL(precoAtual);
@@ -492,27 +482,29 @@ export default function useEntradaXmlRevisaoPrecos({
     });
   }, [baseCalculoMargem, mostrarRevisaoPrecos, previewProcessamento]);
 
-  const exportarRelatorioCustosMaioresCSV = () => exportarRelatorioCustosMaioresCSVArquivo({
-    api,
-    obterResumoCustoItem,
-    previewProcessamento,
-    setGerandoRelatorioCustos,
-    toast,
-  });
+  const exportarRelatorioCustosMaioresCSV = () =>
+    exportarRelatorioCustosMaioresCSVArquivo({
+      api,
+      obterResumoCustoItem,
+      previewProcessamento,
+      setGerandoRelatorioCustos,
+      toast,
+    });
 
-  const exportarRelatorioCustosMaioresPDF = () => exportarRelatorioCustosMaioresPDFArquivo({
-    api,
-    obterResumoCustoItem,
-    previewProcessamento,
-    setGerandoRelatorioCustos,
-    toast,
-  });
+  const exportarRelatorioCustosMaioresPDF = () =>
+    exportarRelatorioCustosMaioresPDFArquivo({
+      api,
+      obterResumoCustoItem,
+      previewProcessamento,
+      setGerandoRelatorioCustos,
+      toast,
+    });
 
   const voltarParaVisualizacao = () => {
     setMostrarRevisaoPrecos(false);
     setPreviewProcessamento(null);
     setInputsRevisaoPrecos({});
-    setBaseCalculoMargem('nf');
+    setBaseCalculoMargem("nf");
     if (notaSelecionada) {
       setMostrarVisualizacao(true);
     }

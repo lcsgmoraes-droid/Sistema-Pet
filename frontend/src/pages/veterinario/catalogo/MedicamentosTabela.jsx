@@ -43,7 +43,9 @@ function LinhaMedicamento({ item, onEditar, onExcluir, removendo }) {
     <tr className="hover:bg-teal-50">
       <td className="px-4 py-3">
         <p className="font-medium text-gray-800">{item.nome}</p>
-        <p className="text-xs text-gray-500">{item.nome_comercial || item.principio_ativo || item.fabricante || "-"}</p>
+        <p className="text-xs text-gray-500">
+          {item.nome_comercial || item.principio_ativo || item.fabricante || "-"}
+        </p>
       </td>
       <td className="px-4 py-3 text-gray-600">{formatLista(item.especies_indicadas)}</td>
       <td className="px-4 py-3 text-gray-600">{item.posologia_referencia || "-"}</td>
@@ -53,7 +55,11 @@ function LinhaMedicamento({ item, onEditar, onExcluir, removendo }) {
           : "-"}
       </td>
       <td className="px-4 py-3">
-        <LinhaAcoes onEditar={() => onEditar(item)} onExcluir={() => onExcluir(item)} removendo={removendo} />
+        <LinhaAcoes
+          onEditar={() => onEditar(item)}
+          onExcluir={() => onExcluir(item)}
+          removendo={removendo}
+        />
       </td>
     </tr>
   );

@@ -10,11 +10,12 @@ export function useConfiguracoesFeedback() {
     sucessoTimerRef.current = window.setTimeout(() => setSucesso(null), 3000);
   }, []);
 
-  useEffect(() => (
-    () => {
+  useEffect(
+    () => () => {
       window.clearTimeout(sucessoTimerRef.current);
-    }
-  ), []);
+    },
+    [],
+  );
 
   return { mostrarSucesso, sucesso };
 }

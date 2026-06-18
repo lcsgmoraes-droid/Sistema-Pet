@@ -22,30 +22,57 @@ const OPCOES_CONSCIENCIA = [
   { value: "Coma", label: "Coma" },
 ];
 
-export default function SinaisVitaisFields({
-  form,
-  setCampo,
-  css,
-  renderCampo,
-}) {
+export default function SinaisVitaisFields({ form, setCampo, css, renderCampo }) {
   return (
     <>
       <h3 className="text-sm font-medium text-gray-500 pt-2">Sinais vitais</h3>
       <div className="grid grid-cols-3 gap-3">
         {renderCampo("Peso (kg)")(
-          <input type="number" step="0.1" value={form.peso_kg} onChange={(event) => setCampo("peso_kg", event.target.value)} className={css.input} placeholder="ex: 12,5" />
+          <input
+            type="number"
+            step="0.1"
+            value={form.peso_kg}
+            onChange={(event) => setCampo("peso_kg", event.target.value)}
+            className={css.input}
+            placeholder="ex: 12,5"
+          />,
         )}
         {renderCampo("Temperatura (\u00b0C)")(
-          <input type="number" step="0.1" value={form.temperatura} onChange={(event) => setCampo("temperatura", event.target.value)} className={css.input} placeholder="ex: 38,5" />
+          <input
+            type="number"
+            step="0.1"
+            value={form.temperatura}
+            onChange={(event) => setCampo("temperatura", event.target.value)}
+            className={css.input}
+            placeholder="ex: 38,5"
+          />,
         )}
         {renderCampo("FC (bpm)")(
-          <input type="number" value={form.freq_cardiaca} onChange={(event) => setCampo("freq_cardiaca", event.target.value)} className={css.input} placeholder="ex: 80" />
+          <input
+            type="number"
+            value={form.freq_cardiaca}
+            onChange={(event) => setCampo("freq_cardiaca", event.target.value)}
+            className={css.input}
+            placeholder="ex: 80"
+          />,
         )}
         {renderCampo("FR (rpm)")(
-          <input type="number" value={form.freq_respiratoria} onChange={(event) => setCampo("freq_respiratoria", event.target.value)} className={css.input} placeholder="ex: 20" />
+          <input
+            type="number"
+            value={form.freq_respiratoria}
+            onChange={(event) => setCampo("freq_respiratoria", event.target.value)}
+            className={css.input}
+            placeholder="ex: 20"
+          />,
         )}
         {renderCampo("TPC")(
-          <input type="text" value={form.tpc} onChange={(event) => setCampo("tpc", event.target.value)} className={css.input} placeholder="ex: < 2 seg" />
+          <input
+            type="text"
+            value={form.tpc}
+            onChange={(event) => setCampo("tpc", event.target.value)}
+            className={css.input}
+            placeholder="ex: < 2 seg"
+          />,
         )}
         {renderCampo("Mucosa")(
           <AutocompleteSelect
@@ -55,7 +82,7 @@ export default function SinaisVitaisFields({
             placeholder="Digite para buscar..."
             emptyLabel="Nenhuma mucosa encontrada"
             showLabel={false}
-          />
+          />,
         )}
         {renderCampo("Hidrata\u00e7\u00e3o")(
           <AutocompleteSelect
@@ -65,7 +92,7 @@ export default function SinaisVitaisFields({
             placeholder="Digite para buscar..."
             emptyLabel={"Nenhuma hidrata\u00e7\u00e3o encontrada"}
             showLabel={false}
-          />
+          />,
         )}
         {renderCampo("Consci\u00eancia")(
           <AutocompleteSelect
@@ -75,10 +102,18 @@ export default function SinaisVitaisFields({
             placeholder="Digite para buscar..."
             emptyLabel={"Nenhum n\u00edvel encontrado"}
             showLabel={false}
-          />
+          />,
         )}
         {renderCampo("Dor (0-10)")(
-          <input type="number" min={0} max={10} value={form.nivel_dor} onChange={(event) => setCampo("nivel_dor", event.target.value)} className={css.input} placeholder="0 = sem dor" />
+          <input
+            type="number"
+            min={0}
+            max={10}
+            value={form.nivel_dor}
+            onChange={(event) => setCampo("nivel_dor", event.target.value)}
+            className={css.input}
+            placeholder="0 = sem dor"
+          />,
         )}
       </div>
     </>

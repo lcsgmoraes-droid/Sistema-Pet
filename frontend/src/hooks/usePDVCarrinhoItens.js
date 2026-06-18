@@ -1,9 +1,6 @@
 import { useState } from "react";
 import { debugLog } from "../utils/debug";
-import {
-  obterPrecoVendaPDV,
-  recalcularSubtotalItem,
-} from "../utils/pdvCarrinhoItensUtils";
+import { obterPrecoVendaPDV, recalcularSubtotalItem } from "../utils/pdvCarrinhoItensUtils";
 
 export function usePDVCarrinhoItens({
   vendaAtual,
@@ -30,9 +27,7 @@ export function usePDVCarrinhoItens({
       classificacao_racao: produto.classificacao_racao,
     });
 
-    const itemExistente = vendaAtual.itens.find(
-      (item) => item.produto_id === produto.id,
-    );
+    const itemExistente = vendaAtual.itens.find((item) => item.produto_id === produto.id);
 
     const precoUnitario = obterPrecoVendaPDV(produto);
     const promocaoAtiva = Boolean(produto.promocao_pdv_ativa);
@@ -40,9 +35,7 @@ export function usePDVCarrinhoItens({
     let novosItens;
     if (itemExistente) {
       novosItens = vendaAtual.itens.map((item) =>
-        item.produto_id === produto.id
-          ? recalcularSubtotalItem(item, item.quantidade + 1)
-          : item,
+        item.produto_id === produto.id ? recalcularSubtotalItem(item, item.quantidade + 1) : item,
       );
     } else {
       novosItens = [
@@ -56,7 +49,8 @@ export function usePDVCarrinhoItens({
           produto_imagem_thumbnail: produto.imagem_principal_thumbnail || null,
           quantidade: 1,
           preco_unitario: precoUnitario,
-          preco_venda_original: produto.preco_venda_original ?? produto.preco_venda ?? precoUnitario,
+          preco_venda_original:
+            produto.preco_venda_original ?? produto.preco_venda ?? precoUnitario,
           em_promocao: promocaoAtiva,
           promocao_origem: produto.promocao_origem_pdv || (promocaoAtiva ? "Promocao ERP" : null),
           desconto_promocional_unitario: produto.desconto_promocional_pdv || 0,
@@ -83,9 +77,7 @@ export function usePDVCarrinhoItens({
 
   const alterarQuantidade = (index, delta) => {
     const novosItens = vendaAtual.itens.map((item, itemIndex) =>
-      itemIndex === index
-        ? recalcularSubtotalItem(item, item.quantidade + delta)
-        : item,
+      itemIndex === index ? recalcularSubtotalItem(item, item.quantidade + delta) : item,
     );
 
     recalcularTotais(novosItens);
@@ -114,9 +106,7 @@ export function usePDVCarrinhoItens({
   };
 
   const removerItem = (index) => {
-    const novosItens = vendaAtual.itens.filter(
-      (_, itemIndex) => itemIndex !== index,
-    );
+    const novosItens = vendaAtual.itens.filter((_, itemIndex) => itemIndex !== index);
     recalcularTotais(novosItens);
   };
 

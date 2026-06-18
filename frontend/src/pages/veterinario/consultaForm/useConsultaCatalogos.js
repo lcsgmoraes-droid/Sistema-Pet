@@ -21,11 +21,15 @@ export default function useConsultaCatalogos() {
 
     vetApi
       .listarMedicamentos()
-      .then((res) => setMedicamentosCatalogo(Array.isArray(res.data) ? res.data : (res.data?.items ?? [])))
+      .then((res) =>
+        setMedicamentosCatalogo(Array.isArray(res.data) ? res.data : (res.data?.items ?? [])),
+      )
       .catch(() => {});
     vetApi
       .listarCatalogoProcedimentos()
-      .then((res) => setProcedimentosCatalogo(Array.isArray(res.data) ? res.data : (res.data?.items ?? [])))
+      .then((res) =>
+        setProcedimentosCatalogo(Array.isArray(res.data) ? res.data : (res.data?.items ?? [])),
+      )
       .catch(() => {});
   }, []);
 

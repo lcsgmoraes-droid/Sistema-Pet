@@ -23,7 +23,7 @@ IMPORTANTE
 """
 
 from fastapi import Depends, HTTPException, status
-from jose import JWTError, jwt
+from app.security.jwt_compat import JWTError, jwt
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.config import JWT_SECRET_KEY
 

@@ -88,11 +88,7 @@ export default function RotasEntrega() {
   }
 
   async function iniciarRota(rotaId) {
-    if (
-      !confirm(
-        "Deseja iniciar esta rota? Uma mensagem será enviada ao primeiro cliente.",
-      )
-    ) {
+    if (!confirm("Deseja iniciar esta rota? Uma mensagem será enviada ao primeiro cliente.")) {
       return;
     }
 
@@ -143,14 +139,11 @@ export default function RotasEntrega() {
 
     try {
       await api.post(`/rotas-entrega/${rotaId}/reverter-inicio`);
-      alert(
-        "✅ Rota revertida para pendente! Agora você pode adicionar mais entregas.",
-      );
+      alert("✅ Rota revertida para pendente! Agora você pode adicionar mais entregas.");
       carregarRotas(); // Recarregar lista
     } catch (err) {
       console.error("Erro ao reverter rota:", err);
-      const mensagem =
-        err.response?.data?.detail || "Erro ao reverter início da rota";
+      const mensagem = err.response?.data?.detail || "Erro ao reverter início da rota";
       alert(`❌ ${mensagem}`);
     }
   }
@@ -162,9 +155,7 @@ export default function RotasEntrega() {
       return;
     }
 
-    alert(
-      "Esta rota ainda não tem localização ou endereço para abrir no mapa.",
-    );
+    alert("Esta rota ainda não tem localização ou endereço para abrir no mapa.");
   }
 
   const rotasEmAndamento = filtrarRotasEmAndamento(rotas);
@@ -182,9 +173,7 @@ export default function RotasEntrega() {
   return (
     <div className="page">
       <h1>Rotas de Entrega</h1>
-      <p style={{ color: "#666", marginBottom: 20 }}>
-        Rotas criadas e em andamento
-      </p>
+      <p style={{ color: "#666", marginBottom: 20 }}>Rotas criadas e em andamento</p>
 
       <div
         style={{
@@ -210,11 +199,7 @@ export default function RotasEntrega() {
           </select>
         </label>
 
-        <button
-          onClick={carregarRotas}
-          className="btn-secondary"
-          style={{ marginLeft: "auto" }}
-        >
+        <button onClick={carregarRotas} className="btn-secondary" style={{ marginLeft: "auto" }}>
           🔄 Atualizar
         </button>
       </div>

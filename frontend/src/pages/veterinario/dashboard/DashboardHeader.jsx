@@ -8,9 +8,7 @@ export default function DashboardHeader({ exportando, onExportar, onNovaConsulta
           <Stethoscope size={24} className="text-blue-600" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">
-            Painel Veterinário
-          </h1>
+          <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">Painel Veterinário</h1>
           <p className="text-sm text-gray-500">Visão geral do dia</p>
         </div>
       </div>

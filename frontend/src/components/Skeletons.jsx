@@ -16,19 +16,19 @@ export function AnalyseSkeleton() {
 }
 
 export function TextSkeleton({ short = false }) {
-  return <div className={`skeleton ${short ? 'skeleton-text-short' : 'skeleton-text'}`} />;
+  return <div className={`skeleton ${short ? "skeleton-text-short" : "skeleton-text"}`} />;
 }
 
 export function CardSkeleton({ height = 110 }) {
   return (
-    <div 
-      className="skeleton-shimmer" 
-      style={{ 
+    <div
+      className="skeleton-shimmer"
+      style={{
         height,
         padding: 16,
-        border: '1px solid #e0e0e0',
-        borderRadius: 8
-      }} 
+        border: "1px solid #e0e0e0",
+        borderRadius: 8,
+      }}
     />
   );
 }

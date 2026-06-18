@@ -41,16 +41,11 @@ function formatarCPF(cpf) {
 
 function formatarCNPJ(cnpj) {
   if (!cnpj) return "-";
-  return cnpj.replace(
-    /(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/,
-    "$1.$2.$3/$4-$5",
-  );
+  return cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, "$1.$2.$3/$4-$5");
 }
 
 function getDocumentoPessoa(pessoa) {
-  return pessoa.tipo_pessoa === "PF"
-    ? formatarCPF(pessoa.cpf)
-    : formatarCNPJ(pessoa.cnpj);
+  return pessoa.tipo_pessoa === "PF" ? formatarCPF(pessoa.cpf) : formatarCNPJ(pessoa.cnpj);
 }
 
 export default function Pessoas() {
@@ -98,9 +93,7 @@ export default function Pessoas() {
   }, [tipoFiltro, buscaTexto]);
 
   useEffect(() => {
-    setSelecionados((prev) =>
-      prev.filter((id) => pessoas.some((pessoa) => pessoa.id === id)),
-    );
+    setSelecionados((prev) => prev.filter((id) => pessoas.some((pessoa) => pessoa.id === id)));
   }, [pessoas]);
 
   const selecionarPessoa = (id) => {
@@ -318,11 +311,7 @@ export default function Pessoas() {
           }
         />
       ) : (
-        <Panel
-          id="tour-pessoas-tabela"
-          padding="none"
-          className="overflow-hidden"
-        >
+        <Panel id="tour-pessoas-tabela" padding="none" className="overflow-hidden">
           <DataTable
             columns={pessoasColumns}
             data={pessoas}

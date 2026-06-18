@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 /**
  * Hook customizado para detectar se está em dispositivo móvel
- * 
+ *
  * Uso:
  * const isMobile = useIsMobile();
  * const isMobile = useIsMobile(1024); // breakpoint customizado
  */
 export const useIsMobile = (breakpoint = 768) => {
   const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' ? window.innerWidth < breakpoint : false
+    typeof window !== "undefined" ? window.innerWidth < breakpoint : false,
   );
 
   useEffect(() => {
@@ -17,12 +17,12 @@ export const useIsMobile = (breakpoint = 768) => {
       setIsMobile(window.innerWidth < breakpoint);
     };
 
-    window.addEventListener('resize', handleResize);
-    
+    window.addEventListener("resize", handleResize);
+
     // Chamar imediatamente para garantir valor correto
     handleResize();
 
-    return () => window.removeEventListener('resize', handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, [breakpoint]);
 
   return isMobile;
@@ -33,24 +33,22 @@ export const useIsMobile = (breakpoint = 768) => {
  */
 export const useOrientation = () => {
   const [orientation, setOrientation] = useState(
-    typeof window !== 'undefined'
+    typeof window !== "undefined"
       ? window.innerWidth > window.innerHeight
-        ? 'landscape'
-        : 'portrait'
-      : 'portrait'
+        ? "landscape"
+        : "portrait"
+      : "portrait",
   );
 
   useEffect(() => {
     const handleResize = () => {
-      setOrientation(
-        window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'
-      );
+      setOrientation(window.innerWidth > window.innerHeight ? "landscape" : "portrait");
     };
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
     handleResize();
 
-    return () => window.removeEventListener('resize', handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   return orientation;
@@ -60,24 +58,24 @@ export const useOrientation = () => {
  * Hook para detectar tipo de dispositivo (mobile, tablet, desktop)
  */
 export const useDeviceType = () => {
-  const [deviceType, setDeviceType] = useState('desktop');
+  const [deviceType, setDeviceType] = useState("desktop");
 
   useEffect(() => {
     const getDeviceType = () => {
       const width = window.innerWidth;
-      if (width < 768) return 'mobile';
-      if (width < 1024) return 'tablet';
-      return 'desktop';
+      if (width < 768) return "mobile";
+      if (width < 1024) return "tablet";
+      return "desktop";
     };
 
     const handleResize = () => {
       setDeviceType(getDeviceType());
     };
 
-    window.addEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
     handleResize();
 
-    return () => window.removeEventListener('resize', handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   return deviceType;

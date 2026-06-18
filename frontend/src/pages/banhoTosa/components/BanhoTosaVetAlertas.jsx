@@ -5,11 +5,7 @@ const labels = {
   restricoes_alimentares: "Restr. alimentares",
 };
 
-export default function BanhoTosaVetAlertas({
-  restricoes,
-  perfil,
-  compact = false,
-}) {
+export default function BanhoTosaVetAlertas({ restricoes, perfil, compact = false }) {
   const alertas = montarAlertas(restricoes);
   const perfilTexto = montarPerfil(perfil);
 
@@ -21,7 +17,10 @@ export default function BanhoTosaVetAlertas({
     return (
       <div className="mt-2 flex flex-wrap gap-1">
         {alertas.slice(0, 3).map((alerta) => (
-          <span key={alerta.key} className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-700">
+          <span
+            key={alerta.key}
+            className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-700"
+          >
             {alerta.label}
           </span>
         ))}
@@ -50,9 +49,7 @@ export default function BanhoTosaVetAlertas({
               <p className="text-xs font-semibold uppercase tracking-[0.12em] text-red-500">
                 {alerta.label}
               </p>
-              <p className="mt-1 text-sm font-semibold text-slate-700">
-                {alerta.valor}
-              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-700">{alerta.valor}</p>
             </div>
           ))}
         </div>

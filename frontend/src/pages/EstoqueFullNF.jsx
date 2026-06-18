@@ -65,7 +65,10 @@ function contarBaixas(resultado) {
 
 function contarLancamentosFinanceiros(resultado) {
   if (!resultado) return 0;
-  if (resultado.lancamentos_financeiros !== undefined && resultado.lancamentos_financeiros !== null) {
+  if (
+    resultado.lancamentos_financeiros !== undefined &&
+    resultado.lancamentos_financeiros !== null
+  ) {
     return Number(resultado.lancamentos_financeiros) || 0;
   }
   return resultado?.tarifa_envio?.conta_pagar_id ? 1 : 0;
@@ -85,7 +88,9 @@ function formatarDataHora(valor) {
 }
 
 function normalizarSku(valor) {
-  return String(valor || "").trim().toLowerCase();
+  return String(valor || "")
+    .trim()
+    .toLowerCase();
 }
 
 function formatarQuantidade(valor) {
@@ -101,9 +106,9 @@ function extrairDetalheErro(error) {
 function ehErroEstoqueFull(detalhe) {
   return Boolean(
     detalhe &&
-      typeof detalhe === "object" &&
-      detalhe.code === "estoque_insuficiente_full_nf" &&
-      Array.isArray(detalhe.itens),
+    typeof detalhe === "object" &&
+    detalhe.code === "estoque_insuficiente_full_nf" &&
+    Array.isArray(detalhe.itens),
   );
 }
 
@@ -120,7 +125,11 @@ export default function EstoqueFullNF() {
 
   const [abaAtiva, setAbaAtiva] = useState("lancamento");
   const [modalConclusao, setModalConclusao] = useState({ aberto: false, resultado: null });
-  const [modalEditarCanal, setModalEditarCanal] = useState({ aberto: false, lancamento: null, canal: "" });
+  const [modalEditarCanal, setModalEditarCanal] = useState({
+    aberto: false,
+    lancamento: null,
+    canal: "",
+  });
   const [historico, setHistorico] = useState([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -206,10 +215,14 @@ export default function EstoqueFullNF() {
       ]);
 
       const categoriasDre = Array.isArray(categoriasResponse.data) ? categoriasResponse.data : [];
-      const subcategoriasDre = Array.isArray(subcategoriasResponse.data) ? subcategoriasResponse.data : [];
+      const subcategoriasDre = Array.isArray(subcategoriasResponse.data)
+        ? subcategoriasResponse.data
+        : [];
       const categoriasDespesaMap = new Map(
         categoriasDre
-          .filter((cat) => cat.ativo !== false && String(cat.natureza || "").toLowerCase() === "despesa")
+          .filter(
+            (cat) => cat.ativo !== false && String(cat.natureza || "").toLowerCase() === "despesa",
+          )
           .map((cat) => [Number(cat.id), cat]),
       );
 
@@ -531,7 +544,9 @@ export default function EstoqueFullNF() {
       const categoriaAtualizada = response.data;
 
       setCategoriasDespesa((prev) =>
-        prev.map((cat) => (String(cat.id) === String(categoriaAtualizada.id) ? categoriaAtualizada : cat)),
+        prev.map((cat) =>
+          String(cat.id) === String(categoriaAtualizada.id) ? categoriaAtualizada : cat,
+        ),
       );
       setCategoriaTarifaId(String(categoriaAtualizada.id));
       setModalDre({ aberto: false, categoria: null });
@@ -540,7 +555,8 @@ export default function EstoqueFullNF() {
       await processar(categoriaAtualizada);
     } catch (error) {
       console.error("Erro ao vincular categoria a DRE:", error);
-      const detalhe = error?.response?.data?.detail || "Nao foi possivel vincular a categoria a DRE.";
+      const detalhe =
+        error?.response?.data?.detail || "Nao foi possivel vincular a categoria a DRE.";
       toast.error(detalhe);
     } finally {
       setSalvandoVinculoDre(false);
@@ -569,295 +585,316 @@ export default function EstoqueFullNF() {
 
       {abaAtiva === "lancamento" && (
         <>
-      <Panel className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <div className="block text-sm font-medium text-gray-700 mb-1">Numero da NF (automatico via XML)</div>
-            <input
-              id="numero-nf"
-              aria-label="Numero da NF"
-              type="text"
-              value={numeroNF}
-              readOnly
-              placeholder="Selecione um XML para preencher"
-              className="w-full border border-amber-300 bg-amber-50 rounded-lg px-3 py-2 text-gray-900"
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <div className="block text-sm font-medium text-gray-700">Canal / origem *</div>
-              {plataforma && <ChannelBadge channel={plataforma} />}
-            </div>
-            <select
-              id="plataforma-full"
-              aria-label="Canal ou origem"
-              value={plataforma}
-              onChange={(e) => setPlataforma(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-            >
-              <option value="">Selecione o canal</option>
-              {CANAIS_FULL.map((canal) => (
-                <option key={canal.value} value={canal.value}>
-                  {canal.label}
-                </option>
-              ))}
-            </select>
-            {!plataforma && (
-              <p className="mt-1 text-xs text-amber-700">Obrigatorio para direcionar a despesa na DRE correta.</p>
-            )}
-          </div>
-
-          <div>
-            <div className="block text-sm font-medium text-gray-700 mb-1">Data vencimento tarifa</div>
-            <input
-              id="vencimento-tarifa"
-              aria-label="Data vencimento tarifa"
-              type="date"
-              value={dataVencimentoTarifa}
-              onChange={(e) => setDataVencimentoTarifa(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-            />
-          </div>
-        </div>
-
-        <div>
-          <div className="block text-sm font-medium text-gray-700 mb-1">Observacao (opcional)</div>
-          <input
-            id="obs-full"
-            aria-label="Observacao"
-            type="text"
-            value={observacao}
-            onChange={(e) => setObservacao(e.target.value)}
-            placeholder="Ex: lote de pedidos da semana"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2"
-          />
-        </div>
-      </Panel>
-
-      <Panel
-        className="space-y-3"
-        title="Itens da NF (baixa de estoque)"
-        actions={(
-          <ActionButton icon={Plus} intent="create" onClick={adicionarLinha}>
-            Adicionar item
-          </ActionButton>
-        )}
-      >
-
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end bg-slate-50 border border-slate-200 rounded-xl p-3 md:p-4">
-          <div className="md:col-span-8">
-            <div className="block text-sm font-medium text-slate-700 mb-1">Escolher XML da NF (preenche numero e itens)</div>
-            <input
-              key={xmlInputKey}
-              type="file"
-              accept=".xml,text/xml,application/xml"
-              onChange={(e) => setArquivoXml(e.target.files?.[0] || null)}
-              className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2"
-            />
-          </div>
-          <div className="md:col-span-4">
-            <ActionButton
-              className="w-full"
-              icon={FileText}
-              intent="edit"
-              loading={lendoXml}
-              onClick={importarItensDoXml}
-              size="md"
-            >
-              Ler XML e preencher
-            </ActionButton>
-          </div>
-        </div>
-
-        {problemasEstoque.length > 0 && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <Panel className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <h3 className="font-semibold">Estoque insuficiente em {problemasEstoque.length} item(ns)</h3>
-                <p className="mt-1 text-red-800">
-                  Corrija o estoque dos produtos marcados em uma nova aba e depois revalide sem perder esta NF.
-                </p>
+                <div className="block text-sm font-medium text-gray-700 mb-1">
+                  Numero da NF (automatico via XML)
+                </div>
+                <input
+                  id="numero-nf"
+                  aria-label="Numero da NF"
+                  type="text"
+                  value={numeroNF}
+                  readOnly
+                  placeholder="Selecione um XML para preencher"
+                  className="w-full border border-amber-300 bg-amber-50 rounded-lg px-3 py-2 text-gray-900"
+                />
               </div>
-              <ActionButton
-                icon={RefreshCw}
-                intent="warning"
-                loading={validandoEstoque}
-                onClick={revalidarEstoque}
-                tone="soft"
-              >
-                Revalidar estoque
-              </ActionButton>
-            </div>
-            <div className="mt-3 grid gap-2">
-              {problemasEstoque.map((problema) => (
-                <div
-                  key={`${problema.entrada_sku || problema.sku}-${problema.produto_id || "sem-produto"}`}
-                  className="flex flex-col gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 md:flex-row md:items-center md:justify-between"
-                >
-                  <div>
-                    <p className="font-semibold">{problema.nome || "Produto nao identificado"}</p>
-                    <p className="text-xs text-red-700">
-                      SKU {problema.sku || problema.entrada_sku || "-"} | Disponivel: {formatarQuantidade(problema.disponivel)} | NF pede:{" "}
-                      {formatarQuantidade(problema.solicitado)} | Falta: {formatarQuantidade(problema.faltante)}
-                    </p>
-                  </div>
-                  {problema.url_correcao && (
-                    <ActionButton
-                      icon={ExternalLink}
-                      intent="delete"
-                      onClick={() => abrirCorrecaoEstoque(problema)}
-                      size="xs"
-                    >
-                      Corrigir estoque
-                    </ActionButton>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
-        <div className="space-y-2">
-          {itens.map((item) => {
-            const problema = problemaDaLinha(item);
-            return (
-              <div
-                key={item.id}
-                className={`grid grid-cols-1 gap-2 rounded-xl md:grid-cols-12 ${
-                  problema ? "border border-red-300 bg-red-50 p-2" : ""
-                }`}
-              >
-                <div className="md:col-span-7">
-                  <input
-                    id={`sku-${item.id}`}
-                    aria-label={`SKU ${item.id}`}
-                    type="text"
-                    value={item.sku}
-                    onChange={(e) => atualizarLinha(item.id, "sku", e.target.value)}
-                    placeholder="SKU do produto"
-                    className={`w-full rounded-lg border px-3 py-2 ${
-                      problema ? "border-red-300 bg-white text-red-900" : "border-gray-300"
-                    }`}
-                  />
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="block text-sm font-medium text-gray-700">Canal / origem *</div>
+                  {plataforma && <ChannelBadge channel={plataforma} />}
                 </div>
-                <div className="md:col-span-3">
-                  <input
-                    id={`qtd-${item.id}`}
-                    aria-label={`Quantidade ${item.id}`}
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={item.quantidade}
-                    onChange={(e) => atualizarLinha(item.id, "quantidade", e.target.value)}
-                    placeholder="Quantidade"
-                    className={`w-full rounded-lg border px-3 py-2 ${
-                      problema ? "border-red-300 bg-white text-red-900" : "border-gray-300"
-                    }`}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <ActionButton
-                    className="w-full"
-                    icon={Trash2}
-                    intent="delete"
-                    onClick={() => removerLinha(item.id)}
-                    tone="soft"
-                  >
-                    Remover
-                  </ActionButton>
-                </div>
-                {problema && (
-                  <div className="md:col-span-12 flex flex-col gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs text-red-800 md:flex-row md:items-center md:justify-between">
-                    <span>
-                      {problema.nome}: disponivel {formatarQuantidade(problema.disponivel)}, solicitado{" "}
-                      {formatarQuantidade(problema.solicitado)}, falta {formatarQuantidade(problema.faltante)}.
-                    </span>
-                    {problema.url_correcao && (
-                      <ActionButton
-                        icon={ExternalLink}
-                        intent="delete"
-                        onClick={() => abrirCorrecaoEstoque(problema)}
-                        size="xs"
-                        tone="soft"
-                      >
-                        Abrir ajuste de estoque
-                      </ActionButton>
-                    )}
-                  </div>
+                <select
+                  id="plataforma-full"
+                  aria-label="Canal ou origem"
+                  value={plataforma}
+                  onChange={(e) => setPlataforma(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                >
+                  <option value="">Selecione o canal</option>
+                  {CANAIS_FULL.map((canal) => (
+                    <option key={canal.value} value={canal.value}>
+                      {canal.label}
+                    </option>
+                  ))}
+                </select>
+                {!plataforma && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Obrigatorio para direcionar a despesa na DRE correta.
+                  </p>
                 )}
               </div>
-            );
-          })}
-        </div>
-      </Panel>
 
-      <Panel
-        className="space-y-4"
-        title="Tarifa de envio (financeiro)"
-        subtitle="Se preencher esta parte, o sistema cria uma conta a pagar so da tarifa de envio. Se deixar zero, nao cria nada no financeiro."
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <div className="block text-sm font-medium text-gray-700 mb-1">Valor da tarifa</div>
-            <CurrencyInput
-              id="valor-tarifa"
-              aria-label="Valor da tarifa"
-              value={tarifaEnvio}
-              onChange={setTarifaEnvio}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-              placeholder="0,00"
-            />
-          </div>
-
-          <div>
-            <div className="block text-sm font-medium text-gray-700 mb-1">
-              Categoria de despesa {tarifaEnvio > 0 ? "(obrigatoria)" : "(opcional)"}
+              <div>
+                <div className="block text-sm font-medium text-gray-700 mb-1">
+                  Data vencimento tarifa
+                </div>
+                <input
+                  id="vencimento-tarifa"
+                  aria-label="Data vencimento tarifa"
+                  type="date"
+                  value={dataVencimentoTarifa}
+                  onChange={(e) => setDataVencimentoTarifa(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                />
+              </div>
             </div>
-            <select
-              id="categoria-tarifa"
-              aria-label="Categoria da tarifa"
-              value={categoriaTarifaId}
-              onChange={(e) => setCategoriaTarifaId(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
-            >
-              <option value="">Sem categoria</option>
-              {categoriasDespesa.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.caminho_completo || cat.nome}
-                </option>
-              ))}
-            </select>
-            {tarifaEnvio > 0 && !categoriaTarifaId && (
-              <p className="mt-1 text-xs text-amber-700">
-                Para gerar o contas a pagar da tarifa, selecione uma categoria com DRE vinculada.
-              </p>
-            )}
-            {tarifaEnvio > 0 && categoriaTarifaId && !categoriaTarifaSelecionada?.dre_subcategoria_id && (
-              <p className="mt-1 text-xs text-red-700">
-                Esta categoria ainda nao tem vinculo DRE. Ajuste o cadastro da categoria antes de confirmar.
-              </p>
-            )}
-            {tarifaEnvio > 0 && categoriaTarifaSelecionada?.dre_subcategoria_id && (
-              <p className="mt-1 text-xs text-emerald-700">
-                A despesa sera lancada na DRE do canal/origem selecionado.
-              </p>
-            )}
-          </div>
-        </div>
-      </Panel>
 
-      <div className="flex flex-wrap gap-3">
-        <ActionButton
-          icon={CheckCircle2}
-          intent="create"
-          loading={salvando}
-          onClick={() => processar()}
-          size="lg"
-        >
-          Confirmar baixa por NF
-        </ActionButton>
-      </div>
+            <div>
+              <div className="block text-sm font-medium text-gray-700 mb-1">
+                Observacao (opcional)
+              </div>
+              <input
+                id="obs-full"
+                aria-label="Observacao"
+                type="text"
+                value={observacao}
+                onChange={(e) => setObservacao(e.target.value)}
+                placeholder="Ex: lote de pedidos da semana"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              />
+            </div>
+          </Panel>
+
+          <Panel
+            className="space-y-3"
+            title="Itens da NF (baixa de estoque)"
+            actions={
+              <ActionButton icon={Plus} intent="create" onClick={adicionarLinha}>
+                Adicionar item
+              </ActionButton>
+            }
+          >
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end bg-slate-50 border border-slate-200 rounded-xl p-3 md:p-4">
+              <div className="md:col-span-8">
+                <div className="block text-sm font-medium text-slate-700 mb-1">
+                  Escolher XML da NF (preenche numero e itens)
+                </div>
+                <input
+                  key={xmlInputKey}
+                  type="file"
+                  accept=".xml,text/xml,application/xml"
+                  onChange={(e) => setArquivoXml(e.target.files?.[0] || null)}
+                  className="w-full border border-slate-300 bg-white rounded-lg px-3 py-2"
+                />
+              </div>
+              <div className="md:col-span-4">
+                <ActionButton
+                  className="w-full"
+                  icon={FileText}
+                  intent="edit"
+                  loading={lendoXml}
+                  onClick={importarItensDoXml}
+                  size="md"
+                >
+                  Ler XML e preencher
+                </ActionButton>
+              </div>
+            </div>
+
+            {problemasEstoque.length > 0 && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <h3 className="font-semibold">
+                      Estoque insuficiente em {problemasEstoque.length} item(ns)
+                    </h3>
+                    <p className="mt-1 text-red-800">
+                      Corrija o estoque dos produtos marcados em uma nova aba e depois revalide sem
+                      perder esta NF.
+                    </p>
+                  </div>
+                  <ActionButton
+                    icon={RefreshCw}
+                    intent="warning"
+                    loading={validandoEstoque}
+                    onClick={revalidarEstoque}
+                    tone="soft"
+                  >
+                    Revalidar estoque
+                  </ActionButton>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {problemasEstoque.map((problema) => (
+                    <div
+                      key={`${problema.entrada_sku || problema.sku}-${problema.produto_id || "sem-produto"}`}
+                      className="flex flex-col gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 md:flex-row md:items-center md:justify-between"
+                    >
+                      <div>
+                        <p className="font-semibold">
+                          {problema.nome || "Produto nao identificado"}
+                        </p>
+                        <p className="text-xs text-red-700">
+                          SKU {problema.sku || problema.entrada_sku || "-"} | Disponivel:{" "}
+                          {formatarQuantidade(problema.disponivel)} | NF pede:{" "}
+                          {formatarQuantidade(problema.solicitado)} | Falta:{" "}
+                          {formatarQuantidade(problema.faltante)}
+                        </p>
+                      </div>
+                      {problema.url_correcao && (
+                        <ActionButton
+                          icon={ExternalLink}
+                          intent="delete"
+                          onClick={() => abrirCorrecaoEstoque(problema)}
+                          size="xs"
+                        >
+                          Corrigir estoque
+                        </ActionButton>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {itens.map((item) => {
+                const problema = problemaDaLinha(item);
+                return (
+                  <div
+                    key={item.id}
+                    className={`grid grid-cols-1 gap-2 rounded-xl md:grid-cols-12 ${
+                      problema ? "border border-red-300 bg-red-50 p-2" : ""
+                    }`}
+                  >
+                    <div className="md:col-span-7">
+                      <input
+                        id={`sku-${item.id}`}
+                        aria-label={`SKU ${item.id}`}
+                        type="text"
+                        value={item.sku}
+                        onChange={(e) => atualizarLinha(item.id, "sku", e.target.value)}
+                        placeholder="SKU do produto"
+                        className={`w-full rounded-lg border px-3 py-2 ${
+                          problema ? "border-red-300 bg-white text-red-900" : "border-gray-300"
+                        }`}
+                      />
+                    </div>
+                    <div className="md:col-span-3">
+                      <input
+                        id={`qtd-${item.id}`}
+                        aria-label={`Quantidade ${item.id}`}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.quantidade}
+                        onChange={(e) => atualizarLinha(item.id, "quantidade", e.target.value)}
+                        placeholder="Quantidade"
+                        className={`w-full rounded-lg border px-3 py-2 ${
+                          problema ? "border-red-300 bg-white text-red-900" : "border-gray-300"
+                        }`}
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <ActionButton
+                        className="w-full"
+                        icon={Trash2}
+                        intent="delete"
+                        onClick={() => removerLinha(item.id)}
+                        tone="soft"
+                      >
+                        Remover
+                      </ActionButton>
+                    </div>
+                    {problema && (
+                      <div className="md:col-span-12 flex flex-col gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs text-red-800 md:flex-row md:items-center md:justify-between">
+                        <span>
+                          {problema.nome}: disponivel {formatarQuantidade(problema.disponivel)},
+                          solicitado {formatarQuantidade(problema.solicitado)}, falta{" "}
+                          {formatarQuantidade(problema.faltante)}.
+                        </span>
+                        {problema.url_correcao && (
+                          <ActionButton
+                            icon={ExternalLink}
+                            intent="delete"
+                            onClick={() => abrirCorrecaoEstoque(problema)}
+                            size="xs"
+                            tone="soft"
+                          >
+                            Abrir ajuste de estoque
+                          </ActionButton>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Panel>
+
+          <Panel
+            className="space-y-4"
+            title="Tarifa de envio (financeiro)"
+            subtitle="Se preencher esta parte, o sistema cria uma conta a pagar so da tarifa de envio. Se deixar zero, nao cria nada no financeiro."
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <div className="block text-sm font-medium text-gray-700 mb-1">Valor da tarifa</div>
+                <CurrencyInput
+                  id="valor-tarifa"
+                  aria-label="Valor da tarifa"
+                  value={tarifaEnvio}
+                  onChange={setTarifaEnvio}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  placeholder="0,00"
+                />
+              </div>
+
+              <div>
+                <div className="block text-sm font-medium text-gray-700 mb-1">
+                  Categoria de despesa {tarifaEnvio > 0 ? "(obrigatoria)" : "(opcional)"}
+                </div>
+                <select
+                  id="categoria-tarifa"
+                  aria-label="Categoria da tarifa"
+                  value={categoriaTarifaId}
+                  onChange={(e) => setCategoriaTarifaId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                >
+                  <option value="">Sem categoria</option>
+                  {categoriasDespesa.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.caminho_completo || cat.nome}
+                    </option>
+                  ))}
+                </select>
+                {tarifaEnvio > 0 && !categoriaTarifaId && (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Para gerar o contas a pagar da tarifa, selecione uma categoria com DRE
+                    vinculada.
+                  </p>
+                )}
+                {tarifaEnvio > 0 &&
+                  categoriaTarifaId &&
+                  !categoriaTarifaSelecionada?.dre_subcategoria_id && (
+                    <p className="mt-1 text-xs text-red-700">
+                      Esta categoria ainda nao tem vinculo DRE. Ajuste o cadastro da categoria antes
+                      de confirmar.
+                    </p>
+                  )}
+                {tarifaEnvio > 0 && categoriaTarifaSelecionada?.dre_subcategoria_id && (
+                  <p className="mt-1 text-xs text-emerald-700">
+                    A despesa sera lancada na DRE do canal/origem selecionado.
+                  </p>
+                )}
+              </div>
+            </div>
+          </Panel>
+
+          <div className="flex flex-wrap gap-3">
+            <ActionButton
+              icon={CheckCircle2}
+              intent="create"
+              loading={salvando}
+              onClick={() => processar()}
+              size="lg"
+            >
+              Confirmar baixa por NF
+            </ActionButton>
+          </div>
         </>
       )}
 
@@ -866,7 +903,7 @@ export default function EstoqueFullNF() {
           className="space-y-4"
           title="Historico de baixas FULL"
           subtitle="Lancamentos processados por NF, com canal, estoque e tarifa financeira quando houver."
-          actions={(
+          actions={
             <ActionButton
               icon={RefreshCw}
               loading={carregandoHistorico}
@@ -875,21 +912,28 @@ export default function EstoqueFullNF() {
             >
               Atualizar historico
             </ActionButton>
-          )}
+          }
         >
-
           {!carregandoHistorico && !historico.length && (
             <EmptyState title="Nenhuma baixa FULL por NF encontrada ainda." />
           )}
 
           <div className="space-y-3">
             {historico.map((lancamento) => (
-              <div key={lancamento.numero_nf} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div
+                key={lancamento.numero_nf}
+                className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+              >
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-base font-semibold text-slate-900">NF {lancamento.numero_nf}</h4>
-                      <ChannelBadge channel={lancamento.plataforma} label={lancamento.plataforma_label} />
+                      <h4 className="text-base font-semibold text-slate-900">
+                        NF {lancamento.numero_nf}
+                      </h4>
+                      <ChannelBadge
+                        channel={lancamento.plataforma}
+                        label={lancamento.plataforma_label}
+                      />
                       <ActionButton
                         icon={Edit3}
                         intent="edit"
@@ -900,7 +944,9 @@ export default function EstoqueFullNF() {
                         Editar canal
                       </ActionButton>
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">Processado em {formatarDataHora(lancamento.processado_em)}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Processado em {formatarDataHora(lancamento.processado_em)}
+                    </p>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
                     <div className="rounded-lg bg-emerald-50 px-3 py-2">
@@ -909,7 +955,9 @@ export default function EstoqueFullNF() {
                     </div>
                     <div className="rounded-lg bg-blue-50 px-3 py-2">
                       <p className="text-xs text-blue-700">Financeiro</p>
-                      <p className="font-semibold text-blue-900">{contarLancamentosFinanceiros(lancamento)}</p>
+                      <p className="font-semibold text-blue-900">
+                        {contarLancamentosFinanceiros(lancamento)}
+                      </p>
                     </div>
                     <div className="rounded-lg bg-slate-50 px-3 py-2">
                       <p className="text-xs text-slate-600">Itens</p>
@@ -918,26 +966,47 @@ export default function EstoqueFullNF() {
                     <div className="rounded-lg bg-slate-50 px-3 py-2">
                       <p className="text-xs text-slate-600">Tarifa</p>
                       <p className="font-semibold text-slate-900">
-                        {lancamento.tarifa_envio ? formatMoneyBRL(lancamento.tarifa_envio.valor) : "-"}
+                        {lancamento.tarifa_envio
+                          ? formatMoneyBRL(lancamento.tarifa_envio.valor)
+                          : "-"}
                       </p>
                     </div>
                   </div>
                 </div>
 
                 <details className="mt-3">
-                  <summary className="cursor-pointer text-sm font-medium text-blue-700">Ver itens da baixa</summary>
+                  <summary className="cursor-pointer text-sm font-medium text-blue-700">
+                    Ver itens da baixa
+                  </summary>
                   <div className="mt-3">
                     <DataTable
                       columns={[
                         { key: "sku", header: "SKU", render: (item) => item.sku || "-" },
                         { key: "produto", header: "Produto", render: (item) => item.nome || "-" },
-                        { key: "quantidade", header: "Qtd", align: "right", render: (item) => item.quantidade },
-                        { key: "antes", header: "Antes", align: "right", render: (item) => item.estoque_anterior },
-                        { key: "depois", header: "Depois", align: "right", render: (item) => item.estoque_novo },
+                        {
+                          key: "quantidade",
+                          header: "Qtd",
+                          align: "right",
+                          render: (item) => item.quantidade,
+                        },
+                        {
+                          key: "antes",
+                          header: "Antes",
+                          align: "right",
+                          render: (item) => item.estoque_anterior,
+                        },
+                        {
+                          key: "depois",
+                          header: "Depois",
+                          align: "right",
+                          render: (item) => item.estoque_novo,
+                        },
                       ]}
                       data={lancamento.itens || []}
                       emptyMessage="Nenhum item registrado nesta baixa."
-                      getRowKey={(item) => `${lancamento.numero_nf}-${item.movimentacao_id || item.produto_id || item.sku}`}
+                      getRowKey={(item) =>
+                        `${lancamento.numero_nf}-${item.movimentacao_id || item.produto_id || item.sku}`
+                      }
                       theadClassName="bg-slate-50"
                     />
                   </div>
@@ -952,7 +1021,9 @@ export default function EstoqueFullNF() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
           <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl">
             <div className="border-b border-slate-200 px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Processamento concluido</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                Processamento concluido
+              </p>
               <h3 className="mt-1 text-lg font-semibold text-slate-900">Baixa por NF finalizada</h3>
             </div>
 
@@ -960,7 +1031,9 @@ export default function EstoqueFullNF() {
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                 <div>
                   <p className="text-xs text-slate-500">NF</p>
-                  <p className="text-base font-semibold text-slate-900">{modalConclusao.resultado?.numero_nf}</p>
+                  <p className="text-base font-semibold text-slate-900">
+                    {modalConclusao.resultado?.numero_nf}
+                  </p>
                 </div>
                 <ChannelBadge
                   channel={modalConclusao.resultado?.plataforma}
@@ -972,8 +1045,16 @@ export default function EstoqueFullNF() {
                 <p className="font-semibold">Confirme a loja/canal antes de seguir.</p>
                 <p className="mt-1">
                   Esta baixa ficou registrada em{" "}
-                  <strong>{getChannelConfig(modalConclusao.resultado?.plataforma, modalConclusao.resultado?.plataforma_label).label}</strong>.
-                  Se estiver errado, corrija agora para manter estoque, financeiro e DRE na origem certa.
+                  <strong>
+                    {
+                      getChannelConfig(
+                        modalConclusao.resultado?.plataforma,
+                        modalConclusao.resultado?.plataforma_label,
+                      ).label
+                    }
+                  </strong>
+                  . Se estiver errado, corrija agora para manter estoque, financeiro e DRE na origem
+                  certa.
                 </p>
               </div>
 
@@ -994,15 +1075,16 @@ export default function EstoqueFullNF() {
 
               {modalConclusao.resultado?.estoque_ja_baixado && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  O estoque desta NF ja estava baixado. O sistema nao baixou novamente e executou apenas o que ainda
-                  estava pendente.
+                  O estoque desta NF ja estava baixado. O sistema nao baixou novamente e executou
+                  apenas o que ainda estava pendente.
                 </div>
               )}
 
               {modalConclusao.resultado?.tarifa_envio?.conta_pagar_id && (
                 <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
-                  Conta a pagar gerada: <strong>#{modalConclusao.resultado.tarifa_envio.conta_pagar_id}</strong> no valor de{" "}
-                  <strong>{formatMoneyBRL(modalConclusao.resultado.tarifa_envio.valor)}</strong>.
+                  Conta a pagar gerada:{" "}
+                  <strong>#{modalConclusao.resultado.tarifa_envio.conta_pagar_id}</strong> no valor
+                  de <strong>{formatMoneyBRL(modalConclusao.resultado.tarifa_envio.valor)}</strong>.
                 </div>
               )}
             </div>
@@ -1016,11 +1098,7 @@ export default function EstoqueFullNF() {
               >
                 Corrigir canal
               </ActionButton>
-              <ActionButton
-                icon={History}
-                onClick={() => fecharModalConclusao(true)}
-                tone="soft"
-              >
+              <ActionButton icon={History} onClick={() => fecharModalConclusao(true)} tone="soft">
                 Ver historico
               </ActionButton>
               <ActionButton
@@ -1040,7 +1118,9 @@ export default function EstoqueFullNF() {
           <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Correcao de canal</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                  Correcao de canal
+                </p>
                 <h3 className="mt-1 text-lg font-semibold text-slate-900">
                   Editar loja/canal da NF {modalEditarCanal.lancamento?.numero_nf}
                 </h3>
@@ -1070,7 +1150,10 @@ export default function EstoqueFullNF() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="editar-canal-full">
+                <label
+                  className="mb-1 block text-sm font-medium text-slate-700"
+                  htmlFor="editar-canal-full"
+                >
                   Loja / canal correto
                 </label>
                 <select
@@ -1093,20 +1176,18 @@ export default function EstoqueFullNF() {
                 </select>
               </div>
 
-              {modalEditarCanal.canal && modalEditarCanal.canal !== modalEditarCanal.lancamento?.plataforma && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  Vou mover esta NF para{" "}
-                  <strong>{getChannelConfig(modalEditarCanal.canal).label}</strong>. Confira antes de salvar.
-                </div>
-              )}
+              {modalEditarCanal.canal &&
+                modalEditarCanal.canal !== modalEditarCanal.lancamento?.plataforma && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    Vou mover esta NF para{" "}
+                    <strong>{getChannelConfig(modalEditarCanal.canal).label}</strong>. Confira antes
+                    de salvar.
+                  </div>
+                )}
             </div>
 
             <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
-              <ActionButton
-                onClick={fecharModalEditarCanal}
-                disabled={salvandoCanal}
-                tone="soft"
-              >
+              <ActionButton onClick={fecharModalEditarCanal} disabled={salvandoCanal} tone="soft">
                 Cancelar
               </ActionButton>
               <ActionButton
@@ -1128,8 +1209,12 @@ export default function EstoqueFullNF() {
           <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl border border-slate-200">
             <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Acao necessaria</p>
-                <h3 className="mt-1 text-lg font-semibold text-slate-900">Vincular categoria a DRE</h3>
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                  Acao necessaria
+                </p>
+                <h3 className="mt-1 text-lg font-semibold text-slate-900">
+                  Vincular categoria a DRE
+                </h3>
               </div>
               <IconActionButton
                 aria-label="Fechar"
@@ -1142,9 +1227,10 @@ export default function EstoqueFullNF() {
 
             <div className="space-y-4 px-5 py-4">
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                A categoria <strong>{modalDre.categoria?.caminho_completo || modalDre.categoria?.nome}</strong> ainda
-                nao tem vinculo contabil. Para gerar a conta a pagar e jogar a despesa na DRE do canal selecionado, escolha
-                abaixo onde essa despesa deve entrar.
+                A categoria{" "}
+                <strong>{modalDre.categoria?.caminho_completo || modalDre.categoria?.nome}</strong>{" "}
+                ainda nao tem vinculo contabil. Para gerar a conta a pagar e jogar a despesa na DRE
+                do canal selecionado, escolha abaixo onde essa despesa deve entrar.
               </div>
 
               <div>
@@ -1158,7 +1244,9 @@ export default function EstoqueFullNF() {
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100"
                 >
                   <option value="">
-                    {carregandoDre ? "Carregando opcoes..." : "Selecione onde classificar esta despesa"}
+                    {carregandoDre
+                      ? "Carregando opcoes..."
+                      : "Selecione onde classificar esta despesa"}
                   </option>
                   {dreSubcategoriasDespesa.map((sub) => (
                     <option key={sub.id} value={sub.id}>
@@ -1168,23 +1256,20 @@ export default function EstoqueFullNF() {
                 </select>
                 {!carregandoDre && !dreSubcategoriasDespesa.length && (
                   <p className="mt-2 text-xs text-red-700">
-                    Nenhuma subcategoria DRE de despesa ativa foi encontrada. Cadastre o plano DRE antes de continuar.
+                    Nenhuma subcategoria DRE de despesa ativa foi encontrada. Cadastre o plano DRE
+                    antes de continuar.
                   </p>
                 )}
               </div>
 
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-                Esse vinculo fica salvo na categoria financeira. Nas proximas baixas com a mesma categoria, o sistema ja
-                segue direto.
+                Esse vinculo fica salvo na categoria financeira. Nas proximas baixas com a mesma
+                categoria, o sistema ja segue direto.
               </div>
             </div>
 
             <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
-              <ActionButton
-                onClick={fecharModalDre}
-                disabled={salvandoVinculoDre}
-                tone="soft"
-              >
+              <ActionButton onClick={fecharModalDre} disabled={salvandoVinculoDre} tone="soft">
                 Resolver depois
               </ActionButton>
               <ActionButton

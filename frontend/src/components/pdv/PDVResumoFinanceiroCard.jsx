@@ -25,21 +25,16 @@ export default function PDVResumoFinanceiroCard({
     (vendaAtual.cupom_code
       ? {
           code: vendaAtual.cupom_code,
-          discount_applied:
-            vendaAtual.cupom_discount_applied ?? vendaAtual.desconto_valor ?? 0,
+          discount_applied: vendaAtual.cupom_discount_applied ?? vendaAtual.desconto_valor ?? 0,
         }
       : null);
-  const descontoPercentualTexto =
-    cupomExibicao
-      ? `Cupom ${String(cupomExibicao.code || "").toUpperCase()} aplicado:`
-      : vendaAtual.desconto_valor > 0 && totalBruto > 0
-      ? `${((vendaAtual.desconto_valor / totalBruto) * 100).toLocaleString(
-          "pt-BR",
-          {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          },
-        )}% de desconto:`
+  const descontoPercentualTexto = cupomExibicao
+    ? `Cupom ${String(cupomExibicao.code || "").toUpperCase()} aplicado:`
+    : vendaAtual.desconto_valor > 0 && totalBruto > 0
+      ? `${((vendaAtual.desconto_valor / totalBruto) * 100).toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}% de desconto:`
       : "Desconto:";
 
   if (vendaAtual.itens.length === 0) {
@@ -62,9 +57,7 @@ export default function PDVResumoFinanceiroCard({
                   : "bg-amber-100 text-amber-900 border border-amber-300"
               }`}
             >
-              <span className="mt-0.5 shrink-0">
-                {alerta.nivel === "critico" ? "🚨" : "⚠️"}
-              </span>
+              <span className="mt-0.5 shrink-0">{alerta.nivel === "critico" ? "🚨" : "⚠️"}</span>
               <span>{alerta.mensagem}</span>
             </div>
           ))}
@@ -82,9 +75,7 @@ export default function PDVResumoFinanceiroCard({
             <div className="border rounded-lg p-3 bg-purple-50 border-purple-200">
               <div className="flex items-center gap-1 mb-2">
                 <Tag className="w-3.5 h-3.5 text-purple-600" />
-                <span className="text-xs font-medium text-purple-700">
-                  Cupom de desconto
-                </span>
+                <span className="text-xs font-medium text-purple-700">Cupom de desconto</span>
               </div>
               {cupomExibicao ? (
                 <div className="flex items-center justify-between">
@@ -126,18 +117,14 @@ export default function PDVResumoFinanceiroCard({
                   </button>
                 </div>
               ) : null}
-              {erroCupom && (
-                <p className="text-xs text-red-600 mt-1">{erroCupom}</p>
-              )}
+              {erroCupom && <p className="text-xs text-red-600 mt-1">{erroCupom}</p>}
             </div>
           )}
 
           <div className="flex justify-between items-center">
             <span
               className={
-                vendaAtual.desconto_valor > 0
-                  ? "text-orange-600 text-sm"
-                  : "text-gray-500 text-sm"
+                vendaAtual.desconto_valor > 0 ? "text-orange-600 text-sm" : "text-gray-500 text-sm"
               }
             >
               {descontoPercentualTexto}
@@ -204,9 +191,7 @@ export default function PDVResumoFinanceiroCard({
             <>
               <div className="flex justify-between text-green-600 border-t pt-3">
                 <span className="font-medium">(-) Valor Pago:</span>
-                <span className="font-semibold">
-                  {formatMoneyBRL(vendaAtual.total_pago)}
-                </span>
+                <span className="font-semibold">{formatMoneyBRL(vendaAtual.total_pago)}</span>
               </div>
 
               <div className="flex justify-between text-2xl font-bold border-t-2 pt-3">
@@ -238,9 +223,7 @@ export default function PDVResumoFinanceiroCard({
             <div className="border-t pt-3">
               <div className="flex justify-between text-2xl font-bold text-gray-900">
                 <span>Total:</span>
-                <span className="text-green-600">
-                  {formatMoneyBRL(vendaAtual.total)}
-                </span>
+                <span className="text-green-600">{formatMoneyBRL(vendaAtual.total)}</span>
               </div>
             </div>
           )}

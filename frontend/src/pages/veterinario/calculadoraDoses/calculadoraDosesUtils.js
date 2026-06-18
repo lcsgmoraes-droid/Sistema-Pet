@@ -26,5 +26,5 @@ export function calcularDose(form) {
 export function obterDoseMedia(medicamento) {
   const doseMin = numero(medicamento?.dose_min_mgkg);
   const doseMax = numero(medicamento?.dose_max_mgkg);
-  return doseMin && doseMax ? ((doseMin + doseMax) / 2).toFixed(2) : (doseMin || doseMax || "");
+  return doseMin && doseMax ? ((doseMin + doseMax) / 2).toFixed(2) : doseMin || doseMax || "";
 }

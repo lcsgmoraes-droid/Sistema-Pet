@@ -244,9 +244,7 @@ export default function PDVVendasRecentesSidebar({
                 onChange={(e) => setFiltroTemEntrega(e.target.checked)}
                 className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
               />
-              <span className="text-xs font-medium text-gray-700">
-                Apenas com entrega
-              </span>
+              <span className="text-xs font-medium text-gray-700">Apenas com entrega</span>
             </label>
 
             <div className="px-2 pb-2">
@@ -276,9 +274,7 @@ export default function PDVVendasRecentesSidebar({
                 type="button"
               >
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
-                <span>
-                  {pendenciasSeparacao} pedido(s) online aguardando separacao.
-                </span>
+                <span>{pendenciasSeparacao} pedido(s) online aguardando separacao.</span>
               </button>
             )}
 
@@ -391,9 +387,7 @@ export default function PDVVendasRecentesSidebar({
                         <div className="text-right">
                           {venda.status === "baixa_parcial" ? (
                             <>
-                              <div className="text-[10px] text-gray-500">
-                                Pago
-                              </div>
+                              <div className="text-[10px] text-gray-500">Pago</div>
                               <div className="text-xs font-semibold text-green-600">
                                 {formatMoneyBRL(venda.valor_pago || 0)}
                               </div>
@@ -406,11 +400,7 @@ export default function PDVVendasRecentesSidebar({
                               {formatMoneyBRL(venda.total || 0)}
                             </div>
                           )}
-                          <StatusBadge
-                            status={venda.status}
-                            size="xs"
-                            className="mt-1"
-                          />
+                          <StatusBadge status={venda.status} size="xs" className="mt-1" />
                         </div>
                       </div>
                     </div>
@@ -424,7 +414,11 @@ export default function PDVVendasRecentesSidebar({
                           <button
                             onClick={(e) => marcarProntoRetirada(e, venda.id)}
                             className="rounded border border-amber-500 bg-white px-2 py-0.5 text-[10px] font-semibold text-amber-700 transition-colors hover:bg-amber-50"
-                            title={venda.tem_entrega ? "Marcar pedido como pronto para entrega" : "Marcar pedido como pronto para retirada"}
+                            title={
+                              venda.tem_entrega
+                                ? "Marcar pedido como pronto para entrega"
+                                : "Marcar pedido como pronto para retirada"
+                            }
                             type="button"
                           >
                             Pronto
@@ -524,11 +518,7 @@ export default function PDVVendasRecentesSidebar({
           right: painelVendasAberto ? "208px" : "0",
           padding: painelVendasAberto ? "6px" : "6px 8px",
         }}
-        title={
-          painelVendasAberto
-            ? "Recolher vendas recentes"
-            : "Expandir vendas recentes"
-        }
+        title={painelVendasAberto ? "Recolher vendas recentes" : "Expandir vendas recentes"}
         type="button"
       >
         {painelVendasAberto ? (
@@ -536,9 +526,7 @@ export default function PDVVendasRecentesSidebar({
         ) : (
           <>
             <ChevronLeft className="w-4 h-4" />
-            <span className="text-[10px] font-medium whitespace-nowrap">
-              Vendas
-            </span>
+            <span className="text-[10px] font-medium whitespace-nowrap">Vendas</span>
           </>
         )}
       </button>

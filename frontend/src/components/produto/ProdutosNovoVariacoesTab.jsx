@@ -15,8 +15,18 @@ export default function ProdutosNovoVariacoesTab({
     <div className="space-y-6">
       {!isEdicao ? (
         <div className="text-center py-16 border-2 border-dashed border-yellow-300 rounded-lg bg-yellow-50">
-          <svg className="mx-auto h-16 w-16 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          <svg
+            className="mx-auto h-16 w-16 text-yellow-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+            />
           </svg>
           <p className="mt-4 text-xl font-semibold text-yellow-900">Aba Bloqueada</p>
           <p className="mt-2 text-sm text-yellow-800">
@@ -46,7 +56,7 @@ export default function ProdutosNovoVariacoesTab({
                 onClick={handleToggleFormVariacao}
                 className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
               >
-                {mostrarFormVariacao ? 'Cancelar' : 'Nova Variacao'}
+                {mostrarFormVariacao ? "Cancelar" : "Nova Variacao"}
               </button>
             </div>
 
@@ -65,7 +75,9 @@ export default function ProdutosNovoVariacoesTab({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nome Complementar *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nome Complementar *
+                    </label>
                     <input
                       type="text"
                       value={novaVariacao.nome}
@@ -75,43 +87,59 @@ export default function ProdutosNovoVariacoesTab({
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Codigo de Barras</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Codigo de Barras
+                    </label>
                     <input
                       type="text"
                       value={novaVariacao.codigo_barras}
-                      onChange={(e) => setNovaVariacao({ ...novaVariacao, codigo_barras: e.target.value })}
+                      onChange={(e) =>
+                        setNovaVariacao({ ...novaVariacao, codigo_barras: e.target.value })
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       placeholder="EAN-13"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Preco de Custo</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Preco de Custo
+                    </label>
                     <input
                       type="number"
                       step="0.01"
                       value={novaVariacao.preco_custo}
-                      onChange={(e) => setNovaVariacao({ ...novaVariacao, preco_custo: e.target.value })}
+                      onChange={(e) =>
+                        setNovaVariacao({ ...novaVariacao, preco_custo: e.target.value })
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       placeholder="0.00"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Preco de Venda *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Preco de Venda *
+                    </label>
                     <input
                       type="number"
                       step="0.01"
                       value={novaVariacao.preco_venda}
-                      onChange={(e) => setNovaVariacao({ ...novaVariacao, preco_venda: e.target.value })}
+                      onChange={(e) =>
+                        setNovaVariacao({ ...novaVariacao, preco_venda: e.target.value })
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       placeholder="0.00"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Estoque Minimo</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Estoque Minimo
+                    </label>
                     <input
                       type="number"
                       value={novaVariacao.estoque_minimo}
-                      onChange={(e) => setNovaVariacao({ ...novaVariacao, estoque_minimo: e.target.value })}
+                      onChange={(e) =>
+                        setNovaVariacao({ ...novaVariacao, estoque_minimo: e.target.value })
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       placeholder="0"
                     />
@@ -123,11 +151,15 @@ export default function ProdutosNovoVariacoesTab({
                     <input
                       type="checkbox"
                       checked={novaVariacao.e_kit}
-                      onChange={(e) => setNovaVariacao({ ...novaVariacao, e_kit: e.target.checked })}
+                      onChange={(e) =>
+                        setNovaVariacao({ ...novaVariacao, e_kit: e.target.checked })
+                      }
                       className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                     <div>
-                      <span className="font-medium text-gray-900">Esta variacao e um KIT (possui composicao)</span>
+                      <span className="font-medium text-gray-900">
+                        Esta variacao e um KIT (possui composicao)
+                      </span>
                       <p className="text-sm text-gray-600 mt-1">
                         Se marcado, voce podera definir a composicao do kit apos salvar a variacao.
                       </p>
@@ -157,28 +189,48 @@ export default function ProdutosNovoVariacoesTab({
             {variacoes.length === 0 ? (
               <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
                 <p className="text-gray-500">Nenhuma variacao cadastrada ainda.</p>
-                <p className="text-sm text-gray-400 mt-1">Clique em "Nova Variacao" para comecar.</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  Clique em "Nova Variacao" para comecar.
+                </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Codigo de Barras</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Custo</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Venda</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Estoque</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Acoes</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        SKU
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Nome
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Codigo de Barras
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Custo
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Venda
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Estoque
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">
+                        Acoes
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {variacoes.map((variacao) => (
                       <tr key={variacao.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-900">{variacao.codigo}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                          {variacao.codigo}
+                        </td>
                         <td className="px-4 py-3 text-sm text-gray-700">{variacao.nome}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{variacao.codigo_barras || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {variacao.codigo_barras || "-"}
+                        </td>
                         <td className="px-4 py-3 text-sm text-right text-gray-900">
                           R$ {(variacao.preco_custo || 0).toFixed(2)}
                         </td>
@@ -186,7 +238,9 @@ export default function ProdutosNovoVariacoesTab({
                           R$ {variacao.preco_venda.toFixed(2)}
                         </td>
                         <td className="px-4 py-3 text-sm text-right">
-                          <span className={`font-semibold ${variacao.estoque_atual <= variacao.estoque_minimo ? 'text-red-600' : 'text-green-600'}`}>
+                          <span
+                            className={`font-semibold ${variacao.estoque_atual <= variacao.estoque_minimo ? "text-red-600" : "text-green-600"}`}
+                          >
                             {variacao.estoque_atual || 0}
                           </span>
                         </td>

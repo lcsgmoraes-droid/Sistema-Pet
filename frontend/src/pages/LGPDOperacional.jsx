@@ -60,7 +60,11 @@ const PREFERENCES = [
   ["marketing_whatsapp", "WhatsApp marketing", "Mensagens promocionais e lembretes comerciais."],
   ["marketing_sms", "SMS marketing", "Comunicacoes curtas por SMS."],
   ["marketing_push", "Push no app", "Avisos e campanhas no aplicativo."],
-  ["analytics", "Analise e personalizacao", "Uso de dados para segmentacao e melhoria da experiencia."],
+  [
+    "analytics",
+    "Analise e personalizacao",
+    "Uso de dados para segmentacao e melhoria da experiencia.",
+  ],
 ];
 
 const REQUEST_TYPE_LABEL = Object.fromEntries(REQUEST_TYPES);
@@ -108,9 +112,7 @@ function PreferenceToggle({ description, label, name, onChange, value }) {
       />
       <span className="min-w-0">
         <span className="block text-sm font-semibold text-slate-900">{label}</span>
-        <span className="mt-1 block text-xs leading-snug text-slate-500">
-          {description}
-        </span>
+        <span className="mt-1 block text-xs leading-snug text-slate-500">{description}</span>
       </span>
     </label>
   );
@@ -140,16 +142,14 @@ function RequestCard({ request, selected, onSelect }) {
             <span>Canal: {request.channel || "-"}</span>
           </div>
         </div>
-        <StatusBadge
-          status={request.status}
-          intent={STATUS_INTENT[request.status]}
-        >
+        <StatusBadge status={request.status} intent={STATUS_INTENT[request.status]}>
           {REQUEST_STATUS_LABEL[request.status] || request.status}
         </StatusBadge>
       </div>
       {request.requester_name || request.requester_email ? (
         <p className="mt-2 truncate text-xs text-slate-600">
-          Solicitante: {request.requester_name || "-"} {request.requester_email ? `- ${request.requester_email}` : ""}
+          Solicitante: {request.requester_name || "-"}{" "}
+          {request.requester_email ? `- ${request.requester_email}` : ""}
         </p>
       ) : null}
       {request.details ? (
@@ -353,9 +353,7 @@ export default function LGPDOperacional() {
         resolution_notes: processForm.resolution_notes || null,
       });
       const updated = response.data?.request;
-      setRequests((current) =>
-        current.map((item) => (item.id === updated?.id ? updated : item)),
-      );
+      setRequests((current) => current.map((item) => (item.id === updated?.id ? updated : item)));
       setClienteRequests((current) =>
         current.map((item) => (item.id === updated?.id ? updated : item)),
       );
@@ -392,9 +390,7 @@ export default function LGPDOperacional() {
         resolution_notes: anonymizeForm.resolution_notes || null,
       });
       const updated = response.data?.request;
-      setRequests((current) =>
-        current.map((item) => (item.id === updated?.id ? updated : item)),
-      );
+      setRequests((current) => current.map((item) => (item.id === updated?.id ? updated : item)));
       setClienteRequests((current) =>
         current.map((item) => (item.id === updated?.id ? updated : item)),
       );
@@ -428,9 +424,15 @@ export default function LGPDOperacional() {
         subject_id: String(selectedClienteId),
         request_type: newRequest.request_type,
         details: newRequest.details || null,
-        requester_name: newRequest.requester_name || dossie?.cliente?.nome || clienteSelecionado?.nome || null,
-        requester_email: newRequest.requester_email || dossie?.cliente?.email || clienteSelecionado?.email || null,
-        requester_phone: newRequest.requester_phone || dossie?.cliente?.telefone || clienteSelecionado?.telefone || null,
+        requester_name:
+          newRequest.requester_name || dossie?.cliente?.nome || clienteSelecionado?.nome || null,
+        requester_email:
+          newRequest.requester_email || dossie?.cliente?.email || clienteSelecionado?.email || null,
+        requester_phone:
+          newRequest.requester_phone ||
+          dossie?.cliente?.telefone ||
+          clienteSelecionado?.telefone ||
+          null,
         channel: "erp",
       });
       const created = response.data?.request;
@@ -481,7 +483,9 @@ export default function LGPDOperacional() {
       await loadStatus();
       toast.success("Solicitacao de exclusao aberta. Revise e confirme a anonimizacao.");
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Nao foi possivel abrir a solicitacao de exclusao.");
+      toast.error(
+        error.response?.data?.detail || "Nao foi possivel abrir a solicitacao de exclusao.",
+      );
     } finally {
       setSaving(false);
     }
@@ -621,7 +625,10 @@ export default function LGPDOperacional() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <CustomerIdentity customer={cliente} />
-                    <StatusBadge intent={cliente?.ativo === false ? "neutral" : "success"} size="xs">
+                    <StatusBadge
+                      intent={cliente?.ativo === false ? "neutral" : "success"}
+                      size="xs"
+                    >
                       {cliente?.ativo === false ? "Inativo" : "Ativo"}
                     </StatusBadge>
                   </div>
@@ -641,7 +648,9 @@ export default function LGPDOperacional() {
               >
                 Carregar dados LGPD
               </ActionButton>
-              {selectedClienteId ? <CopyableCode label="Titular" value={selectedClienteId} /> : null}
+              {selectedClienteId ? (
+                <CopyableCode label="Titular" value={selectedClienteId} />
+              ) : null}
             </div>
           </div>
 
@@ -656,7 +665,9 @@ export default function LGPDOperacional() {
                 </div>
                 <div className="grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-2">
                   <span>Email: {selectedCustomer.email || "-"}</span>
-                  <span>Telefone: {selectedCustomer.telefone || selectedCustomer.celular || "-"}</span>
+                  <span>
+                    Telefone: {selectedCustomer.telefone || selectedCustomer.celular || "-"}
+                  </span>
                   <span>Codigo: {selectedCustomer.codigo || "-"}</span>
                   <span>Tipo: {selectedCustomer.tipo_cadastro || "-"}</span>
                   <span>ID: {selectedCustomer.id || "-"}</span>
@@ -709,7 +720,11 @@ export default function LGPDOperacional() {
 
       <Panel
         title={selectedClienteId ? "2. Solicitacoes deste titular" : "2. Fila de solicitacoes"}
-        subtitle={selectedClienteId ? "Clique em uma solicitacao para tratar em uma janela separada." : "Fila operacional geral enquanto nenhum titular esta selecionado."}
+        subtitle={
+          selectedClienteId
+            ? "Clique em uma solicitacao para tratar em uma janela separada."
+            : "Fila operacional geral enquanto nenhum titular esta selecionado."
+        }
         actions={
           selectedClienteId ? (
             <ActionButton
@@ -743,8 +758,16 @@ export default function LGPDOperacional() {
         ) : visibleRequests.length === 0 ? (
           <EmptyState
             compact
-            title={selectedClienteId ? "Nenhuma solicitacao para este titular" : "Nenhuma solicitacao neste filtro"}
-            description={selectedClienteId ? "Use Abrir exclusao LGPD para exclusao/anonimizacao ou Registrar pedido LGPD para outros direitos do titular." : "Quando um titular pedir acesso, exportacao, correcao ou exclusao, o acompanhamento aparece aqui."}
+            title={
+              selectedClienteId
+                ? "Nenhuma solicitacao para este titular"
+                : "Nenhuma solicitacao neste filtro"
+            }
+            description={
+              selectedClienteId
+                ? "Use Abrir exclusao LGPD para exclusao/anonimizacao ou Registrar pedido LGPD para outros direitos do titular."
+                : "Quando um titular pedir acesso, exportacao, correcao ou exclusao, o acompanhamento aparece aqui."
+            }
           />
         ) : (
           <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
@@ -765,9 +788,7 @@ export default function LGPDOperacional() {
           <div className="flex max-h-[92vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-xl">
             <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-4">
               <div>
-                <h3 className="text-base font-semibold text-slate-950">
-                  Tratar solicitacao LGPD
-                </h3>
+                <h3 className="text-base font-semibold text-slate-950">Tratar solicitacao LGPD</h3>
                 <p className="mt-1 text-sm text-slate-500">
                   Atualize o status ou execute a anonimizacao quando o pedido for de exclusao.
                 </p>
@@ -785,7 +806,8 @@ export default function LGPDOperacional() {
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="font-semibold text-slate-950">
-                    {REQUEST_TYPE_LABEL[requestToProcess.request_type] || requestToProcess.request_type}
+                    {REQUEST_TYPE_LABEL[requestToProcess.request_type] ||
+                      requestToProcess.request_type}
                   </div>
                   <CopyableCode label="ID" value={requestToProcess.id} />
                 </div>
@@ -797,7 +819,8 @@ export default function LGPDOperacional() {
                 </div>
               </div>
 
-              {requestToProcess.request_type === "deletion" && requestToProcess.subject_type === "customer" ? (
+              {requestToProcess.request_type === "deletion" &&
+              requestToProcess.subject_type === "customer" ? (
                 <div className="rounded-lg border border-red-200 bg-red-50 p-3">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
@@ -806,8 +829,8 @@ export default function LGPDOperacional() {
                         Exclusao LGPD: proximo passo e anonimizar
                       </div>
                       <p className="mt-1 text-xs leading-relaxed text-red-700">
-                        Remove dados pessoais do titular e dos pets, revoga consentimentos
-                        e preserva historico financeiro/vendas sem identificadores.
+                        Remove dados pessoais do titular e dos pets, revoga consentimentos e
+                        preserva historico financeiro/vendas sem identificadores.
                       </p>
                     </div>
                   </div>
@@ -887,11 +910,10 @@ export default function LGPDOperacional() {
           <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
             <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-4">
               <div>
-                <h3 className="text-base font-semibold text-slate-950">
-                  Registrar pedido LGPD
-                </h3>
+                <h3 className="text-base font-semibold text-slate-950">Registrar pedido LGPD</h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Use quando o titular pediu acesso, exportacao, correcao, exclusao ou revogacao por telefone, loja ou atendimento.
+                  Use quando o titular pediu acesso, exportacao, correcao, exclusao ou revogacao por
+                  telefone, loja ou atendimento.
                 </p>
               </div>
               <button
@@ -1001,9 +1023,7 @@ export default function LGPDOperacional() {
           <div className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-lg bg-white shadow-xl">
             <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-4">
               <div>
-                <h3 className="text-base font-semibold text-slate-950">
-                  Dossie e preferencias
-                </h3>
+                <h3 className="text-base font-semibold text-slate-950">Dossie e preferencias</h3>
                 <p className="mt-1 text-sm text-slate-500">
                   Use para exportar dados do titular ou ajustar consentimentos de comunicacao.
                 </p>
@@ -1042,13 +1062,17 @@ export default function LGPDOperacional() {
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         {selectedCustomer ? <CustomerIdentity customer={selectedCustomer} /> : null}
-                        <StatusBadge intent={selectedCustomer?.ativo === false ? "neutral" : "success"}>
+                        <StatusBadge
+                          intent={selectedCustomer?.ativo === false ? "neutral" : "success"}
+                        >
                           {selectedCustomer?.ativo === false ? "Inativo" : "Ativo"}
                         </StatusBadge>
                       </div>
                       <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-2">
                         <span>Email: {selectedCustomer?.email || "-"}</span>
-                        <span>Telefone: {selectedCustomer?.telefone || selectedCustomer?.celular || "-"}</span>
+                        <span>
+                          Telefone: {selectedCustomer?.telefone || selectedCustomer?.celular || "-"}
+                        </span>
                         <span>Codigo: {selectedCustomer?.codigo || "-"}</span>
                         <span>Tipo: {selectedCustomer?.tipo_cadastro || "-"}</span>
                         <span>Gerado em: {formatDate(dossie?.generated_at)}</span>
@@ -1069,7 +1093,10 @@ export default function LGPDOperacional() {
                     {resumoDossie.length ? (
                       <div className="grid grid-cols-2 gap-2">
                         {resumoDossie.map(([label, value]) => (
-                          <div key={label} className="rounded-lg border border-slate-200 bg-white p-3">
+                          <div
+                            key={label}
+                            className="rounded-lg border border-slate-200 bg-white p-3"
+                          >
                             <div className="text-xs font-medium text-slate-500">{label}</div>
                             <div className="mt-1 text-lg font-bold text-slate-950">{value}</div>
                           </div>
@@ -1120,16 +1147,30 @@ export default function LGPDOperacional() {
                           <div className="max-h-64 overflow-y-auto">
                             {consentimentos?.historico?.length ? (
                               consentimentos.historico.slice(0, 20).map((item) => (
-                                <div key={item.id} className="border-b border-slate-100 px-3 py-2 text-xs last:border-b-0">
+                                <div
+                                  key={item.id}
+                                  className="border-b border-slate-100 px-3 py-2 text-xs last:border-b-0"
+                                >
                                   <div className="flex flex-wrap items-center justify-between gap-2">
                                     <span className="font-medium text-slate-800">
                                       {item.consent_type}
                                     </span>
-                                    <StatusBadge intent={item.consent_given && !item.revoked_at ? "success" : "danger"} size="xs">
-                                      {item.consent_given && !item.revoked_at ? "Autorizado" : "Revogado"}
+                                    <StatusBadge
+                                      intent={
+                                        item.consent_given && !item.revoked_at
+                                          ? "success"
+                                          : "danger"
+                                      }
+                                      size="xs"
+                                    >
+                                      {item.consent_given && !item.revoked_at
+                                        ? "Autorizado"
+                                        : "Revogado"}
                                     </StatusBadge>
                                   </div>
-                                  <div className="mt-1 text-slate-500">{formatDate(item.created_at)}</div>
+                                  <div className="mt-1 text-slate-500">
+                                    {formatDate(item.created_at)}
+                                  </div>
                                   {item.consent_text ? (
                                     <div className="mt-1 text-slate-500">{item.consent_text}</div>
                                   ) : null}
@@ -1187,9 +1228,9 @@ export default function LGPDOperacional() {
             </div>
             <div className="space-y-4 p-4">
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                O codigo interno, vendas, pagamentos e historico operacional continuam
-                preservados para auditoria. Nome, documentos, contatos, enderecos,
-                observacoes sensiveis, dados dos pets e consentimentos ativos serao removidos.
+                O codigo interno, vendas, pagamentos e historico operacional continuam preservados
+                para auditoria. Nome, documentos, contatos, enderecos, observacoes sensiveis, dados
+                dos pets e consentimentos ativos serao removidos.
               </div>
               <label className="block text-sm font-medium text-slate-700">
                 Observacao da conclusao

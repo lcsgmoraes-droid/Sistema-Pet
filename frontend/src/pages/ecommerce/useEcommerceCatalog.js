@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState } from "react";
 import {
   DEFAULT_CATALOG_LIMIT,
   DEFAULT_CATALOG_ORDER,
   buildCatalogCategoryOptions,
   buildProductMap,
-} from './ecommerceMvpUtils';
+} from "./ecommerceMvpUtils";
 
 export default function useEcommerceCatalog() {
   const [products, setProducts] = useState([]);
@@ -16,8 +16,8 @@ export default function useEcommerceCatalog() {
     categories: [],
   });
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const [categoria, setCategoria] = useState('todas');
+  const [search, setSearch] = useState("");
+  const [categoria, setCategoria] = useState("todas");
   const [ordenacaoCatalogo, setOrdenacaoCatalogo] = useState(DEFAULT_CATALOG_ORDER);
 
   const categorias = useMemo(() => {
@@ -27,10 +27,13 @@ export default function useEcommerceCatalog() {
     });
   }, [catalogMeta.categories, products]);
 
-  const productMap = useMemo(() => ({
-    ...productCache,
-    ...buildProductMap(products),
-  }), [productCache, products]);
+  const productMap = useMemo(
+    () => ({
+      ...productCache,
+      ...buildProductMap(products),
+    }),
+    [productCache, products],
+  );
 
   function setCatalogProducts(nextProducts) {
     const normalizedProducts = Array.isArray(nextProducts) ? nextProducts : [];
@@ -42,8 +45,8 @@ export default function useEcommerceCatalog() {
   }
 
   function clearCatalogFilters() {
-    setSearch('');
-    setCategoria('todas');
+    setSearch("");
+    setCategoria("todas");
     setOrdenacaoCatalogo(DEFAULT_CATALOG_ORDER);
     setPage(1);
   }

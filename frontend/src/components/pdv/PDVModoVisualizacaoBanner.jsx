@@ -35,11 +35,7 @@ export default function PDVModoVisualizacaoBanner({
           <span className="text-xs">(Clique em Editar para modificar)</span>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <ImprimirCupom
-            venda={vendaAtual}
-            size="md"
-            className="min-w-[132px]"
-          />
+          <ImprimirCupom venda={vendaAtual} size="md" className="min-w-[132px]" />
 
           {podeAbrirDevolucao && (
             <ActionButton
@@ -69,8 +65,7 @@ export default function PDVModoVisualizacaoBanner({
             Voltar
           </ActionButton>
 
-          {(vendaAtual.status === "finalizada" ||
-            vendaAtual.status === "baixa_parcial") && (
+          {(vendaAtual.status === "finalizada" || vendaAtual.status === "baixa_parcial") && (
             <ActionButton
               onClick={emitirNotaVendaFinalizada}
               icon={FileText}
@@ -82,8 +77,7 @@ export default function PDVModoVisualizacaoBanner({
             </ActionButton>
           )}
 
-          {(vendaAtual.status === "finalizada" ||
-            vendaAtual.status === "baixa_parcial") && (
+          {(vendaAtual.status === "finalizada" || vendaAtual.status === "baixa_parcial") && (
             <ActionButton
               onClick={mudarStatusParaAberta}
               icon={AlertCircle}

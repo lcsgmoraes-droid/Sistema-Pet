@@ -1,28 +1,28 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import api from '../api';
-import { getAccessToken } from '../auth/tokenStorage';
-import { toast } from 'react-hot-toast';
-import { formatMoneyBRL } from '../utils/formatters';
-import EntradaXmlCriarProdutoModal from './entrada-xml/EntradaXmlCriarProdutoModal';
-import EntradaXmlDetalhesModal from './entrada-xml/EntradaXmlDetalhesModal';
-import EntradaPdfUploadModal from './entrada-xml/EntradaPdfUploadModal';
-import EntradaXmlHistoricoPrecosModal from './entrada-xml/EntradaXmlHistoricoPrecosModal';
-import EntradaXmlHeader from './entrada-xml/EntradaXmlHeader';
-import EntradaXmlMetricas from './entrada-xml/EntradaXmlMetricas';
-import EntradaXmlNotasTable from './entrada-xml/EntradaXmlNotasTable';
-import EntradaXmlRascunhoDevolucaoModal from './entrada-xml/EntradaXmlRascunhoDevolucaoModal';
-import EntradaXmlRevisaoPrecosModal from './entrada-xml/EntradaXmlRevisaoPrecosModal';
-import EntradaXmlResultadoLoteModal from './entrada-xml/EntradaXmlResultadoLoteModal';
-import EntradaXmlSefazPanels from './entrada-xml/EntradaXmlSefazPanels';
-import EntradaXmlVisualizacaoNotaModal from './entrada-xml/EntradaXmlVisualizacaoNotaModal';
-import useEntradaXmlConferencia from './entrada-xml/useEntradaXmlConferencia';
-import useEntradaXmlHistoricoPrecos from './entrada-xml/useEntradaXmlHistoricoPrecos';
-import useEntradaXmlProdutos from './entrada-xml/useEntradaXmlProdutos';
-import useEntradaXmlRateio from './entrada-xml/useEntradaXmlRateio';
-import useEntradaXmlRevisaoPrecos from './entrada-xml/useEntradaXmlRevisaoPrecos';
-import useEntradaXmlSefaz from './entrada-xml/useEntradaXmlSefaz';
-import useEntradaXmlUpload from './entrada-xml/useEntradaXmlUpload';
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import api from "../api";
+import { getAccessToken } from "../auth/tokenStorage";
+import { toast } from "react-hot-toast";
+import { formatMoneyBRL } from "../utils/formatters";
+import EntradaXmlCriarProdutoModal from "./entrada-xml/EntradaXmlCriarProdutoModal";
+import EntradaXmlDetalhesModal from "./entrada-xml/EntradaXmlDetalhesModal";
+import EntradaPdfUploadModal from "./entrada-xml/EntradaPdfUploadModal";
+import EntradaXmlHistoricoPrecosModal from "./entrada-xml/EntradaXmlHistoricoPrecosModal";
+import EntradaXmlHeader from "./entrada-xml/EntradaXmlHeader";
+import EntradaXmlMetricas from "./entrada-xml/EntradaXmlMetricas";
+import EntradaXmlNotasTable from "./entrada-xml/EntradaXmlNotasTable";
+import EntradaXmlRascunhoDevolucaoModal from "./entrada-xml/EntradaXmlRascunhoDevolucaoModal";
+import EntradaXmlRevisaoPrecosModal from "./entrada-xml/EntradaXmlRevisaoPrecosModal";
+import EntradaXmlResultadoLoteModal from "./entrada-xml/EntradaXmlResultadoLoteModal";
+import EntradaXmlSefazPanels from "./entrada-xml/EntradaXmlSefazPanels";
+import EntradaXmlVisualizacaoNotaModal from "./entrada-xml/EntradaXmlVisualizacaoNotaModal";
+import useEntradaXmlConferencia from "./entrada-xml/useEntradaXmlConferencia";
+import useEntradaXmlHistoricoPrecos from "./entrada-xml/useEntradaXmlHistoricoPrecos";
+import useEntradaXmlProdutos from "./entrada-xml/useEntradaXmlProdutos";
+import useEntradaXmlRateio from "./entrada-xml/useEntradaXmlRateio";
+import useEntradaXmlRevisaoPrecos from "./entrada-xml/useEntradaXmlRevisaoPrecos";
+import useEntradaXmlSefaz from "./entrada-xml/useEntradaXmlSefaz";
+import useEntradaXmlUpload from "./entrada-xml/useEntradaXmlUpload";
 import {
   ACAO_CONFERENCIA_OPCOES,
   CONFERENCIA_STATUS_META,
@@ -34,7 +34,7 @@ import {
   obterCustoAquisicaoItem,
   detectarDivergencias,
   extrairMensagemErroApi,
-} from './entrada-xml/entradaXmlUtils';
+} from "./entrada-xml/entradaXmlUtils";
 
 const EntradaXML = () => {
   const navigate = useNavigate();
@@ -45,9 +45,9 @@ const EntradaXML = () => {
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const [mostrarUploadPdf, setMostrarUploadPdf] = useState(false);
   const [mostrarVisualizacao, setMostrarVisualizacao] = useState(false);
-  
+
   // Filtro de status da tabela
-  const [filtroStatus, setFiltroStatus] = useState('todos');
+  const [filtroStatus, setFiltroStatus] = useState("todos");
 
   const {
     multiplicadoresPack,
@@ -60,51 +60,47 @@ const EntradaXML = () => {
     tipoRateio,
   } = useEntradaXmlRateio({ api, toast });
 
-
   const sincronizarNotaNaLista = (dadosNota) => {
     if (!dadosNota?.id) return;
 
-    const conferenciaStatus = dadosNota?.conferencia?.status || dadosNota?.conferencia_status || 'nao_iniciada';
+    const conferenciaStatus =
+      dadosNota?.conferencia?.status || dadosNota?.conferencia_status || "nao_iniciada";
     const divergenciasCount = Number(
-      dadosNota?.conferencia?.itens_com_divergencia ??
-      dadosNota?.divergencias_count ??
-      0,
+      dadosNota?.conferencia?.itens_com_divergencia ?? dadosNota?.divergencias_count ?? 0,
     );
 
-    setNotasEntrada((prev) => prev.map((nota) => {
-      if (nota.id !== dadosNota.id) {
-        return nota;
-      }
+    setNotasEntrada((prev) =>
+      prev.map((nota) => {
+        if (nota.id !== dadosNota.id) {
+          return nota;
+        }
 
-      return {
-        ...nota,
-        status: dadosNota.status ?? nota.status,
-        fornecedor_nome: dadosNota.fornecedor_nome ?? nota.fornecedor_nome,
-        fornecedor_cnpj: dadosNota.fornecedor_cnpj ?? nota.fornecedor_cnpj,
-        data_emissao: dadosNota.data_emissao ?? nota.data_emissao,
-        valor_total: dadosNota.valor_total ?? nota.valor_total,
-        produtos_vinculados: dadosNota.produtos_vinculados ?? nota.produtos_vinculados,
-        produtos_nao_vinculados: dadosNota.produtos_nao_vinculados ?? nota.produtos_nao_vinculados,
-        entrada_estoque_realizada: dadosNota.entrada_estoque_realizada ?? nota.entrada_estoque_realizada,
-        conferencia_status: conferenciaStatus,
-        divergencias_count: divergenciasCount,
-      };
-    }));
+        return {
+          ...nota,
+          status: dadosNota.status ?? nota.status,
+          fornecedor_nome: dadosNota.fornecedor_nome ?? nota.fornecedor_nome,
+          fornecedor_cnpj: dadosNota.fornecedor_cnpj ?? nota.fornecedor_cnpj,
+          data_emissao: dadosNota.data_emissao ?? nota.data_emissao,
+          valor_total: dadosNota.valor_total ?? nota.valor_total,
+          produtos_vinculados: dadosNota.produtos_vinculados ?? nota.produtos_vinculados,
+          produtos_nao_vinculados:
+            dadosNota.produtos_nao_vinculados ?? nota.produtos_nao_vinculados,
+          entrada_estoque_realizada:
+            dadosNota.entrada_estoque_realizada ?? nota.entrada_estoque_realizada,
+          conferencia_status: conferenciaStatus,
+          divergencias_count: divergenciasCount,
+        };
+      }),
+    );
   };
 
-
-
-
-
-
-
   useEffect(() => {
-    console.log('?? [EntradaXML] Componente montado, iniciando carregamento...');
+    console.log("?? [EntradaXML] Componente montado, iniciando carregamento...");
     carregarDados();
   }, []);
 
   useEffect(() => {
-    const notaIdParam = searchParams.get('nota_id');
+    const notaIdParam = searchParams.get("nota_id");
     if (!notaIdParam) return;
     if (autoOpenNotaIdRef.current === notaIdParam) return;
 
@@ -114,35 +110,35 @@ const EntradaXML = () => {
     autoOpenNotaIdRef.current = notaIdParam;
     abrirDetalhes(notaId).finally(() => {
       const params = new URLSearchParams(searchParams);
-      params.delete('nota_id');
+      params.delete("nota_id");
       setSearchParams(params, { replace: true });
     });
   }, [searchParams, setSearchParams]);
 
   const carregarDados = async () => {
-    console.log('?? [EntradaXML] Carregando dados...');
+    console.log("?? [EntradaXML] Carregando dados...");
     try {
       const token = getAccessToken();
-      console.log('?? [EntradaXML] Token obtido:', token ? 'SIM' : 'NAO');
+      console.log("?? [EntradaXML] Token obtido:", token ? "SIM" : "NAO");
       const headers = { Authorization: `Bearer ${token}` };
 
-      console.log('?? [EntradaXML] Fazendo requisicoes para:', {
-        notasEntrada: `/notas-entrada/`
+      console.log("?? [EntradaXML] Fazendo requisicoes para:", {
+        notasEntrada: `/notas-entrada/`,
       });
 
       const notasRes = await api.get(`/notas-entrada/`, { headers });
 
-      console.log('? [EntradaXML] Dados carregados:', {
-        notasEntrada: notasRes.data?.length || 0
+      console.log("? [EntradaXML] Dados carregados:", {
+        notasEntrada: notasRes.data?.length || 0,
       });
 
       setNotasEntrada(notasRes.data);
     } catch (error) {
-      console.error('? [EntradaXML] ERRO ao carregar dados:');
-      console.error('  - Mensagem:', error.message);
-      console.error('  - Response:', error.response?.data);
-      console.error('  - Status:', error.response?.status);
-      console.error('  - Stack:', error.stack);
+      console.error("? [EntradaXML] ERRO ao carregar dados:");
+      console.error("  - Mensagem:", error.message);
+      console.error("  - Response:", error.response?.data);
+      console.error("  - Status:", error.response?.status);
+      console.error("  - Stack:", error.stack);
       toast.error(`Erro ao carregar dados: ${extrairMensagemErroApi(error)}`);
     }
   };
@@ -198,16 +194,17 @@ const EntradaXML = () => {
     try {
       const response = await api.get(`/notas-entrada/${notaId}`);
       const nota = aplicarNotaSelecionada(response.data);
-      const temDivergenciaNosItens = (nota?.itens || []).some((item) => (
-        Boolean(item.tem_divergencia) || detectarDivergencias(item).length > 0
-      ));
-      const temDivergenciaConferencia = (nota?.conferencia?.itens_com_divergencia || 0) > 0 || temDivergenciaNosItens;
+      const temDivergenciaNosItens = (nota?.itens || []).some(
+        (item) => Boolean(item.tem_divergencia) || detectarDivergencias(item).length > 0,
+      );
+      const temDivergenciaConferencia =
+        (nota?.conferencia?.itens_com_divergencia || 0) > 0 || temDivergenciaNosItens;
       setMostrarDetalhes(true);
       setMostrarCamposConferencia(abrirConferencia || temDivergenciaConferencia);
-      setFiltroItensNota(temDivergenciaConferencia ? 'divergencias' : 'todos');
+      setFiltroItensNota(temDivergenciaConferencia ? "divergencias" : "todos");
       setMultiplicadoresPack({}); // limpar overrides manuais ao abrir nova nota
-    } catch (error) {
-      toast.error('Erro ao carregar detalhes da nota');
+    } catch {
+      toast.error("Erro ao carregar detalhes da nota");
     }
   };
 
@@ -324,23 +321,21 @@ const EntradaXML = () => {
     toast,
   });
 
-  const salvarTipoRateio = (notaId, tipo) => (
-    salvarTipoRateioRateio(notaId, tipo, aplicarNotaSelecionada)
-  );
+  const salvarTipoRateio = (notaId, tipo) =>
+    salvarTipoRateioRateio(notaId, tipo, aplicarNotaSelecionada);
 
-  const salvarQuantidadeOnlineItem = (notaId, itemId, quantidadeOnline) => (
-    salvarQuantidadeOnlineItemRateio(notaId, itemId, quantidadeOnline, setNotaSelecionada)
-  );
+  const salvarQuantidadeOnlineItem = (notaId, itemId, quantidadeOnline) =>
+    salvarQuantidadeOnlineItemRateio(notaId, itemId, quantidadeOnline, setNotaSelecionada);
 
   const abrirVisualizacao = async (notaId) => {
     try {
       const response = await api.get(`/notas-entrada/${notaId}`);
       aplicarNotaSelecionada(response.data);
       setMostrarCamposConferencia(false);
-      setFiltroItensNota('todos');
+      setFiltroItensNota("todos");
       setMostrarVisualizacao(true);
-    } catch (error) {
-      toast.error('Erro ao carregar nota');
+    } catch {
+      toast.error("Erro ao carregar nota");
     }
   };
   const excluirNota = async (notaId, numeroNota) => {
@@ -350,75 +345,70 @@ const EntradaXML = () => {
 
     setLoading(true);
     try {
-            await api.delete(`/notas-entrada/${notaId}`);
+      await api.delete(`/notas-entrada/${notaId}`);
 
-      toast.success('??? Nota excluída com sucesso!');
-      
+      toast.success("??? Nota excluída com sucesso!");
+
       if (mostrarDetalhes) {
         setMostrarDetalhes(false);
         setNotaSelecionada(null);
       }
-      
+
       carregarDados();
     } catch (error) {
-      toast.error(extrairMensagemErroApi(error, 'Erro ao excluir nota'));
+      toast.error(extrairMensagemErroApi(error, "Erro ao excluir nota"));
     } finally {
       setLoading(false);
     }
   };
 
   const reverterNota = async (notaId, numeroNota) => {
-    if (!confirm(`?? Tem certeza que deseja REVERTER a entrada da nota ${numeroNota}?\n\nIsso ira:\n• Remover as quantidades do estoque\n• Excluir os lotes criados\n• Estornar as contas a pagar lançadas\n• Restaurar o status da nota para pendente`)) {
+    if (
+      !confirm(
+        `?? Tem certeza que deseja REVERTER a entrada da nota ${numeroNota}?\n\nIsso ira:\n• Remover as quantidades do estoque\n• Excluir os lotes criados\n• Estornar as contas a pagar lançadas\n• Restaurar o status da nota para pendente`,
+      )
+    ) {
       return;
     }
 
     setLoading(true);
     try {
-            const response = await api.post(
-        `/notas-entrada/${notaId}/reverter`,
-        {}
-      );
+      const response = await api.post(`/notas-entrada/${notaId}/reverter`, {});
 
-      toast.success(
-        `? Entrada revertida! ${response.data.itens_revertidos} produtos ajustados`,
-        { duration: 5000 }
-      );
-      
+      toast.success(`? Entrada revertida! ${response.data.itens_revertidos} produtos ajustados`, {
+        duration: 5000,
+      });
+
       if (mostrarDetalhes) {
         setMostrarDetalhes(false);
         setNotaSelecionada(null);
       }
-      
+
       carregarDados();
     } catch (error) {
-      toast.error(extrairMensagemErroApi(error, 'Erro ao reverter entrada'));
+      toast.error(extrairMensagemErroApi(error, "Erro ao reverter entrada"));
     } finally {
       setLoading(false);
     }
   };
 
-
-
-
-
-
   const getConfiancaBadge = (confianca) => {
     if (!confianca) return <span className="text-gray-400 text-sm">Nao vinculado</span>;
 
-    let nivel = 'baixa';
-    if (confianca >= 90) nivel = 'alta';
-    else if (confianca >= 70) nivel = 'media';
+    let nivel = "baixa";
+    if (confianca >= 90) nivel = "alta";
+    else if (confianca >= 70) nivel = "media";
 
     const styles = {
-      alta: 'bg-green-100 text-green-800',
-      media: 'bg-yellow-100 text-yellow-800',
-      baixa: 'bg-orange-100 text-orange-800'
+      alta: "bg-green-100 text-green-800",
+      media: "bg-yellow-100 text-yellow-800",
+      baixa: "bg-orange-100 text-orange-800",
     };
 
-    let selo = 'BAIXA';
-    if (nivel === 'alta') selo = 'OK';
-    else if (nivel === 'media') selo = 'ATENCAO';
-    
+    let selo = "BAIXA";
+    if (nivel === "alta") selo = "OK";
+    else if (nivel === "media") selo = "ATENCAO";
+
     return (
       <span className={`px-2 py-1 rounded text-xs font-semibold ${styles[nivel]}`}>
         {confianca.toFixed(1)}% {selo}

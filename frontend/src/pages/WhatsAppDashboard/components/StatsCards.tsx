@@ -1,5 +1,5 @@
-import React, { memo } from 'react';
-import type { DashboardStats } from '../../../stores/whatsappStore';
+import React, { memo } from "react";
+import type { DashboardStats } from "../../../stores/whatsappStore";
 
 interface StatsCardsProps {
   stats: DashboardStats | null;
@@ -9,7 +9,7 @@ interface StatsCardsProps {
 
 export const StatsCards: React.FC<StatsCardsProps> = memo(({ stats, fallbackStats, isLoading }) => {
   const sourceStats = stats || fallbackStats;
-  const skeletonKeys = ['s1', 's2', 's3', 's4', 's5', 's6'];
+  const skeletonKeys = ["s1", "s2", "s3", "s4", "s5", "s6"];
 
   if (isLoading && !stats) {
     return (
@@ -26,45 +26,45 @@ export const StatsCards: React.FC<StatsCardsProps> = memo(({ stats, fallbackStat
 
   const cards = [
     {
-      label: 'Total',
+      label: "Total",
       value: sourceStats.total_handoffs,
-      icon: '💬',
-      color: 'bg-blue-50 text-blue-700'
+      icon: "💬",
+      color: "bg-blue-50 text-blue-700",
     },
     {
-      label: 'Aguardando',
+      label: "Aguardando",
       value: sourceStats.pending_count,
-      icon: '⏳',
-      color: 'bg-yellow-50 text-yellow-700'
+      icon: "⏳",
+      color: "bg-yellow-50 text-yellow-700",
     },
     {
-      label: 'Ativas',
+      label: "Ativas",
       value: sourceStats.active_count,
-      icon: '💭',
-      color: 'bg-green-50 text-green-700'
+      icon: "💭",
+      color: "bg-green-50 text-green-700",
     },
     {
-      label: 'Resolvidas',
+      label: "Resolvidas",
       value: sourceStats.resolved_count,
-      icon: '✅',
-      color: 'bg-gray-50 text-gray-700'
+      icon: "✅",
+      color: "bg-gray-50 text-gray-700",
     },
     {
-      label: 'Agentes Online',
+      label: "Agentes Online",
       value: sourceStats.available_agents || 0,
-      icon: '👤',
-      color: 'bg-purple-50 text-purple-700'
+      icon: "👤",
+      color: "bg-purple-50 text-purple-700",
     },
     {
-      label: 'Tempo Médio',
-      value: sourceStats.avg_response_time_seconds 
-        ? Math.round(sourceStats.avg_response_time_seconds / 60) + 'min'
-        : '0min',
-      icon: '⚡',
-      color: 'bg-orange-50 text-orange-700'
-    }
+      label: "Tempo Médio",
+      value: sourceStats.avg_response_time_seconds
+        ? Math.round(sourceStats.avg_response_time_seconds / 60) + "min"
+        : "0min",
+      icon: "⚡",
+      color: "bg-orange-50 text-orange-700",
+    },
   ];
-  
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
       {cards.map((card) => (

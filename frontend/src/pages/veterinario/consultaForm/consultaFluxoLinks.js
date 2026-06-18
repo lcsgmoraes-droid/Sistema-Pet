@@ -15,9 +15,7 @@ function textoLimpo(valor) {
 }
 
 function resumoClinico(form = {}) {
-  return [form.diagnostico, form.tratamento, form.queixa_principal]
-    .map(textoLimpo)
-    .find(Boolean);
+  return [form.diagnostico, form.tratamento, form.queixa_principal].map(textoLimpo).find(Boolean);
 }
 
 function limitarResumo(texto, limite = 80) {
@@ -52,7 +50,7 @@ export function buildAgendarRetornoConsultaLink({
     "motivo",
     baseMotivo
       ? `Retorno - ${baseMotivo}`
-      : `Retorno da consulta #${consultaOrigemId || ""}`.trim()
+      : `Retorno da consulta #${consultaOrigemId || ""}`.trim(),
   );
 
   return `/veterinario/agenda?${params.toString()}`;
@@ -77,7 +75,7 @@ export function buildInternacaoConsultaLink({
     "motivo",
     baseMotivo && consultaId
       ? `Internacao apos consulta #${consultaId} - ${baseMotivo}`
-      : baseMotivo || "Internacao apos consulta"
+      : baseMotivo || "Internacao apos consulta",
   );
 
   return `/veterinario/internacoes?${params.toString()}`;

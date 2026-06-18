@@ -2,13 +2,13 @@
  * API Client para o módulo de Controle de Caixa
  */
 
-import api from '../api';
+import api from "../api";
 
 /**
  * Abrir novo caixa
  */
 export const abrirCaixa = async (dados) => {
-  const response = await api.post('/caixas/abrir', dados);
+  const response = await api.post("/caixas/abrir", dados);
   return response.data;
 };
 
@@ -16,7 +16,7 @@ export const abrirCaixa = async (dados) => {
  * Obter caixa aberto do usuário atual
  */
 export const obterCaixaAberto = async () => {
-  const response = await api.get('/caixas/aberto');
+  const response = await api.get("/caixas/aberto");
   return response.data;
 };
 
@@ -27,15 +27,11 @@ export const validarCaixaAtual = async (caixaIdEsperado) => {
   const caixaAtual = await obterCaixaAberto();
 
   if (!caixaAtual) {
-    throw new Error(
-      'Seu caixa foi fechado em outra aba. Atualize a pagina e tente novamente.',
-    );
+    throw new Error("Seu caixa foi fechado em outra aba. Atualize a pagina e tente novamente.");
   }
 
   if (caixaAtual.id !== caixaIdEsperado) {
-    throw new Error(
-      'O caixa ativo mudou em outra aba. Atualize a pagina e tente novamente.',
-    );
+    throw new Error("O caixa ativo mudou em outra aba. Atualize a pagina e tente novamente.");
   }
 
   return caixaAtual;
@@ -45,7 +41,7 @@ export const validarCaixaAtual = async (caixaIdEsperado) => {
  * Listar caixas
  */
 export const listarCaixas = async (params = {}) => {
-  const response = await api.get('/caixas', { params });
+  const response = await api.get("/caixas", { params });
   return response.data;
 };
 

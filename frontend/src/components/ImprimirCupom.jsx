@@ -1,16 +1,16 @@
-import { Printer } from 'lucide-react';
-import PropTypes from 'prop-types';
-import { formatMoneyBRL } from '../utils/formatters';
-import ActionButton from './ui/ActionButton';
+import { Printer } from "lucide-react";
+import PropTypes from "prop-types";
+import { formatMoneyBRL } from "../utils/formatters";
+import ActionButton from "./ui/ActionButton";
 
 const RECEIPT_WIDTH = 42;
 
 function toAscii(texto) {
-  return String(texto || '')
-    .normalize('NFD')
-    .replaceAll(/[\u0300-\u036f]/g, '')
-    .replaceAll(/[^\x20-\x7E]/g, ' ')
-    .replaceAll(/\s+/g, ' ')
+  return String(texto || "")
+    .normalize("NFD")
+    .replaceAll(/[\u0300-\u036f]/g, "")
+    .replaceAll(/[^\x20-\x7E]/g, " ")
+    .replaceAll(/\s+/g, " ")
     .trim();
 }
 
@@ -24,20 +24,20 @@ function center(texto, width = RECEIPT_WIDTH) {
   const total = Math.max(0, width - valor.length);
   const left = Math.floor(total / 2);
   const right = total - left;
-  return `${' '.repeat(left)}${valor}${' '.repeat(right)}`;
+  return `${" ".repeat(left)}${valor}${" ".repeat(right)}`;
 }
 
 function linePair(label, valor, width = RECEIPT_WIDTH) {
   const right = clip(valor, Math.max(8, Math.floor(width / 2)));
   const maxLeft = Math.max(0, width - right.length - 1);
   const left = clip(label, maxLeft);
-  return `${left}${' '.repeat(Math.max(1, width - left.length - right.length))}${right}`;
+  return `${left}${" ".repeat(Math.max(1, width - left.length - right.length))}${right}`;
 }
 
 function wrap(texto, width = RECEIPT_WIDTH) {
-  const palavras = toAscii(texto).split(' ');
+  const palavras = toAscii(texto).split(" ");
   const linhas = [];
-  let atual = '';
+  let atual = "";
 
   for (const palavra of palavras) {
     if (!palavra) continue;
@@ -54,17 +54,17 @@ function wrap(texto, width = RECEIPT_WIDTH) {
     for (let i = 0; i < palavra.length; i += width) {
       linhas.push(palavra.slice(i, i + width));
     }
-    atual = '';
+    atual = "";
   }
 
   if (atual) linhas.push(atual);
-  return linhas.length ? linhas : [''];
+  return linhas.length ? linhas : [""];
 }
 
 function renderItens(itens = []) {
   const linhas = [];
   for (const item of itens) {
-    const nome = item?.produto_nome || item?.descricao || 'Item';
+    const nome = item?.produto_nome || item?.descricao || "Item";
     linhas.push(...wrap(nome, RECEIPT_WIDTH));
 
     const qtd = Number(item?.quantidade || 0);
@@ -74,9 +74,9 @@ function renderItens(itens = []) {
 
     const desconto = Number(item?.desconto_valor || 0);
     if (desconto > 0) {
-      linhas.push(linePair('Desconto item', `-${formatMoneyBRL(desconto)}`));
+      linhas.push(linePair("Desconto item", `-${formatMoneyBRL(desconto)}`));
     }
-    linhas.push('');
+    linhas.push("");
   }
   return linhas;
 }
@@ -84,15 +84,15 @@ function renderItens(itens = []) {
 function montarCupom(venda) {
   const agora = new Date();
   const dataVenda = venda?.data_venda ? new Date(venda.data_venda) : agora;
-  const numeroVenda = venda?.numero_venda || venda?.id || '-';
+  const numeroVenda = venda?.numero_venda || venda?.id || "-";
   const subtotal = Number(venda?.subtotal || 0);
   const descontoTotal = Number(venda?.desconto_valor || 0);
   const totalBruto = subtotal + descontoTotal;
   const taxaEntrega = Number(venda?.entrega?.taxa_entrega_total || 0);
   const total = Number(venda?.total || 0);
-  const enderecoEntrega = venda?.entrega?.endereco_completo || venda?.endereco_entrega || '';
+  const enderecoEntrega = venda?.entrega?.endereco_completo || venda?.endereco_entrega || "";
   const observacoesEntrega =
-    venda?.entrega?.observacoes_entrega || venda?.observacoes_entrega || '';
+    venda?.entrega?.observacoes_entrega || venda?.observacoes_entrega || "";
   const telefoneCliente =
     venda?.cliente?.celular ||
     venda?.cliente?.telefone ||
@@ -107,15 +107,15 @@ function montarCupom(venda) {
     venda?.cliente?.estado,
   ]
     .filter(Boolean)
-    .join(', ');
+    .join(", ");
 
   const linhas = [
-    center('PET SHOP PRO'),
-    center('Central de Gestao'),
-    center(dataVenda.toLocaleString('pt-BR')),
-    '-'.repeat(RECEIPT_WIDTH),
+    center("PET SHOP PRO"),
+    center("Central de Gestao"),
+    center(dataVenda.toLocaleString("pt-BR")),
+    "-".repeat(RECEIPT_WIDTH),
     clip(`VENDA #${numeroVenda}`),
-    clip(`Data: ${dataVenda.toLocaleString('pt-BR')}`),
+    clip(`Data: ${dataVenda.toLocaleString("pt-BR")}`),
   ];
 
   if (venda?.cliente?.nome || venda?.cliente_nome) {
@@ -135,59 +135,63 @@ function montarCupom(venda) {
   }
 
   linhas.push(
-    '-'.repeat(RECEIPT_WIDTH),
-    clip('ITENS'),
-    '-'.repeat(RECEIPT_WIDTH),
+    "-".repeat(RECEIPT_WIDTH),
+    clip("ITENS"),
+    "-".repeat(RECEIPT_WIDTH),
     ...renderItens(venda?.itens || []),
-    '-'.repeat(RECEIPT_WIDTH),
-    linePair('Total bruto:', formatMoneyBRL(totalBruto)),
+    "-".repeat(RECEIPT_WIDTH),
+    linePair("Total bruto:", formatMoneyBRL(totalBruto)),
   );
 
   if (descontoTotal > 0) {
-    linhas.push(linePair('Desconto:', `-${formatMoneyBRL(descontoTotal)}`));
+    linhas.push(linePair("Desconto:", `-${formatMoneyBRL(descontoTotal)}`));
   }
 
   if (venda?.tem_entrega) {
-    linhas.push(linePair('Taxa entrega:', formatMoneyBRL(taxaEntrega)));
+    linhas.push(linePair("Taxa entrega:", formatMoneyBRL(taxaEntrega)));
   }
 
   linhas.push(
-    '-'.repeat(RECEIPT_WIDTH),
-    linePair('TOTAL:', formatMoneyBRL(total)),
-    '-'.repeat(RECEIPT_WIDTH),
+    "-".repeat(RECEIPT_WIDTH),
+    linePair("TOTAL:", formatMoneyBRL(total)),
+    "-".repeat(RECEIPT_WIDTH),
   );
 
   if (Array.isArray(venda?.pagamentos) && venda.pagamentos.length > 0) {
-    linhas.push('PAGAMENTOS');
+    linhas.push("PAGAMENTOS");
     for (const pag of venda.pagamentos) {
-      const forma = pag?.forma_pagamento || 'Pagamento';
+      const forma = pag?.forma_pagamento || "Pagamento";
       const valor = formatMoneyBRL(Number(pag?.valor || 0));
       linhas.push(linePair(forma, valor));
     }
-    linhas.push('-'.repeat(RECEIPT_WIDTH));
+    linhas.push("-".repeat(RECEIPT_WIDTH));
   }
 
   if (venda?.tem_entrega && (enderecoEntrega || observacoesEntrega)) {
-    linhas.push('ENTREGA:');
+    linhas.push("ENTREGA:");
     if (enderecoEntrega) {
       linhas.push(...wrap(enderecoEntrega, RECEIPT_WIDTH));
     }
     if (observacoesEntrega) {
       linhas.push(...wrap(`Obs: ${observacoesEntrega}`, RECEIPT_WIDTH));
     }
-    linhas.push('-'.repeat(RECEIPT_WIDTH));
+    linhas.push("-".repeat(RECEIPT_WIDTH));
   }
 
   if (venda?.observacoes) {
-    linhas.push('OBSERVACOES:', ...wrap(venda.observacoes, RECEIPT_WIDTH), '-'.repeat(RECEIPT_WIDTH));
+    linhas.push(
+      "OBSERVACOES:",
+      ...wrap(venda.observacoes, RECEIPT_WIDTH),
+      "-".repeat(RECEIPT_WIDTH),
+    );
   }
 
-  linhas.push(center('Obrigado pela preferencia!'), center('Volte sempre!'));
+  linhas.push(center("Obrigado pela preferencia!"), center("Volte sempre!"));
 
-  return linhas.join('\n');
+  return linhas.join("\n");
 }
 
-export default function ImprimirCupom({ className = '', size = 'md', venda }) {
+export default function ImprimirCupom({ className = "", size = "md", venda }) {
   const imprimir = () => {
     globalThis.print();
   };
@@ -202,7 +206,7 @@ export default function ImprimirCupom({ className = '', size = 'md', venda }) {
         icon={Printer}
         intent="neutral"
         size={size}
-        className={['print:hidden', className].filter(Boolean).join(' ')}
+        className={["print:hidden", className].filter(Boolean).join(" ")}
       >
         <span>Imprimir Cupom</span>
       </ActionButton>
@@ -241,17 +245,17 @@ export default function ImprimirCupom({ className = '', size = 'md', venda }) {
       <pre
         className="cupom-impressao hidden print:block"
         style={{
-          width: '76mm',
+          width: "76mm",
           fontFamily: 'Consolas, "Courier New", monospace',
-          fontSize: '13px',
+          fontSize: "13px",
           lineHeight: 1.28,
-          letterSpacing: '0.1px',
+          letterSpacing: "0.1px",
           fontWeight: 800,
-          whiteSpace: 'pre',
+          whiteSpace: "pre",
           margin: 0,
           padding: 0,
-          textTransform: 'none',
-          textRendering: 'geometricPrecision',
+          textTransform: "none",
+          textRendering: "geometricPrecision",
         }}
       >
         {montarCupom(venda)}
@@ -262,7 +266,7 @@ export default function ImprimirCupom({ className = '', size = 'md', venda }) {
 
 ImprimirCupom.propTypes = {
   className: PropTypes.string,
-  size: PropTypes.oneOf(['xs', 'sm', 'md', 'lg']),
+  size: PropTypes.oneOf(["xs", "sm", "md", "lg"]),
   venda: PropTypes.shape({
     id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     numero_venda: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),

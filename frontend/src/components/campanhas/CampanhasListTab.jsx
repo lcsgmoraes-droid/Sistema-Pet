@@ -35,9 +35,7 @@ export default function CampanhasListTab({
       <div className="px-6 py-4 border-b bg-gray-50 flex items-center justify-between">
         <h2 className="font-semibold text-gray-800">Campanhas Cadastradas</h2>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">
-            {campanhasVisiveis.length} campanha(s)
-          </span>
+          <span className="text-sm text-gray-500">{campanhasVisiveis.length} campanha(s)</span>
           <button
             onClick={onNovaCampanha}
             className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors"
@@ -48,9 +46,7 @@ export default function CampanhasListTab({
       </div>
 
       {loadingCampanhas ? (
-        <div className="p-8 text-center text-gray-400">
-          Carregando campanhas...
-        </div>
+        <div className="p-8 text-center text-gray-400">Carregando campanhas...</div>
       ) : campanhas.length === 0 ? (
         <div className="p-8 text-center text-gray-400">
           <p className="text-2xl mb-2">{"\u{1F3AA}"}</p>
@@ -72,9 +68,7 @@ export default function CampanhasListTab({
                   <div className="text-2xl">{tipo.emoji}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-gray-900">
-                        {campanha.name}
-                      </span>
+                      <span className="font-medium text-gray-900">{campanha.name}</span>
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full font-medium ${tipo.color}`}
                       >
@@ -87,9 +81,7 @@ export default function CampanhasListTab({
                   </div>
 
                   <button
-                    onClick={() =>
-                      editando ? onFecharEdicao() : onAbrirEdicao(campanha)
-                    }
+                    onClick={() => (editando ? onFecharEdicao() : onAbrirEdicao(campanha))}
                     className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors"
                   >
                     {editando ? "Cancelar" : "\u2699\uFE0F Configurar"}
@@ -127,8 +119,7 @@ export default function CampanhasListTab({
                   <div className="mt-4 bg-blue-50 rounded-xl p-4 border border-blue-200">
                     <p className="text-xs font-semibold text-blue-700 mb-3">
                       {"\u2699\uFE0F"} Parametros -{" "}
-                      {tipoLabels[campanha.campaign_type]?.label ||
-                        campanha.campaign_type}
+                      {tipoLabels[campanha.campaign_type]?.label || campanha.campaign_type}
                     </p>
                     <label className="block text-xs font-semibold text-gray-700 mb-1">
                       Nome da campanha
@@ -149,9 +140,7 @@ export default function CampanhasListTab({
                       disabled={salvandoParams}
                       className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
                     >
-                      {salvandoParams
-                        ? "Salvando..."
-                        : "\u{1F4BE} Salvar campanha"}
+                      {salvandoParams ? "Salvando..." : "\u{1F4BE} Salvar campanha"}
                     </button>
                   </div>
                 )}

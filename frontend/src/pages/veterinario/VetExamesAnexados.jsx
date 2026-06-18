@@ -10,10 +10,7 @@ export default function VetExamesAnexados() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-5">
-      <ExamesAnexadosHeader
-        onNovoExame={exames.abrirNovoExame}
-        onVerPets={exames.verPets}
-      />
+      <ExamesAnexadosHeader onNovoExame={exames.abrirNovoExame} onVerPets={exames.verPets} />
 
       <ExamesAnexadosFiltros
         periodo={exames.periodo}

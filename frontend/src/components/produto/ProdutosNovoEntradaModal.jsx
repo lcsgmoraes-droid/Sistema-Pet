@@ -28,11 +28,11 @@ export default function ProdutosNovoEntradaModal({
               <button
                 type="button"
                 onClick={() => {
-                  const sugestao = `LOTE-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-${Math.floor(
-                    Math.random() * 1000
+                  const sugestao = `LOTE-${new Date().toISOString().split("T")[0].replace(/-/g, "")}-${Math.floor(
+                    Math.random() * 1000,
                   )
                     .toString()
-                    .padStart(3, '0')}`;
+                    .padStart(3, "0")}`;
                   setEntradaData({ ...entradaData, nome_lote: sugestao });
                 }}
                 className="text-xs text-blue-600 hover:text-blue-800"
@@ -50,7 +50,9 @@ export default function ProdutosNovoEntradaModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Data de Fabricacao</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Data de Fabricacao
+            </label>
             <input
               type="date"
               value={entradaData.data_fabricacao}
@@ -93,7 +95,11 @@ export default function ProdutosNovoEntradaModal({
           >
             Cancelar
           </button>
-          <button type="button" onClick={onSubmit} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+          <button
+            type="button"
+            onClick={onSubmit}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
             Registrar Entrada
           </button>
         </div>

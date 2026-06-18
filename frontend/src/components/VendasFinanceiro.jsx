@@ -1,7 +1,6 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
@@ -52,8 +51,7 @@ import {
   sanitizarNumero,
   vendaEstaEmAberto,
 } from "./financeiro/vendasFinanceiroUtils";
-import MoneyCell, { formatMoneyCellValue, isZeroMoneyValue } from "./ui/MoneyCell";
-import NumberCell from "./ui/NumberCell";
+import { formatMoneyCellValue, isZeroMoneyValue } from "./ui/MoneyCell";
 
 function obterCanalVendaFinanceiro(venda) {
   return normalizeSalesChannel(
@@ -118,19 +116,15 @@ export default function VendasFinanceiro() {
   const [vendasExpandidas, setVendasExpandidas] = useState(new Set());
 
   // Dados de comparação estendidos
-  const [formasRecebimentoComparacao, setFormasRecebimentoComparacao] =
-    useState([]);
+  const [formasRecebimentoComparacao, setFormasRecebimentoComparacao] = useState([]);
   const [vendasPorGrupoComparacao, setVendasPorGrupoComparacao] = useState([]);
-  const [vendasPorFuncionarioComparacao, setVendasPorFuncionarioComparacao] =
-    useState([]);
+  const [vendasPorFuncionarioComparacao, setVendasPorFuncionarioComparacao] = useState([]);
 
   // Estados para Análise Inteligente
   const [produtosMaisLucrativos, setProdutosMaisLucrativos] = useState([]);
   const [produtosPorCategoria, setProdutosPorCategoria] = useState({});
   const [produtosAnalise, setProdutosAnalise] = useState([]);
-  const [alertasInteligentesVendas, setAlertasInteligentesVendas] = useState(
-    [],
-  );
+  const [alertasInteligentesVendas, setAlertasInteligentesVendas] = useState([]);
   const [previsaoProximos7Dias, setPrevisaoProximos7Dias] = useState(0);
   const menuRelatoriosRef = useRef(null);
   const [menuRelatoriosAberto, setMenuRelatoriosAberto] = useState(false);
@@ -147,9 +141,7 @@ export default function VendasFinanceiro() {
   });
   const linhasVendasRefs = useRef(new Map());
   const [mostrarConfigFeriados, setMostrarConfigFeriados] = useState(false);
-  const [feriadosCustomizados, setFeriadosCustomizados] = useState(
-    carregarFeriadosCustomizados,
-  );
+  const [feriadosCustomizados, setFeriadosCustomizados] = useState(carregarFeriadosCustomizados);
   const [configDiasUteis, setConfigDiasUteis] = useState(carregarConfigDiasUteis);
   const [novoFeriadoData, setNovoFeriadoData] = useState("");
   const [novoFeriadoNome, setNovoFeriadoNome] = useState("");
@@ -202,14 +194,12 @@ export default function VendasFinanceiro() {
 
   const valorEhZeroVisual = isZeroMoneyValue;
 
-  const formatarMoedaOuTraco = (valor) =>
-    formatMoneyCellValue(valor, { zeroAsDash: true });
+  const formatarMoedaOuTraco = (valor) => formatMoneyCellValue(valor, { zeroAsDash: true });
 
   const formatarMoedaComSinalOuTraco = (valor, sinal) =>
     formatMoneyCellValue(valor, { sign: sinal, zeroAsDash: true });
 
-  const formatarPercentualOuTraco = (valor) =>
-    valorEhZeroVisual(valor) ? "-" : `${valor}%`;
+  const formatarPercentualOuTraco = (valor) => (valorEhZeroVisual(valor) ? "-" : `${valor}%`);
 
   const formatarData = formatarDataVendaFinanceiro;
 
@@ -365,7 +355,13 @@ export default function VendasFinanceiro() {
       feriadosPorData,
       considerarSabadoDiaUtil: configDiasUteis.considerarSabadoDiaUtil,
     });
-  }, [configDiasUteis.considerarSabadoDiaUtil, dataInicio, dataFim, feriadosPorData, vendasPorData]);
+  }, [
+    configDiasUteis.considerarSabadoDiaUtil,
+    dataInicio,
+    dataFim,
+    feriadosPorData,
+    vendasPorData,
+  ]);
 
   const resumoDiasPeriodo = useMemo(
     () => calcularResumoDiasPeriodoFinanceiro(vendasPorDataCalendario),
@@ -406,21 +402,14 @@ export default function VendasFinanceiro() {
 
   const vendasResumoPeriodo = useMemo(() => listaVendasVisiveis, [listaVendasVisiveis]);
 
-  const fluxoResultadoCards = useMemo(
-    () => montarFluxoResultadoCardsFinanceiro(resumo),
-    [resumo],
-  );
+  const fluxoResultadoCards = useMemo(() => montarFluxoResultadoCardsFinanceiro(resumo), [resumo]);
 
   const distribuicaoTemporalVendas = useMemo(
     () => calcularDistribuicaoTemporalVendasFinanceiro(vendasResumoPeriodo),
     [vendasResumoPeriodo],
   );
-  const {
-    vendasPorDiaSemanaResumo,
-    vendasPorHorarioComMovimento,
-    melhorDiaSemana,
-    melhorHorario,
-  } = distribuicaoTemporalVendas;
+  const { vendasPorDiaSemanaResumo, vendasPorHorarioComMovimento, melhorDiaSemana, melhorHorario } =
+    distribuicaoTemporalVendas;
 
   const analisePromocoes = useMemo(
     () => calcularAnalisePromocoesFinanceiro(vendasResumoPeriodo),
@@ -464,25 +453,18 @@ export default function VendasFinanceiro() {
       });
 
       if (filtroFuncionario) params.append("funcionario", filtroFuncionario);
-      if (filtroFormaPagamento)
-        params.append("forma_pagamento", filtroFormaPagamento);
+      if (filtroFormaPagamento) params.append("forma_pagamento", filtroFormaPagamento);
       if (filtroCategoria) params.append("categoria", filtroCategoria);
       if (filtroCanalVenda) params.append("canal_venda", filtroCanalVenda);
 
-      const response = await api.get(
-        `/relatorios/vendas/export/pdf?${params.toString()}`,
-        {
-          responseType: "blob",
-        },
-      );
+      const response = await api.get(`/relatorios/vendas/export/pdf?${params.toString()}`, {
+        responseType: "blob",
+      });
 
       const url = globalThis.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute(
-        "download",
-        `relatorio_vendas_${dataInicio}_${dataFim}.pdf`,
-      );
+      link.setAttribute("download", `relatorio_vendas_${dataInicio}_${dataFim}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -555,10 +537,7 @@ export default function VendasFinanceiro() {
     if (formasRecebimentoFiltradas.length > 0) {
       const formasData = [
         ["Forma", "Valor pago"],
-        ...formasRecebimentoFiltradas.map((f) => [
-          f.forma_pagamento,
-          f.valor_total,
-        ]),
+        ...formasRecebimentoFiltradas.map((f) => [f.forma_pagamento, f.valor_total]),
       ];
       planilhas.push({
         sheet: "Formas Pagamento",
@@ -630,13 +609,9 @@ export default function VendasFinanceiro() {
           params: montarParametrosRelatorio(periodoComp),
         });
         setResumoComparacao(responseComp.data.resumo || {});
-        setFormasRecebimentoComparacao(
-          responseComp.data.formas_recebimento || [],
-        );
+        setFormasRecebimentoComparacao(responseComp.data.formas_recebimento || []);
         setVendasPorGrupoComparacao(responseComp.data.vendas_por_grupo || []);
-        setVendasPorFuncionarioComparacao(
-          responseComp.data.vendas_por_funcionario || [],
-        );
+        setVendasPorFuncionarioComparacao(responseComp.data.vendas_por_funcionario || []);
       } else {
         // Limpar dados de comparação quando desativado
         setResumoComparacao({
@@ -747,10 +722,7 @@ export default function VendasFinanceiro() {
           }
         : { venda_ids: ids };
 
-      const { data } = await api.post(
-        "/relatorios/vendas/reprocessar-rentabilidade",
-        payload,
-      );
+      const { data } = await api.post("/relatorios/vendas/reprocessar-rentabilidade", payload);
       const total = Number(data?.total_reprocessado || 0);
       const vendasReprocessadasIds = Array.isArray(data?.vendas)
         ? data.vendas.map((venda) => venda?.venda_id)
@@ -761,10 +733,9 @@ export default function VendasFinanceiro() {
       aplicarFeedbackReprocessamento(vendasReprocessadasIds);
     } catch (error) {
       console.error("Erro ao reprocessar rentabilidade:", error);
-      toast.error(
-        error?.response?.data?.detail || "Nao foi possivel reprocessar as vendas.",
-        { id: toastId },
-      );
+      toast.error(error?.response?.data?.detail || "Nao foi possivel reprocessar as vendas.", {
+        id: toastId,
+      });
     } finally {
       setReprocessandoRentabilidade(false);
     }
@@ -854,25 +825,16 @@ export default function VendasFinanceiro() {
   }, [podeVerFinanceiroCompleto]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      getFeriadosStorageKey(),
-      JSON.stringify(feriadosCustomizados),
-    );
+    window.localStorage.setItem(getFeriadosStorageKey(), JSON.stringify(feriadosCustomizados));
   }, [feriadosCustomizados]);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      getDiasUteisStorageKey(),
-      JSON.stringify(configDiasUteis),
-    );
+    window.localStorage.setItem(getDiasUteisStorageKey(), JSON.stringify(configDiasUteis));
   }, [configDiasUteis]);
 
   useEffect(() => {
     const fecharMenuAoClicarFora = (event) => {
-      if (
-        menuRelatoriosRef.current &&
-        !menuRelatoriosRef.current.contains(event.target)
-      ) {
+      if (menuRelatoriosRef.current && !menuRelatoriosRef.current.contains(event.target)) {
         setMenuRelatoriosAberto(false);
       }
     };
@@ -954,16 +916,13 @@ export default function VendasFinanceiro() {
                   />
                 </svg>
                 <div className="text-sm">
-                  <span className="font-semibold text-blue-800">
-                    Modo Comparação Ativo:
-                  </span>
+                  <span className="font-semibold text-blue-800">Modo Comparação Ativo:</span>
                   <span className="text-blue-700 sm:ml-2">
                     Comparando{" "}
                     <span className="font-medium">
                       {formatarData(dataInicio)} até {formatarData(dataFim)}
                     </span>{" "}
-                    com{" "}
-                    <span className="font-medium">{getTextoComparacao()}</span>
+                    com <span className="font-medium">{getTextoComparacao()}</span>
                   </span>
                 </div>
               </div>
@@ -1024,7 +983,6 @@ export default function VendasFinanceiro() {
             vendasPorGrupo={vendasPorGrupo}
             vendasPorTipo={vendasPorTipo}
           />
-
         </div>
       )}
 
@@ -1073,9 +1031,7 @@ export default function VendasFinanceiro() {
               vendaIds: vendasSelecionadas.map((venda) => venda.id),
             })
           }
-          onReprocessarVenda={(venda) =>
-            reprocessarRentabilidadeVendas({ vendaIds: [venda.id] })
-          }
+          onReprocessarVenda={(venda) => reprocessarRentabilidadeVendas({ vendaIds: [venda.id] })}
           onToggleSelecaoTodasVendas={toggleSelecaoTodasVendas}
           onToggleSelecaoVenda={toggleSelecaoVenda}
           onVendaRowRef={registrarLinhaVendaReprocessada}

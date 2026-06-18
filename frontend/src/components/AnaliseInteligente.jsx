@@ -1,11 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import api from '../api';
-import { 
-  TrendingUp, TrendingDown, AlertTriangle, CheckCircle, 
-  ArrowUpRight, ArrowDownRight, Calendar, BarChart3, 
-  Lightbulb, Target, DollarSign, TrendingDown as TrendDown,
-  Award, Info
-} from 'lucide-react';
+import { useState, useEffect } from "react";
+import api from "../api";
+import {
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  CheckCircle,
+  ArrowUpRight,
+  ArrowDownRight,
+  Calendar,
+  BarChart3,
+  Lightbulb,
+  Target,
+  DollarSign,
+  TrendingDown as TrendDown,
+  Brain,
+  Info,
+} from "lucide-react";
 
 const AnaliseInteligente = ({ dados, periodo }) => {
   const [analise, setAnalise] = useState(null);
@@ -22,12 +32,12 @@ const AnaliseInteligente = ({ dados, periodo }) => {
 
   const carregarIndicesMercado = async () => {
     try {
-      const response = await api.get('/ia/dre/indices-mercado', {
-        params: { setor: 'pet_shop' }
+      const response = await api.get("/ia/dre/indices-mercado", {
+        params: { setor: "pet_shop" },
       });
       setIndicesMercado(response.data);
     } catch (error) {
-      console.error('Erro ao carregar índices:', error);
+      console.error("Erro ao carregar índices:", error);
     }
   };
 
@@ -35,11 +45,11 @@ const AnaliseInteligente = ({ dados, periodo }) => {
     setLoading(true);
     try {
       // Simular análise IA (substituir por endpoint real)
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       const analiseGerada = gerarAnaliseIA(dados);
       setAnalise(analiseGerada);
-      
+
       // Comparação com período anterior
       if (periodo.mes > 1) {
         const mesAnterior = await buscarDREMesAnterior(periodo);
@@ -48,7 +58,7 @@ const AnaliseInteligente = ({ dados, periodo }) => {
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar análise:', error);
+      console.error("Erro ao carregar análise:", error);
     } finally {
       setLoading(false);
     }
@@ -58,12 +68,12 @@ const AnaliseInteligente = ({ dados, periodo }) => {
     try {
       const mesAnterior = periodo.mes === 1 ? 12 : periodo.mes - 1;
       const anoAnterior = periodo.mes === 1 ? periodo.ano - 1 : periodo.ano;
-      
-      const response = await api.get('/financeiro/dre', {
-        params: { ano: anoAnterior, mes: mesAnterior }
+
+      const response = await api.get("/financeiro/dre", {
+        params: { ano: anoAnterior, mes: mesAnterior },
       });
       return response.data;
-    } catch (error) {
+    } catch {
       return null;
     }
   };
@@ -78,23 +88,23 @@ const AnaliseInteligente = ({ dados, periodo }) => {
       receita: {
         atual: atual.receita_bruta || 0,
         anterior: anterior.receita_bruta || 0,
-        variacao: calcularVariacao(atual.receita_bruta, anterior.receita_bruta)
+        variacao: calcularVariacao(atual.receita_bruta, anterior.receita_bruta),
       },
       lucro: {
         atual: atual.lucro_liquido || 0,
         anterior: anterior.lucro_liquido || 0,
-        variacao: calcularVariacao(atual.lucro_liquido, anterior.lucro_liquido)
+        variacao: calcularVariacao(atual.lucro_liquido, anterior.lucro_liquido),
       },
       despesas: {
         atual: atual.total_despesas || 0,
         anterior: anterior.total_despesas || 0,
-        variacao: calcularVariacao(atual.total_despesas, anterior.total_despesas)
+        variacao: calcularVariacao(atual.total_despesas, anterior.total_despesas),
       },
       margem: {
         atual: atual.margem_liquida || 0,
         anterior: anterior.margem_liquida || 0,
-        variacao: calcularVariacao(atual.margem_liquida, anterior.margem_liquida)
-      }
+        variacao: calcularVariacao(atual.margem_liquida, anterior.margem_liquida),
+      },
     };
   };
 
@@ -107,29 +117,30 @@ const AnaliseInteligente = ({ dados, periodo }) => {
     const margemLiquida = dados.margem_liquida || 0;
     if (margemLiquida < 5) {
       alertas.push({
-        tipo: 'critico',
-        titulo: 'Margem líquida crítica',
+        tipo: "critico",
+        titulo: "Margem líquida crítica",
         descricao: `Margem de apenas ${margemLiquida.toFixed(1)}%. Ideal: acima de 10%`,
-        icon: AlertTriangle
+        icon: AlertTriangle,
       });
       recomendacoes.push({
-        prioridade: 'alta',
-        titulo: 'Urgente: Revisar estrutura de custos',
-        descricao: 'Margem muito baixa. Considere: aumentar preços, reduzir custos fixos, ou renegociar com fornecedores.'
+        prioridade: "alta",
+        titulo: "Urgente: Revisar estrutura de custos",
+        descricao:
+          "Margem muito baixa. Considere: aumentar preços, reduzir custos fixos, ou renegociar com fornecedores.",
       });
     } else if (margemLiquida < 10) {
       insights.push({
-        tipo: 'atencao',
-        titulo: 'Margem líquida abaixo do ideal',
+        tipo: "atencao",
+        titulo: "Margem líquida abaixo do ideal",
         descricao: `${margemLiquida.toFixed(1)}% - Há espaço para melhoria`,
-        icon: TrendingDown
+        icon: TrendingDown,
       });
     } else {
       insights.push({
-        tipo: 'positivo',
-        titulo: 'Margem líquida saudável',
+        tipo: "positivo",
+        titulo: "Margem líquida saudável",
         descricao: `${margemLiquida.toFixed(1)}% - Acima da média do setor`,
-        icon: CheckCircle
+        icon: CheckCircle,
       });
     }
 
@@ -138,10 +149,10 @@ const AnaliseInteligente = ({ dados, periodo }) => {
     const despesas = dados.total_despesas || 0;
     if (despesas > receita * 0.8) {
       alertas.push({
-        tipo: 'atencao',
-        titulo: 'Despesas elevadas',
+        tipo: "atencao",
+        titulo: "Despesas elevadas",
         descricao: `Despesas representam ${((despesas / receita) * 100).toFixed(0)}% da receita`,
-        icon: AlertTriangle
+        icon: AlertTriangle,
       });
     }
 
@@ -150,9 +161,9 @@ const AnaliseInteligente = ({ dados, periodo }) => {
     const margemBruta = ((receita - cmv) / receita) * 100;
     if (margemBruta < 30) {
       recomendacoes.push({
-        prioridade: 'media',
-        titulo: 'Revisar custo dos produtos',
-        descricao: `Margem bruta de ${margemBruta.toFixed(1)}%. Considere negociar com fornecedores ou ajustar preços.`
+        prioridade: "media",
+        titulo: "Revisar custo dos produtos",
+        descricao: `Margem bruta de ${margemBruta.toFixed(1)}%. Considere negociar com fornecedores ou ajustar preços.`,
       });
     }
 
@@ -160,22 +171,22 @@ const AnaliseInteligente = ({ dados, periodo }) => {
     const lucro = dados.lucro_liquido || 0;
     if (lucro > 0) {
       insights.push({
-        tipo: 'positivo',
-        titulo: 'Resultado positivo',
-        descricao: `Lucro de R$ ${lucro.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-        icon: TrendingUp
+        tipo: "positivo",
+        titulo: "Resultado positivo",
+        descricao: `Lucro de R$ ${lucro.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+        icon: TrendingUp,
       });
     } else {
       alertas.push({
-        tipo: 'critico',
-        titulo: 'Prejuízo no período',
-        descricao: `Resultado negativo de R$ ${Math.abs(lucro).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-        icon: TrendingDown
+        tipo: "critico",
+        titulo: "Prejuízo no período",
+        descricao: `Resultado negativo de R$ ${Math.abs(lucro).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+        icon: TrendingDown,
       });
       recomendacoes.push({
-        prioridade: 'alta',
-        titulo: 'Plano de recuperação necessário',
-        descricao: 'Análise detalhada de custos e revisão de estratégia de precificação urgente.'
+        prioridade: "alta",
+        titulo: "Plano de recuperação necessário",
+        descricao: "Análise detalhada de custos e revisão de estratégia de precificação urgente.",
       });
     }
 
@@ -191,22 +202,22 @@ const AnaliseInteligente = ({ dados, periodo }) => {
       insights,
       recomendacoes,
       alertas,
-      score: Math.min(score, 100)
+      score: Math.min(score, 100),
     };
   };
 
   const renderScoreSaude = (score) => {
-    let cor = 'red';
-    let texto = 'Crítico';
+    let cor = "red";
+    let texto = "Crítico";
     if (score >= 80) {
-      cor = 'green';
-      texto = 'Excelente';
+      cor = "green";
+      texto = "Excelente";
     } else if (score >= 60) {
-      cor = 'yellow';
-      texto = 'Bom';
+      cor = "yellow";
+      texto = "Bom";
     } else if (score >= 40) {
-      cor = 'orange';
-      texto = 'Regular';
+      cor = "orange";
+      texto = "Regular";
     }
 
     return (
@@ -218,19 +229,20 @@ const AnaliseInteligente = ({ dados, periodo }) => {
         <div className="flex items-center gap-6">
           <div className="relative w-32 h-32">
             <svg className="transform -rotate-90 w-32 h-32">
+              <circle cx="64" cy="64" r="56" stroke="#e5e7eb" strokeWidth="12" fill="none" />
               <circle
                 cx="64"
                 cy="64"
                 r="56"
-                stroke="#e5e7eb"
-                strokeWidth="12"
-                fill="none"
-              />
-              <circle
-                cx="64"
-                cy="64"
-                r="56"
-                stroke={cor === 'green' ? '#10b981' : cor === 'yellow' ? '#fbbf24' : cor === 'orange' ? '#f59e0b' : '#ef4444'}
+                stroke={
+                  cor === "green"
+                    ? "#10b981"
+                    : cor === "yellow"
+                      ? "#fbbf24"
+                      : cor === "orange"
+                        ? "#f59e0b"
+                        : "#ef4444"
+                }
                 strokeWidth="12"
                 fill="none"
                 strokeDasharray={`${(score / 100) * 351.86} 351.86`}
@@ -244,10 +256,12 @@ const AnaliseInteligente = ({ dados, periodo }) => {
           <div>
             <p className="text-2xl font-bold text-gray-800 mb-1">{texto}</p>
             <p className="text-sm text-gray-600">
-              {score >= 80 && 'Sua saúde financeira está ótima! Continue assim.'}
-              {score >= 60 && score < 80 && 'Boa saúde financeira. Pequenos ajustes podem melhorar.'}
-              {score >= 40 && score < 60 && 'Situação estável, mas requer atenção.'}
-              {score < 40 && 'Atenção! Medidas corretivas são necessárias.'}
+              {score >= 80 && "Sua saúde financeira está ótima! Continue assim."}
+              {score >= 60 &&
+                score < 80 &&
+                "Boa saúde financeira. Pequenos ajustes podem melhorar."}
+              {score >= 40 && score < 60 && "Situação estável, mas requer atenção."}
+              {score < 40 && "Atenção! Medidas corretivas são necessárias."}
             </p>
           </div>
         </div>
@@ -270,50 +284,75 @@ const AnaliseInteligente = ({ dados, periodo }) => {
 
     const indicadores = [
       {
-        nome: 'CMV',
+        nome: "CMV",
         seu: cmvAtual,
         idealMin: benchmarks.cmv.min,
         idealMax: benchmarks.cmv.max,
         inverter: true, // Menor é melhor
-        unidade: '%',
-        cor: cmvAtual <= benchmarks.cmv.max ? 'green' : cmvAtual <= benchmarks.cmv.max * 1.1 ? 'yellow' : 'red'
+        unidade: "%",
+        cor:
+          cmvAtual <= benchmarks.cmv.max
+            ? "green"
+            : cmvAtual <= benchmarks.cmv.max * 1.1
+              ? "yellow"
+              : "red",
       },
       {
-        nome: 'Margem Bruta',
+        nome: "Margem Bruta",
         seu: margemBrutaAtual,
         idealMin: benchmarks.margem_bruta.min,
         idealMax: benchmarks.margem_bruta.max,
         inverter: false, // Maior é melhor
-        unidade: '%',
-        cor: margemBrutaAtual >= benchmarks.margem_bruta.min ? 'green' : margemBrutaAtual >= benchmarks.margem_bruta.min * 0.9 ? 'yellow' : 'red'
+        unidade: "%",
+        cor:
+          margemBrutaAtual >= benchmarks.margem_bruta.min
+            ? "green"
+            : margemBrutaAtual >= benchmarks.margem_bruta.min * 0.9
+              ? "yellow"
+              : "red",
       },
       {
-        nome: 'Margem Líquida',
+        nome: "Margem Líquida",
         seu: margemLiquidaAtual,
         idealMin: benchmarks.margem_liquida.min,
         idealMax: benchmarks.margem_liquida.max,
         inverter: false,
-        unidade: '%',
-        cor: margemLiquidaAtual >= benchmarks.margem_liquida.min ? 'green' : margemLiquidaAtual >= benchmarks.margem_liquida.min * 0.8 ? 'yellow' : 'red'
+        unidade: "%",
+        cor:
+          margemLiquidaAtual >= benchmarks.margem_liquida.min
+            ? "green"
+            : margemLiquidaAtual >= benchmarks.margem_liquida.min * 0.8
+              ? "yellow"
+              : "red",
       },
       {
-        nome: 'Despesas Admin',
+        nome: "Despesas Admin",
         seu: despesasAdminAtual,
         idealMin: 0,
         idealMax: benchmarks.despesas_admin.max,
         inverter: true,
-        unidade: '%',
-        cor: despesasAdminAtual <= benchmarks.despesas_admin.max ? 'green' : despesasAdminAtual <= benchmarks.despesas_admin.max * 1.2 ? 'yellow' : 'red'
+        unidade: "%",
+        cor:
+          despesasAdminAtual <= benchmarks.despesas_admin.max
+            ? "green"
+            : despesasAdminAtual <= benchmarks.despesas_admin.max * 1.2
+              ? "yellow"
+              : "red",
       },
       {
-        nome: 'Despesas Totais',
+        nome: "Despesas Totais",
         seu: despesasTotaisAtual,
         idealMin: 0,
         idealMax: benchmarks.despesas_totais.max,
         inverter: true,
-        unidade: '%',
-        cor: despesasTotaisAtual <= benchmarks.despesas_totais.max ? 'green' : despesasTotaisAtual <= benchmarks.despesas_totais.max * 1.2 ? 'yellow' : 'red'
-      }
+        unidade: "%",
+        cor:
+          despesasTotaisAtual <= benchmarks.despesas_totais.max
+            ? "green"
+            : despesasTotaisAtual <= benchmarks.despesas_totais.max * 1.2
+              ? "yellow"
+              : "red",
+      },
     ];
 
     return (
@@ -332,7 +371,6 @@ const AnaliseInteligente = ({ dados, periodo }) => {
         <div className="space-y-4">
           {indicadores.map((ind, idx) => {
             const faixaIdeal = ind.idealMax - ind.idealMin;
-            const centro = ind.idealMin + (faixaIdeal / 2);
             const dentroFaixa = ind.seu >= ind.idealMin && ind.seu <= ind.idealMax;
 
             return (
@@ -340,14 +378,22 @@ const AnaliseInteligente = ({ dados, periodo }) => {
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-gray-700">{ind.nome}</span>
                   <div className="flex items-center gap-4">
-                    <span className={`text-lg font-bold ${
-                      ind.cor === 'green' ? 'text-green-600' : 
-                      ind.cor === 'yellow' ? 'text-yellow-600' : 'text-red-600'
-                    }`}>
-                      {ind.seu.toFixed(1)}{ind.unidade}
+                    <span
+                      className={`text-lg font-bold ${
+                        ind.cor === "green"
+                          ? "text-green-600"
+                          : ind.cor === "yellow"
+                            ? "text-yellow-600"
+                            : "text-red-600"
+                      }`}
+                    >
+                      {ind.seu.toFixed(1)}
+                      {ind.unidade}
                     </span>
                     <span className="text-sm text-gray-500">
-                      Ideal: {ind.idealMin > 0 ? `${ind.idealMin.toFixed(0)}-` : ''}{ind.idealMax.toFixed(0)}{ind.unidade}
+                      Ideal: {ind.idealMin > 0 ? `${ind.idealMin.toFixed(0)}-` : ""}
+                      {ind.idealMax.toFixed(0)}
+                      {ind.unidade}
                     </span>
                   </div>
                 </div>
@@ -355,20 +401,20 @@ const AnaliseInteligente = ({ dados, periodo }) => {
                 {/* Barra Visual */}
                 <div className="relative h-8 bg-gray-200 rounded-full overflow-hidden">
                   {/* Faixa Ideal (Verde) */}
-                  <div 
+                  <div
                     className="absolute h-full bg-green-200"
                     style={{
                       left: `${(ind.idealMin / 100) * 100}%`,
-                      width: `${(faixaIdeal / 100) * 100}%`
+                      width: `${(faixaIdeal / 100) * 100}%`,
                     }}
                   />
-                  
+
                   {/* Marcador do Valor Atual */}
-                  <div 
+                  <div
                     className="absolute h-full w-2 bg-gray-800 shadow-lg z-10"
                     style={{
                       left: `${Math.min(Math.max((ind.seu / 100) * 100, 0), 100)}%`,
-                      transform: 'translateX(-50%)'
+                      transform: "translateX(-50%)",
                     }}
                   >
                     <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
@@ -387,12 +433,18 @@ const AnaliseInteligente = ({ dados, periodo }) => {
                   ) : ind.seu < ind.idealMin ? (
                     <>
                       <TrendDown size={16} className="text-orange-600" />
-                      <span className="text-orange-600">Abaixo do ideal ({(ind.idealMin - ind.seu).toFixed(1)}{ind.unidade} a menos)</span>
+                      <span className="text-orange-600">
+                        Abaixo do ideal ({(ind.idealMin - ind.seu).toFixed(1)}
+                        {ind.unidade} a menos)
+                      </span>
                     </>
                   ) : (
                     <>
                       <AlertTriangle size={16} className="text-red-600" />
-                      <span className="text-red-600">Acima do ideal (+{(ind.seu - ind.idealMax).toFixed(1)}{ind.unidade})</span>
+                      <span className="text-red-600">
+                        Acima do ideal (+{(ind.seu - ind.idealMax).toFixed(1)}
+                        {ind.unidade})
+                      </span>
                     </>
                   )}
                 </div>
@@ -451,10 +503,12 @@ const AnaliseInteligente = ({ dados, periodo }) => {
               <div key={chave} className="bg-gray-50 rounded-lg p-4">
                 <p className="text-sm text-gray-600 mb-1 capitalize">{chave}</p>
                 <p className="text-xl font-bold text-gray-800 mb-2">
-                  R$ {valor.atual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  R$ {valor.atual.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                 </p>
                 {valor.variacao !== null && (
-                  <div className={`flex items-center gap-1 text-sm ${valor.variacao > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <div
+                    className={`flex items-center gap-1 text-sm ${valor.variacao > 0 ? "text-green-600" : "text-red-600"}`}
+                  >
                     {valor.variacao > 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
                     <span className="font-semibold">{Math.abs(valor.variacao).toFixed(1)}%</span>
                   </div>
@@ -477,15 +531,15 @@ const AnaliseInteligente = ({ dados, periodo }) => {
               <div
                 key={idx}
                 className={`p-4 rounded-lg border-l-4 ${
-                  alerta.tipo === 'critico'
-                    ? 'bg-red-50 border-red-500'
-                    : 'bg-yellow-50 border-yellow-500'
+                  alerta.tipo === "critico"
+                    ? "bg-red-50 border-red-500"
+                    : "bg-yellow-50 border-yellow-500"
                 }`}
               >
                 <div className="flex items-start gap-3">
                   <alerta.icon
                     size={20}
-                    className={alerta.tipo === 'critico' ? 'text-red-600' : 'text-yellow-600'}
+                    className={alerta.tipo === "critico" ? "text-red-600" : "text-yellow-600"}
                   />
                   <div>
                     <p className="font-semibold text-gray-800">{alerta.titulo}</p>
@@ -510,22 +564,22 @@ const AnaliseInteligente = ({ dados, periodo }) => {
               <div
                 key={idx}
                 className={`p-4 rounded-lg ${
-                  insight.tipo === 'positivo'
-                    ? 'bg-green-50'
-                    : insight.tipo === 'atencao'
-                    ? 'bg-yellow-50'
-                    : 'bg-blue-50'
+                  insight.tipo === "positivo"
+                    ? "bg-green-50"
+                    : insight.tipo === "atencao"
+                      ? "bg-yellow-50"
+                      : "bg-blue-50"
                 }`}
               >
                 <div className="flex items-start gap-3">
                   <insight.icon
                     size={20}
                     className={
-                      insight.tipo === 'positivo'
-                        ? 'text-green-600'
-                        : insight.tipo === 'atencao'
-                        ? 'text-yellow-600'
-                        : 'text-blue-600'
+                      insight.tipo === "positivo"
+                        ? "text-green-600"
+                        : insight.tipo === "atencao"
+                          ? "text-yellow-600"
+                          : "text-blue-600"
                     }
                   />
                   <div>
@@ -557,11 +611,11 @@ const AnaliseInteligente = ({ dados, periodo }) => {
                     <div className="flex items-center gap-2 mb-2">
                       <span
                         className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                          rec.prioridade === 'alta'
-                            ? 'bg-red-100 text-red-700'
-                            : rec.prioridade === 'media'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-blue-100 text-blue-700'
+                          rec.prioridade === "alta"
+                            ? "bg-red-100 text-red-700"
+                            : rec.prioridade === "media"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-blue-100 text-blue-700"
                         }`}
                       >
                         {rec.prioridade.toUpperCase()}

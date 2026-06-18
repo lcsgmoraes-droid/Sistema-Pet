@@ -103,10 +103,7 @@ export default function PDVModalsLayer({
       )}
 
       {mostrarModalAbrirCaixa && (
-        <ModalAbrirCaixa
-          onClose={onCloseModalAbrirCaixa}
-          onSucesso={onAbrirCaixaSucesso}
-        />
+        <ModalAbrirCaixa onClose={onCloseModalAbrirCaixa} onSucesso={onAbrirCaixaSucesso} />
       )}
 
       {mostrarCalculadoraRacao && (

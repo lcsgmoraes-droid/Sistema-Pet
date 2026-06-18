@@ -1,12 +1,11 @@
-import React from 'react';
-import ModalConfronto from './ModalConfronto';
-import ModalDecisaoRascunho from './ModalDecisaoRascunho';
-import ModalEnvioPedido from './ModalEnvioPedido';
-import ModalExportacaoPedido from './ModalExportacaoPedido';
-import ModalGruposFornecedores from './ModalGruposFornecedores';
-import ModalRecebimento from './ModalRecebimento';
-import PedidosCompraSugestaoModal from './PedidosCompraSugestaoModal';
-import { useEscapeToClose } from '../../utils/modalEscape';
+import ModalConfronto from "./ModalConfronto";
+import ModalDecisaoRascunho from "./ModalDecisaoRascunho";
+import ModalEnvioPedido from "./ModalEnvioPedido";
+import ModalExportacaoPedido from "./ModalExportacaoPedido";
+import ModalGruposFornecedores from "./ModalGruposFornecedores";
+import ModalRecebimento from "./ModalRecebimento";
+import PedidosCompraSugestaoModal from "./PedidosCompraSugestaoModal";
+import { useEscapeToClose } from "../../utils/modalEscape";
 
 export default function PedidosCompraModalsLayer({
   mostrarRecebimento,

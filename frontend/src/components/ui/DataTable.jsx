@@ -155,85 +155,80 @@ export default function DataTable({
         onScroll={() => sincronizarRolagem(bottomScrollRef.current, topScrollRef.current)}
         className="erp-data-table-wrap overflow-x-auto"
       >
-      <table
-        ref={tableRef}
-        className={[
-          "w-full border-collapse text-sm",
-          tableClassName,
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        <thead className={["bg-slate-100", theadClassName].filter(Boolean).join(" ")}>
-          <tr>
-            {columns.map((column) => renderHeaderCell(column, headerContext))}
-          </tr>
-        </thead>
-        <tbody className={tbodyClassName}>
-          {loading ? (
-            <tr>
-              <td colSpan={colSpan} className="px-4 py-8 text-center text-slate-500">
-                {loadingMessage}
-              </td>
-            </tr>
-          ) : data.length === 0 ? (
-            <tr>
-              <td colSpan={colSpan} className="px-4 py-8 text-center text-slate-500">
-                {emptyMessage}
-              </td>
-            </tr>
-          ) : (
-            data.map((row, rowIndex) => {
-              const rowKey = getRowKey ? getRowKey(row, rowIndex) : row?.id ?? rowIndex;
-              const expanded = isRowExpanded?.(row, rowIndex);
-              const clickable = typeof onRowClick === "function";
-              const cellContext = getCellContext?.(row, rowIndex);
+        <table
+          ref={tableRef}
+          className={["w-full border-collapse text-sm", tableClassName].filter(Boolean).join(" ")}
+        >
+          <thead className={["bg-slate-100", theadClassName].filter(Boolean).join(" ")}>
+            <tr>{columns.map((column) => renderHeaderCell(column, headerContext))}</tr>
+          </thead>
+          <tbody className={tbodyClassName}>
+            {loading ? (
+              <tr>
+                <td colSpan={colSpan} className="px-4 py-8 text-center text-slate-500">
+                  {loadingMessage}
+                </td>
+              </tr>
+            ) : data.length === 0 ? (
+              <tr>
+                <td colSpan={colSpan} className="px-4 py-8 text-center text-slate-500">
+                  {emptyMessage}
+                </td>
+              </tr>
+            ) : (
+              data.map((row, rowIndex) => {
+                const rowKey = getRowKey ? getRowKey(row, rowIndex) : (row?.id ?? rowIndex);
+                const expanded = isRowExpanded?.(row, rowIndex);
+                const clickable = typeof onRowClick === "function";
+                const cellContext = getCellContext?.(row, rowIndex);
 
-              return (
-                <Fragment key={rowKey}>
-                  <tr
-                    ref={getRowRef ? (element) => getRowRef(row, rowIndex, element) : undefined}
-                    onClick={clickable ? (event) => onRowClick(row, rowIndex, event) : undefined}
-                    className={[
-                      "border-b border-slate-100 transition hover:bg-slate-50",
-                      clickable ? "cursor-pointer" : "",
-                      resolveClassName(rowClassName, row, rowIndex),
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
-                    {columns.map((column) => {
-                      const rendered = renderCell(column, row, rowIndex, cellContext);
+                return (
+                  <Fragment key={rowKey}>
+                    <tr
+                      ref={getRowRef ? (element) => getRowRef(row, rowIndex, element) : undefined}
+                      onClick={clickable ? (event) => onRowClick(row, rowIndex, event) : undefined}
+                      className={[
+                        "border-b border-slate-100 transition hover:bg-slate-50",
+                        clickable ? "cursor-pointer" : "",
+                        resolveClassName(rowClassName, row, rowIndex),
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {columns.map((column) => {
+                        const rendered = renderCell(column, row, rowIndex, cellContext);
 
-                      if (isTableElement(rendered, "td")) {
-                        return cloneElement(rendered, { key: column.key });
-                      }
+                        if (isTableElement(rendered, "td")) {
+                          return cloneElement(rendered, { key: column.key });
+                        }
 
-                      return (
-                        <td
-                          key={column.key}
-                          className={[
-                            "px-2 py-2 align-middle",
-                            ALIGN_CLASSES[column.align || "left"],
-                            resolveClassName(column.className, row, rowIndex),
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
-                          title={resolveClassName(column.cellTitle, row, rowIndex)}
-                          style={resolveClassName(column.cellStyle, row, rowIndex)}
-                        >
-                          {rendered}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                  {expanded && renderExpandedRow ? renderExpandedRow(row, rowIndex, colSpan) : null}
-                </Fragment>
-              );
-            })
-          )}
-        </tbody>
-      </table>
+                        return (
+                          <td
+                            key={column.key}
+                            className={[
+                              "px-2 py-2 align-middle",
+                              ALIGN_CLASSES[column.align || "left"],
+                              resolveClassName(column.className, row, rowIndex),
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                            title={resolveClassName(column.cellTitle, row, rowIndex)}
+                            style={resolveClassName(column.cellStyle, row, rowIndex)}
+                          >
+                            {rendered}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    {expanded && renderExpandedRow
+                      ? renderExpandedRow(row, rowIndex, colSpan)
+                      : null}
+                  </Fragment>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

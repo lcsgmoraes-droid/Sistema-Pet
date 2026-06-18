@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import {
-  formatarMoeda,
-  getRelatorioValorizacaoEstoque,
-} from "../api/produtos";
+import { formatarMoeda, getRelatorioValorizacaoEstoque } from "../api/produtos";
 import FornecedorSelector, {
   getFornecedorNome,
 } from "../components/fornecedores/FornecedorSelector";
@@ -185,8 +182,7 @@ export default function ProdutosValorizacaoEstoque() {
     } catch (error) {
       console.error("Erro ao carregar relatorio de valorizacao:", error);
       toast.error(
-        error?.response?.data?.detail ||
-          "Nao foi possivel carregar o relatorio de valorizacao.",
+        error?.response?.data?.detail || "Nao foi possivel carregar o relatorio de valorizacao.",
       );
       setDados({
         items: [],
@@ -254,31 +250,23 @@ export default function ProdutosValorizacaoEstoque() {
     setFiltrosAplicados(filtrosIniciais);
   };
 
-  const inicioItem =
-    dados.total === 0 ? 0 : (dados.page - 1) * dados.page_size + 1;
-  const fimItem =
-    dados.total === 0 ? 0 : Math.min(dados.page * dados.page_size, dados.total);
+  const inicioItem = dados.total === 0 ? 0 : (dados.page - 1) * dados.page_size + 1;
+  const fimItem = dados.total === 0 ? 0 : Math.min(dados.page * dados.page_size, dados.total);
   const totalPaginas = dados.pages || 0;
 
   return (
     <div className="space-y-6 p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Valorizacao de Estoque
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900">Valorizacao de Estoque</h1>
           <p className="mt-2 max-w-4xl text-sm text-gray-600">
-            Use esta tela para medir o estoque fisico por area, produto e total,
-            olhando custo, potencial de venda e saldo disponivel. Kits virtuais
-            ficam fora da conta por padrao para nao duplicar o mesmo estoque dos
-            itens base.
+            Use esta tela para medir o estoque fisico por area, produto e total, olhando custo,
+            potencial de venda e saldo disponivel. Kits virtuais ficam fora da conta por padrao para
+            nao duplicar o mesmo estoque dos itens base.
           </p>
         </div>
 
-        <ActionButton
-          onClick={() => navigate("/produtos")}
-          tone="soft"
-        >
+        <ActionButton onClick={() => navigate("/produtos")} tone="soft">
           Voltar para produtos
         </ActionButton>
       </div>
@@ -289,9 +277,7 @@ export default function ProdutosValorizacaoEstoque() {
       >
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
           <div className="xl:col-span-2">
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Busca
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Busca</label>
             <input
               type="text"
               value={filtrosForm.busca}
@@ -343,14 +329,10 @@ export default function ProdutosValorizacaoEstoque() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Area / setor
-            </label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Area / setor</label>
             <select
               value={filtrosForm.departamento_id}
-              onChange={(event) =>
-                atualizarFiltro("departamento_id", event.target.value)
-              }
+              onChange={(event) => atualizarFiltro("departamento_id", event.target.value)}
               className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
             >
               <option value="">Todos os setores</option>
@@ -370,9 +352,7 @@ export default function ProdutosValorizacaoEstoque() {
                 <input
                   type="checkbox"
                   checked={filtrosForm.apenas_com_estoque}
-                  onChange={(event) =>
-                    atualizarFiltro("apenas_com_estoque", event.target.checked)
-                  }
+                  onChange={(event) => atualizarFiltro("apenas_com_estoque", event.target.checked)}
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 Somente itens com estoque
@@ -394,9 +374,7 @@ export default function ProdutosValorizacaoEstoque() {
                 <span>Itens por pagina</span>
                 <select
                   value={filtrosForm.page_size}
-                  onChange={(event) =>
-                    atualizarFiltro("page_size", Number(event.target.value))
-                  }
+                  onChange={(event) => atualizarFiltro("page_size", Number(event.target.value))}
                   className="rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
                 >
                   {[25, 50, 100, 200].map((size) => (
@@ -409,16 +387,10 @@ export default function ProdutosValorizacaoEstoque() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <ActionButton
-                onClick={limparFiltros}
-                tone="soft"
-              >
+              <ActionButton onClick={limparFiltros} tone="soft">
                 Limpar filtros
               </ActionButton>
-              <ActionButton
-                type="submit"
-                intent="edit"
-              >
+              <ActionButton type="submit" intent="edit">
                 Atualizar relatorio
               </ActionButton>
             </div>
@@ -480,18 +452,14 @@ export default function ProdutosValorizacaoEstoque() {
       <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
         <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="border-b border-gray-200 px-5 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Resumo por area
-            </h2>
+            <h2 className="text-lg font-semibold text-gray-900">Resumo por area</h2>
             <p className="mt-1 text-sm text-gray-500">
               Veja quanto cada area representa em unidades, custo e potencial de venda.
             </p>
           </div>
 
           {loading ? (
-            <div className="px-5 py-10 text-center text-sm text-gray-500">
-              Calculando areas...
-            </div>
+            <div className="px-5 py-10 text-center text-sm text-gray-500">Calculando areas...</div>
           ) : dados.areas.length === 0 ? (
             <div className="px-5 py-10 text-center text-sm text-gray-500">
               Nenhuma area encontrada para os filtros atuais.
@@ -526,47 +494,45 @@ export default function ProdutosValorizacaoEstoque() {
                     );
 
                     return (
-                    <tr key={area.area_nome} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 align-top">
-                        <div className="font-semibold text-gray-900">
-                          {area.area_nome}
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          {area.total_produtos} produto(s)
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-gray-700">
-                        {formatarQuantidade(area.total_itens_estoque)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-gray-700">
-                        {formatarQuantidade(area.total_itens_disponiveis)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="inline-flex min-w-[76px] flex-col items-end gap-1">
-                          <span className="text-sm font-semibold text-slate-800">
-                            {percentualReserva.toFixed(1)}%
-                          </span>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                            <div
-                              className={`h-full ${
-                                percentualReserva >= 50
-                                  ? "bg-amber-400"
-                                  : percentualReserva > 0
-                                    ? "bg-blue-400"
-                                    : "bg-emerald-400"
-                              }`}
-                              style={{ width: `${percentualReserva}%` }}
-                            />
+                      <tr key={area.area_nome} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 align-top">
+                          <div className="font-semibold text-gray-900">{area.area_nome}</div>
+                          <div className="mt-1 text-xs text-gray-500">
+                            {area.total_produtos} produto(s)
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm font-semibold text-blue-700">
-                        {formatarMoeda(area.valor_custo_total)}
-                        <div className="mt-1 text-xs font-normal text-emerald-700">
-                          Venda: {formatarMoeda(area.valor_venda_total)}
-                        </div>
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm text-gray-700">
+                          {formatarQuantidade(area.total_itens_estoque)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm text-gray-700">
+                          {formatarQuantidade(area.total_itens_disponiveis)}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="inline-flex min-w-[76px] flex-col items-end gap-1">
+                            <span className="text-sm font-semibold text-slate-800">
+                              {percentualReserva.toFixed(1)}%
+                            </span>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                              <div
+                                className={`h-full ${
+                                  percentualReserva >= 50
+                                    ? "bg-amber-400"
+                                    : percentualReserva > 0
+                                      ? "bg-blue-400"
+                                      : "bg-emerald-400"
+                                }`}
+                                style={{ width: `${percentualReserva}%` }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold text-blue-700">
+                          {formatarMoeda(area.valor_custo_total)}
+                          <div className="mt-1 text-xs font-normal text-emerald-700">
+                            Venda: {formatarMoeda(area.valor_venda_total)}
+                          </div>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
@@ -578,9 +544,7 @@ export default function ProdutosValorizacaoEstoque() {
         <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-gray-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                Produtos filtrados
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900">Produtos filtrados</h2>
               <p className="text-sm text-gray-500">
                 {dados.total === 0
                   ? "Nenhum produto encontrado."
@@ -603,9 +567,7 @@ export default function ProdutosValorizacaoEstoque() {
                 </span>
                 <button
                   type="button"
-                  onClick={() =>
-                    setPaginaAtual((prev) => Math.min(totalPaginas, prev + 1))
-                  }
+                  onClick={() => setPaginaAtual((prev) => Math.min(totalPaginas, prev + 1))}
                   disabled={paginaAtual >= totalPaginas || loading}
                   className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -671,80 +633,78 @@ export default function ProdutosValorizacaoEstoque() {
                     );
 
                     return (
-                    <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 align-top">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold text-gray-900">
-                            {item.nome}
-                          </span>
-                          <BadgeTipoProduto item={item} />
-                          <BadgeSituacaoEstoque item={item} />
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          Codigo {item.codigo || "-"}
-                          {item.sku ? ` | SKU ${item.sku}` : ""}
-                        </div>
-                        {item.categoria_nome && (
-                          <div className="mt-1 text-xs text-gray-400">
-                            Categoria: {item.categoria_nome}
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 align-top">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-semibold text-gray-900">{item.nome}</span>
+                            <BadgeTipoProduto item={item} />
+                            <BadgeSituacaoEstoque item={item} />
                           </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 align-top text-sm text-gray-700">
-                        <FornecedorIdentity
-                          fallback=""
-                          nameClassName="font-medium text-gray-700"
-                          record={item}
-                          showDocument={false}
-                        />
-                      </td>
-                      <td className="px-4 py-3 align-top text-sm text-gray-700">
-                        <div>{item.marca_nome || "Sem marca"}</div>
-                        <div className="mt-1 text-xs text-gray-500">
-                          {item.departamento_nome || "Sem setor"}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm font-medium text-gray-900">
-                        {formatarQuantidade(item.estoque_atual)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-amber-700">
-                        {formatarQuantidade(item.estoque_reservado)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm font-semibold text-emerald-700">
-                        {formatarQuantidade(item.estoque_disponivel)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="inline-flex min-w-[84px] flex-col items-center gap-1">
-                          <span className="text-xs font-semibold text-slate-700">
-                            {percentualReserva.toFixed(1)}% reservado
-                          </span>
-                          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                            <div
-                              className={`h-full ${
-                                percentualReserva >= 50
-                                  ? "bg-amber-400"
-                                  : percentualReserva > 0
-                                    ? "bg-blue-400"
-                                    : "bg-emerald-400"
-                              }`}
-                              style={{ width: `${percentualReserva}%` }}
-                            />
+                          <div className="mt-1 text-xs text-gray-500">
+                            Codigo {item.codigo || "-"}
+                            {item.sku ? ` | SKU ${item.sku}` : ""}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-gray-700">
-                        {formatarMoeda(item.preco_custo)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm text-gray-700">
-                        {formatarMoeda(item.preco_venda)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm font-semibold text-blue-700">
-                        {formatarMoeda(item.valor_custo_total)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm font-semibold text-emerald-700">
-                        {formatarMoeda(item.valor_venda_total)}
-                      </td>
-                    </tr>
+                          {item.categoria_nome && (
+                            <div className="mt-1 text-xs text-gray-400">
+                              Categoria: {item.categoria_nome}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 align-top text-sm text-gray-700">
+                          <FornecedorIdentity
+                            fallback=""
+                            nameClassName="font-medium text-gray-700"
+                            record={item}
+                            showDocument={false}
+                          />
+                        </td>
+                        <td className="px-4 py-3 align-top text-sm text-gray-700">
+                          <div>{item.marca_nome || "Sem marca"}</div>
+                          <div className="mt-1 text-xs text-gray-500">
+                            {item.departamento_nome || "Sem setor"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm font-medium text-gray-900">
+                          {formatarQuantidade(item.estoque_atual)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm text-amber-700">
+                          {formatarQuantidade(item.estoque_reservado)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold text-emerald-700">
+                          {formatarQuantidade(item.estoque_disponivel)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <div className="inline-flex min-w-[84px] flex-col items-center gap-1">
+                            <span className="text-xs font-semibold text-slate-700">
+                              {percentualReserva.toFixed(1)}% reservado
+                            </span>
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                              <div
+                                className={`h-full ${
+                                  percentualReserva >= 50
+                                    ? "bg-amber-400"
+                                    : percentualReserva > 0
+                                      ? "bg-blue-400"
+                                      : "bg-emerald-400"
+                                }`}
+                                style={{ width: `${percentualReserva}%` }}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm text-gray-700">
+                          {formatarMoeda(item.preco_custo)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm text-gray-700">
+                          {formatarMoeda(item.preco_venda)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold text-blue-700">
+                          {formatarMoeda(item.valor_custo_total)}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold text-emerald-700">
+                          {formatarMoeda(item.valor_venda_total)}
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>

@@ -24,9 +24,13 @@ export function buildProtocoloPayload(form) {
   return {
     nome: form.nome.trim(),
     especie: form.especie.trim() || undefined,
-    dose_inicial_semanas: form.dose_inicial_semanas ? parseInt(form.dose_inicial_semanas, 10) : undefined,
+    dose_inicial_semanas: form.dose_inicial_semanas
+      ? parseInt(form.dose_inicial_semanas, 10)
+      : undefined,
     numero_doses_serie: form.numero_doses_serie ? parseInt(form.numero_doses_serie, 10) : undefined,
-    intervalo_doses_dias: form.intervalo_doses_dias ? parseInt(form.intervalo_doses_dias, 10) : undefined,
+    intervalo_doses_dias: form.intervalo_doses_dias
+      ? parseInt(form.intervalo_doses_dias, 10)
+      : undefined,
     reforco_anual: Boolean(form.reforco_anual),
     observacoes: form.observacoes.trim() || undefined,
   };

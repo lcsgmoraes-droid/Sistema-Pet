@@ -1,4 +1,9 @@
-export default function HorariosSugeridosAgendaDia({ agendaDiaModal, formNovo, horariosAgendaModal, onChangeCampo }) {
+export default function HorariosSugeridosAgendaDia({
+  agendaDiaModal,
+  formNovo,
+  horariosAgendaModal,
+  onChangeCampo,
+}) {
   return (
     <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
       <div className="flex items-center justify-between gap-3">
@@ -50,8 +55,8 @@ function HorarioSugeridoButton({ formNovo, onChangeCampo, slot }) {
             ? "border-blue-600 bg-blue-600 text-white"
             : "border-amber-500 bg-amber-500 text-white"
           : slot.livre
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-          : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+            : "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
       }`}
     >
       <div>{slot.horario}</div>

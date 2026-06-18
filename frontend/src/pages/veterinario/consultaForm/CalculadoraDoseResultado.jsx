@@ -3,7 +3,8 @@ export default function CalculadoraDoseResultado({ resultado }) {
     <div className="mt-5 rounded-xl border border-cyan-100 bg-cyan-50 p-4">
       {!resultado ? (
         <p className="text-sm text-cyan-700">
-          Informe peso e dose para calcular. Se quiser, você ainda pode abrir a calculadora completa depois.
+          Informe peso e dose para calcular. Se quiser, você ainda pode abrir a calculadora completa
+          depois.
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">

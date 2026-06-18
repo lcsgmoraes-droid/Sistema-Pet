@@ -43,10 +43,7 @@ export function usePDVVendaCarregamento({
 }) {
   const carregamentosEmAndamentoRef = useRef(new Map());
 
-  const carregarVendaEspecifica = async (
-    vendaId,
-    abrirModalPagamento = false,
-  ) => {
+  const carregarVendaEspecifica = async (vendaId, abrirModalPagamento = false) => {
     const vendaIdNormalizado = Number.parseInt(vendaId, 10);
     if (!Number.isFinite(vendaIdNormalizado) || vendaIdNormalizado <= 0) {
       alert("Venda invalida");
@@ -54,8 +51,7 @@ export function usePDVVendaCarregamento({
     }
 
     const chaveCarregamento = String(vendaIdNormalizado);
-    const carregamentoExistente =
-      carregamentosEmAndamentoRef.current.get(chaveCarregamento);
+    const carregamentoExistente = carregamentosEmAndamentoRef.current.get(chaveCarregamento);
 
     if (carregamentoExistente) {
       await carregamentoExistente;
@@ -86,9 +82,7 @@ export function usePDVVendaCarregamento({
           }
         }
 
-        const { pagamentos, totalPago } = await carregarPagamentosVenda(
-          vendaIdNormalizado,
-        );
+        const { pagamentos, totalPago } = await carregarPagamentosVenda(vendaIdNormalizado);
 
         await sincronizarComissaoDaVenda(venda.funcionario_id);
 
@@ -120,9 +114,7 @@ export function usePDVVendaCarregamento({
         setModoVisualizacao(true);
 
         await sincronizarEntregadorDaVenda(venda.entregador_id);
-        await recarregarContextoClientePorId?.(
-          clienteCompleto?.id || venda.cliente_id,
-        );
+        await recarregarContextoClientePorId?.(clienteCompleto?.id || venda.cliente_id);
 
         if (abrirModalPagamento) {
           setTimeout(() => {
@@ -134,9 +126,7 @@ export function usePDVVendaCarregamento({
         if (error.response?.status === 404) {
           alert("Venda nao encontrada. Pode ter sido cancelada ou excluida.");
         } else {
-          alert(
-            "Erro ao carregar venda: " + (error.message || "Erro desconhecido"),
-          );
+          alert("Erro ao carregar venda: " + (error.message || "Erro desconhecido"));
         }
       } finally {
         setLoading(false);
@@ -243,9 +233,7 @@ export function usePDVVendaCarregamento({
         itens: vendaCompleta.itens || [],
         subtotal: parseFloat(vendaCompleta.subtotal || vendaCompleta.total),
         desconto_valor: parseFloat(vendaCompleta.desconto_valor || 0),
-        desconto_percentual: parseFloat(
-          vendaCompleta.desconto_percentual || 0,
-        ),
+        desconto_percentual: parseFloat(vendaCompleta.desconto_percentual || 0),
         cupom_code: vendaCompleta.cupom_code || null,
         cupom_discount_applied: vendaCompleta.cupom_discount_applied ?? null,
         total: parseFloat(vendaCompleta.total),
@@ -256,12 +244,8 @@ export function usePDVVendaCarregamento({
         entrega: {
           endereco_completo: vendaCompleta.endereco_entrega || "",
           endereco_id: vendaCompleta.endereco_id || null,
-          taxa_entrega_total: parseFloat(
-            parseFloat(vendaCompleta.taxa_entrega || 0).toFixed(2),
-          ),
-          taxa_loja: parseFloat(
-            parseFloat(vendaCompleta.entrega?.taxa_loja || 0).toFixed(2),
-          ),
+          taxa_entrega_total: parseFloat(parseFloat(vendaCompleta.taxa_entrega || 0).toFixed(2)),
+          taxa_loja: parseFloat(parseFloat(vendaCompleta.entrega?.taxa_loja || 0).toFixed(2)),
           taxa_entregador: parseFloat(
             parseFloat(vendaCompleta.entrega?.taxa_entregador || 0).toFixed(2),
           ),
@@ -277,9 +261,7 @@ export function usePDVVendaCarregamento({
 
       setVendaAtual(vendaParaSetar);
       setModoVisualizacao(true);
-      await recarregarContextoClientePorId?.(
-        clienteCompleto?.id || vendaCompleta.cliente_id,
-      );
+      await recarregarContextoClientePorId?.(clienteCompleto?.id || vendaCompleta.cliente_id);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error("Erro ao reabrir venda:", error);

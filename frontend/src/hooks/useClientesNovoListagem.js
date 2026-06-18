@@ -4,8 +4,7 @@ import api from "../api";
 export function useClientesNovoListagem({ tipoFiltro, setError }) {
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [carregamentoInicialConcluido, setCarregamentoInicialConcluido] =
-    useState(false);
+  const [carregamentoInicialConcluido, setCarregamentoInicialConcluido] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [totalRegistros, setTotalRegistros] = useState(0);
@@ -27,9 +26,7 @@ export function useClientesNovoListagem({ tipoFiltro, setError }) {
       const paginaDesejada = options.paginaAtual ?? paginaAtual;
       const limiteDesejado = options.registrosPorPagina ?? registrosPorPagina;
       const termoBusca =
-        typeof options.searchTerm === "string"
-          ? options.searchTerm.trim()
-          : searchTermAplicado;
+        typeof options.searchTerm === "string" ? options.searchTerm.trim() : searchTermAplicado;
 
       try {
         setLoading(true);
@@ -68,13 +65,7 @@ export function useClientesNovoListagem({ tipoFiltro, setError }) {
         setCarregamentoInicialConcluido(true);
       }
     },
-    [
-      paginaAtual,
-      registrosPorPagina,
-      searchTermAplicado,
-      setError,
-      tipoFiltro,
-    ],
+    [paginaAtual, registrosPorPagina, searchTermAplicado, setError, tipoFiltro],
   );
 
   useEffect(() => {
@@ -89,9 +80,8 @@ export function useClientesNovoListagem({ tipoFiltro, setError }) {
       }
 
       return (
-        clientes.find(
-          (cliente) => String(cliente?.codigo || "").trim() === termoNormalizado,
-        ) || null
+        clientes.find((cliente) => String(cliente?.codigo || "").trim() === termoNormalizado) ||
+        null
       );
     },
     [clientes],

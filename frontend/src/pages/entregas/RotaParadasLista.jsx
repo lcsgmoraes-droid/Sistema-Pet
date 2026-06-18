@@ -25,12 +25,8 @@ function RotaParadasLista({
     <>
       {/* Paradas Expandidas */}
       {expandida && paradasOrdenadas.length > 0 && (
-        <div
-          style={{ marginTop: 20, borderTop: "2px solid #eee", paddingTop: 15 }}
-        >
-          <h4 style={{ marginBottom: 15 }}>
-            📍 Paradas da Rota (arraste para reordenar)
-          </h4>
+        <div style={{ marginTop: 20, borderTop: "2px solid #eee", paddingTop: 15 }}>
+          <h4 style={{ marginBottom: 15 }}>📍 Paradas da Rota (arraste para reordenar)</h4>
 
           {paradasOrdenadas.map((parada, index) => (
             <div key={parada.id}>
@@ -44,8 +40,7 @@ function RotaParadasLista({
                   marginBottom: 10,
                   border: "1px solid #ddd",
                   borderRadius: 6,
-                  backgroundColor:
-                    draggedIndex === index ? "#f0f8ff" : "#fafafa",
+                  backgroundColor: draggedIndex === index ? "#f0f8ff" : "#fafafa",
                   cursor: "move",
                   display: "flex",
                   justifyContent: "space-between",
@@ -70,9 +65,7 @@ function RotaParadasLista({
                     >
                       {parada.ordem}º
                     </span>
-                    <span style={{ color: "#666", fontSize: 14 }}>
-                      Venda #{parada.venda_id}
-                    </span>
+                    <span style={{ color: "#666", fontSize: 14 }}>Venda #{parada.venda_id}</span>
                     {parada.status && (
                       <span
                         style={{
@@ -137,7 +130,8 @@ function RotaParadasLista({
                       )}
                       {parada.distancia_acumulada_real_km && (
                         <span style={{ marginLeft: 12, color: "#0f766e" }}>
-                          • Acumulado real: {Number(parada.distancia_acumulada_real_km).toFixed(2)} km
+                          • Acumulado real: {Number(parada.distancia_acumulada_real_km).toFixed(2)}{" "}
+                          km
                         </span>
                       )}
                       {parada.distancia_acumulada && (
@@ -154,11 +148,8 @@ function RotaParadasLista({
                   </div>
 
                   {parada.data_entrega && (
-                    <div
-                      style={{ color: "#28a745", fontSize: 12, marginTop: 3 }}
-                    >
-                      ✓ Entregue em:{" "}
-                      {new Date(parada.data_entrega).toLocaleString("pt-BR")}
+                    <div style={{ color: "#28a745", fontSize: 12, marginTop: 3 }}>
+                      ✓ Entregue em: {new Date(parada.data_entrega).toLocaleString("pt-BR")}
                     </div>
                   )}
 
@@ -190,67 +181,48 @@ function RotaParadasLista({
                   }}
                 >
                   {/* Botão Entregue - só aparece se status != entregue */}
-                  {parada.status !== "entregue" &&
-                    rota.status === "em_rota" && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          marcarComoEntregue(parada.id, rota.id);
-                        }}
-                        disabled={processandoEntrega === parada.id}
-                        style={{
-                          padding: "8px 12px",
-                          backgroundColor:
-                            processandoEntrega === parada.id
-                              ? "#ccc"
-                              : "#28A745",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: 6,
-                          cursor:
-                            processandoEntrega === parada.id
-                              ? "not-allowed"
-                              : "pointer",
-                          fontWeight: "600",
-                          fontSize: 12,
-                          whiteSpace: "nowrap",
-                          width: "130px",
-                          textAlign: "center",
-                        }}
-                      >
-                        {processandoEntrega === parada.id
-                          ? "⏳..."
-                          : "✅ Entregue"}
-                      </button>
-                    )}
+                  {parada.status !== "entregue" && rota.status === "em_rota" && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        marcarComoEntregue(parada.id, rota.id);
+                      }}
+                      disabled={processandoEntrega === parada.id}
+                      style={{
+                        padding: "8px 12px",
+                        backgroundColor: processandoEntrega === parada.id ? "#ccc" : "#28A745",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 6,
+                        cursor: processandoEntrega === parada.id ? "not-allowed" : "pointer",
+                        fontWeight: "600",
+                        fontSize: 12,
+                        whiteSpace: "nowrap",
+                        width: "130px",
+                        textAlign: "center",
+                      }}
+                    >
+                      {processandoEntrega === parada.id ? "⏳..." : "✅ Entregue"}
+                    </button>
+                  )}
 
                   {/* Botão Não Entregue - só aparece para rotas em andamento */}
                   {parada.status !== "entregue" &&
-                    (rota.status === "em_rota" ||
-                      rota.status === "em_andamento") && (
+                    (rota.status === "em_rota" || rota.status === "em_andamento") && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          marcarNaoEntregue(
-                            parada.id,
-                            rota.id,
-                            parada.venda_id,
-                          );
+                          marcarNaoEntregue(parada.id, rota.id, parada.venda_id);
                         }}
                         disabled={processandoNaoEntregue === parada.id}
                         style={{
                           padding: "8px 12px",
                           backgroundColor:
-                            processandoNaoEntregue === parada.id
-                              ? "#ccc"
-                              : "#FFC107",
+                            processandoNaoEntregue === parada.id ? "#ccc" : "#FFC107",
                           color: "#000",
                           border: "none",
                           borderRadius: 6,
-                          cursor:
-                            processandoNaoEntregue === parada.id
-                              ? "not-allowed"
-                              : "pointer",
+                          cursor: processandoNaoEntregue === parada.id ? "not-allowed" : "pointer",
                           fontWeight: "600",
                           fontSize: 12,
                           whiteSpace: "nowrap",
@@ -258,9 +230,7 @@ function RotaParadasLista({
                           textAlign: "center",
                         }}
                       >
-                        {processandoNaoEntregue === parada.id
-                          ? "⏳..."
-                          : "⚠️ Falta Entregar"}
+                        {processandoNaoEntregue === parada.id ? "⏳..." : "⚠️ Falta Entregar"}
                       </button>
                     )}
 

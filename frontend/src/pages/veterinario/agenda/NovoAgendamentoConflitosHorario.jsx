@@ -10,12 +10,14 @@ export default function NovoAgendamentoConflitosHorario({
       <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
         {diagnosticoConflitoSelecionado.conflitosVeterinario.length > 0 && (
           <p>
-            {veterinarioSelecionadoModal?.nome || "O veterinario selecionado"} ja possui paciente nesse horario.
+            {veterinarioSelecionadoModal?.nome || "O veterinario selecionado"} ja possui paciente
+            nesse horario.
           </p>
         )}
         {diagnosticoConflitoSelecionado.conflitosConsultorio.length > 0 && (
           <p>
-            {consultorioSelecionadoModal?.nome || "O consultorio selecionado"} ja esta reservado nesse horario.
+            {consultorioSelecionadoModal?.nome || "O consultorio selecionado"} ja esta reservado
+            nesse horario.
           </p>
         )}
         <p className="mt-1">Escolha outro horario, profissional ou consultorio para continuar.</p>

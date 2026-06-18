@@ -1,6 +1,6 @@
 /**
  * SPRINT 6 - PASSO 6: Componente de Conferência Avançada com Filtros
- * 
+ *
  * Funcionalidades:
  * - Filtros por grupo de produto, produto, período
  * - Rodapé com período selecionado e totais
@@ -8,10 +8,10 @@
  * - UX tipo ERP (SimpleVet)
  */
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import api from '../../api';
-import CustomerIdentity from '../../components/ui/CustomerIdentity';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import api from "../../api";
+import CustomerIdentity from "../../components/ui/CustomerIdentity";
 
 const ConferenciaAvancada = () => {
   const { funcionario_id } = useParams();
@@ -19,7 +19,7 @@ const ConferenciaAvancada = () => {
 
   // Estado de carregamento
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [, setError] = useState(null);
 
   // Dados gerais
   const [funcionario, setFuncionario] = useState(null);
@@ -29,21 +29,20 @@ const ConferenciaAvancada = () => {
 
   // Filtros
   const [gruposProduto, setGruposProduto] = useState([]);
-  const [produtos, setProdutos] = useState([]);
   const [formasPagamento, setFormasPagamento] = useState([]);
 
-  const [filtroGrupo, setFiltroGrupo] = useState('');
-  const [filtroProduto, setFiltroProduto] = useState('');
-  const [filtroDataInicio, setFiltroDataInicio] = useState('');
-  const [filtroDataFim, setFiltroDataFim] = useState('');
+  const [filtroGrupo, setFiltroGrupo] = useState("");
+  const [filtroProduto, setFiltroProduto] = useState("");
+  const [filtroDataInicio, setFiltroDataInicio] = useState("");
+  const [filtroDataFim, setFiltroDataFim] = useState("");
 
   // Modal de fechamento
   const [mostrarModalFechamento, setMostrarModalFechamento] = useState(false);
   const [comissoesSelecionadas, setComissoesSelecionadas] = useState(new Set());
-  const [valorPago, setValorPago] = useState('');
-  const [formaPagamentoSelecionada, setFormaPagamentoSelecionada] = useState('nao_informado');
-  const [dataPagamento, setDataPagamento] = useState(new Date().toISOString().split('T')[0]);
-  const [observacoes, setObservacoes] = useState('');
+  const [valorPago, setValorPago] = useState("");
+  const [formaPagamentoSelecionada, setFormaPagamentoSelecionada] = useState("nao_informado");
+  const [dataPagamento, setDataPagamento] = useState(new Date().toISOString().split("T")[0]);
+  const [observacoes, setObservacoes] = useState("");
   const [loadingFechamento, setLoadingFechamento] = useState(false);
   const [erroFechamento, setErroFechamento] = useState(null);
 
@@ -67,20 +66,19 @@ const ConferenciaAvancada = () => {
       }
 
       // Carregar formas de pagamento
-      const formasRes = await api.get('/comissoes/formas-pagamento');
+      const formasRes = await api.get("/comissoes/formas-pagamento");
       if (formasRes.data.success) {
         setFormasPagamento(formasRes.data.formas);
       }
 
       // Carregar grupos de produto (categorias)
-      const categoriasRes = await api.get('/produtos/categorias');
+      const categoriasRes = await api.get("/produtos/categorias");
       if (categoriasRes.data.data) {
         setGruposProduto(categoriasRes.data.data);
       }
-
     } catch (err) {
-      setError(err.response?.data?.detail || 'Erro ao carregar dados');
-      console.error('Erro:', err);
+      setError(err.response?.data?.detail || "Erro ao carregar dados");
+      console.error("Erro:", err);
     } finally {
       setLoading(false);
     }
@@ -89,7 +87,7 @@ const ConferenciaAvancada = () => {
   const aplicarFiltros = async () => {
     try {
       setLoading(true);
-      
+
       const params = {
         grupo_produto: filtroGrupo ? parseInt(filtroGrupo) : undefined,
         produto_id: filtroProduto ? parseInt(filtroProduto) : undefined,
@@ -97,10 +95,9 @@ const ConferenciaAvancada = () => {
         data_fim: filtroDataFim || undefined,
       };
 
-      const confRes = await api.get(
-        `/comissoes/conferencia-avancada/${funcionario_id}`,
-        { params: Object.fromEntries(Object.entries(params).filter(([_, v]) => v !== undefined)) }
-      );
+      const confRes = await api.get(`/comissoes/conferencia-avancada/${funcionario_id}`, {
+        params: Object.fromEntries(Object.entries(params).filter(([_, v]) => v !== undefined)),
+      });
 
       if (confRes.data.success) {
         setComissoes(confRes.data.comissoes);
@@ -108,17 +105,17 @@ const ConferenciaAvancada = () => {
         setPeriodoSelecionado(confRes.data.periodo_selecionado);
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Erro ao aplicar filtros');
+      setError(err.response?.data?.detail || "Erro ao aplicar filtros");
     } finally {
       setLoading(false);
     }
   };
 
   const limparFiltros = () => {
-    setFiltroGrupo('');
-    setFiltroProduto('');
-    setFiltroDataInicio('');
-    setFiltroDataFim('');
+    setFiltroGrupo("");
+    setFiltroProduto("");
+    setFiltroDataInicio("");
+    setFiltroDataFim("");
     setTimeout(() => carregarDados(), 100);
   };
 
@@ -136,20 +133,20 @@ const ConferenciaAvancada = () => {
     if (comissoesSelecionadas.size === comissoes.length) {
       setComissoesSelecionadas(new Set());
     } else {
-      setComissoesSelecionadas(new Set(comissoes.map(c => c.id)));
+      setComissoesSelecionadas(new Set(comissoes.map((c) => c.id)));
     }
   };
 
   const handleAbrirModalFechamento = () => {
     if (comissoesSelecionadas.size === 0) {
-      alert('Selecione pelo menos uma comissão');
+      alert("Selecione pelo menos uma comissão");
       return;
     }
 
-    setDataPagamento(new Date().toISOString().split('T')[0]);
-    setValorPago('');
-    setFormaPagamentoSelecionada('nao_informado');
-    setObservacoes('');
+    setDataPagamento(new Date().toISOString().split("T")[0]);
+    setValorPago("");
+    setFormaPagamentoSelecionada("nao_informado");
+    setObservacoes("");
     setErroFechamento(null);
     setMostrarModalFechamento(true);
   };
@@ -157,7 +154,7 @@ const ConferenciaAvancada = () => {
   const handleConfirmarFechamento = async () => {
     try {
       if (!valorPago || parseFloat(valorPago) <= 0) {
-        setErroFechamento('Valor a pagar deve ser maior que zero');
+        setErroFechamento("Valor a pagar deve ser maior que zero");
         return;
       }
 
@@ -172,16 +169,16 @@ const ConferenciaAvancada = () => {
         observacoes: observacoes || null,
       };
 
-      const response = await api.post('/comissoes/fechar-com-pagamento', payload);
+      const response = await api.post("/comissoes/fechar-com-pagamento", payload);
 
       if (response.data.success) {
         alert(
           `✅ Fechamento realizado com sucesso!\n\n` +
-          `Processadas: ${response.data.total_processadas}\n` +
-          `Valor total: R$ ${response.data.valor_total_fechado.toFixed(2)}\n` +
-          `Valor pago: R$ ${response.data.valor_total_pago.toFixed(2)}\n` +
-          `Saldo restante: R$ ${response.data.saldo_total_restante.toFixed(2)}\n` +
-          `Comissões com saldo: ${response.data.comissoes_com_saldo}`
+            `Processadas: ${response.data.total_processadas}\n` +
+            `Valor total: R$ ${response.data.valor_total_fechado.toFixed(2)}\n` +
+            `Valor pago: R$ ${response.data.valor_total_pago.toFixed(2)}\n` +
+            `Saldo restante: R$ ${response.data.saldo_total_restante.toFixed(2)}\n` +
+            `Comissões com saldo: ${response.data.comissoes_com_saldo}`,
         );
 
         setMostrarModalFechamento(false);
@@ -189,7 +186,7 @@ const ConferenciaAvancada = () => {
         carregarDados();
       }
     } catch (err) {
-      setErroFechamento(err.response?.data?.detail || 'Erro ao fechar comissões');
+      setErroFechamento(err.response?.data?.detail || "Erro ao fechar comissões");
     } finally {
       setLoadingFechamento(false);
     }
@@ -205,7 +202,7 @@ const ConferenciaAvancada = () => {
 
   // Calcular valores da seleção
   const valorTotalSelecionado = Array.from(comissoesSelecionadas).reduce((sum, id) => {
-    const comissao = comissoes.find(c => c.id === id);
+    const comissao = comissoes.find((c) => c.id === id);
     return sum + (comissao ? comissao.valor_comissao : 0);
   }, 0);
 
@@ -219,11 +216,11 @@ const ConferenciaAvancada = () => {
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Conferência de Comissões</h1>
             <p className="text-gray-600 mt-1">
-              {funcionario ? `${funcionario.nome} (ID: ${funcionario.id})` : 'Carregando...'}
+              {funcionario ? `${funcionario.nome} (ID: ${funcionario.id})` : "Carregando..."}
             </p>
           </div>
           <button
-            onClick={() => navigate('/comissoes/abertas')}
+            onClick={() => navigate("/comissoes/abertas")}
             className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
           >
             ← Voltar
@@ -234,7 +231,7 @@ const ConferenciaAvancada = () => {
       {/* ============ FILTROS ============ */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <h2 className="text-lg font-semibold mb-4 text-gray-700">Filtros Avançados</h2>
-        
+
         <div className="grid grid-cols-4 gap-4">
           {/* Filtro: Grupo de Produto */}
           <div>
@@ -245,8 +242,10 @@ const ConferenciaAvancada = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
             >
               <option value="">Todos</option>
-              {gruposProduto.map(grupo => (
-                <option key={grupo.id} value={grupo.id}>{grupo.nome}</option>
+              {gruposProduto.map((grupo) => (
+                <option key={grupo.id} value={grupo.id}>
+                  {grupo.nome}
+                </option>
               ))}
             </select>
           </div>
@@ -312,11 +311,13 @@ const ConferenciaAvancada = () => {
               <h3 className="font-semibold text-gray-700 mb-2">Período Selecionado</h3>
               <p className="text-gray-600">
                 {periodoSelecionado.data_inicio && periodoSelecionado.data_fim
-                  ? `${new Date(periodoSelecionado.data_inicio).toLocaleDateString('pt-BR')} até ${new Date(periodoSelecionado.data_fim).toLocaleDateString('pt-BR')}`
-                  : 'Sem período específico'}
+                  ? `${new Date(periodoSelecionado.data_inicio).toLocaleDateString("pt-BR")} até ${new Date(periodoSelecionado.data_fim).toLocaleDateString("pt-BR")}`
+                  : "Sem período específico"}
               </p>
               {periodoSelecionado.grupo_produto_nome && (
-                <p className="text-gray-600 text-sm">Grupo: {periodoSelecionado.grupo_produto_nome}</p>
+                <p className="text-gray-600 text-sm">
+                  Grupo: {periodoSelecionado.grupo_produto_nome}
+                </p>
               )}
               {periodoSelecionado.produto_nome && (
                 <p className="text-gray-600 text-sm">Produto: {periodoSelecionado.produto_nome}</p>
@@ -368,14 +369,18 @@ const ConferenciaAvancada = () => {
                 <th className="px-4 py-3 text-left">
                   <input
                     type="checkbox"
-                    checked={comissoesSelecionadas.size === comissoes.length && comissoes.length > 0}
+                    checked={
+                      comissoesSelecionadas.size === comissoes.length && comissoes.length > 0
+                    }
                     onChange={selecionarTodas}
                   />
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Data</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Produto</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cliente</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Quantidade</th>
+                <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
+                  Quantidade
+                </th>
                 <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Base</th>
                 <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">%</th>
                 <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Valor</th>
@@ -393,25 +398,28 @@ const ConferenciaAvancada = () => {
                       onChange={() => toggleComissaoSelecionada(comissao.id)}
                     />
                   </td>
-                  <td className="px-4 py-3 text-sm">{new Date(comissao.data_venda).toLocaleDateString('pt-BR')}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {new Date(comissao.data_venda).toLocaleDateString("pt-BR")}
+                  </td>
                   <td className="px-4 py-3 text-sm">{comissao.nome_produto}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    <CustomerIdentity
-                      nameClassName="font-medium text-gray-600"
-                      record={comissao}
-                    />
+                    <CustomerIdentity nameClassName="font-medium text-gray-600" record={comissao} />
                   </td>
                   <td className="px-4 py-3 text-sm text-right">{comissao.quantidade.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-sm text-right">R$ {comissao.valor_base_calculo.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-sm text-right">{comissao.percentual_comissao.toFixed(2)}%</td>
+                  <td className="px-4 py-3 text-sm text-right">
+                    R$ {comissao.valor_base_calculo.toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right">
+                    {comissao.percentual_comissao.toFixed(2)}%
+                  </td>
                   <td className="px-4 py-3 text-sm text-right font-semibold text-green-600">
                     R$ {comissao.valor_comissao.toFixed(2)}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-blue-600">
-                    {comissao.valor_pago ? `R$ ${comissao.valor_pago.toFixed(2)}` : '-'}
+                    {comissao.valor_pago ? `R$ ${comissao.valor_pago.toFixed(2)}` : "-"}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-orange-600">
-                    {comissao.saldo_restante ? `R$ ${comissao.saldo_restante.toFixed(2)}` : '-'}
+                    {comissao.saldo_restante ? `R$ ${comissao.saldo_restante.toFixed(2)}` : "-"}
                   </td>
                 </tr>
               ))}
@@ -445,7 +453,9 @@ const ConferenciaAvancada = () => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-300">Saldo Restante</p>
-                  <p className={`text-2xl font-bold ${saldoRestanteCalculado > 0 ? 'text-orange-400' : 'text-green-400'}`}>
+                  <p
+                    className={`text-2xl font-bold ${saldoRestanteCalculado > 0 ? "text-orange-400" : "text-green-400"}`}
+                  >
                     R$ {saldoRestanteCalculado.toFixed(2)}
                   </p>
                 </div>
@@ -477,7 +487,9 @@ const ConferenciaAvancada = () => {
             <div className="space-y-4">
               {/* Resumo do que será fechado */}
               <div className="bg-blue-50 p-4 rounded border border-blue-200">
-                <p className="text-sm text-gray-600">Comissões a processar: {comissoesSelecionadas.size}</p>
+                <p className="text-sm text-gray-600">
+                  Comissões a processar: {comissoesSelecionadas.size}
+                </p>
                 <p className="text-lg font-bold text-gray-800">
                   Valor Total: R$ {valorTotalSelecionado.toFixed(2)}
                 </p>
@@ -485,23 +497,31 @@ const ConferenciaAvancada = () => {
 
               {/* Forma de Pagamento */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Forma de Pagamento *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Forma de Pagamento *
+                </label>
                 <select
                   value={formaPagamentoSelecionada}
                   onChange={(e) => setFormaPagamentoSelecionada(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 >
-                  {formasPagamento.map(forma => (
-                    <option key={forma.id} value={forma.nome}>{forma.descricao}</option>
+                  {formasPagamento.map((forma) => (
+                    <option key={forma.id} value={forma.nome}>
+                      {forma.descricao}
+                    </option>
                   ))}
                 </select>
               </div>
 
               {/* Valor a Pagar */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Valor a Pagar *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Valor a Pagar *
+                </label>
                 <div className="flex gap-2">
-                  <span className="flex items-center bg-gray-100 px-3 py-2 rounded-lg border border-gray-300">R$</span>
+                  <span className="flex items-center bg-gray-100 px-3 py-2 rounded-lg border border-gray-300">
+                    R$
+                  </span>
                   <input
                     type="number"
                     step="0.01"
@@ -517,7 +537,8 @@ const ConferenciaAvancada = () => {
                   Máximo: R$ {valorTotalSelecionado.toFixed(2)}
                   {parseFloat(valorPago) < valorTotalSelecionado && parseFloat(valorPago) > 0 && (
                     <span className="text-orange-600 font-semibold ml-2">
-                      (Pagamento Parcial - Saldo: R$ {(valorTotalSelecionado - parseFloat(valorPago)).toFixed(2)})
+                      (Pagamento Parcial - Saldo: R${" "}
+                      {(valorTotalSelecionado - parseFloat(valorPago)).toFixed(2)})
                     </span>
                   )}
                 </p>
@@ -525,7 +546,9 @@ const ConferenciaAvancada = () => {
 
               {/* Data de Pagamento */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Data de Pagamento *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Data de Pagamento *
+                </label>
                 <input
                   type="date"
                   value={dataPagamento}
@@ -567,7 +590,7 @@ const ConferenciaAvancada = () => {
                     Processando...
                   </>
                 ) : (
-                  'Confirmar Fechamento'
+                  "Confirmar Fechamento"
                 )}
               </button>
             </div>

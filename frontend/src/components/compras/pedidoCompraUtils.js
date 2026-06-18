@@ -3,24 +3,24 @@ export const numeroSeguro = (valor) => {
   return Number.isFinite(numero) ? numero : 0;
 };
 
-export const textoNumeroSeguro = (valor, fallback = '0') => {
-  if (valor === null || valor === undefined || valor === '') {
+export const textoNumeroSeguro = (valor, fallback = "0") => {
+  if (valor === null || valor === undefined || valor === "") {
     return fallback;
   }
 
   return String(valor);
 };
 
-export const normalizarTextoBusca = (texto = '') =>
-  String(texto || '')
+export const normalizarTextoBusca = (texto = "") =>
+  String(texto || "")
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ')
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 
 export const textoContemTokens = (texto, busca) => {
-  const tokens = normalizarTextoBusca(busca).split(' ').filter(Boolean);
+  const tokens = normalizarTextoBusca(busca).split(" ").filter(Boolean);
   if (tokens.length === 0) {
     return true;
   }
@@ -34,24 +34,26 @@ export const normalizarItemPedido = (item = {}) => {
   const preco = numeroSeguro(item.preco_unitario);
   const desconto = numeroSeguro(item.desconto_item);
   const totalInformado = Number(item.total ?? item.valor_total);
-  const total = Number.isFinite(totalInformado)
-    ? totalInformado
-    : (preco - desconto) * quantidade;
+  const total = Number.isFinite(totalInformado) ? totalInformado : (preco - desconto) * quantidade;
 
   return {
     produto_id: Number(item.produto_id),
     produto_nome: item.produto_nome || item.nome || `Produto ${item.produto_id}`,
-    produto_codigo: item.produto_codigo || item.codigo || item.sku || '',
+    produto_codigo: item.produto_codigo || item.codigo || item.sku || "",
     quantidade_pedida: quantidade,
     preco_unitario: preco,
     desconto_item: desconto,
-    total
+    total,
   };
 };
 
 export const clonarItensPedido = (itens = []) => itens.map((item) => normalizarItemPedido(item));
 
-export const consolidarItensPedido = (itensBase = [], itensAdicionais = [], estrategia = 'somar') => {
+export const consolidarItensPedido = (
+  itensBase = [],
+  itensAdicionais = [],
+  estrategia = "somar",
+) => {
   const mapa = new Map();
 
   const adicionarOuSomarItem = (item) => {
@@ -68,7 +70,7 @@ export const consolidarItensPedido = (itensBase = [], itensAdicionais = [], estr
       return;
     }
 
-    if (estrategia === 'manter_existente') {
+    if (estrategia === "manter_existente") {
       const preco = numeroSeguro(existente.preco_unitario);
       const desconto = numeroSeguro(existente.desconto_item);
       const quantidade = numeroSeguro(existente.quantidade_pedida);
@@ -79,17 +81,15 @@ export const consolidarItensPedido = (itensBase = [], itensAdicionais = [], estr
         preco_unitario: preco,
         desconto_item: desconto,
         quantidade_pedida: quantidade,
-        total: (preco - desconto) * quantidade
+        total: (preco - desconto) * quantidade,
       });
       return;
     }
 
-    if (estrategia === 'maior_quantidade') {
+    if (estrategia === "maior_quantidade") {
       const quantidadeExistente = numeroSeguro(existente.quantidade_pedida);
       const quantidadeNova = numeroSeguro(normalizado.quantidade_pedida);
-      const itemEscolhido = quantidadeNova >= quantidadeExistente
-        ? normalizado
-        : existente;
+      const itemEscolhido = quantidadeNova >= quantidadeExistente ? normalizado : existente;
       const preco = numeroSeguro(itemEscolhido.preco_unitario);
       const desconto = numeroSeguro(itemEscolhido.desconto_item);
       const quantidade = Math.max(quantidadeExistente, quantidadeNova);
@@ -101,14 +101,17 @@ export const consolidarItensPedido = (itensBase = [], itensAdicionais = [], estr
         quantidade_pedida: quantidade,
         preco_unitario: preco,
         desconto_item: desconto,
-        total: (preco - desconto) * quantidade
+        total: (preco - desconto) * quantidade,
       });
       return;
     }
 
-    const preco = numeroSeguro(normalizado.preco_unitario) || numeroSeguro(existente.preco_unitario);
-    const desconto = numeroSeguro(normalizado.desconto_item) || numeroSeguro(existente.desconto_item);
-    const quantidade = numeroSeguro(existente.quantidade_pedida) + numeroSeguro(normalizado.quantidade_pedida);
+    const preco =
+      numeroSeguro(normalizado.preco_unitario) || numeroSeguro(existente.preco_unitario);
+    const desconto =
+      numeroSeguro(normalizado.desconto_item) || numeroSeguro(existente.desconto_item);
+    const quantidade =
+      numeroSeguro(existente.quantidade_pedida) + numeroSeguro(normalizado.quantidade_pedida);
 
     mapa.set(chave, {
       ...existente,
@@ -116,7 +119,7 @@ export const consolidarItensPedido = (itensBase = [], itensAdicionais = [], estr
       preco_unitario: preco,
       desconto_item: desconto,
       quantidade_pedida: quantidade,
-      total: (preco - desconto) * quantidade
+      total: (preco - desconto) * quantidade,
     });
   };
 
@@ -127,24 +130,24 @@ export const consolidarItensPedido = (itensBase = [], itensAdicionais = [], estr
 };
 
 export const converterPedidoParaFormData = (pedido) => ({
-  fornecedor_id: pedido?.fornecedor_id?.toString() || '',
+  fornecedor_id: pedido?.fornecedor_id?.toString() || "",
   data_prevista_entrega: pedido?.data_prevista_entrega
-    ? new Date(pedido.data_prevista_entrega).toISOString().split('T')[0]
-    : '',
-  valor_frete: textoNumeroSeguro(pedido?.valor_frete, '0'),
-  valor_desconto: textoNumeroSeguro(pedido?.valor_desconto, '0'),
-  observacoes: pedido?.observacoes || '',
+    ? new Date(pedido.data_prevista_entrega).toISOString().split("T")[0]
+    : "",
+  valor_frete: textoNumeroSeguro(pedido?.valor_frete, "0"),
+  valor_desconto: textoNumeroSeguro(pedido?.valor_desconto, "0"),
+  observacoes: pedido?.observacoes || "",
   itens: clonarItensPedido(
     (pedido?.itens || []).map((item) => ({
       produto_id: item.produto_id,
       produto_nome: item.produto_nome || `Produto ${item.produto_id}`,
-      produto_codigo: item.produto_codigo || item.codigo || item.sku || '',
+      produto_codigo: item.produto_codigo || item.codigo || item.sku || "",
       quantidade_pedida: item.quantidade_pedida,
       preco_unitario: item.preco_unitario,
       desconto_item: item.desconto_item || 0,
-      total: item.total ?? item.valor_total
-    }))
-  )
+      total: item.total ?? item.valor_total,
+    })),
+  ),
 });
 
 export const extrairNomeArquivoCabecalho = (contentDisposition, fallback) => {
@@ -168,19 +171,20 @@ export const extrairNomeArquivoCabecalho = (contentDisposition, fallback) => {
 
   const matchSimple = contentDisposition.match(/filename\s*=\s*([^;]+)/i);
   if (matchSimple?.[1]) {
-    return matchSimple[1].trim().replace(/^"|"$/g, '');
+    return matchSimple[1].trim().replace(/^"|"$/g, "");
   }
 
   return fallback;
 };
 
 export const baixarArquivoResposta = (response, fallback) => {
-  const contentDisposition = response?.headers?.['content-disposition'] || response?.headers?.['Content-Disposition'];
+  const contentDisposition =
+    response?.headers?.["content-disposition"] || response?.headers?.["Content-Disposition"];
   const nomeArquivo = extrairNomeArquivoCabecalho(contentDisposition, fallback);
   const url = window.URL.createObjectURL(new Blob([response.data]));
-  const link = document.createElement('a');
+  const link = document.createElement("a");
   link.href = url;
-  link.setAttribute('download', nomeArquivo);
+  link.setAttribute("download", nomeArquivo);
   document.body.appendChild(link);
   link.click();
   link.remove();

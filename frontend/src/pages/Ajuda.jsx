@@ -54,8 +54,7 @@ const FAQS = [
   },
   {
     pergunta: "Posso testar antes de pagar?",
-    resposta:
-      "Sim. Novas empresas comecam com 30 dias gratis do Plano Basico.",
+    resposta: "Sim. Novas empresas comecam com 30 dias gratis do Plano Basico.",
   },
   {
     pergunta: "Como funciona o pagamento?",
@@ -199,31 +198,27 @@ const ItemFAQ = ({ pergunta, resposta }) => {
 -------------------------------------------------------- */
 const Ajuda = () => {
   const [aba, setAba] = useState("planos");
-  const msgGeral = encodeURIComponent(
-    "Olá! Tenho dúvidas sobre os planos do CorePet.",
-  );
+  const msgGeral = encodeURIComponent("Olá! Tenho dúvidas sobre os planos do CorePet.");
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero */}
       <div className="bg-gradient-to-br from-indigo-600 to-purple-700 text-white py-12 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <p className="text-indigo-200 text-sm font-medium mb-2">
-            Ajuda e Planos
-          </p>
+          <p className="text-indigo-200 text-sm font-medium mb-2">Ajuda e Planos</p>
           <h1 className="text-3xl font-bold mb-3">
             {aba === "introducao"
               ? "Preparando seu sistema"
               : aba === "central"
-              ? "Como usar o CorePet"
-              : "Módulos Beta do CorePet"}
+                ? "Como usar o CorePet"
+                : "Módulos Beta do CorePet"}
           </h1>
           <p className="text-indigo-100 text-base max-w-xl mx-auto">
             {aba === "introducao"
               ? "Checklist guiado, com sequencia recomendada, para configurar o sistema com seguranca do inicio ao fim."
               : aba === "central"
-              ? "Aprenda a usar cada funcionalidade do sistema. Pesquise por dúvidas, navegue por módulo ou leia o passo a passo."
-              : "O Plano Básico fica no centro da oferta. Os recursos avançados aparecem como Beta acompanhado para você conhecer e pedir liberação quando fizer sentido."}
+                ? "Aprenda a usar cada funcionalidade do sistema. Pesquise por dúvidas, navegue por módulo ou leia o passo a passo."
+                : "O Plano Básico fica no centro da oferta. Os recursos avançados aparecem como Beta acompanhado para você conhecer e pedir liberação quando fizer sentido."}
           </p>
           <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
             <a
@@ -304,10 +299,9 @@ const Ajuda = () => {
                   Já inclusos no seu plano — sem custo extra
                 </p>
                 <p className="text-sm text-green-700 mt-1">
-                  PDV completo, histórico de vendas, financeiro de vendas,
-                  Pessoas, Pets, Produtos, Estoque, Usuários, Cadastros
-                  essenciais, Lembretes, Calculadora de Ração e Configurações
-                  essenciais já estão liberados para você usar hoje.
+                  PDV completo, histórico de vendas, financeiro de vendas, Pessoas, Pets, Produtos,
+                  Estoque, Usuários, Cadastros essenciais, Lembretes, Calculadora de Ração e
+                  Configurações essenciais já estão liberados para você usar hoje.
                 </p>
               </div>
             </div>
@@ -315,12 +309,10 @@ const Ajuda = () => {
 
           {/* Seção: módulos beta */}
           <div className="mb-12">
-            <h2 className="text-xl font-bold text-gray-900 mb-1">
-              Módulos Beta disponíveis
-            </h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-1">Módulos Beta disponíveis</h2>
             <p className="text-sm text-gray-500 mb-6">
-              Eles mostram o que vem por aí e podem ser liberados como piloto
-              acompanhado, sem checkout automático dentro do sistema.
+              Eles mostram o que vem por aí e podem ser liberados como piloto acompanhado, sem
+              checkout automático dentro do sistema.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -332,12 +324,8 @@ const Ajuda = () => {
 
           {/* Seção: como solicitar */}
           <div className="mb-12">
-            <h2 className="text-xl font-bold text-gray-900 mb-1">
-              Como pedir acesso
-            </h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Simples e direto — tudo pelo WhatsApp.
-            </p>
+            <h2 className="text-xl font-bold text-gray-900 mb-1">Como pedir acesso</h2>
+            <p className="text-sm text-gray-500 mb-6">Simples e direto — tudo pelo WhatsApp.</p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
@@ -365,13 +353,9 @@ const Ajuda = () => {
                   className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5"
                 >
                   <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center mb-3">
-                    <span className="text-sm font-bold text-indigo-700">
-                      {etapa.passo}
-                    </span>
+                    <span className="text-sm font-bold text-indigo-700">{etapa.passo}</span>
                   </div>
-                  <p className="font-bold text-gray-900 text-sm mb-1">
-                    {etapa.titulo}
-                  </p>
+                  <p className="font-bold text-gray-900 text-sm mb-1">{etapa.titulo}</p>
                   <p className="text-sm text-gray-500">{etapa.descricao}</p>
                 </div>
               ))}
@@ -380,33 +364,24 @@ const Ajuda = () => {
 
           {/* Seção: dúvidas comuns */}
           <div className="mb-12">
-            <h2 className="text-xl font-bold text-gray-900 mb-1">
-              Dúvidas comuns
-            </h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-1">Dúvidas comuns</h2>
             <p className="text-sm text-gray-500 mb-6">
               Perguntas que a maioria dos usuários faz antes de começar.
             </p>
 
             <div className="space-y-2">
               {FAQS.map((faq) => (
-                <ItemFAQ
-                  key={faq.pergunta}
-                  pergunta={faq.pergunta}
-                  resposta={faq.resposta}
-                />
+                <ItemFAQ key={faq.pergunta} pergunta={faq.pergunta} resposta={faq.resposta} />
               ))}
             </div>
           </div>
 
           {/* CTA final */}
           <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 text-white text-center">
-            <h3 className="text-xl font-bold mb-2">
-              Ainda tem dúvidas? Fala comigo!
-            </h3>
+            <h3 className="text-xl font-bold mb-2">Ainda tem dúvidas? Fala comigo!</h3>
             <p className="text-indigo-100 text-sm mb-5">
-              Nossa equipe responde em minutos pelo WhatsApp. Nenhuma pergunta é
-              boba — é melhor perguntar antes de ativar algo do que usar sem
-              entender.
+              Nossa equipe responde em minutos pelo WhatsApp. Nenhuma pergunta é boba — é melhor
+              perguntar antes de ativar algo do que usar sem entender.
             </p>
             <a
               href={`https://wa.me/${WHATSAPP_NUMERO}?text=${msgGeral}`}

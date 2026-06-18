@@ -25,8 +25,7 @@ export default function useCampanhasGestor() {
   const [gestorModo, setGestorModo] = useState("cliente");
   const [gestorCampanhaTipo, setGestorCampanhaTipo] = useState("carimbos");
   const [gestorCampanhaLista, setGestorCampanhaLista] = useState(null);
-  const [gestorCampanhaCarregando, setGestorCampanhaCarregando] =
-    useState(false);
+  const [gestorCampanhaCarregando, setGestorCampanhaCarregando] = useState(false);
 
   const buscarClientesGestor = async (termo) => {
     if (!termo || termo.length < 2) {
@@ -58,26 +57,20 @@ export default function useCampanhasGestor() {
     try {
       const [saldoRes, carimbosRes, cuponsRes] = await Promise.all([
         api.get(`/campanhas/clientes/${cliente.id}/saldo`),
-        api.get(
-          `/campanhas/clientes/${cliente.id}/carimbos?incluir_estornados=true`,
-        ),
+        api.get(`/campanhas/clientes/${cliente.id}/carimbos?incluir_estornados=true`),
         api.get(`/campanhas/cupons?customer_id=${cliente.id}`),
       ]);
       setGestorSaldo(saldoRes.data);
       setGestorCarimbos(carimbosRes.data);
       setGestorCupons(cuponsRes.data);
       try {
-        const extratoRes = await api.get(
-          `/campanhas/clientes/${cliente.id}/extrato?limit=300`,
-        );
+        const extratoRes = await api.get(`/campanhas/clientes/${cliente.id}/extrato?limit=300`);
         setGestorExtrato(extratoRes.data);
       } catch {
         setGestorExtrato(null);
       }
     } catch (e) {
-      alert(
-        "Erro ao carregar dados: " + (e?.response?.data?.detail || e.message),
-      );
+      alert("Erro ao carregar dados: " + (e?.response?.data?.detail || e.message));
     } finally {
       setGestorCarregando(false);
     }
@@ -93,9 +86,7 @@ export default function useCampanhasGestor() {
     setGestorCampanhaCarregando(true);
     setGestorCampanhaLista(null);
     try {
-      const res = await api.get(
-        `/campanhas/gestor/clientes-por-tipo?tipo=${tipo}`,
-      );
+      const res = await api.get(`/campanhas/gestor/clientes-por-tipo?tipo=${tipo}`);
       setGestorCampanhaLista(res.data?.clientes || []);
     } catch (e) {
       alert("Erro ao carregar: " + (e?.response?.data?.detail || e.message));

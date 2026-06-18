@@ -26,13 +26,8 @@ export default function useProdutosNovoPageComposition({
     setFornecedorData,
     setModalFornecedor,
   } = fornecedoresState;
-  const {
-    handleDeleteImagem,
-    handleSetPrincipal,
-    handleUploadImagem,
-    imagens,
-    uploadingImage,
-  } = imagensState;
+  const { handleDeleteImagem, handleSetPrincipal, handleUploadImagem, imagens, uploadingImage } =
+    imagensState;
   const {
     adicionarProdutoKit,
     buscaComponente,
@@ -63,8 +58,16 @@ export default function useProdutosNovoPageComposition({
     setModalEntrada,
   } = lotesState;
   const { handleClonarProduto, handleVoltar, navigate, setAbaAtiva } = navigationState;
-  const { abaAtiva, camposEmEdicao, formData, isClone, isEdicao, salvando, setCamposEmEdicao, setFormData } =
-    pageState;
+  const {
+    abaAtiva,
+    camposEmEdicao,
+    formData,
+    isClone,
+    isEdicao,
+    salvando,
+    setCamposEmEdicao,
+    setFormData,
+  } = pageState;
   const {
     buscaPredecessor,
     handleBuscaPredecessorChange,
@@ -91,8 +94,14 @@ export default function useProdutosNovoPageComposition({
   } = racaoState;
   const { handleTipoRecorrenciaChange } = recorrenciaState;
   const { handleChangeTributacao, handlePersonalizarFiscal } = tributacaoState;
-  const { formatarData, formatarMoeda, handleChange, handleGerarCodigoBarras, handleGerarSKU, parseNumber } =
-    utilsState;
+  const {
+    formatarData,
+    formatarMoeda,
+    handleChange,
+    handleGerarCodigoBarras,
+    handleGerarSKU,
+    parseNumber,
+  } = utilsState;
   const {
     handleCancelarVariacao,
     handleExcluirVariacao,

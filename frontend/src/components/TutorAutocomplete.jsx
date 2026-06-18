@@ -4,17 +4,31 @@ import { Search } from "lucide-react";
 import { buscarClientes } from "../api/clientes";
 
 function buscarClienteExato(termo, clientes) {
-  const termoLimpo = String(termo || "").trim().toLowerCase();
+  const termoLimpo = String(termo || "")
+    .trim()
+    .toLowerCase();
   if (!termoLimpo) return null;
 
-  return clientes.find((cliente) => {
-    const id = String(cliente?.id || "").trim().toLowerCase();
-    const codigo = String(cliente?.codigo || "").trim().toLowerCase();
-    const nome = String(cliente?.nome || "").trim().toLowerCase();
-    const cpf = String(cliente?.cpf || "").trim().toLowerCase();
-    const telefone = String(cliente?.telefone || "").trim().toLowerCase();
-    return [id, codigo, nome, cpf, telefone].includes(termoLimpo);
-  }) || null;
+  return (
+    clientes.find((cliente) => {
+      const id = String(cliente?.id || "")
+        .trim()
+        .toLowerCase();
+      const codigo = String(cliente?.codigo || "")
+        .trim()
+        .toLowerCase();
+      const nome = String(cliente?.nome || "")
+        .trim()
+        .toLowerCase();
+      const cpf = String(cliente?.cpf || "")
+        .trim()
+        .toLowerCase();
+      const telefone = String(cliente?.telefone || "")
+        .trim()
+        .toLowerCase();
+      return [id, codigo, nome, cpf, telefone].includes(termoLimpo);
+    }) || null
+  );
 }
 
 export default function TutorAutocomplete({
@@ -52,7 +66,9 @@ export default function TutorAutocomplete({
       try {
         setLoading(true);
         const termoOriginal = busca.trim();
-        const termoDigitos = Array.from(termoOriginal).filter((char) => /\d/.test(char)).join("");
+        const termoDigitos = Array.from(termoOriginal)
+          .filter((char) => /\d/.test(char))
+          .join("");
         const termoBusca = termoDigitos.length >= 8 ? termoDigitos : termoOriginal;
         const clientes = await buscarClientes({ search: termoBusca, limit: 20 });
         setSugestoes(Array.isArray(clientes) ? clientes : []);
@@ -78,7 +94,7 @@ export default function TutorAutocomplete({
   }, []);
 
   const mostrarSugestoes = focado && !disabled && busca.trim().length >= 1;
-  let conteudoSugestoes = null;
+  let conteudoSugestoes;
 
   if (loading) {
     conteudoSugestoes = <div className="px-4 py-3 text-sm text-gray-500">Buscando tutores...</div>;
@@ -113,12 +129,18 @@ export default function TutorAutocomplete({
       </button>
     ));
   } else {
-    conteudoSugestoes = <div className="px-4 py-3 text-sm text-gray-500">Nenhum tutor encontrado</div>;
+    conteudoSugestoes = (
+      <div className="px-4 py-3 text-sm text-gray-500">Nenhum tutor encontrado</div>
+    );
   }
 
   return (
     <div ref={containerRef} className="relative">
-      {label ? <label htmlFor={inputId} className="block text-xs font-medium text-gray-600 mb-1">{label}</label> : null}
+      {label ? (
+        <label htmlFor={inputId} className="block text-xs font-medium text-gray-600 mb-1">
+          {label}
+        </label>
+      ) : null}
       <div className="relative">
         <input
           id={inputId}

@@ -8,17 +8,11 @@ import {
 } from "./prescricaoDoseUtils.js";
 
 test("obterPesoParaCalculoDose usa peso informado na consulta antes do cadastro do pet", () => {
-  assert.equal(
-    obterPesoParaCalculoDose({ peso_kg: "12,5" }, { peso: "8" }),
-    12.5,
-  );
+  assert.equal(obterPesoParaCalculoDose({ peso_kg: "12,5" }, { peso: "8" }), 12.5);
 });
 
 test("obterPesoParaCalculoDose usa peso do cadastro do pet quando a consulta ainda não informou peso", () => {
-  assert.equal(
-    obterPesoParaCalculoDose({ peso_kg: "" }, { peso: "8,2" }),
-    8.2,
-  );
+  assert.equal(obterPesoParaCalculoDose({ peso_kg: "" }, { peso: "8,2" }), 8.2);
 });
 
 test("calcularDosePrescricaoPorPeso calcula dose média usando campos do catálogo", () => {

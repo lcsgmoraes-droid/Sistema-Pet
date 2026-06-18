@@ -44,7 +44,9 @@ export function normalizarCodigo(valor) {
 }
 
 export function produtoConfereCodigo(produto, termo) {
-  const termoLimpo = String(termo || "").trim().toLowerCase();
+  const termoLimpo = String(termo || "")
+    .trim()
+    .toLowerCase();
   const termoDigitos = normalizarCodigo(termo);
   if (!termoLimpo) return false;
   const campos = [
@@ -54,7 +56,9 @@ export function produtoConfereCodigo(produto, termo) {
     produto?.gtin_ean_tributario,
   ];
   return campos.some((campo) => {
-    const texto = String(campo || "").trim().toLowerCase();
+    const texto = String(campo || "")
+      .trim()
+      .toLowerCase();
     if (!texto) return false;
     return texto === termoLimpo || (termoDigitos && normalizarCodigo(texto) === termoDigitos);
   });
@@ -91,7 +95,6 @@ export function criarFormBaixaTransferencia(overrides = {}) {
     data_recebimento: hojeIso(),
     modo_baixa: "recebimento",
     forma_pagamento_id: "",
-    compensacoes: {},
     observacao: "",
     ...overrides,
     compensacoes: overrides.compensacoes || {},
@@ -211,8 +214,7 @@ export function distribuirCompensacaoAutomatica(valorBase, contas = []) {
 
     const saldo = Number(conta.saldo_aberto || 0);
     const valorAplicado = Math.min(restante, saldo);
-    proximaCompensacao[conta.conta_pagar_id] =
-      valorAplicado > 0 ? valorAplicado.toFixed(2) : "";
+    proximaCompensacao[conta.conta_pagar_id] = valorAplicado > 0 ? valorAplicado.toFixed(2) : "";
     restante = Number((restante - valorAplicado).toFixed(2));
   });
 
@@ -241,37 +243,30 @@ export const COLUNAS_DOCUMENTO_TRANSFERENCIA = [
   { chave: "totais", label: "Totais do acerto" },
 ];
 
-export const COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO =
-  COLUNAS_DOCUMENTO_TRANSFERENCIA.map((coluna) => coluna.chave);
+export const COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO = COLUNAS_DOCUMENTO_TRANSFERENCIA.map(
+  (coluna) => coluna.chave,
+);
 
-export const COLUNAS_DOCUMENTO_TRANSFERENCIA_RETIRADA = [
-  "codigo",
-  "produto",
-  "quantidade",
-];
+export const COLUNAS_DOCUMENTO_TRANSFERENCIA_RETIRADA = ["codigo", "produto", "quantidade"];
 
-export const COLUNAS_DOCUMENTO_TRANSFERENCIA_FINANCEIRAS = [
-  "custo_unitario",
-  "total",
-  "totais",
-];
+export const COLUNAS_DOCUMENTO_TRANSFERENCIA_FINANCEIRAS = ["custo_unitario", "total", "totais"];
 
 export const normalizarColunasDocumentoTransferencia = (
   colunas = COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO,
 ) => {
-  const candidatas = Array.isArray(colunas)
-    ? colunas
-    : String(colunas || "").split(",");
+  const candidatas = Array.isArray(colunas) ? colunas : String(colunas || "").split(",");
 
   const selecionadas = new Set(
     candidatas
-      .map((coluna) => String(coluna || "").trim().toLowerCase())
+      .map((coluna) =>
+        String(coluna || "")
+          .trim()
+          .toLowerCase(),
+      )
       .filter(Boolean),
   );
 
-  return COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO.filter((coluna) =>
-    selecionadas.has(coluna),
-  );
+  return COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO.filter((coluna) => selecionadas.has(coluna));
 };
 
 export const documentoTransferenciaTemValores = (colunas = []) =>

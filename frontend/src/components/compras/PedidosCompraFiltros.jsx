@@ -1,14 +1,14 @@
-import { Filter, RefreshCw, Search, X } from 'lucide-react';
-import FornecedorSelector from '../fornecedores/FornecedorSelector';
+import { Filter, RefreshCw, Search, X } from "lucide-react";
+import FornecedorSelector from "../fornecedores/FornecedorSelector";
 
 const STATUS_PEDIDO_OPTIONS = [
-  { value: '', label: 'Todos' },
-  { value: 'rascunho', label: 'Rascunho' },
-  { value: 'enviado', label: 'Enviado' },
-  { value: 'confirmado', label: 'Confirmado' },
-  { value: 'recebido_parcial', label: 'Parcial' },
-  { value: 'recebido_total', label: 'Recebido' },
-  { value: 'cancelado', label: 'Cancelado' },
+  { value: "", label: "Todos" },
+  { value: "rascunho", label: "Rascunho" },
+  { value: "enviado", label: "Enviado" },
+  { value: "confirmado", label: "Confirmado" },
+  { value: "recebido_parcial", label: "Parcial" },
+  { value: "recebido_total", label: "Recebido" },
+  { value: "cancelado", label: "Cancelado" },
 ];
 
 export default function PedidosCompraFiltros({
@@ -51,13 +51,13 @@ export default function PedidosCompraFiltros({
         <div className="flex flex-wrap gap-2">
           {STATUS_PEDIDO_OPTIONS.map((opcao) => (
             <button
-              key={opcao.value || 'todos'}
+              key={opcao.value || "todos"}
               type="button"
               onClick={() => onSelecionarStatus(opcao.value)}
               className={`h-9 rounded-lg border px-3 text-sm font-semibold transition-colors ${
                 filtrosPedidos.status === opcao.value
-                  ? 'border-blue-500 bg-blue-600 text-white'
-                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-blue-50 hover:text-blue-700'
+                  ? "border-blue-500 bg-blue-600 text-white"
+                  : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-blue-50 hover:text-blue-700"
               }`}
             >
               {opcao.label}
@@ -73,7 +73,7 @@ export default function PedidosCompraFiltros({
               <input
                 type="search"
                 value={filtrosPedidos.busca}
-                onChange={(event) => onAtualizarFiltro('busca', event.target.value)}
+                onChange={(event) => onAtualizarFiltro("busca", event.target.value)}
                 placeholder="Numero, fornecedor ou observacao"
                 className="h-10 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
               />
@@ -81,7 +81,9 @@ export default function PedidosCompraFiltros({
           </label>
 
           <div className="block">
-            <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Fornecedor</span>
+            <span className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Fornecedor
+            </span>
             <FornecedorSelector
               fornecedores={fornecedoresOrdenados}
               fornecedorId={filtrosPedidos.fornecedor_id}
@@ -91,15 +93,15 @@ export default function PedidosCompraFiltros({
               inputClassName="rounded-lg border-slate-300"
               onInputChange={(termo) => {
                 if (!termo || filtrosPedidos.fornecedor_id) {
-                  onAtualizarFiltro('fornecedor_id', '');
+                  onAtualizarFiltro("fornecedor_id", "");
                 }
               }}
               onSelect={(fornecedor) =>
-                onAtualizarFiltro('fornecedor_id', fornecedor?.id ? String(fornecedor.id) : '')
+                onAtualizarFiltro("fornecedor_id", fornecedor?.id ? String(fornecedor.id) : "")
               }
-              onClear={() => onAtualizarFiltro('fornecedor_id', '')}
+              onClear={() => onAtualizarFiltro("fornecedor_id", "")}
               onFornecedorCriado={(fornecedor) =>
-                onAtualizarFiltro('fornecedor_id', fornecedor?.id ? String(fornecedor.id) : '')
+                onAtualizarFiltro("fornecedor_id", fornecedor?.id ? String(fornecedor.id) : "")
               }
             />
           </div>
@@ -109,7 +111,7 @@ export default function PedidosCompraFiltros({
             <input
               type="date"
               value={filtrosPedidos.data_inicio}
-              onChange={(event) => onAtualizarFiltro('data_inicio', event.target.value)}
+              onChange={(event) => onAtualizarFiltro("data_inicio", event.target.value)}
               className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             />
           </label>
@@ -119,7 +121,7 @@ export default function PedidosCompraFiltros({
             <input
               type="date"
               value={filtrosPedidos.data_fim}
-              onChange={(event) => onAtualizarFiltro('data_fim', event.target.value)}
+              onChange={(event) => onAtualizarFiltro("data_fim", event.target.value)}
               className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
             />
           </label>
@@ -130,7 +132,7 @@ export default function PedidosCompraFiltros({
               disabled={loadingListaPedidos}
               className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <RefreshCw className={`h-4 w-4 ${loadingListaPedidos ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 ${loadingListaPedidos ? "animate-spin" : ""}`} />
               Aplicar
             </button>
             <button

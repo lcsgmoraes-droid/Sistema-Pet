@@ -34,7 +34,7 @@ export function useInternacoesProcedimentoFeitoAcoes({
         unidade_quantidade: item?.unidade_quantidade ?? "",
       });
     },
-    [setFormFeito, setModalFeito]
+    [setFormFeito, setModalFeito],
   );
 
   const confirmarProcedimentoFeito = useCallback(async () => {
@@ -63,7 +63,7 @@ export function useInternacoesProcedimentoFeitoAcoes({
 
       await carregarDetalheInternacao(
         modalFeito.internacao_id,
-        String(expandida) === String(modalFeito.internacao_id)
+        String(expandida) === String(modalFeito.internacao_id),
       );
 
       setAgendaProcedimentos((prev) =>
@@ -83,7 +83,7 @@ export function useInternacoesProcedimentoFeitoAcoes({
                 quantidade_desperdicio: formFeito.quantidade_desperdicio,
                 unidade_quantidade: formFeito.unidade_quantidade,
               };
-        })
+        }),
       );
       setModalFeito(null);
       setFormFeito({ ...FORM_FEITO_INICIAL });

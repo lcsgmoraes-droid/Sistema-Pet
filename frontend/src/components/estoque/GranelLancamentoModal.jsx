@@ -170,9 +170,7 @@ export default function GranelLancamentoModal({
               )}
             </div>
             {nomeGranelSelecionado && (
-              <p className="mt-1 text-xs text-orange-700">
-                Selecionado: {nomeGranelSelecionado}
-              </p>
+              <p className="mt-1 text-xs text-orange-700">Selecionado: {nomeGranelSelecionado}</p>
             )}
           </div>
 
@@ -197,23 +195,37 @@ export default function GranelLancamentoModal({
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="grid gap-2 sm:grid-cols-3">
               <div className="rounded-md bg-white p-2">
-                <div className="text-[11px] font-medium uppercase text-slate-500">Custo/kg origem</div>
-                <div className="mt-1 text-sm font-semibold text-slate-900">{formatMoney(custoKgGranel)}</div>
+                <div className="text-[11px] font-medium uppercase text-slate-500">
+                  Custo/kg origem
+                </div>
+                <div className="mt-1 text-sm font-semibold text-slate-900">
+                  {formatMoney(custoKgGranel)}
+                </div>
               </div>
               <div className="rounded-md bg-white p-2">
-                <div className="text-[11px] font-medium uppercase text-slate-500">Venda/kg origem</div>
-                <div className="mt-1 text-sm font-semibold text-slate-900">{formatMoney(precoVendaKgOrigem)}</div>
+                <div className="text-[11px] font-medium uppercase text-slate-500">
+                  Venda/kg origem
+                </div>
+                <div className="mt-1 text-sm font-semibold text-slate-900">
+                  {formatMoney(precoVendaKgOrigem)}
+                </div>
               </div>
               <div className="rounded-md bg-white p-2">
-                <div className="text-[11px] font-medium uppercase text-slate-500">Preco atual granel</div>
-                <div className="mt-1 text-sm font-semibold text-slate-900">{formatMoney(precoVendaAtualGranel)}</div>
+                <div className="text-[11px] font-medium uppercase text-slate-500">
+                  Preco atual granel
+                </div>
+                <div className="mt-1 text-sm font-semibold text-slate-900">
+                  {formatMoney(precoVendaAtualGranel)}
+                </div>
               </div>
             </div>
 
             <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <div className="text-sm font-semibold text-slate-900">Preco de venda do granel</div>
+                  <div className="text-sm font-semibold text-slate-900">
+                    Preco de venda do granel
+                  </div>
                   <div className="text-xs text-slate-500">
                     Base: {baseMargemTexto} ({formatMoney(baseMargemGranel)})
                   </div>
@@ -321,8 +333,9 @@ export default function GranelLancamentoModal({
                     : "border-amber-200 bg-amber-50 text-amber-700"
                 }`}
               >
-                {granelDentroMargemEsperada ? "Dentro da meta inicial" : "Abaixo da meta inicial"}:
-                {" "}minimo {formatMoney(precoMinimoEsperadoGranel)} por kg (20% acima da venda/kg do pai).
+                {granelDentroMargemEsperada ? "Dentro da meta inicial" : "Abaixo da meta inicial"}:{" "}
+                minimo {formatMoney(precoMinimoEsperadoGranel)} por kg (20% acima da venda/kg do
+                pai).
                 {precoVendaAtualGranel > 0 && precoVendaSugeridoGranel > 0 && (
                   <span className="ml-1 text-slate-600">
                     Diferenca vs atual: {diferencaPrecoGranel >= 0 ? "+" : "-"}
@@ -343,9 +356,7 @@ export default function GranelLancamentoModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Observacao
-            </label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Observacao</label>
             <textarea
               value={observacaoGranel}
               onChange={(event) => setObservacaoGranel(event.target.value)}

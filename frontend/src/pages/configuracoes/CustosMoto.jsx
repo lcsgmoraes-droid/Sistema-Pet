@@ -79,7 +79,7 @@ export default function CustosMoto() {
     const res = await api.get("/configuracoes/custo-moto");
     // Converter null para string vazia para evitar warning do React
     const data = res.data;
-    Object.keys(data).forEach(key => {
+    Object.keys(data).forEach((key) => {
       if (data[key] === null) {
         data[key] = "";
       }
@@ -95,41 +95,45 @@ export default function CustosMoto() {
   }
 
   function preencherValoresSugeridos() {
-    if (!confirm("Preencher com valores sugeridos baseados em uma moto de entrega típica (CG 160, Biz 125, Pop 110)? Os valores atuais serão substituídos.")) {
+    if (
+      !confirm(
+        "Preencher com valores sugeridos baseados em uma moto de entrega típica (CG 160, Biz 125, Pop 110)? Os valores atuais serão substituídos.",
+      )
+    ) {
       return;
     }
-    
+
     setForm({
       // Combustível (gasolina comum Brasil - fev/2026)
       preco_combustivel: "6.30",
       km_por_litro: "38",
-      
+
       // Óleo do motor
       km_troca_oleo: "3000",
       custo_troca_oleo: "95.00",
-      
+
       // Pneu dianteiro (menos desgaste)
       km_troca_pneu_dianteiro: "14000",
       custo_pneu_dianteiro: "210.00",
-      
+
       // Pneu traseiro (mais desgaste - tração)
       km_troca_pneu_traseiro: "10000",
       custo_pneu_traseiro: "240.00",
-      
+
       // Kit transmissão (corrente, coroa, pinhão)
       km_troca_kit_traseiro: "18000",
       custo_kit_traseiro: "420.00",
-      
+
       // Manutenção preventiva geral
       km_manutencao_geral: "5000",
       custo_manutencao_geral: "180.00",
-      
+
       // Custos fixos mensais
       seguro_mensal: "110.00",
       licenciamento_mensal: "32.00",
       ipva_mensal: "55.00", // Aprox. 2.5% de R$ 15k ÷ 12
       outros_custos_mensais: "75.00", // Lavagem, pequenos reparos
-      
+
       // Quilometragem média mensal
       km_medio_mensal: "1200",
     });
@@ -148,7 +152,9 @@ export default function CustosMoto() {
         <h2 className="text-2xl font-bold text-gray-800">🏍️ Custos da Moto</h2>
         <p className="text-gray-600 mt-1">Configure os custos operacionais da moto de entregas</p>
         <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-          💡 <strong>Dica:</strong> Não sabe por onde começar? Clique em "Preencher com Valores Sugeridos" para usar custos típicos de uma moto de entrega (CG 160, Biz 125, Pop 110 na faixa de R$ 15 mil). Depois ajuste conforme sua realidade.
+          💡 <strong>Dica:</strong> Não sabe por onde começar? Clique em "Preencher com Valores
+          Sugeridos" para usar custos típicos de uma moto de entrega (CG 160, Biz 125, Pop 110 na
+          faixa de R$ 15 mil). Depois ajuste conforme sua realidade.
         </div>
         <div className="mt-4">
           <button
@@ -195,9 +201,7 @@ export default function CustosMoto() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              💰 Custo por KM
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">💰 Custo por KM</label>
             <div className="w-full px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-blue-900 font-semibold text-lg">
               R$ {calcularCustoCombustivelPorKm()}
             </div>
@@ -210,7 +214,7 @@ export default function CustosMoto() {
         <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
           <span>🛠️</span> Manutenção (Custos Variáveis por KM)
         </h3>
-        
+
         {/* Óleo */}
         <div className="mb-4 pb-4 border-b border-gray-100">
           <h4 className="text-sm font-semibold text-gray-700 mb-3">Troca de Óleo</h4>
@@ -321,7 +325,9 @@ export default function CustosMoto() {
 
         {/* Kit Transmissão */}
         <div className="mb-4 pb-4 border-b border-gray-100">
-          <h4 className="text-sm font-semibold text-gray-700 mb-3">Kit Transmissão (Corrente, Coroa, Pinhão)</h4>
+          <h4 className="text-sm font-semibold text-gray-700 mb-3">
+            Kit Transmissão (Corrente, Coroa, Pinhão)
+          </h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm text-gray-600 mb-2">Vida Útil do Kit (KM)</label>
@@ -399,7 +405,9 @@ export default function CustosMoto() {
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Seguro Mensal (R$)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Seguro Mensal (R$)
+            </label>
             <input
               type="number"
               step="0.01"
@@ -411,7 +419,9 @@ export default function CustosMoto() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Licenciamento Mensal (R$)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Licenciamento Mensal (R$)
+            </label>
             <input
               type="number"
               step="0.01"
@@ -435,7 +445,9 @@ export default function CustosMoto() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Outros Custos Mensais (R$)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Outros Custos Mensais (R$)
+            </label>
             <input
               type="number"
               step="0.01"
@@ -479,9 +491,7 @@ export default function CustosMoto() {
             <div className="w-full px-3 py-2 bg-purple-50 border border-purple-200 rounded-md text-purple-900 font-semibold text-lg">
               R$ {calcularCustoFixoPorKm()}
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Total dos custos fixos ÷ KM médio mensal
-            </p>
+            <p className="text-xs text-gray-500 mt-1">Total dos custos fixos ÷ KM médio mensal</p>
           </div>
         </div>
       </div>

@@ -31,11 +31,7 @@ export default function ProdutosPromocionaisTable({ produtos = [] }) {
           header: "Desconto",
           align: "right",
           render: (produto) => (
-            <MoneyCell
-              className="text-amber-700"
-              value={produto.desconto}
-              zeroAsDash
-            />
+            <MoneyCell className="text-amber-700" value={produto.desconto} zeroAsDash />
           ),
         },
         {

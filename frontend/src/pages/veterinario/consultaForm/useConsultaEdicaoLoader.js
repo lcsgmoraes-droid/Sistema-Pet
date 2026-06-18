@@ -7,12 +7,7 @@ import {
   mapProcedimentosParaForm,
 } from "./consultaFormMappers";
 
-export default function useConsultaEdicaoLoader({
-  isEdicao,
-  consultaId,
-  setForm,
-  setErro,
-}) {
+export default function useConsultaEdicaoLoader({ isEdicao, consultaId, setForm, setErro }) {
   const [finalizado, setFinalizado] = useState(false);
   const [carregando, setCarregando] = useState(isEdicao);
 

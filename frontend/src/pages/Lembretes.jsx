@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { FiAlertTriangle, FiBell, FiCheckCircle, FiRefreshCw, FiPackage, FiTrash2 } from "react-icons/fi";
+import {
+  FiAlertTriangle,
+  FiBell,
+  FiCheckCircle,
+  FiRefreshCw,
+  FiPackage,
+  FiTrash2,
+} from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import CustomerIdentity from "../components/ui/CustomerIdentity";
@@ -12,7 +19,6 @@ export default function Lembretes() {
   const { moduloAtivo } = useModulos();
   const [lembretes, setLembretes] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filter, setFilter] = useState("pendente"); // pendente, notificado, completado, todos
   const [alertasCampanhas, setAlertasCampanhas] = useState(null);
   const [dresPendentes, setDresPendentes] = useState(0);
   const [autocadastrosBling, setAutocadastrosBling] = useState({ total: 0, items: [] });
@@ -106,7 +112,7 @@ export default function Lembretes() {
           toast.success(
             processados > 0
               ? `${processados} lote(s) removido(s) do estoque vendavel`
-              : "Nenhum lote novo em risco encontrado"
+              : "Nenhum lote novo em risco encontrado",
           );
         }
       } catch (error) {
@@ -145,7 +151,7 @@ export default function Lembretes() {
       await api.post(`/lembretes/${lembrete_id}/completar`, {});
       toast.success("Lembrete marcado como completado");
       carregarLembretes();
-    } catch (error) {
+    } catch {
       toast.error("Erro ao completar lembrete");
     }
   };
@@ -155,7 +161,7 @@ export default function Lembretes() {
       await api.post(`/lembretes/${lembrete_id}/renovar`, {});
       toast.success("Lembrete renovado com sucesso");
       carregarLembretes();
-    } catch (error) {
+    } catch {
       toast.error("Erro ao renovar lembrete");
     }
   };
@@ -166,7 +172,7 @@ export default function Lembretes() {
         await api.delete(`/lembretes/${lembrete_id}`);
         toast.success("Lembrete cancelado");
         carregarLembretes();
-      } catch (error) {
+      } catch {
         toast.error("Erro ao cancelar lembrete");
       }
     }
@@ -248,9 +254,7 @@ export default function Lembretes() {
             }}
           >
             <span style={{ fontSize: "16px" }}>🔔</span>
-            <span
-              style={{ fontWeight: "600", color: "#92400e", fontSize: "14px" }}
-            >
+            <span style={{ fontWeight: "600", color: "#92400e", fontSize: "14px" }}>
               Alertas de Campanhas
             </span>
           </div>
@@ -263,8 +267,7 @@ export default function Lembretes() {
             }}
           >
             {/* Aniversários amanhã */}
-            {alertasCampanhas.proximos_eventos?.total_aniversarios_amanha >
-              0 && (
+            {alertasCampanhas.proximos_eventos?.total_aniversarios_amanha > 0 && (
               <div
                 style={{
                   background: "#fdf2f8",
@@ -294,22 +297,19 @@ export default function Lembretes() {
                   🎂 Aniversário(s) amanhã
                 </p>
                 <div>
-                  {alertasCampanhas.proximos_eventos.aniversarios_amanha
-                    .slice(0, 3)
-                    .map((a, i) => (
-                      <p
-                        key={i}
-                        style={{
-                          fontSize: "12px",
-                          color: "#374151",
-                          margin: "1px 0",
-                        }}
-                      >
-                        {a.tipo === "pet" ? "🐕" : "👤"} {a.nome}
-                      </p>
-                    ))}
-                  {alertasCampanhas.proximos_eventos.total_aniversarios_amanha >
-                    3 && (
+                  {alertasCampanhas.proximos_eventos.aniversarios_amanha.slice(0, 3).map((a, i) => (
+                    <p
+                      key={i}
+                      style={{
+                        fontSize: "12px",
+                        color: "#374151",
+                        margin: "1px 0",
+                      }}
+                    >
+                      {a.tipo === "pet" ? "🐕" : "👤"} {a.nome}
+                    </p>
+                  ))}
+                  {alertasCampanhas.proximos_eventos.total_aniversarios_amanha > 3 && (
                     <p
                       style={{
                         fontSize: "11px",
@@ -317,10 +317,7 @@ export default function Lembretes() {
                         margin: "2px 0 0",
                       }}
                     >
-                      +
-                      {alertasCampanhas.proximos_eventos
-                        .total_aniversarios_amanha - 3}{" "}
-                      mais
+                      +{alertasCampanhas.proximos_eventos.total_aniversarios_amanha - 3} mais
                     </p>
                   )}
                 </div>
@@ -357,20 +354,18 @@ export default function Lembretes() {
                   🎉 Aniversário(s) hoje
                 </p>
                 <div>
-                  {alertasCampanhas.aniversarios_hoje
-                    .slice(0, 3)
-                    .map((a, i) => (
-                      <p
-                        key={i}
-                        style={{
-                          fontSize: "12px",
-                          color: "#374151",
-                          margin: "1px 0",
-                        }}
-                      >
-                        {a.tipo === "pet" ? "🐕" : "👤"} {a.nome}
-                      </p>
-                    ))}
+                  {alertasCampanhas.aniversarios_hoje.slice(0, 3).map((a, i) => (
+                    <p
+                      key={i}
+                      style={{
+                        fontSize: "12px",
+                        color: "#374151",
+                        margin: "1px 0",
+                      }}
+                    >
+                      {a.tipo === "pet" ? "🐕" : "👤"} {a.nome}
+                    </p>
+                  ))}
                 </div>
               </div>
             )}
@@ -471,8 +466,7 @@ export default function Lembretes() {
               </div>
             )}
             {/* Sorteios esta semana */}
-            {alertasCampanhas.proximos_eventos?.sorteios_esta_semana?.length >
-              0 && (
+            {alertasCampanhas.proximos_eventos?.sorteios_esta_semana?.length > 0 && (
               <div
                 style={{
                   background: "#fffbeb",
@@ -490,10 +484,7 @@ export default function Lembretes() {
                     margin: 0,
                   }}
                 >
-                  {
-                    alertasCampanhas.proximos_eventos.sorteios_esta_semana
-                      .length
-                  }
+                  {alertasCampanhas.proximos_eventos.sorteios_esta_semana.length}
                 </p>
                 <p
                   style={{
@@ -556,30 +547,28 @@ export default function Lembretes() {
                   🎁 Brinde(s) pendente(s) de retirada
                 </p>
                 <div>
-                  {alertasCampanhas.alertas.brindes_pendentes
-                    .slice(0, 2)
-                    .map((b, i) => (
-                      <p
-                        key={i}
-                        style={{
-                          fontSize: "12px",
-                          color: "#374151",
-                          margin: "1px 0",
-                        }}
-                      >
-                        <CustomerIdentity
-                          code={b.customer_id}
-                          fallback="Cliente nao informado"
-                          layout="inline"
-                          name={b.nome_cliente}
-                          nameClassName="font-medium text-slate-700"
-                          record={b}
-                        />
-                        {b.retirar_ate
-                          ? ` • até ${new Date(b.retirar_ate).toLocaleDateString("pt-BR")}`
-                          : ""}
-                      </p>
-                    ))}
+                  {alertasCampanhas.alertas.brindes_pendentes.slice(0, 2).map((b, i) => (
+                    <p
+                      key={i}
+                      style={{
+                        fontSize: "12px",
+                        color: "#374151",
+                        margin: "1px 0",
+                      }}
+                    >
+                      <CustomerIdentity
+                        code={b.customer_id}
+                        fallback="Cliente nao informado"
+                        layout="inline"
+                        name={b.nome_cliente}
+                        nameClassName="font-medium text-slate-700"
+                        record={b}
+                      />
+                      {b.retirar_ate
+                        ? ` • até ${new Date(b.retirar_ate).toLocaleDateString("pt-BR")}`
+                        : ""}
+                    </p>
+                  ))}
                   {alertasCampanhas.alertas.total_brindes_pendentes > 2 && (
                     <p
                       style={{
@@ -588,8 +577,7 @@ export default function Lembretes() {
                         margin: "2px 0 0",
                       }}
                     >
-                      +{alertasCampanhas.alertas.total_brindes_pendentes - 2}{" "}
-                      mais
+                      +{alertasCampanhas.alertas.total_brindes_pendentes - 2} mais
                     </p>
                   )}
                 </div>
@@ -600,9 +588,7 @@ export default function Lembretes() {
               <div
                 style={{
                   background:
-                    alertasCampanhas.proximos_eventos.dias_ate_fim_mes <= 3
-                      ? "#fefce8"
-                      : "#f0fdf4",
+                    alertasCampanhas.proximos_eventos.dias_ate_fim_mes <= 3 ? "#fefce8" : "#f0fdf4",
                   border:
                     alertasCampanhas.proximos_eventos.dias_ate_fim_mes <= 3
                       ? "1px solid #fde047"
@@ -675,8 +661,8 @@ export default function Lembretes() {
           </div>
           <div style={{ padding: "12px 20px" }}>
             <p style={{ margin: "0 0 8px", color: "#065f46", fontSize: "13px" }}>
-              O sistema já identificou SKU sem cadastro, criou o produto e seguiu com a baixa automaticamente.
-              Este aviso some sozinho após 1 dia.
+              O sistema já identificou SKU sem cadastro, criou o produto e seguiu com a baixa
+              automaticamente. Este aviso some sozinho após 1 dia.
             </p>
             <div style={{ display: "grid", gap: "6px" }}>
               {autocadastrosBling.items.slice(0, 8).map((item) => (
@@ -695,7 +681,9 @@ export default function Lembretes() {
                     cursor: "pointer",
                     textAlign: "left",
                   }}
-                  onClick={() => navigate(`/produtos?busca=${encodeURIComponent(item.codigo || "")}`)}
+                  onClick={() =>
+                    navigate(`/produtos?busca=${encodeURIComponent(item.codigo || "")}`)
+                  }
                 >
                   <span style={{ fontSize: "13px", color: "#14532d" }}>
                     {item.codigo} - {item.nome}
@@ -759,8 +747,8 @@ export default function Lembretes() {
                 {dresPendentes}
               </p>
               <p style={{ color: "#4b5563", fontSize: "13px", margin: 0 }}>
-                lançamento{dresPendentes !== 1 ? "s" : ""} sem categoria DRE.<br />
-                O DRE pode estar incompleto ou incorreto.
+                lançamento{dresPendentes !== 1 ? "s" : ""} sem categoria DRE.
+                <br />O DRE pode estar incompleto ou incorreto.
               </p>
             </div>
             <button
@@ -843,7 +831,8 @@ export default function Lembretes() {
               Protecao por validade ativa
             </p>
             <p style={{ margin: 0, color: "#1e40af", fontSize: "13px" }}>
-              A busca automatica considera lotes que vencem em ate {validadeConfig.dias || 15} dia(s).
+              A busca automatica considera lotes que vencem em ate {validadeConfig.dias || 15}{" "}
+              dia(s).
             </p>
           </div>
           <button
@@ -906,13 +895,21 @@ export default function Lembretes() {
                   gap: "10px",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    flexWrap: "wrap",
+                  }}
+                >
                   <div>
                     <p style={{ margin: "0 0 4px", color: "#78350f", fontWeight: 700 }}>
                       {item.produto_nome || "Produto sem nome"}
                     </p>
                     <p style={{ margin: 0, color: "#92400e", fontSize: "13px" }}>
-                      Lote {item.lote_nome || item.lote_id} - vence em {formatarDataValidade(item.data_validade)}
+                      Lote {item.lote_nome || item.lote_id} - vence em{" "}
+                      {formatarDataValidade(item.data_validade)}
                     </p>
                   </div>
                   <div style={{ textAlign: "right" }}>
@@ -959,9 +956,7 @@ export default function Lembretes() {
         <div className="empty-state">
           <FiBell size={48} />
           <h2>Nenhum lembrete pendente</h2>
-          <p>
-            Lembretes serão criados automaticamente para produtos recorrentes.
-          </p>
+          <p>Lembretes serão criados automaticamente para produtos recorrentes.</p>
         </div>
       ) : (
         <div className="lembretes-list">
@@ -982,9 +977,7 @@ export default function Lembretes() {
 
           {proximosEmBreve.length > 0 && (
             <div className="section">
-              <h3 className="section-title warning">
-                🔔 Próximos em até 7 dias
-              </h3>
+              <h3 className="section-title warning">🔔 Próximos em até 7 dias</h3>
               {proximosEmBreve.map((l) => (
                 <LembretCard
                   key={l.id}
@@ -1034,14 +1027,11 @@ function formatarMoeda(valor) {
 function LembretCard({ lembrete, onCompletar, onRenovar, onCancelar }) {
   const diasRestantes = lembrete.dias_restantes;
   const dataProxima = new Date(lembrete.data_proxima_dose);
-  const statusClass =
-    diasRestantes < 0 ? "vencido" : diasRestantes <= 7 ? "proximo" : "futuro";
+  const statusClass = diasRestantes < 0 ? "vencido" : diasRestantes <= 7 ? "proximo" : "futuro";
 
   // Progresso de doses
   const temDoseTotal = lembrete.dose_total && lembrete.dose_total > 0;
-  const progressoPercentual = temDoseTotal
-    ? (lembrete.dose_atual / lembrete.dose_total) * 100
-    : 0;
+  const progressoPercentual = temDoseTotal ? (lembrete.dose_atual / lembrete.dose_total) * 100 : 0;
 
   return (
     <div className={`lembrete-card ${statusClass}`}>
@@ -1062,10 +1052,7 @@ function LembretCard({ lembrete, onCompletar, onRenovar, onCancelar }) {
 
         {temDoseTotal && (
           <div className="progress-bar-container">
-            <div
-              className="progress-bar"
-              style={{ width: `${progressoPercentual}%` }}
-            ></div>
+            <div className="progress-bar" style={{ width: `${progressoPercentual}%` }}></div>
           </div>
         )}
 
@@ -1083,9 +1070,7 @@ function LembretCard({ lembrete, onCompletar, onRenovar, onCancelar }) {
           </div>
           <div className="detail-row">
             <span className="label">Data:</span>
-            <span className="value">
-              {dataProxima.toLocaleDateString("pt-BR")}
-            </span>
+            <span className="value">{dataProxima.toLocaleDateString("pt-BR")}</span>
           </div>
           <div className="detail-row">
             <span className="label">Quantidade:</span>
@@ -1094,9 +1079,7 @@ function LembretCard({ lembrete, onCompletar, onRenovar, onCancelar }) {
           {lembrete.preco_estimado && (
             <div className="detail-row">
               <span className="label">Preço Est.:</span>
-              <span className="value">
-                R$ {lembrete.preco_estimado.toFixed(2)}
-              </span>
+              <span className="value">R$ {lembrete.preco_estimado.toFixed(2)}</span>
             </div>
           )}
         </div>

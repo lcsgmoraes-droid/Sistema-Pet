@@ -2,22 +2,15 @@ import { useState } from "react";
 import { recalcularItemComPrecoEDesconto } from "../utils/pdvDescontoItensUtils";
 
 export function usePDVDescontoItens({ vendaAtual, setVendaAtual }) {
-  const [mostrarModalDescontoItem, setMostrarModalDescontoItem] =
-    useState(false);
+  const [mostrarModalDescontoItem, setMostrarModalDescontoItem] = useState(false);
   const [itemEditando, setItemEditando] = useState(null);
 
   const recalcularTotais = (itens, extras = {}) => {
     const subtotal = itens.reduce((sum, item) => sum + item.subtotal, 0);
-    const descontoItens = itens.reduce(
-      (sum, item) => sum + (item.desconto_valor || 0),
-      0,
-    );
+    const descontoItens = itens.reduce((sum, item) => sum + (item.desconto_valor || 0), 0);
     const totalBruto = subtotal + descontoItens;
-    const descontoPercentual =
-      totalBruto > 0 ? (descontoItens / totalBruto) * 100 : 0;
-    const taxaEntrega = vendaAtual.tem_entrega
-      ? vendaAtual.entrega?.taxa_entrega_total || 0
-      : 0;
+    const descontoPercentual = totalBruto > 0 ? (descontoItens / totalBruto) * 100 : 0;
+    const taxaEntrega = vendaAtual.tem_entrega ? vendaAtual.entrega?.taxa_entrega_total || 0 : 0;
     const total = subtotal + taxaEntrega;
 
     setVendaAtual((prev) => ({

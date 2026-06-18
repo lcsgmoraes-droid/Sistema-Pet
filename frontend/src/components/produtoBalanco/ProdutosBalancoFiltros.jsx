@@ -10,9 +10,8 @@ function ProdutosBalancoFiltros({
   onAplicarFiltros,
 }) {
   const fornecedorSelecionado =
-    fornecedores.find(
-      (fornecedor) => String(fornecedor.id) === String(filtros.fornecedor_id),
-    ) || null;
+    fornecedores.find((fornecedor) => String(fornecedor.id) === String(filtros.fornecedor_id)) ||
+    null;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -60,11 +59,7 @@ function ProdutosBalancoFiltros({
           }
         />
 
-        <ActionButton
-          className="h-10"
-          intent="edit"
-          onClick={onAplicarFiltros}
-        >
+        <ActionButton className="h-10" intent="edit" onClick={onAplicarFiltros}>
           Atualizar lista
         </ActionButton>
       </div>

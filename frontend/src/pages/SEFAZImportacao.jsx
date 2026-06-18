@@ -28,7 +28,9 @@ function formatarDataHora(valor) {
 function montarNomeArquivoXml(dados) {
   const numero = String(dados?.numero_nf || "sem-numero").replaceAll(/\D/g, "");
   const serie = String(dados?.serie || "1").replaceAll(/\D/g, "");
-  const chaveAcesso = String(dados?.chave_acesso || "").replaceAll(/\D/g, "").slice(-8);
+  const chaveAcesso = String(dados?.chave_acesso || "")
+    .replaceAll(/\D/g, "")
+    .slice(-8);
   return `nfe_${numero || "0"}_${serie || "1"}_${chaveAcesso || "xml"}.xml`;
 }
 
@@ -48,8 +50,8 @@ export default function SEFAZImportacao() {
   const [loading, setLoading] = useState(false);
   const [configLoading, setConfigLoading] = useState(true);
   const [salvandoRotina, setSalvandoRotina] = useState(false);
-  const [sincronizando, setSincronizando] = useState(false);
-  const [pulandoParaHoje, setPulandoParaHoje] = useState(false);
+  const [, setSincronizando] = useState(false);
+  const [, setPulandoParaHoje] = useState(false);
   const [mensagemRotina, setMensagemRotina] = useState("");
   const listaImportacoesRef = useRef(null);
   const [cfg, setCfg] = useState({
@@ -110,7 +112,9 @@ export default function SEFAZImportacao() {
         proximo_sync_permitido_at: data.proximo_sync_permitido_at || null,
       }));
     } catch (err) {
-      setMensagemRotina(err?.response?.data?.detail || "Nao foi possivel carregar a rotina da SEFAZ.");
+      setMensagemRotina(
+        err?.response?.data?.detail || "Nao foi possivel carregar a rotina da SEFAZ.",
+      );
     } finally {
       setConfigLoading(false);
     }
@@ -138,7 +142,7 @@ export default function SEFAZImportacao() {
     }
   }
 
-  async function sincronizarAgora() {
+  async function _sincronizarAgora() {
     setMensagemRotina("");
     try {
       setSincronizando(true);
@@ -152,9 +156,9 @@ export default function SEFAZImportacao() {
     }
   }
 
-  async function pularParaHoje() {
+  async function _pularParaHoje() {
     const confirmado = window.confirm(
-      "Isso vai fazer o sistema IGNORAR todas as NFs antigas e começar pelo ponto atual da SEFAZ.\n\nAs NFs antigas NÃO serão importadas. Continuar?"
+      "Isso vai fazer o sistema IGNORAR todas as NFs antigas e começar pelo ponto atual da SEFAZ.\n\nAs NFs antigas NÃO serão importadas. Continuar?",
     );
     if (!confirmado) return;
     setMensagemRotina("");
@@ -189,7 +193,8 @@ export default function SEFAZImportacao() {
         ...prev,
         [importacao.id]: {
           tipo: "erro",
-          mensagem: "Esta consulta nao trouxe XML completo da NF-e. Tente outra chave ou rode sincronizacao real.",
+          mensagem:
+            "Esta consulta nao trouxe XML completo da NF-e. Tente outra chave ou rode sincronizacao real.",
         },
       }));
       return;
@@ -266,7 +271,9 @@ export default function SEFAZImportacao() {
       }
 
       if (cnpjEmpresa && telaSaida && cnpjDestinatario && cnpjDestinatario === cnpjEmpresa) {
-        setErro("Esta chave parece ser NF de entrada para a propria empresa. Use a tela NF de Entrada.");
+        setErro(
+          "Esta chave parece ser NF de entrada para a propria empresa. Use a tela NF de Entrada.",
+        );
         return;
       }
 
@@ -298,7 +305,12 @@ export default function SEFAZImportacao() {
         <h1 className="text-2xl font-bold text-gray-800">Consulta NF-e - SEFAZ</h1>
         <p className="text-gray-500 text-sm mt-1">
           Esta tela e para operacao. A configuracao da integracao (certificado, senha e ambiente)
-          fica em <Link to="/configuracoes/integracoes" className="text-indigo-600 font-semibold"> Configuracoes - Integracoes</Link>.
+          fica em{" "}
+          <Link to="/configuracoes/integracoes" className="text-indigo-600 font-semibold">
+            {" "}
+            Configuracoes - Integracoes
+          </Link>
+          .
         </p>
       </div>
 
@@ -354,7 +366,8 @@ export default function SEFAZImportacao() {
           <>
             {!cfg.enabled || !cfg.cert_ok ? (
               <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm">
-                A integracao ainda nao esta pronta para rotina automatica. Finalize em Configuracoes &gt; Integracoes.
+                A integracao ainda nao esta pronta para rotina automatica. Finalize em Configuracoes
+                &gt; Integracoes.
               </div>
             ) : null}
 
@@ -395,7 +408,10 @@ export default function SEFAZImportacao() {
 
             {emCooldown && (
               <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-red-800 text-sm">
-                ⛔ <strong>SEFAZ bloqueada por consumo indevido (código 656).</strong> O sistema fez chamadas demais e a SEFAZ aplicou uma penalidade. O botão ficará disponível em <strong>~{minutosRestantesCooldown} minuto(s)</strong>. Não tente forçar — isso reinicia o contador de penalidade.
+                ⛔ <strong>SEFAZ bloqueada por consumo indevido (código 656).</strong> O sistema fez
+                chamadas demais e a SEFAZ aplicou uma penalidade. O botão ficará disponível em{" "}
+                <strong>~{minutosRestantesCooldown} minuto(s)</strong>. Não tente forçar — isso
+                reinicia o contador de penalidade.
               </div>
             )}
 
@@ -415,14 +431,19 @@ export default function SEFAZImportacao() {
 
       {importacoes.length > 0 && (
         <div ref={listaImportacoesRef} className="space-y-3">
-          <h2 className="text-base font-bold text-gray-800">Importacoes da sessao ({importacoes.length})</h2>
+          <h2 className="text-base font-bold text-gray-800">
+            Importacoes da sessao ({importacoes.length})
+          </h2>
 
           {importacoes.map((imp) => {
             const expandida = importacaoExpandidaId === imp.id;
             const dados = imp.dados;
 
             return (
-              <div key={imp.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div
+                key={imp.id}
+                className="bg-white rounded-xl border border-gray-200 overflow-hidden"
+              >
                 <button
                   type="button"
                   onClick={() => setImportacaoExpandidaId(expandida ? null : imp.id)}
@@ -436,10 +457,21 @@ export default function SEFAZImportacao() {
                   </div>
 
                   <div className="mt-2 grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
-                    <div className="text-gray-600">Chave: <span className="font-mono">{dados.chave_acesso}</span></div>
-                    <div className="text-gray-600">Itens: <strong>{dados.itens?.length || 0}</strong></div>
-                    <div className="text-gray-600">Total: <strong className="text-green-700">{formatarMoeda(dados.valor_total_nf)}</strong></div>
-                    <div className="text-indigo-700 font-semibold">{expandida ? "Fechar" : "Expandir"}</div>
+                    <div className="text-gray-600">
+                      Chave: <span className="font-mono">{dados.chave_acesso}</span>
+                    </div>
+                    <div className="text-gray-600">
+                      Itens: <strong>{dados.itens?.length || 0}</strong>
+                    </div>
+                    <div className="text-gray-600">
+                      Total:{" "}
+                      <strong className="text-green-700">
+                        {formatarMoeda(dados.valor_total_nf)}
+                      </strong>
+                    </div>
+                    <div className="text-indigo-700 font-semibold">
+                      {expandida ? "Fechar" : "Expandir"}
+                    </div>
                   </div>
                 </button>
 
@@ -451,7 +483,9 @@ export default function SEFAZImportacao() {
                       disabled={importandoEntradaId === imp.id}
                       className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 disabled:opacity-60"
                     >
-                      {importandoEntradaId === imp.id ? "Enviando para Entrada por XML..." : "Usar esta NF na Entrada por XML"}
+                      {importandoEntradaId === imp.id
+                        ? "Enviando para Entrada por XML..."
+                        : "Usar esta NF na Entrada por XML"}
                     </button>
 
                     <button
@@ -489,7 +523,9 @@ export default function SEFAZImportacao() {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <span className="text-gray-500">Numero / Serie:</span>
-                          <span className="ml-2 font-semibold">{dados.numero_nf} / {dados.serie}</span>
+                          <span className="ml-2 font-semibold">
+                            {dados.numero_nf} / {dados.serie}
+                          </span>
                         </div>
                         <div>
                           <span className="text-gray-500">Emissao:</span>
@@ -505,17 +541,23 @@ export default function SEFAZImportacao() {
                         </div>
                         <div>
                           <span className="text-gray-500">Destinatario:</span>
-                          <span className="ml-2 font-semibold">{dados.destinatario_nome || "-"}</span>
+                          <span className="ml-2 font-semibold">
+                            {dados.destinatario_nome || "-"}
+                          </span>
                         </div>
                         <div>
                           <span className="text-gray-500">Valor Total:</span>
-                          <span className="ml-2 font-bold text-green-700 text-base">{formatarMoeda(dados.valor_total_nf)}</span>
+                          <span className="ml-2 font-bold text-green-700 text-base">
+                            {formatarMoeda(dados.valor_total_nf)}
+                          </span>
                         </div>
                       </div>
                     </div>
 
                     <div className="p-6">
-                      <h4 className="text-sm font-bold text-gray-700 mb-3">Itens da Nota ({dados.itens?.length || 0})</h4>
+                      <h4 className="text-sm font-bold text-gray-700 mb-3">
+                        Itens da Nota ({dados.itens?.length || 0})
+                      </h4>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
@@ -532,22 +574,40 @@ export default function SEFAZImportacao() {
                           </thead>
                           <tbody className="divide-y divide-gray-100">
                             {dados.itens?.map((item) => (
-                              <tr key={`${imp.id}-${item.numero_item}`} className="hover:bg-gray-50">
+                              <tr
+                                key={`${imp.id}-${item.numero_item}`}
+                                className="hover:bg-gray-50"
+                              >
                                 <td className="px-3 py-2 text-gray-500">{item.numero_item}</td>
-                                <td className="px-3 py-2 font-mono text-xs">{item.codigo_produto}</td>
+                                <td className="px-3 py-2 font-mono text-xs">
+                                  {item.codigo_produto}
+                                </td>
                                 <td className="px-3 py-2">{item.descricao}</td>
-                                <td className="px-3 py-2 font-mono text-xs text-gray-500">{item.ncm || "-"}</td>
+                                <td className="px-3 py-2 font-mono text-xs text-gray-500">
+                                  {item.ncm || "-"}
+                                </td>
                                 <td className="px-3 py-2 text-right">{item.quantidade}</td>
                                 <td className="px-3 py-2 text-gray-500">{item.unidade}</td>
-                                <td className="px-3 py-2 text-right">{formatarMoeda(item.valor_unitario)}</td>
-                                <td className="px-3 py-2 text-right font-semibold">{formatarMoeda(item.valor_total)}</td>
+                                <td className="px-3 py-2 text-right">
+                                  {formatarMoeda(item.valor_unitario)}
+                                </td>
+                                <td className="px-3 py-2 text-right font-semibold">
+                                  {formatarMoeda(item.valor_total)}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
                           <tfoot>
                             <tr className="border-t-2 border-gray-300 bg-gray-50">
-                              <td colSpan={7} className="px-3 py-2 text-right font-bold text-gray-700">Total da NF-e</td>
-                              <td className="px-3 py-2 text-right font-bold text-green-700">{formatarMoeda(dados.valor_total_nf)}</td>
+                              <td
+                                colSpan={7}
+                                className="px-3 py-2 text-right font-bold text-gray-700"
+                              >
+                                Total da NF-e
+                              </td>
+                              <td className="px-3 py-2 text-right font-bold text-green-700">
+                                {formatarMoeda(dados.valor_total_nf)}
+                              </td>
                             </tr>
                           </tfoot>
                         </table>

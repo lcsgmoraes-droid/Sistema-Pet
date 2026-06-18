@@ -17,7 +17,10 @@ export default function BanhoTosaCreditosList({ creditos = [] }) {
     >
       <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
         {creditos.map((credito) => (
-          <div key={credito.id} className="grid gap-3 p-3 md:grid-cols-[1.2fr_0.8fr_0.7fr_0.7fr] md:items-center">
+          <div
+            key={credito.id}
+            className="grid gap-3 p-3 md:grid-cols-[1.2fr_0.8fr_0.7fr_0.7fr] md:items-center"
+          >
             <div>
               <p className="font-semibold text-slate-900">{credito.pacote_nome}</p>
               <p className="flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
@@ -41,9 +44,14 @@ export default function BanhoTosaCreditosList({ creditos = [] }) {
                 )}
               </p>
             </div>
-            <Info label="Saldo" value={`${formatNumber(credito.saldo_creditos, 0)} de ${formatNumber(credito.creditos_total, 0)}`} />
+            <Info
+              label="Saldo"
+              value={`${formatNumber(credito.saldo_creditos, 0)} de ${formatNumber(credito.creditos_total, 0)}`}
+            />
             <Info label="Validade" value={formatDate(credito.data_validade)} />
-            <span className={`rounded-full px-3 py-2 text-center text-xs font-bold ${statusClass(credito)}`}>
+            <span
+              className={`rounded-full px-3 py-2 text-center text-xs font-bold ${statusClass(credito)}`}
+            >
               {credito.vencido ? "Vencido" : credito.status}
             </span>
           </div>

@@ -17,10 +17,6 @@ test("buildMensagemRascunhoSalvo informa quando o rascunho ainda pode ser finali
 test("listarAcoesRascunhoSalvo oferece continuar, topo e lista de consultas", () => {
   assert.deepEqual(
     listarAcoesRascunhoSalvo().map((acao) => acao.id),
-    [
-      RASCUNHO_SALVO_ACOES.CONTINUAR,
-      RASCUNHO_SALVO_ACOES.TOPO,
-      RASCUNHO_SALVO_ACOES.LISTA,
-    ],
+    [RASCUNHO_SALVO_ACOES.CONTINUAR, RASCUNHO_SALVO_ACOES.TOPO, RASCUNHO_SALVO_ACOES.LISTA],
   );
 });

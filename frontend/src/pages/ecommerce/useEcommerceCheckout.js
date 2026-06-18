@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { trackBeginCheckout, trackPurchase } from '../../services/analytics';
-import ecommerceApi from '../../services/ecommerceApi';
+import { useEffect, useState } from "react";
+import { trackBeginCheckout, trackPurchase } from "../../services/analytics";
+import ecommerceApi from "../../services/ecommerceApi";
 import {
   STORAGE_ADDRESS_KEY,
   buildAddressText,
@@ -9,7 +9,7 @@ import {
   extractApiErrorMessage,
   fetchAddressByCep,
   getStoredAddressFields,
-} from './ecommerceMvpUtils';
+} from "./ecommerceMvpUtils";
 
 export default function useEcommerceCheckout({
   authHeaders,
@@ -25,17 +25,17 @@ export default function useEcommerceCheckout({
   onSuccess,
 }) {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [cupom, setCupom] = useState('');
+  const [cupom, setCupom] = useState("");
   const [cupomResult, setCupomResult] = useState(null);
-  const [cidadeDestino, setCidadeDestino] = useState('');
-  const [deliveryMode, setDeliveryMode] = useState('entrega');
-  const [tipoRetirada, setTipoRetirada] = useState('proprio');
+  const [cidadeDestino, setCidadeDestino] = useState("");
+  const [deliveryMode, setDeliveryMode] = useState("entrega");
+  const [tipoRetirada, setTipoRetirada] = useState("proprio");
   const [isDrive, setIsDrive] = useState(false);
   const [addressFields, setAddressFields] = useState(() => getStoredAddressFields());
   const [checkoutResumo, setCheckoutResumo] = useState(null);
   const [checkoutResult, setCheckoutResult] = useState(null);
-  const [pagamentoTipo, setPagamentoTipo] = useState('');
-  const [pagamentoBandeira, setPagamentoBandeira] = useState('Visa');
+  const [pagamentoTipo, setPagamentoTipo] = useState("");
+  const [pagamentoBandeira, setPagamentoBandeira] = useState("Visa");
   const [pagamentoParcelas, setPagamentoParcelas] = useState(1);
 
   useEffect(() => {
@@ -70,48 +70,53 @@ export default function useEcommerceCheckout({
   async function applyCupom(e) {
     e.preventDefault();
     if (!customerToken) {
-      onError('Fa\u00e7a login para aplicar cupom.');
-      setView('conta');
+      onError("Fa\u00e7a login para aplicar cupom.");
+      setView("conta");
       return;
     }
     if (!cupom.trim()) return;
-    onError('');
+    onError("");
     try {
       const response = await ecommerceApi.post(
-        '/api/carrinho/aplicar-cupom',
+        "/api/carrinho/aplicar-cupom",
         { codigo: cupom.trim() },
-        { headers: authHeaders }
+        { headers: authHeaders },
       );
       setCupomResult(response.data);
-      onSuccess('Cupom validado.');
+      onSuccess("Cupom validado.");
     } catch (err) {
       setCupomResult(null);
-      onError(extractApiErrorMessage(err, 'Cupom inv\u00e1lido'));
+      onError(extractApiErrorMessage(err, "Cupom inv\u00e1lido"));
     }
   }
 
   async function calcularResumoCheckout(e) {
     e.preventDefault();
     if (!customerToken) {
-      onError('Fa\u00e7a login para continuar no checkout.');
-      setView('conta');
+      onError("Fa\u00e7a login para continuar no checkout.");
+      setView("conta");
       return;
     }
     if (!cart?.itens?.length) {
-      onError('Adicione itens no carrinho antes de calcular o checkout.');
+      onError("Adicione itens no carrinho antes de calcular o checkout.");
       return;
     }
 
-    const cidadeFinal = (tenantContext?.cidade || cidadeDestino || addressFields.cidade || '').trim();
+    const cidadeFinal = (
+      tenantContext?.cidade ||
+      cidadeDestino ||
+      addressFields.cidade ||
+      ""
+    ).trim();
     if (!cidadeFinal || cidadeFinal.length < 2) {
-      onError('Cidade da loja n\u00e3o configurada para checkout.');
+      onError("Cidade da loja n\u00e3o configurada para checkout.");
       return;
     }
 
-    onError('');
+    onError("");
     setCheckoutResumo(null);
     try {
-      const response = await ecommerceApi.get('/api/checkout/resumo', {
+      const response = await ecommerceApi.get("/api/checkout/resumo", {
         headers: authHeaders,
         params: {
           cidade_destino: cidadeFinal,
@@ -119,70 +124,74 @@ export default function useEcommerceCheckout({
         },
       });
       setCheckoutResumo(response.data);
-      onSuccess('Resumo de checkout calculado.');
+      onSuccess("Resumo de checkout calculado.");
     } catch (err) {
-      onError(extractApiErrorMessage(err, 'Erro ao calcular resumo do checkout'));
+      onError(extractApiErrorMessage(err, "Erro ao calcular resumo do checkout"));
     }
   }
 
   async function finalizarCheckout() {
     if (!customerToken) {
-      onError('Fa\u00e7a login para finalizar o pedido.');
-      setView('conta');
+      onError("Fa\u00e7a login para finalizar o pedido.");
+      setView("conta");
       return;
     }
     if (!isProfileComplete) {
-      onError('Complete seu cadastro antes de finalizar o pedido.');
-      setView('conta');
+      onError("Complete seu cadastro antes de finalizar o pedido.");
+      setView("conta");
       return;
     }
-    const cidadeFinal = (tenantContext?.cidade || cidadeDestino || addressFields.cidade || '').trim();
+    const cidadeFinal = (
+      tenantContext?.cidade ||
+      cidadeDestino ||
+      addressFields.cidade ||
+      ""
+    ).trim();
     if (!cidadeFinal || cidadeFinal.length < 2) {
-      onError('Cidade da loja n\u00e3o configurada para checkout.');
+      onError("Cidade da loja n\u00e3o configurada para checkout.");
       return;
     }
 
     const enderecoFormatado =
-      deliveryMode === 'retirada'
-        ? 'RETIRADA NA LOJA'
-        : buildAddressText(addressFields);
+      deliveryMode === "retirada" ? "RETIRADA NA LOJA" : buildAddressText(addressFields);
 
-    if (deliveryMode === 'entrega' && !enderecoFormatado) {
-      onError('Informe o endere\u00e7o de entrega.');
+    if (deliveryMode === "entrega" && !enderecoFormatado) {
+      onError("Informe o endere\u00e7o de entrega.");
       return;
     }
     if (!pagamentoTipo) {
-      onError('Escolha PIX, debito ou credito para continuar para o pagamento.');
+      onError("Escolha PIX, debito ou credito para continuar para o pagamento.");
       return;
     }
 
     setCheckoutLoading(true);
-    onError('');
-    onSuccess('');
+    onError("");
+    onSuccess("");
     setCheckoutResult(null);
 
     try {
       const response = await ecommerceApi.post(
-        '/api/checkout/finalizar',
+        "/api/checkout/finalizar",
         {
           cidade_destino: cidadeFinal,
           endereco_entrega: enderecoFormatado || null,
           cupom: cupomResult?.codigo || null,
-          tipo_retirada: deliveryMode === 'retirada' ? tipoRetirada : null,
-          is_drive: deliveryMode === 'retirada' && tipoRetirada === 'proprio' ? isDrive : false,
+          tipo_retirada: deliveryMode === "retirada" ? tipoRetirada : null,
+          is_drive: deliveryMode === "retirada" && tipoRetirada === "proprio" ? isDrive : false,
           forma_pagamento_nome: (() => {
-            if (pagamentoTipo === 'pix') return 'PIX';
-            if (pagamentoTipo === 'debito') return `D\u00e9bito ${pagamentoBandeira}`;
-            if (pagamentoTipo === 'credito') return `Cr\u00e9dito ${pagamentoBandeira} ${pagamentoParcelas}x`;
+            if (pagamentoTipo === "pix") return "PIX";
+            if (pagamentoTipo === "debito") return `D\u00e9bito ${pagamentoBandeira}`;
+            if (pagamentoTipo === "credito")
+              return `Cr\u00e9dito ${pagamentoBandeira} ${pagamentoParcelas}x`;
             return null;
           })(),
         },
         {
           headers: {
             ...authHeaders,
-            'Idempotency-Key': buildIdempotencyKey(),
+            "Idempotency-Key": buildIdempotencyKey(),
           },
-        }
+        },
       );
 
       const result = response.data;
@@ -191,8 +200,8 @@ export default function useEcommerceCheckout({
       clearCart();
       setCheckoutResumo(null);
       setCupomResult(null);
-      setCupom('');
-      if (deliveryMode === 'entrega') {
+      setCupom("");
+      if (deliveryMode === "entrega") {
         localStorage.setItem(STORAGE_ADDRESS_KEY, JSON.stringify(addressFields));
       }
 
@@ -201,15 +210,15 @@ export default function useEcommerceCheckout({
       }
 
       if (result?.payment_url) {
-        onSuccess('Redirecionando para pagamento seguro...');
+        onSuccess("Redirecionando para pagamento seguro...");
         window.location.assign(result.payment_url);
         return;
       }
 
-      onSuccess('Pagamento enviado para analise. O pedido sera liberado apos aprovacao.');
-      setView('pedidos');
+      onSuccess("Pagamento enviado para analise. O pedido sera liberado apos aprovacao.");
+      setView("pedidos");
     } catch (err) {
-      onError(extractApiErrorMessage(err, 'Erro ao finalizar checkout'));
+      onError(extractApiErrorMessage(err, "Erro ao finalizar checkout"));
     } finally {
       setCheckoutLoading(false);
     }
@@ -217,20 +226,22 @@ export default function useEcommerceCheckout({
 
   function handleCheckoutFromLoja() {
     if (!cart?.itens?.length) {
-      onError('Adicione itens no carrinho antes de finalizar.');
+      onError("Adicione itens no carrinho antes de finalizar.");
       return;
     }
     if (!customerToken) {
-      onError('Fa\u00e7a login para finalizar o pedido.');
-      setView('conta');
+      onError("Fa\u00e7a login para finalizar o pedido.");
+      setView("conta");
       return;
     }
     if (!isProfileComplete) {
-      onError('Complete seu cadastro (nome completo, telefone, CPF e endere\u00e7o) antes de finalizar.');
-      setView('conta');
+      onError(
+        "Complete seu cadastro (nome completo, telefone, CPF e endere\u00e7o) antes de finalizar.",
+      );
+      setView("conta");
       return;
     }
-    setView('checkout');
+    setView("checkout");
     trackBeginCheckout(cart);
   }
 

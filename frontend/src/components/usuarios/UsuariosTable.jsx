@@ -4,21 +4,14 @@ import IconActionButton from "../ui/IconActionButton";
 import Panel from "../ui/Panel";
 import StatusBadge from "../ui/StatusBadge";
 
-export default function UsuariosTable({
-  loading,
-  onForcarLogout,
-  onToggleStatus,
-  usuarios,
-}) {
+export default function UsuariosTable({ loading, onForcarLogout, onToggleStatus, usuarios }) {
   const columns = [
     {
       key: "email",
       header: "Email",
       render: (usuario) => (
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-slate-900">
-            {usuario.email}
-          </p>
+          <p className="truncate text-sm font-semibold text-slate-900">{usuario.email}</p>
           <p className="text-xs text-slate-500">ID {usuario.user_id}</p>
         </div>
       ),
