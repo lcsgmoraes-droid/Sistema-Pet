@@ -291,6 +291,49 @@ class PetResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+def _pet_response_dict(pet: Pet) -> dict:
+    idade_meses = None
+    if pet.data_nascimento:
+        hoje = dt.now()
+        idade_meses = (hoje.year - pet.data_nascimento.year) * 12 + (
+            hoje.month - pet.data_nascimento.month
+        )
+
+    return {
+        "id": pet.id,
+        "codigo": pet.codigo,
+        "nome": pet.nome,
+        "especie": pet.especie,
+        "raca": pet.raca,
+        "sexo": pet.sexo,
+        "data_nascimento": pet.data_nascimento,
+        "idade_aproximada": pet.idade_aproximada,
+        "castrado": pet.castrado,
+        "castrado_data": pet.castrado_data,
+        "cor": pet.cor,
+        "porte": pet.porte,
+        "peso": pet.peso,
+        "peso_kg": pet.peso,
+        "idade_meses": idade_meses,
+        "microchip": pet.microchip,
+        "alergias": pet.alergias,
+        "alergias_lista": pet.alergias_lista or [],
+        "doencas_cronicas": pet.doencas_cronicas,
+        "condicoes_cronicas_lista": pet.condicoes_cronicas_lista or [],
+        "medicamentos_continuos": pet.medicamentos_continuos,
+        "medicamentos_continuos_lista": pet.medicamentos_continuos_lista or [],
+        "restricoes_alimentares_lista": pet.restricoes_alimentares_lista or [],
+        "historico_clinico": pet.historico_clinico,
+        "tipo_sanguineo": pet.tipo_sanguineo,
+        "pedigree_registro": pet.pedigree_registro,
+        "observacoes": pet.observacoes,
+        "foto_url": pet.foto_url,
+        "ativo": pet.ativo,
+        "created_at": pet.created_at,
+        "updated_at": pet.updated_at,
+    }
+
+
 class ClienteCreate(BaseModel):
     # Tipo de cadastro
     tipo_cadastro: str = "cliente"  # cliente, fornecedor, veterinario, funcionario
@@ -1869,50 +1912,7 @@ def get_pet(
             status_code=status.HTTP_404_NOT_FOUND, detail="Pet nÃ£o encontrado"
         )
 
-    # Calcular idade em meses se tiver data de nascimento
-    idade_meses = None
-    if pet.data_nascimento:
-        hoje = dt.now()
-        idade_meses = (hoje.year - pet.data_nascimento.year) * 12 + (
-            hoje.month - pet.data_nascimento.month
-        )
-
-    # Criar resposta completa com todos os campos do PetResponse
-    pet_dict = {
-        "id": pet.id,
-        "codigo": pet.codigo,
-        "nome": pet.nome,
-        "especie": pet.especie,
-        "raca": pet.raca,
-        "sexo": pet.sexo,
-        "data_nascimento": pet.data_nascimento,
-        "idade_aproximada": pet.idade_aproximada,
-        "castrado": pet.castrado,
-        "castrado_data": pet.castrado_data,
-        "cor": pet.cor,
-        "porte": pet.porte,
-        "peso": pet.peso,
-        "peso_kg": pet.peso,  # Alias para compatibilidade
-        "idade_meses": idade_meses,  # Calculado
-        "microchip": pet.microchip,
-        "alergias": pet.alergias,
-        "alergias_lista": pet.alergias_lista or [],
-        "doencas_cronicas": pet.doencas_cronicas,
-        "condicoes_cronicas_lista": pet.condicoes_cronicas_lista or [],
-        "medicamentos_continuos": pet.medicamentos_continuos,
-        "medicamentos_continuos_lista": pet.medicamentos_continuos_lista or [],
-        "restricoes_alimentares_lista": pet.restricoes_alimentares_lista or [],
-        "historico_clinico": pet.historico_clinico,
-        "tipo_sanguineo": pet.tipo_sanguineo,
-        "pedigree_registro": pet.pedigree_registro,
-        "observacoes": pet.observacoes,
-        "foto_url": pet.foto_url,
-        "ativo": pet.ativo,
-        "created_at": pet.created_at,
-        "updated_at": pet.updated_at,
-    }
-
-    return pet_dict
+    return _pet_response_dict(pet)
 
 
 @router.put("/pets/{pet_id}", response_model=PetResponse)
@@ -1989,50 +1989,7 @@ def update_pet(
     # Log de auditoria com old_data e new_data
     log_update(db, current_user, "pet", pet.id, old_data, update_data)
 
-    # Calcular idade em meses se tiver data de nascimento
-    idade_meses = None
-    if pet.data_nascimento:
-        hoje = dt.now()
-        idade_meses = (hoje.year - pet.data_nascimento.year) * 12 + (
-            hoje.month - pet.data_nascimento.month
-        )
-
-    # Criar resposta com campos calculados
-    pet_dict = {
-        "id": pet.id,
-        "codigo": pet.codigo,
-        "nome": pet.nome,
-        "especie": pet.especie,
-        "raca": pet.raca,
-        "sexo": pet.sexo,
-        "data_nascimento": pet.data_nascimento,
-        "idade_aproximada": pet.idade_aproximada,
-        "castrado": pet.castrado,
-        "castrado_data": pet.castrado_data,
-        "cor": pet.cor,
-        "porte": pet.porte,
-        "peso": pet.peso,
-        "peso_kg": pet.peso,  # Alias
-        "idade_meses": idade_meses,
-        "microchip": pet.microchip,
-        "alergias": pet.alergias,
-        "alergias_lista": pet.alergias_lista or [],
-        "doencas_cronicas": pet.doencas_cronicas,
-        "condicoes_cronicas_lista": pet.condicoes_cronicas_lista or [],
-        "medicamentos_continuos": pet.medicamentos_continuos,
-        "medicamentos_continuos_lista": pet.medicamentos_continuos_lista or [],
-        "restricoes_alimentares_lista": pet.restricoes_alimentares_lista or [],
-        "historico_clinico": pet.historico_clinico,
-        "tipo_sanguineo": pet.tipo_sanguineo,
-        "pedigree_registro": pet.pedigree_registro,
-        "observacoes": pet.observacoes,
-        "foto_url": pet.foto_url,
-        "ativo": pet.ativo,
-        "created_at": pet.created_at,
-        "updated_at": pet.updated_at,
-    }
-
-    return pet_dict
+    return _pet_response_dict(pet)
 
 
 @router.delete("/pets/{pet_id}", status_code=status.HTTP_204_NO_CONTENT)
