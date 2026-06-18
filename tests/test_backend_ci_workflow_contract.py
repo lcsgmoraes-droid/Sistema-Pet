@@ -1060,6 +1060,16 @@ def test_backend_ci_has_blocking_backend_analysis_dashboard_sales_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_clients_partner_transfers_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend clients partner transfers format (blocking)" in source
+    assert (
+        "ruff format --check app/clientes_routes.py "
+        "app/estoque_transferencia_parceiro_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
