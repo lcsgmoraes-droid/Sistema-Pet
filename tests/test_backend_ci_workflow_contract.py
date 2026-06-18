@@ -603,6 +603,16 @@ def test_backend_ci_has_blocking_residual_app_root_lint_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_legacy_app_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Legacy app root lint (blocking)" in source
+    assert (
+        "ruff check app/__init__.py app/auth.py app/db.py app/vendas_routes.py"
+        in source
+    )
+
+
 def test_backend_ci_has_blocking_multi_tenant_tests_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
