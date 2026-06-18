@@ -543,6 +543,10 @@ jobs:
         run: |
           ruff format --check app
 
+      - name: Backend alembic env format (blocking)
+        run: |
+          ruff format --check alembic/env.py
+
       - name: Backend multi tenant tests format (blocking)
         run: |
           ruff format --check tests/multi_tenant
