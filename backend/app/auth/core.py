@@ -8,7 +8,7 @@ Funções principais para autenticação JWT e gerenciamento de usuários.
 from datetime import datetime, timedelta
 import os
 from typing import Optional
-from jose import JWTError, jwt
+from app.security.jwt_compat import JWTError, jwt
 import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials

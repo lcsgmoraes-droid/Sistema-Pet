@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi.security import HTTPAuthorizationCredentials
-from jose import jwt
+from app.security.jwt_compat import jwt
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.requests import Request
