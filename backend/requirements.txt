@@ -20,7 +20,7 @@ alembic==1.18.4
 PyJWT==2.13.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.32
-bcrypt==4.1.2
+bcrypt==5.0.0
 
 # Rate Limiting
 slowapi==0.1.10
