@@ -1043,6 +1043,13 @@ def test_backend_ci_has_blocking_backend_operational_fiscal_light_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_ration_classifier_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend ration classifier format (blocking)" in source
+    assert "ruff format --check app/classificador_racao.py" in source
+
+
 def test_backend_ci_has_blocking_backend_ia_finance_parsers_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
