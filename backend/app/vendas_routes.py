@@ -1077,104 +1077,40 @@ async def finalizar_venda(
             status_code=404, detail="Venda não encontrada após finalização"
         )
 
-    # 🆕 GERAR COMISSÕES AUTOMATICAMENTE (apenas se funcionário/veterinário foi selecionado)
     if venda.funcionario_id:
         try:
-            from app.comissoes_service import gerar_comissoes_venda
-
-            # � BUSCAR TODOS OS PAGAMENTOS DA VENDA (não só os novos!)
-            # Precisamos gerar comissões para TODOS os pagamentos que ainda não têm comissão
-            todos_pagamentos = _listar_pagamentos_venda_para_comissao(
-                db, venda.id, tenant_id
+            resultado_comissoes = _gerar_comissoes_pendentes_venda(
+                db=db,
+                venda=venda,
+                tenant_id=tenant_id,
+                trigger="finalize_sale",
             )
-
-            if not todos_pagamentos:
-                logger.info("ℹ️  Nenhum pagamento encontrado na venda")
-            else:
-                # 🔢 Verificar quais pagamentos já têm comissão
-                parcelas_com_comissao = _parcelas_com_comissao_funcionario(
-                    db,
-                    venda.id,
-                    venda.funcionario_id,
-                    tenant_id,
-                )
+            if resultado_comissoes["comissoes_geradas"] > 0:
                 logger.info(
-                    f"📊 Pagamentos: {len(todos_pagamentos)} total, {len(parcelas_com_comissao)} já com comissão"
+                    "Comissoes geradas ao finalizar venda %s: %s - Total: R$ %.2f",
+                    venda.id,
+                    resultado_comissoes["comissoes_geradas"],
+                    resultado_comissoes["total_comissoes"],
                 )
-
-                # 🔄 GERAR UMA COMISSÃO PARA CADA PAGAMENTO SEM COMISSÃO
-                comissoes_geradas = 0
-                total_comissoes = Decimal("0")
-
-                for idx, pagamento_row in enumerate(todos_pagamentos, start=1):
-                    parcela_numero = idx
-
-                    # Pular se já tem comissão
-                    if parcela_numero in parcelas_com_comissao:
-                        logger.info(
-                            f"⏭️  Parcela {parcela_numero} já tem comissão - pulando"
-                        )
-                        continue
-
-                    valor_pagamento = Decimal(str(pagamento_row[2]))
-                    forma_pagamento = pagamento_row[1]
-
-                    struct_logger.info(
-                        event="COMMISSION_START",
-                        message="Gerando comissão para pagamento",
-                        venda_id=venda.id,
-                        funcionario_id=venda.funcionario_id,
-                        valor_pago=float(valor_pagamento),
-                        forma_pagamento=forma_pagamento,
-                        parcela_numero=parcela_numero,
-                    )
-
-                    resultado = gerar_comissoes_venda(
-                        venda_id=venda.id,
-                        funcionario_id=venda.funcionario_id,
-                        valor_pago=valor_pagamento,
-                        forma_pagamento=forma_pagamento,  # ✅ Passa forma de pagamento correta
-                        parcela_numero=parcela_numero,
-                        db=db,
-                    )
-
-                    if resultado and resultado.get("success"):
-                        if not resultado.get("duplicated"):
-                            comissoes_geradas += 1
-                            total_comissoes += Decimal(
-                                str(resultado.get("total_comissao", 0))
-                            )
-                            struct_logger.info(
-                                event="COMMISSION_GENERATED",
-                                message="Comissão gerada para pagamento",
-                                venda_id=venda.id,
-                                parcela_numero=parcela_numero,
-                                valor_comissao=float(
-                                    resultado.get("total_comissao", 0)
-                                ),
-                            )
-                        else:
-                            struct_logger.warning(
-                                event="COMMISSION_DUPLICATED",
-                                message="Comissão já existia (proteção idempotente)",
-                                venda_id=venda.id,
-                                parcela_numero=parcela_numero,
-                            )
-
-                if comissoes_geradas > 0:
-                    logger.info(
-                        f"✅ {comissoes_geradas} comissões geradas - Total: R$ {total_comissoes}"
-                    )
-                else:
-                    logger.info("ℹ️  Nenhuma comissão nova gerada (todas já existiam)")
-
+                struct_logger.info(
+                    event="COMMISSION_GENERATED_ON_FINALIZE",
+                    message="Comissoes geradas ao finalizar venda",
+                    venda_id=venda.id,
+                    funcionario_id=venda.funcionario_id,
+                    total_comissoes=resultado_comissoes["total_comissoes"],
+                )
+            else:
+                logger.info("Nenhuma comissao nova gerada ao finalizar venda")
         except Exception as e:
             logger.error(
-                f"⚠️ Erro ao gerar comissões (venda {venda.id}): {str(e)}", exc_info=True
+                "Erro ao gerar comissoes ao finalizar venda %s: %s",
+                venda.id,
+                str(e),
+                exc_info=True,
             )
-            # Não abortar a finalização da venda por erro nas comissões
+            # Nao abortar a finalizacao da venda por erro nas comissoes.
     else:
-        logger.info("ℹ️  Venda sem funcionário - comissões não geradas")
+        logger.info("Venda sem funcionario - comissoes nao geradas")
 
     # 🔔 SISTEMA DE RECORRÊNCIA - Criar/Atualizar lembretes automaticamente
     from app.produtos_models import Lembrete
