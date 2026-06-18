@@ -10,7 +10,7 @@ Funções prontas para usar:
 """
 
 from typing import Dict, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, case
 import logging
@@ -53,6 +53,99 @@ def _resolve_tenant_id(
     return str(tenant) if tenant else None
 
 
+def _utcnow_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _saldo_realizado_atual(usuario_id: int, tenant_id: str, db: Session) -> float:
+    saldo = (
+        db.query(
+            func.sum(
+                case(
+                    (FluxoCaixa.tipo == "receita", FluxoCaixa.valor),
+                    else_=-FluxoCaixa.valor,
+                )
+            )
+        )
+        .filter(
+            and_(
+                FluxoCaixa.usuario_id == usuario_id,
+                FluxoCaixa.tenant_id == tenant_id,
+                FluxoCaixa.status == "realizado",
+            )
+        )
+        .scalar()
+        or 0.0
+    )
+    return float(saldo)
+
+
+def _montar_projecoes_estaticas(saldo_atual: float, hoje, dias: int = 15) -> List[Dict]:
+    projecoes = []
+    for i in range(1, dias + 1):
+        data_proj = hoje + timedelta(days=i)
+        dt_proj = datetime.combine(data_proj, datetime.min.time())
+        projecoes.append(
+            {
+                "data": dt_proj.isoformat(),
+                "dias_futuros": i,
+                "entrada_estimada": 0.0,
+                "saida_estimada": 0.0,
+                "saldo_estimado": float(saldo_atual),
+                "limite_inferior": float(saldo_atual),
+                "limite_superior": float(saldo_atual),
+                "vai_faltar_caixa": saldo_atual < 0,
+                "alerta_nivel": "info",
+            }
+        )
+    return projecoes
+
+
+def _persistir_projecoes_estaticas(
+    usuario_id: int,
+    tenant_id: str,
+    projecoes: List[Dict],
+    mensagem_alerta: str,
+    db: Session,
+) -> None:
+    for projecao in projecoes:
+        registro = ProjecaoFluxoCaixa(
+            usuario_id=usuario_id,
+            tenant_id=tenant_id,
+            data_projetada=datetime.fromisoformat(projecao["data"]),
+            dias_futuros=projecao["dias_futuros"],
+            valor_entrada_estimada=projecao["entrada_estimada"],
+            valor_saida_estimada=projecao["saida_estimada"],
+            saldo_estimado=projecao["saldo_estimado"],
+            limite_inferior=projecao["limite_inferior"],
+            limite_superior=projecao["limite_superior"],
+            vai_faltar_caixa=projecao["vai_faltar_caixa"],
+            alerta_nivel=projecao["alerta_nivel"],
+            mensagem_alerta=mensagem_alerta,
+            versao_modelo="fallback-v1",
+        )
+        db.add(registro)
+    db.commit()
+
+
+def _gerar_projecoes_estaticas(
+    usuario_id: int,
+    tenant_id: str,
+    db: Session,
+    mensagem_alerta: str,
+) -> List[Dict]:
+    saldo_atual = _saldo_realizado_atual(usuario_id, tenant_id, db)
+    projecoes = _montar_projecoes_estaticas(saldo_atual, _utcnow_naive().date())
+    _persistir_projecoes_estaticas(
+        usuario_id=usuario_id,
+        tenant_id=tenant_id,
+        projecoes=projecoes,
+        mensagem_alerta=mensagem_alerta,
+        db=db,
+    )
+    return projecoes
+
+
 # ============================================================================
 # FUNÇÃO 1: CALCULAR ÍNDICES DE SAÚDE DO CAIXA
 # ============================================================================
@@ -85,7 +178,7 @@ def calcular_indices_saude(
 
         # 1. SALDO ATUAL
         # Soma movimentações dos últimos 90 dias (otimização)
-        data_90d_atras = datetime.utcnow() - timedelta(days=90)
+        data_90d_atras = _utcnow_naive() - timedelta(days=90)
 
         movimentacoes = (
             db.query(
@@ -110,7 +203,7 @@ def calcular_indices_saude(
         saldo_atual = float(movimentacoes) if movimentacoes else 0.0
 
         # 2. DESPESA MÉDIA DIÁRIA (últimos 30 dias)
-        data_30d_atras = datetime.utcnow() - timedelta(days=30)
+        data_30d_atras = _utcnow_naive() - timedelta(days=30)
 
         despesas_30d = (
             db.query(func.sum(FluxoCaixa.valor))
@@ -230,7 +323,7 @@ def calcular_indices_saude(
             if hasattr(indices, key):
                 setattr(indices, key, value)
 
-        indices.proxima_atualizacao = datetime.utcnow() + timedelta(
+        indices.proxima_atualizacao = _utcnow_naive() + timedelta(
             hours=Aba5Config.CACHE_PROJECTIONS_HOURS
         )
         db.commit()
@@ -283,7 +376,7 @@ def projetar_fluxo_15_dias(
             return None
 
         # 1. COLETAR DADOS HISTÓRICOS (últimos 90 dias)
-        data_90d_atras = datetime.utcnow() - timedelta(days=90)
+        data_90d_atras = _utcnow_naive() - timedelta(days=90)
 
         movimentacoes = (
             db.query(FluxoCaixa.data_movimentacao, FluxoCaixa.tipo, FluxoCaixa.valor)
@@ -301,72 +394,12 @@ def projetar_fluxo_15_dias(
 
         if not movimentacoes:
             logger.warning(f"Sem dados históricos para usuário {usuario_id}")
-            # Fallback: projeção estática baseada no saldo atual
-            saldo_atual = (
-                db.query(
-                    func.sum(
-                        case(
-                            (FluxoCaixa.tipo == "receita", FluxoCaixa.valor),
-                            else_=-FluxoCaixa.valor,
-                        )
-                    )
-                )
-                .filter(
-                    and_(
-                        FluxoCaixa.usuario_id == usuario_id,
-                        FluxoCaixa.tenant_id == tenant_id_resolvido,
-                        FluxoCaixa.status == "realizado",
-                    )
-                )
-                .scalar()
-                or 0.0
+            return _gerar_projecoes_estaticas(
+                usuario_id,
+                tenant_id_resolvido,
+                db,
+                "Projeção sem histórico",
             )
-
-            hoje = datetime.utcnow().date()
-            projecoes = []
-            for i in range(1, 16):
-                data_proj = hoje + timedelta(days=i)
-                dt_proj = datetime.combine(data_proj, datetime.min.time())
-                projecoes.append(
-                    {
-                        "data": dt_proj.isoformat(),
-                        "dias_futuros": i,
-                        "entrada_estimada": 0.0,
-                        "saida_estimada": 0.0,
-                        "saldo_estimado": float(saldo_atual),
-                        "limite_inferior": float(saldo_atual),
-                        "limite_superior": float(saldo_atual),
-                        "vai_faltar_caixa": saldo_atual < 0,
-                        "alerta_nivel": "info",
-                    }
-                )
-
-            # Persistir fallback
-            tenant_id = tenant_id_resolvido
-            if not tenant_id:
-                logger.error(f"❌ Usuário {usuario_id} não encontrado ou sem tenant")
-                return None
-
-            for p in projecoes:
-                registro = ProjecaoFluxoCaixa(
-                    usuario_id=usuario_id,
-                    tenant_id=tenant_id,
-                    data_projetada=datetime.fromisoformat(p["data"]),
-                    dias_futuros=p["dias_futuros"],
-                    valor_entrada_estimada=p["entrada_estimada"],
-                    valor_saida_estimada=p["saida_estimada"],
-                    saldo_estimado=p["saldo_estimado"],
-                    limite_inferior=p["limite_inferior"],
-                    limite_superior=p["limite_superior"],
-                    vai_faltar_caixa=p["vai_faltar_caixa"],
-                    alerta_nivel=p["alerta_nivel"],
-                    mensagem_alerta="Projeção sem histórico",
-                    versao_modelo="fallback-v1",
-                )
-                db.add(registro)
-            db.commit()
-
-            return projecoes
 
         # 2. AGREGAR POR DIA
         saldo_por_dia = {}
@@ -396,71 +429,12 @@ def projetar_fluxo_15_dias(
 
         if len(df) < 10:
             logger.warning(f"Dados insuficientes para Prophet ({len(df)} dias)")
-            # Mesmo fallback estático baseado no saldo atual
-            saldo_atual = (
-                db.query(
-                    func.sum(
-                        case(
-                            (FluxoCaixa.tipo == "receita", FluxoCaixa.valor),
-                            else_=-FluxoCaixa.valor,
-                        )
-                    )
-                )
-                .filter(
-                    and_(
-                        FluxoCaixa.usuario_id == usuario_id,
-                        FluxoCaixa.tenant_id == tenant_id_resolvido,
-                        FluxoCaixa.status == "realizado",
-                    )
-                )
-                .scalar()
-                or 0.0
+            return _gerar_projecoes_estaticas(
+                usuario_id,
+                tenant_id_resolvido,
+                db,
+                "Histórico insuficiente",
             )
-
-            hoje = datetime.utcnow().date()
-            projecoes = []
-            for i in range(1, 16):
-                data_proj = hoje + timedelta(days=i)
-                dt_proj = datetime.combine(data_proj, datetime.min.time())
-                projecoes.append(
-                    {
-                        "data": dt_proj.isoformat(),
-                        "dias_futuros": i,
-                        "entrada_estimada": 0.0,
-                        "saida_estimada": 0.0,
-                        "saldo_estimado": float(saldo_atual),
-                        "limite_inferior": float(saldo_atual),
-                        "limite_superior": float(saldo_atual),
-                        "vai_faltar_caixa": saldo_atual < 0,
-                        "alerta_nivel": "info",
-                    }
-                )
-
-            tenant_id = tenant_id_resolvido
-            if not tenant_id:
-                logger.error(f"❌ Usuário {usuario_id} não encontrado ou sem tenant")
-                return None
-
-            for p in projecoes:
-                registro = ProjecaoFluxoCaixa(
-                    usuario_id=usuario_id,
-                    tenant_id=tenant_id,
-                    data_projetada=datetime.fromisoformat(p["data"]),
-                    dias_futuros=p["dias_futuros"],
-                    valor_entrada_estimada=p["entrada_estimada"],
-                    valor_saida_estimada=p["saida_estimada"],
-                    saldo_estimado=p["saldo_estimado"],
-                    limite_inferior=p["limite_inferior"],
-                    limite_superior=p["limite_superior"],
-                    vai_faltar_caixa=p["vai_faltar_caixa"],
-                    alerta_nivel=p["alerta_nivel"],
-                    mensagem_alerta="Histórico insuficiente",
-                    versao_modelo="fallback-v1",
-                )
-                db.add(registro)
-            db.commit()
-
-            return projecoes
 
         # 4. TREINAR PROPHET
         model = Prophet(
@@ -481,7 +455,7 @@ def projetar_fluxo_15_dias(
 
         # 6. PROCESSAR RESULTADOS
         projecoes = []
-        hoje = datetime.utcnow().date()
+        hoje = _utcnow_naive().date()
 
         # Buscar tenant_id
         tenant_id = tenant_id_resolvido
@@ -600,8 +574,9 @@ def obter_projecoes_proximos_dias(
         if not tenant_id_resolvido:
             return []
 
-        data_futura = datetime.utcnow() + timedelta(days=dias)
-        hoje = datetime.utcnow().date()
+        agora = _utcnow_naive()
+        data_futura = agora + timedelta(days=dias)
+        hoje = agora.date()
 
         projecoes = (
             db.query(ProjecaoFluxoCaixa)
@@ -610,7 +585,7 @@ def obter_projecoes_proximos_dias(
                     ProjecaoFluxoCaixa.usuario_id == usuario_id,
                     ProjecaoFluxoCaixa.tenant_id == tenant_id_resolvido,
                     ProjecaoFluxoCaixa.data_projetada <= data_futura,
-                    ProjecaoFluxoCaixa.data_projetada >= datetime.utcnow(),
+                    ProjecaoFluxoCaixa.data_projetada >= agora,
                 )
             )
             .order_by(ProjecaoFluxoCaixa.data_projetada)
@@ -742,7 +717,7 @@ def gerar_alertas_caixa(
                         "tipo": "critico",
                         "titulo": "🚨 CAIXA CRÍTICO",
                         "mensagem": f"Caixa com apenas {indices.dias_de_caixa:.1f} dias. Ação urgente necessária!",
-                        "data": datetime.utcnow().isoformat(),
+                        "data": _utcnow_naive().isoformat(),
                     }
                 )
             elif indices.status == "alerta":
@@ -751,7 +726,7 @@ def gerar_alertas_caixa(
                         "tipo": "alerta",
                         "titulo": "⚠️ CAIXA EM ALERTA",
                         "mensagem": f"Caixa com {indices.dias_de_caixa:.1f} dias. Monitore de perto.",
-                        "data": datetime.utcnow().isoformat(),
+                        "data": _utcnow_naive().isoformat(),
                     }
                 )
 
@@ -761,7 +736,7 @@ def gerar_alertas_caixa(
                         "tipo": "aviso",
                         "titulo": "📉 TENDÊNCIA NEGATIVA",
                         "mensagem": f"Caixa piorou {abs(indices.percentual_variacao_7d):.1f}% nos últimos 7 dias",
-                        "data": datetime.utcnow().isoformat(),
+                        "data": _utcnow_naive().isoformat(),
                     }
                 )
 
@@ -785,7 +760,7 @@ def gerar_alertas_caixa(
                     "tipo": "critico",
                     "titulo": "🚨 PROJEÇÃO DE FALTA DE CAIXA",
                     "mensagem": f"Projeção indica falta de caixa em {projecoes.data_projetada.strftime('%d/%m')}",
-                    "data": datetime.utcnow().isoformat(),
+                    "data": _utcnow_naive().isoformat(),
                 }
             )
 
@@ -835,8 +810,8 @@ def registrar_movimentacao(
             valor=valor,
             descricao=descricao,
             status="realizado",
-            data_movimentacao=datetime.utcnow(),
-            data_prevista=data_prevista or datetime.utcnow(),
+            data_movimentacao=_utcnow_naive(),
+            data_prevista=data_prevista or _utcnow_naive(),
             origem_tipo=origem_tipo,
             origem_id=origem_id,
         )

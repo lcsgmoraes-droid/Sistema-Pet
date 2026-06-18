@@ -21,6 +21,8 @@ class ClassificadorRacao:
     """
 
     VERSION = "v1.0.0"  # Versionamento para auditoria e evolução
+    PESO_KG_RE = re.compile(r"\b(\d{1,4}(?:[.,]\d{1,3})?)\s{0,3}kg\b", re.IGNORECASE)
+    PESO_G_RE = re.compile(r"\b(\d{1,5}(?:[.,]\d{1,2})?)\s{0,3}g\b", re.IGNORECASE)
 
     # Padrões de Espécie
     ESPECIES = {
@@ -281,13 +283,13 @@ class ClassificadorRacao:
         Exemplos: "15kg", "10 kg", "1.5kg", "500g"
         """
         # Padrão para kg
-        match_kg = re.search(r"(\d+(?:[.,]\d+)?)\s*kg", nome, re.IGNORECASE)
+        match_kg = self.PESO_KG_RE.search(nome)
         if match_kg:
             peso_str = match_kg.group(1).replace(",", ".")
             return float(peso_str)
 
         # Padrão para g (converte para kg)
-        match_g = re.search(r"(\d+(?:[.,]\d+)?)\s*g\b", nome, re.IGNORECASE)
+        match_g = self.PESO_G_RE.search(nome)
         if match_g:
             peso_str = match_g.group(1).replace(",", ".")
             return float(peso_str) / 1000

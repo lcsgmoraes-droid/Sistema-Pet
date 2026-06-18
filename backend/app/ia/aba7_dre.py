@@ -6,12 +6,45 @@ Cálculo e análise de Demonstração de Resultado do Exercício
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import json
 
 from app.utils.logger import logger
 from app.ia.aba7_models import DREPeriodo, DREProduto, DRECategoriaAnalise, DREInsight
 from app.services.dre_periodo_tenant_scope import tenant_id_para_escrita_dre
+
+
+def _utcnow_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _status_resultado(lucro_liquido: float) -> str:
+    if lucro_liquido > 0:
+        return "lucro"
+    if lucro_liquido < 0:
+        return "prejuizo"
+    return "equilibrio"
+
+
+def _score_saude_dre(
+    margem_liquida: float, lucro_liquido: float, receita_liquida: float
+) -> int:
+    score = 50
+    if margem_liquida > 20:
+        score += 30
+    elif margem_liquida > 10:
+        score += 20
+    elif margem_liquida > 5:
+        score += 10
+
+    if lucro_liquido > receita_liquida * 0.15:
+        score += 20
+    elif lucro_liquido > 0:
+        score += 10
+    else:
+        score -= 20
+
+    return max(0, min(100, score))
 
 
 class DREService:
@@ -20,17 +53,10 @@ class DREService:
     def __init__(self, db: Session):
         self.db = db
 
-    # ==================== CÁLCULO DO DRE ====================
-
-    def calcular_dre_periodo(
-        self, usuario_id: int, data_inicio: date, data_fim: date
-    ) -> DREPeriodo:
-        """Calcula DRE para um período"""
-
-        # 1. Buscar vendas do período
-        from app.models import Venda, VendaItem, Produto
-
-        vendas = (
+    def _buscar_vendas_periodo(
+        self, Venda, usuario_id: int, data_inicio: date, data_fim: date
+    ):
+        return (
             self.db.query(Venda)
             .filter(
                 Venda.user_id == usuario_id,
@@ -41,12 +67,7 @@ class DREService:
             .all()
         )
 
-        # 2. Calcular receitas
-        receita_bruta = sum(v.valor_total or 0 for v in vendas)
-        deducoes_receita = sum(v.desconto or 0 for v in vendas)
-        receita_liquida = receita_bruta - deducoes_receita
-
-        # 3. Calcular custo dos produtos vendidos (CMV)
+    def _calcular_custo_produtos(self, vendas, VendaItem, Produto) -> float:
         custo_produtos = 0
         for venda in vendas:
             itens = (
@@ -58,81 +79,86 @@ class DREService:
                 )
                 if produto and produto.preco_custo:
                     custo_produtos += produto.preco_custo * item.quantidade
+        return custo_produtos
 
+    def _somar_lancamentos_saida_periodo(
+        self,
+        LancamentoFluxoCaixa,
+        usuario_id: int,
+        data_inicio: date,
+        data_fim: date,
+        categorias: list[str],
+        *,
+        excluir_categorias: bool = False,
+    ) -> float:
+        filtro_categorias = LancamentoFluxoCaixa.categoria.in_(categorias)
+        if excluir_categorias:
+            filtro_categorias = ~filtro_categorias
+
+        return (
+            self.db.query(func.sum(LancamentoFluxoCaixa.valor))
+            .filter(
+                LancamentoFluxoCaixa.user_id == usuario_id,
+                LancamentoFluxoCaixa.data >= data_inicio,
+                LancamentoFluxoCaixa.data <= data_fim,
+                LancamentoFluxoCaixa.tipo == "saida",
+                filtro_categorias,
+            )
+            .scalar()
+            or 0
+        )
+
+    # ==================== CÁLCULO DO DRE ====================
+
+    def calcular_dre_periodo(
+        self, usuario_id: int, data_inicio: date, data_fim: date
+    ) -> DREPeriodo:
+        """Calcula DRE para um período"""
+
+        # 1. Buscar vendas do período
+        from app.models import LancamentoFluxoCaixa, Produto, Venda, VendaItem
+
+        vendas = self._buscar_vendas_periodo(Venda, usuario_id, data_inicio, data_fim)
+
+        # 2. Calcular receitas
+        receita_bruta = sum(v.valor_total or 0 for v in vendas)
+        deducoes_receita = sum(v.desconto or 0 for v in vendas)
+        receita_liquida = receita_bruta - deducoes_receita
+
+        # 3. Calcular custo dos produtos vendidos (CMV)
+        custo_produtos = self._calcular_custo_produtos(vendas, VendaItem, Produto)
         lucro_bruto = receita_liquida - custo_produtos
         margem_bruta = (
             (lucro_bruto / receita_liquida * 100) if receita_liquida > 0 else 0
         )
 
         # 4. Calcular despesas operacionais
-        from app.models import LancamentoFluxoCaixa
-
-        despesas_vendas = (
-            self.db.query(func.sum(LancamentoFluxoCaixa.valor))
-            .filter(
-                LancamentoFluxoCaixa.user_id == usuario_id,
-                LancamentoFluxoCaixa.data >= data_inicio,
-                LancamentoFluxoCaixa.data <= data_fim,
-                LancamentoFluxoCaixa.tipo == "saida",
-                LancamentoFluxoCaixa.categoria.in_(
-                    ["Vendas", "Marketing", "Comissões"]
-                ),
-            )
-            .scalar()
-            or 0
+        categorias_vendas = ["Vendas", "Marketing", "Comissões"]
+        categorias_admin = ["Administrativo", "Salários", "Aluguel"]
+        categorias_financeiras = ["Financeiro", "Juros", "Taxas"]
+        categorias_operacionais = (
+            categorias_vendas + categorias_admin + categorias_financeiras
         )
-
-        despesas_administrativas = (
-            self.db.query(func.sum(LancamentoFluxoCaixa.valor))
-            .filter(
-                LancamentoFluxoCaixa.user_id == usuario_id,
-                LancamentoFluxoCaixa.data >= data_inicio,
-                LancamentoFluxoCaixa.data <= data_fim,
-                LancamentoFluxoCaixa.tipo == "saida",
-                LancamentoFluxoCaixa.categoria.in_(
-                    ["Administrativo", "Salários", "Aluguel"]
-                ),
-            )
-            .scalar()
-            or 0
+        despesas_vendas = self._somar_lancamentos_saida_periodo(
+            LancamentoFluxoCaixa, usuario_id, data_inicio, data_fim, categorias_vendas
         )
-
-        despesas_financeiras = (
-            self.db.query(func.sum(LancamentoFluxoCaixa.valor))
-            .filter(
-                LancamentoFluxoCaixa.user_id == usuario_id,
-                LancamentoFluxoCaixa.data >= data_inicio,
-                LancamentoFluxoCaixa.data <= data_fim,
-                LancamentoFluxoCaixa.tipo == "saida",
-                LancamentoFluxoCaixa.categoria.in_(["Financeiro", "Juros", "Taxas"]),
-            )
-            .scalar()
-            or 0
+        despesas_administrativas = self._somar_lancamentos_saida_periodo(
+            LancamentoFluxoCaixa, usuario_id, data_inicio, data_fim, categorias_admin
         )
-
-        outras_despesas = (
-            self.db.query(func.sum(LancamentoFluxoCaixa.valor))
-            .filter(
-                LancamentoFluxoCaixa.user_id == usuario_id,
-                LancamentoFluxoCaixa.data >= data_inicio,
-                LancamentoFluxoCaixa.data <= data_fim,
-                LancamentoFluxoCaixa.tipo == "saida",
-                ~LancamentoFluxoCaixa.categoria.in_(
-                    [
-                        "Vendas",
-                        "Marketing",
-                        "Comissões",
-                        "Administrativo",
-                        "Salários",
-                        "Aluguel",
-                        "Financeiro",
-                        "Juros",
-                        "Taxas",
-                    ]
-                ),
-            )
-            .scalar()
-            or 0
+        despesas_financeiras = self._somar_lancamentos_saida_periodo(
+            LancamentoFluxoCaixa,
+            usuario_id,
+            data_inicio,
+            data_fim,
+            categorias_financeiras,
+        )
+        outras_despesas = self._somar_lancamentos_saida_periodo(
+            LancamentoFluxoCaixa,
+            usuario_id,
+            data_inicio,
+            data_fim,
+            categorias_operacionais,
+            excluir_categorias=True,
         )
 
         total_despesas = (
@@ -166,31 +192,9 @@ class DREService:
             (lucro_liquido / receita_liquida * 100) if receita_liquida > 0 else 0
         )
 
-        # 6. Determinar status
-        if lucro_liquido > 0:
-            status = "lucro"
-        elif lucro_liquido < 0:
-            status = "prejuizo"
-        else:
-            status = "equilibrio"
-
-        # 7. Calcular score de saúde (0-100)
-        score = 50  # Base
-        if margem_liquida > 20:
-            score += 30
-        elif margem_liquida > 10:
-            score += 20
-        elif margem_liquida > 5:
-            score += 10
-
-        if lucro_liquido > receita_liquida * 0.15:
-            score += 20
-        elif lucro_liquido > 0:
-            score += 10
-        else:
-            score -= 20
-
-        score = max(0, min(100, score))
+        # 6. Determinar status e score de saúde (0-100)
+        status = _status_resultado(lucro_liquido)
+        score = _score_saude_dre(margem_liquida, lucro_liquido, receita_liquida)
 
         # 8. Criar ou atualizar registro
         dre_existente = (
@@ -238,7 +242,7 @@ class DREService:
         dre.margem_liquida_percent = margem_liquida
         dre.status = status
         dre.score_saude = score
-        dre.atualizado_em = datetime.utcnow()
+        dre.atualizado_em = _utcnow_naive()
 
         self.db.commit()
         self.db.refresh(dre)
@@ -357,7 +361,11 @@ class DREService:
         self.db.commit()
 
     def _calcular_analise_categorias(
-        self, dre_periodo_id: int, usuario_id: int, data_inicio: date, data_fim: date
+        self,
+        dre_periodo_id: int,
+        usuario_id: int,
+        _data_inicio: date,
+        _data_fim: date,
     ):
         """Calcula rentabilidade por categoria"""
 
