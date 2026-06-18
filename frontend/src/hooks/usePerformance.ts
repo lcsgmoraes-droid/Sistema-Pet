@@ -3,13 +3,7 @@
  * Monitora performance e detecta problemas
  */
 
-import { useEffect, useRef } from "react";
-
-interface PerformanceMetrics {
-  renderTime: number;
-  memoryUsage?: number;
-  fps: number;
-}
+import React, { useEffect, useRef } from "react";
 
 export const usePerformanceMonitor = (componentName: string) => {
   const renderCount = useRef(0);
@@ -86,5 +80,3 @@ export const useThrottle = <T extends (...args: any[]) => any>(callback: T, dela
     [callback, delay],
   );
 };
-
-import React from "react";

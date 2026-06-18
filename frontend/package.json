@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "vite build --mode production",
     "build:dev": "vite build --mode development",
-    "lint:core": "eslint \"src/**/*.{js,jsx,mjs,cjs}\" scripts --max-warnings=0",
-    "format:core:check": "prettier --check \"src/**/*.{js,jsx,mjs,cjs}\" scripts",
+    "lint:core": "eslint \"src/**/*.{js,jsx,ts,tsx,mjs,cjs}\" scripts --max-warnings=0",
+    "format:core:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,mjs,cjs}\" scripts",
     "test:auth-storage": "node scripts/test-token-storage.mjs",
     "test:auth-refresh": "node scripts/test-refresh-manager.mjs",
     "test:corepet-branding": "node scripts/test-corepet-branding.mjs",
@@ -61,6 +61,8 @@
     "postcss": "^8.4.32",
     "prettier": "^3.8.4",
     "tailwindcss": "^3.4.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1",
     "vite": "^8.0.16"
   }
 }
