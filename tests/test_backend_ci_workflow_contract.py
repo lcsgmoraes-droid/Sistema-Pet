@@ -1008,6 +1008,17 @@ def test_backend_ci_has_blocking_backend_ia_remainder_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_clean_residual_app_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend clean residual app format (blocking)" in source
+    assert (
+        "ruff format --check app/__init__.py app/auth.py "
+        "app/auth_routes_multitenant.py app/db.py app/ia/__init__.py "
+        "app/ia/aba8_entregas.py app/main.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

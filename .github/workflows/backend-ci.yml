@@ -467,6 +467,10 @@ jobs:
         run: |
           ruff format --check app/ia/aba6_chat_ia.py app/ia/aba7_anomalias.py app/ia/aba7_dre_detalhada_service.py app/ia/aba7_exportador.py app/ia/aba7_extrato_models.py app/ia/aba7_extrato_routes.py app/ia/extrato_ia.py app/ia_config.py app/ia_fluxo_routes.py app/ia_routes.py
 
+      - name: Backend clean residual app format (blocking)
+        run: |
+          ruff format --check app/__init__.py app/auth.py app/auth_routes_multitenant.py app/db.py app/ia/__init__.py app/ia/aba8_entregas.py app/main.py
+
       - name: Backend multi tenant tests format (blocking)
         run: |
           ruff format --check tests/multi_tenant
