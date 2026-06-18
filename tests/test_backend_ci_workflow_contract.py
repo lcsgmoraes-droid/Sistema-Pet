@@ -1008,6 +1008,33 @@ def test_backend_ci_has_blocking_backend_ia_remainder_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_residual_uncovered_app_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend residual uncovered app format (blocking)" in source
+    assert (
+        "ruff format --check app/__init__.py app/analise_racoes_routes.py "
+        "app/auth.py app/auth_routes_multitenant.py "
+        "app/bling_flow_monitor_routes.py app/bling_integration.py "
+        "app/bling_oauth_routes.py app/bling_routes.py app/bling_sync_routes.py "
+        "app/calculadora_racao.py app/classificador_racao.py "
+        "app/clientes_routes.py app/comissoes_diagnostico_routes.py "
+        "app/conciliacao_services.py app/dashboard_routes.py app/db.py "
+        "app/estoque_movimentacoes_edicao_routes.py "
+        "app/estoque_saida_full_routes.py "
+        "app/estoque_transferencia_parceiro_routes.py app/ia/__init__.py "
+        "app/ia/aba5_fluxo_caixa.py app/ia/aba7_dre.py "
+        "app/ia/aba7_dre_canal.py app/ia/aba7_tributacao.py "
+        "app/ia/aba8_entregas.py app/ia/extrato_parser.py "
+        "app/integracao_bling_nf_routes.py app/integracao_bling_pedido_routes.py "
+        "app/main.py app/notas_entrada_pdf_parser.py app/notas_entrada_routes.py "
+        "app/pedidos_compra_routes.py app/produtos_routes.py "
+        "app/relatorio_vendas_routes.py app/routes/sefaz_routes.py "
+        "app/services/sefaz_service.py app/vendas_routes.py "
+        "app/whatsapp/analytics.py app/whatsapp/analytics_simple.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

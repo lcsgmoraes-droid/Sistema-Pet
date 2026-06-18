@@ -108,7 +108,9 @@ def get_config(
         "ultimo_nsu": cfg.get("ultimo_nsu", "000000000000000"),
         "ultimo_sync_at": cfg.get("ultimo_sync_at"),
         "ultimo_sync_status": cfg.get("ultimo_sync_status", "nunca"),
-        "ultimo_sync_mensagem": cfg.get("ultimo_sync_mensagem", "Ainda nao sincronizado."),
+        "ultimo_sync_mensagem": cfg.get(
+            "ultimo_sync_mensagem", "Ainda nao sincronizado."
+        ),
         "ultimo_sync_documentos": cfg.get("ultimo_sync_documentos", 0),
         "ultimo_sync_cstat": cfg.get("ultimo_sync_cstat"),
         "ultimo_sync_xmotivo": cfg.get("ultimo_sync_xmotivo"),
@@ -123,7 +125,9 @@ def get_config(
         "mensagem": status.mensagem,
         "empresa": {
             "nome": tenant.name if tenant else None,
-            "cnpj": SefazTenantConfigService.sanitize_cnpj(tenant.cnpj) if tenant else "",
+            "cnpj": SefazTenantConfigService.sanitize_cnpj(tenant.cnpj)
+            if tenant
+            else "",
             "uf": (tenant.uf or "").upper() if tenant and tenant.uf else "",
         },
     }
@@ -229,7 +233,9 @@ def get_sync_status(
     return {
         "ultimo_sync_at": cfg.get("ultimo_sync_at"),
         "ultimo_sync_status": cfg.get("ultimo_sync_status", "nunca"),
-        "ultimo_sync_mensagem": cfg.get("ultimo_sync_mensagem", "Ainda nao sincronizado."),
+        "ultimo_sync_mensagem": cfg.get(
+            "ultimo_sync_mensagem", "Ainda nao sincronizado."
+        ),
         "ultimo_sync_documentos": cfg.get("ultimo_sync_documentos", 0),
         "ultimo_nsu": cfg.get("ultimo_nsu", "000000000000000"),
     }
@@ -258,6 +264,7 @@ def sync_now(
     if proximo_str and cfg.get("_sync_bloqueado_656"):
         try:
             from datetime import timezone as _tz_check
+
             proximo_dt = datetime.fromisoformat(proximo_str)
             if proximo_dt.tzinfo is None:
                 proximo_dt = proximo_dt.replace(tzinfo=_tz_check.utc)
@@ -281,6 +288,7 @@ def sync_now(
     if ultimo_sync_str:
         try:
             from datetime import timezone as _tz_spam
+
             ultimo_dt = datetime.fromisoformat(ultimo_sync_str)
             if ultimo_dt.tzinfo is None:
                 ultimo_dt = ultimo_dt.replace(tzinfo=_tz_spam.utc)
@@ -370,13 +378,16 @@ def sync_now(
         "documentos": result.get("documentos", 0),
         "notas_salvas": result.get("importadas", 0),
         "notas_puladas": result.get("duplicadas", 0),
-        "ultimo_nsu": result.get("ultimo_nsu", cfg.get("ultimo_nsu", "000000000000000")),
-        "proximo_permitido_at": result.get("proximo_permitido_at", cfg.get("_proximo_sync_permitido_at")),
+        "ultimo_nsu": result.get(
+            "ultimo_nsu", cfg.get("ultimo_nsu", "000000000000000")
+        ),
+        "proximo_permitido_at": result.get(
+            "proximo_permitido_at", cfg.get("_proximo_sync_permitido_at")
+        ),
         "max_nsu": result.get("ultimo_nsu", ""),
         "c_stat": None,
         "x_motivo": None,
     }
-
 
 
 @router.get("/nsu-status")
@@ -423,7 +434,9 @@ def reset_nsu(
     """
     nsu = payload.nsu.strip().zfill(15)
     if not nsu.isdigit() or len(nsu) != 15:
-        raise HTTPException(status_code=422, detail="NSU deve ter 15 dígitos numéricos.")
+        raise HTTPException(
+            status_code=422, detail="NSU deve ter 15 dígitos numéricos."
+        )
 
     _, tenant_id = auth
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
@@ -432,7 +445,9 @@ def reset_nsu(
     nsu_anterior = cfg.get("ultimo_nsu", "000000000000000")
     cfg["ultimo_nsu"] = nsu
     cfg["ultimo_sync_status"] = "nunca"
-    cfg["ultimo_sync_mensagem"] = f"NSU redefinido de {nsu_anterior} para {nsu}. Próxima sincronização buscará a partir deste ponto."
+    cfg["ultimo_sync_mensagem"] = (
+        f"NSU redefinido de {nsu_anterior} para {nsu}. Próxima sincronização buscará a partir deste ponto."
+    )
     SefazTenantConfigService.save_config(tenant_id, cfg)
 
     return {
@@ -466,10 +481,12 @@ def pular_para_hoje(
     if proximo_str and cfg.get("_sync_bloqueado_656"):
         try:
             from datetime import timezone as _tz
+
             proximo_dt = __import__("datetime").datetime.fromisoformat(proximo_str)
             if proximo_dt.tzinfo is None:
                 proximo_dt = proximo_dt.replace(tzinfo=_tz.utc)
             from datetime import datetime as _dt
+
             faltam = int((_dt.now(_tz.utc) - proximo_dt).total_seconds() / -60) + 1
             if faltam > 0:
                 aviso_cooldown = f" O sistema está em cooldown por ~{faltam} minuto(s) — o pulo será executado automaticamente após esse período."
@@ -560,11 +577,13 @@ def sync_diagnostico(
         try:
             resultado = SefazService.sincronizar_nsu(config=cfg, ultimo_nsu=nsu_atual)
         except HTTPException as exc:
-            relatorio_docs.append({
-                "lote": lotes_executados + 1,
-                "erro": str(exc.detail),
-                "nsu_inicio": nsu_atual,
-            })
+            relatorio_docs.append(
+                {
+                    "lote": lotes_executados + 1,
+                    "erro": str(exc.detail),
+                    "nsu_inicio": nsu_atual,
+                }
+            )
             total_erros += 1
             break
 
@@ -592,17 +611,22 @@ def sync_diagnostico(
             # Resumo apenas (sem XML completo)
             if "procNFe" not in schema and "nfeProc" not in xml_str[:200]:
                 entry["tipo"] = "resNFe (resumo)"
-                entry["resultado"] = "ignorado — sem XML completo, não é possível importar itens"
+                entry["resultado"] = (
+                    "ignorado — sem XML completo, não é possível importar itens"
+                )
 
                 # Tentar extrair info básica do resNFe para ajudar no diagnóstico
                 try:
                     import xml.etree.ElementTree as _ET
+
                     _root = _ET.fromstring(xml_str)
+
                     def _txt(tag):
                         for el in _root.iter():
                             if el.tag.split("}")[-1] == tag:
                                 return el.text
                         return None
+
                     entry["chave"] = _txt("chNFe")
                     entry["fornecedor"] = _txt("xNome")
                     entry["numero_nf"] = _txt("nNF")
@@ -618,6 +642,7 @@ def sync_diagnostico(
             # NF-e completa — tentar parsear
             try:
                 from app.notas_entrada_routes import parse_nfe_xml
+
                 dados = parse_nfe_xml(xml_str)
             except Exception as exc_parse:
                 entry["tipo"] = "procNFe"
@@ -633,9 +658,13 @@ def sync_diagnostico(
             entry["valor_total"] = dados.get("valor_total")
 
             # Verificar NF de saída
-            cnpj_emit = "".join(c for c in str(dados.get("fornecedor_cnpj", "")) if c.isdigit())
+            cnpj_emit = "".join(
+                c for c in str(dados.get("fornecedor_cnpj", "")) if c.isdigit()
+            )
             if tenant_cnpj and cnpj_emit == tenant_cnpj:
-                entry["resultado"] = "descartada — NF de saída (emitida pela própria empresa)"
+                entry["resultado"] = (
+                    "descartada — NF de saída (emitida pela própria empresa)"
+                )
                 total_saidas += 1
                 relatorio_docs.append(entry)
                 continue
@@ -643,11 +672,15 @@ def sync_diagnostico(
             # Verificar duplicata
             chave = dados.get("chave_acesso", "")
             if chave:
-                existente = db.query(NotaEntrada).filter(
-                    NotaEntrada.chave_acesso == chave
-                ).first()
+                existente = (
+                    db.query(NotaEntrada)
+                    .filter(NotaEntrada.chave_acesso == chave)
+                    .first()
+                )
                 if existente:
-                    entry["resultado"] = f"duplicada — já existe no sistema (id={existente.id}, status={existente.status})"
+                    entry["resultado"] = (
+                        f"duplicada — já existe no sistema (id={existente.id}, status={existente.status})"
+                    )
                     total_duplicadas += 1
                     relatorio_docs.append(entry)
                     continue

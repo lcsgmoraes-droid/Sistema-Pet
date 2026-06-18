@@ -10,7 +10,11 @@ from xml.etree import ElementTree as ET
 
 import requests
 from cryptography.hazmat.primitives.serialization import pkcs12
-from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    NoEncryption,
+    PrivateFormat,
+)
 from fastapi import HTTPException
 
 from app.config import settings
@@ -44,7 +48,9 @@ class SefazConsumoIndevidoError(Exception):
 class SefazService:
     """Camada de serviço para validar e preparar integração SEFAZ."""
 
-    SOAP_ACTION_DIST_DFE = "http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe/nfeDistDFeInteresse"
+    SOAP_ACTION_DIST_DFE = (
+        "http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe/nfeDistDFeInteresse"
+    )
 
     _ENDPOINTS_DISTRIBUICAO = {
         "homologacao": "https://hom.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx",
@@ -107,13 +113,18 @@ class SefazService:
     @staticmethod
     def _validar_modo(modo: str) -> str:
         if modo not in ("mock", "real"):
-            raise HTTPException(status_code=422, detail="SEFAZ_MODO inválido. Use 'mock' ou 'real'.")
+            raise HTTPException(
+                status_code=422, detail="SEFAZ_MODO inválido. Use 'mock' ou 'real'."
+            )
         return modo
 
     @staticmethod
     def _validar_ambiente(ambiente: str) -> str:
         if ambiente not in ("homologacao", "producao"):
-            raise HTTPException(status_code=422, detail="SEFAZ_AMBIENTE inválido. Use 'homologacao' ou 'producao'.")
+            raise HTTPException(
+                status_code=422,
+                detail="SEFAZ_AMBIENTE inválido. Use 'homologacao' ou 'producao'.",
+            )
         return ambiente
 
     @staticmethod
@@ -121,9 +132,14 @@ class SefazService:
         try:
             cert_bytes = Path(path_cert).read_bytes()
             senha_bytes = senha.encode("utf-8") if senha else None
-            key, cert, _chain = pkcs12.load_key_and_certificates(cert_bytes, senha_bytes)
+            key, cert, _chain = pkcs12.load_key_and_certificates(
+                cert_bytes, senha_bytes
+            )
             if not key or not cert:
-                return False, "Certificado inválido: chave ou certificado não encontrados no .pfx."
+                return (
+                    False,
+                    "Certificado inválido: chave ou certificado não encontrados no .pfx.",
+                )
             return True, "Certificado A1 válido."
         except FileNotFoundError:
             return False, "Arquivo do certificado não encontrado no caminho informado."
@@ -161,7 +177,9 @@ class SefazService:
         uf_limpa = str(uf or "").strip().upper()
         codigo = cls._UF_CODIGO.get(uf_limpa)
         if not codigo:
-            raise HTTPException(status_code=422, detail=f"UF SEFAZ inválida: '{uf_limpa or '-'}'.")
+            raise HTTPException(
+                status_code=422, detail=f"UF SEFAZ inválida: '{uf_limpa or '-'}'."
+            )
         return codigo
 
     @classmethod
@@ -170,7 +188,10 @@ class SefazService:
         senha_bytes = senha.encode("utf-8") if senha else None
         key, cert, _chain = pkcs12.load_key_and_certificates(cert_bytes, senha_bytes)
         if not key or not cert:
-            raise HTTPException(status_code=422, detail="Certificado inválido: chave ou certificado não encontrados no .pfx.")
+            raise HTTPException(
+                status_code=422,
+                detail="Certificado inválido: chave ou certificado não encontrados no .pfx.",
+            )
 
         key_pem = key.private_bytes(
             encoding=Encoding.PEM,
@@ -197,7 +218,7 @@ class SefazService:
             'xmlns:xsd="http://www.w3.org/2001/XMLSchema" '
             'xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">'
             "<soap12:Body>"
-            f"<nfeDistDFeInteresse xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe\">{inner_xml}</nfeDistDFeInteresse>"
+            f'<nfeDistDFeInteresse xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeDistribuicaoDFe">{inner_xml}</nfeDistDFeInteresse>'
             "</soap12:Body>"
             "</soap12:Envelope>"
         )
@@ -261,12 +282,16 @@ class SefazService:
     def _post_soap_dist_dfe(cls, cfg: dict[str, Any], dados_msg_xml: str) -> str:
         endpoint = cls._ENDPOINTS_DISTRIBUICAO.get(cfg["ambiente"])
         if not endpoint:
-            raise HTTPException(status_code=422, detail="Ambiente SEFAZ inválido para consulta.")
+            raise HTTPException(
+                status_code=422, detail="Ambiente SEFAZ inválido para consulta."
+            )
 
         cert_file = None
         key_file = None
         try:
-            cert_file, key_file = cls._extrair_cert_key_tempfiles(cfg["cert_path"], cfg["cert_password"])
+            cert_file, key_file = cls._extrair_cert_key_tempfiles(
+                cfg["cert_path"], cfg["cert_password"]
+            )
             payload = cls._soap_envelope(dados_msg_xml)
             headers = {
                 "Content-Type": "application/soap+xml; charset=utf-8",
@@ -283,9 +308,13 @@ class SefazService:
             response.raise_for_status()
             return response.text
         except requests.exceptions.Timeout as exc:
-            raise HTTPException(status_code=504, detail=f"Timeout na comunicação com a SEFAZ: {exc}") from exc
+            raise HTTPException(
+                status_code=504, detail=f"Timeout na comunicação com a SEFAZ: {exc}"
+            ) from exc
         except requests.exceptions.RequestException as exc:
-            raise HTTPException(status_code=502, detail=cls._mensagem_falha_comunicacao(exc)) from exc
+            raise HTTPException(
+                status_code=502, detail=cls._mensagem_falha_comunicacao(exc)
+            ) from exc
         finally:
             if cert_file:
                 Path(cert_file).unlink(missing_ok=True)
@@ -304,7 +333,9 @@ class SefazService:
                 continue
 
             try:
-                xml_bruto = gzip.decompress(base64.b64decode(conteudo_b64)).decode("utf-8", errors="replace")
+                xml_bruto = gzip.decompress(base64.b64decode(conteudo_b64)).decode(
+                    "utf-8", errors="replace"
+                )
             except Exception:  # noqa: BLE001
                 continue
 
@@ -323,14 +354,23 @@ class SefazService:
         try:
             root = ET.fromstring(soap_xml)
         except Exception as exc:  # noqa: BLE001
-            raise HTTPException(status_code=502, detail=f"Resposta inválida da SEFAZ (XML malformado): {exc}") from exc
+            raise HTTPException(
+                status_code=502,
+                detail=f"Resposta inválida da SEFAZ (XML malformado): {exc}",
+            ) from exc
 
         ret_dist = cls._find_first(root, "retDistDFeInt")
         if ret_dist is None:
-            fault_msg = cls._find_text(root, "Text") or cls._find_text(root, "faultstring")
+            fault_msg = cls._find_text(root, "Text") or cls._find_text(
+                root, "faultstring"
+            )
             if fault_msg:
-                raise HTTPException(status_code=502, detail=f"SEFAZ retornou falha SOAP: {fault_msg}")
-            raise HTTPException(status_code=502, detail="SEFAZ retornou resposta sem retDistDFeInt.")
+                raise HTTPException(
+                    status_code=502, detail=f"SEFAZ retornou falha SOAP: {fault_msg}"
+                )
+            raise HTTPException(
+                status_code=502, detail="SEFAZ retornou resposta sem retDistDFeInt."
+            )
 
         c_stat = cls._find_text(ret_dist, "cStat")
         x_motivo = cls._find_text(ret_dist, "xMotivo")
@@ -389,10 +429,13 @@ class SefazService:
                 "chave_acesso": chave or cls._find_text(inf_nfe, "chNFe"),
                 "numero_nf": cls._find_text(ide, "nNF"),
                 "serie": cls._find_text(ide, "serie"),
-                "data_emissao": cls._find_text(ide, "dhEmi") or cls._find_text(ide, "dEmi"),
+                "data_emissao": cls._find_text(ide, "dhEmi")
+                or cls._find_text(ide, "dEmi"),
                 "emitente_cnpj": cls._find_text(emit, "CNPJ"),
                 "emitente_nome": cls._find_text(emit, "xNome"),
-                "destinatario_cnpj": cls._find_text(dest, "CNPJ") or cls._find_text(dest, "CPF") or None,
+                "destinatario_cnpj": cls._find_text(dest, "CNPJ")
+                or cls._find_text(dest, "CPF")
+                or None,
                 "destinatario_nome": cls._find_text(dest, "xNome") or None,
                 "valor_total_nf": float(cls._find_text(total, "vNF") or 0),
                 "itens": itens,
@@ -406,7 +449,8 @@ class SefazService:
                 "numero_nf": cls._find_text(res_nfe, "nNF"),
                 "serie": cls._find_text(res_nfe, "serie"),
                 "data_emissao": cls._find_text(res_nfe, "dhEmi"),
-                "emitente_cnpj": cls._find_text(res_nfe, "CNPJ") or cls._find_text(res_nfe, "CNPJCPF"),
+                "emitente_cnpj": cls._find_text(res_nfe, "CNPJ")
+                or cls._find_text(res_nfe, "CNPJCPF"),
                 "emitente_nome": cls._find_text(res_nfe, "xNome"),
                 "destinatario_cnpj": None,
                 "destinatario_nome": None,
@@ -418,7 +462,9 @@ class SefazService:
         return None
 
     @classmethod
-    def _consultar_por_chave_real(cls, chave: str, cfg: dict[str, Any]) -> dict[str, Any]:
+    def _consultar_por_chave_real(
+        cls, chave: str, cfg: dict[str, Any]
+    ) -> dict[str, Any]:
         xml_msg = cls._xml_dist_cons_chave(cfg, chave)
         soap = cls._post_soap_dist_dfe(cfg, xml_msg)
         parsed = cls._parse_retorno_dist_dfe(soap)
@@ -432,20 +478,33 @@ class SefazService:
 
         for doc in parsed["docs"]:
             dados = cls._parse_nfe_documento(doc["xml"])
-            if dados and (dados.get("chave_acesso") == chave or not dados.get("chave_acesso")):
+            if dados and (
+                dados.get("chave_acesso") == chave or not dados.get("chave_acesso")
+            ):
                 dados["chave_acesso"] = chave
-                dados["aviso"] = "Consulta real realizada na SEFAZ via distribuição DF-e."
+                dados["aviso"] = (
+                    "Consulta real realizada na SEFAZ via distribuição DF-e."
+                )
                 if dados.get("tem_xml_completo"):
                     dados["xml_nfe"] = doc["xml"]
                 else:
                     dados["xml_nfe"] = None
                 return dados
 
-        raise HTTPException(status_code=404, detail="NF-e não localizada para a chave informada na SEFAZ.")
+        raise HTTPException(
+            status_code=404,
+            detail="NF-e não localizada para a chave informada na SEFAZ.",
+        )
 
     @classmethod
-    def sincronizar_nsu(cls, config: Optional[dict[str, Any]] = None, ultimo_nsu: str = "000000000000000") -> dict[str, Any]:
-        correlation_id = current_correlation_id("integration.sefaz.nsu", reference=ultimo_nsu)
+    def sincronizar_nsu(
+        cls,
+        config: Optional[dict[str, Any]] = None,
+        ultimo_nsu: str = "000000000000000",
+    ) -> dict[str, Any]:
+        correlation_id = current_correlation_id(
+            "integration.sefaz.nsu", reference=ultimo_nsu
+        )
         cfg = cls._read_config(config)
         cls.garantir_pronto_para_consulta_real(cfg)
 
@@ -490,7 +549,9 @@ class SefazService:
         }
 
     @classmethod
-    def _mensagem_e_cert_ok(cls, enabled: bool, modo: str, cert_path: str, cert_pwd: str) -> Tuple[bool, str]:
+    def _mensagem_e_cert_ok(
+        cls, enabled: bool, modo: str, cert_path: str, cert_pwd: str
+    ) -> Tuple[bool, str]:
         if not enabled:
             return False, "SEFAZ desabilitado."
         if modo == "mock":
@@ -500,7 +561,9 @@ class SefazService:
         return False, "Preencha caminho e senha do certificado para modo real."
 
     @classmethod
-    def status_configuracao(cls, config: Optional[dict[str, Any]] = None) -> SefazConfigStatus:
+    def status_configuracao(
+        cls, config: Optional[dict[str, Any]] = None
+    ) -> SefazConfigStatus:
         cfg = cls._read_config(config)
         modo = cfg["modo"]
         ambiente = cfg["ambiente"]
@@ -508,7 +571,9 @@ class SefazService:
         cert_pwd = cfg["cert_password"]
 
         cert_existe = bool(cert_path) and Path(cert_path).exists()
-        cert_ok, msg = cls._mensagem_e_cert_ok(cfg["enabled"], modo, cert_path, cert_pwd)
+        cert_ok, msg = cls._mensagem_e_cert_ok(
+            cfg["enabled"], modo, cert_path, cert_pwd
+        )
 
         return SefazConfigStatus(
             enabled=cfg["enabled"],
@@ -524,17 +589,25 @@ class SefazService:
         )
 
     @classmethod
-    def garantir_pronto_para_consulta_real(cls, config: Optional[dict[str, Any]] = None) -> None:
+    def garantir_pronto_para_consulta_real(
+        cls, config: Optional[dict[str, Any]] = None
+    ) -> None:
         cfg = cls._read_config(config)
 
         cls._validar_modo(cfg["modo"])
         cls._validar_ambiente(cfg["ambiente"])
 
         if not cfg["enabled"]:
-            raise HTTPException(status_code=503, detail="SEFAZ está desabilitado. Defina SEFAZ_ENABLED=true.")
+            raise HTTPException(
+                status_code=503,
+                detail="SEFAZ está desabilitado. Defina SEFAZ_ENABLED=true.",
+            )
 
         if cfg["modo"] != "real":
-            raise HTTPException(status_code=503, detail="SEFAZ está em modo mock. Defina SEFAZ_MODO=real.")
+            raise HTTPException(
+                status_code=503,
+                detail="SEFAZ está em modo mock. Defina SEFAZ_MODO=real.",
+            )
 
         if not cfg["uf"]:
             raise HTTPException(status_code=422, detail="SEFAZ_UF não configurada.")
@@ -542,25 +615,35 @@ class SefazService:
 
         cnpj = cfg["cnpj"]
         if not cnpj or not cnpj.isdigit() or len(cnpj) != 14:
-            raise HTTPException(status_code=422, detail="SEFAZ_CNPJ deve ter 14 dígitos numéricos.")
+            raise HTTPException(
+                status_code=422, detail="SEFAZ_CNPJ deve ter 14 dígitos numéricos."
+            )
 
         cert_path = cfg["cert_path"]
         cert_pwd = cfg["cert_password"]
         if not cert_path:
-            raise HTTPException(status_code=422, detail="SEFAZ_CERT_PATH não configurado.")
+            raise HTTPException(
+                status_code=422, detail="SEFAZ_CERT_PATH não configurado."
+            )
         if not cert_pwd:
-            raise HTTPException(status_code=422, detail="SEFAZ_CERT_PASSWORD não configurado.")
+            raise HTTPException(
+                status_code=422, detail="SEFAZ_CERT_PASSWORD não configurado."
+            )
 
         ok, msg = cls._validar_certificado(cert_path, cert_pwd)
         if not ok:
             raise HTTPException(status_code=422, detail=msg)
 
     @classmethod
-    def consultar_nfe_por_chave(cls, chave: str, config: Optional[dict[str, Any]] = None) -> dict:
+    def consultar_nfe_por_chave(
+        cls, chave: str, config: Optional[dict[str, Any]] = None
+    ) -> dict:
         """
         Ponto único da consulta SEFAZ.
         """
-        correlation_id = current_correlation_id("integration.sefaz.chave", reference=chave)
+        correlation_id = current_correlation_id(
+            "integration.sefaz.chave", reference=chave
+        )
         cfg = cls._read_config(config)
         modo = cls._validar_modo(cfg["modo"])
         if not cfg["enabled"] or modo == "mock":
