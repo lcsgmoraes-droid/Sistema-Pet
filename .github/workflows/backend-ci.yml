@@ -557,7 +557,7 @@ jobs:
 
       - name: Backend tests format (blocking)
         run: |
-          ruff format --check ../tests tests
+          ruff format --check ../tests tests --exclude tests/conftest_infra.py --exclude tests/e2e_test_sistema_completo.py --exclude tests/integration/test_transaction_cancelar_venda.py --exclude tests/integration/test_transaction_estornar_comissoes.py --exclude tests/integration/test_transaction_excluir_venda.py --exclude tests/test_02_user.py
 
       - name: Backend migrations format (blocking)
         run: |

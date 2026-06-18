@@ -28,3 +28,4 @@ def test_sonar_cpd_excludes_legacy_backend_migrations():
     }
 
     assert "backend/migrations/**" in exclusions
+    assert "**/backend/migrations/**" in exclusions
