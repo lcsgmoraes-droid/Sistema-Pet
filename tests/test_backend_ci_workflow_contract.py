@@ -1067,6 +1067,13 @@ def test_backend_ci_has_blocking_backend_whatsapp_analytics_simple_format_step()
     assert "ruff format --check app/whatsapp/analytics_simple.py" in source
 
 
+def test_backend_ci_has_blocking_backend_whatsapp_analytics_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend WhatsApp analytics format (blocking)" in source
+    assert "ruff format --check app/whatsapp/analytics.py" in source
+
+
 def test_backend_ci_has_blocking_backend_analysis_dashboard_sales_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
