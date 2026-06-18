@@ -1,4 +1,5 @@
 import inspect
+import re
 from pathlib import Path
 
 import app.db  # noqa: F401
@@ -76,12 +77,14 @@ def test_migration_base_de_dre_periodos_nao_criou_tenant_id():
     ) as migration_file:
         migration_source = migration_file.read()
 
-    create_start = migration_source.index("op.create_table('dre_periodos'")
+    create_start = re.search(
+        r"op\.create_table\(\s*['\"]dre_periodos['\"]", migration_source
+    ).start()
     create_end = migration_source.index(
-        "op.create_index(op.f('ix_dre_periodos_id')",
+        'op.f("ix_dre_periodos_id")',
         create_start,
     )
     dre_periodos_ddl = migration_source[create_start:create_end]
 
-    assert "sa.Column('usuario_id'" in dre_periodos_ddl
+    assert re.search(r"sa\.Column\(\s*['\"]usuario_id['\"]", dre_periodos_ddl)
     assert "tenant_id" not in dre_periodos_ddl
