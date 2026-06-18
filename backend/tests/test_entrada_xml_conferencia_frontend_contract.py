@@ -11,7 +11,10 @@ def read_source(relative_path: str) -> str:
 def test_opening_conference_without_divergences_keeps_all_items_visible():
     source = read_source("frontend/src/components/EntradaXML.jsx")
 
-    assert "setFiltroItensNota(temDivergenciaConferencia ? 'divergencias' : 'todos')" in source
+    assert (
+        "setFiltroItensNota(temDivergenciaConferencia ? 'divergencias' : 'todos')"
+        in source
+    )
     assert (
         "setFiltroItensNota((abrirConferencia || temDivergenciaConferencia) ? 'divergencias' : 'todos')"
         not in source
@@ -19,7 +22,9 @@ def test_opening_conference_without_divergences_keeps_all_items_visible():
 
 
 def test_empty_divergence_filter_falls_back_to_all_invoice_items():
-    source = read_source("frontend/src/components/entrada-xml/useEntradaXmlConferencia.js")
+    source = read_source(
+        "frontend/src/components/entrada-xml/useEntradaXmlConferencia.js"
+    )
 
     assert "itensComDivergenciaDetalhe.length > 0" in source
     assert (

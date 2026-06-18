@@ -1,6 +1,7 @@
 """
 Testes de criacao de vendas simples.
 """
+
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -99,7 +100,9 @@ def test_create_sale_with_items(db_session, tenant_factory, user_factory):
     assert float(item.subtotal) == 90.00
 
 
-def test_sale_has_correct_tenant_id(db_session, tenant_factory, user_factory, tenant_context):
+def test_sale_has_correct_tenant_id(
+    db_session, tenant_factory, user_factory, tenant_context
+):
     """
     Testa que venda possui tenant_id correto.
     Protege: vinculo venda-tenant.

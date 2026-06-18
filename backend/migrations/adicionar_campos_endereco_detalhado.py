@@ -3,6 +3,7 @@ Migration: Adicionar campos detalhados de endereço em configuracoes_entrega
 Data: 2026-02-01
 Descrição: Adiciona CEP, número, complemento, bairro, cidade e estado separados
 """
+
 import psycopg2
 import os
 from dotenv import load_dotenv
@@ -15,21 +16,18 @@ DB_USER = os.getenv("POSTGRES_USER", "postgres")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "")
 DB_NAME = os.getenv("POSTGRES_DB", "pet_shop_pro")
 
+
 def run_migration():
     """Adiciona campos de endereço detalhado"""
     conn = psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        database=DB_NAME
+        host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASSWORD, database=DB_NAME
     )
-    
+
     try:
         cursor = conn.cursor()
-        
+
         print("📍 Adicionando campos de endereço detalhado em configuracoes_entrega...")
-        
+
         # Adicionar novos campos
         cursor.execute("""
             ALTER TABLE configuracoes_entrega
@@ -40,7 +38,7 @@ def run_migration():
             ADD COLUMN IF NOT EXISTS cidade VARCHAR(100),
             ADD COLUMN IF NOT EXISTS estado VARCHAR(2);
         """)
-        
+
         # Renomear ponto_inicial_rota para logradouro (mais semântico)
         cursor.execute("""
             DO $$
@@ -55,7 +53,7 @@ def run_migration():
                 END IF;
             END $$;
         """)
-        
+
         # Adicionar comentários
         cursor.execute("""
             COMMENT ON COLUMN configuracoes_entrega.logradouro IS 'Rua/Avenida do ponto inicial';
@@ -66,10 +64,10 @@ def run_migration():
             COMMENT ON COLUMN configuracoes_entrega.cidade IS 'Cidade do ponto inicial';
             COMMENT ON COLUMN configuracoes_entrega.estado IS 'Estado (UF) - 2 caracteres';
         """)
-        
+
         conn.commit()
         print("✅ Campos de endereço detalhado adicionados com sucesso!")
-        
+
         # Verificar colunas
         cursor.execute("""
             SELECT column_name, data_type, character_maximum_length 
@@ -78,11 +76,11 @@ def run_migration():
             AND column_name IN ('logradouro', 'cep', 'numero', 'complemento', 'bairro', 'cidade', 'estado')
             ORDER BY column_name;
         """)
-        
+
         print("\n📋 Colunas criadas:")
         for row in cursor.fetchall():
             print(f"  - {row[0]}: {row[1]}" + (f"({row[2]})" if row[2] else ""))
-        
+
     except Exception as e:
         conn.rollback()
         print(f"❌ Erro na migration: {e}")
@@ -90,6 +88,7 @@ def run_migration():
     finally:
         cursor.close()
         conn.close()
+
 
 if __name__ == "__main__":
     run_migration()
