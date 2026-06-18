@@ -57,15 +57,11 @@ def extract_pdf_text(pdf_bytes: bytes) -> str:
         raise ValueError("PDF vazio")
 
     with pdfplumber.open(BytesIO(pdf_bytes)) as pdf:
-        pages_text = [
-            page.extract_text(x_tolerance=1, y_tolerance=3) or "" for page in pdf.pages
-        ]
+        pages_text = [page.extract_text(x_tolerance=1, y_tolerance=3) or "" for page in pdf.pages]
 
     text = "\n".join(page_text.strip() for page_text in pages_text if page_text.strip())
     if not text.strip():
-        raise ValueError(
-            "Nao foi possivel ler texto do PDF. Envie um PDF digital, nao escaneado."
-        )
+        raise ValueError("Nao foi possivel ler texto do PDF. Envie um PDF digital, nao escaneado.")
     return text
 
 
@@ -77,9 +73,7 @@ def parse_pedido_pdf_text(text: str) -> PDFEntradaPedido:
     if not itens:
         raise ValueError("Nenhum item foi identificado no PDF")
 
-    valor_total = _extrair_valor_total(normalized) or sum(
-        item.valor_total for item in itens
-    )
+    valor_total = _extrair_valor_total(normalized) or sum(item.valor_total for item in itens)
     peso_total = _extrair_peso_total(normalized)
     duplicatas = _extrair_duplicatas(normalized)
 
@@ -225,16 +219,12 @@ def _extrair_itens_romaneio(text: str) -> list[PDFEntradaItem]:
     for line in text.split("\n"):
         match = item_patterns[0].match(line)
         if match:
-            codigo, descricao, quantidade, valor_unitario, valor_total, unidade = (
-                match.groups()
-            )
+            codigo, descricao, quantidade, valor_unitario, valor_total, unidade = match.groups()
         else:
             match = item_patterns[1].match(line)
             if not match:
                 continue
-            codigo, descricao, unidade, quantidade, valor_unitario, valor_total = (
-                match.groups()
-            )
+            codigo, descricao, unidade, quantidade, valor_unitario, valor_total = match.groups()
 
         itens.append(
             PDFEntradaItem(
@@ -297,15 +287,9 @@ def _extrair_itens_app_vendas_mobile(text: str) -> list[PDFEntradaItem]:
 
 
 def _extrair_valor_total(text: str) -> Optional[float]:
-    match = re.search(
-        r"VALOR TOTAL:\s*(\d{1,3}(?:\.\d{3})*,\d{2})", text, flags=re.IGNORECASE
-    )
+    match = re.search(r"VALOR TOTAL:\s*(\d{1,3}(?:\.\d{3})*,\d{2})", text, flags=re.IGNORECASE)
     if not match:
-        match = re.search(
-            r"\bTOTAL\s*:\s*R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})",
-            text,
-            flags=re.IGNORECASE,
-        )
+        match = re.search(r"\bTOTAL\s*:\s*R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})", text, flags=re.IGNORECASE)
     if not match:
         return None
     return float(_parse_decimal(match.group(1)))

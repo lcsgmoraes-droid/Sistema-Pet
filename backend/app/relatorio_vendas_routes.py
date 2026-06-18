@@ -26,9 +26,7 @@ from .promocoes_venda_utils import detectar_promocao_por_preco_vendido
 from .services.venda_rentabilidade_reprocessamento_service import (
     reprocessar_rentabilidade_vendas,
 )
-from .services.venda_rentabilidade_snapshot_service import (
-    get_or_build_venda_rentabilidade_snapshot,
-)
+from .services.venda_rentabilidade_snapshot_service import get_or_build_venda_rentabilidade_snapshot
 
 logger = logging.getLogger(__name__)
 
@@ -39,16 +37,10 @@ STATUS_VENDA_SEM_SALDO_ABERTO = STATUS_VENDA_RECEBIDA_INTEGRAL | {"cancelada"}
 
 
 class ReprocessarRentabilidadeVendasRequest(BaseModel):
-    venda_ids: Optional[list[int]] = Field(
-        default=None, description="IDs das vendas selecionadas"
-    )
-    data_inicio: Optional[str] = Field(
-        default=None, description="Data inicial YYYY-MM-DD"
-    )
+    venda_ids: Optional[list[int]] = Field(default=None, description="IDs das vendas selecionadas")
+    data_inicio: Optional[str] = Field(default=None, description="Data inicial YYYY-MM-DD")
     data_fim: Optional[str] = Field(default=None, description="Data final YYYY-MM-DD")
-    canal_venda: Optional[str] = Field(
-        default=None, description="Canal de venda opcional"
-    )
+    canal_venda: Optional[str] = Field(default=None, description="Canal de venda opcional")
 
 
 class ReprocessarRentabilidadeVendasResponse(BaseModel):
@@ -139,9 +131,7 @@ def _as_float(valor) -> float:
 
 def _total_recebido_venda(venda: Venda) -> float:
     pagamentos = list(getattr(venda, "pagamentos", []) or [])
-    total_pagamentos = sum(
-        _as_float(getattr(pagamento, "valor", 0)) for pagamento in pagamentos
-    )
+    total_pagamentos = sum(_as_float(getattr(pagamento, "valor", 0)) for pagamento in pagamentos)
     if total_pagamentos > 0:
         total_venda = _as_float(getattr(venda, "total", 0))
         if total_venda > 0:
@@ -155,10 +145,7 @@ def _total_recebido_venda(venda: Venda) -> float:
             return round(min(valor_recebido, total_venda), 2)
         return round(valor_recebido, 2)
 
-    if (
-        _texto_normalizado(getattr(venda, "status", None))
-        in STATUS_VENDA_RECEBIDA_INTEGRAL
-    ):
+    if _texto_normalizado(getattr(venda, "status", None)) in STATUS_VENDA_RECEBIDA_INTEGRAL:
         return round(_as_float(getattr(venda, "total", 0)), 2)
 
     return 0.0
@@ -169,9 +156,7 @@ def _saldo_aberto_venda(venda: Venda) -> float:
     if status in STATUS_VENDA_SEM_SALDO_ABERTO:
         return 0.0
 
-    return round(
-        max(_as_float(getattr(venda, "total", 0)) - _total_recebido_venda(venda), 0), 2
-    )
+    return round(max(_as_float(getattr(venda, "total", 0)) - _total_recebido_venda(venda), 0), 2)
 
 
 def _valores_operacionais_venda(venda: Venda) -> dict[str, float]:
@@ -199,8 +184,7 @@ def _valores_operacionais_venda(venda: Venda) -> dict[str, float]:
         valor_bruto = subtotal
     else:
         valor_bruto_itens = sum(
-            _as_float(getattr(item, "quantidade", 0))
-            * _as_float(getattr(item, "preco_unitario", 0))
+            _as_float(getattr(item, "quantidade", 0)) * _as_float(getattr(item, "preco_unitario", 0))
             for item in list(getattr(venda, "itens", []) or [])
         )
         if valor_bruto_itens > 0:
@@ -243,9 +227,7 @@ def _snapshot_dict(venda: Venda) -> dict:
     return {}
 
 
-def _precisa_reclassificar_campanha(
-    venda: Venda, custo_campanha: float, cupom_desconto: float
-) -> bool:
+def _precisa_reclassificar_campanha(venda: Venda, custo_campanha: float, cupom_desconto: float) -> bool:
     if custo_campanha <= 0 and cupom_desconto <= 0:
         return False
 
@@ -271,10 +253,14 @@ def _detectar_promocao_item(
         or 0
     )
     quantidade = float(
-        getattr(item, "quantidade", None) or item_snapshot.get("quantidade", 0) or 0
+        getattr(item, "quantidade", None)
+        or item_snapshot.get("quantidade", 0)
+        or 0
     )
     subtotal_item = float(
-        getattr(item, "subtotal", None) or item_snapshot.get("venda_bruta", 0) or 0
+        getattr(item, "subtotal", None)
+        or item_snapshot.get("venda_bruta", 0)
+        or 0
     )
     return detectar_promocao_por_preco_vendido(
         produto,
@@ -285,9 +271,7 @@ def _detectar_promocao_item(
     )
 
 
-def _enriquecer_itens_promocionais(
-    venda: Venda, itens_snapshot: list[dict]
-) -> list[dict]:
+def _enriquecer_itens_promocionais(venda: Venda, itens_snapshot: list[dict]) -> list[dict]:
     itens_venda = list(getattr(venda, "itens", []) or [])
     usados = set()
     resultado = []
@@ -298,10 +282,7 @@ def _enriquecer_itens_promocionais(
 
         if indice < len(itens_venda):
             candidato = itens_venda[indice]
-            if (
-                not produto_id_snapshot
-                or getattr(candidato, "produto_id", None) == produto_id_snapshot
-            ):
+            if not produto_id_snapshot or getattr(candidato, "produto_id", None) == produto_id_snapshot:
                 item_modelo = candidato
                 usados.add(indice)
 
@@ -315,9 +296,7 @@ def _enriquecer_itens_promocionais(
                     break
 
         produto = getattr(item_modelo, "produto", None) if item_modelo else None
-        info_promocao = _detectar_promocao_item(
-            produto, item_modelo, venda, item_snapshot
-        )
+        info_promocao = _detectar_promocao_item(produto, item_modelo, venda, item_snapshot)
         resultado.append({**item_snapshot, **info_promocao})
 
     return resultado
@@ -329,7 +308,7 @@ async def obter_relatorio_vendas(
     data_fim: Optional[str] = Query(None),
     canal_venda: Optional[str] = Query(None),
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Relatório completo de vendas com:
@@ -361,43 +340,28 @@ async def obter_relatorio_vendas(
         Venda.tenant_id == tenant_id,
         Venda.data_venda >= data_inicio_dt,
         Venda.data_venda <= data_fim_dt,
-        or_(Venda.status.is_(None), Venda.status != "cancelada"),
+        or_(Venda.status.is_(None), Venda.status != 'cancelada'),
     ]
     if canal_normalizado:
         filtros_vendas.append(Venda.canal == canal_normalizado)
 
     # OTIMIZAÇÃO: Buscar vendas com EAGER LOADING para evitar N+1 queries
     # Isso carrega todos os relacionamentos de uma vez, reduzindo drasticamente queries ao BD
-    vendas = (
-        db.query(Venda)
-        .options(
-            selectinload(Venda.cliente),
-            selectinload(Venda.usuario),
-            selectinload(Venda.itens)
-            .selectinload(VendaItem.produto)
-            .selectinload(Produto.categoria),
-            selectinload(Venda.itens)
-            .selectinload(VendaItem.produto)
-            .selectinload(Produto.marca),
-            selectinload(Venda.pagamentos),
-        )
-        .filter(and_(*filtros_vendas))
-        .all()
-    )
+    vendas = db.query(Venda).options(
+        selectinload(Venda.cliente),
+        selectinload(Venda.usuario),
+        selectinload(Venda.itens).selectinload(VendaItem.produto).selectinload(Produto.categoria),
+        selectinload(Venda.itens).selectinload(VendaItem.produto).selectinload(Produto.marca),
+        selectinload(Venda.pagamentos)
+    ).filter(and_(*filtros_vendas)).all()
 
     # OTIMIZAÇÃO: Buscar config fiscal UMA VEZ (não para cada venda)
     # Tratamento de erro caso a tabela não exista
     try:
-        config_fiscal = (
-            db.query(EmpresaConfigFiscal)
-            .filter(EmpresaConfigFiscal.tenant_id == tenant_id)
-            .first()
-        )
-        impostos_percentual_global = (
-            float(config_fiscal.aliquota_simples_vigente)
-            if config_fiscal and config_fiscal.aliquota_simples_vigente
-            else 0.0
-        )
+        config_fiscal = db.query(EmpresaConfigFiscal).filter(
+            EmpresaConfigFiscal.tenant_id == tenant_id
+        ).first()
+        impostos_percentual_global = float(config_fiscal.aliquota_simples_vigente) if config_fiscal and config_fiscal.aliquota_simples_vigente else 0.0
     except Exception as e:
         logger.warning(f"Erro ao buscar config fiscal (tabela pode não existir): {e}")
         impostos_percentual_global = 0.0
@@ -407,16 +371,9 @@ async def obter_relatorio_vendas(
     comissoes_map = {}
     if venda_ids:
         try:
-            comissoes_itens = (
-                db.query(ComissaoItem)
-                .filter(
-                    and_(
-                        ComissaoItem.venda_id.in_(venda_ids),
-                        ComissaoItem.tenant_id == tenant_id,
-                    )
-                )
-                .all()
-            )
+            comissoes_itens = db.query(ComissaoItem).filter(
+                and_(ComissaoItem.venda_id.in_(venda_ids), ComissaoItem.tenant_id == tenant_id)
+            ).all()
             for com_item in comissoes_itens:
                 if com_item.venda_id not in comissoes_map:
                     comissoes_map[com_item.venda_id] = []
@@ -427,71 +384,46 @@ async def obter_relatorio_vendas(
     # OTIMIZAÇÃO: Carregar todas as formas de pagamento ativas de uma vez
     formas_pagamento_map = {}
     try:
-        formas_pag_list = (
-            db.query(FormaPagamento)
-            .filter(
-                and_(
-                    FormaPagamento.ativo.is_(True),
-                    FormaPagamento.tenant_id == tenant_id,
-                )
-            )
-            .all()
-        )
+        formas_pag_list = db.query(FormaPagamento).filter(
+            and_(FormaPagamento.ativo.is_(True), FormaPagamento.tenant_id == tenant_id)
+        ).all()
         for fp in formas_pag_list:
             formas_pagamento_map[fp.nome.lower().strip()] = fp
     except Exception as e:
-        logger.warning(
-            f"Erro ao buscar formas de pagamento (tabela pode não existir): {e}"
-        )
+        logger.warning(f"Erro ao buscar formas de pagamento (tabela pode não existir): {e}")
 
     # OTIMIZAÇÃO: Carregar resgates de cashback por venda (negative amount, source_id = venda_id)
     cashback_por_venda = {}  # venda_id → valor resgatado
     if venda_ids:
         try:
             from app.campaigns.models import CashbackTransaction
-
-            resgates = (
-                db.query(
-                    CashbackTransaction.source_id,
-                    func.sum(CashbackTransaction.amount),
-                )
-                .filter(
-                    CashbackTransaction.tenant_id == tenant_id,
-                    CashbackTransaction.amount < 0,
-                    CashbackTransaction.source_id.in_(venda_ids),
-                )
-                .group_by(CashbackTransaction.source_id)
-                .all()
-            )
+            resgates = db.query(
+                CashbackTransaction.source_id,
+                func.sum(CashbackTransaction.amount),
+            ).filter(
+                CashbackTransaction.tenant_id == tenant_id,
+                CashbackTransaction.amount < 0,
+                CashbackTransaction.source_id.in_(venda_ids),
+            ).group_by(CashbackTransaction.source_id).all()
             cashback_por_venda = {r[0]: float(abs(r[1])) for r in resgates}
         except Exception as e:
-            logger.warning(
-                f"Erro ao buscar cashback por venda (tabela pode não existir): {e}"
-            )
+            logger.warning(f"Erro ao buscar cashback por venda (tabela pode não existir): {e}")
 
     cupons_por_venda = {}
     if venda_ids:
         try:
             from app.campaigns.models import CouponRedemption
-
-            resgates_cupons = (
-                db.query(
-                    CouponRedemption.venda_id,
-                    func.sum(CouponRedemption.discount_applied),
-                )
-                .filter(
-                    CouponRedemption.tenant_id == tenant_id,
-                    CouponRedemption.venda_id.in_(venda_ids),
-                    CouponRedemption.voided_at.is_(None),
-                )
-                .group_by(CouponRedemption.venda_id)
-                .all()
-            )
+            resgates_cupons = db.query(
+                CouponRedemption.venda_id,
+                func.sum(CouponRedemption.discount_applied),
+            ).filter(
+                CouponRedemption.tenant_id == tenant_id,
+                CouponRedemption.venda_id.in_(venda_ids),
+                CouponRedemption.voided_at.is_(None),
+            ).group_by(CouponRedemption.venda_id).all()
             cupons_por_venda = {r[0]: float(r[1] or 0) for r in resgates_cupons}
         except Exception as e:
-            logger.warning(
-                f"Erro ao buscar cupons por venda (tabela pode nÃ£o existir): {e}"
-            )
+            logger.warning(f"Erro ao buscar cupons por venda (tabela pode nÃ£o existir): {e}")
 
     comissao_total_por_venda = {
         venda_id: round(sum(float(item.valor_comissao or 0) for item in itens), 2)
@@ -499,18 +431,12 @@ async def obter_relatorio_vendas(
     }
 
     entregadores_map = {}
-    entregador_ids = {
-        v.entregador_id for v in vendas if v.tem_entrega and v.entregador_id
-    }
+    entregador_ids = {v.entregador_id for v in vendas if v.tem_entrega and v.entregador_id}
     if entregador_ids:
         try:
-            entregadores = (
-                db.query(Cliente.id, Cliente.taxa_fixa_entrega)
-                .filter(
-                    and_(Cliente.tenant_id == tenant_id, Cliente.id.in_(entregador_ids))
-                )
-                .all()
-            )
+            entregadores = db.query(Cliente.id, Cliente.taxa_fixa_entrega).filter(
+                and_(Cliente.tenant_id == tenant_id, Cliente.id.in_(entregador_ids))
+            ).all()
             entregadores_map = {
                 entregador_id: float(taxa_fixa_entrega or 0)
                 for entregador_id, taxa_fixa_entrega in entregadores
@@ -521,57 +447,43 @@ async def obter_relatorio_vendas(
     estoque_custos_por_venda = {}
     if venda_ids:
         try:
-            movimentos_estoque = (
-                db.query(EstoqueMovimentacao)
-                .filter(
-                    and_(
-                        EstoqueMovimentacao.tenant_id == tenant_id,
-                        EstoqueMovimentacao.referencia_tipo == "venda",
-                        EstoqueMovimentacao.referencia_id.in_(venda_ids),
-                        EstoqueMovimentacao.tipo == "saida",
-                    )
+            movimentos_estoque = db.query(EstoqueMovimentacao).filter(
+                and_(
+                    EstoqueMovimentacao.tenant_id == tenant_id,
+                    EstoqueMovimentacao.referencia_tipo == 'venda',
+                    EstoqueMovimentacao.referencia_id.in_(venda_ids),
+                    EstoqueMovimentacao.tipo == 'saida'
                 )
-                .all()
-            )
+            ).all()
 
             for movimento in movimentos_estoque:
-                mapa_venda = estoque_custos_por_venda.setdefault(
-                    movimento.referencia_id, {}
-                )
+                mapa_venda = estoque_custos_por_venda.setdefault(movimento.referencia_id, {})
                 mapa_produto = mapa_venda.setdefault(
-                    movimento.produto_id, {"quantidade": 0.0, "valor_total": 0.0}
+                    movimento.produto_id,
+                    {"quantidade": 0.0, "valor_total": 0.0}
                 )
                 mapa_produto["quantidade"] += abs(float(movimento.quantidade or 0))
                 mapa_produto["valor_total"] += abs(float(movimento.valor_total or 0))
         except Exception as e:
-            logger.warning(
-                f"Erro ao buscar movimentacoes de estoque para rentabilidade: {e}"
-            )
+            logger.warning(f"Erro ao buscar movimentacoes de estoque para rentabilidade: {e}")
 
     valores_operacionais_por_venda = {
-        venda.id: _valores_operacionais_venda(venda) for venda in vendas
+        venda.id: _valores_operacionais_venda(venda)
+        for venda in vendas
     }
 
     # ==============================================
     # RESUMO (Cards no topo)
     # ==============================================
     venda_bruta = sum(v["valor_bruto"] for v in valores_operacionais_por_venda.values())
-    taxa_entrega = sum(
-        v["taxa_entrega"] for v in valores_operacionais_por_venda.values()
-    )
+    taxa_entrega = sum(v["taxa_entrega"] for v in valores_operacionais_por_venda.values())
     desconto = sum(v["desconto"] for v in valores_operacionais_por_venda.values())
-    venda_liquida = sum(
-        v["valor_liquido"] for v in valores_operacionais_por_venda.values()
-    )
+    venda_liquida = sum(v["valor_liquido"] for v in valores_operacionais_por_venda.values())
 
-    valor_recebido = sum(
-        v["valor_recebido"] for v in valores_operacionais_por_venda.values()
-    )
+    valor_recebido = sum(v["valor_recebido"] for v in valores_operacionais_por_venda.values())
     em_aberto = sum(v["saldo_aberto"] for v in valores_operacionais_por_venda.values())
 
-    percentual_desconto = round(
-        (desconto / venda_bruta * 100) if venda_bruta > 0 else 0, 1
-    )
+    percentual_desconto = round((desconto / venda_bruta * 100) if venda_bruta > 0 else 0, 1)
 
     resumo = {
         "venda_bruta": round(venda_bruta, 2),
@@ -581,7 +493,7 @@ async def obter_relatorio_vendas(
         "venda_liquida": round(venda_liquida, 2),
         "valor_recebido": round(valor_recebido, 2),
         "em_aberto": round(em_aberto, 2),
-        "quantidade_vendas": len(vendas),
+        "quantidade_vendas": len(vendas)
     }
 
     # ==============================================
@@ -599,12 +511,10 @@ async def obter_relatorio_vendas(
                 "desconto": 0,
                 "valor_liquido": 0,
                 "valor_recebido": 0,
-                "saldo_aberto": 0,
+                "saldo_aberto": 0
             }
 
-        valores_venda = valores_operacionais_por_venda.get(
-            venda.id
-        ) or _valores_operacionais_venda(venda)
+        valores_venda = valores_operacionais_por_venda.get(venda.id) or _valores_operacionais_venda(venda)
         vendas_por_data[data_str]["quantidade"] += 1
         vendas_por_data[data_str]["valor_bruto"] += valores_venda["valor_bruto"]
         vendas_por_data[data_str]["taxa_entrega"] += valores_venda["taxa_entrega"]
@@ -618,18 +528,9 @@ async def obter_relatorio_vendas(
     # Calcular ticket médio
     for data_str in vendas_por_data:
         qtd = vendas_por_data[data_str]["quantidade"]
-        vendas_por_data[data_str]["ticket_medio"] = round(
-            vendas_por_data[data_str]["valor_liquido"] / qtd if qtd > 0 else 0, 2
-        )
+        vendas_por_data[data_str]["ticket_medio"] = round(vendas_por_data[data_str]["valor_liquido"] / qtd if qtd > 0 else 0, 2)
         vendas_por_data[data_str]["percentual_desconto"] = round(
-            (
-                vendas_por_data[data_str]["desconto"]
-                / vendas_por_data[data_str]["valor_bruto"]
-                * 100
-            )
-            if vendas_por_data[data_str]["valor_bruto"] > 0
-            else 0,
-            1,
+            (vendas_por_data[data_str]["desconto"] / vendas_por_data[data_str]["valor_bruto"] * 100) if vendas_por_data[data_str]["valor_bruto"] > 0 else 0, 1
         )
 
     vendas_por_data_lista = sorted(vendas_por_data.values(), key=lambda x: x["data"])
@@ -656,14 +557,14 @@ async def obter_relatorio_vendas(
                     "forma_pagamento": forma_completa,
                     "valor_total": 0,
                     "ordem_forma": forma_base,  # Para ordenar por tipo de pagamento
-                    "ordem_parcelas": parcelas,  # Para ordenar por número de parcelas
+                    "ordem_parcelas": parcelas  # Para ordenar por número de parcelas
                 }
             formas_recebimento[forma_completa]["valor_total"] += pag.valor
 
     # Ordenar por tipo de pagamento e depois por número de parcelas (crescente)
     formas_recebimento_lista = sorted(
         formas_recebimento.values(),
-        key=lambda x: (x["ordem_forma"], x["ordem_parcelas"]),
+        key=lambda x: (x["ordem_forma"], x["ordem_parcelas"])
     )
 
     # Remover campos auxiliares de ordenação
@@ -689,40 +590,26 @@ async def obter_relatorio_vendas(
                 "quantidade": 0,
                 "valor_bruto": 0,
                 "desconto": 0,
-                "valor_liquido": 0,
+                "valor_liquido": 0
             }
 
-        valores_venda = valores_operacionais_por_venda.get(
-            venda.id
-        ) or _valores_operacionais_venda(venda)
+        valores_venda = valores_operacionais_por_venda.get(venda.id) or _valores_operacionais_venda(venda)
         vendas_por_funcionario[nome_func]["quantidade"] += 1
         vendas_por_funcionario[nome_func]["valor_bruto"] += valores_venda["valor_bruto"]
         vendas_por_funcionario[nome_func]["desconto"] += valores_venda["desconto"]
-        vendas_por_funcionario[nome_func]["valor_liquido"] += valores_venda[
-            "valor_liquido"
-        ]
+        vendas_por_funcionario[nome_func]["valor_liquido"] += valores_venda["valor_liquido"]
 
-    vendas_por_funcionario_lista = sorted(
-        vendas_por_funcionario.values(), key=lambda x: x["valor_liquido"], reverse=True
-    )
+    vendas_por_funcionario_lista = sorted(vendas_por_funcionario.values(), key=lambda x: x["valor_liquido"], reverse=True)
 
     # ==============================================
     # VENDAS POR TIPO (Produto/Serviço)
     # ==============================================
     vendas_por_tipo = {
-        "Produto": {
-            "tipo": "Produto",
-            "quantidade": 0,
-            "valor_bruto": 0,
-            "desconto": 0,
-            "valor_liquido": 0,
-        }
+        "Produto": {"tipo": "Produto", "quantidade": 0, "valor_bruto": 0, "desconto": 0, "valor_liquido": 0}
     }
 
     for venda in vendas:
-        valores_venda = valores_operacionais_por_venda.get(
-            venda.id
-        ) or _valores_operacionais_venda(venda)
+        valores_venda = valores_operacionais_por_venda.get(venda.id) or _valores_operacionais_venda(venda)
         vendas_por_tipo["Produto"]["quantidade"] += 1
         vendas_por_tipo["Produto"]["valor_bruto"] += valores_venda["valor_bruto"]
         vendas_por_tipo["Produto"]["desconto"] += valores_venda["desconto"]
@@ -734,14 +621,10 @@ async def obter_relatorio_vendas(
     # VENDAS POR GRUPO DE PRODUTO
     # ==============================================
     vendas_por_grupo = {}
-    total_geral = sum(
-        v["valor_liquido"] for v in valores_operacionais_por_venda.values()
-    )
+    total_geral = sum(v["valor_liquido"] for v in valores_operacionais_por_venda.values())
 
     for venda in vendas:
-        valores_venda = valores_operacionais_por_venda.get(
-            venda.id
-        ) or _valores_operacionais_venda(venda)
+        valores_venda = valores_operacionais_por_venda.get(venda.id) or _valores_operacionais_venda(venda)
         bruto_venda = valores_venda["valor_bruto"]
         desconto_venda = valores_venda["desconto"]
         # OTIMIZAÇÃO: usar itens já carregados
@@ -749,11 +632,7 @@ async def obter_relatorio_vendas(
             # OTIMIZAÇÃO: usar relacionamento produto já carregado
             produto = item.produto
             if produto and produto.categoria:
-                grupo = (
-                    produto.categoria.nome
-                    if hasattr(produto.categoria, "nome")
-                    else str(produto.categoria)
-                )
+                grupo = produto.categoria.nome if hasattr(produto.categoria, 'nome') else str(produto.categoria)
             else:
                 grupo = "Sem categoria"
 
@@ -763,32 +642,23 @@ async def obter_relatorio_vendas(
                     "valor_bruto": 0,
                     "desconto": 0,
                     "valor_liquido": 0,
-                    "percentual": 0,
+                    "percentual": 0
                 }
 
-            valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(
-                getattr(item, "preco_unitario", 0)
-            )
-            desconto_item = (
-                (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
-            )
+            valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(getattr(item, "preco_unitario", 0))
+            desconto_item = (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
 
             vendas_por_grupo[grupo]["valor_bruto"] += valor_item
             vendas_por_grupo[grupo]["desconto"] += desconto_item
-            vendas_por_grupo[grupo]["valor_liquido"] += valor_item - desconto_item
+            vendas_por_grupo[grupo]["valor_liquido"] += (valor_item - desconto_item)
 
     # Calcular percentuais
     for grupo in vendas_por_grupo:
         vendas_por_grupo[grupo]["percentual"] = round(
-            (vendas_por_grupo[grupo]["valor_liquido"] / total_geral * 100)
-            if total_geral > 0
-            else 0,
-            1,
+            (vendas_por_grupo[grupo]["valor_liquido"] / total_geral * 100) if total_geral > 0 else 0, 1
         )
 
-    vendas_por_grupo_lista = sorted(
-        vendas_por_grupo.values(), key=lambda x: x["valor_liquido"], reverse=True
-    )
+    vendas_por_grupo_lista = sorted(vendas_por_grupo.values(), key=lambda x: x["valor_liquido"], reverse=True)
 
     # ==============================================
     # PRODUTOS DETALHADOS AGRUPADOS POR CATEGORIA/SUBCATEGORIA
@@ -796,9 +666,7 @@ async def obter_relatorio_vendas(
     produtos_por_categoria = {}
 
     for venda in vendas:
-        valores_venda = valores_operacionais_por_venda.get(
-            venda.id
-        ) or _valores_operacionais_venda(venda)
+        valores_venda = valores_operacionais_por_venda.get(venda.id) or _valores_operacionais_venda(venda)
         bruto_venda = valores_venda["valor_bruto"]
         desconto_venda = valores_venda["desconto"]
         # OTIMIZAÇÃO: usar itens já carregados
@@ -809,24 +677,12 @@ async def obter_relatorio_vendas(
 
             # Determinar categoria e subcategoria
             if produto and produto.categoria:
-                categoria_nome = (
-                    produto.categoria.nome
-                    if hasattr(produto.categoria, "nome")
-                    else str(produto.categoria)
-                )
+                categoria_nome = produto.categoria.nome if hasattr(produto.categoria, 'nome') else str(produto.categoria)
             else:
                 categoria_nome = "Sem categoria"
 
-            subcategoria_nome = (
-                produto.subcategoria
-                if produto and hasattr(produto, "subcategoria") and produto.subcategoria
-                else None
-            )
-            produto_nome = (
-                f"{produto.nome} ({produto.id})"
-                if produto
-                else f"Produto ID {produto_id}"
-            )
+            subcategoria_nome = produto.subcategoria if produto and hasattr(produto, 'subcategoria') and produto.subcategoria else None
+            produto_nome = f"{produto.nome} ({produto.id})" if produto else f"Produto ID {produto_id}"
 
             # Criar estrutura hierárquica
             if categoria_nome not in produtos_por_categoria:
@@ -837,139 +693,74 @@ async def obter_relatorio_vendas(
                     "total_quantidade": 0,
                     "total_bruto": 0,
                     "total_desconto": 0,
-                    "total_liquido": 0,
+                    "total_liquido": 0
                 }
 
             # Se tem subcategoria, organizar em subcategoria
             if subcategoria_nome:
-                if (
-                    subcategoria_nome
-                    not in produtos_por_categoria[categoria_nome]["subcategorias"]
-                ):
-                    produtos_por_categoria[categoria_nome]["subcategorias"][
-                        subcategoria_nome
-                    ] = {
+                if subcategoria_nome not in produtos_por_categoria[categoria_nome]["subcategorias"]:
+                    produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome] = {
                         "subcategoria": subcategoria_nome,
                         "produtos": {},
                         "total_quantidade": 0,
                         "total_bruto": 0,
                         "total_desconto": 0,
-                        "total_liquido": 0,
+                        "total_liquido": 0
                     }
 
-                if (
-                    produto_nome
-                    not in produtos_por_categoria[categoria_nome]["subcategorias"][
-                        subcategoria_nome
-                    ]["produtos"]
-                ):
-                    produtos_por_categoria[categoria_nome]["subcategorias"][
-                        subcategoria_nome
-                    ]["produtos"][produto_nome] = {
+                if produto_nome not in produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["produtos"]:
+                    produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["produtos"][produto_nome] = {
                         "produto": produto_nome,
                         "quantidade": 0,
                         "valor_bruto": 0,
                         "desconto": 0,
-                        "valor_liquido": 0,
+                        "valor_liquido": 0
                     }
 
-                valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(
-                    getattr(item, "preco_unitario", 0)
-                )
-                desconto_item = (
-                    (valor_item * desconto_venda / bruto_venda)
-                    if bruto_venda > 0
-                    else 0
-                )
+                valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(getattr(item, "preco_unitario", 0))
+                desconto_item = (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
 
                 # Atualizar produto
-                produtos_por_categoria[categoria_nome]["subcategorias"][
-                    subcategoria_nome
-                ]["produtos"][produto_nome]["quantidade"] += item.quantidade
-                produtos_por_categoria[categoria_nome]["subcategorias"][
-                    subcategoria_nome
-                ]["produtos"][produto_nome]["valor_bruto"] += valor_item
-                produtos_por_categoria[categoria_nome]["subcategorias"][
-                    subcategoria_nome
-                ]["produtos"][produto_nome]["desconto"] += desconto_item
-                produtos_por_categoria[categoria_nome]["subcategorias"][
-                    subcategoria_nome
-                ]["produtos"][produto_nome]["valor_liquido"] += (
-                    valor_item - desconto_item
-                )
+                produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["produtos"][produto_nome]["quantidade"] += item.quantidade
+                produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["produtos"][produto_nome]["valor_bruto"] += valor_item
+                produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["produtos"][produto_nome]["desconto"] += desconto_item
+                produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["produtos"][produto_nome]["valor_liquido"] += (valor_item - desconto_item)
 
                 # Atualizar subcategoria
-                produtos_por_categoria[categoria_nome]["subcategorias"][
-                    subcategoria_nome
-                ]["total_quantidade"] += item.quantidade
-                produtos_por_categoria[categoria_nome]["subcategorias"][
-                    subcategoria_nome
-                ]["total_bruto"] += valor_item
-                produtos_por_categoria[categoria_nome]["subcategorias"][
-                    subcategoria_nome
-                ]["total_desconto"] += desconto_item
-                produtos_por_categoria[categoria_nome]["subcategorias"][
-                    subcategoria_nome
-                ]["total_liquido"] += valor_item - desconto_item
+                produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["total_quantidade"] += item.quantidade
+                produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["total_bruto"] += valor_item
+                produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["total_desconto"] += desconto_item
+                produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["total_liquido"] += (valor_item - desconto_item)
             else:
                 # Produto direto na categoria (sem subcategoria)
-                if (
-                    produto_nome
-                    not in produtos_por_categoria[categoria_nome]["produtos"]
-                ):
+                if produto_nome not in produtos_por_categoria[categoria_nome]["produtos"]:
                     produtos_por_categoria[categoria_nome]["produtos"][produto_nome] = {
                         "produto": produto_nome,
                         "quantidade": 0,
                         "valor_bruto": 0,
                         "desconto": 0,
-                        "valor_liquido": 0,
+                        "valor_liquido": 0
                     }
 
-                valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(
-                    getattr(item, "preco_unitario", 0)
-                )
-                desconto_item = (
-                    (valor_item * desconto_venda / bruto_venda)
-                    if bruto_venda > 0
-                    else 0
-                )
+                valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(getattr(item, "preco_unitario", 0))
+                desconto_item = (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
 
-                produtos_por_categoria[categoria_nome]["produtos"][produto_nome][
-                    "quantidade"
-                ] += item.quantidade
-                produtos_por_categoria[categoria_nome]["produtos"][produto_nome][
-                    "valor_bruto"
-                ] += valor_item
-                produtos_por_categoria[categoria_nome]["produtos"][produto_nome][
-                    "desconto"
-                ] += desconto_item
-                produtos_por_categoria[categoria_nome]["produtos"][produto_nome][
-                    "valor_liquido"
-                ] += valor_item - desconto_item
+                produtos_por_categoria[categoria_nome]["produtos"][produto_nome]["quantidade"] += item.quantidade
+                produtos_por_categoria[categoria_nome]["produtos"][produto_nome]["valor_bruto"] += valor_item
+                produtos_por_categoria[categoria_nome]["produtos"][produto_nome]["desconto"] += desconto_item
+                produtos_por_categoria[categoria_nome]["produtos"][produto_nome]["valor_liquido"] += (valor_item - desconto_item)
 
             # Atualizar totais da categoria
-            valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(
-                getattr(item, "preco_unitario", 0)
-            )
-            desconto_item = (
-                (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
-            )
-            produtos_por_categoria[categoria_nome]["total_quantidade"] += (
-                item.quantidade
-            )
+            valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(getattr(item, "preco_unitario", 0))
+            desconto_item = (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
+            produtos_por_categoria[categoria_nome]["total_quantidade"] += item.quantidade
             produtos_por_categoria[categoria_nome]["total_bruto"] += valor_item
             produtos_por_categoria[categoria_nome]["total_desconto"] += desconto_item
-            produtos_por_categoria[categoria_nome]["total_liquido"] += (
-                valor_item - desconto_item
-            )
+            produtos_por_categoria[categoria_nome]["total_liquido"] += (valor_item - desconto_item)
 
     # Converter para lista e ordenar
     produtos_detalhados_lista = []
-    for cat_nome, cat_data in sorted(
-        produtos_por_categoria.items(),
-        key=lambda x: x[1]["total_liquido"],
-        reverse=True,
-    ):
+    for cat_nome, cat_data in sorted(produtos_por_categoria.items(), key=lambda x: x[1]["total_liquido"], reverse=True):
         categoria_obj = {
             "categoria": cat_nome,
             "total_quantidade": cat_data["total_quantidade"],
@@ -977,57 +768,41 @@ async def obter_relatorio_vendas(
             "total_desconto": round(cat_data["total_desconto"], 2),
             "total_liquido": round(cat_data["total_liquido"], 2),
             "subcategorias": [],
-            "produtos": [],
+            "produtos": []
         }
 
         # Adicionar subcategorias
-        for subcat_nome, subcat_data in sorted(
-            cat_data["subcategorias"].items(),
-            key=lambda x: x[1]["total_liquido"],
-            reverse=True,
-        ):
+        for subcat_nome, subcat_data in sorted(cat_data["subcategorias"].items(), key=lambda x: x[1]["total_liquido"], reverse=True):
             subcat_obj = {
                 "subcategoria": subcat_nome,
                 "total_quantidade": subcat_data["total_quantidade"],
                 "total_bruto": round(subcat_data["total_bruto"], 2),
                 "total_desconto": round(subcat_data["total_desconto"], 2),
                 "total_liquido": round(subcat_data["total_liquido"], 2),
-                "produtos": [],
+                "produtos": []
             }
 
             # Produtos da subcategoria
-            for prod in sorted(
-                subcat_data["produtos"].values(),
-                key=lambda x: x["valor_liquido"],
-                reverse=True,
-            ):
-                subcat_obj["produtos"].append(
-                    {
-                        "produto": prod["produto"],
-                        "quantidade": prod["quantidade"],
-                        "valor_bruto": round(prod["valor_bruto"], 2),
-                        "desconto": round(prod["desconto"], 2),
-                        "valor_liquido": round(prod["valor_liquido"], 2),
-                    }
-                )
-
-            categoria_obj["subcategorias"].append(subcat_obj)
-
-        # Produtos diretos da categoria (sem subcategoria)
-        for prod in sorted(
-            cat_data["produtos"].values(),
-            key=lambda x: x["valor_liquido"],
-            reverse=True,
-        ):
-            categoria_obj["produtos"].append(
-                {
+            for prod in sorted(subcat_data["produtos"].values(), key=lambda x: x["valor_liquido"], reverse=True):
+                subcat_obj["produtos"].append({
                     "produto": prod["produto"],
                     "quantidade": prod["quantidade"],
                     "valor_bruto": round(prod["valor_bruto"], 2),
                     "desconto": round(prod["desconto"], 2),
-                    "valor_liquido": round(prod["valor_liquido"], 2),
-                }
-            )
+                    "valor_liquido": round(prod["valor_liquido"], 2)
+                })
+
+            categoria_obj["subcategorias"].append(subcat_obj)
+
+        # Produtos diretos da categoria (sem subcategoria)
+        for prod in sorted(cat_data["produtos"].values(), key=lambda x: x["valor_liquido"], reverse=True):
+            categoria_obj["produtos"].append({
+                "produto": prod["produto"],
+                "quantidade": prod["quantidade"],
+                "valor_bruto": round(prod["valor_bruto"], 2),
+                "desconto": round(prod["desconto"], 2),
+                "valor_liquido": round(prod["valor_liquido"], 2)
+            })
 
         produtos_detalhados_lista.append(categoria_obj)
 
@@ -1096,9 +871,7 @@ async def obter_relatorio_vendas(
             venda,
             list(snapshot.get("itens", []) or []),
         )
-        itens_promocionais = [
-            item for item in itens_enriquecidos if item.get("em_promocao")
-        ]
+        itens_promocionais = [item for item in itens_enriquecidos if item.get("em_promocao")]
         origens_promocao = sorted(
             {
                 origem.strip()
@@ -1108,81 +881,66 @@ async def obter_relatorio_vendas(
             }
         )
 
-        lista_vendas.append(
-            {
-                "id": venda.id,
-                "numero_venda": venda.numero_venda,
-                "data_venda": venda.data_venda.isoformat(),
-                "cliente_nome": venda.cliente.nome if venda.cliente else "Sem cliente",
-                "nf_emitida": _venda_tem_documento_fiscal(venda),
-                "nfe_tipo": venda.nfe_tipo,
-                "nfe_status": venda.nfe_status,
-                "nfe_numero": venda.nfe_numero,
-                "nfe_chave": venda.nfe_chave,
-                "nfe_bling_id": str(venda.nfe_bling_id) if venda.nfe_bling_id else None,
-                "cupom_code": snapshot.get("cupom_code") or venda.cupom_code,
-                "cupom_discount_applied": round(
-                    float(snapshot.get("cupom_desconto", cupom_desconto) or 0),
-                    2,
-                ),
-                "venda_bruta": round(float(snapshot.get("venda_bruta", 0) or 0), 2),
-                "taxa_loja": round(float(snapshot.get("taxa_loja", 0) or 0), 2),
-                "desconto": round(float(snapshot.get("desconto", 0) or 0), 2),
-                "taxa_entrega": round(float(snapshot.get("taxa_entrega", 0) or 0), 2),
-                "taxa_cartao": round(float(snapshot.get("taxa_cartao", 0) or 0), 2),
-                "comissao": round(float(snapshot.get("comissao", 0) or 0), 2),
-                "imposto": round(float(snapshot.get("imposto", 0) or 0), 2),
-                "taxa_operacional": round(
-                    float(snapshot.get("taxa_operacional", 0) or 0), 2
-                ),
-                "custo_produtos": round(
-                    float(snapshot.get("custo_produtos", 0) or 0), 2
-                ),
-                "custo_campanha": round(
-                    float(snapshot.get("custo_campanha", 0) or 0), 2
-                ),
-                "venda_liquida": round(float(snapshot.get("venda_liquida", 0) or 0), 2),
-                "valor_recebido": round(valor_recebido_venda, 2),
-                "lucro": round(float(snapshot.get("lucro", 0) or 0), 2),
-                "margem_sobre_venda": round(
-                    float(snapshot.get("margem_sobre_venda", 0) or 0), 1
-                ),
-                "margem_sobre_custo": round(
-                    float(snapshot.get("margem_sobre_custo", 0) or 0), 1
-                ),
-                "canal": getattr(venda, "canal", None),
-                "loja_origem": getattr(venda, "loja_origem", None),
-                "gateway_provider": snapshot.get("gateway_provider"),
-                "gateway_payment_ids": snapshot.get("gateway_payment_ids") or [],
-                "taxa_gateway": (
-                    round(float(snapshot.get("taxa_gateway") or 0), 2)
-                    if snapshot.get("taxa_gateway") is not None
-                    else None
-                ),
-                "valor_liquido_gateway": (
-                    round(float(snapshot.get("valor_liquido_gateway") or 0), 2)
-                    if snapshot.get("valor_liquido_gateway") is not None
-                    else None
-                ),
-                "valor_bruto_gateway": (
-                    round(float(snapshot.get("valor_bruto_gateway") or 0), 2)
-                    if snapshot.get("valor_bruto_gateway") is not None
-                    else None
-                ),
-                "status": venda.status,
-                "tem_promocao": bool(itens_promocionais),
-                "itens_promocionais": len(itens_promocionais),
-                "valor_promocional": round(
-                    sum(
-                        float(item.get("valor_promocional", 0) or 0)
-                        for item in itens_promocionais
-                    ),
-                    2,
-                ),
-                "origens_promocao": origens_promocao,
-                "itens": itens_enriquecidos,
-            }
-        )
+        lista_vendas.append({
+            "id": venda.id,
+            "numero_venda": venda.numero_venda,
+            "data_venda": venda.data_venda.isoformat(),
+            "cliente_nome": venda.cliente.nome if venda.cliente else "Sem cliente",
+            "nf_emitida": _venda_tem_documento_fiscal(venda),
+            "nfe_tipo": venda.nfe_tipo,
+            "nfe_status": venda.nfe_status,
+            "nfe_numero": venda.nfe_numero,
+            "nfe_chave": venda.nfe_chave,
+            "nfe_bling_id": str(venda.nfe_bling_id) if venda.nfe_bling_id else None,
+            "cupom_code": snapshot.get("cupom_code") or venda.cupom_code,
+            "cupom_discount_applied": round(
+                float(snapshot.get("cupom_desconto", cupom_desconto) or 0),
+                2,
+            ),
+            "venda_bruta": round(float(snapshot.get("venda_bruta", 0) or 0), 2),
+            "taxa_loja": round(float(snapshot.get("taxa_loja", 0) or 0), 2),
+            "desconto": round(float(snapshot.get("desconto", 0) or 0), 2),
+            "taxa_entrega": round(float(snapshot.get("taxa_entrega", 0) or 0), 2),
+            "taxa_cartao": round(float(snapshot.get("taxa_cartao", 0) or 0), 2),
+            "comissao": round(float(snapshot.get("comissao", 0) or 0), 2),
+            "imposto": round(float(snapshot.get("imposto", 0) or 0), 2),
+            "taxa_operacional": round(float(snapshot.get("taxa_operacional", 0) or 0), 2),
+            "custo_produtos": round(float(snapshot.get("custo_produtos", 0) or 0), 2),
+            "custo_campanha": round(float(snapshot.get("custo_campanha", 0) or 0), 2),
+            "venda_liquida": round(float(snapshot.get("venda_liquida", 0) or 0), 2),
+            "valor_recebido": round(valor_recebido_venda, 2),
+            "lucro": round(float(snapshot.get("lucro", 0) or 0), 2),
+            "margem_sobre_venda": round(float(snapshot.get("margem_sobre_venda", 0) or 0), 1),
+            "margem_sobre_custo": round(float(snapshot.get("margem_sobre_custo", 0) or 0), 1),
+            "canal": getattr(venda, "canal", None),
+            "loja_origem": getattr(venda, "loja_origem", None),
+            "gateway_provider": snapshot.get("gateway_provider"),
+            "gateway_payment_ids": snapshot.get("gateway_payment_ids") or [],
+            "taxa_gateway": (
+                round(float(snapshot.get("taxa_gateway") or 0), 2)
+                if snapshot.get("taxa_gateway") is not None
+                else None
+            ),
+            "valor_liquido_gateway": (
+                round(float(snapshot.get("valor_liquido_gateway") or 0), 2)
+                if snapshot.get("valor_liquido_gateway") is not None
+                else None
+            ),
+            "valor_bruto_gateway": (
+                round(float(snapshot.get("valor_bruto_gateway") or 0), 2)
+                if snapshot.get("valor_bruto_gateway") is not None
+                else None
+            ),
+            "status": venda.status,
+            "tem_promocao": bool(itens_promocionais),
+            "itens_promocionais": len(itens_promocionais),
+            "valor_promocional": round(
+                sum(float(item.get("valor_promocional", 0) or 0) for item in itens_promocionais),
+                2,
+            ),
+            "origens_promocao": origens_promocao,
+            "itens": itens_enriquecidos,
+        })
 
     lista_vendas = sorted(lista_vendas, key=lambda x: x["data_venda"], reverse=True)
 
@@ -1206,12 +964,7 @@ async def obter_relatorio_vendas(
     resumo["lucro_total"] = round(lucro_total_geral, 2)
     resumo["venda_liquida"] = round(venda_liquida_geral, 2)
     resumo["valor_recebido"] = round(valor_recebido_geral, 2)
-    resumo["margem_media"] = round(
-        (lucro_total_geral / venda_liquida_geral * 100)
-        if venda_liquida_geral > 0
-        else 0,
-        1,
-    )
+    resumo["margem_media"] = round((lucro_total_geral / venda_liquida_geral * 100) if venda_liquida_geral > 0 else 0, 1)
 
     # ==============================================
     # PRODUTOS PARA ANÁLISE INTELIGENTE (flat list)
@@ -1233,29 +986,21 @@ async def obter_relatorio_vendas(
                 produtos_analise[prod_nome] = {
                     "nome": prod_nome,
                     "produto": prod_nome,
-                    "marca": produto_rel.marca.nome
-                    if produto_rel and produto_rel.marca
-                    else None,
-                    "categoria": produto_rel.categoria.nome
-                    if produto_rel and produto_rel.categoria
-                    else None,
+                    "marca": produto_rel.marca.nome if produto_rel and produto_rel.marca else None,
+                    "categoria": produto_rel.categoria.nome if produto_rel and produto_rel.categoria else None,
                     "quantidade": 0,
                     "valor_total": 0,
                     "custo_total": 0,
                 }
 
-            produtos_analise[prod_nome]["quantidade"] += float(
-                item_snapshot.get("quantidade", 0) or 0
-            )
-            produtos_analise[prod_nome]["valor_total"] += float(
-                item_snapshot.get("venda_bruta", 0) or 0
-            )
-            produtos_analise[prod_nome]["custo_total"] += float(
-                item_snapshot.get("custo_total", 0) or 0
-            )
+            produtos_analise[prod_nome]["quantidade"] += float(item_snapshot.get("quantidade", 0) or 0)
+            produtos_analise[prod_nome]["valor_total"] += float(item_snapshot.get("venda_bruta", 0) or 0)
+            produtos_analise[prod_nome]["custo_total"] += float(item_snapshot.get("custo_total", 0) or 0)
     # Converter para lista e ordenar por valor
     produtos_analise_lista = sorted(
-        list(produtos_analise.values()), key=lambda x: x["valor_total"], reverse=True
+        list(produtos_analise.values()),
+        key=lambda x: x['valor_total'],
+        reverse=True
     )
 
     # ==============================================
@@ -1270,7 +1015,7 @@ async def obter_relatorio_vendas(
         "vendas_por_grupo": vendas_por_grupo_lista,
         "produtos_detalhados": produtos_detalhados_lista,
         "produtos_analise": produtos_analise_lista,
-        "lista_vendas": lista_vendas,
+        "lista_vendas": lista_vendas
     }
 
 
@@ -1281,7 +1026,7 @@ async def obter_relatorio_vendas(
 async def reprocessar_rentabilidade_relatorio_vendas(
     payload: ReprocessarRentabilidadeVendasRequest,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant),
 ):
     """Reprocessa manualmente a rentabilidade de vendas usando o custo atual dos produtos."""
     _current_user, tenant_id = user_and_tenant
@@ -1316,7 +1061,7 @@ async def exportar_vendas_pdf(
     categoria: Optional[str] = Query(None),
     canal_venda: Optional[str] = Query(None),
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Exporta relatório de vendas para PDF"""
     from fastapi import HTTPException
@@ -1330,20 +1075,14 @@ async def exportar_vendas_pdf(
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib import colors
         from reportlab.lib.units import mm
-        from reportlab.platypus import (
-            SimpleDocTemplate,
-            Table,
-            TableStyle,
-            Paragraph,
-            Spacer,
-        )
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.enums import TA_CENTER
     except ImportError as e:
         logger.error(f"Erro ao importar reportlab: {str(e)}")
         raise HTTPException(
             status_code=500,
-            detail="Biblioteca reportlab não instalada. Execute: pip install reportlab",
+            detail="Biblioteca reportlab não instalada. Execute: pip install reportlab"
         )
 
     # Buscar dados do relatório - obter_relatorio_vendas retorna um dict diretamente
@@ -1351,9 +1090,9 @@ async def exportar_vendas_pdf(
         logger.info("Gerando PDF de vendas")
         # Construir filtros de data
         if not data_inicio:
-            data_inicio = datetime.now().replace(day=1).strftime("%Y-%m-%d")
+            data_inicio = datetime.now().replace(day=1).strftime('%Y-%m-%d')
         if not data_fim:
-            data_fim = datetime.now().strftime("%Y-%m-%d")
+            data_fim = datetime.now().strftime('%Y-%m-%d')
         canal_normalizado = _normalizar_canal_venda_relatorio(canal_venda)
 
         # Buscar todas as vendas do período com filtro de tenant
@@ -1361,7 +1100,7 @@ async def exportar_vendas_pdf(
             Venda.tenant_id == tenant_id,
             func.date(Venda.data_venda) >= data_inicio,
             func.date(Venda.data_venda) <= data_fim,
-            or_(Venda.status.is_(None), Venda.status != "cancelada"),
+            or_(Venda.status.is_(None), Venda.status != 'cancelada'),
         ]
         if canal_normalizado:
             filtros_vendas.append(Venda.canal == canal_normalizado)
@@ -1375,136 +1114,101 @@ async def exportar_vendas_pdf(
         taxa_entrega = sum(float(v.taxa_entrega or 0) for v in vendas)
         desconto = sum(float(v.desconto_valor or 0) for v in vendas)
         venda_liquida = sum(float(v.total or 0) for v in vendas)
-        em_aberto = sum(float(v.total or 0) for v in vendas if v.status == "aberta")
+        em_aberto = sum(float(v.total or 0) for v in vendas if v.status == 'aberta')
         quantidade_vendas = len(vendas)
 
         resumo = {
-            "venda_bruta": venda_bruta,
-            "taxa_entrega": taxa_entrega,
-            "desconto": desconto,
-            "venda_liquida": venda_liquida,
-            "em_aberto": em_aberto,
-            "quantidade_vendas": quantidade_vendas,
+            'venda_bruta': venda_bruta,
+            'taxa_entrega': taxa_entrega,
+            'desconto': desconto,
+            'venda_liquida': venda_liquida,
+            'em_aberto': em_aberto,
+            'quantidade_vendas': quantidade_vendas
         }
 
         # Agrupar vendas por data
         vendas_por_data_dict = {}
         for v in vendas:
-            data_str = (
-                v.data_venda.strftime("%Y-%m-%d")
-                if isinstance(v.data_venda, datetime)
-                else str(v.data_venda)
-            )
+            data_str = v.data_venda.strftime('%Y-%m-%d') if isinstance(v.data_venda, datetime) else str(v.data_venda)
             if data_str not in vendas_por_data_dict:
                 vendas_por_data_dict[data_str] = {
-                    "data": data_str,
-                    "quantidade": 0,
-                    "valor_bruto": 0,
-                    "taxa_entrega": 0,
-                    "desconto": 0,
-                    "valor_liquido": 0,
-                    "valor_recebido": 0,
-                    "saldo_aberto": 0,
+                    'data': data_str,
+                    'quantidade': 0,
+                    'valor_bruto': 0,
+                    'taxa_entrega': 0,
+                    'desconto': 0,
+                    'valor_liquido': 0,
+                    'valor_recebido': 0,
+                    'saldo_aberto': 0
                 }
-            vendas_por_data_dict[data_str]["quantidade"] += 1
-            vendas_por_data_dict[data_str]["valor_bruto"] += float(v.subtotal or 0)
-            vendas_por_data_dict[data_str]["taxa_entrega"] += float(v.taxa_entrega or 0)
-            vendas_por_data_dict[data_str]["desconto"] += float(v.desconto_valor or 0)
-            vendas_por_data_dict[data_str]["valor_liquido"] += float(v.total or 0)
-            if v.status != "aberta":
-                vendas_por_data_dict[data_str]["valor_recebido"] += float(v.total or 0)
+            vendas_por_data_dict[data_str]['quantidade'] += 1
+            vendas_por_data_dict[data_str]['valor_bruto'] += float(v.subtotal or 0)
+            vendas_por_data_dict[data_str]['taxa_entrega'] += float(v.taxa_entrega or 0)
+            vendas_por_data_dict[data_str]['desconto'] += float(v.desconto_valor or 0)
+            vendas_por_data_dict[data_str]['valor_liquido'] += float(v.total or 0)
+            if v.status != 'aberta':
+                vendas_por_data_dict[data_str]['valor_recebido'] += float(v.total or 0)
             else:
-                vendas_por_data_dict[data_str]["saldo_aberto"] += float(v.total or 0)
+                vendas_por_data_dict[data_str]['saldo_aberto'] += float(v.total or 0)
 
         vendas_por_data = list(vendas_por_data_dict.values())
         for v in vendas_por_data:
-            v["ticket_medio"] = (
-                v["valor_liquido"] / v["quantidade"] if v["quantidade"] > 0 else 0
-            )
+            v['ticket_medio'] = v['valor_liquido'] / v['quantidade'] if v['quantidade'] > 0 else 0
 
         # Formas de recebimento
         formas_dict = {}
         for v in vendas:
-            pagamentos = (
-                db.query(VendaPagamento)
-                .filter(
-                    and_(
-                        VendaPagamento.venda_id == v.id,
-                        VendaPagamento.tenant_id == tenant_id,
-                    )
-                )
-                .all()
-            )
+            pagamentos = db.query(VendaPagamento).filter(
+                and_(VendaPagamento.venda_id == v.id, VendaPagamento.tenant_id == tenant_id)
+            ).all()
             for p in pagamentos:
-                forma = p.forma_pagamento or "Não informado"
+                forma = p.forma_pagamento or 'Não informado'
                 if forma not in formas_dict:
                     formas_dict[forma] = 0
                 formas_dict[forma] += p.valor or 0
 
-        formas_recebimento = [
-            {"forma_pagamento": k, "valor_total": v} for k, v in formas_dict.items()
-        ]
+        formas_recebimento = [{'forma_pagamento': k, 'valor_total': v} for k, v in formas_dict.items()]
 
         # Vendas por funcionário
         func_dict = {}
         for v in vendas:
-            func_nome = v.vendedor.nome if v.vendedor else "Sem registro"
+            func_nome = v.vendedor.nome if v.vendedor else 'Sem registro'
             if func_nome not in func_dict:
-                func_dict[func_nome] = {
-                    "funcionario": func_nome,
-                    "quantidade": 0,
-                    "valor_total": 0,
-                }
-            func_dict[func_nome]["quantidade"] += 1
-            func_dict[func_nome]["valor_total"] += float(v.total or 0)
+                func_dict[func_nome] = {'funcionario': func_nome, 'quantidade': 0, 'valor_total': 0}
+            func_dict[func_nome]['quantidade'] += 1
+            func_dict[func_nome]['valor_total'] += float(v.total or 0)
 
         vendas_por_funcionario = list(func_dict.values())
         for f in vendas_por_funcionario:
-            f["ticket_medio"] = (
-                f["valor_total"] / f["quantidade"] if f["quantidade"] > 0 else 0
-            )
+            f['ticket_medio'] = f['valor_total'] / f['quantidade'] if f['quantidade'] > 0 else 0
 
         # Produtos detalhados
         prod_dict = {}
         for v in vendas:
-            itens = (
-                db.query(VendaItem)
-                .filter(
-                    and_(VendaItem.venda_id == v.id, VendaItem.tenant_id == tenant_id)
-                )
-                .all()
-            )
+            itens = db.query(VendaItem).filter(
+                and_(VendaItem.venda_id == v.id, VendaItem.tenant_id == tenant_id)
+            ).all()
             for item in itens:
-                prod_nome = item.produto.nome if item.produto else "Produto sem nome"
+                prod_nome = item.produto.nome if item.produto else 'Produto sem nome'
                 if prod_nome not in prod_dict:
                     prod_dict[prod_nome] = {
-                        "produto": prod_nome,
-                        "nome": prod_nome,
-                        "quantidade": 0,
-                        "valor_total": 0,
-                        "custo_total": 0,
-                        "marca": item.produto.marca.nome
-                        if (item.produto and item.produto.marca)
-                        else None,
-                        "categoria": item.produto.categoria.nome
-                        if (item.produto and item.produto.categoria)
-                        else None,
+                        'produto': prod_nome,
+                        'nome': prod_nome,
+                        'quantidade': 0,
+                        'valor_total': 0,
+                        'custo_total': 0,
+                        'marca': item.produto.marca.nome if (item.produto and item.produto.marca) else None,
+                        'categoria': item.produto.categoria.nome if (item.produto and item.produto.categoria) else None
                     }
-                prod_dict[prod_nome]["quantidade"] += float(item.quantidade or 0)
-                prod_dict[prod_nome]["valor_total"] += float(item.subtotal or 0)
+                prod_dict[prod_nome]['quantidade'] += float(item.quantidade or 0)
+                prod_dict[prod_nome]['valor_total'] += float(item.subtotal or 0)
                 # Adicionar custo do produto
                 if item.produto and item.produto.preco_custo:
-                    prod_dict[prod_nome]["custo_total"] += float(
-                        item.produto.preco_custo
-                    ) * float(item.quantidade or 0)
+                    prod_dict[prod_nome]['custo_total'] += float(item.produto.preco_custo) * float(item.quantidade or 0)
 
-        produtos_detalhados = sorted(
-            list(prod_dict.values()), key=lambda x: x["valor_total"], reverse=True
-        )
+        produtos_detalhados = sorted(list(prod_dict.values()), key=lambda x: x['valor_total'], reverse=True)
 
-        logger.info(
-            f"Dados carregados: {len(vendas)} vendas, {len(produtos_detalhados)} produtos"
-        )
+        logger.info(f"Dados carregados: {len(vendas)} vendas, {len(produtos_detalhados)} produtos")
 
     except Exception as e:
         logger.error(f"Erro ao buscar dados: {str(e)}")
@@ -1513,343 +1217,202 @@ async def exportar_vendas_pdf(
 
     # Aplicar filtros se fornecidos
     if funcionario:
-        vendas_por_funcionario = [
-            v for v in vendas_por_funcionario if v.get("funcionario") == funcionario
-        ]
+        vendas_por_funcionario = [v for v in vendas_por_funcionario if v.get('funcionario') == funcionario]
     if forma_pagamento:
-        formas_recebimento = [
-            f for f in formas_recebimento if f.get("forma_pagamento") == forma_pagamento
-        ]
+        formas_recebimento = [f for f in formas_recebimento if f.get('forma_pagamento') == forma_pagamento]
 
     # Gerar PDF
     try:
         buffer = BytesIO()
-        doc = SimpleDocTemplate(
-            buffer, pagesize=landscape(A4), topMargin=15 * mm, bottomMargin=15 * mm
-        )
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), topMargin=15*mm, bottomMargin=15*mm)
         elements = []
         styles = getSampleStyleSheet()
 
         # Título
         title_style = ParagraphStyle(
-            "CustomTitle",
-            parent=styles["Heading1"],
+            'CustomTitle',
+            parent=styles['Heading1'],
             fontSize=18,
-            textColor=colors.HexColor("#1a56db"),
+            textColor=colors.HexColor('#1a56db'),
             spaceAfter=12,
-            alignment=TA_CENTER,
+            alignment=TA_CENTER
         )
         elements.append(Paragraph("RELATÓRIO DE VENDAS", title_style))
-        elements.append(Spacer(1, 5 * mm))
+        elements.append(Spacer(1, 5*mm))
 
         # Período
         subtitle_style = ParagraphStyle(
-            "Subtitle", parent=styles["Normal"], fontSize=11, alignment=TA_CENTER
+            'Subtitle',
+            parent=styles['Normal'],
+            fontSize=11,
+            alignment=TA_CENTER
         )
         periodo_text = f"Período: {data_inicio} até {data_fim}"
         elements.append(Paragraph(periodo_text, subtitle_style))
-        elements.append(Spacer(1, 8 * mm))
+        elements.append(Spacer(1, 8*mm))
 
         # Resumo Financeiro
         header_style = ParagraphStyle(
-            "Header",
-            parent=styles["Heading2"],
+            'Header',
+            parent=styles['Heading2'],
             fontSize=14,
-            textColor=colors.HexColor("#1a56db"),
-            spaceAfter=6,
+            textColor=colors.HexColor('#1a56db'),
+            spaceAfter=6
         )
         elements.append(Paragraph("Resumo Financeiro", header_style))
 
         resumo_data = [
-            ["Métrica", "Valor"],
-            [
-                "Venda Bruta",
-                f"R$ {resumo['venda_bruta']:,.2f}".replace(",", "X")
-                .replace(".", ",")
-                .replace("X", "."),
-            ],
-            [
-                "Taxa de Entrega",
-                f"R$ {resumo['taxa_entrega']:,.2f}".replace(",", "X")
-                .replace(".", ",")
-                .replace("X", "."),
-            ],
-            [
-                "Desconto",
-                f"R$ {resumo['desconto']:,.2f}".replace(",", "X")
-                .replace(".", ",")
-                .replace("X", "."),
-            ],
-            [
-                "Venda Líquida",
-                f"R$ {resumo['venda_liquida']:,.2f}".replace(",", "X")
-                .replace(".", ",")
-                .replace("X", "."),
-            ],
-            [
-                "Valor Recebido",
-                f"R$ {resumo['venda_liquida'] - resumo['em_aberto']:,.2f}".replace(
-                    ",", "X"
-                )
-                .replace(".", ",")
-                .replace("X", "."),
-            ],
-            [
-                "Em Aberto",
-                f"R$ {resumo['em_aberto']:,.2f}".replace(",", "X")
-                .replace(".", ",")
-                .replace("X", "."),
-            ],
-            ["Quantidade de Vendas", str(resumo["quantidade_vendas"])],
+            ['Métrica', 'Valor'],
+            ['Venda Bruta', f"R$ {resumo['venda_bruta']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')],
+            ['Taxa de Entrega', f"R$ {resumo['taxa_entrega']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')],
+            ['Desconto', f"R$ {resumo['desconto']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')],
+            ['Venda Líquida', f"R$ {resumo['venda_liquida']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')],
+            ['Valor Recebido', f"R$ {resumo['venda_liquida'] - resumo['em_aberto']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')],
+            ['Em Aberto', f"R$ {resumo['em_aberto']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')],
+            ['Quantidade de Vendas', str(resumo['quantidade_vendas'])],
         ]
 
-        resumo_table = Table(resumo_data, colWidths=[60 * mm, 40 * mm])
-        resumo_table.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#3b82f6")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-                    ("ALIGN", (1, 1), (1, -1), "RIGHT"),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("FONTSIZE", (0, 0), (-1, 0), 10),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
-                    ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                    ("FONTSIZE", (0, 1), (-1, -1), 9),
-                    (
-                        "ROWBACKGROUNDS",
-                        (0, 1),
-                        (-1, -1),
-                        [colors.white, colors.lightgrey],
-                    ),
-                ]
-            )
-        )
+        resumo_table = Table(resumo_data, colWidths=[60*mm, 40*mm])
+        resumo_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONTSIZE', (0, 1), (-1, -1), 9),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+        ]))
         elements.append(resumo_table)
-        elements.append(Spacer(1, 10 * mm))
+        elements.append(Spacer(1, 10*mm))
 
         # Vendas por Data (se houver)
         if vendas_por_data:
             elements.append(Paragraph("Vendas por Data", header_style))
 
-            vendas_data_list = [
-                [
-                    "Data",
-                    "Qtd",
-                    "Tkt Médio",
-                    "Vl Bruto",
-                    "Taxa",
-                    "Desc.",
-                    "Vl Líq.",
-                    "Recebido",
-                    "Aberto",
-                ]
-            ]
+            vendas_data_list = [['Data', 'Qtd', 'Tkt Médio', 'Vl Bruto', 'Taxa', 'Desc.', 'Vl Líq.', 'Recebido', 'Aberto']]
             for v in vendas_por_data[:10]:  # Limitar a 10 linhas para caber na página
-                vendas_data_list.append(
-                    [
-                        v["data"],
-                        str(v["quantidade"]),
-                        f"R$ {v['ticket_medio']:,.2f}".replace(",", "X")
-                        .replace(".", ",")
-                        .replace("X", "."),
-                        f"R$ {v['valor_bruto']:,.2f}".replace(",", "X")
-                        .replace(".", ",")
-                        .replace("X", "."),
-                        f"R$ {v['taxa_entrega']:,.2f}".replace(",", "X")
-                        .replace(".", ",")
-                        .replace("X", "."),
-                        f"R$ {v['desconto']:,.2f}".replace(",", "X")
-                        .replace(".", ",")
-                        .replace("X", "."),
-                        f"R$ {v['valor_liquido']:,.2f}".replace(",", "X")
-                        .replace(".", ",")
-                        .replace("X", "."),
-                        f"R$ {v['valor_recebido']:,.2f}".replace(",", "X")
-                        .replace(".", ",")
-                        .replace("X", "."),
-                        f"R$ {v['saldo_aberto']:,.2f}".replace(",", "X")
-                        .replace(".", ",")
-                        .replace("X", "."),
-                    ]
-                )
+                vendas_data_list.append([
+                    v['data'],
+                    str(v['quantidade']),
+                    f"R$ {v['ticket_medio']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+                    f"R$ {v['valor_bruto']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+                    f"R$ {v['taxa_entrega']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+                    f"R$ {v['desconto']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+                    f"R$ {v['valor_liquido']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+                    f"R$ {v['valor_recebido']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+                    f"R$ {v['saldo_aberto']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                ])
 
-            vendas_table = Table(
-                vendas_data_list,
-                colWidths=[
-                    22 * mm,
-                    12 * mm,
-                    22 * mm,
-                    22 * mm,
-                    18 * mm,
-                    18 * mm,
-                    22 * mm,
-                    22 * mm,
-                    22 * mm,
-                ],
-            )
-            vendas_table.setStyle(
-                TableStyle(
-                    [
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#10b981")),
-                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                        ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
-                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                        ("FONTSIZE", (0, 0), (-1, 0), 8),
-                        ("FONTSIZE", (0, 1), (-1, -1), 7),
-                        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                        (
-                            "ROWBACKGROUNDS",
-                            (0, 1),
-                            (-1, -1),
-                            [colors.white, colors.lightgrey],
-                        ),
-                    ]
-                )
-            )
+            vendas_table = Table(vendas_data_list, colWidths=[22*mm, 12*mm, 22*mm, 22*mm, 18*mm, 18*mm, 22*mm, 22*mm, 22*mm])
+            vendas_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#10b981')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (2, 1), (-1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 8),
+                ('FONTSIZE', (0, 1), (-1, -1), 7),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+            ]))
             elements.append(vendas_table)
-            elements.append(Spacer(1, 10 * mm))
+            elements.append(Spacer(1, 10*mm))
 
         # Formas de Pagamento
         if formas_recebimento:
             elements.append(Paragraph("Formas de Pagamento", header_style))
 
-            formas_data_list = [["Forma de Pagamento", "Valor Total"]]
+            formas_data_list = [['Forma de Pagamento', 'Valor Total']]
             for f in formas_recebimento:
-                formas_data_list.append(
-                    [
-                        f["forma_pagamento"],
-                        f"R$ {f['valor_total']:,.2f}".replace(",", "X")
-                        .replace(".", ",")
-                        .replace("X", "."),
-                    ]
-                )
+                formas_data_list.append([
+                    f['forma_pagamento'],
+                    f"R$ {f['valor_total']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                ])
 
-            formas_table = Table(formas_data_list, colWidths=[80 * mm, 40 * mm])
-            formas_table.setStyle(
-                TableStyle(
-                    [
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f59e0b")),
-                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                        ("ALIGN", (0, 0), (0, -1), "LEFT"),
-                        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                        ("FONTSIZE", (0, 0), (-1, 0), 10),
-                        ("FONTSIZE", (0, 1), (-1, -1), 9),
-                        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                        (
-                            "ROWBACKGROUNDS",
-                            (0, 1),
-                            (-1, -1),
-                            [colors.white, colors.lightgrey],
-                        ),
-                    ]
-                )
-            )
+            formas_table = Table(formas_data_list, colWidths=[80*mm, 40*mm])
+            formas_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f59e0b')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+            ]))
             elements.append(formas_table)
-            elements.append(Spacer(1, 10 * mm))
+            elements.append(Spacer(1, 10*mm))
 
         # Vendas por Funcionário
         if vendas_por_funcionario:
             elements.append(Paragraph("Vendas por Funcionário", header_style))
 
-            func_data_list = [
-                ["Funcionário", "Qtd Vendas", "Valor Total", "Ticket Médio"]
-            ]
+            func_data_list = [['Funcionário', 'Qtd Vendas', 'Valor Total', 'Ticket Médio']]
             for f in vendas_por_funcionario[:10]:
-                func_data_list.append(
-                    [
-                        f.get("funcionario", "Sem registro"),
-                        str(f["quantidade"]),
-                        f"R$ {f['valor_total']:,.2f}".replace(",", "X")
-                        .replace(".", ",")
-                        .replace("X", "."),
-                        f"R$ {f['ticket_medio']:,.2f}".replace(",", "X")
-                        .replace(".", ",")
-                        .replace("X", "."),
-                    ]
-                )
+                func_data_list.append([
+                    f.get('funcionario', 'Sem registro'),
+                    str(f['quantidade']),
+                    f"R$ {f['valor_total']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.'),
+                    f"R$ {f['ticket_medio']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                ])
 
-            func_table = Table(
-                func_data_list, colWidths=[80 * mm, 25 * mm, 35 * mm, 35 * mm]
-            )
-            func_table.setStyle(
-                TableStyle(
-                    [
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#8b5cf6")),
-                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                        ("ALIGN", (0, 0), (0, -1), "LEFT"),
-                        ("ALIGN", (1, 0), (-1, -1), "CENTER"),
-                        ("ALIGN", (2, 1), (3, -1), "RIGHT"),
-                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                        ("FONTSIZE", (0, 0), (-1, 0), 10),
-                        ("FONTSIZE", (0, 1), (-1, -1), 9),
-                        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                        (
-                            "ROWBACKGROUNDS",
-                            (0, 1),
-                            (-1, -1),
-                            [colors.white, colors.lightgrey],
-                        ),
-                    ]
-                )
-            )
+            func_table = Table(func_data_list, colWidths=[80*mm, 25*mm, 35*mm, 35*mm])
+            func_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#8b5cf6')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (-1, -1), 'CENTER'),
+                ('ALIGN', (2, 1), (3, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+            ]))
             elements.append(func_table)
-            elements.append(Spacer(1, 10 * mm))
+            elements.append(Spacer(1, 10*mm))
 
         # Produtos Mais Vendidos (Top 20)
         if produtos_detalhados:
             elements.append(Paragraph("Produtos Mais Vendidos (Top 20)", header_style))
 
-            prod_data_list = [["Produto", "Qtd", "Valor Total"]]
+            prod_data_list = [['Produto', 'Qtd', 'Valor Total']]
             for p in produtos_detalhados[:20]:
-                prod_data_list.append(
-                    [
-                        p.get("produto", "Produto sem nome"),
-                        str(p["quantidade"]),
-                        f"R$ {p['valor_total']:,.2f}".replace(",", "X")
-                        .replace(".", ",")
-                        .replace("X", "."),
-                    ]
-                )
+                prod_data_list.append([
+                    p.get('produto', 'Produto sem nome'),
+                    str(p['quantidade']),
+                    f"R$ {p['valor_total']:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
+                ])
 
-            prod_table = Table(prod_data_list, colWidths=[120 * mm, 20 * mm, 35 * mm])
-            prod_table.setStyle(
-                TableStyle(
-                    [
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#ec4899")),
-                        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                        ("ALIGN", (0, 0), (0, -1), "LEFT"),
-                        ("ALIGN", (1, 0), (1, -1), "CENTER"),
-                        ("ALIGN", (2, 0), (2, -1), "RIGHT"),
-                        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                        ("FONTSIZE", (0, 0), (-1, 0), 10),
-                        ("FONTSIZE", (0, 1), (-1, -1), 9),
-                        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                        (
-                            "ROWBACKGROUNDS",
-                            (0, 1),
-                            (-1, -1),
-                            [colors.white, colors.lightgrey],
-                        ),
-                    ]
-                )
-            )
+            prod_table = Table(prod_data_list, colWidths=[120*mm, 20*mm, 35*mm])
+            prod_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#ec4899')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+                ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+                ('ALIGN', (2, 0), (2, -1), 'RIGHT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+            ]))
             elements.append(prod_table)
 
         # Rodapé
         footer_style = ParagraphStyle(
-            "Footer", parent=styles["Normal"], fontSize=8, alignment=TA_CENTER
+            'Footer',
+            parent=styles['Normal'],
+            fontSize=8,
+            alignment=TA_CENTER
         )
-        elements.append(Spacer(1, 10 * mm))
-        elements.append(
-            Paragraph(
-                f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}",
-                footer_style,
-            )
-        )
+        elements.append(Spacer(1, 10*mm))
+        elements.append(Paragraph(f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", footer_style))
 
         # Gerar PDF
         doc.build(elements)
@@ -1860,9 +1423,7 @@ async def exportar_vendas_pdf(
         return StreamingResponse(
             buffer,
             media_type="application/pdf",
-            headers={
-                "Content-Disposition": f"attachment; filename=relatorio_vendas_{data_inicio}_{data_fim}.pdf"
-            },
+            headers={"Content-Disposition": f"attachment; filename=relatorio_vendas_{data_inicio}_{data_fim}.pdf"}
         )
 
     except HTTPException:
@@ -1871,3 +1432,4 @@ async def exportar_vendas_pdf(
         logger.error(f"Erro ao gerar PDF: {str(e)}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Erro ao gerar PDF: {str(e)}")
+

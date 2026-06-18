@@ -36,26 +36,18 @@ def excluir_movimentacao(
     """
     current_user, tenant_id = user_and_tenant
     try:
-        movimentacao = (
-            db.query(EstoqueMovimentacao)
-            .filter(
-                EstoqueMovimentacao.id == movimentacao_id,
-                EstoqueMovimentacao.tenant_id == tenant_id,
-            )
-            .first()
-        )
+        movimentacao = db.query(EstoqueMovimentacao).filter(
+            EstoqueMovimentacao.id == movimentacao_id,
+            EstoqueMovimentacao.tenant_id == tenant_id,
+        ).first()
 
         if not movimentacao:
             raise HTTPException(status_code=404, detail="Movimentação não encontrada")
 
-        produto = (
-            db.query(Produto)
-            .filter(
-                Produto.id == movimentacao.produto_id,
-                Produto.tenant_id == tenant_id,
-            )
-            .first()
-        )
+        produto = db.query(Produto).filter(
+            Produto.id == movimentacao.produto_id,
+            Produto.tenant_id == tenant_id,
+        ).first()
         if not produto:
             raise HTTPException(status_code=404, detail="Produto não encontrado")
 
@@ -68,30 +60,20 @@ def excluir_movimentacao(
 
         componentes_estornados = []
         if produto.tipo_produto == "KIT" and produto.tipo_kit == "FISICO":
-            componentes_kit = (
-                db.query(ProdutoKitComponente)
-                .filter(
-                    ProdutoKitComponente.kit_id == produto.id,
-                )
-                .all()
-            )
+            componentes_kit = db.query(ProdutoKitComponente).filter(
+                ProdutoKitComponente.kit_id == produto.id,
+            ).all()
 
             if componentes_kit:
                 logger.info("KIT FISICO detectado - Estornando componentes...")
 
                 for comp in componentes_kit:
-                    componente_produto = (
-                        db.query(Produto)
-                        .filter(
-                            Produto.id == comp.produto_componente_id,
-                            Produto.tenant_id == tenant_id,
-                        )
-                        .first()
-                    )
+                    componente_produto = db.query(Produto).filter(
+                        Produto.id == comp.produto_componente_id,
+                        Produto.tenant_id == tenant_id,
+                    ).first()
                     if componente_produto:
-                        quantidade_componente = (
-                            comp.quantidade * movimentacao.quantidade
-                        )
+                        quantidade_componente = comp.quantidade * movimentacao.quantidade
                         estoque_ant_comp = componente_produto.estoque_atual
 
                         if movimentacao.tipo == "entrada":
@@ -103,20 +85,17 @@ def excluir_movimentacao(
                                 componente_produto.estoque_atual,
                                 quantidade_componente,
                             )
-                            componentes_estornados.append(
-                                {
-                                    "nome": componente_produto.nome,
-                                    "quantidade": quantidade_componente,
-                                    "estoque_anterior": estoque_ant_comp,
-                                    "estoque_novo": componente_produto.estoque_atual,
-                                    "acao": "devolvido",
-                                }
-                            )
+                            componentes_estornados.append({
+                                "nome": componente_produto.nome,
+                                "quantidade": quantidade_componente,
+                                "estoque_anterior": estoque_ant_comp,
+                                "estoque_novo": componente_produto.estoque_atual,
+                                "acao": "devolvido",
+                            })
                         elif (
                             movimentacao.tipo == "saida"
                             and movimentacao.observacao
-                            and "componentes retornados"
-                            in movimentacao.observacao.lower()
+                            and "componentes retornados" in movimentacao.observacao.lower()
                         ):
                             componente_produto.estoque_atual -= quantidade_componente
                             logger.info(
@@ -126,19 +105,15 @@ def excluir_movimentacao(
                                 componente_produto.estoque_atual,
                                 quantidade_componente,
                             )
-                            componentes_estornados.append(
-                                {
-                                    "nome": componente_produto.nome,
-                                    "quantidade": quantidade_componente,
-                                    "estoque_anterior": estoque_ant_comp,
-                                    "estoque_novo": componente_produto.estoque_atual,
-                                    "acao": "estornado",
-                                }
-                            )
+                            componentes_estornados.append({
+                                "nome": componente_produto.nome,
+                                "quantidade": quantidade_componente,
+                                "estoque_anterior": estoque_ant_comp,
+                                "estoque_novo": componente_produto.estoque_atual,
+                                "acao": "estornado",
+                            })
 
-                logger.info(
-                    "KIT FISICO: %s componentes estornados", len(componentes_estornados)
-                )
+                logger.info("KIT FISICO: %s componentes estornados", len(componentes_estornados))
 
         estoque_anterior = produto.estoque_atual
         if movimentacao.tipo == "entrada":
@@ -161,11 +136,7 @@ def excluir_movimentacao(
             )
 
         if movimentacao.lote_id:
-            lote = (
-                db.query(ProdutoLote)
-                .filter(ProdutoLote.id == movimentacao.lote_id)
-                .first()
-            )
+            lote = db.query(ProdutoLote).filter(ProdutoLote.id == movimentacao.lote_id).first()
             if lote:
                 if movimentacao.tipo == "entrada":
                     lote.quantidade_disponivel -= movimentacao.quantidade
@@ -181,13 +152,9 @@ def excluir_movimentacao(
         logger.info("Movimentacao excluida")
 
         try:
-            sincronizar_bling_background(
-                produto.id, produto.estoque_atual, "exclusao_movimentacao"
-            )
+            sincronizar_bling_background(produto.id, produto.estoque_atual, "exclusao_movimentacao")
         except Exception as e_sync:
-            logger.warning(
-                "[BLING-SYNC] Erro ao agendar sync (exclusao_mov): %s", e_sync
-            )
+            logger.warning("[BLING-SYNC] Erro ao agendar sync (exclusao_mov): %s", e_sync)
 
         return {
             "message": "Movimentação excluída com sucesso",
@@ -220,26 +187,18 @@ def editar_movimentacao(
     """
     current_user, tenant_id = user_and_tenant
     try:
-        movimentacao = (
-            db.query(EstoqueMovimentacao)
-            .filter(
-                EstoqueMovimentacao.id == movimentacao_id,
-                EstoqueMovimentacao.tenant_id == tenant_id,
-            )
-            .first()
-        )
+        movimentacao = db.query(EstoqueMovimentacao).filter(
+            EstoqueMovimentacao.id == movimentacao_id,
+            EstoqueMovimentacao.tenant_id == tenant_id,
+        ).first()
 
         if not movimentacao:
             raise HTTPException(status_code=404, detail="Movimentação não encontrada")
 
-        produto = (
-            db.query(Produto)
-            .filter(
-                Produto.id == movimentacao.produto_id,
-                Produto.tenant_id == tenant_id,
-            )
-            .first()
-        )
+        produto = db.query(Produto).filter(
+            Produto.id == movimentacao.produto_id,
+            Produto.tenant_id == tenant_id,
+        ).first()
         if not produto:
             raise HTTPException(status_code=404, detail="Produto não encontrado")
 
@@ -249,21 +208,13 @@ def editar_movimentacao(
             if movimentacao.tipo == "entrada":
                 produto.estoque_atual += diferenca
                 if movimentacao.lote_id:
-                    lote = (
-                        db.query(ProdutoLote)
-                        .filter(ProdutoLote.id == movimentacao.lote_id)
-                        .first()
-                    )
+                    lote = db.query(ProdutoLote).filter(ProdutoLote.id == movimentacao.lote_id).first()
                     if lote:
                         lote.quantidade_disponivel += diferenca
             elif movimentacao.tipo == "saida":
                 produto.estoque_atual -= diferenca
                 if movimentacao.lote_id:
-                    lote = (
-                        db.query(ProdutoLote)
-                        .filter(ProdutoLote.id == movimentacao.lote_id)
-                        .first()
-                    )
+                    lote = db.query(ProdutoLote).filter(ProdutoLote.id == movimentacao.lote_id).first()
                     if lote:
                         lote.quantidade_disponivel -= diferenca
 
@@ -284,13 +235,9 @@ def editar_movimentacao(
 
         if dados.quantidade is not None:
             try:
-                sincronizar_bling_background(
-                    produto.id, produto.estoque_atual, "edicao_movimentacao"
-                )
+                sincronizar_bling_background(produto.id, produto.estoque_atual, "edicao_movimentacao")
             except Exception as e_sync:
-                logger.warning(
-                    "[BLING-SYNC] Erro ao agendar sync (edicao_mov): %s", e_sync
-                )
+                logger.warning("[BLING-SYNC] Erro ao agendar sync (edicao_mov): %s", e_sync)
 
         return {
             "id": movimentacao.id,

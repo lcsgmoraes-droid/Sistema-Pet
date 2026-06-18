@@ -54,10 +54,8 @@ def _texto_limpo(valor) -> str | None:
     texto = str(valor).strip()
     return texto or None
 
-
 class SaidaFullNFItemRequest(BaseModel):
     """Item para baixa de estoque por NF de saida."""
-
     produto_id: Optional[int] = None
     sku: Optional[str] = None
     quantidade: float = Field(gt=0)
@@ -65,7 +63,6 @@ class SaidaFullNFItemRequest(BaseModel):
 
 class SaidaFullNFRequest(BaseModel):
     """Baixa em lote de estoque vinculada a uma NF de saida."""
-
     numero_nf: str
     plataforma: Optional[str] = None
     observacao: Optional[str] = None
@@ -78,22 +75,15 @@ class SaidaFullNFRequest(BaseModel):
 
 class SaidaFullNFCanalUpdateRequest(BaseModel):
     """Atualizacao do canal/origem de uma baixa FULL ja processada."""
-
     plataforma: str
 
 
-def _resolver_produto_full_nf(
-    db: Session, tenant_id: int, item: SaidaFullNFItemRequest
-) -> Optional[Produto]:
+def _resolver_produto_full_nf(db: Session, tenant_id: int, item: SaidaFullNFItemRequest) -> Optional[Produto]:
     if item.produto_id:
-        return (
-            db.query(Produto)
-            .filter(
-                Produto.id == item.produto_id,
-                Produto.tenant_id == tenant_id,
-            )
-            .first()
-        )
+        return db.query(Produto).filter(
+            Produto.id == item.produto_id,
+            Produto.tenant_id == tenant_id,
+        ).first()
 
     if item.sku:
         filtros_sku = [Produto.codigo == item.sku]
@@ -101,21 +91,15 @@ def _resolver_produto_full_nf(
         if hasattr(Produto, "sku"):
             filtros_sku.append(getattr(Produto, "sku") == item.sku)
 
-        return (
-            db.query(Produto)
-            .filter(
-                Produto.tenant_id == tenant_id,
-                or_(*filtros_sku),
-            )
-            .first()
-        )
+        return db.query(Produto).filter(
+            Produto.tenant_id == tenant_id,
+            or_(*filtros_sku),
+        ).first()
 
     return None
 
 
-def _observacao_full_nf(
-    numero_nf: str, plataforma: Optional[str], observacao: Optional[str]
-) -> str:
+def _observacao_full_nf(numero_nf: str, plataforma: Optional[str], observacao: Optional[str]) -> str:
     base = f"Saida FULL por NF {numero_nf} | plataforma: {plataforma or 'full'}"
     if observacao:
         return f"{base} | {observacao}"
@@ -162,9 +146,7 @@ def _produto_usa_estoque_virtual_full_nf(produto: Produto) -> bool:
     )
 
 
-def _estoque_disponivel_saida_full_nf(
-    db: Session, tenant_id: int, produto: Produto
-) -> float:
+def _estoque_disponivel_saida_full_nf(db: Session, tenant_id: int, produto: Produto) -> float:
     if _produto_usa_estoque_virtual_full_nf(produto):
         return float(
             KitEstoqueService.calcular_estoque_virtual_kit(
@@ -178,21 +160,13 @@ def _estoque_disponivel_saida_full_nf(
     return float(getattr(produto, "estoque_atual", 0) or 0)
 
 
-SKU_EXPLICITO_REGEX = re.compile(
-    r"(?:SKU|C[ÓO]DIGO)\s*[:#-]?\s*([A-Z0-9._/-]+)", re.IGNORECASE
-)
-QTD_EXPLICITA_REGEX = re.compile(
-    r"(?:QTD|QUANTIDADE)\s*[:#-]?\s*(\d+(?:[\.,]\d+)?)", re.IGNORECASE
-)
+SKU_EXPLICITO_REGEX = re.compile(r"(?:SKU|C[ÓO]DIGO)\s*[:#-]?\s*([A-Z0-9._/-]+)", re.IGNORECASE)
+QTD_EXPLICITA_REGEX = re.compile(r"(?:QTD|QUANTIDADE)\s*[:#-]?\s*(\d+(?:[\.,]\d+)?)", re.IGNORECASE)
 SKU_QTD_LINHA_REGEX = re.compile(r"^([A-Za-z0-9._\-/]{3,})\s+(\d+(?:[\.,]\d+)?)$")
 
 
 def _to_float_br(value: str) -> float:
-    return (
-        float(value.replace(".", "").replace(",", "."))
-        if "," in value
-        else float(value)
-    )
+    return float(value.replace(".", "").replace(",", ".")) if "," in value else float(value)
 
 
 def _extrair_itens_full_pdf(texto: str) -> List[dict]:
@@ -238,47 +212,41 @@ def _parse_saida_full_xml(xml_bytes: bytes) -> dict:
     root = ET.fromstring(xml_bytes)
     ns = {"nfe": "http://www.portalfiscal.inf.br/nfe"}
 
-    inf_nfe = root.find(".//nfe:infNFe", ns)
+    inf_nfe = root.find('.//nfe:infNFe', ns)
     if inf_nfe is None:
-        inf_nfe = root.find(".//infNFe")
+        inf_nfe = root.find('.//infNFe')
     if inf_nfe is None:
-        raise HTTPException(
-            status_code=400, detail="XML invalido: tag infNFe nao encontrada"
-        )
+        raise HTTPException(status_code=400, detail="XML invalido: tag infNFe nao encontrada")
 
-    ide = inf_nfe.find("nfe:ide", ns)
+    ide = inf_nfe.find('nfe:ide', ns)
     if ide is None:
-        ide = inf_nfe.find("ide")
+        ide = inf_nfe.find('ide')
     if ide is None:
-        raise HTTPException(
-            status_code=400, detail="XML invalido: tag ide nao encontrada"
-        )
+        raise HTTPException(status_code=400, detail="XML invalido: tag ide nao encontrada")
 
-    numero_nf = _xml_find_text(ide, "nfe:nNF", "nNF", ns)
+    numero_nf = _xml_find_text(ide, 'nfe:nNF', 'nNF', ns)
     if not numero_nf:
-        raise HTTPException(
-            status_code=400, detail="Numero da NF nao encontrado no XML"
-        )
+        raise HTTPException(status_code=400, detail="Numero da NF nao encontrado no XML")
 
     itens_por_sku = defaultdict(float)
-    det_list = inf_nfe.findall(".//nfe:det", ns)
+    det_list = inf_nfe.findall('.//nfe:det', ns)
     if not det_list:
-        det_list = inf_nfe.findall(".//det")
+        det_list = inf_nfe.findall('.//det')
 
     for det in det_list:
-        prod = det.find("nfe:prod", ns)
+        prod = det.find('nfe:prod', ns)
         if prod is None:
-            prod = det.find("prod")
+            prod = det.find('prod')
         if prod is None:
             continue
 
-        sku = _xml_find_text(prod, "nfe:cProd", "cProd", ns)
-        qcom = _xml_find_text(prod, "nfe:qCom", "qCom", ns)
+        sku = _xml_find_text(prod, 'nfe:cProd', 'cProd', ns)
+        qcom = _xml_find_text(prod, 'nfe:qCom', 'qCom', ns)
         if not sku or not qcom:
             continue
 
         try:
-            qtd = float(qcom.replace(",", "."))
+            qtd = float(qcom.replace(',', '.'))
         except ValueError:
             continue
 
@@ -291,10 +259,7 @@ def _parse_saida_full_xml(xml_bytes: bytes) -> dict:
     ]
 
     if not itens:
-        raise HTTPException(
-            status_code=400,
-            detail="Nenhum item valido (cProd + qCom) foi encontrado no XML",
-        )
+        raise HTTPException(status_code=400, detail="Nenhum item valido (cProd + qCom) foi encontrado no XML")
 
     return {
         "numero_nf": numero_nf,
@@ -331,7 +296,7 @@ def _processar_item_saida_full_nf(
 
     estoque_anterior = float(produto.estoque_atual or 0)
     if estoque_anterior < item.quantidade:
-        sku_label = _sku_produto(produto) or "sem-sku"
+        sku_label = _sku_produto(produto) or 'sem-sku'
         raise HTTPException(
             status_code=400,
             detail=(
@@ -344,8 +309,8 @@ def _processar_item_saida_full_nf(
 
     movimentacao = EstoqueMovimentacao(
         produto_id=produto.id,
-        tipo="saida",
-        motivo="full_nfe_saida",
+        tipo='saida',
+        motivo='full_nfe_saida',
         quantidade=item.quantidade,
         quantidade_anterior=estoque_anterior,
         quantidade_nova=produto.estoque_atual,
@@ -381,7 +346,7 @@ def _processar_item_kit_virtual_saida_full_nf(
     quantidade_kits = float(item.quantidade or 0)
 
     if estoque_anterior < quantidade_kits:
-        sku_label = _sku_produto(produto) or "sem-sku"
+        sku_label = _sku_produto(produto) or 'sem-sku'
         raise HTTPException(
             status_code=400,
             detail=(
@@ -390,13 +355,11 @@ def _processar_item_kit_virtual_saida_full_nf(
             ),
         )
 
-    componentes = (
-        db.query(ProdutoKitComponente)
-        .filter(ProdutoKitComponente.kit_id == produto.id)
-        .all()
-    )
+    componentes = db.query(ProdutoKitComponente).filter(
+        ProdutoKitComponente.kit_id == produto.id
+    ).all()
     if not componentes:
-        sku_label = _sku_produto(produto) or "sem-sku"
+        sku_label = _sku_produto(produto) or 'sem-sku'
         raise HTTPException(
             status_code=400,
             detail=f"Kit virtual {produto.nome} (SKU {sku_label}) nao possui componentes cadastrados",
@@ -404,14 +367,10 @@ def _processar_item_kit_virtual_saida_full_nf(
 
     componentes_para_baixa = []
     for componente in componentes:
-        produto_componente = (
-            db.query(Produto)
-            .filter(
-                Produto.id == componente.produto_componente_id,
-                Produto.tenant_id == tenant_id,
-            )
-            .first()
-        )
+        produto_componente = db.query(Produto).filter(
+            Produto.id == componente.produto_componente_id,
+            Produto.tenant_id == tenant_id,
+        ).first()
         if not produto_componente:
             raise HTTPException(
                 status_code=400,
@@ -421,7 +380,7 @@ def _processar_item_kit_virtual_saida_full_nf(
         quantidade_componente = quantidade_kits * float(componente.quantidade or 0)
         estoque_componente = float(produto_componente.estoque_atual or 0)
         if estoque_componente < quantidade_componente:
-            sku_label = _sku_produto(produto_componente) or "sem-sku"
+            sku_label = _sku_produto(produto_componente) or 'sem-sku'
             raise HTTPException(
                 status_code=400,
                 detail=(
@@ -431,13 +390,11 @@ def _processar_item_kit_virtual_saida_full_nf(
                 ),
             )
 
-        componentes_para_baixa.append(
-            {
-                "produto": produto_componente,
-                "quantidade": quantidade_componente,
-                "estoque_anterior": estoque_componente,
-            }
-        )
+        componentes_para_baixa.append({
+            "produto": produto_componente,
+            "quantidade": quantidade_componente,
+            "estoque_anterior": estoque_componente,
+        })
 
     componentes_baixados = []
     for baixa in componentes_para_baixa:
@@ -449,14 +406,13 @@ def _processar_item_kit_virtual_saida_full_nf(
 
         movimentacao_componente = EstoqueMovimentacao(
             produto_id=produto_componente.id,
-            tipo="saida",
-            motivo="full_nfe_saida",
+            tipo='saida',
+            motivo='full_nfe_saida',
             quantidade=quantidade_componente,
             quantidade_anterior=estoque_componente_anterior,
             quantidade_nova=estoque_componente_novo,
             custo_unitario=produto_componente.preco_custo,
-            valor_total=quantidade_componente
-            * float(produto_componente.preco_custo or 0),
+            valor_total=quantidade_componente * float(produto_componente.preco_custo or 0),
             documento=numero_nf,
             observacao=(
                 f"{observacao_movimentacao} | componente do kit virtual "
@@ -467,22 +423,20 @@ def _processar_item_kit_virtual_saida_full_nf(
         )
         db.add(movimentacao_componente)
 
-        componentes_baixados.append(
-            {
-                "produto_id": produto_componente.id,
-                "sku": _sku_produto(produto_componente),
-                "nome": produto_componente.nome,
-                "quantidade": quantidade_componente,
-                "estoque_anterior": estoque_componente_anterior,
-                "estoque_novo": estoque_componente_novo,
-            }
-        )
+        componentes_baixados.append({
+            "produto_id": produto_componente.id,
+            "sku": _sku_produto(produto_componente),
+            "nome": produto_componente.nome,
+            "quantidade": quantidade_componente,
+            "estoque_anterior": estoque_componente_anterior,
+            "estoque_novo": estoque_componente_novo,
+        })
 
     estoque_novo = _estoque_disponivel_saida_full_nf(db, tenant_id, produto)
     movimentacao_kit = EstoqueMovimentacao(
         produto_id=produto.id,
-        tipo="saida",
-        motivo="full_nfe_saida",
+        tipo='saida',
+        motivo='full_nfe_saida',
         quantidade=quantidade_kits,
         quantidade_anterior=estoque_anterior,
         quantidade_nova=estoque_novo,
@@ -510,8 +464,7 @@ def _processar_item_kit_virtual_saida_full_nf(
                 "estoque_novo": componente["estoque_novo"],
             }
             for componente in componentes_baixados
-        ]
-        + [
+        ] + [
             {
                 "produto_id": produto.id,
                 "estoque_novo": estoque_novo,
@@ -532,20 +485,18 @@ def _problemas_estoque_saida_full_nf(
         entrada_sku = _texto_limpo(item.sku)
 
         if not produto:
-            problemas.append(
-                {
-                    "tipo": "produto_nao_encontrado",
-                    "produto_id": item.produto_id,
-                    "entrada_sku": entrada_sku,
-                    "sku": entrada_sku,
-                    "nome": "Produto nao encontrado",
-                    "disponivel": 0,
-                    "solicitado": float(item.quantidade or 0),
-                    "faltante": float(item.quantidade or 0),
-                    "mensagem": f"Produto nao encontrado para SKU {entrada_sku or item.produto_id or '-'}",
-                    "url_correcao": None,
-                }
-            )
+            problemas.append({
+                "tipo": "produto_nao_encontrado",
+                "produto_id": item.produto_id,
+                "entrada_sku": entrada_sku,
+                "sku": entrada_sku,
+                "nome": "Produto nao encontrado",
+                "disponivel": 0,
+                "solicitado": float(item.quantidade or 0),
+                "faltante": float(item.quantidade or 0),
+                "mensagem": f"Produto nao encontrado para SKU {entrada_sku or item.produto_id or '-'}",
+                "url_correcao": None,
+            })
             continue
 
         estoque_anterior = _estoque_disponivel_saida_full_nf(db, tenant_id, produto)
@@ -554,27 +505,21 @@ def _problemas_estoque_saida_full_nf(
             sku_label = _sku_produto(produto) or entrada_sku or "sem-sku"
             faltante = max(quantidade - estoque_anterior, 0)
             usa_estoque_virtual = _produto_usa_estoque_virtual_full_nf(produto)
-            problemas.append(
-                {
-                    "tipo": "estoque_insuficiente_kit_virtual"
-                    if usa_estoque_virtual
-                    else "estoque_insuficiente",
-                    "produto_id": produto.id,
-                    "entrada_sku": entrada_sku,
-                    "sku": sku_label,
-                    "nome": produto.nome,
-                    "disponivel": estoque_anterior,
-                    "solicitado": quantidade,
-                    "faltante": faltante,
-                    "mensagem": (
-                        f"Estoque insuficiente para {produto.nome} (SKU {sku_label}). "
-                        f"Disponivel: {estoque_anterior}, solicitado: {quantidade}"
-                    ),
-                    "url_correcao": f"/produtos/{produto.id}/editar"
-                    if usa_estoque_virtual
-                    else f"/produtos/{produto.id}/movimentacoes",
-                }
-            )
+            problemas.append({
+                "tipo": "estoque_insuficiente_kit_virtual" if usa_estoque_virtual else "estoque_insuficiente",
+                "produto_id": produto.id,
+                "entrada_sku": entrada_sku,
+                "sku": sku_label,
+                "nome": produto.nome,
+                "disponivel": estoque_anterior,
+                "solicitado": quantidade,
+                "faltante": faltante,
+                "mensagem": (
+                    f"Estoque insuficiente para {produto.nome} (SKU {sku_label}). "
+                    f"Disponivel: {estoque_anterior}, solicitado: {quantidade}"
+                ),
+                "url_correcao": f"/produtos/{produto.id}/editar" if usa_estoque_virtual else f"/produtos/{produto.id}/movimentacoes",
+            })
 
     return problemas
 
@@ -615,16 +560,12 @@ def _resolver_classificacao_tarifa_full_nf(
             ),
         )
 
-    categoria = (
-        db.query(CategoriaFinanceira)
-        .filter(
-            CategoriaFinanceira.id == categoria_tarifa_id,
-            CategoriaFinanceira.tenant_id == tenant_id,
-            CategoriaFinanceira.tipo == "despesa",
-            CategoriaFinanceira.ativo.is_(True),
-        )
-        .first()
-    )
+    categoria = db.query(CategoriaFinanceira).filter(
+        CategoriaFinanceira.id == categoria_tarifa_id,
+        CategoriaFinanceira.tenant_id == tenant_id,
+        CategoriaFinanceira.tipo == "despesa",
+        CategoriaFinanceira.ativo.is_(True),
+    ).first()
     if not categoria:
         raise HTTPException(
             status_code=400,
@@ -641,19 +582,16 @@ def _resolver_classificacao_tarifa_full_nf(
             ),
         )
 
-    subcategoria = (
-        db.query(DRESubcategoria)
-        .join(DRECategoria, DRECategoria.id == DRESubcategoria.categoria_id)
-        .filter(
-            DRESubcategoria.id == subcategoria_id,
-            DRESubcategoria.tenant_id == tenant_id,
-            DRESubcategoria.ativo.is_(True),
-            DRECategoria.tenant_id == tenant_id,
-            DRECategoria.ativo.is_(True),
-            DRECategoria.natureza == NaturezaDRE.DESPESA,
-        )
-        .first()
-    )
+    subcategoria = db.query(DRESubcategoria).join(
+        DRECategoria, DRECategoria.id == DRESubcategoria.categoria_id
+    ).filter(
+        DRESubcategoria.id == subcategoria_id,
+        DRESubcategoria.tenant_id == tenant_id,
+        DRESubcategoria.ativo.is_(True),
+        DRECategoria.tenant_id == tenant_id,
+        DRECategoria.ativo.is_(True),
+        DRECategoria.natureza == NaturezaDRE.DESPESA,
+    ).first()
     if not subcategoria:
         raise HTTPException(
             status_code=400,
@@ -758,55 +696,41 @@ def _observacao_conta_tarifa_full_nf_com_canal(
 
 
 def _buscar_conta_tarifa_full_nf(db: Session, tenant_id, numero_nf: str):
-    return (
-        db.query(ContaPagar)
-        .filter(
-            ContaPagar.tenant_id == tenant_id,
-            ContaPagar.documento == numero_nf,
-            ContaPagar.descricao == f"Tarifa envio FULL NF {numero_nf}",
-        )
-        .first()
-    )
+    return db.query(ContaPagar).filter(
+        ContaPagar.tenant_id == tenant_id,
+        ContaPagar.documento == numero_nf,
+        ContaPagar.descricao == f"Tarifa envio FULL NF {numero_nf}",
+    ).first()
 
 
 def _buscar_baixas_full_nf(db: Session, tenant_id, numero_nf: str):
-    return (
-        db.query(EstoqueMovimentacao)
-        .filter(
-            EstoqueMovimentacao.tenant_id == tenant_id,
-            EstoqueMovimentacao.documento == numero_nf,
-            EstoqueMovimentacao.motivo == "full_nfe_saida",
-            EstoqueMovimentacao.status != "cancelado",
-        )
-        .order_by(EstoqueMovimentacao.created_at.desc(), EstoqueMovimentacao.id.desc())
-        .all()
-    )
+    return db.query(EstoqueMovimentacao).filter(
+        EstoqueMovimentacao.tenant_id == tenant_id,
+        EstoqueMovimentacao.documento == numero_nf,
+        EstoqueMovimentacao.motivo == "full_nfe_saida",
+        EstoqueMovimentacao.status != "cancelado",
+    ).order_by(EstoqueMovimentacao.created_at.desc(), EstoqueMovimentacao.id.desc()).all()
 
 
 @router.get("/saida-full-nf/historico")
 def historico_saida_full_por_nf(
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Lista baixas FULL por NF ja processadas, agrupadas por NF."""
     _current_user, tenant_id = user_and_tenant
 
-    movimentacoes = (
-        db.query(EstoqueMovimentacao)
-        .options(joinedload(EstoqueMovimentacao.produto))
-        .filter(
-            EstoqueMovimentacao.tenant_id == tenant_id,
-            EstoqueMovimentacao.motivo == "full_nfe_saida",
-            EstoqueMovimentacao.status != "cancelado",
-        )
-        .order_by(
-            desc(EstoqueMovimentacao.created_at),
-            desc(EstoqueMovimentacao.id),
-        )
-        .limit(max(limit * 30, 300))
-        .all()
-    )
+    movimentacoes = db.query(EstoqueMovimentacao).options(
+        joinedload(EstoqueMovimentacao.produto)
+    ).filter(
+        EstoqueMovimentacao.tenant_id == tenant_id,
+        EstoqueMovimentacao.motivo == "full_nfe_saida",
+        EstoqueMovimentacao.status != "cancelado",
+    ).order_by(
+        desc(EstoqueMovimentacao.created_at),
+        desc(EstoqueMovimentacao.id),
+    ).limit(max(limit * 30, 300)).all()
 
     grupos = {}
     for mov in movimentacoes:
@@ -831,29 +755,23 @@ def historico_saida_full_por_nf(
         grupo["total_itens"] += 1
         grupo["baixas_estoque"] += 1
         grupo["valor_estoque"] += float(mov.valor_total or 0)
-        grupo["itens"].append(
-            {
-                "movimentacao_id": mov.id,
-                "produto_id": mov.produto_id,
-                "sku": _sku_produto(mov.produto) if mov.produto else None,
-                "nome": mov.produto.nome if mov.produto else None,
-                "quantidade": float(mov.quantidade or 0),
-                "estoque_anterior": float(mov.quantidade_anterior or 0),
-                "estoque_novo": float(mov.quantidade_nova or 0),
-            }
-        )
+        grupo["itens"].append({
+            "movimentacao_id": mov.id,
+            "produto_id": mov.produto_id,
+            "sku": _sku_produto(mov.produto) if mov.produto else None,
+            "nome": mov.produto.nome if mov.produto else None,
+            "quantidade": float(mov.quantidade or 0),
+            "estoque_anterior": float(mov.quantidade_anterior or 0),
+            "estoque_novo": float(mov.quantidade_nova or 0),
+        })
 
     documentos = list(grupos.keys())
     if documentos:
-        contas_tarifa = (
-            db.query(ContaPagar)
-            .filter(
-                ContaPagar.tenant_id == tenant_id,
-                ContaPagar.documento.in_(documentos),
-                ContaPagar.descricao.ilike("Tarifa envio FULL NF%"),
-            )
-            .all()
-        )
+        contas_tarifa = db.query(ContaPagar).filter(
+            ContaPagar.tenant_id == tenant_id,
+            ContaPagar.documento.in_(documentos),
+            ContaPagar.descricao.ilike("Tarifa envio FULL NF%"),
+        ).all()
 
         for conta in contas_tarifa:
             documento = _texto_limpo(conta.documento)
@@ -871,9 +789,7 @@ def historico_saida_full_por_nf(
                     "conta_pagar_id": conta.id,
                     "valor": valor,
                     "status": conta.status,
-                    "data_vencimento": conta.data_vencimento.isoformat()
-                    if conta.data_vencimento
-                    else None,
+                    "data_vencimento": conta.data_vencimento.isoformat() if conta.data_vencimento else None,
                 }
 
     items = list(grupos.values())[:limit]
@@ -885,7 +801,7 @@ def atualizar_canal_saida_full_por_nf(
     numero_nf: str,
     payload: SaidaFullNFCanalUpdateRequest,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant),
 ):
     """Corrige canal/origem de uma baixa FULL ja processada."""
     _current_user, tenant_id = user_and_tenant
@@ -897,9 +813,7 @@ def atualizar_canal_saida_full_por_nf(
 
     baixas = _buscar_baixas_full_nf(db, tenant_id, numero_nf)
     if not baixas:
-        raise HTTPException(
-            status_code=404, detail=f"Nenhuma baixa encontrada para a NF {numero_nf}."
-        )
+        raise HTTPException(status_code=404, detail=f"Nenhuma baixa encontrada para a NF {numero_nf}.")
 
     canal_anterior = _canal_saida_full_por_observacao(baixas[0].observacao)
     plataforma_label = _CANAL_LABELS.get(canal, canal)
@@ -920,15 +834,11 @@ def atualizar_canal_saida_full_por_nf(
         )
         lancamentos_financeiros = 1
 
-        lancamentos_manuais = (
-            db.query(LancamentoManual)
-            .filter(
-                LancamentoManual.tenant_id == tenant_id,
-                LancamentoManual.documento == numero_nf,
-                LancamentoManual.descricao == f"Tarifa envio FULL NF {numero_nf}",
-            )
-            .all()
-        )
+        lancamentos_manuais = db.query(LancamentoManual).filter(
+            LancamentoManual.tenant_id == tenant_id,
+            LancamentoManual.documento == numero_nf,
+            LancamentoManual.descricao == f"Tarifa envio FULL NF {numero_nf}",
+        ).all()
         for lancamento in lancamentos_manuais:
             lancamento.observacoes = (
                 f"Gerado automaticamente da conta a pagar #{conta_tarifa.id}. "
@@ -944,18 +854,14 @@ def atualizar_canal_saida_full_por_nf(
         "plataforma": canal,
         "plataforma_label": plataforma_label,
         "plataforma_anterior": canal_anterior,
-        "plataforma_anterior_label": _CANAL_LABELS.get(canal_anterior, canal_anterior)
-        if canal_anterior
-        else None,
+        "plataforma_anterior_label": _CANAL_LABELS.get(canal_anterior, canal_anterior) if canal_anterior else None,
         "baixas_estoque": len(baixas),
         "lancamentos_financeiros": lancamentos_financeiros,
         "total_itens": len(baixas),
         "tarifa_envio": (
             {
                 "conta_pagar_id": conta_tarifa.id,
-                "valor": float(
-                    conta_tarifa.valor_final or conta_tarifa.valor_original or 0
-                ),
+                "valor": float(conta_tarifa.valor_final or conta_tarifa.valor_original or 0),
             }
             if conta_tarifa
             else None
@@ -967,18 +873,13 @@ def atualizar_canal_saida_full_por_nf(
 def validar_estoque_saida_full_por_nf(
     payload: SaidaFullNFRequest,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant),
 ):
     """Valida se os itens da NF possuem estoque suficiente, sem gerar baixa."""
     _current_user, tenant_id = user_and_tenant
-    itens_validos = [
-        item for item in payload.itens if item.quantidade and item.quantidade > 0
-    ]
+    itens_validos = [item for item in payload.itens if item.quantidade and item.quantidade > 0]
     if not itens_validos:
-        raise HTTPException(
-            status_code=400,
-            detail="Informe ao menos um item com quantidade maior que zero",
-        )
+        raise HTTPException(status_code=400, detail="Informe ao menos um item com quantidade maior que zero")
 
     problemas = _problemas_estoque_saida_full_nf(db, tenant_id, itens_validos)
     return {
@@ -992,7 +893,7 @@ def validar_estoque_saida_full_por_nf(
 def saida_full_por_nf(
     payload: SaidaFullNFRequest,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Baixa estoque em lote por NF de saida (operacao FULL).
@@ -1006,28 +907,17 @@ def saida_full_por_nf(
     canal = (payload.plataforma or "").strip().lower()
     canais_validos = set(_CANAL_LABELS.keys())
     if not canal:
-        raise HTTPException(
-            status_code=400, detail="Selecione o canal/origem da movimentacao FULL."
-        )
+        raise HTTPException(status_code=400, detail="Selecione o canal/origem da movimentacao FULL.")
     if canal not in canais_validos:
-        raise HTTPException(
-            status_code=400, detail="Canal/origem da movimentacao FULL invalido."
-        )
+        raise HTTPException(status_code=400, detail="Canal/origem da movimentacao FULL invalido.")
     payload.plataforma = canal
 
-    itens_validos = [
-        item for item in payload.itens if item.quantidade and item.quantidade > 0
-    ]
+    itens_validos = [item for item in payload.itens if item.quantidade and item.quantidade > 0]
     if not itens_validos:
-        raise HTTPException(
-            status_code=400,
-            detail="Informe ao menos um item com quantidade maior que zero",
-        )
+        raise HTTPException(status_code=400, detail="Informe ao menos um item com quantidade maior que zero")
 
     processados = []
-    observacao_movimentacao = _observacao_full_nf(
-        payload.numero_nf, payload.plataforma, payload.observacao
-    )
+    observacao_movimentacao = _observacao_full_nf(payload.numero_nf, payload.plataforma, payload.observacao)
     tarifa_valor = float(payload.tarifa_envio or 0)
     baixas_existentes = _buscar_baixas_full_nf(db, tenant_id, payload.numero_nf)
     classificacao_tarifa = None
@@ -1041,9 +931,7 @@ def saida_full_por_nf(
 
     try:
         if baixas_existentes:
-            conta_tarifa_existente = _buscar_conta_tarifa_full_nf(
-                db, tenant_id, payload.numero_nf
-            )
+            conta_tarifa_existente = _buscar_conta_tarifa_full_nf(db, tenant_id, payload.numero_nf)
 
             if tarifa_valor > 0 and classificacao_tarifa and not conta_tarifa_existente:
                 categoria_tarifa, subcategoria_tarifa = classificacao_tarifa
@@ -1064,9 +952,7 @@ def saida_full_por_nf(
                     ),
                     "numero_nf": payload.numero_nf,
                     "plataforma": payload.plataforma,
-                    "plataforma_label": _CANAL_LABELS.get(
-                        payload.plataforma, payload.plataforma
-                    ),
+                    "plataforma_label": _CANAL_LABELS.get(payload.plataforma, payload.plataforma),
                     "estoque_ja_baixado": True,
                     "baixas_estoque": 0,
                     "lancamentos_financeiros": 1,
@@ -1144,18 +1030,14 @@ def saida_full_por_nf(
                         "saida_full_nfe",
                     )
                 except Exception as e_sync:
-                    logger.warning(
-                        f"[BLING-SYNC] Erro ao agendar sync (saida-full-nf): {e_sync}"
-                    )
+                    logger.warning(f"[BLING-SYNC] Erro ao agendar sync (saida-full-nf): {e_sync}")
 
         return {
             "success": True,
             "message": "Baixa de estoque por NF concluida",
             "numero_nf": payload.numero_nf,
             "plataforma": payload.plataforma,
-            "plataforma_label": _CANAL_LABELS.get(
-                payload.plataforma, payload.plataforma
-            ),
+            "plataforma_label": _CANAL_LABELS.get(payload.plataforma, payload.plataforma),
             "baixas_estoque": len(processados),
             "lancamentos_financeiros": 1 if conta_tarifa else 0,
             "total_itens": len(processados),
@@ -1176,9 +1058,7 @@ def saida_full_por_nf(
     except Exception as e:
         db.rollback()
         logger.error(f"Erro na baixa FULL por NF: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Erro ao processar baixa por NF: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Erro ao processar baixa por NF: {str(e)}")
 
 
 @router.post("/saida-full-pdf/parse")
@@ -1215,9 +1095,7 @@ async def parse_saida_full_pdf(
 
         texto = "\n".join(texto_paginas).strip()
         if not texto:
-            raise HTTPException(
-                status_code=400, detail="Nao foi possivel ler texto do PDF"
-            )
+            raise HTTPException(status_code=400, detail="Nao foi possivel ler texto do PDF")
 
         itens = _extrair_itens_full_pdf(texto)
         if not itens:
@@ -1236,9 +1114,7 @@ async def parse_saida_full_pdf(
         raise
     except Exception as e:
         logger.error(f"Erro ao interpretar PDF FULL NF: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Erro ao interpretar PDF: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Erro ao interpretar PDF: {str(e)}")
 
 
 @router.post("/saida-full-xml/parse")
@@ -1254,7 +1130,7 @@ async def parse_saida_full_xml(
         raise HTTPException(status_code=400, detail="Arquivo XML nao informado")
 
     nome = file.filename.lower()
-    if not nome.endswith(".xml"):
+    if not nome.endswith('.xml'):
         raise HTTPException(status_code=400, detail="Envie um arquivo XML valido")
 
     xml_bytes = await file.read()
@@ -1274,6 +1150,5 @@ async def parse_saida_full_xml(
         raise HTTPException(status_code=400, detail="XML invalido: erro de estrutura")
     except Exception as e:
         logger.error(f"Erro ao interpretar XML FULL NF: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Erro ao interpretar XML: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Erro ao interpretar XML: {str(e)}")
+
