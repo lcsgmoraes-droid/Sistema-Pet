@@ -475,6 +475,10 @@ jobs:
         run: |
           ruff format --check app/notas_entrada_pdf_parser.py app/routes/sefaz_routes.py app/calculadora_racao.py
 
+      - name: Backend IA finance parsers format (blocking)
+        run: |
+          ruff format --check app/ia/aba7_dre_canal.py
+
       - name: Backend multi tenant tests format (blocking)
         run: |
           ruff format --check tests/multi_tenant
