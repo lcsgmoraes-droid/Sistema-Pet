@@ -491,6 +491,10 @@ jobs:
         run: |
           ruff format --check app/whatsapp/analytics_simple.py
 
+      - name: Backend WhatsApp analytics format (blocking)
+        run: |
+          ruff format --check app/whatsapp/analytics.py
+
       - name: Backend analysis dashboard sales format (blocking)
         run: |
           ruff format --check app/analise_racoes_routes.py app/dashboard_routes.py app/relatorio_vendas_routes.py
