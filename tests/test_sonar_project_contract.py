@@ -19,3 +19,4 @@ def test_sonar_cpd_excludes_generated_alembic_migrations():
     }
 
     assert "backend/alembic/**" in exclusions
+    assert "**/backend/alembic/**" in exclusions
