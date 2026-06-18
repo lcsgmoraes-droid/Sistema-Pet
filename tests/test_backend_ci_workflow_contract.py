@@ -1050,6 +1050,16 @@ def test_backend_ci_has_blocking_backend_stock_full_exit_format_step():
     assert "ruff format --check app/estoque_saida_full_routes.py" in source
 
 
+def test_backend_ci_has_blocking_backend_analysis_dashboard_sales_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend analysis dashboard sales format (blocking)" in source
+    assert (
+        "ruff format --check app/analise_racoes_routes.py "
+        "app/dashboard_routes.py app/relatorio_vendas_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
