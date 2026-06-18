@@ -12,9 +12,9 @@ pydantic-settings==2.1.0
 email-validator==2.2.0
 
 # Banco de Dados
-sqlalchemy==2.0.25
-psycopg2-binary==2.9.9
-alembic==1.13.1
+sqlalchemy==2.0.51
+psycopg2-binary==2.9.12
+alembic==1.18.4
 
 # Autenticação e Segurança
 PyJWT==2.13.0
