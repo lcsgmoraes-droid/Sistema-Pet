@@ -65,3 +65,18 @@ def test_transferencia_parceiro_centraliza_formato_de_data_curta():
 
     assert "_FORMATO_DATA_CURTA" in source
     assert source.count("%d/%m/%Y") == 1
+
+
+def test_transferencia_parceiro_documenta_404_do_recebimento():
+    source = _source("app/estoque_transferencia_parceiro_routes.py")
+
+    assert '"/transferencia-parceiro/{conta_receber_id}/receber"' in source
+    assert "responses={404:" in source
+
+
+def test_transferencia_parceiro_delete_usa_annotated_para_dependencia_tenant():
+    source = _source("app/estoque_transferencia_parceiro_routes.py")
+    trecho_delete = source.split("def excluir_transferencia_parceiro(", 1)[1]
+
+    assert "user_and_tenant: Annotated[" in trecho_delete
+    assert "Depends(get_current_user_and_tenant)" in trecho_delete

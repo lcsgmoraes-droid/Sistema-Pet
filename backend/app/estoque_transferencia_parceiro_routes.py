@@ -5,7 +5,7 @@ from datetime import date, datetime
 from decimal import Decimal
 import io
 import json
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -2491,7 +2491,10 @@ def listar_contas_pagar_compensacao_transferencia(
     )
 
 
-@router.post("/transferencia-parceiro/{conta_receber_id}/receber")
+@router.post(
+    "/transferencia-parceiro/{conta_receber_id}/receber",
+    responses={404: {"description": "Transferencia ou conta a pagar nao encontrada"}},
+)
 @require_permission("produtos.editar")
 def registrar_recebimento_transferencia_parceiro(
     conta_receber_id: int,
@@ -2648,8 +2651,10 @@ def registrar_recebimento_transferencia_parceiro(
 @require_permission("produtos.editar")
 def excluir_transferencia_parceiro(
     conta_receber_id: int,
+    user_and_tenant: Annotated[
+        tuple[object, object], Depends(get_current_user_and_tenant)
+    ],
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Exclui uma transferencia ainda sem baixa, estornando o estoque."""
     current_user, tenant_id = user_and_tenant
