@@ -30,3 +30,15 @@ def test_tailwind_4_uses_v4_css_entrypoint_and_loads_legacy_js_config():
     assert "@tailwind base;" not in css_source
     assert "@tailwind components;" not in css_source
     assert "@tailwind utilities;" not in css_source
+
+
+def test_tailwind_4_preserves_legacy_visual_defaults_used_by_erp():
+    package = json.loads(FRONTEND_PACKAGE_JSON.read_text(encoding="utf-8"))
+    css_source = FRONTEND_INDEX_CSS.read_text(encoding="utf-8")
+
+    assert _dependency_major_version(package, "tailwindcss") >= 4
+    assert "--default-ring-width: 3px;" in css_source
+    assert "--default-ring-color: var(--color-blue-500);" in css_source
+    assert "border-color: var(--color-gray-200, currentColor);" in css_source
+    assert "input::placeholder" in css_source
+    assert "color: var(--color-gray-400);" in css_source
