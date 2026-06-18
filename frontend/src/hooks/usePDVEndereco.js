@@ -34,9 +34,7 @@ export function usePDVEndereco({ vendaAtual, setVendaAtual }) {
 
     setLoadingCep(true);
     try {
-      const response = await fetch(
-        `https://viacep.com.br/ws/${cep.replace("-", "")}/json/`,
-      );
+      const response = await fetch(`https://viacep.com.br/ws/${cep.replace("-", "")}/json/`);
       const data = await response.json();
 
       if (data.erro) {
@@ -60,11 +58,7 @@ export function usePDVEndereco({ vendaAtual, setVendaAtual }) {
   };
 
   const salvarEnderecoNoCliente = async () => {
-    if (
-      !enderecoAtual?.cep ||
-      !enderecoAtual.endereco ||
-      !enderecoAtual.cidade
-    ) {
+    if (!enderecoAtual?.cep || !enderecoAtual.endereco || !enderecoAtual.cidade) {
       alert("Preencha pelo menos CEP, Endereço e Cidade");
       return;
     }

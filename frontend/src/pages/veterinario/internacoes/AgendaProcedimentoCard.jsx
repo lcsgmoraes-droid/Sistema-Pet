@@ -21,7 +21,9 @@ export default function AgendaProcedimentoCard({
         <p className="text-lg font-semibold text-slate-800 leading-none tabular-nums">
           {formatDateTime(item.horario)}
         </p>
-        <span className={`inline-block mt-2 text-[11px] px-2 py-0.5 rounded-full font-medium ${alerta}`}>
+        <span
+          className={`inline-block mt-2 text-[11px] px-2 py-0.5 rounded-full font-medium ${alerta}`}
+        >
           {item.feito ? "Concluido" : diffMin <= 0 ? "Atrasado" : `Em ${diffMin} min`}
         </span>
       </div>
@@ -53,7 +55,9 @@ export default function AgendaProcedimentoCard({
             Lembrete: {item.lembrete_min || 30} min
           </span>
         </div>
-        {item.observacoes && <p className="text-xs text-slate-500 mt-2 italic">{item.observacoes}</p>}
+        {item.observacoes && (
+          <p className="text-xs text-slate-500 mt-2 italic">{item.observacoes}</p>
+        )}
         {item.feito && <ProcedimentoExecutadoResumo item={item} />}
       </div>
 
@@ -100,6 +104,7 @@ export default function AgendaProcedimentoCard({
 function obterClasseAlertaProcedimento(item, diffMin) {
   if (item.feito) return "bg-emerald-100 text-emerald-700 border border-emerald-200";
   if (diffMin <= 0) return "bg-rose-100 text-rose-700 border border-rose-200";
-  if (diffMin <= Number(item.lembrete_min || 30)) return "bg-amber-100 text-amber-700 border border-amber-200";
+  if (diffMin <= Number(item.lembrete_min || 30))
+    return "bg-amber-100 text-amber-700 border border-amber-200";
   return "bg-sky-100 text-sky-700 border border-sky-200";
 }

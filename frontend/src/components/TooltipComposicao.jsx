@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
-import PropTypes from 'prop-types';
+import { useState } from "react";
+import PropTypes from "prop-types";
 
 function formatarValorFiscal(valor, casas = 2) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
+  return Number(valor || 0).toLocaleString("pt-BR", {
     minimumFractionDigits: casas,
     maximumFractionDigits: casas,
   });
 }
 
-function TooltipComposicao({ custo, composicao, texto = 'Ver composição' }) {
+function TooltipComposicao({ custo, composicao, texto = "Ver composição" }) {
   const [mostrando, setMostrando] = useState(false);
 
   if (!composicao?.componentes_unitario) {
@@ -17,14 +17,29 @@ function TooltipComposicao({ custo, composicao, texto = 'Ver composição' }) {
 
   const comp = composicao.componentes_unitario;
   const linhas = [
-    { label: 'Custo Bruto', valor: composicao.custo_bruto_unitario || 0, icon: '📦' },
-    { label: 'Frete', valor: comp.valor_frete || 0, icon: '🚚', mostrar: comp.valor_frete > 0 },
-    { label: 'Seguro', valor: comp.valor_seguro || 0, icon: '🛡️', mostrar: comp.valor_seguro > 0 },
-    { label: 'Outras Despesas', valor: comp.valor_outras_despesas || 0, icon: '💰', mostrar: comp.valor_outras_despesas > 0 },
-    { label: 'ICMS ST', valor: comp.valor_icms_st || 0, icon: '🏛️', mostrar: comp.valor_icms_st > 0 },
-    { label: 'IPI', valor: comp.valor_ipi || 0, icon: '📋', mostrar: comp.valor_ipi > 0 },
-    { label: 'Desconto', valor: -(comp.valor_desconto || 0), icon: '📉', mostrar: comp.valor_desconto > 0 },
-  ].filter(l => l.mostrar !== false);
+    { label: "Custo Bruto", valor: composicao.custo_bruto_unitario || 0, icon: "📦" },
+    { label: "Frete", valor: comp.valor_frete || 0, icon: "🚚", mostrar: comp.valor_frete > 0 },
+    { label: "Seguro", valor: comp.valor_seguro || 0, icon: "🛡️", mostrar: comp.valor_seguro > 0 },
+    {
+      label: "Outras Despesas",
+      valor: comp.valor_outras_despesas || 0,
+      icon: "💰",
+      mostrar: comp.valor_outras_despesas > 0,
+    },
+    {
+      label: "ICMS ST",
+      valor: comp.valor_icms_st || 0,
+      icon: "🏛️",
+      mostrar: comp.valor_icms_st > 0,
+    },
+    { label: "IPI", valor: comp.valor_ipi || 0, icon: "📋", mostrar: comp.valor_ipi > 0 },
+    {
+      label: "Desconto",
+      valor: -(comp.valor_desconto || 0),
+      icon: "📉",
+      mostrar: comp.valor_desconto > 0,
+    },
+  ].filter((l) => l.mostrar !== false);
 
   return (
     <div className="relative inline-block">
@@ -56,7 +71,9 @@ function TooltipComposicao({ custo, composicao, texto = 'Ver composição' }) {
             {/* Cabecalho */}
             <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-slate-200">
               <h4 className="font-bold text-slate-800 flex items-center gap-2">
-                <span className="text-lg" aria-hidden="true">📊</span>
+                <span className="text-lg" aria-hidden="true">
+                  📊
+                </span>
                 <span>Composição do Preço</span>
               </h4>
               <button
@@ -75,29 +92,37 @@ function TooltipComposicao({ custo, composicao, texto = 'Ver composição' }) {
             <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
               {linhas.map((linha) => {
                 const isNegativo = Number(linha.valor) < 0;
-                const isDestaque = linha.label === 'Custo Bruto' || (composicao.custo_aquisicao_unitario && Math.abs(Number(composicao.custo_aquisicao_unitario) - Number(custo)) < 0.01);
-                let valorCor = 'text-slate-700';
+                const isDestaque =
+                  linha.label === "Custo Bruto" ||
+                  (composicao.custo_aquisicao_unitario &&
+                    Math.abs(Number(composicao.custo_aquisicao_unitario) - Number(custo)) < 0.01);
+                let valorCor = "text-slate-700";
                 if (isNegativo) {
-                  valorCor = 'text-red-600';
+                  valorCor = "text-red-600";
                 } else if (isDestaque) {
-                  valorCor = 'text-emerald-700';
+                  valorCor = "text-emerald-700";
                 }
 
                 return (
                   <div
                     key={linha.label}
                     className={`flex items-center justify-between p-2 rounded-lg transition-colors ${
-                      isDestaque ? 'bg-emerald-50 border border-emerald-200' : 'bg-slate-50 border border-slate-200'
+                      isDestaque
+                        ? "bg-emerald-50 border border-emerald-200"
+                        : "bg-slate-50 border border-slate-200"
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{linha.icon}</span>
-                      <span className={`text-sm font-medium ${isDestaque ? 'text-emerald-900' : 'text-slate-700'}`}>
+                      <span
+                        className={`text-sm font-medium ${isDestaque ? "text-emerald-900" : "text-slate-700"}`}
+                      >
                         {linha.label}
                       </span>
                     </div>
                     <span className={`font-bold ${valorCor}`}>
-                      {isNegativo ? '- ' : '+ '}R$ {formatarValorFiscal(Math.abs(Number(linha.valor)), 4)}
+                      {isNegativo ? "- " : "+ "}R${" "}
+                      {formatarValorFiscal(Math.abs(Number(linha.valor)), 4)}
                     </span>
                   </div>
                 );
@@ -109,7 +134,9 @@ function TooltipComposicao({ custo, composicao, texto = 'Ver composição' }) {
 
             {/* Total */}
             <div className="bg-gradient-to-r from-emerald-100 to-emerald-50 border-2 border-emerald-300 rounded-lg p-3 text-center">
-              <div className="text-xs text-emerald-700 font-medium mb-1">Custo de Aquisição (Unitário)</div>
+              <div className="text-xs text-emerald-700 font-medium mb-1">
+                Custo de Aquisição (Unitário)
+              </div>
               <div className="text-2xl font-bold text-emerald-700">
                 R$ {formatarValorFiscal(composicao.custo_aquisicao_unitario || 0, 4)}
               </div>
@@ -118,11 +145,14 @@ function TooltipComposicao({ custo, composicao, texto = 'Ver composição' }) {
             {/* Info rateio */}
             {composicao.tem_rateio && (
               <div className="mt-2 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-lg p-2">
-                <span className="font-semibold">💡 Rateio aplicado:</span> Valores de frete/impostos que vieram so no total foram distribuidos proporcionalmente.
+                <span className="font-semibold">💡 Rateio aplicado:</span> Valores de frete/impostos
+                que vieram so no total foram distribuidos proporcionalmente.
               </div>
             )}
 
-            <div className="absolute top-2 right-10 text-xs text-slate-400">clique fora para fechar</div>
+            <div className="absolute top-2 right-10 text-xs text-slate-400">
+              clique fora para fechar
+            </div>
           </div>
         </div>
       )}

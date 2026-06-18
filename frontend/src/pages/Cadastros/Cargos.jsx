@@ -32,7 +32,11 @@ export default function Cargos() {
   });
 
   const prepararCargo = (dados) => {
-    const { inss_patronal_valor, fgts_valor, ...dadosPersistiveis } = dados;
+    const {
+      inss_patronal_valor: _inss_patronal_valor,
+      fgts_valor: _fgts_valor,
+      ...dadosPersistiveis
+    } = dados;
     return {
       ...dadosPersistiveis,
       salario_base: numeroCampoParaFloat(dados.salario_base),
@@ -101,7 +105,7 @@ export default function Cargos() {
   const toggleAtivo = async (cargo) => {
     try {
       await api.patch(`/cargos/${cargo.id}/status?ativo=${!cargo.ativo}`);
-      toast.success(`Cargo ${!cargo.ativo ? 'ativado' : 'inativado'} com sucesso!`);
+      toast.success(`Cargo ${!cargo.ativo ? "ativado" : "inativado"} com sucesso!`);
       carregarCargos();
     } catch (error) {
       console.error("Erro ao alterar status:", error);
@@ -110,9 +114,9 @@ export default function Cargos() {
   };
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(valor);
   };
 
@@ -183,9 +187,7 @@ export default function Cargos() {
               <tr key={c.id} className={!c.ativo ? "bg-gray-50" : ""}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">{c.nome}</div>
-                  {c.descricao && (
-                    <div className="text-sm text-gray-500">{c.descricao}</div>
-                  )}
+                  {c.descricao && <div className="text-sm text-gray-500">{c.descricao}</div>}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-green-600">
                   {formatarMoeda(c.salario_base)}
@@ -203,23 +205,31 @@ export default function Cargos() {
                   {Number(c.fgts_percentual).toFixed(2)}%
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    c.gera_ferias ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      c.gera_ferias ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                    }`}
+                  >
                     {c.gera_ferias ? "Sim" : "Não"}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    c.gera_decimo_terceiro ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      c.gera_decimo_terceiro
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
                     {c.gera_decimo_terceiro ? "Sim" : "Não"}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    c.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
+                  <span
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      c.ativo ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
                     {c.ativo ? "Sim" : "Não"}
                   </span>
                 </td>
@@ -231,7 +241,7 @@ export default function Cargos() {
                     Editar
                   </button>
                   <button
-                    className={`${c.ativo ? 'text-yellow-600 hover:text-yellow-900' : 'text-green-600 hover:text-green-900'}`}
+                    className={`${c.ativo ? "text-yellow-600 hover:text-yellow-900" : "text-green-600 hover:text-green-900"}`}
                     onClick={() => toggleAtivo(c)}
                   >
                     {c.ativo ? "Inativar" : "Ativar"}
@@ -273,9 +283,7 @@ export default function Cargos() {
 
             {/* Descrição */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Descrição
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
               <textarea
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 placeholder="Descrição das responsabilidades..."
@@ -316,16 +324,20 @@ export default function Cargos() {
                   <h4 className="text-sm font-semibold text-indigo-950">Guia rapido da folha</h4>
                   <div className="mt-2 grid grid-cols-1 gap-2 text-xs leading-5 text-indigo-900 md:grid-cols-2">
                     <p>
-                      <strong>Salario base:</strong> use o valor bruto do holerite ou contrato. Ele alimenta provisoes, DRE e encargos.
+                      <strong>Salario base:</strong> use o valor bruto do holerite ou contrato. Ele
+                      alimenta provisoes, DRE e encargos.
                     </p>
                     <p>
-                      <strong>INSS patronal e FGTS:</strong> sao custos da empresa calculados sobre o salario base.
+                      <strong>INSS patronal e FGTS:</strong> sao custos da empresa calculados sobre
+                      o salario base.
                     </p>
                     <p>
-                      <strong>INSS funcionario:</strong> e desconto do colaborador e reduz o liquido da folha.
+                      <strong>INSS funcionario:</strong> e desconto do colaborador e reduz o liquido
+                      da folha.
                     </p>
                     <p>
-                      <strong>Regimes sem encargos:</strong> use quando nao houver calculo de ferias, 13o, FGTS ou INSS patronal.
+                      <strong>Regimes sem encargos:</strong> use quando nao houver calculo de
+                      ferias, 13o, FGTS ou INSS patronal.
                     </p>
                   </div>
                 </div>
@@ -333,9 +345,7 @@ export default function Cargos() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Regime
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Regime</label>
               <select
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 value={form.regime_remuneracao || "clt"}
@@ -382,7 +392,9 @@ export default function Cargos() {
                 max="100"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 value={form.inss_patronal_percentual}
-                onChange={(e) => atualizarCampoRemuneracao("inss_patronal_percentual", e.target.value)}
+                onChange={(e) =>
+                  atualizarCampoRemuneracao("inss_patronal_percentual", e.target.value)
+                }
               />
             </div>
 
@@ -402,9 +414,7 @@ export default function Cargos() {
 
             {/* FGTS */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                FGTS (%)
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">FGTS (%)</label>
               <input
                 type="number"
                 step="0.01"
@@ -417,9 +427,7 @@ export default function Cargos() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                FGTS (R$)
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">FGTS (R$)</label>
               <input
                 type="number"
                 step="0.01"
@@ -441,7 +449,9 @@ export default function Cargos() {
                 max="100"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 value={form.inss_funcionario_percentual}
-                onChange={(e) => atualizarCampoRemuneracao("inss_funcionario_percentual", e.target.value)}
+                onChange={(e) =>
+                  atualizarCampoRemuneracao("inss_funcionario_percentual", e.target.value)
+                }
               />
             </div>
 
@@ -455,7 +465,9 @@ export default function Cargos() {
                 min="0"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 value={form.inss_funcionario_valor}
-                onChange={(e) => atualizarCampoRemuneracao("inss_funcionario_valor", e.target.value)}
+                onChange={(e) =>
+                  atualizarCampoRemuneracao("inss_funcionario_valor", e.target.value)
+                }
               />
             </div>
 

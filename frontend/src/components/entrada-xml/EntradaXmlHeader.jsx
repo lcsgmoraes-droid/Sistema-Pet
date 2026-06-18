@@ -1,8 +1,8 @@
-import { useRef } from 'react';
-import PropTypes from 'prop-types';
-import { FileText, FileUp, Files, Search, Settings } from 'lucide-react';
-import ActionButton from '../ui/ActionButton';
-import PageHeader from '../ui/PageHeader';
+import { useRef } from "react";
+import PropTypes from "prop-types";
+import { FileText, FileUp, Files, Search, Settings } from "lucide-react";
+import ActionButton from "../ui/ActionButton";
+import PageHeader from "../ui/PageHeader";
 
 function FileInputAction({
   accept,
@@ -78,7 +78,7 @@ export default function EntradaXmlHeader({
       className="mb-6"
       title="Central NF-e Entradas"
       subtitle="Gerencie todas as notas fiscais de entrada via upload ou direto da SEFAZ."
-      actions={(
+      actions={
         <>
           <FileInputAction
             accept=".xml"
@@ -98,7 +98,7 @@ export default function EntradaXmlHeader({
             size="md"
             onClick={onUploadPdf}
           >
-            {uploadingPdf ? 'Processando PDF...' : 'Importar PDF'}
+            {uploadingPdf ? "Processando PDF..." : "Importar PDF"}
           </ActionButton>
           <FileInputAction
             accept=".xml"
@@ -114,7 +114,7 @@ export default function EntradaXmlHeader({
             type="button"
             icon={Search}
             intent="create"
-            tone={mostrarPainelSefaz ? 'solid' : 'soft'}
+            tone={mostrarPainelSefaz ? "solid" : "soft"}
             size="md"
             onClick={onTogglePainelSefaz}
           >
@@ -124,14 +124,14 @@ export default function EntradaXmlHeader({
             type="button"
             icon={Settings}
             intent="neutral"
-            tone={mostrarConfigSefaz ? 'solid' : 'soft'}
+            tone={mostrarConfigSefaz ? "solid" : "soft"}
             size="md"
             onClick={onToggleConfigSefaz}
           >
             Configurar SEFAZ
           </ActionButton>
         </>
-      )}
+      }
     />
   );
 }

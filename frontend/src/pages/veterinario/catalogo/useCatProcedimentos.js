@@ -29,9 +29,13 @@ export function useCatProcedimentos() {
       setLista(
         Array.isArray(procedimentosResponse.data)
           ? procedimentosResponse.data
-          : procedimentosResponse.data?.items ?? []
+          : (procedimentosResponse.data?.items ?? []),
       );
-      setProdutos(Array.isArray(produtosResponse.data) ? produtosResponse.data : produtosResponse.data?.items ?? []);
+      setProdutos(
+        Array.isArray(produtosResponse.data)
+          ? produtosResponse.data
+          : (produtosResponse.data?.items ?? []),
+      );
     } catch (err) {
       setErro(err?.response?.data?.detail || "Erro ao carregar procedimentos.");
     } finally {
@@ -89,12 +93,15 @@ export function useCatProcedimentos() {
 
   const resumoMargem = useMemo(() => {
     const custoEstimadoForm = form.insumos.reduce((total, item) => {
-      const produto = produtos.find((produtoAtual) => String(produtoAtual.id) === String(item.produto_id));
+      const produto = produtos.find(
+        (produtoAtual) => String(produtoAtual.id) === String(item.produto_id),
+      );
       return total + Number(produto?.preco_custo || 0) * (parseNumero(item.quantidade) || 0);
     }, 0);
     const precoSugeridoForm = parseNumero(form.preco) || 0;
     const margemEstimadaForm = precoSugeridoForm - custoEstimadoForm;
-    const margemPercentualForm = precoSugeridoForm > 0 ? (margemEstimadaForm / precoSugeridoForm) * 100 : 0;
+    const margemPercentualForm =
+      precoSugeridoForm > 0 ? (margemEstimadaForm / precoSugeridoForm) * 100 : 0;
 
     return {
       custoEstimadoForm,

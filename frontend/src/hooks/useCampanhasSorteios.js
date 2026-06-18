@@ -38,9 +38,7 @@ export default function useCampanhasSorteios({
       setNovoSorteio(DEFAULT_SORTEIO);
       await carregarSorteios();
     } catch (e) {
-      setErroCriarSorteio(
-        e?.response?.data?.detail || "Erro ao criar sorteio.",
-      );
+      setErroCriarSorteio(e?.response?.data?.detail || "Erro ao criar sorteio.");
     } finally {
       setCriandoSorteio(false);
     }
@@ -99,15 +97,12 @@ export default function useCampanhasSorteios({
     setCodigosOffline([]);
     setLoadingCodigosOffline(true);
     try {
-      const res = await api.get(
-        `/campanhas/sorteios/${sorteio.id}/codigos-offline`,
-        { params: { limit: 500 } },
-      );
+      const res = await api.get(`/campanhas/sorteios/${sorteio.id}/codigos-offline`, {
+        params: { limit: 500 },
+      });
       setCodigosOffline(res.data.codigos || res.data);
     } catch (e) {
-      alert(
-        "Erro ao carregar codigos: " + (e?.response?.data?.detail || e.message),
-      );
+      alert("Erro ao carregar codigos: " + (e?.response?.data?.detail || e.message));
       setModalCodigosOffline(null);
     } finally {
       setLoadingCodigosOffline(false);

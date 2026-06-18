@@ -9,12 +9,15 @@ import {
 } from "./orcamentoUtils.js";
 
 test("criarItemCatalogoOrcamento usa custo estimado e valor padrao do catalogo", () => {
-  const item = criarItemCatalogoOrcamento({
-    id: 7,
-    nome: "Consulta com medicacao",
-    valor_padrao: 150,
-    custo_estimado: 18,
-  }, 2);
+  const item = criarItemCatalogoOrcamento(
+    {
+      id: 7,
+      nome: "Consulta com medicacao",
+      valor_padrao: 150,
+      custo_estimado: 18,
+    },
+    2,
+  );
 
   assert.equal(item.origem, "catalogo");
   assert.equal(item.catalogo_id, 7);
@@ -26,13 +29,16 @@ test("criarItemCatalogoOrcamento usa custo estimado e valor padrao do catalogo",
 });
 
 test("criarItemProdutoOrcamento usa custo e preco de venda do produto", () => {
-  const item = criarItemProdutoOrcamento({
-    id: 44,
-    nome: "Defenza 2 - 4,5kg",
-    unidade: "un",
-    preco_custo: 62.25,
-    preco_venda: 99.9,
-  }, 3);
+  const item = criarItemProdutoOrcamento(
+    {
+      id: 44,
+      nome: "Defenza 2 - 4,5kg",
+      unidade: "un",
+      preco_custo: 62.25,
+      preco_venda: 99.9,
+    },
+    3,
+  );
 
   assert.equal(item.origem, "produto");
   assert.equal(item.produto_id, 44);

@@ -12,8 +12,7 @@ export default function CampanhasGestorCuponsSection({
   gestorCliente,
 }) {
   const isOpen = gestorSecao === "cupons";
-  const ativos =
-    gestorCupons?.filter((cupom) => cupom.status === "active").length || 0;
+  const ativos = gestorCupons?.filter((cupom) => cupom.status === "active").length || 0;
   const criarCupomParaCliente = () => {
     if (!abrirCupomManual || !gestorCliente) return;
     abrirCupomManual({
@@ -51,21 +50,11 @@ export default function CampanhasGestorCuponsSection({
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
-                  Codigo
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
-                  Desconto
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">
-                  Validade
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-600">
-                  Status
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-600">
-                  Acao
-                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">Codigo</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">Desconto</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-600">Validade</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-600">Status</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-600">Acao</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -73,9 +62,7 @@ export default function CampanhasGestorCuponsSection({
                 <tr
                   key={cupom.id}
                   className={
-                    cupom.status !== "active"
-                      ? "bg-gray-50 opacity-70"
-                      : "hover:bg-gray-50"
+                    cupom.status !== "active" ? "bg-gray-50 opacity-70" : "hover:bg-gray-50"
                   }
                 >
                   <td className="px-4 py-3 font-mono text-xs font-bold text-gray-800">
@@ -96,8 +83,7 @@ export default function CampanhasGestorCuponsSection({
                   <td className="px-4 py-3 text-center">
                     <span
                       className={`px-2 py-0.5 text-xs rounded-full ${
-                        cupomStatus[cupom.status]?.color ||
-                        "bg-gray-100 text-gray-600"
+                        cupomStatus[cupom.status]?.color || "bg-gray-100 text-gray-600"
                       }`}
                     >
                       {cupomStatus[cupom.status]?.label || cupom.status}
@@ -120,9 +106,7 @@ export default function CampanhasGestorCuponsSection({
           </table>
         </div>
       ) : (
-        <div className="p-8 text-center text-gray-400 text-sm">
-          Nenhum cupom encontrado.
-        </div>
+        <div className="p-8 text-center text-gray-400 text-sm">Nenhum cupom encontrado.</div>
       )}
     </CampanhasGestorSection>
   );

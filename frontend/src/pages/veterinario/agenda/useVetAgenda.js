@@ -44,7 +44,9 @@ export function useVetAgenda() {
   const [carregandoCalendario, setCarregandoCalendario] = useState(false);
   const [mensagemCalendario, setMensagemCalendario] = useState("");
   const [consultorioInlineAberto, setConsultorioInlineAberto] = useState(false);
-  const [consultorioInlineForm, setConsultorioInlineForm] = useState(FORM_CONSULTORIO_AGENDA_INICIAL);
+  const [consultorioInlineForm, setConsultorioInlineForm] = useState(
+    FORM_CONSULTORIO_AGENDA_INICIAL,
+  );
   const [consultorioInlineErro, setConsultorioInlineErro] = useState(null);
   const [salvandoConsultorioInline, setSalvandoConsultorioInline] = useState(false);
 

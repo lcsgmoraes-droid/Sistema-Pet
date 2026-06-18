@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
-import { X, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react';
-import api from '../api';
-import toast from 'react-hot-toast';
-import SaleReference from './ui/SaleReference';
+import { useState, useEffect } from "react";
+import { X, RefreshCw, TrendingUp, TrendingDown } from "lucide-react";
+import api from "../api";
+import toast from "react-hot-toast";
+import SaleReference from "./ui/SaleReference";
 
 export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
   const [movimentacoes, setMovimentacoes] = useState([]);
@@ -20,8 +20,8 @@ export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
       setMovimentacoes(response.data.movimentacoes);
       setCaixa(response.data.caixa);
     } catch (error) {
-      console.error('Erro ao carregar movimentações:', error);
-      toast.error('Erro ao carregar movimentações do caixa');
+      console.error("Erro ao carregar movimentações:", error);
+      toast.error("Erro ao carregar movimentações do caixa");
     } finally {
       setLoading(false);
     }
@@ -29,22 +29,22 @@ export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
 
   const formatarData = (dataStr) => {
     const data = new Date(dataStr);
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
     }).format(data);
   };
 
   const getTipoLabel = (tipo) => {
     const labels = {
-      'venda': 'Venda',
-      'suprimento': 'Suprimento',
-      'sangria': 'Sangria',
-      'despesa': 'Despesa',
-      'devolucao': 'Devolução',
-      'transferencia': 'Transferência'
+      venda: "Venda",
+      suprimento: "Suprimento",
+      sangria: "Sangria",
+      despesa: "Despesa",
+      devolucao: "Devolução",
+      transferencia: "Transferência",
     };
     return labels[tipo] || tipo;
   };
@@ -70,12 +70,9 @@ export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
               className="p-2 hover:bg-white rounded-lg transition-colors"
               title="Atualizar"
             >
-              <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-5 h-5 text-gray-600 ${loading ? "animate-spin" : ""}`} />
             </button>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white rounded-lg transition-colors"
-            >
+            <button onClick={onClose} className="p-2 hover:bg-white rounded-lg transition-colors">
               <X className="w-5 h-5 text-gray-600" />
             </button>
           </div>
@@ -98,11 +95,11 @@ export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
                 <div
                   key={mov.id}
                   className={`p-4 rounded-lg border-2 ${
-                    mov.natureza === 'entrada'
-                      ? 'bg-green-50 border-green-200'
-                      : mov.natureza === 'saida'
-                      ? 'bg-red-50 border-red-200'
-                      : 'bg-gray-50 border-gray-200'
+                    mov.natureza === "entrada"
+                      ? "bg-green-50 border-green-200"
+                      : mov.natureza === "saida"
+                        ? "bg-red-50 border-red-200"
+                        : "bg-gray-50 border-gray-200"
                   }`}
                 >
                   <div className="flex items-start justify-between">
@@ -120,26 +117,21 @@ export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
                             </span>
                           )}
                         </div>
-                        
+
                         {mov.descricao && (
                           <p className="text-sm text-gray-700 mt-1">{mov.descricao}</p>
                         )}
-                        
+
                         <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-600">
                           <span>🕐 {formatarData(mov.data_movimento)}</span>
                           <span>👤 {mov.usuario_nome}</span>
                           {mov.venda_id && (
                             <span>
                               🧾{" "}
-                              <SaleReference
-                                sale={mov}
-                                value={mov.venda_numero || mov.venda_id}
-                              />
+                              <SaleReference sale={mov} value={mov.venda_numero || mov.venda_id} />
                             </span>
                           )}
-                          {mov.documento && (
-                            <span>📄 {mov.documento}</span>
-                          )}
+                          {mov.documento && <span>📄 {mov.documento}</span>}
                         </div>
                       </div>
                     </div>
@@ -148,28 +140,28 @@ export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
                     <div className="text-right ml-4">
                       <div
                         className={`text-2xl font-bold ${
-                          mov.natureza === 'entrada'
-                            ? 'text-green-600'
-                            : mov.natureza === 'saida'
-                            ? 'text-red-600'
-                            : 'text-gray-600'
+                          mov.natureza === "entrada"
+                            ? "text-green-600"
+                            : mov.natureza === "saida"
+                              ? "text-red-600"
+                              : "text-gray-600"
                         }`}
                       >
-                        {mov.natureza === 'entrada' && '+'}
-                        {mov.natureza === 'saida' && '-'}
+                        {mov.natureza === "entrada" && "+"}
+                        {mov.natureza === "saida" && "-"}
                         R$ {mov.valor.toFixed(2)}
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
-                        {mov.natureza === 'entrada' ? (
+                        {mov.natureza === "entrada" ? (
                           <span className="flex items-center gap-1 justify-end">
                             <TrendingUp className="w-3 h-3" /> Entrada
                           </span>
-                        ) : mov.natureza === 'saida' ? (
+                        ) : mov.natureza === "saida" ? (
                           <span className="flex items-center gap-1 justify-end">
                             <TrendingDown className="w-3 h-3" /> Saída
                           </span>
                         ) : (
-                          'Neutro'
+                          "Neutro"
                         )}
                       </div>
                     </div>

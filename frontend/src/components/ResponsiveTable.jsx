@@ -1,15 +1,13 @@
-import React from 'react';
-
 /**
  * Componente wrapper para tabelas responsivas em mobile
  * Adiciona scroll horizontal automático em telas pequenas
- * 
+ *
  * Uso:
  * <ResponsiveTable>
  *   <table>...</table>
  * </ResponsiveTable>
  */
-const ResponsiveTable = ({ children, className = '' }) => {
+const ResponsiveTable = ({ children, className = "" }) => {
   return (
     <div className={`erp-responsive-table overflow-x-auto -mx-3 md:mx-0 ${className}`}>
       <div className="inline-block min-w-full align-middle">

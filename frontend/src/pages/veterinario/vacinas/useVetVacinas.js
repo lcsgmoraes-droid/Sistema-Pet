@@ -3,11 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { buildReturnTo } from "../../../utils/petReturnFlow";
 import { vetApi } from "../vetApi";
-import {
-  criarFormVacinaInicial,
-  normalizarVacinas,
-  sugerirProximaDose,
-} from "./vacinaUtils";
+import { criarFormVacinaInicial, normalizarVacinas, sugerirProximaDose } from "./vacinaUtils";
 import { useVacinasBaseData } from "./useVacinasBaseData";
 import { useVacinasCalendario } from "./useVacinasCalendario";
 import { useVacinasDeepLinks } from "./useVacinasDeepLinks";
@@ -28,7 +24,8 @@ export function useVetVacinas() {
   const [tutorFormSelecionado, setTutorFormSelecionado] = useState(null);
   const [form, setForm] = useState(() => criarFormVacinaInicial());
   const [salvando, setSalvando] = useState(false);
-  const { carregarVencendo, pets, protocolos, vacinasVencendo, veterinarios } = useVacinasBaseData();
+  const { carregarVencendo, pets, protocolos, vacinasVencendo, veterinarios } =
+    useVacinasBaseData();
   const {
     calendario,
     carregarCalendarioPreventivo,
@@ -85,25 +82,25 @@ export function useVetVacinas() {
   const petsDaPessoa = useMemo(() => {
     if (!form.pessoa_id) return [];
     return pets.filter(
-      (pet) => String(pet.cliente_id) === String(form.pessoa_id) && pet.ativo !== false
+      (pet) => String(pet.cliente_id) === String(form.pessoa_id) && pet.ativo !== false,
     );
   }, [pets, form.pessoa_id]);
 
   const petsFiltradosCarteira = useMemo(() => {
     if (!pessoaFiltro) return pets;
     return pets.filter(
-      (pet) => String(pet.cliente_id) === String(pessoaFiltro) && pet.ativo !== false
+      (pet) => String(pet.cliente_id) === String(pessoaFiltro) && pet.ativo !== false,
     );
   }, [pets, pessoaFiltro]);
 
   const sugestaoDose = useMemo(
     () => sugerirProximaDose(protocolos, pets, form),
-    [protocolos, pets, form]
+    [protocolos, pets, form],
   );
 
   const retornoNovoPet = useMemo(
     () => buildReturnTo(location.pathname, location.search, { acao: "novo" }),
-    [location.pathname, location.search]
+    [location.pathname, location.search],
   );
 
   const {

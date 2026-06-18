@@ -1,10 +1,10 @@
-import { AlertTriangle, X } from 'lucide-react';
-import EntradaXmlDetalhesConferenciaPanel from './EntradaXmlDetalhesConferenciaPanel';
-import EntradaXmlDetalhesFooter from './EntradaXmlDetalhesFooter';
-import EntradaXmlDetalhesItemCard from './EntradaXmlDetalhesItemCard';
-import ActionButton from '../ui/ActionButton';
-import IconActionButton from '../ui/IconActionButton';
-import SegmentedControl from '../ui/SegmentedControl';
+import { AlertTriangle, X } from "lucide-react";
+import EntradaXmlDetalhesConferenciaPanel from "./EntradaXmlDetalhesConferenciaPanel";
+import EntradaXmlDetalhesFooter from "./EntradaXmlDetalhesFooter";
+import EntradaXmlDetalhesItemCard from "./EntradaXmlDetalhesItemCard";
+import ActionButton from "../ui/ActionButton";
+import IconActionButton from "../ui/IconActionButton";
+import SegmentedControl from "../ui/SegmentedControl";
 
 function EntradaXmlDetalhesModal({
   acaoConferenciaOpcoes,
@@ -75,10 +75,11 @@ function EntradaXmlDetalhesModal({
             <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
               <div>
                 <h2 className="text-xl font-bold">
-                  {notaSelecionada.serie === 'PDF' ? 'Detalhes da entrada PDF' : 'Detalhes da NF-e'}
+                  {notaSelecionada.serie === "PDF" ? "Detalhes da entrada PDF" : "Detalhes da NF-e"}
                 </h2>
                 <p className="text-sm text-gray-600">
-                  {notaSelecionada.serie === 'PDF' ? 'Identificador interno' : 'Chave'}: {notaSelecionada.chave_acesso}
+                  {notaSelecionada.serie === "PDF" ? "Identificador interno" : "Chave"}:{" "}
+                  {notaSelecionada.chave_acesso}
                 </p>
               </div>
               <IconActionButton
@@ -107,11 +108,15 @@ function EntradaXmlDetalhesModal({
                 </div>
                 <div>
                   <span className="text-gray-600">Data Emissao:</span>
-                  <div className="font-semibold">{new Date(notaSelecionada.data_emissao).toLocaleDateString()}</div>
+                  <div className="font-semibold">
+                    {new Date(notaSelecionada.data_emissao).toLocaleDateString()}
+                  </div>
                 </div>
                 <div>
                   <span className="text-gray-600">Valor Total:</span>
-                  <div className="font-bold text-lg text-green-600">R$ {(notaSelecionada.valor_total || 0).toFixed(2)}</div>
+                  <div className="font-bold text-lg text-green-600">
+                    R$ {(notaSelecionada.valor_total || 0).toFixed(2)}
+                  </div>
                 </div>
               </div>
             </div>
@@ -121,7 +126,8 @@ function EntradaXmlDetalhesModal({
               <div className="px-6 py-2 bg-blue-50 border-b border-blue-200">
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-blue-800">
-                    <strong>{notaSelecionada.fornecedor_nome}</strong> foi cadastrado automaticamente.
+                    <strong>{notaSelecionada.fornecedor_nome}</strong> foi cadastrado
+                    automaticamente.
                   </div>
                   <ActionButton
                     onClick={() => navigate(`/clientes/${notaSelecionada.fornecedor_id}`)}
@@ -134,13 +140,14 @@ function EntradaXmlDetalhesModal({
               </div>
             )}
 
-            {notaSelecionada.serie === 'PDF' && (
+            {notaSelecionada.serie === "PDF" && (
               <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-900">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                   <div>
-                    <strong>Entrada importada por PDF.</strong> Revise vinculos, custos e dados fiscais antes de processar.
-                    O PDF nao traz chave NF-e real, CFOP, NCM, impostos, lotes ou validacao SEFAZ.
+                    <strong>Entrada importada por PDF.</strong> Revise vinculos, custos e dados
+                    fiscais antes de processar. O PDF nao traz chave NF-e real, CFOP, NCM, impostos,
+                    lotes ou validacao SEFAZ.
                   </div>
                 </div>
               </div>
@@ -171,15 +178,16 @@ function EntradaXmlDetalhesModal({
                 <div>
                   <h3 className="font-bold text-xl text-gray-800">
                     Produtos da Nota ({itensExibidosNota.length}
-                    {filtroItensNota === 'divergencias' ? ` de ${itensNotaDetalhe.length}` : ''})
+                    {filtroItensNota === "divergencias" ? ` de ${itensNotaDetalhe.length}` : ""})
                   </h3>
                   {itensComDivergenciaDetalhe.length > 0 && (
                     <p className="mt-1 text-xs text-orange-700">
-                      {itensComDivergenciaDetalhe.length} item(ns) com divergencia ou tratativa pendente.
+                      {itensComDivergenciaDetalhe.length} item(ns) com divergencia ou tratativa
+                      pendente.
                     </p>
                   )}
                 </div>
-                
+
                 <div className="flex flex-wrap items-center gap-2">
                   {itensComDivergenciaDetalhe.length > 0 && (
                     <SegmentedControl
@@ -188,35 +196,35 @@ function EntradaXmlDetalhesModal({
                       value={filtroItensNota}
                       onChange={setFiltroItensNota}
                       options={[
-                        { value: 'todos', label: 'Todos' },
+                        { value: "todos", label: "Todos" },
                         {
-                          value: 'divergencias',
+                          value: "divergencias",
                           label: `Com divergencia (${itensComDivergenciaDetalhe.length})`,
-                          activeClassName: 'bg-orange-100 text-orange-800 shadow-sm',
+                          activeClassName: "bg-orange-100 text-orange-800 shadow-sm",
                           onSelect: () => setMostrarCamposConferencia(true),
                         },
                       ]}
                     />
                   )}
 
-                  {notaSelecionada.status === 'pendente' &&
-                   notaSelecionada.itens.some(item => !item.produto_id) && (
-                    <ActionButton
-                      onClick={criarTodosProdutosNaoVinculados}
-                      loading={loading}
-                      intent="create"
-                      size="md"
-                      title="Cria automaticamente todos os produtos nao vinculados com os padrões: Estoque mín: 10, máx: 100, Margem: 50%"
-                    >
-                      <span>Criar Todos Nao Vinculados</span>
-                      <span className="rounded bg-emerald-800 px-2 py-0.5 text-xs text-white">
-                        {notaSelecionada.itens.filter(i => !i.produto_id).length}
-                      </span>
-                    </ActionButton>
-                  )}
+                  {notaSelecionada.status === "pendente" &&
+                    notaSelecionada.itens.some((item) => !item.produto_id) && (
+                      <ActionButton
+                        onClick={criarTodosProdutosNaoVinculados}
+                        loading={loading}
+                        intent="create"
+                        size="md"
+                        title="Cria automaticamente todos os produtos nao vinculados com os padrões: Estoque mín: 10, máx: 100, Margem: 50%"
+                      >
+                        <span>Criar Todos Nao Vinculados</span>
+                        <span className="rounded bg-emerald-800 px-2 py-0.5 text-xs text-white">
+                          {notaSelecionada.itens.filter((i) => !i.produto_id).length}
+                        </span>
+                      </ActionButton>
+                    )}
                 </div>
               </div>
-              
+
               <div className="space-y-3">
                 {itensExibidosNota.length === 0 && (
                   <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">

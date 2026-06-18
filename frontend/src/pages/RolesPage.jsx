@@ -58,12 +58,7 @@ export default function RolesPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {roles.map((role) => (
-            <RoleCard
-              key={role.role_id}
-              onDelete={deletarRole}
-              onEdit={abrirEdicao}
-              role={role}
-            />
+            <RoleCard key={role.role_id} onDelete={deletarRole} onEdit={abrirEdicao} role={role} />
           ))}
         </div>
       )}

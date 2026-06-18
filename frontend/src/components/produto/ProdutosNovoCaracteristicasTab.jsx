@@ -1,6 +1,6 @@
-import ProdutosNovoDadosBasicosSection from './ProdutosNovoDadosBasicosSection';
-import ProdutosNovoEstruturaSection from './ProdutosNovoEstruturaSection';
-import ProdutosNovoPrecosSection from './ProdutosNovoPrecosSection';
+import ProdutosNovoDadosBasicosSection from "./ProdutosNovoDadosBasicosSection";
+import ProdutosNovoEstruturaSection from "./ProdutosNovoEstruturaSection";
+import ProdutosNovoPrecosSection from "./ProdutosNovoPrecosSection";
 
 export default function ProdutosNovoCaracteristicasTab(props) {
   const {

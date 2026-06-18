@@ -15,12 +15,10 @@ export default function CampanhasEnvioInativosModal({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-gray-900">
-              Enviar email de reativacao
-            </h3>
+            <h3 className="font-semibold text-gray-900">Enviar email de reativacao</h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              Clientes sem compra ha mais de {modalEnvioInativos} dias. Os
-              emails sao enfileirados e enviados em lotes.
+              Clientes sem compra ha mais de {modalEnvioInativos} dias. Os emails sao enfileirados e
+              enviados em lotes.
             </p>
           </div>
           <button
@@ -36,17 +34,14 @@ export default function CampanhasEnvioInativosModal({
         <div className="p-6 space-y-4">
           {resultadoEnvioInativos ? (
             <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-1">
-              <p className="font-semibold text-green-800">
-                Emails enfileirados com sucesso.
-              </p>
+              <p className="font-semibold text-green-800">Emails enfileirados com sucesso.</p>
               <p className="text-sm text-green-700">
-                {resultadoEnvioInativos.enfileirados} email(s) adicionados a
-                fila.
+                {resultadoEnvioInativos.enfileirados} email(s) adicionados a fila.
               </p>
               {resultadoEnvioInativos.sem_email > 0 && (
                 <p className="text-xs text-gray-500">
-                  {resultadoEnvioInativos.sem_email} cliente(s) sem email
-                  cadastrado foram ignorados.
+                  {resultadoEnvioInativos.sem_email} cliente(s) sem email cadastrado foram
+                  ignorados.
                 </p>
               )}
               <button

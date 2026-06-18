@@ -32,8 +32,8 @@ export default function EntregasConfig() {
           api.get("/clientes/", {
             params: {
               is_entregador: true,
-              entregador_ativo: true
-            }
+              entregador_ativo: true,
+            },
           }),
         ]);
 
@@ -54,12 +54,12 @@ export default function EntregasConfig() {
         // 🛡️ PROTEÇÃO: Garantir que entregadores seja SEMPRE um array
         const entregadoresList = Array.isArray(pessoas.data)
           ? pessoas.data
-          : (pessoas.data?.clientes || pessoas.data?.items || []);
+          : pessoas.data?.clientes || pessoas.data?.items || [];
 
-        console.log('🚚 Entregadores carregados:', entregadoresList);
+        console.log("🚚 Entregadores carregados:", entregadoresList);
         setEntregadores(entregadoresList);
       } catch (e) {
-        console.error('❌ Erro ao carregar configurações:', e);
+        console.error("❌ Erro ao carregar configurações:", e);
         alert("Erro ao carregar configurações de entrega");
         // 🛡️ Garantir array vazio em caso de erro
         setEntregadores([]);
@@ -128,11 +128,20 @@ export default function EntregasConfig() {
     }
   }
 
-  if (loading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: 200, color: "#64748b" }}>
-      Carregando configurações...
-    </div>
-  );
+  if (loading)
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: 200,
+          color: "#64748b",
+        }}
+      >
+        Carregando configurações...
+      </div>
+    );
 
   return (
     <div className="page">
@@ -148,36 +157,53 @@ export default function EntregasConfig() {
             fontSize: 14,
           }}
         >
-          Etapa da introducao guiada: revise entregador padrao, endereco de partida e metodo de km. Depois clique em <strong>Salvar Configuracoes</strong>.
+          Etapa da introducao guiada: revise entregador padrao, endereco de partida e metodo de km.
+          Depois clique em <strong>Salvar Configuracoes</strong>.
         </div>
       )}
 
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1e293b" }}>🚚 Configurações de Entregas</h1>
-        <p style={{ margin: "6px 0 0", fontSize: 14, color: "#64748b" }}>Gerencie entregadores, ponto de partida e como o sistema registra a distância percorrida.</p>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#1e293b" }}>
+          🚚 Configurações de Entregas
+        </h1>
+        <p style={{ margin: "6px 0 0", fontSize: 14, color: "#64748b" }}>
+          Gerencie entregadores, ponto de partida e como o sistema registra a distância percorrida.
+        </p>
       </div>
 
       <form onSubmit={handleSave} style={{ maxWidth: 640 }}>
-
         {/* ── Entregador Padrão ─────────────────────────────────────── */}
-        <div style={{
-          background: "#f8fafc",
-          border: "1px solid #e2e8f0",
-          borderRadius: 12,
-          padding: "20px 24px",
-          marginBottom: 16,
-          ...destaqueBloco,
-        }}>
-          <h3 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 700, color: "#1e293b" }}>👤 Entregador padrão</h3>
+        <div
+          style={{
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: 12,
+            padding: "20px 24px",
+            marginBottom: 16,
+            ...destaqueBloco,
+          }}
+        >
+          <h3 style={{ margin: "0 0 12px", fontSize: 16, fontWeight: 700, color: "#1e293b" }}>
+            👤 Entregador padrão
+          </h3>
           <select
             value={form.entregador_padrao_id}
             onChange={(e) => setForm({ ...form, entregador_padrao_id: e.target.value })}
-            style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 14 }}
+            style={{
+              width: "100%",
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+              fontSize: 14,
+            }}
           >
             <option value="">Nenhum (escolher manualmente)</option>
-            {Array.isArray(entregadores) && entregadores.map((p) => (
-              <option key={p.id} value={p.id}>{p.nome}</option>
-            ))}
+            {Array.isArray(entregadores) &&
+              entregadores.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nome}
+                </option>
+              ))}
           </select>
           <p style={{ fontSize: 12, color: "#64748b", marginTop: 8, marginBottom: 0 }}>
             Será pré-selecionado ao criar novas rotas de entrega.
@@ -185,20 +211,37 @@ export default function EntregasConfig() {
         </div>
 
         {/* ── Ponto Inicial ─────────────────────────────────────────── */}
-        <div style={{
-          background: "#f8fafc",
-          border: "1px solid #e2e8f0",
-          borderRadius: 12,
-          padding: "20px 24px",
-          marginBottom: 16,
-          ...destaqueBloco,
-        }}>
-          <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#1e293b" }}>📍 Ponto inicial da rota</h3>
-          <p style={{ margin: "0 0 20px", fontSize: 13, color: "#64748b" }}>Endereço usado como ponto de partida ao calcular rotas.</p>
+        <div
+          style={{
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: 12,
+            padding: "20px 24px",
+            marginBottom: 16,
+            ...destaqueBloco,
+          }}
+        >
+          <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#1e293b" }}>
+            📍 Ponto inicial da rota
+          </h3>
+          <p style={{ margin: "0 0 20px", fontSize: 13, color: "#64748b" }}>
+            Endereço usado como ponto de partida ao calcular rotas.
+          </p>
 
           {/* CEP com busca */}
           <div style={{ marginBottom: 16 }}>
-            <label htmlFor="cep" style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>CEP *</label>
+            <label
+              htmlFor="cep"
+              style={{
+                display: "block",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#374151",
+                marginBottom: 6,
+              }}
+            >
+              CEP *
+            </label>
             <div style={{ display: "flex", gap: 10 }}>
               <input
                 id="cep"
@@ -250,7 +293,18 @@ export default function EntregasConfig() {
 
           {/* Logradouro */}
           <div style={{ marginBottom: 16 }}>
-            <label htmlFor="logradouro" style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Logradouro *</label>
+            <label
+              htmlFor="logradouro"
+              style={{
+                display: "block",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#374151",
+                marginBottom: 6,
+              }}
+            >
+              Logradouro *
+            </label>
             <input
               id="logradouro"
               type="text"
@@ -272,9 +326,22 @@ export default function EntregasConfig() {
           </div>
 
           {/* Número e Complemento */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, marginBottom: 16 }}>
+          <div
+            style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 12, marginBottom: 16 }}
+          >
             <div>
-              <label htmlFor="numero" style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Número *</label>
+              <label
+                htmlFor="numero"
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#374151",
+                  marginBottom: 6,
+                }}
+              >
+                Número *
+              </label>
               <input
                 id="numero"
                 type="text"
@@ -295,7 +362,18 @@ export default function EntregasConfig() {
               />
             </div>
             <div>
-              <label htmlFor="complemento" style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Complemento <span style={{ fontWeight: 400, color: "#9ca3af" }}>(opcional)</span></label>
+              <label
+                htmlFor="complemento"
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#374151",
+                  marginBottom: 6,
+                }}
+              >
+                Complemento <span style={{ fontWeight: 400, color: "#9ca3af" }}>(opcional)</span>
+              </label>
               <input
                 id="complemento"
                 type="text"
@@ -319,7 +397,18 @@ export default function EntregasConfig() {
 
           {/* Bairro */}
           <div style={{ marginBottom: 16 }}>
-            <label htmlFor="bairro" style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Bairro *</label>
+            <label
+              htmlFor="bairro"
+              style={{
+                display: "block",
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#374151",
+                marginBottom: 6,
+              }}
+            >
+              Bairro *
+            </label>
             <input
               id="bairro"
               type="text"
@@ -341,9 +430,22 @@ export default function EntregasConfig() {
           </div>
 
           {/* Cidade e Estado */}
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, marginBottom: 4 }}>
+          <div
+            style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, marginBottom: 4 }}
+          >
             <div>
-              <label htmlFor="cidade" style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Cidade *</label>
+              <label
+                htmlFor="cidade"
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#374151",
+                  marginBottom: 6,
+                }}
+              >
+                Cidade *
+              </label>
               <input
                 id="cidade"
                 type="text"
@@ -364,7 +466,18 @@ export default function EntregasConfig() {
               />
             </div>
             <div>
-              <label htmlFor="estado" style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Estado *</label>
+              <label
+                htmlFor="estado"
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "#374151",
+                  marginBottom: 6,
+                }}
+              >
+                Estado *
+              </label>
               <input
                 id="estado"
                 type="text"
@@ -391,21 +504,32 @@ export default function EntregasConfig() {
             </div>
           </div>
 
-          <div style={{ marginTop: 14, padding: "10px 14px", background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8, fontSize: 13, color: "#0369a1" }}>
+          <div
+            style={{
+              marginTop: 14,
+              padding: "10px 14px",
+              background: "#f0f9ff",
+              border: "1px solid #bae6fd",
+              borderRadius: 8,
+              fontSize: 13,
+              color: "#0369a1",
+            }}
+          >
             💡 Preencha o CEP acima para buscar o endereço automaticamente.
           </div>
         </div>
 
-
         {/* ── Método de KM ─────────────────────────────────────────── */}
-        <div style={{
-          background: "#f8fafc",
-          border: "1px solid #e2e8f0",
-          borderRadius: 12,
-          padding: "20px 24px",
-          marginBottom: 24,
-          ...destaqueBloco,
-        }}>
+        <div
+          style={{
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: 12,
+            padding: "20px 24px",
+            marginBottom: 24,
+            ...destaqueBloco,
+          }}
+        >
           <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "#1e293b" }}>
             📏 Como registrar a distância percorrida
           </h3>
@@ -415,17 +539,19 @@ export default function EntregasConfig() {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {/* Opção 1: Automático */}
-            <label style={{
-              display: "flex",
-              gap: 14,
-              alignItems: "flex-start",
-              padding: "14px 16px",
-              borderRadius: 10,
-              border: `2px solid ${form.metodo_km_entrega === "auto_rota" ? "#2563eb" : "#e2e8f0"}`,
-              backgroundColor: form.metodo_km_entrega === "auto_rota" ? "#eff6ff" : "#fff",
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}>
+            <label
+              style={{
+                display: "flex",
+                gap: 14,
+                alignItems: "flex-start",
+                padding: "14px 16px",
+                borderRadius: 10,
+                border: `2px solid ${form.metodo_km_entrega === "auto_rota" ? "#2563eb" : "#e2e8f0"}`,
+                backgroundColor: form.metodo_km_entrega === "auto_rota" ? "#eff6ff" : "#fff",
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+            >
               <input
                 type="radio"
                 name="metodo_km_entrega"
@@ -436,27 +562,46 @@ export default function EntregasConfig() {
               />
               <div>
                 <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", marginBottom: 3 }}>
-                  ✨ Automático <span style={{ background: "#dcfce7", color: "#16a34a", fontSize: 11, fontWeight: 600, padding: "1px 7px", borderRadius: 999, marginLeft: 6 }}>Recomendado</span>
+                  ✨ Automático{" "}
+                  <span
+                    style={{
+                      background: "#dcfce7",
+                      color: "#16a34a",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: "1px 7px",
+                      borderRadius: 999,
+                      marginLeft: 6,
+                    }}
+                  >
+                    Recomendado
+                  </span>
                 </div>
                 <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.5 }}>
-                  Se a rota foi otimizada, o sistema usa a distância calculada automaticamente — <strong>sem precisar de nenhuma ação do entregador</strong>. Se a rota não foi otimizada, o sistema pede para o entregador informar o km.
+                  Se a rota foi otimizada, o sistema usa a distância calculada automaticamente —{" "}
+                  <strong>sem precisar de nenhuma ação do entregador</strong>. Se a rota não foi
+                  otimizada, o sistema pede para o entregador informar o km.
                 </div>
-                <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600, marginTop: 5 }}>Custo: zero</div>
+                <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600, marginTop: 5 }}>
+                  Custo: zero
+                </div>
               </div>
             </label>
 
             {/* Opção 2: Sempre manual */}
-            <label style={{
-              display: "flex",
-              gap: 14,
-              alignItems: "flex-start",
-              padding: "14px 16px",
-              borderRadius: 10,
-              border: `2px solid ${form.metodo_km_entrega === "manual" ? "#2563eb" : "#e2e8f0"}`,
-              backgroundColor: form.metodo_km_entrega === "manual" ? "#eff6ff" : "#fff",
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}>
+            <label
+              style={{
+                display: "flex",
+                gap: 14,
+                alignItems: "flex-start",
+                padding: "14px 16px",
+                borderRadius: 10,
+                border: `2px solid ${form.metodo_km_entrega === "manual" ? "#2563eb" : "#e2e8f0"}`,
+                backgroundColor: form.metodo_km_entrega === "manual" ? "#eff6ff" : "#fff",
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+            >
               <input
                 type="radio"
                 name="metodo_km_entrega"
@@ -470,33 +615,52 @@ export default function EntregasConfig() {
                   ✏️ Sempre manual
                 </div>
                 <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.5 }}>
-                  O entregador digita o km do hodômetro em cada entrega e ao finalizar a rota. Útil para quem precisa de controle rigoroso de quilometragem real.
+                  O entregador digita o km do hodômetro em cada entrega e ao finalizar a rota. Útil
+                  para quem precisa de controle rigoroso de quilometragem real.
                 </div>
-                <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600, marginTop: 5 }}>Custo: zero</div>
+                <div style={{ fontSize: 12, color: "#16a34a", fontWeight: 600, marginTop: 5 }}>
+                  Custo: zero
+                </div>
               </div>
             </label>
 
             {/* Opção 3: App (em breve) */}
-            <div style={{
-              display: "flex",
-              gap: 14,
-              alignItems: "flex-start",
-              padding: "14px 16px",
-              borderRadius: 10,
-              border: "2px solid #e2e8f0",
-              backgroundColor: "#f8fafc",
-              opacity: 0.6,
-              cursor: "not-allowed",
-              position: "relative",
-            }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 14,
+                alignItems: "flex-start",
+                padding: "14px 16px",
+                borderRadius: 10,
+                border: "2px solid #e2e8f0",
+                backgroundColor: "#f8fafc",
+                opacity: 0.6,
+                cursor: "not-allowed",
+                position: "relative",
+              }}
+            >
               <input type="radio" disabled style={{ marginTop: 4, flexShrink: 0 }} />
               <div>
                 <div style={{ fontWeight: 700, fontSize: 14, color: "#94a3b8", marginBottom: 3 }}>
                   📱 GPS via App Mobile
-                  <span style={{ background: "#fef3c7", color: "#b45309", fontSize: 11, fontWeight: 600, padding: "1px 7px", borderRadius: 999, marginLeft: 6 }}>Em breve</span>
+                  <span
+                    style={{
+                      background: "#fef3c7",
+                      color: "#b45309",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: "1px 7px",
+                      borderRadius: 999,
+                      marginLeft: 6,
+                    }}
+                  >
+                    Em breve
+                  </span>
                 </div>
                 <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.5 }}>
-                  O entregador usa o app no celular para rastrear toda a rota em tempo real via GPS — mesmo com a tela apagada. Distância real calculada automaticamente sem nenhuma ação manual.
+                  O entregador usa o app no celular para rastrear toda a rota em tempo real via GPS
+                  — mesmo com a tela apagada. Distância real calculada automaticamente sem nenhuma
+                  ação manual.
                 </div>
               </div>
             </div>
@@ -520,10 +684,12 @@ export default function EntregasConfig() {
             boxShadow: destaqueBloco.boxShadow || "none",
           }}
           onMouseOver={(e) => {
-            if (!saving) e.target.style.backgroundColor = destacarEntregaConfig ? "#b45309" : "#1d4ed8";
+            if (!saving)
+              e.target.style.backgroundColor = destacarEntregaConfig ? "#b45309" : "#1d4ed8";
           }}
           onMouseOut={(e) => {
-            if (!saving) e.target.style.backgroundColor = destacarEntregaConfig ? "#d97706" : "#2563eb";
+            if (!saving)
+              e.target.style.backgroundColor = destacarEntregaConfig ? "#d97706" : "#2563eb";
           }}
         >
           {saving ? "Salvando..." : "Salvar Configurações"}

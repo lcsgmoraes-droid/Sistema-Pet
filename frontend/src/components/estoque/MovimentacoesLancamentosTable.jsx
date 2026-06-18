@@ -33,7 +33,11 @@ function CustoCell({ movimentacao }) {
   }
 
   const tipoVariacao =
-    variacao.tipo === "aumento" ? "text-red-600" : variacao.tipo === "reducao" ? "text-green-600" : "text-slate-900";
+    variacao.tipo === "aumento"
+      ? "text-red-600"
+      : variacao.tipo === "reducao"
+        ? "text-green-600"
+        : "text-slate-900";
   const resumoVariacao = `${variacao.tipo === "aumento" ? "Aumento" : "Reducao"} de ${formatMoney(
     Math.abs(Number(variacao.diferenca_valor || 0)),
   )} (${Number(variacao.diferenca_percentual || 0).toFixed(1)}%)`;
@@ -92,7 +96,9 @@ function CanalBadge({ labelsCanais, movimentacao }) {
   const canalClass = CANAL_CLASSES[movimentacao.canal] || "bg-slate-100 text-slate-600";
 
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${canalClass}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${canalClass}`}
+    >
       {movimentacao.canal_label || labelsCanais[movimentacao.canal] || movimentacao.canal}
     </span>
   );
@@ -195,7 +201,9 @@ export default function MovimentacoesLancamentosTable({
                   <tr
                     key={movimentacao.id}
                     className={`cursor-pointer ${
-                      movCancelado ? "bg-slate-50/80 opacity-70 hover:bg-slate-100" : "hover:bg-slate-50"
+                      movCancelado
+                        ? "bg-slate-50/80 opacity-70 hover:bg-slate-100"
+                        : "hover:bg-slate-50"
                     } ${mesmaVenda ? "border-l-4 border-l-blue-500 bg-blue-50" : ""}`}
                     onClick={() => abrirModal(movimentacao.tipo, movimentacao)}
                   >
@@ -246,10 +254,16 @@ export default function MovimentacoesLancamentosTable({
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600">
                       <LoteCell movimentacao={movimentacao} />
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-sm" onClick={(event) => event.stopPropagation()}>
+                    <td
+                      className="whitespace-nowrap px-4 py-3 text-sm"
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       <div className="flex items-center gap-2">
                         {mesmaVenda ? (
-                          <span className="text-xs font-semibold text-blue-600" title="Mesmo pedido/venda">
+                          <span
+                            className="text-xs font-semibold text-blue-600"
+                            title="Mesmo pedido/venda"
+                          >
                             mesma venda
                           </span>
                         ) : null}
@@ -279,7 +293,9 @@ export default function MovimentacoesLancamentosTable({
                         {movimentacao.motivo &&
                         movimentacao.motivo !== "compra" &&
                         !String(movimentacao.motivo).startsWith("venda") ? (
-                          <StatusBadge intent="info">{getMotivoLabel(movimentacao.motivo)}</StatusBadge>
+                          <StatusBadge intent="info">
+                            {getMotivoLabel(movimentacao.motivo)}
+                          </StatusBadge>
                         ) : null}
                         {movimentacao.observacao_exibicao || movimentacao.observacao}
                       </div>

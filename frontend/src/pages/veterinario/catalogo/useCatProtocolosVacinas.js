@@ -22,7 +22,7 @@ export function useCatProtocolosVacinas() {
     setErro("");
     try {
       const response = await vetApi.listarProtocolosVacinas();
-      setLista(Array.isArray(response.data) ? response.data : response.data?.items ?? []);
+      setLista(Array.isArray(response.data) ? response.data : (response.data?.items ?? []));
     } catch (err) {
       setErro(err?.response?.data?.detail || "Erro ao carregar protocolos.");
     } finally {

@@ -8,7 +8,8 @@ export default function NovoAgendamentoModalHeader({ agendamentoEditandoId, onCl
           {agendamentoEditandoId ? "Editar agendamento" : "Novo agendamento"}
         </h2>
         <p className="mt-1 text-sm text-gray-500">
-          Escolha o tipo do servico, veja a agenda do dia e abra depois o fluxo certo com pet e tutor ja prontos.
+          Escolha o tipo do servico, veja a agenda do dia e abra depois o fluxo certo com pet e
+          tutor ja prontos.
         </p>
       </div>
       <button

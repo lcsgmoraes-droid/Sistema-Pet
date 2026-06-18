@@ -2,7 +2,7 @@
  * SPRINT 7 - PASSO 2 & 3: Formulário de Produto (Criação e Edição)
  * Sistema ERP Pet Shop - Apenas Produtos SIMPLES
  * v2.0.1 - Fix NaN e encoding UTF-8
- * 
+ *
  * Features:
  * - Criação de produto simples
  * - Edição de produto simples
@@ -11,63 +11,61 @@
  * - Preparado para variação/kit (futuro)
  */
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import api from '../../../api';
-import toast from 'react-hot-toast';
-import { ProductType, ProductStatus, Product } from '../types';
-import type { ProductFormData, CreateProductPayload } from '../types';
-import '../styles/ProdutoForm.css';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../../../api";
+import toast from "react-hot-toast";
+import { ProductType, ProductStatus, Product } from "../types";
+import type { ProductFormData, CreateProductPayload } from "../types";
+import "../styles/ProdutoForm.css";
 
 interface ProdutoFormProps {
-  mode?: 'create' | 'edit';
+  mode?: "create" | "edit";
   productId?: number;
   initialData?: Product;
 }
 
 export const ProdutoForm: React.FC<ProdutoFormProps> = ({
-  mode = 'create',
+  mode = "create",
   productId,
-  initialData
+  initialData,
 }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [loadingProduct, setLoadingProduct] = useState(mode === 'edit');
+  const [loadingProduct, setLoadingProduct] = useState(mode === "edit");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Função SEGURA para converter qualquer valor em número
   const parseNumber = (valor: any): number => {
     if (!valor) return 0;
     // Permite tanto vírgula quanto ponto como separador decimal
-    const limpo = valor
-      .toString()
-      .replace(/[^\d.,]/g, '');
+    const limpo = valor.toString().replace(/[^\d.,]/g, "");
     // Normaliza vírgula para ponto
-    const normalizado = limpo.replace(',', '.');
+    const normalizado = limpo.replace(",", ".");
     const numero = parseFloat(normalizado);
     return isNaN(numero) ? 0 : numero;
   };
 
   // Estado do formulário
   const [formData, setFormData] = useState<ProductFormData>({
-    nome: '',
-    sku: '',
+    nome: "",
+    sku: "",
     tipo: ProductType.SIMPLE,
-    preco_custo: '',
-    markup: '',
-    preco: '',
-    preco_promocional: '',
-    estoque: '0',
+    preco_custo: "",
+    markup: "",
+    preco: "",
+    preco_promocional: "",
+    estoque: "0",
     status: ProductStatus.ACTIVE,
-    marca: '',
-    categoria: '',
-    descricao_completa: '',
-    e_produto_fisico: true
+    marca: "",
+    categoria: "",
+    descricao_completa: "",
+    e_produto_fisico: true,
   });
 
   // Carregar dados do produto em modo de edição
   useEffect(() => {
-    if (mode === 'edit') {
+    if (mode === "edit") {
       if (initialData) {
         // Se initialData foi passado, usar diretamente
         loadProductData(initialData);
@@ -86,9 +84,9 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
       const response = await api.get(`/produtos/${id}`);
       loadProductData(response.data);
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Erro ao carregar produto';
+      const errorMessage = err.response?.data?.detail || "Erro ao carregar produto";
       toast.error(errorMessage);
-      navigate('/produtos');
+      navigate("/produtos");
     } finally {
       setLoadingProduct(false);
     }
@@ -98,10 +96,10 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
   const loadProductData = (product: Product) => {
     // Função helper para converter número em string monetária
     const toMoedaStr = (val: any): string => {
-      if (!val || isNaN(Number(val))) return '';
-      return Number(val).toFixed(2).replace('.', ',');
+      if (!val || isNaN(Number(val))) return "";
+      return Number(val).toFixed(2).replace(".", ",");
     };
-    
+
     setFormData({
       nome: product.nome,
       sku: product.sku,
@@ -110,59 +108,59 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
       markup: toMoedaStr(product.markup),
       preco: toMoedaStr(product.preco),
       preco_promocional: toMoedaStr(product.preco_promocional),
-      estoque: product.estoque ? product.estoque.toString() : '0',
+      estoque: product.estoque ? product.estoque.toString() : "0",
       status: product.status,
-      marca: product.marca || '',
-      categoria: product.categoria || '',
-      descricao_completa: product.descricao_completa || '',
-      e_produto_fisico: product.estoque > 0 || true  // Inferir do estoque
+      marca: product.marca || "",
+      categoria: product.categoria || "",
+      descricao_completa: product.descricao_completa || "",
+      e_produto_fisico: product.estoque > 0 || true, // Inferir do estoque
     });
   };
 
   // Atualizar campo
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>,
   ) => {
     const { name, value, type } = e.target;
-    
-    if (type === 'checkbox') {
+
+    if (type === "checkbox") {
       const checked = (e.target as HTMLInputElement).checked;
-      setFormData(prev => ({ ...prev, [name]: checked }));
+      setFormData((prev) => ({ ...prev, [name]: checked }));
     } else {
-      setFormData(prev => {
+      setFormData((prev) => {
         const newData = { ...prev, [name]: value };
-        
+
         // Calcular markup quando alterar preço de custo ou preço de venda
-        if (name === 'preco_custo' || name === 'preco') {
-          const custo = parseNumber(name === 'preco_custo' ? value : prev.preco_custo);
-          const venda = parseNumber(name === 'preco' ? value : prev.preco);
-          
+        if (name === "preco_custo" || name === "preco") {
+          const custo = parseNumber(name === "preco_custo" ? value : prev.preco_custo);
+          const venda = parseNumber(name === "preco" ? value : prev.preco);
+
           if (custo > 0 && venda > 0) {
             const markupCalc = ((venda - custo) / custo) * 100;
-            newData.markup = markupCalc.toFixed(2).replace('.', ',');
+            newData.markup = markupCalc.toFixed(2).replace(".", ",");
           } else {
-            newData.markup = '';
+            newData.markup = "";
           }
         }
-        
+
         // Calcular preço de venda quando alterar markup
-        if (name === 'markup') {
+        if (name === "markup") {
           const custo = parseNumber(prev.preco_custo);
           const markupNum = parseNumber(value);
-          
+
           if (custo > 0) {
             const vendaCalc = custo * (1 + markupNum / 100);
-            newData.preco = vendaCalc.toFixed(2).replace('.', ',');
+            newData.preco = vendaCalc.toFixed(2).replace(".", ",");
           }
         }
-        
+
         return newData;
       });
     }
 
     // Limpar erro do campo ao editar
     if (errors[name]) {
-      setErrors(prev => {
+      setErrors((prev) => {
         const newErrors = { ...prev };
         delete newErrors[name];
         return newErrors;
@@ -172,14 +170,14 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
 
   // Formatar campo com 2 casas decimais no onBlur
   const handleBlur = (name: string) => {
-    setFormData(prev => {
+    setFormData((prev) => {
       const valor = parseNumber(prev[name as keyof ProductFormData]);
       if (valor === 0 && !prev[name as keyof ProductFormData]) {
         return prev;
       }
       return {
         ...prev,
-        [name]: valor.toFixed(2).replace('.', ',')
+        [name]: valor.toFixed(2).replace(".", ","),
       };
     });
   };
@@ -190,32 +188,32 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
 
     // Nome obrigatório
     if (!formData.nome.trim()) {
-      newErrors.nome = 'Nome é obrigatório';
+      newErrors.nome = "Nome é obrigatório";
     }
 
     // SKU obrigatório
     if (!formData.sku.trim()) {
-      newErrors.sku = 'SKU é obrigatório';
+      newErrors.sku = "SKU é obrigatório";
     }
 
-    // Preço obrigatório e vNumber(formData.preco);
-      if (precoNum <= 0) {
-        newErrors.preco = 'Preço deve ser
+    // Preço obrigatório e válido
+    if (!formData.preco.trim()) {
+      newErrors.preco = "Preço é obrigatório";
     } else {
-      const precoNum = parseMoeda(formData.preco);
+      const precoNum = parseNumber(formData.preco);
       if (!Number.isFinite(precoNum) || precoNum <= 0) {
-        newErrors.preco = 'Preço deve ser um número válido maior que zero';
+        newErrors.preco = "Preço deve ser um número válido maior que zero";
       }
     }
 
     // Estoque obrigatório se produto físico
     if (formData.e_produto_fisico) {
       if (!formData.estoque.trim()) {
-        newErrors.estoque = 'Estoque é obrigatório para produtos físicos';
+        newErrors.estoque = "Estoque é obrigatório para produtos físicos";
       } else {
         const estoqueNum = parseInt(formData.estoque, 10);
         if (isNaN(estoqueNum) || estoqueNum < 0) {
-          newErrors.estoque = 'Estoque deve ser um número válido';
+          newErrors.estoque = "Estoque deve ser um número válido";
         }
       }
     }
@@ -230,46 +228,52 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
 
     // Validar
     if (!validate()) {
-      toast.error('Preencha todos os campos obrigatórios');
+      toast.error("Preencha todos os campos obrigatórios");
       return;
     }
 
     // Preparar payload
-    const payload: CreatNumber(formData.preco_custo),
+    const estoque = parseInt(formData.estoque, 10);
+    const payload: CreateProductPayload = {
+      nome: formData.nome.trim(),
+      sku: formData.sku.trim().toUpperCase(),
+      tipo: formData.tipo,
+      preco_custo: parseNumber(formData.preco_custo),
       preco: parseNumber(formData.preco),
-      estoque: formData.tipo === ProductType.SIMPLE ? parseInt(formData.estoque, 10) : 
-                formData.e_produto_fisico ? parseInt(formData.estoque, 10) : 0,
+      estoque:
+        formData.tipo === ProductType.SIMPLE ? estoque : formData.e_produto_fisico ? estoque : 0,
       status: formData.status,
       e_produto_fisico: formData.tipo === ProductType.SIMPLE ? true : formData.e_produto_fisico,
-      ...(formData.preco_promocional && { preco_promocional: parseNumber.estoque, 10) : 
-                formData.e_produto_fisico ? parseInt(formData.estoque, 10) : 0,
-      status: formData.status,
-      e_produto_fisico: formData.tipo === ProductType.SIMPLE ? true : formData.e_produto_fisico,
-      ...(formData.preco_promocional && { preco_promocional: parseMoeda(formData.preco_promocional) }),
+      ...(formData.preco_promocional && {
+        preco_promocional: parseNumber(formData.preco_promocional),
+      }),
       ...(formData.marca && { marca: formData.marca.trim() }),
       ...(formData.categoria && { categoria: formData.categoria.trim() }),
-      ...(formData.descricao_completa && { descricao_completa: formData.descricao_completa.trim() })
+      ...(formData.descricao_completa && {
+        descricao_completa: formData.descricao_completa.trim(),
+      }),
     };
 
     try {
       setLoading(true);
 
-      if (mode === 'edit' && productId) {
+      if (mode === "edit" && productId) {
         // Modo de edição: PATCH
         await api.patch(`/produtos/${productId}`, payload);
-        toast.success('Produto atualizado com sucesso!');
+        toast.success("Produto atualizado com sucesso!");
       } else {
         // Modo de criação: POST
-        await api.post('/produtos', payload);
-        toast.success('Produto criado com sucesso!');
+        await api.post("/produtos", payload);
+        toast.success("Produto criado com sucesso!");
       }
 
-      navigate('/produtos');
+      navigate("/produtos");
     } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 
-        (mode === 'edit' ? 'Erro ao atualizar produto' : 'Erro ao criar produto');
+      const errorMessage =
+        err.response?.data?.detail ||
+        (mode === "edit" ? "Erro ao atualizar produto" : "Erro ao criar produto");
       toast.error(errorMessage);
-      console.error(`Erro ao ${mode === 'edit' ? 'atualizar' : 'criar'} produto:`, err);
+      console.error(`Erro ao ${mode === "edit" ? "atualizar" : "criar"} produto:`, err);
     } finally {
       setLoading(false);
     }
@@ -277,7 +281,7 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
 
   // Cancelar
   const handleCancel = () => {
-    navigate('/produtos');
+    navigate("/produtos");
   };
 
   // Verificar se tipo não é simples
@@ -300,13 +304,11 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
       {/* Header */}
       <div className="form-header">
         <div className="header-title-section">
-          <h1 className="form-title">
-            {mode === 'edit' ? 'Editar Produto' : 'Novo Produto'}
-          </h1>
+          <h1 className="form-title">{mode === "edit" ? "Editar Produto" : "Novo Produto"}</h1>
           <p className="form-subtitle">
-            {mode === 'edit'
-              ? 'Atualize as informações do produto'
-              : 'Preencha as informações abaixo para cadastrar um novo produto'}
+            {mode === "edit"
+              ? "Atualize as informações do produto"
+              : "Preencha as informações abaixo para cadastrar um novo produto"}
           </p>
         </div>
       </div>
@@ -320,10 +322,18 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
 
             <div className="form-row">
               {/* TESTE DE BUILD - REMOVER DEPOIS */}
-              <div style={{ background: 'red', color: 'white', padding: '20px', fontSize: '24px', fontWeight: 'bold' }}>
+              <div
+                style={{
+                  background: "red",
+                  color: "white",
+                  padding: "20px",
+                  fontSize: "24px",
+                  fontWeight: "bold",
+                }}
+              >
                 🔴 BUILD ATUALIZADO EM {new Date().toLocaleTimeString()} 🔴
               </div>
-              
+
               {/* Nome */}
               <div className="form-group">
                 <label htmlFor="nome" className="form-label required">
@@ -333,8 +343,8 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
                   type="text"
                   id="nome"
                   name="nome"
-                  className={`form-input ${errors.nome ? 'input-error' : ''}`}
-                  style={{ border: '5px solid red', padding: '10px' }}
+                  className={`form-input ${errors.nome ? "input-error" : ""}`}
+                  style={{ border: "5px solid red", padding: "10px" }}
                   value={formData.nome}
                   onChange={handleChange}
                   placeholder="Ex: Ração Premium para Cães"
@@ -352,12 +362,12 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
                   type="text"
                   id="sku"
                   name="sku"
-                  className={`form-input ${errors.sku ? 'input-error' : ''}`}
+                  className={`form-input ${errors.sku ? "input-error" : ""}`}
                   value={formData.sku}
                   onChange={handleChange}
                   placeholder="Ex: RAC-001"
                   disabled={loading}
-                  style={{ textTransform: 'uppercase' }}
+                  style={{ textTransform: "uppercase" }}
                 />
                 {errors.sku && <span className="error-message">{errors.sku}</span>}
               </div>
@@ -423,14 +433,12 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
                     disabled={loading}
                     className="form-checkbox"
                   />
-                  <span className="checkbox-text">
-                    Este kit possui estoque físico
-                  </span>
+                  <span className="checkbox-text">Este kit possui estoque físico</span>
                 </label>
                 <p className="field-hint">
                   {formData.e_produto_fisico
-                    ? 'Estoque do kit será controlado (não depende dos componentes)'
-                    : 'Estoque virtual (depende do estoque dos componentes)'}
+                    ? "Estoque do kit será controlado (não depende dos componentes)"
+                    : "Estoque virtual (depende do estoque dos componentes)"}
                 </p>
               </div>
             )}
@@ -438,7 +446,7 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
             {/* Produto simples sempre tem estoque físico */}
             {formData.tipo === ProductType.SIMPLE && (
               <div className="form-group">
-                <p className="field-hint" style={{ marginTop: '8px', color: '#6b7280' }}>
+                <p className="field-hint" style={{ marginTop: "8px", color: "#6b7280" }}>
                   ℹ️ Produtos simples sempre possuem estoque físico controlado
                 </p>
               </div>
@@ -461,7 +469,11 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
                   <input
                     type="text"
                     id="preco_custo"
-                    onBlur={() => handleBlur('preco_custo')}
+                    name="preco_custo"
+                    className="form-input input-with-prefix-field"
+                    value={formData.preco_custo}
+                    onChange={handleChange}
+                    onBlur={() => handleBlur("preco_custo")}
                     placeholder="0,00"
                     disabled={loading}
                   />
@@ -481,11 +493,7 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
                     className="form-input"
                     value={formData.markup}
                     onChange={handleChange}
-                    onBlur={() => handleBlur('markup')
-                    name="markup"
-                    className="form-input"
-                    value={formData.markup}
-                    onChange={handleChange}
+                    onBlur={() => handleBlur("markup")}
                     placeholder="0,00"
                     disabled={loading}
                   />
@@ -507,9 +515,11 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
                     id="preco"
                     name="preco"
                     className={`form-input input-with-prefix-field ${
-                      errors.preco ? 'input-error' : ''
+                      errors.preco ? "input-error" : ""
                     }`}
-                    onBlur={() => handleBlur('preco')}
+                    value={formData.preco}
+                    onChange={handleChange}
+                    onBlur={() => handleBlur("preco")}
                     placeholder="0,00"
                     disabled={loading}
                   />
@@ -531,9 +541,7 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
                     className="form-input input-with-prefix-field"
                     value={formData.preco_promocional}
                     onChange={handleChange}
-                    onBlur={() => handleBlur('preco_promocional')input-with-prefix-field"
-                    value={formData.preco_promocional}
-                    onChange={handleChange}
+                    onBlur={() => handleBlur("preco_promocional")}
                     placeholder="0,00"
                     disabled={loading}
                   />
@@ -543,7 +551,7 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
 
             <div className="form-row">
               {/* Estoque - Mostrar apenas se for produto simples OU kit físico */}
-              {(formData.tipo === ProductType.SIMPLE || 
+              {(formData.tipo === ProductType.SIMPLE ||
                 (formData.tipo === ProductType.KIT && formData.e_produto_fisico)) && (
                 <div className="form-group">
                   <label htmlFor="estoque" className="form-label required">
@@ -553,16 +561,14 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
                     type="number"
                     id="estoque"
                     name="estoque"
-                    className={`form-input ${errors.estoque ? 'input-error' : ''}`}
+                    className={`form-input ${errors.estoque ? "input-error" : ""}`}
                     value={formData.estoque}
                     onChange={handleChange}
                     placeholder="0"
                     min="0"
                     disabled={loading}
                   />
-                  {errors.estoque && (
-                    <span className="error-message">{errors.estoque}</span>
-                  )}
+                  {errors.estoque && <span className="error-message">{errors.estoque}</span>}
                 </div>
               )}
             </div>
@@ -630,19 +636,14 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
 
         {/* Footer com Botões */}
         <div className="form-footer">
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={handleCancel}
-            disabled={loading}
-          >
+          <button type="button" className="btn-secondary" onClick={handleCancel} disabled={loading}>
             Cancelar
           </button>
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading ? (
               <>
                 <span className="spinner-small"></span>
-                {mode === 'edit' ? 'Salvando...' : 'Salvando...'}
+                {mode === "edit" ? "Salvando..." : "Salvando..."}
               </>
             ) : (
               <>
@@ -666,7 +667,7 @@ export const ProdutoForm: React.FC<ProdutoFormProps> = ({
                     strokeLinejoin="round"
                   />
                 </svg>
-                {mode === 'edit' ? 'Salvar Alterações' : 'Salvar Produto'}
+                {mode === "edit" ? "Salvar Alterações" : "Salvar Produto"}
               </>
             )}
           </button>

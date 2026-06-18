@@ -1,8 +1,8 @@
-import { Search } from 'lucide-react';
-import EcommerceCatalogControls, { EcommerceCatalogSummary } from './EcommerceCatalogControls';
-import EcommerceCatalogPagination from './EcommerceCatalogPagination';
-import EcommerceCatalogProductCard from './EcommerceCatalogProductCard';
-import { EcommerceCartSidebar } from './EcommerceCartPanels';
+import { Search } from "lucide-react";
+import EcommerceCatalogControls, { EcommerceCatalogSummary } from "./EcommerceCatalogControls";
+import EcommerceCatalogPagination from "./EcommerceCatalogPagination";
+import EcommerceCatalogProductCard from "./EcommerceCatalogProductCard";
+import { EcommerceCartSidebar } from "./EcommerceCartPanels";
 
 export default function EcommerceStorePage({
   cart,
@@ -37,12 +37,18 @@ export default function EcommerceStorePage({
 }) {
   return (
     <>
-      <EcommerceCatalogSummary
-        isMobile={isMobile}
-        productCount={productCount}
-      />
+      <EcommerceCatalogSummary isMobile={isMobile} productCount={productCount} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 300px', gap: 24, maxWidth: 1280, margin: '0 auto', padding: isMobile ? '12px 12px 28px' : '16px 20px 28px' }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1fr) 300px",
+          gap: 24,
+          maxWidth: 1280,
+          margin: "0 auto",
+          padding: isMobile ? "12px 12px 28px" : "16px 20px 28px",
+        }}
+      >
         <div>
           <EcommerceCatalogControls
             categories={categories}
@@ -59,7 +65,15 @@ export default function EcommerceStorePage({
             onSearchChange={onSearchChange}
           />
 
-          <div style={{ ...S.grid, gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 16 }}>
+          <div
+            style={{
+              ...S.grid,
+              gridTemplateColumns: isMobile
+                ? "repeat(2, 1fr)"
+                : "repeat(auto-fill, minmax(200px, 1fr))",
+              gap: isMobile ? 10 : 16,
+            }}
+          >
             {filteredProducts.map((product) => (
               <EcommerceCatalogProductCard
                 key={product.id}
@@ -75,11 +89,35 @@ export default function EcommerceStorePage({
               />
             ))}
             {!loading && filteredProducts.length === 0 && (
-              <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 0', color: '#9ca3af' }}>
+              <div
+                style={{
+                  gridColumn: "1/-1",
+                  textAlign: "center",
+                  padding: "60px 0",
+                  color: "#9ca3af",
+                }}
+              >
                 <Search size={44} strokeWidth={1.5} style={{ marginBottom: 12 }} />
-                <div style={{ fontWeight: 800, fontSize: 18, color: '#374151' }}>Nenhum produto encontrado</div>
-                <div style={{ fontSize: 13, marginTop: 4 }}>Tente buscar por outro termo ou categoria</div>
-                <button onClick={onClearFilters} style={{ marginTop: 16, padding: '8px 20px', borderRadius: 20, border: '1.5px solid #e7e5e4', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#f97316' }}>
+                <div style={{ fontWeight: 800, fontSize: 18, color: "#374151" }}>
+                  Nenhum produto encontrado
+                </div>
+                <div style={{ fontSize: 13, marginTop: 4 }}>
+                  Tente buscar por outro termo ou categoria
+                </div>
+                <button
+                  onClick={onClearFilters}
+                  style={{
+                    marginTop: 16,
+                    padding: "8px 20px",
+                    borderRadius: 20,
+                    border: "1.5px solid #e7e5e4",
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#f97316",
+                  }}
+                >
                   Limpar filtros
                 </button>
               </div>

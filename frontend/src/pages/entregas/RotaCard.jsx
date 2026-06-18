@@ -33,9 +33,7 @@ function RotaCard({
   const tempoEstimado = calcularTempoEstimado(rota);
 
   // Calcular paradas pendentes
-  const paradasPendentes = paradasOrdenadas.filter(
-    (p) => p.status !== "entregue",
-  ).length;
+  const paradasPendentes = paradasOrdenadas.filter((p) => p.status !== "entregue").length;
   const todasEntregue = paradasOrdenadas.length > 0 && paradasPendentes === 0;
 
   async function carregarDetalhesVenda(paradaId, vendaId) {
@@ -91,9 +89,7 @@ function RotaCard({
         // Auto-calcular a partir da distância da rota otimizada
         const parada = paradasOrdenadas.find((p) => p.id === paradaId);
         if (parada?.distancia_acumulada && rota.km_inicial) {
-          const kmAuto =
-            parseFloat(rota.km_inicial) +
-            parseFloat(parada.distancia_acumulada);
+          const kmAuto = parseFloat(rota.km_inicial) + parseFloat(parada.distancia_acumulada);
           params.km_entrega = parseFloat(kmAuto.toFixed(2));
         }
       }
@@ -107,8 +103,7 @@ function RotaCard({
             return;
           }
           navigator.geolocation.getCurrentPosition(
-            (pos) =>
-              resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+            (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
             () => resolve(null),
             { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 },
           );
@@ -146,8 +141,7 @@ function RotaCard({
       window.location.reload();
     } catch (err) {
       console.error("Erro ao marcar entrega:", err);
-      const mensagem =
-        err.response?.data?.detail || "Erro ao marcar entrega como concluída";
+      const mensagem = err.response?.data?.detail || "Erro ao marcar entrega como concluída";
       alert("❌ " + mensagem);
     } finally {
       setProcessandoEntrega(null);
@@ -164,21 +158,15 @@ function RotaCard({
     }
 
     try {
-      await api.put(
-        `/rotas-entrega/${rotaId}/paradas/${paradaId}/observacao`,
-        null,
-        {
-          params: { observacao: observacao.trim() },
-        },
-      );
+      await api.put(`/rotas-entrega/${rotaId}/paradas/${paradaId}/observacao`, null, {
+        params: { observacao: observacao.trim() },
+      });
 
       alert("✅ Observação salva com sucesso!");
 
       // Atualizar localmente
       setParadasOrdenadas((prev) =>
-        prev.map((p) =>
-          p.id === paradaId ? { ...p, observacoes: observacao.trim() } : p,
-        ),
+        prev.map((p) => (p.id === paradaId ? { ...p, observacoes: observacao.trim() } : p)),
       );
     } catch (err) {
       console.error("Erro ao salvar observação:", err);
@@ -205,13 +193,9 @@ function RotaCard({
 
     try {
       setProcessandoNaoEntregue(paradaId);
-      await api.post(
-        `/rotas-entrega/${rotaId}/paradas/${paradaId}/nao-entregue`,
-        null,
-        {
-          params: { motivo: motivo.trim() },
-        },
-      );
+      await api.post(`/rotas-entrega/${rotaId}/paradas/${paradaId}/nao-entregue`, null, {
+        params: { motivo: motivo.trim() },
+      });
 
       alert(
         "✅ Entrega marcada como não realizada. Venda #" +
@@ -242,8 +226,7 @@ function RotaCard({
       : null;
 
     // Montar mensagem de confirmação com distância se disponível
-    let msgConfirm =
-      "✅ Finalizar esta rota?\n\nEsta ação não pode ser desfeita.";
+    let msgConfirm = "✅ Finalizar esta rota?\n\nEsta ação não pode ser desfeita.";
     if (distanciaGpsTotal) {
       msgConfirm = `✅ Finalizar esta rota?\n\n📏 Distância real pelo GPS: ${distanciaGpsTotal.toFixed(2)} km\n\nEsta ação não pode ser desfeita.`;
     } else if (metodo === "auto_rota" && distanciaRouteTotal) {
@@ -264,15 +247,10 @@ function RotaCard({
         const kmFinalDigitado = prompt(
           "🏁 Digite o KM final do odômetro (opcional):\n\nDeixe em branco para pular.",
         );
-        if (
-          kmFinalDigitado &&
-          !isNaN(kmFinalDigitado) &&
-          parseFloat(kmFinalDigitado) > 0
-        ) {
+        if (kmFinalDigitado && !isNaN(kmFinalDigitado) && parseFloat(kmFinalDigitado) > 0) {
           payload.km_final = parseFloat(kmFinalDigitado);
           if (kmInicial) {
-            payload.distancia_real =
-              parseFloat(kmFinalDigitado) - parseFloat(kmInicial);
+            payload.distancia_real = parseFloat(kmFinalDigitado) - parseFloat(kmInicial);
           }
         }
       } else if (distanciaGpsTotal) {

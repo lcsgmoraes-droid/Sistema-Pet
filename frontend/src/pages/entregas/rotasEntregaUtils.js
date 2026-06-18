@@ -54,9 +54,7 @@ export function getStatusLabel(status) {
 
 export function filtrarRotasEmAndamento(rotas = []) {
   if (!Array.isArray(rotas)) return [];
-  return rotas.filter(
-    (rota) => rota.status === "em_rota" || rota.status === "em_andamento",
-  );
+  return rotas.filter((rota) => rota.status === "em_rota" || rota.status === "em_andamento");
 }
 
 export function agruparRotasPorEntregador(rotas = []) {

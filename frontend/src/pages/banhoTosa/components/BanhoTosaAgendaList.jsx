@@ -17,18 +17,17 @@ export default function BanhoTosaAgendaList({
     <Panel>
       <BanhoTosaAgendaHeader dataRef={dataRef} onAtualizar={onAtualizar} />
       <div className="mt-3 space-y-3">
-        {loading && (
-          <LoadingState compact label="Carregando agenda..." />
-        )}
+        {loading && <LoadingState compact label="Carregando agenda..." />}
 
-        {!loading && agendamentos.map((agendamento) => (
-          <BanhoTosaAgendaCard
-            key={agendamento.id}
-            agendamento={agendamento}
-            onCheckIn={onCheckIn}
-            onCancelar={onCancelar}
-          />
-        ))}
+        {!loading &&
+          agendamentos.map((agendamento) => (
+            <BanhoTosaAgendaCard
+              key={agendamento.id}
+              agendamento={agendamento}
+              onCheckIn={onCheckIn}
+              onCancelar={onCancelar}
+            />
+          ))}
 
         {!loading && agendamentos.length === 0 && (
           <EmptyState

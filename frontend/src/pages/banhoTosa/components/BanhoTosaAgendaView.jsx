@@ -47,7 +47,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
         tutor_id: tutorSelecionado?.id || null,
         tutor_nome: tutorSelecionado?.nome || null,
       }),
-    [location.pathname, location.search, tutorSelecionado?.id, tutorSelecionado?.nome]
+    [location.pathname, location.search, tutorSelecionado?.id, tutorSelecionado?.nome],
   );
   const agendaResumo = useMemo(
     () => resumirAgenda(agendamentos, capacidade, recursos),
@@ -93,11 +93,9 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
       };
     });
     if (novoPetIdQuery) {
-      setForm((prev) => (
-        String(prev.pet_id) === String(novoPetIdQuery)
-          ? prev
-          : { ...prev, pet_id: "" }
-      ));
+      setForm((prev) =>
+        String(prev.pet_id) === String(novoPetIdQuery) ? prev : { ...prev, pet_id: "" },
+      );
     }
   }, [novoPetIdQuery, tutorIdQuery, tutorNomeQuery]);
 
@@ -403,7 +401,9 @@ function CapacidadeAlertas({ capacidade }) {
 
 function resumirAgenda(agendamentos, capacidade, recursos) {
   const emAndamento = agendamentos.filter((agendamento) =>
-    ["check_in", "em_atendimento", "em_execucao"].includes(String(agendamento.status || "").toLowerCase()),
+    ["check_in", "em_atendimento", "em_execucao"].includes(
+      String(agendamento.status || "").toLowerCase(),
+    ),
   ).length;
   const recursosAtivos = recursos.filter((recurso) => recurso.ativo).length;
   const recursosCapacidade = capacidade?.recursos || [];

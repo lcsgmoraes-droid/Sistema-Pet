@@ -13,9 +13,12 @@ export function useConfiguracoesParceirosActions({
   setParceiros,
   setSalvando,
 }) {
-  const atualizarParceiroForm = useCallback((patch) => {
-    setParceiroForm((prev) => ({ ...prev, ...patch }));
-  }, [setParceiroForm]);
+  const atualizarParceiroForm = useCallback(
+    (patch) => {
+      setParceiroForm((prev) => ({ ...prev, ...patch }));
+    },
+    [setParceiroForm],
+  );
 
   const salvarNovoParceiro = useCallback(async () => {
     if (!parceiroForm.vetTenantId) {
@@ -29,7 +32,9 @@ export function useConfiguracoesParceirosActions({
       await vetApi.criarParceiro({
         vet_tenant_id: parceiroForm.vetTenantId,
         tipo_relacao: parceiroForm.tipoRelacao,
-        comissao_empresa_pct: parceiroForm.comissao ? Number.parseFloat(parceiroForm.comissao) : null,
+        comissao_empresa_pct: parceiroForm.comissao
+          ? Number.parseFloat(parceiroForm.comissao)
+          : null,
       });
       mostrarSucesso("Parceiro cadastrado com sucesso!");
       setMostrarForm(false);
@@ -40,18 +45,31 @@ export function useConfiguracoesParceirosActions({
     } finally {
       setSalvando(false);
     }
-  }, [carregar, mostrarSucesso, parceiroForm, setErro, setMostrarForm, setParceiroForm, setSalvando]);
+  }, [
+    carregar,
+    mostrarSucesso,
+    parceiroForm,
+    setErro,
+    setMostrarForm,
+    setParceiroForm,
+    setSalvando,
+  ]);
 
-  const toggleAtivoParceiro = useCallback(async (parceiro) => {
-    try {
-      await vetApi.atualizarParceiro(parceiro.id, { ativo: !parceiro.ativo });
-      setParceiros((prev) =>
-        prev.map((item) => (item.id === parceiro.id ? { ...item, ativo: !parceiro.ativo } : item))
-      );
-    } catch {
-      setErro("Nao foi possivel atualizar o parceiro.");
-    }
-  }, [setErro, setParceiros]);
+  const toggleAtivoParceiro = useCallback(
+    async (parceiro) => {
+      try {
+        await vetApi.atualizarParceiro(parceiro.id, { ativo: !parceiro.ativo });
+        setParceiros((prev) =>
+          prev.map((item) =>
+            item.id === parceiro.id ? { ...item, ativo: !parceiro.ativo } : item,
+          ),
+        );
+      } catch {
+        setErro("Nao foi possivel atualizar o parceiro.");
+      }
+    },
+    [setErro, setParceiros],
+  );
 
   const removerParceiro = useCallback(
     async (id) => {
@@ -65,7 +83,7 @@ export function useConfiguracoesParceirosActions({
         setErro("Erro ao remover parceiro.");
       }
     },
-    [mostrarSucesso, setErro, setParceiros]
+    [mostrarSucesso, setErro, setParceiros],
   );
 
   const cancelarParceiro = useCallback(() => {

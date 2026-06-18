@@ -19,9 +19,7 @@ export default function RoleCard({ onDelete, onEdit, role }) {
               <ShieldCheck className="h-5 w-5" aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <h2 className="truncate text-base font-semibold text-slate-950">
-                {role.nome}
-              </h2>
+              <h2 className="truncate text-base font-semibold text-slate-950">{role.nome}</h2>
               <p className="text-xs text-slate-500">ID {role.role_id}</p>
             </div>
           </div>

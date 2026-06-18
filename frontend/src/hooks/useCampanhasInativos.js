@@ -8,17 +8,12 @@ const DEFAULT_ENVIO_INATIVOS_FORM = {
 
 export default function useCampanhasInativos() {
   const [modalEnvioInativos, setModalEnvioInativos] = useState(null);
-  const [envioInativosForm, setEnvioInativosForm] = useState(
-    DEFAULT_ENVIO_INATIVOS_FORM,
-  );
+  const [envioInativosForm, setEnvioInativosForm] = useState(DEFAULT_ENVIO_INATIVOS_FORM);
   const [enviandoInativos, setEnviandoInativos] = useState(false);
   const [resultadoEnvioInativos, setResultadoEnvioInativos] = useState(null);
 
   const enviarParaInativos = async () => {
-    if (
-      !envioInativosForm.assunto.trim() ||
-      !envioInativosForm.mensagem.trim()
-    ) {
+    if (!envioInativosForm.assunto.trim() || !envioInativosForm.mensagem.trim()) {
       alert("Preencha o assunto e a mensagem antes de enviar.");
       return;
     }

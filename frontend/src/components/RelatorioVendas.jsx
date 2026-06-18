@@ -1,18 +1,17 @@
-import { useState, useEffect } from 'react';
-import api from '../api';
-import { getAccessToken } from '../auth/tokenStorage';
-import { Calendar, DollarSign, TrendingUp, Package, Users, CreditCard, Filter } from 'lucide-react';
-import CustomerIdentity from './ui/CustomerIdentity';
-import PetIdentity from './ui/PetIdentity';
-import ProductIdentity from './ui/ProductIdentity';
-import SaleReference from './ui/SaleReference';
+import { useState, useEffect } from "react";
+import api from "../api";
+import { getAccessToken } from "../auth/tokenStorage";
+import CustomerIdentity from "./ui/CustomerIdentity";
+import PetIdentity from "./ui/PetIdentity";
+import ProductIdentity from "./ui/ProductIdentity";
+import SaleReference from "./ui/SaleReference";
 
 export default function RelatorioVendas() {
   const [loading, setLoading] = useState(true);
-  const [abaAtiva, setAbaAtiva] = useState('resumo');
-  const [dataInicio, setDataInicio] = useState(new Date().toISOString().split('T')[0]);
-  const [dataFim, setDataFim] = useState(new Date().toISOString().split('T')[0]);
-  
+  const [abaAtiva, setAbaAtiva] = useState("resumo");
+  const [dataInicio, setDataInicio] = useState(new Date().toISOString().split("T")[0]);
+  const [dataFim, setDataFim] = useState(new Date().toISOString().split("T")[0]);
+
   // Estados dos dados
   const [resumo, setResumo] = useState({
     venda_bruta: 0,
@@ -20,9 +19,9 @@ export default function RelatorioVendas() {
     desconto: 0,
     venda_liquida: 0,
     em_aberto: 0,
-    quantidade_vendas: 0
+    quantidade_vendas: 0,
   });
-  
+
   const [vendasPorData, setVendasPorData] = useState([]);
   const [formasRecebimento, setFormasRecebimento] = useState([]);
   const [vendasPorFuncionario, setVendasPorFuncionario] = useState([]);
@@ -34,15 +33,15 @@ export default function RelatorioVendas() {
   const getToken = () => getAccessToken();
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(valor || 0);
   };
 
   const formatarData = (dataStr) => {
     const data = new Date(dataStr);
-    return data.toLocaleDateString('pt-BR');
+    return data.toLocaleDateString("pt-BR");
   };
 
   const carregarDados = async () => {
@@ -50,7 +49,7 @@ export default function RelatorioVendas() {
     const token = getToken();
     const config = {
       headers: { Authorization: `Bearer ${token}` },
-      params: { data_inicio: dataInicio, data_fim: dataFim }
+      params: { data_inicio: dataInicio, data_fim: dataFim },
     };
 
     try {
@@ -65,13 +64,13 @@ export default function RelatorioVendas() {
       setVendasPorGrupo(data.vendas_por_grupo || []);
       setProdutosDetalhados(data.produtos_detalhados || []);
       setListaVendas(data.lista_vendas || []);
-      
-      console.log('✅ Dados carregados:', {
+
+      console.log("✅ Dados carregados:", {
         vendasPorData: data.vendas_por_data?.length || 0,
-        formasRecebimento: data.formas_recebimento?.length || 0
+        formasRecebimento: data.formas_recebimento?.length || 0,
       });
     } catch (error) {
-      console.error('Erro ao carregar relatório:', error);
+      console.error("Erro ao carregar relatório:", error);
     } finally {
       setLoading(false);
     }
@@ -115,31 +114,31 @@ export default function RelatorioVendas() {
         {/* Abas */}
         <div className="flex gap-2 border-b">
           <button
-            onClick={() => setAbaAtiva('resumo')}
+            onClick={() => setAbaAtiva("resumo")}
             className={`px-4 py-2 font-medium ${
-              abaAtiva === 'resumo'
-                ? 'border-b-2 border-blue-500 text-blue-600'
-                : 'text-gray-600 hover:text-gray-800'
+              abaAtiva === "resumo"
+                ? "border-b-2 border-blue-500 text-blue-600"
+                : "text-gray-600 hover:text-gray-800"
             }`}
           >
             Resumo
           </button>
           <button
-            onClick={() => setAbaAtiva('produtos')}
+            onClick={() => setAbaAtiva("produtos")}
             className={`px-4 py-2 font-medium ${
-              abaAtiva === 'produtos'
-                ? 'border-b-2 border-blue-500 text-blue-600'
-                : 'text-gray-600 hover:text-gray-800'
+              abaAtiva === "produtos"
+                ? "border-b-2 border-blue-500 text-blue-600"
+                : "text-gray-600 hover:text-gray-800"
             }`}
           >
             Totais por produto/serviço
           </button>
           <button
-            onClick={() => setAbaAtiva('lista')}
+            onClick={() => setAbaAtiva("lista")}
             className={`px-4 py-2 font-medium ${
-              abaAtiva === 'lista'
-                ? 'border-b-2 border-blue-500 text-blue-600'
-                : 'text-gray-600 hover:text-gray-800'
+              abaAtiva === "lista"
+                ? "border-b-2 border-blue-500 text-blue-600"
+                : "text-gray-600 hover:text-gray-800"
             }`}
           >
             Lista de Vendas
@@ -148,7 +147,7 @@ export default function RelatorioVendas() {
       </div>
 
       {/* Conteúdo das Abas */}
-      {abaAtiva === 'resumo' && (
+      {abaAtiva === "resumo" && (
         <div>
           {/* Cards de Resumo */}
           <div className="grid grid-cols-5 gap-4 mb-6">
@@ -212,17 +211,41 @@ export default function RelatorioVendas() {
                   ))}
                   {/* Linha de Total */}
                   {vendasPorData.length > 0 && (
-                    <tr style={{backgroundColor: '#374151', color: 'white', fontWeight: 'bold'}}>
+                    <tr style={{ backgroundColor: "#374151", color: "white", fontWeight: "bold" }}>
                       <td className="px-4 py-3">TOTAL</td>
-                      <td className="px-4 py-3 text-right">{vendasPorData.reduce((sum, item) => sum + item.quantidade, 0)}</td>
+                      <td className="px-4 py-3 text-right">
+                        {vendasPorData.reduce((sum, item) => sum + item.quantidade, 0)}
+                      </td>
                       <td className="px-4 py-3 text-right">-</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorData.reduce((sum, item) => sum + item.valor_bruto, 0))}</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorData.reduce((sum, item) => sum + item.taxa_entrega, 0))}</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorData.reduce((sum, item) => sum + item.desconto, 0))}</td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(
+                          vendasPorData.reduce((sum, item) => sum + item.valor_bruto, 0),
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(
+                          vendasPorData.reduce((sum, item) => sum + item.taxa_entrega, 0),
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(vendasPorData.reduce((sum, item) => sum + item.desconto, 0))}
+                      </td>
                       <td className="px-4 py-3 text-right">-</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorData.reduce((sum, item) => sum + item.valor_liquido, 0))}</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorData.reduce((sum, item) => sum + item.valor_recebido, 0))}</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorData.reduce((sum, item) => sum + item.saldo_aberto, 0))}</td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(
+                          vendasPorData.reduce((sum, item) => sum + item.valor_liquido, 0),
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(
+                          vendasPorData.reduce((sum, item) => sum + item.valor_recebido, 0),
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(
+                          vendasPorData.reduce((sum, item) => sum + item.saldo_aberto, 0),
+                        )}
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -252,9 +275,13 @@ export default function RelatorioVendas() {
                     </tr>
                   ))}
                   {formasRecebimento.length > 0 && (
-                    <tr style={{backgroundColor: '#374151', color: 'white', fontWeight: 'bold'}}>
+                    <tr style={{ backgroundColor: "#374151", color: "white", fontWeight: "bold" }}>
                       <td className="px-4 py-3">TOTAL</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(formasRecebimento.reduce((sum, item) => sum + item.valor_total, 0))}</td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(
+                          formasRecebimento.reduce((sum, item) => sum + item.valor_total, 0),
+                        )}
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -287,12 +314,26 @@ export default function RelatorioVendas() {
                     </tr>
                   ))}
                   {vendasPorFuncionario.length > 0 && (
-                    <tr style={{backgroundColor: '#374151', color: 'white', fontWeight: 'bold'}}>
+                    <tr style={{ backgroundColor: "#374151", color: "white", fontWeight: "bold" }}>
                       <td className="px-4 py-3">TOTAL</td>
-                      <td className="px-4 py-3 text-right">{vendasPorFuncionario.reduce((sum, item) => sum + item.quantidade, 0)}</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorFuncionario.reduce((sum, item) => sum + item.valor_bruto, 0))}</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorFuncionario.reduce((sum, item) => sum + item.desconto, 0))}</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorFuncionario.reduce((sum, item) => sum + item.valor_liquido, 0))}</td>
+                      <td className="px-4 py-3 text-right">
+                        {vendasPorFuncionario.reduce((sum, item) => sum + item.quantidade, 0)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(
+                          vendasPorFuncionario.reduce((sum, item) => sum + item.valor_bruto, 0),
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(
+                          vendasPorFuncionario.reduce((sum, item) => sum + item.desconto, 0),
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(
+                          vendasPorFuncionario.reduce((sum, item) => sum + item.valor_liquido, 0),
+                        )}
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -325,12 +366,24 @@ export default function RelatorioVendas() {
                     </tr>
                   ))}
                   {vendasPorTipo.length > 0 && (
-                    <tr style={{backgroundColor: '#374151', color: 'white', fontWeight: 'bold'}}>
+                    <tr style={{ backgroundColor: "#374151", color: "white", fontWeight: "bold" }}>
                       <td className="px-4 py-3">TOTAL</td>
-                      <td className="px-4 py-3 text-right">{vendasPorTipo.reduce((sum, item) => sum + item.quantidade, 0)}</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorTipo.reduce((sum, item) => sum + item.valor_bruto, 0))}</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorTipo.reduce((sum, item) => sum + item.desconto, 0))}</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorTipo.reduce((sum, item) => sum + item.valor_liquido, 0))}</td>
+                      <td className="px-4 py-3 text-right">
+                        {vendasPorTipo.reduce((sum, item) => sum + item.quantidade, 0)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(
+                          vendasPorTipo.reduce((sum, item) => sum + item.valor_bruto, 0),
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(vendasPorTipo.reduce((sum, item) => sum + item.desconto, 0))}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(
+                          vendasPorTipo.reduce((sum, item) => sum + item.valor_liquido, 0),
+                        )}
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -363,12 +416,24 @@ export default function RelatorioVendas() {
                     </tr>
                   ))}
                   {vendasPorGrupo.length > 0 && (
-                    <tr style={{backgroundColor: '#374151', color: 'white', fontWeight: 'bold'}}>
+                    <tr style={{ backgroundColor: "#374151", color: "white", fontWeight: "bold" }}>
                       <td className="px-4 py-3">TOTAL</td>
                       <td className="px-4 py-3 text-right">-</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorGrupo.reduce((sum, item) => sum + item.valor_bruto, 0))}</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorGrupo.reduce((sum, item) => sum + item.desconto, 0))}</td>
-                      <td className="px-4 py-3 text-right">{formatarMoeda(vendasPorGrupo.reduce((sum, item) => sum + item.valor_liquido, 0))}</td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(
+                          vendasPorGrupo.reduce((sum, item) => sum + item.valor_bruto, 0),
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(
+                          vendasPorGrupo.reduce((sum, item) => sum + item.desconto, 0),
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {formatarMoeda(
+                          vendasPorGrupo.reduce((sum, item) => sum + item.valor_liquido, 0),
+                        )}
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -379,7 +444,7 @@ export default function RelatorioVendas() {
       )}
 
       {/* Aba Produtos Detalhados */}
-      {abaAtiva === 'produtos' && (
+      {abaAtiva === "produtos" && (
         <div className="bg-white rounded-lg shadow">
           <div className="bg-gray-600 text-white px-4 py-2 rounded-t-lg font-semibold">
             Produtos/Serviços
@@ -399,78 +464,125 @@ export default function RelatorioVendas() {
                 {produtosDetalhados.map((categoria, catIdx) => (
                   <>
                     {/* Linha da Categoria */}
-                    <tr key={`cat-${catIdx}`} className="bg-blue-50 font-semibold border-b-2 border-blue-300">
+                    <tr
+                      key={`cat-${catIdx}`}
+                      className="bg-blue-50 font-semibold border-b-2 border-blue-300"
+                    >
                       <td className="px-4 py-2">{categoria.categoria}</td>
                       <td className="px-4 py-2 text-right">{categoria.total_quantidade}</td>
-                      <td className="px-4 py-2 text-right">{formatarMoeda(categoria.total_bruto)}</td>
-                      <td className="px-4 py-2 text-right">{formatarMoeda(categoria.total_desconto)}</td>
-                      <td className="px-4 py-2 text-right">{formatarMoeda(categoria.total_liquido)}</td>
+                      <td className="px-4 py-2 text-right">
+                        {formatarMoeda(categoria.total_bruto)}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {formatarMoeda(categoria.total_desconto)}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {formatarMoeda(categoria.total_liquido)}
+                      </td>
                     </tr>
-                    
+
                     {/* Subcategorias */}
-                    {categoria.subcategorias && categoria.subcategorias.map((subcategoria, subIdx) => (
-                      <>
-                        <tr key={`subcat-${catIdx}-${subIdx}`} className="bg-gray-50 font-medium border-b">
-                          <td className="px-4 py-2 pl-8">📁 {subcategoria.subcategoria}</td>
-                          <td className="px-4 py-2 text-right">{subcategoria.total_quantidade}</td>
-                          <td className="px-4 py-2 text-right">{formatarMoeda(subcategoria.total_bruto)}</td>
-                          <td className="px-4 py-2 text-right">{formatarMoeda(subcategoria.total_desconto)}</td>
-                          <td className="px-4 py-2 text-right">{formatarMoeda(subcategoria.total_liquido)}</td>
-                        </tr>
-                        
-                        {/* Produtos da Subcategoria */}
-                        {subcategoria.produtos.map((produto, prodIdx) => (
-                          <tr key={`prod-${catIdx}-${subIdx}-${prodIdx}`} className="border-b hover:bg-gray-50">
-                            <td className="px-4 py-2 pl-12 text-gray-700">
-                              <ProductIdentity
-                                className="pl-0"
-                                name={produto.produto}
-                                product={produto}
-                              />
+                    {categoria.subcategorias &&
+                      categoria.subcategorias.map((subcategoria, subIdx) => (
+                        <>
+                          <tr
+                            key={`subcat-${catIdx}-${subIdx}`}
+                            className="bg-gray-50 font-medium border-b"
+                          >
+                            <td className="px-4 py-2 pl-8">📁 {subcategoria.subcategoria}</td>
+                            <td className="px-4 py-2 text-right">
+                              {subcategoria.total_quantidade}
                             </td>
-                            <td className="px-4 py-2 text-right text-gray-700">{produto.quantidade}</td>
-                            <td className="px-4 py-2 text-right text-gray-700">{formatarMoeda(produto.valor_bruto)}</td>
-                            <td className="px-4 py-2 text-right text-gray-700">{formatarMoeda(produto.desconto)}</td>
-                            <td className="px-4 py-2 text-right text-gray-700">{formatarMoeda(produto.valor_liquido)}</td>
+                            <td className="px-4 py-2 text-right">
+                              {formatarMoeda(subcategoria.total_bruto)}
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              {formatarMoeda(subcategoria.total_desconto)}
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              {formatarMoeda(subcategoria.total_liquido)}
+                            </td>
                           </tr>
-                        ))}
-                      </>
-                    ))}
-                    
+
+                          {/* Produtos da Subcategoria */}
+                          {subcategoria.produtos.map((produto, prodIdx) => (
+                            <tr
+                              key={`prod-${catIdx}-${subIdx}-${prodIdx}`}
+                              className="border-b hover:bg-gray-50"
+                            >
+                              <td className="px-4 py-2 pl-12 text-gray-700">
+                                <ProductIdentity
+                                  className="pl-0"
+                                  name={produto.produto}
+                                  product={produto}
+                                />
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-700">
+                                {produto.quantidade}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-700">
+                                {formatarMoeda(produto.valor_bruto)}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-700">
+                                {formatarMoeda(produto.desconto)}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-700">
+                                {formatarMoeda(produto.valor_liquido)}
+                              </td>
+                            </tr>
+                          ))}
+                        </>
+                      ))}
+
                     {/* Produtos diretos da Categoria (sem subcategoria) */}
-                    {categoria.produtos && categoria.produtos.map((produto, prodIdx) => (
-                      <tr key={`prod-${catIdx}-${prodIdx}`} className="border-b hover:bg-gray-50">
-                        <td className="px-4 py-2 pl-8 text-gray-700">
-                          <ProductIdentity
-                            className="pl-0"
-                            name={produto.produto}
-                            product={produto}
-                          />
-                        </td>
-                        <td className="px-4 py-2 text-right text-gray-700">{produto.quantidade}</td>
-                        <td className="px-4 py-2 text-right text-gray-700">{formatarMoeda(produto.valor_bruto)}</td>
-                        <td className="px-4 py-2 text-right text-gray-700">{formatarMoeda(produto.desconto)}</td>
-                        <td className="px-4 py-2 text-right text-gray-700">{formatarMoeda(produto.valor_liquido)}</td>
-                      </tr>
-                    ))}
+                    {categoria.produtos &&
+                      categoria.produtos.map((produto, prodIdx) => (
+                        <tr key={`prod-${catIdx}-${prodIdx}`} className="border-b hover:bg-gray-50">
+                          <td className="px-4 py-2 pl-8 text-gray-700">
+                            <ProductIdentity
+                              className="pl-0"
+                              name={produto.produto}
+                              product={produto}
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-right text-gray-700">
+                            {produto.quantidade}
+                          </td>
+                          <td className="px-4 py-2 text-right text-gray-700">
+                            {formatarMoeda(produto.valor_bruto)}
+                          </td>
+                          <td className="px-4 py-2 text-right text-gray-700">
+                            {formatarMoeda(produto.desconto)}
+                          </td>
+                          <td className="px-4 py-2 text-right text-gray-700">
+                            {formatarMoeda(produto.valor_liquido)}
+                          </td>
+                        </tr>
+                      ))}
                   </>
                 ))}
-                
+
                 {/* Linha de Total */}
                 {produtosDetalhados.length > 0 && (
-                  <tr style={{backgroundColor: '#374151', color: 'white', fontWeight: 'bold'}}>
+                  <tr style={{ backgroundColor: "#374151", color: "white", fontWeight: "bold" }}>
                     <td className="px-4 py-3">TOTAL GERAL</td>
                     <td className="px-4 py-3 text-right">
                       {produtosDetalhados.reduce((sum, cat) => sum + cat.total_quantidade, 0)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {formatarMoeda(produtosDetalhados.reduce((sum, cat) => sum + cat.total_bruto, 0))}
+                      {formatarMoeda(
+                        produtosDetalhados.reduce((sum, cat) => sum + cat.total_bruto, 0),
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {formatarMoeda(produtosDetalhados.reduce((sum, cat) => sum + cat.total_desconto, 0))}
+                      {formatarMoeda(
+                        produtosDetalhados.reduce((sum, cat) => sum + cat.total_desconto, 0),
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {formatarMoeda(produtosDetalhados.reduce((sum, cat) => sum + cat.total_liquido, 0))}
+                      {formatarMoeda(
+                        produtosDetalhados.reduce((sum, cat) => sum + cat.total_liquido, 0),
+                      )}
                     </td>
                   </tr>
                 )}
@@ -481,7 +593,7 @@ export default function RelatorioVendas() {
       )}
 
       {/* Aba Lista de Vendas */}
-      {abaAtiva === 'lista' && (
+      {abaAtiva === "lista" && (
         <div className="bg-white rounded-lg shadow">
           <div className="bg-gray-600 text-white px-4 py-2 rounded-t-lg font-semibold">
             Lista de Vendas
@@ -506,10 +618,7 @@ export default function RelatorioVendas() {
                     </td>
                     <td className="px-4 py-2">{formatarData(venda.data_venda)}</td>
                     <td className="px-4 py-2">
-                      <CustomerIdentity
-                        nameClassName="font-medium text-slate-800"
-                        venda={venda}
-                      />
+                      <CustomerIdentity nameClassName="font-medium text-slate-800" venda={venda} />
                     </td>
                     <td className="px-4 py-2">
                       <PetIdentity
@@ -520,14 +629,20 @@ export default function RelatorioVendas() {
                     </td>
                     <td className="px-4 py-2 text-right">{formatarMoeda(venda.total)}</td>
                     <td className="px-4 py-2 text-center">
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        venda.status === 'finalizada' ? 'bg-green-100 text-green-800' :
-                        venda.status === 'baixa_parcial' ? 'bg-blue-100 text-blue-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {venda.status === 'finalizada' ? 'Baixada' : 
-                         venda.status === 'baixa_parcial' ? 'Parcial' : 
-                         'Em aberto'}
+                      <span
+                        className={`px-2 py-1 rounded text-xs ${
+                          venda.status === "finalizada"
+                            ? "bg-green-100 text-green-800"
+                            : venda.status === "baixa_parcial"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-yellow-100 text-yellow-800"
+                        }`}
+                      >
+                        {venda.status === "finalizada"
+                          ? "Baixada"
+                          : venda.status === "baixa_parcial"
+                            ? "Parcial"
+                            : "Em aberto"}
                       </span>
                     </td>
                   </tr>

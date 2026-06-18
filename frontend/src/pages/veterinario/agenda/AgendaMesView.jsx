@@ -68,7 +68,9 @@ export default function AgendaMesView({
                         onGerenciarAgendamento(ag);
                       }}
                       className={`w-full rounded border-l-2 px-1.5 py-1 text-left text-[11px] ${
-                        TIPO_CARD_COLOR[tipoAgendamento] || STATUS_COLOR[ag.status] || "border-l-gray-200 bg-white"
+                        TIPO_CARD_COLOR[tipoAgendamento] ||
+                        STATUS_COLOR[ag.status] ||
+                        "border-l-gray-200 bg-white"
                       }`}
                     >
                       <p className="truncate">
@@ -100,8 +102,12 @@ export default function AgendaMesView({
                     </button>
                   );
                 })}
-                {ags.length > 2 && <p className="text-[10px] text-gray-400">+{ags.length - 2} mais</p>}
-                {ags.length === 0 && <p className="pt-1 text-[10px] text-gray-300">Clique para agendar</p>}
+                {ags.length > 2 && (
+                  <p className="text-[10px] text-gray-400">+{ags.length - 2} mais</p>
+                )}
+                {ags.length === 0 && (
+                  <p className="pt-1 text-[10px] text-gray-300">Clique para agendar</p>
+                )}
               </div>
             </div>
           );

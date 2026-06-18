@@ -16,13 +16,23 @@ export default function SimulacaoContratacao() {
   const [mostrarDetalhes, setMostrarDetalhes] = useState(true);
 
   const meses = [
-    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
   ];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const simular = async (e) => {
@@ -88,9 +98,7 @@ export default function SimulacaoContratacao() {
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          🧮 Simulação de Contratação
-        </h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">🧮 Simulação de Contratação</h1>
         <p className="text-gray-600">
           Calcule o impacto real de contratar um funcionário no seu negócio
         </p>
@@ -98,9 +106,7 @@ export default function SimulacaoContratacao() {
 
       {/* Formulário */}
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          📝 Dados da Contratação
-        </h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">📝 Dados da Contratação</h2>
 
         <form onSubmit={simular} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -156,9 +162,7 @@ export default function SimulacaoContratacao() {
 
             {/* FGTS */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                FGTS (%)
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">FGTS (%)</label>
               <input
                 type="number"
                 name="fgts_percentual"
@@ -218,9 +222,7 @@ export default function SimulacaoContratacao() {
         <>
           {/* Resumo Executivo */}
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-sm p-6 mb-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
-              📊 Resumo Executivo
-            </h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">📊 Resumo Executivo</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white rounded-lg p-4 shadow-sm">
@@ -234,7 +236,9 @@ export default function SimulacaoContratacao() {
               </div>
 
               <div className="bg-white rounded-lg p-4 shadow-sm">
-                <p className="text-sm text-gray-600 mb-1">Custo Total ({simulacao.parametros.meses_simulados} meses)</p>
+                <p className="text-sm text-gray-600 mb-1">
+                  Custo Total ({simulacao.parametros.meses_simulados} meses)
+                </p>
                 <p className="text-2xl font-bold text-purple-600">
                   {formatarMoeda(simulacao.totais.total_geral)}
                 </p>
@@ -255,8 +259,8 @@ export default function SimulacaoContratacao() {
                 <p className="text-2xl font-bold text-green-600">
                   {formatarMoeda(
                     simulacao.totais.total_provisao_ferias +
-                    simulacao.totais.total_provisao_1_3 +
-                    simulacao.totais.total_provisao_13
+                      simulacao.totais.total_provisao_1_3 +
+                      simulacao.totais.total_provisao_13,
                   )}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
@@ -270,8 +274,8 @@ export default function SimulacaoContratacao() {
               <p className="text-sm text-yellow-900">
                 <strong>⚠️ Atenção:</strong> O custo real mensal é{" "}
                 <strong>{formatarMoeda(simulacao.totais.media_mensal)}</strong>, não apenas{" "}
-                <strong>{formatarMoeda(simulacao.parametros.salario_base)}</strong>.
-                Isso representa um aumento de{" "}
+                <strong>{formatarMoeda(simulacao.parametros.salario_base)}</strong>. Isso representa
+                um aumento de{" "}
                 <strong>
                   {formatarPercentual(simulacao.analise.custo_total_vs_salario - 100)}
                 </strong>{" "}
@@ -283,9 +287,7 @@ export default function SimulacaoContratacao() {
           {/* Tabela Detalhada */}
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900">
-                📅 Detalhamento Mensal
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900">📅 Detalhamento Mensal</h2>
               <button
                 onClick={() => setMostrarDetalhes(!mostrarDetalhes)}
                 className="text-sm text-blue-600 hover:text-blue-700"
@@ -392,7 +394,9 @@ export default function SimulacaoContratacao() {
               <strong>💡 Como funciona esta simulação:</strong>
             </p>
             <ul className="mt-2 text-sm text-blue-800 list-disc list-inside space-y-1">
-              <li><strong>Nada é gravado no banco</strong> - é apenas uma projeção</li>
+              <li>
+                <strong>Nada é gravado no banco</strong> - é apenas uma projeção
+              </li>
               <li>Custos diretos: Salário + INSS patronal + FGTS</li>
               <li>Provisões obrigatórias: Férias (1/12) + 1/3 constitucional + 13º (1/12)</li>
               <li>Não considera: Vale-transporte, Vale-refeição, Plano de saúde</li>

@@ -79,11 +79,7 @@ function baixarCsv(eventos, clienteNome, formatBRL) {
     evento.descricao || "",
   ]);
   const csv = [header, ...linhas]
-    .map((linha) =>
-      linha
-        .map((campo) => `"${String(campo).replace(/"/g, '""')}"`)
-        .join(";"),
-    )
+    .map((linha) => linha.map((campo) => `"${String(campo).replace(/"/g, '""')}"`).join(";"))
     .join("\n");
 
   const blob = new Blob([`\uFEFF${csv}`], {
@@ -134,8 +130,7 @@ export default function CampanhasGestorExtratoSection({
         <div className="border-t border-gray-100 p-4 space-y-4">
           {!gestorExtrato ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              Extrato nao disponivel no momento. Os demais dados do gestor
-              continuam carregados.
+              Extrato nao disponivel no momento. Os demais dados do gestor continuam carregados.
             </div>
           ) : (
             <>
@@ -154,9 +149,7 @@ export default function CampanhasGestorExtratoSection({
                 </div>
                 <div className="rounded-lg border border-red-200 bg-red-50 p-3">
                   <p className="text-xs font-medium uppercase text-red-600">Em debito</p>
-                  <p className="text-lg font-bold text-red-700">
-                    {resumo.carimbos_em_debito ?? 0}
-                  </p>
+                  <p className="text-lg font-bold text-red-700">{resumo.carimbos_em_debito ?? 0}</p>
                 </div>
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                   <p className="text-xs font-medium uppercase text-emerald-700">Cashback</p>
@@ -182,11 +175,7 @@ export default function CampanhasGestorExtratoSection({
                 <button
                   type="button"
                   onClick={() =>
-                    baixarCsv(
-                      eventosFiltrados,
-                      gestorExtrato?.cliente_nome,
-                      formatBRL,
-                    )
+                    baixarCsv(eventosFiltrados, gestorExtrato?.cliente_nome, formatBRL)
                   }
                   disabled={eventosFiltrados.length === 0}
                   className={actionButtonClasses({
@@ -226,9 +215,7 @@ export default function CampanhasGestorExtratoSection({
                           </td>
                           <td className="px-3 py-3">
                             <div className="flex flex-col gap-1">
-                              <span className="font-medium text-gray-900">
-                                {evento.titulo}
-                              </span>
+                              <span className="font-medium text-gray-900">{evento.titulo}</span>
                               <span className="text-xs text-gray-500">
                                 {evento.descricao || "-"}
                               </span>
@@ -236,14 +223,18 @@ export default function CampanhasGestorExtratoSection({
                           </td>
                           <td className="px-3 py-3 text-xs text-gray-600">
                             <div className="flex flex-col gap-1">
-                              <span>{evento.campanha_nome || TIPO_LABELS[evento.categoria] || "-"}</span>
+                              <span>
+                                {evento.campanha_nome || TIPO_LABELS[evento.categoria] || "-"}
+                              </span>
                               {evento.numero_venda || evento.venda_id ? (
                                 <SaleReference
                                   sale={evento}
                                   value={evento.numero_venda || evento.venda_id}
                                 />
                               ) : null}
-                              {evento.cupom_codigo ? <span>Cupom {evento.cupom_codigo}</span> : null}
+                              {evento.cupom_codigo ? (
+                                <span>Cupom {evento.cupom_codigo}</span>
+                              ) : null}
                             </div>
                           </td>
                           <td className="px-3 py-3 text-right">

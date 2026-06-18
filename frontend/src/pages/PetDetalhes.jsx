@@ -1,22 +1,31 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import api from '../api';
-import { vetApi } from './veterinario/vetApi';
-import { 
-  FiArrowLeft, FiEdit2, FiUser, FiPhone, FiCalendar, FiActivity,
-  FiHeart, FiClipboard, FiAlertCircle, FiCheckCircle, FiXCircle
-} from 'react-icons/fi';
-import { PawPrint } from 'lucide-react';
-import { formatarIdadeMeses } from '../helpers/idadeHelper';
-import CustomerIdentity from '../components/ui/CustomerIdentity';
-import { useModulos } from '../contexts/ModulosContext';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import api from "../api";
+import { vetApi } from "./veterinario/vetApi";
+import {
+  FiArrowLeft,
+  FiEdit2,
+  FiUser,
+  FiPhone,
+  FiCalendar,
+  FiActivity,
+  FiHeart,
+  FiClipboard,
+  FiAlertCircle,
+  FiCheckCircle,
+  FiXCircle,
+} from "react-icons/fi";
+import { PawPrint } from "lucide-react";
+import { formatarIdadeMeses } from "../helpers/idadeHelper";
+import CustomerIdentity from "../components/ui/CustomerIdentity";
+import { useModulos } from "../contexts/ModulosContext";
 
-const listaClinica = (lista = [], fallback = '') => {
+const listaClinica = (lista = [], fallback = "") => {
   if (Array.isArray(lista) && lista.length > 0) {
     return lista;
   }
-  return (fallback || '')
-    .split('\n')
+  return (fallback || "")
+    .split("\n")
     .map((item) => item.trim())
     .filter(Boolean);
 };
@@ -25,20 +34,20 @@ const PetDetalhes = () => {
   const { petId } = useParams();
   const navigate = useNavigate();
   const { moduloAtivo } = useModulos();
-  const moduloVeterinarioAtivo = moduloAtivo('veterinario');
+  const moduloVeterinarioAtivo = moduloAtivo("veterinario");
 
   const [pet, setPet] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [abaAtiva, setAbaAtiva] = useState('geral');
+  const [error, setError] = useState("");
+  const [abaAtiva, setAbaAtiva] = useState("geral");
   const [historicoInternacoes, setHistoricoInternacoes] = useState([]);
   const [loadingInternacoes, setLoadingInternacoes] = useState(false);
   const [historicoVacinas, setHistoricoVacinas] = useState([]);
   const [loadingVacinas, setLoadingVacinas] = useState(false);
   const [historicoConsultas, setHistoricoConsultas] = useState([]);
   const [loadingConsultas, setLoadingConsultas] = useState(false);
-  const [filtroVacinas, setFiltroVacinas] = useState('');
-  const [filtroConsultas, setFiltroConsultas] = useState('');
+  const [filtroVacinas, setFiltroVacinas] = useState("");
+  const [filtroConsultas, setFiltroConsultas] = useState("");
   const [limiteVacinas, setLimiteVacinas] = useState(6);
   const [limiteConsultas, setLimiteConsultas] = useState(6);
   const [ultimaVacina, setUltimaVacina] = useState(null);
@@ -48,11 +57,11 @@ const PetDetalhes = () => {
   const [loadingExames, setLoadingExames] = useState(false);
   const [salvandoExame, setSalvandoExame] = useState(false);
   const [novoExame, setNovoExame] = useState({
-    nome: '',
-    tipo: 'laboratorial',
-    data_solicitacao: '',
-    laboratorio: '',
-    observacoes: '',
+    nome: "",
+    tipo: "laboratorial",
+    data_solicitacao: "",
+    laboratorio: "",
+    observacoes: "",
     arquivo: null,
   });
 
@@ -75,10 +84,10 @@ const PetDetalhes = () => {
       setLoading(true);
       const response = await api.get(`/pets/${petId}`);
       setPet(response.data);
-      setError('');
+      setError("");
     } catch (err) {
-      console.error('Erro ao carregar pet:', err);
-      setError('Erro ao carregar informações do pet');
+      console.error("Erro ao carregar pet:", err);
+      setError("Erro ao carregar informações do pet");
     } finally {
       setLoading(false);
     }
@@ -90,37 +99,40 @@ const PetDetalhes = () => {
     const nascimento = new Date(dataNascimento);
     const anos = hoje.getFullYear() - nascimento.getFullYear();
     const meses = hoje.getMonth() - nascimento.getMonth();
-    
+
     if (anos === 0) {
-      return `${meses} ${meses === 1 ? 'mês' : 'meses'}`;
+      return `${meses} ${meses === 1 ? "mês" : "meses"}`;
     }
     if (meses < 0) {
       return `${anos - 1} anos e ${12 + meses} meses`;
     }
     if (meses === 0) {
-      return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
+      return `${anos} ${anos === 1 ? "ano" : "anos"}`;
     }
-    return `${anos} anos e ${meses} ${meses === 1 ? 'mês' : 'meses'}`;
+    return `${anos} anos e ${meses} ${meses === 1 ? "mês" : "meses"}`;
   };
 
   const formatarData = (data) => {
-    if (!data) return '-';
-    return new Date(data).toLocaleDateString('pt-BR');
+    if (!data) return "-";
+    return new Date(data).toLocaleDateString("pt-BR");
   };
 
   const formatarDataHora = (data) => {
-    if (!data) return '-';
-    return new Date(data).toLocaleString('pt-BR');
+    if (!data) return "-";
+    return new Date(data).toLocaleString("pt-BR");
   };
 
-  const renderListaClinica = (titulo, itens, vazio = 'Nada registrado') => (
+  const renderListaClinica = (titulo, itens, vazio = "Nada registrado") => (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-2">{titulo}</label>
       <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
         {itens.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {itens.map((item) => (
-              <span key={`${titulo}_${item}`} className="px-3 py-1 bg-white border border-gray-200 rounded-full text-sm text-gray-800">
+              <span
+                key={`${titulo}_${item}`}
+                className="px-3 py-1 bg-white border border-gray-200 rounded-full text-sm text-gray-800"
+              >
                 {item}
               </span>
             ))}
@@ -151,9 +163,7 @@ const PetDetalhes = () => {
     try {
       setLoadingVacinas(true);
       const response = await vetApi.listarVacinasPet(petId);
-      const lista = Array.isArray(response.data)
-        ? response.data
-        : (response.data?.items ?? []);
+      const lista = Array.isArray(response.data) ? response.data : (response.data?.items ?? []);
 
       const ordenadas = [...lista].sort((a, b) => {
         const da = new Date(a.data_aplicacao || 0).getTime();
@@ -178,9 +188,7 @@ const PetDetalhes = () => {
         limit: 200,
       });
 
-      const lista = Array.isArray(response.data)
-        ? response.data
-        : (response.data?.items ?? []);
+      const lista = Array.isArray(response.data) ? response.data : (response.data?.items ?? []);
 
       const ordenadas = [...lista].sort((a, b) => {
         const da = new Date(a.inicio_atendimento || a.created_at || 0).getTime();
@@ -255,37 +263,37 @@ const PetDetalhes = () => {
       await vetApi.interpretarExameIA(exameId);
       await Promise.all([carregarExames(), carregarResumoClinico()]);
     } catch (err) {
-      alert(err.response?.data?.detail || 'Não foi possível interpretar o exame com IA');
+      alert(err.response?.data?.detail || "Não foi possível interpretar o exame com IA");
     }
   };
 
   useEffect(() => {
-    if (abaAtiva !== 'internacoes') return;
+    if (abaAtiva !== "internacoes") return;
     carregarHistoricoInternacoes();
   }, [abaAtiva, petId]);
 
   useEffect(() => {
-    if (abaAtiva !== 'vacinas') return;
+    if (abaAtiva !== "vacinas") return;
     carregarHistoricoVacinas();
   }, [abaAtiva, petId]);
 
   useEffect(() => {
-    if (abaAtiva !== 'consultas') return;
+    if (abaAtiva !== "consultas") return;
     carregarHistoricoConsultas();
   }, [abaAtiva, petId]);
 
   useEffect(() => {
-    if (abaAtiva !== 'saude') return;
+    if (abaAtiva !== "saude") return;
     carregarExames();
   }, [abaAtiva, petId]);
 
   useEffect(() => {
-    if (abaAtiva !== 'vacinas') return;
+    if (abaAtiva !== "vacinas") return;
     setLimiteVacinas(6);
   }, [abaAtiva, filtroVacinas]);
 
   useEffect(() => {
-    if (abaAtiva !== 'consultas') return;
+    if (abaAtiva !== "consultas") return;
     setLimiteConsultas(6);
   }, [abaAtiva, filtroConsultas]);
 
@@ -298,7 +306,10 @@ const PetDetalhes = () => {
       vacina?.lote,
       vacina?.veterinario_responsavel,
       vacina?.veterinario_nome,
-    ].filter(Boolean).join(' ').toLowerCase();
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
     return texto.includes(termo);
   });
 
@@ -311,7 +322,10 @@ const PetDetalhes = () => {
       consulta?.diagnostico,
       consulta?.veterinario_nome,
       consulta?.status,
-    ].filter(Boolean).join(' ').toLowerCase();
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
     return texto.includes(termo);
   });
 
@@ -324,8 +338,8 @@ const PetDetalhes = () => {
       }
       loadPet();
     } catch (err) {
-      console.error('Erro ao alterar status do pet:', err);
-      alert('Erro ao alterar status do pet');
+      console.error("Erro ao alterar status do pet:", err);
+      alert("Erro ao alterar status do pet");
     }
   };
 
@@ -349,17 +363,17 @@ const PetDetalhes = () => {
       }
 
       setNovoExame({
-        nome: '',
-        tipo: 'laboratorial',
-        data_solicitacao: '',
-        laboratorio: '',
-        observacoes: '',
+        nome: "",
+        tipo: "laboratorial",
+        data_solicitacao: "",
+        laboratorio: "",
+        observacoes: "",
         arquivo: null,
       });
       await carregarExames();
     } catch (err) {
-      console.error('Erro ao salvar exame:', err);
-      alert(err.response?.data?.detail || 'Erro ao salvar exame');
+      console.error("Erro ao salvar exame:", err);
+      alert(err.response?.data?.detail || "Erro ao salvar exame");
     } finally {
       setSalvandoExame(false);
     }
@@ -381,10 +395,10 @@ const PetDetalhes = () => {
       <div className="p-6">
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
           <FiAlertCircle />
-          {error || 'Pet não encontrado'}
+          {error || "Pet não encontrado"}
         </div>
         <button
-          onClick={() => navigate('/pets')}
+          onClick={() => navigate("/pets")}
           className="mt-4 flex items-center gap-2 text-blue-600 hover:text-blue-700"
         >
           <FiArrowLeft />
@@ -395,12 +409,12 @@ const PetDetalhes = () => {
   }
 
   const abas = [
-    { id: 'geral', label: 'Dados Gerais', icon: FiClipboard },
-    { id: 'saude', label: 'Saúde', icon: FiHeart },
-    { id: 'vacinas', label: 'Vacinas', icon: FiActivity },
-    { id: 'consultas', label: 'Consultas', icon: FiCalendar },
-    { id: 'internacoes', label: 'Internações', icon: FiActivity },
-    { id: 'servicos', label: 'Serviços', icon: PawPrint },
+    { id: "geral", label: "Dados Gerais", icon: FiClipboard },
+    { id: "saude", label: "Saúde", icon: FiHeart },
+    { id: "vacinas", label: "Vacinas", icon: FiActivity },
+    { id: "consultas", label: "Consultas", icon: FiCalendar },
+    { id: "internacoes", label: "Internações", icon: FiActivity },
+    { id: "servicos", label: "Serviços", icon: PawPrint },
   ];
 
   return (
@@ -408,7 +422,7 @@ const PetDetalhes = () => {
       {/* Header */}
       <div className="mb-6">
         <button
-          onClick={() => navigate('/pets')}
+          onClick={() => navigate("/pets")}
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
         >
           <FiArrowLeft />
@@ -448,7 +462,7 @@ const PetDetalhes = () => {
                   {pet.especie} {pet.raca && `• ${pet.raca}`} {pet.sexo && `• ${pet.sexo}`}
                 </p>
                 <p className="text-sm text-gray-400">{pet.codigo}</p>
-                
+
                 {/* Info do tutor */}
                 <div className="mt-3 flex items-center gap-4 text-sm">
                   <div className="flex items-center gap-2 text-gray-700">
@@ -485,11 +499,11 @@ const PetDetalhes = () => {
                 onClick={toggleAtivacao}
                 className={`px-4 py-2 border-2 rounded-lg transition-colors font-medium ${
                   pet.ativo
-                    ? 'border-red-300 text-red-600 hover:bg-red-50'
-                    : 'border-green-300 text-green-600 hover:bg-green-50'
+                    ? "border-red-300 text-red-600 hover:bg-red-50"
+                    : "border-green-300 text-green-600 hover:bg-green-50"
                 }`}
               >
-                {pet.ativo ? 'Desativar' : 'Reativar'}
+                {pet.ativo ? "Desativar" : "Reativar"}
               </button>
             </div>
           </div>
@@ -499,7 +513,7 @@ const PetDetalhes = () => {
       {/* Abas */}
       <div className="mb-6 border-b border-gray-200">
         <div className="flex gap-4">
-          {abas.map(aba => {
+          {abas.map((aba) => {
             const Icon = aba.icon;
             return (
               <button
@@ -507,8 +521,8 @@ const PetDetalhes = () => {
                 onClick={() => setAbaAtiva(aba.id)}
                 className={`flex items-center gap-2 px-4 py-3 font-medium border-b-2 transition-colors ${
                   abaAtiva === aba.id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-600 hover:text-gray-900"
                 }`}
               >
                 <Icon size={18} />
@@ -522,7 +536,7 @@ const PetDetalhes = () => {
       {/* Conteúdo das abas */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         {/* Aba: Dados Gerais */}
-        {abaAtiva === 'geral' && (
+        {abaAtiva === "geral" && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Informações Gerais</h2>
 
@@ -531,9 +545,16 @@ const PetDetalhes = () => {
                 <p className="text-xs font-semibold text-blue-700 mb-1">Última vacina</p>
                 {ultimaVacina ? (
                   <>
-                    <p className="text-sm font-semibold text-blue-900">{ultimaVacina.nome_vacina || 'Vacina'}</p>
-                    <p className="text-xs text-blue-800">Aplicada em: {formatarData(ultimaVacina.data_aplicacao)}</p>
-                    <p className="text-xs text-blue-800">Próxima dose: {formatarData(ultimaVacina.proxima_dose || ultimaVacina.data_proxima_dose)}</p>
+                    <p className="text-sm font-semibold text-blue-900">
+                      {ultimaVacina.nome_vacina || "Vacina"}
+                    </p>
+                    <p className="text-xs text-blue-800">
+                      Aplicada em: {formatarData(ultimaVacina.data_aplicacao)}
+                    </p>
+                    <p className="text-xs text-blue-800">
+                      Próxima dose:{" "}
+                      {formatarData(ultimaVacina.proxima_dose || ultimaVacina.data_proxima_dose)}
+                    </p>
                   </>
                 ) : (
                   <p className="text-sm text-blue-800">Nenhuma vacina registrada.</p>
@@ -544,93 +565,109 @@ const PetDetalhes = () => {
                 <p className="text-xs font-semibold text-green-700 mb-1">Resumo da última alta</p>
                 {ultimaAlta ? (
                   <>
-                    <p className="text-xs text-green-800">Alta em: {formatarDataHora(ultimaAlta.data_saida)}</p>
-                    <p className="text-sm font-semibold text-green-900 mt-1">Motivo: {ultimaAlta.motivo || '-'}</p>
-                    <p className="text-xs text-green-800 mt-1">Observação: {ultimaAlta.observacoes_alta || 'Sem observação de alta.'}</p>
+                    <p className="text-xs text-green-800">
+                      Alta em: {formatarDataHora(ultimaAlta.data_saida)}
+                    </p>
+                    <p className="text-sm font-semibold text-green-900 mt-1">
+                      Motivo: {ultimaAlta.motivo || "-"}
+                    </p>
+                    <p className="text-xs text-green-800 mt-1">
+                      Observação: {ultimaAlta.observacoes_alta || "Sem observação de alta."}
+                    </p>
                   </>
                 ) : (
                   <p className="text-sm text-green-800">Nenhuma alta registrada.</p>
                 )}
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
                 <p className="text-gray-900 font-medium">{pet.nome}</p>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Código</label>
                 <p className="text-gray-900 font-mono text-sm">{pet.codigo}</p>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Espécie</label>
                 <p className="text-gray-900">{pet.especie}</p>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Raça</label>
-                <p className="text-gray-900">{pet.raca || '-'}</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
-                <p className="text-gray-900">{pet.sexo || '-'}</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Castrado</label>
-                <p className="text-gray-900">{pet.castrado ? 'Sim' : 'Não'}</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
-                <p className="text-gray-900">{formatarData(pet.data_nascimento)}</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Idade</label>
-                <p className="text-gray-900">
-                  {pet.idade_meses ? formatarIdadeMeses(pet.idade_meses) :
-                   pet.idade_aproximada ? formatarIdadeMeses(pet.idade_aproximada) :
-                   pet.data_nascimento ? calcularIdade(pet.data_nascimento) : '-'}
-                </p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Peso</label>
-                <p className="text-gray-900">{pet.peso ? `${pet.peso} kg` : '-'}</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Porte</label>
-                <p className="text-gray-900">{pet.porte || '-'}</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cor/Pelagem</label>
-                <p className="text-gray-900">{pet.cor || '-'}</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Microchip</label>
-                <p className="text-gray-900 font-mono text-sm">{pet.microchip || '-'}</p>
+                <p className="text-gray-900">{pet.raca || "-"}</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tipo sanguíneo</label>
-                <p className="text-gray-900">{pet.tipo_sanguineo || '-'}</p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sexo</label>
+                <p className="text-gray-900">{pet.sexo || "-"}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Castrado</label>
+                <p className="text-gray-900">{pet.castrado ? "Sim" : "Não"}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Data de Nascimento
+                </label>
+                <p className="text-gray-900">{formatarData(pet.data_nascimento)}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Idade</label>
+                <p className="text-gray-900">
+                  {pet.idade_meses
+                    ? formatarIdadeMeses(pet.idade_meses)
+                    : pet.idade_aproximada
+                      ? formatarIdadeMeses(pet.idade_aproximada)
+                      : pet.data_nascimento
+                        ? calcularIdade(pet.data_nascimento)
+                        : "-"}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Peso</label>
+                <p className="text-gray-900">{pet.peso ? `${pet.peso} kg` : "-"}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Porte</label>
+                <p className="text-gray-900">{pet.porte || "-"}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cor/Pelagem</label>
+                <p className="text-gray-900">{pet.cor || "-"}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Microchip</label>
+                <p className="text-gray-900 font-mono text-sm">{pet.microchip || "-"}</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tipo sanguíneo
+                </label>
+                <p className="text-gray-900">{pet.tipo_sanguineo || "-"}</p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Pedigree</label>
-                <p className="text-gray-900">{pet.pedigree_registro || '-'}</p>
+                <p className="text-gray-900">{pet.pedigree_registro || "-"}</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Data da castração</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Data da castração
+                </label>
                 <p className="text-gray-900">{formatarData(pet.castrado_data)}</p>
               </div>
             </div>
@@ -650,20 +687,38 @@ const PetDetalhes = () => {
         )}
 
         {/* Aba: Saúde */}
-        {abaAtiva === 'saude' && (
+        {abaAtiva === "saude" && (
           <div className="space-y-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Informações de Saúde</h2>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {renderListaClinica('Alergias', listaClinica(pet.alergias_lista, pet.alergias), 'Nenhuma alergia registrada')}
-              {renderListaClinica('Doenças crônicas', listaClinica(pet.condicoes_cronicas_lista, pet.doencas_cronicas), 'Nenhuma doença crônica registrada')}
-              {renderListaClinica('Medicamentos contínuos', listaClinica(pet.medicamentos_continuos_lista, pet.medicamentos_continuos), 'Nenhum medicamento contínuo registrado')}
-              {renderListaClinica('Restrições alimentares', listaClinica(pet.restricoes_alimentares_lista), 'Nenhuma restrição alimentar registrada')}
+              {renderListaClinica(
+                "Alergias",
+                listaClinica(pet.alergias_lista, pet.alergias),
+                "Nenhuma alergia registrada",
+              )}
+              {renderListaClinica(
+                "Doenças crônicas",
+                listaClinica(pet.condicoes_cronicas_lista, pet.doencas_cronicas),
+                "Nenhuma doença crônica registrada",
+              )}
+              {renderListaClinica(
+                "Medicamentos contínuos",
+                listaClinica(pet.medicamentos_continuos_lista, pet.medicamentos_continuos),
+                "Nenhum medicamento contínuo registrado",
+              )}
+              {renderListaClinica(
+                "Restrições alimentares",
+                listaClinica(pet.restricoes_alimentares_lista),
+                "Nenhuma restrição alimentar registrada",
+              )}
             </div>
 
             {Array.isArray(carteirinha?.alertas) && carteirinha.alertas.length > 0 && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-                <h3 className="text-sm font-semibold text-amber-900 mb-2">Alertas para atendimento e venda</h3>
+                <h3 className="text-sm font-semibold text-amber-900 mb-2">
+                  Alertas para atendimento e venda
+                </h3>
                 <div className="space-y-2">
                   {carteirinha.alertas.slice(0, 6).map((alerta, idx) => (
                     <div key={`alerta_${idx}`} className="text-sm text-amber-900">
@@ -676,10 +731,12 @@ const PetDetalhes = () => {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Histórico Clínico</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Histórico Clínico
+                </label>
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <p className="text-gray-900 whitespace-pre-line">
-                    {pet.historico_clinico || 'Nenhum histórico clínico registrado'}
+                    {pet.historico_clinico || "Nenhum histórico clínico registrado"}
                   </p>
                 </div>
               </div>
@@ -704,12 +761,16 @@ const PetDetalhes = () => {
                   ) : (
                     <div className="space-y-3">
                       {exames.map((exame) => (
-                        <div key={exame.id} className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                        <div
+                          key={exame.id}
+                          className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
+                        >
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <p className="font-medium text-gray-900">{exame.nome}</p>
                               <p className="text-sm text-gray-500">
-                                {exame.tipo || 'Exame'} • {formatarData(exame.data_solicitacao)} • {exame.status || '-'}
+                                {exame.tipo || "Exame"} • {formatarData(exame.data_solicitacao)} •{" "}
+                                {exame.status || "-"}
                               </p>
                             </div>
                             {exame.arquivo_url && (
@@ -723,21 +784,31 @@ const PetDetalhes = () => {
                               </a>
                             )}
                           </div>
-                          {exame.laboratorio && <p className="text-sm text-gray-600 mt-2">Laboratório: {exame.laboratorio}</p>}
+                          {exame.laboratorio && (
+                            <p className="text-sm text-gray-600 mt-2">
+                              Laboratório: {exame.laboratorio}
+                            </p>
+                          )}
                           {exame.interpretacao_ia_resumo && (
                             <div className="mt-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2">
                               <p className="text-xs font-semibold text-cyan-800">Triagem IA</p>
-                              <p className="text-sm text-cyan-900">{exame.interpretacao_ia_resumo}</p>
+                              <p className="text-sm text-cyan-900">
+                                {exame.interpretacao_ia_resumo}
+                              </p>
                             </div>
                           )}
-                          {exame.observacoes && <p className="text-sm text-gray-600 mt-2">Obs.: {exame.observacoes}</p>}
+                          {exame.observacoes && (
+                            <p className="text-sm text-gray-600 mt-2">Obs.: {exame.observacoes}</p>
+                          )}
                           <div className="mt-3 flex flex-wrap gap-3">
                             <button
                               type="button"
                               onClick={() => interpretarExameIA(exame.id)}
                               className="text-sm text-cyan-700 hover:text-cyan-800"
                             >
-                              {exame.interpretacao_ia_resumo ? 'Reprocessar triagem IA' : 'Interpretar com IA'}
+                              {exame.interpretacao_ia_resumo
+                                ? "Reprocessar triagem IA"
+                                : "Interpretar com IA"}
                             </button>
                           </div>
                         </div>
@@ -769,20 +840,26 @@ const PetDetalhes = () => {
                     <input
                       type="date"
                       value={novoExame.data_solicitacao}
-                      onChange={(e) => setNovoExame((prev) => ({ ...prev, data_solicitacao: e.target.value }))}
+                      onChange={(e) =>
+                        setNovoExame((prev) => ({ ...prev, data_solicitacao: e.target.value }))
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                     />
                   </div>
                   <input
                     type="text"
                     value={novoExame.laboratorio}
-                    onChange={(e) => setNovoExame((prev) => ({ ...prev, laboratorio: e.target.value }))}
+                    onChange={(e) =>
+                      setNovoExame((prev) => ({ ...prev, laboratorio: e.target.value }))
+                    }
                     placeholder="Laboratório ou clínica"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                   />
                   <textarea
                     value={novoExame.observacoes}
-                    onChange={(e) => setNovoExame((prev) => ({ ...prev, observacoes: e.target.value }))}
+                    onChange={(e) =>
+                      setNovoExame((prev) => ({ ...prev, observacoes: e.target.value }))
+                    }
                     rows="3"
                     placeholder="Observações do pedido ou resultado"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
@@ -790,7 +867,9 @@ const PetDetalhes = () => {
                   <input
                     type="file"
                     accept=".pdf,.png,.jpg,.jpeg,.webp"
-                    onChange={(e) => setNovoExame((prev) => ({ ...prev, arquivo: e.target.files?.[0] || null }))}
+                    onChange={(e) =>
+                      setNovoExame((prev) => ({ ...prev, arquivo: e.target.files?.[0] || null }))
+                    }
                     className="w-full text-sm text-gray-600"
                   />
                   <button
@@ -799,7 +878,7 @@ const PetDetalhes = () => {
                     disabled={salvandoExame || !novoExame.nome.trim()}
                     className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg transition-colors font-medium"
                   >
-                    {salvandoExame ? 'Salvando exame...' : 'Salvar exame'}
+                    {salvandoExame ? "Salvando exame..." : "Salvar exame"}
                   </button>
                 </div>
               </div>
@@ -808,7 +887,7 @@ const PetDetalhes = () => {
         )}
 
         {/* Aba: Vacinas */}
-        {abaAtiva === 'vacinas' && (
+        {abaAtiva === "vacinas" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900">Carteira de Vacinação</h2>
@@ -824,30 +903,43 @@ const PetDetalhes = () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
                 <div className="rounded-xl border border-gray-200 bg-white p-4">
                   <p className="text-xs uppercase tracking-wide text-gray-500">Aplicadas</p>
-                  <p className="text-2xl font-bold text-gray-900">{carteirinha?.status_vacinal?.resumo?.total_aplicadas ?? historicoVacinas.length}</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {carteirinha?.status_vacinal?.resumo?.total_aplicadas ??
+                      historicoVacinas.length}
+                  </p>
                 </div>
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                   <p className="text-xs uppercase tracking-wide text-amber-700">Pendentes</p>
-                  <p className="text-2xl font-bold text-amber-900">{carteirinha?.status_vacinal?.resumo?.total_pendentes ?? 0}</p>
+                  <p className="text-2xl font-bold text-amber-900">
+                    {carteirinha?.status_vacinal?.resumo?.total_pendentes ?? 0}
+                  </p>
                 </div>
                 <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
                   <p className="text-xs uppercase tracking-wide text-rose-700">Atrasadas</p>
-                  <p className="text-2xl font-bold text-rose-900">{carteirinha?.status_vacinal?.resumo?.total_vencidas ?? 0}</p>
+                  <p className="text-2xl font-bold text-rose-900">
+                    {carteirinha?.status_vacinal?.resumo?.total_vencidas ?? 0}
+                  </p>
                 </div>
               </div>
 
-              {Array.isArray(carteirinha?.status_vacinal?.pendentes) && carteirinha.status_vacinal.pendentes.length > 0 && (
-                <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                  <h3 className="text-sm font-semibold text-amber-900 mb-2">Protocolos pendentes</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {carteirinha.status_vacinal.pendentes.map((item) => (
-                      <span key={`pendente_${item.nome}`} className="px-3 py-1 rounded-full bg-white border border-amber-200 text-sm text-amber-900">
-                        {item.nome}
-                      </span>
-                    ))}
+              {Array.isArray(carteirinha?.status_vacinal?.pendentes) &&
+                carteirinha.status_vacinal.pendentes.length > 0 && (
+                  <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <h3 className="text-sm font-semibold text-amber-900 mb-2">
+                      Protocolos pendentes
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {carteirinha.status_vacinal.pendentes.map((item) => (
+                        <span
+                          key={`pendente_${item.nome}`}
+                          className="px-3 py-1 rounded-full bg-white border border-amber-200 text-sm text-amber-900"
+                        >
+                          {item.nome}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               <input
                 type="text"
@@ -859,7 +951,9 @@ const PetDetalhes = () => {
             </div>
 
             {loadingVacinas ? (
-              <div className="text-center py-10 text-gray-500">Carregando histórico de vacinas...</div>
+              <div className="text-center py-10 text-gray-500">
+                Carregando histórico de vacinas...
+              </div>
             ) : vacinasFiltradas.length === 0 ? (
               <div className="text-center py-12 text-gray-500 border border-gray-200 rounded-lg bg-gray-50">
                 Nenhuma vacina encontrada com esse filtro.
@@ -869,16 +963,19 @@ const PetDetalhes = () => {
                 {vacinasFiltradas.slice(0, limiteVacinas).map((vacina) => (
                   <div key={vacina.id} className="border border-gray-200 rounded-lg p-4 bg-white">
                     <div className="flex items-center justify-between gap-3 mb-1">
-                      <p className="font-semibold text-gray-800">{vacina.nome_vacina || 'Vacina'}</p>
+                      <p className="font-semibold text-gray-800">
+                        {vacina.nome_vacina || "Vacina"}
+                      </p>
                       <p className="text-xs text-gray-500">{formatarData(vacina.data_aplicacao)}</p>
                     </div>
-                    <p className="text-sm text-gray-600">Fabricante: {vacina.fabricante || '-'}</p>
-                    <p className="text-sm text-gray-600">Lote: {vacina.lote || '-'}</p>
+                    <p className="text-sm text-gray-600">Fabricante: {vacina.fabricante || "-"}</p>
+                    <p className="text-sm text-gray-600">Lote: {vacina.lote || "-"}</p>
                     <p className="text-sm text-gray-600">
                       Próxima dose: {formatarData(vacina.proxima_dose || vacina.data_proxima_dose)}
                     </p>
                     <p className="text-sm text-gray-600">
-                      Veterinário: {vacina.veterinario_responsavel || vacina.veterinario_nome || '-'}
+                      Veterinário:{" "}
+                      {vacina.veterinario_responsavel || vacina.veterinario_nome || "-"}
                     </p>
                     {vacina.observacoes && (
                       <p className="text-sm text-gray-700 mt-1">Obs.: {vacina.observacoes}</p>
@@ -902,7 +999,7 @@ const PetDetalhes = () => {
         )}
 
         {/* Aba: Consultas */}
-        {abaAtiva === 'consultas' && (
+        {abaAtiva === "consultas" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900">Histórico de Consultas</h2>
@@ -925,7 +1022,9 @@ const PetDetalhes = () => {
             </div>
 
             {loadingConsultas ? (
-              <div className="text-center py-10 text-gray-500">Carregando histórico de consultas...</div>
+              <div className="text-center py-10 text-gray-500">
+                Carregando histórico de consultas...
+              </div>
             ) : consultasFiltradas.length === 0 ? (
               <div className="text-center py-12 text-gray-500 border border-gray-200 rounded-lg bg-gray-50">
                 Nenhuma consulta encontrada com esse filtro.
@@ -936,20 +1035,22 @@ const PetDetalhes = () => {
                   <div key={consulta.id} className="border border-gray-200 rounded-lg p-4 bg-white">
                     <div className="flex items-center justify-between gap-3 mb-1">
                       <p className="font-semibold text-gray-800">
-                        {consulta.queixa_principal || consulta.motivo_consulta || 'Consulta veterinária'}
+                        {consulta.queixa_principal ||
+                          consulta.motivo_consulta ||
+                          "Consulta veterinária"}
                       </p>
                       <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                        {consulta.status || 'registrada'}
+                        {consulta.status || "registrada"}
                       </span>
                     </div>
                     <p className="text-sm text-gray-600">
                       Data: {formatarDataHora(consulta.inicio_atendimento || consulta.created_at)}
                     </p>
                     <p className="text-sm text-gray-600">
-                      Veterinário: {consulta.veterinario_nome || '-'}
+                      Veterinário: {consulta.veterinario_nome || "-"}
                     </p>
                     <p className="text-sm text-gray-700 mt-1">
-                      Diagnóstico: {consulta.diagnostico || '-'}
+                      Diagnóstico: {consulta.diagnostico || "-"}
                     </p>
                     <div className="mt-2">
                       <button
@@ -978,12 +1079,12 @@ const PetDetalhes = () => {
         )}
 
         {/* Aba: Serviços */}
-        {abaAtiva === 'internacoes' && (
+        {abaAtiva === "internacoes" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900">Histórico de Internações</h2>
               <button
-                onClick={() => navigate('/veterinario/internacoes')}
+                onClick={() => navigate("/veterinario/internacoes")}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
               >
                 Abrir módulo de internações
@@ -999,35 +1100,57 @@ const PetDetalhes = () => {
             ) : (
               <div className="space-y-4">
                 {historicoInternacoes.map((internacao) => (
-                  <div key={internacao.internacao_id} className="border border-gray-200 rounded-lg p-4 bg-white">
+                  <div
+                    key={internacao.internacao_id}
+                    className="border border-gray-200 rounded-lg p-4 bg-white"
+                  >
                     <div className="flex items-center justify-between gap-3 mb-2">
                       <p className="font-semibold text-gray-800">
-                        Internação #{internacao.internacao_id} {internacao.box ? `• Baia ${internacao.box}` : '• Sem baia'}
+                        Internação #{internacao.internacao_id}{" "}
+                        {internacao.box ? `• Baia ${internacao.box}` : "• Sem baia"}
                       </p>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${internacao.status === 'alta' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${internacao.status === "alta" ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}
+                      >
                         {internacao.status}
                       </span>
                     </div>
 
-                    <p className="text-sm text-gray-600">Motivo: {internacao.motivo || '-'}</p>
-                    <p className="text-sm text-gray-600">Entrada: {formatarDataHora(internacao.data_entrada)}</p>
-                    <p className="text-sm text-gray-600">Alta: {formatarDataHora(internacao.data_saida)}</p>
+                    <p className="text-sm text-gray-600">Motivo: {internacao.motivo || "-"}</p>
+                    <p className="text-sm text-gray-600">
+                      Entrada: {formatarDataHora(internacao.data_entrada)}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Alta: {formatarDataHora(internacao.data_saida)}
+                    </p>
                     {internacao.observacoes_alta && (
-                      <p className="text-sm text-green-700 mt-1">Obs. alta: {internacao.observacoes_alta}</p>
+                      <p className="text-sm text-green-700 mt-1">
+                        Obs. alta: {internacao.observacoes_alta}
+                      </p>
                     )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                        <p className="text-xs font-semibold text-gray-600 mb-2">Evoluções ({internacao.evolucoes?.length || 0})</p>
+                        <p className="text-xs font-semibold text-gray-600 mb-2">
+                          Evoluções ({internacao.evolucoes?.length || 0})
+                        </p>
                         {(internacao.evolucoes?.length || 0) === 0 ? (
                           <p className="text-xs text-gray-400">Nenhuma evolução.</p>
                         ) : (
                           <div className="space-y-2">
                             {(internacao.evolucoes || []).slice(0, 5).map((ev) => (
-                              <div key={ev.id} className="text-xs text-gray-700 border border-gray-200 bg-white rounded p-2">
+                              <div
+                                key={ev.id}
+                                className="text-xs text-gray-700 border border-gray-200 bg-white rounded p-2"
+                              >
                                 <p className="text-gray-500">{formatarDataHora(ev.data_hora)}</p>
-                                <p>Temp: {ev.temperatura || '-'} • FC: {ev.freq_cardiaca || '-'} • FR: {ev.freq_respiratoria || '-'}</p>
-                                {ev.observacoes && <p className="text-gray-600">{ev.observacoes}</p>}
+                                <p>
+                                  Temp: {ev.temperatura || "-"} • FC: {ev.freq_cardiaca || "-"} •
+                                  FR: {ev.freq_respiratoria || "-"}
+                                </p>
+                                {ev.observacoes && (
+                                  <p className="text-gray-600">{ev.observacoes}</p>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -1035,23 +1158,34 @@ const PetDetalhes = () => {
                       </div>
 
                       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                        <p className="text-xs font-semibold text-gray-600 mb-2">Procedimentos ({internacao.procedimentos?.length || 0})</p>
+                        <p className="text-xs font-semibold text-gray-600 mb-2">
+                          Procedimentos ({internacao.procedimentos?.length || 0})
+                        </p>
                         {(internacao.procedimentos?.length || 0) === 0 ? (
                           <p className="text-xs text-gray-400">Nenhum procedimento.</p>
                         ) : (
                           <div className="space-y-2">
                             {(internacao.procedimentos || []).slice(0, 8).map((proc, idx) => (
-                              <div key={`${proc.id || idx}_pet_proc`} className="text-xs text-gray-700 border border-gray-200 bg-white rounded p-2">
+                              <div
+                                key={`${proc.id || idx}_pet_proc`}
+                                className="text-xs text-gray-700 border border-gray-200 bg-white rounded p-2"
+                              >
                                 <div className="flex items-center justify-between gap-2 mb-1">
-                                  <p className="font-semibold text-gray-800">{proc.medicamento || 'Procedimento'}</p>
-                                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${proc.status === 'agendado' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                    {proc.status === 'agendado' ? 'Agendado' : 'Concluído'}
+                                  <p className="font-semibold text-gray-800">
+                                    {proc.medicamento || "Procedimento"}
+                                  </p>
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${proc.status === "agendado" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}
+                                  >
+                                    {proc.status === "agendado" ? "Agendado" : "Concluído"}
                                   </span>
                                 </div>
                                 <p>Agendado: {formatarDataHora(proc.horario_agendado)}</p>
                                 <p>Executado: {formatarDataHora(proc.horario_execucao)}</p>
-                                <p>Dose: {proc.dose || '-'} • Via: {proc.via || '-'}</p>
-                                <p>Responsável: {proc.executado_por || '-'}</p>
+                                <p>
+                                  Dose: {proc.dose || "-"} • Via: {proc.via || "-"}
+                                </p>
+                                <p>Responsável: {proc.executado_por || "-"}</p>
                                 {proc.observacao_execucao && <p>Obs: {proc.observacao_execucao}</p>}
                               </div>
                             ))}
@@ -1067,7 +1201,7 @@ const PetDetalhes = () => {
         )}
 
         {/* Aba: Serviços */}
-        {abaAtiva === 'servicos' && (
+        {abaAtiva === "servicos" && (
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900">Histórico de Serviços</h2>
@@ -1077,7 +1211,9 @@ const PetDetalhes = () => {
             </div>
             {Array.isArray(carteirinha?.alertas) && carteirinha.alertas.length > 0 && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <h3 className="text-sm font-semibold text-amber-900 mb-2">Alertas para banho, tosa e serviços</h3>
+                <h3 className="text-sm font-semibold text-amber-900 mb-2">
+                  Alertas para banho, tosa e serviços
+                </h3>
                 <div className="space-y-2 text-sm text-amber-900">
                   {carteirinha.alertas.slice(0, 5).map((alerta, idx) => (
                     <p key={`servico_alerta_${idx}`}>• {alerta.mensagem}</p>
@@ -1088,7 +1224,9 @@ const PetDetalhes = () => {
             <div className="text-center py-12 text-gray-500">
               <PawPrint size={48} className="mx-auto mb-4 text-gray-300" />
               <p className="text-lg font-medium mb-2">Módulo em desenvolvimento</p>
-              <p className="text-sm">Em breve você poderá gerenciar banho, tosa e outros serviços</p>
+              <p className="text-sm">
+                Em breve você poderá gerenciar banho, tosa e outros serviços
+              </p>
             </div>
           </div>
         )}

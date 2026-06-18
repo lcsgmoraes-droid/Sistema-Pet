@@ -4,8 +4,7 @@ const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100];
 
 const VARIANT_CLASSES = {
   inline: "flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between",
-  top:
-    "mt-6 flex w-full flex-col gap-3 rounded-t-lg border border-gray-200 bg-gray-50 px-4 py-3 md:flex-row md:items-center md:justify-between",
+  top: "mt-6 flex w-full flex-col gap-3 rounded-t-lg border border-gray-200 bg-gray-50 px-4 py-3 md:flex-row md:items-center md:justify-between",
   bottom:
     "flex w-full flex-col gap-3 border-t border-gray-200 bg-gray-50 px-4 py-3 md:flex-row md:items-center md:justify-between",
 };
@@ -24,10 +23,7 @@ function getVisiblePages(currentPage, totalPages) {
           ? totalPages - 4
           : currentPage - 2;
 
-  return Array.from(
-    { length: Math.min(totalPages, 5) },
-    (_, index) => firstPage + index,
-  );
+  return Array.from({ length: Math.min(totalPages, 5) }, (_, index) => firstPage + index);
 }
 
 export default function PaginationControls({
@@ -89,7 +85,10 @@ export default function PaginationControls({
           type="button"
           onClick={() => goToPage(1)}
           disabled={disabled || isFirstPage}
-          className={cx(actionButtonClasses({ intent: "neutral", tone: "soft", size: "xs" }), "hidden sm:inline-flex")}
+          className={cx(
+            actionButtonClasses({ intent: "neutral", tone: "soft", size: "xs" }),
+            "hidden sm:inline-flex",
+          )}
         >
           Primeira
         </button>
@@ -136,7 +135,10 @@ export default function PaginationControls({
           type="button"
           onClick={() => goToPage(pageCount)}
           disabled={disabled || isLastPage}
-          className={cx(actionButtonClasses({ intent: "neutral", tone: "soft", size: "xs" }), "hidden sm:inline-flex")}
+          className={cx(
+            actionButtonClasses({ intent: "neutral", tone: "soft", size: "xs" }),
+            "hidden sm:inline-flex",
+          )}
         >
           Ultima
         </button>

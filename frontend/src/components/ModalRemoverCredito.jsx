@@ -10,36 +10,36 @@
  *   onClose     () => void
  */
 
-import { useState } from 'react';
-import { X, MinusCircle, AlertCircle, Info } from 'lucide-react';
-import CurrencyInput from './CurrencyInput';
-import CustomerIdentity from './ui/CustomerIdentity';
-import { formatBRL } from '../utils/formatters';
-import api from '../api';
+import { useState } from "react";
+import { X, MinusCircle, AlertCircle, Info } from "lucide-react";
+import CurrencyInput from "./CurrencyInput";
+import CustomerIdentity from "./ui/CustomerIdentity";
+import { formatBRL } from "../utils/formatters";
+import api from "../api";
 
 export default function ModalRemoverCredito({ cliente, onConfirmar, onClose }) {
   const creditoDisponivel = parseFloat(cliente?.credito || 0);
 
   const [valor, setValor] = useState(0);
-  const [motivo, setMotivo] = useState('Ajuste manual');
+  const [motivo, setMotivo] = useState("Ajuste manual");
   const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState('');
+  const [erro, setErro] = useState("");
 
   const handleConfirmar = async () => {
     if (!valor || valor <= 0) {
-      setErro('Informe um valor maior que zero.');
+      setErro("Informe um valor maior que zero.");
       return;
     }
     if (valor > creditoDisponivel) {
-      setErro(`Valor excede o crédito disponível (R$ ${formatBRL(creditoDisponivel)}).`)
+      setErro(`Valor excede o crédito disponível (R$ ${formatBRL(creditoDisponivel)}).`);
       return;
     }
     if (!motivo.trim()) {
-      setErro('Informe o motivo da remoção de crédito.');
+      setErro("Informe o motivo da remoção de crédito.");
       return;
     }
 
-    setErro('');
+    setErro("");
     setLoading(true);
 
     try {
@@ -51,10 +51,7 @@ export default function ModalRemoverCredito({ cliente, onConfirmar, onClose }) {
       onConfirmar && onConfirmar(response.data.credito_atual);
       onClose(); // fecha automaticamente após confirmar
     } catch (error) {
-      setErro(
-        error.response?.data?.detail ||
-          'Erro ao remover crédito. Tente novamente.'
-      );
+      setErro(error.response?.data?.detail || "Erro ao remover crédito. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -77,10 +74,7 @@ export default function ModalRemoverCredito({ cliente, onConfirmar, onClose }) {
               />
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-white/20 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -90,8 +84,7 @@ export default function ModalRemoverCredito({ cliente, onConfirmar, onClose }) {
           <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
             <Info className="w-4 h-4 text-red-500 flex-shrink-0" />
             <span className="text-sm text-red-800">
-              Crédito disponível:{' '}
-              <strong>R$ {formatBRL(creditoDisponivel)}</strong>
+              Crédito disponível: <strong>R$ {formatBRL(creditoDisponivel)}</strong>
             </span>
           </div>
 
@@ -125,9 +118,7 @@ export default function ModalRemoverCredito({ cliente, onConfirmar, onClose }) {
 
           {/* Campo motivo */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Motivo
-            </label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Motivo</label>
             <input
               type="text"
               value={motivo}
@@ -167,7 +158,7 @@ export default function ModalRemoverCredito({ cliente, onConfirmar, onClose }) {
                 Removendo...
               </>
             ) : (
-              'Remover Crédito'
+              "Remover Crédito"
             )}
           </button>
         </div>

@@ -2,6 +2,7 @@
 CorePet - Backend API
 FastAPI + SQLAlchemy + SQLite/PostgreSQL
 """
+
 import app.database.orm_guards  # ✅ ORM Guards: força IDs=None antes do flush
 
 import os
@@ -18,7 +19,9 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.orm import Session
 from app.db import get_session as get_db
-from app.db.migration_check import ensure_db_ready  # Pré-Prod Block 3: verificação de migrations
+from app.db.migration_check import (
+    ensure_db_ready,
+)  # Pré-Prod Block 3: verificação de migrations
 from app.config import (
     SYSTEM_NAME,
     SYSTEM_VERSION,
@@ -29,7 +32,9 @@ from app.config import (
     GOOGLE_MAPS_API_KEY,
     settings,  # Pré-Prod Block 1: objeto de settings completo
 )
-from app.core.settings_validation import validate_settings  # Pré-Prod Block 1: validação de settings
+from app.core.settings_validation import (
+    validate_settings,
+)  # Pré-Prod Block 1: validação de settings
 from app.utils.logger import configure_logging
 from app.middlewares.request_context import RequestContextMiddleware
 from app.middlewares.security_audit import SecurityAuditMiddleware
@@ -49,17 +54,25 @@ from app.vendas_routes import router as vendas_router
 from app.caixa_routes import router as caixa_router
 from app.nfe_routes import router as nfe_router
 from app.estoque_routes import router as estoque_router
-from app.estoque_movimentacoes_manuais_routes import router as estoque_movimentacoes_manuais_router
+from app.estoque_movimentacoes_manuais_routes import (
+    router as estoque_movimentacoes_manuais_router,
+)
 from app.estoque_entrada_manual_routes import router as estoque_entrada_manual_router
 from app.estoque_saida_manual_routes import router as estoque_saida_manual_router
 from app.estoque_granel_routes import router as estoque_granel_router
 from app.estoque_transferencia_routes import router as estoque_transferencia_router
-from app.estoque_transferencia_parceiro_routes import router as estoque_transferencia_parceiro_router
+from app.estoque_transferencia_parceiro_routes import (
+    router as estoque_transferencia_parceiro_router,
+)
 from app.estoque_saida_full_routes import router as estoque_saida_full_router
 from app.estoque_alertas_gerais_routes import router as estoque_alertas_gerais_router
 from app.estoque_relatorios_routes import router as estoque_relatorios_router
-from app.estoque_movimentacoes_edicao_routes import router as estoque_movimentacoes_edicao_router
-from app.estoque_movimentacoes_consulta_routes import router as estoque_movimentacoes_consulta_router
+from app.estoque_movimentacoes_edicao_routes import (
+    router as estoque_movimentacoes_edicao_router,
+)
+from app.estoque_movimentacoes_consulta_routes import (
+    router as estoque_movimentacoes_consulta_router,
+)
 from app.estoque_alertas_routes import router as estoque_alertas_router
 from app.estoque_validade_routes import router as estoque_validade_router
 from app.bling_sync_routes import router as bling_sync_router
@@ -102,9 +115,15 @@ from app.lembretes import router as lembretes_router
 from app.calculadora_racao import router as calculadora_racao_router
 from app.cliente_info_pdv import router as cliente_info_pdv_router
 from app.opcoes_racao_routes import router as opcoes_racao_router
-from app.analise_racoes_routes import router as analise_racoes_router  # Fase 4: Análises de Rações
-from app.pdv_racoes_routes import router as pdv_racoes_router  # Fase 5: PDV Inteligente de Rações
-from app.sugestoes_racoes_routes import router as sugestoes_racoes_router  # Fase 6: Sugestões Inteligentes
+from app.analise_racoes_routes import (
+    router as analise_racoes_router,
+)  # Fase 4: Análises de Rações
+from app.pdv_racoes_routes import (
+    router as pdv_racoes_router,
+)  # Fase 5: PDV Inteligente de Rações
+from app.sugestoes_racoes_routes import (
+    router as sugestoes_racoes_router,
+)  # Fase 6: Sugestões Inteligentes
 from app.ml_racoes_routes import router as ml_racoes_router  # Fase 7: Machine Learning
 from app.formas_pagamento_routes import router as formas_pagamento_router
 from app.operadoras_routes import router as operadoras_router
@@ -116,7 +135,10 @@ from app.comissoes_diagnostico_routes import router as comissoes_diagnostico_rou
 from app.routers.relatorios_comissoes import router as relatorios_comissoes_router
 from app.routes.acertos_routes import router as acertos_router
 from app.audit.api import router as audit_router
-from app.api.endpoints.whatsapp import router as whatsapp_router  # Sprint 3: WhatsApp IA
+from app.api.endpoints.whatsapp import (
+    router as whatsapp_router,
+)  # Sprint 3: WhatsApp IA
+
 # from app.api.endpoints.whatsapp import router as whatsapp_router  # DESATIVADO - Conflita com novos modelos WhatsApp IA
 from app.api.endpoints.segmentacao import router as segmentacao_router
 from app.pdv_ai_routes import router as pdv_ai_router
@@ -124,9 +146,12 @@ from app.usuarios_routes import router as usuarios_router
 from app.roles_routes import router as roles_router
 from app.permissions_routes import router as permissions_router
 from app.api.pdv_internal_routes import router as pdv_internal_router
+
 # [DESATIVADO - PHASE 5] from app.api.opportunity_metrics_routes import router as opportunity_metrics_router
 from app.api.racao_calculadora_routes import router as racao_calculadora_internal_router
-from app.api.whatsapp_orchestrator_internal_routes import router as whatsapp_orchestrator_internal_router
+from app.api.whatsapp_orchestrator_internal_routes import (
+    router as whatsapp_orchestrator_internal_router,
+)
 from app.api.v1.fiscal_sugestao import router as fiscal_sugestao_router
 from app.api.v1.produto_fiscal import router as produto_fiscal_router
 from app.api.v1.pdv_fiscal import router as pdv_fiscal_router
@@ -141,12 +166,20 @@ from app.funcionarios_routes import router as funcionarios_router
 from app.empresa_config_routes import router as empresa_config_router
 from app.pdv_indicadores_routes import router as pdv_indicadores_router
 from app.empresa_routes import router as empresa_router
-from app.api.endpoints.configuracoes_entrega import router as configuracoes_entrega_router
+from app.api.endpoints.configuracoes_entrega import (
+    router as configuracoes_entrega_router,
+)
 from app.api.endpoints.rotas_entrega import router as rotas_entrega_router
 from app.api.endpoints.acertos_entrega import router as acertos_entrega_router
-from app.api.endpoints.configuracao_custo_moto import router as configuracao_custo_moto_router
-from app.api.endpoints.dashboard_entregas import router as dashboard_entregas_router  # ETAPA 11.1
-from app.pendencia_estoque_routes import router as pendencia_estoque_router  # Sistema de Lista de Espera
+from app.api.endpoints.configuracao_custo_moto import (
+    router as configuracao_custo_moto_router,
+)
+from app.api.endpoints.dashboard_entregas import (
+    router as dashboard_entregas_router,
+)  # ETAPA 11.1
+from app.pendencia_estoque_routes import (
+    router as pendencia_estoque_router,
+)  # Sistema de Lista de Espera
 
 # ============================================================================
 # WHATSAPP + IA - SPRINT 2 & 4 & 6 & 7
@@ -154,15 +187,29 @@ from app.pendencia_estoque_routes import router as pendencia_estoque_router  # S
 from app.whatsapp.webhook import router as whatsapp_webhook_router
 from app.routers.whatsapp_config import router as whatsapp_config_router
 from app.routers.whatsapp_handoff import router as whatsapp_handoff_router  # Sprint 4
-from app.routers.whatsapp_websocket import router as whatsapp_websocket_router  # Sprint 5: WebSocket
-from app.routes.whatsapp_routes import router as whatsapp_api_router  # Sprint 6: Tools & Tests
-from app.whatsapp.analytics_router import router as whatsapp_analytics_router  # Sprint 7: Analytics
-from app.whatsapp.security_router import router as whatsapp_security_router  # Sprint 8: Security & LGPD
+from app.routers.whatsapp_websocket import (
+    router as whatsapp_websocket_router,
+)  # Sprint 5: WebSocket
+from app.routes.whatsapp_routes import (
+    router as whatsapp_api_router,
+)  # Sprint 6: Tools & Tests
+from app.whatsapp.analytics_router import (
+    router as whatsapp_analytics_router,
+)  # Sprint 7: Analytics
+from app.whatsapp.security_router import (
+    router as whatsapp_security_router,
+)  # Sprint 8: Security & LGPD
 from app.health_router import router as health_router  # Sprint 9: Health & Monitoring
 from app.admin_fix_routes import router as admin_fix_router  # Correções administrativas
-from app.routes.health_routes import router as health_check_router  # FASE 8: Healthcheck + Readiness
-from app.routes.error_events_routes import router as error_events_router  # Observabilidade operacional
-from app.routes.ops_tenants_routes import router as ops_tenants_router  # Gestao operacional de tenants
+from app.routes.health_routes import (
+    router as health_check_router,
+)  # FASE 8: Healthcheck + Readiness
+from app.routes.error_events_routes import (
+    router as error_events_router,
+)  # Observabilidade operacional
+from app.routes.ops_tenants_routes import (
+    router as ops_tenants_router,
+)  # Gestao operacional de tenants
 from app.lgpd_routes import router as lgpd_router  # LGPD operacional
 
 # ============================================================================
@@ -180,8 +227,12 @@ from app.routes.app_vet_routes import router as app_vet_router
 from app.routes.ecommerce_webhooks import router as ecommerce_webhooks_router
 from app.routes.ecommerce_aparencia_routes import router as ecommerce_aparencia_router
 from app.routes.ecommerce_config_routes import router as ecommerce_config_router
-from app.routes.ecommerce_payment_config_routes import public_router as ecommerce_payment_config_public_router
-from app.routes.ecommerce_payment_config_routes import router as ecommerce_payment_config_router
+from app.routes.ecommerce_payment_config_routes import (
+    public_router as ecommerce_payment_config_public_router,
+)
+from app.routes.ecommerce_payment_config_routes import (
+    router as ecommerce_payment_config_router,
+)
 from app.routes.ecommerce_notify_routes import router as ecommerce_notify_router
 from app.routes.ecommerce_analytics_routes import router as ecommerce_analytics_router
 from app.routes.ecommerce_entregador import router as ecommerce_entregador_router
@@ -234,7 +285,13 @@ logger = logging.getLogger(__name__)
 
 
 def _module_dependencies(modulo: str, *, allow_ecommerce_customer: bool = False):
-    return [Depends(require_active_module(modulo, allow_ecommerce_customer=allow_ecommerce_customer))]
+    return [
+        Depends(
+            require_active_module(
+                modulo, allow_ecommerce_customer=allow_ecommerce_customer
+            )
+        )
+    ]
 
 
 BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS = 5 * 60 * 60  # 5 horas
@@ -324,6 +381,7 @@ def _release_background_jobs_leader() -> None:
 
     try:
         import fcntl
+
         fcntl.flock(_background_jobs_lock_handle, fcntl.LOCK_UN)
     except Exception:
         pass
@@ -340,8 +398,10 @@ def _release_background_jobs_leader() -> None:
 def _bling_recarregar_tokens_do_env():
     """Relê o access_token e refresh_token do .env e atualiza os.environ."""
     import os as _os
+
     try:
         from dotenv import dotenv_values
+
         env_path = "/opt/petshop/.env"
         if _os.path.exists(env_path):
             vals = dotenv_values(env_path)
@@ -361,14 +421,18 @@ def _loop_renovacao_token_bling():
     o token atualizado do .env.
     """
     import os as _os
+
     worker_pid = _os.getpid()
-    logger.info(f"[BLING] Job de renovação automática iniciado (PID {worker_pid}, intervalo: 5h)")
+    logger.info(
+        f"[BLING] Job de renovação automática iniciado (PID {worker_pid}, intervalo: 5h)"
+    )
 
     while not _bling_token_stop_event.is_set():
         try:
             # Tenta importar fcntl (disponível no Linux/servidor)
             try:
                 import fcntl
+
                 has_fcntl = True
             except ImportError:
                 has_fcntl = False
@@ -390,26 +454,34 @@ def _loop_renovacao_token_bling():
                                 pass
 
                         if recently_renewed:
-                            logger.info(f"[BLING] PID {worker_pid} — token já renovado por outro worker, recarregando do .env")
+                            logger.info(
+                                f"[BLING] PID {worker_pid} — token já renovado por outro worker, recarregando do .env"
+                            )
                             _bling_recarregar_tokens_do_env()
                         else:
                             from app.bling_integration import BlingAPI
+
                             bling = BlingAPI()
                             bling.renovar_access_token()
                             with open(_BLING_LAST_RENEWAL_FILE, "w") as tf:
                                 tf.write(str(time.time()))
-                            logger.info(f"[BLING] ✅ PID {worker_pid} — Token renovado automaticamente")
+                            logger.info(
+                                f"[BLING] ✅ PID {worker_pid} — Token renovado automaticamente"
+                            )
                     finally:
                         fcntl.flock(lock_f, fcntl.LOCK_UN)
             else:
                 # Ambiente de desenvolvimento (Windows) — renova diretamente
                 from app.bling_integration import BlingAPI
+
                 bling = BlingAPI()
                 bling.renovar_access_token()
                 logger.info("[BLING] ✅ Token renovado automaticamente")
 
         except Exception as e:
-            logger.warning(f"[BLING] ⚠️ PID {worker_pid} — Falha na renovação automática do token: {e}")
+            logger.warning(
+                f"[BLING] ⚠️ PID {worker_pid} — Falha na renovação automática do token: {e}"
+            )
 
         _bling_token_stop_event.wait(BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS)
 
@@ -422,7 +494,9 @@ def _loop_sefaz_sync():
     *** DESATIVADO TEMPORARIAMENTE — sincronização apenas via chamada manual. ***
     Para reativar: remover o return logo abaixo.
     """
-    logger.info("[SEFAZ] Sincronização automática DESATIVADA — usando apenas modo manual.")
+    logger.info(
+        "[SEFAZ] Sincronização automática DESATIVADA — usando apenas modo manual."
+    )
     return
 
     # --- CÓDIGO ABAIXO PRESERVADO PARA REATIVAÇÃO FUTURA ---
@@ -439,7 +513,9 @@ def _loop_sefaz_sync():
     while not _sefaz_sync_stop_event.is_set():
         try:
             import json as _json
-            from app.services.sefaz_tenant_config_service import SefazTenantConfigService
+            from app.services.sefaz_tenant_config_service import (
+                SefazTenantConfigService,
+            )
             from app.services.sefaz_sync_coordinator import sefaz_coordinator
 
             base_dir = SefazTenantConfigService.BASE_DIR
@@ -460,7 +536,10 @@ def _loop_sefaz_sync():
                             continue
                         if cfg.get("modo") != "real":
                             continue
-                        if not cfg.get("cert_path") or not _Path(cfg["cert_path"]).exists():
+                        if (
+                            not cfg.get("cert_path")
+                            or not _Path(cfg["cert_path"]).exists()
+                        ):
                             continue
 
                         # Verificação de timing:
@@ -483,8 +562,12 @@ def _loop_sefaz_sync():
                                 ultimo_dt = _dt.fromisoformat(ultimo_str)
                                 if ultimo_dt.tzinfo is None:
                                     ultimo_dt = ultimo_dt.replace(tzinfo=_tz.utc)
-                                intervalo_min = int(cfg.get("importacao_intervalo_min", 60))
-                                if (agora - ultimo_dt).total_seconds() / 60 < intervalo_min:
+                                intervalo_min = int(
+                                    cfg.get("importacao_intervalo_min", 60)
+                                )
+                                if (
+                                    agora - ultimo_dt
+                                ).total_seconds() / 60 < intervalo_min:
                                     continue
 
                         tenant_id_str = tenant_dir.name
@@ -518,7 +601,9 @@ def _loop_sefaz_sync():
 
         _sefaz_sync_stop_event.wait(600)  # verifica a cada 10 minutos
 
-    logger.info(f"[SEFAZ] Job de sincronizacao automatica finalizado (PID {worker_pid})")
+    logger.info(
+        f"[SEFAZ] Job de sincronizacao automatica finalizado (PID {worker_pid})"
+    )
 
 
 def _loop_expirar_reservas():
@@ -529,8 +614,11 @@ def _loop_expirar_reservas():
     """
     from datetime import datetime as _dt
     import os as _os
+
     worker_pid = _os.getpid()
-    logger.info(f"[RESERVAS] Job de expiração de reservas iniciado (PID {worker_pid}, intervalo: 30min)")
+    logger.info(
+        f"[RESERVAS] Job de expiração de reservas iniciado (PID {worker_pid}, intervalo: 30min)"
+    )
 
     # Aguarda 2 minutos no startup para o backend estar totalmente pronto
     _expirar_reservas_stop_event.wait(120)
@@ -547,22 +635,30 @@ def _loop_expirar_reservas():
             db = SessionLocal()
             try:
                 agora = _dt.utcnow()
-                tenants_ativos = db.query(Tenant.id).filter(Tenant.status == "active").all()
+                tenants_ativos = (
+                    db.query(Tenant.id).filter(Tenant.status == "active").all()
+                )
                 total_expirados = 0
 
                 for (tenant_id_raw,) in tenants_ativos:
                     try:
                         tenant_id = UUID(str(tenant_id_raw))
                     except (TypeError, ValueError):
-                        logger.warning("[RESERVAS] Tenant com ID invalido ignorado no job de expiracao")
+                        logger.warning(
+                            "[RESERVAS] Tenant com ID invalido ignorado no job de expiracao"
+                        )
                         continue
 
                     set_current_tenant(tenant_id)
-                    pedidos_vencidos_tenant = db.query(PedidoIntegrado).filter(
-                        PedidoIntegrado.tenant_id == tenant_id,
-                        PedidoIntegrado.status == "aberto",
-                        PedidoIntegrado.expira_em < agora
-                    ).all()
+                    pedidos_vencidos_tenant = (
+                        db.query(PedidoIntegrado)
+                        .filter(
+                            PedidoIntegrado.tenant_id == tenant_id,
+                            PedidoIntegrado.status == "aberto",
+                            PedidoIntegrado.expira_em < agora,
+                        )
+                        .all()
+                    )
 
                     if pedidos_vencidos_tenant:
                         logger.info(
@@ -573,12 +669,16 @@ def _loop_expirar_reservas():
 
                     for pedido in pedidos_vencidos_tenant:
                         # Libera apenas os itens ainda reservados (sem liberado_em nem vendido_em)
-                        itens = db.query(PedidoIntegradoItem).filter(
-                            PedidoIntegradoItem.tenant_id == tenant_id,
-                            PedidoIntegradoItem.pedido_integrado_id == pedido.id,
-                            PedidoIntegradoItem.liberado_em.is_(None),
-                            PedidoIntegradoItem.vendido_em.is_(None)
-                        ).all()
+                        itens = (
+                            db.query(PedidoIntegradoItem)
+                            .filter(
+                                PedidoIntegradoItem.tenant_id == tenant_id,
+                                PedidoIntegradoItem.pedido_integrado_id == pedido.id,
+                                PedidoIntegradoItem.liberado_em.is_(None),
+                                PedidoIntegradoItem.vendido_em.is_(None),
+                            )
+                            .all()
+                        )
                         for item in itens:
                             item.liberado_em = agora
                             db.add(item)
@@ -590,8 +690,10 @@ def _loop_expirar_reservas():
 
                 if total_expirados:
                     db.commit()
-                    logger.info("[RESERVAS] %s pedido(s) expirado(s), reservas liberadas", total_expirados)
-
+                    logger.info(
+                        "[RESERVAS] %s pedido(s) expirado(s), reservas liberadas",
+                        total_expirados,
+                    )
 
             except Exception as e:
                 db.rollback()
@@ -601,11 +703,15 @@ def _loop_expirar_reservas():
                 db.close()
 
         except Exception as e:
-            logger.warning(f"[RESERVAS] ⚠️ PID {worker_pid} — Falha geral no job de expiração: {e}")
+            logger.warning(
+                f"[RESERVAS] ⚠️ PID {worker_pid} — Falha geral no job de expiração: {e}"
+            )
 
         _expirar_reservas_stop_event.wait(EXPIRAR_RESERVAS_INTERVALO_SEGUNDOS)
 
-    logger.info(f"[RESERVAS] Job de expiração de reservas finalizado (PID {worker_pid})")
+    logger.info(
+        f"[RESERVAS] Job de expiração de reservas finalizado (PID {worker_pid})"
+    )
 
 
 # ============================================================================
@@ -642,6 +748,7 @@ app = FastAPI(
 # PROXY HEADERS - Para HTTPS atrás de reverse proxy (nginx)
 # ====================
 
+
 # Confia nos headers X-Forwarded-* do nginx
 @app.middleware("http")
 async def proxy_headers_middleware(request: Request, call_next):
@@ -651,6 +758,7 @@ async def proxy_headers_middleware(request: Request, call_next):
         request.scope["scheme"] = "https"
     response = await call_next(request)
     return response
+
 
 # ====================
 # MIDDLEWARE DE REQUEST CONTEXT (PRÉ-PROD BLOCO 4)
@@ -702,17 +810,21 @@ app.add_middleware(TenancyMiddleware)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+
 # Handler customizado para rate limit
 @app.exception_handler(RateLimitExceeded)
 async def custom_rate_limit_handler(request: Request, exc: RateLimitExceeded):
-    logger.warning(f"🚫 Rate limit exceeded: {get_remote_address(request)} on {request.url.path}")
+    logger.warning(
+        f"🚫 Rate limit exceeded: {get_remote_address(request)} on {request.url.path}"
+    )
     return JSONResponse(
         status_code=429,
         content={
             "error": "too_many_requests",
             "message": "Muitas requisições. Aguarde alguns minutos e tente novamente.",
-        }
+        },
     )
+
 
 # CORS
 app.add_middleware(
@@ -728,6 +840,7 @@ app.add_middleware(
 # EXCEPTION HANDLERS
 # ====================
 
+
 # Handler para erros de validação
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -739,9 +852,10 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={
             "error": "validation_error",
             "message": "Dados inválidos",
-            "details": exc.errors()
-        }
+            "details": exc.errors(),
+        },
     )
+
 
 # Handler para erros HTTP (incluindo 401, 403, 404)
 @app.exception_handler(HTTPException)
@@ -758,10 +872,12 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         headers=exc.headers,
     )
 
+
 # Handler para erros internos 500
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     # Log estruturado de erro (ERROR)
+    from app import config as app_config
     from app.utils.logger import logger as structured_logger
 
     structured_logger.error(
@@ -769,14 +885,15 @@ async def general_exception_handler(request: Request, exc: Exception):
         message=f"Erro 500: {str(exc)}",
         path=request.url.path,
         method=request.method,
-        exception_type=type(exc).__name__
+        exception_type=type(exc).__name__,
     )
     logger.error(f"❌ Erro 500: {str(exc)}", exc_info=True)
 
     # Sanitização de erros em produção
     # Em produção: NÃO expor detalhes internos
     # Em dev/staging: Mostrar detalhes para debugging
-    is_production = ENVIRONMENT.lower() in ["production", "prod"]
+    environment = getattr(app_config, "ENVIRONMENT", ENVIRONMENT)
+    is_production = environment.lower() in ["production", "prod"]
 
     if is_production:
         # Produção: Mensagem genérica (sem detalhes)
@@ -785,7 +902,7 @@ async def general_exception_handler(request: Request, exc: Exception):
             content={
                 "error": "internal_server_error",
                 "message": "Erro interno no servidor. Nossa equipe foi notificada.",
-            }
+            },
         )
     else:
         # Dev/Staging: Mostrar detalhes para debugging
@@ -798,6 +915,7 @@ async def general_exception_handler(request: Request, exc: Exception):
                 "type": type(exc).__name__,  # Apenas em dev
             },
         )
+
 
 # ====================
 # ARQUIVOS ESTÁTICOS - ANTES DOS ROUTERS!
@@ -827,125 +945,342 @@ app.include_router(roles_router, tags=["Roles & RBAC"])
 app.include_router(permissions_router, tags=["Permissions & RBAC"])
 app.include_router(clientes_router, tags=["Clientes & Pets"])
 app.include_router(pets_router, tags=["Gestão de Pets"])  # Módulo dedicado separado
-app.include_router(veterinario_router, tags=["Veterinário"], dependencies=_module_dependencies("veterinario"))  # Módulo Veterinário
-app.include_router(banho_tosa_router, tags=["Banho & Tosa"], dependencies=_module_dependencies("banho_tosa"))  # Modulo Banho & Tosa
-app.include_router(cadastros_router, tags=["Cadastros - Espécies & Raças"])  # Cadastros básicos
+app.include_router(
+    veterinario_router,
+    tags=["Veterinário"],
+    dependencies=_module_dependencies("veterinario"),
+)  # Módulo Veterinário
+app.include_router(
+    banho_tosa_router,
+    tags=["Banho & Tosa"],
+    dependencies=_module_dependencies("banho_tosa"),
+)  # Modulo Banho & Tosa
+app.include_router(
+    cadastros_router, tags=["Cadastros - Espécies & Raças"]
+)  # Cadastros básicos
 app.include_router(cliente_info_pdv_router, tags=["Clientes & Pets"])
-app.include_router(importacao_router, prefix="/produtos", tags=["Importação de Produtos"])  # ANTES de produtos_router!
+app.include_router(
+    importacao_router, prefix="/produtos", tags=["Importação de Produtos"]
+)  # ANTES de produtos_router!
 app.include_router(importacao_pessoas_router, tags=["Importação de Pessoas"])
 app.include_router(produtos_router, tags=["Produtos"])
 app.include_router(opcoes_racao_router, tags=["Opções de Ração"])
-app.include_router(analise_racoes_router, tags=["Análises de Rações"])  # Fase 4: Dashboard de Análise
-app.include_router(pdv_racoes_router, tags=["PDV - Rações Inteligentes"])  # Fase 5: Alertas e Sugestões
-app.include_router(sugestoes_racoes_router, tags=["Sugestões Inteligentes - Rações"])  # Fase 6: Detecção e Otimização
-app.include_router(ml_racoes_router, tags=["Machine Learning - Rações"])  # Fase 7: Aprendizado e Previsão
+app.include_router(
+    analise_racoes_router, tags=["Análises de Rações"]
+)  # Fase 4: Dashboard de Análise
+app.include_router(
+    pdv_racoes_router, tags=["PDV - Rações Inteligentes"]
+)  # Fase 5: Alertas e Sugestões
+app.include_router(
+    sugestoes_racoes_router, tags=["Sugestões Inteligentes - Rações"]
+)  # Fase 6: Detecção e Otimização
+app.include_router(
+    ml_racoes_router, tags=["Machine Learning - Rações"]
+)  # Fase 7: Aprendizado e Previsão
 app.include_router(variacoes_router, tags=["Produtos - Variações"])  # Sprint 2
 app.include_router(calculadora_racao_router, tags=["Calculadora de Ração"])
 app.include_router(lembretes_router, tags=["Lembretes de Recorrência"])
-app.include_router(relatorio_vendas_router, tags=["Relatório de Vendas"])  # ANTES de vendas_router!
+app.include_router(
+    relatorio_vendas_router, tags=["Relatório de Vendas"]
+)  # ANTES de vendas_router!
 app.include_router(vendas_router, tags=["Vendas & PDV"])
 app.include_router(caixa_router, tags=["Controle de Caixa"])
-app.include_router(nfe_router, tags=["Nota Fiscal Eletrônica (NF-e)"], dependencies=_module_dependencies("fiscal"))
+app.include_router(
+    nfe_router,
+    tags=["Nota Fiscal Eletrônica (NF-e)"],
+    dependencies=_module_dependencies("fiscal"),
+)
 app.include_router(estoque_router, tags=["Gestão de Estoque"])
-app.include_router(estoque_movimentacoes_manuais_router, tags=["Estoque - Movimentacoes Manuais"])
+app.include_router(
+    estoque_movimentacoes_manuais_router, tags=["Estoque - Movimentacoes Manuais"]
+)
 app.include_router(estoque_entrada_manual_router, tags=["Estoque - Entrada Manual"])
 app.include_router(estoque_saida_manual_router, tags=["Estoque - Saida Manual"])
 app.include_router(estoque_granel_router, tags=["Estoque - Granel"])
 app.include_router(estoque_transferencia_router, tags=["Estoque - Transferencia"])
-app.include_router(estoque_transferencia_parceiro_router, tags=["Estoque - Transferencia Parceiro"])
+app.include_router(
+    estoque_transferencia_parceiro_router, tags=["Estoque - Transferencia Parceiro"]
+)
 app.include_router(estoque_saida_full_router, tags=["Estoque - Saida FULL"])
 app.include_router(estoque_alertas_gerais_router, tags=["Estoque - Alertas Gerais"])
 app.include_router(estoque_relatorios_router, tags=["Estoque - Relatorios"])
-app.include_router(estoque_movimentacoes_edicao_router, tags=["Estoque - Movimentacoes Edicao"])
-app.include_router(estoque_movimentacoes_consulta_router, tags=["Estoque - Movimentacoes Consulta"])
+app.include_router(
+    estoque_movimentacoes_edicao_router, tags=["Estoque - Movimentacoes Edicao"]
+)
+app.include_router(
+    estoque_movimentacoes_consulta_router, tags=["Estoque - Movimentacoes Consulta"]
+)
 app.include_router(estoque_validade_router, tags=["Estoque - Validade"])
 app.include_router(estoque_alertas_router, tags=["Estoque - Alertas Negativo"])
-app.include_router(bling_sync_router, tags=["Sincronização Bling"], dependencies=_module_dependencies("bling"))
+app.include_router(
+    bling_sync_router,
+    tags=["Sincronização Bling"],
+    dependencies=_module_dependencies("bling"),
+)
 app.include_router(fornecedor_grupos_router, tags=["Grupos de Fornecedores"])
-app.include_router(pedidos_compra_router, tags=["Pedidos de Compra"], dependencies=_module_dependencies("compras"))
-app.include_router(notas_entrada_router, tags=["Notas de Entrada (XML)"], dependencies=_module_dependencies("compras"))
-app.include_router(compras_pendencias_router, tags=["Compras - Pendencias"], dependencies=_module_dependencies("compras"))
-app.include_router(contas_pagar_router, tags=["Financeiro - Contas a Pagar"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(
+    pedidos_compra_router,
+    tags=["Pedidos de Compra"],
+    dependencies=_module_dependencies("compras"),
+)
+app.include_router(
+    notas_entrada_router,
+    tags=["Notas de Entrada (XML)"],
+    dependencies=_module_dependencies("compras"),
+)
+app.include_router(
+    compras_pendencias_router,
+    tags=["Compras - Pendencias"],
+    dependencies=_module_dependencies("compras"),
+)
+app.include_router(
+    contas_pagar_router,
+    tags=["Financeiro - Contas a Pagar"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
 app.include_router(tipo_despesa_router, tags=["Cadastros - Tipo de Despesa"])
-app.include_router(contas_receber_router, tags=["Financeiro - Contas a Receber"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(conciliacao_cartao_router, tags=["Financeiro - Conciliação de Cartão"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(conciliacao_bancaria_router, tags=["Conciliação Bancária - OFX"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(conciliacao_router, tags=["Conciliação de Pagamentos"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(conciliacao_aba1_router, tags=["Conciliação Vendas - Aba 1 V2"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(conciliacao_historico_router, tags=["Conciliação - Histórico"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(
+    contas_receber_router,
+    tags=["Financeiro - Contas a Receber"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    conciliacao_cartao_router,
+    tags=["Financeiro - Conciliação de Cartão"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    conciliacao_bancaria_router,
+    tags=["Conciliação Bancária - OFX"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    conciliacao_router,
+    tags=["Conciliação de Pagamentos"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    conciliacao_aba1_router,
+    tags=["Conciliação Vendas - Aba 1 V2"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    conciliacao_historico_router,
+    tags=["Conciliação - Histórico"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
 app.include_router(admin_router, tags=["Administração"])
 app.include_router(formas_pagamento_router, tags=["Formas de Pagamento & PDV"])
 app.include_router(operadoras_router, tags=["Operadoras de Cartão"])
-app.include_router(comissoes_router, tags=["Comissões"], dependencies=_module_dependencies("comissoes"))
-app.include_router(comissoes_demonstrativo_router, tags=["Comissões - Demonstrativo"], dependencies=_module_dependencies("comissoes"))
-app.include_router(comissoes_avancadas_router, tags=["Comissões - Avançadas"], dependencies=_module_dependencies("comissoes"))
-app.include_router(comissoes_diagnostico_router, tags=["Comissões - Diagnóstico"], dependencies=_module_dependencies("comissoes"))
-app.include_router(relatorios_comissoes_router, tags=["Comissões - Relatórios Analíticos"], dependencies=_module_dependencies("comissoes"))
-app.include_router(acertos_router, prefix="/acertos", tags=["Acertos Financeiros de Parceiros"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(
+    comissoes_router, tags=["Comissões"], dependencies=_module_dependencies("comissoes")
+)
+app.include_router(
+    comissoes_demonstrativo_router,
+    tags=["Comissões - Demonstrativo"],
+    dependencies=_module_dependencies("comissoes"),
+)
+app.include_router(
+    comissoes_avancadas_router,
+    tags=["Comissões - Avançadas"],
+    dependencies=_module_dependencies("comissoes"),
+)
+app.include_router(
+    comissoes_diagnostico_router,
+    tags=["Comissões - Diagnóstico"],
+    dependencies=_module_dependencies("comissoes"),
+)
+app.include_router(
+    relatorios_comissoes_router,
+    tags=["Comissões - Relatórios Analíticos"],
+    dependencies=_module_dependencies("comissoes"),
+)
+app.include_router(
+    acertos_router,
+    prefix="/acertos",
+    tags=["Acertos Financeiros de Parceiros"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
 
-app.include_router(dre_router, tags=["Financeiro - DRE"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(dre_canais_router, tags=["Financeiro - DRE por Canal"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(dre_plano_contas_router, dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(dre_classificacao_router, tags=["DRE - Classificação Automática"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(contas_bancarias_router, tags=["Financeiro - Contas Bancárias"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(
+    dre_router,
+    tags=["Financeiro - DRE"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    dre_canais_router,
+    tags=["Financeiro - DRE por Canal"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    dre_plano_contas_router, dependencies=_module_dependencies("financeiro_erp")
+)
+app.include_router(
+    dre_classificacao_router,
+    tags=["DRE - Classificação Automática"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    contas_bancarias_router,
+    tags=["Financeiro - Contas Bancárias"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
 app.include_router(financeiro_router, tags=["Financeiro - Configurações"])
-app.include_router(lancamentos_router, tags=["Financeiro - Lançamentos"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(
+    lancamentos_router,
+    tags=["Financeiro - Lançamentos"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
 app.include_router(categorias_router, tags=["Financeiro - Categorias"])
-app.include_router(bling_router, tags=["Integração Bling"], dependencies=_module_dependencies("bling"))
-app.include_router(bling_oauth_router, tags=["Bling OAuth"], dependencies=_module_dependencies("bling"))
-app.include_router(bling_pedido_router, tags=["Integração Bling - Pedido"], dependencies=_module_dependencies("bling"))
-app.include_router(bling_nf_router, tags=["Integração Bling - NF"], dependencies=_module_dependencies("bling"))
+app.include_router(
+    bling_router, tags=["Integração Bling"], dependencies=_module_dependencies("bling")
+)
+app.include_router(
+    bling_oauth_router, tags=["Bling OAuth"], dependencies=_module_dependencies("bling")
+)
+app.include_router(
+    bling_pedido_router,
+    tags=["Integração Bling - Pedido"],
+    dependencies=_module_dependencies("bling"),
+)
+app.include_router(
+    bling_nf_router,
+    tags=["Integração Bling - NF"],
+    dependencies=_module_dependencies("bling"),
+)
 app.include_router(dashboard_router, tags=["Dashboard Financeiro"])
-app.include_router(ia_router, tags=["IA - Fluxo de Caixa"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(chat_router, tags=["IA - Chat Financeiro"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(dre_ia_router, tags=["IA - DRE Inteligente"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(extrato_ia_router, tags=["IA - Extrato Bancário (ABA 7)"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(ia_fluxo_router, tags=["IA - Fluxo Inteligente"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(
+    ia_router,
+    tags=["IA - Fluxo de Caixa"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    chat_router,
+    tags=["IA - Chat Financeiro"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    dre_ia_router,
+    tags=["IA - DRE Inteligente"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    extrato_ia_router,
+    tags=["IA - Extrato Bancário (ABA 7)"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    ia_fluxo_router,
+    tags=["IA - Fluxo Inteligente"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
 app.include_router(analytics_router, tags=["Analytics - CQRS Read Models"])
 app.include_router(audit_router, tags=["Auditoria (Read-Only)"])
 app.include_router(tributacao_router, tags=["Tributação e Impostos"])
-app.include_router(whatsapp_router, tags=["WhatsApp IA - Sprint 3"], dependencies=_module_dependencies("whatsapp"))  # ✅ REATIVADO Sprint 3
+app.include_router(
+    whatsapp_router,
+    tags=["WhatsApp IA - Sprint 3"],
+    dependencies=_module_dependencies("whatsapp"),
+)  # ✅ REATIVADO Sprint 3
 # app.include_router(whatsapp_router, tags=["WhatsApp CRM"])  # DESATIVADO - Usar novos endpoints WhatsApp IA
-app.include_router(segmentacao_router, tags=["Segmentação de Clientes"], dependencies=_module_dependencies("campanhas"))
+app.include_router(
+    segmentacao_router,
+    tags=["Segmentação de Clientes"],
+    dependencies=_module_dependencies("campanhas"),
+)
 app.include_router(pdv_ai_router, tags=["PDV - IA Contextual"])
 app.include_router(pdv_internal_router, tags=["PDV - Internal API"])
-app.include_router(racao_calculadora_internal_router, tags=["Calculadora de Ração - Internal API"])
-app.include_router(whatsapp_orchestrator_internal_router, tags=["WhatsApp - Internal Orchestrator"], dependencies=_module_dependencies("whatsapp"))
+app.include_router(
+    racao_calculadora_internal_router, tags=["Calculadora de Ração - Internal API"]
+)
+app.include_router(
+    whatsapp_orchestrator_internal_router,
+    tags=["WhatsApp - Internal Orchestrator"],
+    dependencies=_module_dependencies("whatsapp"),
+)
 app.include_router(fiscal_sugestao_router, tags=["Fiscal - Sugestões Inteligentes"])
 app.include_router(produto_fiscal_router, tags=["Produto - Fiscal"])
 app.include_router(pdv_fiscal_router, tags=["PDV - Fiscal em Tempo Real"])
 app.include_router(produto_fiscal_v2_router, tags=["Produto - Fiscal V2"])
 app.include_router(empresa_fiscal_router, tags=["Empresa - Configuração Fiscal"])
-app.include_router(simples_router, tags=["Simples Nacional - Fechamento Mensal"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(auditoria_provisoes_router, tags=["Auditoria - Provisões"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(projecao_caixa_router, tags=["Projeção de Caixa - IA Determinística"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(simulacao_contratacao_router, tags=["Simulação de Contratação - IA Determinística"], dependencies=_module_dependencies("rh"))
-app.include_router(cargos_router, tags=["RH - Cargos"], dependencies=_module_dependencies("rh"))
-app.include_router(funcionarios_router, tags=["RH - Funcionários"], dependencies=_module_dependencies("rh"))
+app.include_router(
+    simples_router,
+    tags=["Simples Nacional - Fechamento Mensal"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    auditoria_provisoes_router,
+    tags=["Auditoria - Provisões"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    projecao_caixa_router,
+    tags=["Projeção de Caixa - IA Determinística"],
+    dependencies=_module_dependencies("financeiro_erp"),
+)
+app.include_router(
+    simulacao_contratacao_router,
+    tags=["Simulação de Contratação - IA Determinística"],
+    dependencies=_module_dependencies("rh"),
+)
+app.include_router(
+    cargos_router, tags=["RH - Cargos"], dependencies=_module_dependencies("rh")
+)
+app.include_router(
+    funcionarios_router,
+    tags=["RH - Funcionários"],
+    dependencies=_module_dependencies("rh"),
+)
 app.include_router(empresa_config_router, tags=["Empresa - Configuração Geral"])
 app.include_router(pdv_indicadores_router, tags=["PDV - Indicadores e Margens"])
 app.include_router(empresa_router, tags=["Empresa - Configurações"])
-app.include_router(configuracoes_entrega_router, tags=["Configurações - Entregas"], dependencies=_module_dependencies("entregas"))
+app.include_router(
+    configuracoes_entrega_router,
+    tags=["Configurações - Entregas"],
+    dependencies=_module_dependencies("entregas"),
+)
 app.include_router(
     rotas_entrega_router,
     tags=["Entregas - Rotas"],
     dependencies=_module_dependencies("entregas", allow_ecommerce_customer=True),
 )
-app.include_router(acertos_entrega_router, tags=["Entregas - Acertos Financeiros"], dependencies=_module_dependencies("entregas"))
-app.include_router(configuracao_custo_moto_router, tags=["Custos - Moto da Loja"], dependencies=_module_dependencies("entregas"))
-app.include_router(dashboard_entregas_router, dependencies=_module_dependencies("entregas"))  # ETAPA 11.1 - Dashboard Financeiro (tags no router)
-app.include_router(pendencia_estoque_router, tags=["Pendências de Estoque - Lista de Espera"])
+app.include_router(
+    acertos_entrega_router,
+    tags=["Entregas - Acertos Financeiros"],
+    dependencies=_module_dependencies("entregas"),
+)
+app.include_router(
+    configuracao_custo_moto_router,
+    tags=["Custos - Moto da Loja"],
+    dependencies=_module_dependencies("entregas"),
+)
+app.include_router(
+    dashboard_entregas_router, dependencies=_module_dependencies("entregas")
+)  # ETAPA 11.1 - Dashboard Financeiro (tags no router)
+app.include_router(
+    pendencia_estoque_router, tags=["Pendências de Estoque - Lista de Espera"]
+)
 
 # ============================================================================
 # WHATSAPP + IA - SPRINT 2 & 4 & 5 & 6 & 7
 # ============================================================================
 app.include_router(whatsapp_webhook_router)  # Webhooks 360dialog (sem auth)
-app.include_router(whatsapp_config_router, dependencies=_module_dependencies("whatsapp"))   # Configuração (com auth)
-app.include_router(whatsapp_handoff_router, dependencies=_module_dependencies("whatsapp"))  # Sprint 4: Human Handoff (com auth)
+app.include_router(
+    whatsapp_config_router, dependencies=_module_dependencies("whatsapp")
+)  # Configuração (com auth)
+app.include_router(
+    whatsapp_handoff_router, dependencies=_module_dependencies("whatsapp")
+)  # Sprint 4: Human Handoff (com auth)
 app.include_router(whatsapp_websocket_router)  # Sprint 5: WebSocket Real-time
-app.include_router(whatsapp_api_router, dependencies=_module_dependencies("whatsapp"))  # Sprint 6: Tools & Tests (com auth)
-app.include_router(whatsapp_analytics_router, dependencies=_module_dependencies("whatsapp"))  # Sprint 7: Analytics & Reports (com auth)
-app.include_router(whatsapp_security_router, dependencies=_module_dependencies("whatsapp"))  # Sprint 8: Security & LGPD (com auth)
+app.include_router(
+    whatsapp_api_router, dependencies=_module_dependencies("whatsapp")
+)  # Sprint 6: Tools & Tests (com auth)
+app.include_router(
+    whatsapp_analytics_router, dependencies=_module_dependencies("whatsapp")
+)  # Sprint 7: Analytics & Reports (com auth)
+app.include_router(
+    whatsapp_security_router, dependencies=_module_dependencies("whatsapp")
+)  # Sprint 8: Security & LGPD (com auth)
 app.include_router(lgpd_router)  # LGPD operacional geral (com auth)
 app.include_router(health_router)  # Sprint 9: Health & Monitoring (sem auth)
 app.include_router(admin_fix_router)  # Correções administrativas
@@ -960,21 +1295,37 @@ app.include_router(ecommerce_public_router)
 app.include_router(ecommerce_cart_router)
 app.include_router(ecommerce_checkout_router)
 app.include_router(ecommerce_webhooks_router)
-app.include_router(ecommerce_aparencia_router, dependencies=_module_dependencies("ecommerce"))
-app.include_router(ecommerce_config_router, dependencies=_module_dependencies("ecommerce"))
+app.include_router(
+    ecommerce_aparencia_router, dependencies=_module_dependencies("ecommerce")
+)
+app.include_router(
+    ecommerce_config_router, dependencies=_module_dependencies("ecommerce")
+)
 app.include_router(ecommerce_payment_config_public_router)
-app.include_router(ecommerce_payment_config_router, dependencies=_module_dependencies("ecommerce"))
+app.include_router(
+    ecommerce_payment_config_router, dependencies=_module_dependencies("ecommerce")
+)
 app.include_router(ecommerce_notify_router)
-app.include_router(ecommerce_analytics_router, dependencies=_module_dependencies("ecommerce"))
-app.include_router(ecommerce_drive_router, dependencies=_module_dependencies("ecommerce"))     # Drive pickup — PDV + cliente
-app.include_router(sefaz_router, dependencies=_module_dependencies("compras"))  # SEFAZ — consulta NF-e por chave
+app.include_router(
+    ecommerce_analytics_router, dependencies=_module_dependencies("ecommerce")
+)
+app.include_router(
+    ecommerce_drive_router, dependencies=_module_dependencies("ecommerce")
+)  # Drive pickup — PDV + cliente
+app.include_router(
+    sefaz_router, dependencies=_module_dependencies("compras")
+)  # SEFAZ — consulta NF-e por chave
 app.include_router(app_mobile_router)  # App Mobile - Rotas dos clientes
 app.include_router(app_vet_router)  # App Mobile - Veterinario operacional
 app.include_router(app_privacy_router)  # App Mobile - Privacidade/LGPD
 app.include_router(app_banho_tosa_router)  # App Mobile - Banho & Tosa
-app.include_router(campaigns_router, dependencies=_module_dependencies("campanhas"))   # Motor de Campanhas
-app.include_router(canal_descontos_router, dependencies=_module_dependencies("campanhas"))  # Descontos Globais por Canal (Ecommerce / App)
-app.include_router(modulos_router)     # Módulos Premium
+app.include_router(
+    campaigns_router, dependencies=_module_dependencies("campanhas")
+)  # Motor de Campanhas
+app.include_router(
+    canal_descontos_router, dependencies=_module_dependencies("campanhas")
+)  # Descontos Globais por Canal (Ecommerce / App)
+app.include_router(modulos_router)  # Módulos Premium
 
 # [DESATIVADO - PHASE 5] app.include_router(opportunity_metrics_router, tags=["PDV - Métricas de Oportunidades"])
 # ❌ REMOVIDO: Routers duplicados (usuarios_router, roles_router, permissions_router já registrados na linha 316-318)
@@ -982,6 +1333,7 @@ app.include_router(modulos_router)     # Módulos Premium
 # ====================
 # VALIDADOR DE AMBIENTE
 # ====================
+
 
 def validate_environment():
     """
@@ -1013,7 +1365,11 @@ def validate_environment():
     errors = []
 
     # Validação rigorosa de JWT_SECRET_KEY (mantida para compatibilidade)
-    if JWT_SECRET_KEY in ["CHANGE_ME_IN_ENV", "CHANGE_ME", "change-this-to-a-random-secure-key"]:
+    if JWT_SECRET_KEY in [
+        "CHANGE_ME_IN_ENV",
+        "CHANGE_ME",
+        "change-this-to-a-random-secure-key",
+    ]:
         errors.append("JWT_SECRET_KEY must be changed from default value")
     elif len(JWT_SECRET_KEY) < 32:
         errors.append("JWT_SECRET_KEY must be at least 32 characters long")
@@ -1026,11 +1382,15 @@ def validate_environment():
 
     # Warnings (não bloqueiam inicialização)
     if not GOOGLE_MAPS_API_KEY:
-        logger.warning("[WARNING] GOOGLE_MAPS_API_KEY not set (features may be limited)")
+        logger.warning(
+            "[WARNING] GOOGLE_MAPS_API_KEY not set (features may be limited)"
+        )
+
 
 # ====================
 # EVENTOS
 # ====================
+
 
 @app.on_event("startup")
 def on_startup():
@@ -1047,9 +1407,9 @@ def on_startup():
     # 1️⃣ PRÉ-PROD BLOCO 1: Validação de Ambiente
     # ============================================================================
     validate_environment()
-    logger.info("\n" + "="*60)
+    logger.info("\n" + "=" * 60)
     print_config()
-    logger.info("="*60 + "\n")
+    logger.info("=" * 60 + "\n")
 
     # ============================================================================
     # 2️⃣ PRÉ-PROD BLOCO 3: Validação de Migrations
@@ -1057,6 +1417,7 @@ def on_startup():
     try:
         # Usar engine do db module
         from app.db import engine
+
         ensure_db_ready(engine)
         logger.info("✅ [PRÉ-PROD] Database migrations check passed")
     except Exception as e:
@@ -1087,6 +1448,7 @@ def on_startup():
         # Iniciar scheduler de campanhas
         try:
             from app.campaigns.scheduler import CampaignScheduler
+
             global _campaign_scheduler
             _campaign_scheduler = CampaignScheduler()
             _campaign_scheduler.start()
@@ -1098,6 +1460,7 @@ def on_startup():
         if _env_bool("BLING_SYNC_SCHEDULER_ENABLED", True):
             try:
                 from app.schedulers.bling_sync_scheduler import BlingSyncScheduler
+
                 global _bling_sync_scheduler
                 _bling_sync_scheduler = BlingSyncScheduler()
                 _bling_sync_scheduler.start()
@@ -1138,7 +1501,9 @@ def on_startup():
             )
             _estoque_validade_thread.start()
         else:
-            logger.info("[JOBS] Protecao de estoque por validade desativada neste processo.")
+            logger.info(
+                "[JOBS] Protecao de estoque por validade desativada neste processo."
+            )
 
         global _sefaz_sync_thread
         _sefaz_sync_stop_event.clear()
@@ -1149,7 +1514,9 @@ def on_startup():
         )
         _sefaz_sync_thread.start()
     else:
-        logger.info("[JOBS] Worker secundario: background jobs desativados neste processo.")
+        logger.info(
+            "[JOBS] Worker secundario: background jobs desativados neste processo."
+        )
 
     logger.info(f"[OK] {SYSTEM_NAME} v{SYSTEM_VERSION} iniciado!")
     logger.info("[API] Disponivel em: http://127.0.0.1:8000")
@@ -1216,6 +1583,7 @@ def on_shutdown():
 # ROTAS BÁSICAS
 # ====================
 
+
 @app.get("/")
 def root():
     """Rota raiz"""
@@ -1223,18 +1591,14 @@ def root():
         "system": SYSTEM_NAME,
         "version": SYSTEM_VERSION,
         "status": "online",
-        "docs": "/docs"
+        "docs": "/docs",
     }
 
 
 @app.get("/health")
 def health_check():
     """Health check para monitoramento"""
-    return {
-        "status": "healthy",
-        "system": SYSTEM_NAME,
-        "version": SYSTEM_VERSION
-    }
+    return {"status": "healthy", "system": SYSTEM_NAME, "version": SYSTEM_VERSION}
 
 
 @app.get("/ready")
@@ -1246,11 +1610,7 @@ def readiness_check(db: Session = Depends(get_db)):
     try:
         # Testar conexão com banco
         db.execute("SELECT 1")
-        return {
-            "status": "ready",
-            "system": SYSTEM_NAME,
-            "database": "connected"
-        }
+        return {"status": "ready", "system": SYSTEM_NAME, "database": "connected"}
     except Exception as e:
         logger.error(f"Readiness check failed: {e}")
         return JSONResponse(
@@ -1258,8 +1618,8 @@ def readiness_check(db: Session = Depends(get_db)):
             content={
                 "status": "not_ready",
                 "database": "disconnected",
-                "error": str(e)
-            }
+                "error": str(e),
+            },
         )
 
 
@@ -1269,7 +1629,7 @@ def test_racas(especie: str = ""):
     return [
         {"id": 1, "nome": "Labrador", "especie": "Cão"},
         {"id": 2, "nome": "Golden Retriever", "especie": "Cão"},
-        {"id": 3, "nome": "Siamês", "especie": "Gato"}
+        {"id": 3, "nome": "Siamês", "especie": "Gato"},
     ]
 
 

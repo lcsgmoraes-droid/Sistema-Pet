@@ -6,12 +6,7 @@ import Panel from "../../../components/ui/Panel";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { formatCurrency, formatNumber, getApiErrorMessage } from "../banhoTosaUtils";
 
-export default function BanhoTosaPacotesList({
-  pacotes = [],
-  onChanged,
-  onEdit,
-  onDelete,
-}) {
+export default function BanhoTosaPacotesList({ pacotes = [], onChanged, onEdit, onDelete }) {
   async function toggleAtivo(pacote) {
     try {
       await banhoTosaApi.atualizarPacote(pacote.id, { ativo: !pacote.ativo });
@@ -33,13 +28,18 @@ export default function BanhoTosaPacotesList({
     >
       <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
         {pacotes.map((pacote) => (
-          <div key={pacote.id} className="grid gap-3 p-3 md:grid-cols-[1.3fr_0.7fr_0.7fr_auto] md:items-center">
+          <div
+            key={pacote.id}
+            className="grid gap-3 p-3 md:grid-cols-[1.3fr_0.7fr_0.7fr_auto] md:items-center"
+          >
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold text-slate-900">{pacote.nome}</p>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                  pacote.ativo ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
-                }`}>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                    pacote.ativo ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                  }`}
+                >
                   {pacote.ativo ? "Ativo" : "Inativo"}
                 </span>
               </div>
@@ -50,11 +50,33 @@ export default function BanhoTosaPacotesList({
             <Info label="Creditos" value={formatNumber(pacote.quantidade_creditos, 0)} />
             <Info label="Preco" value={formatCurrency(pacote.preco)} />
             <div className="flex flex-wrap justify-start gap-2 md:justify-end">
-              <ActionButton icon={Power} intent={pacote.ativo ? "neutral" : "create"} tone="soft" size="xs" onClick={() => toggleAtivo(pacote)}>
+              <ActionButton
+                icon={Power}
+                intent={pacote.ativo ? "neutral" : "create"}
+                tone="soft"
+                size="xs"
+                onClick={() => toggleAtivo(pacote)}
+              >
                 {pacote.ativo ? "Desativar" : "Ativar"}
               </ActionButton>
-              <ActionButton icon={Pencil} intent="edit" tone="soft" size="xs" onClick={() => onEdit?.(pacote)}>Editar</ActionButton>
-              <ActionButton icon={Trash2} intent="delete" tone="soft" size="xs" onClick={() => onDelete?.(pacote)}>Excluir</ActionButton>
+              <ActionButton
+                icon={Pencil}
+                intent="edit"
+                tone="soft"
+                size="xs"
+                onClick={() => onEdit?.(pacote)}
+              >
+                Editar
+              </ActionButton>
+              <ActionButton
+                icon={Trash2}
+                intent="delete"
+                tone="soft"
+                size="xs"
+                onClick={() => onDelete?.(pacote)}
+              >
+                Excluir
+              </ActionButton>
             </div>
           </div>
         ))}

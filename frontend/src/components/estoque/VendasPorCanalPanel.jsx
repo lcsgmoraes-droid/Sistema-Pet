@@ -24,12 +24,15 @@ export default function VendasPorCanalPanel({
       <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {vendasPorCanal.map(({ canal, qtd, valor, count, pct }) => {
           const labelCanal = labelsCanais[canal] || canal;
-          const corCanal = estilosCanais[canal]?.card || "bg-slate-50 border-slate-200 text-slate-700";
+          const corCanal =
+            estilosCanais[canal]?.card || "bg-slate-50 border-slate-200 text-slate-700";
           const barColor = estilosCanais[canal]?.bar || "bg-slate-400";
 
           return (
             <div key={canal} className={`rounded-xl border p-4 ${corCanal}`}>
-              <div className="text-xs font-bold uppercase tracking-wide opacity-70">{labelCanal}</div>
+              <div className="text-xs font-bold uppercase tracking-wide opacity-70">
+                {labelCanal}
+              </div>
               <div className="mt-2 flex items-end justify-between gap-2">
                 <div>
                   <div className="text-2xl font-black">{formatQuantidade(qtd)} un</div>

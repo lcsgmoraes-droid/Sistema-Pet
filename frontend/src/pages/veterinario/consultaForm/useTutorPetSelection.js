@@ -29,23 +29,20 @@ export default function useTutorPetSelection({
 
   const petsDoTutor = useMemo(
     () => listarPetsAtivosDoTutor(pets, tutorSelecionado),
-    [pets, tutorSelecionado]
+    [pets, tutorSelecionado],
   );
 
   const petSelecionado = useMemo(
     () => pets.find((pet) => String(pet.id) === String(formPetId)) ?? null,
-    [pets, formPetId]
+    [pets, formPetId],
   );
 
   const petSelecionadoLabel = useMemo(
     () => obterPetSelecionadoLabel(petSelecionado),
-    [petSelecionado]
+    [petSelecionado],
   );
 
-  const sugestoesEspecies = useMemo(
-    () => listarSugestoesEspecies(pets),
-    [pets]
-  );
+  const sugestoesEspecies = useMemo(() => listarSugestoesEspecies(pets), [pets]);
 
   useEffect(() => {
     if (isEdicao) return;
@@ -110,11 +107,13 @@ export default function useTutorPetSelection({
   function selecionarPetCriado(petCriado) {
     setPets((prev) => inserirPetSemDuplicar(prev, petCriado));
 
-    setTutorSelecionado((prev) => criarTutorAPartirDoPet(petCriado, {
-      nome: prev?.nome ?? tutorSelecionado?.nome,
-      telefone: prev?.telefone,
-      celular: prev?.celular,
-    }));
+    setTutorSelecionado((prev) =>
+      criarTutorAPartirDoPet(petCriado, {
+        nome: prev?.nome ?? tutorSelecionado?.nome,
+        telefone: prev?.telefone,
+        celular: prev?.celular,
+      }),
+    );
     setBuscaTutor(petCriado.cliente_nome ?? tutorSelecionado?.nome ?? buscaTutor);
     setCampo("pet_id", String(petCriado.id));
     setListaPetsExpandida(false);

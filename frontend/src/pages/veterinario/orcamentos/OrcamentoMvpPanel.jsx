@@ -13,7 +13,8 @@ import {
   toNumber,
 } from "./orcamentoUtils";
 
-const inputClass = "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300";
+const inputClass =
+  "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300";
 const selectClass = `${inputClass} bg-white`;
 
 export default function OrcamentoMvpPanel({
@@ -75,8 +76,11 @@ export default function OrcamentoMvpPanel({
   }, [chaveContexto, contexto?.consultaId, contexto?.internacaoId]);
 
   const totais = useMemo(() => calcularTotaisOrcamento(itens), [itens]);
-  const catalogoSelecionado = procedimentosCatalogo.find((item) => String(item.id) === String(catalogoId));
-  const podeSalvar = !modoSomenteLeitura && (contexto?.consultaId || contexto?.internacaoId || contexto?.petId);
+  const catalogoSelecionado = procedimentosCatalogo.find(
+    (item) => String(item.id) === String(catalogoId),
+  );
+  const podeSalvar =
+    !modoSomenteLeitura && (contexto?.consultaId || contexto?.internacaoId || contexto?.petId);
 
   const adicionarCatalogo = () => {
     if (!catalogoSelecionado) return;
@@ -90,10 +94,7 @@ export default function OrcamentoMvpPanel({
 
   const adicionarProduto = () => {
     if (!produtoSelecionado) return;
-    setItens((prev) => [
-      ...prev,
-      criarItemProdutoOrcamento(produtoSelecionado, quantidadeProduto),
-    ]);
+    setItens((prev) => [...prev, criarItemProdutoOrcamento(produtoSelecionado, quantidadeProduto)]);
     setProdutoSelecionado(null);
     setQuantidadeProduto("1");
   };
@@ -112,9 +113,11 @@ export default function OrcamentoMvpPanel({
   };
 
   const atualizarPrecoItem = (index, precoUnitario) => {
-    setItens((prev) => prev.map((item, idx) => (
-      idx === index ? recalcularItemOrcamento(item, { preco_unitario: precoUnitario }) : item
-    )));
+    setItens((prev) =>
+      prev.map((item, idx) =>
+        idx === index ? recalcularItemOrcamento(item, { preco_unitario: precoUnitario }) : item,
+      ),
+    );
   };
 
   const removerItem = (index) => {
@@ -133,7 +136,9 @@ export default function OrcamentoMvpPanel({
       veterinario_id: contexto?.veterinarioId || null,
       titulo,
       status: "rascunho",
-      previsao_dias_internacao: contexto?.internacaoId ? Math.max(Math.round(toNumber(diasInternacao)), 1) : null,
+      previsao_dias_internacao: contexto?.internacaoId
+        ? Math.max(Math.round(toNumber(diasInternacao)), 1)
+        : null,
       itens,
     };
 
@@ -145,7 +150,10 @@ export default function OrcamentoMvpPanel({
       setItens(Array.isArray(response.data?.itens) ? response.data.itens : itens);
       setFeedback({ tipo: "sucesso", texto: "Orçamento salvo." });
     } catch (error) {
-      setFeedback({ tipo: "erro", texto: error?.response?.data?.detail || "Erro ao salvar orçamento." });
+      setFeedback({
+        tipo: "erro",
+        texto: error?.response?.data?.detail || "Erro ao salvar orçamento.",
+      });
     } finally {
       setSalvando(false);
     }
@@ -160,7 +168,9 @@ export default function OrcamentoMvpPanel({
             <h2 className="font-semibold text-gray-800">{titulo}</h2>
           </div>
           <p className="mt-1 text-xs text-gray-500">
-            Custo {formatMoneyBRL(totais.custo_total_estimado)} · Venda {formatMoneyBRL(totais.preco_total)} · Margem {formatMoneyBRL(totais.margem_valor)} ({formatPercent(totais.margem_percentual)})
+            Custo {formatMoneyBRL(totais.custo_total_estimado)} · Venda{" "}
+            {formatMoneyBRL(totais.preco_total)} · Margem {formatMoneyBRL(totais.margem_valor)} (
+            {formatPercent(totais.margem_percentual)})
           </p>
         </div>
         <button
@@ -175,7 +185,9 @@ export default function OrcamentoMvpPanel({
       </div>
 
       {feedback && (
-        <p className={`mt-3 rounded-lg px-3 py-2 text-xs ${feedback.tipo === "erro" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
+        <p
+          className={`mt-3 rounded-lg px-3 py-2 text-xs ${feedback.tipo === "erro" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}
+        >
           {feedback.texto}
         </p>
       )}
@@ -285,14 +297,21 @@ export default function OrcamentoMvpPanel({
           <p className="text-xs text-gray-400">Nenhum item no orçamento.</p>
         ) : (
           itens.map((item, index) => (
-            <div key={`${item.origem}_${item.catalogo_id || item.produto_id || index}`} className="grid gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 md:grid-cols-[1fr_110px_110px_44px]">
+            <div
+              key={`${item.origem}_${item.catalogo_id || item.produto_id || index}`}
+              className="grid gap-2 rounded-lg border border-gray-100 bg-gray-50 p-3 md:grid-cols-[1fr_110px_110px_44px]"
+            >
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-gray-800">{item.nome}</p>
                 <p className="text-xs text-gray-500">
-                  Qtd. {Number(item.quantidade || 0).toLocaleString("pt-BR")} {item.unidade || ""} · Custo {formatMoneyBRL(item.custo_total_estimado)} · Margem {formatMoneyBRL(item.margem_valor)}
+                  Qtd. {Number(item.quantidade || 0).toLocaleString("pt-BR")} {item.unidade || ""} ·
+                  Custo {formatMoneyBRL(item.custo_total_estimado)} · Margem{" "}
+                  {formatMoneyBRL(item.margem_valor)}
                 </p>
               </div>
-              <p className="self-center text-sm font-semibold text-gray-700">{formatMoneyBRL(item.preco_total)}</p>
+              <p className="self-center text-sm font-semibold text-gray-700">
+                {formatMoneyBRL(item.preco_total)}
+              </p>
               <input
                 type="text"
                 value={item.preco_unitario}

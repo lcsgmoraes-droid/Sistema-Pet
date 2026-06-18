@@ -81,15 +81,9 @@ function montarVendaReaberta(vendaAtualizada, clienteCompleto) {
     entrega: {
       endereco_completo: vendaAtualizada.endereco_entrega || "",
       endereco_id: vendaAtualizada.endereco_id || null,
-      taxa_entrega_total: parseFloat(
-        parseFloat(vendaAtualizada.taxa_entrega || 0).toFixed(2),
-      ),
-      taxa_loja: parseFloat(
-        parseFloat(vendaAtualizada.taxa_loja || 0).toFixed(2),
-      ),
-      taxa_entregador: parseFloat(
-        parseFloat(vendaAtualizada.taxa_entregador || 0).toFixed(2),
-      ),
+      taxa_entrega_total: parseFloat(parseFloat(vendaAtualizada.taxa_entrega || 0).toFixed(2)),
+      taxa_loja: parseFloat(parseFloat(vendaAtualizada.taxa_loja || 0).toFixed(2)),
+      taxa_entregador: parseFloat(parseFloat(vendaAtualizada.taxa_entregador || 0).toFixed(2)),
       observacoes_entrega: vendaAtualizada.observacoes_entrega || "",
       distancia_km: vendaAtualizada.distancia_km || 0,
       valor_por_km: vendaAtualizada.valor_por_km || 0,
@@ -154,9 +148,7 @@ export function usePDVVendaFinalizacao({
 
     if (!confirmar) return;
 
-    const motivo = window.prompt(
-      "Informe a justificativa do cancelamento/exclusao da venda:",
-    );
+    const motivo = window.prompt("Informe a justificativa do cancelamento/exclusao da venda:");
 
     if (!motivo) return;
 
@@ -249,9 +241,7 @@ export function usePDVVendaFinalizacao({
           `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada, mas a transmissao ficou pendente.`,
         );
       } else {
-        toast.success(
-          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} enviada para emissao/transmissao!`,
-        );
+        toast.success(`${tipoNota === "nfe" ? "NF-e" : "NFC-e"} enviada para emissao/transmissao!`);
       }
     } catch (error) {
       console.error("Erro ao emitir nota da venda finalizada:", error);
@@ -259,9 +249,7 @@ export function usePDVVendaFinalizacao({
       const acaoFiscal = extrairAcaoCorrecaoFiscal(error);
       if (
         acaoFiscal &&
-        window.confirm(
-          `${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`,
-        )
+        window.confirm(`${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`)
       ) {
         navigate(acaoFiscal.url);
       } else {
@@ -290,9 +278,7 @@ export function usePDVVendaFinalizacao({
 
     if (modoVisualizacao && vendaAtual.id) {
       try {
-        const vendaAtualizada = await recarregarVendaAtualComPagamentos(
-          vendaAtual.id,
-        );
+        const vendaAtualizada = await recarregarVendaAtualComPagamentos(vendaAtual.id);
         await recarregarContextoClienteAtual?.();
         debugLog("\u2705 Venda recarregada:", vendaAtualizada);
       } catch (error) {
@@ -310,13 +296,10 @@ export function usePDVVendaFinalizacao({
       return;
     }
 
-    const vendaAtualizada = await recarregarVendaAtualComPagamentos(
-      vendaAtual.id,
-    );
+    const vendaAtualizada = await recarregarVendaAtualComPagamentos(vendaAtual.id);
     await recarregarContextoClienteAtual?.();
     setModoVisualizacao(
-      vendaAtualizada.status === "finalizada" ||
-        vendaAtualizada.status === "baixa_parcial",
+      vendaAtualizada.status === "finalizada" || vendaAtualizada.status === "baixa_parcial",
     );
     carregarVendasRecentes();
   };

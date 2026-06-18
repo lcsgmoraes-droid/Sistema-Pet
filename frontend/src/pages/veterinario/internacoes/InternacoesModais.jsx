@@ -95,7 +95,9 @@ export default function InternacoesModais({
         procedimento={modalFeito}
         baiaExibicao={
           modalFeito
-            ? (internacaoPorId.get(String(modalFeito.internacao_id))?.box || modalFeito.baia || "Sem baia")
+            ? internacaoPorId.get(String(modalFeito.internacao_id))?.box ||
+              modalFeito.baia ||
+              "Sem baia"
             : "Sem baia"
         }
         formFeito={formFeito}

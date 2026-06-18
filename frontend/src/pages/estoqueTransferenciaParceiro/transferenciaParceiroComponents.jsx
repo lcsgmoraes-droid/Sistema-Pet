@@ -16,12 +16,7 @@ export function StatusTransferenciaBadge({ status, label }) {
   );
 }
 
-export function ResumoTransferenciaCard({
-  titulo,
-  valor,
-  descricao,
-  destaque = "slate",
-}) {
+export function ResumoTransferenciaCard({ titulo, valor, descricao, destaque = "slate" }) {
   const estilos = {
     slate: "border-slate-200 bg-slate-50 text-slate-900",
     blue: "border-blue-100 bg-blue-50 text-blue-900",

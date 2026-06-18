@@ -39,11 +39,7 @@ export default function NovoPetButton({
       type="button"
       onClick={handleClick}
       disabled={disabled}
-      title={
-        disabled
-          ? "Selecione o tutor primeiro"
-          : "Cadastrar um novo pet para este tutor"
-      }
+      title={disabled ? "Selecione o tutor primeiro" : "Cadastrar um novo pet para este tutor"}
       className={actionButtonClasses({
         intent: "create",
         tone: "soft",

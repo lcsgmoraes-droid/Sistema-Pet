@@ -103,11 +103,36 @@ test("monta analise de custos com grupos e pareceres percentuais", () => {
       despesas_fixas: 21000,
       detalhes_classificacao: {
         fixas: [
-          { id: 1, descricao: "Aluguel", valor: 10000, origem_classificacao: "Categoria financeira: Aluguel" },
-          { id: 2, descricao: "Pro Labore Karine", valor: 3000, origem_classificacao: "Tipo de despesa: Salarios" },
-          { id: 3, descricao: "Salarios loja", valor: 7000, origem_classificacao: "Tipo de despesa: Salarios" },
-          { id: 4, descricao: "Internet e Telefone", valor: 500, origem_classificacao: "Categoria financeira: Internet" },
-          { id: 5, descricao: "Sistema", valor: 500, origem_classificacao: "Categoria financeira: Sistema" },
+          {
+            id: 1,
+            descricao: "Aluguel",
+            valor: 10000,
+            origem_classificacao: "Categoria financeira: Aluguel",
+          },
+          {
+            id: 2,
+            descricao: "Pro Labore Karine",
+            valor: 3000,
+            origem_classificacao: "Tipo de despesa: Salarios",
+          },
+          {
+            id: 3,
+            descricao: "Salarios loja",
+            valor: 7000,
+            origem_classificacao: "Tipo de despesa: Salarios",
+          },
+          {
+            id: 4,
+            descricao: "Internet e Telefone",
+            valor: 500,
+            origem_classificacao: "Categoria financeira: Internet",
+          },
+          {
+            id: 5,
+            descricao: "Sistema",
+            valor: 500,
+            origem_classificacao: "Categoria financeira: Sistema",
+          },
         ],
       },
     },
@@ -137,11 +162,36 @@ test("usa metas setoriais que cabem dentro do limite total de custo fixo", () =>
       despesas_fixas: 39810,
       detalhes_classificacao: {
         fixas: [
-          { id: 1, descricao: "Aluguel loja", valor: 11210, origem_classificacao: "Categoria financeira: Aluguel" },
-          { id: 2, descricao: "Folha e pro labore", valor: 24600, origem_classificacao: "Tipo de despesa: Salarios" },
-          { id: 3, descricao: "Energia e agua", valor: 1440, origem_classificacao: "Categoria financeira: Energia" },
-          { id: 4, descricao: "Internet e sistemas", valor: 1410, origem_classificacao: "Categoria financeira: Internet" },
-          { id: 5, descricao: "Escritorio", valor: 880, origem_classificacao: "Categoria financeira: Escritorio" },
+          {
+            id: 1,
+            descricao: "Aluguel loja",
+            valor: 11210,
+            origem_classificacao: "Categoria financeira: Aluguel",
+          },
+          {
+            id: 2,
+            descricao: "Folha e pro labore",
+            valor: 24600,
+            origem_classificacao: "Tipo de despesa: Salarios",
+          },
+          {
+            id: 3,
+            descricao: "Energia e agua",
+            valor: 1440,
+            origem_classificacao: "Categoria financeira: Energia",
+          },
+          {
+            id: 4,
+            descricao: "Internet e sistemas",
+            valor: 1410,
+            origem_classificacao: "Categoria financeira: Internet",
+          },
+          {
+            id: 5,
+            descricao: "Escritorio",
+            valor: 880,
+            origem_classificacao: "Categoria financeira: Escritorio",
+          },
         ],
       },
     },
@@ -151,7 +201,10 @@ test("usa metas setoriais que cabem dentro do limite total de custo fixo", () =>
   const aluguel = analise.pareceres.find((item) => item.id === "aluguel");
   const folha = analise.pareceres.find((item) => item.id === "folha");
   const total = analise.pareceres.find((item) => item.id === "total_fixo");
-  const somaMetasSetoriais = pareceresSetoriais.reduce((soma, item) => soma + item.metaPercentual, 0);
+  const somaMetasSetoriais = pareceresSetoriais.reduce(
+    (soma, item) => soma + item.metaPercentual,
+    0,
+  );
 
   assert.equal(total.status, "atencao");
   assert.equal(total.metaPercentual, 34);
@@ -181,7 +234,12 @@ test("ajusta referencia de aluguel conforme porte selecionado", () => {
     despesas_fixas: 10000,
     detalhes_classificacao: {
       fixas: [
-        { id: 1, descricao: "Aluguel", valor: 6500, origem_classificacao: "Categoria financeira: Aluguel" },
+        {
+          id: 1,
+          descricao: "Aluguel",
+          valor: 6500,
+          origem_classificacao: "Categoria financeira: Aluguel",
+        },
       ],
     },
   };

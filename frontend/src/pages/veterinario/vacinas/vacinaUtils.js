@@ -18,7 +18,7 @@ export function criarFormVacinaInicial(overrides = {}) {
 }
 
 export function normalizarVacinas(data) {
-  const itens = Array.isArray(data) ? data : data?.items ?? [];
+  const itens = Array.isArray(data) ? data : (data?.items ?? []);
 
   return itens.map((vacina) => ({
     ...vacina,
@@ -44,10 +44,7 @@ export function sugerirProximaDose(protocolos, pets, form) {
     const nome = (item?.nome || "").toLowerCase();
     const especie = (item?.especie || "").toLowerCase();
     const especieCompativel =
-      !especie ||
-      !especiePet ||
-      especiePet.includes(especie) ||
-      especie.includes(especiePet);
+      !especie || !especiePet || especiePet.includes(especie) || especie.includes(especiePet);
     return especieCompativel && (nomeVacina.includes(nome) || nome.includes(nomeVacina));
   });
 

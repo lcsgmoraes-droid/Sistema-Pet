@@ -22,7 +22,7 @@ export function useCatMedicamentos() {
     setErro("");
     try {
       const response = await vetApi.listarMedicamentos(busca || undefined);
-      setLista(Array.isArray(response.data) ? response.data : response.data?.items ?? []);
+      setLista(Array.isArray(response.data) ? response.data : (response.data?.items ?? []));
     } catch (err) {
       setErro(err?.response?.data?.detail || "Erro ao carregar medicamentos.");
     } finally {

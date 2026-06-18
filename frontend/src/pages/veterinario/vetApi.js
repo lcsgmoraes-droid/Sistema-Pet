@@ -31,7 +31,8 @@ export const vetApi = {
   criarConsulta: (data) => api.post(`${BASE}/consultas`, data),
   atualizarConsulta: (id, data) => api.patch(`${BASE}/consultas/${id}`, data),
   removerConsulta: (id) => api.delete(`${BASE}/consultas/${id}`),
-  sincronizarRascunhoConsulta: (id, data) => api.put(`${BASE}/consultas/${id}/rascunho-itens`, data),
+  sincronizarRascunhoConsulta: (id, data) =>
+    api.put(`${BASE}/consultas/${id}/rascunho-itens`, data),
   finalizarConsulta: (id) => api.post(`${BASE}/consultas/${id}/finalizar`),
   validarAssinaturaConsulta: (id) => api.get(`${BASE}/consultas/${id}/assinatura`),
   baixarProntuarioPdf: (id) =>
@@ -72,9 +73,11 @@ export const vetApi = {
     api.post(`${BASE}/pets/${petId}/peso`, null, { params: { peso_kg: pesos, observacoes: obs } }),
 
   // Procedimentos
-  listarProcedimentosConsulta: (consultaId) => api.get(`${BASE}/consultas/${consultaId}/procedimentos`),
+  listarProcedimentosConsulta: (consultaId) =>
+    api.get(`${BASE}/consultas/${consultaId}/procedimentos`),
   adicionarProcedimento: (data) => api.post(`${BASE}/procedimentos`, data),
-  diagnosticoPushAgendamento: (agendamentoId) => api.get(`${BASE}/agendamentos/${agendamentoId}/push-diagnostico`),
+  diagnosticoPushAgendamento: (agendamentoId) =>
+    api.get(`${BASE}/agendamentos/${agendamentoId}/push-diagnostico`),
 
   // Orçamentos
   listarOrcamentos: (params) => api.get(`${BASE}/orcamentos`, { params }),
@@ -89,18 +92,22 @@ export const vetApi = {
 
   // Internações
   listarInternacoes: (statusOrParams) => {
-    const params = (statusOrParams && typeof statusOrParams === "object")
-      ? statusOrParams
-      : { status: statusOrParams };
+    const params =
+      statusOrParams && typeof statusOrParams === "object"
+        ? statusOrParams
+        : { status: statusOrParams };
     return api.get(`${BASE}/internacoes`, { params });
   },
   obterInternacao: (internacaoId) => api.get(`${BASE}/internacoes/${internacaoId}`),
   criarInternacao: (data) => api.post(`${BASE}/internacoes`, data),
-  registrarEvolucao: (internacaoId, data) => api.post(`${BASE}/internacoes/${internacaoId}/evolucao`, data),
-  registrarProcedimentoInternacao: (internacaoId, data) => api.post(`${BASE}/internacoes/${internacaoId}/procedimento`, data),
+  registrarEvolucao: (internacaoId, data) =>
+    api.post(`${BASE}/internacoes/${internacaoId}/evolucao`, data),
+  registrarProcedimentoInternacao: (internacaoId, data) =>
+    api.post(`${BASE}/internacoes/${internacaoId}/procedimento`, data),
   obterConfigInternacao: () => api.get(`${BASE}/internacoes/config`),
   atualizarConfigInternacao: (data) => api.put(`${BASE}/internacoes/config`, data),
-  listarProcedimentosAgendaInternacao: (params) => api.get(`${BASE}/internacoes/procedimentos-agenda`, { params }),
+  listarProcedimentosAgendaInternacao: (params) =>
+    api.get(`${BASE}/internacoes/procedimentos-agenda`, { params }),
   criarProcedimentoAgendaInternacao: (internacaoId, data) =>
     api.post(`${BASE}/internacoes/${internacaoId}/procedimentos-agenda`, data),
   concluirProcedimentoAgendaInternacao: (agendaId, data) =>
@@ -114,21 +121,26 @@ export const vetApi = {
   // Catálogos
   listarCatalogoProcedimentos: () => api.get(`${BASE}/catalogo/procedimentos`),
   criarCatalogoProcedimento: (data) => api.post(`${BASE}/catalogo/procedimentos`, data),
-  atualizarCatalogoProcedimento: (id, data) => api.patch(`${BASE}/catalogo/procedimentos/${id}`, data),
+  atualizarCatalogoProcedimento: (id, data) =>
+    api.patch(`${BASE}/catalogo/procedimentos/${id}`, data),
   removerCatalogoProcedimento: (id) => api.delete(`${BASE}/catalogo/procedimentos/${id}`),
-  listarProdutosEstoque: (busca) => api.get(`${BASE}/catalogo/produtos-estoque`, { params: { busca } }),
+  listarProdutosEstoque: (busca) =>
+    api.get(`${BASE}/catalogo/produtos-estoque`, { params: { busca } }),
   listarMedicamentos: (busca) => api.get(`${BASE}/catalogo/medicamentos`, { params: { busca } }),
   criarMedicamento: (data) => api.post(`${BASE}/catalogo/medicamentos`, data),
   atualizarMedicamento: (id, data) => api.patch(`${BASE}/catalogo/medicamentos/${id}`, data),
   removerMedicamento: (id) => api.delete(`${BASE}/catalogo/medicamentos/${id}`),
   listarProtocolosVacinas: () => api.get(`${BASE}/catalogo/protocolos-vacinas`),
-  criarProtocoloVacina: (params) => api.post(`${BASE}/catalogo/protocolos-vacinas`, null, { params }),
-  atualizarProtocoloVacina: (id, data) => api.patch(`${BASE}/catalogo/protocolos-vacinas/${id}`, data),
+  criarProtocoloVacina: (params) =>
+    api.post(`${BASE}/catalogo/protocolos-vacinas`, null, { params }),
+  atualizarProtocoloVacina: (id, data) =>
+    api.patch(`${BASE}/catalogo/protocolos-vacinas/${id}`, data),
   removerProtocoloVacina: (id) => api.delete(`${BASE}/catalogo/protocolos-vacinas/${id}`),
 
   // Perfil comportamental
   obterPerfilComportamental: (petId) => api.get(`${BASE}/pets/${petId}/perfil-comportamental`),
-  salvarPerfilComportamental: (petId, data) => api.put(`${BASE}/pets/${petId}/perfil-comportamental`, data),
+  salvarPerfilComportamental: (petId, data) =>
+    api.put(`${BASE}/pets/${petId}/perfil-comportamental`, data),
 
   // Parceiros (Multi-Tenant)
   listarParceiros: () => api.get(`${BASE}/parceiros`),
@@ -145,14 +157,14 @@ export const vetApi = {
     }),
 
   // Chat IA de exames
-  chatExameIA: (exameId, pergunta) =>
-    api.post(`${BASE}/exames/${exameId}/chat`, { pergunta }),
+  chatExameIA: (exameId, pergunta) => api.post(`${BASE}/exames/${exameId}/chat`, { pergunta }),
 
   // Assistente IA clínico (livre ou vinculado ao atendimento)
   assistenteIA: (payload) => api.post(`${BASE}/ia/assistente`, payload),
   memoriaStatusAssistenteIA: () => api.get(`${BASE}/ia/memoria-status`),
   listarConversasAssistenteIA: (params) => api.get(`${BASE}/ia/conversas`, { params }),
-  listarMensagensConversaAssistenteIA: (conversaId) => api.get(`${BASE}/ia/conversas/${conversaId}/mensagens`),
+  listarMensagensConversaAssistenteIA: (conversaId) =>
+    api.get(`${BASE}/ia/conversas/${conversaId}/mensagens`),
   feedbackMensagemAssistenteIA: (mensagemId, payload) =>
     api.post(`${BASE}/ia/mensagens/${mensagemId}/feedback`, payload),
 

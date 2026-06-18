@@ -33,7 +33,7 @@ export default function OpenAIIntegracaoCard() {
       temChaveSalva
         ? "Chave OpenAI já cadastrada para este tenant. Se quiser trocar, cole uma nova abaixo."
         : "Cole aqui a chave da OpenAI para habilitar análise de PDF, hemograma e imagens nos exames veterinários.",
-    [temChaveSalva]
+    [temChaveSalva],
   );
 
   useEffect(() => {
@@ -112,7 +112,7 @@ export default function OpenAIIntegracaoCard() {
     } catch (error) {
       mostrarMensagem(
         "erro",
-        error?.response?.data?.detail || "Não foi possível salvar a configuração da OpenAI."
+        error?.response?.data?.detail || "Não foi possível salvar a configuração da OpenAI.",
       );
     } finally {
       setSaving(false);
@@ -128,9 +128,12 @@ export default function OpenAIIntegracaoCard() {
               <FiCpu size={18} />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">OpenAI para Exames Veterinários</h2>
+              <h2 className="text-lg font-semibold text-slate-900">
+                OpenAI para Exames Veterinários
+              </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Habilita leitura e apoio de IA para hemograma, bioquímica, PDF, raio-x, ultrassom e imagens anexadas.
+                Habilita leitura e apoio de IA para hemograma, bioquímica, PDF, raio-x, ultrassom e
+                imagens anexadas.
               </p>
             </div>
           </div>
@@ -153,7 +156,9 @@ export default function OpenAIIntegracaoCard() {
         <ul className="mt-2 space-y-1 text-indigo-700">
           <li>- Processar arquivo do exame com IA na consulta e na tela de exames anexados.</li>
           <li>- Interpretar hemograma e exames laboratoriais a partir de PDF ou imagem.</li>
-          <li>- Extrair alertas, achados, condutas sugeridas e responder perguntas sobre o exame.</li>
+          <li>
+            - Extrair alertas, achados, condutas sugeridas e responder perguntas sobre o exame.
+          </li>
         </ul>
       </div>
 
@@ -206,7 +211,9 @@ export default function OpenAIIntegracaoCard() {
                 }))
               }
               disabled={loading || saving}
-              placeholder={temChaveSalva ? "Cole uma nova chave apenas se quiser trocar a atual" : "sk-..."}
+              placeholder={
+                temChaveSalva ? "Cole uma nova chave apenas se quiser trocar a atual" : "sk-..."
+              }
               className="min-w-0 flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-slate-400"
             />
             <button
@@ -224,8 +231,8 @@ export default function OpenAIIntegracaoCard() {
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <p className="font-medium">Segurança</p>
           <p className="mt-1">
-            Se uma chave foi enviada em conversa, print ou outro local exposto, o ideal é revogar essa chave na OpenAI
-            e cadastrar uma nova aqui.
+            Se uma chave foi enviada em conversa, print ou outro local exposto, o ideal é revogar
+            essa chave na OpenAI e cadastrar uma nova aqui.
           </p>
         </div>
 

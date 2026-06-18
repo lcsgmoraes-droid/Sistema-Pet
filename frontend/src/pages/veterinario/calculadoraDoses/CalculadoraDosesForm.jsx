@@ -50,7 +50,12 @@ export default function CalculadoraDosesForm({
         />
 
         <div>
-          <label htmlFor="calc-dose-medicamento" className="block text-sm font-medium text-gray-700 mb-1">Medicamento</label>
+          <label
+            htmlFor="calc-dose-medicamento"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            Medicamento
+          </label>
           <select
             id="calc-dose-medicamento"
             value={form.medicamento_id}
@@ -59,7 +64,9 @@ export default function CalculadoraDosesForm({
           >
             <option value="">Selecione...</option>
             {medicamentos.map((med) => (
-              <option key={med.id} value={med.id}>{med.nome}</option>
+              <option key={med.id} value={med.id}>
+                {med.nome}
+              </option>
             ))}
           </select>
         </div>
@@ -95,7 +102,9 @@ export default function CalculadoraDosesForm({
 function CampoNumero({ id, label, min, onChange, step, value }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">
+        {label}
+      </label>
       <input
         id={id}
         type="number"

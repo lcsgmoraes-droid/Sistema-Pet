@@ -1,8 +1,8 @@
-import { CheckCircle, FileText } from 'lucide-react';
+import { CheckCircle, FileText } from "lucide-react";
 
 export default function ModalPerguntaNFe({
   cliente,
-  erro = '',
+  erro = "",
   loading = false,
   onConfirmar,
   onEmitir,
@@ -31,7 +31,7 @@ export default function ModalPerguntaNFe({
             {cliente?.cnpj ? (
               <>
                 <button
-                  onClick={() => onEmitir('nfe')}
+                  onClick={() => onEmitir("nfe")}
                   disabled={loading}
                   className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
@@ -39,7 +39,7 @@ export default function ModalPerguntaNFe({
                   <span>Emitir NF-e (Empresa)</span>
                 </button>
                 <button
-                  onClick={() => onEmitir('nfce')}
+                  onClick={() => onEmitir("nfce")}
                   disabled={loading}
                   className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                 >
@@ -49,7 +49,7 @@ export default function ModalPerguntaNFe({
               </>
             ) : (
               <button
-                onClick={() => onEmitir('nfce')}
+                onClick={() => onEmitir("nfce")}
                 disabled={loading}
                 className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
               >

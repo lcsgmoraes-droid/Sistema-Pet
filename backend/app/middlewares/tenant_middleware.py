@@ -1,6 +1,6 @@
 from fastapi import Request, status
 from fastapi.responses import JSONResponse, Response
-from jose import JWTError, jwt
+from app.security.jwt_compat import JWTError, jwt
 from starlette.middleware.base import BaseHTTPMiddleware
 import logging
 from uuid import UUID

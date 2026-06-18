@@ -11,17 +11,24 @@ export function usePDVClienteBusca({
   const [clientesSugeridos, setClientesSugeridos] = useState([]);
 
   function buscarClientePorCodigoExato(termo) {
-    const termoLimpo = String(termo || "").trim().toLowerCase();
+    const termoLimpo = String(termo || "")
+      .trim()
+      .toLowerCase();
     if (!termoLimpo) return null;
 
     const porId = clientesSugeridos.find(
-      (cliente) => String(cliente?.id || "").trim().toLowerCase() === termoLimpo,
+      (cliente) =>
+        String(cliente?.id || "")
+          .trim()
+          .toLowerCase() === termoLimpo,
     );
     if (porId) return porId;
 
     return clientesSugeridos.find(
       (cliente) =>
-        String(cliente?.codigo || "").trim().toLowerCase() === termoLimpo,
+        String(cliente?.codigo || "")
+          .trim()
+          .toLowerCase() === termoLimpo,
     );
   }
 
@@ -64,8 +71,7 @@ export function usePDVClienteBusca({
       try {
         const termoOriginal = buscarCliente.trim();
         const termoDigitos = termoOriginal.replace(/\D/g, "");
-        const termoBusca =
-          termoDigitos.length >= 8 ? termoDigitos : termoOriginal;
+        const termoBusca = termoDigitos.length >= 8 ? termoDigitos : termoOriginal;
         const clientes = await buscarClientes({
           search: termoBusca,
           limit: 20,

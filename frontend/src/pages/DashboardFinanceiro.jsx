@@ -71,9 +71,7 @@ const DashboardFinanceiro = () => {
 
     // Carregar resumo
     try {
-      const resumoRes = await api.get(
-        `/dashboard/resumo?periodo_dias=${periodoDias}`,
-      );
+      const resumoRes = await api.get(`/dashboard/resumo?periodo_dias=${periodoDias}`);
       setResumo(resumoRes.data);
     } catch (err) {
       console.error("Erro ao carregar resumo:", err);
@@ -91,9 +89,7 @@ const DashboardFinanceiro = () => {
 
     // Carregar contas vencidas
     try {
-      const contasVencidasRes = await api.get(
-        `/dashboard/contas-vencidas?limite=5`,
-      );
+      const contasVencidasRes = await api.get(`/dashboard/contas-vencidas?limite=5`);
       setContasVencidas(contasVencidasRes.data);
     } catch (err) {
       console.error("Erro ao carregar contas vencidas:", err);
@@ -106,9 +102,10 @@ const DashboardFinanceiro = () => {
     carregarDados();
   }, [periodoDias]);
 
-  const coberturaPE = resumo.fluxo_periodo.saidas > 0
-    ? (resumo.fluxo_periodo.entradas / resumo.fluxo_periodo.saidas) * 100
-    : 100;
+  const coberturaPE =
+    resumo.fluxo_periodo.saidas > 0
+      ? (resumo.fluxo_periodo.entradas / resumo.fluxo_periodo.saidas) * 100
+      : 100;
 
   const montarInsights = () => {
     const lucro = Number(resumo.fluxo_periodo.lucro || 0);
@@ -116,43 +113,57 @@ const DashboardFinanceiro = () => {
       resumo.vendas_periodo.faturamento_bruto ?? resumo.vendas_periodo.valor_total ?? 0,
     );
     const ticketMedio = Number(resumo.vendas_periodo.ticket_medio || 0);
-    const vencidoLiquido = Number(resumo.contas_receber.vencidas || 0) - Number(resumo.contas_pagar.vencidas || 0);
+    const vencidoLiquido =
+      Number(resumo.contas_receber.vencidas || 0) - Number(resumo.contas_pagar.vencidas || 0);
 
     return [
       {
         titulo: "Resultado do período",
         valor: lucro >= 0 ? formatMoneyBRL(lucro) : `- ${formatMoneyBRL(Math.abs(lucro))}`,
-        descricao: lucro >= 0
-          ? "O período está fechando no azul."
-          : "O período está consumindo caixa e merece atenção.",
-        cor: lucro >= 0 ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-red-200 bg-red-50 text-red-900",
+        descricao:
+          lucro >= 0
+            ? "O período está fechando no azul."
+            : "O período está consumindo caixa e merece atenção.",
+        cor:
+          lucro >= 0
+            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+            : "border-red-200 bg-red-50 text-red-900",
         pergunta: `Analise o resultado dos últimos ${periodoDias} dias e me diga o que mais impactou o lucro.`,
       },
       {
         titulo: "Cobertura das despesas",
         valor: `${coberturaPE.toFixed(1)}%`,
-        descricao: coberturaPE >= 100
-          ? "As entradas do período cobriram as saídas."
-          : "As entradas ainda não cobriram todas as saídas.",
-        cor: coberturaPE >= 100 ? "border-blue-200 bg-blue-50 text-blue-900" : "border-orange-200 bg-orange-50 text-orange-900",
+        descricao:
+          coberturaPE >= 100
+            ? "As entradas do período cobriram as saídas."
+            : "As entradas ainda não cobriram todas as saídas.",
+        cor:
+          coberturaPE >= 100
+            ? "border-blue-200 bg-blue-50 text-blue-900"
+            : "border-orange-200 bg-orange-50 text-orange-900",
         pergunta: `Explique minha cobertura de despesas nos últimos ${periodoDias} dias e como melhorar.`,
       },
       {
         titulo: "Ritmo comercial",
         valor: `${resumo.vendas_periodo.quantidade || 0} vendas`,
-        descricao: faturamento > 0
-          ? `Faturamento bruto de ${formatMoneyBRL(faturamento)} no período.`
-          : "Ainda não houve faturamento no período selecionado.",
+        descricao:
+          faturamento > 0
+            ? `Faturamento bruto de ${formatMoneyBRL(faturamento)} no período.`
+            : "Ainda não houve faturamento no período selecionado.",
         cor: "border-violet-200 bg-violet-50 text-violet-900",
         pergunta: `Analise meu ritmo comercial nos últimos ${periodoDias} dias, com vendas, ticket e produtos líderes.`,
       },
       {
         titulo: "Pressão de vencidos",
         valor: ticketMedio > 0 ? `Ticket médio ${formatMoneyBRL(ticketMedio)}` : "Sem ticket médio",
-        descricao: vencidoLiquido >= 0
-          ? "Os recebimentos vencidos superam ou empatam com os pagamentos vencidos."
-          : "Os pagamentos vencidos estão acima dos recebimentos vencidos.",
-        cor: vencidoLiquido >= 0 ? "border-cyan-200 bg-cyan-50 text-cyan-900" : "border-amber-200 bg-amber-50 text-amber-900",
+        descricao:
+          vencidoLiquido >= 0
+            ? "Os recebimentos vencidos superam ou empatam com os pagamentos vencidos."
+            : "Os pagamentos vencidos estão acima dos recebimentos vencidos.",
+        cor:
+          vencidoLiquido >= 0
+            ? "border-cyan-200 bg-cyan-50 text-cyan-900"
+            : "border-amber-200 bg-amber-50 text-amber-900",
         pergunta: "Analise minhas contas vencidas e diga a prioridade de cobrança e pagamento.",
       },
     ];
@@ -169,9 +180,10 @@ const DashboardFinanceiro = () => {
   };
 
   const abrirAssistenteGestao = () => {
-    const perguntaBase = periodoDias === 1
-      ? "Quero um resumo de vendas do dia, produtos mais vendidos e alertas de caixa."
-      : `Quero um resumo de vendas dos últimos ${periodoDias} dias, margem e DRE simplificada.`;
+    const perguntaBase =
+      periodoDias === 1
+        ? "Quero um resumo de vendas do dia, produtos mais vendidos e alertas de caixa."
+        : `Quero um resumo de vendas dos últimos ${periodoDias} dias, margem e DRE simplificada.`;
 
     abrirPerguntaIA(perguntaBase);
   };
@@ -215,13 +227,21 @@ const DashboardFinanceiro = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => abrirPerguntaIA("Compare este mês com o mês anterior e me diga onde melhorei ou piorei.")}
+              onClick={() =>
+                abrirPerguntaIA(
+                  "Compare este mês com o mês anterior e me diga onde melhorei ou piorei.",
+                )
+              }
               className="px-3 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-sm font-medium transition-colors"
             >
               Comparar meses
             </button>
             <button
-              onClick={() => abrirPerguntaIA("Me dê um raio-x executivo do negócio com vendas, margem, canal e alertas.")}
+              onClick={() =>
+                abrirPerguntaIA(
+                  "Me dê um raio-x executivo do negócio com vendas, margem, canal e alertas.",
+                )
+              }
               className="px-3 py-2 rounded-lg bg-white text-slate-900 hover:bg-slate-100 text-sm font-medium transition-colors"
             >
               Raio-x executivo
@@ -254,7 +274,14 @@ const DashboardFinanceiro = () => {
             Perguntar para IA de Gestão
           </button>
           <div className="flex gap-1">
-            {[{ v: 1, label: "Hoje" }, { v: 7, label: "7d" }, { v: 15, label: "15d" }, { v: 30, label: "30d" }, { v: 60, label: "60d" }, { v: 90, label: "90d" }].map(({ v, label }) => (
+            {[
+              { v: 1, label: "Hoje" },
+              { v: 7, label: "7d" },
+              { v: 15, label: "15d" },
+              { v: 30, label: "30d" },
+              { v: 60, label: "60d" },
+              { v: 90, label: "90d" },
+            ].map(({ v, label }) => (
               <button
                 key={v}
                 onClick={() => setPeriodoDias(v)}
@@ -268,71 +295,85 @@ const DashboardFinanceiro = () => {
               </button>
             ))}
           </div>
-          <p className="text-xs text-gray-400">Período afeta: Lucro · Vendas · Fluxo · Ticket Médio</p>
+          <p className="text-xs text-gray-400">
+            Período afeta: Lucro · Vendas · Fluxo · Ticket Médio
+          </p>
         </div>
       </div>
 
       {/* KPIs — linha 1: valores fixos (não afetados pelo período) */}
       <div className="mb-1">
-        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5">📌 Posição atual — não muda com o período</p>
+        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5">
+          📌 Posição atual — não muda com o período
+        </p>
         <div id="tour-stats" className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* Saldo */}
-        <button
-          type="button"
-          onClick={() => navigate("/financeiro/fluxo-caixa")}
-          className="bg-blue-600 rounded-xl p-3 text-white text-left hover:bg-blue-700 transition-colors"
-        >
-          <div className="flex justify-between items-start mb-2">
-            <DollarSign className="w-4 h-4 opacity-80" />
-            <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">Hoje</span>
-          </div>
-          <p className="text-xs opacity-75 mb-0.5">Saldo Estimado</p>
-          <p className="text-base font-bold leading-tight">{formatarMoeda(resumo.saldo_atual)}</p>
-        </button>
+          {/* Saldo */}
+          <button
+            type="button"
+            onClick={() => navigate("/financeiro/fluxo-caixa")}
+            className="bg-blue-600 rounded-xl p-3 text-white text-left hover:bg-blue-700 transition-colors"
+          >
+            <div className="flex justify-between items-start mb-2">
+              <DollarSign className="w-4 h-4 opacity-80" />
+              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">Hoje</span>
+            </div>
+            <p className="text-xs opacity-75 mb-0.5">Saldo Estimado</p>
+            <p className="text-base font-bold leading-tight">{formatarMoeda(resumo.saldo_atual)}</p>
+          </button>
 
-        {/* A Receber */}
-        <button
-          type="button"
-          onClick={() => navigate("/financeiro/contas-receber")}
-          className="bg-emerald-600 rounded-xl p-3 text-white text-left hover:bg-emerald-700 transition-colors"
-        >
-          <div className="flex justify-between items-start mb-2">
-            <TrendingUp className="w-4 h-4 opacity-80" />
+          {/* A Receber */}
+          <button
+            type="button"
+            onClick={() => navigate("/financeiro/contas-receber")}
+            className="bg-emerald-600 rounded-xl p-3 text-white text-left hover:bg-emerald-700 transition-colors"
+          >
+            <div className="flex justify-between items-start mb-2">
+              <TrendingUp className="w-4 h-4 opacity-80" />
+              {resumo.contas_receber.vencidas > 0 && (
+                <AlertCircle className="w-3.5 h-3.5 text-yellow-300" />
+              )}
+            </div>
+            <p className="text-xs opacity-75 mb-0.5">A Receber</p>
+            <p className="text-base font-bold leading-tight">
+              {formatarMoeda(resumo.contas_receber.total)}
+            </p>
             {resumo.contas_receber.vencidas > 0 && (
-              <AlertCircle className="w-3.5 h-3.5 text-yellow-300" />
+              <p className="text-xs mt-1 text-yellow-200">
+                ⚠ {formatarMoeda(resumo.contas_receber.vencidas)} venc.
+              </p>
             )}
-          </div>
-          <p className="text-xs opacity-75 mb-0.5">A Receber</p>
-          <p className="text-base font-bold leading-tight">{formatarMoeda(resumo.contas_receber.total)}</p>
-          {resumo.contas_receber.vencidas > 0 && (
-            <p className="text-xs mt-1 text-yellow-200">⚠ {formatarMoeda(resumo.contas_receber.vencidas)} venc.</p>
-          )}
-        </button>
+          </button>
 
-        {/* A Pagar */}
-        <button
-          type="button"
-          onClick={() => navigate("/financeiro/contas-pagar")}
-          className="bg-red-500 rounded-xl p-3 text-white text-left hover:bg-red-600 transition-colors"
-        >
-          <div className="flex justify-between items-start mb-2">
-            <TrendingDown className="w-4 h-4 opacity-80" />
+          {/* A Pagar */}
+          <button
+            type="button"
+            onClick={() => navigate("/financeiro/contas-pagar")}
+            className="bg-red-500 rounded-xl p-3 text-white text-left hover:bg-red-600 transition-colors"
+          >
+            <div className="flex justify-between items-start mb-2">
+              <TrendingDown className="w-4 h-4 opacity-80" />
+              {resumo.contas_pagar.vencidas > 0 && (
+                <AlertCircle className="w-3.5 h-3.5 text-yellow-300" />
+              )}
+            </div>
+            <p className="text-xs opacity-75 mb-0.5">A Pagar</p>
+            <p className="text-base font-bold leading-tight">
+              {formatarMoeda(resumo.contas_pagar.total)}
+            </p>
             {resumo.contas_pagar.vencidas > 0 && (
-              <AlertCircle className="w-3.5 h-3.5 text-yellow-300" />
+              <p className="text-xs mt-1 text-yellow-200">
+                ⚠ {formatarMoeda(resumo.contas_pagar.vencidas)} venc.
+              </p>
             )}
-          </div>
-          <p className="text-xs opacity-75 mb-0.5">A Pagar</p>
-          <p className="text-base font-bold leading-tight">{formatarMoeda(resumo.contas_pagar.total)}</p>
-          {resumo.contas_pagar.vencidas > 0 && (
-            <p className="text-xs mt-1 text-yellow-200">⚠ {formatarMoeda(resumo.contas_pagar.vencidas)} venc.</p>
-          )}
-        </button>
+          </button>
         </div>
       </div>
 
       {/* KPIs — linha 2: valores do período selecionado */}
       <div className="mb-4">
-        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5 mt-3">📅 Período selecionado: {periodoDias === 1 ? "Hoje" : `últimos ${periodoDias} dias`}</p>
+        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5 mt-3">
+          📅 Período selecionado: {periodoDias === 1 ? "Hoje" : `últimos ${periodoDias} dias`}
+        </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {/* Faturamento Bruto */}
           <button
@@ -342,11 +383,15 @@ const DashboardFinanceiro = () => {
           >
             <div className="flex justify-between items-start mb-2">
               <FileText className="w-4 h-4 opacity-80" />
-              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">{periodoDias === 1 ? "Hoje" : `${periodoDias}d`}</span>
+              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">
+                {periodoDias === 1 ? "Hoje" : `${periodoDias}d`}
+              </span>
             </div>
             <p className="text-xs opacity-75 mb-0.5">Faturamento Bruto</p>
             <p className="text-base font-bold leading-tight">
-              {formatarMoeda(resumo.vendas_periodo.faturamento_bruto ?? resumo.vendas_periodo.valor_total)}
+              {formatarMoeda(
+                resumo.vendas_periodo.faturamento_bruto ?? resumo.vendas_periodo.valor_total,
+              )}
             </p>
           </button>
 
@@ -362,7 +407,9 @@ const DashboardFinanceiro = () => {
           >
             <div className="flex justify-between items-start mb-2">
               <TrendingUp className="w-4 h-4 opacity-80" />
-              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">{periodoDias === 1 ? "Hoje" : `${periodoDias}d`}</span>
+              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">
+                {periodoDias === 1 ? "Hoje" : `${periodoDias}d`}
+              </span>
             </div>
             <p className="text-xs opacity-75 mb-0.5">
               {resumo.fluxo_periodo.lucro >= 0 ? "Lucro do Período" : "Prejuízo"}
@@ -380,7 +427,9 @@ const DashboardFinanceiro = () => {
           >
             <div className="flex justify-between items-start mb-2">
               <ShoppingBag className="w-4 h-4 opacity-80" />
-              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">{periodoDias === 1 ? "Hoje" : `${periodoDias}d`}</span>
+              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">
+                {periodoDias === 1 ? "Hoje" : `${periodoDias}d`}
+              </span>
             </div>
             <p className="text-xs opacity-75 mb-0.5">Vendas</p>
             <p className="text-base font-bold leading-tight">
@@ -399,7 +448,9 @@ const DashboardFinanceiro = () => {
           >
             <div className="flex justify-between items-start mb-2">
               <BarChart2 className="w-4 h-4 opacity-80" />
-              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">{periodoDias === 1 ? "Hoje" : `${periodoDias}d`}</span>
+              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">
+                {periodoDias === 1 ? "Hoje" : `${periodoDias}d`}
+              </span>
             </div>
             <p className="text-xs opacity-75 mb-0.5">Ticket Médio</p>
             <p className="text-base font-bold leading-tight">
@@ -413,24 +464,33 @@ const DashboardFinanceiro = () => {
         <div id="tour-financeiro" className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
           <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
             <p className="text-xs text-gray-500 mb-1">Entradas</p>
-            <p className="text-lg font-bold text-emerald-600">{formatarMoeda(resumo.fluxo_periodo.entradas)}</p>
+            <p className="text-lg font-bold text-emerald-600">
+              {formatarMoeda(resumo.fluxo_periodo.entradas)}
+            </p>
           </div>
           <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
             <p className="text-xs text-gray-500 mb-1">Saídas</p>
-            <p className="text-lg font-bold text-red-500">{formatarMoeda(resumo.fluxo_periodo.saidas)}</p>
+            <p className="text-lg font-bold text-red-500">
+              {formatarMoeda(resumo.fluxo_periodo.saidas)}
+            </p>
           </div>
           <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
             <p className="text-xs text-gray-500 mb-1">Margem</p>
             <p className="text-lg font-bold text-gray-800">
               {resumo.fluxo_periodo.entradas > 0
-                ? ((resumo.fluxo_periodo.lucro / resumo.fluxo_periodo.entradas) * 100).toFixed(1) + "%"
+                ? ((resumo.fluxo_periodo.lucro / resumo.fluxo_periodo.entradas) * 100).toFixed(1) +
+                  "%"
                 : "—"}
             </p>
           </div>
           <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
             <p className="text-xs text-gray-500 mb-1">Finalizadas</p>
-            <p className="text-lg font-bold text-gray-800">{resumo.vendas_periodo.finalizadas || 0}</p>
-            <p className="text-xs text-gray-400">de {resumo.vendas_periodo.quantidade || 0} vendas</p>
+            <p className="text-lg font-bold text-gray-800">
+              {resumo.vendas_periodo.finalizadas || 0}
+            </p>
+            <p className="text-xs text-gray-400">
+              de {resumo.vendas_periodo.quantidade || 0} vendas
+            </p>
           </div>
         </div>
       </div>
@@ -471,7 +531,10 @@ const DashboardFinanceiro = () => {
       {/* Gráfico + Alertas IA lado a lado */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
         {/* Gráfico de fluxo */}
-        <div id="tour-composicao" className="lg:col-span-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+        <div
+          id="tour-composicao"
+          className="lg:col-span-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100"
+        >
           <h2 className="text-sm font-semibold text-gray-700 mb-3">
             📈 Fluxo Financeiro — últimos {periodoDias} dias
           </h2>
@@ -527,7 +590,10 @@ const DashboardFinanceiro = () => {
         </div>
 
         {/* Alertas IA */}
-        <div id="tour-acoes-rapidas" className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div
+          id="tour-acoes-rapidas"
+          className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+        >
           <AlertasIA compacto />
         </div>
       </div>
@@ -547,9 +613,14 @@ const DashboardFinanceiro = () => {
                 </p>
                 <div className="space-y-1.5">
                   {contasVencidas.contas_receber.slice(0, 3).map((conta) => (
-                    <div key={conta.id} className="flex justify-between items-center p-2 bg-red-50 border border-red-100 rounded-lg">
+                    <div
+                      key={conta.id}
+                      className="flex justify-between items-center p-2 bg-red-50 border border-red-100 rounded-lg"
+                    >
                       <div>
-                        <p className="text-xs font-medium text-gray-700">{conta.cliente || "Sem cliente"}</p>
+                        <p className="text-xs font-medium text-gray-700">
+                          {conta.cliente || "Sem cliente"}
+                        </p>
                         <p className="text-xs text-red-500">Venceu há {conta.dias_vencido} dias</p>
                       </div>
                       <p className="text-sm font-bold text-red-600">{formatarMoeda(conta.saldo)}</p>
@@ -565,12 +636,21 @@ const DashboardFinanceiro = () => {
                 </p>
                 <div className="space-y-1.5">
                   {contasVencidas.contas_pagar.slice(0, 3).map((conta) => (
-                    <div key={conta.id} className="flex justify-between items-center p-2 bg-orange-50 border border-orange-100 rounded-lg">
+                    <div
+                      key={conta.id}
+                      className="flex justify-between items-center p-2 bg-orange-50 border border-orange-100 rounded-lg"
+                    >
                       <div>
-                        <p className="text-xs font-medium text-gray-700">{conta.fornecedor || "Sem fornecedor"}</p>
-                        <p className="text-xs text-orange-500">Venceu há {conta.dias_vencido} dias</p>
+                        <p className="text-xs font-medium text-gray-700">
+                          {conta.fornecedor || "Sem fornecedor"}
+                        </p>
+                        <p className="text-xs text-orange-500">
+                          Venceu há {conta.dias_vencido} dias
+                        </p>
                       </div>
-                      <p className="text-sm font-bold text-orange-600">{formatarMoeda(conta.saldo)}</p>
+                      <p className="text-sm font-bold text-orange-600">
+                        {formatarMoeda(conta.saldo)}
+                      </p>
                     </div>
                   ))}
                 </div>

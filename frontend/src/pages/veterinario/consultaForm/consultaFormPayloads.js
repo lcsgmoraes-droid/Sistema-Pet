@@ -1,9 +1,4 @@
-export function buildConsultaPayload({
-  form,
-  petSelecionadoAtual,
-  tipoQuery,
-  agendamentoIdQuery,
-}) {
+export function buildConsultaPayload({ form, petSelecionadoAtual, tipoQuery, agendamentoIdQuery }) {
   return {
     pet_id: form.pet_id || undefined,
     cliente_id: petSelecionadoAtual.cliente_id,
@@ -61,7 +56,9 @@ export function buildItensPrescricao(itens) {
         posologia,
         via_administracao: item.via || undefined,
         duracao_dias: item.duracao_dias ? Number.parseInt(item.duracao_dias) : undefined,
-        medicamento_catalogo_id: item.medicamento_id ? Number.parseInt(item.medicamento_id) : undefined,
+        medicamento_catalogo_id: item.medicamento_id
+          ? Number.parseInt(item.medicamento_id)
+          : undefined,
       };
     })
     .filter(Boolean);
@@ -69,9 +66,11 @@ export function buildItensPrescricao(itens) {
 
 export function buildRascunhoItensConsultaPayload(form) {
   return {
-    prescricao_itens: (form.prescricao_itens || []).filter((item) => String(item.nome || "").trim()),
+    prescricao_itens: (form.prescricao_itens || []).filter((item) =>
+      String(item.nome || "").trim(),
+    ),
     procedimentos_realizados: (form.procedimentos_realizados || []).filter((item) =>
-      String(item.nome || "").trim()
+      String(item.nome || "").trim(),
     ),
   };
 }

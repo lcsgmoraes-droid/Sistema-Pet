@@ -1,19 +1,19 @@
-import { useEffect, useState } from 'react';
-import { X, TrendingUp, TrendingDown, Receipt, ArrowRightLeft, RotateCcw, AlertCircle } from 'lucide-react';
-import { adicionarMovimentacao, obterCaixaAberto } from '../api/caixa';
-import api from '../api';
-import FornecedorSelector from './fornecedores/FornecedorSelector';
-import { useEscapeToClose } from '../utils/modalEscape';
+import { useEffect, useState } from "react";
+import { X, TrendingUp, TrendingDown, Receipt, AlertCircle } from "lucide-react";
+import { adicionarMovimentacao, obterCaixaAberto } from "../api/caixa";
+import api from "../api";
+import FornecedorSelector from "./fornecedores/FornecedorSelector";
+import { useEscapeToClose } from "../utils/modalEscape";
 
 const validarCaixaAtual = async (caixaIdEsperado) => {
   const caixaAtual = await obterCaixaAberto();
 
   if (!caixaAtual) {
-    throw new Error('Seu caixa foi fechado em outra aba. Atualize a página e tente novamente.');
+    throw new Error("Seu caixa foi fechado em outra aba. Atualize a página e tente novamente.");
   }
 
   if (caixaAtual.id !== caixaIdEsperado) {
-    throw new Error('O caixa ativo mudou em outra aba. Atualize a página e tente novamente.');
+    throw new Error("O caixa ativo mudou em outra aba. Atualize a página e tente novamente.");
   }
 };
 
@@ -21,16 +21,16 @@ const validarCaixaAtual = async (caixaIdEsperado) => {
  * Modal de Suprimento - Entrada de valores no caixa
  */
 export function ModalSuprimento({ caixaId, onClose, onSucesso }) {
-  const [valor, setValor] = useState('');
-  const [contaOrigem, setContaOrigem] = useState('');
-  const [descricao, setDescricao] = useState('');
+  const [valor, setValor] = useState("");
+  const [contaOrigem, setContaOrigem] = useState("");
+  const [descricao, setDescricao] = useState("");
   const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState('');
+  const [erro, setErro] = useState("");
 
   const handleSalvar = async () => {
     const valorNum = parseFloat(valor);
     if (!valorNum || valorNum <= 0) {
-      setErro('Informe um valor válido');
+      setErro("Informe um valor válido");
       return;
     }
 
@@ -38,15 +38,15 @@ export function ModalSuprimento({ caixaId, onClose, onSucesso }) {
     try {
       await validarCaixaAtual(caixaId);
       await adicionarMovimentacao(caixaId, {
-        tipo: 'suprimento',
+        tipo: "suprimento",
         valor: valorNum,
-        forma_pagamento: 'Dinheiro',
-        conta_origem_nome: contaOrigem || 'Não informado',
-        descricao: descricao
+        forma_pagamento: "Dinheiro",
+        conta_origem_nome: contaOrigem || "Não informado",
+        descricao: descricao,
       });
       onSucesso();
     } catch (error) {
-      setErro(error.response?.data?.detail || error.message || 'Erro ao adicionar suprimento');
+      setErro(error.response?.data?.detail || error.message || "Erro ao adicionar suprimento");
     } finally {
       setLoading(false);
     }
@@ -78,9 +78,7 @@ export function ModalSuprimento({ caixaId, onClose, onSucesso }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Valor*
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Valor*</label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
             <input
@@ -120,7 +118,7 @@ export function ModalSuprimento({ caixaId, onClose, onSucesso }) {
             disabled={loading}
             className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
           >
-            {loading ? 'Salvando...' : 'Salvar'}
+            {loading ? "Salvando..." : "Salvar"}
           </button>
         </div>
       </div>
@@ -132,16 +130,16 @@ export function ModalSuprimento({ caixaId, onClose, onSucesso }) {
  * Modal de Sangria - Retirada de valores do caixa
  */
 export function ModalSangria({ caixaId, saldoAtual, onClose, onSucesso }) {
-  const [valor, setValor] = useState('');
-  const [contaDestino, setContaDestino] = useState('');
-  const [descricao, setDescricao] = useState('');
+  const [valor, setValor] = useState("");
+  const [contaDestino, setContaDestino] = useState("");
+  const [descricao, setDescricao] = useState("");
   const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState('');
+  const [erro, setErro] = useState("");
 
   const handleSalvar = async () => {
     const valorNum = parseFloat(valor);
     if (!valorNum || valorNum <= 0) {
-      setErro('Informe um valor válido');
+      setErro("Informe um valor válido");
       return;
     }
 
@@ -149,15 +147,15 @@ export function ModalSangria({ caixaId, saldoAtual, onClose, onSucesso }) {
     try {
       await validarCaixaAtual(caixaId);
       await adicionarMovimentacao(caixaId, {
-        tipo: 'sangria',
+        tipo: "sangria",
         valor: valorNum,
-        forma_pagamento: 'Dinheiro',
-        conta_destino_nome: contaDestino || 'Não informado',
-        descricao: descricao
+        forma_pagamento: "Dinheiro",
+        conta_destino_nome: contaDestino || "Não informado",
+        descricao: descricao,
       });
       onSucesso();
     } catch (error) {
-      setErro(error.response?.data?.detail || error.message || 'Erro ao adicionar sangria');
+      setErro(error.response?.data?.detail || error.message || "Erro ao adicionar sangria");
     } finally {
       setLoading(false);
     }
@@ -179,9 +177,7 @@ export function ModalSangria({ caixaId, saldoAtual, onClose, onSucesso }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Valor da Sangria*
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Valor da Sangria*</label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
             <input
@@ -237,7 +233,7 @@ export function ModalSangria({ caixaId, saldoAtual, onClose, onSucesso }) {
             disabled={loading}
             className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors"
           >
-            {loading ? 'Salvando...' : 'Salvar'}
+            {loading ? "Salvando..." : "Salvar"}
           </button>
         </div>
       </div>
@@ -249,16 +245,16 @@ export function ModalSangria({ caixaId, saldoAtual, onClose, onSucesso }) {
  * Modal de Despesa - Registro de despesas
  */
 export function ModalDespesa({ caixaId, onClose, onSucesso }) {
-  const [tipoDespesaId, setTipoDespesaId] = useState('');
+  const [tipoDespesaId, setTipoDespesaId] = useState("");
   const [tiposDespesa, setTiposDespesa] = useState([]);
-  const [descricao, setDescricao] = useState('');
-  const [valor, setValor] = useState('');
-  const [formaPagamento, setFormaPagamento] = useState('Dinheiro');
-  const [fornecedor, setFornecedor] = useState('');
-  const [documento, setDocumento] = useState('');
+  const [descricao, setDescricao] = useState("");
+  const [valor, setValor] = useState("");
+  const [formaPagamento, setFormaPagamento] = useState("Dinheiro");
+  const [fornecedor, setFornecedor] = useState("");
+  const [documento, setDocumento] = useState("");
   const [carregandoTipos, setCarregandoTipos] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState('');
+  const [erro, setErro] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -266,13 +262,15 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
     const carregarTiposDespesa = async () => {
       try {
         setCarregandoTipos(true);
-        const res = await api.get('/cadastros/tipo-despesa/');
+        const res = await api.get("/cadastros/tipo-despesa/");
         if (!mounted) return;
         const tiposAtivos = Array.isArray(res.data)
           ? res.data.filter((item) => item?.ativo !== false)
           : [];
         tiposAtivos.sort((a, b) =>
-          String(a?.nome || '').localeCompare(String(b?.nome || ''), 'pt-BR', { sensitivity: 'base' })
+          String(a?.nome || "").localeCompare(String(b?.nome || ""), "pt-BR", {
+            sensitivity: "base",
+          }),
         );
         setTiposDespesa(tiposAtivos);
       } catch {
@@ -292,23 +290,25 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
   const handleSalvar = async () => {
     const valorNum = parseFloat(valor);
     if (!valorNum || valorNum <= 0) {
-      setErro('Informe um valor válido');
+      setErro("Informe um valor válido");
       return;
     }
 
     if (!tipoDespesaId) {
-      setErro('Selecione um tipo de despesa');
+      setErro("Selecione um tipo de despesa");
       return;
     }
 
     const tipoSelecionado = tiposDespesa.find((item) => String(item.id) === String(tipoDespesaId));
     if (!tipoSelecionado) {
-      setErro('Tipo de despesa inválido');
+      setErro("Tipo de despesa inválido");
       return;
     }
 
     if (!tipoSelecionado.dre_subcategoria_id) {
-      setErro('Esse tipo de despesa não está vinculado à DRE. Ajuste em Cadastros > Despesas Rápidas (PDV).');
+      setErro(
+        "Esse tipo de despesa não está vinculado à DRE. Ajuste em Cadastros > Despesas Rápidas (PDV).",
+      );
       return;
     }
 
@@ -316,7 +316,7 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
     try {
       await validarCaixaAtual(caixaId);
       await adicionarMovimentacao(caixaId, {
-        tipo: 'despesa',
+        tipo: "despesa",
         valor: valorNum,
         categoria: tipoSelecionado.nome,
         tipo_despesa_id: Number(tipoDespesaId),
@@ -324,11 +324,11 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
         descricao: descricao,
         forma_pagamento: formaPagamento,
         fornecedor_nome: fornecedor,
-        documento: documento
+        documento: documento,
       });
       onSucesso();
     } catch (error) {
-      setErro(error.response?.data?.detail || error.message || 'Erro ao adicionar despesa');
+      setErro(error.response?.data?.detail || error.message || "Erro ao adicionar despesa");
     } finally {
       setLoading(false);
     }
@@ -344,9 +344,7 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
     >
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Tipo de despesa*
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de despesa*</label>
           <select
             value={tipoDespesaId}
             onChange={(e) => {
@@ -355,9 +353,11 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             disabled={carregandoTipos}
           >
-            <option value="">{carregandoTipos ? 'Carregando...' : 'Selecione...'}</option>
+            <option value="">{carregandoTipos ? "Carregando..." : "Selecione..."}</option>
             {tiposDespesa.map((cat) => (
-              <option key={cat.id} value={String(cat.id)}>{cat.nome}</option>
+              <option key={cat.id} value={String(cat.id)}>
+                {cat.nome}
+              </option>
             ))}
           </select>
           {!carregandoTipos && tiposDespesa.length === 0 && (
@@ -368,9 +368,7 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Descrição*
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Descrição*</label>
           <input
             type="text"
             value={descricao}
@@ -398,9 +396,7 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Valor*
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Valor*</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
               <input
@@ -424,25 +420,23 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
                   fornecedorSelecionado.nome ||
                     fornecedorSelecionado.razao_social ||
                     fornecedorSelecionado.nome_fantasia ||
-                    '',
+                    "",
                 )
               }
-              onClear={() => setFornecedor('')}
+              onClear={() => setFornecedor("")}
               onFornecedorCriado={(fornecedorCriado) =>
                 setFornecedor(
                   fornecedorCriado.nome ||
                     fornecedorCriado.razao_social ||
                     fornecedorCriado.nome_fantasia ||
-                    '',
+                    "",
                 )
               }
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Documento / NF
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Documento / NF</label>
             <input
               type="text"
               value={documento}
@@ -465,7 +459,7 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
             disabled={loading}
             className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
           >
-            {loading ? 'Salvando...' : 'Salvar'}
+            {loading ? "Salvando..." : "Salvar"}
           </button>
         </div>
       </div>
@@ -480,11 +474,11 @@ function ModalBase({ titulo, icone: Icone, corIcone, children, onClose, erro }) 
   useEscapeToClose({ isOpen: true, onClose });
 
   const coresIcone = {
-    green: 'bg-green-100 text-green-600',
-    orange: 'bg-orange-100 text-orange-600',
-    red: 'bg-red-100 text-red-600',
-    blue: 'bg-blue-100 text-blue-600',
-    purple: 'bg-purple-100 text-purple-600'
+    green: "bg-green-100 text-green-600",
+    orange: "bg-orange-100 text-orange-600",
+    red: "bg-red-100 text-red-600",
+    blue: "bg-blue-100 text-blue-600",
+    purple: "bg-purple-100 text-purple-600",
   };
 
   return (
@@ -493,15 +487,14 @@ function ModalBase({ titulo, icone: Icone, corIcone, children, onClose, erro }) 
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div className="flex items-center space-x-3">
-            <div className={`w-12 h-12 ${coresIcone[corIcone]} rounded-full flex items-center justify-center`}>
+            <div
+              className={`w-12 h-12 ${coresIcone[corIcone]} rounded-full flex items-center justify-center`}
+            >
               <Icone className="w-6 h-6" />
             </div>
             <h2 className="text-xl font-bold text-gray-900">{titulo}</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
             <X className="w-6 h-6" />
           </button>
         </div>

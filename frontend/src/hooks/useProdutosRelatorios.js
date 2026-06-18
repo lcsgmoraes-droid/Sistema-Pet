@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { formatarData, getProdutos } from "../api/produtos";
 
-const COLUNAS_RELATORIO_PRODUTOS = [
+const montarColunasRelatorioProdutos = (obterEstoqueVisualProduto) => [
   { key: "nome", label: "Nome", value: (p) => p.nome || "" },
   { key: "codigo", label: "Codigo", value: (p) => p.codigo || p.sku || "" },
   { key: "codigo_barras", label: "Codigo de Barras", value: (p) => p.codigo_barras || "" },
@@ -115,13 +115,9 @@ const ordenarProdutosRelatorio = (lista, ordenacao, obterEstoqueVisualProduto) =
     case "nome_desc":
       return copia.sort((a, b) => porTexto(a, b, (p) => p.nome, false));
     case "estoque_asc":
-      return copia.sort(
-        (a, b) => obterEstoqueVisualProduto(a) - obterEstoqueVisualProduto(b),
-      );
+      return copia.sort((a, b) => obterEstoqueVisualProduto(a) - obterEstoqueVisualProduto(b));
     case "estoque_desc":
-      return copia.sort(
-        (a, b) => obterEstoqueVisualProduto(b) - obterEstoqueVisualProduto(a),
-      );
+      return copia.sort((a, b) => obterEstoqueVisualProduto(b) - obterEstoqueVisualProduto(a));
     case "preco_asc":
       return copia.sort((a, b) => Number(a.preco_venda ?? 0) - Number(b.preco_venda ?? 0));
     case "preco_desc":
@@ -135,7 +131,7 @@ const ordenarProdutosRelatorio = (lista, ordenacao, obterEstoqueVisualProduto) =
 const normalizarValorCsv = (valor) => {
   if (valor === null || valor === undefined) return "";
   if (typeof valor === "number") return String(valor).replace(".", ",");
-  return String(valor).replaceAll("\"", '""');
+  return String(valor).replaceAll('"', '""');
 };
 
 const baixarCsvProdutos = (nomeArquivo, colunas, dados) => {
@@ -161,13 +157,10 @@ const baixarCsvProdutos = (nomeArquivo, colunas, dados) => {
   URL.revokeObjectURL(url);
 };
 
-export default function useProdutosRelatorios({
-  filtros,
-  obterEstoqueVisualProduto,
-}) {
+export default function useProdutosRelatorios({ filtros, obterEstoqueVisualProduto }) {
+  const colunasRelatorioProdutos = montarColunasRelatorioProdutos(obterEstoqueVisualProduto);
   const [menuRelatoriosAberto, setMenuRelatoriosAberto] = useState(false);
-  const [modalRelatorioPersonalizado, setModalRelatorioPersonalizado] =
-    useState(false);
+  const [modalRelatorioPersonalizado, setModalRelatorioPersonalizado] = useState(false);
   const [colunasRelatorio, setColunasRelatorio] = useState([
     "nome",
     "codigo",
@@ -183,10 +176,7 @@ export default function useProdutosRelatorios({
 
   useEffect(() => {
     const handleClickFora = (event) => {
-      if (
-        menuRelatoriosRef.current &&
-        !menuRelatoriosRef.current.contains(event.target)
-      ) {
+      if (menuRelatoriosRef.current && !menuRelatoriosRef.current.contains(event.target)) {
         setMenuRelatoriosAberto(false);
       }
     };
@@ -246,7 +236,7 @@ export default function useProdutosRelatorios({
         obterEstoqueVisualProduto,
       );
       const colunasSelecionadas = new Set(colunasRelatorio.filter(Boolean));
-      const colunas = COLUNAS_RELATORIO_PRODUTOS.filter((coluna) =>
+      const colunas = colunasRelatorioProdutos.filter((coluna) =>
         colunasSelecionadas.has(coluna.key),
       );
 
@@ -280,7 +270,7 @@ export default function useProdutosRelatorios({
 
   return {
     colunasRelatorio,
-    colunasRelatorioProdutos: COLUNAS_RELATORIO_PRODUTOS,
+    colunasRelatorioProdutos,
     menuRelatoriosAberto,
     menuRelatoriosRef,
     modalRelatorioPersonalizado,

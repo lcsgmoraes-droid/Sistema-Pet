@@ -8,26 +8,14 @@
  *   pessoas, pets, produtos, estoque, PDV, vendas/financeiro de vendas,
  *   usuarios, configuracoes essenciais e cadastros essenciais.
  */
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "../services/api";
 import { getAccessToken } from "../auth/tokenStorage";
 import { useAuth } from "./AuthContext";
 
 const ModulosContext = createContext();
 const DEV_MODULOS_STORAGE_KEY = "dev_modulos_config";
-const DEV_MODULOS_MODOS_VALIDOS = [
-  "normal",
-  "custom",
-  "all_unlocked",
-  "all_locked",
-];
+const DEV_MODULOS_MODOS_VALIDOS = ["normal", "custom", "all_unlocked", "all_locked"];
 
 export const MODULOS_PREMIUM = [
   "compras",
@@ -68,8 +56,7 @@ export const MODULOS_INFO = {
   },
   financeiro_erp: {
     nome: "Financeiro ERP",
-    descricao:
-      "Contas a pagar, contas a receber, fluxo de caixa, DRE e conciliacoes financeiras.",
+    descricao: "Contas a pagar, contas a receber, fluxo de caixa, DRE e conciliacoes financeiras.",
     preco: 99,
     recursos: [
       "Contas a pagar e receber",
@@ -80,8 +67,7 @@ export const MODULOS_INFO = {
   },
   comissoes: {
     nome: "Comissoes",
-    descricao:
-      "Configuracao, demonstrativos, provisoes e fechamento de comissoes por funcionario.",
+    descricao: "Configuracao, demonstrativos, provisoes e fechamento de comissoes por funcionario.",
     preco: 49,
     recursos: [
       "Regras de comissao",
@@ -92,8 +78,7 @@ export const MODULOS_INFO = {
   },
   veterinario: {
     nome: "Modulo Veterinario",
-    descricao:
-      "Agenda, consultas, prontuario, vacinas, exames, internacoes e catalogos clinicos.",
+    descricao: "Agenda, consultas, prontuario, vacinas, exames, internacoes e catalogos clinicos.",
     preco: 119,
     recursos: [
       "Prontuario e consultas",
@@ -128,8 +113,7 @@ export const MODULOS_INFO = {
   },
   bling: {
     nome: "Integracao Bling",
-    descricao:
-      "Sincronizacao e monitoramento de pedidos, produtos, estoque e notas via Bling.",
+    descricao: "Sincronizacao e monitoramento de pedidos, produtos, estoque e notas via Bling.",
     preco: 69,
     recursos: [
       "Pedidos Bling",
@@ -143,38 +127,25 @@ export const MODULOS_INFO = {
     descricao:
       "Configuracoes e conectores externos para automacoes, canais e plataformas integradas.",
     preco: 0,
-    recursos: [
-      "Configurar conectores",
-      "Monitorar integracoes",
-      "Preparar automacoes externas",
-    ],
+    recursos: ["Configurar conectores", "Monitorar integracoes", "Preparar automacoes externas"],
   },
   rh: {
     nome: "Recursos Humanos",
     descricao:
       "Cadastro operacional de funcionarios e estruturas internas alem dos usuarios do sistema.",
     preco: 49,
-    recursos: [
-      "Funcionarios",
-      "Cargos e departamentos",
-      "Apoio a comissoes",
-    ],
+    recursos: ["Funcionarios", "Cargos e departamentos", "Apoio a comissoes"],
   },
   ia_avancada: {
     nome: "IA Avancada",
     descricao:
       "Recursos de IA alem do chat basico, como previsoes financeiras e assistentes especializados.",
     preco: 79,
-    recursos: [
-      "Fluxo de caixa preditivo",
-      "Alertas inteligentes",
-      "Assistentes por modulo",
-    ],
+    recursos: ["Fluxo de caixa preditivo", "Alertas inteligentes", "Assistentes por modulo"],
   },
   entregas: {
     nome: "Entregas",
-    descricao:
-      "Gerencie rotas de entrega, rastreamento em tempo real e app para entregadores.",
+    descricao: "Gerencie rotas de entrega, rastreamento em tempo real e app para entregadores.",
     preco: 79,
     recursos: [
       "Rotas de entrega otimizadas",
@@ -186,8 +157,7 @@ export const MODULOS_INFO = {
   },
   campanhas: {
     nome: "Campanhas",
-    descricao:
-      "Crie campanhas de marketing, promoções e fidelize seus clientes.",
+    descricao: "Crie campanhas de marketing, promoções e fidelize seus clientes.",
     preco: 49,
     recursos: [
       "Campanhas de desconto personalizadas",
@@ -198,8 +168,7 @@ export const MODULOS_INFO = {
   },
   whatsapp: {
     nome: "WhatsApp Bot",
-    descricao:
-      "Automatize o atendimento via WhatsApp com inteligência artificial.",
+    descricao: "Automatize o atendimento via WhatsApp com inteligência artificial.",
     preco: 119,
     recursos: [
       "Bot de atendimento 24/7",
@@ -211,8 +180,7 @@ export const MODULOS_INFO = {
   },
   ecommerce: {
     nome: "E-commerce",
-    descricao:
-      "Venda online com sua própria loja virtual integrada ao sistema.",
+    descricao: "Venda online com sua própria loja virtual integrada ao sistema.",
     preco: 99,
     recursos: [
       "Loja virtual com seu domínio",
@@ -224,8 +192,7 @@ export const MODULOS_INFO = {
   },
   app_mobile: {
     nome: "App para Clientes",
-    descricao:
-      "Ofereça um app mobile próprio para seus clientes comprarem e acompanharem pedidos.",
+    descricao: "Ofereça um app mobile próprio para seus clientes comprarem e acompanharem pedidos.",
     preco: 69,
     recursos: [
       "App iOS e Android com sua marca",
@@ -237,8 +204,7 @@ export const MODULOS_INFO = {
   },
   marketplaces: {
     nome: "Marketplaces",
-    descricao:
-      "Venda no Mercado Livre, Shopee, Amazon e outros de forma integrada.",
+    descricao: "Venda no Mercado Livre, Shopee, Amazon e outros de forma integrada.",
     preco: 99,
     recursos: [
       "Integração com Mercado Livre",
@@ -270,13 +236,9 @@ export const ModulosProvider = ({ children }) => {
       const raw = localStorage.getItem(DEV_MODULOS_STORAGE_KEY);
       if (!raw) return { modo: "normal", overrides: {} };
       const parsed = JSON.parse(raw);
-      const modo = DEV_MODULOS_MODOS_VALIDOS.includes(parsed?.modo)
-        ? parsed.modo
-        : "normal";
+      const modo = DEV_MODULOS_MODOS_VALIDOS.includes(parsed?.modo) ? parsed.modo : "normal";
       const overrides =
-        parsed?.overrides && typeof parsed.overrides === "object"
-          ? parsed.overrides
-          : {};
+        parsed?.overrides && typeof parsed.overrides === "object" ? parsed.overrides : {};
 
       return {
         modo,
@@ -325,9 +287,7 @@ export const ModulosProvider = ({ children }) => {
         Array.isArray(modulosBetaApi) ? modulosBetaApi : MODULOS_BETA_PUBLICOS,
       );
       setModulosForaOfertaPublica(
-        Array.isArray(modulosForaOfertaApi)
-          ? modulosForaOfertaApi
-          : MODULOS_FORA_DA_OFERTA_PUBLICA,
+        Array.isArray(modulosForaOfertaApi) ? modulosForaOfertaApi : MODULOS_FORA_DA_OFERTA_PUBLICA,
       );
     } catch {
       // Fail-closed: se não conseguir confirmar o plano, não libera premium.
@@ -353,10 +313,7 @@ export const ModulosProvider = ({ children }) => {
 
   useEffect(() => {
     if (!devControlesAtivos) return;
-    localStorage.setItem(
-      DEV_MODULOS_STORAGE_KEY,
-      JSON.stringify(devModulosConfig),
-    );
+    localStorage.setItem(DEV_MODULOS_STORAGE_KEY, JSON.stringify(devModulosConfig));
   }, [devModulosConfig, devControlesAtivos]);
 
   const moduloAtivoBase = useCallback(
@@ -378,10 +335,7 @@ export const ModulosProvider = ({ children }) => {
 
         if (
           devModulosConfig.modo === "custom" &&
-          Object.prototype.hasOwnProperty.call(
-            devModulosConfig.overrides,
-            modulo,
-          )
+          Object.prototype.hasOwnProperty.call(devModulosConfig.overrides, modulo)
         ) {
           return Boolean(devModulosConfig.overrides[modulo]);
         }
@@ -419,10 +373,7 @@ export const ModulosProvider = ({ children }) => {
         const baseAtivo = moduloAtivoBase(modulo);
         const overrides = { ...prev.overrides };
 
-        const atualModoNormal = Object.prototype.hasOwnProperty.call(
-          overrides,
-          modulo,
-        )
+        const atualModoNormal = Object.prototype.hasOwnProperty.call(overrides, modulo)
           ? Boolean(overrides[modulo])
           : baseAtivo;
         const proximo = !atualModoNormal;
@@ -477,9 +428,7 @@ export const ModulosProvider = ({ children }) => {
     ],
   );
 
-  return (
-    <ModulosContext.Provider value={value}>{children}</ModulosContext.Provider>
-  );
+  return <ModulosContext.Provider value={value}>{children}</ModulosContext.Provider>;
 };
 
 export const useModulos = () => {

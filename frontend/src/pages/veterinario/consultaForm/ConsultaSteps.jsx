@@ -26,8 +26,8 @@ export default function ConsultaSteps({
           indice === etapaAtual
             ? "bg-blue-600 text-white"
             : liberada
-            ? "bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200"
-            : "bg-gray-100 text-gray-400 cursor-not-allowed";
+              ? "bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200"
+              : "bg-gray-100 text-gray-400 cursor-not-allowed";
 
         return (
           <div key={nome} className="flex items-center gap-1">

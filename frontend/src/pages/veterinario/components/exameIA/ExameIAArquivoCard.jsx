@@ -7,7 +7,12 @@ export default function ExameIAArquivoCard({ exame }) {
       <div className="mt-1 flex flex-wrap items-center gap-3">
         <span>{exame.arquivo_nome}</span>
         {exame.arquivo_url && (
-          <a href={exame.arquivo_url} target="_blank" rel="noreferrer" className="text-indigo-700 underline">
+          <a
+            href={exame.arquivo_url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-indigo-700 underline"
+          >
             abrir arquivo
           </a>
         )}

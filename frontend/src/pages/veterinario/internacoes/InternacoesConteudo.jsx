@@ -51,10 +51,7 @@ export default function InternacoesConteudo({
   return (
     <div className="space-y-3">
       {aba === "ativas" && (
-        <CentroInternacaoTabs
-          centroAba={centroAba}
-          onChangeCentroAba={onChangeCentroAba}
-        />
+        <CentroInternacaoTabs centroAba={centroAba} onChangeCentroAba={onChangeCentroAba} />
       )}
 
       {aba === "ativas" && centroAba === "mapa" && (

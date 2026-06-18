@@ -11,7 +11,7 @@ from fastapi import (
     status,
 )
 from fastapi.security import HTTPAuthorizationCredentials
-from jose import JWTError, jwt
+from app.security.jwt_compat import JWTError, jwt
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, text

@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import api from '../api';
-import { deleteImagemProduto, uploadImagemProduto } from '../api/produtos';
+import { useState } from "react";
+import api from "../api";
+import { deleteImagemProduto, uploadImagemProduto } from "../api/produtos";
 
 const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
 
@@ -16,7 +16,7 @@ export default function useProdutosNovoImagens({ id, setImagens }) {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
     const maxSize = MAX_UPLOAD_SIZE_BYTES;
 
     for (const file of files) {
@@ -36,7 +36,7 @@ export default function useProdutosNovoImagens({ id, setImagens }) {
       const uploadedImages = [];
       for (const file of files) {
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append("file", file);
 
         try {
           const response = await uploadImagemProduto(id, formData);
@@ -44,7 +44,7 @@ export default function useProdutosNovoImagens({ id, setImagens }) {
         } catch (error) {
           console.error(`Erro ao enviar ${file.name}:`, error);
           alert(
-            `Erro ao enviar ${file.name}: ${error.response?.data?.detail || 'Erro desconhecido'}`,
+            `Erro ao enviar ${file.name}: ${error.response?.data?.detail || "Erro desconhecido"}`,
           );
         }
       }
@@ -52,26 +52,26 @@ export default function useProdutosNovoImagens({ id, setImagens }) {
       await recarregarImagens();
       alert(`${uploadedImages.length} imagem(ns) enviada(s) com sucesso!`);
     } catch (error) {
-      console.error('Erro ao enviar imagens:', error);
-      alert(error.response?.data?.detail || 'Erro ao enviar imagens');
+      console.error("Erro ao enviar imagens:", error);
+      alert(error.response?.data?.detail || "Erro ao enviar imagens");
     } finally {
       setUploadingImage(false);
-      e.target.value = '';
+      e.target.value = "";
     }
   };
 
   const handleDeleteImagem = async (imagemId) => {
-    if (!window.confirm('Deseja realmente excluir esta imagem?')) {
+    if (!window.confirm("Deseja realmente excluir esta imagem?")) {
       return;
     }
 
     try {
       await deleteImagemProduto(imagemId);
       await recarregarImagens();
-      alert('Imagem excluída com sucesso!');
+      alert("Imagem excluída com sucesso!");
     } catch (error) {
-      console.error('Erro ao excluir imagem:', error);
-      alert('Erro ao excluir imagem');
+      console.error("Erro ao excluir imagem:", error);
+      alert("Erro ao excluir imagem");
     }
   };
 
@@ -79,10 +79,10 @@ export default function useProdutosNovoImagens({ id, setImagens }) {
     try {
       await api.put(`/produtos/imagens/${imagemId}`, { principal: true });
       await recarregarImagens();
-      alert('Imagem principal atualizada!');
+      alert("Imagem principal atualizada!");
     } catch (error) {
-      console.error('Erro ao definir imagem principal:', error);
-      alert('Erro ao definir imagem principal');
+      console.error("Erro ao definir imagem principal:", error);
+      alert("Erro ao definir imagem principal");
     }
   };
 

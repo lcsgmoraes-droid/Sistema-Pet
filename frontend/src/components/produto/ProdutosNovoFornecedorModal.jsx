@@ -16,7 +16,7 @@ export default function ProdutosNovoFornecedorModal({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
         <h3 className="text-xl font-bold text-gray-900 mb-4">
-          {fornecedorEdit ? 'Editar Fornecedor' : 'Adicionar Fornecedor'}
+          {fornecedorEdit ? "Editar Fornecedor" : "Adicionar Fornecedor"}
         </h3>
 
         <div className="space-y-4">
@@ -31,9 +31,7 @@ export default function ProdutosNovoFornecedorModal({
                   fornecedor_id: fornecedor.id,
                 })
               }
-              onClear={() =>
-                setFornecedorData({ ...fornecedorData, fornecedor_id: "" })
-              }
+              onClear={() => setFornecedorData({ ...fornecedorData, fornecedor_id: "" })}
               onFornecedorCriado={(fornecedor) =>
                 setFornecedorData({
                   ...fornecedorData,
@@ -46,11 +44,15 @@ export default function ProdutosNovoFornecedorModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Codigo no Fornecedor</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Codigo no Fornecedor
+            </label>
             <input
               type="text"
               value={fornecedorData.codigo_fornecedor}
-              onChange={(e) => setFornecedorData({ ...fornecedorData, codigo_fornecedor: e.target.value })}
+              onChange={(e) =>
+                setFornecedorData({ ...fornecedorData, codigo_fornecedor: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="SKU-FORNECEDOR-001"
             />
@@ -64,7 +66,9 @@ export default function ProdutosNovoFornecedorModal({
                 type="number"
                 step="0.01"
                 value={fornecedorData.preco_custo}
-                onChange={(e) => setFornecedorData({ ...fornecedorData, preco_custo: e.target.value })}
+                onChange={(e) =>
+                  setFornecedorData({ ...fornecedorData, preco_custo: e.target.value })
+                }
                 className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="0,00"
               />
@@ -72,23 +76,31 @@ export default function ProdutosNovoFornecedorModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Prazo de Entrega (dias)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Prazo de Entrega (dias)
+            </label>
             <input
               type="number"
               value={fornecedorData.prazo_entrega}
-              onChange={(e) => setFornecedorData({ ...fornecedorData, prazo_entrega: e.target.value })}
+              onChange={(e) =>
+                setFornecedorData({ ...fornecedorData, prazo_entrega: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="7"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Estoque no Fornecedor</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Estoque no Fornecedor
+            </label>
             <input
               type="number"
               step="0.01"
               value={fornecedorData.estoque_fornecedor}
-              onChange={(e) => setFornecedorData({ ...fornecedorData, estoque_fornecedor: e.target.value })}
+              onChange={(e) =>
+                setFornecedorData({ ...fornecedorData, estoque_fornecedor: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="100"
             />
@@ -98,7 +110,9 @@ export default function ProdutosNovoFornecedorModal({
             <input
               type="checkbox"
               checked={fornecedorData.e_principal}
-              onChange={(e) => setFornecedorData({ ...fornecedorData, e_principal: e.target.checked })}
+              onChange={(e) =>
+                setFornecedorData({ ...fornecedorData, e_principal: e.target.checked })
+              }
               className="w-4 h-4 text-blue-600 rounded"
             />
             <label className="text-sm font-medium text-gray-700">Fornecedor Principal</label>
@@ -113,7 +127,11 @@ export default function ProdutosNovoFornecedorModal({
           >
             Cancelar
           </button>
-          <button type="button" onClick={onSubmit} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          <button
+            type="button"
+            onClick={onSubmit}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
             Salvar
           </button>
         </div>

@@ -10,19 +10,11 @@ export default function CampanhasDashboardTab({
   onAbrirAba,
 }) {
   if (loadingDashboard) {
-    return (
-      <div className="p-8 text-center text-gray-400">
-        Carregando dashboard...
-      </div>
-    );
+    return <div className="p-8 text-center text-gray-400">Carregando dashboard...</div>;
   }
 
   if (!dashboard) {
-    return (
-      <div className="p-8 text-center text-gray-400">
-        Erro ao carregar dashboard.
-      </div>
-    );
+    return <div className="p-8 text-center text-gray-400">Erro ao carregar dashboard.</div>;
   }
 
   return (

@@ -66,11 +66,7 @@ export const TIPO_LABELS = {
   },
 };
 
-export const USER_CREATABLE_TYPES = new Set([
-  "inactivity",
-  "quick_repurchase",
-  "bulk_segment",
-]);
+export const USER_CREATABLE_TYPES = new Set(["inactivity", "quick_repurchase", "bulk_segment"]);
 
 export const CUPOM_STATUS = {
   active: { label: "Ativo", color: "bg-green-100 text-green-700" },
@@ -135,8 +131,7 @@ export function createDefaultPremio() {
     tipo_premio: "cupom",
     coupon_value: 50,
     coupon_valid_days: 10,
-    mensagem:
-      "Parabens! Voce foi um dos nossos melhores clientes do mes! \u{1F3C6}",
+    mensagem: "Parabens! Voce foi um dos nossos melhores clientes do mes! \u{1F3C6}",
     mensagem_brinde:
       "Parabens! Voce foi um dos nossos melhores clientes do mes. Passe em nossa loja e retire seu brinde especial - sera um prazer recebe-lo! \u{1F381}",
     retirar_de: "",

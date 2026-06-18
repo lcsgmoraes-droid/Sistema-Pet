@@ -1,4 +1,10 @@
-export default function ProcedimentoInsumoRow({ atualizarInsumo, index, item, produtos, removerInsumo }) {
+export default function ProcedimentoInsumoRow({
+  atualizarInsumo,
+  index,
+  item,
+  produtos,
+  removerInsumo,
+}) {
   return (
     <div className="grid gap-2 md:grid-cols-12">
       <select

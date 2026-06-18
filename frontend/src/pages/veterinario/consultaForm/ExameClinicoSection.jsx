@@ -15,7 +15,10 @@ export default function ExameClinicoSection({
 }) {
   return (
     <>
-      <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4 disabled:opacity-100">
+      <fieldset
+        disabled={modoSomenteLeitura}
+        className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4 disabled:opacity-100"
+      >
         <h2 className="font-semibold text-gray-700">Exame clínico</h2>
         {renderCampo("Histórico clínico")(
           <textarea
@@ -23,7 +26,7 @@ export default function ExameClinicoSection({
             onChange={(event) => setCampo("historico_clinico", event.target.value)}
             className={css.textarea}
             placeholder="Histórico médico, cirurgias anteriores, medicações em uso…"
-          />
+          />,
         )}
         {renderCampo("Exame físico detalhado")(
           <textarea
@@ -32,7 +35,7 @@ export default function ExameClinicoSection({
             className={css.textarea}
             style={{ minHeight: 200 }}
             placeholder="Descrição sistemática: cabeça, tórax, abdômen, membros, pele…"
-          />
+          />,
         )}
       </fieldset>
 

@@ -29,11 +29,7 @@ function obterImagemMiniaturaItem(item) {
 }
 
 function obterImagemSugestaoProduto(produto) {
-  return (
-    produto?.imagem_principal_thumbnail ||
-    produto?.imagem_principal ||
-    null
-  );
+  return produto?.imagem_principal_thumbnail || produto?.imagem_principal || null;
 }
 
 function obterPrecoPDV(produto) {
@@ -50,10 +46,8 @@ function ProdutoSugestaoPDV({
 }) {
   const estoqueZerado =
     produto.tipo_produto === "KIT" && produto.tipo_kit === "VIRTUAL"
-      ? produto.estoque_virtual !== undefined &&
-        Math.floor(produto.estoque_virtual) <= 0
-      : produto.estoque_atual !== undefined &&
-        Math.floor(produto.estoque_atual) <= 0;
+      ? produto.estoque_virtual !== undefined && Math.floor(produto.estoque_virtual) <= 0
+      : produto.estoque_atual !== undefined && Math.floor(produto.estoque_atual) <= 0;
   const imagemSugestao = resolveMediaUrl(obterImagemSugestaoProduto(produto));
   const precoPDV = obterPrecoPDV(produto);
   const precoOriginal = Number.parseFloat(produto.preco_venda_original ?? produto.preco_venda ?? 0);
@@ -100,16 +94,14 @@ function ProdutoSugestaoPDV({
                 </span>
               )}
             </div>
-            {produto.tipo_produto === "VARIACAO" &&
-              formatarVariacao(produto) && (
-                <div className="mt-0.5 text-xs font-medium text-blue-600">
-                  Variacao: {formatarVariacao(produto)}
-                </div>
-              )}
+            {produto.tipo_produto === "VARIACAO" && formatarVariacao(produto) && (
+              <div className="mt-0.5 text-xs font-medium text-blue-600">
+                Variacao: {formatarVariacao(produto)}
+              </div>
+            )}
             <div className="text-sm text-gray-500">
               {produto.codigo && `Cod: ${produto.codigo}`}
-              {produto.tipo_produto === "KIT" &&
-              produto.tipo_kit === "VIRTUAL"
+              {produto.tipo_produto === "KIT" && produto.tipo_kit === "VIRTUAL"
                 ? produto.estoque_virtual !== undefined &&
                   ` | Estoque: ${Math.floor(produto.estoque_virtual)}`
                 : produto.estoque_atual !== undefined &&
@@ -123,9 +115,7 @@ function ProdutoSugestaoPDV({
               {formatMoneyBRL(precoOriginal)}
             </span>
           )}
-          <div className="text-lg font-semibold text-green-600">
-            {formatMoneyBRL(precoPDV)}
-          </div>
+          <div className="text-lg font-semibold text-green-600">{formatMoneyBRL(precoPDV)}</div>
           {promocaoAtiva && (
             <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
               promocao
@@ -162,10 +152,7 @@ export default function PDVProdutosCard({
   vendaAtual,
 }) {
   return (
-    <Panel
-      id="tour-pdv-carrinho"
-      padding="sm"
-    >
+    <Panel id="tour-pdv-carrinho" padding="sm">
       <h2 className="mb-3 flex items-center text-base font-semibold text-gray-900">
         <Package className="mr-2 h-4 w-4 text-blue-600" />
         Produtos e Servicos
@@ -217,20 +204,13 @@ export default function PDVProdutosCard({
               item.produto?.codigo_barras ||
               item.produto_codigo_barras ||
               "";
-            const imagemProduto = resolveMediaUrl(
-              obterImagemMiniaturaItem(item),
-            );
+            const imagemProduto = resolveMediaUrl(obterImagemMiniaturaItem(item));
             const chaveCodigoItem = `${item.produto_id || "item"}-${index}`;
-            const hasComposicao =
-              isKit &&
-              item.composicao_kit &&
-              item.composicao_kit.length > 0;
+            const hasComposicao = isKit && item.composicao_kit && item.composicao_kit.length > 0;
             const itemSemEstoque =
               item.tipo_produto === "KIT" && item.tipo_kit === "VIRTUAL"
-                ? item.estoque_virtual !== undefined &&
-                  Math.floor(item.estoque_virtual) <= 0
-                : item.estoque_atual !== undefined &&
-                  Math.floor(item.estoque_atual) <= 0;
+                ? item.estoque_virtual !== undefined && Math.floor(item.estoque_virtual) <= 0
+                : item.estoque_atual !== undefined && Math.floor(item.estoque_atual) <= 0;
             const itemEmPromocao = Boolean(item.em_promocao);
 
             return (
@@ -241,9 +221,7 @@ export default function PDVProdutosCard({
               >
                 <div
                   className="flex cursor-pointer flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
-                  onClick={() =>
-                    !modoVisualizacao && onAbrirModalDescontoItem(item)
-                  }
+                  onClick={() => !modoVisualizacao && onAbrirModalDescontoItem(item)}
                 >
                   <div className="flex min-w-0 flex-1 items-start gap-2">
                     {hasComposicao && (
@@ -298,10 +276,7 @@ export default function PDVProdutosCard({
                           copied={copiadoCodigoItem === chaveCodigoItem}
                           label="SKU"
                           onCopy={() =>
-                            onCopiarCodigoProdutoCarrinho(
-                              codigoProdutoExibicao,
-                              chaveCodigoItem,
-                            )
+                            onCopiarCodigoProdutoCarrinho(codigoProdutoExibicao, chaveCodigoItem)
                           }
                           title="Copiar SKU do produto"
                           value={codigoProdutoExibicao}
@@ -319,9 +294,7 @@ export default function PDVProdutosCard({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (
-                                !pendenciasProdutoIds.includes(item.produto_id)
-                              ) {
+                              if (!pendenciasProdutoIds.includes(item.produto_id)) {
                                 onAdicionarNaListaEsperaRapido(
                                   {
                                     id: item.produto_id,
@@ -356,8 +329,7 @@ export default function PDVProdutosCard({
                       <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-gray-500">
                         <span>
                           {item.quantidade} Unidade
-                          {item.quantidade !== 1 ? "s" : ""} x{" "}
-                          {formatMoneyBRL(item.preco_unitario)}
+                          {item.quantidade !== 1 ? "s" : ""} x {formatMoneyBRL(item.preco_unitario)}
                         </span>
                         {itemEmPromocao && item.preco_venda_original > item.preco_unitario && (
                           <span className="ml-1 text-xs text-gray-400 line-through">
@@ -439,7 +411,10 @@ export default function PDVProdutosCard({
                         >
                           <div className="flex min-w-0 items-center gap-2">
                             <Package className="w-4 h-4 shrink-0 text-gray-400" />
-                            <span className="truncate text-gray-700" title={componente.produto_nome}>
+                            <span
+                              className="truncate text-gray-700"
+                              title={componente.produto_nome}
+                            >
                               {componente.produto_nome}
                             </span>
                           </div>
@@ -460,9 +435,7 @@ export default function PDVProdutosCard({
                     className="flex flex-col gap-2 sm:flex-row sm:items-center"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <label className="text-sm font-medium text-gray-600 sm:w-16">
-                      Pet:
-                    </label>
+                    <label className="text-sm font-medium text-gray-600 sm:w-16">Pet:</label>
                     <select
                       value={item.pet_id || ""}
                       onChange={(e) =>

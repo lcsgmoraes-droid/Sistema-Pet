@@ -23,10 +23,7 @@ export default function CampanhasNovaCampanhaModal({
         </div>
         <div className="px-6 py-4 space-y-4">
           <div>
-            <label
-              htmlFor="nc-nome"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
+            <label htmlFor="nc-nome" className="block text-xs font-medium text-gray-600 mb-1">
               Nome da campanha
             </label>
             <input
@@ -34,17 +31,12 @@ export default function CampanhasNovaCampanhaModal({
               type="text"
               placeholder="Ex: Recompra Rapida Verao"
               value={novaCampanha.name}
-              onChange={(e) =>
-                setNovaCampanha((p) => ({ ...p, name: e.target.value }))
-              }
+              onChange={(e) => setNovaCampanha((p) => ({ ...p, name: e.target.value }))}
               className="w-full border rounded-lg px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label
-              htmlFor="nc-tipo"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
+            <label htmlFor="nc-tipo" className="block text-xs font-medium text-gray-600 mb-1">
               Tipo
             </label>
             <select
@@ -65,9 +57,7 @@ export default function CampanhasNovaCampanhaModal({
           <p className="text-xs text-gray-500">
             Os parametros poderao ser configurados depois de criar a campanha.
           </p>
-          {erroCriarCampanha && (
-            <p className="text-sm text-red-600">{erroCriarCampanha}</p>
-          )}
+          {erroCriarCampanha && <p className="text-sm text-red-600">{erroCriarCampanha}</p>}
         </div>
         <div className="px-6 py-4 border-t flex gap-3 justify-end">
           <button

@@ -8,15 +8,15 @@
  * Exemplo: produto a R$ 61,44/unidade, cliente comprou R$ 41,78
  *   → quantidade calculada: 41,78 / 61,44 = 0,680 unidades
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 export default function SubtotalInput({ subtotal, precoUnitario, onQuantidadeChange, disabled }) {
-  const [display, setDisplay] = useState('');
+  const [display, setDisplay] = useState("");
 
   // Sincroniza o display quando o subtotal muda por fora (ex: mudança de quantidade)
   useEffect(() => {
     const valor = subtotal ?? 0;
-    setDisplay(valor.toFixed(2).replace('.', ','));
+    setDisplay(valor.toFixed(2).replace(".", ","));
   }, [subtotal]);
 
   const handleFocus = (e) => {
@@ -25,32 +25,32 @@ export default function SubtotalInput({ subtotal, precoUnitario, onQuantidadeCha
 
   const handleChange = (e) => {
     const raw = e.target.value;
-    if (raw === '' || /^[0-9]*[.,]?[0-9]*$/.test(raw)) {
+    if (raw === "" || /^[0-9]*[.,]?[0-9]*$/.test(raw)) {
       setDisplay(raw);
     }
   };
 
   const commit = (raw) => {
-    const normalized = raw.replace(',', '.');
+    const normalized = raw.replace(",", ".");
     const valor = parseFloat(normalized);
     if (!isNaN(valor) && valor > 0 && precoUnitario > 0) {
       const novaQuantidade = Math.round((valor / precoUnitario) * 10000) / 10000;
       onQuantidadeChange(novaQuantidade);
     } else {
       // Restaura o valor atual se inválido
-      setDisplay((subtotal ?? 0).toFixed(2).replace('.', ','));
+      setDisplay((subtotal ?? 0).toFixed(2).replace(".", ","));
     }
   };
 
   const handleBlur = () => commit(display);
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       e.preventDefault();
       e.target.blur();
     }
-    if (e.key === 'Escape') {
-      setDisplay((subtotal ?? 0).toFixed(2).replace('.', ','));
+    if (e.key === "Escape") {
+      setDisplay((subtotal ?? 0).toFixed(2).replace(".", ","));
       e.target.blur();
     }
   };
@@ -58,13 +58,16 @@ export default function SubtotalInput({ subtotal, precoUnitario, onQuantidadeCha
   if (disabled) {
     return (
       <div className="w-24 shrink-0 text-right text-lg font-semibold text-gray-900 sm:w-28">
-        R$ {(subtotal ?? 0).toFixed(2).replace('.', ',')}
+        R$ {(subtotal ?? 0).toFixed(2).replace(".", ",")}
       </div>
     );
   }
 
   return (
-    <div className="flex shrink-0 items-center gap-1" title="Digite o valor total para calcular a quantidade">
+    <div
+      className="flex shrink-0 items-center gap-1"
+      title="Digite o valor total para calcular a quantidade"
+    >
       <span className="text-gray-600 font-medium text-sm">R$</span>
       <input
         type="text"

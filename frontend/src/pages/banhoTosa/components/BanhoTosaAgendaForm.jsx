@@ -37,30 +37,52 @@ export default function BanhoTosaAgendaForm({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField label="Data" type="date" value={dataRef} onChange={onChangeData} />
-          <TextField label="Hora" type="time" value={form.hora} onChange={(value) => onChangeField("hora", value)} />
+          <TextField
+            label="Hora"
+            type="time"
+            value={form.hora}
+            onChange={(value) => onChangeField("hora", value)}
+          />
         </div>
 
-        <SelectField label="Recurso / box" value={form.recurso_id} onChange={(value) => onChangeField("recurso_id", value)}>
+        <SelectField
+          label="Recurso / box"
+          value={form.recurso_id}
+          onChange={(value) => onChangeField("recurso_id", value)}
+        >
           <option value="">Sem recurso definido</option>
-          {recursos.filter((item) => item.ativo).map((recurso) => (
-            <option key={recurso.id} value={recurso.id}>
-              {recurso.nome} - cap. {recurso.capacidade_simultanea}
-            </option>
-          ))}
+          {recursos
+            .filter((item) => item.ativo)
+            .map((recurso) => (
+              <option key={recurso.id} value={recurso.id}>
+                {recurso.nome} - cap. {recurso.capacidade_simultanea}
+              </option>
+            ))}
         </SelectField>
 
         <SelectField label="Servico" value={form.servico_id} onChange={onChangeServico}>
           <option value="">Banho & Tosa avulso</option>
-          {servicos.filter((item) => item.ativo).map((servico) => (
-            <option key={servico.id} value={servico.id}>
-              {servico.nome} - {servico.duracao_padrao_minutos} min
-            </option>
-          ))}
+          {servicos
+            .filter((item) => item.ativo)
+            .map((servico) => (
+              <option key={servico.id} value={servico.id}>
+                {servico.nome} - {servico.duracao_padrao_minutos} min
+              </option>
+            ))}
         </SelectField>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <TextField label="Valor previsto" type="number" value={form.valor_unitario} onChange={(value) => onChangeField("valor_unitario", value)} />
-          <TextField label="Observacoes" value={form.observacoes} onChange={(value) => onChangeField("observacoes", value)} />
+          <TextField
+            label="Valor previsto"
+            type="number"
+            value={form.valor_unitario}
+            onChange={(value) => onChangeField("valor_unitario", value)}
+          />
+          <TextField
+            label="Observacoes"
+            value={form.observacoes}
+            onChange={(value) => onChangeField("observacoes", value)}
+          />
         </div>
       </div>
 

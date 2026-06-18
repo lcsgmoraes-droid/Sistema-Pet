@@ -14,10 +14,7 @@ export const corrigirTextoQuebrado = (value) => {
 
   const tentarTextDecoderUtf8 = (texto) => {
     try {
-      const bytes = Uint8Array.from(
-        texto,
-        (char) => (char.codePointAt(0) ?? 0) & 0xff,
-      );
+      const bytes = Uint8Array.from(texto, (char) => (char.codePointAt(0) ?? 0) & 0xff);
       return new TextDecoder("utf-8").decode(bytes);
     } catch {
       return texto;
@@ -108,21 +105,15 @@ export const obterLotesValidadeDisponiveis = (produto) => {
 
   return origem
     .map((lote) => {
-      const quantidadeDisponivel = Number(
-        lote?.quantidade_disponivel ?? lote?.quantidade ?? 0,
-      );
-      const quantidadeInicial = Number(
-        lote?.quantidade_inicial ?? quantidadeDisponivel,
-      );
+      const quantidadeDisponivel = Number(lote?.quantidade_disponivel ?? lote?.quantidade ?? 0);
+      const quantidadeInicial = Number(lote?.quantidade_inicial ?? quantidadeDisponivel);
 
       return {
         id: lote?.id,
         nome_lote: lote?.nome_lote || lote?.lote || "Sem lote",
         data_validade: lote?.data_validade || null,
         quantidade_inicial: Number.isFinite(quantidadeInicial) ? quantidadeInicial : 0,
-        quantidade_disponivel: Number.isFinite(quantidadeDisponivel)
-          ? quantidadeDisponivel
-          : 0,
+        quantidade_disponivel: Number.isFinite(quantidadeDisponivel) ? quantidadeDisponivel : 0,
       };
     })
     .filter((lote) => lote.quantidade_disponivel > 0)
@@ -159,9 +150,7 @@ export const obterCanaisAtivosProduto = (produto) => {
   if (!ativoLojaFisica) return [];
 
   return [
-    produto?.anunciar_ecommerce === true
-      ? { key: "ecommerce", label: "E-commerce" }
-      : null,
+    produto?.anunciar_ecommerce === true ? { key: "ecommerce", label: "E-commerce" } : null,
     produto?.anunciar_app === true ? { key: "app", label: "App" } : null,
   ].filter(Boolean);
 };

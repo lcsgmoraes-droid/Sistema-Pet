@@ -3,7 +3,7 @@ import inspect
 from types import SimpleNamespace
 from uuid import uuid4
 
-from jose import jwt
+from app.security.jwt_compat import jwt
 
 from app.auth.core import ALGORITHM
 from app.api.endpoints.rotas_entrega import (

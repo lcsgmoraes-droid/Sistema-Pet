@@ -70,11 +70,7 @@ export default function NovoExameAnexadoModal({
             tutorFormSelecionado={tutorFormSelecionado}
           />
 
-          <NovoExameDadosSection
-            form={form}
-            setArquivoNovo={setArquivoNovo}
-            setForm={setForm}
-          />
+          <NovoExameDadosSection form={form} setArquivoNovo={setArquivoNovo} setForm={setForm} />
         </div>
 
         <div className="mt-6 flex gap-3">

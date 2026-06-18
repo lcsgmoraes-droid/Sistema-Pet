@@ -1,7 +1,8 @@
 import { formatMoneyBRL, formatPercent } from "../../../utils/formatters";
 
 export default function ProcedimentoResumoMargem({ resumoMargem }) {
-  const { custoEstimadoForm, margemEstimadaForm, margemPercentualForm, precoSugeridoForm } = resumoMargem;
+  const { custoEstimadoForm, margemEstimadaForm, margemPercentualForm, precoSugeridoForm } =
+    resumoMargem;
 
   return (
     <div className="grid gap-3 border-t border-gray-200 pt-3 md:grid-cols-3">
@@ -15,7 +16,9 @@ export default function ProcedimentoResumoMargem({ resumoMargem }) {
       </div>
       <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
         <p className="text-[11px] uppercase tracking-wide text-gray-400">Margem estimada</p>
-        <p className={`text-sm font-semibold ${margemEstimadaForm < 0 ? "text-red-600" : "text-emerald-700"}`}>
+        <p
+          className={`text-sm font-semibold ${margemEstimadaForm < 0 ? "text-red-600" : "text-emerald-700"}`}
+        >
           {formatMoneyBRL(margemEstimadaForm)}
         </p>
         <p className="text-[11px] text-gray-400">{formatPercent(margemPercentualForm)}</p>

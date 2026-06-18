@@ -15,7 +15,10 @@ export default function PetConsultaSelector({
     <>
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2">
-          {renderCampo("Pet", true)(
+          {renderCampo(
+            "Pet",
+            true,
+          )(
             <TutorPetSelector
               showTutorField={false}
               showPetLabel={false}
@@ -28,15 +31,13 @@ export default function PetConsultaSelector({
               onExpandedChange={setListaPetsExpandida}
               onSelectPet={(petId) => setCampo("pet_id", petId)}
               onNovoPetClick={abrirModalNovoPet}
-            />
+            />,
           )}
         </div>
       </div>
 
       {!isEdicao && tutorSelecionado && petsDoTutor.length === 0 ? (
-        <p className="text-xs text-amber-600">
-          Nenhum pet ativo vinculado a esse tutor.
-        </p>
+        <p className="text-xs text-amber-600">Nenhum pet ativo vinculado a esse tutor.</p>
       ) : null}
     </>
   );

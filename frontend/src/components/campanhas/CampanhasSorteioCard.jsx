@@ -38,8 +38,7 @@ export default function CampanhasSorteioCard({
             {sorteio.rank_filter && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700">
                 {rankLabels[sorteio.rank_filter]?.emoji}{" "}
-                {rankLabels[sorteio.rank_filter]?.label || sorteio.rank_filter}
-                +
+                {rankLabels[sorteio.rank_filter]?.label || sorteio.rank_filter}+
               </span>
             )}
           </div>
@@ -47,16 +46,12 @@ export default function CampanhasSorteioCard({
             <p className="text-sm text-gray-600">{sorteio.prize_description}</p>
           )}
           {sorteio.description && (
-            <p className="text-xs text-gray-400 mt-0.5">
-              {sorteio.description}
-            </p>
+            <p className="text-xs text-gray-400 mt-0.5">{sorteio.description}</p>
           )}
           <p className="text-xs text-gray-400 mt-1">
             {sorteio.total_participantes || 0} participante(s)
             {sorteio.draw_date &&
-              ` - Sorteio: ${new Date(sorteio.draw_date).toLocaleDateString(
-                "pt-BR",
-              )}`}
+              ` - Sorteio: ${new Date(sorteio.draw_date).toLocaleDateString("pt-BR")}`}
           </p>
         </div>
         <div className="flex flex-col gap-2 items-end shrink-0">

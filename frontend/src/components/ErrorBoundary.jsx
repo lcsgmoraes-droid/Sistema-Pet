@@ -1,35 +1,33 @@
-import React from 'react';
-import { AlertTriangle, RefreshCw } from 'lucide-react';
+import React from "react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 
-const CHUNK_RELOAD_RETRY_KEY = 'lazy-chunk-reload-at';
+const CHUNK_RELOAD_RETRY_KEY = "lazy-chunk-reload-at";
 const CHUNK_RELOAD_WINDOW_MS = 5 * 60 * 1000;
-const DOM_DETACH_RELOAD_RETRY_KEY = 'dom-detach-reload-at';
+const DOM_DETACH_RELOAD_RETRY_KEY = "dom-detach-reload-at";
 const DOM_DETACH_RELOAD_WINDOW_MS = 2 * 60 * 1000;
 
 function isDynamicImportError(error) {
-  const message = String(error?.message || error || '').toLowerCase();
+  const message = String(error?.message || error || "").toLowerCase();
 
   return (
-    message.includes('failed to fetch dynamically imported module') ||
-    message.includes('importing a module script failed') ||
-    message.includes('chunkloaderror') ||
-    message.includes('loading chunk')
+    message.includes("failed to fetch dynamically imported module") ||
+    message.includes("importing a module script failed") ||
+    message.includes("chunkloaderror") ||
+    message.includes("loading chunk")
   );
 }
 
 function isDomDetachError(error) {
-  const message = String(error?.message || error || '').toLowerCase();
+  const message = String(error?.message || error || "").toLowerCase();
   return (
     message.includes("failed to execute 'removechild' on 'node'") ||
-    message.includes('the node to be removed is not a child of this node')
+    message.includes("the node to be removed is not a child of this node")
   );
 }
 
 function shouldRetryChunkReload() {
   try {
-    const lastAttempt = Number(
-      window.sessionStorage.getItem(CHUNK_RELOAD_RETRY_KEY) || 0,
-    );
+    const lastAttempt = Number(window.sessionStorage.getItem(CHUNK_RELOAD_RETRY_KEY) || 0);
     return !lastAttempt || Date.now() - lastAttempt > CHUNK_RELOAD_WINDOW_MS;
   } catch {
     return true;
@@ -38,10 +36,7 @@ function shouldRetryChunkReload() {
 
 function markChunkReloadAttempt() {
   try {
-    window.sessionStorage.setItem(
-      CHUNK_RELOAD_RETRY_KEY,
-      String(Date.now()),
-    );
+    window.sessionStorage.setItem(CHUNK_RELOAD_RETRY_KEY, String(Date.now()));
   } catch {
     // Ignore storage issues and fallback to the regular error screen.
   }
@@ -49,9 +44,7 @@ function markChunkReloadAttempt() {
 
 function shouldRetryDomDetachReload() {
   try {
-    const lastAttempt = Number(
-      window.sessionStorage.getItem(DOM_DETACH_RELOAD_RETRY_KEY) || 0,
-    );
+    const lastAttempt = Number(window.sessionStorage.getItem(DOM_DETACH_RELOAD_RETRY_KEY) || 0);
     return !lastAttempt || Date.now() - lastAttempt > DOM_DETACH_RELOAD_WINDOW_MS;
   } catch {
     return true;
@@ -60,10 +53,7 @@ function shouldRetryDomDetachReload() {
 
 function markDomDetachReloadAttempt() {
   try {
-    window.sessionStorage.setItem(
-      DOM_DETACH_RELOAD_RETRY_KEY,
-      String(Date.now()),
-    );
+    window.sessionStorage.setItem(DOM_DETACH_RELOAD_RETRY_KEY, String(Date.now()));
   } catch {
     // Ignore storage issues and fallback to the regular error screen.
   }
@@ -81,7 +71,7 @@ class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     this.setState({ errorInfo });
-    console.error('Critical error caught by ErrorBoundary:', error, errorInfo);
+    console.error("Critical error caught by ErrorBoundary:", error, errorInfo);
 
     if (isDynamicImportError(error) && shouldRetryChunkReload()) {
       markChunkReloadAttempt();
@@ -118,15 +108,13 @@ class ErrorBoundary extends React.Component {
               </div>
             </div>
 
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Algo deu errado
-            </h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Algo deu errado</h1>
             <p className="text-gray-600 mb-6">
               {isChunkError
-                ? 'A tela foi atualizada no servidor e esta aba ficou com um arquivo antigo. Vamos tentar carregar novamente.'
+                ? "A tela foi atualizada no servidor e esta aba ficou com um arquivo antigo. Vamos tentar carregar novamente."
                 : isDomDetach
-                  ? 'A tela teve uma falha pontual de renderizacao. Recarregue a pagina para continuar.'
-                  : 'Ocorreu um erro inesperado na tela. Seus dados estao seguros. Recarregue a pagina para continuar.'}
+                  ? "A tela teve uma falha pontual de renderizacao. Recarregue a pagina para continuar."
+                  : "Ocorreu um erro inesperado na tela. Seus dados estao seguros. Recarregue a pagina para continuar."}
             </p>
 
             {this.state.error && (
@@ -146,7 +134,7 @@ class ErrorBoundary extends React.Component {
                 onClick={this.handleBack}
                 className="px-5 py-2.5 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
               >
-                {'<-'} Voltar
+                {"<-"} Voltar
               </button>
               <button
                 onClick={this.handleReload}

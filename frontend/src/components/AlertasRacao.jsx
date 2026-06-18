@@ -1,28 +1,37 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, CheckCircle, XCircle, RefreshCw, Archive, BarChart3, Lightbulb, Edit } from 'lucide-react';
-import api from '../api';
-import { getAccessToken } from '../auth/tokenStorage';
-import toast from 'react-hot-toast';
-import DashboardAnaliseRacoes from './DashboardAnaliseRacoes';
-import SugestoesInteligentesRacoes from './SugestoesInteligentesRacoes';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Archive,
+  BarChart3,
+  Lightbulb,
+  Edit,
+} from "lucide-react";
+import api from "../api";
+import { getAccessToken } from "../auth/tokenStorage";
+import toast from "react-hot-toast";
+import DashboardAnaliseRacoes from "./DashboardAnaliseRacoes";
+import SugestoesInteligentesRacoes from "./SugestoesInteligentesRacoes";
 
 function AlertasRacao() {
   const navigate = useNavigate();
-  const [abaAtiva, setAbaAtiva] = useState('dashboard'); // dashboard, alertas, sugestoes
+  const [abaAtiva, setAbaAtiva] = useState("dashboard"); // dashboard, alertas, sugestoes
   const [racoesSemClassificacao, setRacoesSemClassificacao] = useState([]);
   const [loading, setLoading] = useState(false);
   const [classificandoIds, setClassificandoIds] = useState(new Set());
   const [stats, setStats] = useState({ total: 0, limite: 50, offset: 0 });
-  const [especieFiltro, setEspecieFiltro] = useState(''); // Filtro de espécie
+  const [especieFiltro, setEspecieFiltro] = useState(""); // Filtro de espécie
 
   const especiesDisponiveis = [
-    { value: '', label: 'Todas as espécies' },
-    { value: 'dog', label: 'Cães' },
-    { value: 'cat', label: 'Gatos' },
-    { value: 'bird', label: 'Pássaros' },
-    { value: 'rodent', label: 'Roedores' },
-    { value: 'fish', label: 'Peixes' }
+    { value: "", label: "Todas as espécies" },
+    { value: "dog", label: "Cães" },
+    { value: "cat", label: "Gatos" },
+    { value: "bird", label: "Pássaros" },
+    { value: "rodent", label: "Roedores" },
+    { value: "fish", label: "Peixes" },
   ];
 
   // Carregar contagem de alertas ao montar (para badge)
@@ -31,19 +40,19 @@ function AlertasRacao() {
   }, []);
 
   useEffect(() => {
-    if (abaAtiva === 'alertas') {
+    if (abaAtiva === "alertas") {
       carregarAlertasRacao();
     }
   }, [especieFiltro, abaAtiva]); // Recarregar quando filtro ou aba mudar
 
   const carregarContagemAlertas = async () => {
     try {
-      const response = await api.get('/produtos/racao/alertas', { 
-        params: { limite: 1, offset: 0 }
+      const response = await api.get("/produtos/racao/alertas", {
+        params: { limite: 1, offset: 0 },
       });
-      setStats(prev => ({ ...prev, total: response.data.total }));
+      setStats((prev) => ({ ...prev, total: response.data.total }));
     } catch (error) {
-      console.error('Erro ao carregar contagem de alertas:', error);
+      console.error("Erro ao carregar contagem de alertas:", error);
     }
   };
 
@@ -52,42 +61,42 @@ function AlertasRacao() {
     try {
       // 🔍 DEBUG: Verificar token antes da requisição
       const token = getAccessToken();
-      console.log('🔐 [AlertasRacao] Iniciando carregamento de alertas', {
+      console.log("🔐 [AlertasRacao] Iniciando carregamento de alertas", {
         hasToken: !!token,
-        tokenPreview: token ? `${token.substring(0, 20)}...` : 'NO TOKEN',
-        especieFiltro
+        tokenPreview: token ? `${token.substring(0, 20)}...` : "NO TOKEN",
+        especieFiltro,
       });
-      
+
       const params = { limite: 50, offset: 0 };
       if (especieFiltro) {
         params.especie = especieFiltro;
       }
-      
-      console.log('📡 [AlertasRacao] Chamando: /produtos/racao/alertas', params);
-      const response = await api.get('/produtos/racao/alertas', { params });
-      console.log('✅ [AlertasRacao] Alertas carregados:', {
+
+      console.log("📡 [AlertasRacao] Chamando: /produtos/racao/alertas", params);
+      const response = await api.get("/produtos/racao/alertas", { params });
+      console.log("✅ [AlertasRacao] Alertas carregados:", {
         total: response.data.total,
-        items: response.data.items?.length
+        items: response.data.items?.length,
       });
-      
+
       setRacoesSemClassificacao(response.data.items || []);
       setStats({
         total: response.data.total,
         limite: response.data.limite,
-        offset: response.data.offset
+        offset: response.data.offset,
       });
     } catch (error) {
-      console.error('❌ [AlertasRacao] Erro ao carregar alertas:', {
+      console.error("❌ [AlertasRacao] Erro ao carregar alertas:", {
         message: error.message,
         status: error.response?.status,
         data: error.response?.data,
-        config: error.config
+        config: error.config,
       });
-      
+
       if (error.response?.status === 403) {
-        toast.error('Acesso negado. Verifique suas permissões ou faça login novamente.');
+        toast.error("Acesso negado. Verifique suas permissões ou faça login novamente.");
       } else {
-        toast.error('Erro ao carregar alertas de rações');
+        toast.error("Erro ao carregar alertas de rações");
       }
     } finally {
       setLoading(false);
@@ -95,26 +104,25 @@ function AlertasRacao() {
   };
 
   const classificarProduto = async (produtoId) => {
-    setClassificandoIds(prev => new Set(prev).add(produtoId));
+    setClassificandoIds((prev) => new Set(prev).add(produtoId));
     try {
       const response = await api.post(`/produtos/${produtoId}/classificar-ia`, null, {
-        params: { forcar: true }
+        params: { forcar: true },
       });
-      
+
       toast.success(
         `${response.data.campos_atualizados.length} campos classificados! Score: ${response.data.confianca.score}%`,
-        { duration: 4000 }
+        { duration: 4000 },
       );
-      
+
       // Remover da lista local
-      setRacoesSemClassificacao(prev => prev.filter(r => r.id !== produtoId));
-      setStats(prev => ({ ...prev, total: prev.total - 1 }));
-      
+      setRacoesSemClassificacao((prev) => prev.filter((r) => r.id !== produtoId));
+      setStats((prev) => ({ ...prev, total: prev.total - 1 }));
     } catch (error) {
-      console.error('Erro ao classificar produto:', error);
-      toast.error('Erro ao classificar produto');
+      console.error("Erro ao classificar produto:", error);
+      toast.error("Erro ao classificar produto");
     } finally {
-      setClassificandoIds(prev => {
+      setClassificandoIds((prev) => {
         const newSet = new Set(prev);
         newSet.delete(produtoId);
         return newSet;
@@ -125,42 +133,40 @@ function AlertasRacao() {
   const classificarTodos = async () => {
     setLoading(true);
     try {
-      const response = await api.post('/produtos/classificar-lote', null, {
-        params: { apenas_sem_classificacao: true }
+      const response = await api.post("/produtos/classificar-lote", null, {
+        params: { apenas_sem_classificacao: true },
       });
-      
-      toast.success(
-        `${response.data.sucessos} produtos classificados com sucesso!`,
-        { duration: 5000 }
-      );
-      
+
+      toast.success(`${response.data.sucessos} produtos classificados com sucesso!`, {
+        duration: 5000,
+      });
+
       if (response.data.erros > 0) {
         toast.error(`${response.data.erros} produtos com erro na classificação`);
       }
-      
+
       // Recarregar lista
       await carregarAlertasRacao();
-      
     } catch (error) {
-      console.error('Erro ao classificar lote:', error);
-      toast.error('Erro ao classificar produtos em lote');
+      console.error("Erro ao classificar lote:", error);
+      toast.error("Erro ao classificar produtos em lote");
     } finally {
       setLoading(false);
     }
   };
 
   const getChamadaAtencao = (completude) => {
-    if (completude >= 75) return { cor: 'text-yellow-600 bg-yellow-50', texto: 'Quase completo' };
-    if (completude >= 50) return { cor: 'text-orange-600 bg-orange-50', texto: 'Incompleto' };
-    return { cor: 'text-red-600 bg-red-50', texto: 'Muito incompleto' };
+    if (completude >= 75) return { cor: "text-yellow-600 bg-yellow-50", texto: "Quase completo" };
+    if (completude >= 50) return { cor: "text-orange-600 bg-orange-50", texto: "Incompleto" };
+    return { cor: "text-red-600 bg-red-50", texto: "Muito incompleto" };
   };
 
   const traduzirCampo = (campo) => {
     const traducoes = {
-      porte_animal: 'Porte',
-      fase_publico: 'Fase',
-      sabor_proteina: 'Sabor/Proteína',
-      peso_embalagem: 'Peso'
+      porte_animal: "Porte",
+      fase_publico: "Fase",
+      sabor_proteina: "Sabor/Proteína",
+      peso_embalagem: "Peso",
     };
     return traducoes[campo] || campo;
   };
@@ -171,19 +177,17 @@ function AlertasRacao() {
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-4">
           <AlertTriangle className="w-8 h-8 text-amber-600" />
-          <h1 className="text-2xl font-bold text-gray-800">
-            Comparador de Rações
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-800">Comparador de Rações</h1>
         </div>
-        
+
         {/* Tabs Navigation */}
         <div className="flex gap-2 border-b border-gray-200">
           <button
-            onClick={() => setAbaAtiva('dashboard')}
+            onClick={() => setAbaAtiva("dashboard")}
             className={`px-6 py-3 font-medium text-sm transition-colors relative ${
-              abaAtiva === 'dashboard'
-                ? 'text-indigo-600 border-b-2 border-indigo-600'
-                : 'text-gray-500 hover:text-gray-700'
+              abaAtiva === "dashboard"
+                ? "text-indigo-600 border-b-2 border-indigo-600"
+                : "text-gray-500 hover:text-gray-700"
             }`}
           >
             <div className="flex items-center gap-2">
@@ -191,13 +195,13 @@ function AlertasRacao() {
               Painel comparativo
             </div>
           </button>
-          
+
           <button
-            onClick={() => setAbaAtiva('alertas')}
+            onClick={() => setAbaAtiva("alertas")}
             className={`px-6 py-3 font-medium text-sm transition-colors relative ${
-              abaAtiva === 'alertas'
-                ? 'text-indigo-600 border-b-2 border-indigo-600'
-                : 'text-gray-500 hover:text-gray-700'
+              abaAtiva === "alertas"
+                ? "text-indigo-600 border-b-2 border-indigo-600"
+                : "text-gray-500 hover:text-gray-700"
             }`}
           >
             <div className="flex items-center gap-2">
@@ -210,13 +214,13 @@ function AlertasRacao() {
               )}
             </div>
           </button>
-          
+
           <button
-            onClick={() => setAbaAtiva('sugestoes')}
+            onClick={() => setAbaAtiva("sugestoes")}
             className={`px-6 py-3 font-medium text-sm transition-colors relative ${
-              abaAtiva === 'sugestoes'
-                ? 'text-indigo-600 border-b-2 border-indigo-600'
-                : 'text-gray-500 hover:text-gray-700'
+              abaAtiva === "sugestoes"
+                ? "text-indigo-600 border-b-2 border-indigo-600"
+                : "text-gray-500 hover:text-gray-700"
             }`}
           >
             <div className="flex items-center gap-2">
@@ -228,15 +232,11 @@ function AlertasRacao() {
       </div>
 
       {/* Conteúdo das Abas */}
-      {abaAtiva === 'dashboard' && (
-        <DashboardAnaliseRacoes />
-      )}
+      {abaAtiva === "dashboard" && <DashboardAnaliseRacoes />}
 
-      {abaAtiva === 'sugestoes' && (
-        <SugestoesInteligentesRacoes />
-      )}
+      {abaAtiva === "sugestoes" && <SugestoesInteligentesRacoes />}
 
-      {abaAtiva === 'alertas' && (
+      {abaAtiva === "alertas" && (
         <div>
           {/* Header da Aba Alertas */}
           <div className="mb-6">
@@ -249,11 +249,11 @@ function AlertasRacao() {
                 disabled={loading || racoesSemClassificacao.length === 0}
                 className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
               >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                 Classificar Todos
               </button>
             </div>
-            
+
             {/* Filtro de Espécie */}
             <div className="flex items-center gap-2 mt-4">
               <label className="text-sm font-medium text-gray-700">Filtrar por:</label>
@@ -262,7 +262,7 @@ function AlertasRacao() {
                 onChange={(e) => setEspecieFiltro(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
-                {especiesDisponiveis.map(especie => (
+                {especiesDisponiveis.map((especie) => (
                   <option key={especie.value} value={especie.value}>
                     {especie.label}
                   </option>
@@ -270,7 +270,7 @@ function AlertasRacao() {
               </select>
               {especieFiltro && (
                 <button
-                  onClick={() => setEspecieFiltro('')}
+                  onClick={() => setEspecieFiltro("")}
                   className="text-sm text-indigo-600 hover:text-indigo-800"
                 >
                   Limpar filtro
@@ -295,7 +295,9 @@ function AlertasRacao() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Nesta Página</p>
-                  <p className="text-2xl font-bold text-gray-800">{racoesSemClassificacao.length}</p>
+                  <p className="text-2xl font-bold text-gray-800">
+                    {racoesSemClassificacao.length}
+                  </p>
                 </div>
                 <Archive className="w-10 h-10 text-amber-500 opacity-20" />
               </div>
@@ -309,7 +311,7 @@ function AlertasRacao() {
                     {racoesSemClassificacao.length > 0
                       ? Math.round(
                           racoesSemClassificacao.reduce((acc, r) => acc + r.completude, 0) /
-                            racoesSemClassificacao.length
+                            racoesSemClassificacao.length,
                         )
                       : 0}
                     %
@@ -388,7 +390,9 @@ function AlertasRacao() {
                                 )}
                                 {racao.especies_indicadas && (
                                   <span className="text-xs text-white bg-indigo-600 px-2 py-1 rounded">
-                                    {especiesDisponiveis.find(e => e.value === racao.especies_indicadas)?.label || racao.especies_indicadas}
+                                    {especiesDisponiveis.find(
+                                      (e) => e.value === racao.especies_indicadas,
+                                    )?.label || racao.especies_indicadas}
                                   </span>
                                 )}
                               </div>
@@ -396,8 +400,8 @@ function AlertasRacao() {
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600">
                             <div>
-                              <div className="text-gray-700">{racao.categoria || '-'}</div>
-                              <div className="text-xs text-gray-500">{racao.marca || '-'}</div>
+                              <div className="text-gray-700">{racao.categoria || "-"}</div>
+                              <div className="text-xs text-gray-500">{racao.marca || "-"}</div>
                             </div>
                           </td>
                           <td className="px-4 py-3 text-sm">
@@ -414,7 +418,9 @@ function AlertasRacao() {
                             </div>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${chamada.cor}`}>
+                            <span
+                              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${chamada.cor}`}
+                            >
                               {racao.completude}%
                             </span>
                           </td>
@@ -447,9 +453,7 @@ function AlertasRacao() {
                               </button>
                             </div>
                             {!racao.auto_classificar_ativo && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                Auto-class. desativada
-                              </p>
+                              <p className="text-xs text-gray-500 mt-1">Auto-class. desativada</p>
                             )}
                           </td>
                         </tr>

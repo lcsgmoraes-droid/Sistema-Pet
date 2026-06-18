@@ -1,4 +1,4 @@
-import ActionButton from '../ui/ActionButton';
+import ActionButton from "../ui/ActionButton";
 
 function EntradaXmlDetalhesConferenciaPanel({
   conferenciaObservacaoGeral,
@@ -22,7 +22,7 @@ function EntradaXmlDetalhesConferenciaPanel({
     return null;
   }
 
-  const estaPendente = notaSelecionada.status === 'pendente';
+  const estaPendente = notaSelecionada.status === "pendente";
   const temDivergencia = resumoConferenciaAtual.itens_com_divergencia > 0;
   const salvandoOuDesfazendo = salvandoConferencia || desfazendoConferencia;
 
@@ -30,18 +30,24 @@ function EntradaXmlDetalhesConferenciaPanel({
     <div className="border-b bg-emerald-50/40 px-6 py-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-3">
-          <div className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${metaConferenciaAtual?.cls || 'border-gray-200 bg-gray-100 text-gray-700'}`}>
-            {metaConferenciaAtual?.label || 'Nao conferida'}
+          <div
+            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${metaConferenciaAtual?.cls || "border-gray-200 bg-gray-100 text-gray-700"}`}
+          >
+            {metaConferenciaAtual?.label || "Nao conferida"}
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
             <div className="rounded-lg border border-white/70 bg-white/80 p-3">
               <div className="text-xs uppercase tracking-wide text-gray-500">Itens OK</div>
-              <div className="text-lg font-bold text-emerald-700">{resumoConferenciaAtual.itens_ok}</div>
+              <div className="text-lg font-bold text-emerald-700">
+                {resumoConferenciaAtual.itens_ok}
+              </div>
             </div>
             <div className="rounded-lg border border-white/70 bg-white/80 p-3">
               <div className="text-xs uppercase tracking-wide text-gray-500">Divergencias</div>
-              <div className="text-lg font-bold text-orange-700">{resumoConferenciaAtual.itens_com_divergencia}</div>
+              <div className="text-lg font-bold text-orange-700">
+                {resumoConferenciaAtual.itens_com_divergencia}
+              </div>
             </div>
             <div className="rounded-lg border border-white/70 bg-white/80 p-3">
               <div className="text-xs uppercase tracking-wide text-gray-500">Qtd recebida</div>
@@ -54,7 +60,8 @@ function EntradaXmlDetalhesConferenciaPanel({
               <div className="text-xs uppercase tracking-wide text-gray-500">Falta + Avaria</div>
               <div className="text-lg font-bold text-rose-700">
                 {formatarValorFiscal(
-                  resumoConferenciaAtual.quantidade_total_faltante + resumoConferenciaAtual.quantidade_total_avariada,
+                  resumoConferenciaAtual.quantidade_total_faltante +
+                    resumoConferenciaAtual.quantidade_total_avariada,
                   2,
                 )}
               </div>
@@ -63,8 +70,8 @@ function EntradaXmlDetalhesConferenciaPanel({
 
           <p className="max-w-3xl text-sm text-gray-700">
             {estaPendente
-              ? 'A conferencia nasce assumindo tudo certo. Se a carga estiver perfeita, basta clicar em Conferido. So mexa nos itens com falta ou avaria.'
-              : 'Conferencia ja salva. Use as acoes de divergencia para gerar a tratativa sem precisar reverter a entrada.'}
+              ? "A conferencia nasce assumindo tudo certo. Se a carga estiver perfeita, basta clicar em Conferido. So mexa nos itens com falta ou avaria."
+              : "Conferencia ja salva. Use as acoes de divergencia para gerar a tratativa sem precisar reverter a entrada."}
           </p>
         </div>
 
@@ -77,7 +84,9 @@ function EntradaXmlDetalhesConferenciaPanel({
                 size="md"
                 tone="soft"
               >
-                {mostrarCamposConferencia ? 'Ocultar ajuste manual' : 'Editar quantidades e avarias'}
+                {mostrarCamposConferencia
+                  ? "Ocultar ajuste manual"
+                  : "Editar quantidades e avarias"}
               </ActionButton>
               <ActionButton
                 disabled={salvandoOuDesfazendo}
@@ -86,13 +95,15 @@ function EntradaXmlDetalhesConferenciaPanel({
                 size="md"
               >
                 {salvandoConferencia
-                  ? 'Salvando...'
-                  : (resumoConferenciaAtual.status === 'nao_iniciada' ? 'Conferido' : 'Atualizar conferencia')}
+                  ? "Salvando..."
+                  : resumoConferenciaAtual.status === "nao_iniciada"
+                    ? "Conferido"
+                    : "Atualizar conferencia"}
               </ActionButton>
             </>
           )}
 
-          {estaPendente && resumoConferenciaAtual.status !== 'nao_iniciada' && (
+          {estaPendente && resumoConferenciaAtual.status !== "nao_iniciada" && (
             <ActionButton
               disabled={salvandoOuDesfazendo || Boolean(notaSelecionada?.entrada_estoque_realizada)}
               intent="warning"
@@ -100,7 +111,7 @@ function EntradaXmlDetalhesConferenciaPanel({
               size="md"
               tone="soft"
             >
-              {desfazendoConferencia ? 'Desfazendo...' : 'Desfazer conferencia'}
+              {desfazendoConferencia ? "Desfazendo..." : "Desfazer conferencia"}
             </ActionButton>
           )}
 
@@ -112,7 +123,7 @@ function EntradaXmlDetalhesConferenciaPanel({
                 size="md"
                 tone="soft"
               >
-                {mostrarCamposConferencia ? 'Ocultar tratativas' : 'Abrir tratativas'}
+                {mostrarCamposConferencia ? "Ocultar tratativas" : "Abrir tratativas"}
               </ActionButton>
               <ActionButton
                 disabled={salvandoOuDesfazendo}
@@ -120,7 +131,7 @@ function EntradaXmlDetalhesConferenciaPanel({
                 onClick={() => salvarConferenciaAtual()}
                 size="md"
               >
-                {salvandoConferencia ? 'Salvando...' : 'Salvar tratativas'}
+                {salvandoConferencia ? "Salvando..." : "Salvar tratativas"}
               </ActionButton>
             </>
           )}
@@ -134,7 +145,7 @@ function EntradaXmlDetalhesConferenciaPanel({
                 size="md"
                 tone="soft"
               >
-                {criandoPendenciaFornecedor ? 'Gerando...' : 'Gerar pendencia fornecedor'}
+                {criandoPendenciaFornecedor ? "Gerando..." : "Gerar pendencia fornecedor"}
               </ActionButton>
               <ActionButton
                 disabled={gerandoRascunhoDevolucao || salvandoOuDesfazendo}
@@ -142,7 +153,7 @@ function EntradaXmlDetalhesConferenciaPanel({
                 onClick={gerarRascunhoDevolucao}
                 size="md"
               >
-                {gerandoRascunhoDevolucao ? 'Gerando...' : 'NF Devolucao das Divergencias'}
+                {gerandoRascunhoDevolucao ? "Gerando..." : "NF Devolucao das Divergencias"}
               </ActionButton>
             </>
           )}

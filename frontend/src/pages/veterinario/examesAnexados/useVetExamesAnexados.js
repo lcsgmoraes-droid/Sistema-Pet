@@ -38,7 +38,7 @@ export function useVetExamesAnexados() {
 
   const retornoNovoPet = useMemo(
     () => buildReturnTo(location.pathname, location.search, { acao: "novo" }),
-    [location.pathname, location.search]
+    [location.pathname, location.search],
   );
 
   return {

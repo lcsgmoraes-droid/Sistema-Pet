@@ -33,13 +33,28 @@ export default function BanhoTosaDefaultsPanel({ onApplied }) {
       subtitle="Cria portes, servicos, recursos e modelos de retorno com valores medios. Nao sobrescreve cadastros existentes."
       title="Base inicial editavel"
     >
-
       {resumo && (
         <div className="mt-4 grid gap-2 text-sm sm:grid-cols-4">
-          <Resumo label="Portes" value={resumo.criados?.parametros} existing={resumo.existentes?.parametros} />
-          <Resumo label="Servicos" value={resumo.criados?.servicos} existing={resumo.existentes?.servicos} />
-          <Resumo label="Recursos" value={resumo.criados?.recursos} existing={resumo.existentes?.recursos} />
-          <Resumo label="Templates" value={resumo.criados?.templates} existing={resumo.existentes?.templates} />
+          <Resumo
+            label="Portes"
+            value={resumo.criados?.parametros}
+            existing={resumo.existentes?.parametros}
+          />
+          <Resumo
+            label="Servicos"
+            value={resumo.criados?.servicos}
+            existing={resumo.existentes?.servicos}
+          />
+          <Resumo
+            label="Recursos"
+            value={resumo.criados?.recursos}
+            existing={resumo.existentes?.recursos}
+          />
+          <Resumo
+            label="Templates"
+            value={resumo.criados?.templates}
+            existing={resumo.existentes?.templates}
+          />
         </div>
       )}
     </Panel>
@@ -49,15 +64,9 @@ export default function BanhoTosaDefaultsPanel({ onApplied }) {
 function Resumo({ label, value = 0, existing = 0 }) {
   return (
     <div className="rounded-lg bg-slate-50 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </p>
-      <p className="mt-1 font-semibold text-slate-900">
-        {value || 0} criados
-      </p>
-      <p className="text-xs text-slate-500">
-        {existing || 0} ja existiam
-      </p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 font-semibold text-slate-900">{value || 0} criados</p>
+      <p className="text-xs text-slate-500">{existing || 0} ja existiam</p>
     </div>
   );
 }

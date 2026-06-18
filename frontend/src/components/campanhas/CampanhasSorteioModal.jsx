@@ -23,10 +23,7 @@ export default function CampanhasSorteioModal({
         </div>
         <div className="px-6 py-4 space-y-3">
           <div>
-            <label
-              htmlFor="s-nome"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
+            <label htmlFor="s-nome" className="block text-xs font-medium text-gray-600 mb-1">
               Nome do sorteio
             </label>
             <input
@@ -34,17 +31,12 @@ export default function CampanhasSorteioModal({
               type="text"
               placeholder="Ex: Sorteio de Marco"
               value={novoSorteio.name}
-              onChange={(e) =>
-                setNovoSorteio((p) => ({ ...p, name: e.target.value }))
-              }
+              onChange={(e) => setNovoSorteio((p) => ({ ...p, name: e.target.value }))}
               className="w-full border rounded-lg px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label
-              htmlFor="s-premio"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
+            <label htmlFor="s-premio" className="block text-xs font-medium text-gray-600 mb-1">
               Premio
             </label>
             <input
@@ -62,10 +54,7 @@ export default function CampanhasSorteioModal({
             />
           </div>
           <div>
-            <label
-              htmlFor="s-nivel"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
+            <label htmlFor="s-nivel" className="block text-xs font-medium text-gray-600 mb-1">
               Nivel minimo elegivel (opcional)
             </label>
             <select
@@ -88,27 +77,19 @@ export default function CampanhasSorteioModal({
             </select>
           </div>
           <div>
-            <label
-              htmlFor="s-data"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
+            <label htmlFor="s-data" className="block text-xs font-medium text-gray-600 mb-1">
               Data do sorteio (opcional)
             </label>
             <input
               id="s-data"
               type="date"
               value={novoSorteio.draw_date}
-              onChange={(e) =>
-                setNovoSorteio((p) => ({ ...p, draw_date: e.target.value }))
-              }
+              onChange={(e) => setNovoSorteio((p) => ({ ...p, draw_date: e.target.value }))}
               className="w-full border rounded-lg px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label
-              htmlFor="s-desc"
-              className="block text-xs font-medium text-gray-600 mb-1"
-            >
+            <label htmlFor="s-desc" className="block text-xs font-medium text-gray-600 mb-1">
               Descricao (opcional)
             </label>
             <textarea
@@ -140,9 +121,7 @@ export default function CampanhasSorteioModal({
               Executar automaticamente na data do sorteio
             </span>
           </label>
-          {erroCriarSorteio && (
-            <p className="text-sm text-red-600">{erroCriarSorteio}</p>
-          )}
+          {erroCriarSorteio && <p className="text-sm text-red-600">{erroCriarSorteio}</p>}
         </div>
         <div className="px-6 py-4 border-t flex gap-3 justify-end">
           <button

@@ -19,9 +19,7 @@ const ClientesNovoCadastroStep = ({
 }) => {
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-        Informações do cadastro
-      </h3>
+      <h3 className="text-lg font-semibold text-gray-900 mb-4">Informações do cadastro</h3>
 
       {editingCliente?.id && (
         <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
@@ -39,9 +37,7 @@ const ClientesNovoCadastroStep = ({
 
       {/* Tipo de Cadastro */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Tipo de cadastro *
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de cadastro *</label>
         <div className="flex gap-4">
           <label className="flex items-center cursor-pointer">
             <input
@@ -112,8 +108,7 @@ const ClientesNovoCadastroStep = ({
       </div>
 
       {/* 🚚 Seção de Entrega */}
-      {(formData.tipo_cadastro === "funcionario" ||
-        formData.tipo_cadastro === "fornecedor") && (
+      {(formData.tipo_cadastro === "funcionario" || formData.tipo_cadastro === "fornecedor") && (
         <div className="bg-blue-50 p-3 rounded border border-blue-200">
           <div className="flex items-center gap-2 mb-1">
             <svg
@@ -129,9 +124,7 @@ const ClientesNovoCadastroStep = ({
                 d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"
               />
             </svg>
-            <label className="text-xs font-medium text-gray-700">
-              É entregador
-            </label>
+            <label className="text-xs font-medium text-gray-700">É entregador</label>
             <label className="relative inline-flex items-center cursor-pointer ml-auto">
               <input
                 type="checkbox"
@@ -163,12 +156,8 @@ const ClientesNovoCadastroStep = ({
                   }
                   className="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <span className="text-xs text-gray-700 font-medium">
-                  Entregador padrão
-                </span>
-                <span className="text-[10px] text-gray-500">
-                  (pré-selecionado nas rotas)
-                </span>
+                <span className="text-xs text-gray-700 font-medium">Entregador padrão</span>
+                <span className="text-[10px] text-gray-500">(pré-selecionado nas rotas)</span>
               </label>
 
               {/* CONTROLA RH - Só para funcionário */}
@@ -184,27 +173,18 @@ const ClientesNovoCadastroStep = ({
                           ...formData,
                           controla_rh: controlaRH,
                           // Se controla RH, limpa modelo de custo E força gera_conta_pagar = false
-                          modelo_custo_entrega: controlaRH
-                            ? ""
-                            : formData.modelo_custo_entrega,
-                          taxa_fixa_entrega: controlaRH
-                            ? ""
-                            : formData.taxa_fixa_entrega,
-                          valor_por_km_entrega: controlaRH
-                            ? ""
-                            : formData.valor_por_km_entrega,
+                          modelo_custo_entrega: controlaRH ? "" : formData.modelo_custo_entrega,
+                          taxa_fixa_entrega: controlaRH ? "" : formData.taxa_fixa_entrega,
+                          valor_por_km_entrega: controlaRH ? "" : formData.valor_por_km_entrega,
                           gera_conta_pagar_custo_entrega: false, // SEMPRE false se controla RH
                         });
                       }}
                       className="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-0.5"
                     />
                     <div>
-                      <span className="text-xs text-gray-700 font-medium">
-                        Controla RH
-                      </span>
+                      <span className="text-xs text-gray-700 font-medium">Controla RH</span>
                       <p className="text-[10px] text-gray-500 mt-0.5">
-                        Custo rateado na folha (não gera contas a
-                        pagar)
+                        Custo rateado na folha (não gera contas a pagar)
                       </p>
                     </div>
                   </label>
@@ -217,32 +197,26 @@ const ClientesNovoCadastroStep = ({
                           Média de entregas por mês
                         </span>
                         <p className="text-[10px] text-gray-500 mt-0.5 mb-1">
-                          Define o rateio inicial do custo do
-                          funcionário por entrega. Será ajustado
+                          Define o rateio inicial do custo do funcionário por entrega. Será ajustado
                           automaticamente no final do mês.
                         </p>
                         <input
                           type="number"
                           min="1"
                           step="1"
-                          value={
-                            formData.media_entregas_configurada ||
-                            ""
-                          }
+                          value={formData.media_entregas_configurada || ""}
                           onChange={(e) =>
                             setFormData({
                               ...formData,
-                              media_entregas_configurada:
-                                e.target.value,
+                              media_entregas_configurada: e.target.value,
                             })
                           }
                           className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                           placeholder="Ex: 100 entregas/mês"
                         />
                         <p className="text-[10px] text-blue-600 mt-1">
-                          💡 Exemplo: Se o custo mensal é R$ 3.000 e
-                          média é 100 entregas, cada entrega custará
-                          R$ 30,00 inicialmente
+                          💡 Exemplo: Se o custo mensal é R$ 3.000 e média é 100 entregas, cada
+                          entrega custará R$ 30,00 inicialmente
                         </p>
                       </label>
                     </div>
@@ -253,15 +227,11 @@ const ClientesNovoCadastroStep = ({
                     <label className="flex items-start gap-2 cursor-pointer ml-5 pl-2 border-l border-gray-300">
                       <input
                         type="checkbox"
-                        checked={
-                          formData.gera_conta_pagar_custo_entrega ||
-                          false
-                        }
+                        checked={formData.gera_conta_pagar_custo_entrega || false}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            gera_conta_pagar_custo_entrega:
-                              e.target.checked,
+                            gera_conta_pagar_custo_entrega: e.target.checked,
                           })
                         }
                         className="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-0.5"
@@ -271,8 +241,7 @@ const ClientesNovoCadastroStep = ({
                           Gerar contas a pagar por entrega
                         </span>
                         <p className="text-[10px] text-gray-500 mt-0.5">
-                          Marque se este funcionário recebe por KM
-                          ou taxa fixa a cada entrega
+                          Marque se este funcionário recebe por KM ou taxa fixa a cada entrega
                         </p>
                       </div>
                     </label>
@@ -282,51 +251,40 @@ const ClientesNovoCadastroStep = ({
 
               {/* MODELO DE CUSTO */}
               {(formData.tipo_cadastro === "fornecedor" ||
-                (formData.tipo_cadastro === "funcionario" &&
-                  !formData.controla_rh)) && (
+                (formData.tipo_cadastro === "funcionario" && !formData.controla_rh)) && (
                 <div className="space-y-2">
                   {/* Avisos condicionais */}
                   {formData.tipo_cadastro === "fornecedor" && (
                     <div className="bg-yellow-50 border border-yellow-200 rounded p-1.5 text-[10px] text-yellow-800">
-                      ⚠️ <strong>Terceirizado</strong> - Sempre gera
-                      contas a pagar
+                      ⚠️ <strong>Terceirizado</strong> - Sempre gera contas a pagar
                     </div>
                   )}
-                  {formData.tipo_cadastro === "funcionario" &&
-                    !formData.controla_rh && (
-                      <div className="bg-blue-50 border border-blue-200 rounded p-1.5 text-[10px] text-blue-800">
-                        ℹ️ <strong>Funcionário sem RH</strong> -{" "}
-                        {formData.gera_conta_pagar_custo_entrega
-                          ? "Gera CP por entrega"
-                          : "Não gera CP"}
-                      </div>
-                    )}
+                  {formData.tipo_cadastro === "funcionario" && !formData.controla_rh && (
+                    <div className="bg-blue-50 border border-blue-200 rounded p-1.5 text-[10px] text-blue-800">
+                      ℹ️ <strong>Funcionário sem RH</strong> -{" "}
+                      {formData.gera_conta_pagar_custo_entrega
+                        ? "Gera CP por entrega"
+                        : "Não gera CP"}
+                    </div>
+                  )}
 
                   {/* Taxa Fixa */}
                   <label className="flex items-start gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={
-                        formData.modelo_custo_entrega ===
-                        "taxa_fixa"
-                      }
+                      checked={formData.modelo_custo_entrega === "taxa_fixa"}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
-                          modelo_custo_entrega: e.target.checked
-                            ? "taxa_fixa"
-                            : "",
+                          modelo_custo_entrega: e.target.checked ? "taxa_fixa" : "",
                           valor_por_km_entrega: "",
                         })
                       }
                       className="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-0.5"
                     />
                     <div className="flex-1">
-                      <span className="text-xs text-gray-700 font-medium">
-                        Taxa Fixa
-                      </span>
-                      {formData.modelo_custo_entrega ===
-                        "taxa_fixa" && (
+                      <span className="text-xs text-gray-700 font-medium">Taxa Fixa</span>
+                      {formData.modelo_custo_entrega === "taxa_fixa" && (
                         <input
                           type="number"
                           step="0.01"
@@ -349,33 +307,24 @@ const ClientesNovoCadastroStep = ({
                   <label className="flex items-start gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={
-                        formData.modelo_custo_entrega === "por_km"
-                      }
+                      checked={formData.modelo_custo_entrega === "por_km"}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
-                          modelo_custo_entrega: e.target.checked
-                            ? "por_km"
-                            : "",
+                          modelo_custo_entrega: e.target.checked ? "por_km" : "",
                           taxa_fixa_entrega: "",
                         })
                       }
                       className="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-0.5"
                     />
                     <div className="flex-1">
-                      <span className="text-xs text-gray-700 font-medium">
-                        Valor por KM
-                      </span>
-                      {formData.modelo_custo_entrega ===
-                        "por_km" && (
+                      <span className="text-xs text-gray-700 font-medium">Valor por KM</span>
+                      {formData.modelo_custo_entrega === "por_km" && (
                         <input
                           type="number"
                           step="0.01"
                           min="0"
-                          value={
-                            formData.valor_por_km_entrega || ""
-                          }
+                          value={formData.valor_por_km_entrega || ""}
                           onChange={(e) =>
                             setFormData({
                               ...formData,
@@ -405,17 +354,13 @@ const ClientesNovoCadastroStep = ({
                   className="w-3.5 h-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <span className="text-xs text-gray-700">
-                  {formData.moto_propria
-                    ? "✅ Moto própria"
-                    : "🏢 Moto da loja"}
+                  {formData.moto_propria ? "✅ Moto própria" : "🏢 Moto da loja"}
                 </span>
               </label>
 
               {/* 📆 Acerto Financeiro */}
               <div className="mt-2 pt-2 border-t border-blue-200">
-                <h4 className="text-xs font-semibold text-gray-700 mb-2">
-                  📆 Acerto Financeiro
-                </h4>
+                <h4 className="text-xs font-semibold text-gray-700 mb-2">📆 Acerto Financeiro</h4>
                 <div className="space-y-2">
                   <div>
                     <label className="block text-[10px] font-medium text-gray-600 mb-0.5">
@@ -435,9 +380,7 @@ const ClientesNovoCadastroStep = ({
                     >
                       <option value="">Selecione</option>
                       <option value="semanal">Semanal</option>
-                      <option value="quinzenal">
-                        Quinzenal (dias 1 e 15)
-                      </option>
+                      <option value="quinzenal">Quinzenal (dias 1 e 15)</option>
                       <option value="mensal">Mensal</option>
                     </select>
                   </div>
@@ -493,8 +436,7 @@ const ClientesNovoCadastroStep = ({
 
                   {formData.tipo_acerto_entrega === "quinzenal" && (
                     <div className="bg-blue-50 p-1.5 rounded text-[10px] text-blue-700">
-                      ℹ️ Acerto nos dias <strong>1</strong> e{" "}
-                      <strong>15</strong>
+                      ℹ️ Acerto nos dias <strong>1</strong> e <strong>15</strong>
                     </div>
                   )}
                 </div>
@@ -541,8 +483,8 @@ const ClientesNovoCadastroStep = ({
           </label>
         </div>
         <p className="text-xs text-gray-500 ml-7">
-          Ao ativar, esta pessoa poderá receber comissões de vendas,
-          independente do tipo de cadastro
+          Ao ativar, esta pessoa poderá receber comissões de vendas, independente do tipo de
+          cadastro
         </p>
         {formData.parceiro_ativo && (
           <div className="mt-3 ml-7">
@@ -568,9 +510,7 @@ const ClientesNovoCadastroStep = ({
       {/* Tipo de Pessoa */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          {formData.tipo_pessoa === "PJ"
-            ? "Tipo de pessoa jurídica *"
-            : "Tipo de pessoa *"}
+          {formData.tipo_pessoa === "PJ" ? "Tipo de pessoa jurídica *" : "Tipo de pessoa *"}
         </label>
         <div className="flex gap-4">
           <label className="flex items-center cursor-pointer">
@@ -610,15 +550,11 @@ const ClientesNovoCadastroStep = ({
       {formData.tipo_pessoa === "PF" && (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nome completo *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nome completo *</label>
             <input
               type="text"
               value={formData.nome}
-              onChange={(e) =>
-                setFormData({ ...formData, nome: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               placeholder="Digite o nome completo"
               required
@@ -626,9 +562,7 @@ const ClientesNovoCadastroStep = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              CPF
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">CPF</label>
             <input
               type="text"
               value={formData.cpf}
@@ -663,9 +597,7 @@ const ClientesNovoCadastroStep = ({
           {/* Campo CRMV para Veterinários */}
           {formData.tipo_cadastro === "veterinario" && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                CRMV
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CRMV</label>
               <input
                 type="text"
                 value={formData.crmv}
@@ -690,9 +622,7 @@ const ClientesNovoCadastroStep = ({
       {formData.tipo_pessoa === "PJ" && (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Razão Social *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Razão Social *</label>
             <input
               type="text"
               value={formData.razao_social}
@@ -708,15 +638,11 @@ const ClientesNovoCadastroStep = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nome Fantasia *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nome Fantasia *</label>
             <input
               type="text"
               value={formData.nome}
-              onChange={(e) =>
-                setFormData({ ...formData, nome: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               placeholder="Nome fantasia da empresa"
               required
@@ -725,9 +651,7 @@ const ClientesNovoCadastroStep = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                CNPJ *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CNPJ *</label>
               <input
                 type="text"
                 value={formData.cnpj}

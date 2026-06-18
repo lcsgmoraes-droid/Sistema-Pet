@@ -9,7 +9,9 @@ export default function RepasseHeader({ carregando, onAtualizar }) {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Fechamento de Repasse</h1>
-          <p className="text-sm text-gray-500">Controle de recebimento dos lancamentos veterinarios</p>
+          <p className="text-sm text-gray-500">
+            Controle de recebimento dos lancamentos veterinarios
+          </p>
         </div>
       </div>
       <button

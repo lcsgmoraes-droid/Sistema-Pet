@@ -141,9 +141,7 @@ export default function CampanhasMainContent({
           deletandoRetencao={retencao.deletandoRetencao}
           onSalvarRetencao={retencao.salvarRetencao}
           onCancelarEdicao={() => retencao.setRetencaoEditando(null)}
-          onNovaRegra={() =>
-            retencao.setRetencaoEditando({ ...retencao.novaRegraPadrao })
-          }
+          onNovaRegra={() => retencao.setRetencaoEditando({ ...retencao.novaRegraPadrao })}
           onEditarRegra={retencao.setRetencaoEditando}
           onDeletarRegra={retencao.deletarRetencao}
         />

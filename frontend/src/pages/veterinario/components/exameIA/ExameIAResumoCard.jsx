@@ -39,8 +39,8 @@ export default function ExameIAResumoCard({ dadosIA, exame, resumo }) {
 
       {!temArquivo && !temResultadoBase && (
         <p className="text-xs text-amber-700">
-          Este exame ainda nao tem arquivo nem resultado em texto. Cadastre o anexo para a IA conseguir analisar
-          hemograma, bioquimica, laudos em PDF e imagens.
+          Este exame ainda nao tem arquivo nem resultado em texto. Cadastre o anexo para a IA
+          conseguir analisar hemograma, bioquimica, laudos em PDF e imagens.
         </p>
       )}
     </div>

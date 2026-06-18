@@ -42,7 +42,7 @@ export function useInternacoesAgendaProcedimentosAcoes({
       }
       await carregarDetalheInternacao(
         agendaForm.internacao_id,
-        expandida === Number(agendaForm.internacao_id)
+        expandida === Number(agendaForm.internacao_id),
       );
       setAgendaForm((prev) => ({
         ...prev,
@@ -72,7 +72,9 @@ export function useInternacoesAgendaProcedimentosAcoes({
   ]);
 
   const reabrirProcedimento = useCallback(() => {
-    setErro("Procedimento concluido ja faz parte do historico clinico. Para corrigir, registre um novo ajuste/evolucao.");
+    setErro(
+      "Procedimento concluido ja faz parte do historico clinico. Para corrigir, registre um novo ajuste/evolucao.",
+    );
   }, [setErro]);
 
   const removerProcedimentoAgenda = useCallback(
@@ -81,7 +83,7 @@ export function useInternacoesAgendaProcedimentosAcoes({
       try {
         await vetApi.removerProcedimentoAgendaInternacao(id);
         setAgendaProcedimentos((prev) =>
-          prev.filter((procedimento) => String(procedimento.id) !== String(id))
+          prev.filter((procedimento) => String(procedimento.id) !== String(id)),
         );
       } catch (e) {
         setErro(e?.response?.data?.detail ?? "Erro ao remover procedimento da agenda.");
@@ -89,7 +91,7 @@ export function useInternacoesAgendaProcedimentosAcoes({
         setSalvando(false);
       }
     },
-    [setAgendaProcedimentos, setErro, setSalvando]
+    [setAgendaProcedimentos, setErro, setSalvando],
   );
 
   return {

@@ -39,23 +39,25 @@ export default function useAssistenteIAController() {
 
   const petSelecionado = useMemo(
     () => pets.find((p) => String(p.id) === String(petId)) || null,
-    [pets, petId]
+    [pets, petId],
   );
   const petsDoTutor = useMemo(() => {
     if (!tutorSelecionado?.id) return [];
-    return pets.filter((pet) => String(pet.cliente_id) === String(tutorSelecionado.id) && pet.ativo !== false);
+    return pets.filter(
+      (pet) => String(pet.cliente_id) === String(tutorSelecionado.id) && pet.ativo !== false,
+    );
   }, [pets, tutorSelecionado]);
   const retornoNovoPet = useMemo(
     () => buildReturnTo(location.pathname, location.search),
-    [location.pathname, location.search]
+    [location.pathname, location.search],
   );
   const consultaSelecionada = useMemo(
     () => consultas.find((item) => String(item.id) === String(consultaId)) ?? null,
-    [consultas, consultaId]
+    [consultas, consultaId],
   );
   const exameSelecionado = useMemo(
     () => exames.find((item) => String(item.id) === String(exameId)) ?? null,
-    [exames, exameId]
+    [exames, exameId],
   );
 
   const chat = useAssistenteIAChatHandlers({

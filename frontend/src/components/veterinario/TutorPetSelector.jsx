@@ -35,9 +35,7 @@ export default function TutorPetSelector({
 
   function setExpandedValue(valueOrUpdater) {
     const nextValue =
-      typeof valueOrUpdater === "function"
-        ? valueOrUpdater(expanded)
-        : valueOrUpdater;
+      typeof valueOrUpdater === "function" ? valueOrUpdater(expanded) : valueOrUpdater;
 
     if (isExpandedControlled) {
       onExpandedChange?.(nextValue);

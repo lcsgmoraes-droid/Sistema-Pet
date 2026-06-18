@@ -26,13 +26,18 @@ export default function ConcluirProcedimentoModal({
             />
           </div>
           <p className="text-sm font-bold text-purple-900">{procedimento.medicamento}</p>
-          <p className="text-xs text-purple-700">Dose: {procedimento.dose || "—"} • Baia: {baiaExibicao}</p>
+          <p className="text-xs text-purple-700">
+            Dose: {procedimento.dose || "—"} • Baia: {baiaExibicao}
+          </p>
         </div>
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          Informe o que estava previsto, quanto realmente foi administrado e quanto virou desperdício/excesso. Assim o registro clínico fica fiel ao que aconteceu no atendimento.
+          Informe o que estava previsto, quanto realmente foi administrado e quanto virou
+          desperdício/excesso. Assim o registro clínico fica fiel ao que aconteceu no atendimento.
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Responsável veterinário *</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Responsável veterinário *
+          </label>
           <select
             value={formFeito.feito_por}
             onChange={(e) => setFormFeito((p) => ({ ...p, feito_por: e.target.value }))}
@@ -41,12 +46,14 @@ export default function ConcluirProcedimentoModal({
             <option value="">Selecione...</option>
             {veterinarios.map((vet) => (
               <option key={vet.id} value={vet.nome}>
-                {vet.nome}{vet.crmv ? ` - CRMV ${vet.crmv}` : ""}
+                {vet.nome}
+                {vet.crmv ? ` - CRMV ${vet.crmv}` : ""}
               </option>
             ))}
-            {formFeito.feito_por && !veterinarios.some((vet) => vet.nome === formFeito.feito_por) && (
-              <option value={formFeito.feito_por}>{formFeito.feito_por}</option>
-            )}
+            {formFeito.feito_por &&
+              !veterinarios.some((vet) => vet.nome === formFeito.feito_por) && (
+                <option value={formFeito.feito_por}>{formFeito.feito_por}</option>
+              )}
           </select>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -72,30 +79,40 @@ export default function ConcluirProcedimentoModal({
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Qtd. efetivamente feita</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Qtd. efetivamente feita
+            </label>
             <input
               type="number"
               min="0"
               step="0.01"
               value={formFeito.quantidade_executada}
-              onChange={(e) => setFormFeito((p) => ({ ...p, quantidade_executada: e.target.value }))}
+              onChange={(e) =>
+                setFormFeito((p) => ({ ...p, quantidade_executada: e.target.value }))
+              }
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Desperdício / excesso</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Desperdício / excesso
+            </label>
             <input
               type="number"
               min="0"
               step="0.01"
               value={formFeito.quantidade_desperdicio}
-              onChange={(e) => setFormFeito((p) => ({ ...p, quantidade_desperdicio: e.target.value }))}
+              onChange={(e) =>
+                setFormFeito((p) => ({ ...p, quantidade_desperdicio: e.target.value }))
+              }
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
             />
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Horário da execução *</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Horário da execução *
+          </label>
           <input
             type="datetime-local"
             value={formFeito.horario_execucao}
@@ -104,7 +121,9 @@ export default function ConcluirProcedimentoModal({
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Observação da execução (opcional)</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Observação da execução (opcional)
+          </label>
           <textarea
             value={formFeito.observacao_execucao}
             onChange={(e) => setFormFeito((p) => ({ ...p, observacao_execucao: e.target.value }))}
@@ -113,7 +132,10 @@ export default function ConcluirProcedimentoModal({
           />
         </div>
         <div className="flex gap-3 pt-1">
-          <button onClick={onClose} className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50"
+          >
             Cancelar
           </button>
           <button

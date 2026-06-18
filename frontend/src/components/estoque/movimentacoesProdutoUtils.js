@@ -5,8 +5,9 @@ function numeroSeguro(valor) {
 
 export function produtoUsaEstoqueVirtual(produto) {
   return (
-    produto?.tipo_produto === 'KIT' || produto?.tipo_produto === 'VARIACAO'
-  ) && produto?.tipo_kit === 'VIRTUAL';
+    (produto?.tipo_produto === "KIT" || produto?.tipo_produto === "VARIACAO") &&
+    produto?.tipo_kit === "VIRTUAL"
+  );
 }
 
 export function resolverEstoqueAtualMovimentacoes(produto) {

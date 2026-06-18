@@ -35,36 +35,39 @@ export function useAgendaDerivados({
 
   const retornoNovoPet = useMemo(
     () => buildReturnTo(location.pathname, location.search, { abrir_novo: "1" }),
-    [location.pathname, location.search]
+    [location.pathname, location.search],
   );
 
   const tituloAgenda = useMemo(
     () => formatTituloAgenda(modo, dataRef, inicioSemana, fimSemana),
-    [dataRef, fimSemana, inicioSemana, modo]
+    [dataRef, fimSemana, inicioSemana, modo],
   );
 
   const diasVisiveis = useMemo(
     () => montarDiasVisiveis(modo, dataRef, inicioSemana),
-    [dataRef, inicioSemana, modo]
+    [dataRef, inicioSemana, modo],
   );
 
   const diasMes = useMemo(() => montarDiasMes(modo, dataRef), [dataRef, modo]);
 
-  const horariosAgendaModal = useMemo(() => montarHorariosAgendaModal(agendaDiaModal), [agendaDiaModal]);
+  const horariosAgendaModal = useMemo(
+    () => montarHorariosAgendaModal(agendaDiaModal),
+    [agendaDiaModal],
+  );
 
   const petSelecionadoModal = useMemo(
     () => petsDoTutor.find((pet) => String(pet.id) === String(formNovo.pet_id)) || null,
-    [petsDoTutor, formNovo.pet_id]
+    [petsDoTutor, formNovo.pet_id],
   );
 
   const veterinarioSelecionadoModal = useMemo(
     () => veterinarios.find((vet) => String(vet.id) === String(formNovo.veterinario_id)) || null,
-    [veterinarios, formNovo.veterinario_id]
+    [veterinarios, formNovo.veterinario_id],
   );
 
   const consultorioSelecionadoModal = useMemo(
     () => consultorios.find((item) => String(item.id) === String(formNovo.consultorio_id)) || null,
-    [consultorios, formNovo.consultorio_id]
+    [consultorios, formNovo.consultorio_id],
   );
 
   const diagnosticoConflitoSelecionado = useMemo(
@@ -76,7 +79,13 @@ export function useAgendaDerivados({
         veterinarioId: formNovo.veterinario_id,
         consultorioId: formNovo.consultorio_id,
       }),
-    [agendaDiaModal, agendamentoEditandoId, formNovo.hora, formNovo.veterinario_id, formNovo.consultorio_id]
+    [
+      agendaDiaModal,
+      agendamentoEditandoId,
+      formNovo.hora,
+      formNovo.veterinario_id,
+      formNovo.consultorio_id,
+    ],
   );
 
   const conflitoHorarioSelecionado =
@@ -98,7 +107,8 @@ export function useAgendaDerivados({
 
   const podeVoltarStatus =
     agendamentoSelecionado &&
-    (agendamentoSelecionado.status === "em_atendimento" || Boolean(agendamentoSelecionado.consulta_id));
+    (agendamentoSelecionado.status === "em_atendimento" ||
+      Boolean(agendamentoSelecionado.consulta_id));
 
   const labelVoltarStatus = agendamentoSelecionado?.consulta_id
     ? "Desfazer inicio do atendimento"
@@ -107,11 +117,11 @@ export function useAgendaDerivados({
   const labelAbrirAgendamentoSelecionado =
     tipoAgendamentoSelecionado === "consulta" || tipoAgendamentoSelecionado === "retorno"
       ? getAgendamentoConsultaActionLabel(agendamentoSelecionado)
-      : TIPO_ACAO[tipoAgendamentoSelecionado] ?? "Abrir atendimento";
+      : (TIPO_ACAO[tipoAgendamentoSelecionado] ?? "Abrir atendimento");
 
   const mensagemAgendamentoSelecionado = montarMensagemGerenciamento(
     agendamentoSelecionado,
-    tipoAgendamentoSelecionado
+    tipoAgendamentoSelecionado,
   );
 
   const bloqueioCamposAgendamento = useMemo(
@@ -119,7 +129,7 @@ export function useAgendaDerivados({
       veterinario: veterinarios.length > 0 && !formNovo.veterinario_id,
       consultorio: consultorios.length > 0 && !formNovo.consultorio_id,
     }),
-    [consultorios.length, formNovo.consultorio_id, formNovo.veterinario_id, veterinarios.length]
+    [consultorios.length, formNovo.consultorio_id, formNovo.veterinario_id, veterinarios.length],
   );
 
   return {

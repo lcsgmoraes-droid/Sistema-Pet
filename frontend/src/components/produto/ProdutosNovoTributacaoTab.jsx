@@ -37,11 +37,12 @@ export default function ProdutosNovoTributacaoTab({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Origem <InfoTooltip title="Define se o produto é nacional ou importado. Impacta o cálculo do ICMS." />
+            Origem{" "}
+            <InfoTooltip title="Define se o produto é nacional ou importado. Impacta o cálculo do ICMS." />
           </label>
           <select
-            value={formData.tributacao?.origem_mercadoria || '0'}
-            onChange={(e) => handleChangeTributacao('origem_mercadoria', e.target.value)}
+            value={formData.tributacao?.origem_mercadoria || "0"}
+            onChange={(e) => handleChangeTributacao("origem_mercadoria", e.target.value)}
             disabled={formData.tributacao?.herdado_da_empresa === true}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
           >
@@ -59,12 +60,13 @@ export default function ProdutosNovoTributacaoTab({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            NCM <InfoTooltip title="Nomenclatura Comum do Mercosul. Classificação fiscal do produto, base para impostos." />
+            NCM{" "}
+            <InfoTooltip title="Nomenclatura Comum do Mercosul. Classificação fiscal do produto, base para impostos." />
           </label>
           <input
             type="text"
-            value={formData.tributacao?.ncm || ''}
-            onChange={(e) => handleChangeTributacao('ncm', e.target.value)}
+            value={formData.tributacao?.ncm || ""}
+            onChange={(e) => handleChangeTributacao("ncm", e.target.value)}
             disabled={formData.tributacao?.herdado_da_empresa === true}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
             placeholder="00000000"
@@ -73,12 +75,13 @@ export default function ProdutosNovoTributacaoTab({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            CEST <InfoTooltip title="Código Especificador da Substituição Tributária. Para produtos sujeitos a ICMS ST." />
+            CEST{" "}
+            <InfoTooltip title="Código Especificador da Substituição Tributária. Para produtos sujeitos a ICMS ST." />
           </label>
           <input
             type="text"
-            value={formData.tributacao?.cest || ''}
-            onChange={(e) => handleChangeTributacao('cest', e.target.value)}
+            value={formData.tributacao?.cest || ""}
+            onChange={(e) => handleChangeTributacao("cest", e.target.value)}
             disabled={formData.tributacao?.herdado_da_empresa === true}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
             placeholder="0000000"
@@ -87,12 +90,13 @@ export default function ProdutosNovoTributacaoTab({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            CFOP <InfoTooltip title="Código Fiscal de Operações e Prestações. Define a natureza da operação de venda." />
+            CFOP{" "}
+            <InfoTooltip title="Código Fiscal de Operações e Prestações. Define a natureza da operação de venda." />
           </label>
           <input
             type="text"
-            value={formData.tributacao?.cfop || ''}
-            onChange={(e) => handleChangeTributacao('cfop', e.target.value)}
+            value={formData.tributacao?.cfop || ""}
+            onChange={(e) => handleChangeTributacao("cfop", e.target.value)}
             disabled={formData.tributacao?.herdado_da_empresa === true}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
             placeholder="0000"
@@ -101,13 +105,14 @@ export default function ProdutosNovoTributacaoTab({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Alíquota ICMS (%) <InfoTooltip title="Imposto sobre Circulação de Mercadorias. Alíquota estadual aplicada na venda. Impacta o preço final." />
+            Alíquota ICMS (%){" "}
+            <InfoTooltip title="Imposto sobre Circulação de Mercadorias. Alíquota estadual aplicada na venda. Impacta o preço final." />
           </label>
           <input
             type="number"
             step="0.01"
-            value={formData.tributacao?.icms_aliquota || ''}
-            onChange={(e) => handleChangeTributacao('icms_aliquota', e.target.value)}
+            value={formData.tributacao?.icms_aliquota || ""}
+            onChange={(e) => handleChangeTributacao("icms_aliquota", e.target.value)}
             disabled={formData.tributacao?.herdado_da_empresa === true}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
             placeholder="0,00"
@@ -116,13 +121,14 @@ export default function ProdutosNovoTributacaoTab({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Alíquota PIS (%) <InfoTooltip title="Programa de Integração Social. Contribuição federal sobre a venda. Geralmente 1,65%." />
+            Alíquota PIS (%){" "}
+            <InfoTooltip title="Programa de Integração Social. Contribuição federal sobre a venda. Geralmente 1,65%." />
           </label>
           <input
             type="number"
             step="0.01"
-            value={formData.tributacao?.pis_aliquota || ''}
-            onChange={(e) => handleChangeTributacao('pis_aliquota', e.target.value)}
+            value={formData.tributacao?.pis_aliquota || ""}
+            onChange={(e) => handleChangeTributacao("pis_aliquota", e.target.value)}
             disabled={formData.tributacao?.herdado_da_empresa === true}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
             placeholder="0,00"
@@ -131,13 +137,14 @@ export default function ProdutosNovoTributacaoTab({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Alíquota COFINS (%) <InfoTooltip title="Contribuição para Financiamento da Seguridade Social. Contribuição federal sobre a venda. Geralmente 7,6%." />
+            Alíquota COFINS (%){" "}
+            <InfoTooltip title="Contribuição para Financiamento da Seguridade Social. Contribuição federal sobre a venda. Geralmente 7,6%." />
           </label>
           <input
             type="number"
             step="0.01"
-            value={formData.tributacao?.cofins_aliquota || ''}
-            onChange={(e) => handleChangeTributacao('cofins_aliquota', e.target.value)}
+            value={formData.tributacao?.cofins_aliquota || ""}
+            onChange={(e) => handleChangeTributacao("cofins_aliquota", e.target.value)}
             disabled={formData.tributacao?.herdado_da_empresa === true}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
             placeholder="0,00"

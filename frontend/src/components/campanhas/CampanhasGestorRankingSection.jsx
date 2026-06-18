@@ -42,21 +42,15 @@ export default function CampanhasGestorRankingSection({
               value: String(gestorSaldo.rank_total_purchases || 0),
             },
           ].map((item) => (
-            <div
-              key={item.label}
-              className="bg-gray-50 rounded-lg p-3 text-center"
-            >
+            <div key={item.label} className="bg-gray-50 rounded-lg p-3 text-center">
               <p className="text-xs text-gray-500 mb-1">{item.label}</p>
-              <p className="font-semibold text-gray-800 text-sm">
-                {item.value}
-              </p>
+              <p className="font-semibold text-gray-800 text-sm">{item.value}</p>
             </div>
           ))}
         </div>
 
         <p className="text-xs text-gray-400 mt-4 text-center">
-          O nivel de ranking e recalculado automaticamente no dia 1 de cada
-          mes.
+          O nivel de ranking e recalculado automaticamente no dia 1 de cada mes.
         </p>
       </div>
     </CampanhasGestorSection>

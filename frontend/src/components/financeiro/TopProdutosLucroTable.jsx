@@ -77,11 +77,7 @@ export default function TopProdutosLucroTable({ produtos = [] }) {
           header: "Custo unit.",
           align: "right",
           render: (produto) => (
-            <MoneyCell
-              className="text-red-600"
-              value={toNumber(produto.custo)}
-              zeroAsDash
-            />
+            <MoneyCell className="text-red-600" value={toNumber(produto.custo)} zeroAsDash />
           ),
         },
         {
@@ -89,11 +85,7 @@ export default function TopProdutosLucroTable({ produtos = [] }) {
           header: "Preço venda",
           align: "right",
           render: (produto) => (
-            <MoneyCell
-              className="text-emerald-700"
-              value={toNumber(produto.preco)}
-              zeroAsDash
-            />
+            <MoneyCell className="text-emerald-700" value={toNumber(produto.preco)} zeroAsDash />
           ),
         },
         {
@@ -117,7 +109,9 @@ export default function TopProdutosLucroTable({ produtos = [] }) {
       ]}
       data={produtos}
       emptyMessage="Nenhum produto com lucro encontrado"
-      getRowKey={(produto, index) => `${produto.nome || "produto"}-${produto.marca || "sem-marca"}-${index}`}
+      getRowKey={(produto, index) =>
+        `${produto.nome || "produto"}-${produto.marca || "sem-marca"}-${index}`
+      }
       theadClassName="bg-slate-100"
     />
   );

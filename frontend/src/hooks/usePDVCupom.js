@@ -1,11 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api";
 
-export function usePDVCupom({
-  vendaAtual,
-  aplicarDescontoTotal,
-  removerDescontoTotal,
-}) {
+export function usePDVCupom({ vendaAtual, aplicarDescontoTotal, removerDescontoTotal }) {
   const [codigoCupom, setCodigoCupom] = useState("");
   const [cupomAplicado, setCupomAplicado] = useState(null);
   const [loadingCupom, setLoadingCupom] = useState(false);

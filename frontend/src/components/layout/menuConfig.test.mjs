@@ -9,8 +9,16 @@ test("createLayoutMenuItems preserva itens principais do menu", () => {
 
   assert.equal(findMenuItem(items, "/dashboard")?.permission, "relatorios.gerencial");
   assert.equal(findMenuItem(items, "/pdv")?.permission, "vendas.criar");
-  assert.equal(findMenuItem(items, "/financeiro")?.submenu?.some((item) => item.path === "/financeiro/vendas"), true);
-  assert.equal(findMenuItem(items, "/veterinario")?.submenu?.some((item) => item.path === "/veterinario/agenda"), true);
+  assert.equal(
+    findMenuItem(items, "/financeiro")?.submenu?.some((item) => item.path === "/financeiro/vendas"),
+    true,
+  );
+  assert.equal(
+    findMenuItem(items, "/veterinario")?.submenu?.some(
+      (item) => item.path === "/veterinario/agenda",
+    ),
+    true,
+  );
 });
 
 test("createLayoutMenuItems aplica badge de lembretes conforme contador", () => {

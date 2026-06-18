@@ -17,7 +17,11 @@ export default function ProtocoloVacinaModal({
       salvando={salvando}
     >
       <div className="grid gap-3 md:grid-cols-2">
-        <CampoTexto label="Nome *" value={form.nome} onChange={(value) => onSetCampo("nome", value)} />
+        <CampoTexto
+          label="Nome *"
+          value={form.nome}
+          onChange={(value) => onSetCampo("nome", value)}
+        />
         <CampoTexto
           label="Especie *"
           placeholder="Cao, gato..."

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import api from '../api';
+import { useState, useEffect } from "react";
+import api from "../api";
 
 export default function Subcategorias() {
   const [categorias, setCategorias] = useState([]);
@@ -9,10 +9,10 @@ export default function Subcategorias() {
   const [modalOpen, setModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     id: null,
-    categoria_id: '',
-    nome: '',
-    descricao: '',
-    ativo: true
+    categoria_id: "",
+    nome: "",
+    descricao: "",
+    ativo: true,
   });
 
   useEffect(() => {
@@ -20,41 +20,37 @@ export default function Subcategorias() {
   }, []);
 
   const carregarDados = async () => {
-    await Promise.all([
-      carregarCategorias(),
-      carregarCategoriasDRE(),
-      carregarSubcategorias()
-    ]);
+    await Promise.all([carregarCategorias(), carregarCategoriasDRE(), carregarSubcategorias()]);
   };
 
   const carregarCategoriasDRE = async () => {
     try {
-      const response = await api.get('/dre/categorias');
+      const response = await api.get("/dre/categorias");
       setDreCategorias(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      console.error('Erro ao carregar categorias DRE:', error);
+      console.error("Erro ao carregar categorias DRE:", error);
       setDreCategorias([]);
     }
   };
 
   const carregarCategorias = async () => {
     try {
-      const response = await api.get('/categorias-financeiras');
-      setCategorias(response.data.filter(c => c.ativo));
+      const response = await api.get("/categorias-financeiras");
+      setCategorias(response.data.filter((c) => c.ativo));
     } catch (error) {
-      console.error('Erro ao carregar categorias:', error);
-      alert('Erro ao carregar categorias');
+      console.error("Erro ao carregar categorias:", error);
+      alert("Erro ao carregar categorias");
     }
   };
 
   const carregarSubcategorias = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/dre/subcategorias');
+      const response = await api.get("/dre/subcategorias");
       setSubcategorias(response.data);
     } catch (error) {
-      console.error('Erro ao carregar subcategorias:', error);
-      alert('Erro ao carregar subcategorias');
+      console.error("Erro ao carregar subcategorias:", error);
+      alert("Erro ao carregar subcategorias");
     } finally {
       setLoading(false);
     }
@@ -62,9 +58,9 @@ export default function Subcategorias() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.categoria_id || !formData.nome) {
-      alert('Preencha categoria e nome');
+      alert("Preencha categoria e nome");
       return;
     }
 
@@ -72,31 +68,35 @@ export default function Subcategorias() {
       if (formData.id) {
         await api.put(`/dre/subcategorias/${formData.id}`, formData);
       } else {
-        const categoriaSelecionada = categorias.find(c => c.id === Number(formData.categoria_id));
-        const subPrincipal = subcategorias.find(s => s.id === categoriaSelecionada?.dre_subcategoria_id);
-        const natureza = categoriaSelecionada?.tipo === 'receita' ? 'receita' : 'despesa';
-        const categoriaDREFallback = dreCategorias.find(c => c.natureza === natureza && c.ativo !== false);
+        const categoriaSelecionada = categorias.find((c) => c.id === Number(formData.categoria_id));
+        const subPrincipal = subcategorias.find(
+          (s) => s.id === categoriaSelecionada?.dre_subcategoria_id,
+        );
+        const natureza = categoriaSelecionada?.tipo === "receita" ? "receita" : "despesa";
+        const categoriaDREFallback = dreCategorias.find(
+          (c) => c.natureza === natureza && c.ativo !== false,
+        );
         const categoriaDREId = subPrincipal?.categoria_id || categoriaDREFallback?.id;
 
         if (!categoriaDREId) {
-          alert('Não foi possível identificar categoria DRE para essa categoria financeira');
+          alert("Não foi possível identificar categoria DRE para essa categoria financeira");
           return;
         }
 
-        await api.post('/dre/subcategorias', {
+        await api.post("/dre/subcategorias", {
           categoria_id: Number(categoriaDREId),
           nome: formData.nome,
-          tipo_custo: categoriaSelecionada?.tipo_custo || 'direto',
-          escopo_rateio: 'ambos'
+          tipo_custo: categoriaSelecionada?.tipo_custo || "direto",
+          escopo_rateio: "ambos",
         });
       }
-      
+
       setModalOpen(false);
-      setFormData({ id: null, categoria_id: '', nome: '', descricao: '', ativo: true });
+      setFormData({ id: null, categoria_id: "", nome: "", descricao: "", ativo: true });
       carregarSubcategorias();
     } catch (error) {
-      console.error('Erro ao salvar:', error);
-      alert('Erro ao salvar subcategoria');
+      console.error("Erro ao salvar:", error);
+      alert("Erro ao salvar subcategoria");
     }
   };
 
@@ -106,20 +106,20 @@ export default function Subcategorias() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Deseja realmente excluir esta subcategoria?')) return;
-    
+    if (!confirm("Deseja realmente excluir esta subcategoria?")) return;
+
     try {
       await api.delete(`/dre/subcategorias/${id}`);
       carregarSubcategorias();
     } catch (error) {
-      console.error('Erro ao excluir:', error);
-      alert('Erro ao excluir subcategoria');
+      console.error("Erro ao excluir:", error);
+      alert("Erro ao excluir subcategoria");
     }
   };
 
   const getNomeCategoria = (catId) => {
-    const cat = categorias.find(c => c.id === catId);
-    return cat ? cat.nome : '-';
+    const cat = categorias.find((c) => c.id === catId);
+    return cat ? cat.nome : "-";
   };
 
   // Agrupar por categoria
@@ -128,7 +128,7 @@ export default function Subcategorias() {
     if (!acc[catId]) {
       acc[catId] = {
         categoria: getNomeCategoria(catId),
-        itens: []
+        itens: [],
       };
     }
     acc[catId].itens.push(sub);
@@ -140,13 +140,11 @@ export default function Subcategorias() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Subcategorias</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Gerencie as subcategorias de produtos
-          </p>
+          <p className="text-sm text-gray-600 mt-1">Gerencie as subcategorias de produtos</p>
         </div>
         <button
           onClick={() => {
-            setFormData({ id: null, categoria_id: '', nome: '', descricao: '', ativo: true });
+            setFormData({ id: null, categoria_id: "", nome: "", descricao: "", ativo: true });
             setModalOpen(true);
           }}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
@@ -167,7 +165,10 @@ export default function Subcategorias() {
               </div>
               <div className="divide-y">
                 {grupo.itens.map((sub) => (
-                  <div key={sub.id} className="px-4 py-3 flex justify-between items-center hover:bg-gray-50">
+                  <div
+                    key={sub.id}
+                    className="px-4 py-3 flex justify-between items-center hover:bg-gray-50"
+                  >
                     <div className="flex-1">
                       <div className="font-medium text-gray-900">{sub.nome}</div>
                       {sub.descricao && (
@@ -175,8 +176,10 @@ export default function Subcategorias() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 text-xs rounded-full ${sub.ativo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {sub.ativo ? 'Ativo' : 'Inativo'}
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${sub.ativo ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                      >
+                        {sub.ativo ? "Ativo" : "Inativo"}
                       </span>
                       <button
                         onClick={() => handleEdit(sub)}
@@ -196,11 +199,9 @@ export default function Subcategorias() {
               </div>
             </div>
           ))}
-          
+
           {Object.keys(subcategoriasPorCategoria).length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              Nenhuma subcategoria cadastrada
-            </div>
+            <div className="text-center py-8 text-gray-500">Nenhuma subcategoria cadastrada</div>
           )}
         </div>
       )}
@@ -210,47 +211,45 @@ export default function Subcategorias() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-xl font-bold mb-4">
-              {formData.id ? 'Editar' : 'Nova'} Subcategoria
+              {formData.id ? "Editar" : "Nova"} Subcategoria
             </h2>
-            
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Categoria *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria *</label>
                 <select
                   value={formData.categoria_id}
-                  onChange={(e) => setFormData({...formData, categoria_id: parseInt(e.target.value)})}
+                  onChange={(e) =>
+                    setFormData({ ...formData, categoria_id: parseInt(e.target.value) })
+                  }
                   className="w-full border rounded-lg px-3 py-2"
                   required
                 >
                   <option value="">Selecione...</option>
-                  {categorias.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.nome}</option>
+                  {categorias.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.nome}
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nome *
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
                 <input
                   type="text"
                   value={formData.nome}
-                  onChange={(e) => setFormData({...formData, nome: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                   className="w-full border rounded-lg px-3 py-2"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descrição
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
                 <textarea
                   value={formData.descricao}
-                  onChange={(e) => setFormData({...formData, descricao: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
                   className="w-full border rounded-lg px-3 py-2"
                   rows="3"
                 />
@@ -260,7 +259,7 @@ export default function Subcategorias() {
                 <input
                   type="checkbox"
                   checked={formData.ativo}
-                  onChange={(e) => setFormData({...formData, ativo: e.target.checked})}
+                  onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
                   className="mr-2"
                 />
                 <label className="text-sm text-gray-700">Ativo</label>

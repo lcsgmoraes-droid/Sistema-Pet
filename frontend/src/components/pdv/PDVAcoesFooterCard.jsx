@@ -65,10 +65,7 @@ export default function PDVAcoesFooterCard({
         <ActionButton
           onClick={onAbrirModalPagamento}
           disabled={
-            loading ||
-            statusVenda === "finalizada" ||
-            statusVenda === "pago_nf" ||
-            !temCaixaAberto
+            loading || statusVenda === "finalizada" || statusVenda === "pago_nf" || !temCaixaAberto
           }
           icon={CreditCard}
           intent="create"

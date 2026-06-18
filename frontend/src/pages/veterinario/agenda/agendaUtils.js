@@ -26,7 +26,11 @@ export const STATUS_LABEL = {
 };
 
 export const TIPO_OPTIONS = [
-  { value: "consulta", label: "Consulta", hint: "Abre o prontuario e inicia o atendimento clinico." },
+  {
+    value: "consulta",
+    label: "Consulta",
+    hint: "Abre o prontuario e inicia o atendimento clinico.",
+  },
   { value: "retorno", label: "Retorno", hint: "Continua a avaliacao de uma consulta anterior." },
   { value: "vacina", label: "Vacina", hint: "Abre o registro de vacinacao do pet ja selecionado." },
   { value: "exame", label: "Exame", hint: "Abre a solicitacao/registro de exame para o pet." },

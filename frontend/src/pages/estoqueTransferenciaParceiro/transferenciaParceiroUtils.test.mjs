@@ -30,10 +30,10 @@ test("normalizarColunasDocumentoTransferencia aceita array e string preservando 
     normalizarColunasDocumentoTransferencia(" total, codigo, invalida, quantidade "),
     ["codigo", "quantidade", "total"],
   );
-  assert.deepEqual(
-    normalizarColunasDocumentoTransferencia(["produto", "totais", "produto"]),
-    ["produto", "totais"],
-  );
+  assert.deepEqual(normalizarColunasDocumentoTransferencia(["produto", "totais", "produto"]), [
+    "produto",
+    "totais",
+  ]);
   assert.deepEqual(
     normalizarColunasDocumentoTransferencia(COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO),
     COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO,
@@ -73,7 +73,10 @@ test("helpers de carga e texto preservam formatos usados na tela", () => {
   assert.deepEqual(extrairListaProdutos({ data: ["a"] }), ["a"]);
   assert.equal(normalizarNumero("12,5"), 12.5);
   assert.equal(formatarData("2026-05-20"), "20/05/2026");
-  assert.equal(extrairObservacaoManualTransferencia("Entrega combinada\n\nItens:\nProduto"), "Entrega combinada");
+  assert.equal(
+    extrairObservacaoManualTransferencia("Entrega combinada\n\nItens:\nProduto"),
+    "Entrega combinada",
+  );
 });
 
 test("factories de estado preservam defaults e overrides da tela", () => {

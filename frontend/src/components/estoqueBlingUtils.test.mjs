@@ -52,10 +52,7 @@ test("classifica erros de sincronizacao do bling em mensagens acionaveis", () =>
   );
 
   assert.equal(
-    buildSyncErrorMeta(
-      { ultimo_erro: "invalid_grant" },
-      { blingConnected: true },
-    ).category,
+    buildSyncErrorMeta({ ultimo_erro: "invalid_grant" }, { blingConnected: true }).category,
     "auth_resolved",
   );
 
@@ -71,10 +68,7 @@ test("classifica erros de sincronizacao do bling em mensagens acionaveis", () =>
 
 test("monta problema de sincronizacao priorizando fila, erro e divergencia", () => {
   assert.equal(
-    buildSyncIssue(
-      { ultimo_erro: "429 Too Many Requests", queue_status: "pendente" },
-      {},
-    ).category,
+    buildSyncIssue({ ultimo_erro: "429 Too Many Requests", queue_status: "pendente" }, {}).category,
     "rate_limit",
   );
 

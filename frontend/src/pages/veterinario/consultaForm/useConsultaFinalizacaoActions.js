@@ -1,8 +1,5 @@
 import { vetApi } from "../vetApi";
-import {
-  buildFinalizacaoPayload,
-  buildItensPrescricao,
-} from "./consultaFormState";
+import { buildFinalizacaoPayload, buildItensPrescricao } from "./consultaFormState";
 
 export default function useConsultaFinalizacaoActions({
   carregarTimelineConsulta,
@@ -42,14 +39,20 @@ export default function useConsultaFinalizacaoActions({
       }
 
       if (form.procedimentos_realizados.length > 0) {
-        const procedimentosValidos = form.procedimentos_realizados.filter((item) => item.nome?.trim());
+        const procedimentosValidos = form.procedimentos_realizados.filter((item) =>
+          item.nome?.trim(),
+        );
         for (const procedimento of procedimentosValidos) {
           await vetApi.adicionarProcedimento({
             consulta_id: consultaIdAtual,
-            catalogo_id: procedimento.catalogo_id ? Number.parseInt(procedimento.catalogo_id) : undefined,
+            catalogo_id: procedimento.catalogo_id
+              ? Number.parseInt(procedimento.catalogo_id)
+              : undefined,
             nome: procedimento.nome,
             descricao: procedimento.descricao || undefined,
-            valor: procedimento.valor ? Number(String(procedimento.valor).replace(",", ".")) : undefined,
+            valor: procedimento.valor
+              ? Number(String(procedimento.valor).replace(",", "."))
+              : undefined,
             observacoes: procedimento.observacoes || undefined,
             realizado: true,
             baixar_estoque: procedimento.baixar_estoque !== false,

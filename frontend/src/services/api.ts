@@ -9,7 +9,7 @@ import {
 import { createRefreshManager } from "../auth/refreshManager";
 
 const configuredApiUrl = import.meta.env.VITE_API_URL;
-const baseURL = import.meta.env.DEV ? "/api" : (configuredApiUrl || "/api");
+const baseURL = import.meta.env.DEV ? "/api" : configuredApiUrl || "/api";
 const PUBLIC_PATH_PREFIXES = [
   "/login",
   "/register",
@@ -32,9 +32,7 @@ const REFRESH_RETRY_EXCLUDED_ENDPOINTS = [
 
 function isPublicBrowserPath() {
   const path = window.location.pathname || "/";
-  return PUBLIC_PATH_PREFIXES.some(
-    (prefix) => path === prefix || path.startsWith(`${prefix}/`),
-  );
+  return PUBLIC_PATH_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 }
 
 function isRefreshRetryEligible(config) {
@@ -62,11 +60,12 @@ export const api = axios.create({
 });
 
 const refreshManager = createRefreshManager({
-  refreshRequest: (refreshToken) => axios.post(
-    `${baseURL}/auth/refresh`,
-    { refresh_token: refreshToken },
-    { headers: { "Content-Type": "application/json" } },
-  ),
+  refreshRequest: (refreshToken) =>
+    axios.post(
+      `${baseURL}/auth/refresh`,
+      { refresh_token: refreshToken },
+      { headers: { "Content-Type": "application/json" } },
+    ),
   getRefreshToken,
   setAccessToken,
   setRefreshToken,
@@ -83,7 +82,7 @@ api.interceptors.request.use(
 
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
 api.interceptors.response.use(
@@ -114,7 +113,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

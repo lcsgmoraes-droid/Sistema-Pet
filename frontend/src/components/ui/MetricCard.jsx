@@ -48,21 +48,11 @@ export default function MetricCard({
         {icon ? <div className="shrink-0 opacity-80">{icon}</div> : null}
       </div>
       <div>
-        <div
-          className={[
-            "font-bold leading-tight text-slate-950",
-            sizeClasses.value,
-          ].join(" ")}
-        >
+        <div className={["font-bold leading-tight text-slate-950", sizeClasses.value].join(" ")}>
           {value ?? "-"}
         </div>
         {subtitle ? (
-          <p
-            className={[
-              "text-xs leading-snug opacity-80",
-              sizeClasses.subtitle,
-            ].join(" ")}
-          >
+          <p className={["text-xs leading-snug opacity-80", sizeClasses.subtitle].join(" ")}>
             {subtitle}
           </p>
         ) : null}

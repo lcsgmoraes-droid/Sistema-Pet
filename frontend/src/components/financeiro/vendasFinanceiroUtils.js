@@ -100,9 +100,7 @@ export function parseDataHoraLocal(valor) {
   }
 
   if (typeof valor === "string") {
-    const match = valor.match(
-      /^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?/,
-    );
+    const match = valor.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?/);
     if (match) {
       const [, ano, mes, dia, hora, minuto, segundo] = match;
       return new Date(
@@ -187,11 +185,11 @@ export function normalizarFormaPagamentoLabel(valor) {
   const texto = String(valor || "").trim();
   const lower = texto.toLowerCase();
   const mapa = {
-    "1": "Dinheiro",
-    "2": "Pix",
-    "3": "Cartao Debito",
-    "4": "Cartao Credito",
-    "5": "Cartao Credito",
+    1: "Dinheiro",
+    2: "Pix",
+    3: "Cartao Debito",
+    4: "Cartao Credito",
+    5: "Cartao Credito",
     pix: "Pix",
     dinheiro: "Dinheiro",
     debito: "Cartao Debito",
@@ -233,15 +231,11 @@ export function filtrarDadosFinanceiroVendas(dados, tipo, filtros = {}) {
   const { filtroFuncionario, filtroFormaPagamento, filtroCategoria } = filtros;
 
   if (filtroFuncionario && tipo === "funcionario") {
-    dadosFiltrados = dadosFiltrados.filter(
-      (item) => item.funcionario === filtroFuncionario,
-    );
+    dadosFiltrados = dadosFiltrados.filter((item) => item.funcionario === filtroFuncionario);
   }
 
   if (filtroFormaPagamento && tipo === "formaPagamento") {
-    dadosFiltrados = dadosFiltrados.filter(
-      (item) => item.forma_pagamento === filtroFormaPagamento,
-    );
+    dadosFiltrados = dadosFiltrados.filter((item) => item.forma_pagamento === filtroFormaPagamento);
   }
 
   if (filtroCategoria && tipo === "categoria") {
@@ -324,9 +318,7 @@ export function montarFeriadosPeriodoFinanceiro({
   dataFim,
   feriadosCustomizados = [],
 }) {
-  const anos = new Set(
-    listarDiasPeriodo(dataInicio, dataFim).map((dia) => dia.getFullYear()),
-  );
+  const anos = new Set(listarDiasPeriodo(dataInicio, dataFim).map((dia) => dia.getFullYear()));
   const feriados = montarFeriadosPadrao(Array.from(anos));
 
   feriadosCustomizados.forEach((feriado) => {
@@ -345,9 +337,7 @@ export function montarVendasPorDataCalendarioFinanceiro({
   feriadosPorData = {},
   considerarSabadoDiaUtil = false,
 }) {
-  const vendasMap = new Map(
-    (vendasPorData || []).map((item) => [dataKeyLocal(item.data), item]),
-  );
+  const vendasMap = new Map((vendasPorData || []).map((item) => [dataKeyLocal(item.data), item]));
 
   return listarDiasPeriodo(dataInicio, dataFim).map((dia) => {
     const key = dataKeyLocal(dia);
@@ -568,11 +558,7 @@ export function getTextoComparacaoPeriodo(periodoComparacao) {
   }
 }
 
-export function calcularPeriodoComparacaoFinanceiro({
-  dataInicio,
-  dataFim,
-  periodoComparacao,
-}) {
+export function calcularPeriodoComparacaoFinanceiro({ dataInicio, dataFim, periodoComparacao }) {
   const inicio = parseDataLocal(dataInicio);
   const fim = parseDataLocal(dataFim);
   if (!inicio || !fim) return { data_inicio: "", data_fim: "" };
@@ -711,8 +697,7 @@ export function calcularAnaliseInteligenteVendas({
         tipo: "atencao",
         titulo: "Recebimento em aberto elevado",
         mensagem: `${percAberto}% da venda liquida ainda esta em aberto no periodo.`,
-        recomendacao:
-          "Priorize cobranca e revise condicoes de pagamento com maior prazo.",
+        recomendacao: "Priorize cobranca e revise condicoes de pagamento com maior prazo.",
       });
     }
   }
@@ -724,8 +709,7 @@ export function calcularAnaliseInteligenteVendas({
       tipo: "atencao",
       titulo: "Muitos produtos com baixa margem",
       mensagem: `${baixaMargem} produtos vendidos estao com margem abaixo de 20%.`,
-      recomendacao:
-        "Reprecifique itens de baixo giro/margem e renegocie compra com fornecedor.",
+      recomendacao: "Reprecifique itens de baixo giro/margem e renegocie compra com fornecedor.",
     });
   }
 
@@ -749,10 +733,7 @@ export function calcularAnaliseInteligenteVendas({
   const previsaoProximos7Dias =
     basePrevisao.length > 0
       ? sanitizarNumero(
-          (basePrevisao.reduce(
-            (soma, item) => soma + sanitizarNumero(item.valor_liquido),
-            0,
-          ) /
+          (basePrevisao.reduce((soma, item) => soma + sanitizarNumero(item.valor_liquido), 0) /
             basePrevisao.length) *
             7,
         )
@@ -799,10 +780,10 @@ function vendaTemNotaFiscal(venda) {
 
   return Boolean(
     venda?.nf_emitida ||
-      venda?.nfe_bling_id ||
-      venda?.nfe_chave ||
-      venda?.nfe_numero ||
-      String(venda?.status || "").toLowerCase() === "pago_nf",
+    venda?.nfe_bling_id ||
+    venda?.nfe_chave ||
+    venda?.nfe_numero ||
+    String(venda?.status || "").toLowerCase() === "pago_nf",
   );
 }
 
@@ -850,7 +831,9 @@ export function calcularTotalizadoresListaVendasFinanceiro(vendas = []) {
     margem_sobre_venda:
       totais.venda_bruta > 0 ? arredondarPercentual((totais.lucro / totais.venda_bruta) * 100) : 0,
     margem_sobre_custo:
-      totais.custo_produtos > 0 ? arredondarPercentual((totais.lucro / totais.custo_produtos) * 100) : 0,
+      totais.custo_produtos > 0
+        ? arredondarPercentual((totais.lucro / totais.custo_produtos) * 100)
+        : 0,
   };
 }
 
@@ -996,9 +979,7 @@ export function calcularDistribuicaoTemporalVendasFinanceiro(vendas = []) {
     ...item,
     ticket_medio: item.quantidade > 0 ? item.valor_liquido / item.quantidade : 0,
   }));
-  const vendasPorHorarioComMovimento = vendasPorHorarioResumo.filter(
-    (item) => item.quantidade > 0,
-  );
+  const vendasPorHorarioComMovimento = vendasPorHorarioResumo.filter((item) => item.quantidade > 0);
 
   return {
     vendasPorDiaSemanaResumo,
@@ -1015,9 +996,7 @@ export function calcularDistribuicaoTemporalVendasFinanceiro(vendas = []) {
 
 export function montarFluxoResultadoCardsFinanceiro(resumo = {}) {
   const taxaLoja = Number(resumo.taxa_loja_total || 0);
-  const repasseEntrega = Number(
-    resumo.taxa_entrega_repasse_total ?? resumo.taxa_entrega ?? 0,
-  );
+  const repasseEntrega = Number(resumo.taxa_entrega_repasse_total ?? resumo.taxa_entrega ?? 0);
   const taxaOperacional = Number(resumo.taxa_operacional_total || 0);
   const custoOperacional = repasseEntrega + taxaOperacional;
   const taxasCartao = Number(resumo.taxa_cartao_total || 0);

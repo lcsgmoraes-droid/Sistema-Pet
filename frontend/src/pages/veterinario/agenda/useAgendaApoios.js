@@ -45,7 +45,7 @@ export function useAgendaApoios({
         dataQuery,
         motivoQuery,
         tipoQuery,
-      })
+      }),
     );
   }, [
     abrirNovoQuery,
@@ -187,7 +187,7 @@ export function useAgendaApoios({
         if (!ativo) return;
         const lista = resposta.data?.items ?? resposta.data ?? [];
         const ordenados = (Array.isArray(lista) ? lista : []).sort((a, b) =>
-          String(a.data_hora || "").localeCompare(String(b.data_hora || ""))
+          String(a.data_hora || "").localeCompare(String(b.data_hora || "")),
         );
         setAgendaDiaModal(ordenados);
       } catch {

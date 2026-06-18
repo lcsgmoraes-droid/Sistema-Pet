@@ -1,105 +1,107 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { toast } from 'react-hot-toast';
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "react-hot-toast";
 
-import api from '../api';
+import api from "../api";
 
-const BRASILIA_TIMEZONE = 'America/Sao_Paulo';
+const BRASILIA_TIMEZONE = "America/Sao_Paulo";
 const EVENT_LABELS = {
-  'order.created': 'Pedido criado/importado',
-  'order.updated': 'Atualizacao do pedido recebida',
-  'invoice.updated': 'NF recebida do Bling',
-  'invoice.linked_to_order': 'NF vinculada ao pedido',
-  'invoice.authorized': 'NF autorizada e processada',
-  'invoice.cancelled': 'NF cancelada processada',
-  'pedido.confirmado': 'Pedido confirmado no sistema',
-  'pedido.cancelado': 'Pedido cancelado no sistema',
-  'pedido.confirmacao.baixa': 'Baixa de estoque do pedido',
-  'nf.processada': 'NF processada com reconciliacao',
-  'nf.baixa_estoque': 'Baixa de estoque via NF',
+  "order.created": "Pedido criado/importado",
+  "order.updated": "Atualizacao do pedido recebida",
+  "invoice.updated": "NF recebida do Bling",
+  "invoice.linked_to_order": "NF vinculada ao pedido",
+  "invoice.authorized": "NF autorizada e processada",
+  "invoice.cancelled": "NF cancelada processada",
+  "pedido.confirmado": "Pedido confirmado no sistema",
+  "pedido.cancelado": "Pedido cancelado no sistema",
+  "pedido.confirmacao.baixa": "Baixa de estoque do pedido",
+  "nf.processada": "NF processada com reconciliacao",
+  "nf.baixa_estoque": "Baixa de estoque via NF",
 };
 const LINK_SOURCE_LABELS = {
-  'nf.webhook': 'webhook da NF',
-  'pedido.webhook': 'webhook do pedido',
-  auditoria: 'auditoria automatica',
+  "nf.webhook": "webhook da NF",
+  "pedido.webhook": "webhook do pedido",
+  auditoria: "auditoria automatica",
 };
 const RECENT_EVENTS_LIMIT = 3;
 
-function Badge({ children, tone = 'slate' }) {
+function Badge({ children, tone = "slate" }) {
   const tones = {
-    slate: 'bg-slate-100 text-slate-700',
-    green: 'bg-emerald-100 text-emerald-700',
-    yellow: 'bg-amber-100 text-amber-700',
-    red: 'bg-rose-100 text-rose-700',
-    blue: 'bg-blue-100 text-blue-700',
+    slate: "bg-slate-100 text-slate-700",
+    green: "bg-emerald-100 text-emerald-700",
+    yellow: "bg-amber-100 text-amber-700",
+    red: "bg-rose-100 text-rose-700",
+    blue: "bg-blue-100 text-blue-700",
   };
 
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${tones[tone] || tones.slate}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${tones[tone] || tones.slate}`}
+    >
       {children}
     </span>
   );
 }
 
 function toneFromSeverity(severity) {
-  if (severity === 'critical') return 'red';
-  if (severity === 'high') return 'yellow';
-  if (severity === 'medium') return 'blue';
-  if (severity === 'info') return 'green';
-  return 'slate';
+  if (severity === "critical") return "red";
+  if (severity === "high") return "yellow";
+  if (severity === "medium") return "blue";
+  if (severity === "info") return "green";
+  return "slate";
 }
 
 function toneFromStatus(status) {
-  if (status === 'ok') return 'green';
-  if (status === 'received') return 'blue';
-  if (status === 'warning') return 'yellow';
-  if (status === 'error') return 'red';
-  return 'slate';
+  if (status === "ok") return "green";
+  if (status === "received") return "blue";
+  if (status === "warning") return "yellow";
+  if (status === "error") return "red";
+  return "slate";
 }
 
 function statusLabel(status) {
-  if (status === 'ok') return 'ok';
-  if (status === 'received') return 'recebido';
-  if (status === 'warning') return 'pendencia';
-  if (status === 'error') return 'erro';
-  return status || '-';
+  if (status === "ok") return "ok";
+  if (status === "received") return "recebido";
+  if (status === "warning") return "pendencia";
+  if (status === "error") return "erro";
+  return status || "-";
 }
 
 function normalizeUtcDateInput(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
+  const raw = String(value || "").trim();
+  if (!raw) return "";
 
   if (/z$/i.test(raw) || /[+-]\d{2}:\d{2}$/.test(raw)) return raw;
 
-  const base = raw.includes('T') ? raw : raw.replace(' ', 'T');
+  const base = raw.includes("T") ? raw : raw.replace(" ", "T");
   return `${base}Z`;
 }
 
 function formatDate(value) {
   const normalized = normalizeUtcDateInput(value);
-  if (!normalized) return '-';
+  if (!normalized) return "-";
   const date = new Date(normalized);
-  if (Number.isNaN(date.getTime())) return '-';
-  return `${date.toLocaleString('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
+  if (Number.isNaN(date.getTime())) return "-";
+  return `${date.toLocaleString("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
     timeZone: BRASILIA_TIMEZONE,
   })} BRT`;
 }
 
 function displayValue(value) {
-  if (value === null || value === undefined) return '-';
-  if (value === '') return '-';
+  if (value === null || value === undefined) return "-";
+  if (value === "") return "-";
   return String(value);
 }
 
-const MONITOR_BASES = ['/bling/monitor', '/integracoes/bling/monitor'];
+const MONITOR_BASES = ["/bling/monitor", "/integracoes/bling/monitor"];
 
 async function monitorRequest(method, path, config) {
   let ultimoErro = null;
 
   for (const base of MONITOR_BASES) {
     try {
-      if (method === 'get') return await api.get(`${base}${path}`, config);
+      if (method === "get") return await api.get(`${base}${path}`, config);
       return await api.post(`${base}${path}`, config?.data, config);
     } catch (error) {
       ultimoErro = error;
@@ -131,7 +133,9 @@ function DetailField({ label, value, hint, mono = false }) {
         <span>{label}</span>
         <InfoHint text={hint} />
       </div>
-      <p className={`mt-1 break-all text-sm text-slate-700 ${mono ? 'font-mono' : ''}`}>{displayValue(value)}</p>
+      <p className={`mt-1 break-all text-sm text-slate-700 ${mono ? "font-mono" : ""}`}>
+        {displayValue(value)}
+      </p>
     </div>
   );
 }
@@ -147,28 +151,28 @@ function SummaryCard({ title, value, hint }) {
 }
 
 function friendlyErrorMessage(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
+  const raw = String(value || "").trim();
+  if (!raw) return "";
 
   const lower = raw.toLowerCase();
 
   if (lower.includes("estoque_movimentacoes_user_id_fkey")) {
-    return 'Nao foi possivel registrar a baixa automatica porque faltava um usuario valido para a operacao.';
+    return "Nao foi possivel registrar a baixa automatica porque faltava um usuario valido para a operacao.";
   }
   if (lower.includes("session's transaction has been rolled back")) {
-    return 'A tentativa automatica falhou por um erro interno de processamento. O incidente continua aberto para nova tentativa.';
+    return "A tentativa automatica falhou por um erro interno de processamento. O incidente continua aberto para nova tentativa.";
   }
-  if (lower.includes('foreign key constraint')) {
-    return 'A correcao automatica nao conseguiu salvar todos os vinculos necessarios no banco.';
+  if (lower.includes("foreign key constraint")) {
+    return "A correcao automatica nao conseguiu salvar todos os vinculos necessarios no banco.";
   }
-  if (lower.includes('produto nao encontrado') || lower.includes('produto não encontrado')) {
-    return 'O produto do item ainda nao foi encontrado no cadastro local.';
+  if (lower.includes("produto nao encontrado") || lower.includes("produto não encontrado")) {
+    return "O produto do item ainda nao foi encontrado no cadastro local.";
   }
-  if (lower.includes('sku') && lower.includes('nao encontrado')) {
-    return 'O SKU do item ainda nao foi encontrado no cadastro local.';
+  if (lower.includes("sku") && lower.includes("nao encontrado")) {
+    return "O SKU do item ainda nao foi encontrado no cadastro local.";
   }
-  if (lower.includes('autocorrecao falhou') || lower.includes('autocorreção falhou')) {
-    return 'A correcao automatica nao conseguiu concluir a acao sugerida.';
+  if (lower.includes("autocorrecao falhou") || lower.includes("autocorreção falhou")) {
+    return "A correcao automatica nao conseguiu concluir a acao sugerida.";
   }
   if (raw.length > 220) {
     return `${raw.slice(0, 217)}...`;
@@ -178,103 +182,119 @@ function friendlyErrorMessage(value) {
 }
 
 function formatAutofixDetails(details) {
-  if (!details || typeof details !== 'object') return '';
+  if (!details || typeof details !== "object") return "";
 
   if (details.auto_fix_error) return friendlyErrorMessage(details.auto_fix_error);
 
   const result = details.auto_fix_result;
   if (result?.error) return friendlyErrorMessage(result.error);
-  if (Array.isArray(result?.erros) && result.erros.length > 0) return friendlyErrorMessage(result.erros.join(' | '));
+  if (Array.isArray(result?.erros) && result.erros.length > 0)
+    return friendlyErrorMessage(result.erros.join(" | "));
   if (result?.motivo) return friendlyErrorMessage(result.motivo);
 
-  return '';
+  return "";
 }
 
 function eventLabel(eventType) {
-  return EVENT_LABELS[eventType] || eventType || 'Evento do monitor';
+  return EVENT_LABELS[eventType] || eventType || "Evento do monitor";
 }
 
 function buildEventResult(evento) {
-  const erros = Array.isArray(evento?.payload?.erros_estoque) ? evento.payload.erros_estoque.filter(Boolean) : [];
-  const errorDetail = friendlyErrorMessage(evento?.error_message || erros.join(' | '));
+  const erros = Array.isArray(evento?.payload?.erros_estoque)
+    ? evento.payload.erros_estoque.filter(Boolean)
+    : [];
+  const errorDetail = friendlyErrorMessage(evento?.error_message || erros.join(" | "));
 
-  if (evento?.event_type === 'invoice.authorized' && evento?.payload?.acao === 'venda_ja_confirmada') {
-    return 'A NF foi processada e o pedido ja estava conciliado anteriormente.';
+  if (
+    evento?.event_type === "invoice.authorized" &&
+    evento?.payload?.acao === "venda_ja_confirmada"
+  ) {
+    return "A NF foi processada e o pedido ja estava conciliado anteriormente.";
   }
-  if (evento?.event_type === 'pedido.confirmado' && evento?.payload?.baixa_estoque_status === 'ok') {
-    return 'Pedido confirmado e estoque baixado sem pendencias.';
+  if (
+    evento?.event_type === "pedido.confirmado" &&
+    evento?.payload?.baixa_estoque_status === "ok"
+  ) {
+    return "Pedido confirmado e estoque baixado sem pendencias.";
   }
-  if (evento?.event_type === 'pedido.confirmado' && evento?.payload?.baixa_estoque_status === 'nf_pendente') {
-    return 'Pedido confirmado no Bling; a venda segue aguardando a NF para consolidar o estoque.';
+  if (
+    evento?.event_type === "pedido.confirmado" &&
+    evento?.payload?.baixa_estoque_status === "nf_pendente"
+  ) {
+    return "Pedido confirmado no Bling; a venda segue aguardando a NF para consolidar o estoque.";
   }
-  if (evento?.event_type === 'pedido.confirmado' && evento?.payload?.baixa_estoque_status === 'warning') {
-    return errorDetail || 'Pedido confirmado, mas a baixa de estoque ficou com pendencias.';
+  if (
+    evento?.event_type === "pedido.confirmado" &&
+    evento?.payload?.baixa_estoque_status === "warning"
+  ) {
+    return errorDetail || "Pedido confirmado, mas a baixa de estoque ficou com pendencias.";
   }
-  if (evento?.status === 'ok') return 'Tudo certo nesta etapa.';
-  if (evento?.status === 'received') return 'Evento recebido; os proximos cards mostram o processamento e o resultado.';
-  if (evento?.status === 'warning') return errorDetail || 'A etapa foi concluida com pendencias.';
-  if (evento?.status === 'error') return errorDetail || 'A etapa falhou e precisa de revisao.';
-  return errorDetail || evento?.message || '-';
+  if (evento?.status === "ok") return "Tudo certo nesta etapa.";
+  if (evento?.status === "received")
+    return "Evento recebido; os proximos cards mostram o processamento e o resultado.";
+  if (evento?.status === "warning") return errorDetail || "A etapa foi concluida com pendencias.";
+  if (evento?.status === "error") return errorDetail || "A etapa falhou e precisa de revisao.";
+  return errorDetail || evento?.message || "-";
 }
 
 function buildEventNarrative(evento) {
   const pedidoLabel = evento.pedido_bling_numero || evento.pedido_bling_id;
   const nfLabel = evento.nf_numero;
-  const linkSource = LINK_SOURCE_LABELS[evento?.payload?.link_source] || '';
+  const linkSource = LINK_SOURCE_LABELS[evento?.payload?.link_source] || "";
 
   switch (evento.event_type) {
-    case 'order.created':
+    case "order.created":
       return {
         title: eventLabel(evento.event_type),
-        what: 'O pedido entrou no sistema a partir do webhook do Bling e ficou pronto para acompanhar NF, reserva e baixa.',
+        what: "O pedido entrou no sistema a partir do webhook do Bling e ficou pronto para acompanhar NF, reserva e baixa.",
         result: buildEventResult(evento),
       };
-    case 'order.updated':
+    case "order.updated":
       return {
         title: eventLabel(evento.event_type),
-        what: 'O Bling enviou uma atualizacao do pedido e o sistema reavaliou o status do fluxo.',
+        what: "O Bling enviou uma atualizacao do pedido e o sistema reavaliou o status do fluxo.",
         result: buildEventResult(evento),
       };
-    case 'invoice.updated':
+    case "invoice.updated":
       return {
         title: eventLabel(evento.event_type),
-        what: 'A NF chegou do Bling e o sistema iniciou a localizacao do pedido para atualizar o vinculo da nota.',
+        what: "A NF chegou do Bling e o sistema iniciou a localizacao do pedido para atualizar o vinculo da nota.",
         result: buildEventResult(evento),
       };
-    case 'invoice.linked_to_order':
+    case "invoice.linked_to_order":
       return {
         title: eventLabel(evento.event_type),
-        what: `${nfLabel ? `A NF ${nfLabel}` : 'A NF recebida'} foi vinculada ao ${pedidoLabel ? `pedido ${pedidoLabel}` : 'pedido correspondente'}${linkSource ? ` via ${linkSource}` : ''}.`,
-        result: 'O vinculo pedido/NF ficou salvo para as proximas etapas do fluxo.',
+        what: `${nfLabel ? `A NF ${nfLabel}` : "A NF recebida"} foi vinculada ao ${pedidoLabel ? `pedido ${pedidoLabel}` : "pedido correspondente"}${linkSource ? ` via ${linkSource}` : ""}.`,
+        result: "O vinculo pedido/NF ficou salvo para as proximas etapas do fluxo.",
       };
-    case 'invoice.authorized':
+    case "invoice.authorized":
       return {
         title: eventLabel(evento.event_type),
-        what: 'Com a NF autorizada, o sistema consolidou o pedido e executou a reconciliacao do estoque.',
+        what: "Com a NF autorizada, o sistema consolidou o pedido e executou a reconciliacao do estoque.",
         result: buildEventResult(evento),
       };
-    case 'invoice.cancelled':
+    case "invoice.cancelled":
       return {
         title: eventLabel(evento.event_type),
-        what: 'A NF cancelada foi processada e o pedido foi ajustado de acordo com o evento recebido.',
+        what: "A NF cancelada foi processada e o pedido foi ajustado de acordo com o evento recebido.",
         result: buildEventResult(evento),
       };
-    case 'pedido.confirmado':
+    case "pedido.confirmado":
       return {
         title: eventLabel(evento.event_type),
-        what: 'O pedido foi consolidado no sistema depois da atualizacao recebida do Bling.',
+        what: "O pedido foi consolidado no sistema depois da atualizacao recebida do Bling.",
         result: buildEventResult(evento),
       };
-    case 'pedido.cancelado':
+    case "pedido.cancelado":
       return {
         title: eventLabel(evento.event_type),
-        what: 'O pedido foi cancelado no sistema e as reservas logicas foram liberadas.',
+        what: "O pedido foi cancelado no sistema e as reservas logicas foram liberadas.",
         result: buildEventResult(evento),
       };
     default:
       return {
         title: eventLabel(evento.event_type),
-        what: evento.message || 'Evento registrado no monitor do fluxo Bling.',
+        what: evento.message || "Evento registrado no monitor do fluxo Bling.",
         result: buildEventResult(evento),
       };
   }
@@ -289,11 +309,11 @@ function buildEventReferenceSummary(evento) {
   if (evento.nf_numero) partes.push(`NF ${evento.nf_numero}`);
   if (evento.sku) partes.push(`SKU ${evento.sku}`);
 
-  return partes.join(' | ');
+  return partes.join(" | ");
 }
 
 function isRoutineEvent(evento) {
-  return evento?.severity === 'info' && ['ok', 'received'].includes(evento?.status);
+  return evento?.severity === "info" && ["ok", "received"].includes(evento?.status);
 }
 
 function splitEventBuckets(eventos) {
@@ -301,7 +321,8 @@ function splitEventBuckets(eventos) {
   const history = [];
 
   eventos.forEach((evento, index) => {
-    const destaque = index < 6 || !isRoutineEvent(evento) || ['warning', 'error'].includes(evento?.status);
+    const destaque =
+      index < 6 || !isRoutineEvent(evento) || ["warning", "error"].includes(evento?.status);
     if (destaque) {
       timeline.push(evento);
       return;
@@ -313,7 +334,7 @@ function splitEventBuckets(eventos) {
 }
 
 function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
-  const pedidoLabel = incidente.pedido_bling_numero || incidente.pedido_bling_id || '-';
+  const pedidoLabel = incidente.pedido_bling_numero || incidente.pedido_bling_id || "-";
   const autoFixDetalhe = formatAutofixDetails(incidente.details);
   const duplicidade = incidente.duplicidade || {};
   const acoesDisponiveis = incidente.acoes_disponiveis || {};
@@ -325,7 +346,9 @@ function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={toneFromSeverity(incidente.severity)}>{incidente.severity}</Badge>
-            <Badge tone={incidente.status === 'resolved' ? 'green' : 'slate'}>{incidente.status}</Badge>
+            <Badge tone={incidente.status === "resolved" ? "green" : "slate"}>
+              {incidente.status}
+            </Badge>
             <span className="text-xs font-mono text-slate-500">{incidente.code}</span>
           </div>
           <h3 className="mt-2 text-sm font-semibold text-slate-900">{incidente.title}</h3>
@@ -338,12 +361,39 @@ function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-        <DetailField label="Pedido Bling" value={pedidoLabel} hint="Numero visivel do pedido no Bling." />
-        <DetailField label="ID interno" value={incidente.pedido_integrado_id} hint="Identificador do pedido dentro do sistema local." mono />
-        <DetailField label="Pedido loja" value={incidente.numero_pedido_loja} hint="Numero do pedido no canal ou marketplace." />
-        <DetailField label="NF numero" value={incidente.nf_numero} hint="Numero humano da NF vinculada a este fluxo." />
-        <DetailField label="NF Bling" value={incidente.nf_bling_id} hint="Identificador tecnico da nota no Bling." mono />
-        <DetailField label="SKU" value={incidente.sku} hint="SKU do item impactado pelo incidente." mono />
+        <DetailField
+          label="Pedido Bling"
+          value={pedidoLabel}
+          hint="Numero visivel do pedido no Bling."
+        />
+        <DetailField
+          label="ID interno"
+          value={incidente.pedido_integrado_id}
+          hint="Identificador do pedido dentro do sistema local."
+          mono
+        />
+        <DetailField
+          label="Pedido loja"
+          value={incidente.numero_pedido_loja}
+          hint="Numero do pedido no canal ou marketplace."
+        />
+        <DetailField
+          label="NF numero"
+          value={incidente.nf_numero}
+          hint="Numero humano da NF vinculada a este fluxo."
+        />
+        <DetailField
+          label="NF Bling"
+          value={incidente.nf_bling_id}
+          hint="Identificador tecnico da nota no Bling."
+          mono
+        />
+        <DetailField
+          label="SKU"
+          value={incidente.sku}
+          hint="SKU do item impactado pelo incidente."
+          mono
+        />
       </div>
 
       {duplicidade.tem_duplicados && (
@@ -351,16 +401,17 @@ function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
           <div className="flex items-center gap-2">
             <Badge tone="yellow">pedido duplicado</Badge>
             <span className="text-sm font-semibold text-amber-900">
-              Pedido loja {duplicidade.numero_pedido_loja || incidente.numero_pedido_loja || '-'}
+              Pedido loja {duplicidade.numero_pedido_loja || incidente.numero_pedido_loja || "-"}
             </span>
           </div>
           <p className="mt-2 text-sm text-amber-800">
-            O sistema identificou mais de um pedido local para o mesmo numero de pedido da loja. O pedido canonico fica como fonte principal do fluxo.
+            O sistema identificou mais de um pedido local para o mesmo numero de pedido da loja. O
+            pedido canonico fica como fonte principal do fluxo.
           </p>
           <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
             <DetailField
               label="Pedido canonico"
-              value={pedidoCanonico.pedido_bling_numero || pedidoCanonico.pedido_bling_id || '-'}
+              value={pedidoCanonico.pedido_bling_numero || pedidoCanonico.pedido_bling_id || "-"}
               hint="Pedido principal escolhido pelo sistema para centralizar NF, estoque e historico."
             />
             <DetailField
@@ -371,16 +422,27 @@ function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
           </div>
           {(duplicidade.pedidos_duplicados || []).length > 0 && (
             <div className="mt-3 rounded-lg border border-amber-100 bg-white px-3 py-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Pedidos duplicados detectados</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                Pedidos duplicados detectados
+              </p>
               <div className="mt-2 space-y-2">
                 {duplicidade.pedidos_duplicados.map((pedido) => (
-                  <div key={pedido.id} className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
-                    <span className="font-medium">#{pedido.pedido_bling_numero || pedido.pedido_bling_id || pedido.id}</span>
-                    <Badge tone={pedido.pode_mesclar_automaticamente ? 'green' : 'yellow'}>
-                      {pedido.pode_mesclar_automaticamente ? 'seguro para mesclar' : 'revisao manual'}
+                  <div
+                    key={pedido.id}
+                    className="flex flex-wrap items-center gap-2 text-sm text-slate-700"
+                  >
+                    <span className="font-medium">
+                      #{pedido.pedido_bling_numero || pedido.pedido_bling_id || pedido.id}
+                    </span>
+                    <Badge tone={pedido.pode_mesclar_automaticamente ? "green" : "yellow"}>
+                      {pedido.pode_mesclar_automaticamente
+                        ? "seguro para mesclar"
+                        : "revisao manual"}
                     </Badge>
                     {pedido.motivos_bloqueio?.length > 0 && (
-                      <span className="text-xs text-amber-700">{pedido.motivos_bloqueio.join(', ')}</span>
+                      <span className="text-xs text-amber-700">
+                        {pedido.motivos_bloqueio.join(", ")}
+                      </span>
                     )}
                   </div>
                 ))}
@@ -396,7 +458,7 @@ function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
         </div>
       )}
 
-      {incidente.auto_fix_status === 'failed' && autoFixDetalhe && (
+      {incidente.auto_fix_status === "failed" && autoFixDetalhe && (
         <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
           Ultima tentativa de correcao: {autoFixDetalhe}
         </div>
@@ -405,31 +467,32 @@ function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
       <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
         <strong>Corrigir</strong> tenta executar a acao automatica sugerida.
         <br />
-        <strong>Resolver</strong> apenas marca o incidente como tratado manualmente, sem corrigir o pedido.
+        <strong>Resolver</strong> apenas marca o incidente como tratado manualmente, sem corrigir o
+        pedido.
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {acoesDisponiveis.pode_consolidar_duplicidade && incidente.status !== 'resolved' && (
+        {acoesDisponiveis.pode_consolidar_duplicidade && incidente.status !== "resolved" && (
           <button
             type="button"
-            onClick={() => onCorrigir({ ...incidente, acao_forcada: 'consolidar_duplicidade' })}
+            onClick={() => onCorrigir({ ...incidente, acao_forcada: "consolidar_duplicidade" })}
             disabled={acaoId === `consolidar-${incidente.id}`}
             className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-600 disabled:opacity-50"
           >
             Consolidar duplicados
           </button>
         )}
-        {acoesDisponiveis.pode_reconciliar_fluxo && incidente.status !== 'resolved' && (
+        {acoesDisponiveis.pode_reconciliar_fluxo && incidente.status !== "resolved" && (
           <button
             type="button"
-            onClick={() => onCorrigir({ ...incidente, acao_forcada: 'reconciliar_fluxo' })}
+            onClick={() => onCorrigir({ ...incidente, acao_forcada: "reconciliar_fluxo" })}
             disabled={acaoId === `reconciliar-${incidente.id}`}
             className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
           >
             Reconciliar fluxo
           </button>
         )}
-        {incidente.auto_fixable && incidente.status !== 'resolved' && (
+        {incidente.auto_fixable && incidente.status !== "resolved" && (
           <button
             type="button"
             onClick={() => onCorrigir(incidente)}
@@ -439,7 +502,7 @@ function IncidentCard({ incidente, onCorrigir, onResolver, acaoId }) {
             Tentar corrigir
           </button>
         )}
-        {incidente.status !== 'resolved' && (
+        {incidente.status !== "resolved" && (
           <button
             type="button"
             onClick={() => onResolver(incidente)}
@@ -459,16 +522,22 @@ function EventCard({ evento, defaultExpanded = false }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const hasReferences = Boolean(
     evento.pedido_bling_numero ||
-      evento.pedido_bling_id ||
-      evento.pedido_integrado_id ||
-      evento.numero_pedido_loja ||
-      evento.nf_numero ||
-      evento.nf_bling_id ||
-      evento.sku
+    evento.pedido_bling_id ||
+    evento.pedido_integrado_id ||
+    evento.numero_pedido_loja ||
+    evento.nf_numero ||
+    evento.nf_bling_id ||
+    evento.sku,
   );
   const referenceSummary = buildEventReferenceSummary(evento);
   const statusTone =
-    evento.status === 'error' ? 'red' : evento.status === 'warning' ? 'yellow' : evento.status === 'received' ? 'blue' : 'green';
+    evento.status === "error"
+      ? "red"
+      : evento.status === "warning"
+        ? "yellow"
+        : evento.status === "received"
+          ? "blue"
+          : "green";
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
@@ -477,8 +546,12 @@ function EventCard({ evento, defaultExpanded = false }) {
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={toneFromSeverity(evento.severity)}>{evento.severity}</Badge>
             <Badge tone={toneFromStatus(evento.status)}>{statusLabel(evento.status)}</Badge>
-            <span className="text-[11px] uppercase tracking-wide text-slate-400">{evento.source || 'runtime'}</span>
-            {expanded && <span className="text-[11px] font-mono text-slate-400">{evento.event_type}</span>}
+            <span className="text-[11px] uppercase tracking-wide text-slate-400">
+              {evento.source || "runtime"}
+            </span>
+            {expanded && (
+              <span className="text-[11px] font-mono text-slate-400">{evento.event_type}</span>
+            )}
           </div>
           <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
@@ -489,7 +562,9 @@ function EventCard({ evento, defaultExpanded = false }) {
               )}
             </div>
             <div className="flex items-center gap-2 md:ml-4 md:flex-col md:items-end">
-              <Badge tone={statusTone}>{evento.status === 'ok' ? 'sem pendencia' : statusLabel(evento.status)}</Badge>
+              <Badge tone={statusTone}>
+                {evento.status === "ok" ? "sem pendencia" : statusLabel(evento.status)}
+              </Badge>
               <span
                 title="Horario exibido em Brasilia."
                 className="shrink-0 text-right text-xs text-slate-500"
@@ -504,7 +579,7 @@ function EventCard({ evento, defaultExpanded = false }) {
           onClick={() => setExpanded((current) => !current)}
           className="shrink-0 rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
         >
-          {expanded ? 'Ocultar detalhes' : 'Ver detalhes'}
+          {expanded ? "Ocultar detalhes" : "Ver detalhes"}
         </button>
       </div>
 
@@ -523,7 +598,9 @@ function EventCard({ evento, defaultExpanded = false }) {
                 <span>Resultado</span>
                 <InfoHint text="Mostra se a etapa terminou bem, com pendencia ou com erro." />
               </div>
-              <p className={`mt-1 text-sm ${evento.status === 'error' ? 'text-rose-700' : evento.status === 'warning' ? 'text-amber-700' : 'text-slate-700'}`}>
+              <p
+                className={`mt-1 text-sm ${evento.status === "error" ? "text-rose-700" : evento.status === "warning" ? "text-amber-700" : "text-slate-700"}`}
+              >
                 {copy.result}
               </p>
             </div>
@@ -536,22 +613,58 @@ function EventCard({ evento, defaultExpanded = false }) {
                 <InfoHint text="Aqui ficam os identificadores usados para ligar pedido, NF e item dentro do fluxo." />
               </div>
               <p className="mt-1 text-sm text-emerald-800">
-                {displayValue(evento.pedido_bling_numero || evento.pedido_bling_id || '-')}
-                {evento.numero_pedido_loja ? ` | Pedido loja ${evento.numero_pedido_loja}` : ''}
-                {evento.nf_numero ? ` | NF ${evento.nf_numero}` : ''}
+                {displayValue(evento.pedido_bling_numero || evento.pedido_bling_id || "-")}
+                {evento.numero_pedido_loja ? ` | Pedido loja ${evento.numero_pedido_loja}` : ""}
+                {evento.nf_numero ? ` | NF ${evento.nf_numero}` : ""}
               </p>
             </div>
           )}
 
           <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-            <DetailField label="Pedido Bling" value={evento.pedido_bling_numero} hint="Numero visivel do pedido no Bling." />
-            <DetailField label="ID Bling" value={evento.pedido_bling_id} hint="Identificador tecnico do pedido recebido do Bling." mono />
-            <DetailField label="ID interno" value={evento.pedido_integrado_id} hint="Identificador do pedido dentro do sistema local." mono />
-            <DetailField label="Pedido loja" value={evento.numero_pedido_loja} hint="Numero do pedido no canal ou marketplace." />
-            <DetailField label="NF numero" value={evento.nf_numero} hint="Numero humano da nota fiscal associada ao evento." />
-            <DetailField label="NF Bling" value={evento.nf_bling_id} hint="Identificador tecnico da nota no Bling." mono />
-            <DetailField label="Status atual" value={evento.pedido_status_atual} hint="Status mais recente conhecido do pedido local." />
-            <DetailField label="SKU" value={evento.sku} hint="SKU do item impactado por esta etapa." mono />
+            <DetailField
+              label="Pedido Bling"
+              value={evento.pedido_bling_numero}
+              hint="Numero visivel do pedido no Bling."
+            />
+            <DetailField
+              label="ID Bling"
+              value={evento.pedido_bling_id}
+              hint="Identificador tecnico do pedido recebido do Bling."
+              mono
+            />
+            <DetailField
+              label="ID interno"
+              value={evento.pedido_integrado_id}
+              hint="Identificador do pedido dentro do sistema local."
+              mono
+            />
+            <DetailField
+              label="Pedido loja"
+              value={evento.numero_pedido_loja}
+              hint="Numero do pedido no canal ou marketplace."
+            />
+            <DetailField
+              label="NF numero"
+              value={evento.nf_numero}
+              hint="Numero humano da nota fiscal associada ao evento."
+            />
+            <DetailField
+              label="NF Bling"
+              value={evento.nf_bling_id}
+              hint="Identificador tecnico da nota no Bling."
+              mono
+            />
+            <DetailField
+              label="Status atual"
+              value={evento.pedido_status_atual}
+              hint="Status mais recente conhecido do pedido local."
+            />
+            <DetailField
+              label="SKU"
+              value={evento.sku}
+              hint="SKU do item impactado por esta etapa."
+              mono
+            />
           </div>
         </>
       )}
@@ -565,7 +678,7 @@ export default function BlingFlowMonitor() {
   const [eventos, setEventos] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [rodandoAuditoria, setRodandoAuditoria] = useState(false);
-  const [acaoId, setAcaoId] = useState('');
+  const [acaoId, setAcaoId] = useState("");
   const [mostrarTodosEventos, setMostrarTodosEventos] = useState(false);
   const [mostrarHistorico, setMostrarHistorico] = useState(false);
 
@@ -573,15 +686,15 @@ export default function BlingFlowMonitor() {
     setCarregando(true);
     try {
       const [resumoRes, incidentesRes, eventosRes] = await Promise.all([
-        monitorRequest('get', '/resumo'),
-        monitorRequest('get', '/incidentes', { params: { status: 'open', limite: 50 } }),
-        monitorRequest('get', '/eventos', { params: { limite: 30 } }),
+        monitorRequest("get", "/resumo"),
+        monitorRequest("get", "/incidentes", { params: { status: "open", limite: 50 } }),
+        monitorRequest("get", "/eventos", { params: { limite: 30 } }),
       ]);
       setResumo(resumoRes.data);
       setIncidentes(incidentesRes.data || []);
       setEventos(eventosRes.data || []);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao carregar monitor do Bling');
+      toast.error(error.response?.data?.detail || "Erro ao carregar monitor do Bling");
     } finally {
       setCarregando(false);
     }
@@ -594,12 +707,14 @@ export default function BlingFlowMonitor() {
   async function executarAuditoria() {
     setRodandoAuditoria(true);
     try {
-      const response = await monitorRequest('post', '/auditar?dias=7&limite=300&auto_fix=true');
+      const response = await monitorRequest("post", "/auditar?dias=7&limite=300&auto_fix=true");
       const data = response.data || {};
-      toast.success(`Auditoria concluida: ${data.incidentes_detectados || 0} incidente(s), ${data.auto_fix_sucessos || 0} correcao(oes).`);
+      toast.success(
+        `Auditoria concluida: ${data.incidentes_detectados || 0} incidente(s), ${data.auto_fix_sucessos || 0} correcao(oes).`,
+      );
       await carregar();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao executar auditoria');
+      toast.error(error.response?.data?.detail || "Erro ao executar auditoria");
     } finally {
       setRodandoAuditoria(false);
     }
@@ -609,58 +724,66 @@ export default function BlingFlowMonitor() {
     const acaoForcada = incidente.acao_forcada;
     const pedidoId = incidente.pedido_integrado_id;
     const actionKey =
-      acaoForcada === 'consolidar_duplicidade'
+      acaoForcada === "consolidar_duplicidade"
         ? `consolidar-${incidente.id}`
-        : acaoForcada === 'reconciliar_fluxo'
+        : acaoForcada === "reconciliar_fluxo"
           ? `reconciliar-${incidente.id}`
           : `corrigir-${incidente.id}`;
     setAcaoId(actionKey);
     try {
-      if (acaoForcada === 'consolidar_duplicidade' && pedidoId) {
-        const response = await api.post(`/integracoes/bling/pedidos/${pedidoId}/consolidar-duplicidade`);
+      if (acaoForcada === "consolidar_duplicidade" && pedidoId) {
+        const response = await api.post(
+          `/integracoes/bling/pedidos/${pedidoId}/consolidar-duplicidade`,
+        );
         const totalMesclados = response.data?.pedidos_mesclados?.length || 0;
         toast.success(`Duplicidade consolidada. ${totalMesclados} pedido(s) incorporado(s).`);
-      } else if (acaoForcada === 'reconciliar_fluxo' && pedidoId) {
+      } else if (acaoForcada === "reconciliar_fluxo" && pedidoId) {
         const response = await api.post(`/integracoes/bling/pedidos/${pedidoId}/reconciliar-fluxo`);
         toast.success(
           response.data?.nf_numero
             ? `Fluxo reconciliado com a NF ${response.data.nf_numero}.`
-            : 'Fluxo reconciliado com sucesso.'
+            : "Fluxo reconciliado com sucesso.",
         );
       } else {
-        const response = await monitorRequest('post', `/incidentes/${incidente.id}/corrigir`);
+        const response = await monitorRequest("post", `/incidentes/${incidente.id}/corrigir`);
         const detalhe =
           response.data?.details?.error ||
           response.data?.details?.motivo ||
-          (Array.isArray(response.data?.details?.erros) ? response.data.details.erros.join(' | ') : '');
+          (Array.isArray(response.data?.details?.erros)
+            ? response.data.details.erros.join(" | ")
+            : "");
 
         if (response.data?.success) {
-          toast.success('Correcao automatica aplicada.');
+          toast.success("Correcao automatica aplicada.");
         } else {
-          toast.error(friendlyErrorMessage(detalhe) || 'A correcao automatica nao conseguiu resolver o incidente.');
+          toast.error(
+            friendlyErrorMessage(detalhe) ||
+              "A correcao automatica nao conseguiu resolver o incidente.",
+          );
         }
       }
       await carregar();
     } catch (error) {
-      const detail = typeof error.response?.data?.detail === 'string'
-        ? error.response?.data?.detail
-        : error.response?.data?.detail?.motivo || error.response?.data?.detail?.error;
-      toast.error(friendlyErrorMessage(detail) || 'Erro ao corrigir incidente');
+      const detail =
+        typeof error.response?.data?.detail === "string"
+          ? error.response?.data?.detail
+          : error.response?.data?.detail?.motivo || error.response?.data?.detail?.error;
+      toast.error(friendlyErrorMessage(detail) || "Erro ao corrigir incidente");
     } finally {
-      setAcaoId('');
+      setAcaoId("");
     }
   }
 
   async function resolverIncidente(incidente) {
     setAcaoId(`resolver-${incidente.id}`);
     try {
-      await monitorRequest('post', `/incidentes/${incidente.id}/resolver`);
-      toast.success('Incidente marcado como resolvido manualmente.');
+      await monitorRequest("post", `/incidentes/${incidente.id}/resolver`);
+      toast.success("Incidente marcado como resolvido manualmente.");
       await carregar();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao resolver incidente');
+      toast.error(error.response?.data?.detail || "Erro ao resolver incidente");
     } finally {
-      setAcaoId('');
+      setAcaoId("");
     }
   }
 
@@ -681,7 +804,8 @@ export default function BlingFlowMonitor() {
           <div className="mt-3 inline-flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
             <InfoHint text="Os horarios abaixo sao renderizados sempre em America/Sao_Paulo, mesmo quando o evento chegou em UTC." />
             <p>
-              Horarios exibidos em Brasilia. Cada evento mostra o recebimento, o vinculo pedido/NF e o resultado da etapa.
+              Horarios exibidos em Brasilia. Cada evento mostra o recebimento, o vinculo pedido/NF e
+              o resultado da etapa.
             </p>
           </div>
         </div>
@@ -706,9 +830,17 @@ export default function BlingFlowMonitor() {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-        <SummaryCard title="Status" value={resumo?.status || '-'} hint="Saude atual do fluxo" />
-        <SummaryCard title="Incidentes abertos" value={resumo?.incidentes_abertos ?? '-'} hint="Pendencias em aberto" />
-        <SummaryCard title="Criticos" value={resumo?.por_severidade?.critical || 0} hint="Exigem atencao imediata" />
+        <SummaryCard title="Status" value={resumo?.status || "-"} hint="Saude atual do fluxo" />
+        <SummaryCard
+          title="Incidentes abertos"
+          value={resumo?.incidentes_abertos ?? "-"}
+          hint="Pendencias em aberto"
+        />
+        <SummaryCard
+          title="Criticos"
+          value={resumo?.por_severidade?.critical || 0}
+          hint="Exigem atencao imediata"
+        />
         <SummaryCard title="High" value={resumo?.por_severidade?.high || 0} hint="Fluxo em risco" />
       </div>
 
@@ -720,7 +852,9 @@ export default function BlingFlowMonitor() {
           </div>
 
           {carregando ? (
-            <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-400">Carregando...</div>
+            <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-400">
+              Carregando...
+            </div>
           ) : incidentes.length === 0 ? (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-8 text-center text-emerald-700">
               Nenhum incidente aberto no momento.
@@ -751,7 +885,9 @@ export default function BlingFlowMonitor() {
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="blue">{eventosTimeline.length} em foco</Badge>
                 <Badge tone="green">mostrando {eventosRecentesVisiveis.length}</Badge>
-                {eventosHistorico.length > 0 && <Badge tone="slate">{eventosHistorico.length} no historico</Badge>}
+                {eventosHistorico.length > 0 && (
+                  <Badge tone="slate">{eventosHistorico.length} no historico</Badge>
+                )}
               </div>
               {eventosTimeline.length > RECENT_EVENTS_LIMIT && (
                 <button
@@ -759,12 +895,15 @@ export default function BlingFlowMonitor() {
                   onClick={() => setMostrarTodosEventos((current) => !current)}
                   className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
-                  {mostrarTodosEventos ? `Mostrar so os ${RECENT_EVENTS_LIMIT} ultimos` : `Mostrar mais ${eventosRecentesOcultos}`}
+                  {mostrarTodosEventos
+                    ? `Mostrar so os ${RECENT_EVENTS_LIMIT} ultimos`
+                    : `Mostrar mais ${eventosRecentesOcultos}`}
                 </button>
               )}
             </div>
             <p className="mt-2 text-sm text-slate-600">
-              A coluna mostra so os {RECENT_EVENTS_LIMIT} eventos mais recentes por padrao. O restante pode ser aberto sob demanda, e a rotina antiga continua no historico.
+              A coluna mostra so os {RECENT_EVENTS_LIMIT} eventos mais recentes por padrao. O
+              restante pode ser aberto sob demanda, e a rotina antiga continua no historico.
             </p>
           </div>
 
@@ -773,7 +912,7 @@ export default function BlingFlowMonitor() {
               <EventCard
                 key={evento.id}
                 evento={evento}
-                defaultExpanded={['warning', 'error'].includes(evento.status)}
+                defaultExpanded={["warning", "error"].includes(evento.status)}
               />
             ))}
           </div>
@@ -784,7 +923,8 @@ export default function BlingFlowMonitor() {
                 <div>
                   <h3 className="text-sm font-semibold text-slate-900">Historico de rotina</h3>
                   <p className="mt-1 text-sm text-slate-500">
-                    Eventos informativos antigos continuam disponiveis aqui, sem poluir a leitura principal.
+                    Eventos informativos antigos continuam disponiveis aqui, sem poluir a leitura
+                    principal.
                   </p>
                 </div>
                 <button
@@ -792,7 +932,9 @@ export default function BlingFlowMonitor() {
                   onClick={() => setMostrarHistorico((current) => !current)}
                   className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
-                  {mostrarHistorico ? 'Ocultar historico' : `Mostrar historico (${eventosHistorico.length})`}
+                  {mostrarHistorico
+                    ? "Ocultar historico"
+                    : `Mostrar historico (${eventosHistorico.length})`}
                 </button>
               </div>
 

@@ -1,11 +1,4 @@
-import {
-  FiAlertCircle,
-  FiArrowLeft,
-  FiArrowRight,
-  FiCheck,
-  FiSave,
-  FiX,
-} from "react-icons/fi";
+import { FiAlertCircle, FiArrowLeft, FiArrowRight, FiCheck, FiSave, FiX } from "react-icons/fi";
 import ClientesNovoCadastroStep from "./ClientesNovoCadastroStep";
 import ClientesNovoComplementaresStep from "./ClientesNovoComplementaresStep";
 import ClientesNovoContatosStep from "./ClientesNovoContatosStep";
@@ -77,14 +70,9 @@ const ClientesNovoWizardModal = ({
         <div className="bg-white border-b border-gray-200 p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-gray-900">
-              {editingCliente
-                ? `Editar ${tipoTituloEdicao}`
-                : `Adicionar ${tipoTituloNovo}`}
+              {editingCliente ? `Editar ${tipoTituloEdicao}` : `Adicionar ${tipoTituloNovo}`}
             </h2>
-            <button
-              onClick={closeModal}
-              className="text-gray-400 hover:text-gray-600"
-            >
+            <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
               <FiX size={24} />
             </button>
           </div>
@@ -107,9 +95,7 @@ const ClientesNovoWizardModal = ({
                   >
                     {currentStep > step.number ? <FiCheck /> : step.number}
                   </button>
-                  <span className="text-xs mt-1 text-center hidden md:block">
-                    {step.title}
-                  </span>
+                  <span className="text-xs mt-1 text-center hidden md:block">{step.title}</span>
                 </div>
                 {index < steps.length - 1 && (
                   <div
@@ -188,11 +174,7 @@ const ClientesNovoWizardModal = ({
           )}
 
           {currentStep === 5 && (
-            <ClientesNovoPetsStep
-              pets={pets}
-              editingCliente={editingCliente}
-              navigate={navigate}
-            />
+            <ClientesNovoPetsStep pets={pets} editingCliente={editingCliente} navigate={navigate} />
           )}
 
           {currentStep === 6 && (
@@ -202,9 +184,7 @@ const ClientesNovoWizardModal = ({
               resumoFinanceiro={resumoFinanceiro}
               loadingResumo={loadingResumo}
               saldoCampanhas={saldoCampanhas}
-              setMostrarModalAdicionarCredito={
-                setMostrarModalAdicionarCredito
-              }
+              setMostrarModalAdicionarCredito={setMostrarModalAdicionarCredito}
               setMostrarModalRemoverCredito={setMostrarModalRemoverCredito}
               navigate={navigate}
             />

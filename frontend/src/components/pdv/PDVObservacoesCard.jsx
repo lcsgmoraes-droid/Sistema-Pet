@@ -1,10 +1,6 @@
 import Panel from "../ui/Panel";
 
-export default function PDVObservacoesCard({
-  modoVisualizacao,
-  observacoes,
-  onObservacoesChange,
-}) {
+export default function PDVObservacoesCard({ modoVisualizacao, observacoes, onObservacoesChange }) {
   return (
     <Panel padding="lg">
       <h2 className="mb-3 text-base font-semibold text-gray-900">Observacoes</h2>

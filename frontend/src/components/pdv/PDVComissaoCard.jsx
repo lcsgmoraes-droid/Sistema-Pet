@@ -38,9 +38,7 @@ export default function PDVComissaoCard({
             disabled={modoVisualizacao}
             className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed"
           />
-          <span className="text-sm font-medium text-gray-700">
-            Venda comissionada?
-          </span>
+          <span className="text-sm font-medium text-gray-700">Venda comissionada?</span>
         </label>
       </div>
 
@@ -48,9 +46,7 @@ export default function PDVComissaoCard({
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Funcionário/Veterinário *{" "}
-            <span className="text-xs text-gray-500">
-              (apenas com comissão configurada)
-            </span>
+            <span className="text-xs text-gray-500">(apenas com comissão configurada)</span>
           </label>
 
           {!funcionarioComissao ? (
@@ -77,9 +73,7 @@ export default function PDVComissaoCard({
                       className="w-full px-4 py-2 text-left hover:bg-gray-50 border-b last:border-b-0"
                     >
                       <div className="font-medium">{func.nome}</div>
-                      <div className="text-xs text-gray-500 capitalize">
-                        {func.cargo}
-                      </div>
+                      <div className="text-xs text-gray-500 capitalize">{func.cargo}</div>
                     </button>
                   ))}
                 </div>
@@ -92,9 +86,7 @@ export default function PDVComissaoCard({
                   {funcionarioComissao.nome.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <div className="font-semibold text-green-900">
-                    {funcionarioComissao.nome}
-                  </div>
+                  <div className="font-semibold text-green-900">{funcionarioComissao.nome}</div>
                   <div className="text-sm text-green-700 capitalize">
                     {funcionarioComissao.cargo}
                   </div>
@@ -112,8 +104,7 @@ export default function PDVComissaoCard({
           )}
 
           <p className="text-xs text-gray-500 mt-2">
-            ℹ️ A comissão será calculada automaticamente conforme configurado no
-            módulo de comissões
+            ℹ️ A comissão será calculada automaticamente conforme configurado no módulo de comissões
           </p>
         </div>
       )}

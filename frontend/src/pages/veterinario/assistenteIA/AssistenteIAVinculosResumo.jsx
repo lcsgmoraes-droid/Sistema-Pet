@@ -1,12 +1,19 @@
 import { Link2 } from "lucide-react";
 
-export default function AssistenteIAVinculosResumo({ consultaSelecionada, exameSelecionado, onAbrirConsulta }) {
+export default function AssistenteIAVinculosResumo({
+  consultaSelecionada,
+  exameSelecionado,
+  onAbrirConsulta,
+}) {
   if (!consultaSelecionada && !exameSelecionado) return null;
 
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {consultaSelecionada && (
-        <ConsultaVinculadaCard consultaSelecionada={consultaSelecionada} onAbrirConsulta={onAbrirConsulta} />
+        <ConsultaVinculadaCard
+          consultaSelecionada={consultaSelecionada}
+          onAbrirConsulta={onAbrirConsulta}
+        />
       )}
 
       {exameSelecionado && <ExameVinculadoCard exameSelecionado={exameSelecionado} />}
@@ -19,9 +26,13 @@ function ConsultaVinculadaCard({ consultaSelecionada, onAbrirConsulta }) {
     <div className="rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-cyan-600">Consulta vinculada</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-cyan-600">
+            Consulta vinculada
+          </p>
           <p className="font-semibold">#{consultaSelecionada.id}</p>
-          <p className="text-xs text-cyan-700">{consultaSelecionada.motivo_consulta || "Sem motivo informado"}</p>
+          <p className="text-xs text-cyan-700">
+            {consultaSelecionada.motivo_consulta || "Sem motivo informado"}
+          </p>
         </div>
         <button
           type="button"
@@ -44,7 +55,9 @@ function ExameVinculadoCard({ exameSelecionado }) {
         #{exameSelecionado.id} • {exameSelecionado.nome || exameSelecionado.tipo || "Exame"}
       </p>
       <p className="text-xs text-violet-700">
-        {exameSelecionado.arquivo_nome ? `Arquivo: ${exameSelecionado.arquivo_nome}` : "Sem arquivo anexado ainda"}
+        {exameSelecionado.arquivo_nome
+          ? `Arquivo: ${exameSelecionado.arquivo_nome}`
+          : "Sem arquivo anexado ainda"}
       </p>
     </div>
   );

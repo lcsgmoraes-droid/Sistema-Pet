@@ -28,9 +28,7 @@ export default function UsuarioModal({
             <h2 id="novo-usuario-title" className="text-lg font-semibold text-slate-950">
               Novo usuario
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Crie o acesso vinculado ao tenant atual.
-            </p>
+            <p className="mt-1 text-sm text-slate-500">Crie o acesso vinculado ao tenant atual.</p>
           </div>
           <IconActionButton
             icon={X}
@@ -64,9 +62,7 @@ export default function UsuarioModal({
               type="email"
               required
               value={novoUsuario.email}
-              onChange={(event) =>
-                setNovoUsuario({ ...novoUsuario, email: event.target.value })
-              }
+              onChange={(event) => setNovoUsuario({ ...novoUsuario, email: event.target.value })}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               placeholder="usuario@empresa.com.br"
               autoComplete="email"

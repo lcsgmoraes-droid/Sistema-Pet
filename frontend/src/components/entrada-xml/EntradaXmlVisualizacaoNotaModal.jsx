@@ -1,8 +1,8 @@
-import PropTypes from 'prop-types';
-import CardFiscal from '../CardFiscal';
+import PropTypes from "prop-types";
+import CardFiscal from "../CardFiscal";
 
 function formatarValorFiscal(valor, casas = 4) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
+  return Number(valor || 0).toLocaleString("pt-BR", {
     minimumFractionDigits: casas,
     maximumFractionDigits: casas,
   });
@@ -11,32 +11,34 @@ function formatarValorFiscal(valor, casas = 4) {
 function obterCustoAquisicaoItem(item) {
   return Number(
     item?.custo_aquisicao_unitario ??
-    item?.custo_aquisicao_unitario_nf ??
-    item?.composicao_custo?.custo_aquisicao_unitario ??
-    item?.custo_unitario_efetivo ??
-    item?.custo_unitario_efetivo_nf ??
-    item?.valor_unitario ??
-    0,
+      item?.custo_aquisicao_unitario_nf ??
+      item?.composicao_custo?.custo_aquisicao_unitario ??
+      item?.custo_unitario_efetivo ??
+      item?.custo_unitario_efetivo_nf ??
+      item?.valor_unitario ??
+      0,
   );
 }
 
 function StatusBadge({ status }) {
   const styles = {
-    pendente: 'bg-yellow-200 text-yellow-800',
-    processada: 'bg-green-200 text-green-800',
-    cancelada: 'bg-red-200 text-red-800',
-    erro: 'bg-red-300 text-red-900',
+    pendente: "bg-yellow-200 text-yellow-800",
+    processada: "bg-green-200 text-green-800",
+    cancelada: "bg-red-200 text-red-800",
+    erro: "bg-red-300 text-red-900",
   };
   const labels = {
-    pendente: 'Pendente',
-    processada: 'Conciliada',
-    cancelada: 'Cancelada',
-    erro: 'Erro',
+    pendente: "Pendente",
+    processada: "Conciliada",
+    cancelada: "Cancelada",
+    erro: "Erro",
   };
 
   return (
-    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${styles[status] || 'bg-gray-200'}`}>
-      {labels[status] || String(status || '').toUpperCase()}
+    <span
+      className={`px-3 py-1 rounded-full text-sm font-semibold ${styles[status] || "bg-gray-200"}`}
+    >
+      {labels[status] || String(status || "").toUpperCase()}
     </span>
   );
 }
@@ -46,7 +48,7 @@ StatusBadge.propTypes = {
 };
 
 StatusBadge.defaultProps = {
-  status: '',
+  status: "",
 };
 
 function EntradaXmlVisualizacaoNotaModal({
@@ -62,11 +64,10 @@ function EntradaXmlVisualizacaoNotaModal({
   if (!aberto || !notaSelecionada) return null;
 
   const itens = notaSelecionada.itens || [];
-  const podeProcessar = (
-    notaSelecionada.status === 'pendente' &&
+  const podeProcessar =
+    notaSelecionada.status === "pendente" &&
     Number(notaSelecionada.produtos_vinculados || 0) > 0 &&
-    !notaSelecionada.entrada_estoque_realizada
-  );
+    !notaSelecionada.entrada_estoque_realizada;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50">
@@ -102,15 +103,21 @@ function EntradaXmlVisualizacaoNotaModal({
               <div className="space-y-1.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Data Emissao:</span>
-                  <span className="font-semibold">{new Date(notaSelecionada.data_emissao).toLocaleDateString('pt-BR')}</span>
+                  <span className="font-semibold">
+                    {new Date(notaSelecionada.data_emissao).toLocaleDateString("pt-BR")}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Status:</span>
-                  <span><StatusBadge status={notaSelecionada.status} /></span>
+                  <span>
+                    <StatusBadge status={notaSelecionada.status} />
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Valor Total:</span>
-                  <span className="font-bold text-green-600">R$ {Number(notaSelecionada.valor_total || 0).toFixed(2)}</span>
+                  <span className="font-bold text-green-600">
+                    R$ {Number(notaSelecionada.valor_total || 0).toFixed(2)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -141,11 +148,15 @@ function EntradaXmlVisualizacaoNotaModal({
               <div className="text-xs text-gray-600">Total Itens</div>
             </div>
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-              <div className="text-xl font-bold text-green-600">{notaSelecionada.produtos_vinculados}</div>
+              <div className="text-xl font-bold text-green-600">
+                {notaSelecionada.produtos_vinculados}
+              </div>
               <div className="text-xs text-gray-600">Vinculados</div>
             </div>
             <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
-              <div className="text-xl font-bold text-orange-600">{notaSelecionada.produtos_nao_vinculados}</div>
+              <div className="text-xl font-bold text-orange-600">
+                {notaSelecionada.produtos_nao_vinculados}
+              </div>
               <div className="text-xs text-gray-600">Nao Vinculados</div>
             </div>
           </div>
@@ -154,14 +165,21 @@ function EntradaXmlVisualizacaoNotaModal({
             <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${metaConferenciaAtual?.cls || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                    {metaConferenciaAtual?.label || 'Nao conferida'}
+                  <div
+                    className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${metaConferenciaAtual?.cls || "bg-gray-100 text-gray-700 border-gray-200"}`}
+                  >
+                    {metaConferenciaAtual?.label || "Nao conferida"}
                   </div>
                   <p className="text-sm text-gray-700 mt-2">
-                    Entrada prevista em estoque: <strong>{formatarValorFiscal(resumoConferenciaAtual.quantidade_total_conferida, 2)}</strong>
+                    Entrada prevista em estoque:{" "}
+                    <strong>
+                      {formatarValorFiscal(resumoConferenciaAtual.quantidade_total_conferida, 2)}
+                    </strong>
                     {resumoConferenciaAtual.itens_com_divergencia > 0 && (
                       <>
-                        {' '}| Divergencias: <strong>{resumoConferenciaAtual.itens_com_divergencia}</strong>
+                        {" "}
+                        | Divergencias:{" "}
+                        <strong>{resumoConferenciaAtual.itens_com_divergencia}</strong>
                       </>
                     )}
                   </p>
@@ -206,15 +224,21 @@ function EntradaXmlVisualizacaoNotaModal({
                     </div>
                     <div>
                       <span className="text-gray-600">Unit:</span>
-                      <div className="font-semibold">R$ {Number(item.valor_unitario || 0).toFixed(2)}</div>
+                      <div className="font-semibold">
+                        R$ {Number(item.valor_unitario || 0).toFixed(2)}
+                      </div>
                     </div>
                     <div>
                       <span className="text-gray-600">Custo Aq.:</span>
-                      <div className="font-semibold text-amber-700">R$ {formatarValorFiscal(obterCustoAquisicaoItem(item), 4)}</div>
+                      <div className="font-semibold text-amber-700">
+                        R$ {formatarValorFiscal(obterCustoAquisicaoItem(item), 4)}
+                      </div>
                     </div>
                     <div>
                       <span className="text-gray-600">Total:</span>
-                      <div className="font-semibold text-green-600">R$ {Number(item.valor_total || 0).toFixed(2)}</div>
+                      <div className="font-semibold text-green-600">
+                        R$ {Number(item.valor_total || 0).toFixed(2)}
+                      </div>
                     </div>
                     <div>
                       <span className="text-gray-600">CFOP:</span>
@@ -222,7 +246,11 @@ function EntradaXmlVisualizacaoNotaModal({
                     </div>
                   </div>
 
-                  <CardFiscal nota={notaSelecionada} item={item} composicao={item.composicao_custo} />
+                  <CardFiscal
+                    nota={notaSelecionada}
+                    item={item}
+                    composicao={item.composicao_custo}
+                  />
 
                   {(item.lote || item.data_validade) && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 text-xs">
@@ -236,7 +264,7 @@ function EntradaXmlVisualizacaoNotaModal({
                         <div className="bg-orange-50 border border-orange-200 rounded p-2">
                           <span className="text-gray-600">Validade:</span>
                           <div className="font-semibold text-orange-800">
-                            {new Date(item.data_validade).toLocaleDateString('pt-BR')}
+                            {new Date(item.data_validade).toLocaleDateString("pt-BR")}
                           </div>
                         </div>
                       )}
@@ -246,7 +274,9 @@ function EntradaXmlVisualizacaoNotaModal({
                   {item.vinculado && item.produto_nome && (
                     <div className="mt-2 pt-2 border-t border-gray-200">
                       <span className="text-xs text-gray-600">Produto vinculado: </span>
-                      <span className="text-sm font-semibold text-blue-600">{item.produto_nome}</span>
+                      <span className="text-sm font-semibold text-blue-600">
+                        {item.produto_nome}
+                      </span>
                     </div>
                   )}
 
@@ -254,7 +284,9 @@ function EntradaXmlVisualizacaoNotaModal({
                     <div className="mt-3 rounded-lg border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
                       <div className="font-semibold mb-1">Divergencia registrada</div>
                       <div>
-                        Estoque: {formatarValorFiscal(item.quantidade_conferida, 2)} | Avaria: {formatarValorFiscal(item.quantidade_avariada, 2)} | Faltante: {formatarValorFiscal(item.quantidade_faltante, 2)}
+                        Estoque: {formatarValorFiscal(item.quantidade_conferida, 2)} | Avaria:{" "}
+                        {formatarValorFiscal(item.quantidade_avariada, 2)} | Faltante:{" "}
+                        {formatarValorFiscal(item.quantidade_faltante, 2)}
                       </div>
                       {item.observacao_conferencia && (
                         <div className="mt-1">Obs.: {item.observacao_conferencia}</div>
@@ -292,7 +324,7 @@ function EntradaXmlVisualizacaoNotaModal({
                 </button>
               </>
             )}
-            {notaSelecionada.status === 'pendente' && (
+            {notaSelecionada.status === "pendente" && (
               <button
                 onClick={() => onAbrirDetalhes(notaSelecionada.id)}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold"

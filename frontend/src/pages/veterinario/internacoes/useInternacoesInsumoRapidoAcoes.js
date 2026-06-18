@@ -26,7 +26,7 @@ export function useInternacoesInsumoRapidoAcoes({
         horario_execucao: sugestaoHorario,
       });
     },
-    [setFormInsumoRapido, setInsumoRapidoSelecionado, setModalInsumoRapido, sugestaoHorario]
+    [setFormInsumoRapido, setInsumoRapidoSelecionado, setModalInsumoRapido, sugestaoHorario],
   );
 
   const confirmarInsumoRapido = useCallback(async () => {

@@ -164,19 +164,11 @@ export default function ProdutosTabelaSection({
     produto.composicao_kit.length > 0;
 
   const renderProdutoExpandido = (produto, _rowIndex, colSpan) => (
-    <tr
-      key={`kit-${produto.id}`}
-      className="bg-amber-50/50 border-l-4 border-amber-400"
-    >
+    <tr key={`kit-${produto.id}`} className="bg-amber-50/50 border-l-4 border-amber-400">
       <td colSpan={colSpan} className="px-4 py-3">
         <div className="ml-12">
           <div className="text-xs font-semibold text-amber-800 mb-2 flex items-center gap-2">
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -198,10 +190,7 @@ export default function ProdutosTabelaSection({
                 <span className="flex-1 text-gray-700">
                   {componente.produto_nome ||
                     componente.nome ||
-                    `Produto #${
-                      componente.produto_id ||
-                      componente.produto_componente_id
-                    }`}
+                    `Produto #${componente.produto_id || componente.produto_componente_id}`}
                 </span>
                 {componente.produto_estoque !== undefined && (
                   <span className="text-gray-500">
@@ -242,13 +231,9 @@ export default function ProdutosTabelaSection({
       <div id="tour-produtos-lista" className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="md:hidden">
           {loading ? (
-            <div className="px-4 py-8 text-center text-gray-500">
-              Carregando produtos...
-            </div>
+            <div className="px-4 py-8 text-center text-gray-500">Carregando produtos...</div>
           ) : produtos.length === 0 ? (
-            <div className="px-4 py-8 text-center text-gray-500">
-              Nenhum produto encontrado
-            </div>
+            <div className="px-4 py-8 text-center text-gray-500">Nenhum produto encontrado</div>
           ) : (
             <div className="space-y-3 bg-gray-50 p-3">
               {produtosValidos.map((produto) => {
@@ -268,7 +253,9 @@ export default function ProdutosTabelaSection({
                     }}
                     onClick={() => navigate(`/produtos/${produto.id}/editar`)}
                     className={`rounded-lg border bg-white p-3 shadow-sm ${
-                      produto.ativo === false ? "border-slate-200 bg-slate-50 opacity-80" : "border-gray-200"
+                      produto.ativo === false
+                        ? "border-slate-200 bg-slate-50 opacity-80"
+                        : "border-gray-200"
                     }`}
                   >
                     <div className="flex gap-3">
@@ -333,14 +320,10 @@ export default function ProdutosTabelaSection({
                         <p className={`mt-1 text-sm font-bold ${validade.className}`}>
                           {validade.data}
                         </p>
-                        <p className="mt-0.5 text-[11px] text-gray-500">
-                          {validade.apoio}
-                        </p>
+                        <p className="mt-0.5 text-[11px] text-gray-500">{validade.apoio}</p>
                       </div>
                       <div className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 p-2">
-                        <p className="text-[10px] font-semibold uppercase text-gray-500">
-                          Estoque
-                        </p>
+                        <p className="text-[10px] font-semibold uppercase text-gray-500">Estoque</p>
                         <p className={`mt-1 text-sm font-bold ${getCorEstoque(produto)}`}>
                           {produto.controlar_estoque ? estoqueDisponivel : "-"}
                         </p>
@@ -351,9 +334,7 @@ export default function ProdutosTabelaSection({
                         )}
                       </div>
                       <div className="min-w-0 flex-1 rounded-lg border border-gray-200 bg-gray-50 p-2">
-                        <p className="text-[10px] font-semibold uppercase text-gray-500">
-                          Venda
-                        </p>
+                        <p className="text-[10px] font-semibold uppercase text-gray-500">Venda</p>
                         <p className="mt-1 text-sm font-bold text-gray-900">
                           <MoneyCell value={produto.preco_venda} />
                         </p>

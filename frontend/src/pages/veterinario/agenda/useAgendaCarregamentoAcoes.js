@@ -27,7 +27,7 @@ export function useAgendaCarregamentoAcoes({
         data_fim: isoDate(dataFimConsulta),
       });
       const data = res.data;
-      setAgendamentos(Array.isArray(data) ? data : data.items ?? []);
+      setAgendamentos(Array.isArray(data) ? data : (data.items ?? []));
     } catch {
       setErro("Erro ao carregar agenda.");
     } finally {
@@ -44,14 +44,14 @@ export function useAgendaCarregamentoAcoes({
       const delta = modo === "dia" ? 1 : 7;
       setDataRef((d) => addDias(d, direcao * delta));
     },
-    [modo, setDataRef]
+    [modo, setDataRef],
   );
 
   const agsDia = useCallback((data) => listarAgendamentosDia(agendamentos, data), [agendamentos]);
 
   const sugerirHoraLivre = useCallback(
     (data) => sugerirHoraLivreAgenda(listarAgendamentosDia(agendamentos, data)),
-    [agendamentos]
+    [agendamentos],
   );
 
   return {

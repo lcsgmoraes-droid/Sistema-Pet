@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 export default function useEntradaXmlHistoricoPrecos({ api, toast }) {
   const [mostrarHistoricoPrecos, setMostrarHistoricoPrecos] = useState(false);
@@ -14,8 +14,8 @@ export default function useEntradaXmlHistoricoPrecos({ api, toast }) {
     try {
       const response = await api.get(`/produtos/${produtoId}/historico-precos`);
       setHistoricoPrecos(response.data);
-    } catch (error) {
-      toast.error('Erro ao carregar historico de precos');
+    } catch {
+      toast.error("Erro ao carregar historico de precos");
       setMostrarHistoricoPrecos(false);
     } finally {
       setCarregandoHistorico(false);

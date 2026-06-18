@@ -1,5 +1,7 @@
 export function mascararDataBr(valor) {
-  const digitos = String(valor || "").replace(/\D/g, "").slice(0, 8);
+  const digitos = String(valor || "")
+    .replace(/\D/g, "")
+    .slice(0, 8);
 
   if (digitos.length <= 2) return digitos;
   if (digitos.length <= 4) return `${digitos.slice(0, 2)}/${digitos.slice(2)}`;
@@ -38,7 +40,11 @@ function dataValida({ dia, mes, ano }) {
   const mesNumero = Number(mes);
   const anoNumero = Number(ano);
 
-  if (!Number.isInteger(diaNumero) || !Number.isInteger(mesNumero) || !Number.isInteger(anoNumero)) {
+  if (
+    !Number.isInteger(diaNumero) ||
+    !Number.isInteger(mesNumero) ||
+    !Number.isInteger(anoNumero)
+  ) {
     return false;
   }
 

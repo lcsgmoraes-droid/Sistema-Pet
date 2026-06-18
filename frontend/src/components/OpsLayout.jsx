@@ -44,12 +44,14 @@ const navItems = [
 
 function getInitials(user) {
   const source = user?.nome || user?.name || user?.email || "Ops";
-  return String(source)
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("") || "OP";
+  return (
+    String(source)
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "OP"
+  );
 }
 
 export default function OpsLayout() {
@@ -131,7 +133,9 @@ export default function OpsLayout() {
               {getInitials(user)}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold">{user?.nome || user?.name || "Operador"}</div>
+              <div className="truncate text-sm font-semibold">
+                {user?.nome || user?.name || "Operador"}
+              </div>
               <div className="truncate text-xs text-slate-400">{user?.email || "sessao ativa"}</div>
             </div>
             <button

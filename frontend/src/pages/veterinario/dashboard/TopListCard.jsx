@@ -9,7 +9,10 @@ export default function TopListCard({ itens, title, vazio }) {
       ) : (
         <div className="space-y-2">
           {itens.map((item, idx) => (
-            <div key={`${item.nome}-${idx}`} className="rounded-lg border border-gray-100 px-3 py-2">
+            <div
+              key={`${item.nome}-${idx}`}
+              className="rounded-lg border border-gray-100 px-3 py-2"
+            >
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm text-gray-700 truncate">{item.nome}</span>
                 <span className="text-xs font-semibold text-blue-700 bg-blue-50 rounded-full px-2 py-0.5">
@@ -19,17 +22,27 @@ export default function TopListCard({ itens, title, vazio }) {
               {item.valor_total != null && (
                 <div className="grid grid-cols-3 gap-2 mt-2 text-[11px]">
                   <span className="text-gray-500">Fat. {formatMoneyBRL(item.valor_total)}</span>
-                  <span className="text-amber-700">Custo {formatMoneyBRL(item.custo_total || 0)}</span>
-                  <span className={(item.margem_total || 0) < 0 ? "text-red-600" : "text-emerald-700"}>
+                  <span className="text-amber-700">
+                    Custo {formatMoneyBRL(item.custo_total || 0)}
+                  </span>
+                  <span
+                    className={(item.margem_total || 0) < 0 ? "text-red-600" : "text-emerald-700"}
+                  >
                     Margem {formatMoneyBRL(item.margem_total || 0)}
                   </span>
                 </div>
               )}
               {item.entrada_empresa_total != null && (
                 <div className="grid grid-cols-3 gap-2 mt-2 text-[11px]">
-                  <span className="text-sky-700">Empresa {formatMoneyBRL(item.entrada_empresa_total || 0)}</span>
-                  <span className="text-violet-700">Repasse {formatMoneyBRL(item.repasse_empresa_total || 0)}</span>
-                  <span className="text-gray-500">Líquido vet {formatMoneyBRL(item.receita_tenant_total || 0)}</span>
+                  <span className="text-sky-700">
+                    Empresa {formatMoneyBRL(item.entrada_empresa_total || 0)}
+                  </span>
+                  <span className="text-violet-700">
+                    Repasse {formatMoneyBRL(item.repasse_empresa_total || 0)}
+                  </span>
+                  <span className="text-gray-500">
+                    Líquido vet {formatMoneyBRL(item.receita_tenant_total || 0)}
+                  </span>
                 </div>
               )}
             </div>

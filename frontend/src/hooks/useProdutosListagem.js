@@ -129,19 +129,14 @@ export default function useProdutosListagem({
     const salvo = localStorage.getItem(PRODUTOS_PERSISTIR_KEY);
     return salvo === null ? true : salvo === "true";
   });
-  const estadoPersistidoInicial = useMemo(
-    () => lerEstadoPersistido(persistirBusca),
-    [],
-  );
+  const estadoPersistidoInicial = useMemo(() => lerEstadoPersistido(persistirBusca), []);
   const [produtosBrutos, setProdutosBrutos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selecionados, setSelecionados] = useState([]);
   const [ultimoSelecionado, setUltimoSelecionado] = useState(null);
   const [filtros, setFiltros] = useState(estadoPersistidoInicial.filtros);
   const [paginaAtual, setPaginaAtual] = useState(estadoPersistidoInicial.paginaAtual);
-  const [itensPorPagina, setItensPorPagina] = useState(
-    estadoPersistidoInicial.itensPorPagina,
-  );
+  const [itensPorPagina, setItensPorPagina] = useState(estadoPersistidoInicial.itensPorPagina);
   const [totalItensServidor, setTotalItensServidor] = useState(0);
   const [totalPaginasServidor, setTotalPaginasServidor] = useState(1);
   const produtosVisiveisRef = useRef([]);
@@ -153,14 +148,11 @@ export default function useProdutosListagem({
     const termosBusca = buscaNormalizada.split(/\s+/).filter(Boolean);
     const buscaAtiva = Boolean(buscaNormalizada);
     const produtoCorrespondeBusca = (produto) => {
-      const campos = [
-        produto.codigo,
-        produto.sku,
-        produto.codigo_barras,
-        produto.nome,
-      ].map((value) => normalizeSearchText(value || ""));
-      const camposDigitos = [produto.codigo, produto.sku, produto.codigo_barras].map(
-        (value) => normalizeSearchText(value || "").replace(/\D/g, ""),
+      const campos = [produto.codigo, produto.sku, produto.codigo_barras, produto.nome].map(
+        (value) => normalizeSearchText(value || ""),
+      );
+      const camposDigitos = [produto.codigo, produto.sku, produto.codigo_barras].map((value) =>
+        normalizeSearchText(value || "").replace(/\D/g, ""),
       );
 
       return termosBusca.every((termo) => {
@@ -213,8 +205,7 @@ export default function useProdutosListagem({
       }
 
       return (
-        produtoCorrespondeBusca(p) ||
-        paisExpandidosSet.has(normalizeExpandId(p.produto_pai_id))
+        produtoCorrespondeBusca(p) || paisExpandidosSet.has(normalizeExpandId(p.produto_pai_id))
       );
     });
 
@@ -327,9 +318,12 @@ export default function useProdutosListagem({
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      carregarDados();
-    }, filtros.busca ? 250 : 0);
+    const timer = setTimeout(
+      () => {
+        carregarDados();
+      },
+      filtros.busca ? 250 : 0,
+    );
 
     return () => clearTimeout(timer);
   }, [
@@ -400,9 +394,7 @@ export default function useProdutosListagem({
       }
     }
 
-    setSelecionados((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
-    );
+    setSelecionados((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
     setUltimoSelecionado(id);
   };
 

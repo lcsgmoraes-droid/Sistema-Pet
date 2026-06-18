@@ -34,7 +34,8 @@ test("sincroniza percentual e valor dos encargos do cargo", () => {
     "164.48",
   );
   assert.equal(
-    sincronizarCampoRemuneracao(form, "inss_funcionario_valor", "164.48").inss_funcionario_percentual,
+    sincronizarCampoRemuneracao(form, "inss_funcionario_valor", "164.48")
+      .inss_funcionario_percentual,
     "7.84",
   );
 });

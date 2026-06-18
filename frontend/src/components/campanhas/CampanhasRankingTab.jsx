@@ -53,17 +53,12 @@ export default function CampanhasRankingTab(props) {
       />
 
       {loadingRanking ? (
-        <div className="p-8 text-center text-gray-400">
-          Carregando ranking...
-        </div>
+        <div className="p-8 text-center text-gray-400">Carregando ranking...</div>
       ) : !ranking ? (
         <div className="p-8 text-center text-gray-400">Carregando...</div>
       ) : (
         <>
-          <CampanhasRankingDistribuicao
-            rankLabels={rankLabels}
-            ranking={ranking}
-          />
+          <CampanhasRankingDistribuicao rankLabels={rankLabels} ranking={ranking} />
           <CampanhasRankingClientesTable
             ranking={ranking}
             rankLabels={rankLabels}
@@ -72,10 +67,7 @@ export default function CampanhasRankingTab(props) {
         </>
       )}
 
-      <CampanhasRankingLoteCard
-        setResultadoLote={setResultadoLote}
-        setModalLote={setModalLote}
-      />
+      <CampanhasRankingLoteCard setResultadoLote={setResultadoLote} setModalLote={setModalLote} />
 
       <CampanhasRankingConfigPanels
         rankingConfig={rankingConfig}

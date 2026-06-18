@@ -50,31 +50,78 @@ export default function BanhoTosaRecursoForm({
       subtitle="Recursos entram na agenda, no calculo de capacidade e no custo operacional."
     >
       <form onSubmit={onSubmit} className="space-y-4">
-        <TextField label="Nome" value={form.nome} onChange={(value) => onChangeField("nome", value)} labelAccessory={<BanhoTosaHelpTooltip text="Identificacao do recurso na agenda e nos relatorios de ocupacao." />} />
+        <TextField
+          label="Nome"
+          value={form.nome}
+          onChange={(value) => onChangeField("nome", value)}
+          labelAccessory={
+            <BanhoTosaHelpTooltip text="Identificacao do recurso na agenda e nos relatorios de ocupacao." />
+          }
+        />
         <div className="grid gap-3 md:grid-cols-2">
-          <SelectField label="Tipo" value={form.tipo} onChange={(value) => onChangeField("tipo", value)} labelAccessory={<BanhoTosaHelpTooltip text="Define como o recurso entra na capacidade: banheira, mesa, secador, box ou veiculo." />}>
-          <option value="banheira">Banheira</option>
-          <option value="mesa_tosa">Mesa de tosa</option>
-          <option value="secador">Secador / soprador</option>
-          <option value="box">Sala / box</option>
-          <option value="veiculo">Taxi dog / veiculo</option>
-          <option value="outro">Outro</option>
+          <SelectField
+            label="Tipo"
+            value={form.tipo}
+            onChange={(value) => onChangeField("tipo", value)}
+            labelAccessory={
+              <BanhoTosaHelpTooltip text="Define como o recurso entra na capacidade: banheira, mesa, secador, box ou veiculo." />
+            }
+          >
+            <option value="banheira">Banheira</option>
+            <option value="mesa_tosa">Mesa de tosa</option>
+            <option value="secador">Secador / soprador</option>
+            <option value="box">Sala / box</option>
+            <option value="veiculo">Taxi dog / veiculo</option>
+            <option value="outro">Outro</option>
           </SelectField>
-          <TextField label="Capacidade simultanea" type="number" value={form.capacidade_simultanea} onChange={(value) => onChangeField("capacidade_simultanea", value)} labelAccessory={<BanhoTosaHelpTooltip text="Quantidade de pets/atendimentos que o recurso comporta ao mesmo tempo." />} />
+          <TextField
+            label="Capacidade simultanea"
+            type="number"
+            value={form.capacidade_simultanea}
+            onChange={(value) => onChangeField("capacidade_simultanea", value)}
+            labelAccessory={
+              <BanhoTosaHelpTooltip text="Quantidade de pets/atendimentos que o recurso comporta ao mesmo tempo." />
+            }
+          />
         </div>
         <div className="grid gap-3 md:grid-cols-2">
-          <TextField label="Potencia watts" type="number" value={form.potencia_watts} onChange={(value) => onChangeField("potencia_watts", value)} labelAccessory={<BanhoTosaHelpTooltip text="Potencia do equipamento para calcular energia por tempo de uso." />} />
-          <TextField label="Manutencao por hora" type="number" value={form.custo_manutencao_hora} onChange={(value) => onChangeField("custo_manutencao_hora", value)} labelAccessory={<BanhoTosaHelpTooltip text="Rateio de troca de escova, limpeza, depreciacao ou manutencao do recurso." />} />
+          <TextField
+            label="Potencia watts"
+            type="number"
+            value={form.potencia_watts}
+            onChange={(value) => onChangeField("potencia_watts", value)}
+            labelAccessory={
+              <BanhoTosaHelpTooltip text="Potencia do equipamento para calcular energia por tempo de uso." />
+            }
+          />
+          <TextField
+            label="Manutencao por hora"
+            type="number"
+            value={form.custo_manutencao_hora}
+            onChange={(value) => onChangeField("custo_manutencao_hora", value)}
+            labelAccessory={
+              <BanhoTosaHelpTooltip text="Rateio de troca de escova, limpeza, depreciacao ou manutencao do recurso." />
+            }
+          />
         </div>
         {editing && (
-          <CheckboxField label="Ativo" checked={form.ativo} onChange={(value) => onChangeField("ativo", value)} />
+          <CheckboxField
+            label="Ativo"
+            checked={form.ativo}
+            onChange={(value) => onChangeField("ativo", value)}
+          />
         )}
 
         <div className="flex flex-wrap justify-end gap-2">
           <ActionButton icon={X} intent="neutral" onClick={onCancelEdit} tone="soft">
             Cancelar
           </ActionButton>
-          <ActionButton icon={Save} intent={editing ? "edit" : "create"} loading={saving} type="submit">
+          <ActionButton
+            icon={Save}
+            intent={editing ? "edit" : "create"}
+            loading={saving}
+            type="submit"
+          >
             {editing ? "Salvar alteracoes" : "Cadastrar recurso"}
           </ActionButton>
         </div>

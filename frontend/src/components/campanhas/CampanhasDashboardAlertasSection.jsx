@@ -9,9 +9,7 @@ export default function CampanhasDashboardAlertasSection({
 
   return (
     <div className="space-y-3">
-      <h2 className="font-semibold text-gray-800">
-        {"\u26A0\uFE0F"} Alertas do Dia
-      </h2>
+      <h2 className="font-semibold text-gray-800">{"\u26A0\uFE0F"} Alertas do Dia</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[
           {
@@ -31,15 +29,9 @@ export default function CampanhasDashboardAlertasSection({
         ].map(({ dias, count, label, colors, textColor }) => (
           <div
             key={dias}
-            className={`rounded-xl border p-4 ${
-              count > 0 ? colors : "bg-gray-50 border-gray-200"
-            }`}
+            className={`rounded-xl border p-4 ${count > 0 ? colors : "bg-gray-50 border-gray-200"}`}
           >
-            <p
-              className={`text-3xl font-bold ${
-                count > 0 ? textColor : "text-gray-400"
-              }`}
-            >
+            <p className={`text-3xl font-bold ${count > 0 ? textColor : "text-gray-400"}`}>
               {count}
             </p>
             <p className="text-xs text-gray-500 mt-1">{label}</p>
@@ -62,32 +54,23 @@ export default function CampanhasDashboardAlertasSection({
         >
           <p
             className={`text-3xl font-bold ${
-              dashboard.alertas.total_sorteios_pendentes > 0
-                ? "text-yellow-700"
-                : "text-gray-400"
+              dashboard.alertas.total_sorteios_pendentes > 0 ? "text-yellow-700" : "text-gray-400"
             }`}
           >
             {dashboard.alertas.total_sorteios_pendentes}
           </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {"\u{1F3B2}"} Sorteio(s) nao executado(s)
-          </p>
+          <p className="text-xs text-gray-500 mt-1">{"\u{1F3B2}"} Sorteio(s) nao executado(s)</p>
         </div>
       </div>
 
       {dashboard.alertas.sorteios_pendentes?.length > 0 && (
         <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b bg-yellow-50">
-            <p className="text-sm font-medium text-yellow-800">
-              {"\u{1F3B2}"} Sorteios Pendentes
-            </p>
+            <p className="text-sm font-medium text-yellow-800">{"\u{1F3B2}"} Sorteios Pendentes</p>
           </div>
           <div className="divide-y">
             {dashboard.alertas.sorteios_pendentes.map((s) => (
-              <div
-                key={s.id}
-                className="px-4 py-3 flex items-center justify-between"
-              >
+              <div key={s.id} className="px-4 py-3 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-900">{s.name}</p>
                   <p className="text-xs text-gray-500">
@@ -125,10 +108,7 @@ export default function CampanhasDashboardAlertasSection({
           </div>
           <div className="divide-y">
             {dashboard.alertas.brindes_pendentes.slice(0, 5).map((b, i) => (
-              <div
-                key={i}
-                className="px-4 py-3 flex items-start justify-between gap-3"
-              >
+              <div key={i} className="px-4 py-3 flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <CustomerIdentity
                     code={b.customer_id}
@@ -146,9 +126,7 @@ export default function CampanhasDashboardAlertasSection({
                     {b.periodo ? ` - ${b.periodo}` : ""}
                   </p>
                   {b.mensagem && (
-                    <p className="text-xs text-amber-700 mt-0.5 truncate">
-                      {b.mensagem}
-                    </p>
+                    <p className="text-xs text-amber-700 mt-0.5 truncate">{b.mensagem}</p>
                   )}
                 </div>
                 {b.retirar_ate && (

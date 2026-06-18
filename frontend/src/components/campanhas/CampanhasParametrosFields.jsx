@@ -11,10 +11,7 @@ export function CampanhaField({
 }) {
   return (
     <div className={colSpan ? `col-span-${colSpan}` : ""}>
-      <label
-        htmlFor={id}
-        className="block text-xs font-medium text-gray-600 mb-1"
-      >
+      <label htmlFor={id} className="block text-xs font-medium text-gray-600 mb-1">
         {label}
       </label>
       <input
@@ -34,10 +31,7 @@ export function CampanhaField({
 export function CampanhaSel({ label, id, value, onChange, children }) {
   return (
     <div>
-      <label
-        htmlFor={id}
-        className="block text-xs font-medium text-gray-600 mb-1"
-      >
+      <label htmlFor={id} className="block text-xs font-medium text-gray-600 mb-1">
         {label}
       </label>
       <select

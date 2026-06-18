@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Calendar, DollarSign, AlertCircle, Sparkles } from 'lucide-react';
-import api from '../api';
-import { useModulos } from '../contexts/ModulosContext';
+import { useState, useEffect } from "react";
+import { TrendingUp, Calendar, DollarSign, AlertCircle, Sparkles } from "lucide-react";
+import api from "../api";
+import { useModulos } from "../contexts/ModulosContext";
 
 const ProjecoesIA = () => {
   const { moduloAtivo } = useModulos();
-  const financeiroErpAtivo = moduloAtivo('financeiro_erp');
+  const financeiroErpAtivo = moduloAtivo("financeiro_erp");
   const [projecoes, setProjecoes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [periodoProjecao, setPeriodoProjecao] = useState(30); // dias
-  const [confianca, setConfianca] = useState({ media: 0, desvio: 0 });
 
   useEffect(() => {
     carregarProjecoes();
@@ -29,7 +28,7 @@ const ProjecoesIA = () => {
       const projecoesGeradas = await gerarProjecoes();
       setProjecoes(projecoesGeradas);
     } catch (erro) {
-      console.error('Erro ao carregar projeções:', erro);
+      console.error("Erro ao carregar projeções:", erro);
     } finally {
       setCarregando(false);
     }
@@ -43,18 +42,18 @@ const ProjecoesIA = () => {
 
     try {
       // Buscar movimentações históricas
-      const response = await api.get('/financeiro/movimentacoes', {
+      const response = await api.get("/financeiro/movimentacoes", {
         params: {
-          data_inicio: dataInicio.toISOString().split('T')[0],
-          data_fim: hoje.toISOString().split('T')[0]
-        }
+          data_inicio: dataInicio.toISOString().split("T")[0],
+          data_fim: hoje.toISOString().split("T")[0],
+        },
       });
 
       const movimentacoes = response.data;
 
       // Calcular médias diárias
-      const mediaDiariaEntradas = calcularMediaDiaria(movimentacoes, 'entrada');
-      const mediaDiariaSaidas = calcularMediaDiaria(movimentacoes, 'saida');
+      const mediaDiariaEntradas = calcularMediaDiaria(movimentacoes, "entrada");
+      const mediaDiariaSaidas = calcularMediaDiaria(movimentacoes, "saida");
 
       // Buscar saldo atual
       const saldoAtual = await buscarSaldoAtual();
@@ -76,29 +75,29 @@ const ProjecoesIA = () => {
         saldoProjetado = saldoProjetado + entradasProjetadas - saidasProjetadas;
 
         // Calcular nível de confiança (diminui com o tempo)
-        const nivelConfianca = Math.max(95 - (i * 1.5), 50);
+        const nivelConfianca = Math.max(95 - i * 1.5, 50);
 
         projecoesArray.push({
-          data: dataProjecao.toISOString().split('T')[0],
-          dataFormatada: dataProjecao.toLocaleDateString('pt-BR'),
+          data: dataProjecao.toISOString().split("T")[0],
+          dataFormatada: dataProjecao.toLocaleDateString("pt-BR"),
           entradasProjetadas: entradasProjetadas,
           saidasProjetadas: saidasProjetadas,
           saldoProjetado: saldoProjetado,
           nivelConfianca: nivelConfianca,
-          diaSemana: dataProjecao.toLocaleDateString('pt-BR', { weekday: 'short' }),
-          alerta: saldoProjetado < 1000 ? 'crítico' : saldoProjetado < 5000 ? 'atenção' : null
+          diaSemana: dataProjecao.toLocaleDateString("pt-BR", { weekday: "short" }),
+          alerta: saldoProjetado < 1000 ? "crítico" : saldoProjetado < 5000 ? "atenção" : null,
         });
       }
 
       return projecoesArray;
     } catch (erro) {
-      console.error('Erro ao gerar projeções:', erro);
+      console.error("Erro ao gerar projeções:", erro);
       return [];
     }
   };
 
   const calcularMediaDiaria = (movimentacoes, tipo) => {
-    const movimentacoesTipo = movimentacoes.filter(m => m.tipo === tipo);
+    const movimentacoesTipo = movimentacoes.filter((m) => m.tipo === tipo);
     if (movimentacoesTipo.length === 0) return 0;
 
     const total = movimentacoesTipo.reduce((sum, m) => sum + m.valor, 0);
@@ -107,25 +106,25 @@ const ProjecoesIA = () => {
 
   const buscarSaldoAtual = async () => {
     try {
-      const response = await api.get('/financeiro/saldo-atual');
+      const response = await api.get("/financeiro/saldo-atual");
       return response.data.saldo || 10000; // valor padrão se não conseguir buscar
     } catch (erro) {
-      console.error('Erro ao buscar saldo:', erro);
+      console.error("Erro ao buscar saldo:", erro);
       return 10000;
     }
   };
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(valor);
   };
 
   const getCorAlerta = (alerta) => {
-    if (alerta === 'crítico') return 'bg-red-100 border-red-300 text-red-800';
-    if (alerta === 'atenção') return 'bg-yellow-100 border-yellow-300 text-yellow-800';
-    return 'bg-green-50 border-green-200';
+    if (alerta === "crítico") return "bg-red-100 border-red-300 text-red-800";
+    if (alerta === "atenção") return "bg-yellow-100 border-yellow-300 text-yellow-800";
+    return "bg-green-50 border-green-200";
   };
 
   const projecoesSemanais = () => {
@@ -143,7 +142,7 @@ const ProjecoesIA = () => {
         entradas: totalEntradas,
         saidas: totalSaidas,
         saldo: totalSaidas - totalEntradas,
-        saldoFinal: saldoFinal
+        saldoFinal: saldoFinal,
       });
     }
     return semanas;
@@ -179,8 +178,8 @@ const ProjecoesIA = () => {
               onClick={() => setPeriodoProjecao(15)}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 periodoProjecao === 15
-                  ? 'bg-white text-purple-600'
-                  : 'bg-purple-500 text-white hover:bg-purple-400'
+                  ? "bg-white text-purple-600"
+                  : "bg-purple-500 text-white hover:bg-purple-400"
               }`}
             >
               15 dias
@@ -189,8 +188,8 @@ const ProjecoesIA = () => {
               onClick={() => setPeriodoProjecao(30)}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 periodoProjecao === 30
-                  ? 'bg-white text-purple-600'
-                  : 'bg-purple-500 text-white hover:bg-purple-400'
+                  ? "bg-white text-purple-600"
+                  : "bg-purple-500 text-white hover:bg-purple-400"
               }`}
             >
               30 dias
@@ -199,8 +198,8 @@ const ProjecoesIA = () => {
               onClick={() => setPeriodoProjecao(60)}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 periodoProjecao === 60
-                  ? 'bg-white text-purple-600'
-                  : 'bg-purple-500 text-white hover:bg-purple-400'
+                  ? "bg-white text-purple-600"
+                  : "bg-purple-500 text-white hover:bg-purple-400"
               }`}
             >
               60 dias
@@ -220,12 +219,10 @@ const ProjecoesIA = () => {
             <div
               key={semana.numero}
               className={`border rounded-lg p-4 ${
-                semana.saldoFinal < 5000 ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'
+                semana.saldoFinal < 5000 ? "border-yellow-300 bg-yellow-50" : "border-gray-200"
               }`}
             >
-              <div className="text-sm font-medium text-gray-600 mb-2">
-                Semana {semana.numero}
-              </div>
+              <div className="text-sm font-medium text-gray-600 mb-2">Semana {semana.numero}</div>
               <div className="text-xs text-gray-500 mb-3">
                 {semana.dataInicio} - {semana.dataFim}
               </div>
@@ -240,7 +237,7 @@ const ProjecoesIA = () => {
                 </div>
                 <div className="border-t pt-2 flex justify-between font-semibold">
                   <span>Saldo Final:</span>
-                  <span className={semana.saldoFinal < 5000 ? 'text-yellow-600' : 'text-gray-800'}>
+                  <span className={semana.saldoFinal < 5000 ? "text-yellow-600" : "text-gray-800"}>
                     {formatarMoeda(semana.saldoFinal)}
                   </span>
                 </div>
@@ -262,10 +259,16 @@ const ProjecoesIA = () => {
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Data</th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Dia</th>
-                <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Entradas</th>
+                <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">
+                  Entradas
+                </th>
                 <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Saídas</th>
-                <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">Saldo Projetado</th>
-                <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">Confiança</th>
+                <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">
+                  Saldo Projetado
+                </th>
+                <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">
+                  Confiança
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -273,7 +276,7 @@ const ProjecoesIA = () => {
                 <tr
                   key={index}
                   className={`border-b border-gray-100 hover:bg-gray-50 ${
-                    projecao.alerta ? getCorAlerta(projecao.alerta) : ''
+                    projecao.alerta ? getCorAlerta(projecao.alerta) : ""
                   }`}
                 >
                   <td className="py-3 px-4 text-sm">{projecao.dataFormatada}</td>
@@ -288,13 +291,15 @@ const ProjecoesIA = () => {
                     {formatarMoeda(projecao.saldoProjetado)}
                   </td>
                   <td className="py-3 px-4 text-center">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      projecao.nivelConfianca >= 80
-                        ? 'bg-green-100 text-green-800'
-                        : projecao.nivelConfianca >= 65
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-orange-100 text-orange-800'
-                    }`}>
+                    <span
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        projecao.nivelConfianca >= 80
+                          ? "bg-green-100 text-green-800"
+                          : projecao.nivelConfianca >= 65
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-orange-100 text-orange-800"
+                      }`}
+                    >
                       {projecao.nivelConfianca.toFixed(0)}%
                     </span>
                   </td>
@@ -311,8 +316,8 @@ const ProjecoesIA = () => {
         <div className="text-sm text-blue-800">
           <p className="font-medium mb-1">Sobre as Projeções</p>
           <p>
-            As projeções são calculadas com base em padrões históricos dos últimos 90 dias.
-            O nível de confiança diminui com o tempo, pois eventos futuros podem alterar as tendências.
+            As projeções são calculadas com base em padrões históricos dos últimos 90 dias. O nível
+            de confiança diminui com o tempo, pois eventos futuros podem alterar as tendências.
           </p>
         </div>
       </div>

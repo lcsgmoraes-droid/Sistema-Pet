@@ -12,8 +12,7 @@ function OperadoraCartaoPadraoInfo({ operadora }) {
         <div>
           <h3 className="font-medium text-emerald-900">Operadora Padrao</h3>
           <p className="text-sm text-emerald-700">
-            <span className="font-medium">{operadora.nome}</span> sera
-            pre-selecionada no PDV
+            <span className="font-medium">{operadora.nome}</span> sera pre-selecionada no PDV
           </p>
         </div>
       </div>

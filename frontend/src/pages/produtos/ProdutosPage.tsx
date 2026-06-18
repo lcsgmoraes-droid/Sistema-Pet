@@ -1,7 +1,7 @@
 /**
  * SPRINT 7 - PASSO 1: Página Principal de Produtos
  * Sistema ERP Pet Shop - Aba Produtos
- * 
+ *
  * Features:
  * - Listagem de produtos
  * - Busca por nome/SKU
@@ -10,12 +10,12 @@
  * - Estados visuais (loading, empty, error)
  */
 
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useProducts } from './hooks/useProducts';
-import { ProductFiltersComponent } from './components/ProductFilters';
-import { ProductTableComponent } from './components/ProductTable';
-import './styles/ProdutosPage.css';
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import { useProducts } from "./hooks/useProducts";
+import { ProductFiltersComponent } from "./components/ProductFilters";
+import { ProductTableComponent } from "./components/ProductTable";
+import "./styles/ProdutosPage.css";
 
 export const ProdutosPage: React.FC = () => {
   const navigate = useNavigate();
@@ -30,16 +30,16 @@ export const ProdutosPage: React.FC = () => {
     setFilters,
     setCurrentPage,
     deleteProduct,
-    toggleProductStatus
+    toggleProductStatus,
   } = useProducts();
 
   const handleNewProduct = () => {
-    navigate('/produtos/novo');
+    navigate("/produtos/novo");
   };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -49,17 +49,12 @@ export const ProdutosPage: React.FC = () => {
         <div className="header-content">
           <div className="header-title-section">
             <h1 className="page-title">Produtos</h1>
-            <p className="page-subtitle">
-              Gerencie o catálogo de produtos da sua loja
-            </p>
+            <p className="page-subtitle">Gerencie o catálogo de produtos da sua loja</p>
           </div>
-          <button 
-            className="btn-primary"
-            onClick={handleNewProduct}
-          >
+          <button className="btn-primary" onClick={handleNewProduct}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <line x1="12" y1="5" x2="12" y2="19" strokeWidth="2" strokeLinecap="round"/>
-              <line x1="5" y1="12" x2="19" y2="12" strokeWidth="2" strokeLinecap="round"/>
+              <line x1="12" y1="5" x2="12" y2="19" strokeWidth="2" strokeLinecap="round" />
+              <line x1="5" y1="12" x2="19" y2="12" strokeWidth="2" strokeLinecap="round" />
             </svg>
             Novo Produto
           </button>
@@ -92,7 +87,12 @@ export const ProdutosPage: React.FC = () => {
               disabled={currentPage === 1}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <polyline points="15 18 9 12 15 6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <polyline
+                  points="15 18 9 12 15 6"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
               Anterior
             </button>
@@ -110,7 +110,12 @@ export const ProdutosPage: React.FC = () => {
             >
               Próxima
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <polyline points="9 18 15 12 9 6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <polyline
+                  points="9 18 15 12 9 6"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </button>
           </div>

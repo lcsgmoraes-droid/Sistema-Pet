@@ -42,7 +42,11 @@ export default function AssistenteIASelecaoContexto({
 
       {modo === "atendimento" && (
         <>
-          <ConsultaSelector consultaId={consultaId} consultas={consultas} setConsultaId={setConsultaId} />
+          <ConsultaSelector
+            consultaId={consultaId}
+            consultas={consultas}
+            setConsultaId={setConsultaId}
+          />
           <ExameSelector exameId={exameId} exames={exames} setExameId={setExameId} />
         </>
       )}

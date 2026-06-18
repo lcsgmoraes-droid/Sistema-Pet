@@ -29,14 +29,7 @@ function valorRecebido(resumo) {
   return numero(resumo.venda_liquida) - numero(resumo.em_aberto);
 }
 
-function ResumoPeriodoCard({
-  borderClass,
-  headerClass,
-  periodo,
-  resumo,
-  titulo,
-  formatarMoeda,
-}) {
+function ResumoPeriodoCard({ borderClass, headerClass, periodo, resumo, titulo, formatarMoeda }) {
   return (
     <div className={`bg-white rounded-lg shadow-lg border-2 ${borderClass}`}>
       <div className={`${headerClass} text-white px-4 py-3 rounded-t-lg`}>
@@ -46,15 +39,11 @@ function ResumoPeriodoCard({
       <div className="p-4 space-y-3">
         <div className="border-b pb-2">
           <div className="text-xs text-gray-600">Quantidade de Vendas</div>
-          <div className="text-2xl font-bold text-gray-700">
-            {resumo.quantidade_vendas || 0}
-          </div>
+          <div className="text-2xl font-bold text-gray-700">{resumo.quantidade_vendas || 0}</div>
         </div>
         <div className="border-b pb-2">
           <div className="text-xs text-gray-600">Valor Bruto</div>
-          <div className="text-xl font-bold text-gray-700">
-            {formatarMoeda(resumo.venda_bruta)}
-          </div>
+          <div className="text-xl font-bold text-gray-700">{formatarMoeda(resumo.venda_bruta)}</div>
         </div>
         <div className="border-b pb-2">
           <div className="text-xs text-gray-600">Valor Liquido</div>
@@ -88,27 +77,17 @@ function VariacaoLinha({ formatarValor, label, variacao }) {
         <Icon className="w-5 h-5" />
         {Math.abs(variacao.percentual)}%
       </div>
-      <div className="text-xs text-gray-500 mt-1">
-        {formatarValor(variacao.valor)}
-      </div>
+      <div className="text-xs text-gray-500 mt-1">{formatarValor(variacao.valor)}</div>
     </div>
   );
 }
 
-function VariacaoCard({
-  calcularVariacao,
-  formatarMoeda,
-  resumo,
-  resumoComparacao,
-}) {
+function VariacaoCard({ calcularVariacao, formatarMoeda, resumo, resumoComparacao }) {
   const variacoes = [
     {
       label: "Qtd de Vendas",
       formatarValor: (valor) => `${valor >= 0 ? "+" : ""}${valor.toFixed(0)} vendas`,
-      value: calcularVariacao(
-        resumo.quantidade_vendas,
-        resumoComparacao.quantidade_vendas,
-      ),
+      value: calcularVariacao(resumo.quantidade_vendas, resumoComparacao.quantidade_vendas),
     },
     {
       label: "Valor Bruto",
@@ -131,9 +110,7 @@ function VariacaoCard({
     <div className="bg-white rounded-lg shadow-lg border-2 border-green-500">
       <div className="bg-green-600 text-white px-4 py-3 rounded-t-lg">
         <h3 className="font-bold text-lg">Diferenca</h3>
-        <p className="text-xs opacity-90 mt-1">
-          Variacao vs periodo anterior
-        </p>
+        <p className="text-xs opacity-90 mt-1">Variacao vs periodo anterior</p>
       </div>
       <div className="p-4 space-y-3">
         {variacoes.map((item) => (
@@ -210,9 +187,7 @@ function ComparacaoFinanceira({
       </div>
 
       <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">
-          Comparacao Visual
-        </h3>
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Comparacao Visual</h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={dados}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -234,11 +209,7 @@ function ComparacaoFinanceira({
   );
 }
 
-function ComparacaoBarras({
-  corAtual,
-  data,
-  titulo = "Comparacao Visual",
-}) {
+function ComparacaoBarras({ corAtual, data, titulo = "Comparacao Visual" }) {
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <h3 className="text-lg font-semibold text-gray-800 mb-4">{titulo}</h3>
@@ -338,10 +309,7 @@ export default function VendasComparacaoPanel({
     <div>
       <div className="bg-white rounded-lg shadow p-4 mb-6">
         <div className="flex items-center gap-4">
-          <label
-            htmlFor="tipo-comparacao-vendas"
-            className="text-sm font-medium text-gray-700"
-          >
+          <label htmlFor="tipo-comparacao-vendas" className="text-sm font-medium text-gray-700">
             Tipo de Analise:
           </label>
           <select
@@ -358,8 +326,8 @@ export default function VendasComparacaoPanel({
           </select>
 
           <div className="ml-auto text-sm text-gray-600">
-            <span className="font-medium">Periodo Atual:</span>{" "}
-            {formatarData(dataInicio)} - {formatarData(dataFim)}
+            <span className="font-medium">Periodo Atual:</span> {formatarData(dataInicio)} -{" "}
+            {formatarData(dataFim)}
           </div>
         </div>
       </div>
@@ -434,9 +402,7 @@ export default function VendasComparacaoPanel({
       {tipoComparacao === "funcionarios" && (
         <>
           <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">
-              Comparacao por Funcionario
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Comparacao por Funcionario</h3>
             <VendasComparativoPeriodoTable
               emptyMessage="Nenhum funcionario encontrado"
               includeQuantidade

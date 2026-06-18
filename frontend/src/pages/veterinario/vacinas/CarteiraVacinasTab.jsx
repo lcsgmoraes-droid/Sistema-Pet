@@ -27,7 +27,10 @@ export default function CarteiraVacinasTab({
           <label htmlFor="vacinas-pet-filtro" className="sr-only">
             Pet
           </label>
-          <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <ChevronDown
+            size={14}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
           <select
             id="vacinas-pet-filtro"
             name="vacinas-pet-filtro"
@@ -49,7 +52,9 @@ export default function CarteiraVacinasTab({
       {!petSelecionado && (
         <div className="p-10 text-center bg-white border border-gray-200 rounded-xl">
           <Syringe size={36} className="mx-auto text-gray-200 mb-3" />
-          <p className="text-gray-400 text-sm">Selecione um pet para ver sua carteira de vacinação.</p>
+          <p className="text-gray-400 text-sm">
+            Selecione um pet para ver sua carteira de vacinação.
+          </p>
         </div>
       )}
 
@@ -113,7 +118,9 @@ function CarteiraTabela({ vacinas }) {
                     <div className="flex items-center gap-2">
                       <span className="text-gray-600">{formatData(vacina.proxima_dose)}</span>
                       {badge && (
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.cls}`}>
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.cls}`}
+                        >
                           {badge.label}
                         </span>
                       )}

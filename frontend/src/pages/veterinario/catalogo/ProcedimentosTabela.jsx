@@ -2,7 +2,13 @@ import { Loader2 } from "lucide-react";
 import { formatMoneyBRL, formatPercent } from "../../../utils/formatters";
 import { LinhaAcoes } from "./shared";
 
-export default function ProcedimentosTabela({ carregando, lista, onEditar, onExcluir, removendoId }) {
+export default function ProcedimentosTabela({
+  carregando,
+  lista,
+  onEditar,
+  onExcluir,
+  removendoId,
+}) {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
       {carregando ? (
@@ -52,18 +58,28 @@ function LinhaProcedimento({ item, onEditar, onExcluir, removendo }) {
         </p>
       </td>
       <td className="px-4 py-3 text-gray-600">
-        {Array.isArray(item.insumos) && item.insumos.length > 0 ? `${item.insumos.length} item(ns)` : "-"}
+        {Array.isArray(item.insumos) && item.insumos.length > 0
+          ? `${item.insumos.length} item(ns)`
+          : "-"}
       </td>
       <td className="px-4 py-3 text-gray-600">{duracao ? `${duracao} min` : "-"}</td>
       <td className="px-4 py-3 text-gray-600">{formatMoneyBRL(item.valor_padrao || 0)}</td>
       <td className="px-4 py-3">
-        <p className={`font-medium ${(item.margem_estimada || 0) < 0 ? "text-red-600" : "text-emerald-700"}`}>
+        <p
+          className={`font-medium ${(item.margem_estimada || 0) < 0 ? "text-red-600" : "text-emerald-700"}`}
+        >
           {formatMoneyBRL(item.margem_estimada || 0)}
         </p>
-        <p className="text-xs text-gray-400">{formatPercent(item.margem_percentual_estimada || 0)}</p>
+        <p className="text-xs text-gray-400">
+          {formatPercent(item.margem_percentual_estimada || 0)}
+        </p>
       </td>
       <td className="px-4 py-3">
-        <LinhaAcoes onEditar={() => onEditar(item)} onExcluir={() => onExcluir(item)} removendo={removendo} />
+        <LinhaAcoes
+          onEditar={() => onEditar(item)}
+          onExcluir={() => onExcluir(item)}
+          removendo={removendo}
+        />
       </td>
     </tr>
   );

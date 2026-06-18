@@ -1,11 +1,4 @@
-import {
-  Bot,
-  CalendarDays,
-  ChevronDown,
-  ChevronUp,
-  FileText,
-  Sparkles,
-} from "lucide-react";
+import { Bot, CalendarDays, ChevronDown, ChevronUp, FileText, Sparkles } from "lucide-react";
 import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import PetIdentity from "../../../components/ui/PetIdentity";
 import ExameAnexadoPainelIA from "../components/ExameAnexadoPainelIA";

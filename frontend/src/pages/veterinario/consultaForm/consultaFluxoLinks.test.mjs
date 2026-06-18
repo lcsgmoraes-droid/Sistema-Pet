@@ -54,5 +54,8 @@ test("buildInternacaoConsultaLink monta deep link para internacao vinculada a co
   assert.equal(url.searchParams.get("consulta_id"), "16");
   assert.equal(url.searchParams.get("tutor_id"), "77");
   assert.equal(url.searchParams.get("tutor_nome"), "Lucas Guerra");
-  assert.equal(url.searchParams.get("motivo"), "Internacao apos consulta #16 - Inflamacao no intestino");
+  assert.equal(
+    url.searchParams.get("motivo"),
+    "Internacao apos consulta #16 - Inflamacao no intestino",
+  );
 });

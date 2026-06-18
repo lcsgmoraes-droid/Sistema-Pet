@@ -68,9 +68,7 @@ export default function VendasFinanceiroHeader({
   return (
     <div className="mb-6 rounded-lg bg-white p-3 shadow sm:p-4">
       <div className="mb-4 flex flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between">
-        <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">
-          Consulta de Vendas
-        </h1>
+        <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">Consulta de Vendas</h1>
 
         {podeVerFinanceiroCompleto ? (
           <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center lg:justify-end 2xl:w-auto">
@@ -147,9 +145,7 @@ export default function VendasFinanceiroHeader({
                 onChange={(event) => setModoComparacao(event.target.checked)}
                 className="w-4 h-4 text-blue-600 rounded"
               />
-              <span className="text-sm font-medium text-gray-700">
-                Comparar com:
-              </span>
+              <span className="text-sm font-medium text-gray-700">Comparar com:</span>
             </label>
 
             {modoComparacao && (
@@ -161,12 +157,8 @@ export default function VendasFinanceiroHeader({
                 <option value="periodo_anterior">
                   Periodo imediatamente anterior (mesmo numero de dias)
                 </option>
-                <option value="mes_anterior">
-                  Mesmo periodo do mes passado
-                </option>
-                <option value="ano_anterior">
-                  Mesmo periodo do ano passado
-                </option>
+                <option value="mes_anterior">Mesmo periodo do mes passado</option>
+                <option value="ano_anterior">Mesmo periodo do ano passado</option>
               </select>
             )}
           </div>
@@ -248,10 +240,7 @@ export default function VendasFinanceiroHeader({
               className="h-11 w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm sm:min-w-[200px] sm:flex-1 lg:h-9 lg:w-auto lg:min-w-[160px] lg:flex-none"
             >
               {VENDAS_FINANCEIRO_CHANNEL_FILTERS.map((canal) => (
-                <option
-                  key={`canal-${canal.value || "todos"}`}
-                  value={canal.value}
-                >
+                <option key={`canal-${canal.value || "todos"}`} value={canal.value}>
                   {canal.filterLabel}
                 </option>
               ))}

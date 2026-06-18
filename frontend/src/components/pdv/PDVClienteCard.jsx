@@ -1,12 +1,4 @@
-import {
-  AlertTriangle,
-  Check,
-  Copy,
-  History,
-  Plus,
-  User,
-  Wallet,
-} from "lucide-react";
+import { AlertTriangle, Check, Copy, History, Plus, User, Wallet } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
 import { getClienteAlertasPdvAtivos } from "../../utils/clienteAlertasPdv";
@@ -27,11 +19,7 @@ function CopyButton({ active, onClick, title }) {
       className="inline-flex h-4 w-4 items-center justify-center rounded text-blue-700 hover:bg-blue-100 hover:text-blue-900"
       title={title}
     >
-      {active ? (
-        <Check className="h-3.5 w-3.5 text-green-600" />
-      ) : (
-        <Copy className="h-3.5 w-3.5" />
-      )}
+      {active ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
     </button>
   );
 }
@@ -41,7 +29,11 @@ function ClienteInfoLine({ label, value, copyKey, copiedKey, onCopy }) {
     <div className="grid min-h-[20px] grid-cols-[48px_minmax(0,1fr)_18px] items-center gap-1">
       <span className="text-blue-700">{label}:</span>
       <span className="truncate text-blue-800">
-        {value || <span aria-hidden="true" className="invisible">-</span>}
+        {value || (
+          <span aria-hidden="true" className="invisible">
+            -
+          </span>
+        )}
       </span>
       {copyKey && value ? (
         <CopyButton
@@ -76,8 +68,7 @@ function ClienteLookup({
           onKeyDown={(e) => {
             if (e.key !== "Enter") return;
 
-            const clientePorCodigo =
-              buscarClientePorCodigoExato(buscarCliente);
+            const clientePorCodigo = buscarClientePorCodigoExato(buscarCliente);
             if (clientePorCodigo) {
               e.preventDefault();
               onSelecionarCliente(clientePorCodigo);
@@ -102,19 +93,13 @@ function ClienteLookup({
       </div>
 
       {buscarCliente.length >= 2 && clientesSugeridos.length === 0 && (
-        <div className="py-2 text-center text-sm text-gray-500">
-          Nenhum cliente encontrado
-        </div>
+        <div className="py-2 text-center text-sm text-gray-500">Nenhum cliente encontrado</div>
       )}
     </div>
   );
 }
 
-function ClienteCupomBadgeList({
-  copiadoClienteCampo,
-  cuponsAtivos,
-  onCopiarCampoCliente,
-}) {
+function ClienteCupomBadgeList({ copiadoClienteCampo, cuponsAtivos, onCopiarCampoCliente }) {
   if (cuponsAtivos.length === 0) {
     return <span className="text-blue-500">-</span>;
   }
@@ -165,29 +150,21 @@ function ClienteFidelidadeResumo({
     <div className="space-y-1.5 text-xs text-blue-800">
       <div className="flex items-center justify-between gap-3">
         <span>Nivel fidelidade:</span>
-        <span className="font-semibold capitalize text-blue-950">
-          {nivelFidelidade}
-        </span>
+        <span className="font-semibold capitalize text-blue-950">{nivelFidelidade}</span>
       </div>
       <div className="flex items-center justify-between gap-3">
         <span>Carimbos fidelidade:</span>
-        <span className="font-semibold text-blue-950">
-          {saldoCarimbos} carimbo(s)
-        </span>
+        <span className="font-semibold text-blue-950">{saldoCarimbos} carimbo(s)</span>
       </div>
       {debitoFidelidade > 0 && (
         <div className="flex items-center justify-between gap-3">
           <span>Debito fidelidade:</span>
-          <span className="font-semibold text-red-600">
-            {debitoFidelidade} carimbo(s)
-          </span>
+          <span className="font-semibold text-red-600">{debitoFidelidade} carimbo(s)</span>
         </div>
       )}
       <div className="flex items-center justify-between gap-3">
         <span>Cashback acumulado:</span>
-        <span className="font-semibold text-green-700">
-          R$ {formatBRL(cashback)}
-        </span>
+        <span className="font-semibold text-green-700">R$ {formatBRL(cashback)}</span>
       </div>
       <div className="flex items-start justify-between gap-3">
         <span className="pt-0.5">Cupons:</span>
@@ -244,9 +221,7 @@ function ClienteAlertasPdv({ cliente }) {
       {alertas.map((alerta, index) => (
         <div
           key={`${alerta.titulo}-${index}`}
-          className={`rounded-lg border px-3 py-2 text-sm ${alertaPdvClasses(
-            alerta.prioridade,
-          )}`}
+          className={`rounded-lg border px-3 py-2 text-sm ${alertaPdvClasses(alerta.prioridade)}`}
         >
           <div className="flex min-w-0 items-start gap-2">
             <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
@@ -337,9 +312,7 @@ function ClienteAcoesResumo({
   return (
     <div className="flex flex-col gap-2 md:flex-row md:items-center">
       {totalVendasAbertas > 0 ? (
-        <div
-          className="flex min-h-[46px] w-full min-w-0 flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 sm:flex-row sm:items-center sm:justify-between md:w-auto md:flex-none"
-        >
+        <div className="flex min-h-[46px] w-full min-w-0 flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 sm:flex-row sm:items-center sm:justify-between md:w-auto md:flex-none">
           <div className="flex min-w-0 items-center gap-2">
             <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-600" />
             <div className="min-w-0">
@@ -449,8 +422,7 @@ export default function PDVClienteCard({
   const creditoCliente = Number(cliente?.credito || 0);
   const cuponsAtivos = saldoCampanhas?.cupons_ativos || [];
   const totalVendasAbertas = Number(vendasEmAbertoInfo?.total_vendas || 0);
-  const telefoneCliente =
-    cliente?.telefone || cliente?.celular || cliente?.whatsapp || "";
+  const telefoneCliente = cliente?.telefone || cliente?.celular || cliente?.whatsapp || "";
   const codigoCliente = cliente?.codigo || cliente?.id || "";
   const nivelFidelidade = saldoCampanhas?.rank_level || "bronze";
   const cashback = Number(saldoCampanhas?.saldo_cashback || 0);
@@ -467,12 +439,7 @@ export default function PDVClienteCard({
           Cliente
         </h2>
         {cliente && !modoVisualizacao && (
-          <ActionButton
-            onClick={onRemoverCliente}
-            intent="delete"
-            tone="ghost"
-            size="xs"
-          >
+          <ActionButton onClick={onRemoverCliente} intent="delete" tone="ghost" size="xs">
             Remover
           </ActionButton>
         )}

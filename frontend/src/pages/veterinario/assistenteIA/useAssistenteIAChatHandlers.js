@@ -61,7 +61,10 @@ export default function useAssistenteIAChatHandlers({
     } catch (e) {
       const detail = e?.response?.data?.detail || "Não foi possível falar com a IA agora.";
       setErro(detail);
-      setHistorico((h) => [...h, { localId: mensagemIaLocalId, role: "ia", text: `Erro: ${detail}` }]);
+      setHistorico((h) => [
+        ...h,
+        { localId: mensagemIaLocalId, role: "ia", text: `Erro: ${detail}` },
+      ]);
     } finally {
       setCarregando(false);
     }
@@ -95,7 +98,7 @@ export default function useAssistenteIAChatHandlers({
           role: item.tipo === "usuario" ? "user" : "ia",
           text: item.conteudo || "",
           feedback: item.feedback || null,
-        }))
+        })),
       );
     } catch {
       setHistorico([]);
@@ -114,7 +117,8 @@ export default function useAssistenteIAChatHandlers({
     if (!mensagemId || salvandoFeedbackId) return;
     setSalvandoFeedbackId(String(mensagemId));
     try {
-      const comentarioBruto = globalThis.prompt("Comentário opcional para melhorar a IA:", "") || "";
+      const comentarioBruto =
+        globalThis.prompt("Comentário opcional para melhorar a IA:", "") || "";
       const comentario = comentarioBruto.trim();
       const payload = {
         util,
@@ -126,8 +130,8 @@ export default function useAssistenteIAChatHandlers({
         atual.map((msg) =>
           msg.id === mensagemId
             ? { ...msg, feedback: { util, nota: util ? 5 : 2, comentario: comentario || null } }
-            : msg
-        )
+            : msg,
+        ),
       );
     } catch {
       // Mantem a conversa sem interromper o fluxo principal.

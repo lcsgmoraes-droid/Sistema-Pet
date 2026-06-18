@@ -1,14 +1,14 @@
-import { useState, useEffect } from 'react';
-import { X, ChevronDown, Loader2 } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
-import api from '../api';
-import toast from 'react-hot-toast';
-import { ehRacao } from '../helpers/deteccaoRacao';
+import { useState, useEffect } from "react";
+import { X, ChevronDown, Loader2 } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import api from "../api";
+import toast from "react-hot-toast";
+import { ehRacao } from "../helpers/deteccaoRacao";
 
 /**
  * Modal Universal da Calculadora de Ração
  * ========================================
- * 
+ *
  * Funciona em 2 modos:
  * 1. PDV: Usa rações do carrinho, autopreenche pet vinculado
  * 2. Outras telas: Autocomplete para buscar rações manualmente
@@ -17,22 +17,20 @@ export default function ModalCalculadoraUniversal({
   isOpen = false,
   onClose = () => {},
   // Props do PDV (quando estiver no contexto do PDV)
-  itensCarrinho = [],
-  clienteId = null
 }) {
   const location = useLocation();
-  const estaNoPDV = location.pathname === '/pdv';
-  
+  const estaNoPDV = location.pathname === "/pdv";
+
   // Detectar mobile
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
     };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   // Estados
@@ -45,16 +43,16 @@ export default function ModalCalculadoraUniversal({
   const [mostraDropdown, setMostraDropdown] = useState(false);
 
   // Estados para modo FORA DO PDV
-  const [buscaRacao, setBuscaRacao] = useState('');
+  const [buscaRacao, setBuscaRacao] = useState("");
   const [racoesDisponiveis, setRacoesDisponiveis] = useState([]);
   const [buscandoRacoes, setBuscandoRacoes] = useState(false);
   const [erroBuscaRacao, setErroBuscaRacao] = useState(null);
 
   // Estados do formulário
   const [form, setForm] = useState({
-    peso_pet_kg: '',
-    idade_meses: '',
-    nivel_atividade: 'normal'
+    peso_pet_kg: "",
+    idade_meses: "",
+    nivel_atividade: "normal",
   });
 
   // Estados para arrastar o modal
@@ -63,19 +61,19 @@ export default function ModalCalculadoraUniversal({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   // Filtrar rações do carrinho (modo PDV)
-  const racoesCarrinho = estaNoPDV 
+  const racoesCarrinho = estaNoPDV
     ? (() => {
         try {
-          const pdvData = sessionStorage.getItem('pdv_calculadora_data');
-          console.log('🔍 Calculadora Universal - Dados do PDV:', pdvData);
+          const pdvData = sessionStorage.getItem("pdv_calculadora_data");
+          console.log("🔍 Calculadora Universal - Dados do PDV:", pdvData);
           if (pdvData) {
             const { itens } = JSON.parse(pdvData);
-            const racoes = (itens || []).filter(item => ehRacao(item));
-            console.log('🥫 Rações encontradas:', racoes);
+            const racoes = (itens || []).filter((item) => ehRacao(item));
+            console.log("🥫 Rações encontradas:", racoes);
             return racoes;
           }
         } catch (e) {
-          console.error('Erro ao ler dados do PDV:', e);
+          console.error("Erro ao ler dados do PDV:", e);
         }
         return [];
       })()
@@ -88,9 +86,9 @@ export default function ModalCalculadoraUniversal({
     Boolean(racao?.tabela_consumo);
 
   const formatarRacaoBusca = (racao) => {
-    if (!racao) return '';
-    const nome = racao.nome || racao.produto_nome || '';
-    const peso = racao.peso_embalagem ? ` - ${racao.peso_embalagem}kg` : '';
+    if (!racao) return "";
+    const nome = racao.nome || racao.produto_nome || "";
+    const peso = racao.peso_embalagem ? ` - ${racao.peso_embalagem}kg` : "";
     return `${nome}${peso}`;
   };
 
@@ -111,15 +109,15 @@ export default function ModalCalculadoraUniversal({
         setBuscandoRacoes(true);
         setErroBuscaRacao(null);
         try {
-            const response = await api.get('/produtos/calculadora-racao/opcoes', {
+          const response = await api.get("/produtos/calculadora-racao/opcoes", {
             params: {
               busca: termo,
               page: 1,
               page_size: 12,
               apenas_aptas: true,
-            }
+            },
           });
-          
+
           const produtos = Array.isArray(response.data)
             ? response.data
             : response.data.items || response.data.produtos || [];
@@ -128,9 +126,9 @@ export default function ModalCalculadoraUniversal({
           setRacoesDisponiveis(racoes);
           setMostraDropdown(true);
         } catch (error) {
-          setErroBuscaRacao('Nao foi possivel buscar racoes agora.');
+          setErroBuscaRacao("Nao foi possivel buscar racoes agora.");
           setMostraDropdown(true);
-          console.error('Erro ao buscar rações:', error);
+          console.error("Erro ao buscar rações:", error);
         } finally {
           setBuscandoRacoes(false);
         }
@@ -156,7 +154,7 @@ export default function ModalCalculadoraUniversal({
       const ultimaRacao = racoesCarrinho[racoesCarrinho.length - 1];
       setRacaoSelecionadaId(ultimaRacao.produto_id);
       setRacaoSelecionada(ultimaRacao);
-      
+
       // Buscar pet se existir
       if (ultimaRacao.pet_id) {
         buscarPet(ultimaRacao.pet_id);
@@ -169,38 +167,38 @@ export default function ModalCalculadoraUniversal({
     try {
       const response = await api.get(`/pets/${petId}`);
       const pet = response.data;
-      
+
       setPetSelecionado(pet);
-      
+
       // Autopreencher form
       setForm({
         ...form,
-        peso_pet_kg: pet.peso_kg || pet.peso || '',
-        idade_meses: pet.idade_meses || pet.idade_aproximada || ''
+        peso_pet_kg: pet.peso_kg || pet.peso || "",
+        idade_meses: pet.idade_meses || pet.idade_aproximada || "",
       });
     } catch (error) {
-      console.error('Erro ao buscar pet:', error);
+      console.error("Erro ao buscar pet:", error);
     }
   };
 
   // Calcular consumo
   const calcularConsumo = async () => {
-    console.log('🔍 Iniciando cálculo...');
-    console.log('📦 Ração selecionada:', racaoSelecionada);
-    console.log('📝 Formulário:', form);
-    
+    console.log("🔍 Iniciando cálculo...");
+    console.log("📦 Ração selecionada:", racaoSelecionada);
+    console.log("📝 Formulário:", form);
+
     // Usar racaoSelecionada diretamente ao invés de buscar na lista
     const racao = racaoSelecionada;
-    
+
     if (!racao) {
-      console.log('❌ Nenhuma ração selecionada');
-      toast.error('Selecione uma ração');
+      console.log("❌ Nenhuma ração selecionada");
+      toast.error("Selecione uma ração");
       return;
     }
 
     if (!form.peso_pet_kg) {
-      console.log('❌ Peso do pet não informado');
-      toast.error('Informe o peso do pet');
+      console.log("❌ Peso do pet não informado");
+      toast.error("Informe o peso do pet");
       return;
     }
 
@@ -215,13 +213,13 @@ export default function ModalCalculadoraUniversal({
         preco: racaoSelecionada.preco_venda || racaoSelecionada.preco_unitario || null,
         peso_pet_kg: parseFloat(form.peso_pet_kg),
         idade_meses: form.idade_meses ? parseInt(form.idade_meses) : null,
-        nivel_atividade: form.nivel_atividade
+        nivel_atividade: form.nivel_atividade,
       };
 
-      console.log('📤 Enviando payload:', payload);
-      const response = await api.post('/produtos/calculadora-racao', payload);
-      
-      console.log('📥 Resposta recebida:', response.data);
+      console.log("📤 Enviando payload:", payload);
+      const response = await api.post("/produtos/calculadora-racao", payload);
+
+      console.log("📥 Resposta recebida:", response.data);
       if (response.data) {
         // Mapear campos da nova API para o formato esperado pelo componente
         const resultadoMapeado = {
@@ -230,15 +228,15 @@ export default function ModalCalculadoraUniversal({
           consumo_diario_gramas: response.data.quantidade_diaria_g,
           custo_por_kg: response.data.custo_por_kg,
           custo_diario: response.data.custo_por_dia,
-          custo_mensal: response.data.custo_mensal
+          custo_mensal: response.data.custo_mensal,
         };
         setResultados(resultadoMapeado);
-        toast.success('Cálculo realizado!');
+        toast.success("Cálculo realizado!");
       }
     } catch (error) {
-      console.error('❌ Erro ao calcular:', error);
+      console.error("❌ Erro ao calcular:", error);
       const detalhe = error?.response?.data?.detail;
-      const mensagem = typeof detalhe === 'string' ? detalhe : 'Erro ao calcular. Tente novamente.';
+      const mensagem = typeof detalhe === "string" ? detalhe : "Erro ao calcular. Tente novamente.";
       setErroCalculo(mensagem);
       toast.error(mensagem);
     } finally {
@@ -259,13 +257,13 @@ export default function ModalCalculadoraUniversal({
   // Handlers para arrastar o modal (apenas desktop)
   const handleMouseDown = (e) => {
     if (isMobile) return; // Desabilitar drag em mobile
-    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) {
+    if (e.target.closest("button") || e.target.closest("input") || e.target.closest("select")) {
       return; // Não arrastar se clicar em botões, inputs ou selects
     }
     setIsDragging(true);
     setDragOffset({
       x: e.clientX - position.x,
-      y: e.clientY - position.y
+      y: e.clientY - position.y,
     });
   };
 
@@ -275,7 +273,7 @@ export default function ModalCalculadoraUniversal({
       if (isDragging) {
         setPosition({
           x: e.clientX - dragOffset.x,
-          y: e.clientY - dragOffset.y
+          y: e.clientY - dragOffset.y,
         });
       }
     };
@@ -285,11 +283,11 @@ export default function ModalCalculadoraUniversal({
     };
 
     if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
       return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener("mousemove", handleMouseMove);
+        window.removeEventListener("mouseup", handleMouseUp);
       };
     }
   }, [isDragging, dragOffset]);
@@ -298,33 +296,37 @@ export default function ModalCalculadoraUniversal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start md:items-center justify-center z-50 p-0 md:p-4 overflow-y-auto">
-      <div 
+      <div
         className={`
           bg-white 
-          ${isMobile 
-            ? 'w-full min-h-screen rounded-none' 
-            : 'rounded-xl w-full max-w-2xl max-h-[90vh]'
+          ${
+            isMobile
+              ? "w-full min-h-screen rounded-none"
+              : "rounded-xl w-full max-w-2xl max-h-[90vh]"
           } 
           shadow-2xl overflow-hidden flex flex-col
         `}
-        style={isMobile ? {} : {
-          transform: `translate(${position.x}px, ${position.y}px)`,
-          cursor: isDragging ? 'grabbing' : 'default'
-        }}
+        style={
+          isMobile
+            ? {}
+            : {
+                transform: `translate(${position.x}px, ${position.y}px)`,
+                cursor: isDragging ? "grabbing" : "default",
+              }
+        }
       >
-        
         {/* Header */}
-        <div 
+        <div
           className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 md:px-6 py-3 md:py-4 flex items-center justify-between"
           onMouseDown={isMobile ? undefined : handleMouseDown}
-          style={{ cursor: isMobile ? 'default' : (isDragging ? 'grabbing' : 'grab') }}
+          style={{ cursor: isMobile ? "default" : isDragging ? "grabbing" : "grab" }}
         >
           <div className="flex items-center gap-2 md:gap-3">
             <span className="text-2xl md:text-3xl">🥫</span>
             <div>
               <h2 className="text-lg md:text-xl font-bold">Calculadora de Ração</h2>
               <p className="text-xs md:text-sm text-orange-100">
-                {estaNoPDV ? 'Rações do carrinho' : 'Buscar ração manualmente'}
+                {estaNoPDV ? "Rações do carrinho" : "Buscar ração manualmente"}
               </p>
             </div>
           </div>
@@ -338,20 +340,19 @@ export default function ModalCalculadoraUniversal({
 
         {/* Conteúdo */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6">
-          
           {/* Seleção de Ração */}
           <div className="space-y-2">
             <label className="block text-sm font-semibold text-gray-700">
-              {estaNoPDV ? 'Ração do Carrinho' : 'Buscar Ração'} *
+              {estaNoPDV ? "Ração do Carrinho" : "Buscar Ração"} *
             </label>
-            
+
             {estaNoPDV ? (
               /* Input com autocomplete de rações do carrinho */
               racoesCarrinho.length > 0 ? (
                 <div className="relative">
                   <input
                     type="text"
-                    value={racaoSelecionada?.produto_nome || ''}
+                    value={racaoSelecionada?.produto_nome || ""}
                     readOnly
                     className="w-full px-4 py-3 pr-10 bg-gray-50 border-2 border-gray-300 rounded-lg text-gray-700 font-medium cursor-pointer"
                     placeholder="Nenhuma ração no carrinho"
@@ -361,7 +362,10 @@ export default function ModalCalculadoraUniversal({
                     onClick={() => setMostraDropdown(!mostraDropdown)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                   >
-                    <ChevronDown size={20} className={`transition-transform ${mostraDropdown ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                      size={20}
+                      className={`transition-transform ${mostraDropdown ? "rotate-180" : ""}`}
+                    />
                   </button>
 
                   {mostraDropdown && (
@@ -377,13 +381,15 @@ export default function ModalCalculadoraUniversal({
                             if (racao.pet_id) buscarPet(racao.pet_id);
                           }}
                           className={`w-full px-4 py-3 text-left hover:bg-orange-50 transition-colors ${
-                            racao.produto_id === racaoSelecionadaId ? 'bg-orange-100 border-l-4 border-l-orange-600' : ''
+                            racao.produto_id === racaoSelecionadaId
+                              ? "bg-orange-100 border-l-4 border-l-orange-600"
+                              : ""
                           }`}
                         >
                           <div className="font-medium">{racao.produto_nome}</div>
                           <div className="text-xs text-gray-500">
                             {racao.peso_embalagem}kg • R$ {racao.preco_unitario.toFixed(2)}
-                            {racao.pet_id && ' • 🐾 Pet vinculado'}
+                            {racao.pet_id && " • 🐾 Pet vinculado"}
                           </div>
                         </button>
                       ))}
@@ -411,18 +417,18 @@ export default function ModalCalculadoraUniversal({
                       if (buscaRacao.trim().length > 0) setMostraDropdown(true);
                     }}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && racoesDisponiveis.length > 0) {
+                      if (e.key === "Enter" && racoesDisponiveis.length > 0) {
                         e.preventDefault();
                         selecionarRacaoAutocomplete(racoesDisponiveis[0]);
                       }
-                      if (e.key === 'Escape') {
+                      if (e.key === "Escape") {
                         setMostraDropdown(false);
                       }
                     }}
                     placeholder="Digite para buscar ração..."
                     className="w-full px-4 py-3 pr-12 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                   />
-                  
+
                   {buscandoRacoes ? (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
                       <Loader2 size={20} className="animate-spin text-orange-500" />
@@ -436,7 +442,7 @@ export default function ModalCalculadoraUniversal({
 
                 {mostraDropdown && racoesDisponiveis.length > 0 && (
                   <div className="bg-white border-2 border-gray-300 rounded-lg shadow-xl max-h-64 overflow-y-auto">
-                    {racoesDisponiveis.map(racao => (
+                    {racoesDisponiveis.map((racao) => (
                       <button
                         key={racao.id}
                         type="button"
@@ -445,15 +451,17 @@ export default function ModalCalculadoraUniversal({
                           selecionarRacaoAutocomplete(racao);
                         }}
                         className={`w-full px-4 py-3 text-left hover:bg-orange-50 transition-colors border-b last:border-b-0 ${
-                          racao.id === racaoSelecionadaId ? 'bg-orange-100 border-l-4 border-l-orange-600' : ''
+                          racao.id === racaoSelecionadaId
+                            ? "bg-orange-100 border-l-4 border-l-orange-600"
+                            : ""
                         }`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="font-medium">{racao.nome}</div>
                             <div className="text-xs text-gray-500">
-                          {racao.peso_embalagem}kg • R$ {racao.preco_venda?.toFixed(2)}
-                          {racao.classificacao_racao && ` • ${racao.classificacao_racao}`}
+                              {racao.peso_embalagem}kg • R$ {racao.preco_venda?.toFixed(2)}
+                              {racao.classificacao_racao && ` • ${racao.classificacao_racao}`}
                             </div>
                           </div>
                           <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-semibold text-green-700">
@@ -465,11 +473,14 @@ export default function ModalCalculadoraUniversal({
                   </div>
                 )}
 
-                {mostraDropdown && !buscandoRacoes && buscaRacao.trim().length > 0 && racoesDisponiveis.length === 0 && (
-                  <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
-                    Nenhuma racao pronta para calculo encontrada com esse termo.
-                  </div>
-                )}
+                {mostraDropdown &&
+                  !buscandoRacoes &&
+                  buscaRacao.trim().length > 0 &&
+                  racoesDisponiveis.length === 0 && (
+                    <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+                      Nenhuma racao pronta para calculo encontrada com esse termo.
+                    </div>
+                  )}
 
                 {erroBuscaRacao && (
                   <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -496,7 +507,7 @@ export default function ModalCalculadoraUniversal({
                 type="number"
                 step="0.1"
                 value={form.peso_pet_kg}
-                onChange={(e) => setForm({...form, peso_pet_kg: e.target.value})}
+                onChange={(e) => setForm({ ...form, peso_pet_kg: e.target.value })}
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                 placeholder="Ex: 8.5"
               />
@@ -509,7 +520,7 @@ export default function ModalCalculadoraUniversal({
               <input
                 type="number"
                 value={form.idade_meses}
-                onChange={(e) => setForm({...form, idade_meses: e.target.value})}
+                onChange={(e) => setForm({ ...form, idade_meses: e.target.value })}
                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                 placeholder="Ex: 24"
               />
@@ -535,7 +546,7 @@ export default function ModalCalculadoraUniversal({
               <h3 className="text-lg font-bold text-green-800 flex items-center gap-2">
                 <span>✅</span> Resultados do Cálculo
               </h3>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-white rounded-lg p-4">
                   <div className="text-sm text-gray-600">⏱️ Duração</div>
@@ -598,9 +609,7 @@ export default function ModalCalculadoraUniversal({
                 Calculando...
               </>
             ) : (
-              <>
-                🧮 Calcular Consumo
-              </>
+              <>🧮 Calcular Consumo</>
             )}
           </button>
         </div>

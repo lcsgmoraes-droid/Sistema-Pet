@@ -117,7 +117,7 @@ export function useProdutosBalancoPage() {
 
   const atualizarEstoqueLocal = (produtoId, novoEstoque) => {
     setProdutos((prev) =>
-      prev.map((p) => (p.id === produtoId ? { ...p, estoque_atual: novoEstoque } : p))
+      prev.map((p) => (p.id === produtoId ? { ...p, estoque_atual: novoEstoque } : p)),
     );
   };
 
@@ -196,7 +196,7 @@ export function useProdutosBalancoPage() {
       toast.error(
         error?.response?.data?.detail ||
           error?.response?.data?.message ||
-          "Erro ao registrar lancamento."
+          "Erro ao registrar lancamento.",
       );
       return false;
     } finally {

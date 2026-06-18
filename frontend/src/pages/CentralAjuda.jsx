@@ -327,14 +327,7 @@ const BASE_CONHECIMENTO = [
       },
       {
         titulo: "Conciliação Bancária — o que é e como fazer",
-        tags: [
-          "conciliação",
-          "bancária",
-          "banco",
-          "extrato",
-          "conferir",
-          "cartão",
-        ],
+        tags: ["conciliação", "bancária", "banco", "extrato", "conferir", "cartão"],
         conteudo: [
           "A conciliação bancária é o processo de **comparar os lançamentos do sistema com o extrato do seu banco**.",
           "Acesse **Financeiro → Conciliação Bancária**.",
@@ -466,14 +459,7 @@ const BASE_CONHECIMENTO = [
     artigos: [
       {
         titulo: "Como configurar os dados da empresa",
-        tags: [
-          "empresa",
-          "cnpj",
-          "dados",
-          "razão social",
-          "logo",
-          "configuração",
-        ],
+        tags: ["empresa", "cnpj", "dados", "razão social", "logo", "configuração"],
         conteudo: [
           "Acesse **Configurações** no menu lateral.",
           "Na aba **Empresa**, preencha: razão social, CNPJ, endereço, telefone, e-mail.",
@@ -607,14 +593,7 @@ const BASE_CONHECIMENTO = [
     artigos: [
       {
         titulo: "Módulo Campanhas — o que faz",
-        tags: [
-          "campanha",
-          "marketing",
-          "promoção",
-          "desconto",
-          "cliente",
-          "premium",
-        ],
+        tags: ["campanha", "marketing", "promoção", "desconto", "cliente", "premium"],
         conteudo: [
           "O módulo Campanhas permite criar promoções e comunicações direcionadas para seus clientes.",
           "• Crie campanhas com desconto por produto, categoria ou valor mínimo de compra.",
@@ -658,15 +637,7 @@ const BASE_CONHECIMENTO = [
       },
       {
         titulo: "App Mobile — o que faz",
-        tags: [
-          "app",
-          "mobile",
-          "celular",
-          "aplicativo",
-          "android",
-          "ios",
-          "premium",
-        ],
+        tags: ["app", "mobile", "celular", "aplicativo", "android", "ios", "premium"],
         conteudo: [
           "Acesse o sistema pelo celular com o app dedicado.",
           "• Faça vendas pelo celular (PDV mobile).",
@@ -791,9 +762,7 @@ const CardArtigo = ({ artigo, corClasses, destaqueTexto }) => {
         </span>
       </button>
       {aberto && (
-        <div
-          className={`px-5 pb-5 space-y-2 ${corClasses.bg} border-t border-gray-100`}
-        >
+        <div className={`px-5 pb-5 space-y-2 ${corClasses.bg} border-t border-gray-100`}>
           {artigo.conteudo.map((linha, i) => (
             <Paragrafo key={i} texto={linha} />
           ))}
@@ -830,10 +799,7 @@ const CentralAjuda = () => {
     });
   }, [busca, moduloAtivo]);
 
-  const totalArtigos = BASE_CONHECIMENTO.reduce(
-    (acc, m) => acc + m.artigos.length,
-    0,
-  );
+  const totalArtigos = BASE_CONHECIMENTO.reduce((acc, m) => acc + m.artigos.length, 0);
 
   return (
     <div className="max-w-4xl mx-auto py-6 px-4">
@@ -843,9 +809,7 @@ const CentralAjuda = () => {
           <FiBookOpen className="w-4 h-4" />
           {totalArtigos} artigos de ajuda
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Como posso te ajudar?
-        </h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Como posso te ajudar?</h2>
         <p className="text-gray-500 text-sm">
           Pesquise por qualquer dúvida ou navegue pelos módulos abaixo.
         </p>
@@ -908,9 +872,7 @@ const CentralAjuda = () => {
           {resultados.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
               <FiSearch className="w-10 h-10 mx-auto mb-3 opacity-40" />
-              <p className="text-base font-medium">
-                Nenhum resultado encontrado
-              </p>
+              <p className="text-base font-medium">Nenhum resultado encontrado</p>
               <p className="text-sm mt-1">
                 Tente palavras diferentes ou{" "}
                 <button
@@ -938,20 +900,13 @@ const CentralAjuda = () => {
                 )}
               </p>
               {resultados.map((artigo, i) => {
-                const cors =
-                  COR_CLASSES[artigo._modulo.cor] || COR_CLASSES.gray;
+                const cors = COR_CLASSES[artigo._modulo.cor] || COR_CLASSES.gray;
                 return (
                   <div key={i}>
-                    <div
-                      className={`text-xs font-medium ${cors.text} mb-1 px-1`}
-                    >
+                    <div className={`text-xs font-medium ${cors.text} mb-1 px-1`}>
                       {artigo._modulo.label}
                     </div>
-                    <CardArtigo
-                      artigo={artigo}
-                      corClasses={cors}
-                      destaqueTexto={busca}
-                    />
+                    <CardArtigo artigo={artigo} corClasses={cors} destaqueTexto={busca} />
                   </div>
                 );
               })}
@@ -972,9 +927,7 @@ const CentralAjuda = () => {
                   >
                     <Icone className={`w-5 h-5 ${cors.icon}`} />
                   </div>
-                  <h3 className="text-base font-bold text-gray-900">
-                    {mod.label}
-                  </h3>
+                  <h3 className="text-base font-bold text-gray-900">{mod.label}</h3>
                   <span className="text-xs text-gray-400 font-normal">
                     {mod.artigos.length} artigo
                     {mod.artigos.length !== 1 ? "s" : ""}
@@ -982,12 +935,7 @@ const CentralAjuda = () => {
                 </div>
                 <div className="space-y-2">
                   {mod.artigos.map((artigo, i) => (
-                    <CardArtigo
-                      key={i}
-                      artigo={artigo}
-                      corClasses={cors}
-                      destaqueTexto={null}
-                    />
+                    <CardArtigo key={i} artigo={artigo} corClasses={cors} destaqueTexto={null} />
                   ))}
                 </div>
               </section>

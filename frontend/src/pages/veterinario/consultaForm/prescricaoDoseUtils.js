@@ -2,9 +2,7 @@ import { parseNumero } from "./consultaFormUtils.js";
 
 function formatarNumeroCampo(valor) {
   if (!Number.isFinite(valor)) return "";
-  return Number.isInteger(valor)
-    ? String(valor)
-    : String(Number(valor.toFixed(2)));
+  return Number.isInteger(valor) ? String(valor) : String(Number(valor.toFixed(2)));
 }
 
 export function obterPesoParaCalculoDose(form = {}, petSelecionado = {}) {
@@ -70,9 +68,7 @@ export function buildCalculadoraDoseFormParaPrescricao({
     medicamento_id: itemPrescricao.medicamento_id
       ? String(itemPrescricao.medicamento_id)
       : calculadoraFormAtual.medicamento_id || "",
-    peso_kg: Number.isFinite(peso)
-      ? formatarNumeroCampo(peso)
-      : calculadoraFormAtual.peso_kg || "",
+    peso_kg: Number.isFinite(peso) ? formatarNumeroCampo(peso) : calculadoraFormAtual.peso_kg || "",
     dose_mg_kg: Number.isFinite(doseMgKg)
       ? formatarNumeroCampo(doseMgKg)
       : calculadoraFormAtual.dose_mg_kg || "",

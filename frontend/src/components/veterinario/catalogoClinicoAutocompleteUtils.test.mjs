@@ -12,8 +12,14 @@ test("montarOpcoesCatalogoClinico combina medicamentos e procedimentos com tipo"
     procedimentos: [{ id: 7, nome: "Curativo", descricao: "Troca de curativo" }],
   });
 
-  assert.deepEqual(opcoes.map((opcao) => opcao.valor), ["med:1", "proc:7"]);
-  assert.deepEqual(opcoes.map((opcao) => opcao.tipo), ["medicamento", "procedimento"]);
+  assert.deepEqual(
+    opcoes.map((opcao) => opcao.valor),
+    ["med:1", "proc:7"],
+  );
+  assert.deepEqual(
+    opcoes.map((opcao) => opcao.tipo),
+    ["medicamento", "procedimento"],
+  );
 });
 
 test("filtrarCatalogoClinico busca por nome, principio ativo, descricao e ignora acentos", () => {
@@ -22,6 +28,12 @@ test("filtrarCatalogoClinico busca por nome, principio ativo, descricao e ignora
     procedimentos: [{ id: 7, nome: "Aplicacao subcutanea", descricao: "Injecao SC" }],
   });
 
-  assert.deepEqual(filtrarCatalogoClinico(opcoes, "metam").map((opcao) => opcao.label), ["Dipirona"]);
-  assert.deepEqual(filtrarCatalogoClinico(opcoes, "injeção").map((opcao) => opcao.label), ["Aplicacao subcutanea"]);
+  assert.deepEqual(
+    filtrarCatalogoClinico(opcoes, "metam").map((opcao) => opcao.label),
+    ["Dipirona"],
+  );
+  assert.deepEqual(
+    filtrarCatalogoClinico(opcoes, "injeção").map((opcao) => opcao.label),
+    ["Aplicacao subcutanea"],
+  );
 });

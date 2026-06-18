@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Baby,
   Beef,
@@ -272,7 +272,11 @@ function OpcoesRacao() {
                   onChange={(event) => setFormData({ ...formData, nome: event.target.value })}
                   className={FIELD_CLASS}
                   placeholder={`Ex: ${
-                    abaAtiva === "linhas" ? "Premium" : abaAtiva === "portes" ? "Pequeno" : "Filhote"
+                    abaAtiva === "linhas"
+                      ? "Premium"
+                      : abaAtiva === "portes"
+                        ? "Pequeno"
+                        : "Filhote"
                   }`}
                 />
               </div>
@@ -394,7 +398,9 @@ function OpcoesRacao() {
                   </div>
 
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="hidden text-xs text-slate-500 sm:inline">Ordem: {item.ordem}</span>
+                    <span className="hidden text-xs text-slate-500 sm:inline">
+                      Ordem: {item.ordem}
+                    </span>
                     {!item.ativo ? <StatusBadge status="inativo" /> : null}
 
                     <IconActionButton

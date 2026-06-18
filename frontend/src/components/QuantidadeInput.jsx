@@ -10,24 +10,24 @@
  * Aceita vírgula ou ponto como separador decimal.
  * Permite apagar tudo e redigitar sem conflito.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 export default function QuantidadeInput({ value, onChange, disabled, className, min = 0.001 }) {
-  const [display, setDisplay] = useState('');
+  const [display, setDisplay] = useState("");
 
   // Sincroniza quando o valor muda por fora (ex: botões + e -)
   useEffect(() => {
-    setDisplay(value !== undefined && value !== null ? String(value) : '');
+    setDisplay(value !== undefined && value !== null ? String(value) : "");
   }, [value]);
 
   const handleChange = (e) => {
     const raw = e.target.value;
     // Permite: dígitos, ponto ou vírgula (uma vez), sem outros caracteres
-    if (raw === '' || /^[0-9]*[.,]?[0-9]*$/.test(raw)) {
+    if (raw === "" || /^[0-9]*[.,]?[0-9]*$/.test(raw)) {
       setDisplay(raw);
       // Atualiza em tempo real quando o valor é um número completo (não termina em . ou ,)
-      if (raw !== '' && !/[.,]$/.test(raw)) {
-        const normalized = raw.replace(',', '.');
+      if (raw !== "" && !/[.,]$/.test(raw)) {
+        const normalized = raw.replace(",", ".");
         const num = parseFloat(normalized);
         if (!isNaN(num) && num > 0) {
           onChange(num);
@@ -38,7 +38,7 @@ export default function QuantidadeInput({ value, onChange, disabled, className, 
 
   const commit = (raw) => {
     // Converte vírgula em ponto para parsear
-    const normalized = raw.replace(',', '.');
+    const normalized = raw.replace(",", ".");
     const num = parseFloat(normalized);
     const final = !isNaN(num) && num > 0 ? num : min;
     onChange(final);
@@ -48,7 +48,7 @@ export default function QuantidadeInput({ value, onChange, disabled, className, 
   const handleBlur = () => commit(display);
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       e.preventDefault();
       e.target.blur();
     }

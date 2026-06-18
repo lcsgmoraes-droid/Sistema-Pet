@@ -15,20 +15,13 @@ export function usePDVEstoqueFiscal({ vendaAtual, limparBuscaProduto }) {
     }
 
     try {
-      const response = await api.get(
-        `/pendencias-estoque/cliente/${vendaAtual.cliente.id}`,
-      );
-      const todas = Array.isArray(response.data?.pendencias)
-        ? response.data.pendencias
-        : [];
+      const response = await api.get(`/pendencias-estoque/cliente/${vendaAtual.cliente.id}`);
+      const todas = Array.isArray(response.data?.pendencias) ? response.data.pendencias : [];
       const pendenciasAtivas = todas.filter(
-        (pendencia) =>
-          pendencia.status === "pendente" || pendencia.status === "notificado",
+        (pendencia) => pendencia.status === "pendente" || pendencia.status === "notificado",
       );
       setPendenciasCount(pendenciasAtivas.length);
-      setPendenciasProdutoIds(
-        pendenciasAtivas.map((pendencia) => pendencia.produto_id),
-      );
+      setPendenciasProdutoIds(pendenciasAtivas.map((pendencia) => pendencia.produto_id));
     } catch {
       setPendenciasCount(0);
       setPendenciasProdutoIds([]);
@@ -55,9 +48,7 @@ export function usePDVEstoqueFiscal({ vendaAtual, limparBuscaProduto }) {
       limparBuscaProduto?.();
       await carregarPendencias();
     } catch (error) {
-      toast.error(
-        error.response?.data?.detail || "Erro ao adicionar à lista de espera",
-      );
+      toast.error(error.response?.data?.detail || "Erro ao adicionar à lista de espera");
     }
   };
 

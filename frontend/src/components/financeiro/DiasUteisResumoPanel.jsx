@@ -22,11 +22,10 @@ export default function DiasUteisResumoPanel({
     <div className="mb-6 rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-800">
-            Dias uteis e media operacional
-          </h3>
+          <h3 className="text-lg font-semibold text-gray-800">Dias uteis e media operacional</h3>
           <p className="text-sm text-gray-500">
-            Configure se sabado entra na media. Feriado com faturamento vira dia util automaticamente.
+            Configure se sabado entra na media. Feriado com faturamento vira dia util
+            automaticamente.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -76,9 +75,7 @@ export default function DiasUteisResumoPanel({
           <div className="mt-1 text-2xl font-bold text-emerald-700">
             {resumoDiasPeriodo.diasTrabalhados}
           </div>
-          <div className="text-xs text-emerald-600">
-            Dia util com venda registrada
-          </div>
+          <div className="text-xs text-emerald-600">Dia util com venda registrada</div>
         </div>
         <div className="rounded-xl bg-amber-50 p-3">
           <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
@@ -87,9 +84,7 @@ export default function DiasUteisResumoPanel({
           <div className="mt-1 text-2xl font-bold text-amber-700">
             {resumoDiasPeriodo.diasUteisSemVenda}
           </div>
-          <div className="text-xs text-amber-700">
-            Fora fins de semana/feriados
-          </div>
+          <div className="text-xs text-amber-700">Fora fins de semana/feriados</div>
         </div>
         <div className="rounded-xl bg-blue-50 p-3">
           <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">
@@ -99,8 +94,8 @@ export default function DiasUteisResumoPanel({
             {formatarMoeda(resumoDiasPeriodo.mediaDiaUtil)}
           </div>
           <div className="text-xs text-blue-700">
-            {resumoDiasPeriodo.feriados} feriado(s),{" "}
-            {resumoDiasPeriodo.finsDeSemana} fim(ns) de semana
+            {resumoDiasPeriodo.feriados} feriado(s), {resumoDiasPeriodo.finsDeSemana} fim(ns) de
+            semana
           </div>
         </div>
       </div>

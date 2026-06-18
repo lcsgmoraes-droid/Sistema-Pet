@@ -13,9 +13,9 @@ export default function useCalculadoraDoseConsulta({
   const medicamentoCalculadoraSelecionado = useMemo(
     () =>
       medicamentosCatalogo.find(
-        (item) => String(item.id) === String(calculadoraForm.medicamento_id)
+        (item) => String(item.id) === String(calculadoraForm.medicamento_id),
       ) ?? null,
-    [medicamentosCatalogo, calculadoraForm.medicamento_id]
+    [medicamentosCatalogo, calculadoraForm.medicamento_id],
   );
 
   const calculadoraResultado = useMemo(() => {
@@ -51,9 +51,10 @@ export default function useCalculadoraDoseConsulta({
     if (!medicamentoCalculadoraSelecionado) return;
     const doseMin = parseNumero(medicamentoCalculadoraSelecionado.dose_minima_mg_kg);
     const doseMax = parseNumero(medicamentoCalculadoraSelecionado.dose_maxima_mg_kg);
-    const doseMedia = Number.isFinite(doseMin) && Number.isFinite(doseMax)
-      ? ((doseMin + doseMax) / 2).toFixed(2)
-      : doseMin || doseMax || "";
+    const doseMedia =
+      Number.isFinite(doseMin) && Number.isFinite(doseMax)
+        ? ((doseMin + doseMax) / 2).toFixed(2)
+        : doseMin || doseMax || "";
     setCalculadoraForm((prev) => ({
       ...prev,
       dose_mg_kg: prev.dose_mg_kg || String(doseMedia || ""),

@@ -1,19 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Upload, CheckCircle, AlertTriangle, XCircle, Clock, 
-  FileText, TrendingUp, Calendar, DollarSign, ArrowRight,
-  RefreshCw, Info, CreditCard
-} from 'lucide-react';
-import { api } from '../services/api';
+import React, { useState, useEffect } from "react";
+import {
+  Upload,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  FileText,
+  RefreshCw,
+  Info,
+  CreditCard,
+} from "lucide-react";
+import { api } from "../services/api";
 
 /**
  * 🎯 PRINCÍPIO DE DESIGN: SIMPLICIDADE
- * 
+ *
  * Usuário precisa entender em 5 segundos:
  * - ✅ Posso processar?
  * - ⚠️ Preciso confirmar?
  * - ❌ Tem risco?
- * 
+ *
  * UI simples compensa complexidade do backend.
  */
 
@@ -27,7 +32,7 @@ export default function ConciliacaoCartoes() {
   // Upload
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = React.useRef(null);
-  
+
   // AJUSTE 6: Estado de processamento por validação
   const [processando, setProcessando] = useState({});
 
@@ -39,28 +44,28 @@ export default function ConciliacaoCartoes() {
 
   const carregarAdquirentes = async () => {
     try {
-      const res = await api.get('/conciliacao/templates');
+      const res = await api.get("/conciliacao/templates");
       setAdquirentes(res.data.templates || []);
       if (res.data.templates?.length > 0) {
         setAdquirenteSelecionado(res.data.templates[0].id);
       }
     } catch (error) {
-      console.error('❌ Erro ao carregar adquirentes:', error);
+      console.error("❌ Erro ao carregar adquirentes:", error);
     }
   };
 
   const carregarValidacoes = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/conciliacao/validacoes', {
+      const res = await api.get("/conciliacao/validacoes", {
         params: {
           page: 1,
-          per_page: 20
-        }
+          per_page: 20,
+        },
       });
       setValidacoes(res.data.items || []);
     } catch (error) {
-      console.error('❌ Erro ao carregar validações:', error);
+      console.error("❌ Erro ao carregar validações:", error);
     } finally {
       setLoading(false);
     }
@@ -81,7 +86,7 @@ export default function ConciliacaoCartoes() {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFile(e.dataTransfer.files[0]);
     }
@@ -96,33 +101,35 @@ export default function ConciliacaoCartoes() {
 
   const handleFile = async (file) => {
     if (!adquirenteSelecionado) {
-      alert('Selecione um adquirente (Stone, Cielo, etc) antes de fazer upload');
+      alert("Selecione um adquirente (Stone, Cielo, etc) antes de fazer upload");
       return;
     }
 
     setUploadingFile(true);
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('adquirente_id', adquirenteSelecionado);
+    formData.append("file", file);
+    formData.append("adquirente_id", adquirenteSelecionado);
 
     try {
-      const uploadRes = await api.post('/conciliacao/upload-operadora', formData);
-      
+      const uploadRes = await api.post("/conciliacao/upload-operadora", formData);
+
       if (uploadRes.data.success) {
         // 2. Validar automaticamente
-        const validarRes = await api.post('/conciliacao/validar', {
+        const validarRes = await api.post("/conciliacao/validar", {
           importacao_id: uploadRes.data.importacao_id,
-          data_inicio: new Date().toISOString().split('T')[0],
-          data_fim: new Date().toISOString().split('T')[0],
-          adquirente_id: adquirenteSelecionado
+          data_inicio: new Date().toISOString().split("T")[0],
+          data_fim: new Date().toISOString().split("T")[0],
+          adquirente_id: adquirenteSelecionado,
         });
-        
-        alert(`✅ Arquivo importado com sucesso!\n\nParcelas confirmadas: ${uploadRes.data.parcelas_confirmadas}\nConfiança: ${validarRes.data.confianca}`);
+
+        alert(
+          `✅ Arquivo importado com sucesso!\n\nParcelas confirmadas: ${uploadRes.data.parcelas_confirmadas}\nConfiança: ${validarRes.data.confianca}`,
+        );
         carregarValidacoes();
       }
     } catch (error) {
-      console.error('❌ Erro ao processar arquivo:', error);
-      alert('Erro ao processar arquivo: ' + (error.response?.data?.detail || error.message));
+      console.error("❌ Erro ao processar arquivo:", error);
+      alert("Erro ao processar arquivo: " + (error.response?.data?.detail || error.message));
     } finally {
       setUploadingFile(false);
     }
@@ -130,77 +137,90 @@ export default function ConciliacaoCartoes() {
 
   const processar = async (validacao) => {
     const confirmacao = validacao.requer_confirmacao;
-    const precisaJustificativa = validacao.confianca === 'BAIXA';
+    const precisaJustificativa = validacao.confianca === "BAIXA";
     const quantidadeParcelas = validacao.quantidade_parcelas || validacao.parcelas_confirmadas || 0;
 
     let justificativa = null;
     if (precisaJustificativa) {
-      justificativa = prompt('⚠️ Confiança BAIXA.\n\nJustificativa obrigatória para processar:');
-      if (!justificativa || justificativa.trim() === '') {
-        alert('❌ Justificativa obrigatória para divergência alta');
+      justificativa = prompt("⚠️ Confiança BAIXA.\n\nJustificativa obrigatória para processar:");
+      if (!justificativa || justificativa.trim() === "") {
+        alert("❌ Justificativa obrigatória para divergência alta");
         return;
       }
     }
 
     if (confirmacao && !precisaJustificativa) {
-      const confirmar = window.confirm(`⚠️ Deseja confirmar o processamento?\n\nConfiança: ${validacao.confianca}\nDivergência: ${validacao.percentual_divergencia}%\nParcelas a processar: ${quantidadeParcelas}`);
+      const confirmar = window.confirm(
+        `⚠️ Deseja confirmar o processamento?\n\nConfiança: ${validacao.confianca}\nDivergência: ${validacao.percentual_divergencia}%\nParcelas a processar: ${quantidadeParcelas}`,
+      );
       if (!confirmar) return;
     }
 
     // AJUSTE 6: Marca como processando
-    setProcessando(prev => ({ ...prev, [validacao.id]: true }));
+    setProcessando((prev) => ({ ...prev, [validacao.id]: true }));
 
     try {
       const res = await api.post(`/conciliacao/processar/${validacao.id}`, {
         confirmacao_usuario: confirmacao,
-        justificativa: justificativa
+        justificativa: justificativa,
       });
 
       if (res.data.success) {
-        alert(`✅ Processado com sucesso!\n\nParcelas: ${res.data.parcelas_processadas}\nValor: R$ ${res.data.valor_total_processado}`);
+        alert(
+          `✅ Processado com sucesso!\n\nParcelas: ${res.data.parcelas_processadas}\nValor: R$ ${res.data.valor_total_processado}`,
+        );
         carregarValidacoes();
       }
     } catch (error) {
-      alert('Erro: ' + (error.response?.data?.detail || error.message));
+      alert("Erro: " + (error.response?.data?.detail || error.message));
     } finally {
       // AJUSTE 6: Remove estado de processando
-      setProcessando(prev => ({ ...prev, [validacao.id]: false }));
+      setProcessando((prev) => ({ ...prev, [validacao.id]: false }));
     }
   };
 
   const reverter = async (validacao) => {
-    const motivo = prompt('⚠️ REVERSÃO\n\nMotivo obrigatório:');
-    if (!motivo || motivo.trim() === '') {
-      alert('❌ Motivo obrigatório para reversão');
+    const motivo = prompt("⚠️ REVERSÃO\n\nMotivo obrigatório:");
+    if (!motivo || motivo.trim() === "") {
+      alert("❌ Motivo obrigatório para reversão");
       return;
     }
 
     try {
       const res = await api.post(`/conciliacao/reverter/${validacao.id}`, {
-        motivo: motivo
+        motivo: motivo,
       });
 
       if (res.data.success) {
-        alert(`✅ Revertido com sucesso!\n\nParcelas revertidas: ${res.data.total_parcelas_revertidas}`);
+        alert(
+          `✅ Revertido com sucesso!\n\nParcelas revertidas: ${res.data.total_parcelas_revertidas}`,
+        );
         carregarValidacoes();
       }
     } catch (error) {
-      alert('Erro: ' + (error.response?.data?.detail || error.message));
+      alert("Erro: " + (error.response?.data?.detail || error.message));
     }
   };
 
   // Visual de confiança (cores semáforo)
   const getConfiancaBadge = (confianca) => {
     const badges = {
-      'ALTA': { bg: 'bg-green-100', text: 'text-green-800', icon: CheckCircle, label: '✅ ALTA' },
-      'MEDIA': { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: AlertTriangle, label: '⚠️ MÉDIA' },
-      'BAIXA': { bg: 'bg-red-100', text: 'text-red-800', icon: XCircle, label: '❌ BAIXA' }
+      ALTA: { bg: "bg-green-100", text: "text-green-800", icon: CheckCircle, label: "✅ ALTA" },
+      MEDIA: {
+        bg: "bg-yellow-100",
+        text: "text-yellow-800",
+        icon: AlertTriangle,
+        label: "⚠️ MÉDIA",
+      },
+      BAIXA: { bg: "bg-red-100", text: "text-red-800", icon: XCircle, label: "❌ BAIXA" },
     };
-    const badge = badges[confianca] || badges['BAIXA'];
+    const badge = badges[confianca] || badges["BAIXA"];
     const Icon = badge.icon;
-    
+
     return (
-      <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-lg ${badge.bg} ${badge.text}`}>
+      <div
+        className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-lg ${badge.bg} ${badge.text}`}
+      >
         <Icon className="w-6 h-6" />
         {badge.label}
       </div>
@@ -226,14 +246,21 @@ export default function ConciliacaoCartoes() {
           <Upload className="w-5 h-5" />
           1. Importar Arquivo da Operadora
         </h2>
-        
+
         {/* Explicação de qual arquivo importar */}
         <div className="mb-4 bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
           <p className="text-sm font-medium text-blue-900 mb-1">📄 Qual arquivo importar?</p>
           <ul className="text-xs text-blue-800 space-y-1">
-            <li>✅ <strong>CSV/TXT que a Stone, Cielo ou Rede enviou por email</strong></li>
-            <li>✅ <strong>Extrato de recebimentos/liquidações da operadora</strong></li>
-            <li>❌ <strong className="text-red-600">NÃO é o arquivo de vendas do seu PDV/sistema</strong></li>
+            <li>
+              ✅ <strong>CSV/TXT que a Stone, Cielo ou Rede enviou por email</strong>
+            </li>
+            <li>
+              ✅ <strong>Extrato de recebimentos/liquidações da operadora</strong>
+            </li>
+            <li>
+              ❌{" "}
+              <strong className="text-red-600">NÃO é o arquivo de vendas do seu PDV/sistema</strong>
+            </li>
           </ul>
         </div>
 
@@ -243,12 +270,12 @@ export default function ConciliacaoCartoes() {
             Adquirente (Stone, Cielo, etc)
           </label>
           <select
-            value={adquirenteSelecionado || ''}
+            value={adquirenteSelecionado || ""}
             onChange={(e) => setAdquirenteSelecionado(parseInt(e.target.value))}
             className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">Selecione...</option>
-            {adquirentes.map(adq => (
+            {adquirentes.map((adq) => (
               <option key={adq.id} value={adq.id}>
                 {adq.adquirente} v{adq.versao}
               </option>
@@ -259,9 +286,7 @@ export default function ConciliacaoCartoes() {
         {/* Drag & Drop Area */}
         <div
           className={`border-2 border-dashed rounded-lg p-12 text-center transition-all ${
-            dragActive 
-              ? 'border-blue-500 bg-blue-50' 
-              : 'border-gray-300 hover:border-gray-400'
+            dragActive ? "border-blue-500 bg-blue-50" : "border-gray-300 hover:border-gray-400"
           }`}
           onDragEnter={handleDrag}
           onDragLeave={handleDrag}
@@ -275,7 +300,7 @@ export default function ConciliacaoCartoes() {
             onChange={handleChange}
             className="hidden"
           />
-          
+
           {uploadingFile ? (
             <div className="flex flex-col items-center gap-4">
               <RefreshCw className="w-12 h-12 text-blue-500 animate-spin" />
@@ -284,17 +309,15 @@ export default function ConciliacaoCartoes() {
           ) : (
             <>
               <Upload className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-xl font-medium text-gray-700 mb-2">
-                Arraste o arquivo CSV aqui
-              </p>
+              <p className="text-xl font-medium text-gray-700 mb-2">Arraste o arquivo CSV aqui</p>
               <p className="text-gray-500 mb-4">ou</p>
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={!adquirenteSelecionado}
                 className={`px-6 py-3 rounded-lg font-medium transition-colors ${
                   adquirenteSelecionado
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
                 }`}
               >
                 Selecionar Arquivo
@@ -315,7 +338,7 @@ export default function ConciliacaoCartoes() {
             onClick={carregarValidacoes}
             className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center gap-2"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             Atualizar
           </button>
         </div>
@@ -333,7 +356,7 @@ export default function ConciliacaoCartoes() {
           </div>
         ) : (
           <div className="space-y-4">
-            {validacoes.map(validacao => (
+            {validacoes.map((validacao) => (
               <ValidacaoCard
                 key={validacao.id}
                 validacao={validacao}
@@ -353,34 +376,39 @@ export default function ConciliacaoCartoes() {
 // Card de Validação - VISUAL SIMPLES E CLARO
 function ValidacaoCard({ validacao, onProcessar, onReverter, getConfiancaBadge, processando }) {
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
     }).format(valor || 0);
   };
 
   const formatarData = (data) => {
-    return new Date(data).toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return new Date(data).toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   // Determinar ação visual
-  const podeProcessar = validacao.pode_processar && validacao.status_validacao === 'aprovada';
-  const jaProcessado = validacao.status_validacao === 'concluida';
-  const divergente = validacao.status_validacao === 'divergente';
+  const podeProcessar = validacao.pode_processar && validacao.status_validacao === "aprovada";
+  const jaProcessado = validacao.status_validacao === "concluida";
+  const divergente = validacao.status_validacao === "divergente";
 
   return (
-    <div className={`border-2 rounded-lg p-6 ${
-      jaProcessado ? 'border-green-300 bg-green-50' :
-      divergente ? 'border-red-300 bg-red-50' :
-      podeProcessar ? 'border-blue-300 bg-blue-50' :
-      'border-gray-300'
-    }`}>
+    <div
+      className={`border-2 rounded-lg p-6 ${
+        jaProcessado
+          ? "border-green-300 bg-green-50"
+          : divergente
+            ? "border-red-300 bg-red-50"
+            : podeProcessar
+              ? "border-blue-300 bg-blue-50"
+              : "border-gray-300"
+      }`}
+    >
       {/* Header com Status */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
@@ -396,7 +424,8 @@ function ValidacaoCard({ validacao, onProcessar, onReverter, getConfiancaBadge, 
       {/* AJUSTE 1: Mostrar QUANTIDADE */}
       <div className="mb-4 bg-blue-50 border-l-4 border-blue-500 p-3 rounded">
         <p className="text-sm font-bold text-blue-900">
-          📊 {validacao.quantidade_parcelas || validacao.parcelas_confirmadas || 0} parcelas encontradas
+          📊 {validacao.quantidade_parcelas || validacao.parcelas_confirmadas || 0} parcelas
+          encontradas
           {validacao.quantidade_nsus && ` • ${validacao.quantidade_nsus} NSUs`}
         </p>
       </div>
@@ -415,22 +444,22 @@ function ValidacaoCard({ validacao, onProcessar, onReverter, getConfiancaBadge, 
             {formatarMoeda(validacao.total_recebimentos_parcelas)}
           </p>
         </div>
-        <div className={`rounded-lg p-4 border-2 ${
-          Math.abs(validacao.diferenca_absoluta) < 1 
-            ? 'bg-green-50 border-green-300' 
-            : 'bg-yellow-50 border-yellow-300'
-        }`}>
+        <div
+          className={`rounded-lg p-4 border-2 ${
+            Math.abs(validacao.diferenca_absoluta) < 1
+              ? "bg-green-50 border-green-300"
+              : "bg-yellow-50 border-yellow-300"
+          }`}
+        >
           <p className="text-sm text-gray-600 mb-1">Divergência</p>
           <p className="text-2xl font-bold text-gray-900">
             {formatarMoeda(validacao.diferenca_absoluta)}
           </p>
-          <p className="text-sm font-medium mt-1">
-            {validacao.percentual_divergencia}%
-          </p>
+          <p className="text-sm font-medium mt-1">{validacao.percentual_divergencia}%</p>
           {/* AJUSTE 5: Link para ver detalhes */}
-          {validacao.confianca === 'BAIXA' && (
+          {validacao.confianca === "BAIXA" && (
             <button
-              onClick={() => alert('Modal de detalhes em desenvolvimento')} 
+              onClick={() => alert("Modal de detalhes em desenvolvimento")}
               className="text-xs text-blue-600 hover:text-blue-800 underline mt-2"
             >
               Ver detalhes da divergência →
@@ -473,8 +502,7 @@ function ValidacaoCard({ validacao, onProcessar, onReverter, getConfiancaBadge, 
                 {!validacao.requer_confirmacao && (
                   <div>
                     <p className="text-green-700 font-medium flex items-center gap-2">
-                      <CheckCircle className="w-5 h-5" />
-                      ✅ Pode processar automaticamente
+                      <CheckCircle className="w-5 h-5" />✅ Pode processar automaticamente
                     </p>
                     {/* AJUSTE 3: Mensagem de reversibilidade */}
                     <p className="text-xs text-gray-600 mt-1 ml-7">
@@ -482,7 +510,7 @@ function ValidacaoCard({ validacao, onProcessar, onReverter, getConfiancaBadge, 
                     </p>
                   </div>
                 )}
-                {validacao.requer_confirmacao && validacao.confianca !== 'BAIXA' && (
+                {validacao.requer_confirmacao && validacao.confianca !== "BAIXA" && (
                   <div>
                     <p className="text-yellow-700 font-medium flex items-center gap-2">
                       <AlertTriangle className="w-5 h-5" />
@@ -494,11 +522,10 @@ function ValidacaoCard({ validacao, onProcessar, onReverter, getConfiancaBadge, 
                     </p>
                   </div>
                 )}
-                {validacao.confianca === 'BAIXA' && (
+                {validacao.confianca === "BAIXA" && (
                   <div>
                     <p className="text-red-700 font-medium flex items-center gap-2">
-                      <XCircle className="w-5 h-5" />
-                      ❌ Risco alto - Justificativa obrigatória
+                      <XCircle className="w-5 h-5" />❌ Risco alto - Justificativa obrigatória
                     </p>
                     {/* AJUSTE 3: Mensagem de reversibilidade */}
                     <p className="text-xs text-gray-600 mt-1 ml-7">
@@ -513,13 +540,13 @@ function ValidacaoCard({ validacao, onProcessar, onReverter, getConfiancaBadge, 
                 onClick={() => onProcessar(validacao)}
                 disabled={processando}
                 className={`px-8 py-3 rounded-lg font-bold text-base transition-all flex items-center gap-2 ${
-                  processando 
-                    ? 'bg-gray-400 cursor-not-allowed'
-                    : validacao.confianca === 'ALTA'
-                    ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl'
-                    : validacao.confianca === 'MEDIA'
-                    ? 'bg-yellow-600 hover:bg-yellow-700 text-white shadow-lg hover:shadow-xl'
-                    : 'bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-xl'
+                  processando
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : validacao.confianca === "ALTA"
+                      ? "bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl"
+                      : validacao.confianca === "MEDIA"
+                        ? "bg-yellow-600 hover:bg-yellow-700 text-white shadow-lg hover:shadow-xl"
+                        : "bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-xl"
                 }`}
               >
                 {processando ? (
@@ -529,9 +556,12 @@ function ValidacaoCard({ validacao, onProcessar, onReverter, getConfiancaBadge, 
                   </>
                 ) : (
                   <>
-                    {validacao.confianca === 'ALTA' && `✅ Processar → avançar ${validacao.quantidade_parcelas || validacao.parcelas_confirmadas || 0} parcelas`}
-                    {validacao.confianca === 'MEDIA' && `⚠️ Confirmar → avançar ${validacao.quantidade_parcelas || validacao.parcelas_confirmadas || 0} parcelas`}
-                    {validacao.confianca === 'BAIXA' && `❌ Justificar → avançar ${validacao.quantidade_parcelas || validacao.parcelas_confirmadas || 0} parcelas`}
+                    {validacao.confianca === "ALTA" &&
+                      `✅ Processar → avançar ${validacao.quantidade_parcelas || validacao.parcelas_confirmadas || 0} parcelas`}
+                    {validacao.confianca === "MEDIA" &&
+                      `⚠️ Confirmar → avançar ${validacao.quantidade_parcelas || validacao.parcelas_confirmadas || 0} parcelas`}
+                    {validacao.confianca === "BAIXA" &&
+                      `❌ Justificar → avançar ${validacao.quantidade_parcelas || validacao.parcelas_confirmadas || 0} parcelas`}
                   </>
                 )}
               </button>

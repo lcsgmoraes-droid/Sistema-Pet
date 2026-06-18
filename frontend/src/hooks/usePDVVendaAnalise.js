@@ -77,10 +77,7 @@ export function usePDVVendaAnalise(vendaAtual) {
 
   const analisarVendaComFormasPagamento = async (formasPagamento) => {
     debugLog("\ud83d\udd0d DEBUG formasPagamento recebidas:", formasPagamento);
-    debugLog(
-      "\ud83d\udcb0 Enviando an\u00e1lise com m\u00faltiplas formas:",
-      formasPagamento,
-    );
+    debugLog("\ud83d\udcb0 Enviando an\u00e1lise com m\u00faltiplas formas:", formasPagamento);
 
     await executarAnalise({
       items: montarItensAnalise(vendaAtual.itens),

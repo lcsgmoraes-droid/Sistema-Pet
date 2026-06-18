@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Sparkles, AlertCircle, CheckCircle, XCircle, RefreshCw, Info } from 'lucide-react';
-import api from '../api';
-import toast from 'react-hot-toast';
+import { useState, useEffect } from "react";
+import { Sparkles, AlertCircle, CheckCircle, XCircle, RefreshCw, Info } from "lucide-react";
+import api from "../api";
+import toast from "react-hot-toast";
 
 /**
  * Componente para Classificação Inteligente de Rações
@@ -9,7 +9,6 @@ import toast from 'react-hot-toast';
  */
 function ClassificacaoRacaoIA({ produtoId, nomeProduto, onAtualizar }) {
   const [classificacao, setClassificacao] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [classificandoIA, setClassificandoIA] = useState(false);
 
   useEffect(() => {
@@ -20,52 +19,51 @@ function ClassificacaoRacaoIA({ produtoId, nomeProduto, onAtualizar }) {
 
   const carregarClassificacao = async () => {
     if (!produtoId) return;
-    
+
     try {
       const response = await api.get(`/produtos/${produtoId}`);
       const produto = response.data;
-      
+
       setClassificacao({
         porte_animal: produto.porte_animal || [],
         fase_publico: produto.fase_publico || [],
         tipo_tratamento: produto.tipo_tratamento || [],
-        sabor_proteina: produto.sabor_proteina || '',
+        sabor_proteina: produto.sabor_proteina || "",
         peso_embalagem: produto.peso_embalagem || null,
-        auto_classificar_nome: produto.auto_classificar_nome !== false
+        auto_classificar_nome: produto.auto_classificar_nome !== false,
       });
     } catch (error) {
-      console.error('Erro ao carregar classificação:', error);
+      console.error("Erro ao carregar classificação:", error);
     }
   };
 
   const classificarIA = async () => {
     if (!produtoId) {
-      toast.error('Salve o produto antes de classificar com IA');
+      toast.error("Salve o produto antes de classificar com IA");
       return;
     }
 
     setClassificandoIA(true);
     try {
       const response = await api.post(`/produtos/${produtoId}/classificar-ia`, null, {
-        params: { forcar: true }
+        params: { forcar: true },
       });
 
       toast.success(
         `✨ ${response.data.campos_atualizados.length} campos identificados! Score: ${response.data.confianca.score}%`,
-        { duration: 5000 }
+        { duration: 5000 },
       );
 
       // Atualizar estado local
       await carregarClassificacao();
-      
+
       // Notificar componente pai para recarregar
       if (onAtualizar) {
         onAtualizar();
       }
-
     } catch (error) {
-      console.error('Erro ao classificar:', error);
-      const mensagem = error.response?.data?.detail || 'Erro ao classificar produto';
+      console.error("Erro ao classificar:", error);
+      const mensagem = error.response?.data?.detail || "Erro ao classificar produto";
       toast.error(mensagem);
     } finally {
       setClassificandoIA(false);
@@ -85,7 +83,7 @@ function ClassificacaoRacaoIA({ produtoId, nomeProduto, onAtualizar }) {
       classificacao.porte_animal?.length > 0,
       classificacao.fase_publico?.length > 0,
       classificacao.sabor_proteina,
-      classificacao.peso_embalagem
+      classificacao.peso_embalagem,
     ];
     const preenchidos = campos.filter(Boolean).length;
     return Math.round((preenchidos / campos.length) * 100);
@@ -94,10 +92,13 @@ function ClassificacaoRacaoIA({ produtoId, nomeProduto, onAtualizar }) {
   const completude = calcularCompletude();
 
   const getStatusCompletude = () => {
-    if (completude === 100) return { cor: 'bg-green-100 text-green-800', icone: CheckCircle, texto: 'Completo' };
-    if (completude >= 75) return { cor: 'bg-yellow-100 text-yellow-800', icone: AlertCircle, texto: 'Quase completo' };
-    if (completude >= 50) return { cor: 'bg-orange-100 text-orange-800', icone: AlertCircle, texto: 'Incompleto' };
-    return { cor: 'bg-red-100 text-red-800', icone: XCircle, texto: 'Muito incompleto' };
+    if (completude === 100)
+      return { cor: "bg-green-100 text-green-800", icone: CheckCircle, texto: "Completo" };
+    if (completude >= 75)
+      return { cor: "bg-yellow-100 text-yellow-800", icone: AlertCircle, texto: "Quase completo" };
+    if (completude >= 50)
+      return { cor: "bg-orange-100 text-orange-800", icone: AlertCircle, texto: "Incompleto" };
+    return { cor: "bg-red-100 text-red-800", icone: XCircle, texto: "Muito incompleto" };
   };
 
   const status = getStatusCompletude();
@@ -113,12 +114,10 @@ function ClassificacaoRacaoIA({ produtoId, nomeProduto, onAtualizar }) {
             <h3 className="text-lg font-semibold text-gray-800">
               Classificação Inteligente de Ração
             </h3>
-            <p className="text-sm text-gray-600">
-              Análise automática baseada no nome do produto
-            </p>
+            <p className="text-sm text-gray-600">Análise automática baseada no nome do produto</p>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${status.cor}`}>
             <Icone className="w-5 h-5" />
@@ -163,9 +162,7 @@ function ClassificacaoRacaoIA({ produtoId, nomeProduto, onAtualizar }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Porte Animal */}
         <div className="bg-white border rounded-lg p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Porte do Animal
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Porte do Animal</label>
           {classificacao.porte_animal && classificacao.porte_animal.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {classificacao.porte_animal.map((porte, idx) => (
@@ -184,9 +181,7 @@ function ClassificacaoRacaoIA({ produtoId, nomeProduto, onAtualizar }) {
 
         {/* Fase/Público */}
         <div className="bg-white border rounded-lg p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Fase / Público
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Fase / Público</label>
           {classificacao.fase_publico && classificacao.fase_publico.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {classificacao.fase_publico.map((fase, idx) => (
@@ -219,9 +214,7 @@ function ClassificacaoRacaoIA({ produtoId, nomeProduto, onAtualizar }) {
 
         {/* Peso Embalagem */}
         <div className="bg-white border rounded-lg p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Peso da Embalagem
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Peso da Embalagem</label>
           {classificacao.peso_embalagem ? (
             <span className="inline-flex px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
               {classificacao.peso_embalagem} kg

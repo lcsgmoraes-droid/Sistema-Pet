@@ -40,7 +40,7 @@ export default function BlingIntegracao() {
       setLoading(true);
       const resp = await api.get("/bling/teste-conexao");
       setStatus(resp.data);
-    } catch (e) {
+    } catch {
       // Conexão falhada é normal se token expirou
       setStatus({
         conectado: false,
@@ -66,7 +66,7 @@ export default function BlingIntegracao() {
       const resp = await api.post("/bling/renovar-token");
       mostrarMensagem(
         "sucesso",
-        `✅ Token renovado! Válido por ${resp.data.expires_in_hours?.toFixed(1) || 6} horas.`
+        `✅ Token renovado! Válido por ${resp.data.expires_in_hours?.toFixed(1) || 6} horas.`,
       );
       setTimeout(() => carregarStatus(), 1000);
     } catch (e) {
@@ -101,15 +101,12 @@ export default function BlingIntegracao() {
       if (status.conectado) {
         mostrarMensagem(
           "sucesso",
-          `✅ Conectado! ${status.total_produtos_bling || 0} produtos no Bling.`
+          `✅ Conectado! ${status.total_produtos_bling || 0} produtos no Bling.`,
         );
       } else {
-        mostrarMensagem(
-          "info",
-          "⚠️ Token expirado. Use o botão 'Renovar Token' abaixo."
-        );
+        mostrarMensagem("info", "⚠️ Token expirado. Use o botão 'Renovar Token' abaixo.");
       }
-    } catch (e) {
+    } catch {
       mostrarMensagem("erro", "Erro ao testar conexão.");
     } finally {
       setLoading(false);
@@ -128,9 +125,7 @@ export default function BlingIntegracao() {
     ? "bg-emerald-50 border-emerald-200"
     : "bg-red-50 border-red-200";
 
-  const statusTexto = status.conectado
-    ? "✅ Conectado"
-    : "❌ Token Expirado";
+  const statusTexto = status.conectado ? "✅ Conectado" : "❌ Token Expirado";
 
   const statusCor = status.conectado ? "text-emerald-700" : "text-red-700";
 
@@ -161,23 +156,17 @@ export default function BlingIntegracao() {
       )}
 
       {/* Card Principal - Status da Integração */}
-      <div
-        className={`border rounded-lg p-6 mb-6 transition-colors ${statusClasse}`}
-      >
+      <div className={`border rounded-lg p-6 mb-6 transition-colors ${statusClasse}`}>
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Integração Bling v3
-            </h2>
-            <p className={`text-sm font-medium mt-1 ${statusCor}`}>
-              {statusTexto}
-            </p>
+            <h2 className="text-lg font-semibold text-gray-900">Integração Bling v3</h2>
+            <p className={`text-sm font-medium mt-1 ${statusCor}`}>{statusTexto}</p>
           </div>
-          <div className={`p-2 rounded-full ${
-            status.conectado
-              ? "bg-emerald-200/50 text-emerald-600"
-              : "bg-red-200/50 text-red-600"
-          }`}>
+          <div
+            className={`p-2 rounded-full ${
+              status.conectado ? "bg-emerald-200/50 text-emerald-600" : "bg-red-200/50 text-red-600"
+            }`}
+          >
             {status.conectado ? (
               <FiCheckCircle className="w-6 h-6" />
             ) : (
@@ -214,8 +203,7 @@ export default function BlingIntegracao() {
           )}
           {!status.conectado && (
             <p className="text-gray-700">
-              O token expirou ou é inválido. Clique em "Renovar Token" abaixo
-              para reconectar.
+              O token expirou ou é inválido. Clique em "Renovar Token" abaixo para reconectar.
             </p>
           )}
         </div>
@@ -259,8 +247,8 @@ export default function BlingIntegracao() {
           </p>
 
           <p className="text-gray-700">
-            <strong>Renovação automática:</strong> O sistema renova o token
-            automaticamente a cada 5h30min. Você não precisa fazer nada.
+            <strong>Renovação automática:</strong> O sistema renova o token automaticamente a cada
+            5h30min. Você não precisa fazer nada.
           </p>
 
           {!status.conectado && (
@@ -277,8 +265,8 @@ export default function BlingIntegracao() {
           )}
 
           <p className="text-gray-600 text-xs mt-4">
-            💡 <strong>Dica:</strong> Mantenha a integração conectada para que
-            o estoque sincronize automaticamente com o Bling.
+            💡 <strong>Dica:</strong> Mantenha a integração conectada para que o estoque sincronize
+            automaticamente com o Bling.
           </p>
         </div>
       </div>

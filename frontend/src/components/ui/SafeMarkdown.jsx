@@ -21,11 +21,7 @@ const markdownComponents = {
   strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
 };
 
-export default function SafeMarkdown({
-  className = "",
-  empty = "-",
-  value,
-}) {
+export default function SafeMarkdown({ className = "", empty = "-", value }) {
   const normalized = normalizeMarkdownContent(value);
 
   if (!normalized) {
@@ -33,12 +29,12 @@ export default function SafeMarkdown({
   }
 
   return (
-    <div className={["space-y-2 text-sm leading-relaxed text-slate-700", className].filter(Boolean).join(" ")}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        skipHtml
-        components={markdownComponents}
-      >
+    <div
+      className={["space-y-2 text-sm leading-relaxed text-slate-700", className]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <ReactMarkdown remarkPlugins={[remarkGfm]} skipHtml components={markdownComponents}>
         {normalized}
       </ReactMarkdown>
     </div>

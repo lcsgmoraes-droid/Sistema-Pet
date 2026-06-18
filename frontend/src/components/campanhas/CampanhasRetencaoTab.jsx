@@ -19,10 +19,9 @@ export default function CampanhasRetencaoTab({
         <div>
           <p className="font-semibold text-orange-800">Retencao Dinamica</p>
           <p className="text-sm text-orange-700 mt-0.5">
-            Cada regra detecta clientes que nao compraram ha X dias e envia
-            automaticamente um cupom de incentivo. Voce pode ter multiplas
-            reguas: 30 dias, 60 dias, 90 dias, cada uma com desconto e
-            mensagem diferentes.
+            Cada regra detecta clientes que nao compraram ha X dias e envia automaticamente um cupom
+            de incentivo. Voce pode ter multiplas reguas: 30 dias, 60 dias, 90 dias, cada uma com
+            desconto e mensagem diferentes.
           </p>
         </div>
       </div>
@@ -50,9 +49,7 @@ export default function CampanhasRetencaoTab({
       ) : retencaoRegras.length === 0 ? (
         <div className="bg-white border rounded-xl p-8 text-center text-gray-500">
           <p className="text-3xl mb-2">🧭</p>
-          <p className="font-medium">
-            Nenhuma regra de retencao cadastrada ainda.
-          </p>
+          <p className="font-medium">Nenhuma regra de retencao cadastrada ainda.</p>
           <p className="text-sm mt-1">
             Crie sua primeira regra para comecar a recuperar clientes inativos.
           </p>
@@ -65,14 +62,10 @@ export default function CampanhasRetencaoTab({
               className="bg-white border border-orange-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center gap-3"
             >
               <div className="flex-1">
-                <p className="font-semibold text-gray-800">
-                  {regra.name || "(sem nome)"}
-                </p>
+                <p className="font-semibold text-gray-800">{regra.name || "(sem nome)"}</p>
                 <div className="flex flex-wrap gap-3 mt-1 text-sm text-gray-600">
                   <span>
-                    🕒{" "}
-                    <strong>{regra.params?.inactivity_days ?? "?"} dias</strong>{" "}
-                    sem compra
+                    🕒 <strong>{regra.params?.inactivity_days ?? "?"} dias</strong> sem compra
                   </span>
                   <span>
                     🎟️ Cupom:{" "}
@@ -83,8 +76,7 @@ export default function CampanhasRetencaoTab({
                     </strong>
                   </span>
                   <span>
-                    📅 Validade:{" "}
-                    <strong>{regra.params?.coupon_valid_days ?? "?"} dias</strong>
+                    📅 Validade: <strong>{regra.params?.coupon_valid_days ?? "?"} dias</strong>
                   </span>
                   <span
                     className={`px-2 py-0.5 rounded-full text-xs font-medium ${

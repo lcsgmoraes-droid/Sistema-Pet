@@ -79,7 +79,13 @@ export default function BanhoTosaRetornosView() {
     <div className="space-y-4">
       <Panel
         actions={
-          <ActionButton icon={RefreshCw} intent="neutral" loading={loading} onClick={carregar} tone="soft">
+          <ActionButton
+            icon={RefreshCw}
+            intent="neutral"
+            loading={loading}
+            onClick={carregar}
+            tone="soft"
+          >
             Atualizar
           </ActionButton>
         }
@@ -109,7 +115,12 @@ export default function BanhoTosaRetornosView() {
       </Panel>
 
       <MetricGrid>
-        <MetricCard icon={<Repeat2 size={18} />} intent="blue" label="Sugestoes" value={itens.length} />
+        <MetricCard
+          icon={<Repeat2 size={18} />}
+          intent="blue"
+          label="Sugestoes"
+          value={itens.length}
+        />
         <MetricCard intent="red" label="Criticas" value={resumo.critica} />
         <MetricCard intent="amber" label="Alta prioridade" value={resumo.alta} />
         <MetricCard intent="emerald" label="Pacotes" value={resumo.pacotes} />
@@ -154,7 +165,9 @@ function RetornoCard({ disabled, item, onAgendar, onAvancar }) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="truncate text-sm font-semibold text-slate-900">{item.titulo}</h3>
-              <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${prioridadeClasses[item.prioridade] || prioridadeClasses.baixa}`}>
+              <span
+                className={`rounded-full border px-2 py-0.5 text-xs font-medium ${prioridadeClasses[item.prioridade] || prioridadeClasses.baixa}`}
+              >
                 {labelPrioridade(item.prioridade)}
               </span>
             </div>
@@ -215,11 +228,14 @@ function RetornoCard({ disabled, item, onAgendar, onAvancar }) {
 }
 
 function montarResumo(itens) {
-  return itens.reduce((acc, item) => {
-    acc[item.prioridade] = (acc[item.prioridade] || 0) + 1;
-    if (String(item.tipo).startsWith("pacote")) acc.pacotes += 1;
-    return acc;
-  }, { critica: 0, alta: 0, pacotes: 0 });
+  return itens.reduce(
+    (acc, item) => {
+      acc[item.prioridade] = (acc[item.prioridade] || 0) + 1;
+      if (String(item.tipo).startsWith("pacote")) acc.pacotes += 1;
+      return acc;
+    },
+    { critica: 0, alta: 0, pacotes: 0 },
+  );
 }
 
 function labelTipo(tipo) {
