@@ -995,6 +995,34 @@ def test_backend_ci_has_blocking_backend_migrations_format_step():
     assert "ruff format --check migrations" in source
 
 
+def test_backend_ci_has_blocking_backend_global_non_legacy_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+    exclusions = (
+        "alembic/versions",
+        "tests/conftest_infra.py",
+        "tests/e2e_test_sistema_completo.py",
+        "tests/integration/test_transaction_cancelar_venda.py",
+        "tests/integration/test_transaction_estornar_comissoes.py",
+        "tests/integration/test_transaction_excluir_venda.py",
+        "tests/test_02_user.py",
+        "atualizar_template_stone.py",
+        "corrigir_template_stone.py",
+        "criar_admin_prod.py",
+        "criar_banco_producao.py",
+        "dar_full_permissoes.py",
+        "importar_producao_lotes.py",
+        "seed_opcoes_racao_standalone.py",
+        "seed_templates.py",
+        "temp_seed_prod.py",
+        "testar_api_produtos.py",
+    )
+
+    assert "Backend global non legacy format (blocking)" in source
+    assert "ruff format --check ." in source
+    for path in exclusions:
+        assert f"--exclude {path}" in source
+
+
 def test_backend_ci_has_blocking_backend_operational_stock_cash_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

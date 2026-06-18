@@ -567,6 +567,27 @@ jobs:
         run: |
           ruff format --check migrations
 
+      - name: Backend global non legacy format (blocking)
+        run: |
+          ruff format --check . \
+            --exclude alembic/versions \
+            --exclude tests/conftest_infra.py \
+            --exclude tests/e2e_test_sistema_completo.py \
+            --exclude tests/integration/test_transaction_cancelar_venda.py \
+            --exclude tests/integration/test_transaction_estornar_comissoes.py \
+            --exclude tests/integration/test_transaction_excluir_venda.py \
+            --exclude tests/test_02_user.py \
+            --exclude atualizar_template_stone.py \
+            --exclude corrigir_template_stone.py \
+            --exclude criar_admin_prod.py \
+            --exclude criar_banco_producao.py \
+            --exclude dar_full_permissoes.py \
+            --exclude importar_producao_lotes.py \
+            --exclude seed_opcoes_racao_standalone.py \
+            --exclude seed_templates.py \
+            --exclude temp_seed_prod.py \
+            --exclude testar_api_produtos.py
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"
