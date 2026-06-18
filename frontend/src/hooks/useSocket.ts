@@ -112,7 +112,7 @@ export const useSocket = (token: string | null, agentId: string | null) => {
       },
 
       // Handoff resolved
-      onHandoffResolved: (handoffId) => {
+      onHandoffResolved: (_handoffId) => {
         scheduleRefresh();
       },
 
@@ -138,7 +138,7 @@ export const useSocket = (token: string | null, agentId: string | null) => {
       },
 
       // Agent status changed
-      onAgentStatusChange: (agent) => {
+      onAgentStatusChange: (_agent) => {
         scheduleRefresh();
       },
 

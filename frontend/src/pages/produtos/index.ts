@@ -4,23 +4,23 @@
  */
 
 // Páginas
-export { default as ProdutosPage } from './ProdutosPage';
-export { default as ProdutoEditPage } from './ProdutoEditPage';
+export { default as ProdutosPage } from "./ProdutosPage";
+export { default as ProdutoEditPage } from "./ProdutoEditPage";
 
 // Componentes
-export { ProductFiltersComponent } from './components/ProductFilters';
-export { ProductTableComponent } from './components/ProductTable';
-export { default as ProdutoForm } from './components/ProdutoForm';
+export { ProductFiltersComponent } from "./components/ProductFilters";
+export { ProductTableComponent } from "./components/ProductTable";
+export { default as ProdutoForm } from "./components/ProdutoForm";
 
 // Hooks
-export { useProducts } from './hooks/useProducts';
+export { useProducts } from "./hooks/useProducts";
 
 // Tipos
-export type { 
-  Product, 
-  ProductFilters, 
+export type {
+  Product,
+  ProductFilters,
   ProductListResponse,
   ProductFormData,
-  CreateProductPayload
-} from './types';
-export { ProductType, ProductStatus } from './types';
+  CreateProductPayload,
+} from "./types";
+export { ProductType, ProductStatus } from "./types";

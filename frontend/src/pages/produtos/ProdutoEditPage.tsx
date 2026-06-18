@@ -1,14 +1,14 @@
 /**
  * SPRINT 7 - PASSO 3: Página de Edição de Produto
  * Sistema ERP Pet Shop
- * 
+ *
  * Wrapper para ProdutoForm em modo de edição
  * Busca o produto por ID e passa para o formulário
  */
 
-import React from 'react';
-import { useParams } from 'react-router-dom';
-import { ProdutoForm } from './components/ProdutoForm';
+import React from "react";
+import { useParams } from "react-router-dom";
+import { ProdutoForm } from "./components/ProdutoForm";
 
 export const ProdutoEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();

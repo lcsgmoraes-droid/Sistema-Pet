@@ -1,19 +1,19 @@
-import React from 'react';
+import React from "react";
 
 interface LoadingSkeletonProps {
-  variant?: 'card' | 'list' | 'table' | 'text';
+  variant?: "card" | "list" | "table" | "text";
   count?: number;
   className?: string;
 }
 
-export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({ 
-  variant = 'card', 
+export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
+  variant = "card",
   count = 1,
-  className = '' 
+  className = "",
 }) => {
   const renderSkeleton = () => {
     switch (variant) {
-      case 'card':
+      case "card":
         return (
           <div className={`bg-white rounded-lg border border-gray-200 p-4 ${className}`}>
             <div className="animate-pulse space-y-3">
@@ -23,8 +23,8 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
             </div>
           </div>
         );
-      
-      case 'list':
+
+      case "list":
         return (
           <div className={`flex items-center gap-3 p-3 ${className}`}>
             <div className="animate-pulse flex items-center gap-3 w-full">
@@ -36,8 +36,8 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
             </div>
           </div>
         );
-      
-      case 'table':
+
+      case "table":
         return (
           <tr className={className}>
             <td colSpan={100} className="p-4">
@@ -49,8 +49,8 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
             </td>
           </tr>
         );
-      
-      case 'text':
+
+      case "text":
         return (
           <div className={`animate-pulse space-y-2 ${className}`}>
             <div className="h-4 bg-gray-200 rounded w-full"></div>
@@ -58,7 +58,7 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
             <div className="h-4 bg-gray-200 rounded w-4/6"></div>
           </div>
         );
-      
+
       default:
         return null;
     }
@@ -67,9 +67,7 @@ export const LoadingSkeleton: React.FC<LoadingSkeletonProps> = ({
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
-        <React.Fragment key={i}>
-          {renderSkeleton()}
-        </React.Fragment>
+        <React.Fragment key={i}>{renderSkeleton()}</React.Fragment>
       ))}
     </>
   );
