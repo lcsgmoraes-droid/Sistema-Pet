@@ -33,9 +33,7 @@ def _table_exists(table_name: str) -> bool:
 def _index_exists(table_name: str, index_name: str) -> bool:
     if not _table_exists(table_name):
         return False
-    return any(
-        index["name"] == index_name for index in _inspector().get_indexes(table_name)
-    )
+    return any(index["name"] == index_name for index in _inspector().get_indexes(table_name))
 
 
 def _create_index_once(index_name: str, table_name: str, columns: list[str]) -> None:
@@ -60,22 +58,10 @@ def upgrade() -> None:
             sa.Column("template_code", sa.String(length=120), nullable=False),
             sa.Column("target_table", sa.String(length=120), nullable=False),
             sa.Column("target_id", sa.Integer(), nullable=False),
-            sa.Column(
-                "status", sa.String(length=40), nullable=False, server_default="active"
-            ),
+            sa.Column("status", sa.String(length=40), nullable=False, server_default="active"),
             sa.Column("created_by_user_id", sa.Integer(), nullable=True),
-            sa.Column(
-                "created_at",
-                sa.DateTime(),
-                nullable=False,
-                server_default=sa.text("CURRENT_TIMESTAMP"),
-            ),
-            sa.Column(
-                "updated_at",
-                sa.DateTime(),
-                nullable=False,
-                server_default=sa.text("CURRENT_TIMESTAMP"),
-            ),
+            sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
+            sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
             sa.UniqueConstraint(
                 "tenant_id",
                 "bundle_code",
@@ -86,29 +72,15 @@ def upgrade() -> None:
             ),
         )
 
-    _create_index_once(
-        "ix_tenant_template_item_installs_id", "tenant_template_item_installs", ["id"]
-    )
-    _create_index_once(
-        "ix_tenant_template_item_installs_tenant_id",
-        "tenant_template_item_installs",
-        ["tenant_id"],
-    )
-    _create_index_once(
-        "ix_tenant_template_item_installs_bundle_code",
-        "tenant_template_item_installs",
-        ["bundle_code"],
-    )
+    _create_index_once("ix_tenant_template_item_installs_id", "tenant_template_item_installs", ["id"])
+    _create_index_once("ix_tenant_template_item_installs_tenant_id", "tenant_template_item_installs", ["tenant_id"])
+    _create_index_once("ix_tenant_template_item_installs_bundle_code", "tenant_template_item_installs", ["bundle_code"])
     _create_index_once(
         "ix_tenant_template_item_installs_bundle_version",
         "tenant_template_item_installs",
         ["bundle_version"],
     )
-    _create_index_once(
-        "ix_tenant_template_item_installs_item_type",
-        "tenant_template_item_installs",
-        ["item_type"],
-    )
+    _create_index_once("ix_tenant_template_item_installs_item_type", "tenant_template_item_installs", ["item_type"])
     _create_index_once(
         "ix_tenant_template_item_installs_template_code",
         "tenant_template_item_installs",

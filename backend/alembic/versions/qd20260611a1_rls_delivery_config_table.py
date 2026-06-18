@@ -24,9 +24,7 @@ TENANT_GUARD = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::
 
 def _should_skip() -> bool:
     bind = op.get_bind()
-    return bind.dialect.name != "postgresql" or not sa.inspect(bind).has_table(
-        TABLE_NAME
-    )
+    return bind.dialect.name != "postgresql" or not sa.inspect(bind).has_table(TABLE_NAME)
 
 
 def _execute_all(statements: list[str]) -> None:

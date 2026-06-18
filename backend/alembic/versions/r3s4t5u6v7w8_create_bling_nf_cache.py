@@ -43,26 +43,11 @@ def upgrade() -> None:
         sa.Column("resumo_payload", sa.JSON(), nullable=True),
         sa.Column("detalhe_payload", sa.JSON(), nullable=True),
         sa.Column("detalhada_em", sa.DateTime(), nullable=True),
-        sa.Column(
-            "last_synced_at",
-            sa.DateTime(),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
+        sa.Column("last_synced_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
         sa.Column("id", sa.Integer(), sa.Identity(always=True), nullable=False),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
-        sa.Column(
-            "updated_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.text("now()"),
-            nullable=False,
-        ),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
             "tenant_id",
@@ -92,15 +77,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_bling_notas_fiscais_cache_last_synced_at",
-        table_name="bling_notas_fiscais_cache",
-    )
-    op.drop_index(
-        "ix_bling_notas_fiscais_cache_data_emissao",
-        table_name="bling_notas_fiscais_cache",
-    )
-    op.drop_index(
-        "ix_bling_notas_fiscais_cache_tenant_id", table_name="bling_notas_fiscais_cache"
-    )
+    op.drop_index("ix_bling_notas_fiscais_cache_last_synced_at", table_name="bling_notas_fiscais_cache")
+    op.drop_index("ix_bling_notas_fiscais_cache_data_emissao", table_name="bling_notas_fiscais_cache")
+    op.drop_index("ix_bling_notas_fiscais_cache_tenant_id", table_name="bling_notas_fiscais_cache")
     op.drop_table("bling_notas_fiscais_cache")

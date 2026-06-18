@@ -18,9 +18,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "banho_tosa_configuracoes", sa.Column("fluxo_etapas", sa.JSON(), nullable=True)
-    )
+    op.add_column("banho_tosa_configuracoes", sa.Column("fluxo_etapas", sa.JSON(), nullable=True))
 
     op.add_column(
         "banho_tosa_servicos",
@@ -29,53 +27,25 @@ def upgrade() -> None:
 
     op.add_column(
         "banho_tosa_parametros_porte",
-        sa.Column(
-            "multiplicador_pelo_curto",
-            sa.Numeric(8, 4),
-            nullable=False,
-            server_default="1",
-        ),
+        sa.Column("multiplicador_pelo_curto", sa.Numeric(8, 4), nullable=False, server_default="1"),
     )
     op.add_column(
         "banho_tosa_parametros_porte",
-        sa.Column(
-            "multiplicador_pelo_longo",
-            sa.Numeric(8, 4),
-            nullable=False,
-            server_default="1.2",
-        ),
+        sa.Column("multiplicador_pelo_longo", sa.Numeric(8, 4), nullable=False, server_default="1.2"),
     )
     op.add_column(
         "banho_tosa_parametros_porte",
-        sa.Column(
-            "tempo_extra_pelo_longo_min",
-            sa.Integer(),
-            nullable=False,
-            server_default="0",
-        ),
+        sa.Column("tempo_extra_pelo_longo_min", sa.Integer(), nullable=False, server_default="0"),
     )
 
-    op.add_column(
-        "banho_tosa_etapas", sa.Column("ordem_fluxo", sa.Integer(), nullable=True)
-    )
-    op.add_column(
-        "banho_tosa_etapas",
-        sa.Column("tempo_previsto_minutos", sa.Integer(), nullable=True),
-    )
-    op.add_column(
-        "banho_tosa_etapas", sa.Column("duracao_segundos", sa.Integer(), nullable=True)
-    )
+    op.add_column("banho_tosa_etapas", sa.Column("ordem_fluxo", sa.Integer(), nullable=True))
+    op.add_column("banho_tosa_etapas", sa.Column("tempo_previsto_minutos", sa.Integer(), nullable=True))
+    op.add_column("banho_tosa_etapas", sa.Column("duracao_segundos", sa.Integer(), nullable=True))
 
     op.alter_column("banho_tosa_servicos", "preco_base", server_default=None)
-    op.alter_column(
-        "banho_tosa_parametros_porte", "multiplicador_pelo_curto", server_default=None
-    )
-    op.alter_column(
-        "banho_tosa_parametros_porte", "multiplicador_pelo_longo", server_default=None
-    )
-    op.alter_column(
-        "banho_tosa_parametros_porte", "tempo_extra_pelo_longo_min", server_default=None
-    )
+    op.alter_column("banho_tosa_parametros_porte", "multiplicador_pelo_curto", server_default=None)
+    op.alter_column("banho_tosa_parametros_porte", "multiplicador_pelo_longo", server_default=None)
+    op.alter_column("banho_tosa_parametros_porte", "tempo_extra_pelo_longo_min", server_default=None)
 
     op.execute(
         """

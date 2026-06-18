@@ -87,16 +87,10 @@ def _criar_tabela() -> None:
             nullable=True,
             comment="Sugestão para próximo mês",
         ),
-        sa.Column(
-            "fechado", sa.Boolean(), server_default=sa.text("false"), nullable=True
-        ),
+        sa.Column("fechado", sa.Boolean(), server_default=sa.text("false"), nullable=True),
         sa.Column("observacoes", sa.Text(), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.func.now(), nullable=True
-        ),
-        sa.Column(
-            "updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=True
-        ),
+        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=True),
+        sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("tenant_id", "ano", "mes", name=UQ_COMPETENCIA),
     )

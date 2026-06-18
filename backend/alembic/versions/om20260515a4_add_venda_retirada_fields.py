@@ -24,14 +24,9 @@ def upgrade() -> None:
 
     columns = {column["name"] for column in inspector.get_columns("vendas")}
     if "tipo_retirada" not in columns:
-        op.add_column(
-            "vendas", sa.Column("tipo_retirada", sa.String(length=20), nullable=True)
-        )
+        op.add_column("vendas", sa.Column("tipo_retirada", sa.String(length=20), nullable=True))
     if "palavra_chave_retirada" not in columns:
-        op.add_column(
-            "vendas",
-            sa.Column("palavra_chave_retirada", sa.String(length=100), nullable=True),
-        )
+        op.add_column("vendas", sa.Column("palavra_chave_retirada", sa.String(length=100), nullable=True))
 
 
 def downgrade() -> None:

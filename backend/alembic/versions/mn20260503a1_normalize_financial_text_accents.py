@@ -80,16 +80,13 @@ def _normalize_column(table_name: str, column_name: str) -> None:
     table_sql = _quote_identifier(table_name)
     column_sql = _quote_identifier(column_name)
     expression = _replace_expression(column_sql)
-    predicates = [
-        f"{column_sql} LIKE {_literal('%' + wrong + '%')}"
-        for wrong, _right in REPLACEMENTS
-    ]
+    predicates = [f"{column_sql} LIKE {_literal('%' + wrong + '%')}" for wrong, _right in REPLACEMENTS]
     op.execute(
         f"""
         UPDATE {table_sql}
            SET {column_sql} = {expression}
          WHERE {column_sql} IS NOT NULL
-           AND ({" OR ".join(predicates)})
+           AND ({' OR '.join(predicates)})
         """
     )
 

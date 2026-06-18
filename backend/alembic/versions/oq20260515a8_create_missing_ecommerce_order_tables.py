@@ -33,9 +33,7 @@ def _indexes(table_name: str) -> set[str]:
     return {index["name"] for index in inspector.get_indexes(table_name)}
 
 
-def _create_index_if_missing(
-    index_name: str, table_name: str, columns: list[str], *, unique: bool = False
-) -> None:
+def _create_index_if_missing(index_name: str, table_name: str, columns: list[str], *, unique: bool = False) -> None:
     if index_name not in _indexes(table_name):
         op.create_index(index_name, table_name, columns, unique=unique)
 
@@ -55,52 +53,24 @@ def upgrade() -> None:
             sa.Column("status", sa.String(), nullable=True, server_default="criado"),
             sa.Column("tipo_retirada", sa.String(length=20), nullable=True),
             sa.Column("palavra_chave_retirada", sa.String(length=100), nullable=True),
-            sa.Column(
-                "is_drive",
-                sa.Boolean(),
-                nullable=False,
-                server_default=sa.text("false"),
-            ),
+            sa.Column("is_drive", sa.Boolean(), nullable=False, server_default=sa.text("false")),
             sa.Column("drive_chegou_at", sa.DateTime(timezone=True), nullable=True),
             sa.Column("drive_entregue_at", sa.DateTime(timezone=True), nullable=True),
-            sa.Column(
-                "created_at",
-                sa.DateTime(timezone=True),
-                nullable=True,
-                server_default=sa.text("now()"),
-            ),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=True, server_default=sa.text("now()")),
             sa.PrimaryKeyConstraint("id"),
             sa.UniqueConstraint("pedido_id", name="uq_pedidos_pedido_id"),
         )
     else:
         columns = _columns("pedidos")
         if "is_drive" not in columns:
-            op.add_column(
-                "pedidos",
-                sa.Column(
-                    "is_drive",
-                    sa.Boolean(),
-                    nullable=False,
-                    server_default=sa.text("false"),
-                ),
-            )
+            op.add_column("pedidos", sa.Column("is_drive", sa.Boolean(), nullable=False, server_default=sa.text("false")))
         if "drive_chegou_at" not in columns:
-            op.add_column(
-                "pedidos",
-                sa.Column("drive_chegou_at", sa.DateTime(timezone=True), nullable=True),
-            )
+            op.add_column("pedidos", sa.Column("drive_chegou_at", sa.DateTime(timezone=True), nullable=True))
         if "drive_entregue_at" not in columns:
-            op.add_column(
-                "pedidos",
-                sa.Column(
-                    "drive_entregue_at", sa.DateTime(timezone=True), nullable=True
-                ),
-            )
+            op.add_column("pedidos", sa.Column("drive_entregue_at", sa.DateTime(timezone=True), nullable=True))
 
     _create_index_if_missing("ix_pedidos_id", "pedidos", ["id"])
-    _create_index_if_missing(
-        "ix_pedidos_pedido_id", "pedidos", ["pedido_id"], unique=True
-    )
+    _create_index_if_missing("ix_pedidos_pedido_id", "pedidos", ["pedido_id"], unique=True)
     _create_index_if_missing("ix_pedidos_tenant_id", "pedidos", ["tenant_id"])
 
     inspector = _inspector()
@@ -115,12 +85,7 @@ def upgrade() -> None:
             sa.Column("preco_unitario", sa.Float(), nullable=False),
             sa.Column("subtotal", sa.Float(), nullable=False),
             sa.Column("tenant_id", sa.String(length=36), nullable=False),
-            sa.Column(
-                "created_at",
-                sa.DateTime(),
-                nullable=True,
-                server_default=sa.text("now()"),
-            ),
+            sa.Column("created_at", sa.DateTime(), nullable=True, server_default=sa.text("now()")),
             sa.ForeignKeyConstraint(["pedido_id"], ["pedidos.pedido_id"]),
             sa.PrimaryKeyConstraint("id"),
         )

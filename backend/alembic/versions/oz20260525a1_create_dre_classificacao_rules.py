@@ -41,17 +41,13 @@ def _has_table(table_name: str) -> bool:
 def _columns(table_name: str) -> set[str]:
     if not _has_table(table_name):
         return set()
-    return {
-        column["name"] for column in sa.inspect(op.get_bind()).get_columns(table_name)
-    }
+    return {column["name"] for column in sa.inspect(op.get_bind()).get_columns(table_name)}
 
 
 def _indexes(table_name: str) -> set[str]:
     if not _has_table(table_name):
         return set()
-    return {
-        index["name"] for index in sa.inspect(op.get_bind()).get_indexes(table_name)
-    }
+    return {index["name"] for index in sa.inspect(op.get_bind()).get_indexes(table_name)}
 
 
 def _add_column_once(table_name: str, column: sa.Column) -> None:
@@ -64,9 +60,7 @@ def _drop_column_once(table_name: str, column_name: str) -> None:
         op.drop_column(table_name, column_name)
 
 
-def _create_index_once(
-    name: str, table_name: str, columns: list[str], **kwargs
-) -> None:
+def _create_index_once(name: str, table_name: str, columns: list[str], **kwargs) -> None:
     if _has_table(table_name) and name not in _indexes(table_name):
         op.create_index(name, table_name, columns, **kwargs)
 
@@ -88,18 +82,8 @@ def _create_regras_table() -> None:
             _uuid_type(),
             nullable=False,
         ),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.func.now(),
-            nullable=False,
-        ),
-        sa.Column(
-            "updated_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.func.now(),
-            nullable=False,
-        ),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("nome", sa.String(150), nullable=False),
         sa.Column("descricao", sa.Text(), nullable=True),
         sa.Column("tipo_regra", sa.String(50), nullable=False),
@@ -114,16 +98,10 @@ def _create_regras_table() -> None:
         sa.Column("canal", sa.String(50), nullable=True),
         sa.Column("prioridade", sa.Integer(), nullable=False, server_default="100"),
         sa.Column("confianca", sa.Integer(), nullable=False, server_default="100"),
-        sa.Column(
-            "aplicacoes_sucesso", sa.Integer(), nullable=False, server_default="0"
-        ),
-        sa.Column(
-            "aplicacoes_rejeitadas", sa.Integer(), nullable=False, server_default="0"
-        ),
+        sa.Column("aplicacoes_sucesso", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("aplicacoes_rejeitadas", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("ativo", sa.Boolean(), nullable=False, server_default=sa.true()),
-        sa.Column(
-            "sugerir_apenas", sa.Boolean(), nullable=False, server_default=sa.false()
-        ),
+        sa.Column("sugerir_apenas", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("criado_por_user_id", sa.Integer(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -141,18 +119,8 @@ def _create_historico_table() -> None:
             _uuid_type(),
             nullable=False,
         ),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.func.now(),
-            nullable=False,
-        ),
-        sa.Column(
-            "updated_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.func.now(),
-            nullable=False,
-        ),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("tipo_lancamento", sa.String(20), nullable=False),
         sa.Column("lancamento_id", sa.Integer(), nullable=False),
         sa.Column(
@@ -173,9 +141,7 @@ def _create_historico_table() -> None:
         sa.Column("beneficiario", sa.String(255), nullable=True),
         sa.Column("tipo_documento", sa.String(50), nullable=True),
         sa.Column("valor", sa.BigInteger(), nullable=False),
-        sa.Column(
-            "usuario_aceitou", sa.Boolean(), nullable=False, server_default=sa.true()
-        ),
+        sa.Column("usuario_aceitou", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column("observacoes", sa.Text(), nullable=True),
         sa.Column("classificado_por_user_id", sa.Integer(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
@@ -188,11 +154,7 @@ def _backfill_beneficiarios() -> None:
 
     contas_pagar_cols = _columns("contas_pagar")
     clientes_cols = _columns("clientes")
-    if {"fornecedor_id", "beneficiario", "tenant_id"}.issubset(contas_pagar_cols) and {
-        "id",
-        "nome",
-        "tenant_id",
-    }.issubset(clientes_cols):
+    if {"fornecedor_id", "beneficiario", "tenant_id"}.issubset(contas_pagar_cols) and {"id", "nome", "tenant_id"}.issubset(clientes_cols):
         op.execute(
             """
             UPDATE contas_pagar cp
@@ -205,11 +167,7 @@ def _backfill_beneficiarios() -> None:
         )
 
     contas_receber_cols = _columns("contas_receber")
-    if {"cliente_id", "beneficiario", "tenant_id"}.issubset(contas_receber_cols) and {
-        "id",
-        "nome",
-        "tenant_id",
-    }.issubset(clientes_cols):
+    if {"cliente_id", "beneficiario", "tenant_id"}.issubset(contas_receber_cols) and {"id", "nome", "tenant_id"}.issubset(clientes_cols):
         op.execute(
             """
             UPDATE contas_receber cr
@@ -222,72 +180,29 @@ def _backfill_beneficiarios() -> None:
         )
 
     if {"afeta_dre", "nota_entrada_id"}.issubset(contas_pagar_cols):
-        op.execute(
-            "UPDATE contas_pagar SET afeta_dre = FALSE WHERE nota_entrada_id IS NOT NULL"
-        )
+        op.execute("UPDATE contas_pagar SET afeta_dre = FALSE WHERE nota_entrada_id IS NOT NULL")
 
 
 def upgrade() -> None:
-    _add_column_once(
-        "contas_pagar", sa.Column("beneficiario", sa.String(255), nullable=True)
-    )
-    _add_column_once(
-        "contas_pagar", sa.Column("tipo_documento", sa.String(50), nullable=True)
-    )
-    _add_column_once(
-        "contas_pagar",
-        sa.Column("afeta_dre", sa.Boolean(), nullable=False, server_default=sa.true()),
-    )
-    _add_column_once(
-        "contas_receber", sa.Column("beneficiario", sa.String(255), nullable=True)
-    )
-    _add_column_once(
-        "contas_receber", sa.Column("tipo_documento", sa.String(50), nullable=True)
-    )
+    _add_column_once("contas_pagar", sa.Column("beneficiario", sa.String(255), nullable=True))
+    _add_column_once("contas_pagar", sa.Column("tipo_documento", sa.String(50), nullable=True))
+    _add_column_once("contas_pagar", sa.Column("afeta_dre", sa.Boolean(), nullable=False, server_default=sa.true()))
+    _add_column_once("contas_receber", sa.Column("beneficiario", sa.String(255), nullable=True))
+    _add_column_once("contas_receber", sa.Column("tipo_documento", sa.String(50), nullable=True))
 
-    _create_index_once(
-        "idx_contas_pagar_beneficiario", "contas_pagar", ["tenant_id", "beneficiario"]
-    )
-    _create_index_once(
-        "idx_contas_pagar_tipo_documento",
-        "contas_pagar",
-        ["tenant_id", "tipo_documento"],
-    )
-    _create_index_once(
-        "idx_contas_pagar_afeta_dre", "contas_pagar", ["tenant_id", "afeta_dre"]
-    )
-    _create_index_once(
-        "idx_contas_receber_beneficiario",
-        "contas_receber",
-        ["tenant_id", "beneficiario"],
-    )
-    _create_index_once(
-        "idx_contas_receber_tipo_documento",
-        "contas_receber",
-        ["tenant_id", "tipo_documento"],
-    )
+    _create_index_once("idx_contas_pagar_beneficiario", "contas_pagar", ["tenant_id", "beneficiario"])
+    _create_index_once("idx_contas_pagar_tipo_documento", "contas_pagar", ["tenant_id", "tipo_documento"])
+    _create_index_once("idx_contas_pagar_afeta_dre", "contas_pagar", ["tenant_id", "afeta_dre"])
+    _create_index_once("idx_contas_receber_beneficiario", "contas_receber", ["tenant_id", "beneficiario"])
+    _create_index_once("idx_contas_receber_tipo_documento", "contas_receber", ["tenant_id", "tipo_documento"])
 
     _create_regras_table()
     _create_historico_table()
 
-    _create_index_once(
-        "idx_regras_classificacao_tenant", "regras_classificacao_dre", ["tenant_id"]
-    )
-    _create_index_once(
-        "idx_regras_classificacao_tipo",
-        "regras_classificacao_dre",
-        ["tenant_id", "tipo_regra"],
-    )
-    _create_index_once(
-        "idx_regras_classificacao_ativo",
-        "regras_classificacao_dre",
-        ["tenant_id", "ativo"],
-    )
-    _create_index_once(
-        "idx_regras_classificacao_subcategoria",
-        "regras_classificacao_dre",
-        ["dre_subcategoria_id"],
-    )
+    _create_index_once("idx_regras_classificacao_tenant", "regras_classificacao_dre", ["tenant_id"])
+    _create_index_once("idx_regras_classificacao_tipo", "regras_classificacao_dre", ["tenant_id", "tipo_regra"])
+    _create_index_once("idx_regras_classificacao_ativo", "regras_classificacao_dre", ["tenant_id", "ativo"])
+    _create_index_once("idx_regras_classificacao_subcategoria", "regras_classificacao_dre", ["dre_subcategoria_id"])
     if _dialect_name() == "postgresql":
         _create_index_once(
             "idx_regras_classificacao_criterios",
@@ -296,32 +211,16 @@ def upgrade() -> None:
             postgresql_using="gin",
         )
     else:
-        _create_index_once(
-            "idx_regras_classificacao_criterios",
-            "regras_classificacao_dre",
-            ["criterios"],
-        )
+        _create_index_once("idx_regras_classificacao_criterios", "regras_classificacao_dre", ["criterios"])
 
-    _create_index_once(
-        "idx_historico_classificacao_tenant",
-        "historico_classificacao_dre",
-        ["tenant_id"],
-    )
+    _create_index_once("idx_historico_classificacao_tenant", "historico_classificacao_dre", ["tenant_id"])
     _create_index_once(
         "idx_historico_classificacao_lancamento",
         "historico_classificacao_dre",
         ["tenant_id", "tipo_lancamento", "lancamento_id"],
     )
-    _create_index_once(
-        "idx_historico_classificacao_subcategoria",
-        "historico_classificacao_dre",
-        ["dre_subcategoria_id"],
-    )
-    _create_index_once(
-        "idx_historico_classificacao_regra",
-        "historico_classificacao_dre",
-        ["regra_aplicada_id"],
-    )
+    _create_index_once("idx_historico_classificacao_subcategoria", "historico_classificacao_dre", ["dre_subcategoria_id"])
+    _create_index_once("idx_historico_classificacao_regra", "historico_classificacao_dre", ["regra_aplicada_id"])
     _create_index_once(
         "idx_historico_classificacao_forma",
         "historico_classificacao_dre",

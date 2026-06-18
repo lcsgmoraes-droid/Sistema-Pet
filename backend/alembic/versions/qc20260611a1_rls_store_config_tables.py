@@ -33,9 +33,7 @@ DOWNGRADE_SQL = (
 )
 
 
-def _run_policy_templates(
-    sql_templates: tuple[str, ...], table_names: tuple[str, ...]
-) -> None:
+def _run_policy_templates(sql_templates: tuple[str, ...], table_names: tuple[str, ...]) -> None:
     bind = op.get_bind()
     if bind.dialect.name != "postgresql":
         return

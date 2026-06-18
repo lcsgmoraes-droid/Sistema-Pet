@@ -5,13 +5,12 @@ Revises: b2c3d4e5f6a7
 Create Date: 2026-02-27
 
 """
-
 from typing import Union, Sequence
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "c3d4e5f6a7b8"
-down_revision: Union[str, Sequence[str], None] = "b2c3d4e5f6a7"
+revision: str = 'c3d4e5f6a7b8'
+down_revision: Union[str, Sequence[str], None] = 'b2c3d4e5f6a7'
 branch_labels = None
 depends_on = None
 

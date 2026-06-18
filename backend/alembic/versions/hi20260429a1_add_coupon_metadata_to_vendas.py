@@ -18,12 +18,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "vendas", sa.Column("cupom_code", sa.String(length=100), nullable=True)
-    )
-    op.add_column(
-        "vendas", sa.Column("cupom_discount_applied", sa.Numeric(10, 2), nullable=True)
-    )
+    op.add_column("vendas", sa.Column("cupom_code", sa.String(length=100), nullable=True))
+    op.add_column("vendas", sa.Column("cupom_discount_applied", sa.Numeric(10, 2), nullable=True))
     op.create_index("ix_vendas_cupom_code", "vendas", ["cupom_code"])
 
 

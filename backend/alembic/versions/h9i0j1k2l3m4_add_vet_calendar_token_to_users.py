@@ -26,14 +26,9 @@ def upgrade() -> None:
     indexes = {index["name"] for index in inspector.get_indexes("users")}
 
     if "vet_calendar_token" not in columns:
-        op.add_column(
-            "users",
-            sa.Column("vet_calendar_token", sa.String(length=255), nullable=True),
-        )
+        op.add_column("users", sa.Column("vet_calendar_token", sa.String(length=255), nullable=True))
     if "ix_users_vet_calendar_token" not in indexes:
-        op.create_index(
-            "ix_users_vet_calendar_token", "users", ["vet_calendar_token"], unique=True
-        )
+        op.create_index("ix_users_vet_calendar_token", "users", ["vet_calendar_token"], unique=True)
 
 
 def downgrade() -> None:

@@ -24,9 +24,7 @@ def _has_table(table_name: str) -> bool:
 def _columns(table_name: str) -> set[str]:
     if not _has_table(table_name):
         return set()
-    return {
-        column["name"] for column in sa.inspect(op.get_bind()).get_columns(table_name)
-    }
+    return {column["name"] for column in sa.inspect(op.get_bind()).get_columns(table_name)}
 
 
 def _add_column_once(table_name: str, column: sa.Column) -> None:
@@ -40,76 +38,18 @@ def _drop_column_once(table_name: str, column_name: str) -> None:
 
 
 def upgrade() -> None:
-    _add_column_once(
-        "cargos",
-        sa.Column(
-            "regime_remuneracao", sa.String(30), nullable=False, server_default="clt"
-        ),
-    )
-    _add_column_once(
-        "cargos",
-        sa.Column(
-            "gera_encargos", sa.Boolean(), nullable=False, server_default=sa.true()
-        ),
-    )
-    _add_column_once(
-        "cargos",
-        sa.Column(
-            "inss_funcionario_percentual",
-            sa.Numeric(),
-            nullable=False,
-            server_default="0",
-        ),
-    )
-    _add_column_once(
-        "cargos",
-        sa.Column(
-            "inss_funcionario_valor", sa.Numeric(), nullable=False, server_default="0"
-        ),
-    )
-    _add_column_once(
-        "cargos",
-        sa.Column(
-            "desconto_transporte_valor",
-            sa.Numeric(),
-            nullable=False,
-            server_default="0",
-        ),
-    )
-    _add_column_once(
-        "cargos",
-        sa.Column(
-            "outros_descontos_valor", sa.Numeric(), nullable=False, server_default="0"
-        ),
-    )
+    _add_column_once("cargos", sa.Column("regime_remuneracao", sa.String(30), nullable=False, server_default="clt"))
+    _add_column_once("cargos", sa.Column("gera_encargos", sa.Boolean(), nullable=False, server_default=sa.true()))
+    _add_column_once("cargos", sa.Column("inss_funcionario_percentual", sa.Numeric(), nullable=False, server_default="0"))
+    _add_column_once("cargos", sa.Column("inss_funcionario_valor", sa.Numeric(), nullable=False, server_default="0"))
+    _add_column_once("cargos", sa.Column("desconto_transporte_valor", sa.Numeric(), nullable=False, server_default="0"))
+    _add_column_once("cargos", sa.Column("outros_descontos_valor", sa.Numeric(), nullable=False, server_default="0"))
 
-    _add_column_once(
-        "clientes", sa.Column("salario_base_override", sa.Numeric(10, 2), nullable=True)
-    )
-    _add_column_once(
-        "clientes", sa.Column("liquido_combinado", sa.Numeric(10, 2), nullable=True)
-    )
-    _add_column_once(
-        "clientes",
-        sa.Column(
-            "complemento_modo",
-            sa.String(20),
-            nullable=False,
-            server_default="automatico",
-        ),
-    )
-    _add_column_once(
-        "clientes",
-        sa.Column(
-            "complemento_fixo_valor",
-            sa.Numeric(10, 2),
-            nullable=False,
-            server_default="0",
-        ),
-    )
-    _add_column_once(
-        "clientes", sa.Column("remuneracao_observacoes", sa.Text(), nullable=True)
-    )
+    _add_column_once("clientes", sa.Column("salario_base_override", sa.Numeric(10, 2), nullable=True))
+    _add_column_once("clientes", sa.Column("liquido_combinado", sa.Numeric(10, 2), nullable=True))
+    _add_column_once("clientes", sa.Column("complemento_modo", sa.String(20), nullable=False, server_default="automatico"))
+    _add_column_once("clientes", sa.Column("complemento_fixo_valor", sa.Numeric(10, 2), nullable=False, server_default="0"))
+    _add_column_once("clientes", sa.Column("remuneracao_observacoes", sa.Text(), nullable=True))
 
 
 def downgrade() -> None:

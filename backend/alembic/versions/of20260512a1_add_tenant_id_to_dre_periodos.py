@@ -49,9 +49,7 @@ def _create_index_if_possible(index_name: str, columns: tuple[str, ...]) -> None
     if index_name in _indexes(TABLE_NAME):
         return
     quoted_columns = ", ".join(columns)
-    op.execute(
-        f"CREATE INDEX IF NOT EXISTS {index_name} ON {TABLE_NAME} ({quoted_columns})"
-    )
+    op.execute(f"CREATE INDEX IF NOT EXISTS {index_name} ON {TABLE_NAME} ({quoted_columns})")
 
 
 def _backfill_tenant_id() -> None:

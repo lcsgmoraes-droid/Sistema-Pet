@@ -31,23 +31,12 @@ def upgrade() -> None:
     if "updated_at" not in columns:
         op.add_column(
             "data_privacy_consents",
-            sa.Column(
-                "updated_at",
-                sa.DateTime(),
-                nullable=False,
-                server_default=sa.text("now()"),
-            ),
+            sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")),
         )
     if "revoked_at" not in columns:
-        op.add_column(
-            "data_privacy_consents",
-            sa.Column("revoked_at", sa.DateTime(), nullable=True),
-        )
+        op.add_column("data_privacy_consents", sa.Column("revoked_at", sa.DateTime(), nullable=True))
     if "revoke_reason" not in columns:
-        op.add_column(
-            "data_privacy_consents",
-            sa.Column("revoke_reason", sa.Text(), nullable=True),
-        )
+        op.add_column("data_privacy_consents", sa.Column("revoke_reason", sa.Text(), nullable=True))
 
 
 def downgrade() -> None:

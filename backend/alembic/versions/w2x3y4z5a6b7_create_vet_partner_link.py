@@ -4,7 +4,6 @@ Revision ID: w2x3y4z5a6b7
 Revises: v1a2b3c4d5e6
 Create Date: 2026-03-15 00:00:00.000000
 """
-
 from typing import Sequence, Union
 
 import sqlalchemy as sa
@@ -84,9 +83,7 @@ def downgrade() -> None:
         op.drop_column("tenants", "organization_type")
 
     if inspector.has_table("vet_partner_link"):
-        index_names = {
-            index["name"] for index in inspector.get_indexes("vet_partner_link")
-        }
+        index_names = {index["name"] for index in inspector.get_indexes("vet_partner_link")}
         if "ix_vet_partner_link_vet_tenant_id" in index_names:
             op.drop_index(
                 "ix_vet_partner_link_vet_tenant_id",

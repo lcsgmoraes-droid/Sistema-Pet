@@ -156,9 +156,7 @@ def upgrade() -> None:
         sa.Column(
             "event_origin",
             postgresql.ENUM(
-                "user_action",
-                "system_scheduled",
-                "campaign_action",
+                "user_action", "system_scheduled", "campaign_action",
                 name="campaign_event_origin_enum",
                 create_type=False,
             ),
@@ -170,11 +168,7 @@ def upgrade() -> None:
         sa.Column(
             "status",
             postgresql.ENUM(
-                "pending",
-                "processing",
-                "done",
-                "failed",
-                "skipped",
+                "pending", "processing", "done", "failed", "skipped",
                 name="campaign_event_status_enum",
                 create_type=False,
             ),
@@ -217,18 +211,11 @@ def upgrade() -> None:
         sa.Column(
             "campaign_type",
             postgresql.ENUM(
-                "birthday_customer",
-                "birthday_pet",
-                "welcome_app",
-                "welcome_ecommerce",
-                "inactivity",
-                "loyalty_stamp",
-                "cashback",
-                "ranking_monthly",
-                "monthly_highlight",
-                "quick_repurchase",
-                "drawing",
-                "bulk_segment",
+                "birthday_customer", "birthday_pet",
+                "welcome_app", "welcome_ecommerce",
+                "inactivity", "loyalty_stamp", "cashback",
+                "ranking_monthly", "monthly_highlight",
+                "quick_repurchase", "drawing", "bulk_segment",
                 name="campaign_type_enum",
                 create_type=False,
             ),
@@ -237,9 +224,7 @@ def upgrade() -> None:
         sa.Column(
             "status",
             postgresql.ENUM(
-                "active",
-                "paused",
-                "archived",
+                "active", "paused", "archived",
                 name="campaign_status_enum",
                 create_type=False,
             ),
@@ -265,9 +250,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_campaigns_tenant_status", "campaigns", ["tenant_id", "status"])
-    op.create_index(
-        "ix_campaigns_tenant_type", "campaigns", ["tenant_id", "campaign_type"]
-    )
+    op.create_index("ix_campaigns_tenant_type", "campaigns", ["tenant_id", "campaign_type"])
 
     # ------------------------------------------------------------------
     # 3. campaign_executions
@@ -291,10 +274,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
-            "tenant_id",
-            "campaign_id",
-            "customer_id",
-            "reference_period",
+            "tenant_id", "campaign_id", "customer_id", "reference_period",
             name="uq_campaign_execution_idempotency",
         ),
     )
@@ -377,9 +357,7 @@ def upgrade() -> None:
         sa.Column("voided_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
-            "tenant_id",
-            "customer_id",
-            "venda_id",
+            "tenant_id", "customer_id", "venda_id",
             name="uq_loyalty_stamp_venda",
         ),
     )
@@ -406,9 +384,7 @@ def upgrade() -> None:
         sa.Column(
             "source_type",
             postgresql.ENUM(
-                "campaign",
-                "manual",
-                "reversal",
+                "campaign", "manual", "reversal",
                 name="cashback_source_type_enum",
                 create_type=False,
             ),
@@ -448,10 +424,7 @@ def upgrade() -> None:
         sa.Column(
             "coupon_type",
             postgresql.ENUM(
-                "percent",
-                "fixed",
-                "gift",
-                "free_shipping",
+                "percent", "fixed", "gift", "free_shipping",
                 name="coupon_type_enum",
                 create_type=False,
             ),
@@ -462,10 +435,7 @@ def upgrade() -> None:
         sa.Column(
             "channel",
             postgresql.ENUM(
-                "pdv",
-                "app",
-                "ecommerce",
-                "all",
+                "pdv", "app", "ecommerce", "all",
                 name="coupon_channel_enum",
                 create_type=False,
             ),
@@ -475,10 +445,7 @@ def upgrade() -> None:
         sa.Column(
             "status",
             postgresql.ENUM(
-                "active",
-                "used",
-                "expired",
-                "voided",
+                "active", "used", "expired", "voided",
                 name="coupon_status_enum",
                 create_type=False,
             ),
@@ -498,12 +465,8 @@ def upgrade() -> None:
         sa.UniqueConstraint("tenant_id", "code", name="uq_coupon_code_tenant"),
     )
     op.create_index("ix_coupons_tenant_status", "coupons", ["tenant_id", "status"])
-    op.create_index(
-        "ix_coupons_tenant_customer", "coupons", ["tenant_id", "customer_id"]
-    )
-    op.create_index(
-        "ix_coupons_tenant_campaign", "coupons", ["tenant_id", "campaign_id"]
-    )
+    op.create_index("ix_coupons_tenant_customer", "coupons", ["tenant_id", "customer_id"])
+    op.create_index("ix_coupons_tenant_campaign", "coupons", ["tenant_id", "campaign_id"])
 
     # ------------------------------------------------------------------
     # 9. coupon_redemptions
@@ -549,11 +512,7 @@ def upgrade() -> None:
         sa.Column(
             "rank_level",
             postgresql.ENUM(
-                "bronze",
-                "silver",
-                "gold",
-                "diamond",
-                "platinum",
+                "bronze", "silver", "gold", "diamond", "platinum",
                 name="rank_level_enum",
                 create_type=False,
             ),
@@ -571,9 +530,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
-            "tenant_id",
-            "customer_id",
-            "period",
+            "tenant_id", "customer_id", "period",
             name="uq_customer_rank_period",
         ),
     )
@@ -600,8 +557,7 @@ def upgrade() -> None:
         sa.Column(
             "channel",
             postgresql.ENUM(
-                "push",
-                "email",
+                "push", "email",
                 name="notification_channel_enum",
                 create_type=False,
             ),
@@ -614,10 +570,7 @@ def upgrade() -> None:
         sa.Column(
             "status",
             postgresql.ENUM(
-                "pending",
-                "sent",
-                "failed",
-                "skipped",
+                "pending", "sent", "failed", "skipped",
                 name="notification_status_enum",
                 create_type=False,
             ),
@@ -634,9 +587,7 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "idempotency_key", name="uq_notification_queue_idempotency"
-        ),
+        sa.UniqueConstraint("idempotency_key", name="uq_notification_queue_idempotency"),
     )
     op.create_index(
         "ix_nq_tenant_status_created",
@@ -656,8 +607,7 @@ def upgrade() -> None:
         sa.Column(
             "channel",
             postgresql.ENUM(
-                "push",
-                "email",
+                "push", "email",
                 name="notification_channel_enum",
                 create_type=False,
             ),
@@ -693,11 +643,7 @@ def upgrade() -> None:
         sa.Column(
             "rank_filter",
             postgresql.ENUM(
-                "bronze",
-                "silver",
-                "gold",
-                "diamond",
-                "platinum",
+                "bronze", "silver", "gold", "diamond", "platinum",
                 name="rank_level_enum",
                 create_type=False,
             ),
@@ -706,11 +652,7 @@ def upgrade() -> None:
         sa.Column(
             "status",
             postgresql.ENUM(
-                "draft",
-                "open",
-                "entries_frozen",
-                "drawn",
-                "cancelled",
+                "draft", "open", "entries_frozen", "drawn", "cancelled",
                 name="drawing_status_enum",
                 create_type=False,
             ),
@@ -733,9 +675,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_drawings_tenant_status", "drawings", ["tenant_id", "status"])
-    op.create_index(
-        "ix_drawings_tenant_campaign", "drawings", ["tenant_id", "campaign_id"]
-    )
+    op.create_index("ix_drawings_tenant_campaign", "drawings", ["tenant_id", "campaign_id"])
 
     # ------------------------------------------------------------------
     # 14. drawing_entries
@@ -750,11 +690,7 @@ def upgrade() -> None:
         sa.Column(
             "rank_level",
             postgresql.ENUM(
-                "bronze",
-                "silver",
-                "gold",
-                "diamond",
-                "platinum",
+                "bronze", "silver", "gold", "diamond", "platinum",
                 name="rank_level_enum",
                 create_type=False,
             ),
@@ -768,9 +704,7 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
-            "tenant_id",
-            "drawing_id",
-            "customer_id",
+            "tenant_id", "drawing_id", "customer_id",
             name="uq_drawing_entry_customer",
         ),
     )

@@ -35,9 +35,7 @@ def upgrade() -> None:
         return
 
     if "especie" not in columns:
-        op.add_column(
-            "racas", sa.Column("especie", sa.String(length=50), nullable=True)
-        )
+        op.add_column("racas", sa.Column("especie", sa.String(length=50), nullable=True))
 
     if "ix_racas_especie" not in _indexes("racas"):
         op.create_index("ix_racas_especie", "racas", ["especie"], unique=False)

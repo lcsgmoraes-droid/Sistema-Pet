@@ -35,21 +35,9 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
-        sa.Column(
-            "provider",
-            sa.String(length=50),
-            nullable=False,
-            server_default="mercadopago",
-        ),
-        sa.Column(
-            "enabled", sa.Boolean(), nullable=False, server_default=sa.text("false")
-        ),
-        sa.Column(
-            "environment",
-            sa.String(length=20),
-            nullable=False,
-            server_default="production",
-        ),
+        sa.Column("provider", sa.String(length=50), nullable=False, server_default="mercadopago"),
+        sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column("environment", sa.String(length=20), nullable=False, server_default="production"),
         sa.Column("public_key", sa.Text(), nullable=True),
         sa.Column("access_token_encrypted", sa.Text(), nullable=True),
         sa.Column("webhook_secret_encrypted", sa.Text(), nullable=True),

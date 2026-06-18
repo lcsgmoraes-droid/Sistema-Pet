@@ -19,12 +19,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "vendas", sa.Column("rentabilidade_snapshot", sa.JSON(), nullable=True)
-    )
-    op.add_column(
-        "vendas", sa.Column("rentabilidade_snapshot_em", sa.DateTime(), nullable=True)
-    )
+    op.add_column("vendas", sa.Column("rentabilidade_snapshot", sa.JSON(), nullable=True))
+    op.add_column("vendas", sa.Column("rentabilidade_snapshot_em", sa.DateTime(), nullable=True))
 
 
 def downgrade() -> None:

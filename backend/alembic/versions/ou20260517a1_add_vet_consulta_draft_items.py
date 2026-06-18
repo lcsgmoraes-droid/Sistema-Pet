@@ -26,15 +26,10 @@ def upgrade() -> None:
     columns = _columns("vet_consultas")
 
     if "prescricao_rascunho" not in columns:
-        op.add_column(
-            "vet_consultas", sa.Column("prescricao_rascunho", sa.JSON(), nullable=True)
-        )
+        op.add_column("vet_consultas", sa.Column("prescricao_rascunho", sa.JSON(), nullable=True))
 
     if "procedimentos_rascunho" not in columns:
-        op.add_column(
-            "vet_consultas",
-            sa.Column("procedimentos_rascunho", sa.JSON(), nullable=True),
-        )
+        op.add_column("vet_consultas", sa.Column("procedimentos_rascunho", sa.JSON(), nullable=True))
 
 
 def downgrade() -> None:

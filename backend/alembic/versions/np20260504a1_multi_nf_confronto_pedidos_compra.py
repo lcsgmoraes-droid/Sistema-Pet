@@ -21,26 +21,18 @@ def upgrade() -> None:
     inspector = sa.inspect(bind)
 
     if inspector.has_table("pedidos_compra"):
-        colunas_pedido = {
-            coluna["name"] for coluna in inspector.get_columns("pedidos_compra")
-        }
+        colunas_pedido = {coluna["name"] for coluna in inspector.get_columns("pedidos_compra")}
         if "nota_entrada_id" not in colunas_pedido:
             op.execute(
                 "ALTER TABLE pedidos_compra "
                 "ADD COLUMN IF NOT EXISTS nota_entrada_id INTEGER REFERENCES notas_entrada(id)"
             )
         if "data_confronto" not in colunas_pedido:
-            op.execute(
-                "ALTER TABLE pedidos_compra ADD COLUMN IF NOT EXISTS data_confronto TIMESTAMP"
-            )
+            op.execute("ALTER TABLE pedidos_compra ADD COLUMN IF NOT EXISTS data_confronto TIMESTAMP")
         if "status_confronto" not in colunas_pedido:
-            op.execute(
-                "ALTER TABLE pedidos_compra ADD COLUMN IF NOT EXISTS status_confronto VARCHAR(30)"
-            )
+            op.execute("ALTER TABLE pedidos_compra ADD COLUMN IF NOT EXISTS status_confronto VARCHAR(30)")
         if "resumo_confronto" not in colunas_pedido:
-            op.execute(
-                "ALTER TABLE pedidos_compra ADD COLUMN IF NOT EXISTS resumo_confronto TEXT"
-            )
+            op.execute("ALTER TABLE pedidos_compra ADD COLUMN IF NOT EXISTS resumo_confronto TEXT")
         if "confronto_finalizado" not in colunas_pedido:
             op.execute(
                 "ALTER TABLE pedidos_compra "
@@ -59,28 +51,13 @@ def upgrade() -> None:
             sa.Column("pedido_compra_id", sa.Integer(), nullable=False),
             sa.Column("nota_entrada_id", sa.Integer(), nullable=False),
             sa.Column("user_id", sa.Integer(), nullable=False),
-            sa.Column(
-                "created_at",
-                sa.DateTime(),
-                server_default=sa.text("now()"),
-                nullable=False,
-            ),
-            sa.Column(
-                "updated_at",
-                sa.DateTime(),
-                server_default=sa.text("now()"),
-                nullable=False,
-            ),
+            sa.Column("created_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
+            sa.Column("updated_at", sa.DateTime(), server_default=sa.text("now()"), nullable=False),
             sa.ForeignKeyConstraint(["pedido_compra_id"], ["pedidos_compra.id"]),
             sa.ForeignKeyConstraint(["nota_entrada_id"], ["notas_entrada.id"]),
             sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
             sa.PrimaryKeyConstraint("id"),
-            sa.UniqueConstraint(
-                "tenant_id",
-                "pedido_compra_id",
-                "nota_entrada_id",
-                name="uq_pedido_compra_nota_entrada",
-            ),
+            sa.UniqueConstraint("tenant_id", "pedido_compra_id", "nota_entrada_id", name="uq_pedido_compra_nota_entrada"),
         )
 
     op.execute(
@@ -123,24 +100,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(
-        op.f("ix_pedidos_compra_notas_entrada_user_id"),
-        table_name="pedidos_compra_notas_entrada",
-    )
-    op.drop_index(
-        op.f("ix_pedidos_compra_notas_entrada_nota_entrada_id"),
-        table_name="pedidos_compra_notas_entrada",
-    )
-    op.drop_index(
-        op.f("ix_pedidos_compra_notas_entrada_pedido_compra_id"),
-        table_name="pedidos_compra_notas_entrada",
-    )
-    op.drop_index(
-        op.f("ix_pedidos_compra_notas_entrada_tenant_id"),
-        table_name="pedidos_compra_notas_entrada",
-    )
-    op.drop_index(
-        op.f("ix_pedidos_compra_notas_entrada_id"),
-        table_name="pedidos_compra_notas_entrada",
-    )
+    op.drop_index(op.f("ix_pedidos_compra_notas_entrada_user_id"), table_name="pedidos_compra_notas_entrada")
+    op.drop_index(op.f("ix_pedidos_compra_notas_entrada_nota_entrada_id"), table_name="pedidos_compra_notas_entrada")
+    op.drop_index(op.f("ix_pedidos_compra_notas_entrada_pedido_compra_id"), table_name="pedidos_compra_notas_entrada")
+    op.drop_index(op.f("ix_pedidos_compra_notas_entrada_tenant_id"), table_name="pedidos_compra_notas_entrada")
+    op.drop_index(op.f("ix_pedidos_compra_notas_entrada_id"), table_name="pedidos_compra_notas_entrada")
     op.drop_table("pedidos_compra_notas_entrada")

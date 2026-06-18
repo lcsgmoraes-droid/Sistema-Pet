@@ -36,9 +36,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("merged_by_user_id", sa.Integer(), nullable=True),
-        sa.Column(
-            "snapshot_json", postgresql.JSONB(astext_type=sa.Text()), nullable=True
-        ),
+        sa.Column("snapshot_json", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column(
             "undone",
             sa.Boolean(),

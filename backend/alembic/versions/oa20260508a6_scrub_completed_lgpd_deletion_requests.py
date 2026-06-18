@@ -15,9 +15,7 @@ branch_labels = None
 depends_on = None
 
 
-SCRUB_NOTE = (
-    "Solicitacao de exclusao concluida; dados pessoais do titular foram anonimizados."
-)
+SCRUB_NOTE = "Solicitacao de exclusao concluida; dados pessoais do titular foram anonimizados."
 
 
 def _columns(table_name: str) -> set[str]:

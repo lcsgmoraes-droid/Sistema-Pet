@@ -26,9 +26,7 @@ def _codigo_barras_valido(valor: str | None) -> str:
     return re.sub(r"\D", "", texto)
 
 
-def _extrair_codigos_barras_por_item(
-    xml_content: str | None,
-) -> dict[int, dict[str, str]]:
+def _extrair_codigos_barras_por_item(xml_content: str | None) -> dict[int, dict[str, str]]:
     if not xml_content:
         return {}
 
@@ -50,9 +48,7 @@ def _extrair_codigos_barras_por_item(
         if prod is None or numero_item <= 0:
             continue
 
-        ean = _codigo_barras_valido(
-            prod.findtext("nfe:cEAN", default="", namespaces=ns)
-        )
+        ean = _codigo_barras_valido(prod.findtext("nfe:cEAN", default="", namespaces=ns))
         ean_tributario = _codigo_barras_valido(
             prod.findtext("nfe:cEANTrib", default="", namespaces=ns)
         )
@@ -70,9 +66,7 @@ def _extrair_codigos_barras_por_item(
 def _preencher_codigos_existentes() -> None:
     conn = op.get_bind()
     notas = conn.execute(
-        sa.text(
-            "SELECT id, xml_content FROM notas_entrada WHERE xml_content IS NOT NULL"
-        )
+        sa.text("SELECT id, xml_content FROM notas_entrada WHERE xml_content IS NOT NULL")
     ).mappings()
 
     for nota in notas:
@@ -135,10 +129,7 @@ def _preencher_codigos_existentes() -> None:
                                AND COALESCE(gtin_ean_tributario, '') = ''
                             """
                         ),
-                        {
-                            "ean_tributario": codigos["ean_tributario"],
-                            "produto_id": produto_id,
-                        },
+                        {"ean_tributario": codigos["ean_tributario"], "produto_id": produto_id},
                     )
                 if codigos["principal"]:
                     conn.execute(

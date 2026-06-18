@@ -17,9 +17,7 @@ depends_on = None
 def upgrade() -> None:
     op.execute("DROP INDEX IF EXISTS ix_pets_codigo")
     op.execute("CREATE INDEX IF NOT EXISTS ix_pets_codigo ON pets (codigo)")
-    op.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS uq_pets_tenant_codigo ON pets (tenant_id, codigo)"
-    )
+    op.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_pets_tenant_codigo ON pets (tenant_id, codigo)")
 
 
 def downgrade() -> None:
