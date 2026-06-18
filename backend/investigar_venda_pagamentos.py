@@ -3,33 +3,39 @@ Investigar venda e seus pagamentos
 """
 
 import sys
-sys.path.insert(0, r"c:\Users\Lucas\OneDrive\Área de Trabalho\Programa\Sistema Pet\backend")
+
+sys.path.insert(
+    0, r"c:\Users\Lucas\OneDrive\Área de Trabalho\Programa\Sistema Pet\backend"
+)
 
 from app.db import SessionLocal
 from sqlalchemy import text
 
 db = SessionLocal()
 
-print("="*80)
+print("=" * 80)
 print("VENDA 202602130001 - ANÁLISE COMPLETA".center(80))
-print("="*80)
+print("=" * 80)
 
 # Buscar venda
-venda = db.execute(text("""
+venda = db.execute(
+    text("""
     SELECT id, numero_venda, total
     FROM vendas
     WHERE numero_venda = '202602130001'
-""")).fetchone()
+""")
+).fetchone()
 
 print(f"\nVenda ID {venda[0]}: {venda[1]}")
 print(f"Total: R$ {venda[2]:.2f}")
 
 # Buscar pagamentos da venda
-print("\n" + "="*80)
+print("\n" + "=" * 80)
 print("PAGAMENTOS".center(80))
-print("="*80)
+print("=" * 80)
 
-pagamentos = db.execute(text("""
+pagamentos = db.execute(
+    text("""
     SELECT 
         vp.id,
         vp.valor,
@@ -43,7 +49,9 @@ pagamentos = db.execute(text("""
     FROM venda_pagamentos vp
     LEFT JOIN formas_pagamento fp ON LOWER(fp.nome) = LOWER(vp.forma_pagamento)
     WHERE vp.venda_id = :venda_id
-"""), {"venda_id": venda[0]}).fetchall()
+"""),
+    {"venda_id": venda[0]},
+).fetchall()
 
 print(f"\n{len(pagamentos)} pagamentos encontrados:")
 for pag in pagamentos:
@@ -56,10 +64,11 @@ for pag in pagamentos:
     print(f"      Forma Nome (join): {pag[6]}")
     print(f"      Taxa Percentual Padrão: {pag[8]}%")
     print(f"      Taxas por Parcela JSON: {pag[7]}")
-    
+
     # Calcular taxa correta
     if pag[7] and pag[3]:
         import json
+
         taxas_json = json.loads(pag[7])
         taxa_parcela = taxas_json.get(str(pag[3]))
         if taxa_parcela:
@@ -67,7 +76,9 @@ for pag in pagamentos:
             print(f"      >>> Taxa para {pag[3]} parcelas: {taxa_parcela}%")
             print(f"      >>> Valor da taxa: R$ {valor_taxa:.2f}")
         else:
-            print(f"      >>> Parcela {pag[3]} não encontrada no JSON, usando taxa padrão")
+            print(
+                f"      >>> Parcela {pag[3]} não encontrada no JSON, usando taxa padrão"
+            )
             if pag[8]:
                 valor_taxa = float(pag[1]) * (float(pag[8]) / 100)
                 print(f"      >>> Valor da taxa (padrão): R$ {valor_taxa:.2f}")
