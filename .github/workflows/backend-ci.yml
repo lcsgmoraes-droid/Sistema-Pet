@@ -555,9 +555,13 @@ jobs:
         run: |
           ruff format --check tests/unit
 
-      - name: Backend remaining tests format (blocking)
+      - name: Backend tests format (blocking)
         run: |
-          ruff format --check ../tests tests/domain
+          ruff format --check ../tests tests
+
+      - name: Backend migrations format (blocking)
+        run: |
+          ruff format --check migrations
 
       - name: Lint (non-blocking)
         run: |

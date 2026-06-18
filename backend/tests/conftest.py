@@ -4,6 +4,7 @@ Minimal conftest for unit and legacy integration-style tests.
 The legacy root tests import ORM models during collection, so test defaults must
 exist before those imports happen.
 """
+
 import sys
 import os
 
@@ -24,7 +25,9 @@ if backend_dir not in sys.path:
 DEFAULT_TEST_DATABASE_URL = "sqlite://"
 os.environ.setdefault("DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
 os.environ.setdefault("ENVIRONMENT", "test")
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-security")
+os.environ.setdefault(
+    "JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-security"
+)
 
 TEST_DATABASE_URL = os.environ["DATABASE_URL"]
 
@@ -73,7 +76,11 @@ def _create_sqlite_schema(engine) -> None:
     from app.db.migration_check import _get_alembic_head
 
     with engine.begin() as conn:
-        conn.execute(text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(64) NOT NULL)"))
+        conn.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(64) NOT NULL)"
+            )
+        )
         conn.execute(text("DELETE FROM alembic_version"))
         conn.execute(
             text("INSERT INTO alembic_version (version_num) VALUES (:version)"),
@@ -142,7 +149,9 @@ def tenant_context():
 @pytest.fixture(scope="session")
 def db_engine():
     """Create database engine for tests."""
-    engine = create_engine(TEST_DATABASE_URL, **_create_engine_kwargs(TEST_DATABASE_URL))
+    engine = create_engine(
+        TEST_DATABASE_URL, **_create_engine_kwargs(TEST_DATABASE_URL)
+    )
     if _is_sqlite_url(TEST_DATABASE_URL):
         _create_sqlite_schema(engine)
     yield engine
@@ -163,4 +172,3 @@ def db_session(db_engine):
         session.close()
         transaction.rollback()
         connection.close()
-

@@ -83,9 +83,7 @@ def e2e_config() -> E2EConfig:
     ]
     missing = [name for name in required if not os.getenv(name)]
     if missing:
-        pytest.skip(
-            "Plano Basico E2E skipped; missing env vars: " + ", ".join(missing)
-        )
+        pytest.skip("Plano Basico E2E skipped; missing env vars: " + ", ".join(missing))
 
     base_url = os.environ["E2E_BASE_URL"].rstrip("/")
     if "mlprohub.com.br" in base_url and not _env_bool("E2E_ALLOW_PRODUCTION"):

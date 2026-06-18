@@ -33,14 +33,15 @@ def run_migration():
     print("=" * 80)
     print("MIGRATION: Criar Tabelas WhatsApp + IA")
     print("=" * 80)
-    
+
     try:
         # Criar session usando get_session
         db = next(get_session())
-        
+
         # 1. Tabela de Configuração por Tenant
         print("\n[1/4] Criando tabela tenant_whatsapp_config...")
-        db.execute(text("""
+        db.execute(
+            text("""
             CREATE TABLE IF NOT EXISTS tenant_whatsapp_config (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 tenant_id UUID NOT NULL,
@@ -76,15 +77,21 @@ def run_migration():
                 
                 FOREIGN KEY (tenant_id) REFERENCES tenants(id)
             )
-        """))
+        """)
+        )
         print("✅ tenant_whatsapp_config criada")
-        
+
         # Índices
-        db.execute(text("CREATE INDEX IF NOT EXISTS idx_whatsapp_config_tenant ON tenant_whatsapp_config(tenant_id)"))
-        
+        db.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_whatsapp_config_tenant ON tenant_whatsapp_config(tenant_id)"
+            )
+        )
+
         # 2. Tabela de Sessões
         print("\n[2/4] Criando tabela whatsapp_ia_sessions...")
-        db.execute(text("""
+        db.execute(
+            text("""
             CREATE TABLE IF NOT EXISTS whatsapp_ia_sessions (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 tenant_id UUID NOT NULL,
@@ -109,17 +116,31 @@ def run_migration():
                 FOREIGN KEY (cliente_id) REFERENCES clientes(id),
                 FOREIGN KEY (assigned_to) REFERENCES users(id)
             )
-        """))
+        """)
+        )
         print("✅ whatsapp_ia_sessions criada")
-        
+
         # Índices
-        db.execute(text("CREATE INDEX IF NOT EXISTS idx_session_tenant_status ON whatsapp_ia_sessions(tenant_id, status, last_message_at)"))
-        db.execute(text("CREATE INDEX IF NOT EXISTS idx_session_phone ON whatsapp_ia_sessions(phone_number, tenant_id)"))
-        db.execute(text("CREATE INDEX IF NOT EXISTS idx_session_cliente ON whatsapp_ia_sessions(cliente_id, tenant_id)"))
-        
+        db.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_session_tenant_status ON whatsapp_ia_sessions(tenant_id, status, last_message_at)"
+            )
+        )
+        db.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_session_phone ON whatsapp_ia_sessions(phone_number, tenant_id)"
+            )
+        )
+        db.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_session_cliente ON whatsapp_ia_sessions(cliente_id, tenant_id)"
+            )
+        )
+
         # 3. Tabela de Mensagens
         print("\n[3/4] Criando tabela whatsapp_ia_messages...")
-        db.execute(text("""
+        db.execute(
+            text("""
             CREATE TABLE IF NOT EXISTS whatsapp_ia_messages (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 session_id UUID NOT NULL,
@@ -152,17 +173,31 @@ def run_migration():
                 FOREIGN KEY (tenant_id) REFERENCES tenants(id),
                 FOREIGN KEY (sent_by_user_id) REFERENCES users(id)
             )
-        """))
+        """)
+        )
         print("✅ whatsapp_ia_messages criada")
-        
+
         # Índices
-        db.execute(text("CREATE INDEX IF NOT EXISTS idx_message_session ON whatsapp_ia_messages(session_id, created_at)"))
-        db.execute(text("CREATE INDEX IF NOT EXISTS idx_message_tenant ON whatsapp_ia_messages(tenant_id, created_at)"))
-        db.execute(text("CREATE INDEX IF NOT EXISTS idx_message_whatsapp_id ON whatsapp_ia_messages(whatsapp_message_id)"))
-        
+        db.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_message_session ON whatsapp_ia_messages(session_id, created_at)"
+            )
+        )
+        db.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_message_tenant ON whatsapp_ia_messages(tenant_id, created_at)"
+            )
+        )
+        db.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_message_whatsapp_id ON whatsapp_ia_messages(whatsapp_message_id)"
+            )
+        )
+
         # 4. Tabela de Métricas
         print("\n[4/4] Criando tabela whatsapp_ia_metrics...")
-        db.execute(text("""
+        db.execute(
+            text("""
             CREATE TABLE IF NOT EXISTS whatsapp_ia_metrics (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 tenant_id UUID NOT NULL,
@@ -179,15 +214,20 @@ def run_migration():
                 
                 FOREIGN KEY (tenant_id) REFERENCES tenants(id)
             )
-        """))
+        """)
+        )
         print("✅ whatsapp_ia_metrics criada")
-        
+
         # Índice
-        db.execute(text("CREATE INDEX IF NOT EXISTS idx_metric_tenant_time ON whatsapp_ia_metrics(tenant_id, timestamp)"))
-        
+        db.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_metric_tenant_time ON whatsapp_ia_metrics(tenant_id, timestamp)"
+            )
+        )
+
         # Commit
         db.commit()
-        
+
         print("\n" + "=" * 80)
         print("✅ MIGRATION CONCLUÍDA COM SUCESSO!")
         print("=" * 80)
@@ -198,10 +238,11 @@ def run_migration():
         print("  ✓ whatsapp_ia_metrics")
         print("\nÍndices criados: 8")
         print("\n🚀 Sistema pronto para receber configurações WhatsApp!")
-        
+
     except Exception as e:
         print(f"\n❌ ERRO na migration: {e}")
         import traceback
+
         traceback.print_exc()
         raise
     finally:

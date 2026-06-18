@@ -38,7 +38,9 @@ def db_session():
     """
     Cria sessão de teste com transação REAL para rollback.
     """
-    engine = create_engine("postgresql://postgres:postgres@localhost:5432/sistemapet_test")
+    engine = create_engine(
+        "postgresql://postgres:postgres@localhost:5432/sistemapet_test"
+    )
     connection = engine.connect()
     transaction = connection.begin()
     Session = sessionmaker(bind=connection)
@@ -46,7 +48,9 @@ def db_session():
 
     # Garantir que tenant_id está disponível
     @event.listens_for(session, "before_cursor_execute", retval=True)
-    def receive_before_cursor_execute(conn, cursor, statement, params, context, executemany):
+    def receive_before_cursor_execute(
+        conn, cursor, statement, params, context, executemany
+    ):
         if isinstance(params, dict) and "tenant_id" not in params:
             params["tenant_id"] = "test_tenant"
         return statement, params
@@ -88,7 +92,7 @@ def cenario_venda_com_comissoes(db_session):
                 CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             )
         """),
-        {"tenant_id": tenant_id}
+        {"tenant_id": tenant_id},
     )
 
     # ============================================================
@@ -104,7 +108,7 @@ def cenario_venda_com_comissoes(db_session):
             (8002, 'Vendedor B - Fornecedor', '22222222222', 'pessoa_fisica', 1, :tenant_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
             (8003, 'Vendedor C - Fornecedor', '33333333333', 'pessoa_fisica', 1, :tenant_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """),
-        {"tenant_id": tenant_id}
+        {"tenant_id": tenant_id},
     )
 
     # ============================================================
@@ -121,7 +125,7 @@ def cenario_venda_com_comissoes(db_session):
             (7002, 'Vendedor B', 'vendedorB@test.com', 'hash456', 'vendedor', 1, 10, :tenant_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
             (7003, 'Vendedor C', 'vendedorC@test.com', 'hash789', 'vendedor', 1, 15, :tenant_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """),
-        {"tenant_id": tenant_id}
+        {"tenant_id": tenant_id},
     )
 
     # ============================================================
@@ -137,7 +141,7 @@ def cenario_venda_com_comissoes(db_session):
                 :tenant_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             )
         """),
-        {"tenant_id": tenant_id}
+        {"tenant_id": tenant_id},
     )
 
     # ============================================================
@@ -153,7 +157,7 @@ def cenario_venda_com_comissoes(db_session):
             (5002, 'Produto B', 150.00, 1, 10, 1, :tenant_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
             (5003, 'Produto C', 200.00, 1, 10, 1, :tenant_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """),
-        {"tenant_id": tenant_id}
+        {"tenant_id": tenant_id},
     )
 
     # ============================================================
@@ -174,7 +178,7 @@ def cenario_venda_com_comissoes(db_session):
                 7001, :tenant_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             )
         """),
-        {"tenant_id": tenant_id, "data_venda": data_venda}
+        {"tenant_id": tenant_id, "data_venda": data_venda},
     )
 
     # ============================================================
@@ -191,7 +195,7 @@ def cenario_venda_com_comissoes(db_session):
             (3002, 4001, 5002, 1, 150.00, 150.00, 0.00, :tenant_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
             (3003, 4001, 5003, 1, 200.00, 200.00, 0.00, :tenant_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """),
-        {"tenant_id": tenant_id}
+        {"tenant_id": tenant_id},
     )
 
     # ============================================================
@@ -228,7 +232,7 @@ def cenario_venda_com_comissoes(db_session):
                 :tenant_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             )
         """),
-        {"tenant_id": tenant_id}
+        {"tenant_id": tenant_id},
     )
 
     db_session.commit()
@@ -238,11 +242,13 @@ def cenario_venda_com_comissoes(db_session):
         "tenant_id": tenant_id,
         "comissoes_ids": [2001, 2002, 2003],
         "funcionarios_ids": [7001, 7002, 7003],
-        "valores_comissoes": [Decimal("10.00"), Decimal("15.00"), Decimal("20.00")]
+        "valores_comissoes": [Decimal("10.00"), Decimal("15.00"), Decimal("20.00")],
     }
 
 
-def test_provisionar_comissoes_rollback_on_exception(db_session, cenario_venda_com_comissoes):
+def test_provisionar_comissoes_rollback_on_exception(
+    db_session, cenario_venda_com_comissoes
+):
     """
     TESTE: Provisão de comissões com rollback completo ao falhar no meio.
 
@@ -264,7 +270,15 @@ def test_provisionar_comissoes_rollback_on_exception(db_session, cenario_venda_c
     # ============================================================
     call_count = {"count": 0}
 
-    def atualizar_dre_mock(db, tenant_id, dre_subcategoria_id, canal, valor, data_lancamento, tipo_movimentacao):
+    def atualizar_dre_mock(
+        db,
+        tenant_id,
+        dre_subcategoria_id,
+        canal,
+        valor,
+        data_lancamento,
+        tipo_movimentacao,
+    ):
         call_count["count"] += 1
         if call_count["count"] == 2:
             # Na 2ª comissão, lançar exceção
@@ -275,12 +289,13 @@ def test_provisionar_comissoes_rollback_on_exception(db_session, cenario_venda_c
     # ============================================================
     # EXECUTAR: Deve lançar exceção
     # ============================================================
-    with patch("app.comissoes_provisao.atualizar_dre_por_lancamento", side_effect=atualizar_dre_mock):
+    with patch(
+        "app.comissoes_provisao.atualizar_dre_por_lancamento",
+        side_effect=atualizar_dre_mock,
+    ):
         with pytest.raises(Exception, match="ERRO SIMULADO"):
             provisionar_comissoes_venda(
-                venda_id=venda_id,
-                tenant_id=tenant_id,
-                db=db_session
+                venda_id=venda_id, tenant_id=tenant_id, db=db_session
             )
 
     # ============================================================
@@ -297,7 +312,7 @@ def test_provisionar_comissoes_rollback_on_exception(db_session, cenario_venda_c
             FROM contas_pagar
             WHERE tenant_id = :tenant_id
         """),
-        {"tenant_id": tenant_id}
+        {"tenant_id": tenant_id},
     )
     total_contas = result_contas.fetchone()[0]
     assert total_contas == 0, (
@@ -315,7 +330,7 @@ def test_provisionar_comissoes_rollback_on_exception(db_session, cenario_venda_c
             WHERE tenant_id = :tenant_id
             AND dre_subcategoria_id = 6001
         """),
-        {"tenant_id": tenant_id}
+        {"tenant_id": tenant_id},
     )
     total_dre = result_dre.fetchone()[0]
     assert total_dre == 0, (
@@ -337,7 +352,7 @@ def test_provisionar_comissoes_rollback_on_exception(db_session, cenario_venda_c
             WHERE venda_id = :venda_id
             ORDER BY id
         """),
-        {"venda_id": venda_id}
+        {"venda_id": venda_id},
     )
     comissoes = result_comissoes.fetchall()
 
@@ -360,24 +375,26 @@ def test_provisionar_comissoes_rollback_on_exception(db_session, cenario_venda_c
     # ============================================================
     # ✅ SUCESSO: Rollback total confirmado
     # ============================================================
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("✅ TESTE PASSOU: Rollback total confirmado!")
-    print("="*80)
+    print("=" * 80)
     print("✅ 0 contas a pagar criadas (esperado: 0)")
     print("✅ 0 lançamentos DRE registrados (esperado: 0)")
     print("✅ 3 comissões permanecem comissao_provisionada = 0")
     print("✅ 3 comissões permanecem conta_pagar_id = NULL")
     print("✅ 3 comissões permanecem data_provisao = NULL")
-    print("="*80)
+    print("=" * 80)
     print("CONCLUSÃO: transactional_session GARANTE atomicidade completa.")
     print("Mesmo com exceção após processar 1 comissão, NADA foi persistido.")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
 
-def test_provisionar_comissoes_sucesso_sem_mock(db_session, cenario_venda_com_comissoes):
+def test_provisionar_comissoes_sucesso_sem_mock(
+    db_session, cenario_venda_com_comissoes
+):
     """
     TESTE CONTROLE: Provisão completa SEM mock (deve ter sucesso).
-    
+
     Prova que a função funciona corretamente quando NÃO há exceções.
     """
     venda_id = cenario_venda_com_comissoes["venda_id"]
@@ -387,9 +404,7 @@ def test_provisionar_comissoes_sucesso_sem_mock(db_session, cenario_venda_com_co
     # EXECUTAR: Sem mock, deve ter sucesso
     # ============================================================
     resultado = provisionar_comissoes_venda(
-        venda_id=venda_id,
-        tenant_id=tenant_id,
-        db=db_session
+        venda_id=venda_id, tenant_id=tenant_id, db=db_session
     )
 
     # ============================================================
@@ -410,7 +425,7 @@ def test_provisionar_comissoes_sucesso_sem_mock(db_session, cenario_venda_com_co
             FROM contas_pagar
             WHERE tenant_id = :tenant_id
         """),
-        {"tenant_id": tenant_id}
+        {"tenant_id": tenant_id},
     )
     total_contas = result_contas.fetchone()[0]
     assert total_contas == 3, f"Esperado 3 contas a pagar, encontrado {total_contas}"
@@ -423,15 +438,17 @@ def test_provisionar_comissoes_sucesso_sem_mock(db_session, cenario_venda_com_co
             WHERE venda_id = :venda_id
             AND comissao_provisionada = 1
         """),
-        {"venda_id": venda_id}
+        {"venda_id": venda_id},
     )
     total_provisionadas = result_comissoes.fetchone()[0]
-    assert total_provisionadas == 3, f"Esperado 3 comissões provisionadas, encontrado {total_provisionadas}"
+    assert total_provisionadas == 3, (
+        f"Esperado 3 comissões provisionadas, encontrado {total_provisionadas}"
+    )
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("✅ TESTE CONTROLE PASSOU: Provisão completa com sucesso!")
-    print("="*80)
+    print("=" * 80)
     print("✅ 3 contas a pagar criadas")
     print("✅ 3 comissões marcadas como provisionadas")
     print("✅ Valor total: R$ 45.00")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")

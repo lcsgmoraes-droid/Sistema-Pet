@@ -1,6 +1,7 @@
 """
 Testes de autenticação e JWT
 """
+
 import jwt
 import os
 from datetime import datetime, timezone
@@ -8,8 +9,7 @@ from datetime import datetime, timezone
 
 def _login_and_select_tenant(client, email: str, password: str, tenant_id: str):
     login_response = client.post(
-        "/auth/login-multitenant",
-        json={"email": email, "password": password}
+        "/auth/login-multitenant", json={"email": email, "password": password}
     )
     assert login_response.status_code == 200
     login_token = login_response.json()["access_token"]
@@ -17,12 +17,14 @@ def _login_and_select_tenant(client, email: str, password: str, tenant_id: str):
     return client.post(
         "/auth/select-tenant",
         json={"tenant_id": str(tenant_id)},
-        headers={"Authorization": f"Bearer {login_token}"}
+        headers={"Authorization": f"Bearer {login_token}"},
     )
 
 
 def _jwt_payload(token: str) -> dict:
-    secret_key = os.getenv("JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-security")
+    secret_key = os.getenv(
+        "JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-security"
+    )
     return jwt.decode(token, secret_key, algorithms=["HS256"])
 
 
@@ -37,39 +39,33 @@ def test_login_returns_jwt_token(client, tenant_factory, user_factory):
     """
     tenant = tenant_factory()
     password = "TestPassword@123"
-    user_factory(
-        tenant_id=tenant.id,
-        email="login@test.com",
-        password=password
-    )
-    
+    user_factory(tenant_id=tenant.id, email="login@test.com", password=password)
+
     response = client.post(
         "/auth/login-multitenant",
-        json={"email": "login@test.com", "password": password}
+        json={"email": "login@test.com", "password": password},
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert "access_token" in data
     assert data["token_type"] == "bearer"
 
 
-def test_login_returns_short_access_token_and_refresh_token(client, tenant_factory, user_factory):
+def test_login_returns_short_access_token_and_refresh_token(
+    client, tenant_factory, user_factory
+):
     """
     Testa que login usa access token curto e refresh token separado.
     Protege: reducao de janela de uso de token roubado.
     """
     tenant = tenant_factory()
     password = "TestPassword@123"
-    user_factory(
-        tenant_id=tenant.id,
-        email="short-token@test.com",
-        password=password
-    )
+    user_factory(tenant_id=tenant.id, email="short-token@test.com", password=password)
 
     response = client.post(
         "/auth/login-multitenant",
-        json={"email": "short-token@test.com", "password": password}
+        json={"email": "short-token@test.com", "password": password},
     )
 
     assert response.status_code == 200
@@ -95,30 +91,28 @@ def test_jwt_contains_tenant_id(client, tenant_factory, user_factory):
     """
     tenant = tenant_factory(nome="Tenant JWT Test")
     password = "Pass@123"
-    user = user_factory(
-        tenant_id=tenant.id,
-        email="jwt@test.com",
-        password=password
-    )
-    
+    user = user_factory(tenant_id=tenant.id, email="jwt@test.com", password=password)
+
     response = _login_and_select_tenant(
         client,
         "jwt@test.com",
         password,
         tenant.id,
     )
-    
+
     assert response.status_code == 200
     token = response.json()["access_token"]
-    
+
     payload = _jwt_payload(token)
-    
+
     assert "tenant_id" in payload
     assert payload["tenant_id"] == str(tenant.id)
     assert payload["sub"] == str(user.id)
 
 
-def test_refresh_token_renews_selected_tenant_access_token(client, tenant_factory, user_factory):
+def test_refresh_token_renews_selected_tenant_access_token(
+    client, tenant_factory, user_factory
+):
     """
     Testa que refresh token renova access token mantendo tenant selecionado.
     Protege: renovacao automatica sem perder contexto multi-tenant.
@@ -126,9 +120,7 @@ def test_refresh_token_renews_selected_tenant_access_token(client, tenant_factor
     tenant = tenant_factory(nome="Tenant Refresh Test")
     password = "Pass@123"
     user = user_factory(
-        tenant_id=tenant.id,
-        email="refresh@test.com",
-        password=password
+        tenant_id=tenant.id, email="refresh@test.com", password=password
     )
 
     select_response = _login_and_select_tenant(
@@ -161,7 +153,9 @@ def test_refresh_token_renews_selected_tenant_access_token(client, tenant_factor
     assert refresh_payload["tenant_id"] == str(tenant.id)
 
 
-def test_refresh_token_cannot_access_protected_routes(client, tenant_factory, user_factory):
+def test_refresh_token_cannot_access_protected_routes(
+    client, tenant_factory, user_factory
+):
     """
     Testa que refresh token nao funciona como bearer de API.
     Protege: separacao entre credencial de renovacao e acesso.
@@ -169,9 +163,7 @@ def test_refresh_token_cannot_access_protected_routes(client, tenant_factory, us
     tenant = tenant_factory(nome="Tenant Refresh Bearer Test")
     password = "Pass@123"
     user_factory(
-        tenant_id=tenant.id,
-        email="refresh-bearer@test.com",
-        password=password
+        tenant_id=tenant.id, email="refresh-bearer@test.com", password=password
     )
 
     select_response = _login_and_select_tenant(
@@ -199,9 +191,7 @@ def test_refresh_fails_after_logout(client, tenant_factory, user_factory):
     tenant = tenant_factory(nome="Tenant Refresh Logout Test")
     password = "Pass@123"
     user_factory(
-        tenant_id=tenant.id,
-        email="refresh-logout@test.com",
-        password=password
+        tenant_id=tenant.id, email="refresh-logout@test.com", password=password
     )
 
     select_response = _login_and_select_tenant(
@@ -234,16 +224,14 @@ def test_login_with_invalid_credentials_fails(client, tenant_factory, user_facto
     """
     tenant = tenant_factory()
     user_factory(
-        tenant_id=tenant.id,
-        email="valid@test.com",
-        password="CorrectPassword@123"
+        tenant_id=tenant.id, email="valid@test.com", password="CorrectPassword@123"
     )
-    
+
     response = client.post(
         "/auth/login-multitenant",
-        json={"email": "valid@test.com", "password": "WrongPassword"}
+        json={"email": "valid@test.com", "password": "WrongPassword"},
     )
-    
+
     assert response.status_code in [401, 403]
 
 
@@ -253,13 +241,13 @@ def test_auth_headers_contain_valid_jwt(auth_headers):
     Protege: infraestrutura de testes autenticados.
     """
     headers, tenant, user = auth_headers()
-    
+
     assert "Authorization" in headers
     assert headers["Authorization"].startswith("Bearer ")
-    
+
     token = headers["Authorization"].split(" ")[1]
     payload = _jwt_payload(token)
-    
+
     assert payload["tenant_id"] == str(tenant.id)
     assert payload["sub"] == str(user.id)
     assert payload["exp"] > datetime.utcnow().timestamp()

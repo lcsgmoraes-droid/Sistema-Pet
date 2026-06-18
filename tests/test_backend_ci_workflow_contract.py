@@ -929,11 +929,18 @@ def test_backend_ci_has_blocking_backend_unit_tests_format_step():
     assert "ruff format --check tests/unit" in source
 
 
-def test_backend_ci_has_blocking_backend_remaining_tests_format_step():
+def test_backend_ci_has_blocking_backend_tests_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
-    assert "Backend remaining tests format (blocking)" in source
-    assert "ruff format --check ../tests tests/domain" in source
+    assert "Backend tests format (blocking)" in source
+    assert "ruff format --check ../tests tests" in source
+
+
+def test_backend_ci_has_blocking_backend_migrations_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend migrations format (blocking)" in source
+    assert "ruff format --check migrations" in source
 
 
 def test_backend_ci_has_blocking_backend_operational_stock_cash_format_step():
