@@ -6,6 +6,7 @@ from decimal import Decimal
 import io
 import logging
 import re
+import unicodedata
 from typing import List, Optional
 import xml.etree.ElementTree as ET
 
@@ -178,13 +179,105 @@ def _estoque_disponivel_saida_full_nf(
     return float(getattr(produto, "estoque_atual", 0) or 0)
 
 
-SKU_EXPLICITO_REGEX = re.compile(
-    r"(?:SKU|C[ÓO]DIGO)\s*[:#-]?\s*([A-Z0-9._/-]+)", re.IGNORECASE
-)
-QTD_EXPLICITA_REGEX = re.compile(
-    r"(?:QTD|QUANTIDADE)\s*[:#-]?\s*(\d+(?:[\.,]\d+)?)", re.IGNORECASE
-)
-SKU_QTD_LINHA_REGEX = re.compile(r"^([A-Za-z0-9._\-/]{3,})\s+(\d+(?:[\.,]\d+)?)$")
+SKU_ROTULOS_EXPLICITOS = ("SKU", "CODIGO")
+QTD_ROTULOS_EXPLICITOS = ("QTD", "QUANTIDADE")
+
+
+def _texto_busca_sem_acento(value: str) -> str:
+    return "".join(
+        char
+        for char in unicodedata.normalize("NFD", value)
+        if unicodedata.category(char) != "Mn"
+    ).upper()
+
+
+def _char_sku_valido(char: str) -> bool:
+    return char.isascii() and (char.isalnum() or char in "._/-")
+
+
+def _posicao_valor_apos_rotulo(linha: str, rotulo: str) -> Optional[int]:
+    texto_busca = _texto_busca_sem_acento(linha)
+    inicio = texto_busca.find(rotulo)
+
+    while inicio >= 0:
+        if inicio > 0 and texto_busca[inicio - 1].isalnum():
+            inicio = texto_busca.find(rotulo, inicio + 1)
+            continue
+
+        posicao = inicio + len(rotulo)
+        while posicao < len(linha) and linha[posicao].isspace():
+            posicao += 1
+        if posicao < len(linha) and linha[posicao] in ":#-":
+            posicao += 1
+        while posicao < len(linha) and linha[posicao].isspace():
+            posicao += 1
+        return posicao if posicao < len(linha) else None
+
+    return None
+
+
+def _extrair_sku_explicito(linha: str) -> Optional[str]:
+    for rotulo in SKU_ROTULOS_EXPLICITOS:
+        posicao = _posicao_valor_apos_rotulo(linha, rotulo)
+        if posicao is None:
+            continue
+
+        inicio = posicao
+        while posicao < len(linha) and _char_sku_valido(linha[posicao]):
+            posicao += 1
+        if posicao > inicio:
+            return linha[inicio:posicao].strip()
+
+    return None
+
+
+def _consumir_numero_quantidade(value: str, posicao: int = 0) -> Optional[str]:
+    if posicao >= len(value) or not value[posicao].isdigit():
+        return None
+
+    inicio = posicao
+    while posicao < len(value) and value[posicao].isdigit():
+        posicao += 1
+
+    if posicao < len(value) and value[posicao] in ".,":
+        separador = posicao
+        posicao += 1
+        if posicao < len(value) and value[posicao].isdigit():
+            while posicao < len(value) and value[posicao].isdigit():
+                posicao += 1
+        else:
+            posicao = separador
+
+    return value[inicio:posicao]
+
+
+def _extrair_quantidade_explicita(linha: str) -> Optional[str]:
+    for rotulo in QTD_ROTULOS_EXPLICITOS:
+        posicao = _posicao_valor_apos_rotulo(linha, rotulo)
+        if posicao is None:
+            continue
+
+        quantidade = _consumir_numero_quantidade(linha, posicao)
+        if quantidade:
+            return quantidade
+
+    return None
+
+
+def _extrair_sku_quantidade_linha(linha: str) -> Optional[tuple[str, str]]:
+    partes = linha.split()
+    if len(partes) != 2:
+        return None
+
+    sku, quantidade_texto = partes
+    if len(sku) < 3 or not all(_char_sku_valido(char) for char in sku):
+        return None
+
+    quantidade = _consumir_numero_quantidade(quantidade_texto)
+    if quantidade != quantidade_texto:
+        return None
+
+    return sku, quantidade
 
 
 def _to_float_br(value: str) -> float:
@@ -203,19 +296,18 @@ def _extrair_itens_full_pdf(texto: str) -> List[dict]:
         if not linha:
             continue
 
-        sku_match = SKU_EXPLICITO_REGEX.search(linha)
-        qtd_match = QTD_EXPLICITA_REGEX.search(linha)
-        if sku_match and qtd_match:
-            sku = sku_match.group(1).strip()
-            qtd = _to_float_br(qtd_match.group(1))
+        sku = _extrair_sku_explicito(linha)
+        quantidade = _extrair_quantidade_explicita(linha)
+        if sku and quantidade:
+            qtd = _to_float_br(quantidade)
             if qtd > 0:
                 itens_por_sku[sku] += qtd
             continue
 
-        linha_match = SKU_QTD_LINHA_REGEX.match(linha)
-        if linha_match:
-            sku = linha_match.group(1).strip()
-            qtd = _to_float_br(linha_match.group(2))
+        linha_item = _extrair_sku_quantidade_linha(linha)
+        if linha_item:
+            sku, quantidade = linha_item
+            qtd = _to_float_br(quantidade)
             if qtd > 0:
                 itens_por_sku[sku] += qtd
 
