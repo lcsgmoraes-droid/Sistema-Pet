@@ -1036,6 +1036,13 @@ def test_backend_ci_has_blocking_backend_ia_finance_parsers_format_step():
     assert "ruff format --check app/ia/aba7_dre_canal.py" in source
 
 
+def test_backend_ci_has_blocking_backend_commissions_diagnostic_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend commissions diagnostic format (blocking)" in source
+    assert "ruff format --check app/comissoes_diagnostico_routes.py" in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
