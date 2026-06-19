@@ -1,8 +1,13 @@
 # Plano mestre de maturidade 10/10
 
-Atualizado em: 2026-05-16
+Atualizado em: 2026-06-19
 
 Este e o guia vivo para acompanhar a analise inicial completa de maturidade do Sistema Pet. Ele existe para nao deixar nenhum bloco para tras.
+
+Estado de 2026-06-19: a rodada 0.5 de CI/lint/format/Sonar foi fechada para
+uso interno profissional. A infraestrutura permanece em manutencao continua;
+novas frentes devem voltar a priorizar produto, regras de negocio e
+refatoracoes seguras.
 
 Regra de uso:
 
@@ -157,6 +162,11 @@ Ja feito:
 - [x] Restore smoke de dump real executado em producao sem tocar o banco principal: backup `/opt/petshop/backups/db/restore_smoke_20260517_135920.dump.gz`, `public_tables=217`, `alembic_rows=1`, container temporario removido e health/watchdog saudaveis depois do teste.
 - [x] Deploy seguro passa a detectar mudancas sem impacto de runtime e pular rebuild/restart quando o diff for apenas docs/workflows/Markdown.
 - [x] Caminho sem rebuild validado em producao em 2026-05-17 no commit `7c390ed8`: deploy normal instalou a logica com backup `/opt/petshop/backups/deploy_20260517_140902`; deploy seguinte no mesmo commit encerrou sem rebuild com backup `/opt/petshop/backups/deploy_20260517_141303`, health `ok` e watchdog `healthy`.
+- [x] Deploy real validado em 2026-06-14 no commit `5ba6a8c43`, com backup
+  operacional `/opt/petshop/backups/deploy_20260614_224744`, dump
+  `/opt/petshop/backups/db/petshop_prod_20260614_225317.dump`, health publico
+  200 healthy e containers `nginx`, `backend`, `worker-bling` e `postgres`
+  saudaveis.
 
 Falta para 10/10:
 
@@ -194,6 +204,13 @@ Ja feito:
 - [x] Migration Smoke automatizado no Backend CI com Postgres descartavel, cobrindo banco limpo e banco historico controlado.
 - [x] Matriz de cobertura critica criada em `docs/auditorias/testes-ci-cobertura-critica.md`.
 - [x] Workflow `E2E Long` criado para execucao manual/agendada da suite longa, separado dos checks rapidos obrigatorios.
+- [x] Smoke CI passou a rodar todos os testes raiz `tests/` antes do smoke de backend/auth.
+- [x] `npm audit --audit-level=moderate`, lint core e format core do frontend
+  estao bloqueantes no Smoke CI.
+- [x] Backend CI possui `ruff check` global bloqueante, alem de blocos por dominio para reduzir diagnostico.
+- [x] Backend CI possui `ruff format --check .` global bloqueante, alem dos blocos por dominio usados durante a migracao.
+- [x] `Quality Gate` aguarda e espelha o check externo `SonarCloud Code Analysis`.
+- [x] Configuracao automatica do SonarCloud ignora caminhos sem runtime e fica alinhada ao `sonar-project.properties`.
 
 Falta para 10/10:
 
@@ -210,6 +227,7 @@ Para manter 10/10:
 - [ ] Toda mudanca de regra critica deve apontar para uma linha da matriz de cobertura.
 - [ ] Suites longas devem continuar manuais/agendadas ate serem rapidas, estaveis e sem segredo obrigatorio.
 - [ ] Se uma area critica nova entrar no produto, atualizar a matriz no mesmo PR.
+- [ ] Nao abrir nova frente apenas de lint/format salvo regressao real; o foco volta para produto e refatoracao de negocio testada.
 
 ## 6. Observabilidade/auditoria
 
@@ -405,6 +423,12 @@ Para manter 10/10:
 | #105 | Testes/CI | Smoke E2E controlado do Plano Basico em tenant de teste |
 | #106 | Testes/CI | Migration Smoke no Backend CI com Postgres descartavel |
 | #107 | Testes/CI | Fechamento 10/10 com matriz de cobertura critica e workflow E2E longo |
+| #481 | Testes/CI | Smoke CI roda todos os testes raiz `tests/` |
+| #482-#486 | Testes/CI | Primeiros pacotes backend com ruff bloqueante por dominio |
+| #623-#657 | Testes/CI | Rodada 0.5 fecha lint/format bloqueante ate `ruff check .` e `ruff format --check .` globais |
+| #653 | Testes/CI/Sonar | `Quality Gate` bloqueia quando SonarCloud externo falha |
+| #654 | Testes/CI/frontend | `npm audit` frontend bloqueante no Smoke CI |
+| #658 | Testes/CI/Sonar | Configuracao automatica do SonarCloud alinhada a caminhos sem runtime e CPD |
 
 ## Criterio para declarar 10/10 geral
 
@@ -423,3 +447,12 @@ Fechamento geral em 2026-05-17:
 - `powershell -ExecutionPolicy Bypass -File .\scripts\fluxo_unico.ps1 release-check` passou.
 - `gh pr list --state open --limit 20` nao retornou PR aberto.
 - Todas as areas do placar geral estao em 10/10 para uso interno profissional.
+
+Revalidacao em 2026-06-19:
+
+- Main limpa em `76097bb0c` apos PR #658.
+- `cmd /c FLUXO_UNICO.bat check` passou.
+- PR #658 passou em `MCP tests`, `Fluxo unico safety`, `Smoke test`,
+  `Tests & Quality`, `Migration Smoke`, `Security CI`, `SonarCloud Code
+  Analysis` e `Quality Gate`.
+- Item 0.5 de lint/format/Sonar fica fechado como manutencao continua.

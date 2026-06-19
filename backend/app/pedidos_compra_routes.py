@@ -24,6 +24,7 @@ TODO - Integração com IA (Fase Futura):
    - Identificar padrões de preço
    - Recomendar melhores fornecedores por produto
 """
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
@@ -45,14 +46,21 @@ from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
 from .models import Cliente, FornecedorGrupo
 from .produtos_models import (
-    Produto, ProdutoLote, EstoqueMovimentacao, 
-    PedidoCompra, PedidoCompraItem, PedidoCompraNotaEntrada, ProdutoFornecedor, Marca,
-    GranelConversao
+    Produto,
+    ProdutoLote,
+    EstoqueMovimentacao,
+    PedidoCompra,
+    PedidoCompraItem,
+    PedidoCompraNotaEntrada,
+    ProdutoFornecedor,
+    Marca,
+    GranelConversao,
 )
 from .vendas_models import Venda, VendaItem
 from .services.email_service import is_email_configured, send_email
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/pedidos-compra", tags=["Pedidos de Compra"])
@@ -72,13 +80,15 @@ PEDIDO_EXPORT_COLUNAS_FINANCEIRAS = {"preco_unitario", "desconto", "total"}
 # SCHEMAS
 # ============================================================================
 
+
 class PedidoCompraItemRequest(BaseModel):
     """Schema para item do pedido"""
+
     produto_id: int
     quantidade_pedida: float = Field(gt=0)
     preco_unitario: float = Field(ge=0)
     desconto_item: float = Field(default=0, ge=0)
-    
+
     # IA (futuro)
     sugestao_ia: bool = False
     motivo_ia: Optional[str] = None
@@ -86,13 +96,14 @@ class PedidoCompraItemRequest(BaseModel):
 
 class PedidoCompraRequest(BaseModel):
     """Schema para criar/editar pedido"""
+
     fornecedor_id: int
     data_prevista_entrega: Optional[datetime] = None
     valor_frete: float = Field(default=0, ge=0)
     valor_desconto: float = Field(default=0, ge=0)
     observacoes: Optional[str] = None
     itens: List[PedidoCompraItemRequest]
-    
+
     # IA (futuro)
     sugestao_ia: bool = False
     confianca_ia: Optional[float] = None
@@ -101,18 +112,21 @@ class PedidoCompraRequest(BaseModel):
 
 class RecebimentoItemRequest(BaseModel):
     """Schema para receber item"""
+
     item_id: int
     quantidade_recebida: float = Field(gt=0)
 
 
 class RecebimentoPedidoRequest(BaseModel):
     """Schema para recebimento de pedido"""
+
     itens: List[RecebimentoItemRequest]
     data_recebimento: Optional[datetime] = None
 
 
 class PedidoCompraResponse(BaseModel):
     """Schema de resposta do pedido"""
+
     id: int
     numero_pedido: str
     fornecedor_id: int
@@ -125,7 +139,7 @@ class PedidoCompraResponse(BaseModel):
     data_prevista_entrega: Optional[datetime]
     observacoes: Optional[str]
     itens_count: int
-    
+
     model_config = {"from_attributes": True}
 
 
@@ -137,22 +151,28 @@ class PedidoCompraEnvioFormatos(BaseModel):
 class PedidoCompraEnviarRequest(BaseModel):
     email: Optional[str] = None
     whatsapp: Optional[str] = None
-    formatos: PedidoCompraEnvioFormatos = Field(default_factory=PedidoCompraEnvioFormatos)
-    colunas_exportacao: List[str] = Field(default_factory=lambda: PEDIDO_EXPORT_COLUNAS_DEFAULT.copy())
+    formatos: PedidoCompraEnvioFormatos = Field(
+        default_factory=PedidoCompraEnvioFormatos
+    )
+    colunas_exportacao: List[str] = Field(
+        default_factory=lambda: PEDIDO_EXPORT_COLUNAS_DEFAULT.copy()
+    )
     envio_manual: bool = False
 
 
-def _buscar_fornecedor_pedido(db: Session, tenant_id: int, pedido: PedidoCompra) -> Optional[Cliente]:
-    return db.query(Cliente).filter(
-        Cliente.id == pedido.fornecedor_id,
-        Cliente.tenant_id == tenant_id
-    ).first()
+def _buscar_fornecedor_pedido(
+    db: Session, tenant_id: int, pedido: PedidoCompra
+) -> Optional[Cliente]:
+    return (
+        db.query(Cliente)
+        .filter(Cliente.id == pedido.fornecedor_id, Cliente.tenant_id == tenant_id)
+        .first()
+    )
 
 
 def _formatar_token_nome(texto: str) -> str:
     return " ".join(
-        token.capitalize() if token.isupper() else token
-        for token in str(texto).split()
+        token.capitalize() if token.isupper() else token for token in str(texto).split()
     )
 
 
@@ -160,7 +180,11 @@ def _normalizar_texto_nome_arquivo(texto: Optional[str]) -> str:
     if not texto:
         return ""
 
-    texto_ascii = unicodedata.normalize("NFKD", str(texto)).encode("ascii", "ignore").decode("ascii")
+    texto_ascii = (
+        unicodedata.normalize("NFKD", str(texto))
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
     texto_limpo = re.sub(r"[^A-Za-z0-9._ -]+", " ", texto_ascii)
     texto_limpo = re.sub(r"\s+", " ", texto_limpo).strip(" ._-")
     return texto_limpo
@@ -172,10 +196,7 @@ def _extrair_nome_curto_fornecedor(fornecedor_nome: Optional[str]) -> str:
         return "Fornecedor"
 
     tokens = nome_limpo.split()
-    ignorar = {
-        "DE", "DA", "DO", "DAS", "DOS", "E",
-        "LTDA", "ME", "EIRELI", "S/A", "SA"
-    }
+    ignorar = {"DE", "DA", "DO", "DAS", "DOS", "E", "LTDA", "ME", "EIRELI", "S/A", "SA"}
 
     for token in tokens:
         if token.upper() not in ignorar:
@@ -184,7 +205,9 @@ def _extrair_nome_curto_fornecedor(fornecedor_nome: Optional[str]) -> str:
     return _formatar_token_nome(tokens[0])
 
 
-def _buscar_nome_marca_pedido(db: Session, tenant_id: int, pedido: PedidoCompra) -> Optional[str]:
+def _buscar_nome_marca_pedido(
+    db: Session, tenant_id: int, pedido: PedidoCompra
+) -> Optional[str]:
     produto_ids = [item.produto_id for item in pedido.itens if item.produto_id]
     if not produto_ids:
         return None
@@ -201,11 +224,13 @@ def _buscar_nome_marca_pedido(db: Session, tenant_id: int, pedido: PedidoCompra)
         .all()
     )
 
-    nomes = sorted({
-        _normalizar_texto_nome_arquivo(resultado[0])
-        for resultado in marcas
-        if resultado[0]
-    })
+    nomes = sorted(
+        {
+            _normalizar_texto_nome_arquivo(resultado[0])
+            for resultado in marcas
+            if resultado[0]
+        }
+    )
 
     if len(nomes) != 1:
         return None
@@ -220,7 +245,9 @@ def _montar_nome_arquivo_pedido(
     tenant_id: int,
     extensao: str,
 ) -> str:
-    numero_pedido = _normalizar_texto_nome_arquivo(pedido.numero_pedido or pedido.id) or str(pedido.id)
+    numero_pedido = _normalizar_texto_nome_arquivo(
+        pedido.numero_pedido or pedido.id
+    ) or str(pedido.id)
     fornecedor_curto = _extrair_nome_curto_fornecedor(fornecedor_nome)
     marca_nome = _buscar_nome_marca_pedido(db, tenant_id, pedido)
 
@@ -234,7 +261,7 @@ def _montar_nome_arquivo_pedido(
 
 def _montar_content_disposition_attachment(filename: str) -> str:
     fallback = _normalizar_texto_nome_arquivo(filename) or "arquivo"
-    return f'attachment; filename="{fallback}"; filename*=UTF-8\'\'{quote(filename)}'
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(filename)}"
 
 
 def _normalizar_colunas_exportacao_pedido(colunas: Optional[object]) -> List[str]:
@@ -258,7 +285,9 @@ def _normalizar_colunas_exportacao_pedido(colunas: Optional[object]) -> List[str
 
 
 def _exportacao_pedido_tem_colunas_financeiras(colunas_exportacao: List[str]) -> bool:
-    return any(coluna in PEDIDO_EXPORT_COLUNAS_FINANCEIRAS for coluna in colunas_exportacao)
+    return any(
+        coluna in PEDIDO_EXPORT_COLUNAS_FINANCEIRAS for coluna in colunas_exportacao
+    )
 
 
 def _formatar_quantidade_documento(valor: Optional[float]) -> str:
@@ -274,11 +303,7 @@ def _carregar_produtos_pedido_exportacao(
     db: Session,
     tenant_id: int,
 ) -> dict[int, Produto]:
-    produto_ids = sorted({
-        item.produto_id
-        for item in pedido.itens
-        if item.produto_id
-    })
+    produto_ids = sorted({item.produto_id for item in pedido.itens if item.produto_id})
     if not produto_ids:
         return {}
 
@@ -303,14 +328,16 @@ def _montar_linhas_exportacao_pedido(
 
     for item in pedido.itens:
         produto = produtos_por_id.get(item.produto_id)
-        linhas.append({
-            "codigo": produto.codigo if produto else "",
-            "produto": produto.nome if produto else f"Produto {item.produto_id}",
-            "quantidade": item.quantidade_pedida or 0,
-            "preco_unitario": item.preco_unitario or 0,
-            "desconto": item.desconto_item or 0,
-            "total": item.valor_total or 0,
-        })
+        linhas.append(
+            {
+                "codigo": produto.codigo if produto else "",
+                "produto": produto.nome if produto else f"Produto {item.produto_id}",
+                "quantidade": item.quantidade_pedida or 0,
+                "preco_unitario": item.preco_unitario or 0,
+                "desconto": item.desconto_item or 0,
+                "total": item.valor_total or 0,
+            }
+        )
 
     return linhas
 
@@ -338,20 +365,22 @@ def _montar_resposta_pedido_detalhada(pedido: PedidoCompra) -> dict:
     }
 
     for item in pedido.itens:
-        resposta["itens"].append({
-            "id": item.id,
-            "produto_id": item.produto_id,
-            "produto_nome": item.produto.nome if item.produto else None,
-            "produto_codigo": item.produto.codigo if item.produto else None,
-            "quantidade_pedida": item.quantidade_pedida,
-            "quantidade_recebida": item.quantidade_recebida,
-            "preco_unitario": item.preco_unitario,
-            "desconto_item": item.desconto_item,
-            "valor_total": item.valor_total,
-            "status": item.status,
-            "sugestao_ia": item.sugestao_ia,
-            "motivo_ia": item.motivo_ia,
-        })
+        resposta["itens"].append(
+            {
+                "id": item.id,
+                "produto_id": item.produto_id,
+                "produto_nome": item.produto.nome if item.produto else None,
+                "produto_codigo": item.produto.codigo if item.produto else None,
+                "quantidade_pedida": item.quantidade_pedida,
+                "quantidade_recebida": item.quantidade_recebida,
+                "preco_unitario": item.preco_unitario,
+                "desconto_item": item.desconto_item,
+                "valor_total": item.valor_total,
+                "status": item.status,
+                "sugestao_ia": item.sugestao_ia,
+                "motivo_ia": item.motivo_ia,
+            }
+        )
 
     return resposta
 
@@ -370,12 +399,14 @@ def _gerar_excel_pedido_bytes(
     except ImportError:
         raise HTTPException(
             status_code=500,
-            detail="Biblioteca openpyxl nao instalada. Execute: pip install openpyxl"
+            detail="Biblioteca openpyxl nao instalada. Execute: pip install openpyxl",
         )
 
     colunas_exportacao = _normalizar_colunas_exportacao_pedido(colunas_exportacao)
     linhas = _montar_linhas_exportacao_pedido(pedido, db, tenant_id)
-    exibir_totais_financeiros = _exportacao_pedido_tem_colunas_financeiras(colunas_exportacao)
+    exibir_totais_financeiros = _exportacao_pedido_tem_colunas_financeiras(
+        colunas_exportacao
+    )
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -403,12 +434,16 @@ def _gerar_excel_pedido_bytes(
     ws[f"B{row}"] = pedido.status.replace("_", " ").upper()
 
     row += 2
-    headers = [PEDIDO_EXPORT_COLUNAS_META[coluna]["titulo"] for coluna in colunas_exportacao]
+    headers = [
+        PEDIDO_EXPORT_COLUNAS_META[coluna]["titulo"] for coluna in colunas_exportacao
+    ]
     for col, header in enumerate(headers, start=1):
         cell = ws.cell(row=row, column=col)
         cell.value = header
         cell.font = Font(bold=True)
-        cell.fill = PatternFill(start_color="CCCCCC", end_color="CCCCCC", fill_type="solid")
+        cell.fill = PatternFill(
+            start_color="CCCCCC", end_color="CCCCCC", fill_type="solid"
+        )
 
     row += 1
     for linha in linhas:
@@ -417,10 +452,10 @@ def _gerar_excel_pedido_bytes(
             valor = linha[coluna]
             if coluna in PEDIDO_EXPORT_COLUNAS_FINANCEIRAS:
                 cell.value = float(valor or 0)
-                cell.number_format = 'R$ #,##0.00'
+                cell.number_format = "R$ #,##0.00"
             elif coluna == "quantidade":
                 cell.value = float(valor or 0)
-                cell.number_format = '#,##0.00'
+                cell.number_format = "#,##0.00"
             else:
                 cell.value = valor
         row += 1
@@ -432,23 +467,25 @@ def _gerar_excel_pedido_bytes(
         row += 1
         ws.cell(row=row, column=coluna_label).value = "Frete:"
         ws.cell(row=row, column=coluna_valor).value = float(pedido.valor_frete or 0)
-        ws.cell(row=row, column=coluna_valor).number_format = 'R$ #,##0.00'
+        ws.cell(row=row, column=coluna_valor).number_format = "R$ #,##0.00"
 
         row += 1
         ws.cell(row=row, column=coluna_label).value = "Desconto:"
         ws.cell(row=row, column=coluna_valor).value = float(pedido.valor_desconto or 0)
-        ws.cell(row=row, column=coluna_valor).number_format = 'R$ #,##0.00'
+        ws.cell(row=row, column=coluna_valor).number_format = "R$ #,##0.00"
 
         row += 1
         ws.cell(row=row, column=coluna_label).value = "TOTAL:"
         ws.cell(row=row, column=coluna_label).font = Font(bold=True, size=12)
         ws.cell(row=row, column=coluna_valor).value = float(pedido.valor_final or 0)
         ws.cell(row=row, column=coluna_valor).font = Font(bold=True, size=12)
-        ws.cell(row=row, column=coluna_valor).number_format = 'R$ #,##0.00'
+        ws.cell(row=row, column=coluna_valor).number_format = "R$ #,##0.00"
 
     for indice, coluna in enumerate(colunas_exportacao, start=1):
         letra_coluna = get_column_letter(indice)
-        ws.column_dimensions[letra_coluna].width = PEDIDO_EXPORT_COLUNAS_META[coluna]["excel_width"]
+        ws.column_dimensions[letra_coluna].width = PEDIDO_EXPORT_COLUNAS_META[coluna][
+            "excel_width"
+        ]
     if exibir_totais_financeiros and len(colunas_exportacao) == 1:
         ws.column_dimensions[get_column_letter(2)].width = 16
 
@@ -469,21 +506,31 @@ def _gerar_pdf_pedido_bytes(
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
         from reportlab.lib.units import mm
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.platypus import (
+            SimpleDocTemplate,
+            Table,
+            TableStyle,
+            Paragraph,
+            Spacer,
+        )
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.enums import TA_CENTER
     except ImportError:
         raise HTTPException(
             status_code=500,
-            detail="Biblioteca reportlab nao instalada. Execute: pip install reportlab"
+            detail="Biblioteca reportlab nao instalada. Execute: pip install reportlab",
         )
 
     colunas_exportacao = _normalizar_colunas_exportacao_pedido(colunas_exportacao)
     linhas = _montar_linhas_exportacao_pedido(pedido, db, tenant_id)
-    exibir_totais_financeiros = _exportacao_pedido_tem_colunas_financeiras(colunas_exportacao)
+    exibir_totais_financeiros = _exportacao_pedido_tem_colunas_financeiras(
+        colunas_exportacao
+    )
 
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=15 * mm, bottomMargin=15 * mm)
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4, topMargin=15 * mm, bottomMargin=15 * mm
+    )
     elements = []
     styles = getSampleStyleSheet()
 
@@ -493,7 +540,7 @@ def _gerar_pdf_pedido_bytes(
         fontSize=18,
         textColor=colors.HexColor("#1a56db"),
         spaceAfter=12,
-        alignment=TA_CENTER
+        alignment=TA_CENTER,
     )
     elements.append(Paragraph("PEDIDO DE COMPRA", title_style))
     elements.append(Spacer(1, 10 * mm))
@@ -506,15 +553,21 @@ def _gerar_pdf_pedido_bytes(
     ]
 
     info_table = Table(info_data, colWidths=[40 * mm, 120 * mm])
-    info_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 10),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-    ]))
+    info_table.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("FONTSIZE", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ]
+        )
+    )
     elements.append(info_table)
     elements.append(Spacer(1, 10 * mm))
 
-    table_data = [[PEDIDO_EXPORT_COLUNAS_META[coluna]["titulo"] for coluna in colunas_exportacao]]
+    table_data = [
+        [PEDIDO_EXPORT_COLUNAS_META[coluna]["titulo"] for coluna in colunas_exportacao]
+    ]
 
     produto_style = ParagraphStyle(
         "ProdutoStyle",
@@ -537,7 +590,10 @@ def _gerar_pdf_pedido_bytes(
                 linha_formatada.append(str(valor or ""))
         table_data.append(linha_formatada)
 
-    col_widths = [PEDIDO_EXPORT_COLUNAS_META[coluna]["pdf_width_mm"] * mm for coluna in colunas_exportacao]
+    col_widths = [
+        PEDIDO_EXPORT_COLUNAS_META[coluna]["pdf_width_mm"] * mm
+        for coluna in colunas_exportacao
+    ]
     items_table = Table(table_data, colWidths=col_widths)
     table_style = [
         ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
@@ -565,12 +621,16 @@ def _gerar_pdf_pedido_bytes(
         ]
 
         totals_table = Table(totals_data, colWidths=[35 * mm, 30 * mm], hAlign="RIGHT")
-        totals_table.setStyle(TableStyle([
-            ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
-            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
-            ("FONTSIZE", (0, -1), (-1, -1), 12),
-            ("LINEABOVE", (0, -1), (-1, -1), 2, colors.black),
-        ]))
+        totals_table.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (0, 0), (-1, -1), "RIGHT"),
+                    ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                    ("FONTSIZE", (0, -1), (-1, -1), 12),
+                    ("LINEABOVE", (0, -1), (-1, -1), 2, colors.black),
+                ]
+            )
+        )
         elements.append(totals_table)
 
     if pedido.observacoes:
@@ -593,7 +653,9 @@ def _montar_email_pedido(
     observacoes = pedido.observacoes or "Sem observacoes adicionais."
     total_itens = len(pedido.itens or [])
     colunas_exportacao = _normalizar_colunas_exportacao_pedido(colunas_exportacao)
-    exibir_totais_financeiros = _exportacao_pedido_tem_colunas_financeiras(colunas_exportacao)
+    exibir_totais_financeiros = _exportacao_pedido_tem_colunas_financeiras(
+        colunas_exportacao
+    )
     resumo_documento_html = (
         f"<li><strong>Valor final:</strong> R$ {pedido.valor_final:.2f}</li>"
         if exibir_totais_financeiros
@@ -643,26 +705,31 @@ def _montar_email_pedido(
 # LISTAR PEDIDOS
 # ============================================================================
 
+
 @router.get("/", response_model=List[PedidoCompraResponse])
 def listar_pedidos(
     status: Optional[str] = Query(None, description="Filtrar por status"),
     fornecedor_id: Optional[int] = Query(None, description="Filtrar por fornecedor"),
     data_inicio: Optional[str] = Query(None, description="Data inicial (YYYY-MM-DD)"),
     data_fim: Optional[str] = Query(None, description="Data final (YYYY-MM-DD)"),
-    busca: Optional[str] = Query(None, description="Buscar por numero, fornecedor ou observacao"),
+    busca: Optional[str] = Query(
+        None, description="Buscar por numero, fornecedor ou observacao"
+    ),
     limit: int = Query(50, le=100),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Lista pedidos de compra com filtros"""
     current_user, tenant_id = current_user_and_tenant
     logger.info("Listando pedidos de compra")
-    
-    query = db.query(PedidoCompra).options(joinedload(PedidoCompra.itens)).filter(
-        PedidoCompra.tenant_id == tenant_id
+
+    query = (
+        db.query(PedidoCompra)
+        .options(joinedload(PedidoCompra.itens))
+        .filter(PedidoCompra.tenant_id == tenant_id)
     )
-    
+
     # Filtros
     if status:
         query = query.filter(PedidoCompra.status == status)
@@ -672,29 +739,30 @@ def listar_pedidos(
         try:
             data = datetime.strptime(data_inicio, "%Y-%m-%d")
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail="data_inicio invalida. Use YYYY-MM-DD") from exc
+            raise HTTPException(
+                status_code=400, detail="data_inicio invalida. Use YYYY-MM-DD"
+            ) from exc
         query = query.filter(PedidoCompra.data_pedido >= data)
     if data_fim:
         try:
             data = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
         except ValueError as exc:
-            raise HTTPException(status_code=400, detail="data_fim invalida. Use YYYY-MM-DD") from exc
+            raise HTTPException(
+                status_code=400, detail="data_fim invalida. Use YYYY-MM-DD"
+            ) from exc
         query = query.filter(PedidoCompra.data_pedido < data)
     if busca and busca.strip():
         termo = f"%{busca.strip()}%"
-        fornecedor_ids = (
-            db.query(Cliente.id)
-            .filter(
-                Cliente.tenant_id == tenant_id,
-                Cliente.tipo_cadastro == "fornecedor",
-                or_(
-                    Cliente.nome.ilike(termo),
-                    Cliente.razao_social.ilike(termo),
-                    Cliente.nome_fantasia.ilike(termo),
-                    Cliente.cnpj.ilike(termo),
-                    Cliente.cpf.ilike(termo),
-                ),
-            )
+        fornecedor_ids = db.query(Cliente.id).filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "fornecedor",
+            or_(
+                Cliente.nome.ilike(termo),
+                Cliente.razao_social.ilike(termo),
+                Cliente.nome_fantasia.ilike(termo),
+                Cliente.cnpj.ilike(termo),
+                Cliente.cpf.ilike(termo),
+            ),
         )
         query = query.filter(
             or_(
@@ -703,32 +771,34 @@ def listar_pedidos(
                 PedidoCompra.fornecedor_id.in_(fornecedor_ids),
             )
         )
-    
+
     # Ordenar por data decrescente
     query = query.order_by(desc(PedidoCompra.data_pedido))
-    
+
     # Paginação
     total = query.count()
     pedidos = query.offset(offset).limit(limit).all()
-    
+
     # Formatar resposta
     resultado = []
     for pedido in pedidos:
-        resultado.append(PedidoCompraResponse(
-            id=pedido.id,
-            numero_pedido=pedido.numero_pedido,
-            fornecedor_id=pedido.fornecedor_id,
-            status=pedido.status,
-            valor_total=pedido.valor_total,
-            valor_frete=pedido.valor_frete,
-            valor_desconto=pedido.valor_desconto,
-            valor_final=pedido.valor_final,
-            data_pedido=pedido.data_pedido,
-            data_prevista_entrega=pedido.data_prevista_entrega,
-            observacoes=pedido.observacoes,
-            itens_count=len(pedido.itens)
-        ))
-    
+        resultado.append(
+            PedidoCompraResponse(
+                id=pedido.id,
+                numero_pedido=pedido.numero_pedido,
+                fornecedor_id=pedido.fornecedor_id,
+                status=pedido.status,
+                valor_total=pedido.valor_total,
+                valor_frete=pedido.valor_frete,
+                valor_desconto=pedido.valor_desconto,
+                valor_final=pedido.valor_final,
+                data_pedido=pedido.data_pedido,
+                data_prevista_entrega=pedido.data_prevista_entrega,
+                observacoes=pedido.observacoes,
+                itens_count=len(pedido.itens),
+            )
+        )
+
     logger.info(f"✅ {len(resultado)} pedidos encontrados (total: {total})")
     return resultado
 
@@ -737,15 +807,12 @@ def listar_pedidos(
 # STATUS DE ENVIO
 # ============================================================================
 
+
 @router.get("/envio/status")
-def status_envio_pedidos(
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
-):
+def status_envio_pedidos(current_user_and_tenant=Depends(get_current_user_and_tenant)):
     """Informa se o servidor está apto a enviar pedidos por e-mail."""
     current_user, tenant_id = current_user_and_tenant
-    return {
-        "email_configurado": is_email_configured()
-    }
+    return {"email_configurado": is_email_configured()}
 
 
 def _resolver_fornecedores_compra(
@@ -759,30 +826,46 @@ def _resolver_fornecedores_compra(
     grupo = None
 
     if fornecedor_grupo_id:
-        grupo = db.query(FornecedorGrupo).filter(
-            FornecedorGrupo.id == fornecedor_grupo_id,
-            FornecedorGrupo.tenant_id == tenant_id,
-            FornecedorGrupo.ativo.is_(True),
-        ).first()
+        grupo = (
+            db.query(FornecedorGrupo)
+            .filter(
+                FornecedorGrupo.id == fornecedor_grupo_id,
+                FornecedorGrupo.tenant_id == tenant_id,
+                FornecedorGrupo.ativo.is_(True),
+            )
+            .first()
+        )
         if not grupo:
-            raise HTTPException(status_code=404, detail="Grupo de fornecedor nao encontrado")
+            raise HTTPException(
+                status_code=404, detail="Grupo de fornecedor nao encontrado"
+            )
     elif incluir_grupo_fornecedor and fornecedor.fornecedor_grupo_id:
-        grupo = db.query(FornecedorGrupo).filter(
-            FornecedorGrupo.id == fornecedor.fornecedor_grupo_id,
-            FornecedorGrupo.tenant_id == tenant_id,
-            FornecedorGrupo.ativo.is_(True),
-        ).first()
+        grupo = (
+            db.query(FornecedorGrupo)
+            .filter(
+                FornecedorGrupo.id == fornecedor.fornecedor_grupo_id,
+                FornecedorGrupo.tenant_id == tenant_id,
+                FornecedorGrupo.ativo.is_(True),
+            )
+            .first()
+        )
 
     if not grupo:
         return [fornecedor.id], None
 
-    fornecedores_grupo = db.query(Cliente.id).filter(
-        Cliente.tenant_id == tenant_id,
-        Cliente.tipo_cadastro == "fornecedor",
-        or_(Cliente.ativo.is_(True), Cliente.ativo.is_(None)),
-        Cliente.fornecedor_grupo_id == grupo.id,
-    ).all()
-    fornecedor_ids = sorted({linha[0] for linha in fornecedores_grupo} | {fornecedor.id})
+    fornecedores_grupo = (
+        db.query(Cliente.id)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "fornecedor",
+            or_(Cliente.ativo.is_(True), Cliente.ativo.is_(None)),
+            Cliente.fornecedor_grupo_id == grupo.id,
+        )
+        .all()
+    )
+    fornecedor_ids = sorted(
+        {linha[0] for linha in fornecedores_grupo} | {fornecedor.id}
+    )
 
     return fornecedor_ids, grupo
 
@@ -980,7 +1063,9 @@ def _carregar_vendas_sugestao(
     dias_busca = max(periodo_dias, max(JANELAS_GIRO_SUGESTAO))
     data_inicio_busca = data_fim - timedelta(days=dias_busca)
     data_inicio_periodo = data_fim - timedelta(days=periodo_dias)
-    venda_data = func.coalesce(Venda.data_finalizacao, Venda.data_venda, Venda.created_at)
+    venda_data = func.coalesce(
+        Venda.data_finalizacao, Venda.data_venda, Venda.created_at
+    )
 
     vendas_rows = (
         db.query(
@@ -1101,7 +1186,9 @@ def _carregar_vendas_sugestao(
         referencia_tipo = str(row.referencia_tipo or "").strip().lower()
         motivo = str(row.motivo or "").strip().lower()
         referencia_id = int(row.referencia_id) if row.referencia_id else None
-        tem_item_direto = bool(referencia_id and (referencia_id, produto_id) in pares_venda_produto)
+        tem_item_direto = bool(
+            referencia_id and (referencia_id, produto_id) in pares_venda_produto
+        )
         venda_referenciada_valida = bool(
             referencia_id
             and referencia_tipo == "venda"
@@ -1113,10 +1200,7 @@ def _carregar_vendas_sugestao(
             or "bling" in motivo
             or "online" in motivo
         )
-        consumo_derivado = bool(
-            venda_referenciada_valida
-            and not tem_item_direto
-        )
+        consumo_derivado = bool(venda_referenciada_valida and not tem_item_direto)
 
         # Venda direta ja contabilizada pela tabela de vendas. Aqui entram apenas
         # consumos que nao aparecem como item desse produto na venda.
@@ -1158,7 +1242,9 @@ def _carregar_vendas_sugestao(
             "fontes": sorted(stats["fontes"]),
             "granel_consumo": {
                 "kg_periodo": _round_seguro_sugestao(stats["granel_kg_periodo"], 3),
-                "pacotes_equivalentes_periodo": _round_seguro_sugestao(stats["granel_pacotes_periodo"], 3),
+                "pacotes_equivalentes_periodo": _round_seguro_sugestao(
+                    stats["granel_pacotes_periodo"], 3
+                ),
                 "janelas_kg": {
                     chave: _round_seguro_sugestao(valor, 3)
                     for chave, valor in stats["granel_janelas_kg"].items()
@@ -1171,9 +1257,13 @@ def _carregar_vendas_sugestao(
                     {
                         "produto_id": item.get("produto_id"),
                         "produto_nome": item.get("produto_nome"),
-                        "peso_pacote_kg": _round_seguro_sugestao(item.get("peso_pacote_kg"), 3),
+                        "peso_pacote_kg": _round_seguro_sugestao(
+                            item.get("peso_pacote_kg"), 3
+                        ),
                         "kg": _round_seguro_sugestao(item.get("kg"), 3),
-                        "pacotes_equivalentes": _round_seguro_sugestao(item.get("pacotes"), 3),
+                        "pacotes_equivalentes": _round_seguro_sugestao(
+                            item.get("pacotes"), 3
+                        ),
                     }
                     for item in sorted(
                         stats["granel_itens"].values(),
@@ -1302,7 +1392,9 @@ def _calcular_dias_com_estoque(
     }
 
 
-def _obter_estoque_atual_sugestao(db: Session, produto: Produto, tenant_id) -> tuple[float, dict]:
+def _obter_estoque_atual_sugestao(
+    db: Session, produto: Produto, tenant_id
+) -> tuple[float, dict]:
     estoque_atual = _float_seguro_sugestao(produto.estoque_atual)
     info = {
         "estoque_derivado": False,
@@ -1338,17 +1430,21 @@ def buscar_rascunho_fornecedor(
     incluir_grupo_fornecedor: bool = Query(default=False),
     fornecedor_grupo_id: Optional[int] = Query(default=None),
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Retorna o rascunho mais recente de um fornecedor, se existir."""
     current_user, tenant_id = current_user_and_tenant
     logger.info("Buscando rascunho em aberto do fornecedor")
 
-    fornecedor = db.query(Cliente).filter(
-        Cliente.id == fornecedor_id,
-        Cliente.tenant_id == tenant_id,
-        Cliente.tipo_cadastro == "fornecedor"
-    ).first()
+    fornecedor = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == fornecedor_id,
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "fornecedor",
+        )
+        .first()
+    )
 
     if not fornecedor:
         raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
@@ -1361,18 +1457,19 @@ def buscar_rascunho_fornecedor(
         fornecedor_grupo_id=fornecedor_grupo_id,
     )
 
-    rascunhos_query = db.query(PedidoCompra).options(
-        joinedload(PedidoCompra.itens).joinedload(PedidoCompraItem.produto)
-    ).filter(
-        PedidoCompra.tenant_id == tenant_id,
-        PedidoCompra.fornecedor_id.in_(fornecedor_ids),
-        PedidoCompra.status == "rascunho"
+    rascunhos_query = (
+        db.query(PedidoCompra)
+        .options(joinedload(PedidoCompra.itens).joinedload(PedidoCompraItem.produto))
+        .filter(
+            PedidoCompra.tenant_id == tenant_id,
+            PedidoCompra.fornecedor_id.in_(fornecedor_ids),
+            PedidoCompra.status == "rascunho",
+        )
     )
 
     total_rascunhos = rascunhos_query.count()
     pedido = rascunhos_query.order_by(
-        desc(PedidoCompra.updated_at),
-        desc(PedidoCompra.id)
+        desc(PedidoCompra.updated_at), desc(PedidoCompra.id)
     ).first()
 
     if not pedido:
@@ -1384,7 +1481,9 @@ def buscar_rascunho_fornecedor(
             "fornecedor_grupo": {
                 "id": grupo.id,
                 "nome": grupo.nome,
-            } if grupo else None,
+            }
+            if grupo
+            else None,
         }
 
     return {
@@ -1395,7 +1494,9 @@ def buscar_rascunho_fornecedor(
         "fornecedor_grupo": {
             "id": grupo.id,
             "nome": grupo.nome,
-        } if grupo else None,
+        }
+        if grupo
+        else None,
     }
 
 
@@ -1403,26 +1504,27 @@ def buscar_rascunho_fornecedor(
 # BUSCAR PEDIDO POR ID
 # ============================================================================
 
+
 @router.get("/{pedido_id}")
 def buscar_pedido(
     pedido_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Busca pedido completo com itens"""
     current_user, tenant_id = current_user_and_tenant
     logger.info(f"🔍 Buscando pedido {pedido_id}")
-    
-    pedido = db.query(PedidoCompra).options(
-        joinedload(PedidoCompra.itens).joinedload(PedidoCompraItem.produto)
-    ).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
-    
+
+    pedido = (
+        db.query(PedidoCompra)
+        .options(joinedload(PedidoCompra.itens).joinedload(PedidoCompraItem.produto))
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
+
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
-    
+
     return _montar_resposta_pedido_detalhada(pedido)
 
 
@@ -1430,51 +1532,53 @@ def buscar_pedido(
 # CRIAR PEDIDO
 # ============================================================================
 
+
 @router.post("/")
 def criar_pedido(
     request: PedidoCompraRequest,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Cria novo pedido de compra"""
     current_user, tenant_id = current_user_and_tenant
     logger.info(f"📝 Criando pedido de compra - Fornecedor: {request.fornecedor_id}")
-    
+
     # Validar fornecedor
-    fornecedor = db.query(Cliente).filter(
-        Cliente.id == request.fornecedor_id,
-        Cliente.tenant_id == tenant_id
-    ).first()
+    fornecedor = (
+        db.query(Cliente)
+        .filter(Cliente.id == request.fornecedor_id, Cliente.tenant_id == tenant_id)
+        .first()
+    )
     if not fornecedor:
         raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
-    
+
     # Validar produtos
     if not request.itens or len(request.itens) == 0:
         raise HTTPException(status_code=400, detail="Pedido deve ter pelo menos 1 item")
-    
+
     for item_req in request.itens:
-        produto = db.query(Produto).filter(
-            Produto.id == item_req.produto_id,
-            Produto.tenant_id == tenant_id
-        ).first()
+        produto = (
+            db.query(Produto)
+            .filter(Produto.id == item_req.produto_id, Produto.tenant_id == tenant_id)
+            .first()
+        )
         if not produto:
             raise HTTPException(
-                status_code=404, 
-                detail=f"Produto {item_req.produto_id} não encontrado"
+                status_code=404, detail=f"Produto {item_req.produto_id} não encontrado"
             )
-    
+
     # Gerar número do pedido
     ultimo_pedido = db.query(PedidoCompra).order_by(desc(PedidoCompra.id)).first()
     numero = 1 if not ultimo_pedido else ultimo_pedido.id + 1
     numero_pedido = f"PC{datetime.now().year}{numero:05d}"
-    
+
     # Calcular totais
     valor_total = sum(
-        (item.preco_unitario - item.desconto_item) * item.quantidade_pedida 
+        (item.preco_unitario - item.desconto_item) * item.quantidade_pedida
         for item in request.itens
     )
     valor_final = valor_total + request.valor_frete - request.valor_desconto
-    
+
     # Criar pedido
     pedido = PedidoCompra(
         numero_pedido=numero_pedido,
@@ -1491,16 +1595,18 @@ def criar_pedido(
         confianca_ia=request.confianca_ia,
         dados_ia=request.dados_ia,
         user_id=current_user.id,
-        tenant_id=tenant_id
+        tenant_id=tenant_id,
     )
-    
+
     db.add(pedido)
     db.flush()  # Para obter o ID
-    
+
     # Criar itens
     for item_req in request.itens:
-        valor_item = (item_req.preco_unitario - item_req.desconto_item) * item_req.quantidade_pedida
-        
+        valor_item = (
+            item_req.preco_unitario - item_req.desconto_item
+        ) * item_req.quantidade_pedida
+
         item = PedidoCompraItem(
             pedido_compra_id=pedido.id,
             produto_id=item_req.produto_id,
@@ -1512,21 +1618,21 @@ def criar_pedido(
             status="pendente",
             sugestao_ia=item_req.sugestao_ia,
             motivo_ia=item_req.motivo_ia,
-            tenant_id=tenant_id
+            tenant_id=tenant_id,
         )
         db.add(item)
-    
+
     db.commit()
     db.refresh(pedido)
-    
+
     logger.info(f"✅ Pedido {pedido.numero_pedido} criado com sucesso")
-    
+
     return {
         "message": "Pedido criado com sucesso",
         "pedido_id": pedido.id,
         "numero_pedido": pedido.numero_pedido,
         "valor_final": pedido.valor_final,
-        "itens_count": len(request.itens)
+        "itens_count": len(request.itens),
     }
 
 
@@ -1534,37 +1640,39 @@ def criar_pedido(
 # ATUALIZAR PEDIDO
 # ============================================================================
 
+
 @router.put("/{pedido_id}")
 def atualizar_pedido(
     pedido_id: int,
     request: PedidoCompraRequest,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Atualiza pedido (apenas se status = rascunho)"""
     current_user, tenant_id = current_user_and_tenant
     logger.info(f"✏️ Atualizando pedido {pedido_id}")
-    
-    pedido = db.query(PedidoCompra).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+
+    pedido = (
+        db.query(PedidoCompra)
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
-    
+
     if pedido.status != "rascunho":
         raise HTTPException(
-            status_code=400, 
-            detail=f"Pedido não pode ser editado no status '{pedido.status}'"
+            status_code=400,
+            detail=f"Pedido não pode ser editado no status '{pedido.status}'",
         )
-    
+
     # Recalcular totais
     valor_total = sum(
-        (item.preco_unitario - item.desconto_item) * item.quantidade_pedida 
+        (item.preco_unitario - item.desconto_item) * item.quantidade_pedida
         for item in request.itens
     )
     valor_final = valor_total + request.valor_frete - request.valor_desconto
-    
+
     # Atualizar pedido
     pedido.fornecedor_id = request.fornecedor_id
     pedido.valor_total = valor_total
@@ -1574,16 +1682,18 @@ def atualizar_pedido(
     pedido.data_prevista_entrega = request.data_prevista_entrega
     pedido.observacoes = request.observacoes
     pedido.updated_at = datetime.utcnow()
-    
+
     # Remover itens antigos
     db.query(PedidoCompraItem).filter(
         PedidoCompraItem.pedido_compra_id == pedido_id
     ).delete()
-    
+
     # Adicionar novos itens
     for item_req in request.itens:
-        valor_item = (item_req.preco_unitario - item_req.desconto_item) * item_req.quantidade_pedida
-        
+        valor_item = (
+            item_req.preco_unitario - item_req.desconto_item
+        ) * item_req.quantidade_pedida
+
         item = PedidoCompraItem(
             pedido_compra_id=pedido.id,
             produto_id=item_req.produto_id,
@@ -1595,18 +1705,18 @@ def atualizar_pedido(
             status="pendente",
             sugestao_ia=item_req.sugestao_ia,
             motivo_ia=item_req.motivo_ia,
-            tenant_id=tenant_id
+            tenant_id=tenant_id,
         )
         db.add(item)
-    
+
     db.commit()
-    
+
     logger.info(f"✅ Pedido {pedido.numero_pedido} atualizado")
-    
+
     return {
         "message": "Pedido atualizado com sucesso",
         "pedido_id": pedido.id,
-        "numero_pedido": pedido.numero_pedido
+        "numero_pedido": pedido.numero_pedido,
     }
 
 
@@ -1614,32 +1724,36 @@ def atualizar_pedido(
 # ENVIAR PEDIDO
 # ============================================================================
 
+
 @router.post("/{pedido_id}/enviar")
 def enviar_pedido(
     pedido_id: int,
     request: PedidoCompraEnviarRequest,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Marca pedido como enviado"""
     current_user, tenant_id = current_user_and_tenant
     logger.info(f"📤 Enviando pedido {pedido_id}")
-    
-    pedido = db.query(PedidoCompra).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+
+    pedido = (
+        db.query(PedidoCompra)
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
-    
+
     if pedido.status != "rascunho":
         raise HTTPException(
-            status_code=400, 
-            detail=f"Pedido não pode ser enviado no status '{pedido.status}'"
+            status_code=400,
+            detail=f"Pedido não pode ser enviado no status '{pedido.status}'",
         )
-    
+
     fornecedor = _buscar_fornecedor_pedido(db, tenant_id, pedido)
-    fornecedor_nome = fornecedor.nome if fornecedor else f"Fornecedor {pedido.fornecedor_id}"
+    fornecedor_nome = (
+        fornecedor.nome if fornecedor else f"Fornecedor {pedido.fornecedor_id}"
+    )
 
     if request.envio_manual:
         pedido.status = "enviado"
@@ -1653,7 +1767,7 @@ def enviar_pedido(
             "pedido_id": pedido.id,
             "numero_pedido": pedido.numero_pedido,
             "status": pedido.status,
-            "tipo_envio": "manual"
+            "tipo_envio": "manual",
         }
 
     email_destino = (request.email or "").strip()
@@ -1662,61 +1776,80 @@ def enviar_pedido(
 
     formatos = request.formatos or PedidoCompraEnvioFormatos()
     if not formatos.pdf and not formatos.excel:
-        raise HTTPException(status_code=400, detail="Selecione pelo menos um formato para envio")
+        raise HTTPException(
+            status_code=400, detail="Selecione pelo menos um formato para envio"
+        )
 
-    colunas_exportacao = _normalizar_colunas_exportacao_pedido(request.colunas_exportacao)
+    colunas_exportacao = _normalizar_colunas_exportacao_pedido(
+        request.colunas_exportacao
+    )
 
     if not is_email_configured():
         raise HTTPException(
-            status_code=503,
-            detail="O envio de e-mail nao esta configurado no servidor"
+            status_code=503, detail="O envio de e-mail nao esta configurado no servidor"
         )
 
     anexos = []
     if formatos.pdf:
-        nome_pdf = _montar_nome_arquivo_pedido(pedido, fornecedor_nome, db, tenant_id, "pdf")
-        anexos.append({
-            "filename": nome_pdf,
-            "content": _gerar_pdf_pedido_bytes(pedido, fornecedor_nome, db, tenant_id, colunas_exportacao),
-            "mime_subtype": "pdf"
-        })
+        nome_pdf = _montar_nome_arquivo_pedido(
+            pedido, fornecedor_nome, db, tenant_id, "pdf"
+        )
+        anexos.append(
+            {
+                "filename": nome_pdf,
+                "content": _gerar_pdf_pedido_bytes(
+                    pedido, fornecedor_nome, db, tenant_id, colunas_exportacao
+                ),
+                "mime_subtype": "pdf",
+            }
+        )
     if formatos.excel:
-        nome_excel = _montar_nome_arquivo_pedido(pedido, fornecedor_nome, db, tenant_id, "xlsx")
-        anexos.append({
-            "filename": nome_excel,
-            "content": _gerar_excel_pedido_bytes(pedido, fornecedor_nome, db, tenant_id, colunas_exportacao),
-            "mime_subtype": "vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        })
+        nome_excel = _montar_nome_arquivo_pedido(
+            pedido, fornecedor_nome, db, tenant_id, "xlsx"
+        )
+        anexos.append(
+            {
+                "filename": nome_excel,
+                "content": _gerar_excel_pedido_bytes(
+                    pedido, fornecedor_nome, db, tenant_id, colunas_exportacao
+                ),
+                "mime_subtype": "vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            }
+        )
 
-    assunto, html_body, text_body = _montar_email_pedido(pedido, fornecedor_nome, colunas_exportacao)
+    assunto, html_body, text_body = _montar_email_pedido(
+        pedido, fornecedor_nome, colunas_exportacao
+    )
     enviado = send_email(
         to=email_destino,
         subject=assunto,
         html_body=html_body,
         text_body=text_body,
         attachments=anexos,
-        simulate_if_unconfigured=False
+        simulate_if_unconfigured=False,
     )
 
     if not enviado:
         raise HTTPException(
             status_code=502,
-            detail="Nao foi possivel enviar o e-mail do pedido. Revise a configuracao SMTP."
+            detail="Nao foi possivel enviar o e-mail do pedido. Revise a configuracao SMTP.",
         )
 
     pedido.status = "enviado"
     pedido.data_envio = datetime.utcnow()
     pedido.updated_at = datetime.utcnow()
-    
+
     db.commit()
-    logger.info(f"Pedido {pedido.numero_pedido} enviado por e-mail para {email_destino}")
+    logger.info(
+        f"Pedido {pedido.numero_pedido} enviado por e-mail para {email_destino}"
+    )
     return {
         "message": "Pedido enviado por e-mail com sucesso",
         "pedido_id": pedido.id,
         "numero_pedido": pedido.numero_pedido,
         "status": pedido.status,
         "tipo_envio": "email",
-        "email": email_destino
+        "email": email_destino,
     }
 
 
@@ -1724,42 +1857,44 @@ def enviar_pedido(
 # CONFIRMAR PEDIDO
 # ============================================================================
 
+
 @router.post("/{pedido_id}/confirmar")
 def confirmar_pedido(
     pedido_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Confirma pedido (fornecedor confirmou recebimento)"""
     current_user, tenant_id = current_user_and_tenant
     logger.info(f"✅ Confirmando pedido {pedido_id}")
-    
-    pedido = db.query(PedidoCompra).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+
+    pedido = (
+        db.query(PedidoCompra)
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
-    
+
     if pedido.status not in ["rascunho", "enviado"]:
         raise HTTPException(
-            status_code=400, 
-            detail=f"Pedido não pode ser confirmado no status '{pedido.status}'"
+            status_code=400,
+            detail=f"Pedido não pode ser confirmado no status '{pedido.status}'",
         )
-    
+
     pedido.status = "confirmado"
     pedido.data_confirmacao = datetime.utcnow()
     pedido.updated_at = datetime.utcnow()
-    
+
     db.commit()
-    
+
     logger.info(f"✅ Pedido {pedido.numero_pedido} confirmado")
-    
+
     return {
         "message": "Pedido confirmado com sucesso",
         "pedido_id": pedido.id,
         "numero_pedido": pedido.numero_pedido,
-        "status": pedido.status
+        "status": pedido.status,
     }
 
 
@@ -1767,47 +1902,49 @@ def confirmar_pedido(
 # CANCELAR PEDIDO
 # ============================================================================
 
+
 @router.post("/{pedido_id}/cancelar")
 def cancelar_pedido(
     pedido_id: int,
     motivo: str = Query(..., min_length=10, description="Motivo do cancelamento"),
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Cancela pedido"""
     current_user, tenant_id = current_user_and_tenant
     logger.info(f"❌ Cancelando pedido {pedido_id}")
-    
-    pedido = db.query(PedidoCompra).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+
+    pedido = (
+        db.query(PedidoCompra)
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
-    
+
     if pedido.status in ["recebido_total", "cancelado"]:
         raise HTTPException(
-            status_code=400, 
-            detail=f"Pedido não pode ser cancelado no status '{pedido.status}'"
+            status_code=400,
+            detail=f"Pedido não pode ser cancelado no status '{pedido.status}'",
         )
-    
+
     pedido.status = "cancelado"
     pedido.observacoes = f"{pedido.observacoes or ''}\n\nCANCELADO: {motivo}"
     pedido.updated_at = datetime.utcnow()
-    
+
     # Cancelar todos os itens
     for item in pedido.itens:
         item.status = "cancelado"
-    
+
     db.commit()
-    
+
     logger.info(f"❌ Pedido {pedido.numero_pedido} cancelado")
-    
+
     return {
         "message": "Pedido cancelado com sucesso",
         "pedido_id": pedido.id,
         "numero_pedido": pedido.numero_pedido,
-        "status": pedido.status
+        "status": pedido.status,
     }
 
 
@@ -1815,86 +1952,94 @@ def cancelar_pedido(
 # RECEBER PEDIDO (com entrada automática no estoque)
 # ============================================================================
 
+
 @router.post("/{pedido_id}/receber")
 def receber_pedido(
     pedido_id: int,
     request: RecebimentoPedidoRequest,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Recebe pedido (total ou parcial) e dá entrada automática no estoque
     """
     current_user, tenant_id = current_user_and_tenant
     logger.info(f"📦 Recebendo pedido {pedido_id}")
-    
-    pedido = db.query(PedidoCompra).options(
-        joinedload(PedidoCompra.itens)
-    ).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
-    
+
+    pedido = (
+        db.query(PedidoCompra)
+        .options(joinedload(PedidoCompra.itens))
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
+
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
-    
+
     if pedido.status not in ["confirmado", "recebido_parcial"]:
         raise HTTPException(
-            status_code=400, 
-            detail=f"Pedido não pode ser recebido no status '{pedido.status}'"
+            status_code=400,
+            detail=f"Pedido não pode ser recebido no status '{pedido.status}'",
         )
-    
+
     data_recebimento = request.data_recebimento or datetime.utcnow()
     itens_recebidos = []
     para_sync_bling = []  # (produto_id, estoque_atual)
-    
+
     # Processar cada item
     for receb_item in request.itens:
         # Buscar item
-        item = db.query(PedidoCompraItem).filter(
-            PedidoCompraItem.id == receb_item.item_id,
-            PedidoCompraItem.pedido_compra_id == pedido_id
-        ).first()
-        
+        item = (
+            db.query(PedidoCompraItem)
+            .filter(
+                PedidoCompraItem.id == receb_item.item_id,
+                PedidoCompraItem.pedido_compra_id == pedido_id,
+            )
+            .first()
+        )
+
         if not item:
             raise HTTPException(
-                status_code=404, 
-                detail=f"Item {receb_item.item_id} não encontrado no pedido"
+                status_code=404,
+                detail=f"Item {receb_item.item_id} não encontrado no pedido",
             )
-        
+
         # Validar quantidade
         quantidade_pendente = item.quantidade_pedida - item.quantidade_recebida
         if receb_item.quantidade_recebida > quantidade_pendente:
             raise HTTPException(
                 status_code=400,
                 detail=f"Item {item.id}: quantidade recebida ({receb_item.quantidade_recebida}) "
-                       f"maior que pendente ({quantidade_pendente})"
+                f"maior que pendente ({quantidade_pendente})",
             )
-        
+
         # Atualizar quantidade recebida
         item.quantidade_recebida += receb_item.quantidade_recebida
-        
+
         # Atualizar status do item
         if item.quantidade_recebida >= item.quantidade_pedida:
             item.status = "recebido_total"
         else:
             item.status = "recebido_parcial"
-        
+
         # DAR ENTRADA NO ESTOQUE
-        produto = db.query(Produto).filter(
-            Produto.id == item.produto_id,
-            Produto.tenant_id == tenant_id
-        ).first()
+        produto = (
+            db.query(Produto)
+            .filter(Produto.id == item.produto_id, Produto.tenant_id == tenant_id)
+            .first()
+        )
         if not produto:
             raise HTTPException(
                 status_code=404,
-                detail=f"Produto {item.produto_id} nao encontrado para o item {item.id}"
+                detail=f"Produto {item.produto_id} nao encontrado para o item {item.id}",
             )
-        
+
         # Criar lote
         numero_lote = f"PC{pedido.id}-{item.id}"
-        custo_unitario_lote = float(item.preco_unitario or 0) - float(item.desconto_item or 0)
-        
+        custo_unitario_lote = float(item.preco_unitario or 0) - float(
+            item.desconto_item or 0
+        )
+
         lote = ProdutoLote(
             produto_id=produto.id,
             nome_lote=numero_lote,
@@ -1906,23 +2051,29 @@ def receber_pedido(
             data_validade=None,
             ordem_entrada=int(datetime.utcnow().timestamp()),
             status="ativo",
-            tenant_id=tenant_id
+            tenant_id=tenant_id,
         )
         db.add(lote)
         db.flush()
-        
+
         # Atualizar estoque do produto
-        produto.estoque_atual = (produto.estoque_atual or 0) + receb_item.quantidade_recebida
-        
+        produto.estoque_atual = (
+            produto.estoque_atual or 0
+        ) + receb_item.quantidade_recebida
+
         # Recalcular custo médio ponderado
         if produto.custo_medio:
-            estoque_anterior = (produto.estoque_atual or 0) - receb_item.quantidade_recebida
+            estoque_anterior = (
+                produto.estoque_atual or 0
+            ) - receb_item.quantidade_recebida
             valor_anterior = estoque_anterior * produto.custo_medio
             valor_entrada = receb_item.quantidade_recebida * lote.custo_unitario
-            produto.custo_medio = (valor_anterior + valor_entrada) / produto.estoque_atual
+            produto.custo_medio = (
+                valor_anterior + valor_entrada
+            ) / produto.estoque_atual
         else:
             produto.custo_medio = lote.custo_unitario
-        
+
         # Registrar movimentação
         movimentacao = EstoqueMovimentacao(
             produto_id=produto.id,
@@ -1932,32 +2083,35 @@ def receber_pedido(
             custo_unitario=lote.custo_unitario,
             motivo=f"Recebimento do pedido {pedido.numero_pedido}",
             documento=pedido.numero_pedido,
-            estoque_anterior=(produto.estoque_atual or 0) - receb_item.quantidade_recebida,
+            estoque_anterior=(produto.estoque_atual or 0)
+            - receb_item.quantidade_recebida,
             estoque_atual=produto.estoque_atual,
             user_id=current_user.id,
-            tenant_id=tenant_id
+            tenant_id=tenant_id,
         )
         db.add(movimentacao)
-        
-        itens_recebidos.append({
-            "item_id": item.id,
-            "produto_id": produto.id,
-            "produto_nome": produto.nome,
-            "quantidade_recebida": receb_item.quantidade_recebida,
-            "lote": numero_lote,
-            "status": item.status
-        })
+
+        itens_recebidos.append(
+            {
+                "item_id": item.id,
+                "produto_id": produto.id,
+                "produto_nome": produto.nome,
+                "quantidade_recebida": receb_item.quantidade_recebida,
+                "lote": numero_lote,
+                "status": item.status,
+            }
+        )
         para_sync_bling.append((produto.id, produto.estoque_atual))
-        
+
         logger.info(
             f"  ✅ Item {item.id}: {produto.nome} - "
             f"{receb_item.quantidade_recebida} unidades recebidas"
         )
-    
+
     # Atualizar status do pedido
     todos_recebidos = all(item.status == "recebido_total" for item in pedido.itens)
     algum_recebido = any(item.quantidade_recebida > 0 for item in pedido.itens)
-    
+
     if todos_recebidos:
         pedido.status = "recebido_total"
         pedido.data_recebimento = data_recebimento
@@ -1965,28 +2119,31 @@ def receber_pedido(
         pedido.status = "recebido_parcial"
         if not pedido.data_recebimento:
             pedido.data_recebimento = data_recebimento
-    
+
     pedido.updated_at = datetime.utcnow()
-    
+
     db.commit()
-    
+
     # SINCRONIZAR ESTOQUE COM BLING para todos os itens recebidos
     try:
         from app.bling_estoque_sync import sincronizar_bling_background
+
         for produto_id, estoque_novo in para_sync_bling:
-            sincronizar_bling_background(produto_id, estoque_novo, "recebimento_pedido_compra")
+            sincronizar_bling_background(
+                produto_id, estoque_novo, "recebimento_pedido_compra"
+            )
     except Exception as e_sync:
         logger.warning(f"[BLING-SYNC] Erro ao agendar sync (pedido_compra): {e_sync}")
-    
+
     logger.info(f"✅ Pedido {pedido.numero_pedido} recebido - Status: {pedido.status}")
-    
+
     return {
         "message": "Recebimento processado com sucesso",
         "pedido_id": pedido.id,
         "numero_pedido": pedido.numero_pedido,
         "status": pedido.status,
         "itens_recebidos": len(itens_recebidos),
-        "detalhes": itens_recebidos
+        "detalhes": itens_recebidos,
     }
 
 
@@ -1994,63 +2151,92 @@ def receber_pedido(
 # EXPORTAÇÃO PDF/EXCEL
 # ============================================================================
 
+
 @router.get("/{pedido_id}/export/excel")
 def exportar_excel(
     pedido_id: int,
-    colunas: Optional[str] = Query(None, description="Colunas do documento separadas por virgula"),
+    colunas: Optional[str] = Query(
+        None, description="Colunas do documento separadas por virgula"
+    ),
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Exporta pedido para Excel"""
     current_user, tenant_id = current_user_and_tenant
-    pedido = db.query(PedidoCompra).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).options(joinedload(PedidoCompra.itens)).first()
-    
+    pedido = (
+        db.query(PedidoCompra)
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .options(joinedload(PedidoCompra.itens))
+        .first()
+    )
+
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
 
     fornecedor = _buscar_fornecedor_pedido(db, tenant_id, pedido)
-    fornecedor_nome = fornecedor.nome if fornecedor else f"Fornecedor {pedido.fornecedor_id}"
+    fornecedor_nome = (
+        fornecedor.nome if fornecedor else f"Fornecedor {pedido.fornecedor_id}"
+    )
     colunas_exportacao = _normalizar_colunas_exportacao_pedido(colunas)
-    output = BytesIO(_gerar_excel_pedido_bytes(pedido, fornecedor_nome, db, tenant_id, colunas_exportacao))
-    filename = _montar_nome_arquivo_pedido(pedido, fornecedor_nome, db, tenant_id, "xlsx")
+    output = BytesIO(
+        _gerar_excel_pedido_bytes(
+            pedido, fornecedor_nome, db, tenant_id, colunas_exportacao
+        )
+    )
+    filename = _montar_nome_arquivo_pedido(
+        pedido, fornecedor_nome, db, tenant_id, "xlsx"
+    )
 
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": _montar_content_disposition_attachment(filename)}
+        headers={
+            "Content-Disposition": _montar_content_disposition_attachment(filename)
+        },
     )
 
 
 @router.get("/{pedido_id}/export/pdf")
 def exportar_pdf(
     pedido_id: int,
-    colunas: Optional[str] = Query(None, description="Colunas do documento separadas por virgula"),
+    colunas: Optional[str] = Query(
+        None, description="Colunas do documento separadas por virgula"
+    ),
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Exporta pedido para PDF"""
     current_user, tenant_id = current_user_and_tenant
-    pedido = db.query(PedidoCompra).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).options(joinedload(PedidoCompra.itens)).first()
-    
+    pedido = (
+        db.query(PedidoCompra)
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .options(joinedload(PedidoCompra.itens))
+        .first()
+    )
+
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
 
     fornecedor = _buscar_fornecedor_pedido(db, tenant_id, pedido)
-    fornecedor_nome = fornecedor.nome if fornecedor else f"Fornecedor {pedido.fornecedor_id}"
+    fornecedor_nome = (
+        fornecedor.nome if fornecedor else f"Fornecedor {pedido.fornecedor_id}"
+    )
     colunas_exportacao = _normalizar_colunas_exportacao_pedido(colunas)
-    buffer = BytesIO(_gerar_pdf_pedido_bytes(pedido, fornecedor_nome, db, tenant_id, colunas_exportacao))
-    filename = _montar_nome_arquivo_pedido(pedido, fornecedor_nome, db, tenant_id, "pdf")
+    buffer = BytesIO(
+        _gerar_pdf_pedido_bytes(
+            pedido, fornecedor_nome, db, tenant_id, colunas_exportacao
+        )
+    )
+    filename = _montar_nome_arquivo_pedido(
+        pedido, fornecedor_nome, db, tenant_id, "pdf"
+    )
 
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": _montar_content_disposition_attachment(filename)}
+        headers={
+            "Content-Disposition": _montar_content_disposition_attachment(filename)
+        },
     )
 
 
@@ -2058,45 +2244,48 @@ def exportar_pdf(
 def reverter_status(
     pedido_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Reverte status do pedido (para corrigir cliques acidentais)"""
     current_user, tenant_id = current_user_and_tenant
-    pedido = db.query(PedidoCompra).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
-    
+    pedido = (
+        db.query(PedidoCompra)
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
+
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
-    
+
     # Lógica de reversão
     status_reverso = {
-        'enviado': 'rascunho',
-        'confirmado': 'enviado',
-        'recebido_parcial': 'confirmado',
-        'recebido_total': 'confirmado'
+        "enviado": "rascunho",
+        "confirmado": "enviado",
+        "recebido_parcial": "confirmado",
+        "recebido_total": "confirmado",
     }
-    
+
     if pedido.status not in status_reverso:
         raise HTTPException(
             status_code=400,
-            detail=f"Não é possível reverter pedido com status '{pedido.status}'"
+            detail=f"Não é possível reverter pedido com status '{pedido.status}'",
         )
-    
+
     status_anterior = pedido.status
     pedido.status = status_reverso[pedido.status]
     pedido.updated_at = datetime.now()
-    
+
     db.commit()
-    logger.info(f"⏪ Pedido {pedido.numero_pedido} revertido: {status_anterior} → {pedido.status}")
-    
+    logger.info(
+        f"⏪ Pedido {pedido.numero_pedido} revertido: {status_anterior} → {pedido.status}"
+    )
+
     return {
         "message": "Status revertido com sucesso",
         "pedido_id": pedido.id,
         "numero_pedido": pedido.numero_pedido,
         "status_anterior": status_anterior,
-        "status_atual": pedido.status
+        "status_atual": pedido.status,
     }
 
 
@@ -2104,27 +2293,50 @@ def reverter_status(
 # 💡 SUGESTÃO INTELIGENTE DE PEDIDO
 # ============================================================================
 
+
 @router.get("/sugestao/{fornecedor_id}")
 def sugerir_pedido_inteligente(
     fornecedor_id: int,
-    periodo_dias: int = Query(default=90, ge=7, le=365, description="Período de análise (7-365 dias)"),
-    dias_cobertura: int = Query(default=30, ge=7, le=180, description="Dias de estoque que o pedido deve cobrir (7-180)"),
-    apenas_criticos: bool = Query(default=False, description="Apenas produtos críticos (estoque < 7 dias)"),
-    incluir_alerta: bool = Query(default=True, description="Incluir produtos em alerta"),
-    incluir_grupo_fornecedor: bool = Query(default=False, description="Incluir todos os CNPJs do grupo comercial do fornecedor"),
-    apenas_fornecedor_principal: bool = Query(default=False, description="Considerar apenas produtos cujo fornecedor principal esta no fornecedor/grupo selecionado"),
-    fornecedor_grupo_id: Optional[int] = Query(default=None, description="Grupo comercial de fornecedores para consolidar a sugestao"),
-    marca_ids: Optional[List[int]] = Query(default=None, description="Filtrar por marcas específicas"),
+    periodo_dias: int = Query(
+        default=90, ge=7, le=365, description="Período de análise (7-365 dias)"
+    ),
+    dias_cobertura: int = Query(
+        default=30,
+        ge=7,
+        le=180,
+        description="Dias de estoque que o pedido deve cobrir (7-180)",
+    ),
+    apenas_criticos: bool = Query(
+        default=False, description="Apenas produtos críticos (estoque < 7 dias)"
+    ),
+    incluir_alerta: bool = Query(
+        default=True, description="Incluir produtos em alerta"
+    ),
+    incluir_grupo_fornecedor: bool = Query(
+        default=False,
+        description="Incluir todos os CNPJs do grupo comercial do fornecedor",
+    ),
+    apenas_fornecedor_principal: bool = Query(
+        default=False,
+        description="Considerar apenas produtos cujo fornecedor principal esta no fornecedor/grupo selecionado",
+    ),
+    fornecedor_grupo_id: Optional[int] = Query(
+        default=None,
+        description="Grupo comercial de fornecedores para consolidar a sugestao",
+    ),
+    marca_ids: Optional[List[int]] = Query(
+        default=None, description="Filtrar por marcas específicas"
+    ),
     marca_ids_brackets: Optional[List[int]] = Query(default=None, alias="marca_ids[]"),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     📊 Sugestão Inteligente de Pedido de Compra
-    
+
     Analisa histórico de vendas, estoque atual e lead time do fornecedor
     para sugerir quantidade ideal a pedir de cada produto.
-    
+
     Algoritmo:
     1. Calcula consumo médio diário baseado em vendas do período
     2. Verifica estoque atual e dias de cobertura restantes
@@ -2132,7 +2344,7 @@ def sugerir_pedido_inteligente(
     4. Sugere quantidade para cobrir a cobertura escolhida, somando reposicao
        apenas quando o estoque atual nao cobre lead time + margem de seguranca.
     5. Prioriza produtos críticos (estoque baixo) e em alerta
-    
+
     Parâmetros:
     - periodo_dias: Base de cálculo (30/60/90/180 dias)
     - dias_cobertura: Quantos dias de estoque o pedido deve garantir (15/30/45/60/90)
@@ -2140,19 +2352,25 @@ def sugerir_pedido_inteligente(
     - incluir_alerta: Incluir produtos que atingiram estoque mínimo
     """
     user, tenant_id = user_and_tenant
-    
-    logger.info(f"💡 Gerando sugestão de pedido - Fornecedor: {fornecedor_id} | Período: {periodo_dias} dias")
-    
+
+    logger.info(
+        f"💡 Gerando sugestão de pedido - Fornecedor: {fornecedor_id} | Período: {periodo_dias} dias"
+    )
+
     # Validar fornecedor
-    fornecedor = db.query(Cliente).filter(
-        Cliente.id == fornecedor_id,
-        Cliente.tenant_id == tenant_id,
-        Cliente.tipo_cadastro == 'fornecedor'
-    ).first()
-    
+    fornecedor = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == fornecedor_id,
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "fornecedor",
+        )
+        .first()
+    )
+
     if not fornecedor:
         raise HTTPException(status_code=404, detail="Fornecedor não encontrado")
-    
+
     # Data inicial para análise
     fornecedor_ids, fornecedor_grupo = _resolver_fornecedores_compra(
         db,
@@ -2164,28 +2382,26 @@ def sugerir_pedido_inteligente(
 
     data_fim = datetime.now()
     data_inicio = data_fim - timedelta(days=periodo_dias)
-    
+
     marcas_filtro = marca_ids or marca_ids_brackets or []
 
     # Buscar produtos do fornecedor com relacionamento e marca
-    produtos_fornecedor_query = db.query(
-        Produto,
-        ProdutoFornecedor,
-        Marca
-    ).join(
-        ProdutoFornecedor,
-        Produto.id == ProdutoFornecedor.produto_id
-    ).outerjoin(
-        Marca,
-        Produto.marca_id == Marca.id
-    ).filter(
-        Produto.tenant_id == tenant_id,
-        Produto.ativo,
-        or_(Produto.participa_sugestao_compra, Produto.participa_sugestao_compra.is_(None)),
-        or_(Produto.e_granel.is_(False), Produto.e_granel.is_(None)),
-        ~Produto.nome.ilike("%granel%"),
-        ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids),
-        ProdutoFornecedor.ativo
+    produtos_fornecedor_query = (
+        db.query(Produto, ProdutoFornecedor, Marca)
+        .join(ProdutoFornecedor, Produto.id == ProdutoFornecedor.produto_id)
+        .outerjoin(Marca, Produto.marca_id == Marca.id)
+        .filter(
+            Produto.tenant_id == tenant_id,
+            Produto.ativo,
+            or_(
+                Produto.participa_sugestao_compra,
+                Produto.participa_sugestao_compra.is_(None),
+            ),
+            or_(Produto.e_granel.is_(False), Produto.e_granel.is_(None)),
+            ~Produto.nome.ilike("%granel%"),
+            ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids),
+            ProdutoFornecedor.ativo,
+        )
     )
 
     if apenas_fornecedor_principal:
@@ -2205,10 +2421,12 @@ def sugerir_pedido_inteligente(
     produtos_fornecedor_raw = produtos_fornecedor_query.all()
     fornecedores_por_id = {
         item.id: item.nome
-        for item in db.query(Cliente.id, Cliente.nome).filter(
+        for item in db.query(Cliente.id, Cliente.nome)
+        .filter(
             Cliente.tenant_id == tenant_id,
             Cliente.id.in_(fornecedor_ids),
-        ).all()
+        )
+        .all()
     }
 
     # Se o mesmo produto estiver vinculado a mais de um CNPJ do grupo,
@@ -2230,7 +2448,7 @@ def sugerir_pedido_inteligente(
             }
 
     produtos_fornecedor = [item["linha"] for item in produtos_por_id.values()]
-    
+
     if not produtos_fornecedor:
         return {
             "fornecedor": {
@@ -2240,7 +2458,9 @@ def sugerir_pedido_inteligente(
                 "grupo": {
                     "id": fornecedor_grupo.id,
                     "nome": fornecedor_grupo.nome,
-                } if fornecedor_grupo else None,
+                }
+                if fornecedor_grupo
+                else None,
             },
             "periodo_dias": periodo_dias,
             "apenas_fornecedor_principal": apenas_fornecedor_principal,
@@ -2249,11 +2469,11 @@ def sugerir_pedido_inteligente(
                 "total_produtos": 0,
                 "produtos_criticos": 0,
                 "produtos_alerta": 0,
-                "valor_total_estimado": 0
+                "valor_total_estimado": 0,
             },
-            "mensagem": "Nenhum produto vinculado a este fornecedor"
+            "mensagem": "Nenhum produto vinculado a este fornecedor",
         }
-    
+
     sugestoes = []
     total_criticos = 0
     total_alerta = 0
@@ -2290,7 +2510,9 @@ def sugerir_pedido_inteligente(
         vendas_30 = _float_seguro_sugestao(vendas_janelas.get("30"))
 
         # Consumo médio diário
-        estoque_atual, estoque_info = _obter_estoque_atual_sugestao(db, produto, tenant_id)
+        estoque_atual, estoque_info = _obter_estoque_atual_sugestao(
+            db, produto, tenant_id
+        )
         estoque_minimo = _float_seguro_sugestao(produto.estoque_minimo)
         cobertura_estoque = _calcular_dias_com_estoque(
             movimentacoes_por_produto.get(produto.id, []),
@@ -2317,26 +2539,28 @@ def sugerir_pedido_inteligente(
         )
         if pode_ajustar_por_ruptura and vendas_periodo > 0:
             if vendas_periodo < MIN_VENDAS_AJUSTE_RUPTURA:
-                motivo_ajuste_ruptura = (
-                    f"Ruptura detectada, mas sem ajuste: apenas {vendas_periodo:g} venda(s) no periodo."
-                )
+                motivo_ajuste_ruptura = f"Ruptura detectada, mas sem ajuste: apenas {vendas_periodo:g} venda(s) no periodo."
             elif dias_com_estoque < MIN_DIAS_COM_ESTOQUE_AJUSTE_RUPTURA:
-                motivo_ajuste_ruptura = (
-                    f"Ruptura detectada, mas sem ajuste: somente {dias_com_estoque:.1f} dia(s) com estoque."
-                )
+                motivo_ajuste_ruptura = f"Ruptura detectada, mas sem ajuste: somente {dias_com_estoque:.1f} dia(s) com estoque."
             else:
                 consumo_ajustado_bruto = vendas_periodo / max(dias_com_estoque, 1.0)
-                limite_ajuste = consumo_base * MAX_MULTIPLICADOR_AJUSTE_RUPTURA if consumo_base > 0 else consumo_ajustado_bruto
+                limite_ajuste = (
+                    consumo_base * MAX_MULTIPLICADOR_AJUSTE_RUPTURA
+                    if consumo_base > 0
+                    else consumo_ajustado_bruto
+                )
                 consumo_ajustado = min(consumo_ajustado_bruto, limite_ajuste)
                 ajuste_ruptura_aplicado = consumo_ajustado > consumo_base * 1.05
                 if consumo_ajustado_bruto > consumo_ajustado:
-                    motivo_ajuste_ruptura = (
-                        f"Media ajustada por ruptura, limitada a {MAX_MULTIPLICADOR_AJUSTE_RUPTURA:g}x o giro observado."
-                    )
+                    motivo_ajuste_ruptura = f"Media ajustada por ruptura, limitada a {MAX_MULTIPLICADOR_AJUSTE_RUPTURA:g}x o giro observado."
                 else:
-                    motivo_ajuste_ruptura = "Media ajustada pelos dias em que havia estoque."
+                    motivo_ajuste_ruptura = (
+                        "Media ajustada pelos dias em que havia estoque."
+                    )
         elif teve_ruptura and vendas_periodo <= 0:
-            motivo_ajuste_ruptura = "Ruptura detectada, mas sem vendas no periodo para projetar demanda."
+            motivo_ajuste_ruptura = (
+                "Ruptura detectada, mas sem vendas no periodo para projetar demanda."
+            )
 
         consumo_diario = max(consumo_base, consumo_ajustado)
 
@@ -2350,7 +2574,9 @@ def sugerir_pedido_inteligente(
         # Lead time do fornecedor (padrão 7 dias se não configurado)
         lead_time = produto_fornecedor.prazo_entrega or 7
         margem_seguranca_dias = MARGEM_SEGURANCA_COMPRA_DIAS
-        dias_reposicao = _float_seguro_sugestao(lead_time) + _float_seguro_sugestao(margem_seguranca_dias)
+        dias_reposicao = _float_seguro_sugestao(lead_time) + _float_seguro_sugestao(
+            margem_seguranca_dias
+        )
 
         # Calcular quantidade sugerida
         # A cobertura escolhida pelo usuario e o alvo principal do pedido.
@@ -2384,7 +2610,6 @@ def sugerir_pedido_inteligente(
 
         # Tendência de vendas — lookup em vez de query individual
         if periodo_dias >= 60 and consumo_observado > 0:
-
             if consumo_recente > consumo_observado * 1.2:
                 tendencia = "CRESCIMENTO"
             elif consumo_recente < consumo_observado * 0.8:
@@ -2404,13 +2629,13 @@ def sugerir_pedido_inteligente(
 
         # Aplicar filtros
         incluir_produto = True
-        
+
         if apenas_criticos and prioridade != "CRÍTICO":
             incluir_produto = False
-        
+
         if not incluir_alerta and prioridade == "ALERTA":
             incluir_produto = False
-        
+
         # Adicionar à lista (mesmo com qtd 0 para visibilidade se estoque alto)
         if incluir_produto or quantidade_sugerida > 0:
             sugestao = {
@@ -2419,15 +2644,23 @@ def sugerir_pedido_inteligente(
                 "produto_sku": produto.codigo,
                 "produto_codigo_barras": produto.codigo_barras,
                 "fornecedor_id": produto_fornecedor.fornecedor_id,
-                "fornecedor_nome": fornecedores_por_id.get(produto_fornecedor.fornecedor_id),
-                "fornecedor_grupo_id": fornecedor_grupo.id if fornecedor_grupo else None,
-                "fornecedor_grupo_nome": fornecedor_grupo.nome if fornecedor_grupo else None,
+                "fornecedor_nome": fornecedores_por_id.get(
+                    produto_fornecedor.fornecedor_id
+                ),
+                "fornecedor_grupo_id": fornecedor_grupo.id
+                if fornecedor_grupo
+                else None,
+                "fornecedor_grupo_nome": fornecedor_grupo.nome
+                if fornecedor_grupo
+                else None,
                 "marca_id": produto.marca_id,
                 "marca_nome": marca.nome if marca else None,
                 "estoque_atual": _float_seguro_sugestao(estoque_atual),
                 "estoque_minimo": _float_seguro_sugestao(estoque_minimo),
                 "consumo_diario": _round_seguro_sugestao(consumo_diario, 2),
-                "consumo_diario_observado": _round_seguro_sugestao(consumo_observado, 3),
+                "consumo_diario_observado": _round_seguro_sugestao(
+                    consumo_observado, 3
+                ),
                 "consumo_diario_ajustado": _round_seguro_sugestao(consumo_ajustado, 3),
                 "consumo_diario_base": _round_seguro_sugestao(consumo_base, 3),
                 "vendas_periodo": _float_seguro_sugestao(vendas_periodo),
@@ -2440,7 +2673,9 @@ def sugerir_pedido_inteligente(
                 "origens_venda": vendas_stats.get("origens") or [],
                 "fontes_calculo": vendas_stats.get("fontes") or [],
                 "granel_consumo": vendas_stats.get("granel_consumo") or {},
-                "dias_estoque": _round_seguro_sugestao(dias_estoque, 1) if dias_estoque < 999 else None,
+                "dias_estoque": _round_seguro_sugestao(dias_estoque, 1)
+                if dias_estoque < 999
+                else None,
                 "dias_com_estoque": dias_com_estoque,
                 "dias_sem_estoque": dias_sem_estoque,
                 "teve_ruptura": teve_ruptura,
@@ -2457,7 +2692,9 @@ def sugerir_pedido_inteligente(
                 "quantidade_sugerida": _round_seguro_sugestao(quantidade_sugerida, 2),
                 "preco_unitario": _float_seguro_sugestao(preco_unitario),
                 "valor_total": _round_seguro_sugestao(valor_sugestao, 2),
-                "peso_bruto": _float_seguro_sugestao(produto.peso_embalagem or produto.peso_bruto or produto.peso_liquido),
+                "peso_bruto": _float_seguro_sugestao(
+                    produto.peso_embalagem or produto.peso_bruto or produto.peso_liquido
+                ),
                 "estoque_derivado": bool(estoque_info.get("estoque_derivado")),
                 "tipo_produto": estoque_info.get("tipo_produto"),
                 "tipo_kit": estoque_info.get("tipo_kit"),
@@ -2476,42 +2713,52 @@ def sugerir_pedido_inteligente(
                     consumo_observado=consumo_observado,
                     ajuste_ruptura_aplicado=ajuste_ruptura_aplicado,
                     motivo_ajuste_ruptura=motivo_ajuste_ruptura,
-                )
+                ),
             }
-            
+
             sugestoes.append(sugestao)
             valor_total += valor_sugestao
-    
+
     # Ordenar por prioridade (CRÍTICO > ALERTA > ATENÇÃO > NORMAL)
     ordem_prioridade = {"CRÍTICO": 0, "ALERTA": 1, "ATENÇÃO": 2, "NORMAL": 3}
-    sugestoes.sort(key=lambda x: (ordem_prioridade.get(x["prioridade"], 4), -x["valor_total"]))
-    
-    logger.info(f"✅ Sugestão gerada: {len(sugestoes)} produtos | {total_criticos} críticos | {total_alerta} em alerta")
-    
-    return _sanitizar_json_sugestao({
-        "fornecedor": {
-            "id": fornecedor.id,
-            "nome": fornecedor.nome,
-            "ids_considerados": fornecedor_ids,
-            "grupo": {
-                "id": fornecedor_grupo.id,
-                "nome": fornecedor_grupo.nome,
-            } if fornecedor_grupo else None,
-        },
-        "periodo_dias": periodo_dias,
-        "dias_cobertura": dias_cobertura,
-        "apenas_fornecedor_principal": apenas_fornecedor_principal,
-        "data_analise_inicio": data_inicio.isoformat(),
-        "data_analise_fim": data_fim.isoformat(),
-        "sugestoes": sugestoes,
-        "resumo": {
-            "total_produtos": len(sugestoes),
-            "produtos_criticos": total_criticos,
-            "produtos_alerta": total_alerta,
-            "produtos_atencao": len([s for s in sugestoes if s["prioridade"] == "ATENÇÃO"]),
-            "valor_total_estimado": _round_seguro_sugestao(valor_total, 2)
+    sugestoes.sort(
+        key=lambda x: (ordem_prioridade.get(x["prioridade"], 4), -x["valor_total"])
+    )
+
+    logger.info(
+        f"✅ Sugestão gerada: {len(sugestoes)} produtos | {total_criticos} críticos | {total_alerta} em alerta"
+    )
+
+    return _sanitizar_json_sugestao(
+        {
+            "fornecedor": {
+                "id": fornecedor.id,
+                "nome": fornecedor.nome,
+                "ids_considerados": fornecedor_ids,
+                "grupo": {
+                    "id": fornecedor_grupo.id,
+                    "nome": fornecedor_grupo.nome,
+                }
+                if fornecedor_grupo
+                else None,
+            },
+            "periodo_dias": periodo_dias,
+            "dias_cobertura": dias_cobertura,
+            "apenas_fornecedor_principal": apenas_fornecedor_principal,
+            "data_analise_inicio": data_inicio.isoformat(),
+            "data_analise_fim": data_fim.isoformat(),
+            "sugestoes": sugestoes,
+            "resumo": {
+                "total_produtos": len(sugestoes),
+                "produtos_criticos": total_criticos,
+                "produtos_alerta": total_alerta,
+                "produtos_atencao": len(
+                    [s for s in sugestoes if s["prioridade"] == "ATENÇÃO"]
+                ),
+                "valor_total_estimado": _round_seguro_sugestao(valor_total, 2),
+            },
         }
-    })
+    )
 
 
 def _gerar_observacao(
@@ -2530,7 +2777,7 @@ def _gerar_observacao(
 ) -> str:
     """Gera observacao inteligente baseada nos dados de compra."""
     observacoes = []
-    
+
     if ruptura_ativa:
         observacoes.append("Ruptura ativa: estoque zerado/negativo")
     elif prioridade == "CRÍTICO":
@@ -2548,7 +2795,11 @@ def _gerar_observacao(
     elif teve_ruptura and motivo_ajuste_ruptura:
         observacoes.append(motivo_ajuste_ruptura)
 
-    if ajuste_ruptura_aplicado and consumo_ajustado > consumo_observado * 1.1 and consumo_observado > 0:
+    if (
+        ajuste_ruptura_aplicado
+        and consumo_ajustado > consumo_observado * 1.1
+        and consumo_observado > 0
+    ):
         observacoes.append("Demanda recalculada pelos dias em que havia estoque")
 
     if tendencia == "CRESCIMENTO":
@@ -2566,6 +2817,7 @@ def _gerar_observacao(
 # CONFRONTO PEDIDO x NF-e
 # ============================================================================
 
+
 def _float_confronto(value: Any, default: float = 0.0) -> float:
     try:
         if value is None:
@@ -2580,13 +2832,17 @@ def _calcular_composicoes_custo_confronto(notas: List) -> Dict[int, Dict[str, An
     try:
         from . import notas_entrada_routes
     except ImportError:
-        logger.exception("Nao foi possivel importar composicao de custos da NF para confronto")
+        logger.exception(
+            "Nao foi possivel importar composicao de custos da NF para confronto"
+        )
         return {}
 
     composicoes: Dict[int, Dict[str, Any]] = {}
     for nota in notas:
         try:
-            composicoes.update(notas_entrada_routes.calcular_composicao_custos_nota(nota) or {})
+            composicoes.update(
+                notas_entrada_routes.calcular_composicao_custos_nota(nota) or {}
+            )
         except Exception:
             logger.exception(
                 "Falha ao calcular custo final da NF no confronto pedido x nota",
@@ -2595,14 +2851,18 @@ def _calcular_composicoes_custo_confronto(notas: List) -> Dict[int, Dict[str, An
     return composicoes
 
 
-def _valor_custo_final_item_nf(item_nf: Any, composicoes_custo: Dict[int, Dict[str, Any]]) -> float:
+def _valor_custo_final_item_nf(
+    item_nf: Any, composicoes_custo: Dict[int, Dict[str, Any]]
+) -> float:
     composicao = composicoes_custo.get(getattr(item_nf, "id", None)) or {}
     if composicao.get("custo_aquisicao_total") is not None:
         return _float_confronto(composicao.get("custo_aquisicao_total"))
     return _float_confronto(getattr(item_nf, "valor_total", 0))
 
 
-def _preco_custo_final_item_nf(item_nf: Any, composicoes_custo: Dict[int, Dict[str, Any]]) -> float:
+def _preco_custo_final_item_nf(
+    item_nf: Any, composicoes_custo: Dict[int, Dict[str, Any]]
+) -> float:
     valor_total = _valor_custo_final_item_nf(item_nf, composicoes_custo)
     quantidade = _float_confronto(getattr(item_nf, "quantidade", 0))
     if quantidade:
@@ -2614,7 +2874,107 @@ def _preco_custo_final_item_nf(item_nf: Any, composicoes_custo: Dict[int, Dict[s
     return _float_confronto(getattr(item_nf, "valor_unitario", 0))
 
 
-def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_id: int) -> dict:
+def _status_item_confronto(
+    dif_qtd: float, dif_preco_pct: float
+) -> tuple[str, bool, bool]:
+    divergiu_qtd = abs(dif_qtd) > 0.001
+    divergiu_preco = abs(dif_preco_pct) > 0.5
+
+    if divergiu_qtd and divergiu_preco:
+        status_item = "divergencia_mista"
+    elif divergiu_qtd:
+        status_item = "divergencia_quantidade"
+    elif divergiu_preco:
+        status_item = "divergencia_preco"
+    else:
+        status_item = "ok"
+
+    return status_item, divergiu_qtd, divergiu_preco
+
+
+def _montar_item_confronto_encontrado(
+    item_pedido,
+    nome_produto,
+    codigo_produto,
+    item_nf_id,
+    qtd_pedida,
+    qtd_nf,
+    preco_pedido,
+    preco_nf,
+    valor_pedido,
+    valor_nf,
+    extras: dict | None = None,
+) -> tuple[dict, bool, bool]:
+    dif_qtd = qtd_nf - qtd_pedida
+    dif_preco_unit = preco_nf - preco_pedido
+    dif_preco_pct = (
+        ((preco_nf - preco_pedido) / preco_pedido * 100) if preco_pedido else 0
+    )
+    dif_valor = valor_nf - valor_pedido
+    status_item, divergiu_qtd, divergiu_preco = _status_item_confronto(
+        dif_qtd, dif_preco_pct
+    )
+
+    item = {
+        "produto_id": item_pedido.produto_id,
+        "produto_nome": nome_produto,
+        "produto_codigo": codigo_produto,
+        "item_pedido_id": item_pedido.id,
+        "item_nf_id": item_nf_id,
+        "qtd_pedida": qtd_pedida,
+        "qtd_nf": qtd_nf,
+        "dif_qtd": round(dif_qtd, 3),
+        "preco_pedido": round(preco_pedido, 4),
+        "preco_nf": round(preco_nf, 4),
+        "dif_preco_unit": round(dif_preco_unit, 4),
+        "dif_preco_pct": round(dif_preco_pct, 2),
+        "valor_pedido": round(valor_pedido, 2),
+        "valor_nf": round(valor_nf, 2),
+        "dif_valor": round(dif_valor, 2),
+        "status": status_item,
+        "encontrado_na_nf": True,
+    }
+    if extras:
+        item.update(extras)
+    return item, divergiu_qtd, divergiu_preco
+
+
+def _montar_item_confronto_nao_encontrado(
+    item_pedido,
+    nome_produto,
+    codigo_produto,
+    qtd_pedida,
+    preco_pedido,
+    valor_pedido,
+    extras: dict | None = None,
+) -> dict:
+    item = {
+        "produto_id": item_pedido.produto_id,
+        "produto_nome": nome_produto,
+        "produto_codigo": codigo_produto,
+        "item_pedido_id": item_pedido.id,
+        "item_nf_id": None,
+        "qtd_pedida": qtd_pedida,
+        "qtd_nf": 0,
+        "dif_qtd": -qtd_pedida,
+        "preco_pedido": round(preco_pedido, 4),
+        "preco_nf": 0,
+        "dif_preco_unit": None,
+        "dif_preco_pct": 0,
+        "valor_pedido": round(valor_pedido, 2),
+        "valor_nf": 0,
+        "dif_valor": -round(valor_pedido, 2),
+        "status": "nao_encontrado",
+        "encontrado_na_nf": False,
+    }
+    if extras:
+        item.update(extras)
+    return item
+
+
+def _realizar_confronto_legado(
+    pedido: PedidoCompra, nota, db: Session, tenant_id: int
+) -> dict:
     """Gera o confronto completo entre pedido e NF-e."""
 
     itens_confronto = []
@@ -2624,10 +2984,13 @@ def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_i
     tem_divergencia_preco = False
 
     for item_pedido in pedido.itens:
-        produto = db.query(Produto).filter(
-            Produto.id == item_pedido.produto_id,
-            Produto.tenant_id == tenant_id
-        ).first()
+        produto = (
+            db.query(Produto)
+            .filter(
+                Produto.id == item_pedido.produto_id, Produto.tenant_id == tenant_id
+            )
+            .first()
+        )
 
         nome_produto = produto.nome if produto else f"Produto {item_pedido.produto_id}"
         codigo_produto = produto.codigo if produto else None
@@ -2646,7 +3009,10 @@ def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_i
                     break
         if not item_nf and codigo_produto:
             for it in nota.itens:
-                if it.codigo_produto and it.codigo_produto.strip() == str(codigo_produto).strip():
+                if (
+                    it.codigo_produto
+                    and it.codigo_produto.strip() == str(codigo_produto).strip()
+                ):
                     item_nf = it
                     break
 
@@ -2661,90 +3027,65 @@ def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_i
             valor_nf = item_nf.valor_total
             total_nf += valor_nf
 
-            dif_qtd = qtd_nf - qtd_pedida
-            dif_preco_unit = preco_nf - preco_pedido
-            dif_preco_pct = ((preco_nf - preco_pedido) / preco_pedido * 100) if preco_pedido else 0
-            dif_valor = valor_nf - valor_pedido
-
-            if abs(dif_qtd) > 0.001:
+            item_confronto, divergiu_qtd, divergiu_preco = (
+                _montar_item_confronto_encontrado(
+                    item_pedido,
+                    nome_produto,
+                    codigo_produto,
+                    item_nf.id,
+                    qtd_pedida,
+                    qtd_nf,
+                    preco_pedido,
+                    preco_nf,
+                    valor_pedido,
+                    valor_nf,
+                )
+            )
+            if divergiu_qtd:
                 tem_divergencia_qtd = True
-            if abs(dif_preco_pct) > 0.5:
+            if divergiu_preco:
                 tem_divergencia_preco = True
 
-            status_item = "ok"
-            if abs(dif_qtd) > 0.001 and abs(dif_preco_pct) > 0.5:
-                status_item = "divergencia_mista"
-            elif abs(dif_qtd) > 0.001:
-                status_item = "divergencia_quantidade"
-            elif abs(dif_preco_pct) > 0.5:
-                status_item = "divergencia_preco"
-
-            itens_confronto.append({
-                "produto_id": item_pedido.produto_id,
-                "produto_nome": nome_produto,
-                "produto_codigo": codigo_produto,
-                "item_pedido_id": item_pedido.id,
-                "item_nf_id": item_nf.id,
-                "qtd_pedida": qtd_pedida,
-                "qtd_nf": qtd_nf,
-                "dif_qtd": round(dif_qtd, 3),
-                "preco_pedido": round(preco_pedido, 4),
-                "preco_nf": round(preco_nf, 4),
-                "dif_preco_unit": round(dif_preco_unit, 4),
-                "dif_preco_pct": round(dif_preco_pct, 2),
-                "valor_pedido": round(valor_pedido, 2),
-                "valor_nf": round(valor_nf, 2),
-                "dif_valor": round(dif_valor, 2),
-                "status": status_item,
-                "encontrado_na_nf": True,
-            })
+            itens_confronto.append(item_confronto)
         else:
             # Item do pedido não encontrado na NF
             tem_divergencia_qtd = True
-            itens_confronto.append({
-                "produto_id": item_pedido.produto_id,
-                "produto_nome": nome_produto,
-                "produto_codigo": codigo_produto,
-                "item_pedido_id": item_pedido.id,
-                "item_nf_id": None,
-                "qtd_pedida": qtd_pedida,
-                "qtd_nf": 0,
-                "dif_qtd": -qtd_pedida,
-                "preco_pedido": round(preco_pedido, 4),
-                "preco_nf": 0,
-                "dif_preco_unit": None,
-                "dif_preco_pct": 0,
-                "valor_pedido": round(valor_pedido, 2),
-                "valor_nf": 0,
-                "dif_valor": -round(valor_pedido, 2),
-                "status": "nao_encontrado",
-                "encontrado_na_nf": False,
-            })
+            item_confronto = _montar_item_confronto_nao_encontrado(
+                item_pedido,
+                nome_produto,
+                codigo_produto,
+                qtd_pedida,
+                preco_pedido,
+                valor_pedido,
+            )
+            itens_confronto.append(item_confronto)
 
     # Itens na NF que não estavam no pedido
     ids_pedido_produto = {i.produto_id for i in pedido.itens}
     for it in nota.itens:
         if it.produto_id and it.produto_id not in ids_pedido_produto:
             total_nf += it.valor_total
-            itens_confronto.append({
-                "produto_id": it.produto_id,
-                "produto_nome": it.descricao,
-                "produto_codigo": it.codigo_produto,
-                "item_pedido_id": None,
-                "item_nf_id": it.id,
-                "qtd_pedida": 0,
-                "qtd_nf": it.quantidade,
-                "dif_qtd": it.quantidade,
-                "preco_pedido": 0,
-                "preco_nf": round(it.valor_unitario, 4),
-                "dif_preco_unit": None,
-                "dif_preco_pct": 0,
-                "valor_pedido": 0,
-                "valor_nf": round(it.valor_total, 2),
-                "dif_valor": round(it.valor_total, 2),
-                "status": "nao_pedido",
-                "encontrado_na_nf": True,
-            })
+            itens_confronto.append(
+                {
+                    "produto_id": it.produto_id,
+                    "produto_nome": it.descricao,
+                    "produto_codigo": it.codigo_produto,
+                    "item_pedido_id": None,
+                    "item_nf_id": it.id,
+                    "qtd_pedida": 0,
+                    "qtd_nf": it.quantidade,
+                    "dif_qtd": it.quantidade,
+                    "preco_pedido": 0,
+                    "preco_nf": round(it.valor_unitario, 4),
+                    "dif_preco_unit": None,
+                    "dif_preco_pct": 0,
+                    "valor_pedido": 0,
+                    "valor_nf": round(it.valor_total, 2),
+                    "dif_valor": round(it.valor_total, 2),
+                    "status": "nao_pedido",
+                    "encontrado_na_nf": True,
+                }
+            )
 
     # Status geral do confronto
     if tem_divergencia_qtd and tem_divergencia_preco:
@@ -2769,7 +3110,7 @@ def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_i
             "desconto_nf": nota.valor_desconto,
             "itens_pedido": len(pedido.itens),
             "itens_nf": len(nota.itens),
-        }
+        },
     }
 
 
@@ -2801,7 +3142,9 @@ def _formatar_numeros_notas(notas: List) -> str:
     return ", ".join(numeros) if numeros else "-"
 
 
-def _realizar_confronto(pedido: PedidoCompra, nota_ou_notas, db: Session, tenant_id: int) -> dict:
+def _realizar_confronto(
+    pedido: PedidoCompra, nota_ou_notas, db: Session, tenant_id: int
+) -> dict:
     """Gera o confronto completo entre pedido e uma ou mais NF-e."""
     notas = _normalizar_notas_confronto(nota_ou_notas)
     itens_nf = [item for nota in notas for item in (nota.itens or [])]
@@ -2821,7 +3164,8 @@ def _realizar_confronto(pedido: PedidoCompra, nota_ou_notas, db: Session, tenant
 
     def _itens_nf_para_pedido(item_pedido, codigo_produto, ean_produto):
         candidatos = [
-            it for it in itens_nf
+            it
+            for it in itens_nf
             if it.id not in itens_nf_usados and it.produto_id == item_pedido.produto_id
         ]
         if candidatos:
@@ -2829,16 +3173,22 @@ def _realizar_confronto(pedido: PedidoCompra, nota_ou_notas, db: Session, tenant
 
         if ean_produto:
             candidatos = [
-                it for it in itens_nf
-                if it.id not in itens_nf_usados and it.ean and _codigo_igual(it.ean, ean_produto)
+                it
+                for it in itens_nf
+                if it.id not in itens_nf_usados
+                and it.ean
+                and _codigo_igual(it.ean, ean_produto)
             ]
             if candidatos:
                 return candidatos
 
         if codigo_produto:
             candidatos = [
-                it for it in itens_nf
-                if it.id not in itens_nf_usados and it.codigo_produto and _codigo_igual(it.codigo_produto, codigo_produto)
+                it
+                for it in itens_nf
+                if it.id not in itens_nf_usados
+                and it.codigo_produto
+                and _codigo_igual(it.codigo_produto, codigo_produto)
             ]
             if candidatos:
                 return candidatos
@@ -2846,10 +3196,13 @@ def _realizar_confronto(pedido: PedidoCompra, nota_ou_notas, db: Session, tenant
         return []
 
     for item_pedido in pedido.itens:
-        produto = db.query(Produto).filter(
-            Produto.id == item_pedido.produto_id,
-            Produto.tenant_id == tenant_id
-        ).first()
+        produto = (
+            db.query(Produto)
+            .filter(
+                Produto.id == item_pedido.produto_id, Produto.tenant_id == tenant_id
+            )
+            .first()
+        )
 
         nome_produto = produto.nome if produto else f"Produto {item_pedido.produto_id}"
         codigo_produto = produto.codigo if produto else None
@@ -2866,72 +3219,58 @@ def _realizar_confronto(pedido: PedidoCompra, nota_ou_notas, db: Session, tenant
                 itens_nf_usados.add(it.id)
 
             qtd_nf = sum(float(it.quantidade or 0) for it in itens_match)
-            valor_nf = sum(_valor_custo_final_item_nf(it, composicoes_custo) for it in itens_match)
-            preco_nf = (valor_nf / qtd_nf) if qtd_nf else _preco_custo_final_item_nf(itens_match[0], composicoes_custo)
+            valor_nf = sum(
+                _valor_custo_final_item_nf(it, composicoes_custo) for it in itens_match
+            )
+            preco_nf = (
+                (valor_nf / qtd_nf)
+                if qtd_nf
+                else _preco_custo_final_item_nf(itens_match[0], composicoes_custo)
+            )
             total_nf += valor_nf
 
-            dif_qtd = qtd_nf - qtd_pedida
-            dif_preco_unit = preco_nf - preco_pedido
-            dif_preco_pct = ((preco_nf - preco_pedido) / preco_pedido * 100) if preco_pedido else 0
-            dif_valor = valor_nf - valor_pedido
-
-            if abs(dif_qtd) > 0.001:
+            item_confronto, divergiu_qtd, divergiu_preco = (
+                _montar_item_confronto_encontrado(
+                    item_pedido,
+                    nome_produto,
+                    codigo_produto,
+                    itens_match[0].id,
+                    qtd_pedida,
+                    qtd_nf,
+                    preco_pedido,
+                    preco_nf,
+                    valor_pedido,
+                    valor_nf,
+                    extras={
+                        "item_nf_ids": [it.id for it in itens_match],
+                        "nota_entrada_ids": sorted(
+                            {
+                                it.nota_entrada_id
+                                for it in itens_match
+                                if it.nota_entrada_id
+                            }
+                        ),
+                    },
+                )
+            )
+            if divergiu_qtd:
                 tem_divergencia_qtd = True
-            if abs(dif_preco_pct) > 0.5:
+            if divergiu_preco:
                 tem_divergencia_preco = True
 
-            status_item = "ok"
-            if abs(dif_qtd) > 0.001 and abs(dif_preco_pct) > 0.5:
-                status_item = "divergencia_mista"
-            elif abs(dif_qtd) > 0.001:
-                status_item = "divergencia_quantidade"
-            elif abs(dif_preco_pct) > 0.5:
-                status_item = "divergencia_preco"
-
-            itens_confronto.append({
-                "produto_id": item_pedido.produto_id,
-                "produto_nome": nome_produto,
-                "produto_codigo": codigo_produto,
-                "item_pedido_id": item_pedido.id,
-                "item_nf_id": itens_match[0].id,
-                "item_nf_ids": [it.id for it in itens_match],
-                "nota_entrada_ids": sorted({it.nota_entrada_id for it in itens_match if it.nota_entrada_id}),
-                "qtd_pedida": qtd_pedida,
-                "qtd_nf": qtd_nf,
-                "dif_qtd": round(dif_qtd, 3),
-                "preco_pedido": round(preco_pedido, 4),
-                "preco_nf": round(preco_nf, 4),
-                "dif_preco_unit": round(dif_preco_unit, 4),
-                "dif_preco_pct": round(dif_preco_pct, 2),
-                "valor_pedido": round(valor_pedido, 2),
-                "valor_nf": round(valor_nf, 2),
-                "dif_valor": round(dif_valor, 2),
-                "status": status_item,
-                "encontrado_na_nf": True,
-            })
+            itens_confronto.append(item_confronto)
         else:
             tem_divergencia_qtd = True
-            itens_confronto.append({
-                "produto_id": item_pedido.produto_id,
-                "produto_nome": nome_produto,
-                "produto_codigo": codigo_produto,
-                "item_pedido_id": item_pedido.id,
-                "item_nf_id": None,
-                "item_nf_ids": [],
-                "nota_entrada_ids": [],
-                "qtd_pedida": qtd_pedida,
-                "qtd_nf": 0,
-                "dif_qtd": -qtd_pedida,
-                "preco_pedido": round(preco_pedido, 4),
-                "preco_nf": 0,
-                "dif_preco_unit": None,
-                "dif_preco_pct": 0,
-                "valor_pedido": round(valor_pedido, 2),
-                "valor_nf": 0,
-                "dif_valor": -round(valor_pedido, 2),
-                "status": "nao_encontrado",
-                "encontrado_na_nf": False,
-            })
+            item_confronto = _montar_item_confronto_nao_encontrado(
+                item_pedido,
+                nome_produto,
+                codigo_produto,
+                qtd_pedida,
+                preco_pedido,
+                valor_pedido,
+                extras={"item_nf_ids": [], "nota_entrada_ids": []},
+            )
+            itens_confronto.append(item_confronto)
 
     for it in itens_nf:
         if it.id in itens_nf_usados:
@@ -2940,27 +3279,29 @@ def _realizar_confronto(pedido: PedidoCompra, nota_ou_notas, db: Session, tenant
         valor_nf = _valor_custo_final_item_nf(it, composicoes_custo)
         preco_nf = _preco_custo_final_item_nf(it, composicoes_custo)
         total_nf += valor_nf
-        itens_confronto.append({
-            "produto_id": it.produto_id,
-            "produto_nome": it.descricao,
-            "produto_codigo": it.codigo_produto,
-            "item_pedido_id": None,
-            "item_nf_id": it.id,
-            "item_nf_ids": [it.id],
-            "nota_entrada_ids": [it.nota_entrada_id] if it.nota_entrada_id else [],
-            "qtd_pedida": 0,
-            "qtd_nf": qtd_nf,
-            "dif_qtd": qtd_nf,
-            "preco_pedido": 0,
-            "preco_nf": round(preco_nf, 4),
-            "dif_preco_unit": None,
-            "dif_preco_pct": 0,
-            "valor_pedido": 0,
-            "valor_nf": round(valor_nf, 2),
-            "dif_valor": round(valor_nf, 2),
-            "status": "nao_pedido",
-            "encontrado_na_nf": True,
-        })
+        itens_confronto.append(
+            {
+                "produto_id": it.produto_id,
+                "produto_nome": it.descricao,
+                "produto_codigo": it.codigo_produto,
+                "item_pedido_id": None,
+                "item_nf_id": it.id,
+                "item_nf_ids": [it.id],
+                "nota_entrada_ids": [it.nota_entrada_id] if it.nota_entrada_id else [],
+                "qtd_pedida": 0,
+                "qtd_nf": qtd_nf,
+                "dif_qtd": qtd_nf,
+                "preco_pedido": 0,
+                "preco_nf": round(preco_nf, 4),
+                "dif_preco_unit": None,
+                "dif_preco_pct": 0,
+                "valor_pedido": 0,
+                "valor_nf": round(valor_nf, 2),
+                "dif_valor": round(valor_nf, 2),
+                "status": "nao_pedido",
+                "encontrado_na_nf": True,
+            }
+        )
 
     if tem_divergencia_qtd and tem_divergencia_preco:
         status_confronto = "divergencia_mista"
@@ -2988,7 +3329,7 @@ def _realizar_confronto(pedido: PedidoCompra, nota_ou_notas, db: Session, tenant
             "nota_entrada_ids": [n.id for n in notas],
             "numeros_nota": _formatar_numeros_notas(notas),
             "notas_entrada": _resumir_notas_confronto(notas),
-        }
+        },
     }
 
 
@@ -3017,9 +3358,12 @@ def _resumo_por_itens(itens: List[dict], resumo_base: dict) -> dict:
     }
 
 
-def _ids_notas_vinculadas(db: Session, pedido: PedidoCompra, tenant_id: int) -> List[int]:
+def _ids_notas_vinculadas(
+    db: Session, pedido: PedidoCompra, tenant_id: int
+) -> List[int]:
     ids = [
-        row[0] for row in db.query(PedidoCompraNotaEntrada.nota_entrada_id)
+        row[0]
+        for row in db.query(PedidoCompraNotaEntrada.nota_entrada_id)
         .filter(
             PedidoCompraNotaEntrada.pedido_compra_id == pedido.id,
             PedidoCompraNotaEntrada.tenant_id == tenant_id,
@@ -3032,22 +3376,30 @@ def _ids_notas_vinculadas(db: Session, pedido: PedidoCompra, tenant_id: int) -> 
     return ids
 
 
-def _garantir_vinculo_legado(db: Session, pedido: PedidoCompra, tenant_id: int, user_id: int) -> None:
+def _garantir_vinculo_legado(
+    db: Session, pedido: PedidoCompra, tenant_id: int, user_id: int
+) -> None:
     if not pedido.nota_entrada_id:
         return
-    existe = db.query(PedidoCompraNotaEntrada.id).filter(
-        PedidoCompraNotaEntrada.pedido_compra_id == pedido.id,
-        PedidoCompraNotaEntrada.nota_entrada_id == pedido.nota_entrada_id,
-        PedidoCompraNotaEntrada.tenant_id == tenant_id,
-    ).first()
+    existe = (
+        db.query(PedidoCompraNotaEntrada.id)
+        .filter(
+            PedidoCompraNotaEntrada.pedido_compra_id == pedido.id,
+            PedidoCompraNotaEntrada.nota_entrada_id == pedido.nota_entrada_id,
+            PedidoCompraNotaEntrada.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if existe:
         return
-    db.add(PedidoCompraNotaEntrada(
-        pedido_compra_id=pedido.id,
-        nota_entrada_id=pedido.nota_entrada_id,
-        user_id=user_id,
-        tenant_id=tenant_id,
-    ))
+    db.add(
+        PedidoCompraNotaEntrada(
+            pedido_compra_id=pedido.id,
+            nota_entrada_id=pedido.nota_entrada_id,
+            user_id=user_id,
+            tenant_id=tenant_id,
+        )
+    )
     db.flush()
 
 
@@ -3055,7 +3407,9 @@ def _sincronizar_nota_legacy(pedido: PedidoCompra, nota_ids: List[int]) -> None:
     pedido.nota_entrada_id = nota_ids[0] if nota_ids else None
 
 
-def _obter_notas_vinculadas(db: Session, pedido: PedidoCompra, tenant_id: int, com_itens: bool = False) -> List:
+def _obter_notas_vinculadas(
+    db: Session, pedido: PedidoCompra, tenant_id: int, com_itens: bool = False
+) -> List:
     from .produtos_models import NotaEntrada
 
     nota_ids = _ids_notas_vinculadas(db, pedido, tenant_id)
@@ -3074,10 +3428,15 @@ def _obter_notas_vinculadas(db: Session, pedido: PedidoCompra, tenant_id: int, c
     return [por_id[nid] for nid in nota_ids if nid in por_id]
 
 
-def _buscar_pedido_finalizado_da_nota(db: Session, nota_id: int, pedido_id: int, tenant_id: int) -> Optional[PedidoCompra]:
+def _buscar_pedido_finalizado_da_nota(
+    db: Session, nota_id: int, pedido_id: int, tenant_id: int
+) -> Optional[PedidoCompra]:
     pedido_por_vinculo = (
         db.query(PedidoCompra)
-        .join(PedidoCompraNotaEntrada, PedidoCompraNotaEntrada.pedido_compra_id == PedidoCompra.id)
+        .join(
+            PedidoCompraNotaEntrada,
+            PedidoCompraNotaEntrada.pedido_compra_id == PedidoCompra.id,
+        )
         .filter(
             PedidoCompraNotaEntrada.nota_entrada_id == nota_id,
             PedidoCompraNotaEntrada.tenant_id == tenant_id,
@@ -3090,15 +3449,21 @@ def _buscar_pedido_finalizado_da_nota(db: Session, nota_id: int, pedido_id: int,
     if pedido_por_vinculo:
         return pedido_por_vinculo
 
-    return db.query(PedidoCompra).filter(
-        PedidoCompra.nota_entrada_id == nota_id,
-        PedidoCompra.confronto_finalizado,
-        PedidoCompra.id != pedido_id,
-        PedidoCompra.tenant_id == tenant_id,
-    ).first()
+    return (
+        db.query(PedidoCompra)
+        .filter(
+            PedidoCompra.nota_entrada_id == nota_id,
+            PedidoCompra.confronto_finalizado,
+            PedidoCompra.id != pedido_id,
+            PedidoCompra.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
 
-def _salvar_confronto_pedido(pedido: PedidoCompra, notas: List, confronto: dict) -> None:
+def _salvar_confronto_pedido(
+    pedido: PedidoCompra, notas: List, confronto: dict
+) -> None:
     pedido.data_confronto = datetime.utcnow()
     pedido.status_confronto = confronto["status_confronto"]
     pedido.resumo_confronto = json.dumps(confronto, ensure_ascii=False, default=str)
@@ -3110,33 +3475,44 @@ def _salvar_confronto_pedido(pedido: PedidoCompra, notas: List, confronto: dict)
 def listar_notas_candidatas(
     pedido_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Lista NF-e importadas do mesmo fornecedor do pedido, ordenadas pela mais recente."""
     from .produtos_models import NotaEntrada
 
     current_user, tenant_id = current_user_and_tenant
-    pedido = db.query(PedidoCompra).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+    pedido = (
+        db.query(PedidoCompra)
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
 
     # Buscar CNPJ do fornecedor
-    fornecedor = db.query(Cliente).filter(
-        Cliente.id == pedido.fornecedor_id,
-        Cliente.tenant_id == tenant_id
-    ).first()
+    fornecedor = (
+        db.query(Cliente)
+        .filter(Cliente.id == pedido.fornecedor_id, Cliente.tenant_id == tenant_id)
+        .first()
+    )
 
     query = db.query(NotaEntrada).filter(NotaEntrada.tenant_id == tenant_id)
 
     if fornecedor and fornecedor.cnpj:
-        cnpj_limpo = fornecedor.cnpj.replace(".", "").replace("/", "").replace("-", "").strip()
+        cnpj_limpo = (
+            fornecedor.cnpj.replace(".", "").replace("/", "").replace("-", "").strip()
+        )
         query = query.filter(
             or_(
                 NotaEntrada.fornecedor_id == pedido.fornecedor_id,
-                func.replace(func.replace(func.replace(NotaEntrada.fornecedor_cnpj, ".", ""), "/", ""), "-", "") == cnpj_limpo,
+                func.replace(
+                    func.replace(
+                        func.replace(NotaEntrada.fornecedor_cnpj, ".", ""), "/", ""
+                    ),
+                    "-",
+                    "",
+                )
+                == cnpj_limpo,
             )
         )
     elif fornecedor:
@@ -3147,17 +3523,19 @@ def listar_notas_candidatas(
 
     result = []
     for n in notas:
-        result.append({
-            "id": n.id,
-            "numero_nota": n.numero_nota,
-            "serie": n.serie,
-            "chave_acesso": n.chave_acesso,
-            "fornecedor_nome": n.fornecedor_nome,
-            "data_emissao": n.data_emissao,
-            "valor_total": n.valor_total,
-            "status": n.status,
-            "ja_vinculada": n.id in nota_ids_vinculadas,
-        })
+        result.append(
+            {
+                "id": n.id,
+                "numero_nota": n.numero_nota,
+                "serie": n.serie,
+                "chave_acesso": n.chave_acesso,
+                "fornecedor_nome": n.fornecedor_nome,
+                "data_emissao": n.data_emissao,
+                "valor_total": n.valor_total,
+                "status": n.status,
+                "ja_vinculada": n.id in nota_ids_vinculadas,
+            }
+        )
 
     return {
         "notas": result,
@@ -3171,27 +3549,27 @@ def vincular_nota_e_confrontar(
     pedido_id: int,
     nota_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Vincula NF-e ao pedido e realiza o confronto completo."""
     from .produtos_models import NotaEntrada
 
     current_user, tenant_id = current_user_and_tenant
-    pedido = db.query(PedidoCompra).options(
-        joinedload(PedidoCompra.itens)
-    ).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+    pedido = (
+        db.query(PedidoCompra)
+        .options(joinedload(PedidoCompra.itens))
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
 
-    nota = db.query(NotaEntrada).options(
-        joinedload(NotaEntrada.itens)
-    ).filter(
-        NotaEntrada.id == nota_id,
-        NotaEntrada.tenant_id == tenant_id
-    ).first()
+    nota = (
+        db.query(NotaEntrada)
+        .options(joinedload(NotaEntrada.itens))
+        .filter(NotaEntrada.id == nota_id, NotaEntrada.tenant_id == tenant_id)
+        .first()
+    )
     if not nota:
         raise HTTPException(status_code=404, detail="Nota fiscal não encontrada")
 
@@ -3199,27 +3577,35 @@ def vincular_nota_e_confrontar(
     if pedido.confronto_finalizado:
         raise HTTPException(status_code=400, detail="Confronto ja foi finalizado")
 
-    outro_finalizado = _buscar_pedido_finalizado_da_nota(db, nota_id, pedido_id, tenant_id)
+    outro_finalizado = _buscar_pedido_finalizado_da_nota(
+        db, nota_id, pedido_id, tenant_id
+    )
     if outro_finalizado:
         raise HTTPException(
             status_code=400,
-            detail=f"Esta NF já está vinculada em definitivo ao pedido {outro_finalizado.numero_pedido}. Não é possível revinculá-la."
+            detail=f"Esta NF já está vinculada em definitivo ao pedido {outro_finalizado.numero_pedido}. Não é possível revinculá-la.",
         )
 
     _garantir_vinculo_legado(db, pedido, tenant_id, current_user.id)
 
-    vinculo = db.query(PedidoCompraNotaEntrada).filter(
-        PedidoCompraNotaEntrada.pedido_compra_id == pedido.id,
-        PedidoCompraNotaEntrada.nota_entrada_id == nota_id,
-        PedidoCompraNotaEntrada.tenant_id == tenant_id,
-    ).first()
+    vinculo = (
+        db.query(PedidoCompraNotaEntrada)
+        .filter(
+            PedidoCompraNotaEntrada.pedido_compra_id == pedido.id,
+            PedidoCompraNotaEntrada.nota_entrada_id == nota_id,
+            PedidoCompraNotaEntrada.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not vinculo:
-        db.add(PedidoCompraNotaEntrada(
-            pedido_compra_id=pedido.id,
-            nota_entrada_id=nota_id,
-            user_id=current_user.id,
-            tenant_id=tenant_id,
-        ))
+        db.add(
+            PedidoCompraNotaEntrada(
+                pedido_compra_id=pedido.id,
+                nota_entrada_id=nota_id,
+                user_id=current_user.id,
+                tenant_id=tenant_id,
+            )
+        )
         db.flush()
 
     notas = _obter_notas_vinculadas(db, pedido, tenant_id, com_itens=True)
@@ -3244,27 +3630,31 @@ def desvincular_nota_e_recalcular_confronto(
     pedido_id: int,
     nota_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Remove uma NF do confronto do pedido e recalcula com as restantes."""
     current_user, tenant_id = current_user_and_tenant
-    pedido = db.query(PedidoCompra).options(
-        joinedload(PedidoCompra.itens)
-    ).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+    pedido = (
+        db.query(PedidoCompra)
+        .options(joinedload(PedidoCompra.itens))
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido nao encontrado")
     if pedido.confronto_finalizado:
         raise HTTPException(status_code=400, detail="Confronto ja foi finalizado")
 
     _garantir_vinculo_legado(db, pedido, tenant_id, current_user.id)
-    vinculo = db.query(PedidoCompraNotaEntrada).filter(
-        PedidoCompraNotaEntrada.pedido_compra_id == pedido.id,
-        PedidoCompraNotaEntrada.nota_entrada_id == nota_id,
-        PedidoCompraNotaEntrada.tenant_id == tenant_id,
-    ).first()
+    vinculo = (
+        db.query(PedidoCompraNotaEntrada)
+        .filter(
+            PedidoCompraNotaEntrada.pedido_compra_id == pedido.id,
+            PedidoCompraNotaEntrada.nota_entrada_id == nota_id,
+            PedidoCompraNotaEntrada.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if vinculo:
         db.delete(vinculo)
         db.flush()
@@ -3303,14 +3693,15 @@ def desvincular_nota_e_recalcular_confronto(
 def obter_confronto_salvo(
     pedido_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Retorna o confronto salvo do pedido."""
     current_user, tenant_id = current_user_and_tenant
-    pedido = db.query(PedidoCompra).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+    pedido = (
+        db.query(PedidoCompra)
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
     notas = _obter_notas_vinculadas(db, pedido, tenant_id)
@@ -3326,38 +3717,55 @@ def obter_confronto_salvo(
         "data_confronto": pedido.data_confronto,
         "status_confronto": pedido.status_confronto,
         "confronto_finalizado": pedido.confronto_finalizado or False,
-        "confronto": json.loads(pedido.resumo_confronto) if pedido.resumo_confronto else None,
+        "confronto": json.loads(pedido.resumo_confronto)
+        if pedido.resumo_confronto
+        else None,
     }
 
 
 @router.get("/{pedido_id}/confronto/csv")
 def exportar_confronto_csv(
     pedido_id: int,
-    filtros: Optional[str] = Query(None, description="Filtrar status separados por vírgula: ok,divergencia_quantidade,divergencia_preco,divergencia_mista,nao_encontrado,nao_pedido"),
+    filtros: Optional[str] = Query(
+        None,
+        description="Filtrar status separados por vírgula: ok,divergencia_quantidade,divergencia_preco,divergencia_mista,nao_encontrado,nao_pedido",
+    ),
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Exporta o confronto do pedido em CSV."""
     current_user, tenant_id = current_user_and_tenant
-    pedido = db.query(PedidoCompra).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+    pedido = (
+        db.query(PedidoCompra)
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
     if not pedido or not pedido.resumo_confronto:
         raise HTTPException(status_code=404, detail="Confronto não encontrado")
 
     from .produtos_models import NotaEntrada as _NotaEntrada
+
     confronto = json.loads(pedido.resumo_confronto)
     itens = confronto.get("itens", [])
     resumo = confronto.get("resumo", {})
     itens = _aplicar_filtros_confronto(itens, filtros)
     resumo = _resumo_por_itens(itens, resumo)
 
-    nota = db.query(_NotaEntrada).filter(
-        _NotaEntrada.id == pedido.nota_entrada_id,
-        _NotaEntrada.tenant_id == tenant_id,
-    ).first() if pedido.nota_entrada_id else None
-    numero_nota = _formatar_numeros_notas(_obter_notas_vinculadas(db, pedido, tenant_id)) or resumo.get("numeros_nota") or (nota.numero_nota if nota and nota.numero_nota else "-")
+    nota = (
+        db.query(_NotaEntrada)
+        .filter(
+            _NotaEntrada.id == pedido.nota_entrada_id,
+            _NotaEntrada.tenant_id == tenant_id,
+        )
+        .first()
+        if pedido.nota_entrada_id
+        else None
+    )
+    numero_nota = (
+        _formatar_numeros_notas(_obter_notas_vinculadas(db, pedido, tenant_id))
+        or resumo.get("numeros_nota")
+        or (nota.numero_nota if nota and nota.numero_nota else "-")
+    )
 
     def fmt(v):
         if v is None or v == "":
@@ -3368,79 +3776,119 @@ def exportar_confronto_csv(
         f"Pedido;{pedido.numero_pedido}",
         f"NF;{numero_nota}",
         "",
-        "Produto;Código;Qtd Pedida;Qtd NF;Dif. Qtd;Preço Pedido (R$);Preço NF (R$);Dif. Unit. (R$);Dif. Preço (%);Valor Pedido (R$);Valor NF (R$);Dif. Valor (R$);Status"
+        "Produto;Código;Qtd Pedida;Qtd NF;Dif. Qtd;Preço Pedido (R$);Preço NF (R$);Dif. Unit. (R$);Dif. Preço (%);Valor Pedido (R$);Valor NF (R$);Dif. Valor (R$);Status",
     ]
     for it in itens:
         linhas.append(
-            f"{it.get('produto_nome','')};{it.get('produto_codigo','')};{fmt(it.get('qtd_pedida',0))};{fmt(it.get('qtd_nf',0))};{fmt(it.get('dif_qtd',0))};{fmt(it.get('preco_pedido',0))};{fmt(it.get('preco_nf',0))};{fmt(it.get('dif_preco_unit',''))};{fmt(it.get('dif_preco_pct',0))};{fmt(it.get('valor_pedido',0))};{fmt(it.get('valor_nf',0))};{fmt(it.get('dif_valor',0))};{it.get('status','')}"
+            f"{it.get('produto_nome', '')};{it.get('produto_codigo', '')};{fmt(it.get('qtd_pedida', 0))};{fmt(it.get('qtd_nf', 0))};{fmt(it.get('dif_qtd', 0))};{fmt(it.get('preco_pedido', 0))};{fmt(it.get('preco_nf', 0))};{fmt(it.get('dif_preco_unit', ''))};{fmt(it.get('dif_preco_pct', 0))};{fmt(it.get('valor_pedido', 0))};{fmt(it.get('valor_nf', 0))};{fmt(it.get('dif_valor', 0))};{it.get('status', '')}"
         )
     linhas.append("")
-    linhas.append(f";;Total Pedido (R$);;{fmt(resumo.get('total_pedido',0))}")
-    linhas.append(f";;Total NF (R$);;{fmt(resumo.get('total_nf',0))}")
-    linhas.append(f";;Diferença Total (R$);;{fmt(resumo.get('dif_total',0))}")
+    linhas.append(f";;Total Pedido (R$);;{fmt(resumo.get('total_pedido', 0))}")
+    linhas.append(f";;Total NF (R$);;{fmt(resumo.get('total_nf', 0))}")
+    linhas.append(f";;Diferença Total (R$);;{fmt(resumo.get('dif_total', 0))}")
 
     csv_content = "\n".join(linhas)
     return StreamingResponse(
         io.StringIO(csv_content),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f"attachment; filename=confronto_{pedido.numero_pedido}.csv"}
+        headers={
+            "Content-Disposition": f"attachment; filename=confronto_{pedido.numero_pedido}.csv"
+        },
     )
 
 
 @router.get("/{pedido_id}/confronto/pdf")
 def exportar_confronto_pdf(
     pedido_id: int,
-    filtros: Optional[str] = Query(None, description="Filtrar status separados por vírgula"),
+    filtros: Optional[str] = Query(
+        None, description="Filtrar status separados por vírgula"
+    ),
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Exporta o confronto do pedido em PDF."""
     try:
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib import colors
         from reportlab.lib.units import mm
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.platypus import (
+            SimpleDocTemplate,
+            Table,
+            TableStyle,
+            Paragraph,
+            Spacer,
+        )
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.enums import TA_CENTER
     except ImportError:
         raise HTTPException(status_code=500, detail="reportlab não instalado")
 
     current_user, tenant_id = current_user_and_tenant
-    pedido = db.query(PedidoCompra).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+    pedido = (
+        db.query(PedidoCompra)
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
     if not pedido or not pedido.resumo_confronto:
         raise HTTPException(status_code=404, detail="Confronto não encontrado")
 
     from .produtos_models import NotaEntrada as _NotaEntrada
+
     confronto = json.loads(pedido.resumo_confronto)
     itens = confronto.get("itens", [])
     resumo = confronto.get("resumo", {})
     itens = _aplicar_filtros_confronto(itens, filtros)
     resumo = _resumo_por_itens(itens, resumo)
 
-    nota = db.query(_NotaEntrada).filter(
-        _NotaEntrada.id == pedido.nota_entrada_id,
-        _NotaEntrada.tenant_id == tenant_id,
-    ).first() if pedido.nota_entrada_id else None
-    numero_nota = _formatar_numeros_notas(_obter_notas_vinculadas(db, pedido, tenant_id)) or resumo.get("numeros_nota") or (nota.numero_nota if nota and nota.numero_nota else "-")
+    nota = (
+        db.query(_NotaEntrada)
+        .filter(
+            _NotaEntrada.id == pedido.nota_entrada_id,
+            _NotaEntrada.tenant_id == tenant_id,
+        )
+        .first()
+        if pedido.nota_entrada_id
+        else None
+    )
+    numero_nota = (
+        _formatar_numeros_notas(_obter_notas_vinculadas(db, pedido, tenant_id))
+        or resumo.get("numeros_nota")
+        or (nota.numero_nota if nota and nota.numero_nota else "-")
+    )
 
-    fornecedor = db.query(Cliente).filter(
-        Cliente.id == pedido.fornecedor_id,
-        Cliente.tenant_id == tenant_id
-    ).first()
-    fornecedor_nome = fornecedor.nome if fornecedor else f"Fornecedor {pedido.fornecedor_id}"
+    fornecedor = (
+        db.query(Cliente)
+        .filter(Cliente.id == pedido.fornecedor_id, Cliente.tenant_id == tenant_id)
+        .first()
+    )
+    fornecedor_nome = (
+        fornecedor.nome if fornecedor else f"Fornecedor {pedido.fornecedor_id}"
+    )
 
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), topMargin=12*mm, bottomMargin=12*mm, leftMargin=10*mm, rightMargin=10*mm)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        topMargin=12 * mm,
+        bottomMargin=12 * mm,
+        leftMargin=10 * mm,
+        rightMargin=10 * mm,
+    )
     elements = []
     styles = getSampleStyleSheet()
 
-    title_style = ParagraphStyle("T", parent=styles["Heading1"], fontSize=16,
-                                 textColor=colors.HexColor("#1a56db"), alignment=TA_CENTER, spaceAfter=8)
+    title_style = ParagraphStyle(
+        "T",
+        parent=styles["Heading1"],
+        fontSize=16,
+        textColor=colors.HexColor("#1a56db"),
+        alignment=TA_CENTER,
+        spaceAfter=8,
+    )
     sub_style = ParagraphStyle("S", parent=styles["Normal"], fontSize=9, spaceAfter=4)
-    small_style = ParagraphStyle("Sm", parent=styles["Normal"], fontSize=6.5, leading=8, wordWrap="CJK")
+    small_style = ParagraphStyle(
+        "Sm", parent=styles["Normal"], fontSize=6.5, leading=8, wordWrap="CJK"
+    )
 
     def cell(valor):
         return Paragraph(escape(str(valor if valor is not None else "-")), small_style)
@@ -3450,10 +3898,17 @@ def exportar_confronto_pdf(
     numero_nota_pdf = escape(str(numero_nota or "-"))
     fornecedor_pdf = escape(str(fornecedor_nome or "-"))
     data_confronto_pdf = escape(
-        pedido.data_confronto.strftime("%d/%m/%Y %H:%M") if pedido.data_confronto else "-"
+        pedido.data_confronto.strftime("%d/%m/%Y %H:%M")
+        if pedido.data_confronto
+        else "-"
     )
-    elements.append(Paragraph(f"Pedido: <b>{pedido_pdf}</b> &nbsp;|&nbsp; NF: <b>{numero_nota_pdf}</b> &nbsp;|&nbsp; Fornecedor: <b>{fornecedor_pdf}</b> &nbsp;|&nbsp; Data confronto: <b>{data_confronto_pdf}</b>", sub_style))
-    elements.append(Spacer(1, 4*mm))
+    elements.append(
+        Paragraph(
+            f"Pedido: <b>{pedido_pdf}</b> &nbsp;|&nbsp; NF: <b>{numero_nota_pdf}</b> &nbsp;|&nbsp; Fornecedor: <b>{fornecedor_pdf}</b> &nbsp;|&nbsp; Data confronto: <b>{data_confronto_pdf}</b>",
+            sub_style,
+        )
+    )
+    elements.append(Spacer(1, 4 * mm))
 
     STATUS_LABELS = {
         "ok": "OK",
@@ -3472,29 +3927,65 @@ def exportar_confronto_pdf(
         "nao_pedido": colors.HexColor("#ede9fe"),
     }
 
-    table_data = [["Produto", "Cód.", "Qtd Ped.", "Qtd NF", "Dif.Qtd", "R$ Ped.", "R$ NF", "Dif.Unit", "Dif.%", "Vl.Ped.", "Vl.NF", "Dif.R$", "Status"]]
+    table_data = [
+        [
+            "Produto",
+            "Cód.",
+            "Qtd Ped.",
+            "Qtd NF",
+            "Dif.Qtd",
+            "R$ Ped.",
+            "R$ NF",
+            "Dif.Unit",
+            "Dif.%",
+            "Vl.Ped.",
+            "Vl.NF",
+            "Dif.R$",
+            "Status",
+        ]
+    ]
     row_colors = []
 
     for idx, it in enumerate(itens):
         st = it.get("status", "ok")
         row_colors.append((idx + 1, STATUS_COLORS.get(st, colors.white)))
-        table_data.append([
-            cell(it.get("produto_nome", "")),
-            cell(it.get("produto_codigo") or ""),
-            cell(f"{it.get('qtd_pedida', 0):.2f}".rstrip("0").rstrip(".")),
-            cell(f"{it.get('qtd_nf', 0):.2f}".rstrip("0").rstrip(".")),
-            cell(f"{it.get('dif_qtd', 0):+.2f}".rstrip("0").rstrip(".")),
-            cell(f"R$ {it.get('preco_pedido', 0):.2f}"),
-            cell(f"R$ {it.get('preco_nf', 0):.2f}"),
-            cell(f"R$ {it.get('dif_preco_unit', 0):+.2f}" if it.get('dif_preco_unit') is not None else "-"),
-            cell(f"{it.get('dif_preco_pct', 0):+.1f}%"),
-            cell(f"R$ {it.get('valor_pedido', 0):.2f}"),
-            cell(f"R$ {it.get('valor_nf', 0):.2f}"),
-            cell(f"R$ {it.get('dif_valor', 0):+.2f}"),
-            cell(STATUS_LABELS.get(st, st)),
-        ])
+        table_data.append(
+            [
+                cell(it.get("produto_nome", "")),
+                cell(it.get("produto_codigo") or ""),
+                cell(f"{it.get('qtd_pedida', 0):.2f}".rstrip("0").rstrip(".")),
+                cell(f"{it.get('qtd_nf', 0):.2f}".rstrip("0").rstrip(".")),
+                cell(f"{it.get('dif_qtd', 0):+.2f}".rstrip("0").rstrip(".")),
+                cell(f"R$ {it.get('preco_pedido', 0):.2f}"),
+                cell(f"R$ {it.get('preco_nf', 0):.2f}"),
+                cell(
+                    f"R$ {it.get('dif_preco_unit', 0):+.2f}"
+                    if it.get("dif_preco_unit") is not None
+                    else "-"
+                ),
+                cell(f"{it.get('dif_preco_pct', 0):+.1f}%"),
+                cell(f"R$ {it.get('valor_pedido', 0):.2f}"),
+                cell(f"R$ {it.get('valor_nf', 0):.2f}"),
+                cell(f"R$ {it.get('dif_valor', 0):+.2f}"),
+                cell(STATUS_LABELS.get(st, st)),
+            ]
+        )
 
-    col_widths = [54*mm, 16*mm, 14*mm, 14*mm, 14*mm, 16*mm, 16*mm, 16*mm, 12*mm, 18*mm, 18*mm, 16*mm, 16*mm]
+    col_widths = [
+        54 * mm,
+        16 * mm,
+        14 * mm,
+        14 * mm,
+        14 * mm,
+        16 * mm,
+        16 * mm,
+        16 * mm,
+        12 * mm,
+        18 * mm,
+        18 * mm,
+        16 * mm,
+        16 * mm,
+    ]
     t = Table(table_data, colWidths=col_widths, repeatRows=1)
     style_cmds = [
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a56db")),
@@ -3511,23 +4002,42 @@ def exportar_confronto_pdf(
         style_cmds.append(("BACKGROUND", (0, row_idx), (-1, row_idx), color))
     t.setStyle(TableStyle(style_cmds))
     elements.append(t)
-    elements.append(Spacer(1, 5*mm))
+    elements.append(Spacer(1, 5 * mm))
 
     # Resumo financeiro
     resumo_data = [
         ["", "Total Produtos", "Frete", "Desconto"],
-        ["Pedido", f"R$ {resumo.get('total_pedido', 0):.2f}", f"R$ {resumo.get('frete_pedido', 0):.2f}", f"R$ {resumo.get('desconto_pedido', 0):.2f}"],
-        ["NF",    f"R$ {resumo.get('total_nf', 0):.2f}",    f"R$ {resumo.get('frete_nf', 0):.2f}",    f"R$ {resumo.get('desconto_nf', 0):.2f}"],
-        ["Diferença", f"R$ {resumo.get('dif_total', 0):+.2f}", f"R$ {(resumo.get('frete_nf',0)-resumo.get('frete_pedido',0)):+.2f}", "-"],
+        [
+            "Pedido",
+            f"R$ {resumo.get('total_pedido', 0):.2f}",
+            f"R$ {resumo.get('frete_pedido', 0):.2f}",
+            f"R$ {resumo.get('desconto_pedido', 0):.2f}",
+        ],
+        [
+            "NF",
+            f"R$ {resumo.get('total_nf', 0):.2f}",
+            f"R$ {resumo.get('frete_nf', 0):.2f}",
+            f"R$ {resumo.get('desconto_nf', 0):.2f}",
+        ],
+        [
+            "Diferença",
+            f"R$ {resumo.get('dif_total', 0):+.2f}",
+            f"R$ {(resumo.get('frete_nf', 0) - resumo.get('frete_pedido', 0)):+.2f}",
+            "-",
+        ],
     ]
-    rt = Table(resumo_data, colWidths=[30*mm, 45*mm, 35*mm, 35*mm])
-    rt.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f3f4f6")),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-    ]))
+    rt = Table(resumo_data, colWidths=[30 * mm, 45 * mm, 35 * mm, 35 * mm])
+    rt.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f3f4f6")),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
     elements.append(rt)
 
     doc.build(elements)
@@ -3535,41 +4045,65 @@ def exportar_confronto_pdf(
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=confronto_{pedido.numero_pedido}.pdf"}
+        headers={
+            "Content-Disposition": f"attachment; filename=confronto_{pedido.numero_pedido}.pdf"
+        },
     )
 
 
 @router.get("/{pedido_id}/confronto/email-texto")
 def gerar_email_confronto(
     pedido_id: int,
-    filtros: Optional[str] = Query(None, description="Filtrar status separados por vírgula"),
+    filtros: Optional[str] = Query(
+        None, description="Filtrar status separados por vírgula"
+    ),
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Gera texto de e-mail para enviar ao fornecedor com as divergências."""
     current_user, tenant_id = current_user_and_tenant
-    pedido = db.query(PedidoCompra).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+    pedido = (
+        db.query(PedidoCompra)
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
     if not pedido or not pedido.resumo_confronto:
         raise HTTPException(status_code=404, detail="Confronto não encontrado")
 
     from .produtos_models import NotaEntrada as _NotaEntrada
+
     confronto = json.loads(pedido.resumo_confronto)
     itens = confronto.get("itens", [])
     resumo = confronto.get("resumo", {})
     itens = _aplicar_filtros_confronto(itens, filtros)
     resumo = _resumo_por_itens(itens, resumo)
 
-    fornecedor = db.query(Cliente).filter(Cliente.id == pedido.fornecedor_id, Cliente.tenant_id == tenant_id).first()
+    fornecedor = (
+        db.query(Cliente)
+        .filter(Cliente.id == pedido.fornecedor_id, Cliente.tenant_id == tenant_id)
+        .first()
+    )
     fornecedor_nome = fornecedor.nome if fornecedor else "Fornecedor"
 
-    nota = db.query(_NotaEntrada).filter(
-        _NotaEntrada.id == pedido.nota_entrada_id,
-        _NotaEntrada.tenant_id == tenant_id
-    ).first() if pedido.nota_entrada_id else None
-    numero_nota = _formatar_numeros_notas(_obter_notas_vinculadas(db, pedido, tenant_id)) or resumo.get("numeros_nota") or (nota.numero_nota if nota and nota.numero_nota else str(pedido.nota_entrada_id or ""))
+    nota = (
+        db.query(_NotaEntrada)
+        .filter(
+            _NotaEntrada.id == pedido.nota_entrada_id,
+            _NotaEntrada.tenant_id == tenant_id,
+        )
+        .first()
+        if pedido.nota_entrada_id
+        else None
+    )
+    numero_nota = (
+        _formatar_numeros_notas(_obter_notas_vinculadas(db, pedido, tenant_id))
+        or resumo.get("numeros_nota")
+        or (
+            nota.numero_nota
+            if nota and nota.numero_nota
+            else str(pedido.nota_entrada_id or "")
+        )
+    )
 
     divergencias = [i for i in itens if i.get("status") != "ok"]
 
@@ -3578,9 +4112,13 @@ def gerar_email_confronto(
         partes = []
         st = d.get("status")
         if st in ("divergencia_quantidade", "divergencia_mista", "nao_encontrado"):
-            partes.append(f"qtd. pedida: {d['qtd_pedida']}, qtd. recebida: {d['qtd_nf']}")
+            partes.append(
+                f"qtd. pedida: {d['qtd_pedida']}, qtd. recebida: {d['qtd_nf']}"
+            )
         if st in ("divergencia_preco", "divergencia_mista"):
-            partes.append(f"preço pedido: R$ {d['preco_pedido']:.2f}, preço NF: R$ {d['preco_nf']:.2f} ({d['dif_preco_pct']:+.1f}%)")
+            partes.append(
+                f"preço pedido: R$ {d['preco_pedido']:.2f}, preço NF: R$ {d['preco_nf']:.2f} ({d['dif_preco_pct']:+.1f}%)"
+            )
         if st == "nao_pedido":
             partes.append("produto não constava no pedido")
         linhas_divergencia.append(f"- {d['produto_nome']}: {'; '.join(partes)}")
@@ -3597,8 +4135,8 @@ Ao realizar a conferência do pedido {pedido.numero_pedido} com a nota fiscal re
 {chr(10).join(linhas_divergencia)}
 
 Resumo financeiro:
-- Total do pedido: R$ {resumo.get('total_pedido', 0):.2f}
-- Total da NF:     R$ {resumo.get('total_nf', 0):.2f}
+- Total do pedido: R$ {resumo.get("total_pedido", 0):.2f}
+- Total da NF:     R$ {resumo.get("total_nf", 0):.2f}
 - Diferença:       R$ {abs(dif_total):.2f} {sinal}
 
 Solicitamos gentilmente que nos informem o motivo das divergências e, se aplicável, o prazo para envio dos itens faltantes ou emissão de nota de crédito pela diferença de valores.
@@ -3616,41 +4154,50 @@ Atenciosamente,
 def finalizar_confronto(
     pedido_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Finaliza o confronto, criando vínculo permanente entre pedido e NF (1-para-1)."""
     current_user, tenant_id = current_user_and_tenant
-    pedido = db.query(PedidoCompra).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+    pedido = (
+        db.query(PedidoCompra)
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
     _garantir_vinculo_legado(db, pedido, tenant_id, current_user.id)
     notas = _obter_notas_vinculadas(db, pedido, tenant_id)
     if not notas or not pedido.resumo_confronto:
-        raise HTTPException(status_code=400, detail="Pedido não possui confronto realizado")
+        raise HTTPException(
+            status_code=400, detail="Pedido não possui confronto realizado"
+        )
     if pedido.confronto_finalizado:
         raise HTTPException(status_code=400, detail="Confronto já foi finalizado")
     # Verificar se esta NF já está finalizada em outro pedido
     for nota in notas:
-        outro_finalizado = _buscar_pedido_finalizado_da_nota(db, nota.id, pedido_id, tenant_id)
+        outro_finalizado = _buscar_pedido_finalizado_da_nota(
+            db, nota.id, pedido_id, tenant_id
+        )
         if outro_finalizado:
             raise HTTPException(
                 status_code=400,
-                detail=f"Esta NF ja esta vinculada ao pedido {outro_finalizado.numero_pedido}. Uma NF so pode ser finalizada em um pedido."
+                detail=f"Esta NF ja esta vinculada ao pedido {outro_finalizado.numero_pedido}. Uma NF so pode ser finalizada em um pedido.",
             )
 
-    outro = db.query(PedidoCompra).filter(
-        PedidoCompra.nota_entrada_id == pedido.nota_entrada_id,
-        PedidoCompra.confronto_finalizado,
-        PedidoCompra.id != pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+    outro = (
+        db.query(PedidoCompra)
+        .filter(
+            PedidoCompra.nota_entrada_id == pedido.nota_entrada_id,
+            PedidoCompra.confronto_finalizado,
+            PedidoCompra.id != pedido_id,
+            PedidoCompra.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if outro:
         raise HTTPException(
             status_code=400,
-            detail=f"Esta NF já está vinculada ao pedido {outro.numero_pedido}. Uma NF só pode ser confrontada com um pedido."
+            detail=f"Esta NF já está vinculada ao pedido {outro.numero_pedido}. Uma NF só pode ser confrontada com um pedido.",
         )
     pedido.confronto_finalizado = True
     pedido.updated_at = datetime.utcnow()
@@ -3669,26 +4216,31 @@ def finalizar_confronto(
 def sugerir_pedido_complementar(
     pedido_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Cria pedido rascunho com os itens faltantes após o confronto."""
     current_user, tenant_id = current_user_and_tenant
-    pedido = db.query(PedidoCompra).filter(
-        PedidoCompra.id == pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+    pedido = (
+        db.query(PedidoCompra)
+        .filter(PedidoCompra.id == pedido_id, PedidoCompra.tenant_id == tenant_id)
+        .first()
+    )
     if not pedido or not pedido.resumo_confronto:
         raise HTTPException(status_code=404, detail="Confronto não encontrado")
 
     confronto = json.loads(pedido.resumo_confronto)
     itens_faltantes = [
-        i for i in confronto.get("itens", [])
+        i
+        for i in confronto.get("itens", [])
         if i.get("status") in ("nao_encontrado", "divergencia_quantidade")
         and i.get("dif_qtd", 0) < 0
     ]
 
     if not itens_faltantes:
-        raise HTTPException(status_code=400, detail="Não há itens faltantes para criar pedido complementar")
+        raise HTTPException(
+            status_code=400,
+            detail="Não há itens faltantes para criar pedido complementar",
+        )
 
     # Gerar número do pedido
     ultimo = db.query(PedidoCompra).order_by(desc(PedidoCompra.id)).first()
@@ -3702,12 +4254,14 @@ def sugerir_pedido_complementar(
         preco = it.get("preco_pedido", 0)
         valor_item = qtd_faltante * preco
         valor_total += valor_item
-        itens_novos.append({
-            "produto_id": it["produto_id"],
-            "qtd": qtd_faltante,
-            "preco": preco,
-            "valor": valor_item,
-        })
+        itens_novos.append(
+            {
+                "produto_id": it["produto_id"],
+                "qtd": qtd_faltante,
+                "preco": preco,
+                "valor": valor_item,
+            }
+        )
 
     # Criar pedido complementar
     novo_pedido = PedidoCompra(
@@ -3721,7 +4275,7 @@ def sugerir_pedido_complementar(
         data_pedido=datetime.utcnow(),
         observacoes=f"Pedido complementar gerado automaticamente após confronto com NF. Pedido original: {pedido.numero_pedido}",
         user_id=current_user.id,
-        tenant_id=tenant_id
+        tenant_id=tenant_id,
     )
     db.add(novo_pedido)
     db.flush()
@@ -3736,7 +4290,7 @@ def sugerir_pedido_complementar(
             desconto_item=0,
             valor_total=it["valor"],
             status="pendente",
-            tenant_id=tenant_id
+            tenant_id=tenant_id,
         )
         db.add(item)
 
@@ -3749,4 +4303,3 @@ def sugerir_pedido_complementar(
         "itens_faltantes": len(itens_novos),
         "valor_total": valor_total,
     }
-

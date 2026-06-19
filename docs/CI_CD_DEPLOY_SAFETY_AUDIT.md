@@ -1,6 +1,6 @@
 # Auditoria de CI/CD e deploy seguro
 
-Atualizado em: 2026-05-17
+Atualizado em: 2026-06-19
 
 Este arquivo acompanha a maturidade de CI/CD e deploy seguro do Sistema Pet.
 
@@ -21,9 +21,13 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | Branch protection da `main` ja exige `MCP tests` | GitHub branch protection |
 | Feito | CI dos MCPs roda em todo PR | `.github/workflows/mcp-ci.yml` |
 | Feito | Backend CI passa a rodar em todo PR para `main` e `develop` | `.github/workflows/backend-ci.yml` |
+| Feito | Backend CI possui `ruff check` global bloqueante e blocos por dominio para antecipar falhas | `.github/workflows/backend-ci.yml`, `tests/test_backend_ci_workflow_contract.py` |
+| Feito | Backend CI possui `ruff format` global bloqueante para backend e testes, sem excecao dos testes de transacao legados | `.github/workflows/backend-ci.yml`, `tests/test_backend_ci_workflow_contract.py` |
+| Feito | Analise automatica do SonarCloud possui configuracao propria para ignorar caminhos sem runtime e manter exclusoes de duplicacao alinhadas ao `sonar-project.properties` | `.sonarcloud.properties`, `tests/test_sonarcloud_config_contract.py` |
+| Feito | Quality Gate bloqueia merge quando o check externo `SonarCloud Code Analysis` nao conclui com sucesso | `.github/workflows/backend-ci.yml`, `tests/test_backend_ci_workflow_contract.py` |
 | Feito | Check de deploy safety roda em todo PR para `main` | `.github/workflows/deploy-safety.yml` |
 | Feito | Branch protection da `main` exige `MCP tests`, `Fluxo unico safety`, `Quality Gate` e `Smoke test` | GitHub branch protection |
-| Feito | Smoke CI valida backend, auth basico e build frontend | `.github/workflows/smoke-ci.yml` |
+| Feito | Smoke CI valida todos os testes raiz, backend/auth, `npm audit`, lint/format core e build frontend | `.github/workflows/smoke-ci.yml`, `tests/test_smoke_ci_workflow_contract.py` |
 | Feito | Validador local bloqueia multiplas heads Alembic, artefatos e arquivos proibidos | `scripts/validar_fluxo.ps1` |
 | Feito | Rollback operacional simples documentado | `docs/PRODUCAO_ROLLBACK_CHECKLIST.md` |
 | Feito | Checklist de deploy com backup, health e rollback criado | `docs/PRODUCAO_ROLLBACK_CHECKLIST.md` |
@@ -57,35 +61,42 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | #107 | Fechamento Testes/CI 10/10 com matriz critica e E2E longo | Mergeado |
 | #108 | Compose de producao repassa `OPS_ALERT_*` para o backend | Mergeado e deployado via `petdeploy` |
 | #110 | Alerta Ops por e-mail operacional | Mergeado e deployado via `petdeploy` |
+| #481 | Smoke CI passou a rodar todos os testes raiz `tests/` | Mergeado |
+| #482-#486 | `app/tenancy`, auth multi-tenant, `app/db`, `app/schemas` e `app/security` com ruff bloqueante | Mergeados; deployados quando havia runtime |
+| #623-#657 | Rodada 0.5 fechou lint/format bloqueante por blocos ate `ruff check .` e `ruff format --check .` globais | Mergeados; sem deploy quando o escopo era apenas CI/docs |
+| #653 | `Quality Gate` passou a espelhar o check externo do SonarCloud | Mergeado |
+| #654 | `npm audit` do frontend passou a ser bloqueante no Smoke CI | Mergeado |
+| #658 | Configuracao automatica do SonarCloud alinhada ao `sonar-project.properties` e aos caminhos sem runtime | Mergeado; sem deploy de runtime |
 
 ## Ultimo deploy real validado
 
-Data: 2026-05-17.
+Data: 2026-06-14.
 
 Escopo deployado:
 
-- Commit de runtime em producao: `56c59119` (`Adiciona alerta Ops por email`).
+- Commit de runtime em producao: `5ba6a8c43`.
 - Script usado: `sudo -n /usr/local/sbin/petshop-deploy-producao` via `petdeploy`.
-- Backup operacional criado no servidor: `/opt/petshop/backups/deploy_20260517_151356`.
+- Backup operacional criado no servidor: `/opt/petshop/backups/deploy_20260614_224744`.
+- Backup do banco criado no servidor: `/opt/petshop/backups/db/petshop_prod_20260614_225317.dump`.
 - Backend reconstruido com imagem `petshop-backend:prod`.
 - Frontend gerado em `runtime/frontend/dist`.
 - Alembic executado com sucesso.
-- Containers finais saudaveis: `backend`, `nginx`, `postgres`, `worker-bling`.
-- Health publico validado: `https://mlprohub.com.br/api/health`.
-- Watchdog interno e health publico validados pelo script de deploy.
+- Containers finais saudaveis: `nginx`, `backend`, `worker-bling` e `postgres`.
+- Health publico validado com HTTP 200 e estado `healthy`.
+- Logs recentes de backend e worker sem `Traceback`, `ERROR`, `CRITICAL` ou `ORM FAIL-FAST`.
+- `npm audit` do deploy recente retornou 0 vulnerabilidades.
 
 Validacao apos deploy:
 
-- `petshop-status-producao`: commit `56c59119`, branch `main`, containers
-  `backend`, `nginx`, `postgres` e `worker-bling` saudaveis.
-- `https://mlprohub.com.br/api/health`: `{"status":"ok"}`.
-- `https://mlprohub.com.br/api/health/watchdog`: `{"status":"healthy"}`.
+- Producao ficou operacionalmente concluida apesar de interrupcao local do terminal.
+- PRs posteriores de CI/docs/Sonar ate `#658` nao alteraram runtime de aplicacao
+  e nao exigiram rebuild/restart de producao.
+
+Historico operacional anterior preservado:
+
 - `OPS_ALERT_EMAIL_TO` configurado no `.env` seguro de producao com backup
   `backups/env/.env_20260517_151349_ops_alert_email`.
-- Disparo controlado de alerta Ops por e-mail retornou `enabled=true`,
-  `sent=1`, `sent_email=1`, `sent_webhook=0` e `status=sent`.
-- `backend/logs/ops_alert_notifications.jsonl` registrou a deduplicacao do
-  alerta controlado.
+- Disparo controlado de alerta Ops por e-mail validado em 2026-05-17.
 - Recebimento humano do e-mail em `prohubml@gmail.com` confirmado por Lucas em
   2026-05-17.
 
@@ -148,7 +159,8 @@ migration_smoke_status=ok
 
 | Prioridade | Status | Item | Motivo |
 |---|---|---|---|
-| Media | Feito em 2026-05-16; manter continuo | Revisar este guia apos deploy real | Ajusta o procedimento com evidencia operacional |
+| Alta | Fechado em 2026-06-19; manter continuo | Item 0.5 de lint/format/Sonar bloqueante | `ruff check .`, `ruff format --check .`, Smoke CI, npm audit e Quality Gate/Sonar ja bloqueiam PR |
+| Media | Feito em 2026-06-19; manter continuo | Revisar este guia apos deploy real ou rodada longa de CI | Ajusta o procedimento com evidencia operacional |
 | Media | Continuo | Manter checks obrigatorios verdes em todo PR | Evita regressao do trilho seguro |
 | Baixa | Continuo | Registrar incidentes e rollbacks quando ocorrerem | Mantem historico auditavel |
 
@@ -156,4 +168,4 @@ migration_smoke_status=ok
 
 1. Em todo proximo deploy real autorizado, repetir `release-check`, usar `petdeploy` com `/usr/local/sbin/petshop-deploy-producao` e validar health/watchdog.
 2. Conferir no painel Ops ou no arquivo `backend/logs/deploy_events.jsonl` os eventos `running`, `success` ou `failed` do deploy.
-3. Seguir para Testes/CI avancado ou para o canal real de notificacao Ops, que depende de webhook seguro configurado em producao.
+3. Voltar a evoluir produto e refatoracoes de negocio; CI/CD fica em manutencao continua, nao como frente principal.

@@ -2,9 +2,21 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from backend_legacy_root_scripts import CLEANED_LEGACY_ROOT_SCRIPTS
+
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND_CI_WORKFLOW = ROOT / ".github" / "workflows" / "backend-ci.yml"
+FORMATTED_LEGACY_TESTS = (
+    "tests/conftest_infra.py",
+    "tests/e2e_test_sistema_completo.py",
+    "tests/test_02_user.py",
+)
+FORMATTED_TRANSACTION_TESTS = (
+    "tests/integration/test_transaction_cancelar_venda.py",
+    "tests/integration/test_transaction_estornar_comissoes.py",
+    "tests/integration/test_transaction_excluir_venda.py",
+)
 
 
 def test_backend_ci_has_blocking_tenancy_lint_step():
@@ -603,6 +615,16 @@ def test_backend_ci_has_blocking_residual_app_root_lint_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_legacy_app_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Legacy app root lint (blocking)" in source
+    assert (
+        "ruff check app/__init__.py app/auth.py app/db.py app/vendas_routes.py"
+        in source
+    )
+
+
 def test_backend_ci_has_blocking_multi_tenant_tests_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
@@ -797,6 +819,41 @@ def test_backend_ci_has_blocking_backend_integrations_racoes_pdv_root_format_ste
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_bling_flow_monitor_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend Bling flow monitor format (blocking)" in source
+    assert "ruff format --check app/bling_flow_monitor_routes.py" in source
+
+
+def test_backend_ci_has_blocking_backend_bling_oauth_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend Bling OAuth format (blocking)" in source
+    assert "ruff format --check app/bling_oauth_routes.py" in source
+
+
+def test_backend_ci_has_blocking_backend_bling_routes_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend Bling routes format (blocking)" in source
+    assert "ruff format --check app/bling_routes.py" in source
+
+
+def test_backend_ci_has_blocking_backend_bling_integration_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend Bling integration format (blocking)" in source
+    assert "ruff format --check app/bling_integration.py" in source
+
+
+def test_backend_ci_has_blocking_backend_bling_sync_routes_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend Bling sync routes format (blocking)" in source
+    assert "ruff format --check app/bling_sync_routes.py" in source
+
+
 def test_backend_ci_has_blocking_backend_ai_packages_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
@@ -852,6 +909,13 @@ def test_backend_ci_has_blocking_backend_services_format_step():
     )
 
 
+def test_backend_ci_has_blocking_backend_sefaz_service_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend SEFAZ service format (blocking)" in source
+    assert "ruff format --check app/services/sefaz_service.py" in source
+
+
 def test_backend_ci_has_blocking_backend_business_support_scripts_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
@@ -861,6 +925,48 @@ def test_backend_ci_has_blocking_backend_business_support_scripts_format_step():
         "app/parsers app/scripts app/middlewares app/notas_entrada app/produtos "
         "scripts"
     ) in source
+
+
+def test_backend_ci_has_blocking_backend_safe_root_scripts_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+    root_scripts = (
+        "analisar_produtos_simplesvet.py",
+        "buscar_taxas.py",
+        "check_contas_receber.py",
+        "check_migration_status.py",
+        "corrigir_codigo_barras.py",
+        "criar_alertas_retroativos.py",
+        "criar_tabelas_local.py",
+        "debug_importacao.py",
+        "deduplicar_clientes.py",
+        "importador_pets.py",
+        "importador_producao.py",
+        "importador_produtos.py",
+        "importar_simplesvet.py",
+        "importar_simplesvet_direto.py",
+        "investigar_comissoes_imposto.py",
+        "investigar_formas_pagamento.py",
+        "investigar_importacao.py",
+        "investigar_templates.py",
+        "investigar_venda.py",
+        "investigar_venda_pagamentos.py",
+        "limpar_codigo_barras_producao.py",
+        "reprocessar_venda.py",
+        "reset_nsu_status.py",
+        "reverter_sql_manual.py",
+        "seed_opcoes_racao.py",
+        "test_migration.py",
+        "test_processar_taxas.py",
+        "test_single_import.py",
+        "ver_colunas.py",
+        "verificar_dados_importados.py",
+        "verificar_produtos_banco.py",
+        "verificar_produtos_tenant.py",
+        "verificar_tipos_produtos.py",
+    )
+
+    assert "Backend safe root scripts format (blocking)" in source
+    assert f"ruff format --check {' '.join(root_scripts)}" in source
 
 
 def test_backend_ci_has_blocking_backend_multi_tenant_tests_format_step():
@@ -877,11 +983,32 @@ def test_backend_ci_has_blocking_backend_unit_tests_format_step():
     assert "ruff format --check tests/unit" in source
 
 
-def test_backend_ci_has_blocking_backend_remaining_tests_format_step():
+def test_backend_ci_has_blocking_backend_tests_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
-    assert "Backend remaining tests format (blocking)" in source
-    assert "ruff format --check ../tests tests/domain" in source
+    assert "Backend tests format (blocking)" in source
+    assert "ruff format --check ../tests tests" in source
+    for path in FORMATTED_LEGACY_TESTS + FORMATTED_TRANSACTION_TESTS:
+        assert f"--exclude {path}" not in source
+
+
+def test_backend_ci_has_blocking_backend_migrations_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend migrations format (blocking)" in source
+    assert "ruff format --check migrations" in source
+
+
+def test_backend_ci_has_blocking_backend_global_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend global format (blocking)" in source
+    assert "ruff format --check ." in source
+    assert "--exclude alembic/versions" in source
+    for path in FORMATTED_LEGACY_TESTS + FORMATTED_TRANSACTION_TESTS:
+        assert f"--exclude {path}" not in source
+    for path in CLEANED_LEGACY_ROOT_SCRIPTS:
+        assert f"--exclude {path}" not in source
 
 
 def test_backend_ci_has_blocking_backend_operational_stock_cash_format_step():
@@ -998,6 +1125,128 @@ def test_backend_ci_has_blocking_backend_ia_remainder_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_clean_residual_app_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend clean residual app format (blocking)" in source
+    assert (
+        "ruff format --check app/__init__.py app/auth.py "
+        "app/auth_routes_multitenant.py app/db.py app/ia/__init__.py "
+        "app/ia/aba8_entregas.py app/main.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_backend_operational_fiscal_light_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend operational fiscal light format (blocking)" in source
+    assert (
+        "ruff format --check app/notas_entrada_pdf_parser.py "
+        "app/routes/sefaz_routes.py app/calculadora_racao.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_backend_ia_finance_parsers_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend IA finance parsers format (blocking)" in source
+    assert (
+        "ruff format --check app/ia/aba7_dre_canal.py "
+        "app/ia/aba7_tributacao.py app/ia/extrato_parser.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_backend_racao_ia_reports_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend racao IA reports format (blocking)" in source
+    assert (
+        "ruff format --check app/classificador_racao.py "
+        "app/ia/aba5_fluxo_caixa.py app/ia/aba7_dre.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_backend_commissions_diagnostic_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend commissions diagnostic format (blocking)" in source
+    assert "ruff format --check app/comissoes_diagnostico_routes.py" in source
+
+
+def test_backend_ci_has_blocking_backend_stock_full_exit_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend stock full exit format (blocking)" in source
+    assert "ruff format --check app/estoque_saida_full_routes.py" in source
+
+
+def test_backend_ci_has_blocking_backend_stock_movement_edit_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend stock movement edit format (blocking)" in source
+    assert "ruff format --check app/estoque_movimentacoes_edicao_routes.py" in source
+
+
+def test_backend_ci_has_blocking_backend_conciliation_bling_nf_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend conciliation bling nf format (blocking)" in source
+    assert (
+        "ruff format --check app/conciliacao_services.py "
+        "app/integracao_bling_nf_routes.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_backend_whatsapp_analytics_simple_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend WhatsApp analytics simple format (blocking)" in source
+    assert "ruff format --check app/whatsapp/analytics_simple.py" in source
+
+
+def test_backend_ci_has_blocking_backend_whatsapp_analytics_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend WhatsApp analytics format (blocking)" in source
+    assert "ruff format --check app/whatsapp/analytics.py" in source
+
+
+def test_backend_ci_has_blocking_backend_analysis_dashboard_sales_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend analysis dashboard sales format (blocking)" in source
+    assert (
+        "ruff format --check app/analise_racoes_routes.py "
+        "app/dashboard_routes.py app/relatorio_vendas_routes.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_backend_commerce_routes_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend commerce routes format (blocking)" in source
+    assert (
+        "ruff format --check app/clientes_routes.py "
+        "app/estoque_transferencia_parceiro_routes.py "
+        "app/integracao_bling_pedido_routes.py app/notas_entrada_routes.py "
+        "app/pedidos_compra_routes.py app/produtos_routes.py app/vendas_routes.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_backend_app_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend app format (blocking)" in source
+    assert "ruff format --check app" in source
+
+
+def test_backend_ci_has_blocking_backend_alembic_env_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend alembic env format (blocking)" in source
+    assert "ruff format --check alembic/env.py" in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
@@ -1017,3 +1266,13 @@ def test_backend_ci_has_blocking_ai_core_lint_step():
 
     assert "AI Core lint (blocking)" in source
     assert "ruff check app/ai_core" in source
+
+
+def test_backend_ci_quality_gate_mirrors_sonarcloud_external_check():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Quality Gate" in source
+    assert "Ensure SonarCloud external check passed" in source
+    assert "SonarCloud Code Analysis" in source
+    assert "check-runs" in source
+    assert "SONAR_WAIT_SECONDS" in source

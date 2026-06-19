@@ -2,6 +2,7 @@
 Teste simples de import do tenant_safe_sql
 """
 
+
 def test_import_module():
     """Teste básico de import do módulo"""
     try:
@@ -11,8 +12,9 @@ def test_import_module():
             execute_tenant_safe_one,
             execute_tenant_safe_first,
             execute_tenant_safe_all,
-            TenantSafeSQLError
+            TenantSafeSQLError,
         )
+
         print("✅ Import successful!")
         imported_symbols = (
             execute_tenant_safe,

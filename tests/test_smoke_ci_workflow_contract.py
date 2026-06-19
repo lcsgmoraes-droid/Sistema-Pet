@@ -28,6 +28,13 @@ def test_smoke_ci_blocks_frontend_core_lint_and_format():
     assert "npm run format:core:check" in source
 
 
+def test_smoke_ci_blocks_frontend_dependency_audit():
+    source = SMOKE_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Frontend dependency audit (blocking)" in source
+    assert "npm audit --audit-level=moderate" in source
+
+
 def test_frontend_package_exposes_core_lint_and_format_scripts():
     package = json.loads(FRONTEND_PACKAGE_JSON.read_text(encoding="utf-8"))
 

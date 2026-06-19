@@ -39,12 +39,12 @@ class TestCriarVenda:
         """
         # ARRANGE
         with (
-            patch("app.vendas.service.Venda") as MockVenda,
-            patch("app.vendas.service.VendaItem"),
-            patch("app.vendas.service.ContaReceber"),
-            patch("app.vendas.service.LancamentoManual"),
-            patch("app.vendas.service.CategoriaFinanceira"),
-            patch("app.vendas.service.log_action"),
+            patch("app.vendas_models.Venda") as MockVenda,
+            patch("app.vendas_models.VendaItem"),
+            patch("app.financeiro_models.ContaReceber"),
+            patch("app.financeiro_models.LancamentoManual"),
+            patch("app.financeiro_models.CategoriaFinanceira"),
+            patch("app.audit_log.log_action"),
         ):
             # Configurar mock de Venda
             MockVenda.return_value = fake_venda_model
@@ -112,12 +112,12 @@ class TestCriarVenda:
         }
 
         with (
-            patch("app.vendas.service.Venda") as MockVenda,
-            patch("app.vendas.service.VendaItem"),
-            patch("app.vendas.service.ContaReceber"),
-            patch("app.vendas.service.LancamentoManual"),
-            patch("app.vendas.service.CategoriaFinanceira"),
-            patch("app.vendas.service.log_action"),
+            patch("app.vendas_models.Venda") as MockVenda,
+            patch("app.vendas_models.VendaItem"),
+            patch("app.financeiro_models.ContaReceber"),
+            patch("app.financeiro_models.LancamentoManual"),
+            patch("app.financeiro_models.CategoriaFinanceira"),
+            patch("app.audit_log.log_action"),
         ):
             fake_venda_model.total = Decimal("200.00")
             MockVenda.return_value = fake_venda_model
@@ -160,12 +160,12 @@ class TestCriarVenda:
         }
 
         with (
-            patch("app.vendas.service.Venda") as MockVenda,
-            patch("app.vendas.service.VendaItem"),
-            patch("app.vendas.service.ContaReceber"),
-            patch("app.vendas.service.LancamentoManual"),
-            patch("app.vendas.service.CategoriaFinanceira"),
-            patch("app.vendas.service.log_action"),
+            patch("app.vendas_models.Venda") as MockVenda,
+            patch("app.vendas_models.VendaItem"),
+            patch("app.financeiro_models.ContaReceber"),
+            patch("app.financeiro_models.LancamentoManual"),
+            patch("app.financeiro_models.CategoriaFinanceira"),
+            patch("app.audit_log.log_action"),
         ):
             fake_venda_model.taxa_entrega = Decimal("15.50")
             fake_venda_model.tem_entrega = True
@@ -201,6 +201,7 @@ class TestFinalizarVenda:
         mock_event_dispatcher,
         fake_venda_model,
         fake_pagamentos,
+        make_query_mock,
     ):
         """
         CENÁRIO: Finalizar venda com pagamento completo em dinheiro
@@ -212,27 +213,22 @@ class TestFinalizarVenda:
         """
         # ARRANGE
         with (
-            patch("app.vendas.service.Venda"),
-            patch("app.vendas.service.VendaPagamento") as MockPagamento,
-            patch("app.vendas.service.VendaItem"),
+            patch("app.vendas_models.Venda") as MockVenda,
+            patch("app.vendas_models.VendaPagamento") as MockPagamento,
+            patch("app.vendas_models.VendaItem"),
             patch("app.financeiro.ContasReceberService"),
         ):
             # Configurar venda existente
             fake_venda_model.status = "aberta"
-            mock_db_session.query.return_value.filter_by.return_value.first.return_value = fake_venda_model
 
-            # Configurar itens da venda
-            item_mock = MagicMock()
-            item_mock.produto_id = 10
-            item_mock.quantidade = 2
-            mock_db_session.query.return_value.filter_by.return_value.all.return_value = [
-                item_mock
-            ]
+            def side_effect_query(model):
+                if model is MockVenda:
+                    return make_query_mock(first=fake_venda_model)
+                if model is MockPagamento:
+                    return make_query_mock(all_=[])
+                return make_query_mock()
 
-            # Configurar pagamentos existentes (nenhum)
-            mock_db_session.query(
-                MockPagamento
-            ).filter_by.return_value.all.return_value = []
+            mock_db_session.query.side_effect = side_effect_query
 
             # ACT
             VendaService.finalizar_venda(
@@ -240,6 +236,7 @@ class TestFinalizarVenda:
                 pagamentos=fake_pagamentos,
                 user_id=1,
                 user_nome="Usuário Teste",
+                tenant_id="00000000-0000-0000-0000-000000000001",
                 db=mock_db_session,
             )
 
@@ -247,8 +244,8 @@ class TestFinalizarVenda:
             assert fake_venda_model.status == "finalizada"
             assert fake_venda_model.data_finalizacao is not None
 
-            # Verificar baixa de estoque
-            mock_estoque_service.baixar_estoque.assert_called()
+            # Venda aberta ja baixa estoque na criacao; finalizar nao baixa de novo.
+            mock_estoque_service.baixar_estoque.assert_not_called()
 
             # Verificar movimentação de caixa
             mock_caixa_service.registrar_movimentacao_venda.assert_called_once()
@@ -274,6 +271,7 @@ class TestFinalizarVenda:
         mock_estoque_service,
         mock_event_dispatcher,
         fake_venda_model,
+        make_query_mock,
     ):
         """
         CENÁRIO: Finalizar venda com pagamento parcial
@@ -281,23 +279,24 @@ class TestFinalizarVenda:
         """
         # ARRANGE
         with (
-            patch("app.vendas.service.Venda"),
-            patch("app.vendas.service.VendaPagamento"),
-            patch("app.vendas.service.VendaItem"),
-            patch("app.vendas.service.LancamentoManual") as MockLancamento,
-            patch("app.vendas.service.CategoriaFinanceira"),
+            patch("app.vendas_models.Venda") as MockVenda,
+            patch("app.vendas_models.VendaPagamento") as MockPagamento,
+            patch("app.vendas_models.VendaItem"),
+            patch("app.financeiro_models.LancamentoManual") as MockLancamento,
+            patch("app.financeiro_models.CategoriaFinanceira"),
             patch("app.financeiro.ContasReceberService"),
         ):
             fake_venda_model.status = "aberta"
             fake_venda_model.total = Decimal("100.00")
-            mock_db_session.query.return_value.filter_by.return_value.first.return_value = fake_venda_model
 
-            item_mock = MagicMock()
-            item_mock.produto_id = 10
-            item_mock.quantidade = 1
-            mock_db_session.query.return_value.filter_by.return_value.all.return_value = [
-                item_mock
-            ]
+            def side_effect_query(model):
+                if model is MockVenda:
+                    return make_query_mock(first=fake_venda_model)
+                if model is MockPagamento:
+                    return make_query_mock(all_=[])
+                return make_query_mock(first=MagicMock())
+
+            mock_db_session.query.side_effect = side_effect_query
 
             pagamentos = [
                 {"forma_pagamento": "Dinheiro", "valor": 50.00, "numero_parcelas": 1}
@@ -309,6 +308,7 @@ class TestFinalizarVenda:
                 pagamentos=pagamentos,
                 user_id=1,
                 user_nome="Usuário Teste",
+                tenant_id="00000000-0000-0000-0000-000000000001",
                 db=mock_db_session,
             )
 
@@ -333,6 +333,7 @@ class TestCancelarVenda:
         mock_estoque_service,
         mock_event_dispatcher,
         fake_venda_model,
+        make_query_mock,
     ):
         """
         CENÁRIO: Cancelar uma venda aberta
@@ -343,25 +344,30 @@ class TestCancelarVenda:
         """
         # ARRANGE
         with (
-            patch("app.vendas.service.Venda"),
-            patch("app.vendas.service.VendaItem") as MockItem,
-            patch("app.vendas.service.ContaReceber"),
-            patch("app.vendas.service.LancamentoManual"),
-            patch("app.vendas.service.MovimentacaoCaixa"),
-            patch("app.vendas.service.MovimentacaoFinanceira"),
-            patch("app.vendas.service.log_action"),
+            patch("app.vendas_models.Venda") as MockVenda,
+            patch("app.vendas_models.VendaItem") as MockItem,
+            patch("app.financeiro_models.ContaReceber"),
+            patch("app.caixa_models.MovimentacaoCaixa"),
+            patch("app.financeiro_models.MovimentacaoFinanceira"),
+            patch("app.audit_log.log_action"),
             patch("app.comissoes_estorno.estornar_comissoes_venda") as mock_estorno,
         ):
             fake_venda_model.status = "aberta"
-            mock_db_session.query.return_value.filter_by.return_value.first.return_value = fake_venda_model
 
             # Configurar itens
             item_mock = MagicMock()
             item_mock.produto_id = 10
             item_mock.quantidade = 2
-            mock_db_session.query(MockItem).filter_by.return_value.all.return_value = [
-                item_mock
-            ]
+
+            def side_effect_query(*models):
+                model = models[0] if len(models) == 1 else None
+                if model is MockVenda:
+                    return make_query_mock(first=fake_venda_model)
+                if model is MockItem:
+                    return make_query_mock(all_=[item_mock])
+                return make_query_mock()
+
+            mock_db_session.query.side_effect = side_effect_query
 
             # Configurar estorno de comissões
             mock_estorno.return_value = {
@@ -372,7 +378,11 @@ class TestCancelarVenda:
 
             # ACT
             VendaService.cancelar_venda(
-                venda_id=100, motivo="Cliente desistiu", user_id=1, db=mock_db_session
+                venda_id=100,
+                motivo="Cliente desistiu",
+                user_id=1,
+                tenant_id="00000000-0000-0000-0000-000000000001",
+                db=mock_db_session,
             )
 
             # ASSERT
@@ -403,6 +413,7 @@ class TestCancelarVenda:
         mock_estoque_service,
         mock_event_dispatcher,
         fake_venda_model,
+        make_query_mock,
     ):
         """
         CENÁRIO: Cancelar venda já finalizada
@@ -410,17 +421,15 @@ class TestCancelarVenda:
         """
         # ARRANGE
         with (
-            patch("app.vendas.service.Venda"),
-            patch("app.vendas.service.VendaItem") as MockItem,
-            patch("app.vendas.service.ContaReceber") as MockConta,
-            patch("app.vendas.service.LancamentoManual") as MockLanc,
-            patch("app.vendas.service.MovimentacaoCaixa") as MockMovCaixa,
-            patch("app.vendas.service.MovimentacaoFinanceira"),
-            patch("app.vendas.service.log_action"),
+            patch("app.vendas_models.Venda") as MockVenda,
+            patch("app.vendas_models.VendaItem") as MockItem,
+            patch("app.financeiro_models.ContaReceber") as MockConta,
+            patch("app.caixa_models.MovimentacaoCaixa") as MockMovCaixa,
+            patch("app.financeiro_models.MovimentacaoFinanceira"),
+            patch("app.audit_log.log_action"),
             patch("app.comissoes_estorno.estornar_comissoes_venda"),
         ):
             fake_venda_model.status = "finalizada"
-            mock_db_session.query.return_value.filter_by.return_value.first.return_value = fake_venda_model
 
             # Itens
             item_mock = MagicMock()
@@ -438,26 +447,29 @@ class TestCancelarVenda:
             # Movimentação caixa
             mov_caixa = MagicMock()
 
-            # Configurar queries
-            def side_effect_query(model):
-                query_mock = MagicMock()
-                if model == MockItem:
-                    query_mock.filter_by.return_value.all.return_value = [item_mock]
-                elif model == MockConta:
-                    query_mock.filter_by.return_value.all.return_value = [conta_mock]
-                elif model == MockLanc:
-                    query_mock.filter.return_value.all.return_value = [lanc_mock]
-                elif model == MockMovCaixa:
-                    query_mock.filter_by.return_value.all.return_value = [mov_caixa]
-                else:
-                    query_mock.filter_by.return_value.all.return_value = []
-                return query_mock
+            def side_effect_query(*models):
+                model = models[0] if len(models) == 1 else None
+                if model is MockVenda:
+                    return make_query_mock(first=fake_venda_model)
+                if model is MockItem:
+                    return make_query_mock(all_=[item_mock])
+                if model is MockConta:
+                    return make_query_mock(all_=[conta_mock])
+                if getattr(model, "__name__", "") == "LancamentoManual":
+                    return make_query_mock(all_=[lanc_mock])
+                if model is MockMovCaixa:
+                    return make_query_mock(all_=[mov_caixa])
+                return make_query_mock()
 
             mock_db_session.query.side_effect = side_effect_query
 
             # ACT
             resultado = VendaService.cancelar_venda(
-                venda_id=100, motivo="Erro operacional", user_id=1, db=mock_db_session
+                venda_id=100,
+                motivo="Erro operacional",
+                user_id=1,
+                tenant_id="00000000-0000-0000-0000-000000000001",
+                db=mock_db_session,
             )
 
             # ASSERT
@@ -502,14 +514,18 @@ class TestValidacoesGerais:
         """
         from fastapi import HTTPException
 
-        with patch("app.vendas.service.Venda"):
+        with patch("app.vendas_models.Venda"):
             fake_venda_model.status = "cancelada"
             mock_db_session.query.return_value.filter_by.return_value.first.return_value = fake_venda_model
 
             # ACT & ASSERT
             with pytest.raises(HTTPException) as exc_info:
                 VendaService.cancelar_venda(
-                    venda_id=100, motivo="Teste", user_id=1, db=mock_db_session
+                    venda_id=100,
+                    motivo="Teste",
+                    user_id=1,
+                    tenant_id="00000000-0000-0000-0000-000000000001",
+                    db=mock_db_session,
                 )
 
             assert exc_info.value.status_code == 400

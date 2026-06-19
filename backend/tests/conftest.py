@@ -4,6 +4,7 @@ Minimal conftest for unit and legacy integration-style tests.
 The legacy root tests import ORM models during collection, so test defaults must
 exist before those imports happen.
 """
+
 import sys
 import os
 
@@ -24,7 +25,9 @@ if backend_dir not in sys.path:
 DEFAULT_TEST_DATABASE_URL = "sqlite://"
 os.environ.setdefault("DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
 os.environ.setdefault("ENVIRONMENT", "test")
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-security")
+os.environ.setdefault(
+    "JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-security"
+)
 
 TEST_DATABASE_URL = os.environ["DATABASE_URL"]
 
@@ -42,7 +45,15 @@ def _compile_jsonb_for_sqlite(_type, _compiler, **_kw):
 
 
 # Re-export legacy factory fixtures without replacing the canonical db_session.
-from tests.conftest_infra import auth_headers, tenant_factory, user_factory  # noqa: E402,F401
+from tests.conftest_infra import (  # noqa: E402
+    auth_headers as _auth_headers,
+    tenant_factory as _tenant_factory,
+    user_factory as _user_factory,
+)
+
+auth_headers = _auth_headers
+tenant_factory = _tenant_factory
+user_factory = _user_factory
 
 
 def _is_sqlite_url(database_url: str) -> bool:
@@ -73,7 +84,11 @@ def _create_sqlite_schema(engine) -> None:
     from app.db.migration_check import _get_alembic_head
 
     with engine.begin() as conn:
-        conn.execute(text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(64) NOT NULL)"))
+        conn.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(64) NOT NULL)"
+            )
+        )
         conn.execute(text("DELETE FROM alembic_version"))
         conn.execute(
             text("INSERT INTO alembic_version (version_num) VALUES (:version)"),
@@ -142,7 +157,9 @@ def tenant_context():
 @pytest.fixture(scope="session")
 def db_engine():
     """Create database engine for tests."""
-    engine = create_engine(TEST_DATABASE_URL, **_create_engine_kwargs(TEST_DATABASE_URL))
+    engine = create_engine(
+        TEST_DATABASE_URL, **_create_engine_kwargs(TEST_DATABASE_URL)
+    )
     if _is_sqlite_url(TEST_DATABASE_URL):
         _create_sqlite_schema(engine)
     yield engine
@@ -164,3 +181,32 @@ def db_session(db_engine):
         transaction.rollback()
         connection.close()
 
+
+@pytest.fixture
+def db(db_session):
+    """Legacy alias for tests written before the db_session fixture name."""
+    from uuid import UUID
+
+    from app.tenancy.context import clear_current_tenant, set_current_tenant
+
+    set_current_tenant(UUID("00000000-0000-0000-0000-000000000001"))
+    try:
+        yield db_session
+    finally:
+        clear_current_tenant()
+
+
+@pytest.fixture
+def normal_user_token(auth_headers):
+    """Legacy token fixture for tests that assert non-admin access is forbidden."""
+    headers, _tenant, _user = auth_headers()
+    return headers["Authorization"].removeprefix("Bearer ")
+
+
+@pytest.fixture
+def admin_user_token(auth_headers, db_session):
+    """Legacy token fixture for read-only admin API tests."""
+    headers, _tenant, user = auth_headers()
+    user.is_admin = True
+    db_session.flush()
+    return headers["Authorization"].removeprefix("Bearer ")

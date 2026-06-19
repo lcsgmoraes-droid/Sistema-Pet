@@ -2,10 +2,11 @@
 Inserir tabela de consumo de exemplo no produto Golden Fórmula Filhotes
 Baseado em tabelas reais de embalagens de ração
 """
+
 import sqlite3
 import json
 
-conn = sqlite3.connect('petshop.db')
+conn = sqlite3.connect("petshop.db")
 cursor = conn.cursor()
 
 # Tabela de consumo exemplo (similar à imagem fornecida)
@@ -20,7 +21,7 @@ tabela_consumo = {
         "30": 322,
         "35": 361,
         "40": 400,
-        "45": 436
+        "45": 436,
     },
     "filhote_2m": {
         "5": 89,
@@ -31,7 +32,7 @@ tabela_consumo = {
         "30": 322,
         "35": 361,
         "40": 400,
-        "45": 436
+        "45": 436,
     },
     "filhote_3m": {
         "5": 112,
@@ -42,7 +43,7 @@ tabela_consumo = {
         "30": 424,
         "35": 476,
         "40": 526,
-        "45": 574
+        "45": 574,
     },
     "filhote_4m": {
         "5": 125,
@@ -53,7 +54,7 @@ tabela_consumo = {
         "30": 470,
         "35": 527,
         "40": 583,
-        "45": 637
+        "45": 637,
     },
     "filhote_6m": {
         "5": 128,
@@ -64,7 +65,7 @@ tabela_consumo = {
         "30": 495,
         "35": 556,
         "40": 614,
-        "45": 671
+        "45": 671,
     },
     "filhote_8m": {
         "5": 129,
@@ -75,7 +76,7 @@ tabela_consumo = {
         "30": 494,
         "35": 555,
         "40": 613,
-        "45": 670
+        "45": 670,
     },
     "filhote_10m": {
         "5": 126,
@@ -86,7 +87,7 @@ tabela_consumo = {
         "30": 484,
         "35": 544,
         "40": 601,
-        "45": 657
+        "45": 657,
     },
     "filhote_12m": {
         "5": 124,
@@ -97,22 +98,26 @@ tabela_consumo = {
         "30": 489,
         "35": 549,
         "40": 607,
-        "45": 663
-    }
+        "45": 663,
+    },
 }
 
 # Atualizar produto ID 72 (Golden Fórmula Filhotes)
 cursor.execute(
     "UPDATE produtos SET tabela_consumo = ? WHERE id = 72",
-    (json.dumps(tabela_consumo),)
+    (json.dumps(tabela_consumo),),
 )
 
 conn.commit()
 print("✅ Tabela de consumo inserida no produto Golden Fórmula Filhotes (ID 72)")
 print("\n📊 Tabela inserida:")
-print(f"   • Cães adultos: {len(tabela_consumo['peso_adulto'])} faixas de peso (5-45kg)")
+print(
+    f"   • Cães adultos: {len(tabela_consumo['peso_adulto'])} faixas de peso (5-45kg)"
+)
 print("   • Filhotes: 8 faixas etárias (2-12 meses)")
-print(f"\n💡 Exemplo: Filhote 4 meses, 15kg adulto = {tabela_consumo['filhote_4m']['15']}g/dia")
+print(
+    f"\n💡 Exemplo: Filhote 4 meses, 15kg adulto = {tabela_consumo['filhote_4m']['15']}g/dia"
+)
 print("   • Com embalagem 15kg: duração = 15000g / 286g = ~52 dias")
 
 conn.close()

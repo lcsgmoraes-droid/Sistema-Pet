@@ -1,6 +1,7 @@
 """
 Testes de isolamento multi-tenant.
 """
+
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -12,7 +13,9 @@ def _tenant_uuid(tenant):
     return UUID(str(tenant.id))
 
 
-def _create_product(tenant, user=None, nome: str = "Produto", preco: float = 10.0) -> Produto:
+def _create_product(
+    tenant, user=None, nome: str = "Produto", preco: float = 10.0
+) -> Produto:
     return Produto(
         tenant_id=_tenant_uuid(tenant),
         user_id=user.id if user else None,
@@ -63,12 +66,16 @@ def test_tenant_cannot_access_other_tenant_products(
     db_session.commit()
 
     tenant_context(tenant_a.id)
-    produtos_a = db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_a)).all()
+    produtos_a = (
+        db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_a)).all()
+    )
     assert all(p.tenant_id == _tenant_uuid(tenant_a) for p in produtos_a)
     assert produto_b not in produtos_a
 
     tenant_context(tenant_b.id)
-    produtos_b = db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_b)).all()
+    produtos_b = (
+        db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_b)).all()
+    )
     assert all(p.tenant_id == _tenant_uuid(tenant_b) for p in produtos_b)
     assert produto_a not in produtos_b
 
@@ -161,13 +168,19 @@ def test_cross_tenant_data_leakage_prevention(
     db_session.commit()
 
     tenant_context(tenant_1.id)
-    produtos_tenant_1 = db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_1)).all()
+    produtos_tenant_1 = (
+        db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_1)).all()
+    )
 
     tenant_context(tenant_2.id)
-    produtos_tenant_2 = db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_2)).all()
+    produtos_tenant_2 = (
+        db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_2)).all()
+    )
 
     tenant_context(tenant_3.id)
-    produtos_tenant_3 = db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_3)).all()
+    produtos_tenant_3 = (
+        db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_3)).all()
+    )
 
     assert len(produtos_tenant_1) >= 1
     assert len(produtos_tenant_2) >= 1

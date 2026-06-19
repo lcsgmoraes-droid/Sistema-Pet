@@ -49,3 +49,29 @@ def test_main_registra_router_de_saida_full():
         'app.include_router(estoque_saida_full_router, tags=["Estoque - Saida FULL"])'
         in main_source
     )
+
+
+def test_parser_pdf_saida_full_nao_usa_regex_de_sku_e_quantidade():
+    source = _source("app/estoque_saida_full_routes.py")
+
+    assert "SKU_EXPLICITO_REGEX" not in source
+    assert "QTD_EXPLICITA_REGEX" not in source
+    assert "SKU_QTD_LINHA_REGEX" not in source
+
+
+def test_parser_pdf_saida_full_extrai_sku_quantidade_explicitos_e_em_linha():
+    itens = estoque_saida_full_routes._extrair_itens_full_pdf(
+        "\n".join(
+            [
+                "Produto A SKU: ABC-123 QTD: 2",
+                "codigo # ABC-123 quantidade 1,5",
+                "XYZ_999 3",
+                "Linha sem item",
+            ]
+        )
+    )
+
+    assert itens == [
+        {"sku": "ABC-123", "quantidade": 3.5},
+        {"sku": "XYZ_999", "quantidade": 3.0},
+    ]

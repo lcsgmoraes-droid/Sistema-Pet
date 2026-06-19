@@ -646,6 +646,31 @@ class VendaService:
             #     logger.error(f"⚠️  Erro ao publicar evento VendaCriada: {str(e)}", exc_info=True)
             #     # Não aborta a criação da venda
 
+            try:
+                from app.domain.events import VendaCriada, publish_event
+
+                publish_event(
+                    VendaCriada(
+                        venda_id=venda.id,
+                        numero_venda=venda.numero_venda,
+                        user_id=user_id,
+                        cliente_id=venda.cliente_id,
+                        funcionario_id=venda.funcionario_id,
+                        total=float(venda.total),
+                        quantidade_itens=len(itens),
+                        tem_entrega=venda.tem_entrega,
+                        metadados={
+                            "taxa_entrega": float(taxa_entrega),
+                            "subtotal": float(subtotal_itens),
+                        },
+                    )
+                )
+                logger.debug("Evento VendaCriada publicado (venda_id=%s)", venda.id)
+            except Exception as e:
+                logger.error(
+                    "Erro ao publicar evento VendaCriada: %s", str(e), exc_info=True
+                )
+
             return venda.to_dict()
 
         except HTTPException:
@@ -1301,6 +1326,35 @@ class VendaService:
         # except Exception as e:
         #     logger.error(f"⚠️  Erro ao publicar evento VendaCancelada: {str(e)}", exc_info=True)
         #     # Não aborta o cancelamento
+
+        try:
+            from app.domain.events import VendaCancelada, publish_event
+
+            publish_event(
+                VendaCancelada(
+                    venda_id=venda.id,
+                    numero_venda=venda.numero_venda,
+                    user_id=user_id,
+                    cliente_id=venda.cliente_id,
+                    funcionario_id=venda.funcionario_id,
+                    motivo=motivo,
+                    status_anterior=status_anterior,
+                    total=float(venda.total),
+                    itens_estornados=itens_estornados,
+                    contas_canceladas=contas_canceladas,
+                    comissoes_estornadas=(movimentacoes_estornadas > 0),
+                    metadados={
+                        "lancamentos_cancelados": lancamentos_cancelados,
+                        "movimentacoes_caixa_removidas": movimentacoes_removidas,
+                        "movimentacoes_bancarias_estornadas": movimentacoes_estornadas,
+                    },
+                )
+            )
+            logger.debug("Evento VendaCancelada publicado (venda_id=%s)", venda.id)
+        except Exception as e:
+            logger.error(
+                "Erro ao publicar evento VendaCancelada: %s", str(e), exc_info=True
+            )
 
         return {
             "venda": venda.to_dict(),
@@ -2078,6 +2132,38 @@ class VendaService:
             #
             # except Exception as e:
             #     logger.error(f"⚠️  Erro ao publicar evento VendaFinalizada: {str(e)}", exc_info=True)
+
+            try:
+                from app.domain.events import VendaFinalizada, publish_event
+
+                publish_event(
+                    VendaFinalizada(
+                        venda_id=venda.id,
+                        numero_venda=venda.numero_venda,
+                        user_id=user_id,
+                        user_nome=user_nome,
+                        cliente_id=venda.cliente_id,
+                        funcionario_id=venda.funcionario_id,
+                        total=float(venda.total),
+                        total_pago=total_pagamentos,
+                        status=venda.status,
+                        formas_pagamento=[p["forma_pagamento"] for p in pagamentos],
+                        estoque_baixado=(len(estoque_baixado) > 0),
+                        caixa_movimentado=(len(movimentacoes_caixa_ids) > 0),
+                        contas_baixadas=len(contas_baixadas),
+                        metadados={
+                            "quantidade_itens": len(venda.itens),
+                            "tem_entrega": venda.tem_entrega,
+                        },
+                    )
+                )
+                logger.debug("Evento VendaFinalizada publicado (venda_id=%s)", venda.id)
+            except Exception as e:
+                logger.error(
+                    "Erro ao publicar evento VendaFinalizada: %s",
+                    str(e),
+                    exc_info=True,
+                )
 
             # Novos eventos: VendaRealizadaEvent + eventos por produto/KIT
             try:

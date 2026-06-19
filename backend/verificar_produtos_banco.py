@@ -16,13 +16,14 @@ db = SessionLocal()
 try:
     # Contar produtos no banco
     total_produtos = db.query(func.count(Produto.id)).scalar()
-    
+
     # Contar produtos com SKU válido
-    produtos_com_sku = db.query(func.count(Produto.id)).filter(
-        Produto.codigo.isnot(None), 
-        Produto.codigo != ''
-    ).scalar()
-    
+    produtos_com_sku = (
+        db.query(func.count(Produto.id))
+        .filter(Produto.codigo.isnot(None), Produto.codigo != "")
+        .scalar()
+    )
+
     print("═══════════════════════════════════════")
     print("  PRODUTOS NO BANCO DE DADOS")
     print("═══════════════════════════════════════")
@@ -35,6 +36,6 @@ try:
     print(f"Banco atual: {produtos_com_sku:,} produtos")
     print(f"Faltam importar: {6358 - produtos_com_sku:,} produtos")
     print("═══════════════════════════════════════")
-    
+
 finally:
     db.close()

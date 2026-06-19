@@ -75,6 +75,8 @@ cycler==0.12.1
     # via matplotlib
 deprecated==1.3.1
     # via limits
+defusedxml==0.7.1
+    # via -r requirements.txt
 distro==1.9.0
     # via openai
 dnspython==2.8.0
