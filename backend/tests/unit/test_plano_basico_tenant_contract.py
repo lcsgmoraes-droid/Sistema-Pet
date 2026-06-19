@@ -286,29 +286,33 @@ def test_racao_catalog_and_calculator_routes_require_product_permissions():
 
 
 def test_product_auxiliary_catalog_routes_require_product_permissions():
-    produtos_source = _source("backend/app/produtos_routes.py")
+    catalogos_source = _source("backend/app/produtos/catalogos_routes.py")
 
     protected_routes = [
-        '@router.post("/categorias", response_model=CategoriaResponse, status_code=status.HTTP_201_CREATED)\n@require_permission("produtos.criar")',
-        '@router.get("/categorias", response_model=List[CategoriaResponse])\n@require_permission("produtos.visualizar")',
-        '@router.get("/categorias/hierarquia", response_model=List[dict])\n@require_permission("produtos.visualizar")',
-        '@router.get("/categorias/{categoria_id}", response_model=CategoriaResponse)\n@require_permission("produtos.visualizar")',
-        '@router.put("/categorias/{categoria_id}", response_model=CategoriaResponse)\n@require_permission("produtos.editar")',
-        '@router.delete("/categorias/{categoria_id}", status_code=status.HTTP_204_NO_CONTENT)\n@require_permission("produtos.editar")',
-        '@router.post("/marcas", response_model=MarcaResponse, status_code=status.HTTP_201_CREATED)\n@require_permission("produtos.criar")',
-        '@router.get("/marcas", response_model=List[MarcaResponse])\n@require_permission("produtos.visualizar")',
-        '@router.get("/marcas/{marca_id}", response_model=MarcaResponse)\n@require_permission("produtos.visualizar")',
-        '@router.put("/marcas/{marca_id}", response_model=MarcaResponse)\n@require_permission("produtos.editar")',
-        '@router.delete("/marcas/{marca_id}", status_code=status.HTTP_204_NO_CONTENT)\n@require_permission("produtos.editar")',
-        '@router.post("/departamentos", response_model=DepartamentoResponse, status_code=status.HTTP_201_CREATED)\n@require_permission("produtos.criar")',
-        '@router.get("/departamentos", response_model=List[DepartamentoResponse])\n@require_permission("produtos.visualizar")',
-        '@router.get("/departamentos/{departamento_id}", response_model=DepartamentoResponse)\n@require_permission("produtos.visualizar")',
-        '@router.put("/departamentos/{departamento_id}", response_model=DepartamentoResponse)\n@require_permission("produtos.editar")',
-        '@router.delete("/departamentos/{departamento_id}", status_code=status.HTTP_204_NO_CONTENT)\n@require_permission("produtos.editar")',
+        ("post", "/categorias", "produtos.criar"),
+        ("get", "/categorias", "produtos.visualizar"),
+        ("get", "/categorias/hierarquia", "produtos.visualizar"),
+        ("get", "/categorias/{categoria_id}", "produtos.visualizar"),
+        ("put", "/categorias/{categoria_id}", "produtos.editar"),
+        ("delete", "/categorias/{categoria_id}", "produtos.editar"),
+        ("post", "/marcas", "produtos.criar"),
+        ("get", "/marcas", "produtos.visualizar"),
+        ("get", "/marcas/{marca_id}", "produtos.visualizar"),
+        ("put", "/marcas/{marca_id}", "produtos.editar"),
+        ("delete", "/marcas/{marca_id}", "produtos.editar"),
+        ("post", "/departamentos", "produtos.criar"),
+        ("get", "/departamentos", "produtos.visualizar"),
+        ("get", "/departamentos/{departamento_id}", "produtos.visualizar"),
+        ("put", "/departamentos/{departamento_id}", "produtos.editar"),
+        ("delete", "/departamentos/{departamento_id}", "produtos.editar"),
     ]
 
-    for route in protected_routes:
-        assert route in produtos_source
+    for method, path, permission in protected_routes:
+        pattern = (
+            rf'@router\.{method}\(\s*"{re.escape(path)}"[\s\S]*?\)\s*'
+            rf'@require_permission\("{permission}"\)'
+        )
+        assert re.search(pattern, catalogos_source)
 
 
 def test_pet_quick_add_blocks_race_without_selected_species():
