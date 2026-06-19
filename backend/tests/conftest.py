@@ -45,7 +45,15 @@ def _compile_jsonb_for_sqlite(_type, _compiler, **_kw):
 
 
 # Re-export legacy factory fixtures without replacing the canonical db_session.
-from tests.conftest_infra import auth_headers, tenant_factory, user_factory  # noqa: E402,F401
+from tests.conftest_infra import (  # noqa: E402
+    auth_headers as _auth_headers,
+    tenant_factory as _tenant_factory,
+    user_factory as _user_factory,
+)
+
+auth_headers = _auth_headers
+tenant_factory = _tenant_factory
+user_factory = _user_factory
 
 
 def _is_sqlite_url(database_url: str) -> bool:
@@ -172,3 +180,33 @@ def db_session(db_engine):
         session.close()
         transaction.rollback()
         connection.close()
+
+
+@pytest.fixture
+def db(db_session):
+    """Legacy alias for tests written before the db_session fixture name."""
+    from uuid import UUID
+
+    from app.tenancy.context import clear_current_tenant, set_current_tenant
+
+    set_current_tenant(UUID("00000000-0000-0000-0000-000000000001"))
+    try:
+        yield db_session
+    finally:
+        clear_current_tenant()
+
+
+@pytest.fixture
+def normal_user_token(auth_headers):
+    """Legacy token fixture for tests that assert non-admin access is forbidden."""
+    headers, _tenant, _user = auth_headers()
+    return headers["Authorization"].removeprefix("Bearer ")
+
+
+@pytest.fixture
+def admin_user_token(auth_headers, db_session):
+    """Legacy token fixture for read-only admin API tests."""
+    headers, _tenant, user = auth_headers()
+    user.is_admin = True
+    db_session.flush()
+    return headers["Authorization"].removeprefix("Bearer ")

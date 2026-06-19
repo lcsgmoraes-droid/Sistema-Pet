@@ -7,7 +7,7 @@ Funções de consulta read-only ao log de auditoria.
 
 from typing import Optional
 from datetime import datetime
-from sqlalchemy import desc, and_
+from sqlalchemy import desc, and_, or_
 from sqlalchemy.orm import Session
 import json
 
@@ -75,7 +75,15 @@ def get_replays(
     if status:
         # Inferir status baseado no action
         if status == "success":
-            filters.append(AuditLog.action == "replay_end")
+            filters.append(
+                and_(
+                    AuditLog.action == "replay_end",
+                    or_(
+                        AuditLog.details.is_(None),
+                        ~AuditLog.details.like("%error%"),
+                    ),
+                )
+            )
         elif status == "failure":
             filters.append(
                 and_(AuditLog.action == "replay_end", AuditLog.details.like("%error%"))
