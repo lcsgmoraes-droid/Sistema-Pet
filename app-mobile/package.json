@@ -55,5 +55,8 @@
     "babel-preset-expo": "~54.0.10",
     "typescript": "^5.3.0"
   },
-  "private": true
+  "private": true,
+  "overrides": {
+    "undici": "6.27.0"
+  }
 }
