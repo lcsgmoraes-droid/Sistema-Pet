@@ -14,7 +14,7 @@ EXPECTED_CORE_PINS = {
 
 EXPECTED_RUNTIME_PINS = {
     "uvicorn[standard]": "0.49.0",
-    "pydantic-settings": "2.14.1",
+    "pydantic-settings": "2.14.2",
     "email-validator": "2.3.0",
     "bcrypt": "4.1.2",
     "slowapi": "0.1.10",
