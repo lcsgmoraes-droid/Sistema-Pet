@@ -471,9 +471,9 @@ function RegisterCard({
           placeholder="Senha (minimo 8 caracteres)"
           visible={showRegisterPassword}
           onToggle={onToggleRegisterPassword}
-          style={fieldInputStyle(S.formInput, registerFieldError, "password")}
+          style={fieldInputStyle(S.formInput, registerFieldError, "senha")}
         />
-        <FieldError field="password" fieldError={registerFieldError} />
+        <FieldError field="senha" fieldError={registerFieldError} />
         <label style={checkboxLabelStyle(registerFieldError, "accepted_terms")}>
           <input
             name="ecommerce_register_accepted_terms"

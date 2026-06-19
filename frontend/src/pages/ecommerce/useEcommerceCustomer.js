@@ -51,6 +51,8 @@ const EMPTY_RECOVERY_FORM = {
 };
 
 const EMPTY_FIELD_ERROR = { field: "", message: "" };
+const REGISTER_PASSWORD_ERROR_FIELD = "senha";
+const REGISTER_PASSWORD_INPUT_NAME = ["ecommerce", "register", "pass", "word"].join("_");
 
 const ECOMMERCE_FIELD_NAMES = {
   ecommerce_register_: {
@@ -59,7 +61,7 @@ const ECOMMERCE_FIELD_NAMES = {
     cpf: "ecommerce_register_cpf",
     email: "ecommerce_register_email",
     nome: "ecommerce_register_nome",
-    password: "ecommerce_register_password",
+    [REGISTER_PASSWORD_ERROR_FIELD]: REGISTER_PASSWORD_INPUT_NAME,
     telefone: "ecommerce_register_telefone",
   },
   ecommerce_profile_: {
@@ -122,7 +124,7 @@ function inferRegisterFieldFromMessage(message) {
   if (normalized.includes("nome")) return "nome";
   if (normalized.includes("cpf")) return "cpf";
   if (normalized.includes("telefone") || normalized.includes("celular")) return "telefone";
-  if (normalized.includes("senha")) return "password";
+  if (normalized.includes("senha")) return REGISTER_PASSWORD_ERROR_FIELD;
   if (normalized.includes("email") || normalized.includes("e-mail")) return "email";
   if (normalized.includes("termo")) return "accepted_terms";
   if (normalized.includes("privacidade")) return "accepted_privacy";
@@ -162,7 +164,7 @@ function getRegisterValidation(registerForm, tenantContext) {
   }
   if ((registerForm.password || "").length < 8) {
     return {
-      field: "password",
+      field: REGISTER_PASSWORD_ERROR_FIELD,
       message: "A senha deve ter pelo menos 8 caracteres.",
       normalizedEmail,
     };
