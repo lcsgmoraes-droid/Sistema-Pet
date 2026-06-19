@@ -5,6 +5,7 @@ sofrem impacto por venda ou cancelamento.
 """
 
 import logging
+from contextlib import contextmanager
 from sqlalchemy.orm import Session
 
 from app.domain.events.venda_events import VendaFinalizada, VendaCancelada
@@ -19,6 +20,19 @@ class KitEstoqueEventHandler:
     """
     Handler responsável por manter o estoque virtual de KITs consistente.
     """
+
+    @staticmethod
+    @contextmanager
+    def _session_scope():
+        session_generator = get_session()
+        db = next(session_generator)
+        try:
+            yield db
+        finally:
+            try:
+                next(session_generator)
+            except StopIteration:
+                pass
 
     @staticmethod
     def _recalcular_kits_por_venda(db: Session, venda_id: int) -> None:
@@ -46,10 +60,10 @@ class KitEstoqueEventHandler:
         O estoque já foi baixado neste ponto.
         """
         try:
-            db = next(get_session())
-            KitEstoqueEventHandler._recalcular_kits_por_venda(
-                db=db, venda_id=event.venda_id
-            )
+            with KitEstoqueEventHandler._session_scope() as db:
+                KitEstoqueEventHandler._recalcular_kits_por_venda(
+                    db=db, venda_id=event.venda_id
+                )
         except Exception as e:
             logger.error(
                 f"❌ Erro ao recalcular KITs após venda finalizada: {e}", exc_info=True
@@ -62,10 +76,10 @@ class KitEstoqueEventHandler:
         O estoque já foi estornado neste ponto.
         """
         try:
-            db = next(get_session())
-            KitEstoqueEventHandler._recalcular_kits_por_venda(
-                db=db, venda_id=event.venda_id
-            )
+            with KitEstoqueEventHandler._session_scope() as db:
+                KitEstoqueEventHandler._recalcular_kits_por_venda(
+                    db=db, venda_id=event.venda_id
+                )
         except Exception as e:
             logger.error(
                 f"❌ Erro ao recalcular KITs após cancelamento de venda: {e}",

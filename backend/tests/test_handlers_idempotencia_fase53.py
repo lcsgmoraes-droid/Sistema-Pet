@@ -18,10 +18,13 @@ COBERTURA:
 import pytest
 import sqlite3
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
+from uuid import UUID
 
 # Imports do sistema
 import sys
+from sqlalchemy.dialects import sqlite as sqlalchemy_sqlite
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -29,6 +32,9 @@ from app.domain.events.venda_events import VendaCriada, VendaFinalizada, VendaCa
 from app.read_models.handlers_v53_idempotente import VendaReadModelHandler
 from app.core.side_effects_guard import suppress_in_replay
 from app.core.replay_context import enable_replay_mode, disable_replay_mode
+
+
+TENANT_ID = UUID("11111111-1111-1111-1111-111111111111")
 
 
 # ===== FIXTURES =====
@@ -43,47 +49,60 @@ def test_db():
     conn.execute("""
         CREATE TABLE read_vendas_resumo_diario (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            data DATE NOT NULL UNIQUE,
+            tenant_id TEXT NOT NULL,
+            data DATE NOT NULL,
             quantidade_aberta INTEGER DEFAULT 0,
             quantidade_finalizada INTEGER DEFAULT 0,
             quantidade_cancelada INTEGER DEFAULT 0,
             total_vendido DECIMAL(10, 2) DEFAULT 0,
             total_cancelado DECIMAL(10, 2) DEFAULT 0,
             ticket_medio DECIMAL(10, 2) DEFAULT 0,
-            atualizado_em TIMESTAMP
+            atualizado_em TIMESTAMP,
+            UNIQUE(tenant_id, data)
         )
     """)
 
     conn.execute("""
         CREATE TABLE read_performance_parceiro (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
             funcionario_id INTEGER NOT NULL,
             mes_referencia DATE NOT NULL,
             quantidade_vendas INTEGER DEFAULT 0,
             total_vendido DECIMAL(10, 2) DEFAULT 0,
+            ticket_medio DECIMAL(10, 2) DEFAULT 0,
             vendas_canceladas INTEGER DEFAULT 0,
             taxa_cancelamento DECIMAL(5, 2) DEFAULT 0,
             atualizado_em TIMESTAMP,
-            UNIQUE(funcionario_id, mes_referencia)
+            UNIQUE(tenant_id, funcionario_id, mes_referencia)
         )
     """)
 
     conn.execute("""
         CREATE TABLE read_receita_mensal (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mes_referencia DATE NOT NULL UNIQUE,
+            tenant_id TEXT NOT NULL,
+            mes_referencia DATE NOT NULL,
             receita_bruta DECIMAL(10, 2) DEFAULT 0,
             quantidade_vendas INTEGER DEFAULT 0,
             receita_cancelada DECIMAL(10, 2) DEFAULT 0,
             quantidade_cancelamentos INTEGER DEFAULT 0,
             receita_liquida DECIMAL(10, 2) DEFAULT 0,
-            atualizado_em TIMESTAMP
+            ticket_medio DECIMAL(10, 2) DEFAULT 0,
+            variacao_percentual DECIMAL(5, 2),
+            atualizado_em TIMESTAMP,
+            UNIQUE(tenant_id, mes_referencia)
         )
     """)
 
     conn.commit()
     yield conn
     conn.close()
+
+
+@pytest.fixture(autouse=True)
+def read_model_tenant_context(tenant_context):
+    tenant_context(TENANT_ID)
 
 
 @pytest.fixture
@@ -99,8 +118,8 @@ def mock_db_session(test_db):
 
         def execute(self, stmt):
             # Executar statement SQLAlchemy
-            compiled = stmt.compile(dialect=sqlite3.dialect())
-            params = compiled.params
+            compiled = stmt.compile(dialect=sqlalchemy_sqlite.dialect())
+            params = _coerce_params(compiled)
             query_str = str(compiled)
 
             cursor = self.conn.execute(query_str, params)
@@ -128,6 +147,20 @@ def mock_db_session(test_db):
             return None
 
     return MockSession(test_db)
+
+
+def _coerce_value(value):
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
+
+
+def _coerce_params(compiled):
+    if compiled.positiontup:
+        return tuple(_coerce_value(compiled.params[name]) for name in compiled.positiontup)
+    return {name: _coerce_value(value) for name, value in compiled.params.items()}
 
 
 # ===== TESTES DE IDEMPOTÊNCIA =====
