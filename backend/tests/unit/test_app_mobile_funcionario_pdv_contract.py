@@ -4,7 +4,24 @@ from pathlib import Path
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 
+from app.routes import app_mobile_funcionario_pdv_routes
+from app.routes import app_mobile_routes
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
+PDV_SOURCE = "backend/app/routes/app_mobile_funcionario_pdv_routes.py"
+EXPECTED_PDV_SUBROUTES = {
+    ("/funcionario/pdv/produtos/buscar", "GET"),
+    ("/funcionario/pdv/produtos/barcode/{barcode}", "GET"),
+    ("/funcionario/pdv/clientes/buscar", "GET"),
+    ("/funcionario/pdv/caixa/aberto", "GET"),
+    ("/funcionario/pdv/formas-pagamento", "GET"),
+    ("/funcionario/pdv/beneficios/preview", "POST"),
+    ("/funcionario/pdv/vendas/salvar", "POST"),
+    ("/funcionario/pdv/vendas/finalizar", "POST"),
+}
+EXPECTED_PUBLIC_PDV_ROUTES = {
+    (f"/app{path}", method) for path, method in EXPECTED_PDV_SUBROUTES
+}
 
 
 def read_repo(path: str) -> str:
@@ -20,8 +37,16 @@ def extract_block(source: str, marker: str) -> str:
     return source[start:next_route]
 
 
+def _route_signatures(router):
+    return {
+        (route.path, ",".join(sorted(route.methods)))
+        for route in router.routes
+        if hasattr(route, "methods")
+    }
+
+
 def test_funcionario_pdv_endpoints_exist():
-    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    source = read_repo(PDV_SOURCE)
 
     assert '"/funcionario/pdv/produtos/buscar"' in source
     assert '"/funcionario/pdv/produtos/barcode/{barcode}"' in source
@@ -30,10 +55,33 @@ def test_funcionario_pdv_endpoints_exist():
     assert '"/funcionario/pdv/formas-pagamento"' in source
     assert '"/funcionario/pdv/vendas/salvar"' in source
     assert '"/funcionario/pdv/vendas/finalizar"' in source
+    assert EXPECTED_PDV_SUBROUTES <= _route_signatures(
+        app_mobile_funcionario_pdv_routes.router
+    )
+    assert EXPECTED_PUBLIC_PDV_ROUTES <= _route_signatures(app_mobile_routes.router)
+
+
+def test_funcionario_pdv_mantem_aliases_no_agregador():
+    assert (
+        app_mobile_routes.FuncionarioPdvProdutoResponse
+        is app_mobile_funcionario_pdv_routes.FuncionarioPdvProdutoResponse
+    )
+    assert (
+        app_mobile_routes.FuncionarioPdvFinalizarRequest
+        is app_mobile_funcionario_pdv_routes.FuncionarioPdvFinalizarRequest
+    )
+    assert (
+        app_mobile_routes.finalizar_venda_funcionario_pdv
+        is app_mobile_funcionario_pdv_routes.finalizar_venda_funcionario_pdv
+    )
+    assert (
+        app_mobile_routes._get_funcionario_operacional_or_403
+        is app_mobile_funcionario_pdv_routes._get_funcionario_operacional_or_403
+    )
 
 
 def test_funcionario_pdv_delegates_to_official_sale_flow():
-    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    source = read_repo(PDV_SOURCE)
     block = extract_block(source, "def finalizar_venda_funcionario_pdv")
 
     assert "VendaService.criar_venda" in block
@@ -44,7 +92,7 @@ def test_funcionario_pdv_delegates_to_official_sale_flow():
 
 
 def test_funcionario_pdv_does_not_manage_cash_register():
-    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    source = read_repo(PDV_SOURCE)
 
     assert '"/funcionario/pdv/caixa/abrir"' not in source
     assert '"/funcionario/pdv/caixa/fechar"' not in source
@@ -53,7 +101,7 @@ def test_funcionario_pdv_does_not_manage_cash_register():
 
 
 def test_funcionario_pdv_reuses_open_erp_cash_register_for_tenant():
-    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    source = read_repo(PDV_SOURCE)
     service = read_repo("backend/app/vendas/service.py")
     caixa_service = read_repo("backend/app/caixa/service.py")
     caixa_block = extract_block(source, "def obter_caixa_aberto_funcionario_pdv")
@@ -89,7 +137,7 @@ def test_funcionario_pdv_reuses_open_erp_cash_register_for_tenant():
 
 
 def test_funcionario_pdv_searches_sellable_erp_products_not_app_catalog():
-    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    source = read_repo(PDV_SOURCE)
     search_block = extract_block(source, "def buscar_produtos_funcionario_pdv")
     barcode_block = extract_block(source, "def buscar_produto_funcionario_pdv_barcode")
 
@@ -102,7 +150,7 @@ def test_funcionario_pdv_searches_sellable_erp_products_not_app_catalog():
 
 
 def test_funcionario_pdv_searches_products_and_clients_like_web_pdv():
-    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    source = read_repo(PDV_SOURCE)
     product_block = extract_block(source, "def buscar_produtos_funcionario_pdv")
     barcode_block = extract_block(source, "def buscar_produto_funcionario_pdv_barcode")
     client_block = extract_block(source, "def buscar_clientes_funcionario_pdv")
@@ -170,7 +218,7 @@ def test_mobile_app_has_employee_pdv_navigation_service_and_screen():
 
 
 def test_funcionario_pdv_supports_campaign_benefits_preview_contract():
-    backend = read_repo("backend/app/routes/app_mobile_routes.py")
+    backend = read_repo(PDV_SOURCE)
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
     screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
 
@@ -191,7 +239,7 @@ def test_funcionario_pdv_supports_campaign_benefits_preview_contract():
 
 
 def test_funcionario_pdv_finalization_passes_coupon_and_cashback_to_official_sale_flow():
-    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    source = read_repo(PDV_SOURCE)
     block = extract_block(source, "def finalizar_venda_funcionario_pdv")
 
     assert "cupom_codigo" in block
@@ -205,7 +253,7 @@ def test_funcionario_pdv_finalization_passes_coupon_and_cashback_to_official_sal
 
 
 def test_funcionario_pdv_supports_credit_installments_from_erp_payment_rules():
-    backend = read_repo("backend/app/routes/app_mobile_routes.py")
+    backend = read_repo(PDV_SOURCE)
     types = read_repo("app-mobile/src/types/index.ts")
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
     screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
@@ -227,7 +275,7 @@ def test_funcionario_pdv_supports_credit_installments_from_erp_payment_rules():
 
 
 def test_funcionario_pdv_collects_card_brand_nsu_and_erp_payment_rule():
-    backend = read_repo("backend/app/routes/app_mobile_routes.py")
+    backend = read_repo(PDV_SOURCE)
     types = read_repo("app-mobile/src/types/index.ts")
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
     screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
@@ -262,7 +310,7 @@ def test_funcionario_pdv_collects_card_brand_nsu_and_erp_payment_rule():
 
 
 def test_funcionario_pdv_card_brand_is_explicit_and_nsu_optional():
-    backend = read_repo("backend/app/routes/app_mobile_routes.py")
+    backend = read_repo(PDV_SOURCE)
     resolver_block = extract_block(
         backend, "def _resolver_forma_pagamento_cartao_funcionario_pdv"
     )
@@ -276,7 +324,7 @@ def test_funcionario_pdv_card_brand_is_explicit_and_nsu_optional():
 
 
 def test_funcionario_pdv_search_ranks_full_phrase_before_loose_code_digits():
-    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    source = read_repo(PDV_SOURCE)
     search_block = extract_block(source, "def buscar_produtos_funcionario_pdv")
 
     assert "_produto_busca_filtros_funcionario(termo)" in search_block
@@ -301,7 +349,7 @@ def test_funcionario_pdv_uses_keyboard_safe_scroll_and_product_images():
 
 
 def test_funcionario_pdv_can_save_open_sale_for_cashier_checkout():
-    backend = read_repo("backend/app/routes/app_mobile_routes.py")
+    backend = read_repo(PDV_SOURCE)
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
     screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
     save_block = extract_block(backend, "def salvar_venda_funcionario_pdv")
