@@ -1,5 +1,5 @@
 from app import bling_sync_routes
-from app.bling_sync import produtos_routes
+from app.bling_sync import product_matching, produtos_routes
 
 
 EXPECTED_SUBROUTES = {
@@ -36,4 +36,13 @@ def test_bling_sync_mantem_aliases_de_compatibilidade():
     assert (
         bling_sync_routes.importar_imagens_dos_produtos_bling
         is produtos_routes.importar_imagens_dos_produtos_bling
+    )
+
+
+def test_bling_sync_matching_helpers_ficam_em_modulo_dedicado():
+    assert bling_sync_routes._sku_bling is product_matching._sku_bling
+    assert bling_sync_routes._barcode_bling is product_matching._barcode_bling
+    assert (
+        bling_sync_routes._produto_sincroniza_estoque
+        is product_matching._produto_sincroniza_estoque
     )
