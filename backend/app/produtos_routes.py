@@ -29,7 +29,6 @@ from .produtos_models import (
     Produto,
     ProdutoLote,
     EstoqueMovimentacao,
-    ProdutoHistoricoPreco,
     ProdutoKitComponente,  # Sprint 4: ComposiÃ§Ã£o de KIT
 )
 from .produtos.schemas import (
@@ -57,7 +56,6 @@ from .produtos.schemas import (
     EntradaEstoqueRequest,
     SaidaEstoqueRequest,
     AtualizacaoLoteRequest,
-    HistoricoPrecoResponse,
 )
 
 from .services.produto_service import ProdutoService
@@ -105,6 +103,7 @@ from .produtos.racao import (
     _produto_eh_racao_expr,
 )
 from .produtos.fornecedores_routes import router as fornecedores_router
+from .produtos.historico_precos_routes import router as historico_precos_router
 from .produtos.imagens_routes import router as imagens_router
 from .produtos.relatorios_routes import router as relatorios_router
 from .produtos.validade import (
@@ -128,6 +127,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/produtos", tags=["produtos"])
 router.include_router(fornecedores_router)
+router.include_router(historico_precos_router)
 router.include_router(imagens_router)
 router.include_router(relatorios_router)
 
@@ -2804,78 +2804,6 @@ def saida_estoque_fifo(
         "lotes_consumidos": lotes_consumidos,
         "numero_pedido": saida.numero_pedido,
     }
-
-
-# ==========================================
-# HISTÃ“RICO DE PREÃ‡OS
-# ==========================================
-
-
-@router.get(
-    "/{produto_id}/historico-precos", response_model=List[HistoricoPrecoResponse]
-)
-@require_permission("produtos.visualizar")
-def listar_historico_precos(
-    produto_id: int,
-    limit: int = 50,
-    offset: int = 0,
-    db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
-):
-    """
-    Lista histÃ³rico de alteraÃ§Ãµes de preÃ§os de um produto
-    """
-    current_user, tenant_id = user_and_tenant
-
-    produto = (
-        db.query(Produto)
-        .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
-        .first()
-    )
-    if not produto:
-        raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
-
-    historicos = (
-        db.query(ProdutoHistoricoPreco)
-        .options(
-            joinedload(ProdutoHistoricoPreco.user),
-            joinedload(ProdutoHistoricoPreco.nota_entrada),
-        )
-        .filter(ProdutoHistoricoPreco.produto_id == produto_id)
-        .order_by(ProdutoHistoricoPreco.created_at.desc())
-        .limit(limit)
-        .offset(offset)
-        .all()
-    )
-
-    resultado = []
-    for hist in historicos:
-        resultado.append(
-            {
-                "id": hist.id,
-                "data": hist.created_at,
-                "preco_custo_anterior": hist.preco_custo_anterior,
-                "preco_custo_novo": hist.preco_custo_novo,
-                "preco_venda_anterior": hist.preco_venda_anterior,
-                "preco_venda_novo": hist.preco_venda_novo,
-                "margem_anterior": hist.margem_anterior,
-                "margem_nova": hist.margem_nova,
-                "variacao_custo_percentual": hist.variacao_custo_percentual,
-                "variacao_venda_percentual": hist.variacao_venda_percentual,
-                "motivo": hist.motivo,
-                "nota_numero": hist.nota_entrada.numero_nota
-                if hist.nota_entrada
-                else None,
-                "nota_data_emissao": hist.nota_entrada.data_emissao
-                if hist.nota_entrada
-                else None,
-                "referencia": hist.referencia,
-                "observacoes": hist.observacoes,
-                "usuario": hist.user.email if hist.user else None,
-            }
-        )
-
-    return resultado
 
 
 # ==================== CLASSIFICAï¿½ï¿½O INTELIGENTE DE RAï¿½ï¿½ES ====================
