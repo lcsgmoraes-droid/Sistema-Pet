@@ -112,9 +112,10 @@ def test_ecommerce_profile_reload_uses_active_profile_from_token_contract():
 
 def test_operational_app_gates_use_app_access_profile_service():
     mobile_routes = read_backend("app/routes/app_mobile_routes.py")
+    mobile_pdv_routes = read_backend("app/routes/app_mobile_funcionario_pdv_routes.py")
     vet_routes = read_backend("app/routes/app_vet_routes.py")
     delivery_routes = read_backend("app/api/endpoints/rotas_entrega.py")
 
-    assert "get_cliente_for_app_profile_or_none" in mobile_routes
+    assert "get_cliente_for_app_profile_or_none" in mobile_routes + mobile_pdv_routes
     assert "get_cliente_for_app_profile_or_none" in vet_routes
     assert "get_cliente_for_app_profile_or_none" in delivery_routes
