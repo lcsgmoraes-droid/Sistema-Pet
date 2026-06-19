@@ -159,7 +159,9 @@ def _coerce_value(value):
 
 def _coerce_params(compiled):
     if compiled.positiontup:
-        return tuple(_coerce_value(compiled.params[name]) for name in compiled.positiontup)
+        return tuple(
+            _coerce_value(compiled.params[name]) for name in compiled.positiontup
+        )
     return {name: _coerce_value(value) for name, value in compiled.params.items()}
 
 
