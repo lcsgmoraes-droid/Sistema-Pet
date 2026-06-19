@@ -1053,9 +1053,16 @@ def registrar_cliente(
 ):
     tenant_id = _extract_tenant_id_from_request(request)
     email = payload.email.strip().lower()
+    nome = (payload.nome or "").strip()
     canal_registro = normalize_online_sales_channel(
         payload.canal or request.headers.get("X-Client-Channel") or ""
     )
+
+    if len(nome.split()) < 2:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe nome completo (nome e sobrenome)",
+        )
 
     if not payload.accepted_terms or not payload.accepted_privacy:
         raise HTTPException(
@@ -1081,7 +1088,7 @@ def registrar_cliente(
     user = User(
         email=email,
         hashed_password=hash_password(payload.password),
-        nome=payload.nome,
+        nome=nome,
         telefone=telefone,
         is_active=True,
         is_admin=False,
@@ -1104,8 +1111,8 @@ def registrar_cliente(
     db.refresh(user)
 
     cliente = _get_or_create_cliente_for_user(db, user)
-    if payload.nome:
-        cliente.nome = payload.nome
+    if nome:
+        cliente.nome = nome
     if cpf_normalizado and not cliente.cpf:
         cliente.cpf = cpf_normalizado
     cliente.telefone = telefone

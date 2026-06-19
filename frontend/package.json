@@ -12,6 +12,7 @@
     "test:auth-storage": "node scripts/test-token-storage.mjs",
     "test:auth-refresh": "node scripts/test-refresh-manager.mjs",
     "test:corepet-branding": "node scripts/test-corepet-branding.mjs",
+    "test:ecommerce-account-validation": "node scripts/test-ecommerce-account-validation.mjs",
     "test:ecommerce-orders-followup": "node scripts/test-ecommerce-orders-followup.mjs",
     "test:app-payment-return": "node scripts/test-app-payment-return-links.mjs",
     "test:pdv-online-order-actions": "node scripts/test-pdv-online-order-actions.mjs",

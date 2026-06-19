@@ -12,6 +12,7 @@ export default function useEcommerceOrders({ authHeaders, customerToken, view, o
   });
   const [ordersDetailed, setOrdersDetailed] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
 
   function persistOrderIds(ids) {
     setOrderIds(ids);
@@ -21,6 +22,7 @@ export default function useEcommerceOrders({ authHeaders, customerToken, view, o
   async function loadOrdersDetailed() {
     if (!customerToken) return;
     setOrdersLoading(true);
+    setOrdersError("");
     try {
       const response = await ecommerceApi.get("/api/checkout/pedidos", {
         headers: authHeaders,
@@ -34,8 +36,10 @@ export default function useEcommerceOrders({ authHeaders, customerToken, view, o
         persistOrderIds(Array.from(new Set([...ids, ...orderIds])));
       }
     } catch (err) {
+      const message = extractApiErrorMessage(err, "Erro ao carregar detalhes dos pedidos");
       setOrdersDetailed([]);
-      onError(extractApiErrorMessage(err, "Erro ao carregar detalhes dos pedidos"));
+      setOrdersError(message);
+      onError(message);
     } finally {
       setOrdersLoading(false);
     }
@@ -67,6 +71,7 @@ export default function useEcommerceOrders({ authHeaders, customerToken, view, o
 
   return {
     ordersDetailed,
+    ordersError,
     ordersLoading,
     loadOrdersDetailed,
     avisarCheguei,

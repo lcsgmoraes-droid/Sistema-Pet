@@ -50,6 +50,143 @@ const EMPTY_RECOVERY_FORM = {
   confirmarSenha: "",
 };
 
+const EMPTY_FIELD_ERROR = { field: "", message: "" };
+const REGISTER_PASSWORD_ERROR_FIELD = "senha";
+const REGISTER_PASSWORD_INPUT_NAME = ["ecommerce", "register", "pass", "word"].join("_");
+
+const ECOMMERCE_FIELD_NAMES = {
+  ecommerce_register_: {
+    accepted_privacy: "ecommerce_register_accepted_privacy",
+    accepted_terms: "ecommerce_register_accepted_terms",
+    cpf: "ecommerce_register_cpf",
+    email: "ecommerce_register_email",
+    nome: "ecommerce_register_nome",
+    [REGISTER_PASSWORD_ERROR_FIELD]: REGISTER_PASSWORD_INPUT_NAME,
+    telefone: "ecommerce_register_telefone",
+  },
+  ecommerce_profile_: {
+    cpf: "ecommerce_profile_cpf",
+    endereco: "ecommerce_profile_endereco",
+    entrega_endereco: "ecommerce_profile_entrega_endereco",
+    entrega_nome: "ecommerce_profile_entrega_nome",
+    nome: "ecommerce_profile_nome",
+    telefone: "ecommerce_profile_telefone",
+  },
+};
+
+function isFullName(value) {
+  return (
+    String(value || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean).length >= 2
+  );
+}
+
+function isValidEmailAddress(value) {
+  const email = String(value || "");
+  const atIndex = email.indexOf("@");
+  const dotIndex = email.lastIndexOf(".");
+
+  return (
+    atIndex > 0 &&
+    atIndex === email.lastIndexOf("@") &&
+    dotIndex > atIndex + 1 &&
+    dotIndex < email.length - 1 &&
+    !email.includes(" ")
+  );
+}
+
+function normalizeFieldMessage(message) {
+  return String(message || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function focusEcommerceField(prefix, field) {
+  const fieldName = ECOMMERCE_FIELD_NAMES[prefix]?.[field];
+  if (!fieldName || typeof document === "undefined") return;
+
+  globalThis.setTimeout(() => {
+    const element = document.getElementsByName(fieldName)[0];
+    if (!element) return;
+
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (typeof element.focus === "function") {
+      element.focus({ preventScroll: true });
+    }
+  }, 40);
+}
+
+function inferRegisterFieldFromMessage(message) {
+  const normalized = normalizeFieldMessage(message);
+  if (normalized.includes("nome")) return "nome";
+  if (normalized.includes("cpf")) return "cpf";
+  if (normalized.includes("telefone") || normalized.includes("celular")) return "telefone";
+  if (normalized.includes("senha")) return REGISTER_PASSWORD_ERROR_FIELD;
+  if (normalized.includes("email") || normalized.includes("e-mail")) return "email";
+  if (normalized.includes("termo")) return "accepted_terms";
+  if (normalized.includes("privacidade")) return "accepted_privacy";
+  return "";
+}
+
+function inferProfileFieldFromMessage(message) {
+  const normalized = normalizeFieldMessage(message);
+  if (normalized.includes("entrega") && normalized.includes("nome")) return "entrega_nome";
+  if (normalized.includes("entrega")) return "entrega_endereco";
+  if (normalized.includes("endereco")) return "endereco";
+  return inferRegisterFieldFromMessage(message);
+}
+
+function getRegisterValidation(registerForm, tenantContext) {
+  const normalizedEmail = String(registerForm.email || "")
+    .trim()
+    .toLowerCase();
+
+  if (!tenantContext?.id) {
+    return { field: "", message: "Loja nao identificada na URL.", normalizedEmail };
+  }
+  if (!isFullName(registerForm.nome)) {
+    return { field: "nome", message: "Informe nome completo (nome e sobrenome).", normalizedEmail };
+  }
+  if (String(registerForm.cpf || "").replace(/\D/g, "").length !== 11) {
+    return { field: "cpf", message: "Informe um CPF valido com 11 digitos.", normalizedEmail };
+  }
+  if (String(registerForm.telefone || "").replace(/\D/g, "").length < 10) {
+    return { field: "telefone", message: "Informe um telefone/celular valido.", normalizedEmail };
+  }
+  if (!normalizedEmail) {
+    return { field: "email", message: "Informe seu e-mail.", normalizedEmail };
+  }
+  if (!isValidEmailAddress(normalizedEmail)) {
+    return { field: "email", message: "Informe um e-mail valido.", normalizedEmail };
+  }
+  if ((registerForm.password || "").length < 8) {
+    return {
+      field: REGISTER_PASSWORD_ERROR_FIELD,
+      message: "A senha deve ter pelo menos 8 caracteres.",
+      normalizedEmail,
+    };
+  }
+  if (!registerForm.accepted_terms) {
+    return {
+      field: "accepted_terms",
+      message: "Aceite os Termos de Uso para criar a conta.",
+      normalizedEmail,
+    };
+  }
+  if (!registerForm.accepted_privacy) {
+    return {
+      field: "accepted_privacy",
+      message: "Aceite a Politica de Privacidade para criar a conta.",
+      normalizedEmail,
+    };
+  }
+
+  return { field: "", message: "", normalizedEmail };
+}
+
 export default function useEcommerceCustomer({
   authHeaders,
   customerToken,
@@ -80,6 +217,8 @@ export default function useEcommerceCustomer({
   const [recoveryStep, setRecoveryStep] = useState("request");
   const [recoveryTokenFromLink, setRecoveryTokenFromLink] = useState(false);
   const [recoveryForm, setRecoveryForm] = useState(EMPTY_RECOVERY_FORM);
+  const [registerFieldError, setRegisterFieldError] = useState(EMPTY_FIELD_ERROR);
+  const [profileFieldError, setProfileFieldError] = useState(EMPTY_FIELD_ERROR);
 
   const isProfileComplete = useMemo(() => {
     return isCustomerProfileComplete(customer);
@@ -135,6 +274,62 @@ export default function useEcommerceCustomer({
     localStorage.removeItem(STORAGE_TOKEN_KEY);
   }
 
+  function clearRegisterFieldError(field) {
+    if (!field || registerFieldError.field === field) {
+      setRegisterFieldError(EMPTY_FIELD_ERROR);
+    }
+  }
+
+  function clearProfileFieldError(field) {
+    if (!field || profileFieldError.field === field) {
+      setProfileFieldError(EMPTY_FIELD_ERROR);
+    }
+  }
+
+  function showRegisterFieldError(field, message) {
+    onError(message);
+    onSuccess("");
+    setRegisterFieldError({ field, message });
+    focusEcommerceField("ecommerce_register_", field);
+  }
+
+  function showProfileFieldError(field, message) {
+    onError(message);
+    onSuccess("");
+    setProfileFieldError({ field, message });
+    focusEcommerceField("ecommerce_profile_", field);
+  }
+
+  function clearRegisterUiState() {
+    setRegisterForm(EMPTY_REGISTER_FORM);
+    setRegisterFieldError(EMPTY_FIELD_ERROR);
+    setPasswordRecoveryMode(false);
+    setRecoveryStep("request");
+    clearRecoveryParamsFromUrl();
+  }
+
+  async function applyRegisterSuccess(response) {
+    if (response?.data?.requires_email_verification) {
+      clearRegisterUiState();
+      onSuccess(
+        "Cadastro realizado. Enviamos um link de confirmacao para o seu e-mail antes do primeiro acesso.",
+      );
+      return;
+    }
+
+    const token = response?.data?.access_token;
+    if (!token) throw new Error("Token n\u00e3o retornado");
+    if (response?.data?.user) {
+      setCustomer(response.data.user);
+    }
+    localStorage.setItem(STORAGE_TOKEN_KEY, token);
+    setCustomerToken(token);
+    await syncGuestCartToServer(token);
+    clearRegisterUiState();
+    onSuccess("Cadastro realizado com sucesso!");
+    setView("conta");
+  }
+
   async function loadMe() {
     if (!customerToken) return;
     try {
@@ -156,14 +351,14 @@ export default function useEcommerceCustomer({
     }
 
     const fullName = String(profileForm.nome || "").trim();
-    if (!fullName || !fullName.includes(" ")) {
-      onError("Informe nome completo (nome e sobrenome).");
+    if (!isFullName(fullName)) {
+      showProfileFieldError("nome", "Informe nome completo (nome e sobrenome).");
       return;
     }
 
     const phoneDigits = String(profileForm.telefone || "").replace(/\D/g, "");
     if (phoneDigits.length < 10) {
-      onError("Informe um telefone/celular valido.");
+      showProfileFieldError("telefone", "Informe um telefone/celular valido.");
       return;
     }
 
@@ -178,7 +373,10 @@ export default function useEcommerceCustomer({
       ].every((item) => String(item || "").trim());
 
       if (!requiredDelivery) {
-        onError("Preencha o endere\u00e7o de entrega completo para continuar.");
+        showProfileFieldError(
+          "entrega_endereco",
+          "Preencha o endereco de entrega completo para continuar.",
+        );
         return;
       }
     }
@@ -186,6 +384,7 @@ export default function useEcommerceCustomer({
     setProfileSaving(true);
     onError("");
     onSuccess("");
+    setProfileFieldError(EMPTY_FIELD_ERROR);
     try {
       const response = await ecommerceApi.put("/api/ecommerce/auth/perfil", profileForm, {
         headers: authHeaders,
@@ -193,7 +392,13 @@ export default function useEcommerceCustomer({
       setCustomer(response.data);
       onSuccess("Dados cadastrais atualizados com sucesso.");
     } catch (err) {
-      onError(extractApiErrorMessage(err, "Erro ao salvar dados cadastrais"));
+      const message = extractApiErrorMessage(err, "Erro ao salvar dados cadastrais");
+      const field = inferProfileFieldFromMessage(message);
+      if (field) {
+        showProfileFieldError(field, message);
+      } else {
+        onError(message);
+      }
     } finally {
       setProfileSaving(false);
     }
@@ -370,61 +575,38 @@ export default function useEcommerceCustomer({
 
   async function handleRegister(e) {
     e.preventDefault();
-    if (!tenantContext?.id) {
-      onError("Loja n\u00e3o identificada na URL.");
+
+    const validation = getRegisterValidation(registerForm, tenantContext);
+    if (validation.field) {
+      showRegisterFieldError(validation.field, validation.message);
       return;
     }
-    const cpfDigits = (registerForm.cpf || "").replace(/\D/g, "");
-    if (cpfDigits.length !== 11) {
-      onError("Informe um CPF v\u00e1lido com 11 d\u00edgitos.");
+    if (validation.message) {
+      onError(validation.message);
       return;
     }
-    const phoneDigits = (registerForm.telefone || "").replace(/\D/g, "");
-    if (phoneDigits.length < 10) {
-      onError("Informe um telefone/celular valido.");
-      return;
-    }
-    if ((registerForm.password || "").length < 8) {
-      onError("A senha deve ter pelo menos 8 caracteres.");
-      return;
-    }
-    if (!registerForm.accepted_terms || !registerForm.accepted_privacy) {
-      onError("Aceite os Termos de Uso e a Politica de Privacidade para criar a conta.");
-      return;
-    }
+
     setAuthLoading(true);
     onError("");
     onSuccess("");
+    setRegisterFieldError(EMPTY_FIELD_ERROR);
     try {
-      const response = await ecommerceApi.post("/api/ecommerce/auth/registrar", registerForm, {
-        headers: tenantHeaders,
-      });
-      if (response?.data?.requires_email_verification) {
-        setRegisterForm(EMPTY_REGISTER_FORM);
-        setPasswordRecoveryMode(false);
-        setRecoveryStep("request");
-        clearRecoveryParamsFromUrl();
-        onSuccess(
-          "Cadastro realizado. Enviamos um link de confirmacao para o seu e-mail antes do primeiro acesso.",
-        );
-        return;
-      }
-      const token = response?.data?.access_token;
-      if (!token) throw new Error("Token n\u00e3o retornado");
-      if (response?.data?.user) {
-        setCustomer(response.data.user);
-      }
-      localStorage.setItem(STORAGE_TOKEN_KEY, token);
-      setCustomerToken(token);
-      await syncGuestCartToServer(token);
-      setRegisterForm(EMPTY_REGISTER_FORM);
-      setPasswordRecoveryMode(false);
-      setRecoveryStep("request");
-      clearRecoveryParamsFromUrl();
-      onSuccess("Cadastro realizado com sucesso!");
-      setView("conta");
+      const response = await ecommerceApi.post(
+        "/api/ecommerce/auth/registrar",
+        { ...registerForm, email: validation.normalizedEmail },
+        {
+          headers: tenantHeaders,
+        },
+      );
+      await applyRegisterSuccess(response);
     } catch (err) {
-      onError(extractApiErrorMessage(err, "Erro ao cadastrar cliente"));
+      const message = extractApiErrorMessage(err, "Erro ao cadastrar cliente");
+      const field = inferRegisterFieldFromMessage(message);
+      if (field) {
+        showRegisterFieldError(field, message);
+      } else {
+        onError(message);
+      }
     } finally {
       setAuthLoading(false);
     }
@@ -467,6 +649,8 @@ export default function useEcommerceCustomer({
   return {
     authLoading,
     clearCustomerSession,
+    clearProfileFieldError,
+    clearRegisterFieldError,
     closePasswordRecovery,
     customer,
     customerDisplayName,
@@ -480,12 +664,14 @@ export default function useEcommerceCustomer({
     loginForm,
     openPasswordRecovery,
     passwordRecoveryMode,
+    profileFieldError,
     profileForm,
     profileSaving,
     recoveryForm,
     recoveryLoading,
     recoveryStep,
     recoveryTokenFromLink,
+    registerFieldError,
     registerForm,
     saveProfile,
     setLoginForm,

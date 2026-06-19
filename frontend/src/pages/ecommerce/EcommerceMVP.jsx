@@ -182,6 +182,8 @@ export default function EcommerceMVP() {
   const {
     authLoading,
     clearCustomerSession,
+    clearProfileFieldError,
+    clearRegisterFieldError,
     closePasswordRecovery,
     customer,
     customerDisplayName,
@@ -195,12 +197,14 @@ export default function EcommerceMVP() {
     loginForm,
     openPasswordRecovery,
     passwordRecoveryMode,
+    profileFieldError,
     profileForm,
     profileSaving,
     recoveryForm,
     recoveryLoading,
     recoveryStep,
     recoveryTokenFromLink,
+    registerFieldError,
     registerForm,
     saveProfile,
     setLoginForm,
@@ -252,13 +256,19 @@ export default function EcommerceMVP() {
     onSuccess: setSuccess,
   });
 
-  const { ordersDetailed, ordersLoading, loadOrdersDetailed, avisarCheguei, recordOrderId } =
-    useEcommerceOrders({
-      authHeaders,
-      customerToken,
-      view,
-      onError: setError,
-    });
+  const {
+    ordersDetailed,
+    ordersError,
+    ordersLoading,
+    loadOrdersDetailed,
+    avisarCheguei,
+    recordOrderId,
+  } = useEcommerceOrders({
+    authHeaders,
+    customerToken,
+    view,
+    onError: setError,
+  });
 
   useEffect(() => {
     const viewParam = new URLSearchParams(location.search).get("view");
@@ -619,6 +629,7 @@ export default function EcommerceMVP() {
       {view === "pedidos" && (
         <EcommerceOrdersPage
           orders={ordersDetailed}
+          ordersError={ordersError}
           ordersLoading={ordersLoading}
           styles={S}
           onContinueShopping={() => setView("loja")}
@@ -636,12 +647,14 @@ export default function EcommerceMVP() {
           loginForm={loginForm}
           notifyRequestsCount={notifyRequests.length}
           passwordRecoveryMode={passwordRecoveryMode}
+          profileFieldError={profileFieldError}
           profileForm={profileForm}
           profileSaving={profileSaving}
           recoveryForm={recoveryForm}
           recoveryLoading={recoveryLoading}
           recoveryStep={recoveryStep}
           recoveryTokenFromLink={recoveryTokenFromLink}
+          registerFieldError={registerFieldError}
           registerForm={registerForm}
           setLoginForm={setLoginForm}
           setProfileForm={setProfileForm}
@@ -654,6 +667,8 @@ export default function EcommerceMVP() {
           styles={S}
           wishlistCount={wishlist.length}
           onClosePasswordRecovery={closePasswordRecovery}
+          onClearProfileFieldError={clearProfileFieldError}
+          onClearRegisterFieldError={clearRegisterFieldError}
           onDeliveryCepBlur={handleDeliveryCepBlur}
           onLogin={handleLogin}
           onLogout={logoutCustomer}
