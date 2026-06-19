@@ -14,7 +14,12 @@ COMPONENTES:
 
 from .base import DomainEvent
 from .venda_events import VendaCriada, VendaFinalizada, VendaCancelada
-from .dispatcher import EventDispatcher, event_dispatcher, publish_event, subscribe_handler
+from .dispatcher import (
+    EventDispatcher,
+    event_dispatcher,
+    publish_event,
+    subscribe_handler,
+)
 from .handlers import LogEventHandler, AuditoriaEventHandler
 
 __all__ = [
