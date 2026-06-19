@@ -41,8 +41,14 @@ assert.match(
 
 assert.match(
   customerHook,
-  /showRegisterFieldError\("nome", "Informe nome completo \(nome e sobrenome\)\./,
+  /field:\s*"nome",\s*message:\s*"Informe nome completo \(nome e sobrenome\)\./,
   "cadastro deve validar nome completo antes de chamar a API",
+);
+
+assert.match(
+  customerHook,
+  /getRegisterValidation\(registerForm, tenantContext\)/,
+  "cadastro deve centralizar a validacao antes de chamar a API",
 );
 
 assert.match(

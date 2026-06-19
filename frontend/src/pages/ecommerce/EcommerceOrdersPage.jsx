@@ -1,3 +1,5 @@
+import PropTypes from "prop-types";
+
 import { formatCurrency, formatDateTime } from "./ecommerceMvpUtils";
 
 const ORDER_STATUS_COLORS = {
@@ -403,6 +405,88 @@ export default function EcommerceOrdersPage({
   onReload,
 }) {
   const orderList = Array.isArray(orders) ? orders : [];
+  let ordersContent;
+
+  if (ordersLoading) {
+    ordersContent = (
+      <div style={{ textAlign: "center", color: "#64748b", padding: 40 }}>Carregando pedidos...</div>
+    );
+  } else if (ordersError) {
+    ordersContent = (
+      <div
+        role="alert"
+        style={{
+          background: "#fef2f2",
+          border: "1px solid #fecaca",
+          borderRadius: 12,
+          color: "#991b1b",
+          padding: 18,
+          display: "grid",
+          gap: 10,
+        }}
+      >
+        <div style={{ fontSize: 15, fontWeight: 800 }}>Nao foi possivel carregar pedidos</div>
+        <div style={{ fontSize: 13, lineHeight: 1.45 }}>
+          {ordersError}. Tente atualizar a lista. Se o pagamento acabou de ser aprovado, a loja
+          continua recebendo a confirmacao pelo Mercado Pago.
+        </div>
+        <button
+          onClick={onReload}
+          style={{
+            justifySelf: "start",
+            background: "#991b1b",
+            border: "none",
+            color: "#fff",
+            borderRadius: 10,
+            padding: "9px 16px",
+            fontWeight: 800,
+            fontSize: 13,
+            cursor: "pointer",
+          }}
+        >
+          Tentar novamente
+        </button>
+      </div>
+    );
+  } else if (orderList.length === 0) {
+    ordersContent = (
+      <div
+        style={{
+          textAlign: "center",
+          padding: "48px 0",
+          display: "grid",
+          gap: 10,
+          justifyItems: "center",
+        }}
+      >
+        <span style={{ fontSize: 48 }}>📋</span>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e" }}>Nenhum pedido ainda</div>
+        <div style={{ fontSize: 13, color: "#9ca3af" }}>
+          Seus pedidos aparecerão aqui após a compra.
+        </div>
+        <button
+          onClick={onContinueShopping}
+          style={{ ...S.checkoutBig, width: "auto", padding: "10px 24px" }}
+        >
+          Ir às compras
+        </button>
+      </div>
+    );
+  } else {
+    ordersContent = (
+      <div style={{ display: "grid", gap: 14 }}>
+        {orderList.map((order) => (
+          <OrderCard
+            key={order.pedido_id}
+            order={order}
+            styles={S}
+            onDriveArrived={onDriveArrived}
+            onOpenPayment={onOpenPayment}
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "28px 16px" }}>
@@ -435,80 +519,20 @@ export default function EcommerceOrdersPage({
         </button>
       </div>
 
-      {ordersLoading ? (
-        <div style={{ textAlign: "center", color: "#64748b", padding: 40 }}>
-          Carregando pedidos...
-        </div>
-      ) : ordersError ? (
-        <div
-          role="alert"
-          style={{
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            borderRadius: 12,
-            color: "#991b1b",
-            padding: 18,
-            display: "grid",
-            gap: 10,
-          }}
-        >
-          <div style={{ fontSize: 15, fontWeight: 800 }}>Nao foi possivel carregar pedidos</div>
-          <div style={{ fontSize: 13, lineHeight: 1.45 }}>
-            {ordersError}. Tente atualizar a lista. Se o pagamento acabou de ser aprovado, a loja
-            continua recebendo a confirmacao pelo Mercado Pago.
-          </div>
-          <button
-            onClick={onReload}
-            style={{
-              justifySelf: "start",
-              background: "#991b1b",
-              border: "none",
-              color: "#fff",
-              borderRadius: 10,
-              padding: "9px 16px",
-              fontWeight: 800,
-              fontSize: 13,
-              cursor: "pointer",
-            }}
-          >
-            Tentar novamente
-          </button>
-        </div>
-      ) : orderList.length === 0 ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "48px 0",
-            display: "grid",
-            gap: 10,
-            justifyItems: "center",
-          }}
-        >
-          <span style={{ fontSize: 48 }}>📋</span>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e" }}>Nenhum pedido ainda</div>
-          <div style={{ fontSize: 13, color: "#9ca3af" }}>
-            Seus pedidos aparecerão aqui após a compra.
-          </div>
-          <button
-            onClick={onContinueShopping}
-            style={{ ...S.checkoutBig, width: "auto", padding: "10px 24px" }}
-          >
-            Ir às compras
-          </button>
-        </div>
-      ) : (
-        <div style={{ display: "grid", gap: 14 }}>
-          {orderList.map((order) => (
-            <OrderCard
-              key={order.pedido_id}
-              order={order}
-              styles={S}
-              onDriveArrived={onDriveArrived}
-              onOpenPayment={onOpenPayment}
-            />
-          ))}
-        </div>
-      )}
+      {ordersContent}
     </div>
   );
 }
+
+EcommerceOrdersPage.propTypes = {
+  orders: PropTypes.arrayOf(PropTypes.object),
+  ordersError: PropTypes.string,
+  ordersLoading: PropTypes.bool.isRequired,
+  styles: PropTypes.shape({
+    checkoutBig: PropTypes.object,
+  }).isRequired,
+  onContinueShopping: PropTypes.func.isRequired,
+  onDriveArrived: PropTypes.func.isRequired,
+  onOpenPayment: PropTypes.func.isRequired,
+  onReload: PropTypes.func.isRequired,
+};
