@@ -55,13 +55,24 @@ def test_contas_de_nf_entrada_usam_classificacao_aprendida_por_fornecedor():
 
 
 def test_contas_de_taxa_pdv_usam_classificacao_aprendida_por_descricao():
-    source = _source("backend/app/vendas/service.py")
+    source = _source("backend/app/vendas/pos_processamento.py")
     taxas = source.split("def processar_contas_pagar_taxas(", 1)[1].split(
         "def gerar_dre_competencia_venda(",
         1,
     )[0]
 
     assert "aplicar_classificacao_aprendida_conta_pagar(" in taxas
+
+
+def test_vendas_service_mantem_imports_publicos_de_pos_processamento():
+    from app.vendas import pos_processamento, service
+
+    assert service.processar_contas_pagar_taxas is (
+        pos_processamento.processar_contas_pagar_taxas
+    )
+    assert service.processar_comissoes_venda is (
+        pos_processamento.processar_comissoes_venda
+    )
 
 
 def test_falha_ao_criar_taxa_do_pdv_limpa_transacao_da_venda_finalizada():
