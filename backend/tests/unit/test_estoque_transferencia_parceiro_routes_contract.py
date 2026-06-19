@@ -5,6 +5,7 @@ os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test
 os.environ["DEBUG"] = "false"
 
 from app import estoque_transferencia_parceiro_routes
+from app.estoque import transferencia_parceiro_documents
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -53,11 +54,27 @@ def test_estoque_routes_nao_expõe_mais_decorators_de_transferencia_parceiro():
 def test_main_registra_router_de_transferencia_parceiro():
     main_source = _source("app/main.py")
 
+    assert "from app.estoque_transferencia_parceiro_routes import" in main_source
+    assert "router as estoque_transferencia_parceiro_router" in main_source
+    assert "app.include_router(" in main_source
+    assert "estoque_transferencia_parceiro_router" in main_source
+    assert 'tags=["Estoque - Transferencia Parceiro"]' in main_source
+
+
+def test_documentos_transferencia_parceiro_ficam_em_modulo_dedicado():
     assert (
-        "from app.estoque_transferencia_parceiro_routes import "
-        "router as estoque_transferencia_parceiro_router"
-    ) in main_source
+        estoque_transferencia_parceiro_routes._gerar_pdf_transferencia_parceiro_bytes
+        is transferencia_parceiro_documents._gerar_pdf_transferencia_parceiro_bytes
+    )
     assert (
-        "app.include_router(estoque_transferencia_parceiro_router, "
-        'tags=["Estoque - Transferencia Parceiro"])'
-    ) in main_source
+        estoque_transferencia_parceiro_routes._gerar_pdf_transferencias_parceiro_consolidado_bytes
+        is transferencia_parceiro_documents._gerar_pdf_transferencias_parceiro_consolidado_bytes
+    )
+    assert (
+        estoque_transferencia_parceiro_routes._montar_email_transferencia_parceiro
+        is transferencia_parceiro_documents._montar_email_transferencia_parceiro
+    )
+    assert (
+        estoque_transferencia_parceiro_routes._status_transferencia_parceiro
+        is transferencia_parceiro_documents._status_transferencia_parceiro
+    )
