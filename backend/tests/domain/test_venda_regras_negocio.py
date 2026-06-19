@@ -64,7 +64,7 @@ class TestRegrasCriacaoVenda:
             ],
         }
 
-        with patch("app.vendas.service.Venda") as MockVenda:
+        with patch("app.vendas_models.Venda") as MockVenda:
             # Forçar erro ao criar venda
             MockVenda.side_effect = Exception("Erro simulado")
 
@@ -90,7 +90,7 @@ class TestRegrasFinalizacaoVenda:
         REGRA: Só pode finalizar venda se houver caixa aberto
         ESPERA: HTTPException quando caixa validação falha
         """
-        with patch("app.vendas.service.Venda"):
+        with patch("app.vendas_models.Venda"):
             # Configurar caixa service para lançar erro
             mock_caixa_service.validar_caixa_aberto.side_effect = HTTPException(
                 status_code=400, detail="Nenhum caixa aberto"
@@ -106,6 +106,7 @@ class TestRegrasFinalizacaoVenda:
                     pagamentos=pagamentos,
                     user_id=1,
                     user_nome="Teste",
+                    tenant_id="00000000-0000-0000-0000-000000000001",
                     db=mock_db_session,
                 )
 
@@ -116,7 +117,7 @@ class TestRegrasFinalizacaoVenda:
         REGRA: Venda deve existir para ser finalizada
         ESPERA: HTTPException 404
         """
-        with patch("app.vendas.service.Venda"):
+        with patch("app.vendas_models.Venda"):
             # Venda não encontrada
             mock_db_session.query.return_value.filter_by.return_value.first.return_value = None
 
@@ -128,6 +129,7 @@ class TestRegrasFinalizacaoVenda:
                     pagamentos=pagamentos,
                     user_id=1,
                     user_nome="Teste",
+                    tenant_id="00000000-0000-0000-0000-000000000001",
                     db=mock_db_session,
                 )
 
@@ -140,7 +142,7 @@ class TestRegrasFinalizacaoVenda:
         REGRA: Não pode finalizar venda que já está finalizada
         ESPERA: HTTPException 400
         """
-        with patch("app.vendas.service.Venda"):
+        with patch("app.vendas_models.Venda"):
             fake_venda_model.status = "finalizada"
             mock_db_session.query.return_value.filter_by.return_value.first.return_value = fake_venda_model
 
@@ -152,6 +154,7 @@ class TestRegrasFinalizacaoVenda:
                     pagamentos=pagamentos,
                     user_id=1,
                     user_nome="Teste",
+                    tenant_id="00000000-0000-0000-0000-000000000001",
                     db=mock_db_session,
                 )
 
@@ -165,7 +168,7 @@ class TestRegrasFinalizacaoVenda:
         REGRA: Não pode finalizar venda cancelada
         ESPERA: HTTPException 400
         """
-        with patch("app.vendas.service.Venda"):
+        with patch("app.vendas_models.Venda"):
             fake_venda_model.status = "cancelada"
             mock_db_session.query.return_value.filter_by.return_value.first.return_value = fake_venda_model
 
@@ -177,6 +180,7 @@ class TestRegrasFinalizacaoVenda:
                     pagamentos=pagamentos,
                     user_id=1,
                     user_nome="Teste",
+                    tenant_id="00000000-0000-0000-0000-000000000001",
                     db=mock_db_session,
                 )
 
@@ -189,7 +193,7 @@ class TestRegrasFinalizacaoVenda:
         REGRA: Deve informar pelo menos 1 forma de pagamento
         ESPERA: HTTPException 400
         """
-        with patch("app.vendas.service.Venda"):
+        with patch("app.vendas_models.Venda"):
             fake_venda_model.status = "aberta"
             mock_db_session.query.return_value.filter_by.return_value.first.return_value = fake_venda_model
 
@@ -199,6 +203,7 @@ class TestRegrasFinalizacaoVenda:
                     pagamentos=[],
                     user_id=1,
                     user_nome="Teste",
+                    tenant_id="00000000-0000-0000-0000-000000000001",
                     db=mock_db_session,
                 )
 
@@ -213,8 +218,8 @@ class TestRegrasFinalizacaoVenda:
         ESPERA: HTTPException 400
         """
         with (
-            patch("app.vendas.service.Venda"),
-            patch("app.vendas.service.VendaPagamento") as MockPagamento,
+            patch("app.vendas_models.Venda"),
+            patch("app.vendas_models.VendaPagamento") as MockPagamento,
         ):
             fake_venda_model.status = "aberta"
             fake_venda_model.total = Decimal("100.00")
@@ -235,6 +240,7 @@ class TestRegrasFinalizacaoVenda:
                     pagamentos=novos_pagamentos,
                     user_id=1,
                     user_nome="Teste",
+                    tenant_id="00000000-0000-0000-0000-000000000001",
                     db=mock_db_session,
                 )
 
@@ -242,27 +248,34 @@ class TestRegrasFinalizacaoVenda:
             assert "já está totalmente paga" in exc.value.detail.lower()
 
     def test_credito_cliente_requer_cliente_vinculado(
-        self, mock_db_session, mock_caixa_service, fake_venda_model
+        self, mock_db_session, mock_caixa_service, fake_venda_model, make_query_mock
     ):
         """
         REGRA: Crédito de cliente só pode ser usado se houver cliente vinculado
         ESPERA: HTTPException 400
         """
         with (
-            patch("app.vendas.service.Venda"),
-            patch("app.vendas.service.VendaPagamento"),
-            patch("app.vendas.service.VendaItem"),
+            patch("app.vendas_models.Venda") as MockVenda,
+            patch("app.vendas_models.VendaPagamento") as MockPagamento,
+            patch("app.vendas_models.VendaItem") as MockItem,
         ):
             fake_venda_model.status = "aberta"
             fake_venda_model.cliente_id = None  # SEM CLIENTE
             fake_venda_model.total = Decimal("100.00")
-            mock_db_session.query.return_value.filter_by.return_value.first.return_value = fake_venda_model
 
             item_mock = MagicMock()
             item_mock.produto_id = 10
-            mock_db_session.query.return_value.filter_by.return_value.all.return_value = [
-                item_mock
-            ]
+
+            def side_effect_query(model):
+                if model is MockVenda:
+                    return make_query_mock(first=fake_venda_model)
+                if model is MockPagamento:
+                    return make_query_mock(all_=[])
+                if model is MockItem:
+                    return make_query_mock(all_=[item_mock])
+                return make_query_mock()
+
+            mock_db_session.query.side_effect = side_effect_query
 
             pagamentos = [{"forma_pagamento": "Crédito Cliente", "valor": 100.00}]
 
@@ -272,6 +285,7 @@ class TestRegrasFinalizacaoVenda:
                     pagamentos=pagamentos,
                     user_id=1,
                     user_nome="Teste",
+                    tenant_id="00000000-0000-0000-0000-000000000001",
                     db=mock_db_session,
                 )
 
@@ -279,17 +293,22 @@ class TestRegrasFinalizacaoVenda:
             assert "cliente vinculado" in exc.value.detail.lower()
 
     def test_credito_insuficiente_impede_pagamento(
-        self, mock_db_session, mock_caixa_service, fake_venda_model, fake_cliente_model
+        self,
+        mock_db_session,
+        mock_caixa_service,
+        fake_venda_model,
+        fake_cliente_model,
+        make_query_mock,
     ):
         """
         REGRA: Cliente deve ter crédito suficiente
         ESPERA: HTTPException 400
         """
         with (
-            patch("app.vendas.service.Venda"),
-            patch("app.vendas.service.VendaPagamento"),
-            patch("app.vendas.service.VendaItem"),
-            patch("app.vendas.service.Cliente"),
+            patch("app.vendas_models.Venda") as MockVenda,
+            patch("app.vendas_models.VendaPagamento") as MockPagamento,
+            patch("app.vendas_models.VendaItem") as MockItem,
+            patch("app.models.Cliente") as MockCliente,
         ):
             fake_venda_model.status = "aberta"
             fake_venda_model.cliente_id = 1
@@ -299,19 +318,15 @@ class TestRegrasFinalizacaoVenda:
 
             # Mock de query para retornar venda e cliente
             def side_effect_query(model):
-                query_mock = MagicMock()
-                if model.__name__ == "Venda":
-                    query_mock.filter_by.return_value.first.return_value = (
-                        fake_venda_model
-                    )
-                elif model.__name__ == "Cliente":
-                    query_mock.filter_by.return_value.first.return_value = (
-                        fake_cliente_model
-                    )
-                else:
-                    query_mock.filter_by.return_value.all.return_value = []
-                    query_mock.filter_by.return_value.first.return_value = None
-                return query_mock
+                if model is MockVenda:
+                    return make_query_mock(first=fake_venda_model)
+                if model is MockCliente:
+                    return make_query_mock(first=fake_cliente_model)
+                if model is MockPagamento:
+                    return make_query_mock(all_=[])
+                if model is MockItem:
+                    return make_query_mock(all_=[])
+                return make_query_mock()
 
             mock_db_session.query.side_effect = side_effect_query
 
@@ -326,6 +341,7 @@ class TestRegrasFinalizacaoVenda:
                     pagamentos=pagamentos,
                     user_id=1,
                     user_nome="Teste",
+                    tenant_id="00000000-0000-0000-0000-000000000001",
                     db=mock_db_session,
                 )
 
@@ -346,12 +362,16 @@ class TestRegrasCancelamentoVenda:
         REGRA: Venda deve existir para ser cancelada
         ESPERA: HTTPException 404
         """
-        with patch("app.vendas.service.Venda"):
+        with patch("app.vendas_models.Venda"):
             mock_db_session.query.return_value.filter_by.return_value.first.return_value = None
 
             with pytest.raises(HTTPException) as exc:
                 VendaService.cancelar_venda(
-                    venda_id=999, motivo="Teste", user_id=1, db=mock_db_session
+                    venda_id=999,
+                    motivo="Teste",
+                    user_id=1,
+                    tenant_id="00000000-0000-0000-0000-000000000001",
+                    db=mock_db_session,
                 )
 
             assert exc.value.status_code == 404
@@ -361,13 +381,17 @@ class TestRegrasCancelamentoVenda:
         REGRA: Não pode cancelar venda já cancelada (idempotência)
         ESPERA: HTTPException 400
         """
-        with patch("app.vendas.service.Venda"):
+        with patch("app.vendas_models.Venda"):
             fake_venda_model.status = "cancelada"
             mock_db_session.query.return_value.filter_by.return_value.first.return_value = fake_venda_model
 
             with pytest.raises(HTTPException) as exc:
                 VendaService.cancelar_venda(
-                    venda_id=100, motivo="Teste", user_id=1, db=mock_db_session
+                    venda_id=100,
+                    motivo="Teste",
+                    user_id=1,
+                    tenant_id="00000000-0000-0000-0000-000000000001",
+                    db=mock_db_session,
                 )
 
             assert exc.value.status_code == 400
@@ -381,9 +405,9 @@ class TestRegrasCancelamentoVenda:
         ESPERA: Rollback chamado em caso de erro
         """
         with (
-            patch("app.vendas.service.Venda"),
-            patch("app.vendas.service.VendaItem"),
-            patch("app.vendas.service.log_action"),
+            patch("app.vendas_models.Venda"),
+            patch("app.vendas_models.VendaItem"),
+            patch("app.audit_log.log_action"),
         ):
             fake_venda_model.status = "aberta"
             mock_db_session.query.return_value.filter_by.return_value.first.return_value = fake_venda_model
@@ -401,7 +425,11 @@ class TestRegrasCancelamentoVenda:
 
             with pytest.raises(HTTPException):
                 VendaService.cancelar_venda(
-                    venda_id=100, motivo="Teste", user_id=1, db=mock_db_session
+                    venda_id=100,
+                    motivo="Teste",
+                    user_id=1,
+                    tenant_id="00000000-0000-0000-0000-000000000001",
+                    db=mock_db_session,
                 )
 
             # Verificar rollback
@@ -423,7 +451,7 @@ class TestSegurancaIsolamentoUsuario:
         REGRA: Usuário só pode finalizar suas próprias vendas
         ESPERA: HTTPException 404 (venda não encontrada)
         """
-        with patch("app.vendas.service.Venda"):
+        with patch("app.vendas_models.Venda"):
             fake_venda_model.user_id = 1
 
             # Buscar com user_id diferente retorna None
@@ -435,7 +463,7 @@ class TestSegurancaIsolamentoUsuario:
                     query_mock.first.return_value = fake_venda_model
                 return query_mock
 
-            mock_db_session.query.return_value.filter_by.side_effect = side_effect_query
+            mock_db_session.query.return_value.filter_by.return_value.first.return_value = None
 
             pagamentos = [{"forma_pagamento": "Dinheiro", "valor": 100.00}]
 
@@ -445,6 +473,7 @@ class TestSegurancaIsolamentoUsuario:
                     pagamentos=pagamentos,
                     user_id=2,  # Usuário diferente
                     user_nome="Outro",
+                    tenant_id="00000000-0000-0000-0000-000000000001",
                     db=mock_db_session,
                 )
 
@@ -457,7 +486,7 @@ class TestSegurancaIsolamentoUsuario:
         REGRA: Usuário só pode cancelar suas próprias vendas
         ESPERA: HTTPException 404
         """
-        with patch("app.vendas.service.Venda"):
+        with patch("app.vendas_models.Venda"):
             fake_venda_model.user_id = 1
 
             # Buscar com user_id diferente retorna None
@@ -468,6 +497,7 @@ class TestSegurancaIsolamentoUsuario:
                     venda_id=100,
                     motivo="Teste",
                     user_id=2,  # Usuário diferente
+                    tenant_id="00000000-0000-0000-0000-000000000001",
                     db=mock_db_session,
                 )
 

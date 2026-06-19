@@ -10,10 +10,25 @@ from unittest.mock import Mock, MagicMock
 from datetime import datetime
 from decimal import Decimal
 
+from app.vendas.service import VendaService
+
+
+TEST_TENANT_ID = "00000000-0000-0000-0000-000000000001"
+
 
 # ============================================================
 # FIXTURES DE MOCKS
 # ============================================================
+
+
+@pytest.fixture(autouse=True)
+def stable_venda_number(monkeypatch):
+    """Keep domain tests independent from the SQL query used for numbering."""
+    monkeypatch.setattr(
+        VendaService,
+        "_gerar_numero_venda",
+        staticmethod(lambda db, tenant_id=None, user_id=None: "202601230001"),
+    )
 
 
 @pytest.fixture
@@ -31,24 +46,47 @@ def mock_db_session():
     - begin_nested() para savepoints
     """
     session = MagicMock()
+    added_objects = []
+
+    def add_object(obj):
+        added_objects.append(obj)
+
+    def flush_objects():
+        for index, obj in enumerate(added_objects, start=100):
+            if getattr(obj, "id", None) is None:
+                obj.id = index
+
+    session.add.side_effect = add_object
+    session.flush.side_effect = flush_objects
 
     # Simular begin_nested (savepoint)
     session.begin_nested.return_value.__enter__ = Mock(return_value=None)
     session.begin_nested.return_value.__exit__ = Mock(return_value=None)
 
-    # Simular query builder
-    def create_query_mock(model):
+    # Simular query builder padrÃ£o, permitindo que testes ajustem query.return_value.
+    query_mock = MagicMock()
+    query_mock.filter_by.return_value = query_mock
+    query_mock.filter.return_value = query_mock
+    query_mock.order_by.return_value = query_mock
+    query_mock.first.return_value = None
+    query_mock.all.return_value = []
+    session.query.return_value = query_mock
+
+    return session
+
+
+@pytest.fixture
+def make_query_mock():
+    def _make_query_mock(*, first=None, all_=None):
         query_mock = MagicMock()
         query_mock.filter_by.return_value = query_mock
         query_mock.filter.return_value = query_mock
         query_mock.order_by.return_value = query_mock
-        query_mock.first.return_value = None
-        query_mock.all.return_value = []
+        query_mock.first.return_value = first
+        query_mock.all.return_value = [] if all_ is None else all_
         return query_mock
 
-    session.query.side_effect = create_query_mock
-
-    return session
+    return _make_query_mock
 
 
 @pytest.fixture
@@ -200,6 +238,7 @@ def fake_venda_data():
         "taxa_entrega": 0,
         "tem_entrega": False,
         "observacoes": "Teste",
+        "tenant_id": TEST_TENANT_ID,
     }
 
 
@@ -215,11 +254,17 @@ def fake_venda_model():
     venda.cliente_id = 1
     venda.funcionario_id = None
     venda.vendedor_id = None
+    venda.tenant_id = TEST_TENANT_ID
     venda.status = "aberta"
     venda.total = Decimal("100.00")
     venda.desconto_valor = Decimal("0")
     venda.taxa_entrega = Decimal("0")
     venda.tem_entrega = False
+    venda.caixa_id = None
+    venda.cupom_code = None
+    venda.cupom_discount_applied = None
+    venda.dre_gerada = True
+    venda.itens = []
     venda.observacoes = "Teste"
     venda.data_venda = datetime.now()
     venda.created_at = datetime.now()
@@ -236,7 +281,7 @@ def fake_venda_model():
     venda.cliente.credito = Decimal("0")
 
     # Mock do to_dict
-    venda.to_dict.return_value = {
+    venda.to_dict.side_effect = lambda: {
         "id": venda.id,
         "numero_venda": venda.numero_venda,
         "status": venda.status,

@@ -18,6 +18,7 @@ TIPOS DE HANDLERS:
 
 import logging
 from typing import Optional
+from contextlib import contextmanager
 
 from .base import DomainEvent
 from .venda_events import VendaCriada, VendaFinalizada, VendaCancelada
@@ -104,6 +105,22 @@ class AuditoriaEventHandler:
         """
         self.db_session_factory = db_session_factory
 
+    @contextmanager
+    def _session_scope(self):
+        session_or_generator = self.db_session_factory()
+        if hasattr(session_or_generator, "__next__"):
+            generator = session_or_generator
+            db = next(generator)
+            try:
+                yield db
+            finally:
+                try:
+                    next(generator)
+                except StopIteration:
+                    pass
+        else:
+            yield session_or_generator
+
     def _save_event(self, event: DomainEvent, categoria: str, detalhes: str) -> None:
         """
         Salva evento no banco de dados (tabela audit_log).
@@ -120,26 +137,22 @@ class AuditoriaEventHandler:
         try:
             from app.audit_log import log_action
 
-            # Obter sessão do banco
-            db = self.db_session_factory()
-
-            # Extrair user_id do evento (todos eventos de venda têm)
             user_id = getattr(event, "user_id", None)
             venda_id = getattr(event, "venda_id", None)
 
             if user_id and venda_id:
-                log_action(
-                    db=db,
-                    user_id=user_id,
-                    action="EVENT",
-                    entity_type="vendas",
-                    entity_id=venda_id,
-                    details=f"[{categoria}] {detalhes}",
-                )
-                db.commit()
-                logger.debug(
-                    f"💾 Evento {categoria} persistido no banco (venda_id={venda_id})"
-                )
+                with self._session_scope() as db:
+                    log_action(
+                        db=db,
+                        user_id=user_id,
+                        action="EVENT",
+                        entity_type="vendas",
+                        entity_id=venda_id,
+                        details=f"[{categoria}] {detalhes}",
+                    )
+                    logger.debug(
+                        f"💾 Evento {categoria} persistido no banco (venda_id={venda_id})"
+                    )
 
         except Exception as e:
             logger.error(
