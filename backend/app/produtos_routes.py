@@ -12,7 +12,7 @@ Inclui: Categorias, Marcas, Departamentos, Produtos, Lotes, FIFO, CÃ³digo de B
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, or_, and_
+from sqlalchemy import func, or_
 from typing import List, Optional
 from datetime import datetime, timedelta
 import logging
@@ -22,7 +22,6 @@ from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
 from .security.permissions_decorator import require_permission
 from app.partner_utils import get_all_accessible_tenant_ids
-from .vendas_models import Venda, VendaItem
 from .produtos_models import (
     Categoria,
     Marca,
@@ -86,7 +85,6 @@ from .produtos.core import (
     _normalizar_payload_granel,
     _normalizar_promocao_erp_payload,
     _normalizar_sku_produto,
-    _produto_sku_value,
 )
 from .produtos.listagem import (
     _aplicar_filtro_fornecedor_produto,
