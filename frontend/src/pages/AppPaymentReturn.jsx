@@ -1,6 +1,11 @@
 import { useEffect, useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { FiCheckCircle, FiClock, FiXCircle } from "react-icons/fi";
+import {
+  buildAppPaymentReturnLinks,
+  readAppPaymentReturnParams,
+  selectAppPaymentReturnOpenLink,
+} from "../utils/appPaymentReturnLinks";
 
 const STATUS_COPY = {
   success: {
@@ -28,41 +33,22 @@ const STATUS_COPY = {
 
 export default function AppPaymentReturn() {
   const [searchParams] = useSearchParams();
-  const paymentStatus = searchParams.get("payment_status") || "pending";
-  const pedidoId = searchParams.get("pedido_id") || "";
-  const loja =
-    searchParams.get("loja") || searchParams.get("tenant") || searchParams.get("store") || "";
+  const returnParams = useMemo(
+    () => readAppPaymentReturnParams(searchParams.toString()),
+    [searchParams],
+  );
+  const { paymentStatus, pedidoId } = returnParams;
   const statusCopy = STATUS_COPY[paymentStatus] || STATUS_COPY.pending;
   const Icon = statusCopy.icon;
 
-  const deepLink = useMemo(() => {
-    const params = new URLSearchParams();
-    if (paymentStatus) params.set("payment_status", paymentStatus);
-    if (pedidoId) params.set("pedido_id", pedidoId);
-    if (loja) params.set("loja", loja);
-    return `corepet://app/pedidos${params.toString() ? `?${params.toString()}` : ""}`;
-  }, [paymentStatus, pedidoId, loja]);
-
-  const androidIntentLink = useMemo(() => {
-    const params = new URLSearchParams();
-    if (paymentStatus) params.set("payment_status", paymentStatus);
-    if (pedidoId) params.set("pedido_id", pedidoId);
-    if (loja) params.set("loja", loja);
-    const query = params.toString();
-    return `intent://app/pedidos${query ? `?${query}` : ""}#Intent;scheme=corepet;package=br.com.corepet.app;end`;
-  }, [paymentStatus, pedidoId, loja]);
+  const appLinks = useMemo(() => buildAppPaymentReturnLinks(returnParams), [returnParams]);
 
   const appOpenLink = useMemo(() => {
-    if (typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent || "")) {
-      return androidIntentLink;
-    }
-    return deepLink;
-  }, [androidIntentLink, deepLink]);
-
-  const fallbackAppUrl = useMemo(() => {
-    if (!loja) return "/app";
-    return `/app?loja=${encodeURIComponent(loja)}`;
-  }, [loja]);
+    return selectAppPaymentReturnOpenLink(
+      appLinks,
+      typeof navigator !== "undefined" ? navigator.userAgent : "",
+    );
+  }, [appLinks]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -92,12 +78,12 @@ export default function AppPaymentReturn() {
         >
           Abrir app CorePet
         </a>
-        <Link
+        <a
           className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-          to={fallbackAppUrl}
+          href={appLinks.retryLink}
         >
-          Abrir dados da loja
-        </Link>
+          Tentar abrir app novamente
+        </a>
       </section>
     </main>
   );
