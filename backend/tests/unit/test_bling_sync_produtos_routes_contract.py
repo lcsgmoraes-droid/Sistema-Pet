@@ -1,5 +1,6 @@
 from app import bling_sync_routes
-from app.bling_sync import product_matching, produtos_routes
+from app.bling_sync import catalog_snapshots, product_matching, produtos_routes
+from app.bling_sync import status_queries
 
 
 EXPECTED_SUBROUTES = {
@@ -45,4 +46,30 @@ def test_bling_sync_matching_helpers_ficam_em_modulo_dedicado():
     assert (
         bling_sync_routes._produto_sincroniza_estoque
         is product_matching._produto_sincroniza_estoque
+    )
+
+
+def test_bling_sync_snapshot_helpers_ficam_em_modulo_dedicado():
+    assert (
+        bling_sync_routes._get_resumo_cobertura_bling
+        is catalog_snapshots._get_resumo_cobertura_bling
+    )
+    assert (
+        bling_sync_routes._get_snapshot_faltantes_bling
+        is catalog_snapshots._get_snapshot_faltantes_bling
+    )
+    assert (
+        bling_sync_routes._get_snapshot_sem_vinculo_com_match_bling
+        is catalog_snapshots._get_snapshot_sem_vinculo_com_match_bling
+    )
+    assert (
+        bling_sync_routes._invalidate_bling_snapshots
+        is catalog_snapshots._invalidate_bling_snapshots
+    )
+
+
+def test_bling_sync_status_query_fica_em_modulo_dedicado():
+    assert (
+        bling_sync_routes._build_sync_problem_query
+        is status_queries._build_sync_problem_query
     )
