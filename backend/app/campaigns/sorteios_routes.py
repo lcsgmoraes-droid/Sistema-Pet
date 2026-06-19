@@ -4,6 +4,7 @@ Rotas de sorteios das campanhas.
 Sub-router incluido por ``app.campaigns.routes`` sob o prefixo ``/campanhas``.
 """
 
+import secrets
 import uuid as _uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -25,6 +26,7 @@ from app.db import SessionLocal
 
 
 router = APIRouter()
+SORTEIO_NAO_ENCONTRADO = "Sorteio não encontrado."
 
 
 def get_db():
@@ -44,11 +46,9 @@ class CriarSorteioBody(BaseModel):
     name: str
     description: Optional[str] = None
     prize_description: Optional[str] = None
-    rank_filter: Optional[str] = (
-        None  # bronze | silver | gold | diamond | platinum | None = todos
-    )
-    draw_date: Optional[str] = None  # ISO 8601 date string
-    auto_execute: bool = False  # True = executar automaticamente na draw_date
+    rank_filter: Optional[str] = None
+    draw_date: Optional[str] = None
+    auto_execute: bool = False
 
 
 class EditarSorteioBody(BaseModel):
@@ -58,6 +58,26 @@ class EditarSorteioBody(BaseModel):
     rank_filter: Optional[str] = None
     draw_date: Optional[str] = None
     auto_execute: Optional[bool] = None
+
+
+def _parse_rank_filter(
+    value: str | None, *, detail_prefix: str
+) -> RankLevelEnum | None:
+    if not value:
+        return None
+    try:
+        return RankLevelEnum(value)
+    except ValueError as exc:
+        raise HTTPException(400, detail=f"{detail_prefix}: {value}") from exc
+
+
+def _parse_draw_date(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value).replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise HTTPException(400, detail="draw_date inválido (use ISO 8601)") from exc
 
 
 def _drawing_to_dict(d: Drawing, entry_count: int = 0) -> dict:
@@ -120,23 +140,10 @@ def criar_sorteio(
     """Cria um novo sorteio em status 'draft'."""
     _, tenant_id = user_and_tenant
 
-    rank_filter = None
-    if body.rank_filter:
-        try:
-            rank_filter = RankLevelEnum(body.rank_filter)
-        except ValueError:
-            raise HTTPException(
-                400, detail=f"Nível de ranking inválido: {body.rank_filter}"
-            )
-
-    draw_date = None
-    if body.draw_date:
-        try:
-            from datetime import datetime as _dt
-
-            draw_date = _dt.fromisoformat(body.draw_date).replace(tzinfo=timezone.utc)
-        except ValueError:
-            raise HTTPException(400, detail="draw_date inválido (use ISO 8601)")
+    rank_filter = _parse_rank_filter(
+        body.rank_filter, detail_prefix="Nível de ranking inválido"
+    )
+    draw_date = _parse_draw_date(body.draw_date)
 
     drawing = Drawing(
         tenant_id=tenant_id,
@@ -170,7 +177,7 @@ def editar_sorteio(
         .first()
     )
     if not drawing:
-        raise HTTPException(404, detail="Sorteio não encontrado.")
+        raise HTTPException(404, detail=SORTEIO_NAO_ENCONTRADO)
     if drawing.status == DrawingStatusEnum.drawn:
         raise HTTPException(400, detail="Sorteio já executado não pode ser editado.")
 
@@ -181,23 +188,11 @@ def editar_sorteio(
     if body.prize_description is not None:
         drawing.prize_description = body.prize_description
     if body.rank_filter is not None:
-        try:
-            drawing.rank_filter = (
-                RankLevelEnum(body.rank_filter) if body.rank_filter else None
-            )
-        except ValueError:
-            raise HTTPException(400, detail=f"Nível inválido: {body.rank_filter}")
+        drawing.rank_filter = _parse_rank_filter(
+            body.rank_filter, detail_prefix="Nível inválido"
+        )
     if body.draw_date is not None:
-        try:
-            from datetime import datetime as _dt
-
-            drawing.draw_date = (
-                _dt.fromisoformat(body.draw_date).replace(tzinfo=timezone.utc)
-                if body.draw_date
-                else None
-            )
-        except ValueError:
-            raise HTTPException(400, detail="draw_date inválido (use ISO 8601)")
+        drawing.draw_date = _parse_draw_date(body.draw_date)
     if body.auto_execute is not None:
         drawing.auto_execute = body.auto_execute
 
@@ -229,7 +224,7 @@ def inscrever_participantes(
         .first()
     )
     if not drawing:
-        raise HTTPException(404, detail="Sorteio não encontrado.")
+        raise HTTPException(404, detail=SORTEIO_NAO_ENCONTRADO)
     if drawing.status in (DrawingStatusEnum.drawn, DrawingStatusEnum.cancelled):
         raise HTTPException(
             400,
@@ -260,12 +255,12 @@ def inscrever_participantes(
     clientes_ranking = q.all()
 
     # Clientes já inscritos (para skip)
-    ja_inscritos = set(
+    ja_inscritos = {
         row[0]
         for row in db.query(DrawingEntry.customer_id)
         .filter(DrawingEntry.drawing_id == drawing_id)
         .all()
-    )
+    }
 
     novos = 0
     for cr in clientes_ranking:
@@ -303,17 +298,16 @@ def executar_sorteio(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
-    Executa o sorteio com semente aleatória auditável (seed_uuid).
+    Executa o sorteio e grava um identificador auditável (seed_uuid).
 
     Algoritmo:
     1. Congela a lista de participantes (hash SHA-256)
-    2. Gera seed_uuid aleatório
-    3. Usa seed para embaralhar deterministicamente a lista
+    2. Gera seed_uuid de auditoria
+    3. Seleciona o ganhador com gerador criptograficamente seguro
     4. Sorteia 1 ganhador por peso (ticket_count)
     5. Grava resultado e muda status para 'drawn'
     """
     import hashlib
-    import random as _random
 
     _, tenant_id = user_and_tenant
 
@@ -323,7 +317,7 @@ def executar_sorteio(
         .first()
     )
     if not drawing:
-        raise HTTPException(404, detail="Sorteio não encontrado.")
+        raise HTTPException(404, detail=SORTEIO_NAO_ENCONTRADO)
     if drawing.status == DrawingStatusEnum.drawn:
         raise HTTPException(400, detail="Sorteio já executado.")
     if drawing.status == DrawingStatusEnum.cancelled:
@@ -342,7 +336,7 @@ def executar_sorteio(
     ids_csv = ",".join(str(e.id) for e in entries)
     entries_hash = hashlib.sha256(ids_csv.encode()).hexdigest()
 
-    # Seed aleatório auditável
+    # Identificador auditável do sorteio executado.
     seed_uuid = _uuid.uuid4()
 
     # Construir pool com pesos (ticket_count)
@@ -350,10 +344,7 @@ def executar_sorteio(
     for e in entries:
         pool.extend([e] * max(1, e.ticket_count))
 
-    # Deterministic shuffle usando seed
-    rng = _random.Random(str(seed_uuid))
-    rng.shuffle(pool)
-    winner_entry = pool[0]
+    winner_entry = secrets.choice(pool)
 
     # Gravar resultado
     now = datetime.now(timezone.utc)
@@ -426,7 +417,7 @@ def resultado_sorteio(
         .first()
     )
     if not drawing:
-        raise HTTPException(404, detail="Sorteio não encontrado.")
+        raise HTTPException(404, detail=SORTEIO_NAO_ENCONTRADO)
 
     entries = (
         db.query(DrawingEntry)
@@ -496,7 +487,7 @@ def codigos_offline_sorteio(
         .first()
     )
     if not drawing:
-        raise HTTPException(404, detail="Sorteio não encontrado.")
+        raise HTTPException(404, detail=SORTEIO_NAO_ENCONTRADO)
 
     entries = (
         db.query(DrawingEntry)
@@ -555,10 +546,9 @@ def cancelar_sorteio(
         .first()
     )
     if not drawing:
-        raise HTTPException(404, detail="Sorteio não encontrado.")
+        raise HTTPException(404, detail=SORTEIO_NAO_ENCONTRADO)
     if drawing.status == DrawingStatusEnum.drawn:
         raise HTTPException(400, detail="Sorteio já executado não pode ser cancelado.")
 
     drawing.status = DrawingStatusEnum.cancelled
     db.commit()
-    return
