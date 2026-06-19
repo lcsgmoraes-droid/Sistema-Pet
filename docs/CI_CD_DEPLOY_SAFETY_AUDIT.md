@@ -22,6 +22,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | CI dos MCPs roda em todo PR | `.github/workflows/mcp-ci.yml` |
 | Feito | Backend CI passa a rodar em todo PR para `main` e `develop` | `.github/workflows/backend-ci.yml` |
 | Feito | Backend CI possui `ruff format` global bloqueante para backend e testes, sem excecao dos testes de transacao legados | `.github/workflows/backend-ci.yml`, `tests/test_backend_ci_workflow_contract.py` |
+| Feito | Analise automatica do SonarCloud possui configuracao propria para ignorar testes de transacao legados como codigo novo | `.sonarcloud.properties`, `tests/test_sonarcloud_config_contract.py` |
 | Feito | Check de deploy safety roda em todo PR para `main` | `.github/workflows/deploy-safety.yml` |
 | Feito | Branch protection da `main` exige `MCP tests`, `Fluxo unico safety`, `Quality Gate` e `Smoke test` | GitHub branch protection |
 | Feito | Smoke CI valida backend, auth basico e build frontend | `.github/workflows/smoke-ci.yml` |
