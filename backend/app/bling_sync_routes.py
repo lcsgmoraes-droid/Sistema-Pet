@@ -13,7 +13,6 @@ from sqlalchemy import and_, or_, func, desc
 from typing import Any, List, Optional
 from datetime import UTC, datetime, timedelta
 import threading
-import re
 import time
 
 from .db import get_session
@@ -43,6 +42,24 @@ from .bling_sync.schemas import (
     SyncStatusResponse,
     VincularProdutoRequest,
 )
+from .bling_sync.product_matching import (
+    _acao_faltante_bling,
+    _barcode_bling,
+    _coerce_float,
+    _escolher_item_melhor_match,
+    _extrair_codigos_bling_item,
+    _extrair_lista_produtos_bling,
+    _indexar_produtos_locais_por_codigo,
+    _limpar_texto_busca,
+    _montar_codigos_busca,
+    _motivo_faltante_bling,
+    _origem_match_produto_bling,
+    _produto_eh_pai,
+    _produto_sincroniza_estoque,
+    _sku_bling,
+    _texto_limpo,
+    _tipo_produto_local,
+)
 from .bling_sync.produtos_routes import (
     importar_imagens_dos_produtos_bling as importar_imagens_dos_produtos_bling,
     listar_produtos_bling as listar_produtos_bling,
@@ -59,45 +76,6 @@ PRODUTO_NAO_ENCONTRADO = "Produto não encontrado"
 
 def utc_now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
-
-
-def _normalizar_codigo_match(valor: Optional[str]) -> str:
-    return re.sub(r"[^a-zA-Z0-9]", "", (valor or "").strip()).lower()
-
-
-def _texto_limpo(valor: Optional[str]) -> str:
-    return str(valor or "").strip()
-
-
-def _coerce_float(valor, default: float = 0.0) -> float:
-    if valor is None:
-        return float(default)
-
-    if isinstance(valor, dict):
-        for chave in ("saldoFisicoTotal", "saldoVirtualTotal", "quantidade", "valor"):
-            if chave in valor:
-                return _coerce_float(valor.get(chave), default=default)
-        return float(default)
-
-    if isinstance(valor, (int, float)):
-        return float(valor)
-
-    texto = str(valor).strip()
-    if not texto:
-        return float(default)
-
-    if "," in texto and "." in texto:
-        if texto.rfind(",") > texto.rfind("."):
-            texto = texto.replace(".", "").replace(",", ".")
-        else:
-            texto = texto.replace(",", "")
-    elif "," in texto:
-        texto = texto.replace(",", ".")
-
-    try:
-        return float(texto)
-    except (TypeError, ValueError):
-        return float(default)
 
 
 def _latest_queue_ids_subquery_route(db: Session, tenant_id) -> Any:
@@ -134,89 +112,6 @@ def _latest_queue_ids_subquery_route(db: Session, tenant_id) -> Any:
         .filter(ranked.c.rn == 1)
         .subquery()
     )
-
-
-def _sku_bling(item: dict) -> str:
-    return _texto_limpo(item.get("sku") or item.get("codigo"))
-
-
-def _barcode_bling(item: dict) -> str:
-    return _texto_limpo(item.get("codigoBarras") or item.get("gtin"))
-
-
-def _motivo_faltante_bling(item: dict) -> str:
-    sku = _sku_bling(item)
-    barcode = _barcode_bling(item)
-
-    if sku and barcode:
-        return "Nao existe produto local com esse SKU nem com esse codigo de barras."
-    if sku:
-        return "O SKU do Bling ainda nao existe no CorePet."
-    if barcode:
-        return "O codigo de barras do Bling ainda nao existe no CorePet."
-    return "O cadastro do Bling esta sem SKU e sem codigo de barras para autocorrecao."
-
-
-def _acao_faltante_bling(item: dict) -> str:
-    return (
-        "Criar e vincular"
-        if (_sku_bling(item) or _barcode_bling(item))
-        else "Revisar cadastro no Bling"
-    )
-
-
-def _montar_codigos_busca(
-    codigo_principal: str, codigos_extras: Optional[list[str]] = None
-) -> list[str]:
-    codigos: list[str] = []
-    vistos: set[str] = set()
-
-    for bruto in [codigo_principal, *(codigos_extras or [])]:
-        codigo = (bruto or "").strip()
-        if not codigo:
-            continue
-
-        candidatos = [codigo]
-        codigo_normalizado = _normalizar_codigo_match(codigo)
-        if codigo_normalizado and codigo_normalizado != codigo:
-            candidatos.append(codigo_normalizado)
-
-        for candidato in candidatos:
-            chave = candidato.lower()
-            if chave in vistos:
-                continue
-            vistos.add(chave)
-            codigos.append(candidato)
-
-    return codigos
-
-
-def _escolher_item_melhor_match(itens: list[dict], codigos_busca: list[str]) -> dict:
-    if not itens:
-        return {}
-
-    codigos_normalizados = {
-        _normalizar_codigo_match(codigo)
-        for codigo in codigos_busca
-        if _normalizar_codigo_match(codigo)
-    }
-
-    if not codigos_normalizados:
-        return itens[0]
-
-    for item in itens:
-        campos_codigo = [
-            item.get("codigo"),
-            item.get("sku"),
-            item.get("codigoBarras"),
-            item.get("gtin"),
-        ]
-        for campo in campos_codigo:
-            codigo_item = _normalizar_codigo_match(str(campo or ""))
-            if codigo_item and codigo_item in codigos_normalizados:
-                return item
-
-    return itens[0]
 
 
 def _buscar_item_bling_para_vinculo(
@@ -266,25 +161,6 @@ def _buscar_item_bling_por_codigos(
             return _escolher_item_melhor_match(itens, codigos_busca)
 
     return None
-
-
-def _normalizar_termo_busca(valor: Optional[str]) -> str:
-    return (valor or "").strip()
-
-
-def _limpar_texto_busca(valor: str) -> str:
-    return re.sub(r"\s+", " ", valor).strip()
-
-
-def _extrair_lista_produtos_bling(resultado: Optional[dict]) -> list[dict]:
-    itens = (resultado or {}).get("data", [])
-    produtos: list[dict] = []
-    for item in itens:
-        if isinstance(item, dict) and isinstance(item.get("produto"), dict):
-            produtos.append(item.get("produto") or {})
-        elif isinstance(item, dict):
-            produtos.append(item)
-    return produtos
 
 
 def _buscar_produtos_bling_por_termo(
@@ -627,56 +503,6 @@ def _executar_reconciliacao_geral_em_background(
         with _reconciliacao_geral_lock:
             _reconciliacao_geral_estado["running"] = False
             _reconciliacao_geral_estado["finished_at"] = utc_now()
-
-
-def _chave_codigo_produto(valor: Optional[str]) -> str:
-    return _normalizar_codigo_match(valor)
-
-
-def _tipo_produto_local(produto) -> str:
-    return _texto_limpo(getattr(produto, "tipo_produto", None)).upper() or "SIMPLES"
-
-
-def _produto_eh_pai(produto) -> bool:
-    return _tipo_produto_local(produto) == "PAI"
-
-
-def _produto_sincroniza_estoque(produto) -> bool:
-    return not _produto_eh_pai(produto)
-
-
-def _chaves_match_produto_local(produto) -> set[str]:
-    return {
-        chave
-        for chave in [
-            _chave_codigo_produto(getattr(produto, "codigo", None)),
-            _chave_codigo_produto(getattr(produto, "codigo_barras", None)),
-            _chave_codigo_produto(getattr(produto, "gtin_ean", None)),
-            _chave_codigo_produto(getattr(produto, "gtin_ean_tributario", None)),
-        ]
-        if chave
-    }
-
-
-def _indexar_produtos_locais_por_codigo(produtos: list) -> dict[str, set[int]]:
-    codigos_para_produto: dict[str, set[int]] = {}
-    for produto in produtos:
-        for chave in _chaves_match_produto_local(produto):
-            codigos_para_produto.setdefault(chave, set()).add(produto.id)
-    return codigos_para_produto
-
-
-def _extrair_codigos_bling_item(item: dict) -> set[str]:
-    return {
-        chave
-        for chave in [
-            _chave_codigo_produto(item.get("codigo")),
-            _chave_codigo_produto(item.get("sku")),
-            _chave_codigo_produto(item.get("codigoBarras")),
-            _chave_codigo_produto(item.get("gtin")),
-        ]
-        if chave
-    }
 
 
 def _listar_todos_produtos_bling(
@@ -1126,39 +952,6 @@ def _get_snapshot_faltantes_bling(
         "snapshot_disponivel": True,
         "cache_idade_segundos": 0,
     }
-
-
-def _origem_match_produto_bling(produto, item: dict) -> str:
-    codigo_local = _chave_codigo_produto(getattr(produto, "codigo", None))
-    barcode_local = (
-        _chave_codigo_produto(getattr(produto, "codigo_barras", None))
-        or _chave_codigo_produto(getattr(produto, "gtin_ean", None))
-        or _chave_codigo_produto(getattr(produto, "gtin_ean_tributario", None))
-    )
-    chaves_sku_bling = {
-        chave
-        for chave in [
-            _chave_codigo_produto(item.get("sku")),
-            _chave_codigo_produto(item.get("codigo")),
-        ]
-        if chave
-    }
-    chaves_barcode_bling = {
-        chave
-        for chave in [
-            _chave_codigo_produto(item.get("codigoBarras")),
-            _chave_codigo_produto(item.get("gtin")),
-        ]
-        if chave
-    }
-
-    if codigo_local and codigo_local in chaves_sku_bling:
-        return "sku"
-    if barcode_local and (
-        barcode_local in chaves_barcode_bling or barcode_local in chaves_sku_bling
-    ):
-        return "codigo_barras"
-    return "codigo"
 
 
 def _calcular_snapshot_sem_vinculo_com_match_bling(
@@ -2679,205 +2472,6 @@ def vincular_todos_por_sku(
         "nao_encontrados_no_bling": len(nao_encontrados),
         "erros": len(erros),
         "tempo_execucao_ms": int((time.monotonic() - inicio_execucao) * 1000),
-        "detalhes_vinculados": vinculados,
-        "detalhes_nao_encontrados": nao_encontrados,
-        "detalhes_erros": erros,
-    }
-
-    # Produtos sem vínculo ou com bling_produto_id vazio
-    subq_vinculados = (
-        db.query(ProdutoBlingSync.produto_id)
-        .filter(
-            ProdutoBlingSync.tenant_id == tenant_id,
-            ProdutoBlingSync.bling_produto_id.isnot(None),
-            ProdutoBlingSync.bling_produto_id != "",
-        )
-        .subquery()
-    )
-
-    consulta_sem_vinculo = (
-        db.query(Produto)
-        .filter(
-            Produto.tenant_id == tenant_id,
-            Produto.codigo.isnot(None),
-            Produto.codigo != "",
-            Produto.tipo_produto != "PAI",
-        )
-        .filter(Produto.id.notin_(subq_vinculados))
-    )
-
-    # Universo local ainda sem vínculo (antes do recorte Bling-centric)
-    total_universo_sem_vinculo = consulta_sem_vinculo.count()
-    produtos_sem_vinculo_info = consulta_sem_vinculo.with_entities(
-        Produto.id,
-        Produto.codigo,
-        Produto.codigo_barras,
-        Produto.gtin_ean,
-        Produto.gtin_ean_tributario,
-    ).all()
-
-    codigos_para_produto_sem_vinculo: dict[str, set[int]] = {}
-    for produto_info in produtos_sem_vinculo_info:
-        for chave in [
-            _chave_codigo_produto(produto_info.codigo),
-            _chave_codigo_produto(produto_info.codigo_barras),
-            _chave_codigo_produto(produto_info.gtin_ean),
-            _chave_codigo_produto(produto_info.gtin_ean_tributario),
-        ]:
-            if not chave:
-                continue
-            codigos_para_produto_sem_vinculo.setdefault(chave, set()).add(
-                produto_info.id
-            )
-
-    bling = BlingAPI()
-    bling_itens, coleta_bling_completa = _listar_todos_produtos_bling(
-        bling=bling, limite=100, max_paginas=100
-    )
-
-    ids_sem_vinculo_com_match_bling: set[int] = set()
-    for item in bling_itens:
-        codigos_bling = _extrair_codigos_bling_item(item)
-        if not codigos_bling:
-            continue
-        for codigo in codigos_bling:
-            ids_sem_vinculo_com_match_bling.update(
-                codigos_para_produto_sem_vinculo.get(codigo, set())
-            )
-
-    total_sem_vinculo = len(ids_sem_vinculo_com_match_bling)
-    if total_sem_vinculo > 0:
-        produtos_sem_vinculo = (
-            consulta_sem_vinculo.filter(Produto.id.in_(ids_sem_vinculo_com_match_bling))
-            .order_by(Produto.id.asc())
-            .limit(limite)
-            .all()
-        )
-    else:
-        produtos_sem_vinculo = []
-
-    total = len(produtos_sem_vinculo)
-    vinculados = []
-    nao_encontrados = []
-    erros = []
-    sincronizados_sucesso = 0
-    sincronizados_erro = 0
-    interrompido_por_tempo = False
-    inicio_execucao = time.monotonic()
-
-    logger.info(
-        "📦 Processando lote Bling-centric: %s de %s faltantes (universo local sem vínculo: %s)",
-        total,
-        total_sem_vinculo,
-        total_universo_sem_vinculo,
-    )
-
-    for produto in produtos_sem_vinculo:
-        if (time.monotonic() - inicio_execucao) >= timeout_seconds:
-            interrompido_por_tempo = True
-            logger.warning(
-                "⏱️ Vínculo em massa interrompido por limite de tempo (%ss)",
-                timeout_seconds,
-            )
-            break
-
-        try:
-            codigo_busca = (produto.codigo or "").strip()
-            nome_busca = (produto.nome or "").strip()
-            codigos_extras = [
-                (produto.codigo_barras or "").strip(),
-                (produto.gtin_ean or "").strip(),
-                (produto.gtin_ean_tributario or "").strip(),
-            ]
-            item_escolhido = _buscar_item_bling_com_retry(
-                bling,
-                codigo_busca,
-                nome_busca,
-                codigos_extras=codigos_extras,
-            )
-
-            if not item_escolhido:
-                nao_encontrados.append(
-                    {
-                        "produto_id": produto.id,
-                        "codigo": produto.codigo,
-                        "nome": produto.nome,
-                    }
-                )
-                continue
-
-            bling_produto_id = str(item_escolhido.get("id") or "").strip()
-            if not bling_produto_id:
-                nao_encontrados.append(
-                    {
-                        "produto_id": produto.id,
-                        "codigo": produto.codigo,
-                        "nome": produto.nome,
-                    }
-                )
-                continue
-
-            _upsert_sync_vinculo(db, tenant_id, produto, bling_produto_id)
-
-            resultado_sync = BlingSyncService.queue_product_sync(
-                db,
-                produto_id=produto.id,
-                estoque_novo=float(produto.estoque_atual or 0),
-                motivo="vinculo_massa_forcar_sync",
-                origem="manual",
-                force=True,
-            )
-
-            sync_ok = bool(resultado_sync.get("ok"))
-            if sync_ok:
-                sincronizados_sucesso += 1
-            else:
-                sincronizados_erro += 1
-
-            vinculados.append(
-                {
-                    "produto_id": produto.id,
-                    "codigo": produto.codigo,
-                    "nome": produto.nome,
-                    "bling_produto_id": bling_produto_id,
-                    "sync_ok": sync_ok,
-                    "sync_detail": resultado_sync.get("detail")
-                    or resultado_sync.get("erro"),
-                }
-            )
-
-            logger.info(f"✅ Vinculado: {produto.codigo} → Bling ID {bling_produto_id}")
-            time.sleep(0.35)
-
-        except Exception as e:
-            logger.error(f"❌ Erro ao vincular produto {produto.codigo}: {e}")
-            erros.append(
-                {"produto_id": produto.id, "codigo": produto.codigo, "erro": str(e)}
-            )
-
-    db.commit()
-
-    logger.info(
-        f"🔗 Vinculação concluída: {len(vinculados)} vinculados, {len(nao_encontrados)} não encontrados, {len(erros)} erros"
-    )
-
-    restantes = max(total_sem_vinculo - total, 0)
-
-    return {
-        "limite_lote": limite,
-        "timeout_seconds": timeout_seconds,
-        "interrompido_por_tempo": interrompido_por_tempo,
-        "total_universo_local_sem_vinculo": total_universo_sem_vinculo,
-        "total_bling_analisado": len(bling_itens),
-        "coleta_bling_completa": coleta_bling_completa,
-        "total_sem_vinculo": total_sem_vinculo,
-        "total_processados": total,
-        "restantes_para_proximo_lote": restantes,
-        "vinculados": len(vinculados),
-        "sincronizados_com_sucesso": sincronizados_sucesso,
-        "sincronizados_com_erro": sincronizados_erro,
-        "nao_encontrados_no_bling": len(nao_encontrados),
-        "erros": len(erros),
         "detalhes_vinculados": vinculados,
         "detalhes_nao_encontrados": nao_encontrados,
         "detalhes_erros": erros,
