@@ -373,6 +373,24 @@ def test_funcionario_pdv_can_save_open_sale_for_cashier_checkout():
     assert "salvarAberta" in screen
 
 
+def test_funcionario_pdv_supports_fractional_quantity_and_value_to_weight_inputs():
+    backend = read_repo(PDV_SOURCE)
+    types = read_repo("app-mobile/src/types/index.ts")
+    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+
+    assert "quantidade: float = Field(gt=0)" in backend
+    assert "quantidade: number" in types
+    assert "QUANTIDADE_MINIMA_PDV = 0.001" in screen
+    assert "quantidadeEditando" in screen
+    assert "valorEditando" in screen
+    assert "editarQuantidadeItem" in screen
+    assert "editarValorItem" in screen
+    assert "valor / precoUnitario" in screen
+    assert "formatarQuantidadeCampo(item.quantidade)" in screen
+    assert "Valor (R$)" in screen
+    assert 'keyboardType="decimal-pad"' in screen
+
+
 def test_funcionario_pdv_shows_customer_details_like_web_pdv():
     types = read_repo("app-mobile/src/types/index.ts")
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")

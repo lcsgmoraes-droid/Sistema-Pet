@@ -40,6 +40,8 @@ type ItemCarrinhoPdv = {
   quantidade: number;
 };
 
+const QUANTIDADE_MINIMA_PDV = 0.001;
+
 const FORMAS_PAGAMENTO: { key: FuncionarioPdvFormaPagamento; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: "dinheiro", label: "Dinheiro", icon: "cash-outline" },
   { key: "pix", label: "Pix", icon: "qr-code-outline" },
@@ -54,16 +56,40 @@ function mensagemErroApi(error: any, fallback: string) {
 }
 
 function parseNumero(valor: string): number | null {
-  const normalizado = valor.replace(/\./g, "").replace(",", ".").trim();
-  if (!normalizado) return null;
-  const numero = Number(normalizado);
+  let texto = String(valor ?? "").trim().replace(/\s/g, "");
+  if (!texto) return null;
+  if (texto.includes(",") && texto.includes(".")) {
+    texto =
+      texto.lastIndexOf(",") > texto.lastIndexOf(".")
+        ? texto.replace(/\./g, "").replace(",", ".")
+        : texto.replace(/,/g, "");
+  } else if (texto.includes(",")) {
+    texto = texto.replace(",", ".");
+  }
+  const numero = Number(texto);
   return Number.isFinite(numero) ? numero : null;
+}
+
+function arredondarQuantidadePdv(valor: number) {
+  return Math.round(Math.max(QUANTIDADE_MINIMA_PDV, valor) * 1000) / 1000;
 }
 
 function formatarQuantidade(valor: number | null | undefined) {
   return new Intl.NumberFormat("pt-BR", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 3,
+  }).format(Number(valor ?? 0));
+}
+
+function formatarQuantidadeCampo(valor: number | null | undefined) {
+  return formatarQuantidade(valor).replace(/\./g, "");
+}
+
+function formatarValorCampo(valor: number | null | undefined) {
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    useGrouping: false,
   }).format(Number(valor ?? 0));
 }
 
@@ -88,6 +114,8 @@ export default function FuncionarioPdvScreen() {
   const [buscaManual, setBuscaManual] = useState("");
   const [sugestoes, setSugestoes] = useState<FuncionarioPdvProduto[]>([]);
   const [carrinho, setCarrinho] = useState<ItemCarrinhoPdv[]>([]);
+  const [quantidadeEditando, setQuantidadeEditando] = useState<Record<number, string>>({});
+  const [valorEditando, setValorEditando] = useState<Record<number, string>>({});
   const [clienteBusca, setClienteBusca] = useState("");
   const [clientesSugestoes, setClientesSugestoes] = useState<FuncionarioPdvCliente[]>([]);
   const [cliente, setCliente] = useState<FuncionarioPdvCliente | null>(null);
@@ -299,6 +327,16 @@ export default function FuncionarioPdvScreen() {
       Alert.alert("Produto nao vendavel", produto.aviso || "Este produto nao pode ser vendido no PDV.");
       return;
     }
+    setQuantidadeEditando((atual) => {
+      const proximo = { ...atual };
+      delete proximo[produto.id];
+      return proximo;
+    });
+    setValorEditando((atual) => {
+      const proximo = { ...atual };
+      delete proximo[produto.id];
+      return proximo;
+    });
     setCarrinho((atual) => {
       const existente = atual.find((item) => item.produto.id === produto.id);
       if (existente) {
@@ -312,16 +350,94 @@ export default function FuncionarioPdvScreen() {
     setBuscaManual("");
   }
 
-  function alterarQuantidade(produtoId: number, quantidade: number) {
-    if (!Number.isFinite(quantidade) || quantidade <= 0) {
-      setCarrinho((atual) => atual.filter((item) => item.produto.id !== produtoId));
-      return;
-    }
+  function limparEdicaoItem(produtoId: number) {
+    setQuantidadeEditando((atual) => {
+      const proximo = { ...atual };
+      delete proximo[produtoId];
+      return proximo;
+    });
+    setValorEditando((atual) => {
+      const proximo = { ...atual };
+      delete proximo[produtoId];
+      return proximo;
+    });
+  }
+
+  function aplicarQuantidade(produtoId: number, quantidade: number) {
+    if (!Number.isFinite(quantidade) || quantidade <= 0) return;
     setCarrinho((atual) =>
       atual.map((item) =>
-        item.produto.id === produtoId ? { ...item, quantidade: Math.round(quantidade * 1000) / 1000 } : item,
+        item.produto.id === produtoId ? { ...item, quantidade: arredondarQuantidadePdv(quantidade) } : item,
       ),
     );
+  }
+
+  function removerProduto(produtoId: number) {
+    setCarrinho((atual) => atual.filter((item) => item.produto.id !== produtoId));
+    limparEdicaoItem(produtoId);
+  }
+
+  function alterarQuantidade(produtoId: number, quantidade: number) {
+    if (!Number.isFinite(quantidade) || quantidade <= 0) {
+      removerProduto(produtoId);
+      return;
+    }
+    limparEdicaoItem(produtoId);
+    aplicarQuantidade(produtoId, quantidade);
+  }
+
+  function editarQuantidadeItem(produtoId: number, texto: string) {
+    setQuantidadeEditando((atual) => ({ ...atual, [produtoId]: texto }));
+    setValorEditando((atual) => {
+      const proximo = { ...atual };
+      delete proximo[produtoId];
+      return proximo;
+    });
+    const quantidade = parseNumero(texto);
+    if (quantidade !== null && quantidade > 0) {
+      aplicarQuantidade(produtoId, quantidade);
+    }
+  }
+
+  function finalizarEdicaoQuantidade(produtoId: number) {
+    const texto = quantidadeEditando[produtoId];
+    const quantidade = parseNumero(texto ?? "");
+    if (quantidade !== null && quantidade > 0) {
+      aplicarQuantidade(produtoId, quantidade);
+    }
+    setQuantidadeEditando((atual) => {
+      const proximo = { ...atual };
+      delete proximo[produtoId];
+      return proximo;
+    });
+  }
+
+  function editarValorItem(item: ItemCarrinhoPdv, texto: string) {
+    setValorEditando((atual) => ({ ...atual, [item.produto.id]: texto }));
+    setQuantidadeEditando((atual) => {
+      const proximo = { ...atual };
+      delete proximo[item.produto.id];
+      return proximo;
+    });
+    const valor = parseNumero(texto);
+    const precoUnitario = Number(item.produto.preco_venda ?? 0);
+    if (valor !== null && valor > 0 && precoUnitario > 0) {
+      aplicarQuantidade(item.produto.id, valor / precoUnitario);
+    }
+  }
+
+  function finalizarEdicaoValor(item: ItemCarrinhoPdv) {
+    const texto = valorEditando[item.produto.id];
+    const valor = parseNumero(texto ?? "");
+    const precoUnitario = Number(item.produto.preco_venda ?? 0);
+    if (valor !== null && valor > 0 && precoUnitario > 0) {
+      aplicarQuantidade(item.produto.id, valor / precoUnitario);
+    }
+    setValorEditando((atual) => {
+      const proximo = { ...atual };
+      delete proximo[item.produto.id];
+      return proximo;
+    });
   }
 
   async function onBarcodeScanned({ data }: { data: string }) {
@@ -383,6 +499,8 @@ export default function FuncionarioPdvScreen() {
 
   function limparVendaAtual() {
     setCarrinho([]);
+    setQuantidadeEditando({});
+    setValorEditando({});
     setCliente(null);
     setMostrarDetalhesCliente(false);
     setClienteBusca("");
@@ -633,31 +751,62 @@ export default function FuncionarioPdvScreen() {
             carrinho.map((item) => (
               <View key={item.produto.id} style={styles.itemCarrinho}>
                 <ProdutoImagem uri={item.produto.imagem_url} compacta />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.itemNome} numberOfLines={2}>{item.produto.nome}</Text>
-                  <Text style={styles.itemMeta}>{formatarMoeda(item.produto.preco_venda)} un.</Text>
+                <View style={styles.itemCarrinhoConteudo}>
+                  <View style={styles.itemCarrinhoTopo}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.itemNome} numberOfLines={2}>{item.produto.nome}</Text>
+                      <Text style={styles.itemMeta}>
+                        {formatarMoeda(item.produto.preco_venda)} / {(item.produto.unidade || "un").toLowerCase()}
+                      </Text>
+                    </View>
+                    <Text style={styles.itemSubtotal}>
+                      {formatarMoeda(item.quantidade * Number(item.produto.preco_venda ?? 0))}
+                    </Text>
+                  </View>
+                  <View style={styles.itemControles}>
+                    <View style={styles.campoCarrinho}>
+                      <Text style={styles.campoCarrinhoLabel}>Qtd.</Text>
+                      <View style={styles.quantidadeBox}>
+                        <TouchableOpacity
+                          style={styles.botaoQuantidade}
+                          onPress={() => alterarQuantidade(item.produto.id, item.quantidade - 1)}
+                        >
+                          <Ionicons name="remove" size={16} color={CORES.texto} />
+                        </TouchableOpacity>
+                        <TextInput
+                          value={quantidadeEditando[item.produto.id] ?? formatarQuantidadeCampo(item.quantidade)}
+                          onChangeText={(valor) => editarQuantidadeItem(item.produto.id, valor)}
+                          onBlur={() => finalizarEdicaoQuantidade(item.produto.id)}
+                          keyboardType="decimal-pad"
+                          returnKeyType="done"
+                          selectTextOnFocus
+                          style={styles.inputQuantidade}
+                        />
+                        <TouchableOpacity
+                          style={styles.botaoQuantidade}
+                          onPress={() => alterarQuantidade(item.produto.id, item.quantidade + 1)}
+                        >
+                          <Ionicons name="add" size={16} color={CORES.texto} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    <View style={styles.campoCarrinho}>
+                      <Text style={styles.campoCarrinhoLabel}>Valor (R$)</Text>
+                      <TextInput
+                        value={
+                          valorEditando[item.produto.id] ??
+                          formatarValorCampo(item.quantidade * Number(item.produto.preco_venda ?? 0))
+                        }
+                        onChangeText={(valor) => editarValorItem(item, valor)}
+                        onBlur={() => finalizarEdicaoValor(item)}
+                        keyboardType="decimal-pad"
+                        returnKeyType="done"
+                        selectTextOnFocus
+                        style={styles.inputValorItem}
+                      />
+                    </View>
+                  </View>
                 </View>
-                <View style={styles.quantidadeBox}>
-                  <TouchableOpacity
-                    style={styles.botaoQuantidade}
-                    onPress={() => alterarQuantidade(item.produto.id, item.quantidade - 1)}
-                  >
-                    <Ionicons name="remove" size={16} color={CORES.texto} />
-                  </TouchableOpacity>
-                  <TextInput
-                    value={String(item.quantidade).replace(".", ",")}
-                    onChangeText={(valor) => alterarQuantidade(item.produto.id, parseNumero(valor) ?? 0)}
-                    keyboardType="decimal-pad"
-                    style={styles.inputQuantidade}
-                  />
-                  <TouchableOpacity
-                    style={styles.botaoQuantidade}
-                    onPress={() => alterarQuantidade(item.produto.id, item.quantidade + 1)}
-                  >
-                    <Ionicons name="add" size={16} color={CORES.texto} />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.itemSubtotal}>{formatarMoeda(item.quantidade * item.produto.preco_venda)}</Text>
               </View>
             ))
           )}
@@ -1167,7 +1316,7 @@ const styles = StyleSheet.create({
   vazioTexto: { marginTop: ESPACO.sm, color: CORES.textoSecundario, fontSize: FONTE.normal },
   itemCarrinho: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: ESPACO.sm,
     borderTopWidth: 1,
     borderTopColor: CORES.borda,
@@ -1191,10 +1340,15 @@ const styles = StyleSheet.create({
   produtoImagem: { width: "100%", height: "100%" },
   itemNome: { fontSize: FONTE.normal, fontWeight: "800", color: CORES.texto },
   itemMeta: { fontSize: FONTE.pequena, color: CORES.textoSecundario, marginTop: 2 },
+  itemCarrinhoConteudo: { flex: 1, gap: ESPACO.xs },
+  itemCarrinhoTopo: { flexDirection: "row", alignItems: "flex-start", gap: ESPACO.sm },
+  itemControles: { flexDirection: "row", flexWrap: "wrap", gap: ESPACO.sm },
+  campoCarrinho: { gap: 3 },
+  campoCarrinhoLabel: { color: CORES.textoSecundario, fontSize: FONTE.pequena, fontWeight: "800" },
   quantidadeBox: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: CORES.borda, borderRadius: RAIO.md },
   botaoQuantidade: { width: 34, height: 38, alignItems: "center", justifyContent: "center" },
   inputQuantidade: {
-    width: 48,
+    width: 66,
     height: 38,
     textAlign: "center",
     color: CORES.texto,
@@ -1203,7 +1357,19 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderColor: CORES.borda,
   },
-  itemSubtotal: { width: 82, textAlign: "right", fontWeight: "800", color: CORES.texto },
+  inputValorItem: {
+    width: 92,
+    height: 40,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    borderRadius: RAIO.md,
+    paddingHorizontal: ESPACO.sm,
+    textAlign: "right",
+    color: CORES.texto,
+    fontWeight: "800",
+    backgroundColor: "#fff",
+  },
+  itemSubtotal: { minWidth: 82, textAlign: "right", fontWeight: "800", color: CORES.texto },
   clienteSelecionado: {
     flexDirection: "row",
     alignItems: "center",
