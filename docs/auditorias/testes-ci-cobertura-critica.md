@@ -1,6 +1,6 @@
 # Matriz de cobertura critica de Testes/CI
 
-Data: 2026-05-17
+Data: 2026-06-19
 
 Objetivo: manter Testes/CI em 10/10 por cobertura de risco real, sem perseguir
 porcentagem cega. A regra e simples: toda area que pode quebrar seguranca,
@@ -29,8 +29,10 @@ Obrigatorio em todo PR para `main`:
 
 - `MCP tests`: valida os MCPs locais e protocolo via stdio.
 - `Fluxo unico safety`: valida guardrails DEV -> PROD.
-- `Quality Gate`: valida multitenant hardening, import smoke e Migration Smoke.
-- `Smoke test`: valida smoke de backend/auth e build frontend.
+- `Quality Gate`: valida multitenant hardening, import smoke, Migration Smoke
+  e check externo `SonarCloud Code Analysis`.
+- `Smoke test`: valida testes raiz, smoke de backend/auth, audit/lint/format
+  core do frontend e build frontend.
 
 Longo, manual ou agendado:
 
@@ -61,3 +63,7 @@ Longo, manual ou agendado:
   `docs/auditorias/testes-ci-e2e-plano-basico.md`.
 - Migration Smoke automatizado no Backend CI, cobrindo banco limpo e historico
   controlado.
+- Rodada 0.5 de 2026-06-18/19 fechou lint e format bloqueantes no Backend CI
+  ate `ruff check .` e `ruff format --check .`.
+- PR #658 confirmou SonarCloud/Quality Gate verdes com configuracao automatica
+  alinhada aos caminhos sem runtime.
