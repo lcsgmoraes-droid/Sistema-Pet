@@ -21,12 +21,10 @@ assert.deepEqual(
 assert.deepEqual(
   buildAppPaymentReturnLinks(params),
   {
-    deepLink:
-      "corepet://app/pedidos?payment_status=pending&pedido_id=PED-123&loja=atacadao",
+    deepLink: "corepet://app/pedidos?payment_status=pending&pedido_id=PED-123&loja=atacadao",
     androidIntentLink:
       "intent://app/pedidos?payment_status=pending&pedido_id=PED-123&loja=atacadao#Intent;scheme=corepet;package=br.com.corepet.app;end",
-    retryLink:
-      "corepet://app/pedidos?payment_status=pending&pedido_id=PED-123&loja=atacadao",
+    retryLink: "corepet://app/pedidos?payment_status=pending&pedido_id=PED-123&loja=atacadao",
   },
   "retorno de compra feita pelo app deve apontar novamente para o app, sem fallback para ecommerce",
 );

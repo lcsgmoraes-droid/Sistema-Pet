@@ -73,6 +73,6 @@ def test_android_manifest_accepts_corepet_payment_return_deep_link():
         "app-mobile/android/app/src/main/AndroidManifest.xml"
     )
 
-    assert 'android.intent.action.VIEW' in manifest
-    assert 'android.intent.category.BROWSABLE' in manifest
+    assert "android.intent.action.VIEW" in manifest
+    assert "android.intent.category.BROWSABLE" in manifest
     assert 'android:scheme="corepet"' in manifest

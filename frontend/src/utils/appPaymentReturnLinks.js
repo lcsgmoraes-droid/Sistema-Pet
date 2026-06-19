@@ -7,8 +7,7 @@ function cleanParam(value) {
 }
 
 function paymentStatusFromParams(params) {
-  const rawStatus = cleanParam(params.get("payment_status") || params.get("status"))
-    .toLowerCase();
+  const rawStatus = cleanParam(params.get("payment_status") || params.get("status")).toLowerCase();
   return APP_PAYMENT_STATUS_ALIASES[rawStatus] || rawStatus || "pending";
 }
 
