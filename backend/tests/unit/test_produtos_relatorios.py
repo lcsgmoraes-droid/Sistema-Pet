@@ -1,6 +1,8 @@
 from datetime import datetime
 
 from app.produtos.relatorios import (
+    _calcular_janelas_vendas_produto,
+    _calcular_totais_validade_proxima,
     _parse_relatorio_datetime,
     _serializar_movimentacao_relatorio,
 )
@@ -58,3 +60,95 @@ def test_serializar_movimentacao_relatorio_preserva_contrato_visual():
     assert serializado["usuario"] == "Lucas"
     assert serializado["em_promocao"] is True
     assert serializado["desconto_promocional"] == 1.25
+
+
+def test_calcular_janelas_vendas_produto_preserva_metricas_e_curva():
+    data_fim = datetime(2026, 6, 30, 23, 59)
+    janela_30_inicio = datetime(2026, 6, 1)
+    rows = [
+        FakeObject(
+            venda_id=1,
+            data_venda=datetime(2026, 6, 30),
+            quantidade=2,
+            subtotal=20,
+        ),
+        FakeObject(
+            venda_id=1,
+            data_venda=datetime(2026, 6, 30),
+            quantidade=1,
+            subtotal=5,
+        ),
+        FakeObject(
+            venda_id=2,
+            data_venda=datetime(2026, 6, 23),
+            quantidade=1,
+            subtotal=7,
+        ),
+        FakeObject(
+            venda_id=3,
+            data_venda=datetime(2026, 5, 20),
+            quantidade=3,
+            subtotal=12,
+        ),
+    ]
+
+    janelas, curva_30_dias = _calcular_janelas_vendas_produto(
+        rows,
+        data_fim_dt=data_fim,
+        janela_30_inicio=janela_30_inicio,
+    )
+
+    assert janelas["7"] == {
+        "dias": 7,
+        "quantidade_vendida": 3.0,
+        "valor_vendido": 25.0,
+        "numero_vendas": 1,
+        "media_diaria": 0.43,
+    }
+    assert janelas["15"]["quantidade_vendida"] == 4.0
+    assert janelas["15"]["valor_vendido"] == 32.0
+    assert janelas["15"]["numero_vendas"] == 2
+    assert janelas["60"]["quantidade_vendida"] == 7.0
+    assert janelas["90"]["numero_vendas"] == 3
+    assert curva_30_dias[0] == {"data": "2026-06-01", "quantidade": 0.0}
+    assert curva_30_dias[-1] == {"data": "2026-06-30", "quantidade": 3.0}
+
+
+def test_calcular_totais_validade_proxima_preserva_resumo_operacional():
+    agora = datetime(2026, 6, 1)
+    config = FakeObject(
+        ativo=True,
+        aplicar_app=True,
+        aplicar_ecommerce=False,
+        desconto_7_dias=10,
+        desconto_30_dias=5,
+        desconto_60_dias=0,
+    )
+    rows = [
+        (1, 10, "tenant-1", datetime(2026, 6, 5), 2, 3, 10),
+        (2, 11, "tenant-1", datetime(2026, 6, 20), 4, 5, 12),
+        (3, 12, "tenant-1", datetime(2026, 5, 30), 1, 7, 15),
+        (4, 13, "tenant-1", datetime(2026, 7, 20), 6, 2, 8),
+    ]
+
+    totais = _calcular_totais_validade_proxima(
+        rows,
+        agora=agora,
+        campaign_configs={"tenant-1": config},
+        exclusoes_produto={("tenant-1", 11): FakeObject(id=90)},
+        exclusoes_lote={},
+    )
+
+    assert totais == {
+        "total_lotes": 4,
+        "total_produtos": 4,
+        "total_quantidade": 13.0,
+        "lotes_vencidos": 1,
+        "lotes_ate_7_dias": 1,
+        "lotes_ate_30_dias": 2,
+        "lotes_ate_60_dias": 3,
+        "valor_custo_em_risco": 45.0,
+        "valor_venda_em_risco": 131.0,
+        "lotes_em_campanha": 1,
+        "lotes_excluidos_campanha": 1,
+    }
