@@ -1,3 +1,8 @@
+from pathlib import Path
+
+import pytest
+from fastapi import HTTPException
+
 from app.routes import app_mobile_pets_routes
 from app.routes import app_mobile_routes
 
@@ -39,4 +44,51 @@ def test_app_mobile_mantem_aliases_de_compatibilidade_de_pets():
     assert (
         app_mobile_routes.obter_carteirinha_pet_app
         is app_mobile_pets_routes.obter_carteirinha_pet_app
+    )
+
+
+def test_app_mobile_pets_upload_destination_usa_mime_e_uuid(tmp_path, monkeypatch):
+    upload_base = tmp_path / "pets"
+    monkeypatch.setattr(app_mobile_pets_routes, "PET_UPLOAD_DIR", upload_base)
+
+    dest, filename = app_mobile_pets_routes._pet_upload_destination(
+        "tenant-a", "image/png"
+    )
+
+    assert dest.parent == upload_base / "tenant-a"
+    assert filename.startswith("pet-")
+    assert filename.endswith(".png")
+    assert dest.resolve().parent == (upload_base / "tenant-a").resolve()
+
+    with pytest.raises(HTTPException):
+        app_mobile_pets_routes._pet_upload_destination("tenant-a", "text/plain")
+    with pytest.raises(HTTPException):
+        app_mobile_pets_routes._pet_upload_destination("../tenant-a", "image/png")
+
+
+def test_app_mobile_pets_upload_antigo_fica_preso_a_base(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(app_mobile_pets_routes, "PET_UPLOAD_DIR", Path("uploads/pets"))
+
+    safe_path = Path("uploads/pets/tenant-a/pet-ok.jpg")
+    safe_path.parent.mkdir(parents=True)
+    safe_path.write_bytes(b"ok")
+
+    assert (
+        app_mobile_pets_routes._local_pet_upload_path_from_public_url(
+            "/uploads/pets/tenant-a/pet-ok.jpg"
+        )
+        == safe_path
+    )
+    assert (
+        app_mobile_pets_routes._local_pet_upload_path_from_public_url(
+            "/uploads/pets/tenant-a/../../fora.jpg"
+        )
+        is None
+    )
+    assert (
+        app_mobile_pets_routes._local_pet_upload_path_from_public_url(
+            "/uploads/outro/pet.jpg"
+        )
+        is None
     )

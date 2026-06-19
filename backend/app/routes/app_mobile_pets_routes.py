@@ -16,6 +16,15 @@ from app.veterinario_models import ConsultaVet, ExameVet
 router = APIRouter()
 
 PET_UPLOAD_DIR = Path("uploads/pets")
+PET_IMAGE_EXTENSIONS = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
+PET_SAFE_PATH_CHARS = frozenset(
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+)
 
 
 class PetResponse(BaseModel):
@@ -150,6 +159,55 @@ def _get_pet_owned_or_404(db: Session, pet_id: int, current_user: User) -> Pet:
     return pet
 
 
+def _pet_upload_destination(tenant_id, content_type: str | None) -> tuple[Path, str]:
+    ext = PET_IMAGE_EXTENSIONS.get(str(content_type or "").lower())
+    if not ext:
+        raise HTTPException(
+            status_code=400,
+            detail="Tipo de arquivo nao suportado. Use JPG, PNG ou WebP.",
+        )
+
+    tenant_segment = str(tenant_id)
+    if not tenant_segment or any(
+        char not in PET_SAFE_PATH_CHARS for char in tenant_segment
+    ):
+        raise HTTPException(status_code=400, detail="Tenant de upload invalido.")
+
+    tenant_dir = PET_UPLOAD_DIR / tenant_segment
+    filename = f"pet-{uuid.uuid4().hex}{ext}"
+    dest = tenant_dir / filename
+    try:
+        resolved_base = PET_UPLOAD_DIR.resolve()
+        resolved_dir = tenant_dir.resolve()
+        if resolved_base not in resolved_dir.parents:
+            raise HTTPException(status_code=400, detail="Caminho de upload invalido.")
+
+        tenant_dir.mkdir(parents=True, exist_ok=True)
+        resolved_dest = dest.resolve()
+        if resolved_dest.parent != resolved_dir:
+            raise HTTPException(status_code=400, detail="Caminho de upload invalido.")
+    except OSError as exc:
+        raise HTTPException(
+            status_code=500, detail="Falha ao preparar upload."
+        ) from exc
+    return dest, filename
+
+
+def _local_pet_upload_path_from_public_url(url: str | None) -> Path | None:
+    normalized = str(url or "").strip()
+    if not normalized.startswith("/uploads/pets/"):
+        return None
+    path = Path(normalized.lstrip("/"))
+    try:
+        resolved_path = path.resolve()
+        resolved_base = PET_UPLOAD_DIR.resolve()
+        if resolved_base not in resolved_path.parents:
+            return None
+    except OSError:
+        return None
+    return path
+
+
 @router.get("/pets", response_model=list[PetResponse])
 def listar_pets(
     current_user: User = Depends(_get_current_ecommerce_user),
@@ -247,29 +305,15 @@ async def upload_foto_pet(
     """Faz upload da foto do pet e salva em /uploads/pets/{tenant_id}/."""
     pet = _get_pet_owned_or_404(db, pet_id, current_user)
 
-    # Valida tipo de arquivo
-    allowed = {"image/jpeg", "image/png", "image/webp", "image/gif"}
-    if file.content_type not in allowed:
-        raise HTTPException(
-            status_code=400,
-            detail="Tipo de arquivo não suportado. Use JPG, PNG ou WebP.",
-        )
-
-    # Salva o arquivo em uploads/pets/{tenant_id}/
-    ext = Path(file.filename or "foto.jpg").suffix or ".jpg"
-    tenant_dir = PET_UPLOAD_DIR / str(current_user.tenant_id)
-    tenant_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"pet-{pet_id}-{uuid.uuid4().hex[:8]}{ext}"
-    dest = tenant_dir / filename
+    dest, filename = _pet_upload_destination(current_user.tenant_id, file.content_type)
 
     content = await file.read()
     dest.write_bytes(content)
 
     # Remove foto anterior se era um upload local
-    if pet.foto_url and pet.foto_url.startswith("/uploads/pets/"):
-        old_path = Path(pet.foto_url.lstrip("/"))
-        if old_path.exists():
-            old_path.unlink(missing_ok=True)
+    old_path = _local_pet_upload_path_from_public_url(pet.foto_url)
+    if old_path and old_path.exists():
+        old_path.unlink(missing_ok=True)
 
     pet.foto_url = f"/uploads/pets/{current_user.tenant_id}/{filename}"
     db.commit()
