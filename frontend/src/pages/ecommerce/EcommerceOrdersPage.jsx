@@ -409,7 +409,9 @@ export default function EcommerceOrdersPage({
 
   if (ordersLoading) {
     ordersContent = (
-      <div style={{ textAlign: "center", color: "#64748b", padding: 40 }}>Carregando pedidos...</div>
+      <div style={{ textAlign: "center", color: "#64748b", padding: 40 }}>
+        Carregando pedidos...
+      </div>
     );
   } else if (ordersError) {
     ordersContent = (
