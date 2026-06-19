@@ -29,8 +29,13 @@ from app.routes.ecommerce_cart import (
 )
 from app.routes.ecommerce_checkout import (
     _activate_checkout_tenant_context,
+    _buscar_carrinho,
     _current_identity as checkout_current_identity,
+    cancelar_pedido,
+    consultar_status_pedido,
+    drive_cheguei,
     finalizar_checkout,
+    listar_pedidos_cliente,
 )
 from app.routes.ecommerce_entregador import _get_entregador_cliente
 from app.routes.ecommerce_entregador import obter_rota_entregador
@@ -218,6 +223,22 @@ def test_checkout_finalizar_reactivates_tenant_before_gateway_lookup():
     assert source.index("_activate_checkout_tenant_context(identity)") < source.index(
         "get_active_mercado_pago_runtime_config"
     )
+
+
+def test_checkout_order_routes_reactivate_tenant_before_pedido_queries():
+    for route_handler in (
+        _buscar_carrinho,
+        listar_pedidos_cliente,
+        consultar_status_pedido,
+        cancelar_pedido,
+        drive_cheguei,
+    ):
+        source = inspect.getsource(route_handler)
+
+        assert "_activate_checkout_tenant_context(identity)" in source
+        assert source.index(
+            "_activate_checkout_tenant_context(identity)"
+        ) < source.index("db.query(Pedido)")
 
 
 def test_app_mobile_rastreio_entrega_sql_cru_filtra_gps_por_tenant():

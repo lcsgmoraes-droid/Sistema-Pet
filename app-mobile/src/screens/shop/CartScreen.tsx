@@ -153,7 +153,12 @@ export default function CartScreen() {
               // Limpar o carrinho após o pedido ser feito com sucesso
               await limpar();
               if (pedido.payment_url) {
-                await Linking.openURL(pedido.payment_url);
+                void Linking.openURL(pedido.payment_url).catch(() => {
+                  Alert.alert(
+                    'Pedido criado',
+                    'Nao consegui abrir o pagamento automaticamente. Use o botao Abrir pagamento na proxima tela.'
+                  );
+                });
               }
               navigation.navigate('CheckoutSucesso', { pedido });
             } catch (err: any) {
