@@ -50,6 +50,58 @@ const EMPTY_RECOVERY_FORM = {
   confirmarSenha: "",
 };
 
+const EMPTY_FIELD_ERROR = { field: "", message: "" };
+
+function isFullName(value) {
+  return (
+    String(value || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean).length >= 2
+  );
+}
+
+function normalizeFieldMessage(message) {
+  return String(message || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function focusEcommerceField(prefix, field) {
+  if (!field || typeof document === "undefined") return;
+
+  window.setTimeout(() => {
+    const element = document.querySelector(`[name="${prefix}${field}"]`);
+    if (!element) return;
+
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (typeof element.focus === "function") {
+      element.focus({ preventScroll: true });
+    }
+  }, 40);
+}
+
+function inferRegisterFieldFromMessage(message) {
+  const normalized = normalizeFieldMessage(message);
+  if (normalized.includes("nome")) return "nome";
+  if (normalized.includes("cpf")) return "cpf";
+  if (normalized.includes("telefone") || normalized.includes("celular")) return "telefone";
+  if (normalized.includes("senha")) return "password";
+  if (normalized.includes("email") || normalized.includes("e-mail")) return "email";
+  if (normalized.includes("termo")) return "accepted_terms";
+  if (normalized.includes("privacidade")) return "accepted_privacy";
+  return "";
+}
+
+function inferProfileFieldFromMessage(message) {
+  const normalized = normalizeFieldMessage(message);
+  if (normalized.includes("entrega") && normalized.includes("nome")) return "entrega_nome";
+  if (normalized.includes("entrega")) return "entrega_endereco";
+  if (normalized.includes("endereco")) return "endereco";
+  return inferRegisterFieldFromMessage(message);
+}
+
 export default function useEcommerceCustomer({
   authHeaders,
   customerToken,
@@ -80,6 +132,8 @@ export default function useEcommerceCustomer({
   const [recoveryStep, setRecoveryStep] = useState("request");
   const [recoveryTokenFromLink, setRecoveryTokenFromLink] = useState(false);
   const [recoveryForm, setRecoveryForm] = useState(EMPTY_RECOVERY_FORM);
+  const [registerFieldError, setRegisterFieldError] = useState(EMPTY_FIELD_ERROR);
+  const [profileFieldError, setProfileFieldError] = useState(EMPTY_FIELD_ERROR);
 
   const isProfileComplete = useMemo(() => {
     return isCustomerProfileComplete(customer);
@@ -135,6 +189,32 @@ export default function useEcommerceCustomer({
     localStorage.removeItem(STORAGE_TOKEN_KEY);
   }
 
+  function clearRegisterFieldError(field) {
+    if (!field || registerFieldError.field === field) {
+      setRegisterFieldError(EMPTY_FIELD_ERROR);
+    }
+  }
+
+  function clearProfileFieldError(field) {
+    if (!field || profileFieldError.field === field) {
+      setProfileFieldError(EMPTY_FIELD_ERROR);
+    }
+  }
+
+  function showRegisterFieldError(field, message) {
+    onError(message);
+    onSuccess("");
+    setRegisterFieldError({ field, message });
+    focusEcommerceField("ecommerce_register_", field);
+  }
+
+  function showProfileFieldError(field, message) {
+    onError(message);
+    onSuccess("");
+    setProfileFieldError({ field, message });
+    focusEcommerceField("ecommerce_profile_", field);
+  }
+
   async function loadMe() {
     if (!customerToken) return;
     try {
@@ -156,14 +236,14 @@ export default function useEcommerceCustomer({
     }
 
     const fullName = String(profileForm.nome || "").trim();
-    if (!fullName || !fullName.includes(" ")) {
-      onError("Informe nome completo (nome e sobrenome).");
+    if (!isFullName(fullName)) {
+      showProfileFieldError("nome", "Informe nome completo (nome e sobrenome).");
       return;
     }
 
     const phoneDigits = String(profileForm.telefone || "").replace(/\D/g, "");
     if (phoneDigits.length < 10) {
-      onError("Informe um telefone/celular valido.");
+      showProfileFieldError("telefone", "Informe um telefone/celular valido.");
       return;
     }
 
@@ -178,7 +258,10 @@ export default function useEcommerceCustomer({
       ].every((item) => String(item || "").trim());
 
       if (!requiredDelivery) {
-        onError("Preencha o endere\u00e7o de entrega completo para continuar.");
+        showProfileFieldError(
+          "entrega_endereco",
+          "Preencha o endereco de entrega completo para continuar.",
+        );
         return;
       }
     }
@@ -186,6 +269,7 @@ export default function useEcommerceCustomer({
     setProfileSaving(true);
     onError("");
     onSuccess("");
+    setProfileFieldError(EMPTY_FIELD_ERROR);
     try {
       const response = await ecommerceApi.put("/api/ecommerce/auth/perfil", profileForm, {
         headers: authHeaders,
@@ -193,7 +277,13 @@ export default function useEcommerceCustomer({
       setCustomer(response.data);
       onSuccess("Dados cadastrais atualizados com sucesso.");
     } catch (err) {
-      onError(extractApiErrorMessage(err, "Erro ao salvar dados cadastrais"));
+      const message = extractApiErrorMessage(err, "Erro ao salvar dados cadastrais");
+      const field = inferProfileFieldFromMessage(message);
+      if (field) {
+        showProfileFieldError(field, message);
+      } else {
+        onError(message);
+      }
     } finally {
       setProfileSaving(false);
     }
@@ -374,33 +464,59 @@ export default function useEcommerceCustomer({
       onError("Loja n\u00e3o identificada na URL.");
       return;
     }
+    if (!isFullName(registerForm.nome)) {
+      showRegisterFieldError("nome", "Informe nome completo (nome e sobrenome).");
+      return;
+    }
     const cpfDigits = (registerForm.cpf || "").replace(/\D/g, "");
     if (cpfDigits.length !== 11) {
-      onError("Informe um CPF v\u00e1lido com 11 d\u00edgitos.");
+      showRegisterFieldError("cpf", "Informe um CPF valido com 11 digitos.");
       return;
     }
     const phoneDigits = (registerForm.telefone || "").replace(/\D/g, "");
     if (phoneDigits.length < 10) {
-      onError("Informe um telefone/celular valido.");
+      showRegisterFieldError("telefone", "Informe um telefone/celular valido.");
+      return;
+    }
+    const normalizedEmail = registerForm.email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      showRegisterFieldError("email", "Informe seu e-mail.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      showRegisterFieldError("email", "Informe um e-mail valido.");
       return;
     }
     if ((registerForm.password || "").length < 8) {
-      onError("A senha deve ter pelo menos 8 caracteres.");
+      showRegisterFieldError("password", "A senha deve ter pelo menos 8 caracteres.");
       return;
     }
-    if (!registerForm.accepted_terms || !registerForm.accepted_privacy) {
-      onError("Aceite os Termos de Uso e a Politica de Privacidade para criar a conta.");
+    if (!registerForm.accepted_terms) {
+      showRegisterFieldError("accepted_terms", "Aceite os Termos de Uso para criar a conta.");
+      return;
+    }
+    if (!registerForm.accepted_privacy) {
+      showRegisterFieldError(
+        "accepted_privacy",
+        "Aceite a Politica de Privacidade para criar a conta.",
+      );
       return;
     }
     setAuthLoading(true);
     onError("");
     onSuccess("");
+    setRegisterFieldError(EMPTY_FIELD_ERROR);
     try {
-      const response = await ecommerceApi.post("/api/ecommerce/auth/registrar", registerForm, {
-        headers: tenantHeaders,
-      });
+      const response = await ecommerceApi.post(
+        "/api/ecommerce/auth/registrar",
+        { ...registerForm, email: normalizedEmail },
+        {
+          headers: tenantHeaders,
+        },
+      );
       if (response?.data?.requires_email_verification) {
         setRegisterForm(EMPTY_REGISTER_FORM);
+        setRegisterFieldError(EMPTY_FIELD_ERROR);
         setPasswordRecoveryMode(false);
         setRecoveryStep("request");
         clearRecoveryParamsFromUrl();
@@ -418,13 +534,20 @@ export default function useEcommerceCustomer({
       setCustomerToken(token);
       await syncGuestCartToServer(token);
       setRegisterForm(EMPTY_REGISTER_FORM);
+      setRegisterFieldError(EMPTY_FIELD_ERROR);
       setPasswordRecoveryMode(false);
       setRecoveryStep("request");
       clearRecoveryParamsFromUrl();
       onSuccess("Cadastro realizado com sucesso!");
       setView("conta");
     } catch (err) {
-      onError(extractApiErrorMessage(err, "Erro ao cadastrar cliente"));
+      const message = extractApiErrorMessage(err, "Erro ao cadastrar cliente");
+      const field = inferRegisterFieldFromMessage(message);
+      if (field) {
+        showRegisterFieldError(field, message);
+      } else {
+        onError(message);
+      }
     } finally {
       setAuthLoading(false);
     }
@@ -467,6 +590,8 @@ export default function useEcommerceCustomer({
   return {
     authLoading,
     clearCustomerSession,
+    clearProfileFieldError,
+    clearRegisterFieldError,
     closePasswordRecovery,
     customer,
     customerDisplayName,
@@ -480,12 +605,14 @@ export default function useEcommerceCustomer({
     loginForm,
     openPasswordRecovery,
     passwordRecoveryMode,
+    profileFieldError,
     profileForm,
     profileSaving,
     recoveryForm,
     recoveryLoading,
     recoveryStep,
     recoveryTokenFromLink,
+    registerFieldError,
     registerForm,
     saveProfile,
     setLoginForm,

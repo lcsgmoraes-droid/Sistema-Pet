@@ -1,3 +1,60 @@
+function fieldInputStyle(baseStyle, fieldError, field) {
+  if (fieldError?.field !== field) return baseStyle;
+  return {
+    ...baseStyle,
+    borderColor: "#dc2626",
+    boxShadow: "0 0 0 3px rgba(220, 38, 38, 0.14)",
+    background: "#fff7f7",
+  };
+}
+
+function checkboxInputStyle(fieldError, field) {
+  if (fieldError?.field !== field) return { marginTop: 2 };
+  return {
+    marginTop: 2,
+    outline: "3px solid rgba(220, 38, 38, 0.18)",
+    outlineOffset: 3,
+  };
+}
+
+function checkboxLabelStyle(fieldError, field) {
+  const base = {
+    display: "flex",
+    gap: 8,
+    alignItems: "flex-start",
+    fontSize: 12,
+    color: "#57534e",
+    lineHeight: 1.45,
+  };
+
+  if (fieldError?.field !== field) return base;
+  return {
+    ...base,
+    border: "1px solid #fecaca",
+    background: "#fff7f7",
+    borderRadius: 8,
+    padding: "8px 10px",
+  };
+}
+
+function FieldError({ field, fieldError }) {
+  if (fieldError?.field !== field || !fieldError?.message) return null;
+
+  return (
+    <div
+      role="alert"
+      style={{
+        color: "#b91c1c",
+        fontSize: 12,
+        fontWeight: 700,
+        marginTop: 5,
+      }}
+    >
+      {fieldError.message}
+    </div>
+  );
+}
+
 function PasswordInput({ name, value, onChange, placeholder, visible, onToggle, style }) {
   return (
     <div style={{ position: "relative" }}>
@@ -43,9 +100,13 @@ function CustomerProfileForm({
   onLogout,
   onProfileCepBlur,
   onSaveProfile,
+  profileFieldError,
+  onClearProfileFieldError,
 }) {
-  const updateProfile = (field) => (e) =>
+  const updateProfile = (field) => (e) => {
+    onClearProfileFieldError(field);
     setProfileForm((prev) => ({ ...prev, [field]: e.target.value }));
+  };
 
   return (
     <div style={{ display: "grid", gap: 16 }}>
@@ -62,12 +123,16 @@ function CustomerProfileForm({
             Dados pessoais
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <input
-              value={profileForm.nome}
-              onChange={updateProfile("nome")}
-              placeholder="Nome completo"
-              style={S.formInput}
-            />
+            <div>
+              <input
+                name="ecommerce_profile_nome"
+                value={profileForm.nome}
+                onChange={updateProfile("nome")}
+                placeholder="Nome completo"
+                style={fieldInputStyle(S.formInput, profileFieldError, "nome")}
+              />
+              <FieldError field="nome" fieldError={profileFieldError} />
+            </div>
             <input
               value={customer?.email || ""}
               disabled
@@ -76,19 +141,27 @@ function CustomerProfileForm({
             />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <input
-              value={profileForm.telefone}
-              onChange={updateProfile("telefone")}
-              placeholder="Telefone *"
-              style={S.formInput}
-              required
-            />
-            <input
-              value={profileForm.cpf}
-              onChange={updateProfile("cpf")}
-              placeholder="CPF"
-              style={S.formInput}
-            />
+            <div>
+              <input
+                name="ecommerce_profile_telefone"
+                value={profileForm.telefone}
+                onChange={updateProfile("telefone")}
+                placeholder="Telefone *"
+                style={fieldInputStyle(S.formInput, profileFieldError, "telefone")}
+                required
+              />
+              <FieldError field="telefone" fieldError={profileFieldError} />
+            </div>
+            <div>
+              <input
+                name="ecommerce_profile_cpf"
+                value={profileForm.cpf}
+                onChange={updateProfile("cpf")}
+                placeholder="CPF"
+                style={fieldInputStyle(S.formInput, profileFieldError, "cpf")}
+              />
+              <FieldError field="cpf" fieldError={profileFieldError} />
+            </div>
           </div>
 
           <div
@@ -103,6 +176,7 @@ function CustomerProfileForm({
             Endereço principal
           </div>
           <input
+            name="ecommerce_profile_cep"
             value={profileForm.cep}
             onChange={updateProfile("cep")}
             onBlur={onProfileCepBlur}
@@ -110,19 +184,23 @@ function CustomerProfileForm({
             style={S.formInput}
           />
           <input
+            name="ecommerce_profile_endereco"
             value={profileForm.endereco}
             onChange={updateProfile("endereco")}
             placeholder="Rua / Avenida"
-            style={S.formInput}
+            style={fieldInputStyle(S.formInput, profileFieldError, "endereco")}
           />
+          <FieldError field="endereco" fieldError={profileFieldError} />
           <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: 8 }}>
             <input
+              name="ecommerce_profile_numero"
               value={profileForm.numero}
               onChange={updateProfile("numero")}
               placeholder="Número"
               style={S.formInput}
             />
             <input
+              name="ecommerce_profile_complemento"
               value={profileForm.complemento}
               onChange={updateProfile("complemento")}
               placeholder="Complemento"
@@ -131,18 +209,21 @@ function CustomerProfileForm({
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 100px", gap: 8 }}>
             <input
+              name="ecommerce_profile_bairro"
               value={profileForm.bairro}
               onChange={updateProfile("bairro")}
               placeholder="Bairro"
               style={S.formInput}
             />
             <input
+              name="ecommerce_profile_cidade"
               value={profileForm.cidade}
               onChange={updateProfile("cidade")}
               placeholder="Cidade"
               style={S.formInput}
             />
             <input
+              name="ecommerce_profile_estado"
               value={profileForm.estado}
               onChange={updateProfile("estado")}
               placeholder="UF"
@@ -190,12 +271,15 @@ function CustomerProfileForm({
                 Endereço de entrega alternativo
               </div>
               <input
+                name="ecommerce_profile_entrega_nome"
                 value={profileForm.entrega_nome}
                 onChange={updateProfile("entrega_nome")}
                 placeholder="Nome para entrega"
-                style={S.formInput}
+                style={fieldInputStyle(S.formInput, profileFieldError, "entrega_nome")}
               />
+              <FieldError field="entrega_nome" fieldError={profileFieldError} />
               <input
+                name="ecommerce_profile_entrega_cep"
                 value={profileForm.entrega_cep}
                 onChange={updateProfile("entrega_cep")}
                 onBlur={onDeliveryCepBlur}
@@ -203,19 +287,23 @@ function CustomerProfileForm({
                 style={S.formInput}
               />
               <input
+                name="ecommerce_profile_entrega_endereco"
                 value={profileForm.entrega_endereco}
                 onChange={updateProfile("entrega_endereco")}
                 placeholder="Rua / Avenida"
-                style={S.formInput}
+                style={fieldInputStyle(S.formInput, profileFieldError, "entrega_endereco")}
               />
+              <FieldError field="entrega_endereco" fieldError={profileFieldError} />
               <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: 8 }}>
                 <input
+                  name="ecommerce_profile_entrega_numero"
                   value={profileForm.entrega_numero}
                   onChange={updateProfile("entrega_numero")}
                   placeholder="Número"
                   style={S.formInput}
                 />
                 <input
+                  name="ecommerce_profile_entrega_complemento"
                   value={profileForm.entrega_complemento}
                   onChange={updateProfile("entrega_complemento")}
                   placeholder="Complemento"
@@ -224,18 +312,21 @@ function CustomerProfileForm({
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 100px", gap: 8 }}>
                 <input
+                  name="ecommerce_profile_entrega_bairro"
                   value={profileForm.entrega_bairro}
                   onChange={updateProfile("entrega_bairro")}
                   placeholder="Bairro"
                   style={S.formInput}
                 />
                 <input
+                  name="ecommerce_profile_entrega_cidade"
                   value={profileForm.entrega_cidade}
                   onChange={updateProfile("entrega_cidade")}
                   placeholder="Cidade"
                   style={S.formInput}
                 />
                 <input
+                  name="ecommerce_profile_entrega_estado"
                   value={profileForm.entrega_estado}
                   onChange={updateProfile("entrega_estado")}
                   placeholder="UF"
@@ -278,13 +369,19 @@ function RegisterCard({
   setRegisterForm,
   showRegisterPassword,
   styles: S,
+  registerFieldError,
   onRegister,
+  onClearRegisterFieldError,
   onToggleRegisterPassword,
 }) {
-  const updateRegister = (field) => (e) =>
+  const updateRegister = (field) => (e) => {
+    onClearRegisterFieldError(field);
     setRegisterForm((prev) => ({ ...prev, [field]: e.target.value }));
-  const updateRegisterCheck = (field) => (e) =>
+  };
+  const updateRegisterCheck = (field) => (e) => {
+    onClearRegisterFieldError(field);
     setRegisterForm((prev) => ({ ...prev, [field]: e.target.checked }));
+  };
 
   return (
     <div style={S.accountCard}>
@@ -298,8 +395,9 @@ function RegisterCard({
           value={registerForm.nome}
           onChange={updateRegister("nome")}
           placeholder="Nome completo"
-          style={S.formInput}
+          style={fieldInputStyle(S.formInput, registerFieldError, "nome")}
         />
+        <FieldError field="nome" fieldError={registerFieldError} />
         <input
           name="ecommerce_register_cpf"
           autoComplete="off"
@@ -307,9 +405,10 @@ function RegisterCard({
           onChange={updateRegister("cpf")}
           placeholder="CPF *  (000.000.000-00)"
           inputMode="numeric"
-          style={S.formInput}
+          style={fieldInputStyle(S.formInput, registerFieldError, "cpf")}
           required
         />
+        <FieldError field="cpf" fieldError={registerFieldError} />
         <input
           name="ecommerce_register_telefone"
           autoComplete="off"
@@ -317,9 +416,10 @@ function RegisterCard({
           onChange={updateRegister("telefone")}
           placeholder="Telefone/WhatsApp *"
           inputMode="tel"
-          style={S.formInput}
+          style={fieldInputStyle(S.formInput, registerFieldError, "telefone")}
           required
         />
+        <FieldError field="telefone" fieldError={registerFieldError} />
         <input
           name="ecommerce_register_email"
           autoComplete="off"
@@ -327,8 +427,9 @@ function RegisterCard({
           onChange={updateRegister("email")}
           placeholder="Email"
           type="email"
-          style={S.formInput}
+          style={fieldInputStyle(S.formInput, registerFieldError, "email")}
         />
+        <FieldError field="email" fieldError={registerFieldError} />
         <PasswordInput
           name="ecommerce_register_password"
           value={registerForm.password}
@@ -336,23 +437,16 @@ function RegisterCard({
           placeholder="Senha (minimo 8 caracteres)"
           visible={showRegisterPassword}
           onToggle={onToggleRegisterPassword}
-          style={S.formInput}
+          style={fieldInputStyle(S.formInput, registerFieldError, "password")}
         />
-        <label
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "flex-start",
-            fontSize: 12,
-            color: "#57534e",
-            lineHeight: 1.45,
-          }}
-        >
+        <FieldError field="password" fieldError={registerFieldError} />
+        <label style={checkboxLabelStyle(registerFieldError, "accepted_terms")}>
           <input
+            name="ecommerce_register_accepted_terms"
             type="checkbox"
             checked={registerForm.accepted_terms}
             onChange={updateRegisterCheck("accepted_terms")}
-            style={{ marginTop: 2 }}
+            style={checkboxInputStyle(registerFieldError, "accepted_terms")}
           />
           <span>
             Li e aceito os{" "}
@@ -367,21 +461,14 @@ function RegisterCard({
             .
           </span>
         </label>
-        <label
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "flex-start",
-            fontSize: 12,
-            color: "#57534e",
-            lineHeight: 1.45,
-          }}
-        >
+        <FieldError field="accepted_terms" fieldError={registerFieldError} />
+        <label style={checkboxLabelStyle(registerFieldError, "accepted_privacy")}>
           <input
+            name="ecommerce_register_accepted_privacy"
             type="checkbox"
             checked={registerForm.accepted_privacy}
             onChange={updateRegisterCheck("accepted_privacy")}
-            style={{ marginTop: 2 }}
+            style={checkboxInputStyle(registerFieldError, "accepted_privacy")}
           />
           <span>
             Li e aceito a{" "}
@@ -396,6 +483,7 @@ function RegisterCard({
             .
           </span>
         </label>
+        <FieldError field="accepted_privacy" fieldError={registerFieldError} />
         <button type="submit" disabled={authLoading} style={S.saveBtn}>
           {authLoading ? "Criando..." : "Criar minha conta"}
         </button>
@@ -668,12 +756,14 @@ export default function EcommerceAccountPage({
   loginForm,
   notifyRequestsCount,
   passwordRecoveryMode,
+  profileFieldError,
   profileForm,
   profileSaving,
   recoveryForm,
   recoveryLoading,
   recoveryStep,
   recoveryTokenFromLink,
+  registerFieldError,
   registerForm,
   setLoginForm,
   setProfileForm,
@@ -686,6 +776,8 @@ export default function EcommerceAccountPage({
   styles: S,
   wishlistCount,
   onClosePasswordRecovery,
+  onClearProfileFieldError,
+  onClearRegisterFieldError,
   onDeliveryCepBlur,
   onLogin,
   onLogout,
@@ -720,6 +812,8 @@ export default function EcommerceAccountPage({
           onLogout={onLogout}
           onProfileCepBlur={onProfileCepBlur}
           onSaveProfile={onSaveProfile}
+          profileFieldError={profileFieldError}
+          onClearProfileFieldError={onClearProfileFieldError}
         />
       ) : (
         <div
@@ -731,7 +825,9 @@ export default function EcommerceAccountPage({
             setRegisterForm={setRegisterForm}
             showRegisterPassword={showRegisterPassword}
             styles={S}
+            registerFieldError={registerFieldError}
             onRegister={onRegister}
+            onClearRegisterFieldError={onClearRegisterFieldError}
             onToggleRegisterPassword={onToggleRegisterPassword}
           />
           <LoginCard

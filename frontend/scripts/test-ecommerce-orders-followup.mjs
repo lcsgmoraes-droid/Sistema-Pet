@@ -45,6 +45,10 @@ assert.match(
   "pedido online pendente deve aparecer como em separacao para o cliente",
 );
 
-assert.match(source, /aprovado:\s*'#10b981'/, "status aprovado deve ter cor positiva propria");
+assert.match(
+  source,
+  /aprovado:\s*["']#10b981["']/,
+  "status aprovado deve ter cor positiva propria",
+);
 
 console.log("E-commerce orders follow-up checks passed.");

@@ -394,6 +394,7 @@ function OrderCard({ order, styles: S, onDriveArrived, onOpenPayment }) {
 
 export default function EcommerceOrdersPage({
   orders,
+  ordersError,
   ordersLoading,
   styles: S,
   onContinueShopping,
@@ -437,6 +438,41 @@ export default function EcommerceOrdersPage({
       {ordersLoading ? (
         <div style={{ textAlign: "center", color: "#64748b", padding: 40 }}>
           Carregando pedidos...
+        </div>
+      ) : ordersError ? (
+        <div
+          role="alert"
+          style={{
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            borderRadius: 12,
+            color: "#991b1b",
+            padding: 18,
+            display: "grid",
+            gap: 10,
+          }}
+        >
+          <div style={{ fontSize: 15, fontWeight: 800 }}>Nao foi possivel carregar pedidos</div>
+          <div style={{ fontSize: 13, lineHeight: 1.45 }}>
+            {ordersError}. Tente atualizar a lista. Se o pagamento acabou de ser aprovado, a loja
+            continua recebendo a confirmacao pelo Mercado Pago.
+          </div>
+          <button
+            onClick={onReload}
+            style={{
+              justifySelf: "start",
+              background: "#991b1b",
+              border: "none",
+              color: "#fff",
+              borderRadius: 10,
+              padding: "9px 16px",
+              fontWeight: 800,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            Tentar novamente
+          </button>
         </div>
       ) : orderList.length === 0 ? (
         <div

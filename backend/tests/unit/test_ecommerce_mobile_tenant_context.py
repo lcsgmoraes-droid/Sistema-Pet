@@ -21,6 +21,7 @@ from app.routes.ecommerce_auth import (
     _serialize_profile,
     _transfer_cliente_relations_for_ecommerce_merge,
     atualizar_perfil,
+    registrar_cliente,
 )
 from app.routes import app_mobile_routes
 from app.routes.ecommerce_cart import (
@@ -239,6 +240,16 @@ def test_checkout_order_routes_reactivate_tenant_before_pedido_queries():
         assert source.index(
             "_activate_checkout_tenant_context(identity)"
         ) < source.index("db.query(Pedido)")
+
+
+def test_ecommerce_register_rejects_incomplete_customer_name_before_creating_user():
+    source = inspect.getsource(registrar_cliente)
+
+    assert 'nome = (payload.nome or "").strip()' in source
+    assert "len(nome.split()) < 2" in source
+    assert "Informe nome completo (nome e sobrenome)" in source
+    assert source.index("len(nome.split()) < 2") < source.index("user = User(")
+    assert "nome=nome" in source
 
 
 def test_app_mobile_rastreio_entrega_sql_cru_filtra_gps_por_tenant():
