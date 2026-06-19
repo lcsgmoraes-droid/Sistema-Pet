@@ -1,4 +1,6 @@
+from datetime import date, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -92,3 +94,45 @@ def test_app_mobile_pets_upload_antigo_fica_preso_a_base(tmp_path, monkeypatch):
         )
         is None
     )
+
+
+def test_app_mobile_pets_serializadores_preservam_carteirinha():
+    consulta = SimpleNamespace(
+        id=7,
+        created_at=datetime(2026, 6, 19, 12, 30),
+        tipo="retorno",
+        status="finalizada",
+        diagnostico="ok",
+        observacoes_tutor="sem alteracoes",
+    )
+    exame = SimpleNamespace(
+        id=9,
+        nome="Hemograma",
+        tipo="laboratorial",
+        status="disponivel",
+        data_resultado=date(2026, 6, 18),
+        interpretacao_ia_resumo="normal",
+        arquivo_url="/uploads/exame.pdf",
+    )
+
+    assert app_mobile_pets_routes._serialize_consultas_carteirinha([consulta]) == [
+        {
+            "id": 7,
+            "data": "2026-06-19T12:30:00",
+            "tipo": "retorno",
+            "status": "finalizada",
+            "diagnostico": "ok",
+            "observacoes_tutor": "sem alteracoes",
+        }
+    ]
+    assert app_mobile_pets_routes._serialize_exames_carteirinha([exame]) == [
+        {
+            "id": 9,
+            "nome": "Hemograma",
+            "tipo": "laboratorial",
+            "status": "disponivel",
+            "data_resultado": "2026-06-18",
+            "interpretacao_ia_resumo": "normal",
+            "arquivo_url": "/uploads/exame.pdf",
+        }
+    ]

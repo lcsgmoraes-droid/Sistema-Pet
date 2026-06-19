@@ -208,6 +208,48 @@ def _local_pet_upload_path_from_public_url(url: str | None) -> Path | None:
     return path
 
 
+def _write_pet_upload(dest: Path, content: bytes) -> None:
+    with dest.open("wb") as output:
+        output.write(content)
+
+
+def _serialize_consultas_carteirinha(consultas) -> list[dict]:
+    historico = []
+    for consulta in consultas:
+        data = consulta.created_at.isoformat() if consulta.created_at else None
+        historico.append(
+            {
+                "id": consulta.id,
+                "data": data,
+                "tipo": consulta.tipo,
+                "status": consulta.status,
+                "diagnostico": consulta.diagnostico,
+                "observacoes_tutor": consulta.observacoes_tutor,
+            }
+        )
+    return historico
+
+
+def _serialize_exames_carteirinha(exames) -> list[dict]:
+    historico = []
+    for exame in exames:
+        data_resultado = (
+            exame.data_resultado.isoformat() if exame.data_resultado else None
+        )
+        historico.append(
+            {
+                "id": exame.id,
+                "nome": exame.nome,
+                "tipo": exame.tipo,
+                "status": exame.status,
+                "data_resultado": data_resultado,
+                "interpretacao_ia_resumo": exame.interpretacao_ia_resumo,
+                "arquivo_url": exame.arquivo_url,
+            }
+        )
+    return historico
+
+
 @router.get("/pets", response_model=list[PetResponse])
 def listar_pets(
     current_user: User = Depends(_get_current_ecommerce_user),
@@ -308,7 +350,7 @@ async def upload_foto_pet(
     dest, filename = _pet_upload_destination(current_user.tenant_id, file.content_type)
 
     content = await file.read()
-    dest.write_bytes(content)
+    _write_pet_upload(dest, content)
 
     # Remove foto anterior se era um upload local
     old_path = _local_pet_upload_path_from_public_url(pet.foto_url)
@@ -357,31 +399,6 @@ def obter_carteirinha_pet_app(
         "pet": _serialize_pet(pet),
         "alertas": _montar_alertas_pet(db, pet, tenant_id),
         "status_vacinal": status_vacinal,
-        "consultas": [
-            {
-                "id": consulta.id,
-                "data": consulta.created_at.isoformat()
-                if consulta.created_at
-                else None,
-                "tipo": consulta.tipo,
-                "status": consulta.status,
-                "diagnostico": consulta.diagnostico,
-                "observacoes_tutor": consulta.observacoes_tutor,
-            }
-            for consulta in consultas
-        ],
-        "exames": [
-            {
-                "id": exame.id,
-                "nome": exame.nome,
-                "tipo": exame.tipo,
-                "status": exame.status,
-                "data_resultado": exame.data_resultado.isoformat()
-                if exame.data_resultado
-                else None,
-                "interpretacao_ia_resumo": exame.interpretacao_ia_resumo,
-                "arquivo_url": exame.arquivo_url,
-            }
-            for exame in exames
-        ],
+        "consultas": _serialize_consultas_carteirinha(consultas),
+        "exames": _serialize_exames_carteirinha(exames),
     }
