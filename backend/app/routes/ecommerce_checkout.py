@@ -209,13 +209,14 @@ def _frete_local_por_cidade(db: Session, tenant_id: str, cidade_destino: str) ->
 
 
 def _buscar_carrinho(db: Session, identity: EcommerceIdentity) -> Pedido | None:
-    _expirar_reservas_automaticamente(db, identity.tenant_id)
+    tenant_id = _activate_checkout_tenant_context(identity)
+    _expirar_reservas_automaticamente(db, tenant_id)
 
     return (
         db.query(Pedido)
         .filter(
             Pedido.cliente_id == identity.user_id,
-            Pedido.tenant_id == identity.tenant_id,
+            Pedido.tenant_id == tenant_id,
             Pedido.status == "carrinho",
         )
         .order_by(Pedido.id.desc())
@@ -749,13 +750,14 @@ def listar_pedidos_cliente(
     db: Session = Depends(get_session),
 ):
     """Lista todos os pedidos finalizados do cliente logado (exclui carrinho ativo)."""
-    _expirar_reservas_automaticamente(db, identity.tenant_id)
+    tenant_id = _activate_checkout_tenant_context(identity)
+    _expirar_reservas_automaticamente(db, tenant_id)
 
     pedidos = (
         db.query(Pedido)
         .filter(
             Pedido.cliente_id == identity.user_id,
-            Pedido.tenant_id == identity.tenant_id,
+            Pedido.tenant_id == tenant_id,
             Pedido.status != "carrinho",
         )
         .order_by(Pedido.id.desc())
@@ -809,14 +811,15 @@ def consultar_status_pedido(
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
-    _expirar_reservas_automaticamente(db, identity.tenant_id)
+    tenant_id = _activate_checkout_tenant_context(identity)
+    _expirar_reservas_automaticamente(db, tenant_id)
 
     pedido = (
         db.query(Pedido)
         .filter(
             Pedido.pedido_id == pedido_id,
             Pedido.cliente_id == identity.user_id,
-            Pedido.tenant_id == identity.tenant_id,
+            Pedido.tenant_id == tenant_id,
         )
         .first()
     )
@@ -858,14 +861,15 @@ def cancelar_pedido(
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
-    _expirar_reservas_automaticamente(db, identity.tenant_id)
+    tenant_id = _activate_checkout_tenant_context(identity)
+    _expirar_reservas_automaticamente(db, tenant_id)
 
     pedido = (
         db.query(Pedido)
         .filter(
             Pedido.pedido_id == pedido_id,
             Pedido.cliente_id == identity.user_id,
-            Pedido.tenant_id == identity.tenant_id,
+            Pedido.tenant_id == tenant_id,
         )
         .first()
     )
@@ -897,12 +901,13 @@ def drive_cheguei(
     db: Session = Depends(get_session),
 ):
     """Cliente pressiona 'Cheguei' — grava timestamp de chegada no drive."""
+    tenant_id = _activate_checkout_tenant_context(identity)
     pedido = (
         db.query(Pedido)
         .filter(
             Pedido.pedido_id == pedido_id,
             Pedido.cliente_id == identity.user_id,
-            Pedido.tenant_id == identity.tenant_id,
+            Pedido.tenant_id == tenant_id,
         )
         .first()
     )
