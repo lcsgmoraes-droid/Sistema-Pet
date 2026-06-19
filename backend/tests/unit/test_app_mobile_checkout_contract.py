@@ -54,11 +54,25 @@ def test_app_linking_returns_payment_to_orders_without_store_picker():
     navigator = _read_mobile_source("app-mobile/src/navigation/AppNavigator.tsx")
     tenant_store = _read_mobile_source("app-mobile/src/store/tenant.store.ts")
     app_return = _read_mobile_source("frontend/src/pages/AppPaymentReturn.jsx")
+    app_return_links = _read_mobile_source(
+        "frontend/src/utils/appPaymentReturnLinks.js"
+    )
 
     assert '"corepet://app"' in navigator
     assert 'ListaPedidos: "pedidos"' in navigator
     assert "Linking.getInitialURL" in tenant_store
     assert "extractStoreSlug(initialUrl" in tenant_store
-    assert "corepet://app/pedidos" in app_return
-    assert "intent://app/pedidos" in app_return
-    assert "loja" in app_return
+    assert "buildAppPaymentReturnLinks" in app_return
+    assert "corepet://app/pedidos" in app_return_links
+    assert "intent://app/pedidos" in app_return_links
+    assert "loja" in app_return_links
+
+
+def test_android_manifest_accepts_corepet_payment_return_deep_link():
+    manifest = _read_mobile_source(
+        "app-mobile/android/app/src/main/AndroidManifest.xml"
+    )
+
+    assert 'android.intent.action.VIEW' in manifest
+    assert 'android.intent.category.BROWSABLE' in manifest
+    assert 'android:scheme="corepet"' in manifest

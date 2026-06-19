@@ -37,3 +37,16 @@ def test_modal_pagamento_tem_adicionar_pagamento_no_rodape_quando_forma_selecion
 
     assert 'data-testid="modal-pagamento-footer-adicionar"' in fonte
     assert "Adicionar Pagamento" in fonte
+
+
+def test_auxiliar_contagem_cedulas_nao_usa_number_inputs_com_scroll():
+    fonte = _frontend_source("components/ModalFecharCaixa.jsx")
+    inicio = fonte.index("Painel de Contagem de Notas")
+    fim = fonte.index("<CurrencyInput", inicio)
+    bloco = fonte[inicio:fim]
+
+    assert 'type="number"' not in bloco
+    assert bloco.count('inputMode="numeric"') == 6
+    assert 'inputMode="decimal"' in bloco
+    assert "atualizarQuantidadeNota" in fonte
+    assert "atualizarValorMoedas" in fonte

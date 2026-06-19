@@ -76,6 +76,26 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
     );
   };
 
+  const atualizarQuantidadeNota = (campo, valor) => {
+    setNotas((prev) => ({
+      ...prev,
+      [campo]: String(valor || "").replace(/\D/g, ""),
+    }));
+  };
+
+  const atualizarValorMoedas = (valor) => {
+    const somenteDecimal = String(valor || "")
+      .replace(",", ".")
+      .replace(/[^\d.]/g, "");
+    const [inteiros, ...decimais] = somenteDecimal.split(".");
+    const casasDecimais = decimais.join("").slice(0, 2);
+
+    setNotas((prev) => ({
+      ...prev,
+      moedas: decimais.length ? `${inteiros}.${casasDecimais}` : inteiros,
+    }));
+  };
+
   const carregarVendasForma = async (forma) => {
     if (formaExpandida === forma) {
       setFormaExpandida(null);
@@ -361,9 +381,11 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                             R$ 2
                           </div>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={notas.n2}
-                            onChange={(e) => setNotas({ ...notas, n2: e.target.value })}
+                            onChange={(e) => atualizarQuantidadeNota("n2", e.target.value)}
                             className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-gray-500 focus:ring-2 focus:ring-gray-200"
                             placeholder=""
                           />
@@ -383,9 +405,11 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                             R$ 5
                           </div>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={notas.n5}
-                            onChange={(e) => setNotas({ ...notas, n5: e.target.value })}
+                            onChange={(e) => atualizarQuantidadeNota("n5", e.target.value)}
                             className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
                             placeholder=""
                           />
@@ -405,9 +429,11 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                             R$ 10
                           </div>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={notas.n10}
-                            onChange={(e) => setNotas({ ...notas, n10: e.target.value })}
+                            onChange={(e) => atualizarQuantidadeNota("n10", e.target.value)}
                             className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-red-500 focus:ring-2 focus:ring-red-200"
                             placeholder=""
                           />
@@ -427,9 +453,11 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                             R$ 20
                           </div>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={notas.n20}
-                            onChange={(e) => setNotas({ ...notas, n20: e.target.value })}
+                            onChange={(e) => atualizarQuantidadeNota("n20", e.target.value)}
                             className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200"
                             placeholder=""
                           />
@@ -449,9 +477,11 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                             R$ 50
                           </div>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={notas.n50}
-                            onChange={(e) => setNotas({ ...notas, n50: e.target.value })}
+                            onChange={(e) => atualizarQuantidadeNota("n50", e.target.value)}
                             className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                             placeholder=""
                           />
@@ -471,9 +501,11 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                             R$ 100
                           </div>
                           <input
-                            type="number"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={notas.n100}
-                            onChange={(e) => setNotas({ ...notas, n100: e.target.value })}
+                            onChange={(e) => atualizarQuantidadeNota("n100", e.target.value)}
                             className="w-20 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-green-500 focus:ring-2 focus:ring-green-200"
                             placeholder=""
                           />
@@ -495,10 +527,10 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                             💰 Moedas
                           </div>
                           <input
-                            type="number"
-                            step="0.01"
+                            type="text"
+                            inputMode="decimal"
                             value={notas.moedas}
-                            onChange={(e) => setNotas({ ...notas, moedas: e.target.value })}
+                            onChange={(e) => atualizarValorMoedas(e.target.value)}
                             className="w-32 px-3 py-2 border-2 border-gray-300 rounded-lg text-center font-bold text-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
                             placeholder=""
                           />
