@@ -174,7 +174,7 @@ FORBIDDEN_USER_CONTROLLED_LOG_PATTERNS = [
         "supplier unlink user log",
     ),
     (
-        "app/produtos_routes.py",
+        "app/produtos/racao_routes.py",
         r"logger\.info\(f\"\[racao/alertas\].*\{tenant_id\}.*\{especie\}",
         "ration alerts tenant/species log",
     ),
