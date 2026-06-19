@@ -83,12 +83,13 @@ def test_funcionario_pdv_mantem_aliases_no_agregador():
 def test_funcionario_pdv_delegates_to_official_sale_flow():
     source = read_repo(PDV_SOURCE)
     block = extract_block(source, "def finalizar_venda_funcionario_pdv")
+    payload_block = extract_block(source, "def _criar_payload_venda_funcionario_pdv")
 
     assert "VendaService.criar_venda" in block
     assert "VendaService.finalizar_venda" in block
     assert "processar_comissoes_venda" in block
-    assert '"funcionario_id": funcionario.id' in block
-    assert '"vendedor_id": current_user.id' in block
+    assert '"funcionario_id": funcionario.id' in payload_block
+    assert '"vendedor_id": current_user.id' in payload_block
 
 
 def test_funcionario_pdv_does_not_manage_cash_register():
@@ -140,19 +141,22 @@ def test_funcionario_pdv_searches_sellable_erp_products_not_app_catalog():
     source = read_repo(PDV_SOURCE)
     search_block = extract_block(source, "def buscar_produtos_funcionario_pdv")
     barcode_block = extract_block(source, "def buscar_produto_funcionario_pdv_barcode")
+    barcode_lookup_block = extract_block(source, "def _buscar_produto_pdv_por_barcode")
 
-    for block in (search_block, barcode_block):
+    for block in (search_block, barcode_lookup_block):
         assert "Produto.tenant_id == tenant_id" in block
         assert "Produto.ativo.is_(True)" in block or "Produto.ativo == true()" in block
         assert "Produto.tipo_produto.in_" in block
         assert "Produto.anunciar_app" not in block
         assert "Produto.is_sellable" not in block
+    assert "_buscar_produto_pdv_por_barcode" in barcode_block
 
 
 def test_funcionario_pdv_searches_products_and_clients_like_web_pdv():
     source = read_repo(PDV_SOURCE)
     product_block = extract_block(source, "def buscar_produtos_funcionario_pdv")
     barcode_block = extract_block(source, "def buscar_produto_funcionario_pdv_barcode")
+    barcode_lookup_block = extract_block(source, "def _buscar_produto_pdv_por_barcode")
     client_block = extract_block(source, "def buscar_clientes_funcionario_pdv")
     client_lookup_block = extract_block(source, "def _buscar_cliente_pdv_funcionario")
     serializer_block = extract_block(source, "def _serialize_funcionario_pdv_cliente")
@@ -170,7 +174,8 @@ def test_funcionario_pdv_searches_products_and_clients_like_web_pdv():
         assert field in source
     assert "_produto_busca_filtros_funcionario(termo)" in product_block
     assert "_produto_busca_rank_funcionario(termo)" in product_block
-    assert "_barcode_filters_for_produto(barcode)" in barcode_block
+    assert "_barcode_filters_for_produto(barcode)" in barcode_lookup_block
+    assert "_normalizar_barcode_obrigatorio_funcionario_pdv(barcode)" in barcode_block
 
     for field in [
         "Cliente.nome.ilike",
@@ -241,12 +246,13 @@ def test_funcionario_pdv_supports_campaign_benefits_preview_contract():
 def test_funcionario_pdv_finalization_passes_coupon_and_cashback_to_official_sale_flow():
     source = read_repo(PDV_SOURCE)
     block = extract_block(source, "def finalizar_venda_funcionario_pdv")
+    payload_block = extract_block(source, "def _criar_payload_venda_funcionario_pdv")
 
     assert "cupom_codigo" in block
     assert "desconto_cupom" in block
     assert "cashback_valor" in block
-    assert '"cupom_code": beneficios["cupom_code"]' in block
-    assert '"cupom_discount_applied": beneficios["desconto_cupom"]' in block
+    assert '"cupom_code": beneficios["cupom_code"]' in payload_block
+    assert '"cupom_discount_applied": beneficios["desconto_cupom"]' in payload_block
     assert '"forma_pagamento": "Cashback"' in block
     assert 'cupom_code=beneficios["cupom_code"]' in block
     assert 'cupom_discount_applied=beneficios["desconto_cupom"]' in block
@@ -353,13 +359,14 @@ def test_funcionario_pdv_can_save_open_sale_for_cashier_checkout():
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
     screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
     save_block = extract_block(backend, "def salvar_venda_funcionario_pdv")
+    payload_block = extract_block(backend, "def _criar_payload_venda_funcionario_pdv")
 
     assert "FuncionarioPdvSalvarRequest" in backend
     assert "FuncionarioPdvSalvarResponse" in backend
     assert "VendaService.criar_venda" in save_block
     assert "VendaService.finalizar_venda" not in save_block
     assert '"status": "aberta"' in save_block
-    assert '"canal": "app_funcionario"' in save_block
+    assert '"canal": "app_funcionario"' in payload_block
     assert "/app/funcionario/pdv/vendas/salvar" in service
     assert "salvarVendaPdv" in service
     assert "Salvar para o caixa" in screen

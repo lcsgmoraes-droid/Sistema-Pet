@@ -328,6 +328,31 @@ def _serialize_funcionario_pdv_produto(produto: Produto) -> dict:
     }
 
 
+def _normalizar_barcode_obrigatorio_funcionario_pdv(barcode: str) -> str:
+    barcode_normalizado = (barcode or "").strip()
+    if not barcode_normalizado:
+        raise HTTPException(status_code=400, detail="Codigo de barras obrigatorio.")
+    return barcode_normalizado
+
+
+def _buscar_produto_pdv_por_barcode(
+    db: Session, tenant_id: str, barcode: str
+) -> Optional[Produto]:
+    prioridade_estoque = case((func.coalesce(Produto.estoque_atual, 0) > 0, 0), else_=1)
+    return (
+        db.query(Produto)
+        .filter(
+            Produto.tenant_id == tenant_id,
+            Produto.ativo == true(),
+            Produto.situacao.is_not(False),
+            Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+            or_(*_barcode_filters_for_produto(barcode)),
+        )
+        .order_by(prioridade_estoque.asc(), Produto.nome.asc(), Produto.id.asc())
+        .first()
+    )
+
+
 def _serialize_funcionario_pdv_cliente(cliente: Cliente) -> dict:
     documento = cliente.cpf or cliente.cnpj
     partes_endereco = [
@@ -923,6 +948,33 @@ def _calcular_beneficios_funcionario_pdv(
     }
 
 
+def _criar_payload_venda_funcionario_pdv(
+    *,
+    dados: FuncionarioPdvSalvarRequest | FuncionarioPdvFinalizarRequest,
+    current_user: User,
+    funcionario: Cliente,
+    tenant_id: str,
+    beneficios: dict,
+) -> dict:
+    return {
+        "cliente_id": dados.cliente_id,
+        "vendedor_id": current_user.id,
+        "funcionario_id": funcionario.id,
+        "itens": beneficios["itens_payload"],
+        "desconto_valor": beneficios["desconto_cupom"],
+        "desconto_percentual": 0,
+        "cupom_code": beneficios["cupom_code"],
+        "cupom_discount_applied": beneficios["desconto_cupom"],
+        "tenant_id": tenant_id,
+        "observacoes": dados.observacoes,
+        "tem_entrega": False,
+        "taxa_entrega": 0,
+        "percentual_taxa_loja": 0,
+        "percentual_taxa_entregador": 0,
+        "canal": "app_funcionario",
+    }
+
+
 @router.get(
     "/funcionario/pdv/produtos/buscar",
     response_model=list[FuncionarioPdvProdutoResponse],
@@ -966,22 +1018,10 @@ def buscar_produto_funcionario_pdv_barcode(
     db: Session = Depends(get_session),
 ):
     _funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
-    barcode = (barcode or "").strip()
-    if not barcode:
-        raise HTTPException(status_code=400, detail="Codigo de barras obrigatorio.")
-
-    prioridade_estoque = case((func.coalesce(Produto.estoque_atual, 0) > 0, 0), else_=1)
-    produto = (
-        db.query(Produto)
-        .filter(
-            Produto.tenant_id == tenant_id,
-            Produto.ativo == true(),
-            Produto.situacao.is_not(False),
-            Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
-            or_(*_barcode_filters_for_produto(barcode)),
-        )
-        .order_by(prioridade_estoque.asc(), Produto.nome.asc(), Produto.id.asc())
-        .first()
+    produto = _buscar_produto_pdv_por_barcode(
+        db,
+        tenant_id,
+        _normalizar_barcode_obrigatorio_funcionario_pdv(barcode),
     )
     if not produto:
         raise HTTPException(
@@ -1183,23 +1223,13 @@ def salvar_venda_funcionario_pdv(
         cashback_valor=0,
     )
 
-    criar_payload = {
-        "cliente_id": dados.cliente_id,
-        "vendedor_id": current_user.id,
-        "funcionario_id": funcionario.id,
-        "itens": beneficios["itens_payload"],
-        "desconto_valor": beneficios["desconto_cupom"],
-        "desconto_percentual": 0,
-        "cupom_code": beneficios["cupom_code"],
-        "cupom_discount_applied": beneficios["desconto_cupom"],
-        "tenant_id": tenant_id,
-        "observacoes": dados.observacoes,
-        "tem_entrega": False,
-        "taxa_entrega": 0,
-        "percentual_taxa_loja": 0,
-        "percentual_taxa_entregador": 0,
-        "canal": "app_funcionario",
-    }
+    criar_payload = _criar_payload_venda_funcionario_pdv(
+        dados=dados,
+        current_user=current_user,
+        funcionario=funcionario,
+        tenant_id=tenant_id,
+        beneficios=beneficios,
+    )
     venda_criada = VendaService.criar_venda(
         payload=criar_payload, user_id=current_user.id, db=db
     )
@@ -1257,23 +1287,13 @@ def finalizar_venda_funcionario_pdv(
     )
     if forma_pagamento != "cartao_credito":
         numero_parcelas = max(1, min(numero_parcelas, 1))
-    criar_payload = {
-        "cliente_id": dados.cliente_id,
-        "vendedor_id": current_user.id,
-        "funcionario_id": funcionario.id,
-        "itens": beneficios["itens_payload"],
-        "desconto_valor": beneficios["desconto_cupom"],
-        "desconto_percentual": 0,
-        "cupom_code": beneficios["cupom_code"],
-        "cupom_discount_applied": beneficios["desconto_cupom"],
-        "tenant_id": tenant_id,
-        "observacoes": dados.observacoes,
-        "tem_entrega": False,
-        "taxa_entrega": 0,
-        "percentual_taxa_loja": 0,
-        "percentual_taxa_entregador": 0,
-        "canal": "app_funcionario",
-    }
+    criar_payload = _criar_payload_venda_funcionario_pdv(
+        dados=dados,
+        current_user=current_user,
+        funcionario=funcionario,
+        tenant_id=tenant_id,
+        beneficios=beneficios,
+    )
     venda_criada = VendaService.criar_venda(
         payload=criar_payload, user_id=current_user.id, db=db
     )

@@ -570,33 +570,7 @@ def buscar_produto_barcode(
     """
     tenant_id = _activate_user_tenant_context(current_user)
     barcode = (barcode or "").strip()
-    barcode_digits = "".join(ch for ch in barcode if ch.isdigit())
-    codigo_barras_digits = func.regexp_replace(
-        func.coalesce(Produto.codigo_barras, ""), r"\D", "", "g"
-    )
-    gtin_digits = func.regexp_replace(
-        func.coalesce(Produto.gtin_ean, ""), r"\D", "", "g"
-    )
-    gtin_tributario_digits = func.regexp_replace(
-        func.coalesce(Produto.gtin_ean_tributario, ""), r"\D", "", "g"
-    )
-    filtros_codigo = [
-        Produto.codigo_barras == barcode,
-        Produto.gtin_ean == barcode,
-        Produto.gtin_ean_tributario == barcode,
-        Produto.codigo == barcode,
-        Produto.codigos_barras_alternativos.ilike(f"%{barcode}%"),
-    ]
-    if barcode_digits:
-        filtros_codigo.extend(
-            [
-                codigo_barras_digits == barcode_digits,
-                gtin_digits == barcode_digits,
-                gtin_tributario_digits == barcode_digits,
-                Produto.codigo == barcode_digits,
-                Produto.codigos_barras_alternativos.ilike(f"%{barcode_digits}%"),
-            ]
-        )
+    filtros_codigo = _barcode_filters_for_produto(barcode)
 
     prioridade_estoque = case((func.coalesce(Produto.estoque_atual, 0) > 0, 0), else_=1)
 
