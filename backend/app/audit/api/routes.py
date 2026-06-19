@@ -13,7 +13,7 @@ from typing import Optional
 from datetime import datetime
 
 from app.db import get_session
-from app.auth.dependencies import require_admin
+from app.auth.dependencies import require_admin_with_tenant_context
 from app.models import User
 from app.audit.schemas import (
     PaginatedReplayResponse,
@@ -34,7 +34,6 @@ from app.audit.queries import (
 router = APIRouter(
     prefix="/audit",
     tags=["Auditoria (Read-Only)"],
-    dependencies=[Depends(require_admin)],  # APENAS ADMIN
 )
 
 
@@ -55,7 +54,7 @@ def list_replays(
         description="Filtrar por status",
     ),
     db: Session = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_admin_with_tenant_context),
 ):
     """
     **[READ-ONLY]** Lista todos os replays de eventos com paginação.
@@ -83,7 +82,7 @@ def list_replays(
 def get_replay(
     replay_id: int,
     db: Session = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_admin_with_tenant_context),
 ):
     """
     **[READ-ONLY]** Retorna detalhes de um replay específico.
@@ -122,7 +121,7 @@ def list_rebuilds(
         None, pattern="^(success|failure)$", description="Filtrar por status"
     ),
     db: Session = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_admin_with_tenant_context),
 ):
     """
     **[READ-ONLY]** Lista todos os rebuilds de read models com paginação.
@@ -150,7 +149,7 @@ def list_rebuilds(
 def get_rebuild(
     rebuild_id: int,
     db: Session = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_admin_with_tenant_context),
 ):
     """
     **[READ-ONLY]** Retorna detalhes de um rebuild específico.
@@ -184,7 +183,7 @@ def get_summary(
     start_date: Optional[datetime] = Query(None, description="Data inicial (ISO 8601)"),
     end_date: Optional[datetime] = Query(None, description="Data final (ISO 8601)"),
     db: Session = Depends(get_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_admin_with_tenant_context),
 ):
     """
     **[READ-ONLY]** Retorna resumo agregado de auditoria.

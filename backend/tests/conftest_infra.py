@@ -225,7 +225,7 @@ def user_factory(db_session):
 
 
 @pytest.fixture(scope="function")
-def auth_headers(user_factory, tenant_factory):
+def auth_headers(user_factory, tenant_factory, db_session):
     """
     Fixture que cria um tenant, usuário e retorna headers com JWT válido.
     """
@@ -239,6 +239,19 @@ def auth_headers(user_factory, tenant_factory):
                 tenant_id=tenant.id, email=f"auth_{uuid.uuid4().hex[:8]}@test.com"
             )
 
+        from app.models import UserSession
+
+        token_jti = str(uuid.uuid4())
+        db_session.add(
+            UserSession(
+                user_id=user.id,
+                tenant_id=uuid.UUID(str(tenant.id)),
+                token_jti=token_jti,
+                expires_at=datetime.now(UTC) + timedelta(days=7),
+            )
+        )
+        db_session.flush()
+
         # Gerar JWT
         secret_key = os.getenv(
             "JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-security"
@@ -248,6 +261,8 @@ def auth_headers(user_factory, tenant_factory):
             "sub": str(user.id),
             "tenant_id": str(tenant.id),
             "email": user.email,
+            "jti": token_jti,
+            "typ": "access",
             "exp": datetime.now(UTC) + timedelta(days=7),
         }
 

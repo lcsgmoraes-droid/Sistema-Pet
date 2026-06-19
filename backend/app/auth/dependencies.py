@@ -205,6 +205,20 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
+def require_admin_with_tenant_context(
+    user_and_tenant: tuple[User, UUID] = Depends(get_current_user_and_tenant),
+) -> User:
+    """Require admin access after the tenant context has been configured."""
+    current_user, _tenant_id = user_and_tenant
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Apenas administradores podem acessar este recurso.",
+        )
+
+    return current_user
+
+
 def require_active_user(current_user: User = Depends(get_current_user)) -> User:
     """
     Dependency que requer usuário ativo.
