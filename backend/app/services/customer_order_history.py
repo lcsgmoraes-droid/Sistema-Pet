@@ -127,9 +127,13 @@ def build_checkout_history_entry(
 
 
 def build_sale_history_entry(venda: Any, *, linked_order: Any | None = None) -> dict:
-    canal = normalize_sales_channel(getattr(venda, "canal", None), default="loja_fisica")
+    canal = normalize_sales_channel(
+        getattr(venda, "canal", None), default="loja_fisica"
+    )
     pedido_id = getattr(linked_order, "pedido_id", None)
-    created_at = getattr(venda, "data_venda", None) or getattr(venda, "created_at", None)
+    created_at = getattr(venda, "data_venda", None) or getattr(
+        venda, "created_at", None
+    )
     itens = list(getattr(venda, "itens", []) or [])
     return {
         "historico_id": f"venda:{getattr(venda, 'id', None)}",
