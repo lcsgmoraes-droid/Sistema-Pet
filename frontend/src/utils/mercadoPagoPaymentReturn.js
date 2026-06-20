@@ -20,7 +20,9 @@ const PAYMENT_RETURN_MESSAGES = {
 
 export function readMercadoPagoPaymentReturn(search = "") {
   const params = new URLSearchParams(search);
-  const rawStatus = String(params.get("payment_status") || "")
+  const rawStatus = String(
+    params.get("payment_status") || params.get("collection_status") || params.get("status") || "",
+  )
     .trim()
     .toLowerCase();
   const status = rawStatus === "approved" ? "success" : rawStatus;
@@ -35,7 +37,7 @@ export function readMercadoPagoPaymentReturn(search = "") {
     level: config.level,
     title: config.title,
     message: config.message,
-    pedidoId: params.get("pedido_id") || "",
+    pedidoId: params.get("pedido_id") || params.get("external_reference") || "",
   };
 }
 
@@ -43,7 +45,9 @@ export function stripMercadoPagoPaymentReturnParams(search = "") {
   const params = new URLSearchParams(search);
   [
     "payment_status",
+    "collection_status",
     "pedido_id",
+    "external_reference",
     "collection_id",
     "payment_id",
     "status",
@@ -52,6 +56,7 @@ export function stripMercadoPagoPaymentReturnParams(search = "") {
     "site_id",
     "processing_mode",
     "merchant_account_id",
+    "payment_type",
   ].forEach((key) => params.delete(key));
   params.set("view", "pedidos");
   return params.toString();
