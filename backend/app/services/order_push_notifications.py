@@ -133,7 +133,7 @@ def notify_order_event(
         user = _load_user(db, tenant_id=tenant_id, user_id=user_id)
         push_token = str(getattr(user, "push_token", "") or "").strip()
         if not push_token:
-            logger.info(
+            logger.warning(
                 "[OrderPush] usuario sem push_token tenant_id=%s user_id=%s event=%s pedido_id=%s venda_id=%s canal=%s",
                 tenant_id,
                 user_id,
