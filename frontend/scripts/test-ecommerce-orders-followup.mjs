@@ -63,11 +63,7 @@ assert.match(
   "pagina de pedidos deve priorizar canal_label vindo da API",
 );
 
-assert.match(
-  source,
-  /App mobile/,
-  "pagina de pedidos deve exibir canal app mobile de forma clara",
-);
+assert.match(source, /App mobile/, "pagina de pedidos deve exibir canal app mobile de forma clara");
 
 assert.match(
   source,
