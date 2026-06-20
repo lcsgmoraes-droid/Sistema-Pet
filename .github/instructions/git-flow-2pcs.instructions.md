@@ -1,9 +1,11 @@
 ---
 applyTo: "**"
 ---
-# Fluxo Git para dois computadores
+# Fluxo Git simples e seguro
 
-O Lucas trabalha no mesmo projeto em dois PCs. Mantenha o Git previsivel.
+O Lucas hoje trabalha principalmente em um PC, mas o fluxo continua preparado
+para dois computadores. Mantenha o Git previsivel sem repetir checagens a cada
+micro-etapa.
 
 ## Antes de editar
 
@@ -11,6 +13,8 @@ O Lucas trabalha no mesmo projeto em dois PCs. Mantenha o Git previsivel.
 - Se estiver em `main` ou `master`, crie branch de tarefa antes de alterar arquivos:
   `powershell -ExecutionPolicy Bypass -File .\scripts\git_start_task.ps1 -Tipo feat -Nome "nome da tarefa"`.
 - Se ja estiver em uma branch de tarefa, continue nela.
+- Confira a `main` no inicio de uma nova tarefa e antes de fechar/enviar a
+  branch. Nao repita essa checagem a cada passo pequeno na mesma branch.
 
 ## Ao finalizar
 
@@ -22,7 +26,7 @@ O Lucas trabalha no mesmo projeto em dois PCs. Mantenha o Git previsivel.
 
 ## Depois do merge
 
-- No outro PC, atualize a `main` antes de iniciar outra tarefa.
+- Atualize a `main` antes de iniciar outra tarefa depois de um PR mergeado.
 - O script `git_start_task.ps1` ja faz `fetch`, troca para `main`, executa `pull --ff-only` e cria a nova branch.
 
 ## Producao

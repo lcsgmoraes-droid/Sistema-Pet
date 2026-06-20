@@ -1,6 +1,8 @@
-# Fluxo Git para trabalhar em 2 PCs
+# Fluxo Git simples e seguro
 
 Este projeto deve seguir branch por tarefa. A `main` fica limpa e estavel.
+Mesmo trabalhando em apenas um PC, mantenha os pontos de seguranca: branch de
+tarefa, PR e nada direto na `main`.
 
 ## Uma vez em cada computador
 
@@ -14,6 +16,14 @@ Isso ativa os hooks locais que bloqueiam commit e push direto na `main`.
 
 ## Comecar uma tarefa
 
+Antes, confira onde voce esta:
+
+```powershell
+git status --short --branch
+```
+
+Se estiver em `main` ou `master`, rode:
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\git_start_task.ps1 -Tipo feat -Nome "cadastro de pet"
 ```
@@ -23,6 +33,9 @@ O script faz:
 - Confere se nao ha alteracoes soltas.
 - Atualiza `main` com `origin/main`.
 - Cria uma branch nova, por exemplo `feat/20260514-1015-cadastro-de-pet`.
+
+Se ja estiver em uma branch de tarefa, continue nela. Nao precisa repetir a
+checagem da `main` a cada micro-etapa.
 
 ## Fechar uma tarefa
 
@@ -41,7 +54,7 @@ O script faz:
 
 Depois disso, abra o Pull Request no GitHub e faca o merge pela interface.
 
-## No outro computador
+## Depois do merge
 
 Depois que o Pull Request for juntado, basta iniciar a proxima tarefa pelo mesmo script:
 
@@ -53,7 +66,7 @@ Ele atualiza a `main` antes de criar a branch nova.
 
 ## Saber se este PC precisa atualizar
 
-Quando estiver em duvida se o outro computador subiu alguma novidade, rode:
+Quando estiver em duvida se a `main` mudou no GitHub, rode:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\git_check_updates.ps1
