@@ -5,6 +5,8 @@
   "scripts": {
     "start": "expo start",
     "start:clear": "expo start --clear",
+    "prepare:firebase": "node scripts/prepare-google-services.js",
+    "eas-build-post-install": "npm run prepare:firebase",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck",
     "android": "expo run:android",

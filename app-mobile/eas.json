@@ -6,6 +6,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "environment": "development",
       "env": {
         "EXPO_PUBLIC_API_URL": "http://localhost:8000/api",
         "EXPO_PUBLIC_TENANT_ID": "180d9cbf-5dcb-4676-bf11-dcbd91ed444b"
@@ -14,6 +15,7 @@
     "preview": {
       "distribution": "internal",
       "channel": "preview",
+      "environment": "preview",
       "android": {
         "buildType": "apk"
       },
@@ -25,6 +27,7 @@
     "production": {
       "autoIncrement": true,
       "channel": "production",
+      "environment": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://corepet.com.br/api",
         "EXPO_PUBLIC_TENANT_ID": "180d9cbf-5dcb-4676-bf11-dcbd91ed444b"

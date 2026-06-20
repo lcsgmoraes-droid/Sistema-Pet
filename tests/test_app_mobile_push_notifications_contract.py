@@ -21,6 +21,8 @@ def test_app_mobile_push_registration_has_manual_profile_action():
     assert "ensurePushNotificationsRegistered" in service
     assert 'status: "expo_go"' in service
     assert 'status: "permission_denied"' in service
+    assert 'status: "firebase_not_configured"' in service
+    assert "Firebase/FCM" in service
     assert 'status: "registered"' in service
     assert "registerPushToken(tokenData.data)" in service
 

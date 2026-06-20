@@ -37,6 +37,7 @@
         "backgroundColor": "#0F5F66"
       },
       "package": "br.com.corepet.app",
+      "googleServicesFile": "./google-services.json",
       "allowBackup": false,
       "permissions": [
         "POST_NOTIFICATIONS",

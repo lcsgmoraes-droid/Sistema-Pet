@@ -46,6 +46,8 @@ frontend/build/
 app-mobile/node_modules/
 app-mobile/.expo/
 app-mobile/dist/
+app-mobile/google-services.json
+app-mobile/android/app/google-services.json
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
