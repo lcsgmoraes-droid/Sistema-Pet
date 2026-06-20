@@ -10,18 +10,10 @@ from sqlalchemy.orm import joinedload
 from app.idempotency_models import IdempotencyKey
 from app.models import Cliente
 from app.pedido_models import Pedido, PedidoItem
+from app.services.sales_channel_labels import channel_label_for
 from app.services.sales_channel import normalize_sales_channel
 from app.vendas_models import Venda, VendaItem
 
-
-CHANNEL_LABELS = {
-    "ecommerce": "Ecommerce",
-    "app": "App mobile",
-    "loja_fisica": "Loja fisica / ERP",
-    "mercado_livre": "Mercado Livre",
-    "shopee": "Shopee",
-    "amazon": "Amazon",
-}
 
 ECOMMERCE_SALE_INTEGRATION_ENDPOINT = "POST /api/ecommerce/integracao/venda"
 CHECKOUT_FINALIZAR_ENDPOINT = "POST /api/checkout/finalizar"
@@ -42,13 +34,6 @@ def _to_iso(value: Any) -> str | None:
     if isinstance(value, datetime):
         return value.isoformat()
     return str(value) if value else None
-
-
-def channel_label_for(channel: Any) -> str:
-    normalized = normalize_sales_channel(channel, default="ecommerce")
-    if normalized in CHANNEL_LABELS:
-        return CHANNEL_LABELS[normalized]
-    return normalized.replace("_", " ").strip().capitalize() or "Ecommerce"
 
 
 def _checkout_item_dict(item: Any) -> dict:

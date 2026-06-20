@@ -6,8 +6,8 @@ from typing import Any
 import requests
 
 from app.models import Cliente, User
-from app.services.customer_order_history import channel_label_for
 from app.services.sales_channel import normalize_sales_channel
+from app.services.sales_channel_labels import channel_label_for
 
 
 logger = logging.getLogger(__name__)
@@ -133,6 +133,15 @@ def notify_order_event(
         user = _load_user(db, tenant_id=tenant_id, user_id=user_id)
         push_token = str(getattr(user, "push_token", "") or "").strip()
         if not push_token:
+            logger.info(
+                "[OrderPush] usuario sem push_token tenant_id=%s user_id=%s event=%s pedido_id=%s venda_id=%s canal=%s",
+                tenant_id,
+                user_id,
+                event,
+                pedido_id,
+                venda_id,
+                canal,
+            )
             return False
 
         content = build_order_push_content(
