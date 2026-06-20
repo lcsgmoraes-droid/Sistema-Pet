@@ -2,11 +2,6 @@ import * as SecureStore from 'expo-secure-store';
 import api from './api';
 import { AppProfileType, AuthResponse, EcommerceUser } from '../types';
 
-// ─────────────────────────────────────────────────────────────
-// Todos os endpoints usam os mesmos do e-commerce (token_type = ecommerce_customer)
-// Rota base: /ecommerce/auth/...
-// ─────────────────────────────────────────────────────────────
-
 export async function login(email: string, password: string): Promise<AuthResponse> {
   const { data } = await api.post<AuthResponse>('/ecommerce/auth/login', { email, password });
   if (data.access_token) {
@@ -91,11 +86,6 @@ export async function getStoredToken(): Promise<string | null> {
   return SecureStore.getItemAsync('auth_token');
 }
 
-// Registra o token de push notification para receber notificações
 export async function registerPushToken(pushToken: string): Promise<void> {
-  try {
-    await api.post('/app/push-token', { token: pushToken });
-  } catch (_) {
-    // não bloqueia a experiência se falhar
-  }
+  await api.post('/app/push-token', { token: pushToken });
 }

@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import KeyboardSafeScrollView from "../../components/KeyboardSafeScrollView";
 import { updateProfile } from "../../services/auth.service";
+import { ensurePushNotificationsRegistered } from "../../services/pushNotifications.service";
 import { useAuthStore } from "../../store/auth.store";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 import { PONTOS } from "../../config";
@@ -33,6 +34,8 @@ export default function ProfileScreen() {
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [trocandoPerfil, setTrocandoPerfil] = useState(false);
+  const [ativandoNotificacoes, setAtivandoNotificacoes] = useState(false);
+  const [statusNotificacoes, setStatusNotificacoes] = useState<string | null>(null);
 
   useEffect(() => {
     setNome(user?.nome ?? "");
@@ -147,6 +150,21 @@ export default function ProfileScreen() {
       { text: "Cancelar", style: "cancel" },
       { text: "Sair", style: "destructive", onPress: logout },
     ]);
+  }
+
+  async function ativarNotificacoes() {
+    setAtivandoNotificacoes(true);
+    try {
+      const result = await ensurePushNotificationsRegistered();
+      setStatusNotificacoes(result.message);
+      Alert.alert("Notificacoes", result.message);
+    } catch (err: any) {
+      const mensagem = err?.message || "Nao foi possivel ativar notificacoes.";
+      setStatusNotificacoes(mensagem);
+      Alert.alert("Notificacoes", mensagem);
+    } finally {
+      setAtivandoNotificacoes(false);
+    }
   }
 
   return (
@@ -383,6 +401,29 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        <View style={styles.secao}>
+          <View style={styles.secaoHeader}>
+            <Text style={styles.secaoTitulo}>Notificacoes de pedidos</Text>
+          </View>
+          {statusNotificacoes && (
+            <Text style={styles.textoSuporte}>{statusNotificacoes}</Text>
+          )}
+          <TouchableOpacity
+            style={[styles.botaoNotificacoes, ativandoNotificacoes && { opacity: 0.7 }]}
+            onPress={ativarNotificacoes}
+            disabled={ativandoNotificacoes}
+          >
+            {ativandoNotificacoes ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Ionicons name="notifications-outline" size={20} color="#fff" />
+                <Text style={styles.botaoNotificacoesTexto}>Ativar notificacoes</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity style={styles.botaoSair} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={20} color={CORES.erro} />
           <Text style={styles.botaoSairTexto}>Sair da conta</Text>
@@ -544,6 +585,22 @@ const styles = StyleSheet.create({
     marginTop: ESPACO.sm,
   },
   botaoSalvarTexto: { color: "#fff", fontWeight: "bold", fontSize: FONTE.normal },
+  botaoNotificacoes: {
+    minHeight: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: ESPACO.sm,
+    backgroundColor: CORES.primario,
+    borderRadius: RAIO.md,
+    paddingVertical: ESPACO.sm + 4,
+    marginTop: ESPACO.md,
+  },
+  botaoNotificacoesTexto: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: FONTE.normal,
+  },
   linha: { flexDirection: "row", gap: ESPACO.sm },
   enderecoCard: {
     flexDirection: "row",
