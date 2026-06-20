@@ -413,6 +413,13 @@ def _public_base_url() -> str:
     )
 
 
+def _app_payment_return_url() -> str:
+    return (
+        os.getenv("ECOMMERCE_APP_PAYMENT_RETURN_URL")
+        or "corepet://app/pedidos"
+    ).strip().rstrip("/")
+
+
 def _classificar_forma_pagamento_online(nome: str | None) -> str | None:
     valor = (nome or "").strip().lower()
     if not valor:
@@ -694,7 +701,7 @@ def finalizar_checkout(
         ).strip("/")
         return_url_params = None
         if origem_checkout == "app":
-            return_url_base = f"{_public_base_url()}/app/retorno-pagamento"
+            return_url_base = _app_payment_return_url()
             return_url_params = {
                 "loja": storefront_ref,
                 "tenant": storefront_ref,

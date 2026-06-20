@@ -19,6 +19,18 @@ assert.deepEqual(
 );
 
 assert.deepEqual(
+  readAppPaymentReturnParams(
+    "?status=approved&external_reference=PED-456&tenant=atacadao",
+  ),
+  {
+    paymentStatus: "success",
+    pedidoId: "PED-456",
+    loja: "atacadao",
+  },
+  "retorno nativo do Mercado Pago deve voltar para o app com pedido e loja",
+);
+
+assert.deepEqual(
   buildAppPaymentReturnLinks(params),
   {
     deepLink: "corepet://app/pedidos?payment_status=pending&pedido_id=PED-123&loja=atacadao",

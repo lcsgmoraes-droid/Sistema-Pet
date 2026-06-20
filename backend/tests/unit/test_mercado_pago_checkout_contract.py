@@ -150,6 +150,61 @@ def test_build_preference_payload_retorno_app_preserva_loja_e_canal(monkeypatch)
     }
 
 
+def test_build_preference_payload_retorno_app_aceita_deep_link(monkeypatch):
+    monkeypatch.setenv("ECOMMERCE_BASE_URL", "https://corepet.com.br/")
+
+    payload = build_preference_payload(
+        pedido=_pedido(),
+        total=123.45,
+        forma_pagamento_tipo="pix",
+        endereco_entrega="RETIRADA NA LOJA",
+        tipo_retirada="app_loja",
+        return_url_base="corepet://app/pedidos",
+        return_url_params={"loja": "atacadao", "tenant": "atacadao", "canal": "app"},
+    )
+
+    assert payload["back_urls"] == {
+        "success": "corepet://app/pedidos?view=pedidos&payment_status=success&pedido_id=PED-COREPET-123&loja=atacadao&tenant=atacadao&canal=app",
+        "pending": "corepet://app/pedidos?view=pedidos&payment_status=pending&pedido_id=PED-COREPET-123&loja=atacadao&tenant=atacadao&canal=app",
+        "failure": "corepet://app/pedidos?view=pedidos&payment_status=failure&pedido_id=PED-COREPET-123&loja=atacadao&tenant=atacadao&canal=app",
+    }
+
+
+def test_build_preference_payload_retorno_explicito_nao_usa_override_global(monkeypatch):
+    monkeypatch.setenv("ECOMMERCE_BASE_URL", "https://corepet.com.br/")
+    monkeypatch.setenv("MERCADO_PAGO_BACK_URL_SUCCESS", "https://corepet.com.br/retorno-antigo")
+
+    payload = build_preference_payload(
+        pedido=_pedido(),
+        total=123.45,
+        forma_pagamento_tipo="pix",
+        endereco_entrega="RETIRADA NA LOJA",
+        tipo_retirada="app_loja",
+        return_url_base="corepet://app/pedidos",
+        return_url_params={"loja": "atacadao", "tenant": "atacadao", "canal": "app"},
+    )
+
+    assert payload["back_urls"]["success"] == (
+        "corepet://app/pedidos?view=pedidos&payment_status=success&"
+        "pedido_id=PED-COREPET-123&loja=atacadao&tenant=atacadao&canal=app"
+    )
+
+
+def test_app_checkout_usa_deep_link_como_retorno_padrao(monkeypatch):
+    monkeypatch.delenv("ECOMMERCE_APP_PAYMENT_RETURN_URL", raising=False)
+
+    assert ecommerce_checkout._app_payment_return_url() == "corepet://app/pedidos"
+
+
+def test_app_checkout_permite_configurar_retorno_http(monkeypatch):
+    monkeypatch.setenv(
+        "ECOMMERCE_APP_PAYMENT_RETURN_URL",
+        "https://corepet.com.br/app/retorno-pagamento/",
+    )
+
+    assert ecommerce_checkout._app_payment_return_url() == "https://corepet.com.br/app/retorno-pagamento"
+
+
 def test_finalizar_checkout_define_origem_antes_de_criar_preferencia_mp():
     source = inspect.getsource(ecommerce_checkout.finalizar_checkout)
 
