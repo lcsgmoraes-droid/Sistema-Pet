@@ -18,6 +18,12 @@ AUTOMATIC_ANALYSIS_EXCLUSIONS = (
     "backend/migrations/**",
     "**/backend/migrations/**",
 )
+REQUIRED_SHARED_CPD_EXCLUSIONS = (
+    "backend/alembic/**",
+    "**/backend/alembic/**",
+    "backend/migrations/**",
+    "**/backend/migrations/**",
+)
 
 
 def _property_value(source: str, key: str) -> str:
@@ -44,6 +50,14 @@ def test_sonarcloud_excludes_non_runtime_paths_from_automatic_analysis():
     exclusions = _property_items(source, "sonar.exclusions")
 
     for exclusion in AUTOMATIC_ANALYSIS_EXCLUSIONS:
+        assert exclusion in exclusions
+
+
+def test_shared_sonar_project_keeps_required_migration_cpd_exclusions():
+    source = SONAR_PROJECT.read_text(encoding="utf-8")
+    exclusions = _property_items(source, "sonar.cpd.exclusions")
+
+    for exclusion in REQUIRED_SHARED_CPD_EXCLUSIONS:
         assert exclusion in exclusions
 
 
