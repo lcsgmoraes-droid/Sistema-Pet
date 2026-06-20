@@ -10,16 +10,18 @@ def read(path: str) -> str:
 
 def test_app_mobile_push_registration_has_manual_profile_action():
     service_path = ROOT / "app-mobile/src/services/pushNotifications.service.ts"
-    assert service_path.exists(), "Create a dedicated push notification registration service"
+    assert service_path.exists(), (
+        "Create a dedicated push notification registration service"
+    )
 
     service = service_path.read_text(encoding="utf-8")
     hook = read("app-mobile/src/hooks/usePushNotifications.ts")
     profile = read("app-mobile/src/screens/profile/ProfileScreen.tsx")
 
     assert "ensurePushNotificationsRegistered" in service
-    assert "status: \"expo_go\"" in service
-    assert "status: \"permission_denied\"" in service
-    assert "status: \"registered\"" in service
+    assert 'status: "expo_go"' in service
+    assert 'status: "permission_denied"' in service
+    assert 'status: "registered"' in service
     assert "registerPushToken(tokenData.data)" in service
 
     assert "ensurePushNotificationsRegistered" in hook
