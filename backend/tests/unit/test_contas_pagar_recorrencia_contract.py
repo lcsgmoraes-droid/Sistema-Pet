@@ -9,21 +9,20 @@ def _source(relative_path: str) -> str:
 
 
 def test_recorrencia_usa_janela_rolante_de_12_meses():
-    source = _source("app/contas_pagar_routes.py")
+    source = _source("app/financeiro/contas_pagar_recorrencia.py")
+    routes_source = _source("app/contas_pagar_routes.py")
 
     assert "RECORRENCIA_JANELA_MESES_PADRAO = 12" in source
     assert "calcular_limite_janela_recorrencia" in source
     assert "_gerar_contas_recorrentes_ate_janela(" in source
-    assert "limite_recorrencia = calcular_limite_janela_recorrencia(hoje)" in source
-    assert "ContaPagar.proxima_recorrencia <= limite_recorrencia" in source
-    assert (
-        "while conta_origem.proxima_recorrencia and conta_origem.proxima_recorrencia <= limite_recorrencia:"
-        in source
-    )
+    assert "limite_recorrencia = calcular_limite_janela_recorrencia(" in routes_source
+    assert "ContaPagar.proxima_recorrencia <= limite_recorrencia" in routes_source
+    assert "while (" in source
+    assert "conta_origem.proxima_recorrencia <= limite_recorrencia" in source
 
 
 def test_recorrencia_gerada_preserva_classificacao_financeira_e_competencia():
-    source = _source("app/contas_pagar_routes.py")
+    source = _source("app/financeiro/contas_pagar_recorrencia.py")
 
     assert "dre_subcategoria_id=conta_origem.dre_subcategoria_id" in source
     assert "canal=conta_origem.canal" in source
@@ -36,15 +35,16 @@ def test_recorrencia_gerada_preserva_classificacao_financeira_e_competencia():
 
 def test_pagamento_de_recorrencia_reabastece_janela_de_12_meses():
     source = _source("app/contas_pagar_routes.py")
+    recorrencia_source = _source("app/financeiro/contas_pagar_recorrencia.py")
 
-    assert "_garantir_janela_recorrencia_apos_pagamento(" in source
+    assert "_garantir_janela_recorrencia_apos_pagamento(" in recorrencia_source
 
     registrar_pagamento = source.split("async def registrar_pagamento(", 1)[1].split(
         "# ============================================================================\n# DASHBOARD / RESUMO",
         1,
     )[0]
 
-    assert "if conta.status == 'pago':" in registrar_pagamento
+    assert 'if conta.status == "pago":' in registrar_pagamento
     assert "_garantir_janela_recorrencia_apos_pagamento(" in registrar_pagamento
 
 
@@ -79,8 +79,9 @@ def test_edicao_de_conta_pagar_pode_ativar_recorrencia():
 
 def test_edicao_recorrente_garante_janela_mesmo_quando_ja_estava_marcada():
     source = _source("app/contas_pagar_routes.py")
+    recorrencia_source = _source("app/financeiro/contas_pagar_recorrencia.py")
 
-    assert "_garantir_janela_recorrencia_conta(" in source
+    assert "_garantir_janela_recorrencia_conta(" in recorrencia_source
     update_endpoint = source.split("def atualizar_conta_pagar", 1)[1].split(
         "def buscar_conta_pagar",
         1,
@@ -92,6 +93,7 @@ def test_edicao_recorrente_garante_janela_mesmo_quando_ja_estava_marcada():
 
 def test_recorrencia_tem_exclusao_seletiva_e_edicao_futura():
     source = _source("app/contas_pagar_routes.py")
+    recorrencia_source = _source("app/financeiro/contas_pagar_recorrencia.py")
 
     assert "class ContaPagarRecorrenciaBulkDelete" in source
     assert "class ContaPagarRecorrenciaItemResponse" in source
@@ -99,4 +101,5 @@ def test_recorrencia_tem_exclusao_seletiva_e_edicao_futura():
     assert '@router.post("/recorrencias/excluir")' in source
     assert "class ContaPagarUpdate" in source
     assert "aplicar_recorrencia_futura" in source
+    assert "_aplicar_edicao_recorrencia_futura(" in recorrencia_source
     assert "_aplicar_edicao_recorrencia_futura(" in source
