@@ -41,7 +41,10 @@ export default function AppPaymentReturn() {
   const statusCopy = STATUS_COPY[paymentStatus] || STATUS_COPY.pending;
   const Icon = statusCopy.icon;
 
-  const appLinks = useMemo(() => buildAppPaymentReturnLinks(returnParams), [returnParams]);
+  const appLinks = useMemo(
+    () => buildAppPaymentReturnLinks(returnParams),
+    [returnParams],
+  );
 
   const appOpenLink = useMemo(() => {
     return selectAppPaymentReturnOpenLink(

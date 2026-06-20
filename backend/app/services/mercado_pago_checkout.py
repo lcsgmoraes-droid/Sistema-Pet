@@ -111,6 +111,7 @@ def build_preference_payload(
 ) -> dict[str, Any]:
     base_url = _public_base_url()
     payment_return_base_url = str(return_url_base or base_url).strip().rstrip("/")
+    use_global_back_url_overrides = not return_url_base and not return_url_params
     pedido_id = str(pedido.pedido_id)
     tenant_id = str(pedido.tenant_id)
     canal = normalizar_canal_venda_online(getattr(pedido, "origem", "") or "ecommerce")
@@ -142,15 +143,27 @@ def build_preference_payload(
         "metadata": metadata,
         "notification_url": notification_url or f"{base_url}/api/webhooks/mercadopago",
         "back_urls": {
-            "success": os.getenv("MERCADO_PAGO_BACK_URL_SUCCESS")
+            "success": (
+                os.getenv("MERCADO_PAGO_BACK_URL_SUCCESS")
+                if use_global_back_url_overrides
+                else None
+            )
             or _payment_return_url(
                 payment_return_base_url, "success", pedido_id, return_url_params
             ),
-            "pending": os.getenv("MERCADO_PAGO_BACK_URL_PENDING")
+            "pending": (
+                os.getenv("MERCADO_PAGO_BACK_URL_PENDING")
+                if use_global_back_url_overrides
+                else None
+            )
             or _payment_return_url(
                 payment_return_base_url, "pending", pedido_id, return_url_params
             ),
-            "failure": os.getenv("MERCADO_PAGO_BACK_URL_FAILURE")
+            "failure": (
+                os.getenv("MERCADO_PAGO_BACK_URL_FAILURE")
+                if use_global_back_url_overrides
+                else None
+            )
             or _payment_return_url(
                 payment_return_base_url, "failure", pedido_id, return_url_params
             ),

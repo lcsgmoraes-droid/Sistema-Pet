@@ -18,14 +18,28 @@ const PAYMENT_RETURN_MESSAGES = {
   },
 };
 
+const SUCCESS_STATUSES = new Set(["success", "approved", "accredited", "paid"]);
+const PENDING_STATUSES = new Set(["pending", "in_process", "in_mediation", "authorized"]);
+const FAILURE_STATUSES = new Set(["failure", "failed", "rejected", "cancelled", "canceled"]);
+
+export function normalizeMercadoPagoPaymentReturnStatus(...values) {
+  for (const value of values) {
+    const rawStatus = String(value || "").trim().toLowerCase();
+    if (!rawStatus) continue;
+    if (SUCCESS_STATUSES.has(rawStatus)) return "success";
+    if (PENDING_STATUSES.has(rawStatus)) return "pending";
+    if (FAILURE_STATUSES.has(rawStatus)) return "failure";
+  }
+  return "";
+}
+
 export function readMercadoPagoPaymentReturn(search = "") {
   const params = new URLSearchParams(search);
-  const rawStatus = String(
-    params.get("payment_status") || params.get("collection_status") || params.get("status") || "",
-  )
-    .trim()
-    .toLowerCase();
-  const status = rawStatus === "approved" ? "success" : rawStatus;
+  const status = normalizeMercadoPagoPaymentReturnStatus(
+    params.get("payment_status"),
+    params.get("status"),
+    params.get("collection_status"),
+  );
   const config = PAYMENT_RETURN_MESSAGES[status];
 
   if (!config) {

@@ -1,14 +1,17 @@
-const APP_PAYMENT_STATUS_ALIASES = {
-  approved: "success",
-};
+import { normalizeMercadoPagoPaymentReturnStatus } from "./mercadoPagoPaymentReturn.js";
 
 function cleanParam(value) {
   return String(value || "").trim();
 }
 
 function paymentStatusFromParams(params) {
-  const rawStatus = cleanParam(params.get("payment_status") || params.get("status")).toLowerCase();
-  return APP_PAYMENT_STATUS_ALIASES[rawStatus] || rawStatus || "pending";
+  return (
+    normalizeMercadoPagoPaymentReturnStatus(
+      params.get("payment_status"),
+      params.get("status"),
+      params.get("collection_status"),
+    ) || "pending"
+  );
 }
 
 function appendPaymentReturnParams(baseUrl, { paymentStatus, pedidoId, loja }) {
@@ -24,7 +27,7 @@ export function readAppPaymentReturnParams(search = "") {
   const params = new URLSearchParams(search);
   return {
     paymentStatus: paymentStatusFromParams(params),
-    pedidoId: cleanParam(params.get("pedido_id")),
+    pedidoId: cleanParam(params.get("pedido_id") || params.get("external_reference")),
     loja: cleanParam(params.get("loja") || params.get("tenant") || params.get("store")),
   };
 }
