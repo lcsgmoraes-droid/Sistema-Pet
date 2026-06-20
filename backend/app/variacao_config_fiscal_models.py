@@ -31,7 +31,6 @@ class VariacaoConfigFiscal(TenantScoped, Base):
     — apenas a coluna + unicidade — evitando FK pendurada que quebra
     ``create_all``/registry.
     """
-
     __tablename__ = "variacao_config_fiscal"
 
     id = Column(Integer, primary_key=True)

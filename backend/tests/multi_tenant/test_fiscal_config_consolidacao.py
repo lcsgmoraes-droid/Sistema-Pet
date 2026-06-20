@@ -13,7 +13,6 @@ Estes testes travam o resultado da consolidação:
    - query SEM tenant no contexto => fail-fast (RuntimeError);
    - query COM tenant no contexto => não quebra (protege o sync do Bling).
 """
-
 from uuid import uuid4
 
 import pytest
@@ -74,7 +73,6 @@ def fiscal_session():
 # (1) Schema canônico alinhado à migration
 # ---------------------------------------------------------------------------
 
-
 def test_kit_config_fiscal_bate_com_schema_real():
     cols = _colunas(KitConfigFiscal)
     assert {"cfop_venda", "cfop_compra"} <= cols
@@ -94,7 +92,6 @@ def test_produto_config_fiscal_mantem_cfop_venda_compra():
 # (2) Bug de tipo: tenant_id UUID
 # ---------------------------------------------------------------------------
 
-
 def test_variacao_tenant_id_e_uuid():
     tenant_col = VariacaoConfigFiscal.__table__.c.tenant_id
     assert isinstance(tenant_col.type, PG_UUID)
@@ -104,7 +101,6 @@ def test_variacao_tenant_id_e_uuid():
 # ---------------------------------------------------------------------------
 # (3) Adoção do mixin TenantScoped (entra no filtro automático)
 # ---------------------------------------------------------------------------
-
 
 @pytest.mark.parametrize("model", MODELOS_FISCAIS, ids=lambda m: m.__name__)
 def test_modelo_fiscal_e_tenant_scoped(model):
@@ -132,7 +128,6 @@ def test_query_com_tenant_nao_quebra(fiscal_session, tenant_context, model):
 # ---------------------------------------------------------------------------
 # (4) Migration idempotente: cria a tabela com tenant_id UUID em banco limpo
 # ---------------------------------------------------------------------------
-
 
 def _carregar_migration():
     import importlib.util

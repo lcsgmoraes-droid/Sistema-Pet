@@ -7,6 +7,8 @@ __all__ = ["Base"]
 from app.models import User, UserSession, Cliente, UserTenant, Pet, Especie, Raca  # noqa
 
 # Importando models fiscais (do diretório app/fiscal_models/)
+# KitConfigFiscal/ProdutoConfigFiscal são reexportados de app.fiscal_models a partir
+# dos módulos canônicos top-level (consolidação).
 from app.fiscal_models import (  # noqa
     EmpresaConfigFiscal,
     FiscalCatalogoProdutos,
@@ -15,7 +17,6 @@ from app.fiscal_models import (  # noqa
     KitConfigFiscal,
     ProdutoConfigFiscal,
 )
-
 # variacao_config_fiscal não tem cópia em fiscal_models/: importar o módulo canônico
 # direto para registrar a tabela no metadata do Alembic.
 from app.variacao_config_fiscal_models import VariacaoConfigFiscal  # noqa

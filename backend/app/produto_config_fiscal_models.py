@@ -25,7 +25,6 @@ class ProdutoConfigFiscal(TenantScoped, Base):
     filtro global de tenant (``tenant_id`` vem do mixin: UUID NOT NULL, indexado —
     schema idêntico ao que já estava na tabela).
     """
-
     __tablename__ = "produto_config_fiscal"
 
     id = Column(Integer, primary_key=True)
