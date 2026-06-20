@@ -13,13 +13,15 @@ Tambem sera incluida notificacao push no app mobile quando uma compra for criada
 - Exibir canal de forma clara, sem rotulo generico "online".
 - Reaproveitar a API consumida pelo ecommerce e pelo app mobile sempre que possivel.
 - Enviar push para o app mobile quando houver token registrado no `User.push_token`.
+- Notificar a compra quando o pedido for criado/finalizado no checkout.
+- Notificar atualizacoes vindas do webhook de pagamento.
+- Notificar atualizacoes operacionais do pedido, como separacao, pronto para retirada, saiu para entrega e entregue.
 
 ## Fora de Escopo Nesta Fatia
 
 - Conciliar historico antigo por email, CPF, telefone ou nome.
-- Criar tela administrativa nova no ERP.
 - Criar inbox persistente de notificacoes dentro do app.
-- Alterar o fluxo de pagamento do Mercado Pago alem dos eventos de notificacao.
+- Mudar regras de checkout, cobranca ou aprovacao do Mercado Pago. O pagamento continua como esta; esta fatia apenas usa os webhooks de pagamento como gatilho de notificacao e atualizacao visual.
 
 ## Regras de Canal
 
@@ -40,7 +42,7 @@ Compras feitas no app mobile devem aparecer como `app`, mesmo usando o mesmo che
 
 A rota existente `GET /api/checkout/pedidos` sera mantida como contrato principal para ecommerce e app mobile. Ela passara a montar uma lista unificada com duas fontes:
 
-1. `pedidos`: pedidos online do usuario logado ainda nao consolidados, principalmente `pendente`, `recusado` ou `cancelado`.
+1. `pedidos`: pedidos de checkout ecommerce/app do usuario logado ainda nao consolidados, principalmente `pendente`, `recusado` ou `cancelado`.
 2. `vendas`: vendas do cliente ERP vinculado ao usuario logado por `Cliente.user_id == User.id`.
 
 A resposta sera um read model de historico do cliente. Ela nao altera a fonte da verdade: `pedidos` continua sendo a fonte para checkout antes da confirmacao, e `vendas` continua sendo a fonte para vendas consolidadas e historico ERP.
@@ -90,11 +92,11 @@ Para pedidos ainda pendentes sem venda:
 
 ## Deduplicacao
 
-Quando uma venda ja tiver sido gerada a partir de um pedido online, o historico deve mostrar apenas uma entrada consolidada. A preferencia sera:
+Quando uma venda ja tiver sido gerada a partir de um pedido de checkout ecommerce/app, o historico deve mostrar apenas uma entrada consolidada. A preferencia sera:
 
 1. Se existe `Venda` relacionada ao `Pedido`, mostrar a entrada da venda.
 2. Preservar `pedido_id`, `payment_url`, `tipo_retirada`, `palavra_chave_retirada` e dados de drive quando existirem.
-3. Nao duplicar o mesmo pedido como `pedido_online` e `venda`.
+3. Nao duplicar o mesmo pedido como `pedido_online` e `venda`. `pedido_online` e apenas um identificador tecnico da API; o cliente continuara vendo o canal explicito em `canal_label`.
 
 O vinculo existente por `IdempotencyKey` de integracao ecommerce-venda e/ou `Venda.observacoes` com o `pedido_id` podera ser usado para associar venda e pedido sem criar uma migracao nesta fatia.
 
@@ -122,13 +124,14 @@ O vinculo existente por `IdempotencyKey` de integracao ecommerce-venda e/ou `Ven
 
 ## Notificacoes Push
 
-Sera criado um servico backend pequeno para notificar eventos de pedido ao usuario cliente:
+Sera criado um servico backend pequeno para notificar eventos de pedido ao usuario cliente conforme eles acontecem:
 
 - Compra criada/checkout finalizado: "Pedido recebido" ou "Aguardando pagamento".
-- Pagamento aprovado: "Pagamento aprovado".
-- Pagamento recusado/cancelado: "Pagamento nao concluido".
-- Separacao/retirada: "Pedido em separacao", "Pronto para retirada".
-- Entrega: "Pedido saiu para entrega", "Pedido entregue".
+- Webhook de pagamento aprovado: "Pagamento aprovado".
+- Webhook de pagamento pendente/em analise: "Pagamento em analise".
+- Webhook de pagamento recusado/cancelado: "Pagamento nao concluido".
+- Separacao/retirada no ERP: "Pedido em separacao" e "Pronto para retirada".
+- Entrega/rota no ERP/app entregador: "Pedido saiu para entrega" e "Pedido entregue".
 
 O servico deve:
 
@@ -146,7 +149,7 @@ O app mobile deve aceitar `source: "order"` e navegar para `Pedidos`.
   - Ampliar `listar_pedidos_cliente`.
   - Disparar push apos checkout pendente, sem bloquear a resposta.
 - `backend/app/routes/ecommerce_webhooks.py`
-  - Disparar push quando o status do pedido mudar via webhook.
+  - Disparar push quando o status do pedido mudar por webhook de pagamento.
 - `backend/app/vendas_routes.py`
   - Disparar push quando `marcar-pronto-retirada`, `marcar-entregue` e atualizacoes relevantes alterarem status.
 - `app-mobile/src/screens/orders/OrdersScreen.tsx`
@@ -159,7 +162,7 @@ O app mobile deve aceitar `source: "order"` e navegar para `Pedidos`.
 ## Tratamento de Erros
 
 - Se nao existir `Cliente` vinculado ao `User`, a API retorna somente pedidos da tabela `pedidos`.
-- Falha ao resolver venda relacionada nao deve derrubar a listagem; o pedido aparece como item online.
+- Falha ao resolver venda relacionada nao deve derrubar a listagem; o pedido aparece como item de checkout.
 - Falha no push deve ser logada e ignorada.
 - A listagem deve continuar paginada por `limit` e ordenada por data mais recente.
 
@@ -167,12 +170,12 @@ O app mobile deve aceitar `source: "order"` e navegar para `Pedidos`.
 
 Backend:
 
-- Testar que `/checkout/pedidos` retorna pedidos online pendentes do usuario.
+- Testar que `/checkout/pedidos` retorna pedidos de checkout pendentes do usuario.
 - Testar que retorna vendas vinculadas por `Cliente.user_id`.
 - Testar que nao retorna vendas de cliente sem vinculo com o usuario.
 - Testar que canal `app`, `ecommerce` e `loja_fisica` geram labels corretos.
-- Testar que venda consolidada deduplica o pedido online original.
-- Testar que notificacao push e chamada nos eventos de checkout/webhook/status sem bloquear erro.
+- Testar que venda consolidada deduplica o pedido de checkout original.
+- Testar que a notificacao push deve ser chamada nos eventos de checkout, webhook de pagamento e status operacional sem bloquear erro.
 
 Frontend web:
 
