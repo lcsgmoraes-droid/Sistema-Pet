@@ -25,6 +25,9 @@ def test_android_push_build_has_firebase_configuration_contract():
 
     app_config = read("app-mobile/app.config.js")
     assert "process.env.GOOGLE_SERVICES_JSON" in app_config
+    assert "EAS_BUILD_PLATFORM" in app_config
+    assert "fs.existsSync" in app_config
+    assert "delete android.googleServicesFile" in app_config
     assert "googleServicesFile" in app_config
 
     prepare_script = read("app-mobile/scripts/prepare-google-services.js")
