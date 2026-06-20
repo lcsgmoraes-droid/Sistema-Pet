@@ -7,6 +7,8 @@ __all__ = ["Base"]
 from app.models import User, UserSession, Cliente, UserTenant, Pet, Especie, Raca  # noqa
 
 # Importando models fiscais (do diretório app/fiscal_models/)
+# KitConfigFiscal/ProdutoConfigFiscal são reexportados de app.fiscal_models a partir
+# dos módulos canônicos top-level (consolidação).
 from app.fiscal_models import (  # noqa
     EmpresaConfigFiscal,
     FiscalCatalogoProdutos,
