@@ -51,9 +51,7 @@ def test_notify_order_event_sends_expo_push_without_blocking(monkeypatch):
     calls = []
 
     def fake_post(url, json, timeout, headers=None):
-        calls.append(
-            {"url": url, "json": json, "timeout": timeout, "headers": headers}
-        )
+        calls.append({"url": url, "json": json, "timeout": timeout, "headers": headers})
         return SimpleNamespace(
             raise_for_status=lambda: None,
             json=lambda: {"data": {"status": "ok"}},
