@@ -6,8 +6,9 @@ Executar UMA VEZ ao configurar o sistema ou adicionar novo tenant.
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+
+from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
-from app.auth import get_current_user_and_tenant
 from app.seed_adquirentes import criar_templates_adquirentes
 
 router = APIRouter(prefix="/admin", tags=["Administração"])
@@ -25,10 +26,12 @@ def seed_adquirentes_templates(
     Não duplica se já existir.
 
     Requer: usuário autenticado com tenant selecionado.
+    get_current_user_and_tenant valida o tenant e configura o contexto ORM
+    necessário para AdquirenteTemplate, que é TenantScoped.
     """
     _current_user, tenant_id = user_and_tenant
 
-    resultado = criar_templates_adquirentes(db, tenant_id)
+    resultado = criar_templates_adquirentes(db, str(tenant_id))
 
     return {
         "success": True,
