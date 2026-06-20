@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ecommerceApi from "../../services/ecommerceApi";
 import { STORAGE_ORDERS_KEY, extractApiErrorMessage } from "./ecommerceMvpUtils";
 
 export default function useEcommerceOrders({ authHeaders, customerToken, view, onError }) {
-  const [orderIds, setOrderIds] = useState(() => {
+  const [, setOrderIds] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_ORDERS_KEY) || "[]");
     } catch {
@@ -13,14 +13,21 @@ export default function useEcommerceOrders({ authHeaders, customerToken, view, o
   const [ordersDetailed, setOrdersDetailed] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState("");
+  const loadingOrdersRef = useRef(false);
 
-  function persistOrderIds(ids) {
-    setOrderIds(ids);
-    localStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(ids));
-  }
+  const persistOrderIds = useCallback((idsOrUpdater) => {
+    setOrderIds((currentIds) => {
+      const ids = typeof idsOrUpdater === "function" ? idsOrUpdater(currentIds) : idsOrUpdater;
+      const normalizedIds = Array.isArray(ids) ? ids : [];
+      localStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(normalizedIds));
+      return normalizedIds;
+    });
+  }, []);
 
-  async function loadOrdersDetailed() {
+  const loadOrdersDetailed = useCallback(async () => {
     if (!customerToken) return;
+    if (loadingOrdersRef.current) return;
+    loadingOrdersRef.current = true;
     setOrdersLoading(true);
     setOrdersError("");
     try {
@@ -33,7 +40,7 @@ export default function useEcommerceOrders({ authHeaders, customerToken, view, o
 
       if (pedidos.length) {
         const ids = pedidos.map((pedido) => pedido?.pedido_id).filter(Boolean);
-        persistOrderIds(Array.from(new Set([...ids, ...orderIds])));
+        persistOrderIds((currentIds) => Array.from(new Set([...ids, ...currentIds])));
       }
     } catch (err) {
       const message = extractApiErrorMessage(err, "Erro ao carregar detalhes dos pedidos");
@@ -41,33 +48,40 @@ export default function useEcommerceOrders({ authHeaders, customerToken, view, o
       setOrdersError(message);
       onError(message);
     } finally {
+      loadingOrdersRef.current = false;
       setOrdersLoading(false);
     }
-  }
+  }, [authHeaders, customerToken, onError, persistOrderIds]);
 
-  async function recordOrderId(orderId) {
-    if (!orderId) return;
-    persistOrderIds(Array.from(new Set([orderId, ...orderIds])));
-    await loadOrdersDetailed();
-  }
+  const recordOrderId = useCallback(
+    async (orderId) => {
+      if (!orderId) return;
+      persistOrderIds((currentIds) => Array.from(new Set([orderId, ...currentIds])));
+      await loadOrdersDetailed();
+    },
+    [loadOrdersDetailed, persistOrderIds],
+  );
 
   useEffect(() => {
     if (!customerToken || view !== "pedidos") return;
     loadOrdersDetailed();
-  }, [view, customerToken]);
+  }, [customerToken, loadOrdersDetailed, view]);
 
-  async function avisarCheguei(pedidoId) {
-    try {
-      await ecommerceApi.post(
-        `/api/checkout/pedido/${pedidoId}/drive-cheguei`,
-        {},
-        { headers: authHeaders },
-      );
-      await loadOrdersDetailed();
-    } catch (err) {
-      onError(extractApiErrorMessage(err, "Erro ao avisar chegada"));
-    }
-  }
+  const avisarCheguei = useCallback(
+    async (pedidoId) => {
+      try {
+        await ecommerceApi.post(
+          `/api/checkout/pedido/${pedidoId}/drive-cheguei`,
+          {},
+          { headers: authHeaders },
+        );
+        await loadOrdersDetailed();
+      } catch (err) {
+        onError(extractApiErrorMessage(err, "Erro ao avisar chegada"));
+      }
+    },
+    [authHeaders, loadOrdersDetailed, onError],
+  );
 
   return {
     ordersDetailed,
