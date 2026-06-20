@@ -18,12 +18,20 @@ anotacoes soltas.
 
 ## Fluxo de trabalho
 
-Antes de alterar codigo, use sempre o fluxo Git do repositorio:
+Antes de alterar codigo, confira onde voce esta:
 
 ```powershell
 git status --short --branch
+```
+
+Se estiver em `main` ou `master`, comece uma branch nova:
+
+```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\git_start_task.ps1 -Tipo feat -Nome "nome da tarefa"
 ```
+
+Se ja estiver em uma branch de tarefa, continue nela. A `main` deve ser conferida
+no inicio da tarefa e antes de fechar/enviar a branch, nao a cada passo pequeno.
 
 Ao terminar:
 

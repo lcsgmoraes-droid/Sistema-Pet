@@ -27,15 +27,23 @@ Antes de agir, leia e siga obrigatoriamente:
 
 Nunca sair do fluxo unico DEV -> PROD.
 
-Use sempre esta sequencia:
+Para trabalho diario em branch, use a sequencia enxuta:
+
+1. `git status --short --branch`
+2. Se estiver em `main`/`master`, abrir branch com `scripts/git_start_task.ps1`
+3. Se ja estiver em branch de tarefa, continuar nela
+4. Rodar testes focados no que foi alterado
+5. Fechar com `scripts/git_finish_task.ps1 -Mensagem "mensagem clara" -Push`
+
+Para release/deploy, use a sequencia completa:
 
 1. `FLUXO_UNICO.bat check`
-2. `FLUXO_UNICO.bat dev-up`
+2. `FLUXO_UNICO.bat dev-up` quando precisar validar o ambiente local
 3. `FLUXO_UNICO.bat release-check`
-4. **Se alterou arquivos em `frontend/src`: rodar `npm run build` dentro da pasta `frontend` e incluir o `dist` no commit com `git add -f frontend/dist`**
-5. `git push origin main`
+4. **Se alterou arquivos em `frontend/src`: rodar `npm run build` dentro da pasta `frontend`; nao commitar `frontend/dist`**
+5. Abrir/atualizar Pull Request e juntar pela interface do GitHub quando os checks passarem
 6. **DEPLOY NO SERVIDOR REMOTO (mlprohub.com.br / 192.241.150.121): preferir o usuario operacional `petdeploy` e rodar `ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-deploy-producao"`. Esse wrapper root-owned executa o script oficial `scripts/deploy_producao_seguro.sh`, que faz pull, build frontend, rebuild backend/worker, migrations e health. `root@192.241.150.121` fica apenas como fallback operacional autorizado.**
-7. `FLUXO_UNICO.bat status` (mostra containers locais; para ver estado real da producao, checar via SSH)
+7. `FLUXO_UNICO.bat status` mostra containers locais; para ver estado real da producao, checar via SSH
 
 ## Comunicacao com o usuario
 
@@ -50,9 +58,9 @@ Use sempre esta sequencia:
 - Nao enviar dados de DEV para producao.
 - Nao pular validacao de release.
 - Nao corrigir em producao manualmente sem refletir no Git.
-- **Sempre rodar `npm run build` (na pasta `frontend`) antes de qualquer deploy quando houver mudancas no frontend. O nginx de producao serve arquivos estaticos da pasta `dist` - sem build, o codigo novo nao aparece em producao.**
+- **Sempre rodar `npm run build` (na pasta `frontend`) antes de release/deploy quando houver mudancas no frontend. Nao commitar `frontend/dist`; o deploy seguro gera `runtime/frontend/dist` no servidor.**
 - **NUNCA usar `git add -A` sem antes verificar `git status --short` e checar se ha arquivos de infraestrutura sendo deletados (linhas com ` D` ou `D `). Arquivos protegidos: `docker-compose.*.yml`, `.env.*`, `scripts/*.ps1`, `.github/`, `docs/FLUXO_UNICO_DEV_PROD.md`. Se aparecerem como deletados: restaurar com `git checkout HEAD -- <arquivo>` antes de commitar.**
-- **PRODUCAO REAL E REMOTA: `mlprohub.com.br` esta hospedado no servidor DigitalOcean (IP 192.241.150.121). O `prod-up` local NAO afeta a producao real. Para deployar em producao: fazer `git push origin main` e depois usar `petdeploy@192.241.150.121` com `sudo -n /usr/local/sbin/petshop-deploy-producao`. NUNCA usar `git pull` + `docker restart` como deploy de codigo; o backend fica DENTRO DA IMAGEM DOCKER e precisa do script seguro com rebuild.**
+- **PRODUCAO REAL E REMOTA: `mlprohub.com.br` esta hospedado no servidor DigitalOcean (IP 192.241.150.121). O `prod-up` local NAO afeta a producao real. Para deployar em producao: primeiro o PR deve estar mergeado na `main`; depois usar `petdeploy@192.241.150.121` com `sudo -n /usr/local/sbin/petshop-deploy-producao`. NUNCA usar `git pull` + `docker restart` como deploy de codigo; o backend fica DENTRO DA IMAGEM DOCKER e precisa do script seguro com rebuild.**
 
 ## Padronizacao de numeros e moeda (OBRIGATORIO)
 

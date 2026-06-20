@@ -77,9 +77,17 @@ if ((Test-GitRef 'refs/heads/main') -and (Test-GitRef 'refs/remotes/origin/main'
     $actions += 'Confira se este repositorio tem main e origin/main configurados.'
 }
 
-$upstreamRaw = git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null
-if ($LASTEXITCODE -eq 0) {
-    $upstream = $upstreamRaw.Trim()
+$previousErrorActionPreference = $ErrorActionPreference
+$ErrorActionPreference = 'SilentlyContinue'
+try {
+    $upstreamRaw = git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null
+    $upstreamExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+
+if ($upstreamExitCode -eq 0 -and -not [string]::IsNullOrWhiteSpace($upstreamRaw)) {
+    $upstream = ($upstreamRaw | Select-Object -First 1).Trim()
     $current = Get-AheadBehind 'HEAD' $upstream
 
     if ($current.RightAhead -gt 0) {

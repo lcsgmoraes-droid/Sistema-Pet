@@ -13,12 +13,13 @@
     "git limpo e organizado"
   ],
   "multi_pc_git_flow": {
-    "goal": "permitir que Lucas trabalhe em dois computadores sem divergir o repositorio",
+    "goal": "manter o repositorio previsivel em um ou dois computadores, sem repetir checagens a cada micro-etapa",
     "main_rule": "main deve ficar limpa e estavel; todo trabalho de codigo entra por branch de tarefa e Pull Request",
     "assistant_must": [
       "antes de alterar arquivos: executar git status --short --branch",
       "se estiver em main ou master: criar branch com scripts/git_start_task.ps1 antes de editar",
       "se ja estiver em branch de tarefa: continuar nela",
+      "verificar main no inicio de uma nova tarefa e antes de fechar/enviar a branch; nao repetir a cada passo dentro da mesma branch",
       "nunca commitar direto em main ou master",
       "nunca fazer push direto para main ou master",
       "ao fechar tarefa: usar scripts/git_finish_task.ps1 quando for criar commit e enviar branch"
@@ -30,10 +31,10 @@
     "docs": "docs/GIT_FLUXO_2_PCS.md"
   },
   "mandatory_flow": {
-    "step_1": "Executar FLUXO_UNICO.bat check antes de qualquer acao relevante",
+    "step_1": "Executar FLUXO_UNICO.bat check no inicio de uma sessao de trabalho relevante ou antes de preparar release; nao repetir a cada micro-etapa",
     "step_2": "Trabalhar no DEV usando FLUXO_UNICO.bat dev-up",
     "step_3": "Antes de subir producao, executar FLUXO_UNICO.bat release-check",
-    "step_3b": "Se houver alteracoes em frontend/src, executar npm run build dentro da pasta frontend ANTES do prod-up",
+    "step_3b": "Se houver alteracoes em frontend/src, executar npm run build dentro da pasta frontend antes de release/deploy; nao versionar frontend/dist",
     "step_4": "Subir producao apenas com FLUXO_UNICO.bat prod-up",
     "step_5": "Conferir com FLUXO_UNICO.bat status"
   },
@@ -100,13 +101,13 @@
       "sem multiplas heads de migration",
       "mudancas organizadas por escopo",
       "comandos do fluxo unico executados",
-      "se frontend/src foi alterado: npm run build executado e dist atualizado no commit"
+      "se frontend/src foi alterado: npm run build executado antes de release/deploy, sem commitar frontend/dist"
     ]
   },
   "producao_deploy_rules": {
-    "frontend_changes": "npm run build + commit do dist + docker restart petshop-prod-nginx",
+    "frontend_changes": "build de producao gera runtime/frontend/dist no servidor; nao commitar frontend/dist",
     "backend_changes": "OBRIGATORIO reconstruir imagem: docker compose -f docker-compose.prod.yml build backend && docker compose -f docker-compose.prod.yml up -d backend",
-    "reason": "O codigo do backend fica DENTRO da imagem Docker (nao em volume montado). Um simples docker restart nao aplica mudancas de codigo. So o frontend usa volume (pasta dist). Sempre reconstruir imagem ao alterar qualquer arquivo em backend/.",
+    "reason": "O codigo do backend fica DENTRO da imagem Docker (nao em volume montado). Um simples docker restart nao aplica mudancas de codigo. So o frontend usa artefato gerado no deploy em runtime/frontend/dist. Sempre reconstruir imagem ao alterar qualquer arquivo em backend/.",
     "never_do": "docker restart petshop-prod-backend como unico comando apos mudancas no codigo backend"
   },
   "REGRA_ABSOLUTA_DEPLOY_PRODUCAO": {

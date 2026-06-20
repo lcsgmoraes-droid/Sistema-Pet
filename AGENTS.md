@@ -1,6 +1,8 @@
 # Regras para assistentes neste repositorio
 
-Estas regras existem para manter o Sistema Pet organizado quando o Lucas trabalha em dois computadores.
+Estas regras existem para manter o Sistema Pet organizado e seguro. Hoje o Lucas
+trabalha principalmente em um computador, entao a checagem da `main` deve ser
+feita nos momentos certos, sem virar repeticao a cada micro-etapa.
 
 ## Fluxo Git obrigatorio para codigo
 
@@ -8,11 +10,16 @@ Estas regras existem para manter o Sistema Pet organizado quando o Lucas trabalh
 - Se estiver em `main` ou `master` e a tarefa exigir edicao, criar uma branch de tarefa antes de mexer:
   `powershell -ExecutionPolicy Bypass -File .\scripts\git_start_task.ps1 -Tipo feat -Nome "nome da tarefa"`.
 - Se ja estiver em uma branch de tarefa, continuar nela.
+- Verificar a `main` no inicio de uma nova tarefa e antes de fechar/enviar a branch.
+  Durante a mesma tarefa, nao repetir essa verificacao a cada passo se a branch
+  nao mudou e nao houve troca de computador.
 - Nunca fazer commit direto em `main` ou `master`.
 - Nunca fazer push direto para `main` ou `master`; usar branch e Pull Request no GitHub.
 - Ao terminar uma tarefa, usar:
   `powershell -ExecutionPolicy Bypass -File .\scripts\git_finish_task.ps1 -Mensagem "mensagem clara" -Push`.
-- Depois que o Pull Request for juntado no GitHub, o outro computador deve atualizar a `main` antes de comecar nova tarefa.
+- Depois que o Pull Request for juntado no GitHub, atualizar a `main` antes de
+  comecar nova tarefa. O script `git_start_task.ps1` ja faz isso ao criar a
+  proxima branch.
 
 ## Producao continua protegida
 

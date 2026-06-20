@@ -44,10 +44,26 @@ Use para: ver se os servicos estao de pe e saudaveis.
 
 ---
 
-## Ordem certa (sempre igual)
+## Rotina diaria enxuta
+
+Use esta rotina quando estiver desenvolvendo em uma branch de tarefa:
+
+1. `git status --short --branch`
+2. Se estiver em `main` ou `master`, iniciar branch com:
+   `powershell -ExecutionPolicy Bypass -File .\scripts\git_start_task.ps1 -Tipo feat -Nome "nome da tarefa"`
+3. Se ja estiver em branch de tarefa, continuar nela.
+4. Rodar apenas os testes focados no que foi alterado.
+5. Antes de fechar/enviar a branch, usar:
+   `powershell -ExecutionPolicy Bypass -File .\scripts\git_finish_task.ps1 -Mensagem "mensagem clara" -Push`
+
+Regra pratica: verificar a `main` no inicio de uma nova tarefa e antes de fechar
+a branch. Nao precisa repetir essa verificacao a cada micro-etapa se voce
+continua na mesma branch e no mesmo computador.
+
+## Release e producao
 
 1. `FLUXO_UNICO.bat check`
-2. `FLUXO_UNICO.bat dev-up`
+2. `FLUXO_UNICO.bat dev-up` quando precisar validar o ambiente local
 3. `FLUXO_UNICO.bat release-check`
 4. **Se mexeu em qualquer arquivo dentro de `frontend/src`:** commitar apenas o codigo-fonte
    - Nao versionar `frontend/dist`
