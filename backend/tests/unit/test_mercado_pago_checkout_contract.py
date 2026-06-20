@@ -170,9 +170,13 @@ def test_build_preference_payload_retorno_app_aceita_deep_link(monkeypatch):
     }
 
 
-def test_build_preference_payload_retorno_explicito_nao_usa_override_global(monkeypatch):
+def test_build_preference_payload_retorno_explicito_nao_usa_override_global(
+    monkeypatch,
+):
     monkeypatch.setenv("ECOMMERCE_BASE_URL", "https://corepet.com.br/")
-    monkeypatch.setenv("MERCADO_PAGO_BACK_URL_SUCCESS", "https://corepet.com.br/retorno-antigo")
+    monkeypatch.setenv(
+        "MERCADO_PAGO_BACK_URL_SUCCESS", "https://corepet.com.br/retorno-antigo"
+    )
 
     payload = build_preference_payload(
         pedido=_pedido(),
@@ -202,7 +206,10 @@ def test_app_checkout_permite_configurar_retorno_http(monkeypatch):
         "https://corepet.com.br/app/retorno-pagamento/",
     )
 
-    assert ecommerce_checkout._app_payment_return_url() == "https://corepet.com.br/app/retorno-pagamento"
+    assert (
+        ecommerce_checkout._app_payment_return_url()
+        == "https://corepet.com.br/app/retorno-pagamento"
+    )
 
 
 def test_finalizar_checkout_define_origem_antes_de_criar_preferencia_mp():

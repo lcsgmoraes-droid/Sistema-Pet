@@ -16,13 +16,16 @@ contexto de tenant — só ``get_current_user_and_tenant`` faz isso. Com
 
 Estes testes travam (ratchet) os dois contratos.
 """
+
 import inspect
 import os
 from pathlib import Path
 
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ.setdefault("ENVIRONMENT", "test")
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-security")
+os.environ.setdefault(
+    "JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-security"
+)
 
 from app import admin_routes
 from app.auth.dependencies import get_current_user_and_tenant
