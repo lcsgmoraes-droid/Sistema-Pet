@@ -1,4 +1,5 @@
 from app import nfe_routes
+from app.nfe import listagem
 from app.nfe import operacional_routes
 
 
@@ -42,3 +43,13 @@ def test_nfe_routes_mantem_aliases_de_compatibilidade():
     assert nfe_routes.cancelar_nfe is operacional_routes.cancelar_nfe
     assert nfe_routes.webhook_bling is operacional_routes.webhook_bling
     assert nfe_routes.baixar_danfe is operacional_routes.baixar_danfe
+
+
+def test_nfe_routes_mantem_aliases_de_listagem_para_imports_legados():
+    assert nfe_routes._normalizar_nota_bling is listagem._normalizar_nota_bling
+    assert nfe_routes._status_nota_bling is listagem._status_nota_bling
+    assert nfe_routes._obter_detalhe_nfe_cache is listagem._obter_detalhe_nfe_cache
+    assert (
+        nfe_routes._sincronizar_cache_nfes_com_bling
+        is listagem._sincronizar_cache_nfes_com_bling
+    )
