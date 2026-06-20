@@ -43,6 +43,21 @@ assert.deepEqual(
   "retorno approved do Mercado Pago deve ser tratado como success",
 );
 
+assert.deepEqual(
+  readMercadoPagoPaymentReturn(
+    "?collection_status=approved&external_reference=PED-456&payment_type=account_money",
+  ),
+  {
+    status: "success",
+    level: "success",
+    title: "Pagamento aprovado",
+    message:
+      "Recebemos a confirmacao do Mercado Pago. A loja ja recebeu seu pedido e a lista abaixo sera atualizada automaticamente.",
+    pedidoId: "PED-456",
+  },
+  "retorno collection_status do Mercado Pago deve usar external_reference como pedido",
+);
+
 assert.equal(
   readMercadoPagoPaymentReturn("?foo=bar"),
   null,
@@ -53,6 +68,14 @@ assert.equal(
   stripMercadoPagoPaymentReturnParams("?payment_status=success&pedido_id=PED-123&foo=bar"),
   "foo=bar&view=pedidos",
   "limpeza da URL deve preservar outros parametros e manter a aba pedidos",
+);
+
+assert.equal(
+  stripMercadoPagoPaymentReturnParams(
+    "?collection_status=approved&external_reference=PED-456&payment_type=account_money&foo=bar",
+  ),
+  "foo=bar&view=pedidos",
+  "limpeza da URL deve remover parametros alternativos do Mercado Pago",
 );
 
 console.log("Mercado Pago payment return checks passed.");

@@ -74,6 +74,12 @@ def _excluded_payment_types(forma_pagamento_tipo: str) -> list[dict[str, str]]:
     return [{"id": "ticket"}]
 
 
+def _excluded_payment_methods(forma_pagamento_tipo: str) -> list[dict[str, str]]:
+    if forma_pagamento_tipo in {"pix", "cartao_debito", "cartao_credito"}:
+        return [{"id": "account_money"}]
+    return []
+
+
 def _payment_return_url(
     base_url: str,
     payment_status: str,
@@ -151,6 +157,7 @@ def build_preference_payload(
         },
         "auto_return": "approved",
         "payment_methods": {
+            "excluded_payment_methods": _excluded_payment_methods(forma_pagamento_tipo),
             "excluded_payment_types": _excluded_payment_types(forma_pagamento_tipo),
             "installments": 12,
         },

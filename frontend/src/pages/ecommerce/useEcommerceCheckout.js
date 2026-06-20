@@ -205,14 +205,14 @@ export default function useEcommerceCheckout({
         localStorage.setItem(STORAGE_ADDRESS_KEY, JSON.stringify(addressFields));
       }
 
-      if (result?.pedido_id) {
-        await recordOrderId(result.pedido_id);
-      }
-
       if (result?.payment_url) {
         onSuccess("Redirecionando para pagamento seguro...");
         window.location.assign(result.payment_url);
         return;
+      }
+
+      if (result?.pedido_id) {
+        await recordOrderId(result.pedido_id);
       }
 
       onSuccess("Pagamento enviado para analise. O pedido sera liberado apos aprovacao.");
