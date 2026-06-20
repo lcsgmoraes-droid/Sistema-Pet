@@ -51,4 +51,28 @@ assert.match(
   "status aprovado deve ter cor positiva propria",
 );
 
+assert.match(
+  source,
+  /function getOrderChannelLabel/,
+  "pagina de pedidos deve traduzir canal do pedido",
+);
+
+assert.match(
+  source,
+  /order\.canal_label/,
+  "pagina de pedidos deve priorizar canal_label vindo da API",
+);
+
+assert.match(
+  source,
+  /App mobile/,
+  "pagina de pedidos deve exibir canal app mobile de forma clara",
+);
+
+assert.match(
+  source,
+  /Loja fisica \/ ERP/,
+  "pagina de pedidos deve exibir canal loja fisica/ERP de forma clara",
+);
+
 console.log("E-commerce orders follow-up checks passed.");

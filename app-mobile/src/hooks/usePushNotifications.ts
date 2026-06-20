@@ -90,6 +90,10 @@ export function usePushNotifications(isAuthenticated: boolean) {
     responseListener.current =
       Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data || {};
+        if (data.source === "order") {
+          navigateWhenReady("Pedidos");
+          return;
+        }
         if (data.source !== "app-vet") return;
         if (data.kind === "procedimento") {
           navigateWhenReady("VetProcedimentos");

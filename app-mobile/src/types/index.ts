@@ -438,6 +438,8 @@ export interface Pedido {
   status: string;
   total: number;
   origem?: string | null;
+  canal?: string | null;
+  canal_label?: string | null;
   venda_id?: number | null;
   status_entrega?: string | null;
   retirado_por?: string | null;
