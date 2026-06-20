@@ -1,4 +1,7 @@
 from types import SimpleNamespace
+import importlib
+import logging
+import sys
 
 from app.services.order_push_notifications import (
     build_order_push_content,
@@ -23,6 +26,15 @@ class FakeDB:
 
     def query(self, model):
         return FakeQuery(self.user)
+
+
+def test_order_push_service_does_not_import_customer_history_models():
+    sys.modules.pop("app.services.order_push_notifications", None)
+    sys.modules.pop("app.services.customer_order_history", None)
+
+    importlib.import_module("app.services.order_push_notifications")
+
+    assert "app.services.customer_order_history" not in sys.modules
 
 
 def test_build_order_push_content_maps_payment_and_fulfillment_events():
@@ -109,3 +121,22 @@ def test_notify_order_event_ignores_missing_token_and_send_errors(monkeypatch):
         )
         is False
     )
+
+
+def test_notify_order_event_logs_when_user_has_no_push_token(caplog):
+    caplog.set_level(logging.INFO, logger="app.services.order_push_notifications")
+
+    sent = notify_order_event(
+        FakeDB(SimpleNamespace(id=11, tenant_id="tenant-1", push_token=None)),
+        tenant_id="tenant-1",
+        user_id=11,
+        event="ready_for_pickup",
+        pedido_id="202606200026",
+        venda_id=1065887,
+        canal="ecommerce",
+    )
+
+    assert sent is False
+    assert "sem push_token" in caplog.text
+    assert "user_id=11" in caplog.text
+    assert "venda_id=1065887" in caplog.text
