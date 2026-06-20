@@ -75,8 +75,6 @@ def _excluded_payment_types(forma_pagamento_tipo: str) -> list[dict[str, str]]:
 
 
 def _excluded_payment_methods(forma_pagamento_tipo: str) -> list[dict[str, str]]:
-    if forma_pagamento_tipo in {"pix", "cartao_debito", "cartao_credito"}:
-        return [{"id": "account_money"}]
     return []
 
 

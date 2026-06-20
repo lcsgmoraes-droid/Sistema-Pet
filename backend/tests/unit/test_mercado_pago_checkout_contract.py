@@ -65,16 +65,14 @@ def test_build_preference_payload_inclui_metadados_urls_e_total(monkeypatch):
         "endereco_entrega": "RETIRADA NA LOJA",
         "tem_entrega": False,
     }
-    assert payload["payment_methods"]["excluded_payment_methods"] == [
-        {"id": "account_money"}
-    ]
+    assert payload["payment_methods"]["excluded_payment_methods"] == []
 
 
 @pytest.mark.parametrize(
     "forma_pagamento_tipo",
     ["pix", "cartao_debito", "cartao_credito"],
 )
-def test_build_preference_payload_bloqueia_saldo_mercado_pago(
+def test_build_preference_payload_nao_exclui_account_money(
     monkeypatch, forma_pagamento_tipo
 ):
     monkeypatch.setenv("ECOMMERCE_BASE_URL", "https://corepet.com.br/")
@@ -87,9 +85,7 @@ def test_build_preference_payload_bloqueia_saldo_mercado_pago(
         tipo_retirada="app_loja",
     )
 
-    assert payload["payment_methods"]["excluded_payment_methods"] == [
-        {"id": "account_money"}
-    ]
+    assert payload["payment_methods"]["excluded_payment_methods"] == []
 
 
 def test_build_preference_payload_normaliza_web_como_ecommerce(monkeypatch):
