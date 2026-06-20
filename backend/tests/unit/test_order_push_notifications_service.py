@@ -124,7 +124,7 @@ def test_notify_order_event_ignores_missing_token_and_send_errors(monkeypatch):
 
 
 def test_notify_order_event_logs_when_user_has_no_push_token(caplog):
-    caplog.set_level(logging.INFO, logger="app.services.order_push_notifications")
+    caplog.set_level(logging.WARNING, logger="app.services.order_push_notifications")
 
     sent = notify_order_event(
         FakeDB(SimpleNamespace(id=11, tenant_id="tenant-1", push_token=None)),
