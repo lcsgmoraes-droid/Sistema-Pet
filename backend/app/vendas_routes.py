@@ -38,6 +38,7 @@ from .services.venda_rentabilidade_snapshot_service import (
     get_or_build_venda_rentabilidade_snapshot,
     invalidate_venda_rentabilidade_snapshot,
 )
+from .services.order_push_notifications import notify_sale_order_event
 from .utils.tenant_safe_sql import execute_tenant_safe
 from .vendas.regras import _resolver_status_entrega_atualizacao, calcular_totais_venda
 
@@ -953,6 +954,7 @@ async def marcar_venda_entregue(
     if dados.retirado_por:
         venda.retirado_por = dados.retirado_por.strip()
     db.commit()
+    notify_sale_order_event(db, venda=venda, event="delivered")
     return {
         "id": venda_id,
         "status_entrega": "entregue",
@@ -980,6 +982,7 @@ async def marcar_venda_pronta_retirada(
         raise HTTPException(status_code=400, detail="Venda ja foi entregue/retirada")
     venda.status_entrega = "pronto"
     db.commit()
+    notify_sale_order_event(db, venda=venda, event="ready_for_pickup")
     return {"id": venda_id, "status_entrega": "pronto"}
 
 

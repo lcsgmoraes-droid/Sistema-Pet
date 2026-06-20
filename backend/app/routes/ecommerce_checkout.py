@@ -25,6 +25,7 @@ from app.services.mercado_pago_checkout import (
     create_preference,
     is_mercado_pago_provider,
 )
+from app.services.order_push_notifications import notify_order_event
 from app.services.sales_channel import resolve_checkout_sales_channel
 from app.tenancy.context import (
     clear_current_tenant,
@@ -748,6 +749,14 @@ def finalizar_checkout(
     logger.info(
         f"Checkout enviado para pagamento: carrinho #{carrinho.pedido_id} "
         f"aguardando aprovacao (tipo_retirada={tipo_retirada})"
+    )
+    notify_order_event(
+        db,
+        tenant_id=tenant_id,
+        user_id=identity.user_id,
+        event="checkout_created",
+        pedido_id=carrinho.pedido_id,
+        canal=origem_checkout,
     )
     return response
 

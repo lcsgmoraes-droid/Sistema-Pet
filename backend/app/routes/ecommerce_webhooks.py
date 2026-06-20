@@ -28,6 +28,7 @@ from app.services.sales_channel import (
     benefit_channel_from_sales_channel,
     normalize_sales_channel,
 )
+from app.services.order_push_notifications import notify_order_event
 from app.tenancy.context import set_current_tenant
 
 
@@ -182,6 +183,38 @@ def _map_payment_status(payload: dict) -> str | None:
         "charged_back": "cancelado",
     }
     return mapping.get(raw)
+
+
+def _order_push_event_for_payment_status(pedido_status: str | None) -> str | None:
+    if pedido_status == "aprovado":
+        return "payment_approved"
+    if pedido_status == "pendente":
+        return "payment_in_analysis"
+    if pedido_status in {"recusado", "cancelado"}:
+        return "payment_failed"
+    return None
+
+
+def _notify_payment_status_change(
+    db,
+    *,
+    tenant_id: str,
+    pedido: Pedido | None,
+    pedido_status: str | None,
+    venda_id: int | None,
+) -> None:
+    event = _order_push_event_for_payment_status(pedido_status)
+    if not pedido or not event:
+        return
+    notify_order_event(
+        db,
+        tenant_id=str(tenant_id),
+        user_id=pedido.cliente_id,
+        event=event,
+        pedido_id=pedido.pedido_id,
+        venda_id=venda_id,
+        canal=pedido.origem,
+    )
 
 
 def _find_pedido_id(payload: dict) -> str | None:
@@ -859,6 +892,8 @@ async def webhook_pagarme(request: Request):
 
         updated = False
         venda_id = None
+        pedido_notificacao = None
+        pedido_status_notificacao = None
         if pedido_id and pedido_status:
             pedido = (
                 db.query(Pedido)
@@ -868,6 +903,8 @@ async def webhook_pagarme(request: Request):
             if pedido:
                 pedido.status = pedido_status
                 updated = True
+                pedido_notificacao = pedido
+                pedido_status_notificacao = pedido_status
                 if pedido_status == "aprovado":
                     payment_method, _ = _extrair_pagamento_do_webhook(payload)
                     _normalizar_payment_method_online(payment_method)
@@ -888,6 +925,13 @@ async def webhook_pagarme(request: Request):
         registry.response_body = json.dumps(response)
         registry.completed_at = datetime.utcnow()
         db.commit()
+        _notify_payment_status_change(
+            db,
+            tenant_id=tenant_id,
+            pedido=pedido_notificacao,
+            pedido_status=pedido_status_notificacao,
+            venda_id=venda_id,
+        )
 
         return response
 
@@ -1013,6 +1057,8 @@ async def webhook_mercadopago_tenant(webhook_token: str, request: Request):
 
         updated = False
         venda_id = None
+        pedido_notificacao = None
+        pedido_status_notificacao = None
         if pedido_id and pedido_status:
             pedido = (
                 db.query(Pedido)
@@ -1022,6 +1068,8 @@ async def webhook_mercadopago_tenant(webhook_token: str, request: Request):
             if pedido:
                 pedido.status = pedido_status
                 updated = True
+                pedido_notificacao = pedido
+                pedido_status_notificacao = pedido_status
                 if pedido_status == "aprovado":
                     payment_method, _ = _extrair_pagamento_do_webhook(payload)
                     _normalizar_payment_method_online(payment_method)
@@ -1044,6 +1092,13 @@ async def webhook_mercadopago_tenant(webhook_token: str, request: Request):
         registry.response_body = json.dumps(response)
         registry.completed_at = datetime.utcnow()
         db.commit()
+        _notify_payment_status_change(
+            db,
+            tenant_id=str(tenant_id),
+            pedido=pedido_notificacao,
+            pedido_status=pedido_status_notificacao,
+            venda_id=venda_id,
+        )
 
         return response
 
@@ -1144,6 +1199,8 @@ async def webhook_mercadopago(request: Request):
 
         updated = False
         venda_id = None
+        pedido_notificacao = None
+        pedido_status_notificacao = None
         if pedido_id and pedido_status:
             pedido = (
                 db.query(Pedido)
@@ -1153,6 +1210,8 @@ async def webhook_mercadopago(request: Request):
             if pedido:
                 pedido.status = pedido_status
                 updated = True
+                pedido_notificacao = pedido
+                pedido_status_notificacao = pedido_status
                 if pedido_status == "aprovado":
                     payment_method, _ = _extrair_pagamento_do_webhook(payload)
                     _normalizar_payment_method_online(payment_method)
@@ -1175,6 +1234,13 @@ async def webhook_mercadopago(request: Request):
         registry.response_body = json.dumps(response)
         registry.completed_at = datetime.utcnow()
         db.commit()
+        _notify_payment_status_change(
+            db,
+            tenant_id=tenant_id,
+            pedido=pedido_notificacao,
+            pedido_status=pedido_status_notificacao,
+            venda_id=venda_id,
+        )
 
         return response
 
