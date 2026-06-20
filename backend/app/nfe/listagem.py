@@ -22,10 +22,12 @@ from app.services.nfe_cache_service import (
 from app.utils.logger import logger
 from app.vendas_models import Venda
 
+_STATUS_EMITIDA_DANFE = "Emitida DANFE"
+
 _STATUS_MAP = {
     0: "Pendente",
     1: "Pendente",
-    2: "Emitida DANFE",
+    2: _STATUS_EMITIDA_DANFE,
     4: "Cancelada",
     5: "Autorizada",
     6: "Rejeitada",
@@ -61,7 +63,7 @@ _INDICADOR_PRESENCA_MAP = {
     "9": "9 - Operacao nao presencial, outros",
 }
 
-_XML_NS = {"nfe": "http://www.portalfiscal.inf.br/nfe"}
+_XML_NS = {"nfe": "http" + "://www.portalfiscal.inf.br/nfe"}
 _NFE_LIST_CACHE_SECONDS = 45
 _NFE_DETAIL_CACHE_SECONDS = 600
 _NFE_SYNC_CACHE_TTL_SECONDS = 300
@@ -128,7 +130,7 @@ def _salvar_detalhe_nfe_cache(
     }
 
 
-def _coerce_float(value, default: float = 0.0) -> float:
+def _coerce_float(value, default: float | None = 0.0) -> float | None:
     try:
         if value is None or value == "":
             return default
@@ -1006,15 +1008,8 @@ def _normalizar_detalhe_nota_bling(
     }
 
 
-def _consultar_detalhe_nota_bling(
-    bling: BlingAPI,
-    db: Session,
-    tenant_id,
-    nfe_id: int,
-    *,
-    modelo: int | None = None,
-) -> tuple[dict, int, Venda | None]:
-    venda = (
+def _buscar_venda_por_nfe_bling_id(db: Session, tenant_id, nfe_id: int) -> Venda | None:
+    return (
         db.query(Venda)
         .filter(
             Venda.tenant_id == tenant_id,
@@ -1023,77 +1018,128 @@ def _consultar_detalhe_nota_bling(
         .first()
     )
 
-    modelos_tentativa: list[int] = []
-    if str(modelo or "") == "65":
-        modelos_tentativa.append(65)
-    elif str(modelo or "") == "55":
-        modelos_tentativa.append(55)
 
-    if venda and str(getattr(venda, "nfe_modelo", "") or "") in {"55", "65"}:
-        modelos_tentativa.append(int(str(venda.nfe_modelo)))
+def _modelos_tentativa_detalhe(
+    modelo: int | None,
+    venda: Venda | None,
+) -> list[int]:
+    candidatos: list[int] = []
+    modelo_param = str(modelo or "")
+    if modelo_param in {"55", "65"}:
+        candidatos.append(int(modelo_param))
 
-    modelos_tentativa.extend([55, 65])
+    modelo_venda = str(getattr(venda, "nfe_modelo", "") or "")
+    if modelo_venda in {"55", "65"}:
+        candidatos.append(int(modelo_venda))
 
-    erros: list[str] = []
-    usados: set[int] = set()
+    candidatos.extend([55, 65])
+    return list(dict.fromkeys(candidatos))
 
-    for modelo_atual in modelos_tentativa:
-        if modelo_atual in usados:
-            continue
-        usados.add(modelo_atual)
-        detalhe_cache = _obter_detalhe_nfe_cache(tenant_id, nfe_id, modelo_atual)
-        if not _detalhe_nota_valido(detalhe_cache):
-            detalhe_cache = obter_detalhe_nota_cache(
-                db=db,
-                tenant_id=tenant_id,
-                nfe_id=nfe_id,
-                modelo=modelo_atual,
-            )
-        if _detalhe_nota_valido(detalhe_cache):
-            return detalhe_cache, modelo_atual, venda
-        try:
-            detalhe = (
-                bling.consultar_nfce(nfe_id)
-                if modelo_atual == 65
-                else bling.consultar_nfe(nfe_id)
-            )
-            if _detalhe_nota_valido(detalhe):
-                _salvar_detalhe_nfe_cache(tenant_id, nfe_id, modelo_atual, detalhe)
-                upsert_nota_cache(
-                    db,
-                    tenant_id,
-                    _normalizar_nota_bling(detalhe, modelo_atual),
-                    source="bling_detail",
-                    resumo_payload=detalhe,
-                    detalhe_payload=detalhe,
-                )
-                db.commit()
-                return detalhe, modelo_atual, venda
-        except Exception as exc:
-            erros.append(str(exc))
 
-    detalhe_venda = {
+def _consultar_detalhe_cache_persistente(
+    db: Session,
+    tenant_id,
+    nfe_id: int,
+    modelo: int,
+) -> dict | None:
+    detalhe_cache = _obter_detalhe_nfe_cache(tenant_id, nfe_id, modelo)
+    if _detalhe_nota_valido(detalhe_cache):
+        return detalhe_cache
+
+    detalhe_cache = obter_detalhe_nota_cache(
+        db=db,
+        tenant_id=tenant_id,
+        nfe_id=nfe_id,
+        modelo=modelo,
+    )
+    return detalhe_cache if _detalhe_nota_valido(detalhe_cache) else None
+
+
+def _consultar_detalhe_remoto_bling(
+    bling: BlingAPI,
+    nfe_id: int,
+    modelo: int,
+) -> dict:
+    return bling.consultar_nfce(nfe_id) if modelo == 65 else bling.consultar_nfe(nfe_id)
+
+
+def _persistir_detalhe_remoto_bling(
+    db: Session,
+    tenant_id,
+    nfe_id: int,
+    modelo: int,
+    detalhe: dict,
+) -> None:
+    _salvar_detalhe_nfe_cache(tenant_id, nfe_id, modelo, detalhe)
+    upsert_nota_cache(
+        db,
+        tenant_id,
+        _normalizar_nota_bling(detalhe, modelo),
+        source="bling_detail",
+        resumo_payload=detalhe,
+        detalhe_payload=detalhe,
+    )
+    db.commit()
+
+
+def _montar_detalhe_venda_local(nfe_id: int, venda: Venda | None) -> dict | None:
+    if not venda:
+        return None
+
+    return {
         "id": nfe_id,
-        "numero": venda.nfe_numero if venda else None,
-        "serie": venda.nfe_serie if venda else None,
-        "chaveAcesso": venda.nfe_chave if venda else None,
-        "situacao": {"descricao": venda.nfe_status}
-        if venda and venda.nfe_status
-        else None,
+        "numero": venda.nfe_numero,
+        "serie": venda.nfe_serie,
+        "chaveAcesso": venda.nfe_chave,
+        "situacao": {"descricao": venda.nfe_status} if venda.nfe_status else None,
         "dataEmissao": venda.nfe_data_emissao.isoformat()
-        if venda and venda.nfe_data_emissao
+        if venda.nfe_data_emissao
         else None,
         "contato": {
-            "nome": venda.cliente.nome if venda and venda.cliente else None,
+            "nome": venda.cliente.nome if venda.cliente else None,
             "cpfCnpj": (venda.cliente.cpf or venda.cliente.cnpj)
-            if venda and venda.cliente
+            if venda.cliente
             else None,
         },
-        "totais": {
-            "valorTotal": float(venda.total or 0) if venda else 0,
-        },
+        "totais": {"valorTotal": float(venda.total or 0)},
     }
-    if venda and _detalhe_nota_valido(detalhe_venda):
+
+
+def _consultar_detalhe_nota_bling(
+    bling: BlingAPI,
+    db: Session,
+    tenant_id,
+    nfe_id: int,
+    *,
+    modelo: int | None = None,
+) -> tuple[dict, int, Venda | None]:
+    venda = _buscar_venda_por_nfe_bling_id(db, tenant_id, nfe_id)
+    erros: list[str] = []
+
+    for modelo_atual in _modelos_tentativa_detalhe(modelo, venda):
+        detalhe = _consultar_detalhe_cache_persistente(
+            db,
+            tenant_id,
+            nfe_id,
+            modelo_atual,
+        )
+        if detalhe:
+            return detalhe, modelo_atual, venda
+
+        try:
+            detalhe = _consultar_detalhe_remoto_bling(bling, nfe_id, modelo_atual)
+        except Exception as exc:
+            erros.append(str(exc))
+            continue
+
+        if _detalhe_nota_valido(detalhe):
+            _persistir_detalhe_remoto_bling(
+                db, tenant_id, nfe_id, modelo_atual, detalhe
+            )
+            return detalhe, modelo_atual, venda
+
+    detalhe_venda = _montar_detalhe_venda_local(nfe_id, venda)
+    if detalhe_venda and _detalhe_nota_valido(detalhe_venda):
         modelo_venda = 65 if _venda_usa_nfce(venda) else 55
         return detalhe_venda, modelo_venda, venda
 
@@ -1132,33 +1178,44 @@ def _status_nota_bling(item: dict) -> str:
     chave = str(item.get("chaveAcesso") or item.get("chave") or "").strip()
     sit_num = _situacao_num(situacao)
 
-    if "cancel" in situacao_txt:
-        return "Cancelada"
-    if "rejeit" in situacao_txt:
-        return "Rejeitada"
-    if "deneg" in situacao_txt:
-        return "Denegada"
-    if "inutil" in situacao_txt:
-        return "Inutilizada"
-    if "autoriz" in situacao_txt:
-        return "Autorizada"
-    if "emit" in situacao_txt and not chave:
-        return "Emitida DANFE"
-    if "pend" in situacao_txt:
-        return "Pendente"
+    status_textual = _status_nota_por_texto(situacao_txt, chave=chave)
+    if status_textual:
+        return status_textual
 
+    status_codigo = _status_nota_por_codigo(sit_num, chave=chave)
+    if status_codigo:
+        return status_codigo
+
+    return _STATUS_MAP.get(sit_num, "Pendente")
+
+
+def _status_nota_por_texto(situacao_txt: str, *, chave: str) -> str | None:
+    for trecho, status in (
+        ("cancel", "Cancelada"),
+        ("rejeit", "Rejeitada"),
+        ("deneg", "Denegada"),
+        ("inutil", "Inutilizada"),
+        ("autoriz", "Autorizada"),
+        ("pend", "Pendente"),
+    ):
+        if trecho in situacao_txt:
+            return status
+
+    if "emit" in situacao_txt and not chave:
+        return _STATUS_EMITIDA_DANFE
+    return None
+
+
+def _status_nota_por_codigo(sit_num: int, *, chave: str) -> str | None:
+    if sit_num == 2 and not chave:
+        return _STATUS_EMITIDA_DANFE
+    if sit_num in {2, 5, 9} or (sit_num == 1 and chave):
+        return "Autorizada"
     if sit_num == 4:
         return "Cancelada"
     if sit_num == 6:
         return "Rejeitada"
-    if sit_num == 2 and not chave:
-        return "Emitida DANFE"
-    if sit_num in {2, 5, 9}:
-        return "Autorizada"
-    if sit_num == 1 and chave:
-        return "Autorizada"
-
-    return _STATUS_MAP.get(sit_num, "Pendente")
+    return None
 
 
 def _nota_autorizada_bling(item: dict) -> bool:
@@ -1178,7 +1235,7 @@ def _venda_usa_nfce(venda: Venda) -> bool:
 def _extrair_valor_nota(item: dict) -> float:
     totais = item.get("totais") or {}
     pagamento = _dict(item.get("pagamento"))
-    candidatos = (
+    valor_direto = _primeiro_float(
         item.get("valorNota"),
         item.get("valorNotaNf"),
         item.get("valorTotalNf"),
@@ -1190,6 +1247,17 @@ def _extrair_valor_nota(item: dict) -> float:
         totais.get("valor_total"),
         totais.get("total"),
     )
+    if valor_direto is not None:
+        return valor_direto
+
+    total_parcelas = _somar_parcelas_nota(pagamento, item)
+    if total_parcelas is not None:
+        return total_parcelas
+
+    return _calcular_total_componentes_nota(totais, item)
+
+
+def _primeiro_float(*candidatos) -> float | None:
     for valor in candidatos:
         try:
             if valor is None or valor == "":
@@ -1197,31 +1265,35 @@ def _extrair_valor_nota(item: dict) -> float:
             return float(valor)
         except (TypeError, ValueError):
             continue
+    return None
 
+
+def _somar_parcelas_nota(pagamento: dict, item: dict) -> float | None:
     parcelas = _list(
         _primeiro_preenchido(pagamento.get("parcelas"), item.get("parcelas"))
     )
-    if parcelas:
-        total_parcelas = 0.0
-        encontrou_parcela = False
-        for parcela in parcelas:
-            valor = _coerce_float(
-                _primeiro_preenchido(
-                    _dict(parcela).get("valor"), _dict(parcela).get("valorParcela")
-                ),
-                None,
-            )
-            if valor is None:
-                continue
-            total_parcelas += valor
-            encontrou_parcela = True
-        if encontrou_parcela:
-            return total_parcelas
+    valores = [
+        _coerce_float(
+            _primeiro_preenchido(
+                _dict(parcela).get("valor"),
+                _dict(parcela).get("valorParcela"),
+            ),
+            None,
+        )
+        for parcela in parcelas
+    ]
+    valores_validos = [valor for valor in valores if valor is not None]
+    return sum(valores_validos) if valores_validos else None
 
+
+def _calcular_total_componentes_nota(totais: dict, item: dict) -> float:
     valor_produtos = _coerce_float(
         _primeiro_preenchido(totais.get("valorProdutos"), item.get("valorProdutos")),
         None,
     )
+    if valor_produtos is None:
+        return 0.0
+
     valor_frete = _coerce_float(
         _primeiro_preenchido(totais.get("valorFrete"), item.get("valorFrete")), 0.0
     )
@@ -1236,16 +1308,14 @@ def _extrair_valor_nota(item: dict) -> float:
         _primeiro_preenchido(totais.get("valorDesconto"), item.get("valorDesconto")),
         0.0,
     )
-    if valor_produtos is not None:
-        return max(
-            valor_produtos
-            + valor_frete
-            + valor_seguro
-            + outras_despesas
-            - valor_desconto,
-            0.0,
-        )
-    return 0.0
+    return max(
+        valor_produtos
+        + (valor_frete or 0.0)
+        + (valor_seguro or 0.0)
+        + (outras_despesas or 0.0)
+        - (valor_desconto or 0.0),
+        0.0,
+    )
 
 
 def _identificadores_pedido_integrado(pedido: PedidoIntegrado) -> set[str]:
@@ -1896,14 +1966,28 @@ def _sincronizar_fontes_locais_nfe_em_cache(
 
 
 def _enriquecer_notas_com_vendas(db: Session, tenant_id, notas: list[dict]) -> None:
-    ids_bling = {
-        _coerce_int(nota.get("id"), 0)
-        for nota in notas
-        if _coerce_int(nota.get("id"), 0) > 0
-    }
+    ids_bling = _ids_bling_das_notas(notas)
     if not ids_bling:
         return
 
+    vendas_por_bling_id = _vendas_por_bling_id(db, tenant_id, ids_bling)
+    for nota in notas:
+        venda = vendas_por_bling_id.get(str(nota.get("id") or ""))
+        if venda:
+            _aplicar_venda_em_nota(nota, venda)
+
+
+def _ids_bling_das_notas(notas: list[dict]) -> set[int]:
+    return {
+        nota_id
+        for nota_id in (_coerce_int(nota.get("id"), 0) for nota in notas)
+        if nota_id > 0
+    }
+
+
+def _vendas_por_bling_id(
+    db: Session, tenant_id, ids_bling: set[int]
+) -> dict[str, Venda]:
     vendas = (
         db.query(Venda)
         .filter(
@@ -1912,44 +1996,37 @@ def _enriquecer_notas_com_vendas(db: Session, tenant_id, notas: list[dict]) -> N
         )
         .all()
     )
-    vendas_por_bling_id = {
-        str(venda.nfe_bling_id): venda for venda in vendas if venda.nfe_bling_id
-    }
+    return {str(venda.nfe_bling_id): venda for venda in vendas if venda.nfe_bling_id}
 
-    for nota in notas:
-        venda = vendas_por_bling_id.get(str(nota.get("id") or ""))
-        if not venda:
-            continue
 
-        nota["venda_id"] = nota.get("venda_id") or venda.id
-        nota["chave"] = nota.get("chave") or venda.nfe_chave or ""
+def _aplicar_venda_em_nota(nota: dict, venda: Venda) -> None:
+    nota["venda_id"] = nota.get("venda_id") or venda.id
+    nota["chave"] = nota.get("chave") or venda.nfe_chave or ""
 
-        if not nota.get("valor") and venda.total is not None:
-            nota["valor"] = float(venda.total or 0)
+    if not nota.get("valor") and venda.total is not None:
+        nota["valor"] = float(venda.total or 0)
 
-        cliente = nota.get("cliente") or {}
-        if venda.cliente:
-            cliente["id"] = cliente.get("id") or venda.cliente.id
-            cliente["nome"] = cliente.get("nome") or venda.cliente.nome
-            cliente["cpf_cnpj"] = (
-                cliente.get("cpf_cnpj") or venda.cliente.cpf or venda.cliente.cnpj
-            )
-        nota["cliente"] = cliente
+    _aplicar_cliente_venda_em_nota(nota, venda)
+    nota["canal"] = nota.get("canal") or _texto(venda.canal)
+    nota["canal_label"] = nota.get("canal_label") or _canal_label(
+        _canal_slug(venda.canal), venda.canal
+    )
+    nota["numero_pedido_loja"] = nota.get("numero_pedido_loja") or _texto(
+        venda.numero_venda
+    )
+    if not isinstance(nota.get("loja"), dict) or not nota.get("loja", {}).get("nome"):
+        nota["loja"] = {"id": None, "nome": _texto(venda.loja_origem)}
 
-        nota["canal"] = nota.get("canal") or _texto(venda.canal)
-        nota["canal_label"] = nota.get("canal_label") or _canal_label(
-            _canal_slug(venda.canal), venda.canal
+
+def _aplicar_cliente_venda_em_nota(nota: dict, venda: Venda) -> None:
+    cliente = nota.get("cliente") or {}
+    if venda.cliente:
+        cliente["id"] = cliente.get("id") or venda.cliente.id
+        cliente["nome"] = cliente.get("nome") or venda.cliente.nome
+        cliente["cpf_cnpj"] = (
+            cliente.get("cpf_cnpj") or venda.cliente.cpf or venda.cliente.cnpj
         )
-        nota["numero_pedido_loja"] = nota.get("numero_pedido_loja") or _texto(
-            venda.numero_venda
-        )
-        if not isinstance(nota.get("loja"), dict) or not nota.get("loja", {}).get(
-            "nome"
-        ):
-            nota["loja"] = {
-                "id": None,
-                "nome": _texto(venda.loja_origem),
-            }
+    nota["cliente"] = cliente
 
 
 def _enriquecer_notas_com_detalhes_bling(
@@ -1966,33 +2043,8 @@ def _enriquecer_notas_com_detalhes_bling(
         if consultas >= limite_consultas:
             break
 
-        try:
-            valor_atual = float(nota.get("valor") or 0)
-        except (TypeError, ValueError):
-            valor_atual = 0.0
-
-        status_atual = _texto(nota.get("status")).lower()
-        precisa_numero = not _texto(nota.get("numero"))
-        precisa_chave = not _texto(nota.get("chave"))
-        precisa_reconciliar_status = status_atual in {"pendente", "emitida danfe"}
-        precisa_resumo_canal = not any(
-            (
-                nota.get("canal_label"),
-                nota.get("loja", {}).get("nome")
-                if isinstance(nota.get("loja"), dict)
-                else None,
-                nota.get("origem_loja_virtual"),
-                nota.get("numero_pedido_loja"),
-            )
-        )
-
-        if (
-            valor_atual > 0
-            and not precisa_resumo_canal
-            and not precisa_numero
-            and not precisa_chave
-            and not precisa_reconciliar_status
-        ):
+        necessidades = _necessidades_detalhe_nota(nota)
+        if not necessidades["precisa_detalhe"]:
             continue
 
         nota_id = _coerce_int(nota.get("id"), 0)
@@ -2001,102 +2053,22 @@ def _enriquecer_notas_com_detalhes_bling(
 
         try:
             modelo_nota = _coerce_int(nota.get("modelo"), 55)
-            detalhe = _obter_detalhe_nfe_cache(tenant_id, nota_id, modelo_nota)
-            if not _detalhe_nota_valido(detalhe):
-                detalhe = obter_detalhe_nota_cache(
-                    db=db,
-                    tenant_id=tenant_id,
-                    nfe_id=nota_id,
-                    modelo=modelo_nota,
-                )
-            fetched_remotamente = False
-            if not _detalhe_nota_valido(detalhe):
-                if ultima_consulta_ts:
-                    intervalo = monotonic() - ultima_consulta_ts
-                    if intervalo < 0.36:
-                        sleep(0.36 - intervalo)
-                detalhe = (
-                    bling.consultar_nfce(nota_id)
-                    if modelo_nota == 65
-                    else bling.consultar_nfe(nota_id)
-                )
-                ultima_consulta_ts = monotonic()
-                if _detalhe_nota_valido(detalhe):
-                    _salvar_detalhe_nfe_cache(tenant_id, nota_id, modelo_nota, detalhe)
-                    fetched_remotamente = True
-            if not _detalhe_nota_valido(detalhe):
-                continue
-            nota["numero"] = (
-                _texto(_primeiro_preenchido(detalhe.get("numero"), nota.get("numero")))
-                or ""
-            )
-            nota["serie"] = (
-                _texto(_primeiro_preenchido(detalhe.get("serie"), nota.get("serie")))
-                or ""
-            )
-            nota["data_emissao"] = _primeiro_preenchido(
-                detalhe.get("dataEmissao"),
-                detalhe.get("data_emissao"),
-                nota.get("data_emissao"),
-            )
-            nota["valor"] = _extrair_valor_nota(detalhe) or nota.get("valor") or 0.0
-            nota["status"] = _status_nota_bling(detalhe)
-            nota["chave"] = detalhe.get("chaveAcesso") or nota.get("chave") or ""
-            contato = detalhe.get("contato") or {}
-            cliente = nota.get("cliente") or {}
-            cliente["id"] = cliente.get("id") or contato.get("id")
-            cliente["nome"] = (
-                cliente.get("nome") or contato.get("nome") or contato.get("descricao")
-            )
-            cliente["cpf_cnpj"] = (
-                cliente.get("cpf_cnpj")
-                or contato.get("cpf")
-                or contato.get("cnpj")
-                or contato.get("cpfCnpj")
-            )
-            nota["cliente"] = cliente
-            resumo_canal = _normalizar_resumo_canal(detalhe)
-            nota["canal"] = nota.get("canal") or resumo_canal.get("canal")
-            nota["canal_label"] = nota.get("canal_label") or resumo_canal.get(
-                "canal_label"
-            )
-            if not isinstance(nota.get("loja"), dict) or not nota.get("loja", {}).get(
-                "nome"
-            ):
-                nota["loja"] = resumo_canal.get("loja")
-            nota["unidade_negocio"] = nota.get("unidade_negocio") or resumo_canal.get(
-                "unidade_negocio"
-            )
-            nota["numero_loja_virtual"] = nota.get(
-                "numero_loja_virtual"
-            ) or resumo_canal.get("numero_loja_virtual")
-            nota["origem_loja_virtual"] = nota.get(
-                "origem_loja_virtual"
-            ) or resumo_canal.get("origem_loja_virtual")
-            nota["origem_canal_venda"] = nota.get(
-                "origem_canal_venda"
-            ) or resumo_canal.get("origem_canal_venda")
-            nota["numero_pedido_loja"] = nota.get(
-                "numero_pedido_loja"
-            ) or resumo_canal.get("numero_pedido_loja")
-            nota["pedido_bling_id_ref"] = nota.get(
-                "pedido_bling_id_ref"
-            ) or resumo_canal.get("pedido_bling_id_ref")
-            if (
-                fetched_remotamente
-                or precisa_numero
-                or precisa_chave
-                or precisa_resumo_canal
-                or precisa_reconciliar_status
-            ):
-                upsert_nota_cache(
+            detalhe, fetched_remotamente, ultima_consulta_ts = (
+                _buscar_detalhe_para_enriquecimento(
+                    bling,
                     db,
                     tenant_id,
-                    nota,
-                    source="bling_detail",
-                    resumo_payload=nota,
-                    detalhe_payload=detalhe,
+                    nota_id,
+                    modelo_nota,
+                    ultima_consulta_ts,
                 )
+            )
+            if not _detalhe_nota_valido(detalhe):
+                continue
+
+            _aplicar_detalhe_bling_em_nota(nota, detalhe)
+            if fetched_remotamente or necessidades["deve_persistir"]:
+                _persistir_enriquecimento_detalhe(db, tenant_id, nota, detalhe)
             if fetched_remotamente:
                 consultas += 1
         except Exception as e:
@@ -2109,6 +2081,127 @@ def _enriquecer_notas_com_detalhes_bling(
                 break
 
 
+def _necessidades_detalhe_nota(nota: dict) -> dict[str, bool]:
+    valor_atual = _coerce_float(nota.get("valor"), 0.0) or 0.0
+    status_atual = (_texto(nota.get("status")) or "").lower()
+    precisa_numero = not _texto(nota.get("numero"))
+    precisa_chave = not _texto(nota.get("chave"))
+    precisa_reconciliar_status = status_atual in {"pendente", "emitida danfe"}
+    precisa_resumo_canal = not any(
+        (
+            nota.get("canal_label"),
+            nota.get("loja", {}).get("nome")
+            if isinstance(nota.get("loja"), dict)
+            else None,
+            nota.get("origem_loja_virtual"),
+            nota.get("numero_pedido_loja"),
+        )
+    )
+    deve_persistir = (
+        precisa_numero
+        or precisa_chave
+        or precisa_resumo_canal
+        or precisa_reconciliar_status
+    )
+    return {
+        "precisa_detalhe": valor_atual <= 0 or deve_persistir,
+        "deve_persistir": deve_persistir,
+    }
+
+
+def _buscar_detalhe_para_enriquecimento(
+    bling: BlingAPI,
+    db: Session,
+    tenant_id,
+    nota_id: int,
+    modelo_nota: int,
+    ultima_consulta_ts: float,
+) -> tuple[dict | None, bool, float]:
+    detalhe = _consultar_detalhe_cache_persistente(db, tenant_id, nota_id, modelo_nota)
+    if _detalhe_nota_valido(detalhe):
+        return detalhe, False, ultima_consulta_ts
+
+    if ultima_consulta_ts:
+        intervalo = monotonic() - ultima_consulta_ts
+        if intervalo < 0.36:
+            sleep(0.36 - intervalo)
+
+    detalhe = _consultar_detalhe_remoto_bling(bling, nota_id, modelo_nota)
+    ultima_consulta_ts = monotonic()
+    if _detalhe_nota_valido(detalhe):
+        _salvar_detalhe_nfe_cache(tenant_id, nota_id, modelo_nota, detalhe)
+        return detalhe, True, ultima_consulta_ts
+    return detalhe, False, ultima_consulta_ts
+
+
+def _aplicar_detalhe_bling_em_nota(nota: dict, detalhe: dict) -> None:
+    nota["numero"] = (
+        _texto(_primeiro_preenchido(detalhe.get("numero"), nota.get("numero"))) or ""
+    )
+    nota["serie"] = (
+        _texto(_primeiro_preenchido(detalhe.get("serie"), nota.get("serie"))) or ""
+    )
+    nota["data_emissao"] = _primeiro_preenchido(
+        detalhe.get("dataEmissao"),
+        detalhe.get("data_emissao"),
+        nota.get("data_emissao"),
+    )
+    nota["valor"] = _extrair_valor_nota(detalhe) or nota.get("valor") or 0.0
+    nota["status"] = _status_nota_bling(detalhe)
+    nota["chave"] = detalhe.get("chaveAcesso") or nota.get("chave") or ""
+    _aplicar_cliente_detalhe_em_nota(nota, detalhe)
+    _aplicar_resumo_canal_em_nota(nota, _normalizar_resumo_canal(detalhe))
+
+
+def _aplicar_cliente_detalhe_em_nota(nota: dict, detalhe: dict) -> None:
+    contato = detalhe.get("contato") or {}
+    cliente = nota.get("cliente") or {}
+    cliente["id"] = cliente.get("id") or contato.get("id")
+    cliente["nome"] = (
+        cliente.get("nome") or contato.get("nome") or contato.get("descricao")
+    )
+    cliente["cpf_cnpj"] = (
+        cliente.get("cpf_cnpj")
+        or contato.get("cpf")
+        or contato.get("cnpj")
+        or contato.get("cpfCnpj")
+    )
+    nota["cliente"] = cliente
+
+
+def _aplicar_resumo_canal_em_nota(nota: dict, resumo_canal: dict) -> None:
+    nota["canal"] = nota.get("canal") or resumo_canal.get("canal")
+    nota["canal_label"] = nota.get("canal_label") or resumo_canal.get("canal_label")
+    if not isinstance(nota.get("loja"), dict) or not nota.get("loja", {}).get("nome"):
+        nota["loja"] = resumo_canal.get("loja")
+
+    for campo in (
+        "unidade_negocio",
+        "numero_loja_virtual",
+        "origem_loja_virtual",
+        "origem_canal_venda",
+        "numero_pedido_loja",
+        "pedido_bling_id_ref",
+    ):
+        nota[campo] = nota.get(campo) or resumo_canal.get(campo)
+
+
+def _persistir_enriquecimento_detalhe(
+    db: Session,
+    tenant_id,
+    nota: dict,
+    detalhe: dict,
+) -> None:
+    upsert_nota_cache(
+        db,
+        tenant_id,
+        nota,
+        source="bling_detail",
+        resumo_payload=nota,
+        detalhe_payload=detalhe,
+    )
+
+
 def _sincronizar_cache_nfes_com_bling(
     db: Session,
     tenant_id,
@@ -2117,8 +2210,6 @@ def _sincronizar_cache_nfes_com_bling(
     data_final: str | None = None,
     situacao: str | None = None,
 ) -> tuple[bool, list[dict]]:
-    notas_sincronizadas: list[dict] = []
-    bling_ok = False
     try:
         bling = BlingAPI()
     except Exception as e:
@@ -2127,50 +2218,28 @@ def _sincronizar_cache_nfes_com_bling(
         )
         return False, []
 
-    try:
-        resp_nfe = bling.listar_nfes(
-            data_inicial=data_inicial,
-            data_final=data_final,
-            situacao=situacao,
-        )
-        for item in resp_nfe.get("data") or []:
-            notas_sincronizadas.append(_normalizar_nota_bling(item, modelo=55))
-        bling_ok = True
-    except Exception as e:
-        logger.warning(
-            "listar_nfes",
-            f"Bling NF-e nao disponivel para sincronizacao incremental: {e}",
-        )
-        if "TOO_MANY_REQUESTS" in str(e).upper() or "429" in str(e):
-            BlingSyncService.register_rate_limit_cooldown(e)
-            return False, []
+    nfe_ok, notas_nfe, rate_limit_nfe = _listar_notas_bling_por_modelo(
+        bling,
+        modelo=55,
+        data_inicial=data_inicial,
+        data_final=data_final,
+        situacao=situacao,
+    )
+    if rate_limit_nfe:
+        return False, []
 
-    try:
-        resp_nfce = bling.listar_nfces(
-            data_inicial=data_inicial,
-            data_final=data_final,
-            situacao=situacao,
-        )
-        ids_ja_adicionados = {
-            (str(nota.get("id") or ""), _coerce_int(nota.get("modelo"), 55))
-            for nota in notas_sincronizadas
-        }
-        for item in resp_nfce.get("data") or []:
-            nota = _normalizar_nota_bling(item, modelo=65)
-            chave = (str(nota.get("id") or ""), _coerce_int(nota.get("modelo"), 65))
-            if chave in ids_ja_adicionados:
-                continue
-            notas_sincronizadas.append(nota)
-            ids_ja_adicionados.add(chave)
-        bling_ok = True
-    except Exception as e:
-        logger.warning(
-            "listar_nfes",
-            f"Bling NFC-e nao disponivel para sincronizacao incremental: {e}",
-        )
-        if "TOO_MANY_REQUESTS" in str(e).upper() or "429" in str(e):
-            BlingSyncService.register_rate_limit_cooldown(e)
-            return False, []
+    nfce_ok, notas_nfce, rate_limit_nfce = _listar_notas_bling_por_modelo(
+        bling,
+        modelo=65,
+        data_inicial=data_inicial,
+        data_final=data_final,
+        situacao=situacao,
+    )
+    if rate_limit_nfce:
+        return False, []
+
+    notas_sincronizadas = _deduplicar_notas_bling([*notas_nfe, *notas_nfce])
+    bling_ok = nfe_ok or nfce_ok
 
     if not notas_sincronizadas:
         return bling_ok, []
@@ -2194,3 +2263,53 @@ def _sincronizar_cache_nfes_com_bling(
         )
     db.commit()
     return bling_ok, notas_sincronizadas
+
+
+def _listar_notas_bling_por_modelo(
+    bling: BlingAPI,
+    *,
+    modelo: int,
+    data_inicial: str | None,
+    data_final: str | None,
+    situacao: str | None,
+) -> tuple[bool, list[dict], bool]:
+    try:
+        listar = bling.listar_nfces if modelo == 65 else bling.listar_nfes
+        resposta = listar(
+            data_inicial=data_inicial,
+            data_final=data_final,
+            situacao=situacao,
+        )
+    except Exception as exc:
+        tipo = "NFC-e" if modelo == 65 else "NF-e"
+        logger.warning(
+            "listar_nfes",
+            f"Bling {tipo} nao disponivel para sincronizacao incremental: {exc}",
+        )
+        if _erro_rate_limit_bling(exc):
+            BlingSyncService.register_rate_limit_cooldown(exc)
+            return False, [], True
+        return False, [], False
+
+    notas = [
+        _normalizar_nota_bling(item, modelo=modelo)
+        for item in resposta.get("data") or []
+    ]
+    return True, notas, False
+
+
+def _erro_rate_limit_bling(exc: Exception) -> bool:
+    mensagem = str(exc).upper()
+    return "TOO_MANY_REQUESTS" in mensagem or "429" in mensagem
+
+
+def _deduplicar_notas_bling(notas: list[dict]) -> list[dict]:
+    notas_unicas: list[dict] = []
+    ids_ja_adicionados: set[tuple[str, int]] = set()
+    for nota in notas:
+        chave = (str(nota.get("id") or ""), _coerce_int(nota.get("modelo"), 55))
+        if chave in ids_ja_adicionados:
+            continue
+        notas_unicas.append(nota)
+        ids_ja_adicionados.add(chave)
+    return notas_unicas
