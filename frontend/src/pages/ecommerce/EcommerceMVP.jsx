@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import ecommerceApi from "../../services/ecommerceApi";
 import { api } from "../../services/api";
@@ -52,6 +52,7 @@ export default function EcommerceMVP() {
   const location = useLocation();
   const navigate = useNavigate();
   const params = useParams();
+  const handledPaymentReturnSearchRef = useRef("");
 
   const [view, setView] = useState("loja");
 
@@ -280,6 +281,8 @@ export default function EcommerceMVP() {
   useEffect(() => {
     const paymentReturn = readMercadoPagoPaymentReturn(location.search);
     if (!paymentReturn) return;
+    if (handledPaymentReturnSearchRef.current === location.search) return;
+    handledPaymentReturnSearchRef.current = location.search;
 
     setView("pedidos");
     if (paymentReturn.level === "error") {
