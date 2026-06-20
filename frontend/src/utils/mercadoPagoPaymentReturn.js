@@ -24,7 +24,9 @@ const FAILURE_STATUSES = new Set(["failure", "failed", "rejected", "cancelled", 
 
 export function normalizeMercadoPagoPaymentReturnStatus(...values) {
   for (const value of values) {
-    const rawStatus = String(value || "").trim().toLowerCase();
+    const rawStatus = String(value || "")
+      .trim()
+      .toLowerCase();
     if (!rawStatus) continue;
     if (SUCCESS_STATUSES.has(rawStatus)) return "success";
     if (PENDING_STATUSES.has(rawStatus)) return "pending";
