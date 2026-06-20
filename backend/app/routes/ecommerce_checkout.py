@@ -415,9 +415,10 @@ def _public_base_url() -> str:
 
 def _app_payment_return_url() -> str:
     return (
-        os.getenv("ECOMMERCE_APP_PAYMENT_RETURN_URL")
-        or "corepet://app/pedidos"
-    ).strip().rstrip("/")
+        (os.getenv("ECOMMERCE_APP_PAYMENT_RETURN_URL") or "corepet://app/pedidos")
+        .strip()
+        .rstrip("/")
+    )
 
 
 def _classificar_forma_pagamento_online(nome: str | None) -> str | None:

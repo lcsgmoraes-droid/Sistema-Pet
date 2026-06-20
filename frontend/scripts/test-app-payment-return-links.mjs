@@ -19,9 +19,7 @@ assert.deepEqual(
 );
 
 assert.deepEqual(
-  readAppPaymentReturnParams(
-    "?status=approved&external_reference=PED-456&tenant=atacadao",
-  ),
+  readAppPaymentReturnParams("?status=approved&external_reference=PED-456&tenant=atacadao"),
   {
     paymentStatus: "success",
     pedidoId: "PED-456",
