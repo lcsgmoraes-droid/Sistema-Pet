@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -97,6 +97,8 @@ const CANAL_LABELS: Record<string, string> = {
   amazon: "Amazon",
 };
 
+const PENDING_ORDER_POLL_MS = 12_000;
+
 function getCanalLabel(pedido: Pedido): string {
   if (pedido.canal_label) return pedido.canal_label;
   const canal = (pedido.canal || pedido.origem || "ecommerce")
@@ -158,19 +160,29 @@ export default function OrdersScreen() {
     }
   }
 
-  useFocusEffect(
-    useCallback(() => {
-      carregar();
-    }, []),
-  );
-
-  async function carregar() {
+  const carregar = useCallback(async () => {
     try {
       const lista = await listarPedidos();
       setPedidos(lista);
     } catch {}
     setCarregando(false);
-  }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      carregar();
+    }, [carregar]),
+  );
+
+  useEffect(() => {
+    const temPedidoPendente = pedidos.some(
+      (pedido) => pedido.status === "pendente",
+    );
+    if (!temPedidoPendente) return;
+
+    const interval = setInterval(carregar, PENDING_ORDER_POLL_MS);
+    return () => clearInterval(interval);
+  }, [carregar, pedidos]);
 
   async function onRefresh() {
     setRefreshing(true);

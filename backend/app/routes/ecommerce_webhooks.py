@@ -217,12 +217,144 @@ def _notify_payment_status_change(
     )
 
 
+PEDIDO_ID_SOURCES = (
+    ("root", "pedido_id"),
+    ("root", "external_reference"),
+    ("metadata", "pedido_id"),
+    ("metadata", "external_reference"),
+    ("data", "pedido_id"),
+    ("data", "external_reference"),
+    ("data_metadata", "pedido_id"),
+    ("data_metadata", "external_reference"),
+    ("mp_payment", "external_reference"),
+    ("mp_metadata", "pedido_id"),
+    ("mp_metadata", "external_reference"),
+)
+
+PAYMENT_PREFERENCE_ID_SOURCES = (
+    ("root", "payment_preference_id"),
+    ("root", "preference_id"),
+    ("metadata", "payment_preference_id"),
+    ("metadata", "preference_id"),
+    ("data", "payment_preference_id"),
+    ("data", "preference_id"),
+    ("data_metadata", "payment_preference_id"),
+    ("data_metadata", "preference_id"),
+    ("mp_payment", "payment_preference_id"),
+    ("mp_payment", "preference_id"),
+    ("mp_metadata", "payment_preference_id"),
+    ("mp_metadata", "preference_id"),
+    ("mp_order", "id"),
+    ("mp_notification", "payment_preference_id"),
+    ("mp_notification", "preference_id"),
+    ("mp_notification_data", "payment_preference_id"),
+    ("mp_notification_data", "preference_id"),
+)
+
+
 def _find_pedido_id(payload: dict) -> str | None:
-    return (
-        payload.get("pedido_id")
-        or (payload.get("metadata") or {}).get("pedido_id")
-        or ((payload.get("data") or {}).get("metadata") or {}).get("pedido_id")
+    return _find_payload_value(payload, PEDIDO_ID_SOURCES)
+
+
+def _first_non_empty(*values) -> str | None:
+    for value in values:
+        if value is None:
+            continue
+        normalized = str(value).strip()
+        if normalized:
+            return normalized
+    return None
+
+
+def _as_dict(value) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def _payment_payload_contexts(payload: dict) -> dict[str, dict]:
+    data = _as_dict(payload.get("data"))
+    metadata = _as_dict(payload.get("metadata"))
+    data_metadata = _as_dict(data.get("metadata"))
+    mercadopago = _as_dict(payload.get("mercadopago"))
+    mp_payment = _as_dict(mercadopago.get("payment"))
+    mp_metadata = _as_dict(mp_payment.get("metadata"))
+    mp_order = _as_dict(mp_payment.get("order"))
+    mp_notification = _as_dict(mercadopago.get("notification"))
+    mp_notification_data = _as_dict(mp_notification.get("data"))
+
+    return {
+        "root": payload,
+        "data": data,
+        "metadata": metadata,
+        "data_metadata": data_metadata,
+        "mp_payment": mp_payment,
+        "mp_metadata": mp_metadata,
+        "mp_order": mp_order,
+        "mp_notification": mp_notification,
+        "mp_notification_data": mp_notification_data,
+    }
+
+
+def _find_payload_value(
+    payload: dict, sources: tuple[tuple[str, str], ...]
+) -> str | None:
+    contexts = _payment_payload_contexts(payload)
+    return _first_non_empty(
+        *(contexts[context_name].get(key) for context_name, key in sources)
     )
+
+
+def _find_payment_preference_id(payload: dict) -> str | None:
+    return _find_payload_value(payload, PAYMENT_PREFERENCE_ID_SOURCES)
+
+
+def _find_pedido_for_payment(db, *, tenant_id: str, payload: dict) -> Pedido | None:
+    pedido_id = _find_pedido_id(payload)
+    if pedido_id:
+        pedido = (
+            db.query(Pedido)
+            .filter(Pedido.pedido_id == pedido_id, Pedido.tenant_id == tenant_id)
+            .first()
+        )
+        if pedido:
+            return pedido
+
+    payment_preference_id = _find_payment_preference_id(payload)
+    if not payment_preference_id:
+        return None
+
+    return (
+        db.query(Pedido)
+        .filter(
+            Pedido.payment_preference_id == payment_preference_id,
+            Pedido.tenant_id == tenant_id,
+        )
+        .order_by(Pedido.id.desc())
+        .first()
+    )
+
+
+def _apply_payment_status_update(
+    db,
+    *,
+    tenant_id: str,
+    payload: dict,
+) -> tuple[bool, int | None, Pedido | None, str | None]:
+    pedido_status = _map_payment_status(payload)
+    if not pedido_status:
+        return False, None, None, None
+
+    pedido = _find_pedido_for_payment(db, tenant_id=tenant_id, payload=payload)
+    if not pedido:
+        return False, None, None, pedido_status
+
+    pedido.status = pedido_status
+    venda_id = None
+    if pedido_status == "aprovado":
+        payment_method, _ = _extrair_pagamento_do_webhook(payload)
+        _normalizar_payment_method_online(payment_method)
+        venda_id = _integrar_venda_ao_motor(db, pedido, payload)
+
+    return True, venda_id, pedido, pedido_status
 
 
 def _normalizar_payment_method_online(payment_method: str | None) -> str:
@@ -887,28 +1019,12 @@ async def webhook_pagarme(request: Request):
         db.add(registry)
         db.flush()
 
-        pedido_id = _find_pedido_id(payload)
-        pedido_status = _map_payment_status(payload)
-
-        updated = False
-        venda_id = None
-        pedido_notificacao = None
-        pedido_status_notificacao = None
-        if pedido_id and pedido_status:
-            pedido = (
-                db.query(Pedido)
-                .filter(Pedido.pedido_id == pedido_id, Pedido.tenant_id == tenant_id)
-                .first()
-            )
-            if pedido:
-                pedido.status = pedido_status
-                updated = True
-                pedido_notificacao = pedido
-                pedido_status_notificacao = pedido_status
-                if pedido_status == "aprovado":
-                    payment_method, _ = _extrair_pagamento_do_webhook(payload)
-                    _normalizar_payment_method_online(payment_method)
-                    venda_id = _integrar_venda_ao_motor(db, pedido, payload)
+        payment_update = _apply_payment_status_update(
+            db, tenant_id=tenant_id, payload=payload
+        )
+        updated, venda_id, pedido_notificacao, pedido_status_notificacao = (
+            payment_update
+        )
 
         response = {
             "status": "processed",
@@ -945,6 +1061,133 @@ async def webhook_pagarme(request: Request):
         )
     finally:
         db.close()
+
+
+def _process_mercadopago_payment_update(
+    db,
+    *,
+    tenant_id: str,
+    endpoint_name: str,
+    key_name: str,
+    event_id: str,
+    event_type: str,
+    payment_id: str | None,
+    payment_status: str,
+    signature_status: str,
+    request_hash: str,
+    payload: dict,
+) -> dict:
+    existing = (
+        db.query(IdempotencyKey)
+        .filter(
+            IdempotencyKey.user_id == 0,
+            IdempotencyKey.tenant_id == tenant_id,
+            IdempotencyKey.endpoint == endpoint_name,
+            IdempotencyKey.chave_idempotencia == key_name,
+        )
+        .first()
+    )
+
+    duplicate_response = {
+        "event_id": event_id,
+        "event_type": event_type,
+        "payment_id": payment_id,
+        "signature": signature_status,
+    }
+    if existing:
+        if existing.request_hash != request_hash:
+            return {"status": "duplicate_status", **duplicate_response}
+        return {"status": "duplicate", **duplicate_response}
+
+    registry = IdempotencyKey(
+        user_id=0,
+        tenant_id=tenant_id,
+        endpoint=endpoint_name,
+        chave_idempotencia=key_name,
+        request_hash=request_hash,
+        status="processing",
+    )
+    db.add(registry)
+    db.flush()
+
+    updated, venda_id, pedido_notificacao, pedido_status_notificacao = (
+        _apply_payment_status_update(db, tenant_id=tenant_id, payload=payload)
+    )
+
+    response = {
+        "status": "processed",
+        "provider": "mercadopago",
+        "event_id": event_id,
+        "event_type": event_type,
+        "payment_id": payment_id,
+        "payment_status": payment_status,
+        "signature": signature_status,
+        "pedido_atualizado": updated,
+        "venda_id": venda_id,
+    }
+
+    registry.status = "completed"
+    registry.response_status_code = 200
+    registry.response_body = json.dumps(response)
+    registry.completed_at = datetime.utcnow()
+    db.commit()
+    _notify_payment_status_change(
+        db,
+        tenant_id=str(tenant_id),
+        pedido=pedido_notificacao,
+        pedido_status=pedido_status_notificacao,
+        venda_id=venda_id,
+    )
+
+    return response
+
+
+def _is_mercadopago_simulation(notification_payload: dict) -> bool:
+    live_mode = notification_payload.get("live_mode")
+    return live_mode is False or str(live_mode).strip().lower() == "false"
+
+
+def _ignored_mercadopago_simulation_response(
+    payment_id: str | None, signature_status: str
+) -> dict:
+    return {
+        "status": "ignored_simulation",
+        "provider": "mercadopago",
+        "payment_id": payment_id,
+        "signature": signature_status,
+        "detail": "Simulacao Mercado Pago sem pagamento real consultavel",
+    }
+
+
+def _finish_mercadopago_webhook(
+    db,
+    *,
+    tenant_id: str,
+    endpoint_name: str,
+    payment_id: str | None,
+    signature_status: str,
+    notification_payload: dict,
+    raw_body: bytes,
+    payload: dict,
+) -> dict:
+    event_id, event_type, request_hash = _extract_event_info(
+        notification_payload, raw_body
+    )
+    payment_status = str(payload.get("status") or "unknown").strip().lower()
+    key_name = f"mercadopago:{payment_id}:{event_type}:{payment_status}"
+    return _process_mercadopago_payment_update(
+        db,
+        tenant_id=tenant_id,
+        endpoint_name=endpoint_name,
+        key_name=key_name,
+        event_id=event_id,
+        event_type=event_type,
+        payment_id=payment_id,
+        payment_status=payment_status,
+        signature_status=signature_status,
+        request_hash=request_hash,
+        payload=payload,
+    )
 
 
 @router.post("/mercadopago/{webhook_token}")
@@ -990,117 +1233,26 @@ async def webhook_mercadopago_tenant(webhook_token: str, request: Request):
                 access_token=payment_config.access_token,
             )
         except HTTPException as exc:
-            live_mode = notification_payload.get("live_mode")
-            if live_mode is False or str(live_mode).strip().lower() == "false":
-                return {
-                    "status": "ignored_simulation",
-                    "provider": "mercadopago",
-                    "payment_id": payment_id,
-                    "signature": signature_status,
-                    "detail": "Simulacao Mercado Pago sem pagamento real consultavel",
-                }
+            if _is_mercadopago_simulation(notification_payload):
+                return _ignored_mercadopago_simulation_response(
+                    payment_id, signature_status
+                )
             raise exc
 
         payload = normalize_payment_payload(payment_payload, notification_payload)
         tenant_id = payment_config.tenant_id
         set_current_tenant(UUID(tenant_id))
 
-        event_id, event_type, request_hash = _extract_event_info(
-            notification_payload, raw_body
-        )
-        payment_status = str(payload.get("status") or "unknown").strip().lower()
-
-        endpoint_name = "POST /api/webhooks/mercadopago/{webhook_token}"
-        key_name = f"mercadopago:{payment_id}:{event_type}:{payment_status}"
-
-        existing = (
-            db.query(IdempotencyKey)
-            .filter(
-                IdempotencyKey.user_id == 0,
-                IdempotencyKey.tenant_id == tenant_id,
-                IdempotencyKey.endpoint == endpoint_name,
-                IdempotencyKey.chave_idempotencia == key_name,
-            )
-            .first()
-        )
-
-        if existing:
-            if existing.request_hash != request_hash:
-                return {
-                    "status": "duplicate_status",
-                    "event_id": event_id,
-                    "event_type": event_type,
-                    "payment_id": payment_id,
-                    "signature": signature_status,
-                }
-            return {
-                "status": "duplicate",
-                "event_id": event_id,
-                "event_type": event_type,
-                "payment_id": payment_id,
-                "signature": signature_status,
-            }
-
-        registry = IdempotencyKey(
-            user_id=0,
-            tenant_id=tenant_id,
-            endpoint=endpoint_name,
-            chave_idempotencia=key_name,
-            request_hash=request_hash,
-            status="processing",
-        )
-        db.add(registry)
-        db.flush()
-
-        pedido_id = _find_pedido_id(payload)
-        pedido_status = _map_payment_status(payload)
-
-        updated = False
-        venda_id = None
-        pedido_notificacao = None
-        pedido_status_notificacao = None
-        if pedido_id and pedido_status:
-            pedido = (
-                db.query(Pedido)
-                .filter(Pedido.pedido_id == pedido_id, Pedido.tenant_id == tenant_id)
-                .first()
-            )
-            if pedido:
-                pedido.status = pedido_status
-                updated = True
-                pedido_notificacao = pedido
-                pedido_status_notificacao = pedido_status
-                if pedido_status == "aprovado":
-                    payment_method, _ = _extrair_pagamento_do_webhook(payload)
-                    _normalizar_payment_method_online(payment_method)
-                    venda_id = _integrar_venda_ao_motor(db, pedido, payload)
-
-        response = {
-            "status": "processed",
-            "provider": "mercadopago",
-            "event_id": event_id,
-            "event_type": event_type,
-            "payment_id": payment_id,
-            "payment_status": payment_status,
-            "signature": signature_status,
-            "pedido_atualizado": updated,
-            "venda_id": venda_id,
-        }
-
-        registry.status = "completed"
-        registry.response_status_code = 200
-        registry.response_body = json.dumps(response)
-        registry.completed_at = datetime.utcnow()
-        db.commit()
-        _notify_payment_status_change(
+        return _finish_mercadopago_webhook(
             db,
-            tenant_id=str(tenant_id),
-            pedido=pedido_notificacao,
-            pedido_status=pedido_status_notificacao,
-            venda_id=venda_id,
+            tenant_id=tenant_id,
+            endpoint_name="POST /api/webhooks/mercadopago/{webhook_token}",
+            payment_id=payment_id,
+            signature_status=signature_status,
+            notification_payload=notification_payload,
+            raw_body=raw_body,
+            payload=payload,
         )
-
-        return response
 
     except HTTPException:
         db.rollback()
@@ -1130,119 +1282,28 @@ async def webhook_mercadopago(request: Request):
     try:
         payment_payload = fetch_payment(str(payment_id or ""))
     except HTTPException as exc:
-        live_mode = notification_payload.get("live_mode")
-        if live_mode is False or str(live_mode).strip().lower() == "false":
-            return {
-                "status": "ignored_simulation",
-                "provider": "mercadopago",
-                "payment_id": payment_id,
-                "signature": signature_status,
-                "detail": "Simulacao Mercado Pago sem pagamento real consultavel",
-            }
+        if _is_mercadopago_simulation(notification_payload):
+            return _ignored_mercadopago_simulation_response(
+                payment_id, signature_status
+            )
         raise exc
 
     payload = normalize_payment_payload(payment_payload, notification_payload)
     tenant_id = _find_tenant_id(payload, request)
     set_current_tenant(UUID(tenant_id))
 
-    event_id, event_type, request_hash = _extract_event_info(
-        notification_payload, raw_body
-    )
-    payment_status = str(payload.get("status") or "unknown").strip().lower()
-
     db = SessionLocal()
     try:
-        endpoint_name = "POST /api/webhooks/mercadopago"
-        key_name = f"mercadopago:{payment_id}:{event_type}:{payment_status}"
-
-        existing = (
-            db.query(IdempotencyKey)
-            .filter(
-                IdempotencyKey.user_id == 0,
-                IdempotencyKey.tenant_id == tenant_id,
-                IdempotencyKey.endpoint == endpoint_name,
-                IdempotencyKey.chave_idempotencia == key_name,
-            )
-            .first()
-        )
-
-        if existing:
-            if existing.request_hash != request_hash:
-                return {
-                    "status": "duplicate_status",
-                    "event_id": event_id,
-                    "event_type": event_type,
-                    "payment_id": payment_id,
-                    "signature": signature_status,
-                }
-            return {
-                "status": "duplicate",
-                "event_id": event_id,
-                "event_type": event_type,
-                "payment_id": payment_id,
-                "signature": signature_status,
-            }
-
-        registry = IdempotencyKey(
-            user_id=0,
-            tenant_id=tenant_id,
-            endpoint=endpoint_name,
-            chave_idempotencia=key_name,
-            request_hash=request_hash,
-            status="processing",
-        )
-        db.add(registry)
-        db.flush()
-
-        pedido_id = _find_pedido_id(payload)
-        pedido_status = _map_payment_status(payload)
-
-        updated = False
-        venda_id = None
-        pedido_notificacao = None
-        pedido_status_notificacao = None
-        if pedido_id and pedido_status:
-            pedido = (
-                db.query(Pedido)
-                .filter(Pedido.pedido_id == pedido_id, Pedido.tenant_id == tenant_id)
-                .first()
-            )
-            if pedido:
-                pedido.status = pedido_status
-                updated = True
-                pedido_notificacao = pedido
-                pedido_status_notificacao = pedido_status
-                if pedido_status == "aprovado":
-                    payment_method, _ = _extrair_pagamento_do_webhook(payload)
-                    _normalizar_payment_method_online(payment_method)
-                    venda_id = _integrar_venda_ao_motor(db, pedido, payload)
-
-        response = {
-            "status": "processed",
-            "provider": "mercadopago",
-            "event_id": event_id,
-            "event_type": event_type,
-            "payment_id": payment_id,
-            "payment_status": payment_status,
-            "signature": signature_status,
-            "pedido_atualizado": updated,
-            "venda_id": venda_id,
-        }
-
-        registry.status = "completed"
-        registry.response_status_code = 200
-        registry.response_body = json.dumps(response)
-        registry.completed_at = datetime.utcnow()
-        db.commit()
-        _notify_payment_status_change(
+        return _finish_mercadopago_webhook(
             db,
             tenant_id=tenant_id,
-            pedido=pedido_notificacao,
-            pedido_status=pedido_status_notificacao,
-            venda_id=venda_id,
+            endpoint_name="POST /api/webhooks/mercadopago",
+            payment_id=payment_id,
+            signature_status=signature_status,
+            notification_payload=notification_payload,
+            raw_body=raw_body,
+            payload=payload,
         )
-
-        return response
 
     except HTTPException:
         db.rollback()
