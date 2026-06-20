@@ -810,7 +810,9 @@ def listar_pedidos_cliente(
             }
         )
 
-    return {"pedidos": resultado}
+    response = {"pedidos": resultado}
+    db.rollback()
+    return response
 
 
 @router.get("/pedido/{pedido_id}/status")

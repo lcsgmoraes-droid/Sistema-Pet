@@ -242,6 +242,13 @@ def test_checkout_order_routes_reactivate_tenant_before_pedido_queries():
         ) < source.index("db.query(Pedido)")
 
 
+def test_checkout_pedidos_releases_read_transaction_before_return():
+    source = inspect.getsource(listar_pedidos_cliente)
+
+    assert "db.rollback()" in source
+    assert source.index("db.rollback()") < source.index("return response")
+
+
 def test_ecommerce_register_rejects_incomplete_customer_name_before_creating_user():
     source = inspect.getsource(registrar_cliente)
 
