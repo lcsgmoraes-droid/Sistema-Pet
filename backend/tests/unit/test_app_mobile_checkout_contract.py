@@ -83,3 +83,15 @@ def test_android_manifest_accepts_corepet_payment_return_deep_link():
     assert "android.intent.action.VIEW" in manifest
     assert "android.intent.category.BROWSABLE" in manifest
     assert 'android:scheme="corepet"' in manifest
+
+
+def test_mobile_orders_screen_shows_channel_label_and_order_push_navigates_to_orders():
+    orders = _read_mobile_source("app-mobile/src/screens/orders/OrdersScreen.tsx")
+    hook = _read_mobile_source("app-mobile/src/hooks/usePushNotifications.ts")
+    types = _read_mobile_source("app-mobile/src/types/index.ts")
+
+    assert "canal_label" in types
+    assert "canal_label" in orders
+    assert "App mobile" in orders
+    assert 'data.source === "order"' in hook
+    assert 'navigateWhenReady("Pedidos"' in hook

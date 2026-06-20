@@ -88,6 +88,24 @@ const STATUS_ENTREGA: Record<string, { label: string; cor: string }> = {
   entregue: { label: "✅ Entregue", cor: "#10B981" },
 };
 
+const CANAL_LABELS: Record<string, string> = {
+  ecommerce: "Ecommerce",
+  app: "App mobile",
+  loja_fisica: "Loja fisica / ERP",
+  mercado_livre: "Mercado Livre",
+  shopee: "Shopee",
+  amazon: "Amazon",
+};
+
+function getCanalLabel(pedido: Pedido): string {
+  if (pedido.canal_label) return pedido.canal_label;
+  const canal = (pedido.canal || pedido.origem || "ecommerce")
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, "_");
+  return CANAL_LABELS[canal] || canal.replace(/_/g, " ") || "Ecommerce";
+}
+
 function getEntregaStatusConfig(pedido: Pedido) {
   const statusEntrega = pedido.status_entrega || "";
   if (!statusEntrega) return null;
@@ -178,6 +196,7 @@ export default function OrdersScreen() {
         item.status,
       );
     const podePagarAgora = item.status === "pendente" && !!item.payment_url;
+    const canalLabel = getCanalLabel(item);
 
     return (
       <View style={styles.card}>
@@ -190,6 +209,10 @@ export default function OrdersScreen() {
             <Text style={styles.pedidoData}>
               {formatarDataHora(item.created_at)}
             </Text>
+            <View style={styles.canalBadge}>
+              <Ionicons name="pricetag-outline" size={11} color="#9A3412" />
+              <Text style={styles.canalBadgeText}>{canalLabel}</Text>
+            </View>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: cfg.cor }]}>
             <Ionicons name={cfg.icone as any} size={13} color={cfg.corTexto} />
@@ -407,6 +430,24 @@ const styles = StyleSheet.create({
     fontSize: FONTE.pequena,
     color: CORES.textoSecundario,
     marginTop: 2,
+  },
+  canalBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 4,
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: RAIO.circulo,
+    borderWidth: 1,
+    borderColor: "#FED7AA",
+    backgroundColor: "#FFF7ED",
+  },
+  canalBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#9A3412",
   },
   statusBadge: {
     flexDirection: "row",

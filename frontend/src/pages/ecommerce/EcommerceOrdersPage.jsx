@@ -24,10 +24,29 @@ const ORDER_STATUS_LABELS = {
   cancelado: "cancelado",
 };
 
+const ORDER_CHANNEL_LABELS = {
+  ecommerce: "Ecommerce",
+  app: "App mobile",
+  loja_fisica: "Loja fisica / ERP",
+  mercado_livre: "Mercado Livre",
+  shopee: "Shopee",
+  amazon: "Amazon",
+};
+
 function normalizarStatusPedido(status) {
   return String(status || "pendente")
     .trim()
     .toLowerCase();
+}
+
+function getOrderChannelLabel(order) {
+  if (order.canal_label) return order.canal_label;
+  const channel = String(order.canal || order.origem || "ecommerce")
+    .trim()
+    .toLowerCase()
+    .replaceAll("-", "_")
+    .replaceAll(" ", "_");
+  return ORDER_CHANNEL_LABELS[channel] || channel.replaceAll("_", " ") || "Ecommerce";
 }
 
 function getOrderFulfillmentStatus(order) {
@@ -127,6 +146,30 @@ function OrderPickupPassword({ password }) {
         Apresente na loja para retirar
       </div>
     </div>
+  );
+}
+
+function OrderChannelBadge({ order }) {
+  const label = getOrderChannelLabel(order);
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        border: "1px solid #fed7aa",
+        borderRadius: 999,
+        color: "#9a3412",
+        background: "#fff7ed",
+        fontSize: 11,
+        fontWeight: 800,
+        lineHeight: 1,
+        padding: "5px 8px",
+        marginTop: 6,
+      }}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -361,6 +404,7 @@ function OrderCard({ order, styles: S, onDriveArrived, onOpenPayment }) {
           <div style={{ fontSize: 12, color: "#9ca3af" }}>
             {order.created_at ? new Date(order.created_at).toLocaleString("pt-BR") : "-"}
           </div>
+          <OrderChannelBadge order={order} />
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
           <span

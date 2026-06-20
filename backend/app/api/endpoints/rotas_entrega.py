@@ -43,6 +43,7 @@ from app.services.notificacao_entrega_service import (
     notificar_inicio_rota,
     notificar_proximo_cliente,
 )
+from app.services.order_push_notifications import notify_sale_order_event
 from app.services.app_access_profile_service import get_cliente_for_app_profile_or_none
 from app.models_configuracao_custo_moto import ConfiguracaoCustoMoto
 from app.session_manager import get_session_by_jti
@@ -1128,6 +1129,8 @@ def criar_rota(
             venda.status_entrega = "em_rota"
 
         db.commit()
+        for venda in vendas:
+            notify_sale_order_event(db, venda=venda, event="out_for_delivery")
         db.refresh(rota)
 
         return obter_rota(rota_id=rota.id, db=db, actor=actor)
@@ -1195,6 +1198,7 @@ def criar_rota(
     venda.status_entrega = "em_rota"
 
     db.commit()
+    notify_sale_order_event(db, venda=venda, event="out_for_delivery")
     db.refresh(rota)
 
     return obter_rota(rota_id=rota.id, db=db, actor=actor)
@@ -1803,6 +1807,8 @@ def marcar_parada_entregue(
             mensagem += " Todas as paradas foram concluidas. Feche a rota."
         return {"message": mensagem, "paradas_pendentes": paradas_pendentes}
 
+    venda_entregue = None
+
     # Marcar status
     if tentativa:
         parada.status = "tentativa"
@@ -1811,7 +1817,7 @@ def marcar_parada_entregue(
     else:
         parada.status = "entregue"
         parada.data_entrega = datetime.now()
-        _sincronizar_venda_entregue_por_parada(db, parada, tenant_id)
+        venda_entregue = _sincronizar_venda_entregue_por_parada(db, parada, tenant_id)
 
         # Registrar KM da entrega (opcional)
         if km_entrega is not None:
@@ -1865,6 +1871,8 @@ def marcar_parada_entregue(
             logger.info(f"Erro ao notificar próximo cliente: {e}")
 
     db.commit()
+    if venda_entregue is not None:
+        notify_sale_order_event(db, venda=venda_entregue, event="delivered")
 
     # Verificar se todas as paradas foram entregues.
     # Tentativas ainda contam como abertas para impedir fechamento acidental.

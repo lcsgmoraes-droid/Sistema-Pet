@@ -20,10 +20,12 @@ from app.routes.ecommerce_auth import (
     _get_current_ecommerce_user,
 )
 from app.services.ecommerce_payment_config import get_active_mercado_pago_runtime_config
+from app.services.customer_order_history import list_customer_order_history
 from app.services.mercado_pago_checkout import (
     create_preference,
     is_mercado_pago_provider,
 )
+from app.services.order_push_notifications import notify_order_event
 from app.services.sales_channel import resolve_checkout_sales_channel
 from app.tenancy.context import (
     clear_current_tenant,
@@ -748,6 +750,14 @@ def finalizar_checkout(
         f"Checkout enviado para pagamento: carrinho #{carrinho.pedido_id} "
         f"aguardando aprovacao (tipo_retirada={tipo_retirada})"
     )
+    notify_order_event(
+        db,
+        tenant_id=tenant_id,
+        user_id=identity.user_id,
+        event="checkout_created",
+        pedido_id=carrinho.pedido_id,
+        canal=origem_checkout,
+    )
     return response
 
 
@@ -757,60 +767,18 @@ def listar_pedidos_cliente(
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
-    """Lista todos os pedidos finalizados do cliente logado (exclui carrinho ativo)."""
+    """Lista o historico de compras do cliente logado por canal."""
     tenant_id = _activate_checkout_tenant_context(identity)
     _expirar_reservas_automaticamente(db, tenant_id)
 
-    pedidos = (
-        db.query(Pedido)
-        .filter(
-            Pedido.cliente_id == identity.user_id,
-            Pedido.tenant_id == tenant_id,
-            Pedido.status != "carrinho",
-        )
-        .order_by(Pedido.id.desc())
-        .limit(limit)
-        .all()
+    pedidos = list_customer_order_history(
+        db,
+        tenant_id=tenant_id,
+        user_id=identity.user_id,
+        limit=limit,
     )
 
-    resultado = []
-    for pedido in pedidos:
-        itens = _buscar_itens(db, pedido.pedido_id)
-        payment_info = _payment_info_for_pedido(db, pedido)
-        venda_info = _venda_info_for_pedido(db, pedido)
-        resultado.append(
-            {
-                "pedido_id": pedido.pedido_id,
-                "status": pedido.status,
-                "total": float(pedido.total or 0.0),
-                "origem": pedido.origem or venda_info["canal"] or "-",
-                "venda_id": venda_info["venda_id"],
-                "status_entrega": venda_info["status_entrega"],
-                "retirado_por": venda_info["retirado_por"],
-                "tem_entrega": venda_info["tem_entrega"],
-                "tipo_retirada": pedido.tipo_retirada,
-                "palavra_chave_retirada": pedido.palavra_chave_retirada,
-                "payment_provider": payment_info["payment_provider"],
-                "payment_preference_id": payment_info["payment_preference_id"],
-                "payment_url": payment_info["payment_url"],
-                "created_at": pedido.created_at.isoformat()
-                if pedido.created_at
-                else None,
-                "itens_count": len(itens),
-                "itens": [
-                    {
-                        "produto_id": item.produto_id,
-                        "nome": item.nome,
-                        "quantidade": item.quantidade,
-                        "preco_unitario": float(item.preco_unitario or 0.0),
-                        "subtotal": float(item.subtotal or 0.0),
-                    }
-                    for item in itens
-                ],
-            }
-        )
-
-    response = {"pedidos": resultado}
+    response = {"pedidos": pedidos}
     db.rollback()
     return response
 
