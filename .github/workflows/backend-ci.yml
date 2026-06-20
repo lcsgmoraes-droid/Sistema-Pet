@@ -655,7 +655,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           SONAR_CHECK_NAME: SonarCloud Code Analysis
-          SONAR_WAIT_SECONDS: "240"
+          SONAR_WAIT_SECONDS: "720"
         run: |
           deadline=$((SECONDS + SONAR_WAIT_SECONDS))
 
