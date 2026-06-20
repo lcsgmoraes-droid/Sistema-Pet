@@ -270,14 +270,14 @@ def test_enriquecer_notas_com_detalhes_bling_preenche_numero_quando_cache_veio_i
     upserts = []
 
     monkeypatch.setattr(
-        "app.nfe_routes._obter_detalhe_nfe_cache",
+        "app.nfe.listagem._obter_detalhe_nfe_cache",
         lambda tenant_id, nfe_id, modelo=None: detalhe,
     )
     monkeypatch.setattr(
-        "app.nfe_routes.obter_detalhe_nota_cache", lambda **kwargs: detalhe
+        "app.nfe.listagem.obter_detalhe_nota_cache", lambda **kwargs: detalhe
     )
     monkeypatch.setattr(
-        "app.nfe_routes.upsert_nota_cache",
+        "app.nfe.listagem.upsert_nota_cache",
         lambda *args, **kwargs: upserts.append(kwargs),
     )
 
