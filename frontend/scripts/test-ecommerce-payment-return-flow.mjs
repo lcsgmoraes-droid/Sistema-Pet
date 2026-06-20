@@ -40,7 +40,7 @@ assert.match(
 
 assert.match(
   ordersHookSource,
-  /const\s+recordOrderId\s*=\s*useCallback\(async\s*\(orderId\)\s*=>/,
+  /const\s+recordOrderId\s*=\s*useCallback\(\s*async\s*\(orderId\)\s*=>/,
   "recordOrderId deve ser estavel para nao repetir o tratamento da URL do Mercado Pago",
 );
 
