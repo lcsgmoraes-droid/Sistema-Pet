@@ -7,6 +7,7 @@ export type PushRegistrationStatus =
   | "registered"
   | "expo_go"
   | "permission_denied"
+  | "firebase_not_configured"
   | "token_error"
   | "backend_error";
 
@@ -33,6 +34,15 @@ async function ensureAndroidChannel() {
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return "Nao foi possivel ativar notificacoes neste aparelho.";
+}
+
+function isFirebaseConfigurationError(error: unknown): boolean {
+  const message = errorMessage(error).toLowerCase();
+  return (
+    message.includes("default firebaseapp is not initialized") ||
+    message.includes("firebaseapp.initializeapp") ||
+    message.includes("fcm-credentials")
+  );
 }
 
 export async function ensurePushNotificationsRegistered(): Promise<PushRegistrationResult> {
@@ -80,6 +90,13 @@ export async function ensurePushNotificationsRegistered(): Promise<PushRegistrat
   try {
     tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
   } catch (error) {
+    if (isFirebaseConfigurationError(error)) {
+      return {
+        status: "firebase_not_configured",
+        message:
+          "Este APK foi gerado sem a configuracao Firebase/FCM. Instale a nova build do app para ativar notificacoes.",
+      };
+    }
     return {
       status: "token_error",
       message: errorMessage(error),
