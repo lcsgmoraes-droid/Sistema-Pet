@@ -45,34 +45,26 @@ function isFirebaseConfigurationError(error: unknown): boolean {
   );
 }
 
-export async function ensurePushNotificationsRegistered(): Promise<PushRegistrationResult> {
-  await ensureAndroidChannel();
+function firebaseNotConfiguredResult(): PushRegistrationResult {
+  return {
+    status: "firebase_not_configured",
+    message:
+      "Este APK foi gerado sem a configuracao Firebase/FCM. Instale a nova build do app para ativar notificacoes.",
+  };
+}
 
+function tokenErrorResult(error: unknown): PushRegistrationResult {
+  return {
+    status: "token_error",
+    message: errorMessage(error),
+  };
+}
+
+export async function ensurePushNotificationsRegistered(): Promise<PushRegistrationResult> {
   if (isExpoGo) {
     return {
       status: "expo_go",
       message: "Push remoto nao funciona no Expo Go. Use o APK de teste instalado.",
-    };
-  }
-
-  const currentPermission = await Notifications.getPermissionsAsync();
-  let finalStatus = currentPermission.status;
-  let canAskAgain = currentPermission.canAskAgain;
-
-  if (finalStatus !== "granted") {
-    const requested = await Notifications.requestPermissionsAsync();
-    finalStatus = requested.status;
-    canAskAgain = requested.canAskAgain;
-  }
-
-  if (finalStatus !== "granted") {
-    return {
-      status: "permission_denied",
-      message: canAskAgain
-        ? "Permissao de notificacoes nao liberada."
-        : "Permissao de notificacoes bloqueada nas configuracoes do aparelho.",
-      permissionStatus: finalStatus,
-      canAskAgain,
     };
   }
 
@@ -86,21 +78,41 @@ export async function ensurePushNotificationsRegistered(): Promise<PushRegistrat
     };
   }
 
-  let tokenData: Notifications.ExpoPushToken;
+  let tokenData: Notifications.ExpoPushToken | null = null;
   try {
+    await ensureAndroidChannel();
+
+    const currentPermission = await Notifications.getPermissionsAsync();
+    let finalStatus = currentPermission.status;
+    let canAskAgain = currentPermission.canAskAgain;
+
+    if (finalStatus !== "granted") {
+      const requested = await Notifications.requestPermissionsAsync();
+      finalStatus = requested.status;
+      canAskAgain = requested.canAskAgain;
+    }
+
+    if (finalStatus !== "granted") {
+      return {
+        status: "permission_denied",
+        message: canAskAgain
+          ? "Permissao de notificacoes nao liberada."
+          : "Permissao de notificacoes bloqueada nas configuracoes do aparelho.",
+        permissionStatus: finalStatus,
+        canAskAgain,
+      };
+    }
+
     tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
   } catch (error) {
     if (isFirebaseConfigurationError(error)) {
-      return {
-        status: "firebase_not_configured",
-        message:
-          "Este APK foi gerado sem a configuracao Firebase/FCM. Instale a nova build do app para ativar notificacoes.",
-      };
+      return firebaseNotConfiguredResult();
     }
-    return {
-      status: "token_error",
-      message: errorMessage(error),
-    };
+    return tokenErrorResult(error);
+  }
+
+  if (!tokenData) {
+    return tokenErrorResult(new Error("Nao foi possivel gerar token de push."));
   }
 
   try {

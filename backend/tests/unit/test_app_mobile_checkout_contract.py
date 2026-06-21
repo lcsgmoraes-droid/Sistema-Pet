@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 
@@ -104,3 +105,19 @@ def test_mobile_orders_screen_polls_pending_orders_until_webhook_updates_status(
     assert "setInterval(carregar, PENDING_ORDER_POLL_MS)" in orders
     assert 'pedido.status === "pendente"' in orders
     assert "clearInterval(interval)" in orders
+
+
+def test_push_registration_handles_firebase_errors_from_native_setup_steps():
+    service = _read_mobile_source(
+        "app-mobile/src/services/pushNotifications.service.ts"
+    )
+
+    assert "function firebaseNotConfiguredResult" in service
+    assert "return firebaseNotConfiguredResult();" in service
+    assert re.search(
+        r"try\s*{.*?await ensureAndroidChannel\(\);"
+        r".*?Notifications\.getPermissionsAsync\(\)"
+        r".*?Notifications\.getExpoPushTokenAsync",
+        service,
+        re.S,
+    )
