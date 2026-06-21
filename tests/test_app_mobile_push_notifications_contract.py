@@ -41,7 +41,9 @@ def test_app_mobile_push_registration_has_manual_profile_action():
 
 
 def test_push_devices_migration_backfills_existing_user_tokens():
-    migration = read("backend/alembic/versions/ua20260621a1_create_user_push_devices.py")
+    migration = read(
+        "backend/alembic/versions/ua20260621a1_create_user_push_devices.py"
+    )
 
     assert "create_table(" in migration
     assert '"user_push_devices"' in migration
