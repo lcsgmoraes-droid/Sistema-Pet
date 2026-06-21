@@ -45,7 +45,8 @@
         "VIBRATE"
       ],
       "blockedPermissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW"
       ],
       "runtimeVersion": "1.0.0",
       "versionCode": 2

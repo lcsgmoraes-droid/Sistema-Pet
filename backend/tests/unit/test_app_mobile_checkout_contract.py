@@ -86,6 +86,15 @@ def test_android_manifest_accepts_corepet_payment_return_deep_link():
     assert 'android:scheme="corepet"' in manifest
 
 
+def test_android_manifest_removes_unused_store_sensitive_permissions():
+    manifest = _read_mobile_source(
+        "app-mobile/android/app/src/main/AndroidManifest.xml"
+    )
+
+    assert 'android.permission.RECORD_AUDIO" tools:node="remove"' in manifest
+    assert 'android.permission.SYSTEM_ALERT_WINDOW" tools:node="remove"' in manifest
+
+
 def test_mobile_orders_screen_shows_channel_label_and_order_push_navigates_to_orders():
     orders = _read_mobile_source("app-mobile/src/screens/orders/OrdersScreen.tsx")
     hook = _read_mobile_source("app-mobile/src/hooks/usePushNotifications.ts")

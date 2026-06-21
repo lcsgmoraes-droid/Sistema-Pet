@@ -28,6 +28,7 @@ Guia mestre:
 | Maiara/Vet/Admin SaaS | `docs/CRONOGRAMA_MAIARA_VETERINARIO_ADMIN_SAAS.md` | Preparacao de demo, padronizacao Vet e admin global |
 | Habilitar app mobile por tenant | `docs/GUIA_HABILITAR_APP_MOBILE_TENANT.md` | Checklist de slug, cidade, perfil e modulos |
 | Release app mobile com EAS | `docs/GUIA_RELEASE_APP_MOBILE_EAS.md` | Canal `preview`/`production`, runtime e verificacao OTA |
+| Publicar app mobile nas lojas | `docs/APP_MOBILE_PUBLICACAO_LOJAS.md` | Checklist Play Store/App Store, privacidade e metadados |
 | Base oficial de dados | `docs/CRONOGRAMA_BASE_DADOS_OFICIAL.md` | Produtos, imagens, cadastros iniciais e atualizacoes |
 | Plano Basico | `docs/auditorias/plano-basico-tenant-checklist.md` | E2E longo controlado |
 | Produto/roadmap | `docs/ROADMAP_MASTER.md` | Checklist da frente especifica |
@@ -47,6 +48,7 @@ Guia mestre:
 | Maiara, Veterinario e Admin SaaS | `docs/CRONOGRAMA_MAIARA_VETERINARIO_ADMIN_SAAS.md` |
 | App mobile por tenant | `docs/GUIA_HABILITAR_APP_MOBILE_TENANT.md` |
 | Release app mobile com EAS | `docs/GUIA_RELEASE_APP_MOBILE_EAS.md` |
+| Publicacao nas lojas | `docs/APP_MOBILE_PUBLICACAO_LOJAS.md` |
 | Base oficial de dados | `docs/CRONOGRAMA_BASE_DADOS_OFICIAL.md` |
 | Evidencias | `docs/PADRAO_EVIDENCIA.md` |
 
