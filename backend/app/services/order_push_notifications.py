@@ -117,7 +117,9 @@ def _load_active_devices(db, *, tenant_id: str, user_id: int | None) -> list:
         return []
 
 
-def _send_expo_push(push_token: str, content: dict[str, Any]) -> tuple[bool, str | None, str | None]:
+def _send_expo_push(
+    push_token: str, content: dict[str, Any]
+) -> tuple[bool, str | None, str | None]:
     payload = {
         "to": push_token,
         "sound": "default",
@@ -146,7 +148,9 @@ def _send_expo_push(push_token: str, content: dict[str, Any]) -> tuple[bool, str
     return True, ticket_id, None
 
 
-def _mark_device_push_result(device, *, sent: bool, ticket_id: str | None, error: str | None) -> None:
+def _mark_device_push_result(
+    device, *, sent: bool, ticket_id: str | None, error: str | None
+) -> None:
     now = _utcnow()
     if sent:
         device.last_success_at = now
