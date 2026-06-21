@@ -18,6 +18,8 @@ precisa ser feito pelo titular das contas Apple/Google.
 - Firebase Android configurado com `app-mobile/google-services.json`.
 - Notificacoes Android ja testadas em aparelho real.
 - Profile EAS `production` configurado para canal `production`.
+- App Store export compliance tecnico configurado no app como sem criptografia
+  propria non-exempt (`ITSAppUsesNonExemptEncryption: false`).
 - Android nativo alinhado com `CorePet`, `br.com.corepet.app`, deep link
   `corepet://` e notificacoes.
 
@@ -212,6 +214,8 @@ atribuição, esta resposta precisa ser revisada antes de publicar update.
   perfil ou recurso exigir.
 - Notificacoes: avisar compras, pagamentos, separacao, retirada e eventos
   transacionais.
+- Export compliance: app declarado sem criptografia propria non-exempt; usa
+  criptografia padrao de transporte/plataforma.
 
 ## Checklist antes de enviar para revisao
 

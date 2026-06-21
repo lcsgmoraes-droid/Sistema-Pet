@@ -22,6 +22,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "br.com.corepet.app",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Usado para escanear codigo de barras dos produtos.",
         "NSPhotoLibraryUsageDescription": "Usado para adicionar foto do seu pet.",
         "NSLocationWhenInUseUsageDescription": "Usado para sugerir a loja mais proxima e enviar a posicao do entregador durante rotas ativas."
