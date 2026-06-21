@@ -125,6 +125,17 @@ def test_mobile_orders_screen_shows_pickup_person_and_delivery_summary():
     assert "Retirado por" in orders
 
 
+def test_mobile_orders_screen_does_not_show_completed_sales_as_pending_payment():
+    orders = _read_mobile_source("app-mobile/src/screens/orders/OrdersScreen.tsx")
+
+    assert "finalizada:" in orders
+    assert "pago_nf:" in orders
+    assert "finalizada_devolucao" in orders
+    assert "devolvida_total" in orders
+    assert "desconhecido:" in orders
+    assert "?? STATUS_CONFIG.desconhecido" in orders
+
+
 def test_push_registration_handles_firebase_errors_from_native_setup_steps():
     service = _read_mobile_source(
         "app-mobile/src/services/pushNotifications.service.ts"
