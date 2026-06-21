@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 import { registerPushToken } from "./auth.service";
@@ -60,6 +61,18 @@ function tokenErrorResult(error: unknown): PushRegistrationResult {
   };
 }
 
+function buildPushDeviceMetadata() {
+  return {
+    platform: Platform.OS,
+    device_name: Device.deviceName ?? null,
+    device_brand: Device.brand ?? null,
+    device_model: Device.modelName ?? Device.modelId ?? null,
+    os_name: Device.osName ?? Platform.OS,
+    os_version: Device.osVersion ?? String(Platform.Version ?? ""),
+    app_version: Constants.expoConfig?.version ?? null,
+  };
+}
+
 export async function ensurePushNotificationsRegistered(): Promise<PushRegistrationResult> {
   if (isExpoGo) {
     return {
@@ -116,7 +129,7 @@ export async function ensurePushNotificationsRegistered(): Promise<PushRegistrat
   }
 
   try {
-    await registerPushToken(tokenData.data);
+    await registerPushToken(tokenData.data, buildPushDeviceMetadata());
   } catch (error) {
     return {
       status: "backend_error",

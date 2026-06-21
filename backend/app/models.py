@@ -165,6 +165,44 @@ class UserSession(Base):  # Não usar BaseTenantModel - sessões não são tenan
     user = relationship("User", back_populates="sessions")
 
 
+class UserPushDevice(BaseTenantModel):
+    """Dispositivo do app mobile autorizado a receber push."""
+
+    __tablename__ = "user_push_devices"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "user_id",
+            "expo_push_token",
+            name="uq_user_push_devices_tenant_user_token",
+        ),
+        Index(
+            "ix_user_push_devices_tenant_user_enabled",
+            "tenant_id",
+            "user_id",
+            "enabled",
+        ),
+    )
+
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    expo_push_token = Column(String(500), nullable=False, index=True)
+    platform = Column(String(20), nullable=True)
+    device_name = Column(String(255), nullable=True)
+    device_brand = Column(String(100), nullable=True)
+    device_model = Column(String(150), nullable=True)
+    os_name = Column(String(100), nullable=True)
+    os_version = Column(String(100), nullable=True)
+    app_version = Column(String(50), nullable=True)
+    enabled = Column(Boolean, nullable=False, default=True, server_default="true")
+    last_seen_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_success_at = Column(DateTime(timezone=True), nullable=True)
+    last_ticket_id = Column(String(120), nullable=True)
+    last_error = Column(Text, nullable=True)
+    last_error_at = Column(DateTime(timezone=True), nullable=True)
+
+    user = relationship("User")
+
+
 class AuditLog(BaseTenantModel):
     """Log de auditoria (LGPD - rastreabilidade)"""
 
