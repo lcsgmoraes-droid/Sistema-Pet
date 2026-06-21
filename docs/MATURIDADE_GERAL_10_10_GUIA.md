@@ -209,8 +209,9 @@ Ja feito:
   estao bloqueantes no Smoke CI.
 - [x] Backend CI possui `ruff check` global bloqueante, alem de blocos por dominio para reduzir diagnostico.
 - [x] Backend CI possui `ruff format --check .` global bloqueante, alem dos blocos por dominio usados durante a migracao.
-- [x] `Quality Gate` aguarda e espelha o check externo `SonarCloud Code Analysis`.
+- [x] `Quality Gate` valida checks operacionais do backend sem aguardar o check externo `SonarCloud Code Analysis`.
 - [x] Configuracao automatica do SonarCloud ignora caminhos sem runtime e fica alinhada ao `sonar-project.properties`.
+- [x] `SonarCloud Code Analysis` permanece como check externo independente e visivel no PR.
 
 Falta para 10/10:
 
@@ -426,7 +427,7 @@ Para manter 10/10:
 | #481 | Testes/CI | Smoke CI roda todos os testes raiz `tests/` |
 | #482-#486 | Testes/CI | Primeiros pacotes backend com ruff bloqueante por dominio |
 | #623-#657 | Testes/CI | Rodada 0.5 fecha lint/format bloqueante ate `ruff check .` e `ruff format --check .` globais |
-| #653 | Testes/CI/Sonar | `Quality Gate` bloqueia quando SonarCloud externo falha |
+| #653 | Testes/CI/Sonar | `Quality Gate` bloqueava quando SonarCloud externo falhava; estrategia revisada em 2026-06-20 para reduzir trava de PR |
 | #654 | Testes/CI/frontend | `npm audit` frontend bloqueante no Smoke CI |
 | #658 | Testes/CI/Sonar | Configuracao automatica do SonarCloud alinhada a caminhos sem runtime e CPD |
 
