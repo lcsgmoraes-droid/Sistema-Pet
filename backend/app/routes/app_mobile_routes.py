@@ -209,6 +209,39 @@ def _serialize_push_device(device: UserPushDevice) -> dict:
     }
 
 
+def _disable_same_push_token_for_other_users(
+    db: Session, current_user: User, token: str
+) -> None:
+    other_devices = (
+        db.query(UserPushDevice)
+        .filter(
+            UserPushDevice.tenant_id == current_user.tenant_id,
+            UserPushDevice.expo_push_token == token,
+            UserPushDevice.user_id != current_user.id,
+            UserPushDevice.enabled.is_(True),
+        )
+        .all()
+    )
+    if not other_devices:
+        return
+
+    other_user_ids = {other_device.user_id for other_device in other_devices}
+    for other_device in other_devices:
+        other_device.enabled = False
+
+    other_users = (
+        db.query(User)
+        .filter(
+            User.tenant_id == current_user.tenant_id,
+            User.id.in_(other_user_ids),
+            User.push_token == token,
+        )
+        .all()
+    )
+    for other_user in other_users:
+        other_user.push_token = None
+
+
 def _produto_permite_balanco_funcionario(
     produto: Produto,
 ) -> tuple[bool, Optional[str]]:
@@ -719,6 +752,7 @@ def registrar_push_token(
     if not token:
         raise HTTPException(status_code=400, detail="Token de push obrigatorio.")
     current_user.push_token = token
+    _disable_same_push_token_for_other_users(db, current_user, token)
 
     device = (
         db.query(UserPushDevice)

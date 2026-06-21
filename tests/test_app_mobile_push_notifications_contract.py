@@ -51,3 +51,13 @@ def test_push_devices_migration_backfills_existing_user_tokens():
     assert "FROM users" in migration
     assert "push_token IS NOT NULL" in migration
     assert "Dispositivo registrado anteriormente" in migration
+
+
+def test_push_token_registration_keeps_device_token_owned_by_current_user():
+    route = read("backend/app/routes/app_mobile_routes.py")
+
+    assert "_disable_same_push_token_for_other_users" in route
+    assert "UserPushDevice.expo_push_token == token" in route
+    assert "UserPushDevice.user_id != current_user.id" in route
+    assert "other_device.enabled = False" in route
+    assert "other_user.push_token = None" in route
