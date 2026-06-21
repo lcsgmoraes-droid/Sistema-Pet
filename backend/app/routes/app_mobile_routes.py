@@ -15,7 +15,7 @@ from sqlalchemy import case, func, or_, text
 from sqlalchemy.orm import Session
 
 from app.db import get_session
-from app.models import Cliente, User
+from app.models import Cliente, User, UserPushDevice
 from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
 from app.routes.ecommerce_auth import (
     _activate_user_tenant_context,
@@ -123,6 +123,13 @@ class ProdutoBarcodeResponse(BaseModel):
 class PushTokenPayload(BaseModel):
     token: str
     plataforma: Optional[str] = None  # "android" | "ios"
+    platform: Optional[str] = None
+    device_name: Optional[str] = None
+    device_brand: Optional[str] = None
+    device_model: Optional[str] = None
+    os_name: Optional[str] = None
+    os_version: Optional[str] = None
+    app_version: Optional[str] = None
 
 
 class FuncionarioProdutoEstoqueResponse(BaseModel):
@@ -172,6 +179,34 @@ def _get_cliente_or_404(db: Session, user: User) -> Cliente:
             detail="Perfil de cliente não encontrado. Contate a loja.",
         )
     return cliente
+
+
+def _serialize_push_device(device: UserPushDevice) -> dict:
+    return {
+        "id": device.id,
+        "platform": device.platform,
+        "device_name": device.device_name,
+        "device_brand": device.device_brand,
+        "device_model": device.device_model,
+        "os_name": device.os_name,
+        "os_version": device.os_version,
+        "app_version": device.app_version,
+        "enabled": bool(device.enabled),
+        "last_seen_at": device.last_seen_at.isoformat()
+        if device.last_seen_at
+        else None,
+        "last_success_at": device.last_success_at.isoformat()
+        if device.last_success_at
+        else None,
+        "last_ticket_id": device.last_ticket_id,
+        "last_error": device.last_error,
+        "last_error_at": device.last_error_at.isoformat()
+        if device.last_error_at
+        else None,
+        "token_preview": f"{device.expo_push_token[:18]}..."
+        if device.expo_push_token
+        else None,
+    }
 
 
 def _produto_permite_balanco_funcionario(
@@ -347,9 +382,19 @@ def obter_status_push(
     )
 
     push_token = getattr(current_user, "push_token", None)
+    devices = (
+        db.query(UserPushDevice)
+        .filter(
+            UserPushDevice.tenant_id == current_user.tenant_id,
+            UserPushDevice.user_id == current_user.id,
+        )
+        .order_by(UserPushDevice.enabled.desc(), UserPushDevice.last_seen_at.desc())
+        .all()
+    )
     return {
-        "token_registrado": bool(push_token),
+        "token_registrado": bool(push_token or devices),
         "push_token_preview": f"{push_token[:18]}..." if push_token else None,
+        "devices": [_serialize_push_device(device) for device in devices],
         "pendencias": [
             {
                 "id": item.id,
@@ -670,9 +715,46 @@ def registrar_push_token(
             "motivo": "Migration pendente: coluna push_token não existe.",
         }
 
-    current_user.push_token = payload.token
+    token = payload.token.strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="Token de push obrigatorio.")
+    current_user.push_token = token
+
+    device = (
+        db.query(UserPushDevice)
+        .filter(
+            UserPushDevice.tenant_id == current_user.tenant_id,
+            UserPushDevice.user_id == current_user.id,
+            UserPushDevice.expo_push_token == token,
+        )
+        .first()
+    )
+    if not device:
+        device = UserPushDevice(
+            tenant_id=current_user.tenant_id,
+            user_id=current_user.id,
+            expo_push_token=token,
+        )
+        db.add(device)
+
+    device.platform = (payload.platform or payload.plataforma or "").strip() or None
+    device.device_name = (payload.device_name or "").strip() or None
+    device.device_brand = (payload.device_brand or "").strip() or None
+    device.device_model = (payload.device_model or "").strip() or None
+    device.os_name = (payload.os_name or "").strip() or None
+    device.os_version = (payload.os_version or "").strip() or None
+    device.app_version = (payload.app_version or "").strip() or None
+    device.enabled = True
+    device.last_seen_at = func.now()
+    device.last_error = None
+    device.last_error_at = None
     db.commit()
-    return {"status": "ok"}
+    db.refresh(device)
+    return {
+        "status": "ok",
+        "device_id": device.id,
+        "token_preview": f"{token[:18]}...",
+    }
 
 
 # ─────────────────────────────────────────

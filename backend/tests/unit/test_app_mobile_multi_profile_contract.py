@@ -57,14 +57,33 @@ def test_operational_mobile_navigators_expose_profile_switch_in_header():
     assert "HeaderProfileActions" in veterinario
 
 
-def test_mobile_profile_switch_is_visible_and_refreshes_profiles_before_alert():
+def test_mobile_profile_switch_only_appears_for_multiple_profiles():
     actions = read_repo("app-mobile/src/components/HeaderProfileActions.tsx")
     home = read_repo("app-mobile/src/screens/HomeScreen.tsx")
+    profile = read_repo("app-mobile/src/screens/profile/ProfileScreen.tsx")
 
-    assert "alwaysShowSwitch" in actions
-    assert "alwaysShowSwitch = true" in actions
+    assert "const canSwitch = available_profiles.length > 1" in actions
+    assert "alwaysShowSwitch" not in actions
     assert "getProfile" in actions
     assert "updateUser" in actions
     assert "Sem outros acessos" in actions
     assert "HeaderProfileActions" in home
-    assert "alwaysShowSwitch" in home
+    assert "alwaysShowSwitch" not in home
+    assert "getProfile" in profile
+    assert "Sem outros acessos" in profile
+    assert "available_profiles.length > 1 &&" in profile
+
+
+def test_operational_headers_can_activate_push_notifications():
+    actions = read_repo("app-mobile/src/components/HeaderProfileActions.tsx")
+
+    assert "ensurePushNotificationsRegistered" in actions
+    assert "notifications-outline" in actions
+    assert "Ativar notificacoes" in actions
+
+
+def test_selected_store_banner_uses_corepet_logo_when_tenant_logo_is_missing():
+    banner = read_repo("app-mobile/src/components/SelectedStoreBanner.tsx")
+
+    assert 'require("../../assets/icon.png")' in banner
+    assert "tenant.logo_url" in banner

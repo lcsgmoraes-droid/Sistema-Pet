@@ -3,6 +3,7 @@ import importlib
 import logging
 import sys
 
+from app.models import UserPushDevice
 from app.services.order_push_notifications import (
     build_order_push_content,
     notify_order_event,
@@ -10,21 +11,34 @@ from app.services.order_push_notifications import (
 
 
 class FakeQuery:
-    def __init__(self, user):
-        self.user = user
+    def __init__(self, items):
+        self.items = items
 
     def filter(self, *args):
         return self
 
+    def order_by(self, *args):
+        return self
+
+    def all(self):
+        if isinstance(self.items, list):
+            return self.items
+        return []
+
     def first(self):
-        return self.user
+        if isinstance(self.items, list):
+            return self.items[0] if self.items else None
+        return self.items
 
 
 class FakeDB:
-    def __init__(self, user):
+    def __init__(self, user, devices=None):
         self.user = user
+        self.devices = devices or []
 
     def query(self, model):
+        if model is UserPushDevice:
+            return FakeQuery(self.devices)
         return FakeQuery(self.user)
 
 
@@ -91,6 +105,68 @@ def test_notify_order_event_sends_expo_push_without_blocking(monkeypatch):
     assert calls[0]["json"]["data"]["pedido_id"] == "PED-2"
 
 
+def test_notify_order_event_sends_to_all_active_user_devices(monkeypatch):
+    calls = []
+
+    def fake_post(url, json, timeout, headers=None):
+        calls.append({"url": url, "json": json, "timeout": timeout, "headers": headers})
+        return SimpleNamespace(
+            raise_for_status=lambda: None,
+            json=lambda: {"data": {"status": "ok", "id": f"ticket-{len(calls)}"}},
+        )
+
+    monkeypatch.setattr(
+        "app.services.order_push_notifications.requests.post", fake_post
+    )
+    user = SimpleNamespace(
+        id=5, tenant_id="tenant-1", push_token="ExponentPushToken[legacy]"
+    )
+    devices = [
+        SimpleNamespace(
+            id=10,
+            user_id=5,
+            tenant_id="tenant-1",
+            expo_push_token="ExponentPushToken[phone-a]",
+            enabled=True,
+            platform="android",
+            device_name="Lucas Samsung",
+            last_ticket_id=None,
+            last_error=None,
+        ),
+        SimpleNamespace(
+            id=11,
+            user_id=5,
+            tenant_id="tenant-1",
+            expo_push_token="ExponentPushToken[phone-b]",
+            enabled=True,
+            platform="android",
+            device_name="Lucas reserva",
+            last_ticket_id=None,
+            last_error=None,
+        ),
+    ]
+
+    sent = notify_order_event(
+        FakeDB(user, devices=devices),
+        tenant_id="tenant-1",
+        user_id=5,
+        event="ready_for_pickup",
+        pedido_id="PED-2",
+        venda_id=20,
+        canal="app",
+    )
+
+    assert sent is True
+    assert [call["json"]["to"] for call in calls] == [
+        "ExponentPushToken[phone-a]",
+        "ExponentPushToken[phone-b]",
+    ]
+    assert devices[0].last_ticket_id == "ticket-1"
+    assert devices[1].last_ticket_id == "ticket-2"
+    assert devices[0].last_error is None
+    assert devices[1].last_error is None
+
+
 def test_notify_order_event_ignores_missing_token_and_send_errors(monkeypatch):
     def failing_post(*args, **kwargs):
         raise RuntimeError("network down")
@@ -123,7 +199,7 @@ def test_notify_order_event_ignores_missing_token_and_send_errors(monkeypatch):
     )
 
 
-def test_notify_order_event_logs_when_user_has_no_push_token(caplog):
+def test_notify_order_event_logs_when_user_has_no_push_device(caplog):
     caplog.set_level(logging.WARNING, logger="app.services.order_push_notifications")
 
     sent = notify_order_event(
@@ -137,6 +213,6 @@ def test_notify_order_event_logs_when_user_has_no_push_token(caplog):
     )
 
     assert sent is False
-    assert "sem push_token" in caplog.text
+    assert "sem dispositivo push" in caplog.text
     assert "user_id=11" in caplog.text
     assert "venda_id=1065887" in caplog.text

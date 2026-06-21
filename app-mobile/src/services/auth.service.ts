@@ -86,6 +86,19 @@ export async function getStoredToken(): Promise<string | null> {
   return SecureStore.getItemAsync('auth_token');
 }
 
-export async function registerPushToken(pushToken: string): Promise<void> {
-  await api.post('/app/push-token', { token: pushToken });
+export interface PushDeviceMetadata {
+  platform?: string;
+  device_name?: string | null;
+  device_brand?: string | null;
+  device_model?: string | null;
+  os_name?: string | null;
+  os_version?: string | null;
+  app_version?: string | null;
+}
+
+export async function registerPushToken(
+  pushToken: string,
+  metadata: PushDeviceMetadata = {},
+): Promise<void> {
+  await api.post('/app/push-token', { token: pushToken, ...metadata });
 }

@@ -24,7 +24,12 @@ def test_app_mobile_push_registration_has_manual_profile_action():
     assert 'status: "firebase_not_configured"' in service
     assert "Firebase/FCM" in service
     assert 'status: "registered"' in service
-    assert "registerPushToken(tokenData.data)" in service
+    assert "expo-device" in service
+    assert "buildPushDeviceMetadata" in service
+    assert "registerPushToken(tokenData.data, buildPushDeviceMetadata())" in service
+    assert "device_name" in service
+    assert "device_model" in service
+    assert "app_version" in service
 
     assert "ensurePushNotificationsRegistered" in hook
     assert "requestPermissionsAsync" not in hook
@@ -33,3 +38,16 @@ def test_app_mobile_push_registration_has_manual_profile_action():
     assert "ativarNotificacoes" in profile
     assert "Notificacoes de pedidos" in profile
     assert "ensurePushNotificationsRegistered" in profile
+
+
+def test_push_devices_migration_backfills_existing_user_tokens():
+    migration = read(
+        "backend/alembic/versions/ua20260621a1_create_user_push_devices.py"
+    )
+
+    assert "create_table(" in migration
+    assert '"user_push_devices"' in migration
+    assert "INSERT INTO user_push_devices" in migration
+    assert "FROM users" in migration
+    assert "push_token IS NOT NULL" in migration
+    assert "Dispositivo registrado anteriormente" in migration

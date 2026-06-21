@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import KeyboardSafeScrollView from "../../components/KeyboardSafeScrollView";
+import * as AuthService from "../../services/auth.service";
 import { updateProfile } from "../../services/auth.service";
 import { ensurePushNotificationsRegistered } from "../../services/pushNotifications.service";
 import { useAuthStore } from "../../store/auth.store";
@@ -145,6 +146,43 @@ export default function ProfileScreen() {
     }
   }
 
+  async function abrirTrocaPerfil() {
+    setTrocandoPerfil(true);
+    try {
+      const freshUser = await AuthService.getProfile();
+      updateUser(freshUser);
+      const freshProfiles = freshUser.available_profiles ?? [];
+      const freshCurrentProfile =
+        freshUser.selected_profile ?? freshUser.perfil_operacional ?? perfilAtual;
+      const profileOptions = freshProfiles
+        .filter((profile) => profile.type !== freshCurrentProfile)
+        .map((profile) => ({
+          text: profile.label || profile.type,
+          onPress: () => {
+            trocarPerfil(profile.type).catch(() => undefined);
+          },
+        }));
+
+      if (profileOptions.length === 0) {
+        Alert.alert("Trocar perfil", "Sem outros acessos liberados para esta conta.");
+        return;
+      }
+
+      Alert.alert("Trocar perfil", "Escolha como entrar no app.", [
+        ...profileOptions,
+        { text: "Cancelar", style: "cancel" },
+      ]);
+    } catch (err: any) {
+      const mensagem =
+        err?.response?.data?.detail ||
+        err?.message ||
+        "Nao foi possivel carregar os acessos agora.";
+      Alert.alert("Erro", String(mensagem));
+    } finally {
+      setTrocandoPerfil(false);
+    }
+  }
+
   function handleLogout() {
     Alert.alert("Sair", "Deseja sair da sua conta?", [
       { text: "Cancelar", style: "cancel" },
@@ -202,6 +240,9 @@ export default function ProfileScreen() {
         {available_profiles.length > 1 && (
           <View style={styles.secao}>
             <Text style={styles.secaoTitulo}>Trocar perfil</Text>
+            <Text style={styles.textoSuporte}>
+              Acesso atual: {perfilAtual}
+            </Text>
             <View style={styles.perfisGrid}>
               {available_profiles.map((profile) => {
                 const selecionado = profile.type === perfilAtual;
@@ -227,6 +268,20 @@ export default function ProfileScreen() {
                 );
               })}
             </View>
+            <TouchableOpacity
+              style={[styles.botaoPerfilAtualizar, trocandoPerfil && { opacity: 0.7 }]}
+              onPress={abrirTrocaPerfil}
+              disabled={trocandoPerfil}
+            >
+              {trocandoPerfil ? (
+                <ActivityIndicator color={CORES.primario} />
+              ) : (
+                <>
+                  <Ionicons name="swap-horizontal-outline" size={18} color={CORES.primario} />
+                  <Text style={styles.botaoPerfilAtualizarTexto}>Ver acessos disponiveis</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
         )}
 
@@ -549,6 +604,25 @@ const styles = StyleSheet.create({
   },
   perfilBotaoTextoAtivo: {
     color: "#fff",
+  },
+  botaoPerfilAtualizar: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: ESPACO.sm,
+    borderWidth: 1,
+    borderColor: CORES.primario,
+    borderRadius: RAIO.md,
+    marginTop: ESPACO.md,
+    paddingHorizontal: ESPACO.md,
+    paddingVertical: ESPACO.sm,
+    backgroundColor: "#EFF6FF",
+  },
+  botaoPerfilAtualizarTexto: {
+    color: CORES.primario,
+    fontSize: FONTE.normal,
+    fontWeight: "700",
   },
   editarTexto: { color: CORES.primario, fontWeight: "500" },
   infoRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: ESPACO.sm },
