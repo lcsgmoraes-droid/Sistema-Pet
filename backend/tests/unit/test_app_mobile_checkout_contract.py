@@ -95,3 +95,12 @@ def test_mobile_orders_screen_shows_channel_label_and_order_push_navigates_to_or
     assert "App mobile" in orders
     assert 'data.source === "order"' in hook
     assert 'navigateWhenReady("Pedidos"' in hook
+
+
+def test_mobile_orders_screen_polls_pending_orders_until_webhook_updates_status():
+    orders = _read_mobile_source("app-mobile/src/screens/orders/OrdersScreen.tsx")
+
+    assert "PENDING_ORDER_POLL_MS" in orders
+    assert "setInterval(carregar, PENDING_ORDER_POLL_MS)" in orders
+    assert 'pedido.status === "pendente"' in orders
+    assert "clearInterval(interval)" in orders

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import ecommerceApi from "../../services/ecommerceApi";
 import { STORAGE_ORDERS_KEY, extractApiErrorMessage } from "./ecommerceMvpUtils";
 
+const PENDING_ORDER_POLL_MS = 12_000;
+
 export default function useEcommerceOrders({ authHeaders, customerToken, view, onError }) {
   const [, setOrderIds] = useState(() => {
     try {
@@ -66,6 +68,17 @@ export default function useEcommerceOrders({ authHeaders, customerToken, view, o
     if (!customerToken || view !== "pedidos") return;
     loadOrdersDetailed();
   }, [customerToken, loadOrdersDetailed, view]);
+
+  useEffect(() => {
+    if (!customerToken || view !== "pedidos") return;
+    const hasPendingOrder = ordersDetailed.some(
+      (pedido) => pedido?.status === "pendente" || pedido?.status === "pending",
+    );
+    if (!hasPendingOrder) return;
+
+    const interval = setInterval(loadOrdersDetailed, PENDING_ORDER_POLL_MS);
+    return () => clearInterval(interval);
+  }, [customerToken, loadOrdersDetailed, ordersDetailed, view]);
 
   const avisarCheguei = useCallback(
     async (pedidoId) => {
