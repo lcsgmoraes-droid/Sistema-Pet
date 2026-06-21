@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import * as AuthService from "../services/auth.service";
+import { ensurePushNotificationsRegistered } from "../services/pushNotifications.service";
 import { useAuthStore } from "../store/auth.store";
 
 type HeaderProfileActionsProps = {
@@ -19,6 +20,7 @@ export default function HeaderProfileActions({
 }: HeaderProfileActionsProps) {
   const { user, logout, selectProfile, updateUser } = useAuthStore();
   const [loadingProfiles, setLoadingProfiles] = useState(false);
+  const [activatingNotifications, setActivatingNotifications] = useState(false);
   const available_profiles = user?.available_profiles ?? [];
   const currentProfile = user?.selected_profile ?? user?.perfil_operacional ?? "cliente";
   const canSwitch = alwaysShowSwitch || available_profiles.length > 1;
@@ -72,8 +74,36 @@ export default function HeaderProfileActions({
     ]);
   };
 
+  const ativarNotificacoes = async () => {
+    setActivatingNotifications(true);
+    try {
+      const result = await ensurePushNotificationsRegistered();
+      Alert.alert("Notificacoes", result.message);
+    } catch (err: any) {
+      Alert.alert(
+        "Notificacoes",
+        err?.message || "Nao foi possivel ativar notificacoes.",
+      );
+    } finally {
+      setActivatingNotifications(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
+      <TouchableOpacity
+        accessibilityLabel="Ativar notificacoes"
+        onPress={ativarNotificacoes}
+        style={styles.action}
+        disabled={activatingNotifications}
+      >
+        {activatingNotifications ? (
+          <ActivityIndicator color={color} size="small" />
+        ) : (
+          <Ionicons name="notifications-outline" size={18} color={color} />
+        )}
+        <Text style={[styles.text, { color }]}>Notif.</Text>
+      </TouchableOpacity>
       {canSwitch && (
         <TouchableOpacity
           accessibilityLabel="Trocar perfil do app"

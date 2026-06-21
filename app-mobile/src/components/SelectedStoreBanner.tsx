@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
   Alert,
@@ -44,11 +43,11 @@ export default function SelectedStoreBanner() {
   return (
     <View style={styles.card}>
       <View style={styles.logoBox}>
-        {tenant.logo_url ? (
-          <Image source={{ uri: tenant.logo_url }} style={styles.logo} resizeMode="contain" />
-        ) : (
-          <Ionicons name="storefront-outline" size={24} color={CORES.primario} />
-        )}
+        <Image
+          source={tenant.logo_url ? { uri: tenant.logo_url } : require("../../assets/icon.png")}
+          style={styles.logo}
+          resizeMode="contain"
+        />
       </View>
 
       <View style={styles.info}>
