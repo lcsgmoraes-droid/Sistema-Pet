@@ -55,11 +55,7 @@ assert.match(
   "pedido com entrega deve aparecer como compra com entrega sem pedir retirada",
 );
 
-assert.match(
-  source,
-  /Pedido retirado por/,
-  "historico deve mostrar quem retirou o pedido",
-);
+assert.match(source, /Pedido retirado por/, "historico deve mostrar quem retirou o pedido");
 
 assert.match(
   ordersHookSource,

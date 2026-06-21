@@ -56,11 +56,7 @@ assert.match(
   "resumo do checkout deve acompanhar a rolagem no desktop",
 );
 
-assert.match(
-  styles,
-  /mobileCheckoutBar:/,
-  "checkout deve definir estilo da barra fixa mobile",
-);
+assert.match(styles, /mobileCheckoutBar:/, "checkout deve definir estilo da barra fixa mobile");
 
 assert.match(
   ecommerceMvp,
