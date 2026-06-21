@@ -435,6 +435,25 @@ export function isCustomerProfileComplete(customer) {
   return hasFullName && hasPhone && hasCpf && hasAddress;
 }
 
+export function resolvePostAuthView({ authReturnView = "", customer = null } = {}) {
+  if (authReturnView === "checkout" && isCustomerProfileComplete(customer)) {
+    return "checkout";
+  }
+  return "conta";
+}
+
+export function buildCheckoutPaymentLabel(tipo, bandeira = "", parcelas = 1) {
+  if (tipo === "pix") return "Pagar com PIX";
+  if (tipo === "debito") {
+    return `Pagar com débito ${bandeira || "cartão"}`.trim();
+  }
+  if (tipo === "credito") {
+    const parcelasLabel = Number(parcelas) > 1 ? ` ${parcelas}x` : "";
+    return `Pagar com crédito ${bandeira || "cartão"}${parcelasLabel}`.trim();
+  }
+  return "Escolha a forma de pagamento";
+}
+
 export function buildProductMap(products) {
   return Object.fromEntries(products.map((product) => [product.id, product]));
 }

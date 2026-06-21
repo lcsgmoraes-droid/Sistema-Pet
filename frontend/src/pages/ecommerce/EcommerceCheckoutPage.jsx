@@ -1,4 +1,4 @@
-import { formatCurrency } from "./ecommerceMvpUtils";
+import { buildCheckoutPaymentLabel, formatCurrency } from "./ecommerceMvpUtils";
 
 const DELIVERY_OPTIONS = [
   { value: "entrega", label: "🚚 Entrega" },
@@ -18,6 +18,20 @@ const PAYMENT_OPTIONS = [
 
 const CARD_BRANDS = ["Visa", "Mastercard", "Elo", "Outra"];
 const CREDIT_INSTALLMENTS = [1, 2, 3];
+
+function getFinalizeBlockReason({
+  cart,
+  cidadeDestino,
+  isProfileComplete,
+  pagamentoTipo,
+  tenantContext,
+}) {
+  if (!cart?.itens?.length) return "Adicione itens no carrinho para continuar.";
+  if (!(tenantContext?.cidade || cidadeDestino)) return "Cidade da loja nao configurada.";
+  if (!isProfileComplete) return "Complete seu cadastro (nome, telefone, CPF e endereco).";
+  if (!pagamentoTipo) return "Escolha a forma de pagamento para continuar.";
+  return "";
+}
 
 function CheckoutDeliveryForm({
   addressFields,
@@ -353,12 +367,14 @@ function CheckoutSummary({
   checkoutResumo,
   checkoutResult,
   finalizeDisabled,
-  isProfileComplete,
+  finalizeBlockReason,
+  isMobile,
+  paymentLabel,
   styles: S,
   onFinalizeCheckout,
 }) {
   return (
-    <div style={S.resumoBox}>
+    <div style={S.checkoutSummaryBox(isMobile)}>
       <div style={{ fontWeight: 700, fontSize: 16, color: "#1c1917", marginBottom: 14 }}>
         Resumo do pedido
       </div>
@@ -435,25 +451,60 @@ function CheckoutSummary({
         disabled={finalizeDisabled}
         style={S.finalizarBtn(finalizeDisabled)}
       >
-        {checkoutLoading ? "Abrindo pagamento..." : "Ir para pagamento"}
+        {checkoutLoading ? "Abrindo pagamento..." : paymentLabel}
       </button>
 
-      {!isProfileComplete && (
+      {finalizeBlockReason && (
         <div
           style={{
             fontSize: 12,
-            color: "#b45309",
-            background: "#fffbeb",
+            color: "#92400e",
+            background: "#fff7ed",
             borderRadius: 8,
             padding: "8px 10px",
             marginTop: 6,
           }}
         >
-          ⚠️ Complete seu cadastro (nome, telefone, CPF e endereço) na aba Conta para finalizar.
+          {finalizeBlockReason}
         </div>
       )}
 
       <CheckoutResult result={checkoutResult} />
+    </div>
+  );
+}
+
+function CheckoutMobilePaymentBar({
+  cart,
+  cartTotal,
+  checkoutLoading,
+  checkoutResumo,
+  finalizeDisabled,
+  finalizeBlockReason,
+  isMobile,
+  paymentLabel,
+  styles: S,
+  onFinalizeCheckout,
+}) {
+  if (!isMobile || !cart?.itens?.length) return null;
+
+  const total = Number(checkoutResumo?.total ?? cartTotal ?? 0);
+
+  return (
+    <div style={S.mobileCheckoutBar}>
+      <div style={S.mobileCheckoutBarTotal}>
+        <span>Total</span>
+        <strong>{formatCurrency(total)}</strong>
+      </div>
+      <button
+        type="button"
+        onClick={onFinalizeCheckout}
+        disabled={finalizeDisabled}
+        style={S.finalizarBtn(finalizeDisabled)}
+      >
+        {checkoutLoading ? "Abrindo..." : paymentLabel}
+      </button>
+      {finalizeBlockReason && <div style={S.mobileCheckoutBarHint}>{finalizeBlockReason}</div>}
     </div>
   );
 }
@@ -468,6 +519,7 @@ export default function EcommerceCheckoutPage({
   cidadeDestino,
   deliveryMode,
   isDrive,
+  isMobile,
   isProfileComplete,
   pagamentoBandeira,
   pagamentoParcelas,
@@ -487,20 +539,26 @@ export default function EcommerceCheckoutPage({
   onPagamentoTipoChange,
   onTipoRetiradaChange,
 }) {
-  const finalizeDisabled =
-    checkoutLoading ||
-    !(tenantContext?.cidade || cidadeDestino) ||
-    !cart?.itens?.length ||
-    !isProfileComplete;
+  const finalizeBlockReason = getFinalizeBlockReason({
+    cart,
+    cidadeDestino,
+    isProfileComplete,
+    pagamentoTipo,
+    tenantContext,
+  });
+  const paymentLabel = buildCheckoutPaymentLabel(
+    pagamentoTipo,
+    pagamentoBandeira,
+    pagamentoParcelas,
+  );
+  const finalizeDisabled = checkoutLoading || Boolean(finalizeBlockReason);
 
   return (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "28px 16px" }}>
+    <div style={S.checkoutPage(isMobile)}>
       <h2 style={{ margin: "0 0 20px", fontSize: 26, fontWeight: 800, color: "#1c1917" }}>
         Checkout
       </h2>
-      <div
-        style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 20, alignItems: "start" }}
-      >
+      <div style={S.checkoutGrid(isMobile)}>
         <div style={{ display: "grid", gap: 16 }}>
           <CheckoutDeliveryForm
             addressFields={addressFields}
@@ -536,11 +594,26 @@ export default function EcommerceCheckoutPage({
           checkoutResumo={checkoutResumo}
           checkoutResult={checkoutResult}
           finalizeDisabled={finalizeDisabled}
-          isProfileComplete={isProfileComplete}
+          finalizeBlockReason={finalizeBlockReason}
+          isMobile={isMobile}
+          paymentLabel={paymentLabel}
           styles={S}
           onFinalizeCheckout={onFinalizeCheckout}
         />
       </div>
+      <CheckoutMobilePaymentBar
+        cart={cart}
+        cartTotal={cartTotal}
+        checkoutLoading={checkoutLoading}
+        checkoutResumo={checkoutResumo}
+        finalizeDisabled={finalizeDisabled}
+        finalizeBlockReason={finalizeBlockReason}
+        isMobile={isMobile}
+        paymentLabel={paymentLabel}
+        styles={S}
+        onFinalizeCheckout={onFinalizeCheckout}
+      />
+      {isMobile && <div style={S.mobileCheckoutSpacer} />}
     </div>
   );
 }

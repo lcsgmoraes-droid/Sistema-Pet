@@ -22,6 +22,7 @@ export default function useEcommerceCheckout({
   setView,
   tenantContext,
   onError,
+  onRequireAuthForCheckout,
   onSuccess,
 }) {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -52,6 +53,14 @@ export default function useEcommerceCheckout({
   function resetCheckoutStatus() {
     setCheckoutResumo(null);
     setCheckoutResult(null);
+  }
+
+  function requireAuthForCheckout() {
+    if (typeof onRequireAuthForCheckout === "function") {
+      onRequireAuthForCheckout();
+      return;
+    }
+    setView("conta");
   }
 
   async function handleCheckoutCepBlur() {
@@ -94,7 +103,7 @@ export default function useEcommerceCheckout({
     e.preventDefault();
     if (!customerToken) {
       onError("Fa\u00e7a login para continuar no checkout.");
-      setView("conta");
+      requireAuthForCheckout();
       return;
     }
     if (!cart?.itens?.length) {
@@ -133,7 +142,7 @@ export default function useEcommerceCheckout({
   async function finalizarCheckout() {
     if (!customerToken) {
       onError("Fa\u00e7a login para finalizar o pedido.");
-      setView("conta");
+      requireAuthForCheckout();
       return;
     }
     if (!isProfileComplete) {
@@ -231,7 +240,7 @@ export default function useEcommerceCheckout({
     }
     if (!customerToken) {
       onError("Fa\u00e7a login para finalizar o pedido.");
-      setView("conta");
+      requireAuthForCheckout();
       return;
     }
     if (!isProfileComplete) {
