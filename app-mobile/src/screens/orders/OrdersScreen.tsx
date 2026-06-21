@@ -64,6 +64,27 @@ const STATUS_CONFIG: Record<
     emoji: "✅",
     icone: "checkmark-done-outline",
   },
+  finalizada: {
+    cor: "#D1FAE5",
+    corTexto: "#065F46",
+    label: "Pago",
+    emoji: "✅",
+    icone: "checkmark-done-outline",
+  },
+  pago_nf: {
+    cor: "#D1FAE5",
+    corTexto: "#065F46",
+    label: "Pago",
+    emoji: "✅",
+    icone: "receipt-outline",
+  },
+  baixa_parcial: {
+    cor: "#DBEAFE",
+    corTexto: "#1E40AF",
+    label: "Parcial",
+    emoji: "✅",
+    icone: "checkmark-done-outline",
+  },
   cancelado: {
     cor: "#FEE2E2",
     corTexto: "#991B1B",
@@ -71,12 +92,54 @@ const STATUS_CONFIG: Record<
     emoji: "❌",
     icone: "close-circle-outline",
   },
+  cancelada: {
+    cor: "#FEE2E2",
+    corTexto: "#991B1B",
+    label: "Cancelado",
+    emoji: "❌",
+    icone: "close-circle-outline",
+  },
+  finalizada_devolucao: {
+    cor: "#FFEDD5",
+    corTexto: "#9A3412",
+    label: "Dev. parcial",
+    emoji: "↩️",
+    icone: "return-up-back-outline",
+  },
+  finalizada_devolucao_parcial: {
+    cor: "#FFEDD5",
+    corTexto: "#9A3412",
+    label: "Dev. parcial",
+    emoji: "↩️",
+    icone: "return-up-back-outline",
+  },
+  finalizada_devolucao_total: {
+    cor: "#F3F4F6",
+    corTexto: "#374151",
+    label: "Devolvida",
+    emoji: "↩️",
+    icone: "return-up-back-outline",
+  },
+  devolvida_total: {
+    cor: "#F3F4F6",
+    corTexto: "#374151",
+    label: "Devolvida",
+    emoji: "↩️",
+    icone: "return-up-back-outline",
+  },
   criado: {
     cor: "#E0E7FF",
     corTexto: "#3730A3",
     label: "Recebido",
     emoji: "🛍️",
     icone: "receipt-outline",
+  },
+  desconhecido: {
+    cor: "#F3F4F6",
+    corTexto: "#374151",
+    label: "Em processamento",
+    emoji: "•",
+    icone: "ellipse-outline",
   },
 };
 
@@ -205,7 +268,7 @@ export default function OrdersScreen() {
   }
 
   function renderPedido({ item }: { item: Pedido }) {
-    const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.pendente;
+    const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.desconhecido;
     const temEntrega = Boolean(item.tem_entrega);
     const entregaCfg = getEntregaStatusConfig(item);
     const temPalavraChave =
