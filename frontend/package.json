@@ -13,6 +13,7 @@
     "test:auth-refresh": "node scripts/test-refresh-manager.mjs",
     "test:corepet-branding": "node scripts/test-corepet-branding.mjs",
     "test:ecommerce-account-validation": "node scripts/test-ecommerce-account-validation.mjs",
+    "test:ecommerce-checkout-conversion-flow": "node scripts/test-ecommerce-checkout-conversion-flow.mjs",
     "test:ecommerce-orders-followup": "node scripts/test-ecommerce-orders-followup.mjs",
     "test:ecommerce-payment-return-flow": "node scripts/test-ecommerce-payment-return-flow.mjs",
     "test:app-payment-return": "node scripts/test-app-payment-return-links.mjs",

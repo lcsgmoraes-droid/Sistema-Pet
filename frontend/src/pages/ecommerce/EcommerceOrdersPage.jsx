@@ -65,8 +65,8 @@ function getOrderFulfillmentStatus(order) {
         background: "#f0fdf4",
         border: "#bbf7d0",
         color: "#166534",
-        label: "Entregue",
-        text: "Seu pedido foi entregue.",
+        label: "Compra com entrega",
+        text: "Pagamento aprovado. Pedido registrado como entrega finalizada pela loja.",
       };
     }
 
@@ -75,7 +75,7 @@ function getOrderFulfillmentStatus(order) {
         background: "#eff6ff",
         border: "#bfdbfe",
         color: "#1d4ed8",
-        label: "Pedido em separacao",
+        label: "Compra com entrega",
         text: "A loja ja recebeu a venda e vai preparar a entrega.",
       };
     }
@@ -114,7 +114,7 @@ function getOrderFulfillmentStatus(order) {
       background: "#fffbeb",
       border: "#fde68a",
       color: "#92400e",
-      label: "Em separacao",
+      label: "A retirar",
       text: "A loja esta preparando seu pedido para retirada.",
     };
   }

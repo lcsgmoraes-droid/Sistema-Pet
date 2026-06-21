@@ -9,12 +9,14 @@ import {
   buildCatalogQueryParams,
   buildCustomerAddressFields,
   buildCustomerProfileForm,
+  buildCheckoutPaymentLabel,
   buildPaginationWindow,
   buildProductMap,
   calculateCatalogMetrics,
   filterCatalogProducts,
   isCustomerProfileComplete,
   normalizeCatalogPayload,
+  resolvePostAuthView,
   resolveStoreDisplayName,
 } from "./ecommerceMvpUtils.js";
 
@@ -194,6 +196,32 @@ test("isCustomerProfileComplete exige nome completo, telefone, cpf e endereco", 
     isCustomerProfileComplete({ nome: "Maria", telefone: "18", cpf: "1", endereco: "" }),
     false,
   );
+});
+
+test("resolvePostAuthView volta ao checkout quando login veio de compra e cadastro esta completo", () => {
+  const completeCustomer = {
+    nome: "Maria Silva",
+    telefone: "18999999999",
+    cpf: "123.456.789-00",
+    endereco: "Rua A",
+  };
+
+  assert.equal(
+    resolvePostAuthView({ authReturnView: "checkout", customer: completeCustomer }),
+    "checkout",
+  );
+  assert.equal(
+    resolvePostAuthView({ authReturnView: "checkout", customer: { nome: "Maria" } }),
+    "conta",
+  );
+  assert.equal(resolvePostAuthView({ authReturnView: "", customer: completeCustomer }), "conta");
+});
+
+test("buildCheckoutPaymentLabel descreve o pagamento escolhido", () => {
+  assert.equal(buildCheckoutPaymentLabel("pix"), "Pagar com PIX");
+  assert.equal(buildCheckoutPaymentLabel("debito", "Visa"), "Pagar com débito Visa");
+  assert.equal(buildCheckoutPaymentLabel("credito", "Elo", 3), "Pagar com crédito Elo 3x");
+  assert.equal(buildCheckoutPaymentLabel(""), "Escolha a forma de pagamento");
 });
 
 test("buildProductMap indexa produtos por id", () => {

@@ -8,6 +8,10 @@ const source = readFileSync(
   resolve(__dirname, "../src/pages/ecommerce/EcommerceOrdersPage.jsx"),
   "utf8",
 );
+const ordersHookSource = readFileSync(
+  resolve(__dirname, "../src/pages/ecommerce/useEcommerceOrders.js"),
+  "utf8",
+);
 
 assert.match(
   source,
@@ -41,8 +45,22 @@ assert.match(
 
 assert.match(
   source,
-  /Em separacao/,
-  "pedido online pendente deve aparecer como em separacao para o cliente",
+  /A retirar/,
+  "pedido online pendente de retirada deve aparecer como a retirar para o cliente",
+);
+
+assert.match(
+  source,
+  /Compra com entrega/,
+  "pedido com entrega deve aparecer como compra com entrega sem pedir retirada",
+);
+
+assert.match(source, /Pedido retirado por/, "historico deve mostrar quem retirou o pedido");
+
+assert.match(
+  ordersHookSource,
+  /hasOpenFulfillmentOrder/,
+  "tela de pedidos deve atualizar automaticamente retiradas em aberto",
 );
 
 assert.match(

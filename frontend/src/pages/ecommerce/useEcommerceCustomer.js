@@ -6,6 +6,7 @@ import {
   extractApiErrorMessage,
   fetchAddressByCep,
   isCustomerProfileComplete,
+  resolvePostAuthView,
 } from "./ecommerceMvpUtils";
 
 const EMPTY_PROFILE_FORM = {
@@ -188,11 +189,13 @@ function getRegisterValidation(registerForm, tenantContext) {
 }
 
 export default function useEcommerceCustomer({
+  authReturnView,
   authHeaders,
   customerToken,
   loadCart,
   location,
   navigate,
+  onAuthReturnHandled,
   restoreGuestCart,
   setCustomerToken,
   setView,
@@ -326,8 +329,14 @@ export default function useEcommerceCustomer({
     setCustomerToken(token);
     await syncGuestCartToServer(token);
     clearRegisterUiState();
-    onSuccess("Cadastro realizado com sucesso!");
-    setView("conta");
+    const nextView = resolvePostAuthView({ authReturnView, customer: response?.data?.user });
+    onSuccess(
+      nextView === "checkout"
+        ? "Cadastro realizado. Vamos finalizar sua compra."
+        : "Cadastro realizado com sucesso!",
+    );
+    setView(nextView);
+    if (nextView === "checkout") onAuthReturnHandled?.();
   }
 
   async function loadMe() {
@@ -390,7 +399,14 @@ export default function useEcommerceCustomer({
         headers: authHeaders,
       });
       setCustomer(response.data);
-      onSuccess("Dados cadastrais atualizados com sucesso.");
+      const nextView = resolvePostAuthView({ authReturnView, customer: response.data });
+      if (nextView === "checkout") {
+        onSuccess("Dados salvos. Vamos finalizar sua compra.");
+        setView(nextView);
+        onAuthReturnHandled?.();
+      } else {
+        onSuccess("Dados cadastrais atualizados com sucesso.");
+      }
     } catch (err) {
       const message = extractApiErrorMessage(err, "Erro ao salvar dados cadastrais");
       const field = inferProfileFieldFromMessage(message);
@@ -637,8 +653,14 @@ export default function useEcommerceCustomer({
       setPasswordRecoveryMode(false);
       setRecoveryStep("request");
       clearRecoveryParamsFromUrl();
-      onSuccess("Login realizado com sucesso. Confira seus dados cadastrais.");
-      setView("conta");
+      const nextView = resolvePostAuthView({ authReturnView, customer: response?.data?.user });
+      onSuccess(
+        nextView === "checkout"
+          ? "Login realizado. Vamos finalizar sua compra."
+          : "Login realizado com sucesso. Confira seus dados cadastrais.",
+      );
+      setView(nextView);
+      if (nextView === "checkout") onAuthReturnHandled?.();
     } catch (err) {
       onError(extractApiErrorMessage(err, "Erro ao realizar login"));
     } finally {

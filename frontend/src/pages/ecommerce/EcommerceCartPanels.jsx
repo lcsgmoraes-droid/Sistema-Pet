@@ -223,6 +223,7 @@ export function EcommerceCartSidebar({
 export function EcommerceCartOrderSummary({
   cart,
   cartTotal,
+  isMobile,
   styles: S,
   onCheckout,
   onContinueShopping,
@@ -230,15 +231,7 @@ export function EcommerceCartOrderSummary({
   const items = Array.isArray(cart?.itens) ? cart.itens : [];
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        border: "1px solid #e7e5e4",
-        borderRadius: 16,
-        padding: 20,
-        boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
-      }}
-    >
+    <div style={S.cartOrderSummaryBox(isMobile)}>
       <div style={{ fontWeight: 700, fontSize: 16, color: "#1c1917", marginBottom: 14 }}>
         Resumo do pedido
       </div>
@@ -370,6 +363,7 @@ export function EcommerceCartPage({
           <EcommerceCartOrderSummary
             cart={cart}
             cartTotal={cartTotal}
+            isMobile={isMobile}
             styles={S}
             onCheckout={onCheckout}
             onContinueShopping={onContinueShopping}

@@ -55,6 +55,16 @@ export default function EcommerceMVP() {
   const handledPaymentReturnSearchRef = useRef("");
 
   const [view, setView] = useState("loja");
+  const [authReturnView, setAuthReturnView] = useState("");
+
+  function requireAuthForCheckout() {
+    setAuthReturnView("checkout");
+    setView("conta");
+  }
+
+  function clearAuthReturnView() {
+    setAuthReturnView("");
+  }
 
   // Detecta mobile (< 768px)
   const [isMobile, setIsMobile] = useState(
@@ -223,11 +233,13 @@ export default function EcommerceMVP() {
     showRecoveryPassword,
     showRegisterPassword,
   } = useEcommerceCustomer({
+    authReturnView,
     authHeaders,
     customerToken,
     loadCart,
     location,
     navigate,
+    onAuthReturnHandled: clearAuthReturnView,
     restoreGuestCart,
     setCustomerToken,
     setView,
@@ -340,6 +352,7 @@ export default function EcommerceMVP() {
     setView,
     tenantContext,
     onError: setError,
+    onRequireAuthForCheckout: requireAuthForCheckout,
     onSuccess: setSuccess,
   });
 
@@ -470,6 +483,7 @@ export default function EcommerceMVP() {
     clearCustomerSession();
     clearCart();
     resetCheckoutStatus();
+    clearAuthReturnView();
     setSuccess("Sess\u00e3o encerrada.");
   }
 
@@ -608,6 +622,7 @@ export default function EcommerceMVP() {
           cidadeDestino={cidadeDestino}
           deliveryMode={deliveryMode}
           isDrive={isDrive}
+          isMobile={isMobile}
           isProfileComplete={isProfileComplete}
           pagamentoBandeira={pagamentoBandeira}
           pagamentoParcelas={pagamentoParcelas}
