@@ -86,6 +86,35 @@ def upgrade() -> None:
         ["tenant_id", "user_id", "enabled"],
         unique=False,
     )
+    op.execute(
+        """
+        INSERT INTO user_push_devices (
+            user_id,
+            expo_push_token,
+            platform,
+            device_name,
+            enabled,
+            last_seen_at,
+            tenant_id,
+            created_at,
+            updated_at
+        )
+        SELECT
+            id,
+            push_token,
+            'legacy',
+            'Dispositivo registrado anteriormente',
+            true,
+            COALESCE(updated_at, created_at, now()),
+            tenant_id,
+            now(),
+            now()
+        FROM users
+        WHERE push_token IS NOT NULL
+          AND btrim(push_token) <> ''
+        ON CONFLICT ON CONSTRAINT uq_user_push_devices_tenant_user_token DO NOTHING
+        """
+    )
 
 
 def downgrade() -> None:
