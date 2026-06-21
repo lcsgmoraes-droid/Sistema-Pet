@@ -8,14 +8,12 @@ import { useAuthStore } from "../store/auth.store";
 type HeaderProfileActionsProps = {
   logoutContextLabel: string;
   color?: string;
-  alwaysShowSwitch?: boolean;
   showLogout?: boolean;
 };
 
 export default function HeaderProfileActions({
   logoutContextLabel,
   color = "#fff",
-  alwaysShowSwitch = true,
   showLogout = true,
 }: HeaderProfileActionsProps) {
   const { user, logout, selectProfile, updateUser } = useAuthStore();
@@ -23,7 +21,7 @@ export default function HeaderProfileActions({
   const [activatingNotifications, setActivatingNotifications] = useState(false);
   const available_profiles = user?.available_profiles ?? [];
   const currentProfile = user?.selected_profile ?? user?.perfil_operacional ?? "cliente";
-  const canSwitch = alwaysShowSwitch || available_profiles.length > 1;
+  const canSwitch = available_profiles.length > 1;
 
   const trocarPerfil = async () => {
     setLoadingProfiles(true);

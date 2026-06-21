@@ -237,12 +237,12 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View style={styles.secao}>
-          <Text style={styles.secaoTitulo}>Trocar perfil</Text>
-          <Text style={styles.textoSuporte}>
-            Acesso atual: {perfilAtual}
-          </Text>
-          {available_profiles.length > 1 ? (
+        {available_profiles.length > 1 && (
+          <View style={styles.secao}>
+            <Text style={styles.secaoTitulo}>Trocar perfil</Text>
+            <Text style={styles.textoSuporte}>
+              Acesso atual: {perfilAtual}
+            </Text>
             <View style={styles.perfisGrid}>
               {available_profiles.map((profile) => {
                 const selecionado = profile.type === perfilAtual;
@@ -268,22 +268,22 @@ export default function ProfileScreen() {
                 );
               })}
             </View>
-          ) : null}
-          <TouchableOpacity
-            style={[styles.botaoPerfilAtualizar, trocandoPerfil && { opacity: 0.7 }]}
-            onPress={abrirTrocaPerfil}
-            disabled={trocandoPerfil}
-          >
-            {trocandoPerfil ? (
-              <ActivityIndicator color={CORES.primario} />
-            ) : (
-              <>
-                <Ionicons name="swap-horizontal-outline" size={18} color={CORES.primario} />
-                <Text style={styles.botaoPerfilAtualizarTexto}>Ver acessos disponiveis</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[styles.botaoPerfilAtualizar, trocandoPerfil && { opacity: 0.7 }]}
+              onPress={abrirTrocaPerfil}
+              disabled={trocandoPerfil}
+            >
+              {trocandoPerfil ? (
+                <ActivityIndicator color={CORES.primario} />
+              ) : (
+                <>
+                  <Ionicons name="swap-horizontal-outline" size={18} color={CORES.primario} />
+                  <Text style={styles.botaoPerfilAtualizarTexto}>Ver acessos disponiveis</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.secao}>
           <View style={styles.secaoHeader}>

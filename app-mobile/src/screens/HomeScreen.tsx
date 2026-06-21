@@ -74,7 +74,6 @@ export default function HomeScreen() {
             <Text style={styles.pontosTexto}>{pontos} pts</Text>
           </TouchableOpacity>
           <HeaderProfileActions
-            alwaysShowSwitch
             color={CORES.primario}
             logoutContextLabel="cliente"
             showLogout={false}
