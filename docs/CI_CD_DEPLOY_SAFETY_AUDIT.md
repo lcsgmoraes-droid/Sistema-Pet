@@ -24,7 +24,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | Backend CI possui `ruff check` global bloqueante e blocos por dominio para antecipar falhas | `.github/workflows/backend-ci.yml`, `tests/test_backend_ci_workflow_contract.py` |
 | Feito | Backend CI possui `ruff format` global bloqueante para backend e testes, sem excecao dos testes de transacao legados | `.github/workflows/backend-ci.yml`, `tests/test_backend_ci_workflow_contract.py` |
 | Feito | Analise automatica do SonarCloud possui configuracao propria para ignorar caminhos sem runtime e manter exclusoes de duplicacao alinhadas ao `sonar-project.properties` | `.sonarcloud.properties`, `tests/test_sonarcloud_config_contract.py` |
-| Feito | Quality Gate bloqueia merge quando o check externo `SonarCloud Code Analysis` nao conclui com sucesso | `.github/workflows/backend-ci.yml`, `tests/test_backend_ci_workflow_contract.py` |
+| Feito | `SonarCloud Code Analysis` continua como check externo visivel no PR, mas o `Quality Gate` nao espera mais esse check para evitar trava duplicada | `.github/workflows/backend-ci.yml`, `tests/test_backend_ci_workflow_contract.py` |
 | Feito | Check de deploy safety roda em todo PR para `main` | `.github/workflows/deploy-safety.yml` |
 | Feito | Branch protection da `main` exige `MCP tests`, `Fluxo unico safety`, `Quality Gate` e `Smoke test` | GitHub branch protection |
 | Feito | Smoke CI valida todos os testes raiz, backend/auth, `npm audit`, lint/format core e build frontend | `.github/workflows/smoke-ci.yml`, `tests/test_smoke_ci_workflow_contract.py` |
@@ -64,7 +64,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | #481 | Smoke CI passou a rodar todos os testes raiz `tests/` | Mergeado |
 | #482-#486 | `app/tenancy`, auth multi-tenant, `app/db`, `app/schemas` e `app/security` com ruff bloqueante | Mergeados; deployados quando havia runtime |
 | #623-#657 | Rodada 0.5 fechou lint/format bloqueante por blocos ate `ruff check .` e `ruff format --check .` globais | Mergeados; sem deploy quando o escopo era apenas CI/docs |
-| #653 | `Quality Gate` passou a espelhar o check externo do SonarCloud | Mergeado |
+| #653 | `Quality Gate` passou a espelhar o check externo do SonarCloud | Historico; estrategia revisada em 2026-06-20 para remover espera duplicada |
 | #654 | `npm audit` do frontend passou a ser bloqueante no Smoke CI | Mergeado |
 | #658 | Configuracao automatica do SonarCloud alinhada ao `sonar-project.properties` e aos caminhos sem runtime | Mergeado; sem deploy de runtime |
 
@@ -159,7 +159,7 @@ migration_smoke_status=ok
 
 | Prioridade | Status | Item | Motivo |
 |---|---|---|---|
-| Alta | Fechado em 2026-06-19; manter continuo | Item 0.5 de lint/format/Sonar bloqueante | `ruff check .`, `ruff format --check .`, Smoke CI, npm audit e Quality Gate/Sonar ja bloqueiam PR |
+| Alta | Fechado em 2026-06-19; manter continuo | Item 0.5 de lint/format/Sonar | `ruff check .`, `ruff format --check .`, Smoke CI, npm audit e Quality Gate bloqueiam PR; SonarCloud fica como check externo independente e visivel |
 | Media | Feito em 2026-06-19; manter continuo | Revisar este guia apos deploy real ou rodada longa de CI | Ajusta o procedimento com evidencia operacional |
 | Media | Continuo | Manter checks obrigatorios verdes em todo PR | Evita regressao do trilho seguro |
 | Baixa | Continuo | Registrar incidentes e rollbacks quando ocorrerem | Mantem historico auditavel |

@@ -49,11 +49,11 @@ def test_backend_ci_keeps_postgres_migration_smoke():
     assert "python scripts/ci_migration_smoke.py" in source
 
 
-def test_backend_ci_quality_gate_mirrors_sonarcloud_external_check():
+def test_backend_ci_quality_gate_does_not_wait_for_sonarcloud_external_check():
     source = _workflow_source()
 
     assert "Quality Gate" in source
-    assert "Ensure SonarCloud external check passed" in source
-    assert "SonarCloud Code Analysis" in source
-    assert "check-runs" in source
-    assert "SONAR_WAIT_SECONDS" in source
+    assert "SonarCloud Code Analysis" not in source
+    assert "check-runs" not in source
+    assert "SONAR_WAIT_SECONDS" not in source
+    assert "Operational backend checks passed" in source
