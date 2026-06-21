@@ -45,6 +45,26 @@ def _normalizar_canal_venda_online(canal: str | None) -> str:
     return normalize_sales_channel(canal)
 
 
+def _resolver_status_entrega_online(
+    *,
+    tem_entrega: bool,
+    tipo_retirada: str | None,
+    canal_origem: str | None,
+) -> str | None:
+    canal = normalize_sales_channel(canal_origem)
+    if canal not in {"app", "ecommerce"}:
+        return None
+
+    if tem_entrega:
+        return "entregue"
+
+    retirada = str(tipo_retirada or "").strip().lower()
+    if retirada in {"proprio", "terceiro", "app_loja"}:
+        return "pendente"
+
+    return None
+
+
 TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 PAGARME_SIGNATURE_HEADERS = (
     "X-Hub-Signature",
@@ -894,15 +914,15 @@ def _integrar_venda_ao_motor(
             venda_row.palavra_chave_retirada = pedido.palavra_chave_retirada
             venda_row.canal = canal_origem
             venda_row.loja_origem = canal_origem
-            online_retirada = (
-                not venda_row.tem_entrega
-                and venda_row.tipo_retirada in {"proprio", "terceiro", "app_loja"}
-                and canal_origem in {"app", "ecommerce"}
+            status_entrega_online = _resolver_status_entrega_online(
+                tem_entrega=bool(venda_row.tem_entrega),
+                tipo_retirada=venda_row.tipo_retirada,
+                canal_origem=canal_origem,
             )
-            if (
-                venda_row.tem_entrega or online_retirada
-            ) and not venda_row.status_entrega:
-                venda_row.status_entrega = "pendente"
+            if status_entrega_online and not venda_row.status_entrega:
+                venda_row.status_entrega = status_entrega_online
+                if status_entrega_online == "entregue":
+                    venda_row.data_entrega = venda_row.data_entrega or datetime.utcnow()
 
             # ── Efeitos colaterais completos (espelha finalização do PDV) ───────
             _processar_pos_venda_ecommerce(

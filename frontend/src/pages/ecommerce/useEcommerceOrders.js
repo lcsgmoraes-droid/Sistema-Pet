@@ -4,6 +4,14 @@ import { STORAGE_ORDERS_KEY, extractApiErrorMessage } from "./ecommerceMvpUtils"
 
 const PENDING_ORDER_POLL_MS = 12_000;
 
+function hasOpenFulfillmentOrder(pedido) {
+  if (!pedido || pedido.tem_entrega) return false;
+  const statusEntrega = String(pedido.status_entrega || "")
+    .trim()
+    .toLowerCase();
+  return Boolean(pedido.tipo_retirada) && ["pendente", "pronto"].includes(statusEntrega);
+}
+
 export default function useEcommerceOrders({ authHeaders, customerToken, view, onError }) {
   const [, setOrderIds] = useState(() => {
     try {
@@ -74,7 +82,8 @@ export default function useEcommerceOrders({ authHeaders, customerToken, view, o
     const hasPendingOrder = ordersDetailed.some(
       (pedido) => pedido?.status === "pendente" || pedido?.status === "pending",
     );
-    if (!hasPendingOrder) return;
+    const hasOpenFulfillment = ordersDetailed.some(hasOpenFulfillmentOrder);
+    if (!hasPendingOrder && !hasOpenFulfillment) return;
 
     const interval = setInterval(loadOrdersDetailed, PENDING_ORDER_POLL_MS);
     return () => clearInterval(interval);

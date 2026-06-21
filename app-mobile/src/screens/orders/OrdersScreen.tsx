@@ -113,8 +113,11 @@ function getEntregaStatusConfig(pedido: Pedido) {
   if (!statusEntrega) return null;
 
   const retiradaNaLoja = !pedido.tem_entrega && !!pedido.tipo_retirada;
+  if (pedido.tem_entrega && statusEntrega === "entregue") {
+    return { label: "Compra com entrega", cor: "#10B981" };
+  }
   if (retiradaNaLoja && statusEntrega === "pendente") {
-    return { label: "Em separacao", cor: "#F59E0B" };
+    return { label: "A retirar", cor: "#F59E0B" };
   }
   if (retiradaNaLoja && statusEntrega === "pronto") {
     return { label: "Pronto para retirada", cor: "#10B981" };
@@ -124,6 +127,12 @@ function getEntregaStatusConfig(pedido: Pedido) {
   }
 
   return STATUS_ENTREGA[statusEntrega] || null;
+}
+
+function hasOpenFulfillmentOrder(pedido: Pedido): boolean {
+  if (!pedido || pedido.tem_entrega) return false;
+  const statusEntrega = (pedido.status_entrega || "").trim().toLowerCase();
+  return Boolean(pedido.tipo_retirada) && ["pendente", "pronto"].includes(statusEntrega);
 }
 
 export default function OrdersScreen() {
@@ -178,7 +187,8 @@ export default function OrdersScreen() {
     const temPedidoPendente = pedidos.some(
       (pedido) => pedido.status === "pendente",
     );
-    if (!temPedidoPendente) return;
+    const temRetiradaAberta = pedidos.some(hasOpenFulfillmentOrder);
+    if (!temPedidoPendente && !temRetiradaAberta) return;
 
     const interval = setInterval(carregar, PENDING_ORDER_POLL_MS);
     return () => clearInterval(interval);
@@ -246,6 +256,11 @@ export default function OrdersScreen() {
               {entregaCfg.label}
             </Text>
           </View>
+        )}
+        {!temEntrega && item.status_entrega === "entregue" && item.retirado_por && (
+          <Text style={styles.retiradoPorTexto}>
+            Retirado por {item.retirado_por}
+          </Text>
         )}
 
         {/* Itens */}
@@ -480,6 +495,11 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   entregaBadgeText: { fontSize: FONTE.pequena, fontWeight: "700" },
+  retiradoPorTexto: {
+    fontSize: FONTE.pequena,
+    color: CORES.textoSecundario,
+    marginBottom: ESPACO.sm,
+  },
 
   itensList: { marginBottom: ESPACO.sm, gap: 4 },
   itemLinha: { flexDirection: "row", alignItems: "center", gap: 8 },

@@ -312,6 +312,9 @@ export default function PDVVendasRecentesSidebar({
                 const conclusaoTitle = venda.tem_entrega
                   ? "Informar quem recebeu"
                   : "Informar quem retirou";
+                const retiradaNomeObrigatorio = !venda.tem_entrega;
+                const retiradaNomeInvalido =
+                  retiradaNomeObrigatorio && !confirmandoRetirada.nome.trim();
 
                 return (
                   <div
@@ -457,7 +460,7 @@ export default function PDVVendasRecentesSidebar({
                           placeholder={
                             venda.tem_entrega
                               ? "Nome de quem recebeu (opcional)"
-                              : "Nome de quem esta retirando (opcional)"
+                              : "Nome de quem esta retirando"
                           }
                           value={confirmandoRetirada.nome}
                           onChange={(e) =>
@@ -467,7 +470,7 @@ export default function PDVVendasRecentesSidebar({
                             }))
                           }
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") {
+                            if (e.key === "Enter" && !retiradaNomeInvalido) {
                               confirmarRetirada(e, venda.id);
                             }
                             if (e.key === "Escape") {
@@ -479,10 +482,20 @@ export default function PDVVendasRecentesSidebar({
                           }}
                           className="w-full text-[11px] px-2 py-1 border border-gray-300 rounded focus:outline-none focus:border-green-500"
                         />
+                        {retiradaNomeObrigatorio && (
+                          <div className="text-[10px] text-amber-700">
+                            Informe quem retirou para concluir o pedido.
+                          </div>
+                        )}
                         <div className="flex gap-1">
                           <button
                             onClick={(e) => confirmarRetirada(e, venda.id)}
-                            className="flex-1 text-[10px] bg-green-600 hover:bg-green-700 text-white font-semibold py-1 rounded transition-colors"
+                            className={`flex-1 text-[10px] text-white font-semibold py-1 rounded transition-colors ${
+                              retiradaNomeInvalido
+                                ? "cursor-not-allowed bg-gray-300"
+                                : "bg-green-600 hover:bg-green-700"
+                            }`}
+                            disabled={retiradaNomeInvalido}
                             type="button"
                           >
                             {"\u2705"} Confirmar

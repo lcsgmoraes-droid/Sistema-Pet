@@ -23,6 +23,26 @@ def test_atualizacao_de_venda_define_pendente_apenas_para_entrega_nova():
     assert _resolver_status_entrega_atualizacao(False, "entregue") is None
 
 
+def test_retirada_na_loja_exige_nome_de_quem_retirou():
+    from fastapi import HTTPException
+
+    from app.vendas_routes import _resolver_retirado_por_conclusao
+
+    venda_retirada = SimpleNamespace(tem_entrega=False)
+    venda_entrega = SimpleNamespace(tem_entrega=True)
+
+    assert _resolver_retirado_por_conclusao(venda_retirada, "  Osvaldo  ") == "Osvaldo"
+    assert _resolver_retirado_por_conclusao(venda_entrega, "") is None
+
+    try:
+        _resolver_retirado_por_conclusao(venda_retirada, "")
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "Informe quem retirou" in exc.detail
+    else:
+        raise AssertionError("Retirada sem nome deveria falhar")
+
+
 def test_sincronizar_parada_entregue_atualiza_venda_para_pdv():
     entrega_em = datetime(2026, 4, 24, 10, 30)
     parada = SimpleNamespace(venda_id=10, status="pendente", data_entrega=None)

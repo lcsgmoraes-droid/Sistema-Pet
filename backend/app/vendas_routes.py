@@ -933,6 +933,13 @@ class MarcarEntregueRequest(BaseModel):
     retirado_por: str | None = None
 
 
+def _resolver_retirado_por_conclusao(venda, retirado_por: str | None) -> str | None:
+    nome = str(retirado_por or "").strip()
+    if not getattr(venda, "tem_entrega", False) and not nome:
+        raise HTTPException(status_code=400, detail="Informe quem retirou o pedido.")
+    return nome or None
+
+
 @router.post("/{venda_id}/marcar-entregue")
 async def marcar_venda_entregue(
     venda_id: int,
@@ -949,10 +956,11 @@ async def marcar_venda_entregue(
     )
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
+    retirado_por = _resolver_retirado_por_conclusao(venda, dados.retirado_por)
     venda.status_entrega = "entregue"
     venda.data_entrega = datetime.now()
-    if dados.retirado_por:
-        venda.retirado_por = dados.retirado_por.strip()
+    if retirado_por:
+        venda.retirado_por = retirado_por
     db.commit()
     notify_sale_order_event(db, venda=venda, event="delivered")
     return {

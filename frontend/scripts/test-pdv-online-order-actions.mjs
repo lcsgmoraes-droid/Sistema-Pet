@@ -50,8 +50,14 @@ assert.match(
 
 assert.match(
   sidebarSource,
-  /Informar quem retirou/,
-  "senha de retirada deve abrir o campo para informar quem retirou",
+  /Nome de quem esta retirando/,
+  "retirada na loja deve pedir nome de quem retirou",
+);
+
+assert.match(
+  sidebarSource,
+  /retiradaNomeObrigatorio/,
+  "confirmacao de retirada deve exigir nome quando nao for entrega",
 );
 
 assert.match(

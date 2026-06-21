@@ -270,11 +270,39 @@ def test_webhook_integracao_usa_origem_do_pedido_como_fallback():
     )
 
 
-def test_webhook_integracao_retirada_online_fica_pendente_de_separacao():
-    source = inspect.getsource(ecommerce_webhooks._integrar_venda_ao_motor)
-
-    assert "online_retirada" in source
-    assert 'venda_row.status_entrega = "pendente"' in source
+def test_webhook_integracao_define_status_operacional_por_modo():
+    assert (
+        ecommerce_webhooks._resolver_status_entrega_online(
+            tem_entrega=False,
+            tipo_retirada="proprio",
+            canal_origem="ecommerce",
+        )
+        == "pendente"
+    )
+    assert (
+        ecommerce_webhooks._resolver_status_entrega_online(
+            tem_entrega=False,
+            tipo_retirada="app_loja",
+            canal_origem="app",
+        )
+        == "pendente"
+    )
+    assert (
+        ecommerce_webhooks._resolver_status_entrega_online(
+            tem_entrega=True,
+            tipo_retirada="entrega",
+            canal_origem="ecommerce",
+        )
+        == "entregue"
+    )
+    assert (
+        ecommerce_webhooks._resolver_status_entrega_online(
+            tem_entrega=False,
+            tipo_retirada=None,
+            canal_origem="loja_fisica",
+        )
+        is None
+    )
 
 
 def test_select_checkout_url_respeita_sandbox(monkeypatch):

@@ -104,7 +104,16 @@ def test_mobile_orders_screen_polls_pending_orders_until_webhook_updates_status(
     assert "PENDING_ORDER_POLL_MS" in orders
     assert "setInterval(carregar, PENDING_ORDER_POLL_MS)" in orders
     assert 'pedido.status === "pendente"' in orders
+    assert "hasOpenFulfillmentOrder" in orders
     assert "clearInterval(interval)" in orders
+
+
+def test_mobile_orders_screen_shows_pickup_person_and_delivery_summary():
+    orders = _read_mobile_source("app-mobile/src/screens/orders/OrdersScreen.tsx")
+
+    assert "A retirar" in orders
+    assert "Compra com entrega" in orders
+    assert "Retirado por" in orders
 
 
 def test_push_registration_handles_firebase_errors_from_native_setup_steps():
