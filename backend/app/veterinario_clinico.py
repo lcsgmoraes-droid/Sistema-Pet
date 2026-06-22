@@ -8,6 +8,8 @@ from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
+from app.services.push_devices import load_user_push_targets
+
 from .models import AuditLog, Cliente, Pet, User
 from .veterinario_core import _all_accessible_tenant_ids, _vet_now
 from .veterinario_exames_ia import _meses_desde
@@ -410,7 +412,16 @@ def _upsert_lembretes_push_agendamento(
         )
         .first()
     )
-    if not user_tutor or not getattr(user_tutor, "push_token", None):
+    if not user_tutor:
+        return
+
+    push_targets = load_user_push_targets(
+        db,
+        tenant_id=str(tenant_id),
+        user_id=user_tutor.id,
+        legacy_push_token=getattr(user_tutor, "push_token", None),
+    )
+    if not push_targets:
         return
 
     prefixo = f"vet-agendamento:{ag.id}:"
@@ -460,7 +471,8 @@ def _upsert_lembretes_push_agendamento(
                 channel=NotificationChannelEnum.push,
                 subject=assunto,
                 body=mensagem,
-                push_token=user_tutor.push_token,
+                push_token=getattr(user_tutor, "push_token", None)
+                or push_targets[0].token,
                 scheduled_at=envio_em,
             )
         )

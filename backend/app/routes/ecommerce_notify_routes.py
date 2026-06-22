@@ -201,23 +201,33 @@ def notificar_clientes_estoque_disponivel(
 
     # Coletar push tokens dos usuários cadastrados para este produto
     from app.models import User
+    from app.services.push_devices import load_user_push_targets
     import requests as http_requests
 
     def _send_expo_push(tokens: list, title: str, body: str, data: dict = None):
         """Envia push via Expo Push API para uma lista de tokens."""
         if not tokens:
             return
-        messages = [
-            {
-                "to": token,
-                "sound": "default",
-                "title": title,
-                "body": body,
-                "data": data or {},
-            }
-            for token in tokens
-            if token and token.startswith("ExponentPushToken")
-        ]
+        seen_tokens = set()
+        messages = []
+        for token in tokens:
+            token = str(token or "").strip()
+            if (
+                not token
+                or not token.startswith("ExponentPushToken")
+                or token in seen_tokens
+            ):
+                continue
+            seen_tokens.add(token)
+            messages.append(
+                {
+                    "to": token,
+                    "sound": "default",
+                    "title": title,
+                    "body": body,
+                    "data": data or {},
+                }
+            )
         if not messages:
             return
         try:
@@ -255,8 +265,16 @@ def notificar_clientes_estoque_disponivel(
             )
             .first()
         )
-        if user and getattr(user, "push_token", None):
-            push_tokens.append(user.push_token)
+        if user:
+            push_tokens.extend(
+                target.token
+                for target in load_user_push_targets(
+                    db,
+                    tenant_id=tenant_id,
+                    user_id=user.id,
+                    legacy_push_token=getattr(user, "push_token", None),
+                )
+            )
 
     db.commit()
 

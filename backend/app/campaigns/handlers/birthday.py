@@ -40,6 +40,7 @@ from app.campaigns.models import (
     CampaignTypeEnum,
 )
 from app.campaigns.notification_service import enqueue_email, enqueue_push
+from app.services.push_devices import load_customer_push_targets
 
 logger = logging.getLogger(__name__)
 
@@ -326,7 +327,12 @@ class BirthdayHandler:
         body = notification_msg.format_map(fmt_vars)
         notif_key = f"bday:{campaign.id}:{customer_id}:{reference_period}"
 
-        if customer_push_token:
+        if load_customer_push_targets(
+            db,
+            tenant_id=campaign.tenant_id,
+            customer_id=customer_id,
+            legacy_push_token=customer_push_token,
+        ):
             enqueue_push(
                 db,
                 tenant_id=campaign.tenant_id,
