@@ -837,7 +837,29 @@ class EstoqueMovimentacao(BaseTenantModel):
     """Movimentações de estoque com rastreamento de lotes"""
 
     __tablename__ = "estoque_movimentacoes"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = (
+        Index(
+            "ix_estoque_mov_tenant_produto_created",
+            "tenant_id",
+            "produto_id",
+            "created_at",
+            "id",
+        ),
+        Index(
+            "ix_estoque_mov_tenant_documento_motivo",
+            "tenant_id",
+            "documento",
+            "motivo",
+        ),
+        Index(
+            "ix_estoque_mov_tenant_motivo_created",
+            "tenant_id",
+            "motivo",
+            "created_at",
+            "id",
+        ),
+        {"extend_existing": True},
+    )
 
     id = Column(Integer, primary_key=True)
     produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False)

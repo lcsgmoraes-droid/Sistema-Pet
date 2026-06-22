@@ -70,6 +70,7 @@ class SaidaFullNFRequest(BaseModel):
     numero_nf: str
     plataforma: Optional[str] = None
     observacao: Optional[str] = None
+    permitir_estoque_negativo: bool = False
     tarifa_envio: Optional[float] = 0
     categoria_tarifa_id: Optional[int] = None
     dre_subcategoria_tarifa_id: Optional[int] = None
@@ -402,6 +403,7 @@ def _processar_item_saida_full_nf(
     numero_nf: str,
     observacao_movimentacao: str,
     current_user: User,
+    permitir_estoque_negativo: bool = False,
 ):
     produto = _resolver_produto_full_nf(db, tenant_id, item)
     if not produto:
@@ -419,10 +421,12 @@ def _processar_item_saida_full_nf(
             numero_nf=numero_nf,
             observacao_movimentacao=observacao_movimentacao,
             current_user=current_user,
+            permitir_estoque_negativo=permitir_estoque_negativo,
         )
 
     estoque_anterior = float(produto.estoque_atual or 0)
-    if estoque_anterior < item.quantidade:
+    faltante = max(float(item.quantidade or 0) - estoque_anterior, 0)
+    if estoque_anterior < item.quantidade and not permitir_estoque_negativo:
         sku_label = _sku_produto(produto) or "sem-sku"
         raise HTTPException(
             status_code=400,
@@ -457,6 +461,8 @@ def _processar_item_saida_full_nf(
         "quantidade": item.quantidade,
         "estoque_anterior": estoque_anterior,
         "estoque_novo": float(produto.estoque_atual or 0),
+        "estoque_negativo": float(produto.estoque_atual or 0) < 0,
+        "faltante": faltante,
     }
 
 
@@ -468,11 +474,12 @@ def _processar_item_kit_virtual_saida_full_nf(
     numero_nf: str,
     observacao_movimentacao: str,
     current_user: User,
+    permitir_estoque_negativo: bool = False,
 ):
     estoque_anterior = _estoque_disponivel_saida_full_nf(db, tenant_id, produto)
     quantidade_kits = float(item.quantidade or 0)
 
-    if estoque_anterior < quantidade_kits:
+    if estoque_anterior < quantidade_kits and not permitir_estoque_negativo:
         sku_label = _sku_produto(produto) or "sem-sku"
         raise HTTPException(
             status_code=400,
@@ -512,7 +519,7 @@ def _processar_item_kit_virtual_saida_full_nf(
 
         quantidade_componente = quantidade_kits * float(componente.quantidade or 0)
         estoque_componente = float(produto_componente.estoque_atual or 0)
-        if estoque_componente < quantidade_componente:
+        if estoque_componente < quantidade_componente and not permitir_estoque_negativo:
             sku_label = _sku_produto(produto_componente) or "sem-sku"
             raise HTTPException(
                 status_code=400,
@@ -594,6 +601,11 @@ def _processar_item_kit_virtual_saida_full_nf(
         "quantidade": quantidade_kits,
         "estoque_anterior": estoque_anterior,
         "estoque_novo": estoque_novo,
+        "estoque_negativo": any(
+            float(componente["estoque_novo"] or 0) < 0
+            for componente in componentes_baixados
+        ),
+        "faltante": max(quantidade_kits - estoque_anterior, 0),
         "tipo_kit": "VIRTUAL",
         "componentes_baixados": componentes_baixados,
         "sync_itens": [
@@ -1193,7 +1205,8 @@ def saida_full_por_nf(
                 ),
             )
 
-        _validar_estoque_saida_full_nf(db, tenant_id, itens_validos)
+        if not payload.permitir_estoque_negativo:
+            _validar_estoque_saida_full_nf(db, tenant_id, itens_validos)
 
         for item in itens_validos:
             processados.append(
@@ -1204,6 +1217,7 @@ def saida_full_por_nf(
                     numero_nf=payload.numero_nf,
                     observacao_movimentacao=observacao_movimentacao,
                     current_user=current_user,
+                    permitir_estoque_negativo=payload.permitir_estoque_negativo,
                 )
             )
 
