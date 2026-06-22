@@ -1,7 +1,10 @@
 from types import SimpleNamespace
 
+import pytest
+from fastapi import HTTPException
+
 from app import estoque_saida_full_routes as routes
-from app.estoque_saida_full_routes import SaidaFullNFItemRequest
+from app.estoque_saida_full_routes import SaidaFullNFItemRequest, SaidaFullNFRequest
 from app.produtos_models import Produto, ProdutoKitComponente
 
 
@@ -158,3 +161,67 @@ def test_processar_saida_full_kit_virtual_baixa_componentes_e_registra_fluxo_vir
     assert movimento_kit.quantidade_anterior == 31
     assert movimento_kit.quantidade_nova == 28
     assert movimento_kit.valor_total == 0
+
+
+def test_processar_saida_full_simples_bloqueia_negativo_por_padrao():
+    produto = _produto(
+        id=101, codigo="SKU-NEG", nome="Produto sem saldo", estoque_atual=1
+    )
+    db = _FakeDB(produtos=[produto])
+
+    with pytest.raises(HTTPException) as excinfo:
+        routes._processar_item_saida_full_nf(
+            db,
+            tenant_id=10,
+            item=SaidaFullNFItemRequest(sku="SKU-NEG", quantidade=3),
+            numero_nf="FULL-NEG",
+            observacao_movimentacao="Saida FULL por NF FULL-NEG",
+            current_user=SimpleNamespace(id=99),
+        )
+
+    assert excinfo.value.status_code == 400
+    assert produto.estoque_atual == 1
+    assert db.added == []
+
+
+def test_payload_saida_full_aceita_confirmacao_para_estoque_negativo():
+    payload = SaidaFullNFRequest(
+        numero_nf="FULL-NEG",
+        plataforma="full",
+        itens=[SaidaFullNFItemRequest(sku="SKU-NEG", quantidade=3)],
+        permitir_estoque_negativo=True,
+    )
+
+    assert payload.permitir_estoque_negativo is True
+
+
+def test_processar_saida_full_simples_permite_negativo_com_confirmacao():
+    produto = _produto(
+        id=101,
+        codigo="SKU-NEG",
+        nome="Produto sem saldo",
+        estoque_atual=1,
+        preco_custo=12.5,
+    )
+    db = _FakeDB(produtos=[produto])
+
+    resultado = routes._processar_item_saida_full_nf(
+        db,
+        tenant_id=10,
+        item=SaidaFullNFItemRequest(sku="SKU-NEG", quantidade=3),
+        numero_nf="FULL-NEG",
+        observacao_movimentacao="Saida FULL por NF FULL-NEG",
+        current_user=SimpleNamespace(id=99),
+        permitir_estoque_negativo=True,
+    )
+
+    assert produto.estoque_atual == -2
+    assert resultado["estoque_anterior"] == 1
+    assert resultado["estoque_novo"] == -2
+    assert resultado["estoque_negativo"] is True
+    assert resultado["faltante"] == 2
+
+    movimento = db.added[0]
+    assert movimento.quantidade_anterior == 1
+    assert movimento.quantidade_nova == -2
+    assert movimento.valor_total == 3 * produto.preco_custo

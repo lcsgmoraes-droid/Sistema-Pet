@@ -4,6 +4,7 @@ from sqlalchemy import (
     Integer,
     DateTime,
     JSON,
+    Index,
     Numeric,
     UniqueConstraint,
 )
@@ -15,6 +16,22 @@ from app.base_models import BaseTenantModel
 class BlingNotaFiscalCache(BaseTenantModel):
     __tablename__ = "bling_notas_fiscais_cache"
     __table_args__ = (
+        Index(
+            "ix_bling_nf_cache_tenant_pedido_ref",
+            "tenant_id",
+            "pedido_bling_id_ref",
+            "data_emissao",
+            "last_synced_at",
+            "id",
+        ),
+        Index(
+            "ix_bling_nf_cache_tenant_numero_loja",
+            "tenant_id",
+            "numero_pedido_loja",
+            "data_emissao",
+            "last_synced_at",
+            "id",
+        ),
         UniqueConstraint(
             "tenant_id",
             "bling_id",

@@ -130,6 +130,7 @@ export default function EstoqueFullNF() {
     lancamento: null,
     canal: "",
   });
+  const [processamentoPendente, setProcessamentoPendente] = useState({});
   const [historico, setHistorico] = useState([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
   const [salvando, setSalvando] = useState(false);
@@ -202,6 +203,13 @@ export default function EstoqueFullNF() {
     return mapa;
   }, [problemasEstoque]);
 
+  const podeLancarNegativo = useMemo(
+    () =>
+      problemasEstoque.length > 0 &&
+      problemasEstoque.every((problema) => problema.tipo !== "produto_nao_encontrado"),
+    [problemasEstoque],
+  );
+
   const problemaDaLinha = (item) => problemasEstoquePorSku.get(normalizarSku(item.sku));
 
   const carregarSubcategoriasDespesaDre = async () => {
@@ -245,7 +253,8 @@ export default function EstoqueFullNF() {
     }
   };
 
-  const abrirModalVinculoDre = (categoria) => {
+  const abrirModalVinculoDre = (categoria, opcoesProcessamento = {}) => {
+    setProcessamentoPendente(opcoesProcessamento);
     setModalDre({ aberto: true, categoria });
     setDreSubcategoriaId("");
     carregarSubcategoriasDespesaDre();
@@ -328,7 +337,10 @@ export default function EstoqueFullNF() {
     }
   };
 
-  const validarTarifaEnvio = (categoriaClassificada = categoriaTarifaSelecionada) => {
+  const validarTarifaEnvio = (
+    categoriaClassificada = categoriaTarifaSelecionada,
+    opcoesProcessamento = {},
+  ) => {
     if (!tarifaEnvio || tarifaEnvio <= 0) return true;
 
     if (!categoriaTarifaId) {
@@ -337,7 +349,7 @@ export default function EstoqueFullNF() {
     }
 
     if (!categoriaClassificada?.dre_subcategoria_id) {
-      abrirModalVinculoDre(categoriaClassificada);
+      abrirModalVinculoDre(categoriaClassificada, opcoesProcessamento);
       return false;
     }
 
@@ -401,7 +413,7 @@ export default function EstoqueFullNF() {
     }
   };
 
-  const processar = async (categoriaClassificada = categoriaTarifaSelecionada) => {
+  const processar = async (categoriaClassificada = categoriaTarifaSelecionada, opcoes = {}) => {
     if (!numeroNF.trim()) {
       toast.error("Informe o numero da NF");
       return;
@@ -419,7 +431,7 @@ export default function EstoqueFullNF() {
       return;
     }
 
-    if (!validarTarifaEnvio(categoriaClassificada)) {
+    if (!validarTarifaEnvio(categoriaClassificada, opcoes)) {
       return;
     }
 
@@ -433,6 +445,10 @@ export default function EstoqueFullNF() {
         observacao: observacao.trim() || null,
         itens: itensValidos,
       };
+
+      if (opcoes.permitirEstoqueNegativo) {
+        payload.permitir_estoque_negativo = true;
+      }
 
       if (tarifaEnvio > 0) {
         payload.tarifa_envio = Number(tarifaEnvio);
@@ -461,8 +477,27 @@ export default function EstoqueFullNF() {
     }
   };
 
+  const lancarNegativo = async () => {
+    if (!podeLancarNegativo) {
+      toast.error("Nao e possivel lancar negativo quando existe produto nao encontrado.");
+      return;
+    }
+
+    const totalFaltante = problemasEstoque.reduce(
+      (soma, problema) => soma + Number(problema.faltante || 0),
+      0,
+    );
+    const confirmou = confirm(
+      `Lancar a NF mesmo deixando estoque negativo?\n\nItens com falta: ${problemasEstoque.length}\nTotal faltante: ${formatarQuantidade(totalFaltante)}\n\nUse esta opcao apenas para nao travar o fluxo agora. Depois ajuste o estoque dos produtos.`,
+    );
+    if (!confirmou) return;
+
+    await processar(categoriaTarifaSelecionada, { permitirEstoqueNegativo: true });
+  };
+
   const fecharModalDre = () => {
     if (salvandoVinculoDre) return;
+    setProcessamentoPendente({});
     setModalDre({ aberto: false, categoria: null });
     setDreSubcategoriaId("");
   };
@@ -551,8 +586,10 @@ export default function EstoqueFullNF() {
       setCategoriaTarifaId(String(categoriaAtualizada.id));
       setModalDre({ aberto: false, categoria: null });
       setDreSubcategoriaId("");
+      const opcoesProcessamento = processamentoPendente || {};
+      setProcessamentoPendente({});
       toast.success("Categoria vinculada a DRE. Continuando a operacao...");
-      await processar(categoriaAtualizada);
+      await processar(categoriaAtualizada, opcoesProcessamento);
     } catch (error) {
       console.error("Erro ao vincular categoria a DRE:", error);
       const detalhe =
@@ -716,6 +753,17 @@ export default function EstoqueFullNF() {
                   >
                     Revalidar estoque
                   </ActionButton>
+                  {podeLancarNegativo && (
+                    <ActionButton
+                      icon={PackageMinus}
+                      intent="delete"
+                      loading={salvando}
+                      onClick={lancarNegativo}
+                      tone="soft"
+                    >
+                      Lancar negativo
+                    </ActionButton>
+                  )}
                 </div>
                 <div className="mt-3 grid gap-2">
                   {problemasEstoque.map((problema) => (
