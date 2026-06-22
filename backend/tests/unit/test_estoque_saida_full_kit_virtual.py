@@ -164,7 +164,9 @@ def test_processar_saida_full_kit_virtual_baixa_componentes_e_registra_fluxo_vir
 
 
 def test_processar_saida_full_simples_bloqueia_negativo_por_padrao():
-    produto = _produto(id=101, codigo="SKU-NEG", nome="Produto sem saldo", estoque_atual=1)
+    produto = _produto(
+        id=101, codigo="SKU-NEG", nome="Produto sem saldo", estoque_atual=1
+    )
     db = _FakeDB(produtos=[produto])
 
     with pytest.raises(HTTPException) as excinfo:
