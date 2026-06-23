@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import importlib.util
 from types import SimpleNamespace
 
 import os
@@ -9,6 +10,16 @@ import pytest
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 
 from app import dashboard_routes
+from app.dashboard import ponto_equilibrio
+
+
+def test_ponto_equilibrio_module_expoe_helpers_usados_pelo_router():
+    assert importlib.util.find_spec("app.dashboard.ponto_equilibrio") is not None
+
+    assert dashboard_routes._somar_componentes_margem_vendas_pe is ponto_equilibrio._somar_componentes_margem_vendas_pe
+    assert dashboard_routes._calcular_margem_periodo_ponto_equilibrio is ponto_equilibrio._calcular_margem_periodo_ponto_equilibrio
+    assert dashboard_routes._classificar_conta_ponto_equilibrio is ponto_equilibrio._classificar_conta_ponto_equilibrio
+    assert dashboard_routes._paginar_detalhes_ponto_equilibrio is ponto_equilibrio._paginar_detalhes_ponto_equilibrio
 
 
 class _FakeQuery:
@@ -173,25 +184,25 @@ def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(
         raising=False,
     )
     monkeypatch.setattr(
-        dashboard_routes,
+        ponto_equilibrio,
         "build_venda_rentabilidade_snapshot",
         build_rapido,
         raising=False,
     )
     monkeypatch.setattr(
-        dashboard_routes,
+        ponto_equilibrio,
         "_formas_pagamento_map",
         lambda db, tenant_id: chamados.update(formas=chamados["formas"] + 1) or {},
         raising=False,
     )
     monkeypatch.setattr(
-        dashboard_routes,
+        ponto_equilibrio,
         "_impostos_percentual",
         lambda db, tenant_id: chamados.update(impostos=chamados["impostos"] + 1) or 7.0,
         raising=False,
     )
     monkeypatch.setattr(
-        dashboard_routes,
+        ponto_equilibrio,
         "_bulk_comissoes_por_venda",
         lambda db, tenant_id, venda_ids: (
             chamados.update(comissoes=chamados["comissoes"] + 1) or {}
@@ -199,7 +210,7 @@ def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(
         raising=False,
     )
     monkeypatch.setattr(
-        dashboard_routes,
+        ponto_equilibrio,
         "_bulk_cupons_por_venda",
         lambda db, tenant_id, vendas: (
             chamados.update(cupons=chamados["cupons"] + 1) or {}
@@ -207,7 +218,7 @@ def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(
         raising=False,
     )
     monkeypatch.setattr(
-        dashboard_routes,
+        ponto_equilibrio,
         "_bulk_cashback_por_venda",
         lambda db, tenant_id, venda_ids: (
             chamados.update(cashback=chamados["cashback"] + 1) or {}
@@ -215,7 +226,7 @@ def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(
         raising=False,
     )
     monkeypatch.setattr(
-        dashboard_routes,
+        ponto_equilibrio,
         "_bulk_taxa_operacional_por_venda",
         lambda db, tenant_id, vendas: (
             chamados.update(taxa_operacional=chamados["taxa_operacional"] + 1) or {}
@@ -223,7 +234,7 @@ def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(
         raising=False,
     )
     monkeypatch.setattr(
-        dashboard_routes,
+        ponto_equilibrio,
         "_bulk_estoque_custos_por_venda",
         lambda db, tenant_id, venda_ids: (
             chamados.update(estoque=chamados["estoque"] + 1) or {}

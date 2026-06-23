@@ -262,3 +262,28 @@ Proxima fatia recomendada:
 2. Nao misturar finalizacao/cancelamento/devolucao de venda com refatoracao de
    comissoes na mesma rodada.
 
+## Atualizacao continua - 2026-06-23 - Dashboard/Ponto de Equilibrio
+
+Fatia maior executada na trilha de arquivos grandes:
+
+- `backend/app/dashboard_routes.py` moveu os calculos e classificacoes do Ponto
+  de Equilibrio para `backend/app/dashboard/ponto_equilibrio.py`.
+- Os endpoints `/financeiro/ponto-equilibrio` e
+  `/financeiro/ponto-equilibrio/detalhes` foram movidos para
+  `backend/app/dashboard/ponto_equilibrio_routes.py`.
+- O router principal inclui o subrouter novo e reexporta os endpoints/helpers
+  antigos para preservar imports internos e testes existentes.
+- O arquivo principal caiu de 2227 para 762 linhas e saiu da zona acima de
+  1000 linhas. Os dois novos arquivos ficaram abaixo de 1000 linhas.
+- Contagem atual recalculada: 78 arquivos de aplicacao ainda estao com 1000+
+  linhas quando testes, migrations e builds sao excluidos.
+- Testes focados: `pytest backend/tests/unit/test_ponto_equilibrio_margem_vendas.py backend/tests/unit/test_ponto_equilibrio_classificacao.py backend/tests/unit/test_ponto_equilibrio_contract.py -q`
+  passou com 13 testes.
+
+Proxima fatia recomendada:
+
+1. Escolher outro hotspot acima de 1000 linhas, priorizando modulo com testes
+   existentes e corte por dominio claro.
+2. Bons candidatos atuais: `clientes_routes.py`, `vendas/service.py`,
+   `dre_canais_routes.py`, `vendas_routes.py` ou `nfe/listagem.py`.
+

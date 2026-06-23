@@ -1,4 +1,5 @@
 from pathlib import Path
+import importlib.util
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -13,8 +14,34 @@ def _frontend_source(relative_path: str) -> str:
     return (REPO_ROOT / "frontend" / relative_path).read_text(encoding="utf-8")
 
 
+def _ponto_equilibrio_backend_source() -> str:
+    return "\n".join(
+        [
+            _backend_source("app/dashboard_routes.py"),
+            _backend_source("app/dashboard/ponto_equilibrio.py"),
+            _backend_source("app/dashboard/ponto_equilibrio_routes.py"),
+        ]
+    )
+
+
+def test_api_ponto_equilibrio_usa_router_dedicado_reexportado():
+    assert importlib.util.find_spec("app.dashboard.ponto_equilibrio_routes") is not None
+
+    from app import dashboard_routes
+    from app.dashboard import ponto_equilibrio_routes
+
+    assert (
+        dashboard_routes.obter_ponto_equilibrio
+        is ponto_equilibrio_routes.obter_ponto_equilibrio
+    )
+    assert (
+        dashboard_routes.obter_ponto_equilibrio_detalhes
+        is ponto_equilibrio_routes.obter_ponto_equilibrio_detalhes
+    )
+
+
 def test_api_ponto_equilibrio_usa_formula_de_margem_de_contribuicao():
-    source = _backend_source("app/dashboard_routes.py")
+    source = _ponto_equilibrio_backend_source()
 
     assert '@router.get("/financeiro/ponto-equilibrio")' in source
     assert "margem_contribuicao_percentual" in source
@@ -47,7 +74,7 @@ def test_api_ponto_equilibrio_usa_formula_de_margem_de_contribuicao():
 
 
 def test_api_ponto_equilibrio_tem_detalhes_lazy_para_nao_pesar_resumo():
-    source = _backend_source("app/dashboard_routes.py")
+    source = _ponto_equilibrio_backend_source()
 
     assert '@router.get("/financeiro/ponto-equilibrio/detalhes")' in source
     assert "incluir_detalhes: bool = False" in source
