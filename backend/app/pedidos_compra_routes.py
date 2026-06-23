@@ -67,11 +67,8 @@ from .pedidos_compra.exportacao import (
 )
 from .pedidos_compra.sugestao import (
     JANELAS_GIRO_SUGESTAO,
-    MARGEM_SEGURANCA_COMPRA_DIAS,
-    MAX_MULTIPLICADOR_AJUSTE_RUPTURA,
-    MIN_DIAS_COM_ESTOQUE_AJUSTE_RUPTURA,
-    MIN_VENDAS_AJUSTE_RUPTURA,
     _calcular_dias_com_estoque,
+    _calcular_planejamento_compra_sugestao,
     _calcular_tendencia_vendas_sugestao,
     _datetime_naive_utc_sugestao,
     _float_seguro_sugestao,
@@ -1650,87 +1647,40 @@ def sugerir_pedido_inteligente(
         ruptura_ativa = bool(cobertura_estoque["ruptura_ativa"])
         teve_ruptura = bool(cobertura_estoque["teve_ruptura"])
 
-        consumo_observado = vendas_periodo / periodo_dias if vendas_periodo > 0 else 0
-        consumo_recente = vendas_30 / 30 if vendas_30 > 0 else 0
-        consumo_base = max(consumo_observado, consumo_recente)
-        consumo_ajustado = consumo_observado
-        ajuste_ruptura_aplicado = False
-        motivo_ajuste_ruptura = None
-        pode_ajustar_por_ruptura = (
-            teve_ruptura
-            and dias_com_estoque >= 1
-            and dias_com_estoque < periodo_dias * 0.95
-        )
-        if pode_ajustar_por_ruptura and vendas_periodo > 0:
-            if vendas_periodo < MIN_VENDAS_AJUSTE_RUPTURA:
-                motivo_ajuste_ruptura = f"Ruptura detectada, mas sem ajuste: apenas {vendas_periodo:g} venda(s) no periodo."
-            elif dias_com_estoque < MIN_DIAS_COM_ESTOQUE_AJUSTE_RUPTURA:
-                motivo_ajuste_ruptura = f"Ruptura detectada, mas sem ajuste: somente {dias_com_estoque:.1f} dia(s) com estoque."
-            else:
-                consumo_ajustado_bruto = vendas_periodo / max(dias_com_estoque, 1.0)
-                limite_ajuste = (
-                    consumo_base * MAX_MULTIPLICADOR_AJUSTE_RUPTURA
-                    if consumo_base > 0
-                    else consumo_ajustado_bruto
-                )
-                consumo_ajustado = min(consumo_ajustado_bruto, limite_ajuste)
-                ajuste_ruptura_aplicado = consumo_ajustado > consumo_base * 1.05
-                if consumo_ajustado_bruto > consumo_ajustado:
-                    motivo_ajuste_ruptura = f"Media ajustada por ruptura, limitada a {MAX_MULTIPLICADOR_AJUSTE_RUPTURA:g}x o giro observado."
-                else:
-                    motivo_ajuste_ruptura = (
-                        "Media ajustada pelos dias em que havia estoque."
-                    )
-        elif teve_ruptura and vendas_periodo <= 0:
-            motivo_ajuste_ruptura = (
-                "Ruptura detectada, mas sem vendas no periodo para projetar demanda."
-            )
-
-        consumo_diario = max(consumo_base, consumo_ajustado)
-
-        estoque_para_calculo = max(0.0, estoque_atual)
-        dias_estoque = (
-            estoque_para_calculo / consumo_diario
-            if consumo_diario > 0 and estoque_para_calculo > 0
-            else (0 if consumo_diario > 0 and estoque_atual <= 0 else 999)
-        )
-
-        # Lead time do fornecedor (padrão 7 dias se não configurado)
         lead_time = produto_fornecedor.prazo_entrega or 7
-        margem_seguranca_dias = MARGEM_SEGURANCA_COMPRA_DIAS
-        dias_reposicao = _float_seguro_sugestao(lead_time) + _float_seguro_sugestao(
-            margem_seguranca_dias
+        planejamento_compra = _calcular_planejamento_compra_sugestao(
+            vendas_periodo=vendas_periodo,
+            vendas_30=vendas_30,
+            periodo_dias=periodo_dias,
+            estoque_atual=estoque_atual,
+            estoque_minimo=estoque_minimo,
+            dias_com_estoque=dias_com_estoque,
+            dias_cobertura=dias_cobertura,
+            lead_time=lead_time,
+            ruptura_ativa=ruptura_ativa,
+            teve_ruptura=teve_ruptura,
         )
 
-        # Calcular quantidade sugerida
-        # A cobertura escolhida pelo usuario e o alvo principal do pedido.
-        # O lead time + margem so entram no alvo quando o estoque atual nao
-        # cobre a janela ate a reposicao.
-        lead_time_incluido_no_alvo = bool(
-            ruptura_ativa
-            or estoque_atual <= estoque_minimo
-            or dias_estoque < dias_reposicao
-        )
-        dias_total_cobertura = _float_seguro_sugestao(dias_cobertura) + (
-            dias_reposicao if lead_time_incluido_no_alvo else 0.0
-        )
-        quantidade_ideal = consumo_diario * dias_total_cobertura
-        quantidade_sugerida = max(0, quantidade_ideal - estoque_para_calculo)
+        consumo_observado = planejamento_compra["consumo_observado"]
+        consumo_recente = planejamento_compra["consumo_recente"]
+        consumo_base = planejamento_compra["consumo_base"]
+        consumo_ajustado = planejamento_compra["consumo_ajustado"]
+        ajuste_ruptura_aplicado = planejamento_compra["ajuste_ruptura_aplicado"]
+        motivo_ajuste_ruptura = planejamento_compra["motivo_ajuste_ruptura"]
+        consumo_diario = planejamento_compra["consumo_diario"]
+        estoque_para_calculo = planejamento_compra["estoque_para_calculo"]
+        dias_estoque = planejamento_compra["dias_estoque"]
+        margem_seguranca_dias = planejamento_compra["margem_seguranca_dias"]
+        dias_reposicao = planejamento_compra["dias_reposicao"]
+        lead_time_incluido_no_alvo = planejamento_compra["lead_time_incluido_no_alvo"]
+        dias_total_cobertura = planejamento_compra["dias_total_cobertura"]
+        quantidade_sugerida = planejamento_compra["quantidade_sugerida"]
+        prioridade = planejamento_compra["prioridade"]
 
-        # Classificação de prioridade
-        if estoque_atual <= 0 and (vendas_periodo > 0 or estoque_minimo > 0):
-            prioridade = "CRÍTICO"
+        if prioridade == "CR\u00cdTICO":
             total_criticos += 1
-        elif dias_estoque < 7:
-            prioridade = "CRÍTICO"
-            total_criticos += 1
-        elif estoque_atual <= estoque_minimo:
-            prioridade = "ALERTA"
+        elif prioridade == "ALERTA":
             total_alerta += 1
-        elif dias_estoque < dias_reposicao:
-            prioridade = "ATENÇÃO"
-        else:
-            prioridade = "NORMAL"
 
         tendencia = _calcular_tendencia_vendas_sugestao(
             periodo_dias,

@@ -415,6 +415,126 @@ def _calcular_dias_com_estoque(
     }
 
 
+def _calcular_planejamento_compra_sugestao(
+    *,
+    vendas_periodo: float,
+    vendas_30: float,
+    periodo_dias: int,
+    estoque_atual: float,
+    estoque_minimo: float,
+    dias_com_estoque: float,
+    dias_cobertura: float,
+    lead_time: float,
+    ruptura_ativa: bool,
+    teve_ruptura: bool,
+) -> dict:
+    periodo_dias = max(1, int(periodo_dias or 0))
+    vendas_periodo = _float_seguro_sugestao(vendas_periodo)
+    vendas_30 = _float_seguro_sugestao(vendas_30)
+    estoque_atual = _float_seguro_sugestao(estoque_atual)
+    estoque_minimo = _float_seguro_sugestao(estoque_minimo)
+    dias_com_estoque = _float_seguro_sugestao(dias_com_estoque)
+
+    consumo_observado = vendas_periodo / periodo_dias if vendas_periodo > 0 else 0
+    consumo_recente = vendas_30 / 30 if vendas_30 > 0 else 0
+    consumo_base = max(consumo_observado, consumo_recente)
+    consumo_ajustado = consumo_observado
+    ajuste_ruptura_aplicado = False
+    motivo_ajuste_ruptura = None
+
+    pode_ajustar_por_ruptura = (
+        teve_ruptura
+        and dias_com_estoque >= 1
+        and dias_com_estoque < periodo_dias * 0.95
+    )
+    if pode_ajustar_por_ruptura and vendas_periodo > 0:
+        if vendas_periodo < MIN_VENDAS_AJUSTE_RUPTURA:
+            motivo_ajuste_ruptura = (
+                "Ruptura detectada, mas sem ajuste: apenas "
+                f"{vendas_periodo:g} venda(s) no periodo."
+            )
+        elif dias_com_estoque < MIN_DIAS_COM_ESTOQUE_AJUSTE_RUPTURA:
+            motivo_ajuste_ruptura = (
+                "Ruptura detectada, mas sem ajuste: somente "
+                f"{dias_com_estoque:.1f} dia(s) com estoque."
+            )
+        else:
+            consumo_ajustado_bruto = vendas_periodo / max(dias_com_estoque, 1.0)
+            limite_ajuste = (
+                consumo_base * MAX_MULTIPLICADOR_AJUSTE_RUPTURA
+                if consumo_base > 0
+                else consumo_ajustado_bruto
+            )
+            consumo_ajustado = min(consumo_ajustado_bruto, limite_ajuste)
+            ajuste_ruptura_aplicado = consumo_ajustado > consumo_base * 1.05
+            if consumo_ajustado_bruto > consumo_ajustado:
+                motivo_ajuste_ruptura = (
+                    "Media ajustada por ruptura, limitada a "
+                    f"{MAX_MULTIPLICADOR_AJUSTE_RUPTURA:g}x o giro observado."
+                )
+            else:
+                motivo_ajuste_ruptura = (
+                    "Media ajustada pelos dias em que havia estoque."
+                )
+    elif teve_ruptura and vendas_periodo <= 0:
+        motivo_ajuste_ruptura = (
+            "Ruptura detectada, mas sem vendas no periodo para projetar demanda."
+        )
+
+    consumo_diario = max(consumo_base, consumo_ajustado)
+    estoque_para_calculo = max(0.0, estoque_atual)
+    dias_estoque = (
+        estoque_para_calculo / consumo_diario
+        if consumo_diario > 0 and estoque_para_calculo > 0
+        else (0 if consumo_diario > 0 and estoque_atual <= 0 else 999)
+    )
+
+    margem_seguranca_dias = MARGEM_SEGURANCA_COMPRA_DIAS
+    dias_reposicao = _float_seguro_sugestao(lead_time) + _float_seguro_sugestao(
+        margem_seguranca_dias
+    )
+    lead_time_incluido_no_alvo = bool(
+        ruptura_ativa
+        or estoque_atual <= estoque_minimo
+        or dias_estoque < dias_reposicao
+    )
+    dias_total_cobertura = _float_seguro_sugestao(dias_cobertura) + (
+        dias_reposicao if lead_time_incluido_no_alvo else 0.0
+    )
+    quantidade_ideal = consumo_diario * dias_total_cobertura
+    quantidade_sugerida = max(0, quantidade_ideal - estoque_para_calculo)
+
+    if estoque_atual <= 0 and (vendas_periodo > 0 or estoque_minimo > 0):
+        prioridade = "CR\u00cdTICO"
+    elif dias_estoque < 7:
+        prioridade = "CR\u00cdTICO"
+    elif estoque_atual <= estoque_minimo:
+        prioridade = "ALERTA"
+    elif dias_estoque < dias_reposicao:
+        prioridade = "ATEN\u00c7\u00c3O"
+    else:
+        prioridade = "NORMAL"
+
+    return {
+        "consumo_observado": consumo_observado,
+        "consumo_recente": consumo_recente,
+        "consumo_base": consumo_base,
+        "consumo_ajustado": consumo_ajustado,
+        "ajuste_ruptura_aplicado": ajuste_ruptura_aplicado,
+        "motivo_ajuste_ruptura": motivo_ajuste_ruptura,
+        "consumo_diario": consumo_diario,
+        "estoque_para_calculo": estoque_para_calculo,
+        "dias_estoque": dias_estoque,
+        "margem_seguranca_dias": margem_seguranca_dias,
+        "dias_reposicao": dias_reposicao,
+        "lead_time_incluido_no_alvo": lead_time_incluido_no_alvo,
+        "dias_total_cobertura": dias_total_cobertura,
+        "quantidade_ideal": quantidade_ideal,
+        "quantidade_sugerida": quantidade_sugerida,
+        "prioridade": prioridade,
+    }
+
+
 def _gerar_observacao(
     prioridade: str,
     dias_estoque: float,

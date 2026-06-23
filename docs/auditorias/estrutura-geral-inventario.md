@@ -204,11 +204,15 @@ Fatia executada na trilha Pedidos de Compra:
 - O calculo de tendencia de vendas foi extraido para
   `_calcular_tendencia_vendas_sugestao`, preservando limiares de crescimento,
   queda, estavel e fallback `N/A`.
+- O planejamento de compra da sugestao foi extraido para
+  `_calcular_planejamento_compra_sugestao`, reunindo consumo observado/recente,
+  ajuste por ruptura, lead time, cobertura alvo, quantidade sugerida e
+  prioridade.
 - Endpoints, payloads, permissoes, tenant e regras de calculo de sugestao foram
   preservados; o router continua orquestrando consultas e montagem da resposta.
-- Na branch atual, o router principal caiu de 1968 para 1633 linhas.
+- Na branch atual, o router principal caiu de 1968 para 1586 linhas.
 - Testes focados: `pytest backend/tests/unit/test_pedidos_compra_sugestao_helpers.py -q`
-  e `pytest` dos testes unitarios de pedidos de compra passaram.
+  passou com 16 testes.
 
 Proxima fatia recomendada:
 

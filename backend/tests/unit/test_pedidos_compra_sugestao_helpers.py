@@ -405,6 +405,38 @@ def test_gerar_observacao_combina_ruptura_tendencia_e_fallback():
     )
 
 
+def test_calcular_planejamento_compra_sugestao_aplica_ruptura_e_prioridade():
+    assert hasattr(sugestao_helpers, "_calcular_planejamento_compra_sugestao")
+
+    resultado = sugestao_helpers._calcular_planejamento_compra_sugestao(
+        vendas_periodo=20,
+        vendas_30=0,
+        periodo_dias=30,
+        estoque_atual=0,
+        estoque_minimo=1,
+        dias_com_estoque=10,
+        dias_cobertura=30,
+        lead_time=7,
+        ruptura_ativa=True,
+        teve_ruptura=True,
+    )
+
+    assert round(resultado["consumo_observado"], 3) == 0.667
+    assert round(resultado["consumo_ajustado"], 3) == 1.333
+    assert resultado["ajuste_ruptura_aplicado"] is True
+    assert (
+        resultado["motivo_ajuste_ruptura"]
+        == "Media ajustada por ruptura, limitada a 2x o giro observado."
+    )
+    assert round(resultado["consumo_diario"], 3) == 1.333
+    assert resultado["dias_estoque"] == 0
+    assert resultado["dias_reposicao"] == 14.0
+    assert resultado["lead_time_incluido_no_alvo"] is True
+    assert resultado["dias_total_cobertura"] == 44.0
+    assert round(resultado["quantidade_sugerida"], 3) == 58.667
+    assert resultado["prioridade"] == "CR\u00cdTICO"
+
+
 def test_calcular_tendencia_vendas_sugestao_respeita_periodo_e_limiares():
     assert hasattr(sugestao_helpers, "_calcular_tendencia_vendas_sugestao")
 
