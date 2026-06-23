@@ -355,3 +355,41 @@ Proxima fatia recomendada:
    `backend/app/contas_pagar_routes.py` ou
    `backend/app/services/tenant_onboarding_service.py`.
 
+## Atualizacao continua - 2026-06-23 - NFE/Listagem
+
+Fatia maior executada na trilha de arquivos grandes:
+
+- `backend/app/nfe/listagem.py` virou uma fachada de compatibilidade para
+  preservar imports antigos usados por `nfe_routes.py` e pelos testes.
+- Helpers puros de status, valores, datas, canais e planejamento de sync foram
+  movidos para `backend/app/nfe/listagem_base.py`.
+- Cache em memoria da listagem/detalhe foi movido para
+  `backend/app/nfe/listagem_cache.py`.
+- Leitura de campos fiscais via XML e enriquecimento por link XML foram movidos
+  para `backend/app/nfe/listagem_xml.py`.
+- Normalizacao de resumo, item, parcela, detalhe Bling, nota Bling e venda local
+  foi movida para `backend/app/nfe/listagem_normalizacao.py`.
+- Consulta de detalhe Bling/cache persistente foi movida para
+  `backend/app/nfe/listagem_detalhes.py`.
+- Complemento por pedidos integrados foi movido para
+  `backend/app/nfe/listagem_pedidos.py`.
+- Sincronizacao incremental, enriquecimento por vendas/detalhes e deduplicacao
+  foram movidos para `backend/app/nfe/listagem_sync.py`.
+- A compatibilidade de monkeypatch legado em `app.nfe.listagem` foi preservada
+  para cache/upsert de detalhes.
+- O arquivo principal caiu de 2315 para 117 linhas e saiu da zona acima de 1000
+  linhas. Todos os modulos novos ficaram abaixo de 1000 linhas.
+- Contagem atual recalculada: 75 arquivos de aplicacao ainda estao com 1000+
+  linhas quando testes, migrations e builds sao excluidos.
+- Testes focados: `pytest backend/tests/unit/test_nfe_listagem_refactor_contract.py backend/tests/unit/test_nfe_operacional_routes_contract.py backend/tests/unit/test_nfe_routes_normalizacao.py backend/tests/unit/test_nfe_cache_service.py backend/tests/unit/test_nfe_cache_mapper_import_order.py backend/tests/unit/test_nfe_pending_reconciliation_service.py backend/tests/unit/test_nfe_authorized_reconciliation_service.py backend/tests/multi_tenant/test_rls_bling_nfe_cache_migration.py -q`
+  passou com 51 testes.
+
+Proxima fatia recomendada:
+
+1. Seguir em outro hotspot acima de 1000 linhas sem misturar fiscal operacional
+   com vendas/estoque.
+2. Candidatos atuais: `backend/app/vendas/service.py`,
+   `backend/app/vendas_routes.py`, `backend/app/contas_pagar_routes.py`,
+   `backend/app/services/tenant_onboarding_service.py` ou
+   `backend/app/api/endpoints/rotas_entrega.py`.
+
