@@ -253,3 +253,83 @@ def test_somar_movimentacoes_complementares_sugestao_deduplica_e_classifica_orig
     assert stats_por_produto[30]["vendas_periodo"] == 4.0
     assert stats_por_produto[30]["origens"]["Bling/online"] == 4.0
     assert stats_por_produto[30]["fontes"] == {"estoque_externo"}
+
+
+def test_montar_resultado_vendas_sugestao_arredonda_ordena_e_filtra_granel():
+    stats_por_produto = defaultdict(_nova_stats_venda_sugestao)
+    stats = stats_por_produto[10]
+    stats["vendas_periodo"] = 3.4567
+    stats["janelas"]["7"] = 1.2345
+    stats["origens"]["Loja"] = 2.2222
+    stats["origens"]["Bling/online"] = 3.3333
+    stats["origens"]["Sem venda"] = 0
+    stats["fontes"].update({"vendas", "estoque_externo"})
+    stats["granel_kg_periodo"] = 7.8912
+    stats["granel_pacotes_periodo"] = 2.3456
+    stats["granel_janelas_kg"]["7"] = 4.4444
+    stats["granel_janelas_pacotes"]["7"] = 1.1111
+    stats["granel_itens"][99].update(
+        {
+            "produto_id": 99,
+            "produto_nome": "Racao granel menor",
+            "peso_pacote_kg": 1.2345,
+            "kg": 3.4567,
+            "pacotes": 2.2222,
+        }
+    )
+    stats["granel_itens"][77].update(
+        {
+            "produto_id": 77,
+            "produto_nome": "Racao granel maior",
+            "peso_pacote_kg": 2,
+            "kg": 5.1111,
+            "pacotes": 1,
+        }
+    )
+    stats["granel_itens"][88].update(
+        {
+            "produto_id": 88,
+            "produto_nome": "Sem consumo",
+            "kg": 0,
+            "pacotes": 0,
+        }
+    )
+
+    assert hasattr(sugestao_helpers, "_montar_resultado_vendas_sugestao")
+
+    resultado = sugestao_helpers._montar_resultado_vendas_sugestao(stats_por_produto)
+
+    assert resultado[10]["vendas_periodo"] == 3.457
+    assert resultado[10]["janelas"] == {
+        "7": 1.234,
+        "15": 0.0,
+        "30": 0.0,
+        "60": 0.0,
+        "90": 0.0,
+    }
+    assert resultado[10]["origens"] == [
+        {"canal": "Bling/online", "quantidade": 3.333},
+        {"canal": "Loja", "quantidade": 2.222},
+    ]
+    assert resultado[10]["fontes"] == ["estoque_externo", "vendas"]
+    granel = resultado[10]["granel_consumo"]
+    assert granel["kg_periodo"] == 7.891
+    assert granel["pacotes_equivalentes_periodo"] == 2.346
+    assert granel["janelas_kg"]["7"] == 4.444
+    assert granel["janelas_pacotes"]["7"] == 1.111
+    assert granel["itens"] == [
+        {
+            "produto_id": 77,
+            "produto_nome": "Racao granel maior",
+            "peso_pacote_kg": 2.0,
+            "kg": 5.111,
+            "pacotes_equivalentes": 1.0,
+        },
+        {
+            "produto_id": 99,
+            "produto_nome": "Racao granel menor",
+            "peso_pacote_kg": 1.234,
+            "kg": 3.457,
+            "pacotes_equivalentes": 2.222,
+        },
+    ]

@@ -277,3 +277,61 @@ def _somar_movimentacoes_complementares_sugestao(
             origem,
             "estoque_componentes" if consumo_derivado else "estoque_externo",
         )
+
+
+def _montar_resultado_vendas_sugestao(stats_por_produto: dict) -> dict:
+    resultado = {}
+    for produto_id, stats in stats_por_produto.items():
+        origens = [
+            {"canal": canal, "quantidade": _round_seguro_sugestao(quantidade, 3)}
+            for canal, quantidade in sorted(
+                stats["origens"].items(),
+                key=lambda item: item[1],
+                reverse=True,
+            )
+            if _float_seguro_sugestao(quantidade) > 0
+        ]
+        resultado[produto_id] = {
+            "vendas_periodo": _round_seguro_sugestao(stats["vendas_periodo"], 3),
+            "janelas": {
+                chave: _round_seguro_sugestao(valor, 3)
+                for chave, valor in stats["janelas"].items()
+            },
+            "origens": origens,
+            "fontes": sorted(stats["fontes"]),
+            "granel_consumo": {
+                "kg_periodo": _round_seguro_sugestao(stats["granel_kg_periodo"], 3),
+                "pacotes_equivalentes_periodo": _round_seguro_sugestao(
+                    stats["granel_pacotes_periodo"], 3
+                ),
+                "janelas_kg": {
+                    chave: _round_seguro_sugestao(valor, 3)
+                    for chave, valor in stats["granel_janelas_kg"].items()
+                },
+                "janelas_pacotes": {
+                    chave: _round_seguro_sugestao(valor, 3)
+                    for chave, valor in stats["granel_janelas_pacotes"].items()
+                },
+                "itens": [
+                    {
+                        "produto_id": item.get("produto_id"),
+                        "produto_nome": item.get("produto_nome"),
+                        "peso_pacote_kg": _round_seguro_sugestao(
+                            item.get("peso_pacote_kg"), 3
+                        ),
+                        "kg": _round_seguro_sugestao(item.get("kg"), 3),
+                        "pacotes_equivalentes": _round_seguro_sugestao(
+                            item.get("pacotes"), 3
+                        ),
+                    }
+                    for item in sorted(
+                        stats["granel_itens"].values(),
+                        key=lambda valor: _float_seguro_sugestao(valor.get("kg")),
+                        reverse=True,
+                    )
+                    if _float_seguro_sugestao(item.get("kg")) > 0
+                ],
+            },
+        }
+
+    return resultado

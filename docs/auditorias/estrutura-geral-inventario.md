@@ -193,16 +193,19 @@ Fatia executada na trilha Pedidos de Compra:
 - A agregacao das movimentacoes complementares foi extraida para
   `_somar_movimentacoes_complementares_sugestao`, preservando deduplicacao de
   venda direta, consumo derivado e origem externa/Bling.
+- A montagem do payload final foi extraida para `_montar_resultado_vendas_sugestao`,
+  preservando arredondamento, ordenacao de origens/fontes e filtro/ordenacao dos
+  itens de granel.
 - Endpoints, payloads, permissoes, tenant e regras de calculo de sugestao foram
   preservados; o router continua orquestrando consultas e montagem da resposta.
-- Na branch atual, o router principal caiu de 1968 para 1798 linhas.
+- Na branch atual, o router principal caiu de 1968 para 1746 linhas.
 - Testes focados: `pytest backend/tests/unit/test_pedidos_compra_sugestao_helpers.py -q`
   e `pytest` dos testes unitarios de pedidos de compra passaram.
 
 Proxima fatia recomendada:
 
-1. Encerrar a subtrilha de sugestao ou extrair apenas a montagem do resultado
-   final, mantendo as consultas e contratos iguais.
+1. Encerrar Compras/Pedidos nesta rodada ou escolher outro hotspot acima de
+   1000 linhas.
 2. Nao mexer em recebimento de pedido, entrada de estoque, fiscal ou envio real
    de e-mail/WhatsApp na mesma rodada.
 
