@@ -9,7 +9,7 @@ from ..produtos_models import NotaEntrada, NotaEntradaItem
 from ..services.sefaz_tenant_config_service import SefazTenantConfigService
 from ..tenancy.context import tenant_context
 from .fornecedores import criar_fornecedor_automatico
-from .produtos import encontrar_produto_similar
+from .produtos import _aplicar_codigos_barras_item_no_produto, encontrar_produto_similar
 from .xml_parser import parse_nfe_xml
 
 logger = logging.getLogger(__name__)
@@ -194,6 +194,7 @@ def _importar_docs_sefaz_scoped(docs: list, tenant_id_str: str, db) -> dict:
                 )
                 db.add(item)
                 if produto:
+                    _aplicar_codigos_barras_item_no_produto(produto, item)
                     vinculados += 1
                 else:
                     nao_vinculados += 1

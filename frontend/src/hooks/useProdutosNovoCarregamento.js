@@ -10,7 +10,10 @@ import {
   getMarcas,
   getProduto,
 } from "../api/produtos";
-import { montarEstadoProdutoClonado } from "../pages/produtosFormUtils";
+import {
+  montarEstadoProdutoClonado,
+  normalizarCodigosBarrasAlternativosCampo,
+} from "../pages/produtosFormUtils";
 
 const construirListaHierarquica = (categorias, parentId = null, nivel = 0) => {
   let resultado = [];
@@ -171,6 +174,11 @@ export default function useProdutosNovoCarregamento({
         codigo: produto.codigo || "",
         nome: produto.nome || "",
         codigo_barras: produto.codigo_barras || "",
+        gtin_ean: produto.gtin_ean || "",
+        gtin_ean_tributario: produto.gtin_ean_tributario || "",
+        codigos_barras_alternativos: normalizarCodigosBarrasAlternativosCampo(
+          produto.codigos_barras_alternativos,
+        ),
         categoria_id: produto.categoria_id || "",
         marca_id: produto.marca_id || "",
         departamento_id: produto.departamento_id || "",
