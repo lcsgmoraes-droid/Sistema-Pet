@@ -71,6 +71,7 @@ from .pedidos_compra.sugestao import (
     MAX_MULTIPLICADOR_AJUSTE_RUPTURA,
     MIN_DIAS_COM_ESTOQUE_AJUSTE_RUPTURA,
     MIN_VENDAS_AJUSTE_RUPTURA,
+    _calcular_dias_com_estoque,
     _datetime_naive_utc_sugestao,
     _float_seguro_sugestao,
     _montar_resultado_vendas_sugestao,
@@ -511,84 +512,6 @@ def _agrupar_movimentacoes_estoque_periodo(
     for row in rows:
         agrupado[int(row.produto_id)].append(row)
     return agrupado
-
-
-def _calcular_dias_com_estoque(
-    movimentacoes: list,
-    estoque_atual: float,
-    data_inicio: datetime,
-    data_fim: datetime,
-) -> dict:
-    data_inicio = _datetime_naive_utc_sugestao(data_inicio) or datetime.utcnow()
-    data_fim = _datetime_naive_utc_sugestao(data_fim) or data_inicio
-    total_dias = max(0.0, (data_fim - data_inicio).total_seconds() / 86400)
-    if total_dias <= 0:
-        return {
-            "dias_com_estoque": 0.0,
-            "dias_sem_estoque": 0.0,
-            "teve_ruptura": estoque_atual <= 0,
-            "ruptura_ativa": estoque_atual <= 0,
-        }
-
-    movimentos = sorted(
-        [
-            (_datetime_naive_utc_sugestao(mov.created_at), mov)
-            for mov in movimentacoes
-            if mov.created_at
-        ],
-        key=lambda item: item[0],
-    )
-
-    if not movimentos:
-        dias_com_estoque = total_dias if estoque_atual > 0 else 0.0
-        dias_sem_estoque = max(0.0, total_dias - dias_com_estoque)
-        return {
-            "dias_com_estoque": round(dias_com_estoque, 1),
-            "dias_sem_estoque": round(dias_sem_estoque, 1),
-            "teve_ruptura": dias_sem_estoque > 0 or estoque_atual <= 0,
-            "ruptura_ativa": estoque_atual <= 0,
-        }
-
-    primeiro = movimentos[0][1]
-    estoque_corrente = (
-        _float_seguro_sugestao(primeiro.quantidade_anterior)
-        if primeiro.quantidade_anterior is not None
-        else _float_seguro_sugestao(estoque_atual)
-    )
-    cursor = data_inicio
-    dias_com_estoque = 0.0
-
-    for momento_mov, mov in movimentos:
-        if not momento_mov:
-            continue
-
-        momento = min(max(momento_mov, data_inicio), data_fim)
-        if momento > cursor:
-            if estoque_corrente > 0:
-                dias_com_estoque += (momento - cursor).total_seconds() / 86400
-            cursor = momento
-
-        if mov.quantidade_nova is not None:
-            estoque_corrente = _float_seguro_sugestao(mov.quantidade_nova)
-        else:
-            quantidade = _float_seguro_sugestao(mov.quantidade)
-            if mov.tipo == "entrada":
-                estoque_corrente += quantidade
-            elif mov.tipo == "saida":
-                estoque_corrente -= quantidade
-
-    if data_fim > cursor and estoque_corrente > 0:
-        dias_com_estoque += (data_fim - cursor).total_seconds() / 86400
-
-    dias_com_estoque = min(max(dias_com_estoque, 0.0), total_dias)
-    dias_sem_estoque = max(0.0, total_dias - dias_com_estoque)
-
-    return {
-        "dias_com_estoque": round(dias_com_estoque, 1),
-        "dias_sem_estoque": round(dias_sem_estoque, 1),
-        "teve_ruptura": dias_sem_estoque >= 1 or estoque_atual <= 0,
-        "ruptura_ativa": estoque_atual <= 0,
-    }
 
 
 def _obter_estoque_atual_sugestao(

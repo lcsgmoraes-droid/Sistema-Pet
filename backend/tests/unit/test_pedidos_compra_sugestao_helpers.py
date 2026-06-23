@@ -333,3 +333,46 @@ def test_montar_resultado_vendas_sugestao_arredonda_ordena_e_filtra_granel():
             "pacotes_equivalentes": 2.222,
         },
     ]
+
+
+def test_calcular_dias_com_estoque_conta_intervalos_com_ruptura():
+    data_inicio = datetime(2026, 6, 1)
+    data_fim = datetime(2026, 6, 11)
+
+    assert hasattr(sugestao_helpers, "_calcular_dias_com_estoque")
+
+    resultado = sugestao_helpers._calcular_dias_com_estoque(
+        movimentacoes=[
+            SimpleNamespace(
+                created_at=datetime(2026, 6, 3),
+                tipo="saida",
+                quantidade=2,
+                quantidade_anterior=2,
+                quantidade_nova=0,
+            ),
+            SimpleNamespace(
+                created_at=datetime(2026, 6, 6),
+                tipo="entrada",
+                quantidade=5,
+                quantidade_anterior=0,
+                quantidade_nova=5,
+            ),
+            SimpleNamespace(
+                created_at=datetime(2026, 6, 8),
+                tipo="saida",
+                quantidade=5,
+                quantidade_anterior=5,
+                quantidade_nova=0,
+            ),
+        ],
+        estoque_atual=0,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+    )
+
+    assert resultado == {
+        "dias_com_estoque": 4.0,
+        "dias_sem_estoque": 6.0,
+        "teve_ruptura": True,
+        "ruptura_ativa": True,
+    }
