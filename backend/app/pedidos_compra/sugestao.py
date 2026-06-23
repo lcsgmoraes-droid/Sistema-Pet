@@ -204,3 +204,24 @@ def _somar_conversao_granel_sugestao(
     item["peso_pacote_kg"] = peso_pacote_kg
     item["kg"] += quantidade_kg
     item["pacotes"] += quantidade_pacotes
+
+
+def _somar_conversoes_granel_rows_sugestao(
+    stats_por_produto: dict,
+    conversoes_rows,
+    data_inicio_periodo: datetime,
+    data_fim: datetime,
+) -> None:
+    for conversao, produto_granel in conversoes_rows:
+        _somar_conversao_granel_sugestao(
+            stats_por_produto,
+            conversao.produto_origem_id,
+            conversao.produto_granel_id,
+            produto_granel.nome if produto_granel else None,
+            conversao.quantidade_granel_kg,
+            conversao.quantidade_origem,
+            conversao.peso_por_unidade_kg,
+            conversao.created_at,
+            data_inicio_periodo,
+            data_fim,
+        )

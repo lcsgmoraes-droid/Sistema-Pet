@@ -1,6 +1,7 @@
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from math import inf, nan
+from types import SimpleNamespace
 
 from app.pedidos_compra import sugestao as sugestao_helpers
 from app.pedidos_compra.sugestao import (
@@ -157,3 +158,38 @@ def test_somar_vendas_rows_sugestao_acumula_vendas_e_retorna_pares():
     assert stats_por_produto[10]["origens"]["Bling/online"] == 1.5
     assert stats_por_produto[10]["fontes"] == {"vendas"}
     assert 99 not in stats_por_produto
+
+
+def test_somar_conversoes_granel_rows_sugestao_acumula_rows_carregados():
+    stats_por_produto = defaultdict(_nova_stats_venda_sugestao)
+    data_fim = datetime(2026, 6, 23, 12, 0)
+    data_inicio_periodo = data_fim - timedelta(days=30)
+    data_ref = data_fim - timedelta(days=3)
+    conversao = SimpleNamespace(
+        produto_origem_id=20,
+        produto_granel_id=99,
+        quantidade_granel_kg=6,
+        quantidade_origem=2,
+        peso_por_unidade_kg=3,
+        created_at=data_ref,
+    )
+    produto_granel = SimpleNamespace(nome="Racao a granel")
+
+    assert hasattr(sugestao_helpers, "_somar_conversoes_granel_rows_sugestao")
+
+    sugestao_helpers._somar_conversoes_granel_rows_sugestao(
+        stats_por_produto,
+        conversoes_rows=[(conversao, produto_granel)],
+        data_inicio_periodo=data_inicio_periodo,
+        data_fim=data_fim,
+    )
+
+    stats = stats_por_produto[20]
+    assert stats["vendas_periodo"] == 2.0
+    assert stats["janelas"]["7"] == 2.0
+    assert stats["granel_kg_periodo"] == 6.0
+    assert stats["granel_pacotes_periodo"] == 2.0
+    assert stats["granel_itens"][99]["produto_nome"] == "Racao a granel"
+    assert stats["granel_itens"][99]["peso_pacote_kg"] == 3.0
+    assert stats["origens"]["Granel"] == 2.0
+    assert stats["fontes"] == {"conversao_granel"}

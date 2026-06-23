@@ -76,7 +76,7 @@ from .pedidos_compra.sugestao import (
     _nova_stats_venda_sugestao,
     _round_seguro_sugestao,
     _sanitizar_json_sugestao,
-    _somar_conversao_granel_sugestao,
+    _somar_conversoes_granel_rows_sugestao,
     _somar_venda_sugestao,
     _somar_vendas_rows_sugestao,
 )
@@ -411,19 +411,12 @@ def _carregar_vendas_sugestao(
         .all()
     )
 
-    for conversao, produto_granel in conversoes_rows:
-        _somar_conversao_granel_sugestao(
-            stats_por_produto,
-            conversao.produto_origem_id,
-            conversao.produto_granel_id,
-            produto_granel.nome if produto_granel else None,
-            conversao.quantidade_granel_kg,
-            conversao.quantidade_origem,
-            conversao.peso_por_unidade_kg,
-            conversao.created_at,
-            data_inicio_periodo,
-            data_fim,
-        )
+    _somar_conversoes_granel_rows_sugestao(
+        stats_por_produto,
+        conversoes_rows,
+        data_inicio_periodo,
+        data_fim,
+    )
 
     filtro_movimentacao_venda = or_(
         EstoqueMovimentacao.referencia_tipo.in_(["venda", "venda_bling"]),
