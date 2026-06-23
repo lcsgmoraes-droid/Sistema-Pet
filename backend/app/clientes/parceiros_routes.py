@@ -10,7 +10,6 @@ from app.audit_log import log_update
 from app.db import get_session
 from app.models import Cliente
 from app.clientes.schemas import ToggleParceiroRequest
-from app.utils.tenant_safe_sql import execute_tenant_safe
 
 router = APIRouter()
 
