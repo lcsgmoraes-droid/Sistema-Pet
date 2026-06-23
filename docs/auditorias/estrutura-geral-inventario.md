@@ -172,3 +172,25 @@ Proxima fatia recomendada:
 2. Manter endpoints, payloads, permissoes, tenant e paginacao iguais.
 3. Nao misturar com estoque, PDV, fiscal, cadastro em lote ou regras de preco.
 
+## Atualizacao continua - 2026-06-23 - Compras/Pedidos
+
+Fatia executada na trilha Pedidos de Compra:
+
+- `backend/app/pedidos_compra_routes.py` extraiu constantes e helpers puros da
+  sugestao inteligente para `backend/app/pedidos_compra/sugestao.py`.
+- Foram movidos: normalizacao numerica, arredondamento seguro, sanitizacao JSON,
+  conversao de datetime para UTC naive, formatacao de origem de venda e estrutura
+  inicial de estatisticas de venda.
+- Endpoints, payloads, permissoes, tenant e regras de calculo de sugestao foram
+  preservados; o router continua orquestrando consultas e montagem da resposta.
+- Na branch atual, o router principal caiu de 1968 para 1922 linhas.
+- Testes focados: `pytest backend/tests/unit/test_pedidos_compra_sugestao_helpers.py -q`
+  e `pytest` dos testes unitarios de pedidos de compra passaram.
+
+Proxima fatia recomendada:
+
+1. Extrair apenas helpers puros de acumulacao de vendas/granel da sugestao ou
+   encerrar a fatia para PR.
+2. Nao mexer em recebimento de pedido, entrada de estoque, fiscal ou envio real
+   de e-mail/WhatsApp na mesma rodada.
+
