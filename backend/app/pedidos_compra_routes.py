@@ -73,10 +73,10 @@ from .pedidos_compra.sugestao import (
     _datetime_naive_utc_sugestao,
     _float_seguro_sugestao,
     _montar_item_sugestao_compra,
+    _montar_resposta_sugestao_compra,
     _montar_resultado_vendas_sugestao,
     _nova_stats_venda_sugestao,
-    _round_seguro_sugestao,
-    _sanitizar_json_sugestao,
+    _selecionar_produtos_fornecedor_sugestao,
     _somar_conversoes_granel_rows_sugestao,
     _somar_movimentacoes_complementares_sugestao,
     _somar_vendas_rows_sugestao,
@@ -1550,25 +1550,10 @@ def sugerir_pedido_inteligente(
         .all()
     }
 
-    # Se o mesmo produto estiver vinculado a mais de um CNPJ do grupo,
-    # manter uma unica linha e preferir o fornecedor selecionado/principal.
-    produtos_por_id = {}
-    for produto, produto_fornecedor, marca in produtos_fornecedor_raw:
-        score = (
-            0 if produto_fornecedor.fornecedor_id == fornecedor_id else 1,
-            0 if produto_fornecedor.e_principal else 1,
-            0 if produto_fornecedor.fornecedor_id == produto.fornecedor_id else 1,
-            _float_seguro_sugestao(produto_fornecedor.preco_custo, 999999999),
-            produto_fornecedor.id,
-        )
-        atual = produtos_por_id.get(produto.id)
-        if not atual or score < atual["score"]:
-            produtos_por_id[produto.id] = {
-                "score": score,
-                "linha": (produto, produto_fornecedor, marca),
-            }
-
-    produtos_fornecedor = [item["linha"] for item in produtos_por_id.values()]
+    produtos_fornecedor = _selecionar_produtos_fornecedor_sugestao(
+        produtos_fornecedor_raw,
+        fornecedor_id,
+    )
 
     if not produtos_fornecedor:
         return {
@@ -1722,43 +1707,21 @@ def sugerir_pedido_inteligente(
             sugestoes.append(sugestao)
             valor_total += valor_sugestao
 
-    # Ordenar por prioridade (CRÍTICO > ALERTA > ATENÇÃO > NORMAL)
-    ordem_prioridade = {"CRÍTICO": 0, "ALERTA": 1, "ATENÇÃO": 2, "NORMAL": 3}
-    sugestoes.sort(
-        key=lambda x: (ordem_prioridade.get(x["prioridade"], 4), -x["valor_total"])
-    )
-
     logger.info(
         f"✅ Sugestão gerada: {len(sugestoes)} produtos | {total_criticos} críticos | {total_alerta} em alerta"
     )
 
-    return _sanitizar_json_sugestao(
-        {
-            "fornecedor": {
-                "id": fornecedor.id,
-                "nome": fornecedor.nome,
-                "ids_considerados": fornecedor_ids,
-                "grupo": {
-                    "id": fornecedor_grupo.id,
-                    "nome": fornecedor_grupo.nome,
-                }
-                if fornecedor_grupo
-                else None,
-            },
-            "periodo_dias": periodo_dias,
-            "dias_cobertura": dias_cobertura,
-            "apenas_fornecedor_principal": apenas_fornecedor_principal,
-            "data_analise_inicio": data_inicio.isoformat(),
-            "data_analise_fim": data_fim.isoformat(),
-            "sugestoes": sugestoes,
-            "resumo": {
-                "total_produtos": len(sugestoes),
-                "produtos_criticos": total_criticos,
-                "produtos_alerta": total_alerta,
-                "produtos_atencao": len(
-                    [s for s in sugestoes if s["prioridade"] == "ATENÇÃO"]
-                ),
-                "valor_total_estimado": _round_seguro_sugestao(valor_total, 2),
-            },
-        }
+    return _montar_resposta_sugestao_compra(
+        fornecedor=fornecedor,
+        fornecedor_ids=fornecedor_ids,
+        fornecedor_grupo=fornecedor_grupo,
+        periodo_dias=periodo_dias,
+        dias_cobertura=dias_cobertura,
+        apenas_fornecedor_principal=apenas_fornecedor_principal,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        sugestoes=sugestoes,
+        total_criticos=total_criticos,
+        total_alerta=total_alerta,
+        valor_total=valor_total,
     )

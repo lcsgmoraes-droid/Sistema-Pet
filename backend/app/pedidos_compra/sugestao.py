@@ -337,6 +337,29 @@ def _montar_resultado_vendas_sugestao(stats_por_produto: dict) -> dict:
     return resultado
 
 
+def _selecionar_produtos_fornecedor_sugestao(
+    produtos_fornecedor_raw,
+    fornecedor_id: int,
+) -> list:
+    produtos_por_id = {}
+    for produto, produto_fornecedor, marca in produtos_fornecedor_raw:
+        score = (
+            0 if produto_fornecedor.fornecedor_id == fornecedor_id else 1,
+            0 if produto_fornecedor.e_principal else 1,
+            0 if produto_fornecedor.fornecedor_id == produto.fornecedor_id else 1,
+            _float_seguro_sugestao(produto_fornecedor.preco_custo, 999999999),
+            produto_fornecedor.id,
+        )
+        atual = produtos_por_id.get(produto.id)
+        if not atual or score < atual["score"]:
+            produtos_por_id[produto.id] = {
+                "score": score,
+                "linha": (produto, produto_fornecedor, marca),
+            }
+
+    return [item["linha"] for item in produtos_por_id.values()]
+
+
 def _calcular_dias_com_estoque(
     movimentacoes: list,
     estoque_atual: float,
@@ -533,6 +556,66 @@ def _calcular_planejamento_compra_sugestao(
         "quantidade_sugerida": quantidade_sugerida,
         "prioridade": prioridade,
     }
+
+
+def _montar_resposta_sugestao_compra(
+    *,
+    fornecedor,
+    fornecedor_ids: list[int],
+    fornecedor_grupo,
+    periodo_dias: int,
+    dias_cobertura: int,
+    apenas_fornecedor_principal: bool,
+    data_inicio: datetime,
+    data_fim: datetime,
+    sugestoes: list[dict],
+    total_criticos: int,
+    total_alerta: int,
+    valor_total: float,
+) -> dict:
+    ordem_prioridade = {
+        "CR\u00cdTICO": 0,
+        "ALERTA": 1,
+        "ATEN\u00c7\u00c3O": 2,
+        "NORMAL": 3,
+    }
+    sugestoes.sort(
+        key=lambda item: (
+            ordem_prioridade.get(item["prioridade"], 4),
+            -float(item.get("valor_total") or 0),
+        )
+    )
+
+    return _sanitizar_json_sugestao(
+        {
+            "fornecedor": {
+                "id": fornecedor.id,
+                "nome": fornecedor.nome,
+                "ids_considerados": fornecedor_ids,
+                "grupo": {
+                    "id": fornecedor_grupo.id,
+                    "nome": fornecedor_grupo.nome,
+                }
+                if fornecedor_grupo
+                else None,
+            },
+            "periodo_dias": periodo_dias,
+            "dias_cobertura": dias_cobertura,
+            "apenas_fornecedor_principal": apenas_fornecedor_principal,
+            "data_analise_inicio": data_inicio.isoformat(),
+            "data_analise_fim": data_fim.isoformat(),
+            "sugestoes": sugestoes,
+            "resumo": {
+                "total_produtos": len(sugestoes),
+                "produtos_criticos": total_criticos,
+                "produtos_alerta": total_alerta,
+                "produtos_atencao": len(
+                    [s for s in sugestoes if s["prioridade"] == "ATEN\u00c7\u00c3O"]
+                ),
+                "valor_total_estimado": _round_seguro_sugestao(valor_total, 2),
+            },
+        }
+    )
 
 
 def _gerar_observacao(

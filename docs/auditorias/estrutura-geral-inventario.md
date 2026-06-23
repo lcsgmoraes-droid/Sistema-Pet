@@ -211,11 +211,15 @@ Fatia executada na trilha Pedidos de Compra:
 - A montagem do item final da sugestao foi extraida para
   `_montar_item_sugestao_compra`, preservando payload operacional,
   arredondamentos, janelas de venda, ruptura, estoque derivado e observacao.
+- A deduplicacao dos vinculos fornecedor/produto e a montagem da resposta final
+  foram extraidas para `_selecionar_produtos_fornecedor_sugestao` e
+  `_montar_resposta_sugestao_compra`, preservando preferencia por fornecedor
+  selecionado/principal, ordenacao por prioridade, resumo e sanitizacao JSON.
 - Endpoints, payloads, permissoes, tenant e regras de calculo de sugestao foram
   preservados; o router continua orquestrando consultas e montagem da resposta.
-- Na branch atual, o router principal caiu de 1968 para 1521 linhas.
+- Na branch atual, o router principal caiu de 1968 para 1486 linhas.
 - Testes focados: `pytest backend/tests/unit/test_pedidos_compra_sugestao_helpers.py -q`
-  passou com 17 testes.
+  passou com 19 testes.
 
 Proxima fatia recomendada:
 

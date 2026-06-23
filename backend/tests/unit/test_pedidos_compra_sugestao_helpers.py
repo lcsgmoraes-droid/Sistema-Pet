@@ -528,6 +528,127 @@ def test_montar_item_sugestao_compra_preserva_payload_operacional():
     assert item["observacao"].startswith("Urgente: estoque cobre menos de 3 dias")
 
 
+def test_selecionar_produtos_fornecedor_sugestao_deduplica_por_prioridade():
+    assert hasattr(sugestao_helpers, "_selecionar_produtos_fornecedor_sugestao")
+
+    produto_10 = SimpleNamespace(id=10, fornecedor_id=99)
+    produto_11 = SimpleNamespace(id=11, fornecedor_id=31)
+    marca_a = SimpleNamespace(nome="Marca A")
+    marca_b = SimpleNamespace(nome="Marca B")
+    linha_selecionada = (
+        produto_10,
+        SimpleNamespace(
+            id=3,
+            fornecedor_id=20,
+            e_principal=False,
+            preco_custo=50,
+        ),
+        marca_a,
+    )
+    linha_principal = (
+        produto_10,
+        SimpleNamespace(
+            id=2,
+            fornecedor_id=21,
+            e_principal=True,
+            preco_custo=10,
+        ),
+        marca_b,
+    )
+    linha_produto_11_principal = (
+        produto_11,
+        SimpleNamespace(
+            id=4,
+            fornecedor_id=30,
+            e_principal=True,
+            preco_custo=80,
+        ),
+        marca_a,
+    )
+    linha_produto_11_fornecedor_produto = (
+        produto_11,
+        SimpleNamespace(
+            id=5,
+            fornecedor_id=31,
+            e_principal=False,
+            preco_custo=20,
+        ),
+        marca_b,
+    )
+
+    selecionados = sugestao_helpers._selecionar_produtos_fornecedor_sugestao(
+        [
+            linha_principal,
+            linha_selecionada,
+            linha_produto_11_fornecedor_produto,
+            linha_produto_11_principal,
+        ],
+        fornecedor_id=20,
+    )
+
+    por_produto = {
+        produto.id: (produto_fornecedor, marca)
+        for produto, produto_fornecedor, marca in selecionados
+    }
+    assert len(selecionados) == 2
+    assert por_produto[10][0].fornecedor_id == 20
+    assert por_produto[10][1].nome == "Marca A"
+    assert por_produto[11][0].fornecedor_id == 30
+    assert por_produto[11][1].nome == "Marca A"
+
+
+def test_montar_resposta_sugestao_compra_ordena_resume_e_sanitiza():
+    assert hasattr(sugestao_helpers, "_montar_resposta_sugestao_compra")
+
+    fornecedor = SimpleNamespace(id=20, nome="Fornecedor A")
+    fornecedor_grupo = SimpleNamespace(id=30, nome="Grupo A")
+    data_inicio = datetime(2026, 6, 1, 8, 30)
+    data_fim = datetime(2026, 6, 23, 9, 45)
+    sugestoes = [
+        {"produto_id": 1, "prioridade": "NORMAL", "valor_total": 100.0},
+        {"produto_id": 2, "prioridade": "ATEN\u00c7\u00c3O", "valor_total": 200.0},
+        {"produto_id": 3, "prioridade": "CR\u00cdTICO", "valor_total": 50.0},
+        {"produto_id": 4, "prioridade": "CR\u00cdTICO", "valor_total": 150.0},
+        {"produto_id": 5, "prioridade": "ALERTA", "valor_total": inf},
+    ]
+
+    resposta = sugestao_helpers._montar_resposta_sugestao_compra(
+        fornecedor=fornecedor,
+        fornecedor_ids=[20, 21],
+        fornecedor_grupo=fornecedor_grupo,
+        periodo_dias=90,
+        dias_cobertura=30,
+        apenas_fornecedor_principal=True,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        sugestoes=sugestoes,
+        total_criticos=2,
+        total_alerta=1,
+        valor_total=500.555,
+    )
+
+    assert resposta["fornecedor"] == {
+        "id": 20,
+        "nome": "Fornecedor A",
+        "ids_considerados": [20, 21],
+        "grupo": {"id": 30, "nome": "Grupo A"},
+    }
+    assert resposta["periodo_dias"] == 90
+    assert resposta["dias_cobertura"] == 30
+    assert resposta["apenas_fornecedor_principal"] is True
+    assert resposta["data_analise_inicio"] == "2026-06-01T08:30:00"
+    assert resposta["data_analise_fim"] == "2026-06-23T09:45:00"
+    assert [item["produto_id"] for item in resposta["sugestoes"]] == [4, 3, 5, 2, 1]
+    assert resposta["sugestoes"][2]["valor_total"] == 0.0
+    assert resposta["resumo"] == {
+        "total_produtos": 5,
+        "produtos_criticos": 2,
+        "produtos_alerta": 1,
+        "produtos_atencao": 1,
+        "valor_total_estimado": 500.56,
+    }
+
+
 def test_calcular_tendencia_vendas_sugestao_respeita_periodo_e_limiares():
     assert hasattr(sugestao_helpers, "_calcular_tendencia_vendas_sugestao")
 
