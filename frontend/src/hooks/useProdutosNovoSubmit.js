@@ -1,4 +1,5 @@
 import { createProduto, updateProduto } from "../api/produtos";
+import { normalizarCodigosBarrasAlternativosPayload } from "../pages/produtosFormUtils";
 import { debugLog } from "../utils/debug";
 import { normalizeMarkdownContent } from "../utils/safeMarkdown";
 
@@ -52,6 +53,11 @@ export default function useProdutosNovoSubmit({
         nome: formData.nome,
         descricao_curta: descricaoNormalizada || null,
         codigo_barras: formData.codigo_barras || null,
+        gtin_ean: formData.gtin_ean || null,
+        gtin_ean_tributario: formData.gtin_ean_tributario || null,
+        codigos_barras_alternativos: normalizarCodigosBarrasAlternativosPayload(
+          formData.codigos_barras_alternativos,
+        ),
         unidade: produtoEhGranel ? "KG" : formData.unidade || "UN",
         preco_custo: formData.preco_custo ? parseFloat(formData.preco_custo) : 0,
         preco_venda: parseFloat(formData.preco_venda),

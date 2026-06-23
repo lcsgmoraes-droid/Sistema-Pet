@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from difflib import SequenceMatcher
@@ -296,6 +297,72 @@ def _codigos_barras_nf(item: Any) -> Dict[str, str]:
     }
 
 
+def _lista_codigos_barras_unicos(valores: List[Any]) -> List[str]:
+    codigos: List[str] = []
+    vistos = set()
+
+    for valor in valores:
+        codigo = _codigo_barras_valido_nf(valor)
+        if codigo and codigo not in vistos:
+            codigos.append(codigo)
+            vistos.add(codigo)
+
+    return codigos
+
+
+def _codigos_barras_alternativos_lista(produto: Produto) -> List[str]:
+    valor = getattr(produto, "codigos_barras_alternativos", None)
+    if not valor:
+        return []
+
+    bruto: List[Any]
+    if isinstance(valor, list):
+        bruto = valor
+    else:
+        texto = str(valor).strip()
+        if not texto:
+            return []
+
+        try:
+            carregado = json.loads(texto)
+            bruto = carregado if isinstance(carregado, list) else [texto]
+        except (TypeError, ValueError, json.JSONDecodeError):
+            bruto = re.split(r"[,;\n]+", texto)
+
+    return _lista_codigos_barras_unicos(bruto)
+
+
+def _codigos_barras_produto(produto: Produto) -> List[str]:
+    return _lista_codigos_barras_unicos(
+        [
+            getattr(produto, "codigo_barras", None),
+            getattr(produto, "gtin_ean", None),
+            getattr(produto, "gtin_ean_tributario", None),
+            *_codigos_barras_alternativos_lista(produto),
+        ]
+    )
+
+
+def _adicionar_codigos_barras_alternativos_produto(
+    produto: Produto, codigos: List[str]
+) -> bool:
+    alternativos = _codigos_barras_alternativos_lista(produto)
+    existentes = set(_codigos_barras_produto(produto))
+    atualizou = False
+
+    for codigo in _lista_codigos_barras_unicos(codigos):
+        if codigo in existentes:
+            continue
+        alternativos.append(codigo)
+        existentes.add(codigo)
+        atualizou = True
+
+    if atualizou:
+        produto.codigos_barras_alternativos = json.dumps(alternativos)
+
+    return atualizou
+
+
 def _preencher_campo_codigo_barras_vazio(
     produto: Produto, campo: str, valor: str
 ) -> bool:
@@ -333,6 +400,12 @@ def _aplicar_codigos_barras_item_no_produto(
         )
         or atualizou
     )
+    atualizou = (
+        _adicionar_codigos_barras_alternativos_produto(
+            produto, [codigos["ean"], codigos["ean_tributario"]]
+        )
+        or atualizou
+    )
 
     if atualizou:
         logger.info(
@@ -352,17 +425,16 @@ def _montar_divergencia_codigo_barras_item(item: NotaEntradaItem) -> Dict[str, A
 
     codigos_nf = _codigos_barras_nf(item)
     produto = item.produto
+    codigos_produto = set(_codigos_barras_produto(produto))
     pares = [
-        ("codigo_barras", "Codigo de barras principal", codigos_nf["principal"]),
-        ("gtin_ean", "EAN comercial", codigos_nf["ean"]),
-        ("gtin_ean_tributario", "EAN fiscal", codigos_nf["ean_tributario"]),
+        ("EAN comercial", codigos_nf["ean"]),
+        ("EAN fiscal", codigos_nf["ean_tributario"]),
     ]
     mensagens = []
 
-    for campo, label, valor_nf in pares:
-        valor_produto = _codigo_barras_valido_nf(getattr(produto, campo, None))
-        if valor_nf and valor_produto and valor_nf != valor_produto:
-            mensagens.append(f"{label}: NF={valor_nf} vs cadastro={valor_produto}")
+    for label, valor_nf in pares:
+        if valor_nf and valor_nf not in codigos_produto:
+            mensagens.append(f"{label} da NF nao encontrado no produto: NF={valor_nf}")
 
     return {"tem_divergencia": bool(mensagens), "mensagens": mensagens}
 
@@ -469,6 +541,7 @@ def encontrar_produto_similar(
                 Produto.codigo_barras == referencia,
                 Produto.gtin_ean == referencia,
                 Produto.gtin_ean_tributario == referencia,
+                Produto.codigos_barras_alternativos.ilike(f"%{referencia}%"),
             )
         )
         if tenant_id is not None:

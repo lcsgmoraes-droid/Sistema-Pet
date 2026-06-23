@@ -15,6 +15,8 @@ import {
   montarPayloadFornecedorProduto,
   montarPayloadMovimentoEstoque,
   montarPayloadProdutoParaSalvar,
+  normalizarCodigosBarrasAlternativosCampo,
+  normalizarCodigosBarrasAlternativosPayload,
   organizarCategoriasHierarquicas,
   validarArquivoImagemProduto,
   validarProdutoParaSalvar,
@@ -153,6 +155,20 @@ test("normaliza produto carregado para o estado do formulario", () => {
       anunciar_app: true,
     },
   );
+});
+
+test("normaliza codigos de barras alternativos para campo e payload", () => {
+  assert.equal(
+    normalizarCodigosBarrasAlternativosCampo('["7890000000001","17890000000002"]'),
+    "7890000000001, 17890000000002",
+  );
+
+  assert.equal(
+    normalizarCodigosBarrasAlternativosPayload("7890000000001, 17890000000002\n7890000000001"),
+    '["7890000000001","17890000000002"]',
+  );
+
+  assert.equal(normalizarCodigosBarrasAlternativosPayload("   "), null);
 });
 
 test("monta estado de produto clonado sem copiar identidade ou estoque", () => {

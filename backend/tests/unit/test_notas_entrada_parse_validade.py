@@ -1,4 +1,5 @@
 import os
+import json
 from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
@@ -154,15 +155,20 @@ def test_aplicar_codigos_barras_nf_nao_sobrescreve_codigo_existente_divergente()
         codigo_barras="7898242030076",
         gtin_ean="17898242030073",
         gtin_ean_tributario="7898242030076",
+        codigos_barras_alternativos=None,
     )
     item = SimpleNamespace(ean="11111111111111", ean_tributario="2222222222222")
 
     atualizou = routes._aplicar_codigos_barras_item_no_produto(produto, item)
 
-    assert atualizou is False
+    assert atualizou is True
     assert produto.codigo_barras == "7898242030076"
     assert produto.gtin_ean == "17898242030073"
     assert produto.gtin_ean_tributario == "7898242030076"
+    assert json.loads(produto.codigos_barras_alternativos) == [
+        "11111111111111",
+        "2222222222222",
+    ]
 
 
 def test_monta_lotes_entrada_com_multiplos_rastros_do_xml():

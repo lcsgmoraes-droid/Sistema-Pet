@@ -10,6 +10,7 @@ from app.db import get_session
 from app.fiscal_patterns import aplicar_inteligencia_fiscal
 from app.notas_entrada.fiscal import calcular_composicao_custos_nota
 from app.notas_entrada.produtos import (
+    _aplicar_codigos_barras_item_no_produto,
     _aplicar_dados_fiscais_item_no_produto,
     _buscar_produto_por_codigo_global,
     _codigos_barras_nf,
@@ -94,6 +95,7 @@ def vincular_produto(
         logger.info(
             "Dados fiscais do produto %s atualizados com informacoes da NF", produto.id
         )
+    _aplicar_codigos_barras_item_no_produto(produto, item)
 
     nota = db.query(NotaEntrada).filter(NotaEntrada.id == nota_id).first()
     custo_item_vinculo = item.valor_unitario

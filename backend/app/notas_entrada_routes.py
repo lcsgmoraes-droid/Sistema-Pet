@@ -308,6 +308,8 @@ async def upload_xml(
                 tenant_id=tenant_id,
             )
             db.add(item)
+            if produto:
+                _aplicar_codigos_barras_item_no_produto(produto, item)
 
         # Atualizar contadores
         nota.produtos_vinculados = vinculados
@@ -521,6 +523,8 @@ async def upload_pdf(
                 tenant_id=tenant_id,
             )
             db.add(item)
+            if produto:
+                _aplicar_codigos_barras_item_no_produto(produto, item)
 
         nota.produtos_vinculados = vinculados
         nota.produtos_nao_vinculados = nao_vinculados
@@ -715,6 +719,8 @@ async def upload_lote_xml(
                     tenant_id=tenant_id,
                 )
                 db.add(item)
+                if produto:
+                    _aplicar_codigos_barras_item_no_produto(produto, item)
 
             # Atualizar contadores
             nota.produtos_vinculados = vinculados

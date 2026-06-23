@@ -53,7 +53,9 @@ export default function ProdutosNovoDadosBasicosSection({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Codigo de Barras</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            EAN principal (codigo de barras)
+          </label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -66,6 +68,41 @@ export default function ProdutosNovoDadosBasicosSection({
               Gerar
             </ActionButton>
           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">EAN comercial</label>
+          <input
+            type="text"
+            value={formData.gtin_ean}
+            onChange={(e) => handleChange("gtin_ean", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="cEAN da NF"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">EAN fiscal</label>
+          <input
+            type="text"
+            value={formData.gtin_ean_tributario}
+            onChange={(e) => handleChange("gtin_ean_tributario", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="cEANTrib da NF"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">EANs alternativos</label>
+          <input
+            type="text"
+            value={formData.codigos_barras_alternativos}
+            onChange={(e) => handleChange("codigos_barras_alternativos", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Separe por virgula"
+          />
         </div>
       </div>
 
