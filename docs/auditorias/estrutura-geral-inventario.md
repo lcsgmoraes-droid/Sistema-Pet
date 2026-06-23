@@ -287,3 +287,38 @@ Proxima fatia recomendada:
 2. Bons candidatos atuais: `clientes_routes.py`, `vendas/service.py`,
    `dre_canais_routes.py`, `vendas_routes.py` ou `nfe/listagem.py`.
 
+## Atualizacao continua - 2026-06-23 - Clientes/Subrouters
+
+Fatia maior executada na trilha de arquivos grandes:
+
+- `backend/app/clientes_routes.py` moveu rotas financeiras e historicos legados
+  para `backend/app/clientes/financeiro_routes.py`.
+- Rotas de pets foram para `backend/app/clientes/pets_routes.py`.
+- Rotas de credito/remocao de campo duplicado foram para
+  `backend/app/clientes/credito_routes.py`.
+- Rotas de parceiros, controle DRE e custo operacional de entregador foram para
+  `backend/app/clientes/parceiros_routes.py`.
+- Rotas de duplicidade e fusao de pessoas foram para
+  `backend/app/clientes/duplicidades_routes.py`.
+- O router principal inclui todos os subrouters e reexporta as funcoes antigas
+  para preservar imports internos e testes existentes.
+- O arquivo principal caiu de 2661 para 903 linhas e saiu da zona acima de 1000
+  linhas. Todos os subrouters novos ficaram abaixo de 1000 linhas.
+- Contagem atual recalculada: 77 arquivos de aplicacao ainda estao com 1000+
+  linhas quando testes, migrations e builds sao excluidos.
+- Testes focados: `pytest backend/tests/unit/test_clientes_financeiro_routes_contract.py backend/tests/unit/test_clientes_timeline_routes_contract.py backend/tests/unit/test_cliente_alertas_pdv.py backend/tests/unit/test_pessoa_duplicate_service.py backend/tests/unit/test_user_controlled_logging_contract.py -q`
+  passou com 17 testes.
+
+Observacao de validacao:
+
+- `pytest backend/tests/unit/test_fornecedor_selector_quick_create_contract.py -q`
+  tem uma falha preexistente em contrato textual do frontend, esperando
+  `api.post('/clientes/', dados)` enquanto o arquivo atual usa outro formato de
+  aspas. Nao foi alterado nesta fatia para evitar misturar escopo.
+
+Proxima fatia recomendada:
+
+1. Escolher o proximo hotspot acima de 1000 linhas com suite dedicada.
+2. Candidatos atuais: `vendas/service.py`, `dre_canais_routes.py`,
+   `vendas_routes.py`, `nfe/listagem.py` ou `contas_pagar_routes.py`.
+
