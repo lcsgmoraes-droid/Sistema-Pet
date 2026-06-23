@@ -1,11 +1,9 @@
 from sqlalchemy.orm import Session
 
 from app.nfe.listagem_base import (
-    _STATUS_MAP,
     _canal_label,
     _canal_slug,
     _coerce_float,
-    _coerce_int,
     _dict,
     _extrair_valor_nota,
     _list,

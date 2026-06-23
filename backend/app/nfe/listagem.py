@@ -1,5 +1,7 @@
 """Fachada de compatibilidade da listagem de NF-e/NFC-e."""
 
+# ruff: noqa: F401
+
 from app.nfe.listagem_base import (
     _FINALIDADE_MAP,
     _INDICADOR_PRESENCA_MAP,

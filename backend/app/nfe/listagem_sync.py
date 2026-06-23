@@ -17,9 +17,8 @@ from app.nfe.listagem_base import (
     _primeiro_preenchido,
     _status_nota_bling,
     _texto,
-    _venda_usa_nfce,
 )
-from app.nfe.listagem_cache import _obter_detalhe_nfe_cache, _salvar_detalhe_nfe_cache
+from app.nfe.listagem_cache import _salvar_detalhe_nfe_cache
 from app.nfe.listagem_detalhes import (
     _consultar_detalhe_cache_persistente,
     _consultar_detalhe_remoto_bling,

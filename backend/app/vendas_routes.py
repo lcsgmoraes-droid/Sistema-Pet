@@ -10,6 +10,8 @@
 Rotas da API para o módulo de Vendas (PDV)
 """
 
+# ruff: noqa: F401
+
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session, joinedload

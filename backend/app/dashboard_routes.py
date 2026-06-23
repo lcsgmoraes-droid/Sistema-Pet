@@ -3,6 +3,8 @@ Rotas para Dashboard Financeiro
 Endpoints para dados consolidados do sistema
 """
 
+# ruff: noqa: F401
+
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_

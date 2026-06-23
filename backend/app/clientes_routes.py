@@ -9,6 +9,8 @@
 Routes para gerenciamento de Clientes e Pets
 """
 
+# ruff: noqa: F401
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import case, or_, func

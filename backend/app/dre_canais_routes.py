@@ -5,6 +5,8 @@ A implementacao fica em app.dre_canais.* para manter os modulos menores,
 mas este arquivo continua exportando os nomes antigos usados por imports legados.
 """
 
+# ruff: noqa: F401
+
 from app.dre_canais.agregacao import (
     _bulk_cashback_por_venda,
     _bulk_comissoes_por_venda,
