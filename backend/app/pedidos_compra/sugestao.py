@@ -225,3 +225,55 @@ def _somar_conversoes_granel_rows_sugestao(
             data_inicio_periodo,
             data_fim,
         )
+
+
+def _somar_movimentacoes_complementares_sugestao(
+    stats_por_produto: dict,
+    movimentos_rows,
+    pares_venda_produto,
+    vendas_referenciadas_validas,
+    data_inicio_periodo: datetime,
+    data_fim: datetime,
+) -> None:
+    pares_venda_produto = set(pares_venda_produto or [])
+    vendas_referenciadas_validas = {
+        int(venda_id) for venda_id in vendas_referenciadas_validas or []
+    }
+
+    for row in movimentos_rows:
+        produto_id = int(row.produto_id)
+        referencia_tipo = str(row.referencia_tipo or "").strip().lower()
+        motivo = str(row.motivo or "").strip().lower()
+        referencia_id = int(row.referencia_id) if row.referencia_id else None
+        tem_item_direto = bool(
+            referencia_id and (referencia_id, produto_id) in pares_venda_produto
+        )
+        venda_referenciada_valida = bool(
+            referencia_id
+            and referencia_tipo == "venda"
+            and referencia_id in vendas_referenciadas_validas
+        )
+        origem_externa = (
+            referencia_tipo == "venda_bling"
+            or "bling" in referencia_tipo
+            or "bling" in motivo
+            or "online" in motivo
+        )
+        consumo_derivado = bool(venda_referenciada_valida and not tem_item_direto)
+
+        if tem_item_direto:
+            continue
+        if not (consumo_derivado or origem_externa):
+            continue
+
+        origem = "granel_kit" if consumo_derivado else "bling"
+        _somar_venda_sugestao(
+            stats_por_produto,
+            produto_id,
+            row.quantidade,
+            row.created_at,
+            data_inicio_periodo,
+            data_fim,
+            origem,
+            "estoque_componentes" if consumo_derivado else "estoque_externo",
+        )

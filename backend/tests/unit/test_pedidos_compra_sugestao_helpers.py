@@ -193,3 +193,63 @@ def test_somar_conversoes_granel_rows_sugestao_acumula_rows_carregados():
     assert stats["granel_itens"][99]["peso_pacote_kg"] == 3.0
     assert stats["origens"]["Granel"] == 2.0
     assert stats["fontes"] == {"conversao_granel"}
+
+
+def test_somar_movimentacoes_complementares_sugestao_deduplica_e_classifica_origem():
+    stats_por_produto = defaultdict(_nova_stats_venda_sugestao)
+    data_fim = datetime(2026, 6, 23, 12, 0)
+    data_inicio_periodo = data_fim - timedelta(days=30)
+    data_ref = data_fim - timedelta(days=4)
+
+    assert hasattr(sugestao_helpers, "_somar_movimentacoes_complementares_sugestao")
+
+    sugestao_helpers._somar_movimentacoes_complementares_sugestao(
+        stats_por_produto,
+        movimentos_rows=[
+            SimpleNamespace(
+                produto_id=10,
+                referencia_id=1001,
+                referencia_tipo="venda",
+                motivo="venda loja",
+                quantidade=2,
+                created_at=data_ref,
+            ),
+            SimpleNamespace(
+                produto_id=20,
+                referencia_id=2001,
+                referencia_tipo="venda",
+                motivo="venda kit",
+                quantidade=3,
+                created_at=data_ref,
+            ),
+            SimpleNamespace(
+                produto_id=30,
+                referencia_id=3001,
+                referencia_tipo="venda_bling",
+                motivo="saida online",
+                quantidade=4,
+                created_at=data_ref,
+            ),
+            SimpleNamespace(
+                produto_id=40,
+                referencia_id=None,
+                referencia_tipo="ajuste",
+                motivo="inventario",
+                quantidade=5,
+                created_at=data_ref,
+            ),
+        ],
+        pares_venda_produto={(1001, 10)},
+        vendas_referenciadas_validas={1001, 2001},
+        data_inicio_periodo=data_inicio_periodo,
+        data_fim=data_fim,
+    )
+
+    assert 10 not in stats_por_produto
+    assert 40 not in stats_por_produto
+    assert stats_por_produto[20]["vendas_periodo"] == 3.0
+    assert stats_por_produto[20]["origens"]["Granel/kit"] == 3.0
+    assert stats_por_produto[20]["fontes"] == {"estoque_componentes"}
+    assert stats_por_produto[30]["vendas_periodo"] == 4.0
+    assert stats_por_produto[30]["origens"]["Bling/online"] == 4.0
+    assert stats_por_produto[30]["fontes"] == {"estoque_externo"}
