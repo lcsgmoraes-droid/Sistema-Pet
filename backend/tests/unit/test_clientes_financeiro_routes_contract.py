@@ -56,17 +56,14 @@ def test_clientes_router_inclui_financeiro_sem_mudar_paths():
     )
     assert clientes_routes.get_extrato_credito is financeiro_routes.get_extrato_credito
     assert (
-        clientes_routes.get_historico_compras
-        is financeiro_routes.get_historico_compras
+        clientes_routes.get_historico_compras is financeiro_routes.get_historico_compras
     )
     assert (
-        clientes_routes.get_vendas_em_aberto
-        is financeiro_routes.get_vendas_em_aberto
+        clientes_routes.get_vendas_em_aberto is financeiro_routes.get_vendas_em_aberto
     )
     assert clientes_routes.baixar_vendas_lote is financeiro_routes.baixar_vendas_lote
     assert (
-        clientes_routes.get_cliente_historico
-        is financeiro_routes.get_cliente_historico
+        clientes_routes.get_cliente_historico is financeiro_routes.get_cliente_historico
     )
 
 
@@ -109,6 +106,5 @@ def test_clientes_outros_subrouters_ficam_dedicados_e_reexportados():
         is parceiros_routes.obter_custo_operacional_entregador
     )
     assert (
-        clientes_routes.verificar_duplicata
-        is duplicidades_routes.verificar_duplicata
+        clientes_routes.verificar_duplicata is duplicidades_routes.verificar_duplicata
     )

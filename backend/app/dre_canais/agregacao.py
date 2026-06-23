@@ -11,7 +11,9 @@ from app.financeiro_models import ContaPagar, FormaPagamento
 from app.models import Cliente
 from app.produtos_models import EstoqueMovimentacao, Produto
 from app.vendas_models import Venda, VendaItem
-from app.services.venda_rentabilidade_snapshot_service import build_venda_rentabilidade_snapshot
+from app.services.venda_rentabilidade_snapshot_service import (
+    build_venda_rentabilidade_snapshot,
+)
 from app.dre_canais.base import (
     _classificar_conta_dre,
     _conta_valor,

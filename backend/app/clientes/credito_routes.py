@@ -31,6 +31,7 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
         )
     return cliente
 
+
 # ==================== REMOVER CAMPO DUPLICADO ====================
 
 

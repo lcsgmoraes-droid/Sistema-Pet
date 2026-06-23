@@ -49,15 +49,13 @@ def _consultar_detalhe_cache_persistente(
     nfe_id: int,
     modelo: int,
 ) -> dict | None:
-    detalhe_cache = _compat_attr(
-        "_obter_detalhe_nfe_cache", _obter_detalhe_nfe_cache
-    )(tenant_id, nfe_id, modelo)
+    detalhe_cache = _compat_attr("_obter_detalhe_nfe_cache", _obter_detalhe_nfe_cache)(
+        tenant_id, nfe_id, modelo
+    )
     if _detalhe_nota_valido(detalhe_cache):
         return detalhe_cache
 
-    detalhe_cache = _compat_attr(
-        "obter_detalhe_nota_cache", obter_detalhe_nota_cache
-    )(
+    detalhe_cache = _compat_attr("obter_detalhe_nota_cache", obter_detalhe_nota_cache)(
         db=db,
         tenant_id=tenant_id,
         nfe_id=nfe_id,

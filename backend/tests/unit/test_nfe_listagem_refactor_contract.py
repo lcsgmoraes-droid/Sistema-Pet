@@ -31,9 +31,15 @@ def test_nfe_listagem_permanece_fachada_pequena_com_aliases_legados():
     source = _source("backend/app/nfe/listagem.py")
 
     assert len(source.splitlines()) < 250
-    assert listagem._normalizar_nota_bling is importlib.import_module(
-        "app.nfe.listagem_normalizacao"
-    )._normalizar_nota_bling
-    assert listagem._sincronizar_cache_nfes_com_bling is importlib.import_module(
-        "app.nfe.listagem_sync"
-    )._sincronizar_cache_nfes_com_bling
+    assert (
+        listagem._normalizar_nota_bling
+        is importlib.import_module(
+            "app.nfe.listagem_normalizacao"
+        )._normalizar_nota_bling
+    )
+    assert (
+        listagem._sincronizar_cache_nfes_com_bling
+        is importlib.import_module(
+            "app.nfe.listagem_sync"
+        )._sincronizar_cache_nfes_com_bling
+    )

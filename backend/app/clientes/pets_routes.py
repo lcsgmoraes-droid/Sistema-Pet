@@ -33,6 +33,7 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
         )
     return cliente
 
+
 # ========== SERIALIZACAO DE PETS ==========
 def _pet_response_dict(pet: Pet) -> dict:
     idade_meses = None
@@ -75,6 +76,7 @@ def _pet_response_dict(pet: Pet) -> dict:
         "created_at": pet.created_at,
         "updated_at": pet.updated_at,
     }
+
 
 # ==================== PETS ====================
 

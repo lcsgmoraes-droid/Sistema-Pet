@@ -72,7 +72,6 @@ def _dashboard_fetchone(db: Session, sql: str, tenant_id, params=None):
     return execute_tenant_safe(db, sql, params or {}, tenant_id=tenant_id).fetchone()
 
 
-
 @router.get("/dashboard/resumo")
 async def obter_resumo_dashboard(
     periodo_dias: int = 30,

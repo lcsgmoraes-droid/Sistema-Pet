@@ -34,6 +34,7 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
         )
     return cliente
 
+
 @router.get("/{cliente_id}/credito/extrato")
 def get_extrato_credito(
     cliente_id: int,

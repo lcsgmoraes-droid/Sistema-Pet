@@ -172,9 +172,7 @@ def notify_order_event(
             except Exception as exc:
                 sent, ticket_id, error = False, None, str(exc)
             any_sent = any_sent or sent
-            mark_push_target_result(
-                target, sent=sent, ticket_id=ticket_id, error=error
-            )
+            mark_push_target_result(target, sent=sent, ticket_id=ticket_id, error=error)
         if hasattr(db, "commit"):
             try:
                 db.commit()

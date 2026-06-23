@@ -16,10 +16,22 @@ from app.dashboard import ponto_equilibrio
 def test_ponto_equilibrio_module_expoe_helpers_usados_pelo_router():
     assert importlib.util.find_spec("app.dashboard.ponto_equilibrio") is not None
 
-    assert dashboard_routes._somar_componentes_margem_vendas_pe is ponto_equilibrio._somar_componentes_margem_vendas_pe
-    assert dashboard_routes._calcular_margem_periodo_ponto_equilibrio is ponto_equilibrio._calcular_margem_periodo_ponto_equilibrio
-    assert dashboard_routes._classificar_conta_ponto_equilibrio is ponto_equilibrio._classificar_conta_ponto_equilibrio
-    assert dashboard_routes._paginar_detalhes_ponto_equilibrio is ponto_equilibrio._paginar_detalhes_ponto_equilibrio
+    assert (
+        dashboard_routes._somar_componentes_margem_vendas_pe
+        is ponto_equilibrio._somar_componentes_margem_vendas_pe
+    )
+    assert (
+        dashboard_routes._calcular_margem_periodo_ponto_equilibrio
+        is ponto_equilibrio._calcular_margem_periodo_ponto_equilibrio
+    )
+    assert (
+        dashboard_routes._classificar_conta_ponto_equilibrio
+        is ponto_equilibrio._classificar_conta_ponto_equilibrio
+    )
+    assert (
+        dashboard_routes._paginar_detalhes_ponto_equilibrio
+        is ponto_equilibrio._paginar_detalhes_ponto_equilibrio
+    )
 
 
 class _FakeQuery:

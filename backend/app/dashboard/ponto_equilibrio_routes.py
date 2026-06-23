@@ -42,6 +42,7 @@ from .ponto_equilibrio import (
 
 router = APIRouter()
 
+
 @router.get("/financeiro/ponto-equilibrio")
 async def obter_ponto_equilibrio(
     data_inicio: Optional[date] = None,

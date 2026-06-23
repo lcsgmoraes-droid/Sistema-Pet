@@ -712,23 +712,15 @@ def _montar_item_sugestao_compra(
         "produto_sku": produto.codigo,
         "produto_codigo_barras": produto.codigo_barras,
         "fornecedor_id": produto_fornecedor.fornecedor_id,
-        "fornecedor_nome": fornecedores_por_id.get(
-            produto_fornecedor.fornecedor_id
-        ),
-        "fornecedor_grupo_id": fornecedor_grupo.id
-        if fornecedor_grupo
-        else None,
-        "fornecedor_grupo_nome": fornecedor_grupo.nome
-        if fornecedor_grupo
-        else None,
+        "fornecedor_nome": fornecedores_por_id.get(produto_fornecedor.fornecedor_id),
+        "fornecedor_grupo_id": fornecedor_grupo.id if fornecedor_grupo else None,
+        "fornecedor_grupo_nome": fornecedor_grupo.nome if fornecedor_grupo else None,
         "marca_id": produto.marca_id,
         "marca_nome": marca.nome if marca else None,
         "estoque_atual": _float_seguro_sugestao(estoque_atual),
         "estoque_minimo": _float_seguro_sugestao(estoque_minimo),
         "consumo_diario": _round_seguro_sugestao(consumo_diario, 2),
-        "consumo_diario_observado": _round_seguro_sugestao(
-            consumo_observado, 3
-        ),
+        "consumo_diario_observado": _round_seguro_sugestao(consumo_observado, 3),
         "consumo_diario_ajustado": _round_seguro_sugestao(consumo_ajustado, 3),
         "consumo_diario_base": _round_seguro_sugestao(consumo_base, 3),
         "vendas_periodo": _float_seguro_sugestao(vendas_periodo),
@@ -752,9 +744,7 @@ def _montar_item_sugestao_compra(
         "ruptura_ajuste_motivo": motivo_ajuste_ruptura,
         "lead_time": lead_time,
         "dias_planejamento": _float_seguro_sugestao(dias_cobertura),
-        "dias_reposicao": _round_seguro_sugestao(
-            planejamento["dias_reposicao"], 1
-        ),
+        "dias_reposicao": _round_seguro_sugestao(planejamento["dias_reposicao"], 1),
         "margem_seguranca_dias": planejamento["margem_seguranca_dias"],
         "lead_time_incluido_no_alvo": planejamento["lead_time_incluido_no_alvo"],
         "dias_total_cobertura": planejamento["dias_total_cobertura"],

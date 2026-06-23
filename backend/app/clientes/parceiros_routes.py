@@ -31,6 +31,7 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
         )
     return cliente
 
+
 # ==================== PARCEIROS ====================
 
 
@@ -217,6 +218,7 @@ def atualizar_controla_dre(
             "controla_dre": cliente.controla_dre,
         },
     }
+
 
 @router.get("/entregadores/{entregador_id}/custo-operacional")
 def obter_custo_operacional_entregador(

@@ -31,6 +31,7 @@ from ..dre_canais_routes import (
     _snapshot_pronto,
 )
 
+
 def _round_money(value) -> float:
     return round(float(value or 0), 2)
 

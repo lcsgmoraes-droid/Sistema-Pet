@@ -31,6 +31,7 @@ def _validar_tenant_e_obter_usuario(user_and_tenant):
     current_user, tenant_id = user_and_tenant
     return current_user, tenant_id
 
+
 @router.get("/verificar-duplicata/campo", response_model=dict)
 def verificar_duplicata(
     cpf: Optional[str] = None,

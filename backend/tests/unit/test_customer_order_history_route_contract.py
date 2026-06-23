@@ -26,9 +26,17 @@ def test_webhook_payment_status_triggers_order_push():
     tenant_webhook_source = inspect.getsource(
         ecommerce_webhooks.webhook_mercadopago_tenant
     )
+    finish_webhook_source = inspect.getsource(
+        ecommerce_webhooks._finish_mercadopago_webhook
+    )
+    payment_update_source = inspect.getsource(
+        ecommerce_webhooks._process_mercadopago_payment_update
+    )
 
     assert "notify_order_event" in module_source
-    assert "_notify_payment_status_change" in tenant_webhook_source
+    assert "_finish_mercadopago_webhook" in tenant_webhook_source
+    assert "_process_mercadopago_payment_update" in finish_webhook_source
+    assert "_notify_payment_status_change" in payment_update_source
     assert "payment_approved" in module_source
     assert "payment_in_analysis" in module_source
     assert "payment_failed" in module_source

@@ -62,7 +62,9 @@ def test_formatar_origem_venda_preserva_nomes_operacionais():
 def test_nova_stats_venda_sugestao_monta_janelas_e_colecoes_mutaveis():
     stats = _nova_stats_venda_sugestao()
 
-    assert tuple(int(chave) for chave in stats["janelas"].keys()) == JANELAS_GIRO_SUGESTAO
+    assert (
+        tuple(int(chave) for chave in stats["janelas"].keys()) == JANELAS_GIRO_SUGESTAO
+    )
     assert stats["origens"]["Loja"] == 0.0
     assert stats["granel_itens"][10] == {"kg": 0.0, "pacotes": 0.0}
     assert stats["fontes"] == set()
