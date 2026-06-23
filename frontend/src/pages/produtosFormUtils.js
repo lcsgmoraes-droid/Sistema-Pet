@@ -52,6 +52,45 @@ export function calcularMargemPercentual(custo, venda) {
   return margem.toFixed(2);
 }
 
+export function normalizarCodigosBarrasAlternativosCampo(valor) {
+  if (!valor) return "";
+
+  if (Array.isArray(valor)) {
+    return valor.map((item) => String(item).trim()).filter(Boolean).join(", ");
+  }
+
+  const texto = String(valor).trim();
+  if (!texto) return "";
+
+  try {
+    const parsed = JSON.parse(texto);
+    if (Array.isArray(parsed)) {
+      return parsed.map((item) => String(item).trim()).filter(Boolean).join(", ");
+    }
+  } catch {
+    // Mantem compatibilidade com cadastros antigos salvos como texto simples.
+  }
+
+  return texto;
+}
+
+export function normalizarCodigosBarrasAlternativosPayload(valor) {
+  const texto = normalizarCodigosBarrasAlternativosCampo(valor);
+  if (!texto.trim()) return null;
+
+  const vistos = new Set();
+  const codigos = texto
+    .split(/[,;\n]+/)
+    .map((item) => item.replace(/\D/g, ""))
+    .filter((item) => {
+      if (!item || vistos.has(item)) return false;
+      vistos.add(item);
+      return true;
+    });
+
+  return codigos.length ? JSON.stringify(codigos) : null;
+}
+
 export function deveMostrarTipoProdutoNoFormulario({ tipoProduto } = {}) {
   return tipoProduto !== "VARIACAO";
 }

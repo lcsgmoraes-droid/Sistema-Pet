@@ -167,6 +167,9 @@ class ProdutoBase(BaseModel):
     descricao_curta: Optional[str] = None
     descricao_completa: Optional[str] = None
     codigo_barras: Optional[str] = None
+    gtin_ean: Optional[str] = None
+    gtin_ean_tributario: Optional[str] = None
+    codigos_barras_alternativos: Optional[str] = None
     categoria_id: Optional[int] = None
     marca_id: Optional[int] = None
     departamento_id: Optional[int] = None
@@ -257,6 +260,9 @@ class ProdutoUpdate(BaseModel):
     descricao_curta: Optional[str] = None
     descricao_completa: Optional[str] = None
     codigo_barras: Optional[str] = None
+    gtin_ean: Optional[str] = None
+    gtin_ean_tributario: Optional[str] = None
+    codigos_barras_alternativos: Optional[str] = None
     categoria_id: Optional[int] = None
     marca_id: Optional[int] = None
     departamento_id: Optional[int] = None
