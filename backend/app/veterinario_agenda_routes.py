@@ -492,9 +492,7 @@ def diagnostico_push_agendamento(
         if user_tutor
         else []
     )
-    push_token_preview = (
-        f"{push_targets[0].token[:18]}..." if push_targets else None
-    )
+    push_token_preview = f"{push_targets[0].token[:18]}..." if push_targets else None
 
     prefixo = f"vet-agendamento:{ag.id}:"
     lembretes = (
