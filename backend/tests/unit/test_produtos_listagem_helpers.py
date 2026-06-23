@@ -419,6 +419,44 @@ def test_buscar_pagina_produtos_listagem_permite_total_posterior():
     assert query.limit_arg == 50
 
 
+def test_montar_resposta_produtos_paginados_calcula_pages_e_total():
+    assert hasattr(produtos_listagem, "_montar_resposta_produtos_paginados")
+    produto = SimpleNamespace(id=10)
+
+    resposta = produtos_listagem._montar_resposta_produtos_paginados(
+        [produto],
+        total=21,
+        page=2,
+        page_size=10,
+        offset=10,
+    )
+
+    assert resposta == {
+        "items": [produto],
+        "total": 21,
+        "page": 2,
+        "page_size": 10,
+        "pages": 3,
+    }
+
+
+def test_montar_resposta_produtos_paginados_estima_total_quando_nao_contou():
+    assert hasattr(produtos_listagem, "_montar_resposta_produtos_paginados")
+    produtos = [SimpleNamespace(id=10), SimpleNamespace(id=11)]
+
+    resposta = produtos_listagem._montar_resposta_produtos_paginados(
+        produtos,
+        total=None,
+        page=3,
+        page_size=2,
+        offset=4,
+    )
+
+    assert resposta["items"] == produtos
+    assert resposta["total"] == 6
+    assert resposta["pages"] == 3
+
+
 def test_tipos_base_listagem_preserva_variacoes_apenas_em_busca():
     assert _tipos_base_listagem(include_variations=False, termo_busca="racao") == [
         "SIMPLES"

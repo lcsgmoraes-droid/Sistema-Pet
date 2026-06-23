@@ -164,6 +164,25 @@ def _buscar_pagina_produtos_listagem(
     return [produto for produto in produtos if produto is not None], total, load_options
 
 
+def _montar_resposta_produtos_paginados(
+    items: list[Any],
+    *,
+    total: Optional[int],
+    page: int,
+    page_size: int,
+    offset: int,
+) -> dict[str, Any]:
+    total_resolvido = total if total is not None else offset + len(items)
+    pages = (total_resolvido + page_size - 1) // page_size
+    return {
+        "items": items,
+        "total": total_resolvido,
+        "page": page,
+        "page_size": page_size,
+        "pages": pages,
+    }
+
+
 def _expandir_produtos_listagem(
     db: Session,
     produtos: list[Produto],

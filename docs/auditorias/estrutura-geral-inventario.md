@@ -156,16 +156,19 @@ Fatia executada na trilha Produtos/listagem:
 - A fatia seguinte extraiu o fetch final paginado para
   `_buscar_pagina_produtos_listagem`, centralizando `count`, ordenacao,
   load options, offset/limit e remocao de itens nulos.
+- A fatia de acabamento extraiu a montagem da resposta paginada para
+  `_montar_resposta_produtos_paginados`, preservando `items`, `total`, `page`,
+  `page_size`, `pages` e o fallback de total estimado em produtos vendaveis.
 - As rotas preservaram endpoints, payloads, permissoes, tenant, paginacao,
   filtros basicos/fornecedor, reservas, validade e enriquecimento.
-- Na branch atual, o router principal caiu de 1837 para 1743 linhas.
+- Na branch atual, o router principal caiu de 1837 para 1740 linhas.
 - Testes focados: `pytest backend/tests/unit/test_produtos*.py -q` passou com
-  87 testes.
+  89 testes.
 
 Proxima fatia recomendada:
 
-1. Antes de continuar em Produtos, escolher uma fatia pequena e testavel ou
-   migrar para outro hotspot acima de 1000 linhas.
+1. Encerrar Produtos/listagem nesta rodada ou migrar para outro hotspot acima
+   de 1000 linhas.
 2. Manter endpoints, payloads, permissoes, tenant e paginacao iguais.
 3. Nao misturar com estoque, PDV, fiscal, cadastro em lote ou regras de preco.
 

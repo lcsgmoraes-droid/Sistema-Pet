@@ -73,6 +73,7 @@ from .produtos.listagem import (
     _mapa_reservas_ativas_multitenant,
     _montar_query_listagem_produtos,
     _montar_query_produtos_vendaveis,
+    _montar_resposta_produtos_paginados,
     _normalizar_paginacao_produtos,
     _resolver_fornecedor_ids_filtro_produto,
     _resolver_promocao_erp_produto,
@@ -474,17 +475,13 @@ def listar_produtos_vendaveis(
             incluir_detalhes_composto=False,
         )
 
-    if total is None:
-        total = offset + len(produtos)
-    pages = (total + page_size - 1) // page_size
-
-    return {
-        "items": produtos,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": pages,
-    }
+    return _montar_resposta_produtos_paginados(
+        produtos,
+        total=total,
+        page=page,
+        page_size=page_size,
+        offset=offset,
+    )
 
 
 @router.get("/", response_model=ProdutosPaginadosResponse)
@@ -596,15 +593,13 @@ def listar_produtos(
         load_options=load_options,
         validade_por_produto=validade_por_produto,
     )
-    pages = (total + page_size - 1) // page_size
-
-    return {
-        "items": produtos_expandidos,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": pages,
-    }
+    return _montar_resposta_produtos_paginados(
+        produtos_expandidos,
+        total=total,
+        page=page,
+        page_size=page_size,
+        offset=offset,
+    )
 
 
 @router.get("/{produto_id}/variacoes", response_model=List[ProdutoResponse])
