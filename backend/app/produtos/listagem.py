@@ -12,6 +12,7 @@ from app.models import Cliente, FornecedorGrupo
 from app.partner_utils import is_partner_owned
 from app.produtos_models import Produto, ProdutoFornecedor
 from app.produtos.search import (
+    _build_produto_search_order_clause,
     _produto_search_conditions,
     _produto_search_conditions_fast,
 )
@@ -133,6 +134,34 @@ def _load_options_listagem_produtos(
         joinedload(Produto.imagens) if incluir_imagens else noload(Produto.imagens),
         joinedload(Produto.lotes) if incluir_lotes else noload(Produto.lotes),
     ]
+
+
+def _buscar_pagina_produtos_listagem(
+    query: Any,
+    *,
+    termo_busca: Optional[str],
+    offset: int,
+    page_size: int,
+    incluir_imagens: bool,
+    incluir_lotes: bool,
+    contar_total: bool = True,
+) -> tuple[list[Produto], Optional[int], list[Any]]:
+    total = query.count() if contar_total else None
+    order_clause = _build_produto_search_order_clause(termo_busca)
+    load_options = _load_options_listagem_produtos(
+        incluir_imagens=incluir_imagens,
+        incluir_lotes=incluir_lotes,
+    )
+
+    produtos = (
+        query.options(*load_options)
+        .order_by(*order_clause)
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+
+    return [produto for produto in produtos if produto is not None], total, load_options
 
 
 def _expandir_produtos_listagem(

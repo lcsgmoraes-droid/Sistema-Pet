@@ -52,9 +52,6 @@ from .services.produto_merge_service import (
     executar_fusao_produtos,
     montar_preview_fusao_produtos,
 )
-from .produtos.search import (
-    _build_produto_search_order_clause,
-)
 from .produtos.codigo_barras import (
     gerar_codigo_barras_ean13,
     validar_codigo_barras_ean13,
@@ -70,9 +67,9 @@ from .produtos.core import (
 from .produtos.listagem import (
     _aplicar_filtro_fornecedor_produto,
     _aplicar_filtros_basicos_produtos,
+    _buscar_pagina_produtos_listagem,
     _enriquecer_produto_listagem,
     _expandir_produtos_listagem,
-    _load_options_listagem_produtos,
     _mapa_reservas_ativas_multitenant,
     _montar_query_listagem_produtos,
     _montar_query_produtos_vendaveis,
@@ -452,25 +449,19 @@ def listar_produtos_vendaveis(
         filtro_por_grupo=filtro_fornecedor_por_grupo,
     )
 
-    total = query.count() if contar_total else None
-
-    # OrdenaÃ§Ã£o inteligente: prioriza match exato no cÃ³digo
-    order_clause = _build_produto_search_order_clause(termo_busca)
-    load_options = _load_options_listagem_produtos(
+    produtos, total, _load_options = _buscar_pagina_produtos_listagem(
+        query,
+        termo_busca=termo_busca,
+        offset=offset,
+        page_size=page_size,
         incluir_imagens=incluir_imagens,
         incluir_lotes=False,
+        contar_total=contar_total,
     )
+
+    # OrdenaÃ§Ã£o inteligente: prioriza match exato no cÃ³digo
 
     # QUERY FINAL
-    produtos = (
-        query.options(*load_options)
-        .order_by(*order_clause)
-        .offset(offset)
-        .limit(page_size)
-        .all()
-    )
-
-    produtos = [p for p in produtos if p is not None]
 
     # PDV usa esta rota como busca rápida enquanto o operador digita/bipa.
     # Evitar cálculo detalhado de composição/custo aqui impede N+1 pesado por tecla.
@@ -576,31 +567,17 @@ def listar_produtos(
     )
 
     # TOTAL
-    total = query.count()
-
-    logger.info("GET /produtos/ - total encontrado: %s", total)
-
-    # PAGINAÃ‡ÃƒO
     offset = (page - 1) * page_size
-
-    order_clause = _build_produto_search_order_clause(termo_busca)
-
-    load_options = _load_options_listagem_produtos(
+    produtos, total, load_options = _buscar_pagina_produtos_listagem(
+        query,
+        termo_busca=termo_busca,
+        offset=offset,
+        page_size=page_size,
         incluir_imagens=incluir_imagens,
         incluir_lotes=incluir_lotes,
     )
 
-    # QUERY FINAL COM RELACIONAMENTOS
-    produtos = (
-        query.options(*load_options)
-        .order_by(*order_clause)
-        .offset(offset)
-        .limit(page_size)
-        .all()
-    )
-
-    # Filtro de seguranÃ§a: remover None
-    produtos = [p for p in produtos if p is not None]
+    logger.info("GET /produtos/ - total encontrado: %s", total)
 
     reservas_por_produto = _mapa_reservas_ativas_multitenant(db, access_ids)
     validade_por_produto = _mapa_validade_proxima_produtos(db, produtos, access_ids)

@@ -89,6 +89,40 @@ class _FakeHierarchyQuery:
         return self.all_result
 
 
+class _FakePageQuery:
+    def __init__(self, rows, total=0):
+        self.rows = rows
+        self.total = total
+        self.count_calls = 0
+        self.options_args = []
+        self.order_by_args = []
+        self.offset_arg = None
+        self.limit_arg = None
+
+    def count(self):
+        self.count_calls += 1
+        return self.total
+
+    def options(self, *options):
+        self.options_args.extend(options)
+        return self
+
+    def order_by(self, *expressions):
+        self.order_by_args.extend(expressions)
+        return self
+
+    def offset(self, value):
+        self.offset_arg = value
+        return self
+
+    def limit(self, value):
+        self.limit_arg = value
+        return self
+
+    def all(self):
+        return self.rows
+
+
 def test_nome_area_produto_prioriza_departamento_direto():
     produto = SimpleNamespace(
         departamento=SimpleNamespace(nome="Racoes"),
@@ -336,6 +370,53 @@ def test_expandir_produtos_listagem_nao_busca_variacoes_durante_busca(monkeypatc
     assert resultado == [produto_pai]
     assert produto_pai.total_variacoes == 3
     assert len(db.query_calls) == 1
+
+
+def test_buscar_pagina_produtos_listagem_aplica_total_ordenacao_e_paginacao():
+    assert hasattr(produtos_listagem, "_buscar_pagina_produtos_listagem")
+    produto = SimpleNamespace(id=10)
+    query = _FakePageQuery([produto, None], total=7)
+
+    produtos, total, load_options = produtos_listagem._buscar_pagina_produtos_listagem(
+        query,
+        termo_busca="golden",
+        offset=20,
+        page_size=10,
+        incluir_imagens=False,
+        incluir_lotes=True,
+        contar_total=True,
+    )
+
+    assert produtos == [produto]
+    assert total == 7
+    assert query.count_calls == 1
+    assert query.offset_arg == 20
+    assert query.limit_arg == 10
+    assert len(load_options) == 4
+    assert query.options_args == load_options
+    assert query.order_by_args
+
+
+def test_buscar_pagina_produtos_listagem_permite_total_posterior():
+    assert hasattr(produtos_listagem, "_buscar_pagina_produtos_listagem")
+    produto = SimpleNamespace(id=11)
+    query = _FakePageQuery([produto], total=99)
+
+    produtos, total, _load_options = produtos_listagem._buscar_pagina_produtos_listagem(
+        query,
+        termo_busca="",
+        offset=0,
+        page_size=50,
+        incluir_imagens=True,
+        incluir_lotes=False,
+        contar_total=False,
+    )
+
+    assert produtos == [produto]
+    assert total is None
+    assert query.count_calls == 0
+    assert query.offset_arg == 0
+    assert query.limit_arg == 50
 
 
 def test_tipos_base_listagem_preserva_variacoes_apenas_em_busca():
