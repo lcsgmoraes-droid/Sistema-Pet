@@ -464,3 +464,17 @@ def _gerar_observacao(
         observacoes.append("Sem vendas no periodo analisado")
 
     return " | ".join(observacoes) if observacoes else "Estoque adequado"
+
+
+def _calcular_tendencia_vendas_sugestao(
+    periodo_dias: int,
+    consumo_observado: float,
+    consumo_recente: float,
+) -> str:
+    if periodo_dias < 60 or consumo_observado <= 0:
+        return "N/A"
+    if consumo_recente > consumo_observado * 1.2:
+        return "CRESCIMENTO"
+    if consumo_recente < consumo_observado * 0.8:
+        return "QUEDA"
+    return "EST\u00c1VEL"

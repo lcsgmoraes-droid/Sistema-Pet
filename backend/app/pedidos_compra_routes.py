@@ -72,6 +72,7 @@ from .pedidos_compra.sugestao import (
     MIN_DIAS_COM_ESTOQUE_AJUSTE_RUPTURA,
     MIN_VENDAS_AJUSTE_RUPTURA,
     _calcular_dias_com_estoque,
+    _calcular_tendencia_vendas_sugestao,
     _datetime_naive_utc_sugestao,
     _float_seguro_sugestao,
     _gerar_observacao,
@@ -1731,16 +1732,11 @@ def sugerir_pedido_inteligente(
         else:
             prioridade = "NORMAL"
 
-        # Tendência de vendas — lookup em vez de query individual
-        if periodo_dias >= 60 and consumo_observado > 0:
-            if consumo_recente > consumo_observado * 1.2:
-                tendencia = "CRESCIMENTO"
-            elif consumo_recente < consumo_observado * 0.8:
-                tendencia = "QUEDA"
-            else:
-                tendencia = "ESTÁVEL"
-        else:
-            tendencia = "N/A"
+        tendencia = _calcular_tendencia_vendas_sugestao(
+            periodo_dias,
+            consumo_observado,
+            consumo_recente,
+        )
 
         # Preço unitário
         preco_unitario = _float_seguro_sugestao(

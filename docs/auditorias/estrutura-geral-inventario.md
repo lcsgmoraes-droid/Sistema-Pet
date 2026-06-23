@@ -201,9 +201,12 @@ Fatia executada na trilha Pedidos de Compra:
   no router.
 - A montagem textual `_gerar_observacao` foi movida para o mesmo modulo,
   preservando mensagens de ruptura, tendencia, ausencia de venda e fallback.
+- O calculo de tendencia de vendas foi extraido para
+  `_calcular_tendencia_vendas_sugestao`, preservando limiares de crescimento,
+  queda, estavel e fallback `N/A`.
 - Endpoints, payloads, permissoes, tenant e regras de calculo de sugestao foram
   preservados; o router continua orquestrando consultas e montagem da resposta.
-- Na branch atual, o router principal caiu de 1968 para 1637 linhas.
+- Na branch atual, o router principal caiu de 1968 para 1633 linhas.
 - Testes focados: `pytest backend/tests/unit/test_pedidos_compra_sugestao_helpers.py -q`
   e `pytest` dos testes unitarios de pedidos de compra passaram.
 

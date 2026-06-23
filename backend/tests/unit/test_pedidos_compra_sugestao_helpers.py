@@ -403,3 +403,40 @@ def test_gerar_observacao_combina_ruptura_tendencia_e_fallback():
         )
         == "Estoque adequado"
     )
+
+
+def test_calcular_tendencia_vendas_sugestao_respeita_periodo_e_limiares():
+    assert hasattr(sugestao_helpers, "_calcular_tendencia_vendas_sugestao")
+
+    assert (
+        sugestao_helpers._calcular_tendencia_vendas_sugestao(
+            periodo_dias=30,
+            consumo_observado=2,
+            consumo_recente=5,
+        )
+        == "N/A"
+    )
+    assert (
+        sugestao_helpers._calcular_tendencia_vendas_sugestao(
+            periodo_dias=60,
+            consumo_observado=10,
+            consumo_recente=13,
+        )
+        == "CRESCIMENTO"
+    )
+    assert (
+        sugestao_helpers._calcular_tendencia_vendas_sugestao(
+            periodo_dias=60,
+            consumo_observado=10,
+            consumo_recente=7,
+        )
+        == "QUEDA"
+    )
+    assert (
+        sugestao_helpers._calcular_tendencia_vendas_sugestao(
+            periodo_dias=60,
+            consumo_observado=10,
+            consumo_recente=10,
+        )
+        == "EST\u00c1VEL"
+    )
