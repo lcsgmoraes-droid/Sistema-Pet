@@ -116,6 +116,39 @@ def _somar_venda_sugestao(
     stats["fontes"].add(fonte)
 
 
+def _somar_vendas_rows_sugestao(
+    stats_por_produto: dict,
+    produto_ids: list[int],
+    vendas_rows,
+    data_inicio_periodo: datetime,
+    data_fim: datetime,
+) -> set[tuple[int, int]]:
+    produto_ids_set = {int(produto_id) for produto_id in produto_ids or []}
+    pares_venda_produto = set()
+
+    for produto_id, venda_id, canal, data_ref, quantidade in vendas_rows:
+        produto_id = int(produto_id)
+        if venda_id:
+            par = (int(venda_id), produto_id)
+            pares_venda_produto.add(par)
+            if produto_id in produto_ids_set:
+                stats_por_produto[produto_id]["pares_venda_produto"].add(par)
+
+        if produto_id in produto_ids_set:
+            _somar_venda_sugestao(
+                stats_por_produto,
+                produto_id,
+                quantidade,
+                data_ref,
+                data_inicio_periodo,
+                data_fim,
+                canal or "loja_fisica",
+                "vendas",
+            )
+
+    return pares_venda_produto
+
+
 def _somar_conversao_granel_sugestao(
     stats_por_produto: dict,
     produto_pai_id: int,

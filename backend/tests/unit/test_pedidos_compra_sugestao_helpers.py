@@ -2,6 +2,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from math import inf, nan
 
+from app.pedidos_compra import sugestao as sugestao_helpers
 from app.pedidos_compra.sugestao import (
     JANELAS_GIRO_SUGESTAO,
     _somar_conversao_granel_sugestao,
@@ -126,3 +127,33 @@ def test_somar_conversao_granel_sugestao_acumula_pacotes_e_quilos():
         "produto_nome": "Racao granel",
         "peso_pacote_kg": 1.5,
     }
+
+
+def test_somar_vendas_rows_sugestao_acumula_vendas_e_retorna_pares():
+    stats_por_produto = defaultdict(_nova_stats_venda_sugestao)
+    data_fim = datetime(2026, 6, 23, 12, 0)
+    data_inicio_periodo = data_fim - timedelta(days=30)
+    data_ref = data_fim - timedelta(days=2)
+
+    assert hasattr(sugestao_helpers, "_somar_vendas_rows_sugestao")
+
+    pares = sugestao_helpers._somar_vendas_rows_sugestao(
+        stats_por_produto,
+        produto_ids=[10],
+        vendas_rows=[
+            (10, 1001, "pdv", data_ref, 2),
+            (10, 1002, "venda_bling", data_ref, "1.5"),
+            (99, 1003, "pdv", data_ref, 8),
+        ],
+        data_inicio_periodo=data_inicio_periodo,
+        data_fim=data_fim,
+    )
+
+    assert pares == {(1001, 10), (1002, 10), (1003, 99)}
+    assert stats_por_produto[10]["pares_venda_produto"] == {(1001, 10), (1002, 10)}
+    assert stats_por_produto[10]["vendas_periodo"] == 3.5
+    assert stats_por_produto[10]["janelas"]["7"] == 3.5
+    assert stats_por_produto[10]["origens"]["Loja"] == 2.0
+    assert stats_por_produto[10]["origens"]["Bling/online"] == 1.5
+    assert stats_por_produto[10]["fontes"] == {"vendas"}
+    assert 99 not in stats_por_produto

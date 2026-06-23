@@ -73,12 +73,12 @@ from .pedidos_compra.sugestao import (
     MIN_VENDAS_AJUSTE_RUPTURA,
     _datetime_naive_utc_sugestao,
     _float_seguro_sugestao,
-    _formatar_origem_venda,
     _nova_stats_venda_sugestao,
     _round_seguro_sugestao,
     _sanitizar_json_sugestao,
     _somar_conversao_granel_sugestao,
     _somar_venda_sugestao,
+    _somar_vendas_rows_sugestao,
 )
 
 import logging
@@ -390,26 +390,13 @@ def _carregar_vendas_sugestao(
         .all()
     )
 
-    pares_venda_produto = set()
-    for produto_id, venda_id, canal, data_ref, quantidade in vendas_rows:
-        produto_id = int(produto_id)
-        if venda_id:
-            par = (int(venda_id), produto_id)
-            pares_venda_produto.add(par)
-            if produto_id in produto_ids:
-                stats_por_produto[produto_id]["pares_venda_produto"].add(par)
-
-        if produto_id in produto_ids:
-            _somar_venda_sugestao(
-                stats_por_produto,
-                produto_id,
-                quantidade,
-                data_ref,
-                data_inicio_periodo,
-                data_fim,
-                canal or "loja_fisica",
-                "vendas",
-            )
+    pares_venda_produto = _somar_vendas_rows_sugestao(
+        stats_por_produto,
+        produto_ids,
+        vendas_rows,
+        data_inicio_periodo,
+        data_fim,
+    )
 
     conversoes_rows = (
         db.query(GranelConversao, Produto)
