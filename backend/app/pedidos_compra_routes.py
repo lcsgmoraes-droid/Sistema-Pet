@@ -28,16 +28,15 @@ TODO - Integração com IA (Fase Futura):
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_, func, desc
+from sqlalchemy import or_, desc
 from typing import List, Optional
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
-from collections import defaultdict
 from io import BytesIO
 
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
-from .models import Cliente, FornecedorGrupo
+from .models import Cliente
 from .produtos_models import (
     Produto,
     ProdutoLote,
@@ -46,9 +45,7 @@ from .produtos_models import (
     PedidoCompraItem,
     ProdutoFornecedor,
     Marca,
-    GranelConversao,
 )
-from .vendas_models import Venda, VendaItem
 from .services.email_service import is_email_configured, send_email
 from .pedidos_compra.confronto_routes import (
     _realizar_confronto as _realizar_confronto,
@@ -70,16 +67,16 @@ from .pedidos_compra.sugestao import (
     _calcular_dias_com_estoque,
     _calcular_planejamento_compra_sugestao,
     _calcular_tendencia_vendas_sugestao,
-    _datetime_naive_utc_sugestao,
     _float_seguro_sugestao,
     _montar_item_sugestao_compra,
     _montar_resposta_sugestao_compra,
-    _montar_resultado_vendas_sugestao,
-    _nova_stats_venda_sugestao,
     _selecionar_produtos_fornecedor_sugestao,
-    _somar_conversoes_granel_rows_sugestao,
-    _somar_movimentacoes_complementares_sugestao,
-    _somar_vendas_rows_sugestao,
+)
+from .pedidos_compra.sugestao_queries import (
+    _agrupar_movimentacoes_estoque_periodo,
+    _carregar_vendas_sugestao,
+    _obter_estoque_atual_sugestao,
+    _resolver_fornecedores_compra,
 )
 
 import logging
@@ -285,264 +282,6 @@ def status_envio_pedidos(current_user_and_tenant=Depends(get_current_user_and_te
     """Informa se o servidor está apto a enviar pedidos por e-mail."""
     current_user, tenant_id = current_user_and_tenant
     return {"email_configurado": is_email_configured()}
-
-
-def _resolver_fornecedores_compra(
-    db: Session,
-    tenant_id,
-    fornecedor: Cliente,
-    incluir_grupo_fornecedor: bool = False,
-    fornecedor_grupo_id: Optional[int] = None,
-) -> tuple[List[int], Optional[FornecedorGrupo]]:
-    """Resolve quais CNPJs devem entrar na operacao de compra."""
-    grupo = None
-
-    if fornecedor_grupo_id:
-        grupo = (
-            db.query(FornecedorGrupo)
-            .filter(
-                FornecedorGrupo.id == fornecedor_grupo_id,
-                FornecedorGrupo.tenant_id == tenant_id,
-                FornecedorGrupo.ativo.is_(True),
-            )
-            .first()
-        )
-        if not grupo:
-            raise HTTPException(
-                status_code=404, detail="Grupo de fornecedor nao encontrado"
-            )
-    elif incluir_grupo_fornecedor and fornecedor.fornecedor_grupo_id:
-        grupo = (
-            db.query(FornecedorGrupo)
-            .filter(
-                FornecedorGrupo.id == fornecedor.fornecedor_grupo_id,
-                FornecedorGrupo.tenant_id == tenant_id,
-                FornecedorGrupo.ativo.is_(True),
-            )
-            .first()
-        )
-
-    if not grupo:
-        return [fornecedor.id], None
-
-    fornecedores_grupo = (
-        db.query(Cliente.id)
-        .filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "fornecedor",
-            or_(Cliente.ativo.is_(True), Cliente.ativo.is_(None)),
-            Cliente.fornecedor_grupo_id == grupo.id,
-        )
-        .all()
-    )
-    fornecedor_ids = sorted(
-        {linha[0] for linha in fornecedores_grupo} | {fornecedor.id}
-    )
-
-    return fornecedor_ids, grupo
-
-def _carregar_vendas_sugestao(
-    db: Session,
-    tenant_id,
-    produto_ids: List[int],
-    periodo_dias: int,
-    data_fim: datetime,
-) -> dict:
-    """Carrega giro por produto usando vendas como fonte principal e estoque como complemento.
-
-    A parte de movimentacao complementa dois casos importantes:
-    - venda online/Bling que baixou estoque antes de virar venda interna;
-    - consumo derivado que nao aparece diretamente como item de venda.
-
-    Granel entra por conversao: cada abertura de pacote fechado vira demanda do
-    produto de origem, evitando dupla contagem quando um mesmo granel recebe 15kg e 20kg.
-    """
-    stats_por_produto = defaultdict(_nova_stats_venda_sugestao)
-    if not produto_ids:
-        return {}
-
-    data_fim = _datetime_naive_utc_sugestao(data_fim) or datetime.utcnow()
-    ids_busca = sorted(set(produto_ids))
-
-    dias_busca = max(periodo_dias, max(JANELAS_GIRO_SUGESTAO))
-    data_inicio_busca = data_fim - timedelta(days=dias_busca)
-    data_inicio_periodo = data_fim - timedelta(days=periodo_dias)
-    venda_data = func.coalesce(
-        Venda.data_finalizacao, Venda.data_venda, Venda.created_at
-    )
-
-    vendas_rows = (
-        db.query(
-            VendaItem.produto_id,
-            Venda.id.label("venda_id"),
-            Venda.canal,
-            venda_data.label("data_ref"),
-            VendaItem.quantidade,
-        )
-        .join(Venda, VendaItem.venda_id == Venda.id)
-        .filter(
-            Venda.tenant_id == tenant_id,
-            VendaItem.produto_id.in_(ids_busca),
-            VendaItem.tipo == "produto",
-            Venda.status.notin_(["cancelada", "devolvida"]),
-            venda_data >= data_inicio_busca,
-            venda_data <= data_fim,
-        )
-        .all()
-    )
-
-    pares_venda_produto = _somar_vendas_rows_sugestao(
-        stats_por_produto,
-        produto_ids,
-        vendas_rows,
-        data_inicio_periodo,
-        data_fim,
-    )
-
-    conversoes_rows = (
-        db.query(GranelConversao, Produto)
-        .join(Produto, GranelConversao.produto_granel_id == Produto.id)
-        .filter(
-            GranelConversao.tenant_id == tenant_id,
-            GranelConversao.produto_origem_id.in_(produto_ids),
-            GranelConversao.status == "confirmado",
-            GranelConversao.created_at >= data_inicio_busca,
-            GranelConversao.created_at <= data_fim,
-        )
-        .all()
-    )
-
-    _somar_conversoes_granel_rows_sugestao(
-        stats_por_produto,
-        conversoes_rows,
-        data_inicio_periodo,
-        data_fim,
-    )
-
-    filtro_movimentacao_venda = or_(
-        EstoqueMovimentacao.referencia_tipo.in_(["venda", "venda_bling"]),
-        EstoqueMovimentacao.motivo.ilike("venda%"),
-    )
-    movimentos_rows = (
-        db.query(
-            EstoqueMovimentacao.produto_id,
-            EstoqueMovimentacao.referencia_id,
-            EstoqueMovimentacao.referencia_tipo,
-            EstoqueMovimentacao.motivo,
-            EstoqueMovimentacao.created_at,
-            EstoqueMovimentacao.quantidade,
-        )
-        .filter(
-            EstoqueMovimentacao.produto_id.in_(ids_busca),
-            EstoqueMovimentacao.tenant_id == tenant_id,
-            EstoqueMovimentacao.tipo == "saida",
-            EstoqueMovimentacao.status != "cancelado",
-            EstoqueMovimentacao.created_at >= data_inicio_busca,
-            EstoqueMovimentacao.created_at <= data_fim,
-            filtro_movimentacao_venda,
-        )
-        .all()
-    )
-
-    referencias_venda = {
-        int(row.referencia_id)
-        for row in movimentos_rows
-        if row.referencia_id
-        and str(row.referencia_tipo or "").strip().lower() == "venda"
-    }
-    vendas_referenciadas_validas = set()
-    if referencias_venda:
-        vendas_referenciadas_validas = {
-            int(venda_id)
-            for (venda_id,) in (
-                db.query(Venda.id)
-                .filter(
-                    Venda.tenant_id == tenant_id,
-                    Venda.id.in_(referencias_venda),
-                    Venda.status.notin_(["cancelada", "devolvida"]),
-                )
-                .all()
-            )
-        }
-
-    _somar_movimentacoes_complementares_sugestao(
-        stats_por_produto,
-        movimentos_rows,
-        pares_venda_produto,
-        vendas_referenciadas_validas,
-        data_inicio_periodo,
-        data_fim,
-    )
-
-    return _montar_resultado_vendas_sugestao(stats_por_produto)
-
-
-def _agrupar_movimentacoes_estoque_periodo(
-    db: Session,
-    tenant_id,
-    produto_ids: List[int],
-    data_inicio: datetime,
-    data_fim: datetime,
-) -> dict:
-    if not produto_ids:
-        return {}
-
-    rows = (
-        db.query(
-            EstoqueMovimentacao.produto_id,
-            EstoqueMovimentacao.created_at,
-            EstoqueMovimentacao.tipo,
-            EstoqueMovimentacao.quantidade,
-            EstoqueMovimentacao.quantidade_anterior,
-            EstoqueMovimentacao.quantidade_nova,
-        )
-        .filter(
-            EstoqueMovimentacao.produto_id.in_(produto_ids),
-            EstoqueMovimentacao.tenant_id == tenant_id,
-            EstoqueMovimentacao.status != "cancelado",
-            EstoqueMovimentacao.created_at >= data_inicio,
-            EstoqueMovimentacao.created_at <= data_fim,
-        )
-        .order_by(EstoqueMovimentacao.produto_id, EstoqueMovimentacao.created_at)
-        .all()
-    )
-
-    agrupado = defaultdict(list)
-    for row in rows:
-        agrupado[int(row.produto_id)].append(row)
-    return agrupado
-
-
-def _obter_estoque_atual_sugestao(
-    db: Session, produto: Produto, tenant_id
-) -> tuple[float, dict]:
-    estoque_atual = _float_seguro_sugestao(produto.estoque_atual)
-    info = {
-        "estoque_derivado": False,
-        "tipo_produto": produto.tipo_produto,
-        "tipo_kit": produto.tipo_kit,
-    }
-
-    if produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit == "VIRTUAL":
-        try:
-            from .services.kit_estoque_service import KitEstoqueService
-
-            estoque_atual = _float_seguro_sugestao(
-                KitEstoqueService.calcular_estoque_virtual_kit(
-                    db,
-                    produto.id,
-                    tenant_id=tenant_id,
-                )
-            )
-            info["estoque_derivado"] = True
-        except Exception as exc:
-            logger.warning(
-                "Nao foi possivel calcular estoque virtual do produto %s: %s",
-                produto.id,
-                exc,
-            )
-
-    return estoque_atual, info
 
 
 @router.get("/rascunho/fornecedor/{fornecedor_id}")

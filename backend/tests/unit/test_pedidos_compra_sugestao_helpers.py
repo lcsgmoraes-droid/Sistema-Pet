@@ -1,5 +1,7 @@
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+import importlib
+import importlib.util
 from math import inf, nan
 from types import SimpleNamespace
 
@@ -647,6 +649,60 @@ def test_montar_resposta_sugestao_compra_ordena_resume_e_sanitiza():
         "produtos_atencao": 1,
         "valor_total_estimado": 500.56,
     }
+
+
+def test_sugestao_queries_basicas_sem_consulta_ao_banco():
+    spec = importlib.util.find_spec("app.pedidos_compra.sugestao_queries")
+    assert spec is not None
+    sugestao_queries = importlib.import_module("app.pedidos_compra.sugestao_queries")
+
+    class DbBloqueado:
+        def query(self, *_args, **_kwargs):
+            raise AssertionError("nao deveria consultar o banco")
+
+    db = DbBloqueado()
+    fornecedor = SimpleNamespace(id=20, fornecedor_grupo_id=None)
+    data_ref = datetime(2026, 6, 23, 12, 0)
+    produto = SimpleNamespace(
+        id=10,
+        estoque_atual="3.5",
+        tipo_produto="PRODUTO",
+        tipo_kit=None,
+    )
+
+    assert sugestao_queries._resolver_fornecedores_compra(
+        db,
+        tenant_id=1,
+        fornecedor=fornecedor,
+    ) == ([20], None)
+    assert (
+        sugestao_queries._carregar_vendas_sugestao(
+            db,
+            tenant_id=1,
+            produto_ids=[],
+            periodo_dias=30,
+            data_fim=data_ref,
+        )
+        == {}
+    )
+    assert (
+        sugestao_queries._agrupar_movimentacoes_estoque_periodo(
+            db,
+            tenant_id=1,
+            produto_ids=[],
+            data_inicio=data_ref - timedelta(days=30),
+            data_fim=data_ref,
+        )
+        == {}
+    )
+    assert sugestao_queries._obter_estoque_atual_sugestao(db, produto, 1) == (
+        3.5,
+        {
+            "estoque_derivado": False,
+            "tipo_produto": "PRODUTO",
+            "tipo_kit": None,
+        },
+    )
 
 
 def test_calcular_tendencia_vendas_sugestao_respeita_periodo_e_limiares():
