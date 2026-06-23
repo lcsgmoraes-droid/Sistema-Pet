@@ -72,7 +72,7 @@ from .pedidos_compra.sugestao import (
     _calcular_tendencia_vendas_sugestao,
     _datetime_naive_utc_sugestao,
     _float_seguro_sugestao,
-    _gerar_observacao,
+    _montar_item_sugestao_compra,
     _montar_resultado_vendas_sugestao,
     _nova_stats_venda_sugestao,
     _round_seguro_sugestao,
@@ -1663,17 +1663,6 @@ def sugerir_pedido_inteligente(
 
         consumo_observado = planejamento_compra["consumo_observado"]
         consumo_recente = planejamento_compra["consumo_recente"]
-        consumo_base = planejamento_compra["consumo_base"]
-        consumo_ajustado = planejamento_compra["consumo_ajustado"]
-        ajuste_ruptura_aplicado = planejamento_compra["ajuste_ruptura_aplicado"]
-        motivo_ajuste_ruptura = planejamento_compra["motivo_ajuste_ruptura"]
-        consumo_diario = planejamento_compra["consumo_diario"]
-        estoque_para_calculo = planejamento_compra["estoque_para_calculo"]
-        dias_estoque = planejamento_compra["dias_estoque"]
-        margem_seguranca_dias = planejamento_compra["margem_seguranca_dias"]
-        dias_reposicao = planejamento_compra["dias_reposicao"]
-        lead_time_incluido_no_alvo = planejamento_compra["lead_time_incluido_no_alvo"]
-        dias_total_cobertura = planejamento_compra["dias_total_cobertura"]
         quantidade_sugerida = planejamento_compra["quantidade_sugerida"]
         prioridade = planejamento_compra["prioridade"]
 
@@ -1707,84 +1696,29 @@ def sugerir_pedido_inteligente(
 
         # Adicionar à lista (mesmo com qtd 0 para visibilidade se estoque alto)
         if incluir_produto or quantidade_sugerida > 0:
-            sugestao = {
-                "produto_id": produto.id,
-                "produto_nome": produto.nome,
-                "produto_sku": produto.codigo,
-                "produto_codigo_barras": produto.codigo_barras,
-                "fornecedor_id": produto_fornecedor.fornecedor_id,
-                "fornecedor_nome": fornecedores_por_id.get(
-                    produto_fornecedor.fornecedor_id
-                ),
-                "fornecedor_grupo_id": fornecedor_grupo.id
-                if fornecedor_grupo
-                else None,
-                "fornecedor_grupo_nome": fornecedor_grupo.nome
-                if fornecedor_grupo
-                else None,
-                "marca_id": produto.marca_id,
-                "marca_nome": marca.nome if marca else None,
-                "estoque_atual": _float_seguro_sugestao(estoque_atual),
-                "estoque_minimo": _float_seguro_sugestao(estoque_minimo),
-                "consumo_diario": _round_seguro_sugestao(consumo_diario, 2),
-                "consumo_diario_observado": _round_seguro_sugestao(
-                    consumo_observado, 3
-                ),
-                "consumo_diario_ajustado": _round_seguro_sugestao(consumo_ajustado, 3),
-                "consumo_diario_base": _round_seguro_sugestao(consumo_base, 3),
-                "vendas_periodo": _float_seguro_sugestao(vendas_periodo),
-                "vendas_janelas": vendas_janelas,
-                "vendas_7d": _float_seguro_sugestao(vendas_janelas.get("7")),
-                "vendas_15d": _float_seguro_sugestao(vendas_janelas.get("15")),
-                "vendas_30d": _float_seguro_sugestao(vendas_janelas.get("30")),
-                "vendas_60d": _float_seguro_sugestao(vendas_janelas.get("60")),
-                "vendas_90d": _float_seguro_sugestao(vendas_janelas.get("90")),
-                "origens_venda": vendas_stats.get("origens") or [],
-                "fontes_calculo": vendas_stats.get("fontes") or [],
-                "granel_consumo": vendas_stats.get("granel_consumo") or {},
-                "dias_estoque": _round_seguro_sugestao(dias_estoque, 1)
-                if dias_estoque < 999
-                else None,
-                "dias_com_estoque": dias_com_estoque,
-                "dias_sem_estoque": dias_sem_estoque,
-                "teve_ruptura": teve_ruptura,
-                "ruptura_ativa": ruptura_ativa,
-                "ruptura_ajuste_aplicado": ajuste_ruptura_aplicado,
-                "ruptura_ajuste_motivo": motivo_ajuste_ruptura,
-                "lead_time": lead_time,
-                "dias_planejamento": _float_seguro_sugestao(dias_cobertura),
-                "dias_reposicao": _round_seguro_sugestao(dias_reposicao, 1),
-                "margem_seguranca_dias": margem_seguranca_dias,
-                "lead_time_incluido_no_alvo": lead_time_incluido_no_alvo,
-                "dias_total_cobertura": dias_total_cobertura,
-                "estoque_para_calculo": _round_seguro_sugestao(estoque_para_calculo, 3),
-                "quantidade_sugerida": _round_seguro_sugestao(quantidade_sugerida, 2),
-                "preco_unitario": _float_seguro_sugestao(preco_unitario),
-                "valor_total": _round_seguro_sugestao(valor_sugestao, 2),
-                "peso_bruto": _float_seguro_sugestao(
-                    produto.peso_embalagem or produto.peso_bruto or produto.peso_liquido
-                ),
-                "estoque_derivado": bool(estoque_info.get("estoque_derivado")),
-                "tipo_produto": estoque_info.get("tipo_produto"),
-                "tipo_kit": estoque_info.get("tipo_kit"),
-                "prioridade": prioridade,
-                "tendencia": tendencia,
-                "observacao": _gerar_observacao(
-                    prioridade,
-                    dias_estoque,
-                    tendencia,
-                    consumo_diario,
-                    estoque_atual=estoque_atual,
-                    teve_ruptura=teve_ruptura,
-                    ruptura_ativa=ruptura_ativa,
-                    dias_sem_estoque=dias_sem_estoque,
-                    consumo_ajustado=consumo_ajustado,
-                    consumo_observado=consumo_observado,
-                    ajuste_ruptura_aplicado=ajuste_ruptura_aplicado,
-                    motivo_ajuste_ruptura=motivo_ajuste_ruptura,
-                ),
-            }
-
+            sugestao = _montar_item_sugestao_compra(
+                produto=produto,
+                produto_fornecedor=produto_fornecedor,
+                marca=marca,
+                fornecedor_grupo=fornecedor_grupo,
+                fornecedores_por_id=fornecedores_por_id,
+                estoque_info=estoque_info,
+                vendas_stats=vendas_stats,
+                vendas_janelas=vendas_janelas,
+                vendas_periodo=vendas_periodo,
+                estoque_atual=estoque_atual,
+                estoque_minimo=estoque_minimo,
+                dias_com_estoque=dias_com_estoque,
+                dias_sem_estoque=dias_sem_estoque,
+                teve_ruptura=teve_ruptura,
+                ruptura_ativa=ruptura_ativa,
+                lead_time=lead_time,
+                dias_cobertura=dias_cobertura,
+                planejamento=planejamento_compra,
+                tendencia=tendencia,
+                preco_unitario=preco_unitario,
+                valor_sugestao=valor_sugestao,
+            )
             sugestoes.append(sugestao)
             valor_total += valor_sugestao
 

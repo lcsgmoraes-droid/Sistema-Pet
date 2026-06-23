@@ -437,6 +437,97 @@ def test_calcular_planejamento_compra_sugestao_aplica_ruptura_e_prioridade():
     assert resultado["prioridade"] == "CR\u00cdTICO"
 
 
+def test_montar_item_sugestao_compra_preserva_payload_operacional():
+    assert hasattr(sugestao_helpers, "_montar_item_sugestao_compra")
+
+    produto = SimpleNamespace(
+        id=10,
+        nome="Racao Premium",
+        codigo="SKU-10",
+        codigo_barras="789",
+        marca_id=5,
+        peso_embalagem=None,
+        peso_bruto=12.5,
+        peso_liquido=11.0,
+    )
+    produto_fornecedor = SimpleNamespace(fornecedor_id=20)
+    marca = SimpleNamespace(nome="Marca Boa")
+    fornecedor_grupo = SimpleNamespace(id=30, nome="Grupo Fornecedor")
+    vendas_janelas = {"7": 1.2345, "15": 2, "30": 3, "60": 4, "90": 5}
+    vendas_stats = {
+        "origens": [{"canal": "Loja", "quantidade": 3}],
+        "fontes": ["vendas"],
+        "granel_consumo": {"kg_periodo": 2.5},
+    }
+    planejamento = {
+        "consumo_observado": 1.2345,
+        "consumo_ajustado": 1.9876,
+        "consumo_base": 1.4567,
+        "consumo_diario": 1.9876,
+        "dias_estoque": 2.26,
+        "ajuste_ruptura_aplicado": True,
+        "motivo_ajuste_ruptura": "Media ajustada pelos dias em que havia estoque.",
+        "margem_seguranca_dias": 7,
+        "dias_reposicao": 14.25,
+        "lead_time_incluido_no_alvo": True,
+        "dias_total_cobertura": 44.25,
+        "estoque_para_calculo": 2.3456,
+        "quantidade_sugerida": 9.8765,
+        "prioridade": "CR\u00cdTICO",
+    }
+
+    item = sugestao_helpers._montar_item_sugestao_compra(
+        produto=produto,
+        produto_fornecedor=produto_fornecedor,
+        marca=marca,
+        fornecedor_grupo=fornecedor_grupo,
+        fornecedores_por_id={20: "Fornecedor A"},
+        estoque_info={
+            "estoque_derivado": True,
+            "tipo_produto": "kit",
+            "tipo_kit": "virtual",
+        },
+        vendas_stats=vendas_stats,
+        vendas_janelas=vendas_janelas,
+        vendas_periodo=12.5,
+        estoque_atual=2.3456,
+        estoque_minimo=4,
+        dias_com_estoque=10.5,
+        dias_sem_estoque=3.5,
+        teve_ruptura=True,
+        ruptura_ativa=False,
+        lead_time=7.25,
+        dias_cobertura=30,
+        planejamento=planejamento,
+        tendencia="CRESCIMENTO",
+        preco_unitario=12.345,
+        valor_sugestao=121.9253925,
+    )
+
+    assert item["produto_id"] == 10
+    assert item["fornecedor_nome"] == "Fornecedor A"
+    assert item["fornecedor_grupo_nome"] == "Grupo Fornecedor"
+    assert item["marca_nome"] == "Marca Boa"
+    assert item["consumo_diario"] == 1.99
+    assert item["consumo_diario_observado"] == 1.234
+    assert item["consumo_diario_ajustado"] == 1.988
+    assert item["consumo_diario_base"] == 1.457
+    assert item["vendas_7d"] == 1.2345
+    assert item["dias_estoque"] == 2.3
+    assert item["ruptura_ajuste_aplicado"] is True
+    assert item["lead_time"] == 7.25
+    assert item["dias_planejamento"] == 30.0
+    assert item["dias_reposicao"] == 14.2
+    assert item["estoque_para_calculo"] == 2.346
+    assert item["quantidade_sugerida"] == 9.88
+    assert item["preco_unitario"] == 12.345
+    assert item["valor_total"] == 121.93
+    assert item["peso_bruto"] == 12.5
+    assert item["estoque_derivado"] is True
+    assert item["prioridade"] == "CR\u00cdTICO"
+    assert item["observacao"].startswith("Urgente: estoque cobre menos de 3 dias")
+
+
 def test_calcular_tendencia_vendas_sugestao_respeita_periodo_e_limiares():
     assert hasattr(sugestao_helpers, "_calcular_tendencia_vendas_sugestao")
 
