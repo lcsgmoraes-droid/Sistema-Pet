@@ -11,6 +11,10 @@ from sqlalchemy.orm import Session, joinedload, noload
 from app.models import Cliente, FornecedorGrupo
 from app.partner_utils import is_partner_owned
 from app.produtos_models import Produto, ProdutoFornecedor
+from app.produtos.search import (
+    _produto_search_conditions,
+    _produto_search_conditions_fast,
+)
 from app.services.kit_estoque_service import KitEstoqueService
 
 
@@ -43,6 +47,78 @@ def _normalizar_paginacao_produtos(
     page_size = min(max(page_size, 1), max_page_size)
     offset = (page - 1) * page_size
     return page, page_size, offset
+
+
+def _montar_query_produtos_vendaveis(
+    db: Session,
+    *,
+    tenant_id: Any,
+    termo_busca: Optional[str],
+    contar_total: bool,
+) -> Any:
+    query = db.query(Produto).filter(
+        Produto.tenant_id == tenant_id,
+        Produto.ativo.is_(True),
+        Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+    )
+
+    if termo_busca:
+        search_conditions = (
+            _produto_search_conditions
+            if contar_total
+            else _produto_search_conditions_fast
+        )
+        for palavra in _palavras_busca_produto(termo_busca):
+            query = query.filter(search_conditions(palavra))
+
+    return query
+
+
+def _montar_query_listagem_produtos(
+    db: Session,
+    *,
+    tenant_ids: list[Any],
+    termo_busca: Optional[str],
+    ativo: Optional[bool],
+    tipo_produto: Optional[str],
+    produto_predecessor_id: Optional[int],
+    include_variations: bool,
+    busca_completa: bool,
+) -> Any:
+    if produto_predecessor_id:
+        query = db.query(Produto).filter(
+            Produto.tenant_id.in_(tenant_ids),
+            Produto.produto_predecessor_id == produto_predecessor_id,
+        )
+    elif tipo_produto:
+        query = db.query(Produto).filter(
+            Produto.tenant_id.in_(tenant_ids),
+            Produto.tipo_produto == tipo_produto,
+        )
+    else:
+        query = db.query(Produto).filter(
+            Produto.tenant_id.in_(tenant_ids),
+            Produto.tipo_produto.in_(
+                _tipos_base_listagem(include_variations, termo_busca)
+            ),
+        )
+
+    if ativo is not None:
+        if ativo:
+            query = query.filter(or_(Produto.ativo.is_(True), Produto.ativo.is_(None)))
+        else:
+            query = query.filter(Produto.ativo.is_(False))
+
+    if termo_busca:
+        search_conditions = (
+            _produto_search_conditions
+            if busca_completa
+            else _produto_search_conditions_fast
+        )
+        for palavra in _palavras_busca_produto(termo_busca):
+            query = query.filter(search_conditions(palavra))
+
+    return query
 
 
 def _load_options_listagem_produtos(

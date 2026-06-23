@@ -8,6 +8,7 @@ from fastapi import HTTPException
 os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test.db"
 os.environ["DEBUG"] = "false"
 
+from app.produtos import listagem as produtos_listagem
 from app.produtos.listagem import (
     _aplicar_filtro_fornecedor_produto,
     _aplicar_filtros_basicos_produtos,
@@ -140,6 +141,70 @@ def test_palavras_busca_produto_remove_espacos_extras():
 def test_palavras_busca_produto_aceita_termo_vazio():
     assert _palavras_busca_produto(None) == []
     assert _palavras_busca_produto("   ") == []
+
+
+def test_montar_query_produtos_vendaveis_aplica_base_status_e_busca():
+    assert hasattr(produtos_listagem, "_montar_query_produtos_vendaveis")
+    query = _FakeProdutoQuery()
+    db = _FakeDb(query)
+
+    resultado = produtos_listagem._montar_query_produtos_vendaveis(
+        db,
+        tenant_id="tenant-principal",
+        termo_busca="golden gato",
+        contar_total=False,
+    )
+
+    assert resultado is query
+    assert len(db.query_calls) == 1
+    assert len(query.filters) == 3
+    assert len(query.filters[0]) == 3
+
+
+def test_montar_query_listagem_produtos_aplica_base_status_e_busca():
+    assert hasattr(produtos_listagem, "_montar_query_listagem_produtos")
+    query = _FakeProdutoQuery()
+    db = _FakeDb(query)
+
+    resultado = produtos_listagem._montar_query_listagem_produtos(
+        db,
+        tenant_ids=["tenant-principal", "tenant-parceiro"],
+        termo_busca="racao senior",
+        ativo=True,
+        tipo_produto=None,
+        produto_predecessor_id=None,
+        include_variations=True,
+        busca_completa=True,
+    )
+
+    assert resultado is query
+    assert len(db.query_calls) == 1
+    assert len(query.filters) == 4
+    assert len(query.filters[0]) == 2
+    assert len(query.filters[1]) == 1
+
+
+def test_montar_query_listagem_produtos_prioriza_predecessor_sobre_tipo():
+    assert hasattr(produtos_listagem, "_montar_query_listagem_produtos")
+    query = _FakeProdutoQuery()
+    db = _FakeDb(query)
+
+    resultado = produtos_listagem._montar_query_listagem_produtos(
+        db,
+        tenant_ids=["tenant-principal"],
+        termo_busca="",
+        ativo=None,
+        tipo_produto="KIT",
+        produto_predecessor_id=42,
+        include_variations=True,
+        busca_completa=False,
+    )
+
+    filtro_base = " ".join(str(expressao) for expressao in query.filters[0])
+    assert resultado is query
+    assert len(query.filters) == 1
+    assert "produto_predecessor_id" in filtro_base
+    assert "tipo_produto" not in filtro_base
 
 
 def test_tipos_base_listagem_preserva_variacoes_apenas_em_busca():

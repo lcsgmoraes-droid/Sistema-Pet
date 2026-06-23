@@ -142,10 +142,24 @@ Fatia executada na trilha Produtos/listagem:
   `test_produtos_listagem_kit_virtual.py`, `test_produtos_validade_listagem.py`
   e `test_produtos_search_helpers.py`.
 
+## Atualizacao continua - 2026-06-23
+
+Fatia executada na trilha Produtos/listagem:
+
+- `backend/app/produtos_routes.py` extraiu a construcao de query base/status/busca
+  de `listar_produtos` e `listar_produtos_vendaveis` para
+  `_montar_query_listagem_produtos` e `_montar_query_produtos_vendaveis` em
+  `backend/app/produtos/listagem.py`.
+- As rotas preservaram endpoints, payloads, permissoes, tenant, paginacao,
+  filtros basicos/fornecedor, reservas, validade e enriquecimento.
+- Na branch atual, o router principal caiu de 1837 para 1799 linhas.
+- Testes focados: `pytest backend/tests/unit/test_produtos*.py -q` passou com
+  83 testes.
+
 Proxima fatia recomendada:
 
-1. Continuar em Produtos, mas extrair apenas construcao de query base/status/busca de
-   `listar_produtos` e `listar_produtos_vendaveis`.
+1. Antes de continuar em Produtos, escolher uma fatia pequena e testavel:
+   contagem/hierarquia de variacoes ou outro hotspot acima de 1000 linhas.
 2. Manter endpoints, payloads, permissoes, tenant e paginacao iguais.
 3. Nao misturar com estoque, PDV, fiscal, cadastro em lote ou regras de preco.
 

@@ -12,7 +12,7 @@ Inclui: Categorias, Marcas, Departamentos, Produtos, Lotes, FIFO, CÃ³digo de B
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime, timedelta
 import logging
@@ -54,8 +54,6 @@ from .services.produto_merge_service import (
 )
 from .produtos.search import (
     _build_produto_search_order_clause,
-    _produto_search_conditions,
-    _produto_search_conditions_fast,
 )
 from .produtos.codigo_barras import (
     gerar_codigo_barras_ean13,
@@ -75,11 +73,11 @@ from .produtos.listagem import (
     _enriquecer_produto_listagem,
     _load_options_listagem_produtos,
     _mapa_reservas_ativas_multitenant,
+    _montar_query_listagem_produtos,
+    _montar_query_produtos_vendaveis,
     _normalizar_paginacao_produtos,
-    _palavras_busca_produto,
     _resolver_fornecedor_ids_filtro_produto,
     _resolver_promocao_erp_produto,
-    _tipos_base_listagem,
 )
 from .produtos.lotes import _consumir_lotes_fifo_produto
 from .produtos.racao import (
@@ -419,27 +417,15 @@ def listar_produtos_vendaveis(
         page_size,
         max_page_size=100,
     )
-
-    # QUERY BASE - Produtos vendÃ¡veis (incluindo KIT)
-    query = db.query(Produto).filter(
-        Produto.tenant_id == tenant_id,
-        Produto.ativo.is_(True),
-        Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),  # KIT Ã© vendÃ¡vel!
-    )
-
-    # FILTROS OPCIONAIS
     termo_busca = (busca or "").strip()
 
-    if termo_busca:
-        # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
-        # Ex: "golden castrado" acha "Ração Golden Gato Castrado Salmão"
-        search_conditions = (
-            _produto_search_conditions
-            if contar_total
-            else _produto_search_conditions_fast
-        )
-        for palavra in _palavras_busca_produto(termo_busca):
-            query = query.filter(search_conditions(palavra))
+    # QUERY BASE - Produtos vendÃ¡veis (incluindo KIT)
+    query = _montar_query_produtos_vendaveis(
+        db,
+        tenant_id=tenant_id,
+        termo_busca=termo_busca,
+        contar_total=contar_total,
+    )
 
     query = _aplicar_filtros_basicos_produtos(
         query,
@@ -553,45 +539,16 @@ def listar_produtos(
     # QUERY BASE
     # - include_variations=True: inclui PAI para permitir visualização da hierarquia
     # - include_variations=False: lista apenas produtos normais (SIMPLES e KIT)
-    if produto_predecessor_id:
-        query = db.query(Produto).filter(
-            Produto.tenant_id.in_(access_ids),
-            Produto.produto_predecessor_id == produto_predecessor_id,
-        )
-    elif tipo_produto:
-        query = db.query(Produto).filter(
-            Produto.tenant_id.in_(access_ids), Produto.tipo_produto == tipo_produto
-        )
-    else:
-        query = db.query(Produto).filter(
-            Produto.tenant_id.in_(access_ids),
-            Produto.tipo_produto.in_(
-                _tipos_base_listagem(include_variations, termo_busca)
-            ),
-        )
-
-    # Aplicar filtro de ativo (se especificado)
-    # Se ativo=None, mostra todos (ativos e inativos)
-    # Se ativo=True, mostra apenas ativos
-    # Se ativo=False, mostra apenas inativos
-    if ativo is not None:
-        if ativo:
-            query = query.filter(or_(Produto.ativo.is_(True), Produto.ativo.is_(None)))
-        else:
-            query = query.filter(Produto.ativo.is_(False))
-
-    # FILTROS OPCIONAIS
-
-    if termo_busca:
-        # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
-        # Ex: "special dog senior" encontra "Racao Special Dog Ultralife Senior"
-        search_conditions = (
-            _produto_search_conditions
-            if busca_completa
-            else _produto_search_conditions_fast
-        )
-        for palavra in _palavras_busca_produto(termo_busca):
-            query = query.filter(search_conditions(palavra))
+    query = _montar_query_listagem_produtos(
+        db,
+        tenant_ids=access_ids,
+        termo_busca=termo_busca,
+        ativo=ativo,
+        tipo_produto=tipo_produto,
+        produto_predecessor_id=produto_predecessor_id,
+        include_variations=include_variations,
+        busca_completa=busca_completa,
+    )
 
     query = _aplicar_filtros_basicos_produtos(
         query,
