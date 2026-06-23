@@ -71,6 +71,7 @@ from .produtos.listagem import (
     _aplicar_filtro_fornecedor_produto,
     _aplicar_filtros_basicos_produtos,
     _enriquecer_produto_listagem,
+    _expandir_produtos_listagem,
     _load_options_listagem_produtos,
     _mapa_reservas_ativas_multitenant,
     _montar_query_listagem_produtos,
@@ -606,62 +607,18 @@ def listar_produtos(
 
     # HIERARQUIA: Para produtos PAI, buscar suas variaÃ§Ãµes
     # Para produtos KIT, calcular estoque virtual e carregar composiÃ§Ã£o
-    produtos_expandidos = []
-    for produto in produtos:
-        # Se for PAI, contar variaÃ§Ãµes antes de adicionar
-        if produto.tipo_produto == "PAI":
-            total_variacoes = (
-                db.query(func.count(Produto.id))
-                .filter(
-                    Produto.produto_pai_id == produto.id,
-                    Produto.tipo_produto == "VARIACAO",
-                    Produto.ativo.is_(True),
-                )
-                .scalar()
-            )
-            produto.total_variacoes = total_variacoes or 0
-
-        _enriquecer_produto_listagem(
-            db,
-            produto,
-            tenant_id,
-            reservas_por_produto,
-            incluir_detalhes_composto=incluir_detalhes_composto,
-            validade_por_produto=validade_por_produto,
-        )
-        produtos_expandidos.append(produto)
-
-        # Se for PAI, buscar e incluir suas variaÃ§Ãµes logo apÃ³s
-        # apenas quando a tela pedir explicitamente include_variations.
-        if include_variations and not termo_busca and produto.tipo_produto == "PAI":
-            variacoes = (
-                db.query(Produto)
-                .filter(
-                    Produto.produto_pai_id == produto.id,
-                    Produto.tipo_produto == "VARIACAO",
-                    Produto.ativo.is_(True),
-                )
-                .options(*load_options)
-                .order_by(Produto.nome)
-                .all()
-            )
-            validade_por_variacao = _mapa_validade_proxima_produtos(
-                db,
-                variacoes,
-                access_ids,
-            )
-
-            for variacao in variacoes:
-                _enriquecer_produto_listagem(
-                    db,
-                    variacao,
-                    tenant_id,
-                    reservas_por_produto,
-                    incluir_detalhes_composto=incluir_detalhes_composto,
-                    validade_por_produto=validade_por_variacao,
-                )
-                produtos_expandidos.append(variacao)
-
+    produtos_expandidos = _expandir_produtos_listagem(
+        db,
+        produtos,
+        tenant_id=tenant_id,
+        access_ids=access_ids,
+        reservas_por_produto=reservas_por_produto,
+        incluir_detalhes_composto=incluir_detalhes_composto,
+        include_variations=include_variations,
+        termo_busca=termo_busca,
+        load_options=load_options,
+        validade_por_produto=validade_por_produto,
+    )
     pages = (total + page_size - 1) // page_size
 
     return {

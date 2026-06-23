@@ -62,6 +62,33 @@ class _FakeProdutoQuery:
         return self
 
 
+class _FakeHierarchyQuery:
+    def __init__(self, scalar_result=None, all_result=None):
+        self.scalar_result = scalar_result
+        self.all_result = all_result or []
+        self.filters = []
+        self.options_args = []
+        self.order_by_args = []
+
+    def filter(self, *expressions):
+        self.filters.append(expressions)
+        return self
+
+    def options(self, *options):
+        self.options_args.extend(options)
+        return self
+
+    def order_by(self, *expressions):
+        self.order_by_args.extend(expressions)
+        return self
+
+    def scalar(self):
+        return self.scalar_result
+
+    def all(self):
+        return self.all_result
+
+
 def test_nome_area_produto_prioriza_departamento_direto():
     produto = SimpleNamespace(
         departamento=SimpleNamespace(nome="Racoes"),
@@ -205,6 +232,110 @@ def test_montar_query_listagem_produtos_prioriza_predecessor_sobre_tipo():
     assert len(query.filters) == 1
     assert "produto_predecessor_id" in filtro_base
     assert "tipo_produto" not in filtro_base
+
+
+def test_expandir_produtos_listagem_conta_e_inclui_variacoes_quando_solicitado(
+    monkeypatch,
+):
+    assert hasattr(produtos_listagem, "_expandir_produtos_listagem")
+    produto_pai = SimpleNamespace(
+        id=10,
+        tipo_produto="PAI",
+        tenant_id="tenant-principal",
+        categoria=None,
+    )
+    variacao = SimpleNamespace(
+        id=11,
+        tipo_produto="VARIACAO",
+        tenant_id="tenant-principal",
+        categoria=None,
+    )
+    produto_simples = SimpleNamespace(
+        id=12,
+        tipo_produto="SIMPLES",
+        tenant_id="tenant-principal",
+        categoria=None,
+    )
+    count_query = _FakeHierarchyQuery(scalar_result=1)
+    variations_query = _FakeHierarchyQuery(all_result=[variacao])
+    db = _FakeDb(count_query, variations_query)
+    enriquecidos = []
+
+    def fake_enriquecer(_db, produto, tenant_id, reservas, **kwargs):
+        enriquecidos.append((produto.id, tenant_id, reservas, kwargs))
+        produto.enriquecido = True
+        return produto
+
+    monkeypatch.setattr(
+        produtos_listagem, "_enriquecer_produto_listagem", fake_enriquecer
+    )
+    monkeypatch.setattr(
+        produtos_listagem,
+        "_mapa_validade_proxima_produtos",
+        lambda _db, produtos, tenant_ids: {
+            produto.id: {"validade_proxima_listagem": f"validade-{produto.id}"}
+            for produto in produtos
+        },
+    )
+
+    resultado = produtos_listagem._expandir_produtos_listagem(
+        db,
+        [produto_pai, produto_simples],
+        tenant_id="tenant-principal",
+        access_ids=["tenant-principal"],
+        reservas_por_produto={10: 2.0},
+        incluir_detalhes_composto=False,
+        include_variations=True,
+        termo_busca="",
+        load_options=["joinedload-fake"],
+        validade_por_produto={10: {"validade_proxima_listagem": "validade-10"}},
+    )
+
+    assert resultado == [produto_pai, variacao, produto_simples]
+    assert produto_pai.total_variacoes == 1
+    assert variations_query.options_args == ["joinedload-fake"]
+    assert len(enriquecidos) == 3
+    assert enriquecidos[0][3]["validade_por_produto"] == {
+        10: {"validade_proxima_listagem": "validade-10"}
+    }
+    assert enriquecidos[1][3]["validade_por_produto"] == {
+        11: {"validade_proxima_listagem": "validade-11"}
+    }
+
+
+def test_expandir_produtos_listagem_nao_busca_variacoes_durante_busca(monkeypatch):
+    assert hasattr(produtos_listagem, "_expandir_produtos_listagem")
+    produto_pai = SimpleNamespace(
+        id=10,
+        tipo_produto="PAI",
+        tenant_id="tenant-principal",
+        categoria=None,
+    )
+    count_query = _FakeHierarchyQuery(scalar_result=3)
+    db = _FakeDb(count_query)
+
+    monkeypatch.setattr(
+        produtos_listagem,
+        "_enriquecer_produto_listagem",
+        lambda _db, produto, *_args, **_kwargs: produto,
+    )
+
+    resultado = produtos_listagem._expandir_produtos_listagem(
+        db,
+        [produto_pai],
+        tenant_id="tenant-principal",
+        access_ids=["tenant-principal"],
+        reservas_por_produto={},
+        incluir_detalhes_composto=True,
+        include_variations=True,
+        termo_busca="racao",
+        load_options=[],
+        validade_por_produto={},
+    )
+
+    assert resultado == [produto_pai]
+    assert produto_pai.total_variacoes == 3
+    assert len(db.query_calls) == 1
 
 
 def test_tipos_base_listagem_preserva_variacoes_apenas_em_busca():

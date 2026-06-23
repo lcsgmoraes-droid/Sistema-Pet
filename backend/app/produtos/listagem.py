@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, List, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, joinedload, noload
 
 from app.models import Cliente, FornecedorGrupo
@@ -15,6 +15,7 @@ from app.produtos.search import (
     _produto_search_conditions,
     _produto_search_conditions_fast,
 )
+from app.produtos.validade import _mapa_validade_proxima_produtos
 from app.services.kit_estoque_service import KitEstoqueService
 
 
@@ -132,6 +133,76 @@ def _load_options_listagem_produtos(
         joinedload(Produto.imagens) if incluir_imagens else noload(Produto.imagens),
         joinedload(Produto.lotes) if incluir_lotes else noload(Produto.lotes),
     ]
+
+
+def _expandir_produtos_listagem(
+    db: Session,
+    produtos: list[Produto],
+    *,
+    tenant_id: Any,
+    access_ids: list[Any],
+    reservas_por_produto: dict[int, float],
+    incluir_detalhes_composto: bool,
+    include_variations: bool,
+    termo_busca: Optional[str],
+    load_options: list[Any],
+    validade_por_produto: dict[int, dict[str, Any]],
+) -> list[Produto]:
+    produtos_expandidos = []
+
+    for produto in produtos:
+        if produto.tipo_produto == "PAI":
+            total_variacoes = (
+                db.query(func.count(Produto.id))
+                .filter(
+                    Produto.produto_pai_id == produto.id,
+                    Produto.tipo_produto == "VARIACAO",
+                    Produto.ativo.is_(True),
+                )
+                .scalar()
+            )
+            produto.total_variacoes = total_variacoes or 0
+
+        _enriquecer_produto_listagem(
+            db,
+            produto,
+            tenant_id,
+            reservas_por_produto,
+            incluir_detalhes_composto=incluir_detalhes_composto,
+            validade_por_produto=validade_por_produto,
+        )
+        produtos_expandidos.append(produto)
+
+        if include_variations and not termo_busca and produto.tipo_produto == "PAI":
+            variacoes = (
+                db.query(Produto)
+                .filter(
+                    Produto.produto_pai_id == produto.id,
+                    Produto.tipo_produto == "VARIACAO",
+                    Produto.ativo.is_(True),
+                )
+                .options(*load_options)
+                .order_by(Produto.nome)
+                .all()
+            )
+            validade_por_variacao = _mapa_validade_proxima_produtos(
+                db,
+                variacoes,
+                access_ids,
+            )
+
+            for variacao in variacoes:
+                _enriquecer_produto_listagem(
+                    db,
+                    variacao,
+                    tenant_id,
+                    reservas_por_produto,
+                    incluir_detalhes_composto=incluir_detalhes_composto,
+                    validade_por_produto=validade_por_variacao,
+                )
+                produtos_expandidos.append(variacao)
+
+    return produtos_expandidos
 
 
 def _resolver_fornecedor_ids_filtro_produto(
