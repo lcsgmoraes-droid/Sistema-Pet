@@ -9,7 +9,7 @@ def _source(path: str) -> str:
 
 
 def test_dre_usa_mesmo_criterio_de_status_da_tela_de_vendas():
-    source = _source("backend/app/dre_canais_routes.py")
+    source = _source("backend/app/dre_canais/base.py")
 
     assert "def _filtro_status_venda_dre" in source
     assert 'Venda.status != "cancelada"' in source
@@ -17,8 +17,9 @@ def test_dre_usa_mesmo_criterio_de_status_da_tela_de_vendas():
 
 
 def test_dre_abre_com_todos_os_canais_por_padrao():
-    backend = _source("backend/app/dre_canais_routes.py")
+    backend = _source("backend/app/dre_canais/routes.py")
     frontend = _source("frontend/src/components/DRE.jsx")
 
-    assert 'canais: str = Query("",' in backend
+    assert "canais: str = Query(" in backend
+    assert '        "",' in backend
     assert "CANAIS_DRE_PADRAO.map((canal) => canal.id)" in frontend

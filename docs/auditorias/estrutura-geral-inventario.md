@@ -322,3 +322,36 @@ Proxima fatia recomendada:
 2. Candidatos atuais: `vendas/service.py`, `dre_canais_routes.py`,
    `vendas_routes.py`, `nfe/listagem.py` ou `contas_pagar_routes.py`.
 
+## Atualizacao continua - 2026-06-23 - DRE/Canais
+
+Fatia maior executada na trilha de arquivos grandes:
+
+- `backend/app/dre_canais_routes.py` virou uma fachada de compatibilidade para
+  preservar o import antigo `app.dre_canais_routes`.
+- Schemas Pydantic foram movidos para `backend/app/dre_canais/schemas.py`.
+- Constantes, normalizacao de canais e helpers compartilhados foram movidos para
+  `backend/app/dre_canais/base.py`.
+- Agregacao de vendas, contas a pagar, fretes e snapshots foi movida para
+  `backend/app/dre_canais/agregacao.py`.
+- Montagem das linhas/totais da DRE foi movida para
+  `backend/app/dre_canais/linhas.py`.
+- O endpoint de detalhes foi movido para `backend/app/dre_canais/detalhes.py` e
+  o endpoint principal para `backend/app/dre_canais/routes.py`.
+- O codigo legado que ficava apos o `return` do endpoint principal foi removido
+  por estar inalcancavel.
+- O arquivo principal caiu de 2485 para 72 linhas e saiu da zona acima de 1000
+  linhas. Todos os modulos novos ficaram abaixo de 1000 linhas.
+- Contagem atual recalculada: 76 arquivos de aplicacao ainda estao com 1000+
+  linhas quando testes, migrations e builds sao excluidos.
+- Testes focados: `pytest backend/tests/unit/test_dre_canais_refactor_contract.py backend/tests/unit/test_dre_vendas_alinhamento.py backend/tests/multi_tenant/test_phase2b3_dre_lancamento_tenant_safe.py backend/tests/multi_tenant/test_dre_periodo_tenant_scope.py backend/tests/multi_tenant/test_phase2b3_3_dre_periodos_tenant_migration.py backend/tests/multi_tenant/test_rls_dre_channel_details_migration.py -q`
+  passou com 28 testes.
+
+Proxima fatia recomendada:
+
+1. Priorizar outro arquivo ainda acima de 1000 linhas com limite de dominio
+   claro.
+2. Candidatos atuais: `backend/app/vendas/service.py`,
+   `backend/app/vendas_routes.py`, `backend/app/nfe/listagem.py`,
+   `backend/app/contas_pagar_routes.py` ou
+   `backend/app/services/tenant_onboarding_service.py`.
+
