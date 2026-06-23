@@ -8,6 +8,7 @@ from fastapi import HTTPException
 os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test.db"
 os.environ["DEBUG"] = "false"
 
+from app.produtos import listagem as produtos_listagem
 from app.produtos.listagem import (
     _aplicar_filtro_fornecedor_produto,
     _aplicar_filtros_basicos_produtos,
@@ -59,6 +60,67 @@ class _FakeProdutoQuery:
     def filter(self, *expressions):
         self.filters.append(expressions)
         return self
+
+
+class _FakeHierarchyQuery:
+    def __init__(self, scalar_result=None, all_result=None):
+        self.scalar_result = scalar_result
+        self.all_result = all_result or []
+        self.filters = []
+        self.options_args = []
+        self.order_by_args = []
+
+    def filter(self, *expressions):
+        self.filters.append(expressions)
+        return self
+
+    def options(self, *options):
+        self.options_args.extend(options)
+        return self
+
+    def order_by(self, *expressions):
+        self.order_by_args.extend(expressions)
+        return self
+
+    def scalar(self):
+        return self.scalar_result
+
+    def all(self):
+        return self.all_result
+
+
+class _FakePageQuery:
+    def __init__(self, rows, total=0):
+        self.rows = rows
+        self.total = total
+        self.count_calls = 0
+        self.options_args = []
+        self.order_by_args = []
+        self.offset_arg = None
+        self.limit_arg = None
+
+    def count(self):
+        self.count_calls += 1
+        return self.total
+
+    def options(self, *options):
+        self.options_args.extend(options)
+        return self
+
+    def order_by(self, *expressions):
+        self.order_by_args.extend(expressions)
+        return self
+
+    def offset(self, value):
+        self.offset_arg = value
+        return self
+
+    def limit(self, value):
+        self.limit_arg = value
+        return self
+
+    def all(self):
+        return self.rows
 
 
 def test_nome_area_produto_prioriza_departamento_direto():
@@ -140,6 +202,259 @@ def test_palavras_busca_produto_remove_espacos_extras():
 def test_palavras_busca_produto_aceita_termo_vazio():
     assert _palavras_busca_produto(None) == []
     assert _palavras_busca_produto("   ") == []
+
+
+def test_montar_query_produtos_vendaveis_aplica_base_status_e_busca():
+    assert hasattr(produtos_listagem, "_montar_query_produtos_vendaveis")
+    query = _FakeProdutoQuery()
+    db = _FakeDb(query)
+
+    resultado = produtos_listagem._montar_query_produtos_vendaveis(
+        db,
+        tenant_id="tenant-principal",
+        termo_busca="golden gato",
+        contar_total=False,
+    )
+
+    assert resultado is query
+    assert len(db.query_calls) == 1
+    assert len(query.filters) == 3
+    assert len(query.filters[0]) == 3
+
+
+def test_montar_query_listagem_produtos_aplica_base_status_e_busca():
+    assert hasattr(produtos_listagem, "_montar_query_listagem_produtos")
+    query = _FakeProdutoQuery()
+    db = _FakeDb(query)
+
+    resultado = produtos_listagem._montar_query_listagem_produtos(
+        db,
+        tenant_ids=["tenant-principal", "tenant-parceiro"],
+        termo_busca="racao senior",
+        ativo=True,
+        tipo_produto=None,
+        produto_predecessor_id=None,
+        include_variations=True,
+        busca_completa=True,
+    )
+
+    assert resultado is query
+    assert len(db.query_calls) == 1
+    assert len(query.filters) == 4
+    assert len(query.filters[0]) == 2
+    assert len(query.filters[1]) == 1
+
+
+def test_montar_query_listagem_produtos_prioriza_predecessor_sobre_tipo():
+    assert hasattr(produtos_listagem, "_montar_query_listagem_produtos")
+    query = _FakeProdutoQuery()
+    db = _FakeDb(query)
+
+    resultado = produtos_listagem._montar_query_listagem_produtos(
+        db,
+        tenant_ids=["tenant-principal"],
+        termo_busca="",
+        ativo=None,
+        tipo_produto="KIT",
+        produto_predecessor_id=42,
+        include_variations=True,
+        busca_completa=False,
+    )
+
+    filtro_base = " ".join(str(expressao) for expressao in query.filters[0])
+    assert resultado is query
+    assert len(query.filters) == 1
+    assert "produto_predecessor_id" in filtro_base
+    assert "tipo_produto" not in filtro_base
+
+
+def test_expandir_produtos_listagem_conta_e_inclui_variacoes_quando_solicitado(
+    monkeypatch,
+):
+    assert hasattr(produtos_listagem, "_expandir_produtos_listagem")
+    produto_pai = SimpleNamespace(
+        id=10,
+        tipo_produto="PAI",
+        tenant_id="tenant-principal",
+        categoria=None,
+    )
+    variacao = SimpleNamespace(
+        id=11,
+        tipo_produto="VARIACAO",
+        tenant_id="tenant-principal",
+        categoria=None,
+    )
+    produto_simples = SimpleNamespace(
+        id=12,
+        tipo_produto="SIMPLES",
+        tenant_id="tenant-principal",
+        categoria=None,
+    )
+    count_query = _FakeHierarchyQuery(scalar_result=1)
+    variations_query = _FakeHierarchyQuery(all_result=[variacao])
+    db = _FakeDb(count_query, variations_query)
+    enriquecidos = []
+
+    def fake_enriquecer(_db, produto, tenant_id, reservas, **kwargs):
+        enriquecidos.append((produto.id, tenant_id, reservas, kwargs))
+        produto.enriquecido = True
+        return produto
+
+    monkeypatch.setattr(
+        produtos_listagem, "_enriquecer_produto_listagem", fake_enriquecer
+    )
+    monkeypatch.setattr(
+        produtos_listagem,
+        "_mapa_validade_proxima_produtos",
+        lambda _db, produtos, tenant_ids: {
+            produto.id: {"validade_proxima_listagem": f"validade-{produto.id}"}
+            for produto in produtos
+        },
+    )
+
+    resultado = produtos_listagem._expandir_produtos_listagem(
+        db,
+        [produto_pai, produto_simples],
+        tenant_id="tenant-principal",
+        access_ids=["tenant-principal"],
+        reservas_por_produto={10: 2.0},
+        incluir_detalhes_composto=False,
+        include_variations=True,
+        termo_busca="",
+        load_options=["joinedload-fake"],
+        validade_por_produto={10: {"validade_proxima_listagem": "validade-10"}},
+    )
+
+    assert resultado == [produto_pai, variacao, produto_simples]
+    assert produto_pai.total_variacoes == 1
+    assert variations_query.options_args == ["joinedload-fake"]
+    assert len(enriquecidos) == 3
+    assert enriquecidos[0][3]["validade_por_produto"] == {
+        10: {"validade_proxima_listagem": "validade-10"}
+    }
+    assert enriquecidos[1][3]["validade_por_produto"] == {
+        11: {"validade_proxima_listagem": "validade-11"}
+    }
+
+
+def test_expandir_produtos_listagem_nao_busca_variacoes_durante_busca(monkeypatch):
+    assert hasattr(produtos_listagem, "_expandir_produtos_listagem")
+    produto_pai = SimpleNamespace(
+        id=10,
+        tipo_produto="PAI",
+        tenant_id="tenant-principal",
+        categoria=None,
+    )
+    count_query = _FakeHierarchyQuery(scalar_result=3)
+    db = _FakeDb(count_query)
+
+    monkeypatch.setattr(
+        produtos_listagem,
+        "_enriquecer_produto_listagem",
+        lambda _db, produto, *_args, **_kwargs: produto,
+    )
+
+    resultado = produtos_listagem._expandir_produtos_listagem(
+        db,
+        [produto_pai],
+        tenant_id="tenant-principal",
+        access_ids=["tenant-principal"],
+        reservas_por_produto={},
+        incluir_detalhes_composto=True,
+        include_variations=True,
+        termo_busca="racao",
+        load_options=[],
+        validade_por_produto={},
+    )
+
+    assert resultado == [produto_pai]
+    assert produto_pai.total_variacoes == 3
+    assert len(db.query_calls) == 1
+
+
+def test_buscar_pagina_produtos_listagem_aplica_total_ordenacao_e_paginacao():
+    assert hasattr(produtos_listagem, "_buscar_pagina_produtos_listagem")
+    produto = SimpleNamespace(id=10)
+    query = _FakePageQuery([produto, None], total=7)
+
+    produtos, total, load_options = produtos_listagem._buscar_pagina_produtos_listagem(
+        query,
+        termo_busca="golden",
+        offset=20,
+        page_size=10,
+        incluir_imagens=False,
+        incluir_lotes=True,
+        contar_total=True,
+    )
+
+    assert produtos == [produto]
+    assert total == 7
+    assert query.count_calls == 1
+    assert query.offset_arg == 20
+    assert query.limit_arg == 10
+    assert len(load_options) == 4
+    assert query.options_args == load_options
+    assert query.order_by_args
+
+
+def test_buscar_pagina_produtos_listagem_permite_total_posterior():
+    assert hasattr(produtos_listagem, "_buscar_pagina_produtos_listagem")
+    produto = SimpleNamespace(id=11)
+    query = _FakePageQuery([produto], total=99)
+
+    produtos, total, _load_options = produtos_listagem._buscar_pagina_produtos_listagem(
+        query,
+        termo_busca="",
+        offset=0,
+        page_size=50,
+        incluir_imagens=True,
+        incluir_lotes=False,
+        contar_total=False,
+    )
+
+    assert produtos == [produto]
+    assert total is None
+    assert query.count_calls == 0
+    assert query.offset_arg == 0
+    assert query.limit_arg == 50
+
+
+def test_montar_resposta_produtos_paginados_calcula_pages_e_total():
+    assert hasattr(produtos_listagem, "_montar_resposta_produtos_paginados")
+    produto = SimpleNamespace(id=10)
+
+    resposta = produtos_listagem._montar_resposta_produtos_paginados(
+        [produto],
+        total=21,
+        page=2,
+        page_size=10,
+        offset=10,
+    )
+
+    assert resposta == {
+        "items": [produto],
+        "total": 21,
+        "page": 2,
+        "page_size": 10,
+        "pages": 3,
+    }
+
+
+def test_montar_resposta_produtos_paginados_estima_total_quando_nao_contou():
+    assert hasattr(produtos_listagem, "_montar_resposta_produtos_paginados")
+    produtos = [SimpleNamespace(id=10), SimpleNamespace(id=11)]
+
+    resposta = produtos_listagem._montar_resposta_produtos_paginados(
+        produtos,
+        total=None,
+        page=3,
+        page_size=2,
+        offset=4,
+    )
+
+    assert resposta["items"] == produtos
+    assert resposta["total"] == 6
+    assert resposta["pages"] == 3
 
 
 def test_tipos_base_listagem_preserva_variacoes_apenas_em_busca():

@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
+from app.services.push_devices import load_user_push_targets
+
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
 from .models import Cliente, Pet, User
@@ -480,6 +482,17 @@ def diagnostico_push_agendamento(
             )
             .first()
         )
+    push_targets = (
+        load_user_push_targets(
+            db,
+            tenant_id=str(tenant_id),
+            user_id=user_tutor.id,
+            legacy_push_token=getattr(user_tutor, "push_token", None),
+        )
+        if user_tutor
+        else []
+    )
+    push_token_preview = f"{push_targets[0].token[:18]}..." if push_targets else None
 
     prefixo = f"vet-agendamento:{ag.id}:"
     lembretes = (
@@ -500,10 +513,8 @@ def diagnostico_push_agendamento(
         "cliente_id": ag.cliente_id,
         "data_hora": ag.data_hora.isoformat() if ag.data_hora else None,
         "status": ag.status,
-        "tutor_tem_push_token": bool(getattr(user_tutor, "push_token", None)),
-        "push_token_preview": f"{user_tutor.push_token[:18]}..."
-        if getattr(user_tutor, "push_token", None)
-        else None,
+        "tutor_tem_push_token": bool(push_targets),
+        "push_token_preview": push_token_preview,
         "lembretes": [
             {
                 "id": lembrete.id,

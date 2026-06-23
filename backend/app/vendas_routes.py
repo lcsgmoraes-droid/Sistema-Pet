@@ -10,14 +10,15 @@
 Rotas da API para o módulo de Vendas (PDV)
 """
 
+# ruff: noqa: F401
+
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func, desc
 from datetime import datetime, timedelta, date
 from decimal import Decimal
-from typing import List, Optional
-from pydantic import BaseModel
+from typing import Optional
 import json
 
 from .db import get_session
@@ -39,8 +40,25 @@ from .services.venda_rentabilidade_snapshot_service import (
     invalidate_venda_rentabilidade_snapshot,
 )
 from .services.order_push_notifications import notify_sale_order_event
-from .utils.tenant_safe_sql import execute_tenant_safe
+from .vendas.comissoes import (
+    _contar_comissoes_venda,
+    _gerar_comissoes_pendentes_venda,
+    _listar_pagamentos_venda_para_comissao,
+    _parcelas_com_comissao_funcionario,
+    _remover_comissoes_venda,
+    _total_pago_venda,
+)
 from .vendas.regras import _resolver_status_entrega_atualizacao, calcular_totais_venda
+from .vendas.schemas import (
+    CancelarVendaRequest,
+    CriarVendaRequest,
+    ExcluirVendaRequest,
+    FinalizarVendaRequest,
+    MarcarEntregueRequest,
+    VendaItemSchema,
+    VendaPagamentoSchema,
+)
+from .utils.tenant_safe_sql import execute_tenant_safe
 
 router = APIRouter(prefix="/vendas", tags=["vendas"])
 
@@ -83,157 +101,6 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
     return cliente
 
 
-def _listar_pagamentos_venda_para_comissao(db: Session, venda_id: int, tenant_id):
-    return execute_tenant_safe(
-        db,
-        """
-        SELECT vp.id, vp.forma_pagamento, vp.valor, vp.data_pagamento
-        FROM venda_pagamentos vp
-        WHERE vp.venda_id = :venda_id
-          AND vp.{tenant_filter}
-        ORDER BY vp.data_pagamento ASC
-    """,
-        {"venda_id": venda_id},
-        tenant_id=tenant_id,
-    ).fetchall()
-
-
-def _parcelas_com_comissao_funcionario(
-    db: Session,
-    venda_id: int,
-    funcionario_id: int,
-    tenant_id,
-) -> set:
-    rows = execute_tenant_safe(
-        db,
-        """
-        SELECT DISTINCT parcela_numero
-        FROM comissoes_itens
-        WHERE venda_id = :venda_id
-          AND funcionario_id = :funcionario_id
-          AND {tenant_filter}
-    """,
-        {
-            "venda_id": venda_id,
-            "funcionario_id": funcionario_id,
-        },
-        tenant_id=tenant_id,
-    ).fetchall()
-    return {row[0] for row in rows}
-
-
-def _gerar_comissoes_pendentes_venda(
-    db: Session,
-    venda,
-    tenant_id,
-    trigger: str,
-) -> dict:
-    """Gera comissoes somente para pagamentos ainda sem comissao."""
-    if not venda.funcionario_id:
-        return {"comissoes_geradas": 0, "total_comissoes": 0.0}
-
-    from app.comissoes_service import gerar_comissoes_venda
-
-    todos_pagamentos = _listar_pagamentos_venda_para_comissao(db, venda.id, tenant_id)
-    if not todos_pagamentos:
-        logger.info(
-            "Nenhum pagamento encontrado na venda %s para gerar comissao", venda.id
-        )
-        return {"comissoes_geradas": 0, "total_comissoes": 0.0}
-
-    parcelas_com_comissao = _parcelas_com_comissao_funcionario(
-        db,
-        venda.id,
-        venda.funcionario_id,
-        tenant_id,
-    )
-
-    comissoes_geradas = 0
-    total_comissoes = Decimal("0")
-
-    for idx, pagamento_row in enumerate(todos_pagamentos, start=1):
-        parcela_numero = idx
-        if parcela_numero in parcelas_com_comissao:
-            logger.info("Parcela %s ja tem comissao - pulando", parcela_numero)
-            continue
-
-        valor_pagamento = Decimal(str(pagamento_row[2]))
-        forma_pagamento = pagamento_row[1]
-
-        struct_logger.info(
-            event="COMMISSION_START",
-            message="Gerando comissao pendente para pagamento",
-            venda_id=venda.id,
-            funcionario_id=venda.funcionario_id,
-            valor_pago=float(valor_pagamento),
-            forma_pagamento=forma_pagamento,
-            parcela_numero=parcela_numero,
-            trigger=trigger,
-        )
-
-        resultado = gerar_comissoes_venda(
-            venda_id=venda.id,
-            funcionario_id=venda.funcionario_id,
-            valor_pago=valor_pagamento,
-            forma_pagamento=forma_pagamento,
-            parcela_numero=parcela_numero,
-            db=db,
-        )
-
-        if resultado and resultado.get("success") and not resultado.get("duplicated"):
-            comissoes_geradas += 1
-            total_comissoes += Decimal(str(resultado.get("total_comissao", 0)))
-
-    return {
-        "comissoes_geradas": comissoes_geradas,
-        "total_comissoes": float(total_comissoes),
-    }
-
-
-def _total_pago_venda(db: Session, venda_id: int, tenant_id) -> Decimal:
-    row = execute_tenant_safe(
-        db,
-        """
-        SELECT COALESCE(SUM(valor), 0) as total_pago
-        FROM venda_pagamentos
-        WHERE venda_id = :venda_id
-          AND {tenant_filter}
-    """,
-        {"venda_id": venda_id},
-        tenant_id=tenant_id,
-    ).fetchone()
-    return Decimal(str(row[0])) if row else Decimal("0")
-
-
-def _contar_comissoes_venda(db: Session, venda_id: int, tenant_id) -> int:
-    return (
-        execute_tenant_safe(
-            db,
-            """
-        SELECT COUNT(*) FROM comissoes_itens
-        WHERE venda_id = :venda_id
-          AND {tenant_filter}
-    """,
-            {"venda_id": venda_id},
-            tenant_id=tenant_id,
-        ).scalar()
-        or 0
-    )
-
-
-def _remover_comissoes_venda(db: Session, venda_id: int, tenant_id) -> None:
-    execute_tenant_safe(
-        db,
-        """
-        DELETE FROM comissoes_itens
-        WHERE venda_id = :venda_id
-          AND {tenant_filter}
-    """,
-        {"venda_id": venda_id},
-        tenant_id=tenant_id,
-    )
-
-
 def _remover_provisoes_comissao_venda(db: Session, venda_id: int, tenant_id) -> None:
     execute_tenant_safe(
         db,
@@ -246,74 +113,6 @@ def _remover_provisoes_comissao_venda(db: Session, venda_id: int, tenant_id) -> 
         {"descricao": f"%Comissão - Venda #{venda_id}%"},
         tenant_id=tenant_id,
     )
-
-
-# ============================================================================
-# SCHEMAS PYDANTIC
-# ============================================================================
-
-
-class VendaItemSchema(BaseModel):
-    tipo: str  # 'produto' ou 'servico'
-    produto_id: Optional[int] = None
-    servico_descricao: Optional[str] = None
-    quantidade: float
-    preco_unitario: float
-    desconto_item: Optional[float] = 0
-    subtotal: float
-    lote_id: Optional[int] = None
-    pet_id: Optional[int] = None  # Vincular item a um pet específico
-    is_kit: Optional[bool] = None  # Identificar se o item é um KIT
-
-
-class VendaPagamentoSchema(BaseModel):
-    forma_pagamento: str
-    valor: float
-    bandeira: Optional[str] = None
-    numero_parcelas: Optional[int] = 1  # Número de parcelas para cartão de crédito
-    numero_transacao: Optional[str] = None
-    numero_autorizacao: Optional[str] = None
-    nsu_cartao: Optional[str] = None  # NSU da operadora (para conciliação bancária)
-    operadora_id: Optional[int] = None  # 🆕 ID da operadora de cartão
-    valor_recebido: Optional[float] = None
-    troco: Optional[float] = None
-
-
-class CriarVendaRequest(BaseModel):
-    cliente_id: Optional[int] = None
-    vendedor_id: Optional[int] = None
-    funcionario_id: Optional[int] = None  # Funcionário/Veterinário que recebe comissão
-    itens: List[VendaItemSchema]
-    desconto_valor: Optional[float] = 0
-    desconto_percentual: Optional[float] = 0
-    cupom_code: Optional[str] = None
-    cupom_discount_applied: Optional[float] = None
-    observacoes: Optional[str] = None
-    tem_entrega: bool = False
-    taxa_entrega: Optional[float] = 0
-    percentual_taxa_loja: Optional[float] = 100  # Percentual 0-100
-    percentual_taxa_entregador: Optional[float] = 0  # Percentual 0-100
-    entregador_id: Optional[int] = None
-    loja_origem: Optional[str] = None
-    endereco_entrega: Optional[str] = None
-    distancia_km: Optional[float] = None
-    valor_por_km: Optional[float] = None
-    observacoes_entrega: Optional[str] = None
-
-
-class FinalizarVendaRequest(BaseModel):
-    pagamentos: List[VendaPagamentoSchema]
-    cupom_code: Optional[str] = None
-    cupom_discount_applied: Optional[float] = None
-
-
-class CancelarVendaRequest(BaseModel):
-    motivo: Optional[str] = None
-
-
-class ExcluirVendaRequest(BaseModel):
-    motivo: Optional[str] = None
-    justificativa: Optional[str] = None
 
 
 def _normalizar_motivo_exclusao_venda(motivo: Optional[str]) -> str:
@@ -927,10 +726,6 @@ def atualizar_venda(
             # Não falha a atualização por erro nas comissões
 
     return venda.to_dict()
-
-
-class MarcarEntregueRequest(BaseModel):
-    retirado_por: str | None = None
 
 
 def _resolver_retirado_por_conclusao(venda, retirado_por: str | None) -> str | None:

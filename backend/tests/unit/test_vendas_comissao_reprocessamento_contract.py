@@ -1,14 +1,34 @@
 import inspect
+import importlib.util
 from types import SimpleNamespace
 
 from app import vendas_routes
+from app.vendas import comissoes as vendas_comissoes
+
+
+def test_vendas_comissoes_module_expoe_helpers_de_reprocessamento():
+    assert importlib.util.find_spec("app.vendas.comissoes") is not None
+
+
+def test_vendas_schemas_module_expoe_schemas_usadas_pelo_router():
+    assert importlib.util.find_spec("app.vendas.schemas") is not None
+
+    from app.vendas import schemas as vendas_schemas
+
+    assert vendas_routes.VendaItemSchema is vendas_schemas.VendaItemSchema
+    assert vendas_routes.VendaPagamentoSchema is vendas_schemas.VendaPagamentoSchema
+    assert vendas_routes.CriarVendaRequest is vendas_schemas.CriarVendaRequest
+    assert vendas_routes.FinalizarVendaRequest is vendas_schemas.FinalizarVendaRequest
+    assert vendas_routes.CancelarVendaRequest is vendas_schemas.CancelarVendaRequest
+    assert vendas_routes.ExcluirVendaRequest is vendas_schemas.ExcluirVendaRequest
+    assert vendas_routes.MarcarEntregueRequest is vendas_schemas.MarcarEntregueRequest
 
 
 def test_gerar_comissoes_pendentes_ignora_parcelas_ja_geradas(monkeypatch):
     chamadas = []
 
     monkeypatch.setattr(
-        vendas_routes,
+        vendas_comissoes,
         "_listar_pagamentos_venda_para_comissao",
         lambda db, venda_id, tenant_id: [
             (10, "Pix", 50, None),
@@ -16,7 +36,7 @@ def test_gerar_comissoes_pendentes_ignora_parcelas_ja_geradas(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        vendas_routes,
+        vendas_comissoes,
         "_parcelas_com_comissao_funcionario",
         lambda db, venda_id, funcionario_id, tenant_id: {1},
     )

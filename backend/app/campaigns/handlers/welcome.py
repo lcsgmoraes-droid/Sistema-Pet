@@ -32,7 +32,8 @@ from app.campaigns.models import (
     CampaignExecution,
     CampaignTypeEnum,
 )
-from app.campaigns.notification_service import enqueue_email
+from app.campaigns.notification_service import enqueue_email, enqueue_push
+from app.services.push_devices import load_customer_push_targets
 
 logger = logging.getLogger(__name__)
 
@@ -216,8 +217,17 @@ class WelcomeHandler:
                 idempotency_key=f"{notif_key}:email",
             )
 
-        # Push token: clientes não têm push_token diretamente,
-        # integração com app mobile será implementada no Sprint 3
-        # enqueue_push(...)
+        if load_customer_push_targets(
+            db,
+            tenant_id=campaign.tenant_id,
+            customer_id=customer_id,
+        ):
+            enqueue_push(
+                db,
+                tenant_id=campaign.tenant_id,
+                customer_id=customer_id,
+                body=body,
+                idempotency_key=f"{notif_key}:push",
+            )
 
         return 1

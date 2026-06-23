@@ -26,6 +26,11 @@ import requests
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from app.services.push_devices import (
+    load_customer_push_targets,
+    mark_push_target_result,
+)
+
 logger = logging.getLogger(__name__)
 
 # Máximo de notificações por rodada (evita saturar conexão SMTP)
@@ -138,7 +143,7 @@ def _send_email(
 
 def _send_push(
     push_token: str, title: str, body_text: str, data: dict | None = None
-) -> None:
+) -> str | None:
     """Envia push usando Expo Push API."""
     if not push_token:
         raise ValueError("Notificação sem push_token")
@@ -157,12 +162,13 @@ def _send_push(
 
     data_obj = body_json.get("data") if isinstance(body_json, dict) else None
     if not isinstance(data_obj, dict):
-        return
+        return None
 
     status = data_obj.get("status")
     if status and status != "ok":
         detail = data_obj.get("details")
         raise RuntimeError(f"Falha no push Expo: status={status} details={detail}")
+    return data_obj.get("id")
 
 
 class NotificationSender:
@@ -209,7 +215,7 @@ class NotificationSender:
                         notif.status = NotificationStatusEnum.sent
                         stats["sent"] += 1
                     elif notif.channel.value == "push":
-                        self._dispatch_push(notif)
+                        self._dispatch_push(db, notif)
                         notif.status = NotificationStatusEnum.sent
                         stats["sent"] += 1
                     else:
@@ -281,14 +287,33 @@ class NotificationSender:
                 break
         _send_email(notif.email_address, subject, notif.body, campaign_type)
 
-    def _dispatch_push(self, notif) -> None:
-        if not notif.push_token:
+    def _dispatch_push(self, db: Session, notif) -> None:
+        targets = load_customer_push_targets(
+            db,
+            tenant_id=notif.tenant_id,
+            customer_id=notif.customer_id,
+            legacy_push_token=notif.push_token,
+        )
+        if not targets:
             raise ValueError("Notificação sem push_token")
 
         subject = notif.subject or "CorePet"
-        _send_push(
-            push_token=notif.push_token,
-            title=subject,
-            body_text=notif.body,
-            data={"idempotency_key": notif.idempotency_key},
-        )
+        errors: list[str] = []
+        sent_count = 0
+        for target in targets:
+            try:
+                ticket_id = _send_push(
+                    push_token=target.token,
+                    title=subject,
+                    body_text=notif.body,
+                    data={"idempotency_key": notif.idempotency_key},
+                )
+                mark_push_target_result(target, sent=True, ticket_id=ticket_id)
+                sent_count += 1
+            except Exception as exc:
+                error = str(exc)
+                mark_push_target_result(target, sent=False, error=error)
+                errors.append(error)
+
+        if sent_count == 0:
+            raise RuntimeError("; ".join(errors) or "Falha ao enviar push")

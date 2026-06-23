@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from typing import Any
 
 import requests
 
-from app.models import Cliente, User, UserPushDevice
+from app.models import Cliente, User
+from app.services.push_devices import load_user_push_targets, mark_push_target_result
 from app.services.sales_channel import normalize_sales_channel
 from app.services.sales_channel_labels import channel_label_for
 
@@ -94,29 +94,6 @@ def _load_user(db, *, tenant_id: str, user_id: int | None) -> User | None:
     )
 
 
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _load_active_devices(db, *, tenant_id: str, user_id: int | None) -> list:
-    if not user_id:
-        return []
-    try:
-        return (
-            db.query(UserPushDevice)
-            .filter(
-                UserPushDevice.user_id == user_id,
-                UserPushDevice.tenant_id == tenant_id,
-                UserPushDevice.enabled.is_(True),
-            )
-            .order_by(UserPushDevice.last_seen_at.desc())
-            .all()
-        )
-    except Exception as exc:
-        logger.warning("[OrderPush] Falha ao consultar dispositivos push: %s", exc)
-        return []
-
-
 def _send_expo_push(
     push_token: str, content: dict[str, Any]
 ) -> tuple[bool, str | None, str | None]:
@@ -148,38 +125,6 @@ def _send_expo_push(
     return True, ticket_id, None
 
 
-def _mark_device_push_result(
-    device, *, sent: bool, ticket_id: str | None, error: str | None
-) -> None:
-    now = _utcnow()
-    if sent:
-        device.last_success_at = now
-        device.last_ticket_id = ticket_id
-        device.last_error = None
-        device.last_error_at = None
-        return
-    device.last_error = error or "Falha ao enviar push"
-    device.last_error_at = now
-    if "DeviceNotRegistered" in device.last_error:
-        device.enabled = False
-
-
-def _legacy_token_device(push_token: str) -> Any:
-    return type(
-        "LegacyPushDevice",
-        (),
-        {
-            "id": None,
-            "expo_push_token": push_token,
-            "last_success_at": None,
-            "last_ticket_id": None,
-            "last_error": None,
-            "last_error_at": None,
-            "enabled": True,
-        },
-    )()
-
-
 def notify_order_event(
     db,
     *,
@@ -192,11 +137,14 @@ def notify_order_event(
 ) -> bool:
     try:
         user = _load_user(db, tenant_id=tenant_id, user_id=user_id)
-        devices = _load_active_devices(db, tenant_id=tenant_id, user_id=user_id)
         legacy_token = str(getattr(user, "push_token", "") or "").strip()
-        if not devices and legacy_token:
-            devices = [_legacy_token_device(legacy_token)]
-        if not devices:
+        targets = load_user_push_targets(
+            db,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            legacy_push_token=legacy_token,
+        )
+        if not targets:
             logger.warning(
                 "[OrderPush] usuario sem dispositivo push tenant_id=%s user_id=%s event=%s pedido_id=%s venda_id=%s canal=%s",
                 tenant_id,
@@ -215,8 +163,8 @@ def notify_order_event(
             canal=canal,
         )
         any_sent = False
-        for device in devices:
-            token = str(getattr(device, "expo_push_token", "") or "").strip()
+        for target in targets:
+            token = target.token
             if not token:
                 continue
             try:
@@ -224,10 +172,7 @@ def notify_order_event(
             except Exception as exc:
                 sent, ticket_id, error = False, None, str(exc)
             any_sent = any_sent or sent
-            if getattr(device, "id", None):
-                _mark_device_push_result(
-                    device, sent=sent, ticket_id=ticket_id, error=error
-                )
+            mark_push_target_result(target, sent=sent, ticket_id=ticket_id, error=error)
         if hasattr(db, "commit"):
             try:
                 db.commit()

@@ -5,12 +5,18 @@ from datetime import datetime
 from typing import Any, List, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, joinedload, noload
 
 from app.models import Cliente, FornecedorGrupo
 from app.partner_utils import is_partner_owned
 from app.produtos_models import Produto, ProdutoFornecedor
+from app.produtos.search import (
+    _build_produto_search_order_clause,
+    _produto_search_conditions,
+    _produto_search_conditions_fast,
+)
+from app.produtos.validade import _mapa_validade_proxima_produtos
 from app.services.kit_estoque_service import KitEstoqueService
 
 
@@ -45,6 +51,78 @@ def _normalizar_paginacao_produtos(
     return page, page_size, offset
 
 
+def _montar_query_produtos_vendaveis(
+    db: Session,
+    *,
+    tenant_id: Any,
+    termo_busca: Optional[str],
+    contar_total: bool,
+) -> Any:
+    query = db.query(Produto).filter(
+        Produto.tenant_id == tenant_id,
+        Produto.ativo.is_(True),
+        Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+    )
+
+    if termo_busca:
+        search_conditions = (
+            _produto_search_conditions
+            if contar_total
+            else _produto_search_conditions_fast
+        )
+        for palavra in _palavras_busca_produto(termo_busca):
+            query = query.filter(search_conditions(palavra))
+
+    return query
+
+
+def _montar_query_listagem_produtos(
+    db: Session,
+    *,
+    tenant_ids: list[Any],
+    termo_busca: Optional[str],
+    ativo: Optional[bool],
+    tipo_produto: Optional[str],
+    produto_predecessor_id: Optional[int],
+    include_variations: bool,
+    busca_completa: bool,
+) -> Any:
+    if produto_predecessor_id:
+        query = db.query(Produto).filter(
+            Produto.tenant_id.in_(tenant_ids),
+            Produto.produto_predecessor_id == produto_predecessor_id,
+        )
+    elif tipo_produto:
+        query = db.query(Produto).filter(
+            Produto.tenant_id.in_(tenant_ids),
+            Produto.tipo_produto == tipo_produto,
+        )
+    else:
+        query = db.query(Produto).filter(
+            Produto.tenant_id.in_(tenant_ids),
+            Produto.tipo_produto.in_(
+                _tipos_base_listagem(include_variations, termo_busca)
+            ),
+        )
+
+    if ativo is not None:
+        if ativo:
+            query = query.filter(or_(Produto.ativo.is_(True), Produto.ativo.is_(None)))
+        else:
+            query = query.filter(Produto.ativo.is_(False))
+
+    if termo_busca:
+        search_conditions = (
+            _produto_search_conditions
+            if busca_completa
+            else _produto_search_conditions_fast
+        )
+        for palavra in _palavras_busca_produto(termo_busca):
+            query = query.filter(search_conditions(palavra))
+
+    return query
+
+
 def _load_options_listagem_produtos(
     *,
     incluir_imagens: bool,
@@ -56,6 +134,123 @@ def _load_options_listagem_produtos(
         joinedload(Produto.imagens) if incluir_imagens else noload(Produto.imagens),
         joinedload(Produto.lotes) if incluir_lotes else noload(Produto.lotes),
     ]
+
+
+def _buscar_pagina_produtos_listagem(
+    query: Any,
+    *,
+    termo_busca: Optional[str],
+    offset: int,
+    page_size: int,
+    incluir_imagens: bool,
+    incluir_lotes: bool,
+    contar_total: bool = True,
+) -> tuple[list[Produto], Optional[int], list[Any]]:
+    total = query.count() if contar_total else None
+    order_clause = _build_produto_search_order_clause(termo_busca)
+    load_options = _load_options_listagem_produtos(
+        incluir_imagens=incluir_imagens,
+        incluir_lotes=incluir_lotes,
+    )
+
+    produtos = (
+        query.options(*load_options)
+        .order_by(*order_clause)
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+
+    return [produto for produto in produtos if produto is not None], total, load_options
+
+
+def _montar_resposta_produtos_paginados(
+    items: list[Any],
+    *,
+    total: Optional[int],
+    page: int,
+    page_size: int,
+    offset: int,
+) -> dict[str, Any]:
+    total_resolvido = total if total is not None else offset + len(items)
+    pages = (total_resolvido + page_size - 1) // page_size
+    return {
+        "items": items,
+        "total": total_resolvido,
+        "page": page,
+        "page_size": page_size,
+        "pages": pages,
+    }
+
+
+def _expandir_produtos_listagem(
+    db: Session,
+    produtos: list[Produto],
+    *,
+    tenant_id: Any,
+    access_ids: list[Any],
+    reservas_por_produto: dict[int, float],
+    incluir_detalhes_composto: bool,
+    include_variations: bool,
+    termo_busca: Optional[str],
+    load_options: list[Any],
+    validade_por_produto: dict[int, dict[str, Any]],
+) -> list[Produto]:
+    produtos_expandidos = []
+
+    for produto in produtos:
+        if produto.tipo_produto == "PAI":
+            total_variacoes = (
+                db.query(func.count(Produto.id))
+                .filter(
+                    Produto.produto_pai_id == produto.id,
+                    Produto.tipo_produto == "VARIACAO",
+                    Produto.ativo.is_(True),
+                )
+                .scalar()
+            )
+            produto.total_variacoes = total_variacoes or 0
+
+        _enriquecer_produto_listagem(
+            db,
+            produto,
+            tenant_id,
+            reservas_por_produto,
+            incluir_detalhes_composto=incluir_detalhes_composto,
+            validade_por_produto=validade_por_produto,
+        )
+        produtos_expandidos.append(produto)
+
+        if include_variations and not termo_busca and produto.tipo_produto == "PAI":
+            variacoes = (
+                db.query(Produto)
+                .filter(
+                    Produto.produto_pai_id == produto.id,
+                    Produto.tipo_produto == "VARIACAO",
+                    Produto.ativo.is_(True),
+                )
+                .options(*load_options)
+                .order_by(Produto.nome)
+                .all()
+            )
+            validade_por_variacao = _mapa_validade_proxima_produtos(
+                db,
+                variacoes,
+                access_ids,
+            )
+
+            for variacao in variacoes:
+                _enriquecer_produto_listagem(
+                    db,
+                    variacao,
+                    tenant_id,
+                    reservas_por_produto,
+                    incluir_detalhes_composto=incluir_detalhes_composto,
+                    validade_por_produto=validade_por_variacao,
+                )
+                produtos_expandidos.append(variacao)
+
+    return produtos_expandidos
 
 
 def _resolver_fornecedor_ids_filtro_produto(

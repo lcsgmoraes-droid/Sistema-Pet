@@ -12,7 +12,7 @@ Inclui: Categorias, Marcas, Departamentos, Produtos, Lotes, FIFO, CÃ³digo de B
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime, timedelta
 import logging
@@ -52,11 +52,6 @@ from .services.produto_merge_service import (
     executar_fusao_produtos,
     montar_preview_fusao_produtos,
 )
-from .produtos.search import (
-    _build_produto_search_order_clause,
-    _produto_search_conditions,
-    _produto_search_conditions_fast,
-)
 from .produtos.codigo_barras import (
     gerar_codigo_barras_ean13,
     validar_codigo_barras_ean13,
@@ -72,14 +67,16 @@ from .produtos.core import (
 from .produtos.listagem import (
     _aplicar_filtro_fornecedor_produto,
     _aplicar_filtros_basicos_produtos,
+    _buscar_pagina_produtos_listagem,
     _enriquecer_produto_listagem,
-    _load_options_listagem_produtos,
+    _expandir_produtos_listagem,
     _mapa_reservas_ativas_multitenant,
+    _montar_query_listagem_produtos,
+    _montar_query_produtos_vendaveis,
+    _montar_resposta_produtos_paginados,
     _normalizar_paginacao_produtos,
-    _palavras_busca_produto,
     _resolver_fornecedor_ids_filtro_produto,
     _resolver_promocao_erp_produto,
-    _tipos_base_listagem,
 )
 from .produtos.lotes import _consumir_lotes_fifo_produto
 from .produtos.racao import (
@@ -419,27 +416,15 @@ def listar_produtos_vendaveis(
         page_size,
         max_page_size=100,
     )
-
-    # QUERY BASE - Produtos vendÃ¡veis (incluindo KIT)
-    query = db.query(Produto).filter(
-        Produto.tenant_id == tenant_id,
-        Produto.ativo.is_(True),
-        Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),  # KIT Ã© vendÃ¡vel!
-    )
-
-    # FILTROS OPCIONAIS
     termo_busca = (busca or "").strip()
 
-    if termo_busca:
-        # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
-        # Ex: "golden castrado" acha "Ração Golden Gato Castrado Salmão"
-        search_conditions = (
-            _produto_search_conditions
-            if contar_total
-            else _produto_search_conditions_fast
-        )
-        for palavra in _palavras_busca_produto(termo_busca):
-            query = query.filter(search_conditions(palavra))
+    # QUERY BASE - Produtos vendÃ¡veis (incluindo KIT)
+    query = _montar_query_produtos_vendaveis(
+        db,
+        tenant_id=tenant_id,
+        termo_busca=termo_busca,
+        contar_total=contar_total,
+    )
 
     query = _aplicar_filtros_basicos_produtos(
         query,
@@ -465,25 +450,19 @@ def listar_produtos_vendaveis(
         filtro_por_grupo=filtro_fornecedor_por_grupo,
     )
 
-    total = query.count() if contar_total else None
-
-    # OrdenaÃ§Ã£o inteligente: prioriza match exato no cÃ³digo
-    order_clause = _build_produto_search_order_clause(termo_busca)
-    load_options = _load_options_listagem_produtos(
+    produtos, total, _load_options = _buscar_pagina_produtos_listagem(
+        query,
+        termo_busca=termo_busca,
+        offset=offset,
+        page_size=page_size,
         incluir_imagens=incluir_imagens,
         incluir_lotes=False,
+        contar_total=contar_total,
     )
+
+    # OrdenaÃ§Ã£o inteligente: prioriza match exato no cÃ³digo
 
     # QUERY FINAL
-    produtos = (
-        query.options(*load_options)
-        .order_by(*order_clause)
-        .offset(offset)
-        .limit(page_size)
-        .all()
-    )
-
-    produtos = [p for p in produtos if p is not None]
 
     # PDV usa esta rota como busca rápida enquanto o operador digita/bipa.
     # Evitar cálculo detalhado de composição/custo aqui impede N+1 pesado por tecla.
@@ -496,17 +475,13 @@ def listar_produtos_vendaveis(
             incluir_detalhes_composto=False,
         )
 
-    if total is None:
-        total = offset + len(produtos)
-    pages = (total + page_size - 1) // page_size
-
-    return {
-        "items": produtos,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": pages,
-    }
+    return _montar_resposta_produtos_paginados(
+        produtos,
+        total=total,
+        page=page,
+        page_size=page_size,
+        offset=offset,
+    )
 
 
 @router.get("/", response_model=ProdutosPaginadosResponse)
@@ -553,45 +528,16 @@ def listar_produtos(
     # QUERY BASE
     # - include_variations=True: inclui PAI para permitir visualização da hierarquia
     # - include_variations=False: lista apenas produtos normais (SIMPLES e KIT)
-    if produto_predecessor_id:
-        query = db.query(Produto).filter(
-            Produto.tenant_id.in_(access_ids),
-            Produto.produto_predecessor_id == produto_predecessor_id,
-        )
-    elif tipo_produto:
-        query = db.query(Produto).filter(
-            Produto.tenant_id.in_(access_ids), Produto.tipo_produto == tipo_produto
-        )
-    else:
-        query = db.query(Produto).filter(
-            Produto.tenant_id.in_(access_ids),
-            Produto.tipo_produto.in_(
-                _tipos_base_listagem(include_variations, termo_busca)
-            ),
-        )
-
-    # Aplicar filtro de ativo (se especificado)
-    # Se ativo=None, mostra todos (ativos e inativos)
-    # Se ativo=True, mostra apenas ativos
-    # Se ativo=False, mostra apenas inativos
-    if ativo is not None:
-        if ativo:
-            query = query.filter(or_(Produto.ativo.is_(True), Produto.ativo.is_(None)))
-        else:
-            query = query.filter(Produto.ativo.is_(False))
-
-    # FILTROS OPCIONAIS
-
-    if termo_busca:
-        # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
-        # Ex: "special dog senior" encontra "Racao Special Dog Ultralife Senior"
-        search_conditions = (
-            _produto_search_conditions
-            if busca_completa
-            else _produto_search_conditions_fast
-        )
-        for palavra in _palavras_busca_produto(termo_busca):
-            query = query.filter(search_conditions(palavra))
+    query = _montar_query_listagem_produtos(
+        db,
+        tenant_ids=access_ids,
+        termo_busca=termo_busca,
+        ativo=ativo,
+        tipo_produto=tipo_produto,
+        produto_predecessor_id=produto_predecessor_id,
+        include_variations=include_variations,
+        busca_completa=busca_completa,
+    )
 
     query = _aplicar_filtros_basicos_produtos(
         query,
@@ -618,102 +564,42 @@ def listar_produtos(
     )
 
     # TOTAL
-    total = query.count()
-
-    logger.info("GET /produtos/ - total encontrado: %s", total)
-
-    # PAGINAÃ‡ÃƒO
     offset = (page - 1) * page_size
-
-    order_clause = _build_produto_search_order_clause(termo_busca)
-
-    load_options = _load_options_listagem_produtos(
+    produtos, total, load_options = _buscar_pagina_produtos_listagem(
+        query,
+        termo_busca=termo_busca,
+        offset=offset,
+        page_size=page_size,
         incluir_imagens=incluir_imagens,
         incluir_lotes=incluir_lotes,
     )
 
-    # QUERY FINAL COM RELACIONAMENTOS
-    produtos = (
-        query.options(*load_options)
-        .order_by(*order_clause)
-        .offset(offset)
-        .limit(page_size)
-        .all()
-    )
-
-    # Filtro de seguranÃ§a: remover None
-    produtos = [p for p in produtos if p is not None]
+    logger.info("GET /produtos/ - total encontrado: %s", total)
 
     reservas_por_produto = _mapa_reservas_ativas_multitenant(db, access_ids)
     validade_por_produto = _mapa_validade_proxima_produtos(db, produtos, access_ids)
 
     # HIERARQUIA: Para produtos PAI, buscar suas variaÃ§Ãµes
     # Para produtos KIT, calcular estoque virtual e carregar composiÃ§Ã£o
-    produtos_expandidos = []
-    for produto in produtos:
-        # Se for PAI, contar variaÃ§Ãµes antes de adicionar
-        if produto.tipo_produto == "PAI":
-            total_variacoes = (
-                db.query(func.count(Produto.id))
-                .filter(
-                    Produto.produto_pai_id == produto.id,
-                    Produto.tipo_produto == "VARIACAO",
-                    Produto.ativo.is_(True),
-                )
-                .scalar()
-            )
-            produto.total_variacoes = total_variacoes or 0
-
-        _enriquecer_produto_listagem(
-            db,
-            produto,
-            tenant_id,
-            reservas_por_produto,
-            incluir_detalhes_composto=incluir_detalhes_composto,
-            validade_por_produto=validade_por_produto,
-        )
-        produtos_expandidos.append(produto)
-
-        # Se for PAI, buscar e incluir suas variaÃ§Ãµes logo apÃ³s
-        # apenas quando a tela pedir explicitamente include_variations.
-        if include_variations and not termo_busca and produto.tipo_produto == "PAI":
-            variacoes = (
-                db.query(Produto)
-                .filter(
-                    Produto.produto_pai_id == produto.id,
-                    Produto.tipo_produto == "VARIACAO",
-                    Produto.ativo.is_(True),
-                )
-                .options(*load_options)
-                .order_by(Produto.nome)
-                .all()
-            )
-            validade_por_variacao = _mapa_validade_proxima_produtos(
-                db,
-                variacoes,
-                access_ids,
-            )
-
-            for variacao in variacoes:
-                _enriquecer_produto_listagem(
-                    db,
-                    variacao,
-                    tenant_id,
-                    reservas_por_produto,
-                    incluir_detalhes_composto=incluir_detalhes_composto,
-                    validade_por_produto=validade_por_variacao,
-                )
-                produtos_expandidos.append(variacao)
-
-    pages = (total + page_size - 1) // page_size
-
-    return {
-        "items": produtos_expandidos,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": pages,
-    }
+    produtos_expandidos = _expandir_produtos_listagem(
+        db,
+        produtos,
+        tenant_id=tenant_id,
+        access_ids=access_ids,
+        reservas_por_produto=reservas_por_produto,
+        incluir_detalhes_composto=incluir_detalhes_composto,
+        include_variations=include_variations,
+        termo_busca=termo_busca,
+        load_options=load_options,
+        validade_por_produto=validade_por_produto,
+    )
+    return _montar_resposta_produtos_paginados(
+        produtos_expandidos,
+        total=total,
+        page=page,
+        page_size=page_size,
+        offset=offset,
+    )
 
 
 @router.get("/{produto_id}/variacoes", response_model=List[ProdutoResponse])
