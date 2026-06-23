@@ -232,3 +232,24 @@ Proxima fatia recomendada:
 2. Nao mexer em recebimento de pedido, entrada de estoque, fiscal ou envio real
    de e-mail/WhatsApp na mesma rodada.
 
+## Atualizacao continua - 2026-06-23 - Vendas/Comissoes
+
+Fatia executada na trilha Vendas:
+
+- `backend/app/vendas_routes.py` moveu helpers de reprocessamento de comissoes
+  para `backend/app/vendas/comissoes.py`.
+- Foram movidos os helpers de pagamentos tenant-safe, parcelas ja comissionadas,
+  geracao de comissoes pendentes, total pago, contagem e remocao de comissoes.
+- Os nomes continuam reexportados por `vendas_routes.py` para preservar imports
+  internos e testes existentes.
+- Na branch atual, o router principal caiu de 2236 para 2115 linhas.
+- Testes focados: `pytest backend/tests/unit/test_vendas_comissao_reprocessamento_contract.py backend/tests/multi_tenant/test_phase2b_tenant_safe_sql.py -q`
+  passou com 15 testes.
+
+Proxima fatia recomendada:
+
+1. Seguir em Vendas apenas se a proxima extracao for isolada de PDV/estoque ou
+   escolher outro hotspot acima de 1000 linhas.
+2. Nao misturar finalizacao/cancelamento/devolucao de venda com refatoracao de
+   comissoes na mesma rodada.
+
