@@ -1,8 +1,11 @@
-from datetime import datetime, timezone
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from math import inf, nan
 
 from app.pedidos_compra.sugestao import (
     JANELAS_GIRO_SUGESTAO,
+    _somar_conversao_granel_sugestao,
+    _somar_venda_sugestao,
     _datetime_naive_utc_sugestao,
     _float_seguro_sugestao,
     _formatar_origem_venda,
@@ -59,3 +62,67 @@ def test_nova_stats_venda_sugestao_monta_janelas_e_colecoes_mutaveis():
     assert stats["origens"]["Loja"] == 0.0
     assert stats["granel_itens"][10] == {"kg": 0.0, "pacotes": 0.0}
     assert stats["fontes"] == set()
+
+
+def test_somar_venda_sugestao_acumula_periodo_janelas_origem_e_fonte():
+    stats_por_produto = defaultdict(_nova_stats_venda_sugestao)
+    data_fim = datetime(2026, 6, 23, 12, 0)
+    data_ref = data_fim - timedelta(days=5)
+
+    _somar_venda_sugestao(
+        stats_por_produto,
+        produto_id=10,
+        quantidade="3.5",
+        data_ref=data_ref,
+        data_inicio_periodo=data_fim - timedelta(days=30),
+        data_fim=data_fim,
+        origem="venda_bling",
+        fonte="venda_interna",
+    )
+
+    stats = stats_por_produto[10]
+    assert stats["vendas_periodo"] == 3.5
+    assert stats["janelas"]["7"] == 3.5
+    assert stats["janelas"]["15"] == 3.5
+    assert stats["janelas"]["30"] == 3.5
+    assert stats["janelas"]["60"] == 3.5
+    assert stats["janelas"]["90"] == 3.5
+    assert stats["origens"]["Bling/online"] == 3.5
+    assert stats["fontes"] == {"venda_interna"}
+
+
+def test_somar_conversao_granel_sugestao_acumula_pacotes_e_quilos():
+    stats_por_produto = defaultdict(_nova_stats_venda_sugestao)
+    data_fim = datetime(2026, 6, 23, 12, 0)
+    data_ref = data_fim - timedelta(days=10)
+
+    _somar_conversao_granel_sugestao(
+        stats_por_produto,
+        produto_pai_id=20,
+        produto_granel_id=99,
+        produto_granel_nome="Racao granel",
+        quantidade_kg=4.5,
+        quantidade_pacotes=3,
+        peso_pacote_kg=1.5,
+        data_ref=data_ref,
+        data_inicio_periodo=data_fim - timedelta(days=30),
+        data_fim=data_fim,
+    )
+
+    stats = stats_por_produto[20]
+    assert stats["vendas_periodo"] == 3.0
+    assert stats["janelas"]["7"] == 0.0
+    assert stats["janelas"]["15"] == 3.0
+    assert stats["granel_kg_periodo"] == 4.5
+    assert stats["granel_pacotes_periodo"] == 3.0
+    assert stats["granel_janelas_kg"]["15"] == 4.5
+    assert stats["granel_janelas_pacotes"]["15"] == 3.0
+    assert stats["origens"]["Granel"] == 3.0
+    assert stats["fontes"] == {"conversao_granel"}
+    assert stats["granel_itens"][99] == {
+        "kg": 4.5,
+        "pacotes": 3.0,
+        "produto_id": 99,
+        "produto_nome": "Racao granel",
+        "peso_pacote_kg": 1.5,
+    }
