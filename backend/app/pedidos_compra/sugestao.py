@@ -413,3 +413,54 @@ def _calcular_dias_com_estoque(
         "teve_ruptura": dias_sem_estoque >= 1 or estoque_atual <= 0,
         "ruptura_ativa": estoque_atual <= 0,
     }
+
+
+def _gerar_observacao(
+    prioridade: str,
+    dias_estoque: float,
+    tendencia: str,
+    consumo_diario: float,
+    estoque_atual: float = 0,
+    teve_ruptura: bool = False,
+    ruptura_ativa: bool = False,
+    dias_sem_estoque: float = 0,
+    consumo_ajustado: float = 0,
+    consumo_observado: float = 0,
+    ajuste_ruptura_aplicado: bool = False,
+    motivo_ajuste_ruptura: Optional[str] = None,
+) -> str:
+    observacoes = []
+
+    if ruptura_ativa:
+        observacoes.append("Ruptura ativa: estoque zerado/negativo")
+    elif prioridade == "CR\u00cdTICO":
+        if dias_estoque < 3:
+            observacoes.append("Urgente: estoque cobre menos de 3 dias")
+        else:
+            observacoes.append(f"Critico: estoque para {dias_estoque:.1f} dias")
+    elif prioridade == "ALERTA":
+        observacoes.append("Estoque abaixo do minimo configurado")
+
+    if ajuste_ruptura_aplicado and teve_ruptura and dias_sem_estoque > 0:
+        observacoes.append(
+            f"Media ajustada por {dias_sem_estoque:.1f} dia(s) sem estoque"
+        )
+    elif teve_ruptura and motivo_ajuste_ruptura:
+        observacoes.append(motivo_ajuste_ruptura)
+
+    if (
+        ajuste_ruptura_aplicado
+        and consumo_ajustado > consumo_observado * 1.1
+        and consumo_observado > 0
+    ):
+        observacoes.append("Demanda recalculada pelos dias em que havia estoque")
+
+    if tendencia == "CRESCIMENTO":
+        observacoes.append("Vendas em crescimento")
+    elif tendencia == "QUEDA":
+        observacoes.append("Vendas em queda")
+
+    if consumo_diario == 0:
+        observacoes.append("Sem vendas no periodo analisado")
+
+    return " | ".join(observacoes) if observacoes else "Estoque adequado"

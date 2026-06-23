@@ -199,9 +199,11 @@ Fatia executada na trilha Pedidos de Compra:
 - O calculo de cobertura/ruptura `_calcular_dias_com_estoque` foi movido para
   `backend/app/pedidos_compra/sugestao.py`, mantendo a consulta de movimentacoes
   no router.
+- A montagem textual `_gerar_observacao` foi movida para o mesmo modulo,
+  preservando mensagens de ruptura, tendencia, ausencia de venda e fallback.
 - Endpoints, payloads, permissoes, tenant e regras de calculo de sugestao foram
   preservados; o router continua orquestrando consultas e montagem da resposta.
-- Na branch atual, o router principal caiu de 1968 para 1680 linhas.
+- Na branch atual, o router principal caiu de 1968 para 1637 linhas.
 - Testes focados: `pytest backend/tests/unit/test_pedidos_compra_sugestao_helpers.py -q`
   e `pytest` dos testes unitarios de pedidos de compra passaram.
 

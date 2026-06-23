@@ -376,3 +376,30 @@ def test_calcular_dias_com_estoque_conta_intervalos_com_ruptura():
         "teve_ruptura": True,
         "ruptura_ativa": True,
     }
+
+
+def test_gerar_observacao_combina_ruptura_tendencia_e_fallback():
+    assert hasattr(sugestao_helpers, "_gerar_observacao")
+
+    observacao = sugestao_helpers._gerar_observacao(
+        prioridade="NORMAL",
+        dias_estoque=0,
+        tendencia="CRESCIMENTO",
+        consumo_diario=0,
+        ruptura_ativa=True,
+    )
+
+    assert observacao == (
+        "Ruptura ativa: estoque zerado/negativo | "
+        "Vendas em crescimento | "
+        "Sem vendas no periodo analisado"
+    )
+    assert (
+        sugestao_helpers._gerar_observacao(
+            prioridade="NORMAL",
+            dias_estoque=30,
+            tendencia="ESTAVEL",
+            consumo_diario=1,
+        )
+        == "Estoque adequado"
+    )
