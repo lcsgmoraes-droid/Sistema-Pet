@@ -16,8 +16,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func, desc
 from datetime import datetime, timedelta, date
 from decimal import Decimal
-from typing import List, Optional
-from pydantic import BaseModel
+from typing import Optional
 import json
 
 from .db import get_session
@@ -48,6 +47,15 @@ from .vendas.comissoes import (
     _total_pago_venda,
 )
 from .vendas.regras import _resolver_status_entrega_atualizacao, calcular_totais_venda
+from .vendas.schemas import (
+    CancelarVendaRequest,
+    CriarVendaRequest,
+    ExcluirVendaRequest,
+    FinalizarVendaRequest,
+    MarcarEntregueRequest,
+    VendaItemSchema,
+    VendaPagamentoSchema,
+)
 from .utils.tenant_safe_sql import execute_tenant_safe
 
 router = APIRouter(prefix="/vendas", tags=["vendas"])
@@ -103,74 +111,6 @@ def _remover_provisoes_comissao_venda(db: Session, venda_id: int, tenant_id) -> 
         {"descricao": f"%Comissão - Venda #{venda_id}%"},
         tenant_id=tenant_id,
     )
-
-
-# ============================================================================
-# SCHEMAS PYDANTIC
-# ============================================================================
-
-
-class VendaItemSchema(BaseModel):
-    tipo: str  # 'produto' ou 'servico'
-    produto_id: Optional[int] = None
-    servico_descricao: Optional[str] = None
-    quantidade: float
-    preco_unitario: float
-    desconto_item: Optional[float] = 0
-    subtotal: float
-    lote_id: Optional[int] = None
-    pet_id: Optional[int] = None  # Vincular item a um pet específico
-    is_kit: Optional[bool] = None  # Identificar se o item é um KIT
-
-
-class VendaPagamentoSchema(BaseModel):
-    forma_pagamento: str
-    valor: float
-    bandeira: Optional[str] = None
-    numero_parcelas: Optional[int] = 1  # Número de parcelas para cartão de crédito
-    numero_transacao: Optional[str] = None
-    numero_autorizacao: Optional[str] = None
-    nsu_cartao: Optional[str] = None  # NSU da operadora (para conciliação bancária)
-    operadora_id: Optional[int] = None  # 🆕 ID da operadora de cartão
-    valor_recebido: Optional[float] = None
-    troco: Optional[float] = None
-
-
-class CriarVendaRequest(BaseModel):
-    cliente_id: Optional[int] = None
-    vendedor_id: Optional[int] = None
-    funcionario_id: Optional[int] = None  # Funcionário/Veterinário que recebe comissão
-    itens: List[VendaItemSchema]
-    desconto_valor: Optional[float] = 0
-    desconto_percentual: Optional[float] = 0
-    cupom_code: Optional[str] = None
-    cupom_discount_applied: Optional[float] = None
-    observacoes: Optional[str] = None
-    tem_entrega: bool = False
-    taxa_entrega: Optional[float] = 0
-    percentual_taxa_loja: Optional[float] = 100  # Percentual 0-100
-    percentual_taxa_entregador: Optional[float] = 0  # Percentual 0-100
-    entregador_id: Optional[int] = None
-    loja_origem: Optional[str] = None
-    endereco_entrega: Optional[str] = None
-    distancia_km: Optional[float] = None
-    valor_por_km: Optional[float] = None
-    observacoes_entrega: Optional[str] = None
-
-
-class FinalizarVendaRequest(BaseModel):
-    pagamentos: List[VendaPagamentoSchema]
-    cupom_code: Optional[str] = None
-    cupom_discount_applied: Optional[float] = None
-
-
-class CancelarVendaRequest(BaseModel):
-    motivo: Optional[str] = None
-
-
-class ExcluirVendaRequest(BaseModel):
-    motivo: Optional[str] = None
-    justificativa: Optional[str] = None
 
 
 def _normalizar_motivo_exclusao_venda(motivo: Optional[str]) -> str:
@@ -784,10 +724,6 @@ def atualizar_venda(
             # Não falha a atualização por erro nas comissões
 
     return venda.to_dict()
-
-
-class MarcarEntregueRequest(BaseModel):
-    retirado_por: str | None = None
 
 
 def _resolver_retirado_por_conclusao(venda, retirado_por: str | None) -> str | None:

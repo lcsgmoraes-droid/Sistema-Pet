@@ -245,6 +245,15 @@ Fatia executada na trilha Vendas:
 - Na branch atual, o router principal caiu de 2236 para 2115 linhas.
 - Testes focados: `pytest backend/tests/unit/test_vendas_comissao_reprocessamento_contract.py backend/tests/multi_tenant/test_phase2b_tenant_safe_sql.py -q`
   passou com 15 testes.
+- Fatia seguinte na mesma data moveu os schemas Pydantic de entrada para
+  `backend/app/vendas/schemas.py`, preservando os nomes expostos pelo router.
+- No estado atual da branch, `backend/app/vendas_routes.py` esta com 2398
+  linhas depois da extracao de schemas.
+- Contagem atual recalculada: 79 arquivos de aplicacao ainda estao com 1000+
+  linhas quando testes, migrations e builds sao excluidos. A contagem bruta com
+  testes/migrations e 83.
+- Testes focados da fatia de schemas: `pytest backend/tests/unit/test_vendas_comissao_reprocessamento_contract.py backend/tests/unit/test_entrega_status_contract.py -q`
+  passou com 10 testes.
 
 Proxima fatia recomendada:
 

@@ -10,6 +10,20 @@ def test_vendas_comissoes_module_expoe_helpers_de_reprocessamento():
     assert importlib.util.find_spec("app.vendas.comissoes") is not None
 
 
+def test_vendas_schemas_module_expoe_schemas_usadas_pelo_router():
+    assert importlib.util.find_spec("app.vendas.schemas") is not None
+
+    from app.vendas import schemas as vendas_schemas
+
+    assert vendas_routes.VendaItemSchema is vendas_schemas.VendaItemSchema
+    assert vendas_routes.VendaPagamentoSchema is vendas_schemas.VendaPagamentoSchema
+    assert vendas_routes.CriarVendaRequest is vendas_schemas.CriarVendaRequest
+    assert vendas_routes.FinalizarVendaRequest is vendas_schemas.FinalizarVendaRequest
+    assert vendas_routes.CancelarVendaRequest is vendas_schemas.CancelarVendaRequest
+    assert vendas_routes.ExcluirVendaRequest is vendas_schemas.ExcluirVendaRequest
+    assert vendas_routes.MarcarEntregueRequest is vendas_schemas.MarcarEntregueRequest
+
+
 def test_gerar_comissoes_pendentes_ignora_parcelas_ja_geradas(monkeypatch):
     chamadas = []
 
