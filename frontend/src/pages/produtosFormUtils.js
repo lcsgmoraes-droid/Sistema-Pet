@@ -56,7 +56,10 @@ export function normalizarCodigosBarrasAlternativosCampo(valor) {
   if (!valor) return "";
 
   if (Array.isArray(valor)) {
-    return valor.map((item) => String(item).trim()).filter(Boolean).join(", ");
+    return valor
+      .map((item) => String(item).trim())
+      .filter(Boolean)
+      .join(", ");
   }
 
   const texto = String(valor).trim();
@@ -65,7 +68,10 @@ export function normalizarCodigosBarrasAlternativosCampo(valor) {
   try {
     const parsed = JSON.parse(texto);
     if (Array.isArray(parsed)) {
-      return parsed.map((item) => String(item).trim()).filter(Boolean).join(", ");
+      return parsed
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+        .join(", ");
     }
   } catch {
     // Mantem compatibilidade com cadastros antigos salvos como texto simples.
