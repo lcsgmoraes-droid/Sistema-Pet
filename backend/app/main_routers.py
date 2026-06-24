@@ -360,7 +360,9 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(formas_pagamento_router, tags=["Formas de Pagamento & PDV"])
     app.include_router(operadoras_router, tags=["Operadoras de Cartão"])
     app.include_router(
-        comissoes_router, tags=["Comissões"], dependencies=_module_dependencies("comissoes")
+        comissoes_router,
+        tags=["Comissões"],
+        dependencies=_module_dependencies("comissoes"),
     )
     app.include_router(
         comissoes_demonstrativo_router,
@@ -420,10 +422,14 @@ def register_routers(app: FastAPI) -> None:
     )
     app.include_router(categorias_router, tags=["Financeiro - Categorias"])
     app.include_router(
-        bling_router, tags=["Integração Bling"], dependencies=_module_dependencies("bling")
+        bling_router,
+        tags=["Integração Bling"],
+        dependencies=_module_dependencies("bling"),
     )
     app.include_router(
-        bling_oauth_router, tags=["Bling OAuth"], dependencies=_module_dependencies("bling")
+        bling_oauth_router,
+        tags=["Bling OAuth"],
+        dependencies=_module_dependencies("bling"),
     )
     app.include_router(
         bling_pedido_router,

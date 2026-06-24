@@ -69,7 +69,6 @@ def validate_environment():
         )
 
 
-
 def on_startup() -> None:
     """Inicializacao do sistema."""
     validate_environment()

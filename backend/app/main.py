@@ -97,8 +97,8 @@ register_routers(app)
 # EVENTOS
 # ============================================================================
 
-app.add_event_handler("startup", on_startup)
-app.add_event_handler("shutdown", on_shutdown)
+app.on_event("startup")(on_startup)
+app.on_event("shutdown")(on_shutdown)
 
 # ============================================================================
 # ROTAS BASICAS

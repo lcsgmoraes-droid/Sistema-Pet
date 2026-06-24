@@ -75,7 +75,9 @@ def register_exception_handlers(app: FastAPI) -> None:
     """Register API exception handlers."""
 
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    async def validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ):
         logger.error(f"[VALIDATION] VALIDATION ERROR: {request.url}")
         logger.error(f"   Errors: {exc.errors()}")
         logger.error(f"   Body: {exc.body if hasattr(exc, 'body') else 'N/A'}")

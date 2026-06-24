@@ -428,7 +428,6 @@ def _loop_expirar_reservas():
     )
 
 
-
 def _loop_estoque_validade():
     """Job em background para retirar lotes em risco do estoque vendavel."""
     import os as _os

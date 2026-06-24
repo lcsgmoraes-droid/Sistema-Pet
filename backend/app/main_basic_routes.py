@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 def register_basic_routes(app: FastAPI) -> None:
     """Register root, health and small diagnostic routes."""
+
     @app.get("/")
     def root():
         """Rota raiz"""
@@ -25,12 +26,10 @@ def register_basic_routes(app: FastAPI) -> None:
             "docs": "/docs",
         }
 
-
     @app.get("/health")
     def health_check():
         """Health check para monitoramento"""
         return {"status": "healthy", "system": SYSTEM_NAME, "version": SYSTEM_VERSION}
-
 
     @app.get("/ready")
     def readiness_check(db: Session = Depends(get_db)):
@@ -53,7 +52,6 @@ def register_basic_routes(app: FastAPI) -> None:
                 },
             )
 
-
     @app.get("/test-racas")
     def test_racas(especie: str = ""):
         """Rota de teste para debug"""
@@ -62,7 +60,6 @@ def register_basic_routes(app: FastAPI) -> None:
             {"id": 2, "nome": "Golden Retriever", "especie": "Cão"},
             {"id": 3, "nome": "Siamês", "especie": "Gato"},
         ]
-
 
     @app.get("/racas")
     def get_racas(especie: Optional[str] = None):
