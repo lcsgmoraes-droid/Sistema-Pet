@@ -10,6 +10,7 @@ from app.integracao_bling_pedido_routes import (
     _resolver_canal_pedido,
     _serializar_pedido_bling,
     _situacao_codigo_bling,
+    processar_pedido_bling_payload,
 )
 from app.services.pedido_integrado_consolidation_service import (
     escolher_pedido_canonico,
@@ -530,3 +531,113 @@ def test_confirmar_pedido_sem_nf_nao_baixa_estoque_nem_marca_item(monkeypatch):
     assert confirmados == []
     assert item.vendido_em is None
     assert eventos[0]["payload"]["baixa_estoque_status"] == "nf_pendente"
+
+
+def test_order_updated_atendido_com_nf_autorizada_consolida_venda(monkeypatch):
+    class FakeQuery:
+        def __init__(self, all_result=None):
+            self.all_result = all_result or []
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return list(self.all_result)
+
+    class FakeDB:
+        def __init__(self, itens):
+            self.itens = itens
+            self.added = []
+            self.commit_calls = 0
+
+        def query(self, model):
+            if getattr(model, "__name__", "") == "PedidoIntegradoItem":
+                return FakeQuery(all_result=self.itens)
+            raise AssertionError(
+                f"Modelo inesperado: {getattr(model, '__name__', model)}"
+            )
+
+        def add(self, obj):
+            self.added.append(obj)
+
+        def commit(self):
+            self.commit_calls += 1
+
+    class FakeBling:
+        def consultar_pedido(self, pedido_bling_id):
+            assert pedido_bling_id == "25997676807"
+            return {
+                "id": 25997676807,
+                "numero": "15207",
+                "numeroPedidoLoja": "260605AJ6TS27W",
+                "situacao": {"id": 9, "valor": 1},
+                "notaFiscal": {"id": "26005873647"},
+            }
+
+        def consultar_nfe(self, nf_id):
+            assert nf_id == 26005873647
+            return {
+                "id": 26005873647,
+                "numero": "003663",
+                "situacao": 5,
+                "valorNota": 76.92,
+            }
+
+        def consultar_nfce(self, nf_id):
+            raise AssertionError("nao deve consultar NFC-e quando NFe respondeu")
+
+    pedido = SimpleNamespace(
+        id=4678,
+        tenant_id="tenant-1",
+        pedido_bling_id="25997676807",
+        pedido_bling_numero="15207",
+        status="aberto",
+        confirmado_em=None,
+        payload={"pedido": {"numeroPedidoLoja": "260605AJ6TS27W"}},
+    )
+    item = SimpleNamespace(sku="022860.1/1", quantidade=1, vendido_em=None)
+    db = FakeDB([item])
+    chamadas = {}
+
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._set_bling_request_tenant",
+        lambda request=None: "tenant-1",
+    )
+    monkeypatch.setattr("app.bling_integration.BlingAPI", lambda: FakeBling())
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.localizar_pedido_por_bling_id",
+        lambda *args, **kwargs: pedido,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.registrar_evento",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.registrar_vinculo_nf_pedido",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.processar_nf_autorizada",
+        lambda **kwargs: (
+            chamadas.setdefault("processou_nf", kwargs),
+            "venda_confirmada",
+        )[1],
+    )
+
+    resposta = processar_pedido_bling_payload(
+        {
+            "event": "order.updated",
+            "date": "2026-06-05T12:00:00Z",
+            "data": {
+                "id": "25997676807",
+                "situacao": {"id": 9, "valor": 1},
+            },
+        },
+        db,
+    )
+
+    assert resposta["status"] == "ok"
+    assert resposta["acao"] == "venda_confirmada"
+    assert chamadas["processou_nf"]["pedido"] is pedido
+    assert chamadas["processou_nf"]["itens"] == [item]
+    assert chamadas["processou_nf"]["nf_id"] == "26005873647"

@@ -41,9 +41,13 @@ BLING_NFE_PENDING_RECONCILE_LIMIT = int(
 BLING_NFE_AUTH_RECONCILE_INTERVAL_MINUTES = int(
     os.getenv("BLING_NFE_AUTH_RECONCILE_INTERVAL_MINUTES", "30")
 )
+BLING_NFE_AUTH_RECONCILE_DAYS = int(os.getenv("BLING_NFE_AUTH_RECONCILE_DAYS", "90"))
 BLING_NFE_AUTH_RECONCILE_LIMIT = int(os.getenv("BLING_NFE_AUTH_RECONCILE_LIMIT", "120"))
 BLING_ORDER_STATUS_RECONCILE_INTERVAL_MINUTES = int(
     os.getenv("BLING_ORDER_STATUS_RECONCILE_INTERVAL_MINUTES", "60")
+)
+BLING_ORDER_STATUS_RECONCILE_DAYS = int(
+    os.getenv("BLING_ORDER_STATUS_RECONCILE_DAYS", "90")
 )
 BLING_ORDER_STATUS_RECONCILE_LIMIT = int(
     os.getenv("BLING_ORDER_STATUS_RECONCILE_LIMIT", "15")
@@ -274,7 +278,7 @@ class BlingSyncScheduler:
         try:
             result = executar_reconciliacao_automatica_nfes_autorizadas(
                 db,
-                dias=5,
+                dias=BLING_NFE_AUTH_RECONCILE_DAYS,
                 limite_notas_por_tenant=BLING_NFE_AUTH_RECONCILE_LIMIT,
             )
             if result.get("notas_reconciliadas_total"):
@@ -292,7 +296,7 @@ class BlingSyncScheduler:
         try:
             result = executar_reconciliacao_automatica_status_pedidos(
                 db,
-                dias=7,
+                dias=BLING_ORDER_STATUS_RECONCILE_DAYS,
                 limite_pedidos_por_tenant=BLING_ORDER_STATUS_RECONCILE_LIMIT,
             )
             if (
