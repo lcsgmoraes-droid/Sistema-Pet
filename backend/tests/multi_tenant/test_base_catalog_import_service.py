@@ -3,6 +3,10 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.services import base_catalog_import_catalog
+from app.services import base_catalog_import_core
+from app.services import base_catalog_import_images
+from app.services import base_catalog_import_relations
 from app.services import base_catalog_import_service
 from app.services.base_catalog_import_service import (
     BaseCatalogImportError,
@@ -813,12 +817,14 @@ def test_import_syncs_rls_context_for_source_and_target_product_relations(
         synced_tenants.append(str(tenant_id))
         return True
 
-    monkeypatch.setattr(
+    for module in (
+        base_catalog_import_catalog,
+        base_catalog_import_core,
+        base_catalog_import_images,
+        base_catalog_import_relations,
         base_catalog_import_service,
-        "sync_rls_tenant",
-        fake_sync_rls_tenant,
-        raising=False,
-    )
+    ):
+        monkeypatch.setattr(module, "sync_rls_tenant", fake_sync_rls_tenant)
 
     import_base_catalog(
         db=catalog_session,
