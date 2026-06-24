@@ -570,7 +570,7 @@ def test_ecommerce_profile_merge_uses_generic_reference_transfer_before_detachin
         }
 
     monkeypatch.setattr(
-        "app.routes.ecommerce_auth.transferir_referencias_pessoa",
+        "app.routes.ecommerce_auth_cliente.transferir_referencias_pessoa",
         fake_transferir_referencias_pessoa,
     )
     db = _TransferDb()
@@ -628,7 +628,7 @@ def test_app_mobile_cliente_helper_uses_profile_resolution_for_duplicate_custome
         is_entregador=False,
     )
     monkeypatch.setattr(
-        "app.routes.ecommerce_auth._find_operational_cliente_match",
+        "app.routes.ecommerce_auth_cliente._find_operational_cliente_match",
         lambda *_args, **_kwargs: None,
     )
     clear_current_tenant()
