@@ -1,22 +1,18 @@
 """Rotas de transferencia de estoque para parceiro."""
 
-from collections import defaultdict
 from datetime import date, datetime
 from decimal import Decimal
 import io
-import json
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
-from sqlalchemy import and_, desc, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
 
 from .auth.dependencies import get_current_user_and_tenant
 from .bling_estoque_sync import sincronizar_bling_background
 from .db import get_session
-from .dre_plano_contas_models import DRECategoria, DRESubcategoria, NaturezaDRE
 from .estoque.transferencia_parceiro_documents import (
     _gerar_pdf_transferencia_parceiro_bytes,
     _gerar_pdf_transferencias_parceiro_consolidado_bytes,
@@ -24,17 +20,52 @@ from .estoque.transferencia_parceiro_documents import (
     _saldo_conta_receber,
     _status_transferencia_parceiro,
 )
-from .estoque.service import EstoqueService
-from .financeiro_models import (
-    CategoriaFinanceira,
-    ContaPagar,
-    ContaReceber,
-    FormaPagamento,
-    Pagamento,
-    Recebimento,
+from .estoque.transferencia_parceiro_schemas import (
+    TransferenciaParceiroContaPagarCompensacaoItem,
+    TransferenciaParceiroContaPagarCompensacaoResponse,
+    TransferenciaParceiroEnviarEmailRequest,
+    TransferenciaParceiroHistoricoItem,
+    TransferenciaParceiroHistoricoMovItem,
+    TransferenciaParceiroHistoricoResponse,
+    TransferenciaParceiroHistoricoTotais,
+    TransferenciaParceiroItemRequest,
+    TransferenciaParceiroPdfConsolidadoRequest,
+    TransferenciaParceiroRecebimentoRequest,
+    TransferenciaParceiroRequest,
 )
+from .estoque.transferencia_parceiro_support import (
+    _MOTIVO_TRANSFERENCIA_PARCEIRO_EDICAO,
+    _MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE,
+    _MOTIVO_TRANSFERENCIA_PARCEIRO_EXCLUSAO,
+    _REFERENCIA_TRANSFERENCIA_PARCEIRO_EDICAO,
+    _REFERENCIA_TRANSFERENCIA_PARCEIRO_EXCLUSAO,
+    _aplicar_compensacoes_contas_pagar_transferencia,
+    _buscar_conta_transferencia_parceiro,
+    _buscar_contas_pagar_compensacao_transferencia,
+    _buscar_forma_pagamento_transferencia,
+    _buscar_transferencias_parceiro_filtradas,
+    _detectar_modo_baixa_transferencia,
+    _formatar_resumo_compensacoes_transferencia,
+    _gerar_codigo_transferencia_parceiro,
+    _label_modo_baixa_transferencia,
+    _listar_itens_por_conta_transferencia_parceiro,
+    _listar_itens_transferencia_parceiro,
+    _montar_observacoes_transferencia_parceiro,
+    _normalizar_modo_baixa_transferencia,
+    _obter_dre_subcategoria_receita_padrao,
+    _obter_ou_criar_categoria_financeira_transferencia,
+    _obter_ou_criar_forma_pagamento_acerto,
+    _obter_ultimo_recebimento_transferencia,
+    _preparar_itens_transferencia_parceiro,
+    _restaurar_lotes_consumidos_transferencia,
+    _saldo_conta_pagar,
+    _status_conta_pagar_compensacao,
+    _texto_limpo,
+)
+from .estoque.service import EstoqueService
+from .financeiro_models import ContaReceber, Recebimento
 from .models import Cliente
-from .produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
+from .produtos_models import EstoqueMovimentacao
 from .security.permissions_decorator import require_permission
 from .services.email_service import is_email_configured, send_email
 import logging
@@ -43,826 +74,24 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/estoque", tags=["Estoque - Transferencia Parceiro"])
 
-
-def _texto_limpo(valor) -> str | None:
-    if valor is None:
-        return None
-    texto = str(valor).strip()
-    return texto or None
-
-
-_MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE = "transf_parceiro"
-_MOTIVO_TRANSFERENCIA_PARCEIRO_EXCLUSAO = "transf_exc"
-_MOTIVO_TRANSFERENCIA_PARCEIRO_EDICAO = "transf_edit"
-_REFERENCIA_TRANSFERENCIA_PARCEIRO_EXCLUSAO = "transf_excl"
-_REFERENCIA_TRANSFERENCIA_PARCEIRO_EDICAO = "transf_edit"
-_MODO_BAIXA_TRANSFERENCIA_LABELS = {
-    "recebimento": "Recebimento",
-    "acerto": "Acerto / Compensacao",
-}
-
-
-class TransferenciaParceiroItemRequest(BaseModel):
-    """Item da transferencia de estoque para parceiro."""
-
-    produto_id: int
-    quantidade: float = Field(gt=0)
-    custo_unitario: Optional[float] = Field(default=None, ge=0)
-    valor_total: Optional[float] = Field(default=None, ge=0)
-
-
-class TransferenciaParceiroRequest(BaseModel):
-    """Transferencia de estoque para parceiro com ressarcimento pelo custo."""
-
-    parceiro_id: int
-    data_vencimento: Optional[date] = None
-    documento: Optional[str] = None
-    observacao: Optional[str] = None
-    itens: List[TransferenciaParceiroItemRequest] = Field(
-        default_factory=list, min_items=1
-    )
-
-
-class TransferenciaParceiroEnviarEmailRequest(BaseModel):
-    email: Optional[str] = None
-    assunto: Optional[str] = None
-    mensagem: Optional[str] = None
-    mostrar_codigo: bool = True
-    mostrar_descricao: bool = True
-    mostrar_quantidade: bool = True
-    mostrar_custo_unitario: bool = True
-    mostrar_total_item: bool = True
-    mostrar_totais: bool = True
-
-
-class TransferenciaParceiroCompensacaoContaRequest(BaseModel):
-    conta_pagar_id: int
-    valor_compensado: float = Field(gt=0)
-
-
-class TransferenciaParceiroRecebimentoRequest(BaseModel):
-    valor_recebido: float = Field(gt=0)
-    data_recebimento: date = Field(default_factory=date.today)
-    modo_baixa: str = Field(default="recebimento")
-    forma_pagamento_id: Optional[int] = None
-    compensacoes: List[TransferenciaParceiroCompensacaoContaRequest] = Field(
-        default_factory=list
-    )
-    observacao: Optional[str] = None
-
-
-class TransferenciaParceiroHistoricoMovItem(BaseModel):
-    produto_id: int
-    produto_nome: str
-    codigo: Optional[str] = None
-    codigo_barras: Optional[str] = None
-    estoque_atual: float = 0
-    quantidade: float = 0
-    custo_unitario: float = 0
-    valor_total: float = 0
-    created_at: Optional[datetime] = None
-
-
-class TransferenciaParceiroContaPagarCompensacaoItem(BaseModel):
-    conta_pagar_id: int
-    descricao: str
-    documento: Optional[str] = None
-    data_emissao: Optional[date] = None
-    data_vencimento: Optional[date] = None
-    status: str
-    status_label: str
-    valor_original: float = 0
-    valor_pago: float = 0
-    saldo_aberto: float = 0
-    observacoes: Optional[str] = None
-
-
-class TransferenciaParceiroContaPagarCompensacaoResponse(BaseModel):
-    items: List[TransferenciaParceiroContaPagarCompensacaoItem] = Field(
-        default_factory=list
-    )
-    total: int = 0
-    total_disponivel: float = 0
-
-
-class TransferenciaParceiroPdfConsolidadoRequest(BaseModel):
-    conta_receber_ids: List[int] = Field(default_factory=list)
-    parceiro_id: Optional[int] = None
-    status_filtro: Optional[str] = None
-    busca: Optional[str] = None
-    data_inicio: Optional[date] = None
-    data_fim: Optional[date] = None
-    mostrar_codigo: bool = True
-    mostrar_descricao: bool = True
-    mostrar_quantidade: bool = True
-    mostrar_custo_unitario: bool = True
-    mostrar_total_item: bool = True
-    mostrar_totais: bool = True
-
-
-class TransferenciaParceiroHistoricoItem(BaseModel):
-    conta_receber_id: int
-    documento: Optional[str] = None
-    parceiro_id: Optional[int] = None
-    parceiro_nome: str
-    parceiro_codigo: Optional[str] = None
-    parceiro_email: Optional[str] = None
-    data_emissao: Optional[date] = None
-    data_vencimento: Optional[date] = None
-    data_recebimento: Optional[date] = None
-    status: str
-    status_label: str
-    valor_original: float = 0
-    valor_recebido: float = 0
-    saldo_aberto: float = 0
-    modo_baixa: Optional[str] = None
-    modo_baixa_label: Optional[str] = None
-    forma_pagamento_id: Optional[int] = None
-    forma_pagamento_nome: Optional[str] = None
-    observacoes: Optional[str] = None
-    itens: List[TransferenciaParceiroHistoricoMovItem] = Field(default_factory=list)
-
-
-class TransferenciaParceiroHistoricoTotais(BaseModel):
-    total_registros: int = 0
-    valor_total: float = 0
-    valor_recebido: float = 0
-    saldo_aberto: float = 0
-    pendentes: int = 0
-    recebidas: int = 0
-    vencidas: int = 0
-
-
-class TransferenciaParceiroHistoricoResponse(BaseModel):
-    items: List[TransferenciaParceiroHistoricoItem] = Field(default_factory=list)
-    totais: TransferenciaParceiroHistoricoTotais
-    total: int
-    page: int
-    page_size: int
-    pages: int
-
-
-def _obter_dre_subcategoria_receita_padrao(db: Session, tenant_id) -> int:
-    subcategoria = (
-        db.query(DRESubcategoria)
-        .join(DRECategoria, DRECategoria.id == DRESubcategoria.categoria_id)
-        .filter(
-            DRESubcategoria.tenant_id == str(tenant_id),
-            DRECategoria.tenant_id == str(tenant_id),
-            and_(DRESubcategoria.ativo.is_(True), DRECategoria.ativo.is_(True)),
-            DRECategoria.natureza == NaturezaDRE.RECEITA,
-        )
-        .order_by(DRECategoria.ordem.asc(), DRESubcategoria.id.asc())
-        .first()
-    )
-    return subcategoria.id if subcategoria else 1
-
-
-def _obter_ou_criar_categoria_financeira_transferencia(
-    db: Session,
-    *,
-    tenant_id,
-    user_id: int,
-) -> CategoriaFinanceira:
-    categoria = (
-        db.query(CategoriaFinanceira)
-        .filter(
-            CategoriaFinanceira.tenant_id == str(tenant_id),
-            CategoriaFinanceira.nome == "Transferencia para Parceiro",
-            CategoriaFinanceira.tipo == "receita",
-        )
-        .first()
-    )
-    if categoria:
-        return categoria
-
-    categoria = CategoriaFinanceira(
-        tenant_id=str(tenant_id),
-        nome="Transferencia para Parceiro",
-        tipo="receita",
-        descricao="Ressarcimento de estoque transferido a parceiro sem gerar venda no PDV.",
-        dre_subcategoria_id=_obter_dre_subcategoria_receita_padrao(db, tenant_id),
-        ativo=True,
-        user_id=user_id,
-    )
-    db.add(categoria)
-    db.flush()
-    return categoria
-
-
-def _obter_ou_criar_forma_pagamento_acerto(
-    db: Session,
-    *,
-    tenant_id,
-    user_id: int,
-) -> FormaPagamento:
-    forma = (
-        db.query(FormaPagamento)
-        .filter(
-            FormaPagamento.tenant_id == str(tenant_id),
-            FormaPagamento.nome.ilike("acerto%"),
-        )
-        .order_by(FormaPagamento.id.asc())
-        .first()
-    )
-    if forma:
-        if forma.ativo is False:
-            forma.ativo = True
-            db.add(forma)
-            db.flush()
-        return forma
-
-    forma = FormaPagamento(
-        tenant_id=str(tenant_id),
-        nome="Acerto",
-        tipo="transferencia",
-        taxa_percentual=0,
-        taxa_fixa=0,
-        prazo_dias=0,
-        prazo_recebimento=0,
-        ativo=True,
-        permite_parcelamento=False,
-        max_parcelas=1,
-        parcelas_maximas=1,
-        gera_contas_receber=False,
-        split_parcelas=False,
-        user_id=user_id,
-    )
-    db.add(forma)
-    db.flush()
-    return forma
-
-
-def _gerar_codigo_transferencia_parceiro() -> str:
-    return f"TRP-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-
-
-def _normalizar_modo_baixa_transferencia(valor: str | None) -> str:
-    texto = _texto_limpo(valor)
-    modo = (texto or "recebimento").strip().lower()
-    if modo not in _MODO_BAIXA_TRANSFERENCIA_LABELS:
-        raise HTTPException(
-            status_code=400,
-            detail="Modo de baixa invalido. Use recebimento ou acerto.",
-        )
-    return modo
-
-
-def _label_modo_baixa_transferencia(valor: str | None) -> str | None:
-    texto = _texto_limpo(valor)
-    if not texto:
-        return None
-    return _MODO_BAIXA_TRANSFERENCIA_LABELS.get(texto, texto.replace("_", " ").title())
-
-
-def _buscar_forma_pagamento_transferencia(
-    db: Session,
-    *,
-    tenant_id,
-    forma_pagamento_id: int,
-) -> FormaPagamento:
-    forma = (
-        db.query(FormaPagamento)
-        .filter(
-            FormaPagamento.id == forma_pagamento_id,
-            FormaPagamento.tenant_id == str(tenant_id),
-        )
-        .first()
-    )
-    if not forma:
-        raise HTTPException(status_code=404, detail="Forma de pagamento nao encontrada")
-    return forma
-
-
-def _saldo_conta_pagar(conta: ContaPagar) -> float:
-    valor_final = float(conta.valor_final or 0)
-    valor_pago = float(conta.valor_pago or 0)
-    saldo = valor_final - valor_pago
-    return round(max(saldo, 0.0), 2)
-
-
-def _status_conta_pagar_compensacao(conta: ContaPagar) -> tuple[str, str]:
-    status_atual = str(getattr(conta, "status", "") or "").strip().lower()
-    saldo_aberto = _saldo_conta_pagar(conta)
-    hoje = date.today()
-
-    if status_atual in {"pago", "recebido"} or saldo_aberto <= 0:
-        return "pago", "Paga"
-    if status_atual in {"cancelado", "cancelada"}:
-        return "cancelado", "Cancelada"
-    if status_atual == "parcial":
-        if conta.data_vencimento and conta.data_vencimento < hoje:
-            return "vencido", "Vencida"
-        return "parcial", "Parcial"
-    if conta.data_vencimento and conta.data_vencimento < hoje:
-        return "vencido", "Vencida"
-    return "pendente", "Pendente"
-
-
-def _buscar_conta_transferencia_parceiro(
-    db: Session,
-    tenant_id: int | str,
-    conta_receber_id: int,
-) -> ContaReceber:
-    conta = (
-        db.query(ContaReceber)
-        .options(
-            joinedload(ContaReceber.cliente),
-        )
-        .filter(
-            ContaReceber.id == conta_receber_id,
-            ContaReceber.tenant_id == str(tenant_id),
-            ContaReceber.canal == "transferencia_parceiro",
-        )
-        .first()
-    )
-
-    if not conta:
-        raise HTTPException(status_code=404, detail="Transferencia nao encontrada")
-
-    return conta
-
-
-def _buscar_transferencias_parceiro_filtradas(
-    db: Session,
-    *,
-    tenant_id: int | str,
-    parceiro_id: Optional[int] = None,
-    status_filtro: Optional[str] = None,
-    busca: Optional[str] = None,
-    data_inicio: Optional[date] = None,
-    data_fim: Optional[date] = None,
-    conta_receber_ids: Optional[list[int]] = None,
-) -> list[ContaReceber]:
-    termo_busca = (busca or "").strip()
-    status_normalizado = (status_filtro or "").strip().lower()
-
-    query = (
-        db.query(ContaReceber)
-        .options(
-            joinedload(ContaReceber.cliente),
-            joinedload(ContaReceber.recebimentos).joinedload(
-                Recebimento.forma_pagamento
-            ),
-        )
-        .filter(
-            ContaReceber.tenant_id == str(tenant_id),
-            ContaReceber.canal == "transferencia_parceiro",
-        )
-    )
-
-    if conta_receber_ids:
-        query = query.filter(ContaReceber.id.in_(conta_receber_ids))
-
-    if parceiro_id:
-        query = query.filter(ContaReceber.cliente_id == parceiro_id)
-
-    if data_inicio:
-        query = query.filter(ContaReceber.data_emissao >= data_inicio)
-
-    if data_fim:
-        query = query.filter(ContaReceber.data_emissao <= data_fim)
-
-    if termo_busca:
-        busca_pattern = f"%{termo_busca}%"
-        query = query.outerjoin(Cliente, Cliente.id == ContaReceber.cliente_id).filter(
-            or_(
-                ContaReceber.documento.ilike(busca_pattern),
-                ContaReceber.descricao.ilike(busca_pattern),
-                ContaReceber.observacoes.ilike(busca_pattern),
-                Cliente.nome.ilike(busca_pattern),
-                Cliente.codigo.ilike(busca_pattern),
-            )
-        )
-
-    contas = query.order_by(
-        desc(ContaReceber.data_emissao),
-        desc(ContaReceber.id),
-    ).all()
-
-    if not status_normalizado:
-        return contas
-
-    return [
-        conta
-        for conta in contas
-        if _status_transferencia_parceiro(conta)[0] == status_normalizado
-    ]
-
-
-def _buscar_contas_pagar_compensacao_transferencia(
-    db: Session,
-    *,
-    tenant_id: int | str,
-    cliente_id: int | None,
-) -> list[ContaPagar]:
-    if not cliente_id:
-        return []
-
-    contas = (
-        db.query(ContaPagar)
-        .filter(
-            ContaPagar.tenant_id == str(tenant_id),
-            ContaPagar.fornecedor_id == cliente_id,
-            ContaPagar.status.notin_(["pago", "cancelado", "cancelada"]),
-        )
-        .order_by(
-            ContaPagar.data_vencimento.asc(),
-            ContaPagar.id.asc(),
-        )
-        .all()
-    )
-
-    return [conta for conta in contas if _saldo_conta_pagar(conta) > 0.009]
-
-
-def _formatar_resumo_compensacoes_transferencia(
-    compensacoes_processadas: list[dict],
-) -> str | None:
-    if not compensacoes_processadas:
-        return None
-
-    partes = []
-    for item in compensacoes_processadas:
-        documento = (
-            _texto_limpo(item.get("documento")) or f"Conta #{item['conta_pagar_id']}"
-        )
-        partes.append(f"{documento} (R$ {float(item['valor_compensado']):.2f})")
-
-    return "Contas compensadas: " + ", ".join(partes)
-
-
-def _aplicar_compensacoes_contas_pagar_transferencia(
-    db: Session,
-    *,
-    conta_receber: ContaReceber,
-    tenant_id: int | str,
-    user_id: int,
-    data_pagamento: date,
-    forma_pagamento: FormaPagamento,
-    compensacoes_payload: list[TransferenciaParceiroCompensacaoContaRequest],
-) -> list[dict]:
-    if not compensacoes_payload:
-        return []
-
-    cliente_id = getattr(conta_receber, "cliente_id", None)
-    if not cliente_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Esta transferencia nao possui pessoa vinculada para compensacao.",
-        )
-
-    ids = [int(item.conta_pagar_id) for item in compensacoes_payload]
-    contas = (
-        db.query(ContaPagar)
-        .filter(
-            ContaPagar.tenant_id == str(tenant_id),
-            ContaPagar.fornecedor_id == cliente_id,
-            ContaPagar.id.in_(ids),
-        )
-        .all()
-    )
-    contas_por_id = {conta.id: conta for conta in contas}
-
-    compensacoes_processadas: list[dict] = []
-    documento_transferencia = (
-        _texto_limpo(conta_receber.documento) or f"TRP-{conta_receber.id:06d}"
-    )
-
-    for item in compensacoes_payload:
-        conta_pagar = contas_por_id.get(int(item.conta_pagar_id))
-        if not conta_pagar:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Conta a pagar #{item.conta_pagar_id} nao encontrada para essa pessoa.",
-            )
-
-        saldo_aberto = _saldo_conta_pagar(conta_pagar)
-        valor_compensado = round(float(item.valor_compensado or 0), 2)
-        if valor_compensado <= 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Informe um valor de compensacao maior que zero.",
-            )
-        if valor_compensado - saldo_aberto > 0.01:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"O valor compensado ultrapassa o saldo da conta a pagar #{conta_pagar.id}. "
-                    f"Saldo atual: R$ {saldo_aberto:.2f}"
-                ),
-            )
-
-        novo_valor_pago = round(
-            float(conta_pagar.valor_pago or 0) + valor_compensado, 2
-        )
-        conta_pagar.valor_pago = Decimal(str(novo_valor_pago))
-        conta_pagar.status = (
-            "pago"
-            if abs(float(conta_pagar.valor_final or 0) - novo_valor_pago) < 0.01
-            else "parcial"
-        )
-        if conta_pagar.status == "pago":
-            conta_pagar.data_pagamento = data_pagamento
-
-        documento_conta = (
-            _texto_limpo(conta_pagar.documento) or f"Conta #{conta_pagar.id}"
-        )
-        observacao_pagamento = (
-            f"Compensacao via transferencia {documento_transferencia} "
-            f"(conta a receber #{conta_receber.id}) - R$ {valor_compensado:.2f}"
-        )
-        pagamento = Pagamento(
-            conta_pagar_id=conta_pagar.id,
-            forma_pagamento_id=forma_pagamento.id,
-            valor_pago=Decimal(str(valor_compensado)),
-            data_pagamento=data_pagamento,
-            observacoes=observacao_pagamento,
-            user_id=user_id,
-            tenant_id=str(tenant_id),
-        )
-        db.add(pagamento)
-
-        conta_pagar.observacoes = (
-            f"{conta_pagar.observacoes}\n\n{observacao_pagamento}".strip()
-            if conta_pagar.observacoes
-            else observacao_pagamento
-        )
-
-        compensacoes_processadas.append(
-            {
-                "conta_pagar_id": conta_pagar.id,
-                "documento": documento_conta,
-                "descricao": conta_pagar.descricao,
-                "valor_compensado": valor_compensado,
-                "saldo_restante": _saldo_conta_pagar(conta_pagar),
-                "status": conta_pagar.status,
-            }
-        )
-
-    return compensacoes_processadas
-
-
-def _obter_ultimo_recebimento_transferencia(conta: ContaReceber) -> Recebimento | None:
-    recebimentos = list(getattr(conta, "recebimentos", None) or [])
-    if not recebimentos:
-        return None
-
-    return max(
-        recebimentos,
-        key=lambda item: (
-            item.data_recebimento or date.min,
-            getattr(item, "created_at", None) or datetime.min,
-            getattr(item, "id", 0) or 0,
-        ),
-    )
-
-
-def _detectar_modo_baixa_transferencia(
-    recebimento: Recebimento | None,
-) -> tuple[str | None, str | None]:
-    if not recebimento:
-        return None, None
-
-    forma_nome = _texto_limpo(
-        getattr(getattr(recebimento, "forma_pagamento", None), "nome", None)
-    )
-    observacoes = (_texto_limpo(recebimento.observacoes) or "").lower()
-
-    if (
-        (forma_nome and forma_nome.lower() == "acerto")
-        or "acerto" in observacoes
-        or "compens" in observacoes
-    ):
-        return "acerto", _label_modo_baixa_transferencia("acerto")
-
-    return "recebimento", _label_modo_baixa_transferencia("recebimento")
-
-
-def _listar_itens_transferencia_parceiro(
-    db: Session,
-    tenant_id: int | str,
-    conta_receber_id: int,
-) -> list[TransferenciaParceiroHistoricoMovItem]:
-    movimentacoes = (
-        db.query(EstoqueMovimentacao)
-        .options(
-            joinedload(EstoqueMovimentacao.produto),
-        )
-        .filter(
-            EstoqueMovimentacao.tenant_id == str(tenant_id),
-            EstoqueMovimentacao.referencia_id == conta_receber_id,
-            EstoqueMovimentacao.motivo.in_(
-                [_MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE, "transferencia_parceiro"]
-            ),
-        )
-        .order_by(
-            EstoqueMovimentacao.created_at.asc(),
-            EstoqueMovimentacao.id.asc(),
-        )
-        .all()
-    )
-
-    itens: list[TransferenciaParceiroHistoricoMovItem] = []
-    for mov in movimentacoes:
-        itens.append(
-            TransferenciaParceiroHistoricoMovItem(
-                produto_id=mov.produto_id,
-                produto_nome=mov.produto.nome
-                if mov.produto
-                else f"Produto #{mov.produto_id}",
-                codigo=getattr(mov.produto, "codigo", None) if mov.produto else None,
-                codigo_barras=getattr(mov.produto, "codigo_barras", None)
-                if mov.produto
-                else None,
-                estoque_atual=float(getattr(mov.produto, "estoque_atual", 0) or 0)
-                if mov.produto
-                else 0,
-                quantidade=float(mov.quantidade or 0),
-                custo_unitario=float(mov.custo_unitario or 0),
-                valor_total=float(mov.valor_total or 0),
-                created_at=mov.created_at,
-            )
-        )
-
-    return itens
-
-
-def _restaurar_lotes_consumidos_transferencia(
-    db: Session,
-    movimentacao: EstoqueMovimentacao,
-) -> int:
-    bruto = getattr(movimentacao, "lotes_consumidos", None)
-    if not bruto:
-        return 0
-
-    try:
-        lotes = json.loads(bruto) if isinstance(bruto, str) else bruto
-    except Exception:
-        lotes = []
-
-    restaurados = 0
-    for item_lote in lotes or []:
-        lote_id = item_lote.get("lote_id")
-        quantidade = float(item_lote.get("quantidade") or 0)
-        if not lote_id or quantidade <= 0:
-            continue
-
-        lote = db.query(ProdutoLote).filter(ProdutoLote.id == lote_id).first()
-        if not lote:
-            continue
-
-        lote.quantidade_disponivel = float(lote.quantidade_disponivel or 0) + quantidade
-        if lote.quantidade_disponivel > 0:
-            lote.status = "ativo"
-        db.add(lote)
-        restaurados += 1
-
-    return restaurados
-
-
-def _resolver_valores_item_transferencia(
-    produto: Produto,
-    item: TransferenciaParceiroItemRequest,
-) -> tuple[Decimal, Decimal]:
-    quantidade = Decimal(str(float(item.quantidade or 0)))
-    custo_padrao = Decimal(str(round(float(produto.preco_custo or 0), 2)))
-    custo_informado = (
-        Decimal(str(round(float(item.custo_unitario or 0), 2)))
-        if item.custo_unitario is not None
-        else None
-    )
-    total_informado = (
-        Decimal(str(round(float(item.valor_total or 0), 2)))
-        if item.valor_total is not None
-        else None
-    )
-
-    if total_informado is not None:
-        total_item = total_informado.quantize(Decimal("0.01"))
-        custo_unitario = (
-            (total_item / quantidade).quantize(Decimal("0.01"))
-            if quantidade > 0
-            else Decimal("0.00")
-        )
-    else:
-        custo_unitario = (
-            custo_informado if custo_informado is not None else custo_padrao
-        ).quantize(Decimal("0.01"))
-        total_item = (custo_unitario * quantidade).quantize(Decimal("0.01"))
-
-    if custo_unitario < 0 or total_item < 0:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Os valores do item '{produto.nome}' nao podem ser negativos",
-        )
-
-    return custo_unitario, total_item
-
-
-def _preparar_itens_transferencia_parceiro(
-    db: Session,
-    *,
-    tenant_id,
-    itens_validos: list[TransferenciaParceiroItemRequest],
-) -> tuple[list[dict], Decimal]:
-    quantidades_por_produto: dict[int, float] = defaultdict(float)
-    for item in itens_validos:
-        quantidades_por_produto[int(item.produto_id)] += float(item.quantidade or 0)
-
-    produto_ids = list(quantidades_por_produto.keys())
-    produtos = (
-        db.query(Produto)
-        .filter(
-            Produto.id.in_(produto_ids),
-            Produto.tenant_id == tenant_id,
-        )
-        .all()
-    )
-    produtos_cache = {produto.id: produto for produto in produtos}
-
-    for produto_id, quantidade in quantidades_por_produto.items():
-        produto = produtos_cache.get(produto_id)
-        if not produto:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Produto ID {produto_id} nao encontrado",
-            )
-
-        if produto.is_parent:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Produto '{produto.nome}' possui variacoes. "
-                    "Selecione a variacao individual para transferir estoque."
-                ),
-            )
-
-        if produto.tipo_produto == "KIT" and produto.tipo_kit == "VIRTUAL":
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Produto '{produto.nome}' e um KIT VIRTUAL. "
-                    "Use os componentes individuais na transferencia."
-                ),
-            )
-
-        estoque_atual = float(produto.estoque_atual or 0)
-        if estoque_atual < quantidade:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"Estoque insuficiente para '{produto.nome}'. "
-                    f"Disponivel: {estoque_atual}, solicitado: {quantidade}"
-                ),
-            )
-
-    itens_processados = []
-    total_transferencia = Decimal("0")
-    for item in itens_validos:
-        produto = produtos_cache.get(int(item.produto_id))
-        if not produto:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Produto ID {item.produto_id} nao encontrado",
-            )
-
-        custo_unitario, total_item = _resolver_valores_item_transferencia(produto, item)
-        total_transferencia += total_item
-
-        itens_processados.append(
-            {
-                "produto_id": produto.id,
-                "produto_nome": produto.nome,
-                "codigo": getattr(produto, "codigo", None),
-                "codigo_barras": getattr(produto, "codigo_barras", None),
-                "quantidade": float(item.quantidade or 0),
-                "custo_unitario": float(custo_unitario),
-                "total_item": float(total_item),
-                "estoque_anterior": float(produto.estoque_atual or 0),
-            }
-        )
-
-    if total_transferencia <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail="Informe ao menos um item com valor total maior que zero",
-        )
-
-    return itens_processados, total_transferencia
-
-
-def _montar_observacoes_transferencia_parceiro(
-    observacao: Optional[str],
-    itens_processados: list[dict],
-) -> str:
-    observacoes_itens = "; ".join(
-        f"{item['produto_nome']} x {item['quantidade']}" for item in itens_processados
-    )
-    observacao_limpa = _texto_limpo(observacao)
-    if observacao_limpa:
-        return f"{observacao_limpa}\n\nItens: {observacoes_itens}"
-    return observacoes_itens
+__all__ = [
+    "TransferenciaParceiroContaPagarCompensacaoItem",
+    "TransferenciaParceiroContaPagarCompensacaoResponse",
+    "TransferenciaParceiroEnviarEmailRequest",
+    "TransferenciaParceiroHistoricoItem",
+    "TransferenciaParceiroHistoricoMovItem",
+    "TransferenciaParceiroHistoricoResponse",
+    "TransferenciaParceiroHistoricoTotais",
+    "TransferenciaParceiroItemRequest",
+    "TransferenciaParceiroPdfConsolidadoRequest",
+    "TransferenciaParceiroRecebimentoRequest",
+    "TransferenciaParceiroRequest",
+    "_gerar_pdf_transferencia_parceiro_bytes",
+    "_gerar_pdf_transferencias_parceiro_consolidado_bytes",
+    "_montar_email_transferencia_parceiro",
+    "_status_transferencia_parceiro",
+    "router",
+]
 
 
 @router.post("/transferencia-parceiro", status_code=status.HTTP_201_CREATED)
@@ -901,10 +130,6 @@ def transferir_estoque_para_parceiro(
             detail="Informe ao menos um item com quantidade maior que zero",
         )
 
-    quantidades_por_produto: dict[int, float] = defaultdict(float)
-    for item in itens_validos:
-        quantidades_por_produto[int(item.produto_id)] += float(item.quantidade or 0)
-
     codigo_transferencia = (
         _texto_limpo(payload.documento) or _gerar_codigo_transferencia_parceiro()
     )
@@ -922,88 +147,12 @@ def transferir_estoque_para_parceiro(
             detail="Ja existe um registro financeiro com este documento",
         )
 
-    itens_processados = []
-    total_transferencia = Decimal("0")
-
     try:
-        produtos_cache: dict[int, Produto] = {}
-
-        for produto_id, quantidade in quantidades_por_produto.items():
-            produto = (
-                db.query(Produto)
-                .filter(
-                    Produto.id == produto_id,
-                    Produto.tenant_id == tenant_id,
-                )
-                .first()
-            )
-            if not produto:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Produto ID {produto_id} nao encontrado",
-                )
-
-            if produto.is_parent:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"Produto '{produto.nome}' possui variacoes. "
-                        "Selecione a variacao individual para transferir estoque."
-                    ),
-                )
-
-            if produto.tipo_produto == "KIT" and produto.tipo_kit == "VIRTUAL":
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"Produto '{produto.nome}' e um KIT VIRTUAL. "
-                        "Use os componentes individuais na transferencia."
-                    ),
-                )
-
-            estoque_atual = float(produto.estoque_atual or 0)
-            if estoque_atual < quantidade:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"Estoque insuficiente para '{produto.nome}'. "
-                        f"Disponivel: {estoque_atual}, solicitado: {quantidade}"
-                    ),
-                )
-
-            produtos_cache[produto.id] = produto
-
-        for item in itens_validos:
-            produto = produtos_cache.get(int(item.produto_id))
-            if not produto:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"Produto ID {item.produto_id} nao encontrado",
-                )
-
-            custo_unitario, total_item = _resolver_valores_item_transferencia(
-                produto, item
-            )
-            total_transferencia += total_item
-
-            itens_processados.append(
-                {
-                    "produto_id": produto.id,
-                    "produto_nome": produto.nome,
-                    "codigo": getattr(produto, "codigo", None),
-                    "codigo_barras": getattr(produto, "codigo_barras", None),
-                    "quantidade": float(item.quantidade or 0),
-                    "custo_unitario": float(custo_unitario),
-                    "total_item": float(total_item),
-                    "estoque_anterior": float(produto.estoque_atual or 0),
-                }
-            )
-
-        if total_transferencia <= 0:
-            raise HTTPException(
-                status_code=400,
-                detail="Informe ao menos um item com valor total maior que zero",
-            )
+        itens_processados, total_transferencia = _preparar_itens_transferencia_parceiro(
+            db,
+            tenant_id=tenant_id,
+            itens_validos=itens_validos,
+        )
 
         categoria_financeira = _obter_ou_criar_categoria_financeira_transferencia(
             db,
@@ -1014,14 +163,6 @@ def transferir_estoque_para_parceiro(
             categoria_financeira.dre_subcategoria_id
             or _obter_dre_subcategoria_receita_padrao(db, tenant_id)
         )
-
-        observacoes_itens = "; ".join(
-            f"{item['produto_nome']} x {item['quantidade']}"
-            for item in itens_processados
-        )
-        observacoes_conta = observacoes_itens
-        if payload.observacao:
-            observacoes_conta = f"{payload.observacao}\n\nItens: {observacoes_itens}"
 
         conta_receber = ContaReceber(
             tenant_id=str(tenant_id),
@@ -1037,7 +178,10 @@ def transferir_estoque_para_parceiro(
             data_vencimento=payload.data_vencimento or date.today(),
             status="pendente",
             documento=codigo_transferencia,
-            observacoes=observacoes_conta,
+            observacoes=_montar_observacoes_transferencia_parceiro(
+                payload.observacao,
+                itens_processados,
+            ),
             user_id=current_user.id,
         )
         db.add(conta_receber)
@@ -1386,51 +530,12 @@ def listar_transferencias_para_parceiro(
             pages=0,
         )
 
-    conta_ids = [conta.id for conta in contas]
-    movimentacoes = (
-        db.query(EstoqueMovimentacao)
-        .options(
-            joinedload(EstoqueMovimentacao.produto),
-        )
-        .filter(
-            EstoqueMovimentacao.tenant_id == str(tenant_id),
-            EstoqueMovimentacao.referencia_id.in_(conta_ids),
-            EstoqueMovimentacao.motivo.in_(
-                [_MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE, "transferencia_parceiro"]
-            ),
-        )
-        .order_by(
-            EstoqueMovimentacao.created_at.desc(),
-            EstoqueMovimentacao.id.desc(),
-        )
-        .all()
+    itens_por_conta = _listar_itens_por_conta_transferencia_parceiro(
+        db,
+        tenant_id,
+        [conta.id for conta in contas],
+        ordem_desc=True,
     )
-
-    itens_por_conta: dict[int, list[TransferenciaParceiroHistoricoMovItem]] = (
-        defaultdict(list)
-    )
-    for mov in movimentacoes:
-        if mov.referencia_id is None:
-            continue
-        itens_por_conta[int(mov.referencia_id)].append(
-            TransferenciaParceiroHistoricoMovItem(
-                produto_id=mov.produto_id,
-                produto_nome=mov.produto.nome
-                if mov.produto
-                else f"Produto #{mov.produto_id}",
-                codigo=getattr(mov.produto, "codigo", None) if mov.produto else None,
-                codigo_barras=getattr(mov.produto, "codigo_barras", None)
-                if mov.produto
-                else None,
-                estoque_atual=float(getattr(mov.produto, "estoque_atual", 0) or 0)
-                if mov.produto
-                else 0,
-                quantidade=float(mov.quantidade or 0),
-                custo_unitario=float(mov.custo_unitario or 0),
-                valor_total=float(mov.valor_total or 0),
-                created_at=mov.created_at,
-            )
-        )
 
     registros_filtrados: list[TransferenciaParceiroHistoricoItem] = []
     totais = {
@@ -1590,51 +695,11 @@ def gerar_pdf_transferencias_parceiro_consolidado(
             detail="Nenhuma transferencia encontrada para gerar o PDF consolidado",
         )
 
-    conta_ids = [conta.id for conta in contas]
-    movimentacoes = (
-        db.query(EstoqueMovimentacao)
-        .options(
-            joinedload(EstoqueMovimentacao.produto),
-        )
-        .filter(
-            EstoqueMovimentacao.tenant_id == str(tenant_id),
-            EstoqueMovimentacao.referencia_id.in_(conta_ids),
-            EstoqueMovimentacao.motivo.in_(
-                [_MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE, "transferencia_parceiro"]
-            ),
-        )
-        .order_by(
-            EstoqueMovimentacao.created_at.asc(),
-            EstoqueMovimentacao.id.asc(),
-        )
-        .all()
+    itens_por_conta = _listar_itens_por_conta_transferencia_parceiro(
+        db,
+        tenant_id,
+        [conta.id for conta in contas],
     )
-
-    itens_por_conta: dict[int, list[TransferenciaParceiroHistoricoMovItem]] = (
-        defaultdict(list)
-    )
-    for mov in movimentacoes:
-        if mov.referencia_id is None:
-            continue
-        itens_por_conta[int(mov.referencia_id)].append(
-            TransferenciaParceiroHistoricoMovItem(
-                produto_id=mov.produto_id,
-                produto_nome=mov.produto.nome
-                if mov.produto
-                else f"Produto #{mov.produto_id}",
-                codigo=getattr(mov.produto, "codigo", None) if mov.produto else None,
-                codigo_barras=getattr(mov.produto, "codigo_barras", None)
-                if mov.produto
-                else None,
-                estoque_atual=float(getattr(mov.produto, "estoque_atual", 0) or 0)
-                if mov.produto
-                else 0,
-                quantidade=float(mov.quantidade or 0),
-                custo_unitario=float(mov.custo_unitario or 0),
-                valor_total=float(mov.valor_total or 0),
-                created_at=mov.created_at,
-            )
-        )
 
     pdf_bytes = _gerar_pdf_transferencias_parceiro_consolidado_bytes(
         contas,
