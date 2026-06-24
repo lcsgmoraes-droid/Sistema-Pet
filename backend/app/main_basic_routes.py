@@ -42,7 +42,7 @@ def register_basic_routes(app: FastAPI) -> None:
             db.execute("SELECT 1")
             return {"status": "ready", "system": SYSTEM_NAME, "database": "connected"}
         except Exception as e:
-            logger.error(f"Readiness check failed: {e}")
+            logger.exception("Readiness check failed")
             return JSONResponse(
                 status_code=503,
                 content={

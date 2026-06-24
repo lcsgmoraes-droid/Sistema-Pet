@@ -97,7 +97,6 @@ from app.api.endpoints.whatsapp import (
     router as whatsapp_router,
 )  # Sprint 3: WhatsApp IA
 
-# from app.api.endpoints.whatsapp import router as whatsapp_router  # DESATIVADO - Conflita com novos modelos WhatsApp IA
 from app.api.endpoints.segmentacao import router as segmentacao_router
 from app.pdv_ai_routes import router as pdv_ai_router
 from app.usuarios_routes import router as usuarios_router
@@ -105,7 +104,6 @@ from app.roles_routes import router as roles_router
 from app.permissions_routes import router as permissions_router
 from app.api.pdv_internal_routes import router as pdv_internal_router
 
-# [DESATIVADO - PHASE 5] from app.api.opportunity_metrics_routes import router as opportunity_metrics_router
 from app.api.racao_calculadora_routes import router as racao_calculadora_internal_router
 from app.api.whatsapp_orchestrator_internal_routes import (
     router as whatsapp_orchestrator_internal_router,
@@ -475,7 +473,6 @@ def register_routers(app: FastAPI) -> None:
         tags=["WhatsApp IA - Sprint 3"],
         dependencies=_module_dependencies("whatsapp"),
     )  # ✅ REATIVADO Sprint 3
-    # app.include_router(whatsapp_router, tags=["WhatsApp CRM"])  # DESATIVADO - Usar novos endpoints WhatsApp IA
     app.include_router(
         segmentacao_router,
         tags=["Segmentação de Clientes"],

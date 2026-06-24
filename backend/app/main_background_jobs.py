@@ -4,9 +4,15 @@ import logging
 import os
 import threading
 import time
+from tempfile import gettempdir
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+
+def _runtime_file(filename: str) -> str:
+    return os.path.join(os.getenv("PETSHOP_RUNTIME_DIR") or gettempdir(), filename)
+
 
 BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS = 5 * 60 * 60  # 5 horas
 _bling_token_stop_event = threading.Event()
@@ -32,16 +38,16 @@ _campaign_scheduler = None
 _bling_sync_scheduler = None
 
 # Arquivos usados para coordenar renovação entre os múltiplos workers uvicorn
-_BLING_LOCK_FILE = "/tmp/bling_token_renewal.lock"
-_BLING_LAST_RENEWAL_FILE = "/tmp/bling_token_last_renewal.txt"
+_BLING_LOCK_FILE = _runtime_file("bling_token_renewal.lock")
+_BLING_LAST_RENEWAL_FILE = _runtime_file("bling_token_last_renewal.txt")
 # Janela de segurança: se outro worker renovou há menos de 60s, apenas recarrega do .env
 _BLING_RENEWAL_COOLDOWN = 60
 
 # File lock para coordenar sincronização SEFAZ entre workers uvicorn
-_SEFAZ_LOCK_FILE = "/tmp/sefaz_sync.lock"
+_SEFAZ_LOCK_FILE = _runtime_file("sefaz_sync.lock")
 
 # Lock líder para garantir que apenas 1 worker rode jobs de background
-_BACKGROUND_JOBS_LOCK_FILE = "/tmp/petshop_background_jobs.lock"
+_BACKGROUND_JOBS_LOCK_FILE = _runtime_file("petshop_background_jobs.lock")
 _background_jobs_lock_handle = None
 _is_background_jobs_leader = False
 
@@ -514,8 +520,8 @@ def start_background_jobs() -> None:
             _campaign_scheduler = CampaignScheduler()
             _campaign_scheduler.start()
             logger.info("[OK] Campaign Scheduler iniciado!")
-        except Exception as e:
-            logger.error(f"[ERROR] Erro ao iniciar Campaign Scheduler: {str(e)}")
+        except Exception:
+            logger.exception("[ERROR] Erro ao iniciar Campaign Scheduler")
 
         if _env_bool("BLING_SYNC_SCHEDULER_ENABLED", True):
             try:
@@ -525,8 +531,8 @@ def start_background_jobs() -> None:
                 _bling_sync_scheduler = BlingSyncScheduler()
                 _bling_sync_scheduler.start()
                 logger.info("[OK] Bling Sync Scheduler iniciado!")
-            except Exception as e:
-                logger.error(f"[ERROR] Erro ao iniciar Bling Sync Scheduler: {str(e)}")
+            except Exception:
+                logger.exception("[ERROR] Erro ao iniciar Bling Sync Scheduler")
         else:
             logger.info("[JOBS] Bling Sync Scheduler desativado neste processo.")
 
@@ -586,16 +592,16 @@ def stop_background_jobs() -> None:
         if _campaign_scheduler:
             _campaign_scheduler.shutdown()
             logger.info("[STOP] Campaign Scheduler parado!")
-    except Exception as e:
-        logger.error(f"[ERROR] Erro ao parar Campaign Scheduler: {str(e)}")
+    except Exception:
+        logger.exception("[ERROR] Erro ao parar Campaign Scheduler")
 
     try:
         global _bling_sync_scheduler
         if _bling_sync_scheduler:
             _bling_sync_scheduler.shutdown()
             logger.info("[STOP] Bling Sync Scheduler parado!")
-    except Exception as e:
-        logger.error(f"[ERROR] Erro ao parar Bling Sync Scheduler: {str(e)}")
+    except Exception:
+        logger.exception("[ERROR] Erro ao parar Bling Sync Scheduler")
 
     global _sefaz_sync_thread
     _sefaz_sync_stop_event.set()

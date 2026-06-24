@@ -32,13 +32,8 @@ def validate_environment():
     # 1️⃣ VALIDAÇÃO COMPLETA DE SETTINGS (Pré-Prod Block 1)
     # ============================================================================
 
-    try:
-        validate_settings(settings)
-        logger.info("✅ [PRÉ-PROD] Validação de settings concluída com sucesso")
-    except Exception:
-        # A exceção já foi logada pelo validate_settings
-        # Apenas re-levanta para impedir inicialização
-        raise
+    validate_settings(settings)
+    logger.info("✅ [PRÉ-PROD] Validação de settings concluída com sucesso")
 
     # ============================================================================
     # 2️⃣ VALIDAÇÕES ADICIONAIS LEGACY (compatibilidade)
@@ -81,8 +76,8 @@ def on_startup() -> None:
 
         ensure_db_ready(engine)
         logger.info("[PRÉ-PROD] Database migrations check passed")
-    except Exception as e:
-        logger.error(f"[PRÉ-PROD] Database migrations check failed: {str(e)}")
+    except Exception:
+        logger.exception("[PRÉ-PROD] Database migrations check failed")
         raise
 
     start_background_jobs()

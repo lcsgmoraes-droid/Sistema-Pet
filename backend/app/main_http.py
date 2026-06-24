@@ -92,9 +92,7 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
-        if exc.status_code == 404 and "Segmento não encontrado" in str(exc.detail):
-            pass
-        else:
+        if exc.status_code != 404 or "Segmento não encontrado" not in str(exc.detail):
             logger.warning(f"[HTTP] HTTP {exc.status_code}: {exc.detail}")
 
         return JSONResponse(
