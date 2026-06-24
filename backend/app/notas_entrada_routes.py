@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc
 from typing import List, Optional
 from datetime import datetime, timedelta
+import json
+import logging
 
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
@@ -60,6 +62,11 @@ from .notas_entrada.financeiro import (
 from .notas_entrada.fornecedores import (
     criar_fornecedor_automatico,
 )
+from .notas_entrada.processamento_acoes import (
+    detectar_contexto_processamento,
+    resolver_custo_operacional_entrada,
+    sugerir_acoes_processamento,
+)
 from .notas_entrada.itens_produto_routes import router as itens_produto_router
 from .notas_entrada.produtos import (
     _aplicar_codigos_barras_item_no_produto,
@@ -79,13 +86,127 @@ from .notas_entrada.schemas import (
 from .notas_entrada.rateio_routes import router as rateio_router
 from .notas_entrada.xml_parser import parse_nfe_xml
 
-import logging
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/notas-entrada", tags=["Notas de Entrada (XML)"])
 router.include_router(itens_produto_router)
 router.include_router(rateio_router)
+
+
+def _acoes_processamento_dict(config: ProcessarConfig) -> dict:
+    return {
+        "lancar_estoque": bool(config.lancar_estoque),
+        "atualizar_custo": bool(config.atualizar_custo),
+        "atualizar_preco_venda": bool(config.atualizar_preco_venda),
+        "gerar_contas_pagar": bool(config.gerar_contas_pagar),
+    }
+
+
+def _carregar_acoes_processamento_nota(nota: NotaEntrada) -> dict:
+    if getattr(nota, "processamento_acoes", None):
+        try:
+            dados = json.loads(nota.processamento_acoes)
+            if isinstance(dados, dict):
+                return {
+                    "lancar_estoque": bool(dados.get("lancar_estoque")),
+                    "atualizar_custo": bool(dados.get("atualizar_custo")),
+                    "atualizar_preco_venda": bool(dados.get("atualizar_preco_venda")),
+                    "gerar_contas_pagar": bool(dados.get("gerar_contas_pagar")),
+                }
+        except (TypeError, ValueError):
+            pass
+
+    legado_processado = bool(getattr(nota, "entrada_estoque_realizada", False))
+    return {
+        "lancar_estoque": legado_processado,
+        "atualizar_custo": legado_processado,
+        "atualizar_preco_venda": legado_processado,
+        "gerar_contas_pagar": legado_processado,
+    }
+
+
+def _reverter_historicos_precos_nota(
+    *, produto: Produto, nota: NotaEntrada, db: Session, tenant_id
+) -> int:
+    historicos = (
+        db.query(ProdutoHistoricoPreco)
+        .filter(
+            ProdutoHistoricoPreco.produto_id == produto.id,
+            ProdutoHistoricoPreco.nota_entrada_id == nota.id,
+            ProdutoHistoricoPreco.motivo.in_(["nfe_entrada", "nfe_revisao_precos"]),
+            ProdutoHistoricoPreco.tenant_id == tenant_id,
+        )
+        .order_by(ProdutoHistoricoPreco.id.desc())
+        .all()
+    )
+
+    for historico in historicos:
+        produto.preco_custo = float(historico.preco_custo_anterior or 0)
+        produto.preco_venda = float(historico.preco_venda_anterior or 0)
+        db.delete(historico)
+
+    return len(historicos)
+
+
+def _atualizar_custo_produto_entrada(
+    *,
+    produto: Produto,
+    nota: NotaEntrada,
+    custo_unitario_entrada: float,
+    custo_unitario_manual: float | None,
+    db: Session,
+    current_user,
+    tenant_id,
+) -> bool:
+    preco_custo_anterior = produto.preco_custo or 0
+    if custo_unitario_entrada == preco_custo_anterior:
+        return False
+
+    preco_venda_anterior = produto.preco_venda or 0
+    margem_anterior = (
+        ((preco_venda_anterior - preco_custo_anterior) / preco_venda_anterior * 100)
+        if preco_venda_anterior > 0
+        else 0
+    )
+
+    produto.preco_custo = custo_unitario_entrada
+    preco_venda_novo = produto.preco_venda or 0
+    margem_nova = (
+        ((preco_venda_novo - produto.preco_custo) / preco_venda_novo * 100)
+        if preco_venda_novo > 0
+        else 0
+    )
+    variacao_custo = (
+        ((produto.preco_custo - preco_custo_anterior) / preco_custo_anterior * 100)
+        if preco_custo_anterior > 0
+        else 0
+    )
+
+    db.add(
+        ProdutoHistoricoPreco(
+            produto_id=produto.id,
+            preco_custo_anterior=preco_custo_anterior,
+            preco_custo_novo=produto.preco_custo,
+            preco_venda_anterior=preco_venda_anterior,
+            preco_venda_novo=preco_venda_novo,
+            margem_anterior=margem_anterior,
+            margem_nova=margem_nova,
+            variacao_custo_percentual=variacao_custo,
+            variacao_venda_percentual=0,
+            motivo="nfe_entrada",
+            nota_entrada_id=nota.id,
+            referencia=f"NF-e {nota.numero_nota}",
+            observacoes=(
+                f"Entrada via NF-e: custo alterado de R$ {preco_custo_anterior:.2f} "
+                f"para R$ {produto.preco_custo:.2f}"
+                f"{' (ajuste manual aplicado no processamento)' if custo_unitario_manual is not None else ''}"
+            ),
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+        )
+    )
+    return True
+
 
 # ============================================================================
 # UPLOAD DE XML
@@ -1080,7 +1201,7 @@ def desfazer_conferencia_nota(
     if not nota:
         raise HTTPException(status_code=404, detail="Nota não encontrada")
 
-    if nota.entrada_estoque_realizada:
+    if nota.entrada_estoque_realizada or nota.status == "processada":
         raise HTTPException(
             status_code=400,
             detail="Nao e possivel desfazer a conferencia apos processar a entrada no estoque.",
@@ -1302,6 +1423,19 @@ def preview_processamento(
 
         preview_itens.append({**item_nf, "produto_vinculado": produto_vinculado})
 
+    try:
+        dados_xml = parse_nfe_xml(nota.xml_content)
+    except Exception:
+        dados_xml = {
+            "natureza_operacao": "",
+            "valor_total": nota.valor_total,
+            "itens": [
+                {"cfop": getattr(item, "cfop", None), "valor_total": item.valor_total}
+                for item in nota.itens
+            ],
+        }
+    sugestao_acoes = sugerir_acoes_processamento(dados_xml)
+
     return {
         "nota_id": nota.id,
         "numero_nota": nota.numero_nota,
@@ -1310,6 +1444,9 @@ def preview_processamento(
         "fornecedor_cnpj": nota.fornecedor_cnpj,
         "valor_total": nota.valor_total,
         "conferencia": _resumir_conferencia_nota(nota),
+        "acoes_processamento_sugeridas": sugestao_acoes["acoes"],
+        "processamento_contexto": sugestao_acoes["contexto"],
+        "processamento_mensagem": sugestao_acoes["mensagem"],
         "itens": preview_itens,
     }
 
@@ -1317,6 +1454,77 @@ def preview_processamento(
 # ============================================================================
 # ATUALIZAR PREÃ‡OS DOS PRODUTOS
 # ============================================================================
+
+
+def _aplicar_precos_venda_processamento(
+    *,
+    nota: NotaEntrada,
+    precos: List[AtualizarPrecoRequest],
+    db: Session,
+    current_user,
+    tenant_id,
+) -> int:
+    atualizados = 0
+    for preco_data in precos:
+        produto = (
+            db.query(Produto)
+            .filter(Produto.id == preco_data.produto_id, Produto.tenant_id == tenant_id)
+            .first()
+        )
+        if not produto:
+            continue
+
+        preco_venda_anterior = produto.preco_venda or 0
+        preco_custo_anterior = produto.preco_custo or 0
+        if preco_venda_anterior == preco_data.preco_venda:
+            continue
+
+        margem_anterior = (
+            ((preco_venda_anterior - preco_custo_anterior) / preco_venda_anterior * 100)
+            if preco_venda_anterior > 0
+            else 0
+        )
+        produto.preco_venda = preco_data.preco_venda
+        margem_nova = (
+            (
+                (produto.preco_venda - (produto.preco_custo or 0))
+                / produto.preco_venda
+                * 100
+            )
+            if produto.preco_venda > 0
+            else 0
+        )
+        variacao_venda = (
+            ((produto.preco_venda - preco_venda_anterior) / preco_venda_anterior * 100)
+            if preco_venda_anterior > 0
+            else 0
+        )
+
+        db.add(
+            ProdutoHistoricoPreco(
+                produto_id=produto.id,
+                preco_custo_anterior=preco_custo_anterior,
+                preco_custo_novo=produto.preco_custo,
+                preco_venda_anterior=preco_venda_anterior,
+                preco_venda_novo=produto.preco_venda,
+                margem_anterior=margem_anterior,
+                margem_nova=margem_nova,
+                variacao_custo_percentual=0,
+                variacao_venda_percentual=variacao_venda,
+                motivo="nfe_revisao_precos",
+                nota_entrada_id=nota.id,
+                referencia=f"NF-e {nota.numero_nota} - Revisao de precos",
+                observacoes=(
+                    f"Preco ajustado de R$ {preco_venda_anterior:.2f} "
+                    f"para R$ {produto.preco_venda:.2f}"
+                ),
+                user_id=current_user.id,
+                tenant_id=tenant_id,
+            )
+        )
+        atualizados += 1
+
+    return atualizados
 
 
 @router.post("/{nota_id}/atualizar-precos")
@@ -1447,7 +1655,7 @@ def processar_entrada_estoque(
     if not nota:
         raise HTTPException(status_code=404, detail="Nota nÃ£o encontrada")
 
-    if nota.entrada_estoque_realizada:
+    if nota.entrada_estoque_realizada or nota.status == "processada":
         raise HTTPException(
             status_code=400, detail="Entrada no estoque jÃ¡ foi realizada"
         )
@@ -1459,7 +1667,35 @@ def processar_entrada_estoque(
             "Vincule todos os produtos antes de processar.",
         )
 
+    try:
+        dados_xml_processamento = parse_nfe_xml(nota.xml_content)
+    except Exception:
+        dados_xml_processamento = {
+            "natureza_operacao": "",
+            "valor_total": nota.valor_total,
+            "itens": [
+                {"cfop": getattr(item, "cfop", None), "valor_total": item.valor_total}
+                for item in nota.itens
+            ],
+        }
+
+    acoes_processamento = _acoes_processamento_dict(config)
+    contexto_processamento = detectar_contexto_processamento(dados_xml_processamento)
+    nota.processamento_contexto = contexto_processamento["contexto"]
+    nota.processamento_acoes = json.dumps(acoes_processamento, sort_keys=True)
+
+    precos_venda_atualizados = 0
+    if config.atualizar_preco_venda and config.precos_venda_override:
+        precos_venda_atualizados = _aplicar_precos_venda_processamento(
+            nota=nota,
+            precos=config.precos_venda_override,
+            db=db,
+            current_user=current_user,
+            tenant_id=tenant_id,
+        )
+
     itens_processados = []
+    custos_atualizados = 0
     composicoes_custo = calcular_composicao_custos_nota(nota)
     lotes_rastro_por_item = _mapear_lotes_rastro_xml(nota.xml_content)
 
@@ -1510,7 +1746,9 @@ def processar_entrada_estoque(
             )
             multiplicador_pack = dados_pack["multiplicador_pack"]
 
-        if custo_unitario_manual is not None:
+        custo_unitario_calculado_nf = custo_unitario_entrada
+
+        if custo_unitario_manual is not None and config.atualizar_custo:
             custo_unitario_entrada = custo_unitario_manual
             logger.info(
                 f"💰 Custo manual aplicado no item {item.id}: "
@@ -1538,6 +1776,12 @@ def processar_entrada_estoque(
             continue
 
         produto = item.produto
+        if not config.atualizar_custo:
+            custo_unitario_entrada = resolver_custo_operacional_entrada(
+                custo_nf=custo_unitario_calculado_nf,
+                custo_atual_sistema=produto.preco_custo,
+                atualizar_custo=False,
+            )
 
         # âœ… REATIVAR produto se estiver inativo
         if not produto.ativo:
@@ -1588,7 +1832,22 @@ def processar_entrada_estoque(
                         f"  â™»ï¸  VÃ­nculo de fornecedor reativado: {produto.codigo}"
                     )
                 # Atualizar preÃ§o de custo no vÃ­nculo
-                vinculo_existente.preco_custo = custo_unitario_entrada
+                if config.atualizar_custo:
+                    vinculo_existente.preco_custo = custo_unitario_entrada
+
+        if not config.lancar_estoque:
+            if config.atualizar_custo and _atualizar_custo_produto_entrada(
+                produto=produto,
+                nota=nota,
+                custo_unitario_entrada=custo_unitario_entrada,
+                custo_unitario_manual=custo_unitario_manual,
+                db=db,
+                current_user=current_user,
+                tenant_id=tenant_id,
+            ):
+                custos_atualizados += 1
+            item.status = "processado"
+            continue
 
         lotes_entrada = _montar_lotes_entrada_item(
             item,
@@ -1629,8 +1888,8 @@ def processar_entrada_estoque(
         produto.estoque_atual = estoque_anterior + quantidade_entrada
 
         # Atualizar preÃ§o de custo e registrar histÃ³rico
-        preco_custo_anterior = produto.preco_custo
-        preco_venda_anterior = produto.preco_venda
+        preco_custo_anterior = produto.preco_custo or 0
+        preco_venda_anterior = produto.preco_venda or 0
         margem_anterior = (
             ((preco_venda_anterior - preco_custo_anterior) / preco_venda_anterior * 100)
             if preco_venda_anterior > 0
@@ -1638,14 +1897,16 @@ def processar_entrada_estoque(
         )
 
         alterou_custo = False
-        if custo_unitario_entrada != preco_custo_anterior:
+        if config.atualizar_custo and custo_unitario_entrada != preco_custo_anterior:
             produto.preco_custo = custo_unitario_entrada
             alterou_custo = True
+            custos_atualizados += 1
 
         # Calcular margem nova
+        preco_venda_novo = produto.preco_venda or 0
         margem_nova = (
-            ((produto.preco_venda - produto.preco_custo) / produto.preco_venda * 100)
-            if produto.preco_venda > 0
+            ((preco_venda_novo - (produto.preco_custo or 0)) / preco_venda_novo * 100)
+            if preco_venda_novo > 0
             else 0
         )
 
@@ -1666,7 +1927,7 @@ def processar_entrada_estoque(
                 preco_custo_anterior=preco_custo_anterior,
                 preco_custo_novo=produto.preco_custo,
                 preco_venda_anterior=preco_venda_anterior,
-                preco_venda_novo=produto.preco_venda,
+                preco_venda_novo=preco_venda_novo,
                 margem_anterior=margem_anterior,
                 margem_nova=margem_nova,
                 variacao_custo_percentual=variacao_custo,
@@ -1691,18 +1952,26 @@ def processar_entrada_estoque(
             )
 
         observacao_movimentacao = (
-            f"Entrada NF-e {nota.numero_nota} - {item.descricao}"
-            if conferencia_item["status_conferencia"] == "ok"
-            else (
-                f"Entrada NF-e {nota.numero_nota} - {item.descricao} | "
-                f"Conferida: {conferencia_item['quantidade_conferida']} | "
-                f"Avariada: {conferencia_item['quantidade_avariada']} | "
-                f"Faltante: {conferencia_item['quantidade_faltante']}"
+            (
+                f"Entrada NF-e {nota.numero_nota} - {item.descricao}"
+                if conferencia_item["status_conferencia"] == "ok"
+                else (
+                    f"Entrada NF-e {nota.numero_nota} - {item.descricao} | "
+                    f"Conferida: {conferencia_item['quantidade_conferida']} | "
+                    f"Avariada: {conferencia_item['quantidade_avariada']} | "
+                    f"Faltante: {conferencia_item['quantidade_faltante']}"
+                )
             )
-        ) + (
-            f" | Custo sistema manual: R$ {custo_unitario_entrada:.4f}"
-            if custo_unitario_manual is not None
-            else ""
+            + (
+                f" | Custo sistema manual: R$ {custo_unitario_entrada:.4f}"
+                if custo_unitario_manual is not None and config.atualizar_custo
+                else ""
+            )
+            + (
+                " | Custo do cadastro preservado; entrada valorizada pelo custo atual do sistema"
+                if not config.atualizar_custo
+                else ""
+            )
         )
 
         estoque_movimento_anterior = estoque_anterior
@@ -1743,7 +2012,9 @@ def processar_entrada_estoque(
                 "pack_multiplicador": multiplicador_pack,
                 "status_conferencia": conferencia_item["status_conferencia"],
                 "custo_unitario_aplicado": float(custo_unitario_entrada),
-                "custo_manual_aplicado": custo_unitario_manual is not None,
+                "custo_manual_aplicado": (
+                    custo_unitario_manual is not None and config.atualizar_custo
+                ),
             }
         )
 
@@ -1772,17 +2043,19 @@ def processar_entrada_estoque(
 
     # Atualizar nota
     nota.status = "processada"
-    nota.entrada_estoque_realizada = True
+    nota.entrada_estoque_realizada = bool(config.lancar_estoque)
     nota.processada_em = datetime.utcnow()
 
     # CRIAR CONTAS A PAGAR apÃ³s processar estoque
     contas_ids = []
     try:
         # Buscar dados do XML salvos na nota para pegar duplicatas
-        dados_xml = parse_nfe_xml(nota.xml_content)
+        dados_xml = dados_xml_processamento
 
-        contas_ids = criar_contas_pagar_da_nota(
-            nota, dados_xml, db, current_user.id, tenant_id
+        contas_ids = (
+            criar_contas_pagar_da_nota(nota, dados_xml, db, current_user.id, tenant_id)
+            if config.gerar_contas_pagar
+            else []
         )
         logger.info(f"ðŸ’° {len(contas_ids)} contas a pagar criadas")
     except Exception as e:
@@ -1831,6 +2104,9 @@ def processar_entrada_estoque(
         "numero_nota": nota.numero_nota,
         "itens_processados": len(itens_processados),
         "contas_pagar_criadas": len(contas_ids),
+        "custos_atualizados": custos_atualizados,
+        "precos_venda_atualizados": precos_venda_atualizados,
+        "acoes_processamento": acoes_processamento,
         "conferencia": resumo_conferencia,
         "detalhes": itens_processados,
     }
@@ -1866,10 +2142,12 @@ def reverter_entrada_estoque(
     if not nota:
         raise HTTPException(status_code=404, detail="Nota nÃ£o encontrada")
 
-    if not nota.entrada_estoque_realizada:
+    if not nota.entrada_estoque_realizada and nota.status != "processada":
         raise HTTPException(
             status_code=400, detail="Esta nota ainda nÃ£o foi processada"
         )
+
+    acoes_nota = _carregar_acoes_processamento_nota(nota)
 
     # REVERTER CONTAS A PAGAR vinculadas a esta nota
     logger.info("ðŸ’° Excluindo contas a pagar vinculadas...")
@@ -1898,6 +2176,7 @@ def reverter_entrada_estoque(
         logger.info(f"âœ… Total de contas excluÃ­das: {contas_excluidas}")
 
     itens_revertidos = []
+    produtos_precos_revertidos = set()
 
     try:
         # Reverter cada item
@@ -1907,6 +2186,16 @@ def reverter_entrada_estoque(
 
             try:
                 produto = item.produto
+                if (
+                    acoes_nota["atualizar_custo"] or acoes_nota["atualizar_preco_venda"]
+                ) and produto.id not in produtos_precos_revertidos:
+                    _reverter_historicos_precos_nota(
+                        produto=produto,
+                        nota=nota,
+                        db=db,
+                        tenant_id=tenant_id,
+                    )
+                    produtos_precos_revertidos.add(produto.id)
 
                 # Buscar lotes criados para esta entrada. Notas podem ter mais de um
                 # rastro/lote para o mesmo item do XML.
@@ -2076,6 +2365,8 @@ def reverter_entrada_estoque(
         nota.status = "pendente"
         nota.entrada_estoque_realizada = False
         nota.processada_em = None
+        nota.processamento_contexto = None
+        nota.processamento_acoes = None
 
         db.commit()
 
