@@ -52,7 +52,10 @@ def test_app_access_profile_model_and_migration_exist():
     migration = read_backend("alembic/versions/sv20260613a1_app_access_profiles.py")
 
     assert "class AppAccessProfile" in models
-    assert "__tablename__ = 'app_access_profiles'" in models
+    assert (
+        "__tablename__ = 'app_access_profiles'" in models
+        or '__tablename__ = "app_access_profiles"' in models
+    )
     assert "app_access_profiles" in migration
     assert "profile_type" in migration
 
@@ -114,7 +117,7 @@ def test_operational_app_gates_use_app_access_profile_service():
     mobile_routes = read_backend("app/routes/app_mobile_routes.py")
     mobile_pdv_routes = read_backend("app/routes/app_mobile_funcionario_pdv_routes.py")
     vet_routes = read_backend("app/routes/app_vet_routes.py")
-    delivery_routes = read_backend("app/api/endpoints/rotas_entrega.py")
+    delivery_routes = read_backend("app/api/endpoints/rotas_entrega_auth.py")
 
     assert "get_cliente_for_app_profile_or_none" in mobile_routes + mobile_pdv_routes
     assert "get_cliente_for_app_profile_or_none" in vet_routes
