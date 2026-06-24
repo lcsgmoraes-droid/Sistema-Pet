@@ -5,11 +5,14 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_stone_online_router_is_not_registered_in_app_main():
-    main_source = (BACKEND_ROOT / "app" / "main.py").read_text(encoding="utf-8")
+    app_bootstrap_source = (
+        (BACKEND_ROOT / "app" / "main.py").read_text(encoding="utf-8")
+        + (BACKEND_ROOT / "app" / "main_routers.py").read_text(encoding="utf-8")
+    )
 
-    assert "app.stone_routes" not in main_source
-    assert "stone_router" not in main_source
-    assert "/stone" not in main_source
+    assert "app.stone_routes" not in app_bootstrap_source
+    assert "stone_router" not in app_bootstrap_source
+    assert "/stone" not in app_bootstrap_source
 
 
 def test_stone_online_source_files_were_removed():

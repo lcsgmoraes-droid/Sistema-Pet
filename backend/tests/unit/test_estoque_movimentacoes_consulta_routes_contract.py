@@ -38,7 +38,7 @@ def test_estoque_routes_nao_expoe_mais_consulta_movimentacoes():
 
 
 def test_main_registra_router_de_consulta_movimentacoes():
-    main_source = _source("app/main.py")
+    main_source = _source("app/main_routers.py")
 
     assert "from app.estoque_movimentacoes_consulta_routes import (" in main_source
     assert "router as estoque_movimentacoes_consulta_router" in main_source

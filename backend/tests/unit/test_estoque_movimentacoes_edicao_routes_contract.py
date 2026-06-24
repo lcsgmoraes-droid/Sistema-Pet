@@ -39,7 +39,7 @@ def test_estoque_routes_nao_expoe_mais_edicao_movimentacoes():
 
 
 def test_main_registra_router_de_edicao_movimentacoes():
-    main_source = _source("app/main.py")
+    main_source = _source("app/main_routers.py")
     normalized_source = " ".join(main_source.split())
 
     assert "from app.estoque_movimentacoes_edicao_routes import (" in main_source

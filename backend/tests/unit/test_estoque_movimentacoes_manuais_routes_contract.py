@@ -61,7 +61,7 @@ def test_agregador_manual_nao_expoe_mais_entrada_e_saida():
 
 
 def test_main_registra_router_de_movimentacoes_manuais():
-    main_source = _source("app/main.py")
+    main_source = _source("app/main_routers.py")
 
     assert (
         "from app.estoque_entrada_manual_routes import router as estoque_entrada_manual_router"
