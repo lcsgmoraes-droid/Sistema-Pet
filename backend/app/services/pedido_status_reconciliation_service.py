@@ -183,6 +183,7 @@ def reconciliar_status_pedido_local(
         _confirmar_pedido,
         _dict,
         _montar_payload_pedido,
+        _processar_nf_autorizada_vinculada_ao_pedido,
         _sincronizar_nf_do_pedido,
         _situacao_codigo_bling,
         _ultima_nf_payload_efetiva,
@@ -255,6 +256,25 @@ def reconciliar_status_pedido_local(
         }
 
     if situacao_id and situacao_id in _SITUACOES_PEDIDO_ATENDIDO:
+        acao_nf = _processar_nf_autorizada_vinculada_ao_pedido(
+            db=db,
+            pedido=pedido,
+            itens=itens,
+            resumo_nf=resumo_nf,
+        )
+        if acao_nf:
+            return {
+                "success": True,
+                "executada": True,
+                "acao": acao_nf,
+                "pedido_integrado_id": pedido.id,
+                "pedido_bling_id": pedido_bling_id,
+                "status_anterior": status_anterior,
+                "status_atual": pedido.status,
+                "nf_numero": _dict(resumo_nf).get("numero"),
+                "erros_estoque": [],
+            }
+
         if pedido.status not in {"confirmado", "cancelado"}:
             erros = _confirmar_pedido(
                 db=db,

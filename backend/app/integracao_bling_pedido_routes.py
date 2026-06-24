@@ -23,6 +23,7 @@ from app.integracao_bling_nf_routes import (
     _texto,
 )
 from app.services.bling_flow_monitor_service import (
+    _nf_contexto_autorizado,
     abrir_incidente,
     registrar_evento,
     registrar_vinculo_nf_pedido,
@@ -340,6 +341,30 @@ def _sincronizar_nf_do_pedido(
         )
 
     return resumo_nf
+
+
+def _processar_nf_autorizada_vinculada_ao_pedido(
+    *,
+    db: Session,
+    pedido: PedidoIntegrado,
+    itens: list[PedidoIntegradoItem],
+    resumo_nf: dict | None,
+) -> str | None:
+    resumo_nf = _dict(resumo_nf)
+    nf_id = _nf_id_valido(
+        _primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id"))
+    )
+    if not nf_id or not _nf_contexto_autorizado(resumo_nf):
+        return None
+
+    from app.services.bling_nf_service import processar_nf_autorizada
+
+    return processar_nf_autorizada(
+        db=db,
+        pedido=pedido,
+        itens=itens,
+        nf_id=nf_id,
+    )
 
 
 def _resolver_canal_pedido(payload: dict | None, canal_salvo: str | None):
@@ -1831,7 +1856,7 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
                     .all()
                 )
-                _sincronizar_nf_do_pedido(
+                resumo_nf = _sincronizar_nf_do_pedido(
                     db=db,
                     pedido=pedido,
                     pedido_payload=pedido_api or data,
@@ -1841,6 +1866,18 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     message="NF identificada no pedido atualizado e vinculada localmente.",
                     link_source="pedido.updated",
                 )
+                acao_nf = _processar_nf_autorizada_vinculada_ao_pedido(
+                    db=db,
+                    pedido=pedido,
+                    itens=itens,
+                    resumo_nf=resumo_nf,
+                )
+                if acao_nf:
+                    logger.info(
+                        f"[BLING WEBHOOK] Pedido {pedido_bling_id} consolidado por NF autorizada vinculada ao pedido (situacao_id={situacao_id})"
+                    )
+                    return {"status": "ok", "acao": acao_nf, "erros_estoque": []}
+
                 _confirmar_pedido(
                     db=db,
                     pedido=pedido,
@@ -1899,13 +1936,13 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                 tenant_id=_tenant_uuid,
                 pedido_bling_id=pedido_bling_id,
             )
-            if pedido and pedido.status not in ("confirmado", "cancelado"):
+            if pedido and pedido.status != "cancelado":
                 itens = (
                     db.query(PedidoIntegradoItem)
                     .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
                     .all()
                 )
-                _sincronizar_nf_do_pedido(
+                resumo_nf = _sincronizar_nf_do_pedido(
                     db=db,
                     pedido=pedido,
                     pedido_payload=pedido_api,
@@ -1915,24 +1952,40 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     message="NF identificada via consulta da API do Bling e vinculada localmente.",
                     link_source="pedido.updated.api",
                 )
+                acao_nf = _processar_nf_autorizada_vinculada_ao_pedido(
+                    db=db,
+                    pedido=pedido,
+                    itens=itens,
+                    resumo_nf=resumo_nf,
+                )
+                if acao_nf:
+                    logger.info(
+                        f"[BLING WEBHOOK] Pedido {pedido_bling_id} consolidado por NF autorizada vinculada via consulta API (situacao_id={situacao_id_api})"
+                    )
+                    return {"status": "ok", "acao": acao_nf, "erros_estoque": []}
+
                 pedido.payload = _montar_payload_pedido(
                     webhook_data=data,
                     pedido_completo=pedido_api,
                     payload_atual=pedido.payload,
                     ultima_nf=_ultima_nf_payload_efetiva(pedido.payload) or None,
                 )
-                _confirmar_pedido(
-                    db=db,
-                    pedido=pedido,
-                    itens=itens,
-                    motivo="venda_bling_webhook",
-                    observacao="Pedido atendido via API do Bling; venda aguardando NF",
-                    processed_at=event_date,
-                    aplicar_baixa_estoque=False,
-                )
-                logger.info(
-                    f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado via consulta API sem baixa; aguardando NF (situacao_id={situacao_id_api})"
-                )
+                if pedido.status != "confirmado":
+                    _confirmar_pedido(
+                        db=db,
+                        pedido=pedido,
+                        itens=itens,
+                        motivo="venda_bling_webhook",
+                        observacao="Pedido atendido via API do Bling; venda aguardando NF",
+                        processed_at=event_date,
+                        aplicar_baixa_estoque=False,
+                    )
+                    logger.info(
+                        f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado via consulta API sem baixa; aguardando NF (situacao_id={situacao_id_api})"
+                    )
+                else:
+                    db.add(pedido)
+                    db.commit()
 
             return {"status": "ok", "acao": "confirmado_via_consulta_api"}
 
