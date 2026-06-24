@@ -24,6 +24,12 @@ def test_tenant_onboarding_service_preserves_public_reexports() -> None:
 
 
 def test_tenant_onboarding_service_stays_split_across_modules() -> None:
-    assert _line_count("app", "services", "tenant_onboarding_service.py") < 1900
+    assert _line_count("app", "services", "tenant_onboarding_service.py") < 300
     assert _line_count("app", "services", "tenant_onboarding_core.py") >= 100
     assert _line_count("app", "services", "tenant_onboarding_contract.py") >= 300
+    assert _line_count("app", "services", "tenant_onboarding_sql.py") >= 80
+    assert _line_count("app", "services", "tenant_onboarding_runner.py") >= 150
+    assert (
+        _line_count("app", "services", "tenant_onboarding_financial_copies.py") < 1000
+    )
+    assert _line_count("app", "services", "tenant_onboarding_catalog_copies.py") < 1000
