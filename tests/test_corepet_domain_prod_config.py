@@ -10,7 +10,9 @@ COMPOSE_PROD = ROOT / "docker-compose.prod.yml"
 GITIGNORE = ROOT / ".gitignore"
 APP_MOBILE_CONFIG = ROOT / "app-mobile" / "src" / "config.ts"
 APP_MOBILE_EAS = ROOT / "app-mobile" / "eas.json"
-ECOMMERCE_AUTH = ROOT / "backend" / "app" / "routes" / "ecommerce_auth.py"
+ECOMMERCE_AUTH_RECOVERY = (
+    ROOT / "backend" / "app" / "routes" / "ecommerce_auth_recovery.py"
+)
 ECOMMERCE_NOTIFY = ROOT / "backend" / "app" / "routes" / "ecommerce_notify_routes.py"
 
 
@@ -123,7 +125,7 @@ def test_prod_generates_public_links_with_corepet_domain():
 def test_runtime_defaults_use_corepet_domain():
     mobile_config = APP_MOBILE_CONFIG.read_text(encoding="utf-8")
     eas_config = json.loads(APP_MOBILE_EAS.read_text(encoding="utf-8"))
-    ecommerce_auth = ECOMMERCE_AUTH.read_text(encoding="utf-8")
+    ecommerce_auth_recovery = ECOMMERCE_AUTH_RECOVERY.read_text(encoding="utf-8")
     ecommerce_notify = ECOMMERCE_NOTIFY.read_text(encoding="utf-8")
 
     assert "const DEFAULT_PROD_API_URL = 'https://corepet.com.br/api';" in mobile_config
@@ -138,8 +140,8 @@ def test_runtime_defaults_use_corepet_domain():
         == "https://corepet.com.br/api"
     )
 
-    assert 'or "https://corepet.com.br"' in ecommerce_auth
-    assert 'or "https://mlprohub.com.br"' not in ecommerce_auth
+    assert 'or "https://corepet.com.br"' in ecommerce_auth_recovery
+    assert 'or "https://mlprohub.com.br"' not in ecommerce_auth_recovery
     assert '"https://corepet.com.br"' in ecommerce_notify
     assert '"https://mlprohub.com.br"' not in ecommerce_notify
 
