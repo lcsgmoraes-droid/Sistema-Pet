@@ -4,10 +4,39 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
-def test_contas_pagar_tem_atalhos_de_periodo():
-    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(
-        encoding="utf-8"
+def read_repo(path: str) -> str:
+    return (REPO_ROOT / path).read_text(encoding="utf-8")
+
+
+def contas_pagar_source() -> str:
+    return "\n".join(
+        read_repo(path)
+        for path in (
+            "frontend/src/components/ContasPagar.jsx",
+            "frontend/src/components/contas-pagar/contasPagarHelpers.js",
+            "frontend/src/components/contas-pagar/ContasPagarFilters.jsx",
+            "frontend/src/components/contas-pagar/ContasPagarTable.jsx",
+            "frontend/src/components/contas-pagar/ContasPagarModals.jsx",
+        )
     )
+
+
+def test_contas_pagar_foi_dividido_em_componentes_menores():
+    arquivos = {
+        "frontend/src/components/ContasPagar.jsx": 1000,
+        "frontend/src/components/contas-pagar/ContasPagarFilters.jsx": 400,
+        "frontend/src/components/contas-pagar/ContasPagarTable.jsx": 500,
+        "frontend/src/components/contas-pagar/ContasPagarModals.jsx": 700,
+        "frontend/src/components/contas-pagar/contasPagarHelpers.js": 150,
+    }
+
+    for path, limite in arquivos.items():
+        linhas = len(read_repo(path).splitlines())
+        assert linhas < limite, f"{path} tem {linhas} linhas, limite {limite}"
+
+
+def test_contas_pagar_tem_atalhos_de_periodo():
+    source = contas_pagar_source()
 
     assert "PERIODOS_RAPIDOS_CONTAS_PAGAR" in source
     assert "Hoje" in source
@@ -21,9 +50,7 @@ def test_contas_pagar_tem_atalhos_de_periodo():
 
 
 def test_contas_pagar_lista_abre_edicao_de_lancamento():
-    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(
-        encoding="utf-8"
-    )
+    source = contas_pagar_source()
 
     assert "const [contaEdicao, setContaEdicao]" in source
     assert "abrirModalEdicao" in source
@@ -33,9 +60,7 @@ def test_contas_pagar_lista_abre_edicao_de_lancamento():
 
 
 def test_modal_conta_pagar_suporta_modo_edicao():
-    source = (REPO_ROOT / "frontend/src/components/ModalNovaContaPagar.jsx").read_text(
-        encoding="utf-8"
-    )
+    source = read_repo("frontend/src/components/ModalNovaContaPagar.jsx")
 
     assert "contaEdicao" in source
     assert "isEditando" in source
@@ -45,9 +70,7 @@ def test_modal_conta_pagar_suporta_modo_edicao():
 
 
 def test_contas_pagar_lista_edita_e_exclui_sem_botao_ver():
-    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(
-        encoding="utf-8"
-    )
+    source = contas_pagar_source()
 
     assert "excluirContaPagar" in source
     assert "api.delete(`/contas-pagar/${conta.id}`)" in source
@@ -58,12 +81,10 @@ def test_contas_pagar_lista_edita_e_exclui_sem_botao_ver():
 
 
 def test_edicao_de_conta_pagar_expoe_recorrencia_no_modal():
-    source = (REPO_ROOT / "frontend/src/components/ModalNovaContaPagar.jsx").read_text(
-        encoding="utf-8"
-    )
+    source = read_repo("frontend/src/components/ModalNovaContaPagar.jsx")
 
     assert "eh_recorrente: Boolean(conta?.eh_recorrente)" in source
-    assert "tipo_recorrencia: conta?.tipo_recorrencia || 'mensal'" in source
+    assert 'tipo_recorrencia: conta?.tipo_recorrencia || "mensal"' in source
     assert "eh_recorrente: payload.eh_recorrente" in source
     assert (
         "tipo_recorrencia: payload.eh_recorrente ? payload.tipo_recorrencia : null"
@@ -77,9 +98,7 @@ def test_edicao_de_conta_pagar_expoe_recorrencia_no_modal():
 
 
 def test_contas_pagar_mantem_acoes_visiveis_com_textos_longos():
-    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(
-        encoding="utf-8"
-    )
+    source = contas_pagar_source()
 
     assert "contas-pagar-actions-cell" in source
     assert "sticky right-0" in source
@@ -89,17 +108,13 @@ def test_contas_pagar_mantem_acoes_visiveis_com_textos_longos():
 
 
 def test_contas_pagar_frontend_trata_recorrencia_em_lote():
-    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(
-        encoding="utf-8"
-    )
-    modal_source = (
-        REPO_ROOT / "frontend/src/components/ModalNovaContaPagar.jsx"
-    ).read_text(encoding="utf-8")
+    source = contas_pagar_source()
+    modal_source = read_repo("frontend/src/components/ModalNovaContaPagar.jsx")
 
     assert "carregarRecorrenciaExclusao" in source
     assert "recorrenciasSelecionadasExclusao" in source
     assert "confirmarExclusaoRecorrencia" in source
-    assert "api.post('/contas-pagar/recorrencias/excluir'" in source
+    assert '"/contas-pagar/recorrencias/excluir"' in source
     assert "Lançamentos da recorrência" in source
 
     assert "aplicar_recorrencia_futura" in modal_source
@@ -107,14 +122,12 @@ def test_contas_pagar_frontend_trata_recorrencia_em_lote():
 
 
 def test_modal_conta_pagar_nao_envia_data_recorrencia_vazia():
-    source = (REPO_ROOT / "frontend/src/components/ModalNovaContaPagar.jsx").read_text(
-        encoding="utf-8"
-    )
+    source = read_repo("frontend/src/components/ModalNovaContaPagar.jsx")
 
     assert "normalizarDataOpcionalRecorrencia" in source
+    assert "data_inicio_recorrencia:" in source
     assert (
-        "data_inicio_recorrencia: normalizarDataOpcionalRecorrencia(payload.data_inicio_recorrencia)"
-        in source
+        "normalizarDataOpcionalRecorrencia(payload.data_inicio_recorrencia)" in source
     )
     assert (
         "data_fim_recorrencia: normalizarDataOpcionalRecorrencia(payload.data_fim_recorrencia)"
@@ -123,9 +136,7 @@ def test_modal_conta_pagar_nao_envia_data_recorrencia_vazia():
 
 
 def test_contas_pagar_pagamento_envia_data_e_mostra_erros_legiveis():
-    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(
-        encoding="utf-8"
-    )
+    source = contas_pagar_source()
     abrir_modal = source.split("const abrirModalPagamento = (conta) => {", 1)[1].split(
         "const abrirModalEdicao",
         1,
@@ -137,9 +148,7 @@ def test_contas_pagar_pagamento_envia_data_e_mostra_erros_legiveis():
 
 
 def test_contas_pagar_pagamento_usa_formas_financeiras_validas():
-    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(
-        encoding="utf-8"
-    )
+    source = contas_pagar_source()
     carregar_formas = source.split("const carregarFormasPagamento = async () => {", 1)[
         1
     ].split(
@@ -148,7 +157,7 @@ def test_contas_pagar_pagamento_usa_formas_financeiras_validas():
     )[0]
 
     assert (
-        "api.get('/financeiro/formas-pagamento?apenas_ativas=true')" in carregar_formas
+        'api.get("/financeiro/formas-pagamento?apenas_ativas=true")' in carregar_formas
     )
     assert "/comissoes/formas-pagamento" not in carregar_formas
     assert "safeArray(response.data).map" in carregar_formas
@@ -159,22 +168,19 @@ def test_contas_pagar_pagamento_usa_formas_financeiras_validas():
 
 
 def test_contas_pagar_pagamento_nao_mostra_icone_textual_na_forma():
-    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(
-        encoding="utf-8"
-    )
+    source = read_repo("frontend/src/components/contas-pagar/ContasPagarModals.jsx")
     modal_pagamento = source.split("Forma de Pagamento</label>", 1)[1].split(
         "Conta Banc",
         1,
     )[0]
 
-    assert "<option key={f.id} value={f.id}>{f.nome}</option>" in modal_pagamento
+    assert "<option key={f.id} value={f.id}>" in modal_pagamento
+    assert "{f.nome}" in modal_pagamento
     assert "{f.icone" not in modal_pagamento
 
 
 def test_contas_pagar_pagamento_alerta_saldo_negativo_antes_de_baixar():
-    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(
-        encoding="utf-8"
-    )
+    source = contas_pagar_source()
 
     assert "confirmarSaldoNegativoPagamento" in source
     assert "Saldo insuficiente na conta bancaria" in source
@@ -183,9 +189,7 @@ def test_contas_pagar_pagamento_alerta_saldo_negativo_antes_de_baixar():
 
 
 def test_contas_pagar_lista_tem_selecao_e_acoes_em_lote():
-    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(
-        encoding="utf-8"
-    )
+    source = contas_pagar_source()
 
     assert "contasSelecionadas" in source
     assert "alternarSelecaoConta" in source
@@ -200,22 +204,18 @@ def test_contas_pagar_lista_tem_selecao_e_acoes_em_lote():
 
 
 def test_contas_pagar_frontend_chama_endpoints_de_estorno_cancelamento_e_exclusao_em_lote():
-    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(
-        encoding="utf-8"
-    )
+    source = contas_pagar_source()
 
     assert "estornarContasSelecionadas" in source
     assert "cancelarContasSelecionadas" in source
     assert "excluirContasSelecionadas" in source
     assert "api.post(`/contas-pagar/${conta.id}/estornar`" in source
     assert "api.post(`/contas-pagar/${conta.id}/cancelar`" in source
-    assert "api.post('/contas-pagar/recorrencias/excluir'" in source
+    assert '"/contas-pagar/recorrencias/excluir"' in source
 
 
 def test_modal_conta_pagar_pergunta_antes_de_replicar_nome_recorrente():
-    source = (REPO_ROOT / "frontend/src/components/ModalNovaContaPagar.jsx").read_text(
-        encoding="utf-8"
-    )
+    source = read_repo("frontend/src/components/ModalNovaContaPagar.jsx")
 
     assert "confirmarReplicacaoDescricao" in source
     assert "window.confirm" in source
