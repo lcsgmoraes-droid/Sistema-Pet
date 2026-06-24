@@ -48,7 +48,7 @@ def _raise_head_error(*_args, **_kwargs):
 
 
 def test_app_startup_calls_database_migration_guard():
-    main_path = Path(__file__).resolve().parents[2] / "app" / "main.py"
+    main_path = Path(__file__).resolve().parents[2] / "app" / "main_lifecycle.py"
     main_source = main_path.read_text(encoding="utf-8")
     tree = ast.parse(main_source)
     startup = next(

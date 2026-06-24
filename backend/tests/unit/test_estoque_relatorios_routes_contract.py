@@ -35,7 +35,7 @@ def test_estoque_routes_nao_expoe_mais_relatorio_valorizado():
 
 
 def test_main_registra_router_de_relatorios_estoque():
-    main_source = _source("app/main.py")
+    main_source = _source("app/main_routers.py")
 
     assert (
         "from app.estoque_relatorios_routes import router as estoque_relatorios_router"

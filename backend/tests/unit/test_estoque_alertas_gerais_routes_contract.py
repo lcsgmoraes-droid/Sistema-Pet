@@ -35,7 +35,7 @@ def test_estoque_routes_nao_expoe_mais_alertas_gerais():
 
 
 def test_main_registra_router_de_alertas_gerais():
-    main_source = _source("app/main.py")
+    main_source = _source("app/main_routers.py")
 
     assert (
         "from app.estoque_alertas_gerais_routes import router as estoque_alertas_gerais_router"

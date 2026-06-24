@@ -46,7 +46,7 @@ def test_estoque_routes_nao_expõe_mais_decorators_de_granel():
 
 
 def test_main_registra_router_de_granel():
-    main_source = _source("app/main.py")
+    main_source = _source("app/main_routers.py")
 
     assert (
         "from app.estoque_granel_routes import router as estoque_granel_router"

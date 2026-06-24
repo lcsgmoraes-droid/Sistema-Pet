@@ -207,6 +207,22 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
+Inventario atualizado em 2026-06-24, excluindo testes, migrations e builds locais:
+
+- 145 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 59 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 13 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
+- 0 arquivos de aplicacao acima de 2000 linhas.
+
+Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
+
+- `backend/app/main.py`: 1744 -> 107 linhas.
+- `backend/app/main_routers.py`: registro de routers e gates de modulos premium.
+- `backend/app/main_background_jobs.py`: loops e controle de jobs de background.
+- `backend/app/main_lifecycle.py`: startup, shutdown e validacao de ambiente.
+- `backend/app/main_http.py`: middlewares e handlers de erro.
+- `backend/app/main_basic_routes.py`: rotas basicas de health/debug.
+
 Maiores arquivos mapeados em 2026-05-04:
 
 Inventario atualizado em 2026-06-07, excluindo testes e migracoes Alembic da fila operacional:

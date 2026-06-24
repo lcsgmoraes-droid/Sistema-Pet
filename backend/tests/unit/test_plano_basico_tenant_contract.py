@@ -213,8 +213,8 @@ def test_modulos_admin_activation_sets_target_tenant_context(monkeypatch):
     assert db.committed is True
 
 
-def test_premium_routers_remain_gated_in_main():
-    main_source = _source("backend/app/main.py")
+def test_premium_routers_remain_gated_in_router_bootstrap():
+    main_source = _source("backend/app/main_routers.py")
     required_gates = {
         "campaigns_router": "campanhas",
         "canal_descontos_router": "campanhas",
@@ -233,7 +233,7 @@ def test_premium_routers_remain_gated_in_main():
     for router_name, modulo in required_gates.items():
         pattern = (
             rf"app\.include_router\(\s*{router_name}\b"
-            rf"[^\n]*dependencies=_module_dependencies\(\"{modulo}\"\)"
+            rf"[\s\S]*?dependencies=_module_dependencies\(\"{modulo}\"\)"
         )
         assert re.search(pattern, main_source), f"{router_name} sem gate {modulo}"
 
@@ -563,17 +563,18 @@ def test_basic_direct_urls_apply_same_frontend_permissions_as_menu():
 
 
 def test_financial_chat_ia_is_not_available_in_basic_without_premium_module():
-    main_source = _source("backend/app/main.py")
+    main_source = _source("backend/app/main_routers.py")
     app_source = _source("frontend/src/App.jsx")
     layout_source = _source("frontend/src/components/Layout.jsx") + _source(
         "frontend/src/components/layout/menuConfig.js"
     )
     modulo_bloqueado_source = _source("frontend/src/components/ModuloBloqueado.jsx")
 
-    assert (
-        'app.include_router(chat_router, tags=["IA - Chat Financeiro"], '
-        'dependencies=_module_dependencies("financeiro_erp"))'
-    ) in main_source
+    assert re.search(
+        r"app\.include_router\(\s*chat_router[\s\S]*?"
+        r'dependencies=_module_dependencies\("financeiro_erp"\)',
+        main_source,
+    )
     assert 'path="ia/chat"' in app_source
     assert (
         'element={<ModuleGate modulo="financeiro_erp"><ChatIA /></ModuleGate>}'
