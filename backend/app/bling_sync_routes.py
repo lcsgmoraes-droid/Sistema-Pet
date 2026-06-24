@@ -47,9 +47,11 @@ from .bling_sync.product_matching import (
     _barcode_bling,
     _coerce_float,
     _escolher_item_melhor_match,
+    _escolher_item_sku_estrito,
     _extrair_lista_produtos_bling,
     _limpar_texto_busca,
     _montar_codigos_busca,
+    _montar_codigos_busca_estrita,
     _produto_eh_pai,
     _produto_sincroniza_estoque,
     _sku_bling,
@@ -81,24 +83,22 @@ def _buscar_item_bling_para_vinculo(
     nome_busca: str,
     codigos_extras: Optional[list[str]] = None,
 ) -> Optional[dict]:
-    codigos_busca = _montar_codigos_busca(codigo_busca, codigos_extras)
+    codigos_busca = _montar_codigos_busca_estrita(codigo_busca, codigos_extras)
 
     for codigo in codigos_busca:
         resultado = bling.listar_produtos(codigo=codigo, limite=50)
         itens = _extrair_lista_produtos_bling(resultado)
         if itens:
-            return _escolher_item_melhor_match(itens, codigos_busca)
+            item = _escolher_item_sku_estrito(itens, codigos_busca)
+            if item:
+                return item
 
         resultado = bling.listar_produtos(sku=codigo, limite=50)
         itens = _extrair_lista_produtos_bling(resultado)
         if itens:
-            return _escolher_item_melhor_match(itens, codigos_busca)
-
-    if nome_busca:
-        resultado = bling.listar_produtos(nome=nome_busca, limite=50)
-        itens = _extrair_lista_produtos_bling(resultado)
-        if itens:
-            return _escolher_item_melhor_match(itens, codigos_busca)
+            item = _escolher_item_sku_estrito(itens, codigos_busca)
+            if item:
+                return item
 
     return None
 
@@ -234,6 +234,26 @@ def _upsert_sync_vinculo(
     produto: Produto,
     bling_produto_id: str,
 ) -> None:
+    bling_produto_id = str(bling_produto_id or "").strip()
+    if bling_produto_id:
+        conflito = (
+            db.query(ProdutoBlingSync)
+            .filter(
+                ProdutoBlingSync.tenant_id == tenant_id,
+                ProdutoBlingSync.bling_produto_id == bling_produto_id,
+                ProdutoBlingSync.produto_id != produto.id,
+            )
+            .first()
+        )
+        if conflito:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Esse item do Bling ja esta vinculado ao produto local "
+                    f"{conflito.produto_id}."
+                ),
+            )
+
     sync = (
         db.query(ProdutoBlingSync)
         .filter(
@@ -1459,7 +1479,11 @@ def vincular_todos_por_sku(
         force_refresh=False,
     )
 
-    itens_match = list(snapshot.get("items", []) or [])
+    itens_match = [
+        item
+        for item in list(snapshot.get("items", []) or [])
+        if item.get("match_origem") == "sku"
+    ]
     total_sem_vinculo = len(itens_match)
     total_universo_sem_vinculo = int(
         snapshot.get("total_sem_vinculo_universo_local", total_sem_vinculo) or 0

@@ -49,6 +49,12 @@ const EMPTY_VINCULOS_META = {
   precisaAtualizar: true,
 };
 
+const EMPTY_LOCAL_META = {
+  total: 0,
+  loaded: false,
+  atualizadoEm: null,
+};
+
 const EMPTY_BLING_CONNECTION = {
   checked: false,
   connected: null,
@@ -58,19 +64,25 @@ const EMPTY_BLING_CONNECTION = {
 
 const TAB_CONFIG = {
   criar: {
-    label: "Criar no sistema",
-    emptyTitle: "Nenhum produto pendente para criar",
+    label: "Bling sem CorePet",
+    emptyTitle: "Nenhum item do Bling sem cadastro local",
     emptyDescription:
-      "Quando o catalogo do Bling tiver item sem SKU ou codigo de barras local, ele aparece aqui.",
+      "Todo produto do Bling encontrado nesta leitura ja tem cadastro correspondente no CorePet.",
   },
   vincular: {
-    label: "Vincular existente",
-    emptyTitle: "Nenhum vinculo pendente",
+    label: "SKU igual",
+    emptyTitle: "Nenhuma sugestao por SKU igual",
     emptyDescription:
-      "Quando encontrarmos o produto no Bling mas faltar apenas o vinculo, ele aparece aqui.",
+      "Quando o mesmo SKU existir no CorePet e no Bling sem vinculo salvo, ele aparece aqui.",
+  },
+  local: {
+    label: "Local sem Bling",
+    emptyTitle: "Nenhum produto local sem vinculo",
+    emptyDescription:
+      "Produtos vendidos apenas na loja fisica podem ficar fora do Bling sem virar pendencia.",
   },
   corrigir: {
-    label: "Corrigir falhas",
+    label: "Falhas de sync",
     emptyTitle: "Nenhuma falha de sincronizacao aberta",
     emptyDescription:
       "Produtos vinculados com divergencia, fila travada ou erro aparecem nesta fila.",
@@ -189,6 +201,7 @@ function PendingCard({
   badges = [],
   details = [],
   actions = [],
+  children = null,
 }) {
   const toneClasses = ISSUE_TONES[tone] || ISSUE_TONES.slate;
 
@@ -230,6 +243,8 @@ function PendingCard({
               />
             ))}
           </div>
+
+          {children ? <div className="space-y-3">{children}</div> : null}
         </div>
 
         <div className="flex w-full flex-col gap-2 xl:w-56">
@@ -342,12 +357,19 @@ function EstoqueBling() {
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncLoaded, setSyncLoaded] = useState(false);
   const [syncError, setSyncError] = useState("");
+  const [localLoading, setLocalLoading] = useState(false);
+  const [localError, setLocalError] = useState("");
+  const [manualSearchKey, setManualSearchKey] = useState("");
 
   const [cobertura, setCobertura] = useState(EMPTY_COBERTURA);
   const [faltantesBling, setFaltantesBling] = useState([]);
   const [faltantesMeta, setFaltantesMeta] = useState(EMPTY_FALTANTES_META);
   const [produtosSemVinculo, setProdutosSemVinculo] = useState([]);
   const [vinculosMeta, setVinculosMeta] = useState(EMPTY_VINCULOS_META);
+  const [produtosLocaisSemBling, setProdutosLocaisSemBling] = useState([]);
+  const [localMeta, setLocalMeta] = useState(EMPTY_LOCAL_META);
+  const [manualBlingLookup, setManualBlingLookup] = useState({});
+  const [manualSearchTerms, setManualSearchTerms] = useState({});
   const [syncItems, setSyncItems] = useState([]);
   const [blingConnection, setBlingConnection] = useState(EMPTY_BLING_CONNECTION);
 
@@ -436,6 +458,38 @@ function EstoqueBling() {
       }
     } finally {
       setSyncLoading(false);
+    }
+  };
+
+  const loadLocalProductsWithoutBling = async ({ silent = true } = {}) => {
+    setLocalLoading(true);
+    setLocalError("");
+
+    try {
+      const response = await api.get("/estoque/sync/produtos-sem-vinculo", {
+        timeout: 30000,
+        params: {
+          limit: 200,
+          offset: 0,
+          apenas_com_match_bling: false,
+        },
+      });
+      const data = response?.data || {};
+      setProdutosLocaisSemBling(data.items || []);
+      setLocalMeta({
+        total: Number(data.total || 0),
+        loaded: true,
+        atualizadoEm: new Date().toISOString(),
+      });
+    } catch (error) {
+      const message = getErrorMessage(error, "Nao foi possivel carregar produtos locais sem Bling.");
+      setLocalError(message);
+      setLocalMeta((current) => ({ ...current, loaded: true }));
+      if (!silent) {
+        toast.error(message);
+      }
+    } finally {
+      setLocalLoading(false);
     }
   };
 
@@ -558,6 +612,12 @@ function EstoqueBling() {
     }
   }, [activeTab, syncLoaded, syncLoading]);
 
+  useEffect(() => {
+    if (activeTab === "local" && !localMeta.loaded && !localLoading) {
+      loadLocalProductsWithoutBling();
+    }
+  }, [activeTab, localMeta.loaded, localLoading]);
+
   const syncProblems = useMemo(() => {
     return (syncItems || [])
       .map((item) => ({
@@ -580,8 +640,12 @@ function EstoqueBling() {
     );
   }, [faltantesBling, search]);
 
+  const skuLinkSuggestions = useMemo(() => {
+    return produtosSemVinculo.filter((item) => item.match_origem === "sku");
+  }, [produtosSemVinculo]);
+
   const filteredLink = useMemo(() => {
-    return produtosSemVinculo.filter((item) =>
+    return skuLinkSuggestions.filter((item) =>
       includesSearch(search, [
         item.nome,
         item.codigo,
@@ -593,7 +657,13 @@ function EstoqueBling() {
         item.motivo,
       ]),
     );
-  }, [produtosSemVinculo, search]);
+  }, [search, skuLinkSuggestions]);
+
+  const filteredLocal = useMemo(() => {
+    return produtosLocaisSemBling.filter((item) =>
+      includesSearch(search, [item.nome, item.codigo, item.id, item.estoque_atual]),
+    );
+  }, [produtosLocaisSemBling, search]);
 
   const filteredFix = useMemo(() => {
     return syncProblems.filter((item) =>
@@ -622,7 +692,8 @@ function EstoqueBling() {
   const syncProblemCount = syncLoaded ? syncProblems.length : dashboardSyncProblemCount;
   const counts = {
     criar: faltantesMeta.snapshotDisponivel ? Number(faltantesMeta.total || 0) : "-",
-    vincular: vinculosMeta.snapshotDisponivel ? Number(vinculosMeta.total || 0) : "-",
+    vincular: vinculosMeta.snapshotDisponivel ? skuLinkSuggestions.length : "-",
+    local: localMeta.loaded ? Number(localMeta.total || 0) : "-",
     corrigir: syncLoaded || cobertura.snapshot_disponivel ? syncProblemCount : "-",
   };
   const knownPendingCount = hasAnySnapshot
@@ -681,7 +752,7 @@ function EstoqueBling() {
   };
 
   const runMassLinkBySku = async () => {
-    const initialTotal = Number(vinculosMeta.total || 0);
+    const initialTotal = Number(skuLinkSuggestions.length || 0);
     if (!initialTotal) {
       toast("Nao ha produtos pendentes para vincular neste momento.");
       return;
@@ -1007,6 +1078,92 @@ function EstoqueBling() {
     }
   };
 
+  const updateManualSearchTerm = (produtoId, value) => {
+    setManualSearchTerms((current) => ({
+      ...current,
+      [produtoId]: value,
+    }));
+  };
+
+  const buscarBlingParaProdutoLocal = async (produto) => {
+    const key = String(produto.id);
+    const termo = String(manualSearchTerms[key] ?? produto.codigo ?? "").trim();
+
+    if (!termo) {
+      toast("Informe SKU, codigo, ID ou nome para buscar no Bling.");
+      return;
+    }
+
+    setManualSearchKey(key);
+    setManualBlingLookup((current) => ({
+      ...current,
+      [key]: { loading: true, searched: true, items: [], error: "" },
+    }));
+
+    try {
+      const response = await api.get("/estoque/sync/produtos-bling", {
+        timeout: 30000,
+        params: {
+          busca: termo,
+          limite: 10,
+        },
+      });
+      setManualBlingLookup((current) => ({
+        ...current,
+        [key]: {
+          loading: false,
+          searched: true,
+          items: response?.data || [],
+          error: "",
+        },
+      }));
+    } catch (error) {
+      const message = getErrorMessage(error, "Nao foi possivel buscar esse produto no Bling.");
+      setManualBlingLookup((current) => ({
+        ...current,
+        [key]: { loading: false, searched: true, items: [], error: message },
+      }));
+      toast.error(message);
+    } finally {
+      setManualSearchKey("");
+    }
+  };
+
+  const vincularProdutoLocalAoBling = async (produto, itemBling) => {
+    const key = `manual-link-${produto.id}-${itemBling.id}`;
+    setRowActionKey(key);
+
+    try {
+      await api.post("/estoque/sync/vincular", {
+        produto_id: produto.id,
+        bling_id: String(itemBling.id),
+      });
+
+      setProdutosLocaisSemBling((current) =>
+        current.filter((item) => Number(item.id) !== Number(produto.id)),
+      );
+      setLocalMeta((current) => ({
+        ...current,
+        total: Math.max(Number(current.total || 0) - 1, 0),
+        atualizadoEm: new Date().toISOString(),
+      }));
+      setManualBlingLookup((current) => {
+        const next = { ...current };
+        delete next[String(produto.id)];
+        return next;
+      });
+
+      toast.success("Produto local vinculado ao item escolhido do Bling.");
+      await loadDashboard();
+    } catch (error) {
+      toast.error(
+        error.response?.data?.detail || error.message || "Nao foi possivel criar o vinculo.",
+      );
+    } finally {
+      setRowActionKey("");
+    }
+  };
+
   const criarPrimeirosFaltantes = async () => {
     const candidatos = filteredCreate
       .filter((item) => item.pronto_para_autocorrecao && item.id)
@@ -1064,7 +1221,8 @@ function EstoqueBling() {
 
   const searchPlaceholder = {
     criar: "Buscar por nome, SKU ou codigo de barras",
-    vincular: "Buscar por produto local, SKU ou item do Bling",
+    vincular: "Buscar por SKU igual, produto local ou item do Bling",
+    local: "Buscar produto local sem vinculo",
     corrigir: "Buscar por produto, SKU, ID Bling ou erro",
   }[activeTab];
 
@@ -1161,8 +1319,8 @@ function EstoqueBling() {
             <PendingCard
               key={`vincular-${item.id}`}
               title={item.nome}
-              subtitle={`Bling: ${item.bling_nome || "-"} | Match por ${item.match_origem === "sku" ? "SKU" : "codigo de barras"}${isParentProduct ? " | Produto PAI" : ""}`}
-              tone={isParentProduct ? "slate" : item.match_origem === "sku" ? "sky" : "amber"}
+              subtitle={`Bling: ${item.bling_nome || "-"} | SKU igual${isParentProduct ? " | Produto PAI" : ""}`}
+              tone={isParentProduct ? "slate" : "sky"}
               badges={[
                 { label: "SKU local", value: item.codigo || "-", mono: true },
                 {
@@ -1195,7 +1353,11 @@ function EstoqueBling() {
                   onClick: () =>
                     runRowAction(
                       `link-${item.id}`,
-                      () => api.post(`/estoque/sync/vincular-automatico/${item.id}`),
+                      () =>
+                        api.post("/estoque/sync/vincular", {
+                          produto_id: item.id,
+                          bling_id: item.bling_id,
+                        }),
                       successMessage,
                     ),
                   disabled: rowActionKey !== "",
@@ -1203,6 +1365,128 @@ function EstoqueBling() {
                 },
               ]}
             />
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderLocalTab = () => {
+    if (localLoading && !localMeta.loaded) {
+      return (
+        <EmptyState
+          title="Carregando produtos locais"
+          description="Esta leitura usa apenas o cadastro local e nao consulta o Bling."
+        />
+      );
+    }
+
+    if (localError && !filteredLocal.length) {
+      return <EmptyState title="Nao foi possivel carregar a lista local" description={localError} />;
+    }
+
+    if (!filteredLocal.length) {
+      return (
+        <EmptyState title={TAB_CONFIG.local.emptyTitle} description={TAB_CONFIG.local.emptyDescription} />
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {filteredLocal.map((item) => {
+          const key = String(item.id);
+          const lookup = manualBlingLookup[key] || {};
+          const searchTerm = manualSearchTerms[key] ?? item.codigo ?? "";
+
+          return (
+            <PendingCard
+              key={`local-${item.id}`}
+              title={item.nome}
+              subtitle={`SKU local ${item.codigo || "-"} | Estoque ${formatNumber(item.estoque_atual)}`}
+              tone="slate"
+              badges={[
+                { label: "SKU local", value: item.codigo || "-", mono: true },
+                { label: "ID local", value: item.id, mono: true },
+              ]}
+              reason={{
+                title: "Opcional para loja fisica",
+                description:
+                  "Este produto ainda nao tem vinculo com o Bling. Busque no Bling somente se ele tambem for vendido online ou por marketplace.",
+              }}
+              details={[
+                { label: "Estoque local", value: formatNumber(item.estoque_atual) },
+                { label: "Lista local", value: formatDate(localMeta.atualizadoEm) },
+                { label: "Consulta Bling", value: lookup.searched ? "Feita sob demanda" : "Nao feita" },
+              ]}
+              actions={[
+                {
+                  label: manualSearchKey === key ? "Buscando..." : "Buscar no Bling",
+                  onClick: () => buscarBlingParaProdutoLocal(item),
+                  disabled: manualSearchKey !== "" || rowActionKey !== "",
+                  className: ISSUE_TONES.slate.button,
+                },
+              ]}
+            >
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={searchTerm}
+                  onChange={(event) => updateManualSearchTerm(key, event.target.value)}
+                  placeholder="SKU, codigo, ID ou nome no Bling"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-slate-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => buscarBlingParaProdutoLocal(item)}
+                  disabled={manualSearchKey !== "" || rowActionKey !== ""}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  Buscar
+                </button>
+              </div>
+
+              {lookup.error ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {lookup.error}
+                </div>
+              ) : null}
+
+              {lookup.searched && !lookup.loading && !lookup.error && !lookup.items?.length ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  Nenhum item do Bling retornou para esse termo.
+                </div>
+              ) : null}
+
+              {lookup.items?.length ? (
+                <div className="space-y-2">
+                  {lookup.items.map((blingItem) => (
+                    <div
+                      key={`${item.id}-${blingItem.id}`}
+                      className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-slate-900">
+                          {blingItem.descricao || "Produto Bling"}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          ID {blingItem.id || "-"} | SKU {blingItem.codigo || "-"} | Estoque{" "}
+                          {formatNumber(blingItem.estoque)}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => vincularProdutoLocalAoBling(item, blingItem)}
+                        disabled={rowActionKey !== ""}
+                        className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        {rowActionKey === `manual-link-${item.id}-${blingItem.id}`
+                          ? "Vinculando..."
+                          : "Vincular"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </PendingCard>
           );
         })}
       </div>
@@ -1312,8 +1596,8 @@ function EstoqueBling() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Sincronizacao Bling</h1>
             <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Esta tela mostra apenas o que pede acao. Regra de correspondencia: primeiro SKU do
-              Bling, depois codigo de barras. Se nao existir match local, criamos e vinculamos.
+              O Bling precisa ter cadastro correspondente no CorePet. Produtos apenas da loja
+              fisica aparecem em uma area opcional e nao viram pendencia.
             </p>
           </div>
         </div>
@@ -1344,9 +1628,10 @@ function EstoqueBling() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <SummaryCard label="Bling sem cadastro local" value={counts.criar} tone="amber" />
-        <SummaryCard label="Produtos para vincular" value={counts.vincular} tone="sky" />
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard label="Bling sem CorePet" value={counts.criar} tone="amber" />
+        <SummaryCard label="Sugestoes SKU igual" value={counts.vincular} tone="sky" />
+        <SummaryCard label="Local sem Bling" value={counts.local} hint="opcional" tone="slate" />
         <SummaryCard label="Sync com problema" value={counts.corrigir} tone="red" />
       </div>
 
@@ -1445,12 +1730,26 @@ function EstoqueBling() {
             {activeTab === "vincular" ? (
               <button
                 onClick={runMassLinkBySku}
-                disabled={runningAction !== "" || !vinculosMeta.snapshotDisponivel}
+                disabled={
+                  runningAction !== "" ||
+                  !vinculosMeta.snapshotDisponivel ||
+                  skuLinkSuggestions.length <= 0
+                }
                 className="rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 {runningAction === "vincular-lote"
                   ? "Vinculando em lotes..."
                   : `Rodar lotes de ${MASS_LINK_BATCH_SIZE} por SKU`}
+              </button>
+            ) : null}
+
+            {activeTab === "local" ? (
+              <button
+                onClick={() => loadLocalProductsWithoutBling({ silent: false })}
+                disabled={localLoading || runningAction !== ""}
+                className="rounded-xl bg-slate-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {localLoading ? "Atualizando..." : "Atualizar lista local"}
               </button>
             ) : null}
 
@@ -1514,6 +1813,7 @@ function EstoqueBling() {
 
       {!loading && activeTab === "criar" ? renderCreateTab() : null}
       {!loading && activeTab === "vincular" ? renderLinkTab() : null}
+      {!loading && activeTab === "local" ? renderLocalTab() : null}
       {!loading && activeTab === "corrigir" ? renderFixTab() : null}
     </div>
   );
