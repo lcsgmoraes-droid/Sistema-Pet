@@ -17,6 +17,25 @@ from app.utils.logger import logger
 from app.vendas_models import Venda
 
 
+_RASTREIO_ROTA_SQL = text(
+    """
+    SELECT id, numero, status, entregador_id, lat_atual, lon_atual, localizacao_atualizada_em,
+        distancia_total_km_real, distancia_retorno_km_real
+    FROM rotas_entrega
+    WHERE token_rastreio = :token
+    LIMIT 1
+    """
+)
+
+_RASTREIO_DISTANCIAS_SQL = text(
+    """
+    SELECT id, distancia_trecho_real_km, distancia_acumulada_real_km
+    FROM rotas_entrega_paradas
+    WHERE rota_id = :rid
+    """
+)
+
+
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calcula distancia entre 2 coordenadas geograficas em km."""
     raio_terra_km = 6371.0
@@ -201,25 +220,129 @@ def atualizar_localizacao_real_rota(
     return delta_km
 
 
-def montar_rastreio_publico(db: Session, token: str) -> dict:
-    rota_row = db.execute(
-        text(
-            """
-                 SELECT id, numero, status, entregador_id, lat_atual, lon_atual, localizacao_atualizada_em,
-                     distancia_total_km_real, distancia_retorno_km_real
-            FROM rotas_entrega
-            WHERE token_rastreio = :token
-            LIMIT 1
-            """
-        ),
-        {"token": token},
-    ).fetchone()
+def _buscar_rota_rastreio(db: Session, token: str):
+    rota_row = db.execute(_RASTREIO_ROTA_SQL, {"token": token}).fetchone()
+    if rota_row:
+        return rota_row
+    raise HTTPException(
+        status_code=404, detail="Rastreio nao encontrado ou link invalido"
+    )
 
-    if not rota_row:
-        raise HTTPException(
-            status_code=404, detail="Rastreio nao encontrado ou link invalido"
+
+def _buscar_entregador(db: Session, entregador_id):
+    if not entregador_id:
+        return None
+    return db.query(Cliente).filter(Cliente.id == entregador_id).first()
+
+
+def _listar_paradas_rastreio(db: Session, rota_id: int) -> list[RotaEntregaParada]:
+    return (
+        db.query(RotaEntregaParada)
+        .filter(RotaEntregaParada.rota_id == rota_id)
+        .order_by(RotaEntregaParada.ordem)
+        .all()
+    )
+
+
+def _distancias_por_parada(db: Session, rota_id: int) -> dict[int, tuple]:
+    rows = db.execute(_RASTREIO_DISTANCIAS_SQL, {"rid": rota_id}).fetchall()
+    return {row[0]: row for row in rows}
+
+
+def _isoformat_or_none(value) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _float_or_none(value) -> float | None:
+    return float(value) if value is not None else None
+
+
+def _montar_posicao(lat, lon, atualizada_em, fonte: str) -> dict | None:
+    if lat is None or lon is None:
+        return None
+    return {
+        "lat": float(lat),
+        "lon": float(lon),
+        "atualizada_em": _isoformat_or_none(atualizada_em),
+        "fonte": fonte,
+    }
+
+
+def _coordenadas_entrega_parada(db: Session, parada_id: int):
+    try:
+        return db.execute(
+            text(
+                "SELECT lat_entrega, lon_entrega FROM rotas_entrega_paradas WHERE id = :pid"
+            ),
+            {"pid": parada_id},
+        ).fetchone()
+    except Exception:
+        return None
+
+
+def _ultima_posicao_por_paradas(
+    db: Session, paradas: list[RotaEntregaParada]
+) -> dict | None:
+    for parada in reversed(paradas):
+        coordenadas = _coordenadas_entrega_parada(db, parada.id)
+        if not coordenadas:
+            continue
+        posicao = _montar_posicao(
+            coordenadas[0], coordenadas[1], parada.data_entrega, "ultima_parada"
         )
+        if posicao:
+            return posicao
+    return None
 
+
+def _montar_ultima_posicao(
+    db: Session,
+    paradas: list[RotaEntregaParada],
+    lat_atual,
+    lon_atual,
+    localizacao_atualizada_em,
+) -> dict | None:
+    posicao_atual = _montar_posicao(
+        lat_atual, lon_atual, localizacao_atualizada_em, "rota_atual"
+    )
+    if posicao_atual:
+        return posicao_atual
+    return _ultima_posicao_por_paradas(db, paradas)
+
+
+def _distancia_ate_ultima_entrega(distancia_total_real, distancia_retorno_real):
+    if distancia_total_real is None:
+        return None
+    return max(float(distancia_total_real or 0) - float(distancia_retorno_real or 0), 0)
+
+
+def _valor_distancia_parada(
+    dist_por_parada: dict[int, tuple], parada_id: int, index: int
+):
+    row = dist_por_parada.get(parada_id)
+    if not row or row[index] is None:
+        return None
+    return float(row[index])
+
+
+def _montar_parada_publica(
+    parada: RotaEntregaParada, dist_por_parada: dict[int, tuple]
+) -> dict:
+    return {
+        "ordem": parada.ordem,
+        "endereco": parada.endereco,
+        "status": parada.status,
+        "data_entrega": _isoformat_or_none(parada.data_entrega),
+        "distancia_trecho_real_km": _valor_distancia_parada(
+            dist_por_parada, parada.id, 1
+        ),
+        "distancia_acumulada_real_km": _valor_distancia_parada(
+            dist_por_parada, parada.id, 2
+        ),
+    }
+
+
+def montar_rastreio_publico(db: Session, token: str) -> dict:
     (
         rota_id,
         rota_numero,
@@ -230,68 +353,14 @@ def montar_rastreio_publico(db: Session, token: str) -> dict:
         localizacao_atualizada_em,
         distancia_total_real,
         distancia_retorno_real,
-    ) = rota_row
-    entregador = (
-        db.query(Cliente).filter(Cliente.id == entregador_id).first()
-        if entregador_id
-        else None
+    ) = _buscar_rota_rastreio(db, token)
+
+    entregador = _buscar_entregador(db, entregador_id)
+    paradas = _listar_paradas_rastreio(db, rota_id)
+    dist_por_parada = _distancias_por_parada(db, rota_id)
+    ultima_posicao = _montar_ultima_posicao(
+        db, paradas, lat_atual, lon_atual, localizacao_atualizada_em
     )
-
-    paradas = (
-        db.query(RotaEntregaParada)
-        .filter(RotaEntregaParada.rota_id == rota_id)
-        .order_by(RotaEntregaParada.ordem)
-        .all()
-    )
-
-    dist_paradas = db.execute(
-        text(
-            """
-            SELECT id, distancia_trecho_real_km, distancia_acumulada_real_km
-            FROM rotas_entrega_paradas
-            WHERE rota_id = :rid
-            """
-        ),
-        {"rid": rota_id},
-    ).fetchall()
-    dist_por_parada = {row[0]: row for row in dist_paradas}
-
-    ultima_posicao = None
-    if lat_atual is not None and lon_atual is not None:
-        ultima_posicao = {
-            "lat": float(lat_atual),
-            "lon": float(lon_atual),
-            "atualizada_em": localizacao_atualizada_em.isoformat()
-            if localizacao_atualizada_em
-            else None,
-            "fonte": "rota_atual",
-        }
-    else:
-        for parada in reversed(paradas):
-            lat = None
-            lon = None
-            try:
-                result = db.execute(
-                    text(
-                        "SELECT lat_entrega, lon_entrega FROM rotas_entrega_paradas WHERE id = :pid"
-                    ),
-                    {"pid": parada.id},
-                ).fetchone()
-                if result:
-                    lat, lon = result
-            except Exception:
-                pass
-            if lat is not None and lon is not None:
-                ultima_posicao = {
-                    "lat": float(lat),
-                    "lon": float(lon),
-                    "atualizada_em": parada.data_entrega.isoformat()
-                    if parada.data_entrega
-                    else None,
-                    "fonte": "ultima_parada",
-                }
-                break
-
     entregues = sum(1 for parada in paradas if parada.status == "entregue")
     total = len(paradas)
 
@@ -302,42 +371,13 @@ def montar_rastreio_publico(db: Session, token: str) -> dict:
         "total_paradas": total,
         "entregues": entregues,
         "pendentes": total - entregues,
-        "distancia_total_km_real": float(distancia_total_real)
-        if distancia_total_real is not None
-        else None,
-        "distancia_retorno_km_real": float(distancia_retorno_real)
-        if distancia_retorno_real is not None
-        else None,
-        "distancia_ate_ultima_entrega_km_real": (
-            max(
-                float(distancia_total_real or 0) - float(distancia_retorno_real or 0),
-                0,
-            )
-            if distancia_total_real is not None
-            else None
+        "distancia_total_km_real": _float_or_none(distancia_total_real),
+        "distancia_retorno_km_real": _float_or_none(distancia_retorno_real),
+        "distancia_ate_ultima_entrega_km_real": _distancia_ate_ultima_entrega(
+            distancia_total_real, distancia_retorno_real
         ),
         "ultima_posicao_gps": ultima_posicao,
         "paradas": [
-            {
-                "ordem": parada.ordem,
-                "endereco": parada.endereco,
-                "status": parada.status,
-                "data_entrega": parada.data_entrega.isoformat()
-                if parada.data_entrega
-                else None,
-                "distancia_trecho_real_km": (
-                    float(dist_por_parada[parada.id][1])
-                    if parada.id in dist_por_parada
-                    and dist_por_parada[parada.id][1] is not None
-                    else None
-                ),
-                "distancia_acumulada_real_km": (
-                    float(dist_por_parada[parada.id][2])
-                    if parada.id in dist_por_parada
-                    and dist_por_parada[parada.id][2] is not None
-                    else None
-                ),
-            }
-            for parada in paradas
+            _montar_parada_publica(parada, dist_por_parada) for parada in paradas
         ],
     }
