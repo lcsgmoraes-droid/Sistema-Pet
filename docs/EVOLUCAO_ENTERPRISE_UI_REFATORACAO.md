@@ -209,9 +209,9 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-24, excluindo testes, migrations e builds locais:
 
-- 144 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 58 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
-- 12 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
+- 143 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 57 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 11 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
@@ -231,6 +231,15 @@ Fatia de 2026-06-24: `backend/app/comissoes_demonstrativo_routes.py` separou cal
 - `backend/app/comissoes_demonstrativo_fechamento.py`: fechamento de pendencias, conta a pagar e lancamento previsto.
 - `backend/app/comissoes_demonstrativo_historico_routes.py`: subrouter de historico e detalhe de fechamentos.
 - `backend/app/comissoes_demonstrativo_schemas.py`: schema Pydantic de fechamento.
+
+Fatia de 2026-06-24: `backend/app/api/endpoints/rotas_entrega.py` virou agregador fino:
+
+- `backend/app/api/endpoints/rotas_entrega.py`: 1732 -> 86 linhas.
+- `backend/app/api/endpoints/rotas_entrega_core_routes.py`: listagem, detalhe, atualizacao e rastreio publico.
+- `backend/app/api/endpoints/rotas_entrega_otimizacao_routes.py`: otimizacao de entregas pendentes.
+- `backend/app/api/endpoints/rotas_entrega_criacao_routes.py`: criacao de rota simples ou multipla.
+- `backend/app/api/endpoints/rotas_entrega_estado_routes.py`: iniciar, reverter, fechar e excluir rota.
+- `backend/app/api/endpoints/rotas_entrega_paradas_routes.py`: recebimento, paradas, reordenacao, entrega, observacao e nao-entrega.
 
 Maiores arquivos mapeados em 2026-05-04:
 
@@ -1106,6 +1115,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-06-24: `backend/app/services/tenant_onboarding_service.py` virou fachada compativel do onboarding de tenants, com SQL/tenant-safe em `tenant_onboarding_sql.py`, auditoria de instalacoes em `tenant_onboarding_item_installs.py`, copias financeiras em `tenant_onboarding_financial_copies.py`, copias de catalogo em `tenant_onboarding_catalog_copies.py` e a orquestracao em `tenant_onboarding_runner.py`. O service principal caiu de 1791 para 184 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem por `splitlines()` de arquivos `.py` e `.jsx` em `backend/app` + `frontend/src` sem migrations/cache, restam 60 arquivos acima de 1000 linhas, 15 acima de 1500 e 0 acima de 2000.
 - 2026-06-24: `backend/app/services/base_catalog_import_service.py` virou fachada compativel da importacao do catalogo base, com nucleo/contratos em `base_catalog_import_core.py`, copia de catalogo em `base_catalog_import_catalog.py`, imagens/S3 em `base_catalog_import_images.py` e relacoes de produtos em `base_catalog_import_relations.py`. O service principal caiu de 1743 para 224 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem por `splitlines()` de arquivos `.py` e `.jsx` em `backend/app` + `frontend/src` sem migrations/cache, restam 59 arquivos acima de 1000 linhas, 14 acima de 1500 e 0 acima de 2000.
 - 2026-06-24: `backend/app/comissoes_demonstrativo_routes.py` extraiu schema, calculo do demonstrativo, montagem do detalhe, historico de fechamentos e fechamento financeiro para `backend/app/comissoes_demonstrativo_*.py`, mantendo o router e reexports de compatibilidade. O router principal caiu de 1734 para 875 linhas fisicas; na contagem atual de `backend/app` + `frontend/src`, restam 144 arquivos acima de 700 linhas, 58 acima de 1000, 12 acima de 1500 e 0 acima de 2000.
+- 2026-06-24: `backend/app/api/endpoints/rotas_entrega.py` virou agregador das rotas de entrega, com listagem/detalhe, otimizacao, criacao, estado da rota e paradas separados em `backend/app/api/endpoints/rotas_entrega_*_routes.py`. O router principal caiu de 1732 para 86 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem atual de `backend/app` + `frontend/src`, restam 143 arquivos acima de 700 linhas, 57 acima de 1000, 11 acima de 1500 e 0 acima de 2000.
 
 ### Nao fazer nesta onda
 
