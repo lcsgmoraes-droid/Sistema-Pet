@@ -257,6 +257,7 @@ const EntradaXML = () => {
     atualizarCustoSistema,
     atualizarMargem,
     atualizarPrecoVenda,
+    acoesProcessamento,
     baseCalculoMargem,
     baseCalculoMargemOpcoes,
     calcularPrecoVenda,
@@ -276,6 +277,7 @@ const EntradaXML = () => {
     previewProcessamento,
     processarNota,
     setBaseCalculoMargem,
+    setAcaoProcessamento,
     setFiltroCusto,
     voltarParaVisualizacao,
   } = useEntradaXmlRevisaoPrecos({
@@ -584,6 +586,7 @@ const EntradaXML = () => {
       <EntradaXmlRevisaoPrecosModal
         aberto={mostrarRevisaoPrecos}
         previewProcessamento={previewProcessamento}
+        acoesProcessamento={acoesProcessamento}
         filtroCusto={filtroCusto}
         setFiltroCusto={setFiltroCusto}
         obterResumoCustoItem={obterResumoCustoItem}
@@ -592,6 +595,7 @@ const EntradaXML = () => {
         gerandoRelatorioCustos={gerandoRelatorioCustos}
         baseCalculoMargem={baseCalculoMargem}
         setBaseCalculoMargem={setBaseCalculoMargem}
+        setAcaoProcessamento={setAcaoProcessamento}
         baseCalculoMargemOpcoes={baseCalculoMargemOpcoes}
         precosAjustados={precosAjustados}
         inputsRevisaoPrecos={inputsRevisaoPrecos}

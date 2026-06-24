@@ -55,6 +55,11 @@ class AtualizarPrecoRequest(BaseModel):
 class ProcessarConfig(BaseModel):
     multiplicadores_override: dict = Field(default_factory=dict)
     custos_override: dict = Field(default_factory=dict)
+    lancar_estoque: bool = True
+    atualizar_custo: bool = True
+    atualizar_preco_venda: bool = True
+    gerar_contas_pagar: bool = True
+    precos_venda_override: List[AtualizarPrecoRequest] = Field(default_factory=list)
 
 
 class CriarProdutoRequest(BaseModel):

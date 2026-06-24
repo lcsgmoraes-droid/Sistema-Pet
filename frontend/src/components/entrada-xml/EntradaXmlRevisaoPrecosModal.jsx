@@ -6,6 +6,7 @@ import TooltipComposicao from "../TooltipComposicao";
 function EntradaXmlRevisaoPrecosModal({
   aberto,
   previewProcessamento,
+  acoesProcessamento,
   filtroCusto,
   setFiltroCusto,
   obterResumoCustoItem,
@@ -24,6 +25,7 @@ function EntradaXmlRevisaoPrecosModal({
   atualizarPrecoVenda,
   normalizarCamposRevisaoPrecos,
   atualizarMargem,
+  setAcaoProcessamento,
   confirmarProcessamento,
   loading,
   onVoltar,
@@ -33,6 +35,30 @@ function EntradaXmlRevisaoPrecosModal({
   const itensVinculados = (previewProcessamento.itens || []).filter(
     (item) => item.produto_vinculado !== null || item.produto_id !== null,
   );
+  const precosAlterados = Object.entries(precosAjustados).filter(([produtoId, dados]) => {
+    const itemOriginal = (previewProcessamento.itens || []).find(
+      (item) =>
+        item.produto_vinculado && String(item.produto_vinculado.produto_id) === String(produtoId),
+    );
+    return (
+      itemOriginal &&
+      itemOriginal.produto_vinculado &&
+      Number(dados.preco_venda) !== Number(itemOriginal.produto_vinculado.preco_venda_atual)
+    );
+  }).length;
+  const custosAtualizados = itensVinculados.filter((item) => {
+    const resumo = obterResumoCustoItem(item);
+    return Math.abs(Number(resumo.custoSistema || 0) - Number(resumo.custoAnterior || 0)) > 0.0001;
+  }).length;
+  const itensComValidade = itensVinculados.filter((item) => Boolean(item.data_validade)).length;
+  const itensSemValidade = Math.max(itensVinculados.length - itensComValidade, 0);
+  const acoes = {
+    lancar_estoque: true,
+    atualizar_custo: true,
+    atualizar_preco_venda: false,
+    gerar_contas_pagar: true,
+    ...(acoesProcessamento || {}),
+  };
 
   const resumoFiltros = itensVinculados.reduce(
     (acc, item) => {
@@ -446,27 +472,74 @@ function EntradaXmlRevisaoPrecosModal({
           </div>
         </div>
 
-        <div className="border-t border-gray-200 p-4 md:p-6 bg-gray-50 flex flex-wrap justify-between items-center gap-3">
-          <button
-            onClick={onVoltar}
-            className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition-colors"
-          >
-            Voltar
-          </button>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-sm text-gray-600">Valor Total da Nota</div>
-              <div className="text-2xl font-bold text-green-600">
-                R$ {Number(previewProcessamento.valor_total || 0).toFixed(2)}
+        <div className="border-t border-gray-200 bg-gray-50 p-4 md:p-6">
+          <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">Acoes ao processar</h3>
+                {previewProcessamento.processamento_mensagem && (
+                  <p className="mt-1 text-sm text-gray-600">
+                    {previewProcessamento.processamento_mensagem}
+                  </p>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 md:grid-cols-5">
+                <span>{itensVinculados.length} itens no estoque</span>
+                <span>{custosAtualizados} custos</span>
+                <span>{precosAlterados} precos</span>
+                <span>{acoes.gerar_contas_pagar ? "Financeiro ativo" : "Sem contas"}</span>
+                <span>
+                  {itensComValidade} validade{itensComValidade === 1 ? "" : "s"} detectada
+                  {itensSemValidade > 0 ? `, ${itensSemValidade} sem validade` : ""}
+                </span>
               </div>
             </div>
+
+            <div className="mt-4 grid gap-2 md:grid-cols-4">
+              {[
+                ["lancar_estoque", "Lancar estoque, lotes e validade"],
+                ["atualizar_custo", "Atualizar custo dos produtos"],
+                ["atualizar_preco_venda", "Atualizar preco de venda revisado"],
+                ["gerar_contas_pagar", "Gerar contas a pagar"],
+              ].map(([acao, label]) => (
+                <label
+                  key={acao}
+                  className="flex min-h-[44px] items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800"
+                >
+                  <input
+                    type="checkbox"
+                    checked={Boolean(acoes[acao])}
+                    onChange={(event) => setAcaoProcessamento(acao, event.target.checked)}
+                    className="h-4 w-4 accent-green-600"
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <button
-              onClick={confirmarProcessamento}
-              disabled={loading}
-              className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-lg shadow disabled:opacity-50 transition-all"
+              onClick={onVoltar}
+              className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold transition-colors"
             >
-              {loading ? "Processando..." : "Confirmar e Processar Nota"}
+              Voltar
             </button>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-sm text-gray-600">Valor Total da Nota</div>
+                <div className="text-2xl font-bold text-green-600">
+                  R$ {Number(previewProcessamento.valor_total || 0).toFixed(2)}
+                </div>
+              </div>
+              <button
+                onClick={confirmarProcessamento}
+                disabled={loading}
+                className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-lg shadow disabled:opacity-50 transition-all"
+              >
+                {loading ? "Processando..." : "Confirmar e Processar Nota"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -476,10 +549,17 @@ function EntradaXmlRevisaoPrecosModal({
 
 EntradaXmlRevisaoPrecosModal.propTypes = {
   aberto: PropTypes.bool.isRequired,
+  acoesProcessamento: PropTypes.shape({
+    lancar_estoque: PropTypes.bool,
+    atualizar_custo: PropTypes.bool,
+    atualizar_preco_venda: PropTypes.bool,
+    gerar_contas_pagar: PropTypes.bool,
+  }),
   previewProcessamento: PropTypes.shape({
     numero_nota: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     fornecedor_nome: PropTypes.string,
     valor_total: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    processamento_mensagem: PropTypes.string,
     itens: PropTypes.arrayOf(PropTypes.object),
   }),
   filtroCusto: PropTypes.string.isRequired,
@@ -500,12 +580,14 @@ EntradaXmlRevisaoPrecosModal.propTypes = {
   atualizarPrecoVenda: PropTypes.func.isRequired,
   normalizarCamposRevisaoPrecos: PropTypes.func.isRequired,
   atualizarMargem: PropTypes.func.isRequired,
+  setAcaoProcessamento: PropTypes.func.isRequired,
   confirmarProcessamento: PropTypes.func.isRequired,
   loading: PropTypes.bool.isRequired,
   onVoltar: PropTypes.func.isRequired,
 };
 
 EntradaXmlRevisaoPrecosModal.defaultProps = {
+  acoesProcessamento: null,
   previewProcessamento: null,
 };
 

@@ -1163,6 +1163,8 @@ class NotaEntrada(BaseTenantModel):
     produtos_vinculados = Column(Integer, default=0)
     produtos_nao_vinculados = Column(Integer, default=0)
     entrada_estoque_realizada = Column(Boolean, default=False)
+    processamento_contexto = Column(String(30), nullable=True)
+    processamento_acoes = Column(Text, nullable=True)
 
     # Rateio Online vs Loja Física (apenas informativo/analítico - estoque é UNIFICADO)
     tipo_rateio = Column(String(20), default="loja")  # 'online', 'loja', 'parcial'

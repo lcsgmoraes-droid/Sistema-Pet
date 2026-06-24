@@ -11,6 +11,13 @@ import {
   obterCustoBasePreviewItem,
 } from "./entradaXmlUtils";
 
+const ACOES_PROCESSAMENTO_PADRAO = {
+  lancar_estoque: true,
+  atualizar_custo: true,
+  atualizar_preco_venda: false,
+  gerar_contas_pagar: true,
+};
+
 export default function useEntradaXmlRevisaoPrecos({
   api,
   carregarDados,
@@ -32,6 +39,7 @@ export default function useEntradaXmlRevisaoPrecos({
   const [filtroCusto, setFiltroCusto] = useState("todos");
   const [gerandoRelatorioCustos, setGerandoRelatorioCustos] = useState(false);
   const [baseCalculoMargem, setBaseCalculoMargem] = useState("nf");
+  const [acoesProcessamento, setAcoesProcessamento] = useState(ACOES_PROCESSAMENTO_PADRAO);
 
   const calcularPrecoVenda = (custoNovo, margemDesejada) => {
     if (margemDesejada >= 100) return custoNovo * 2;
@@ -148,6 +156,10 @@ export default function useEntradaXmlRevisaoPrecos({
       const previewComOverrides = aplicarOverridesPackNoPreview(response.data, multiplicadoresPack);
 
       setBaseCalculoMargem("nf");
+      setAcoesProcessamento({
+        ...ACOES_PROCESSAMENTO_PADRAO,
+        ...(previewComOverrides.acoes_processamento_sugeridas || {}),
+      });
       setPreviewProcessamento(previewComOverrides);
       setMostrarRevisaoPrecos(true);
       setMostrarDetalhes(false);
@@ -210,13 +222,6 @@ export default function useEntradaXmlRevisaoPrecos({
         }
       });
 
-      if (precosParaAtualizar.length > 0) {
-        await api.post(
-          `/notas-entrada/${previewProcessamento.nota_id}/atualizar-precos`,
-          precosParaAtualizar,
-        );
-      }
-
       const overridesNaoDefault = Object.fromEntries(
         Object.entries(multiplicadoresPack).flatMap(([itemId, valor]) => {
           const multiplicador = Number.parseInt(valor, 10);
@@ -230,6 +235,10 @@ export default function useEntradaXmlRevisaoPrecos({
       );
       const custosOverride = Object.fromEntries(
         (previewProcessamento.itens || []).flatMap((item) => {
+          if (!acoesProcessamento.atualizar_custo) {
+            return [];
+          }
+
           const itemId = item.item_id ?? item.id;
           const custoBase = obterCustoBasePreviewItem(item);
           const custoSistema = Number(custosAjustados[itemId] ?? custosAjustados[String(itemId)]);
@@ -246,6 +255,11 @@ export default function useEntradaXmlRevisaoPrecos({
         }),
       );
       const response = await api.post(`/notas-entrada/${previewProcessamento.nota_id}/processar`, {
+        lancar_estoque: Boolean(acoesProcessamento.lancar_estoque),
+        atualizar_custo: Boolean(acoesProcessamento.atualizar_custo),
+        atualizar_preco_venda: Boolean(acoesProcessamento.atualizar_preco_venda),
+        gerar_contas_pagar: Boolean(acoesProcessamento.gerar_contas_pagar),
+        precos_venda_override: acoesProcessamento.atualizar_preco_venda ? precosParaAtualizar : [],
         ...(Object.keys(overridesNaoDefault).length > 0
           ? { multiplicadores_override: overridesNaoDefault }
           : {}),
@@ -265,6 +279,7 @@ export default function useEntradaXmlRevisaoPrecos({
       setCustosAjustados({});
       setInputsRevisaoCustos({});
       setInputsRevisaoPrecos({});
+      setAcoesProcessamento(ACOES_PROCESSAMENTO_PADRAO);
       carregarDados();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erro ao processar nota");
@@ -504,13 +519,23 @@ export default function useEntradaXmlRevisaoPrecos({
     setMostrarRevisaoPrecos(false);
     setPreviewProcessamento(null);
     setInputsRevisaoPrecos({});
+    setInputsRevisaoCustos({});
+    setAcoesProcessamento(ACOES_PROCESSAMENTO_PADRAO);
     setBaseCalculoMargem("nf");
     if (notaSelecionada) {
       setMostrarVisualizacao(true);
     }
   };
 
+  const setAcaoProcessamento = (acao, ativo) => {
+    setAcoesProcessamento((prev) => ({
+      ...prev,
+      [acao]: Boolean(ativo),
+    }));
+  };
+
   return {
+    acoesProcessamento,
     atualizarCustoSistema,
     atualizarMargem,
     atualizarPrecoVenda,
@@ -533,6 +558,7 @@ export default function useEntradaXmlRevisaoPrecos({
     previewProcessamento,
     processarNota,
     setBaseCalculoMargem,
+    setAcaoProcessamento,
     setFiltroCusto,
     setMostrarRevisaoPrecos,
     setPreviewProcessamento,
