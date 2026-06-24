@@ -31,7 +31,9 @@ def _escolher_item_sku_estrito(
     itens: list[dict], codigos_busca: list[str]
 ) -> Optional[dict]:
     codigos_estritos = {
-        chave for chave in [_chave_sku_estrita(codigo) for codigo in codigos_busca] if chave
+        chave
+        for chave in [_chave_sku_estrita(codigo) for codigo in codigos_busca]
+        if chave
     }
     if not codigos_estritos:
         return None

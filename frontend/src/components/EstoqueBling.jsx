@@ -482,7 +482,10 @@ function EstoqueBling() {
         atualizadoEm: new Date().toISOString(),
       });
     } catch (error) {
-      const message = getErrorMessage(error, "Nao foi possivel carregar produtos locais sem Bling.");
+      const message = getErrorMessage(
+        error,
+        "Nao foi possivel carregar produtos locais sem Bling.",
+      );
       setLocalError(message);
       setLocalMeta((current) => ({ ...current, loaded: true }));
       if (!silent) {
@@ -1382,12 +1385,17 @@ function EstoqueBling() {
     }
 
     if (localError && !filteredLocal.length) {
-      return <EmptyState title="Nao foi possivel carregar a lista local" description={localError} />;
+      return (
+        <EmptyState title="Nao foi possivel carregar a lista local" description={localError} />
+      );
     }
 
     if (!filteredLocal.length) {
       return (
-        <EmptyState title={TAB_CONFIG.local.emptyTitle} description={TAB_CONFIG.local.emptyDescription} />
+        <EmptyState
+          title={TAB_CONFIG.local.emptyTitle}
+          description={TAB_CONFIG.local.emptyDescription}
+        />
       );
     }
 
@@ -1416,7 +1424,10 @@ function EstoqueBling() {
               details={[
                 { label: "Estoque local", value: formatNumber(item.estoque_atual) },
                 { label: "Lista local", value: formatDate(localMeta.atualizadoEm) },
-                { label: "Consulta Bling", value: lookup.searched ? "Feita sob demanda" : "Nao feita" },
+                {
+                  label: "Consulta Bling",
+                  value: lookup.searched ? "Feita sob demanda" : "Nao feita",
+                },
               ]}
               actions={[
                 {
@@ -1596,8 +1607,8 @@ function EstoqueBling() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900">Sincronizacao Bling</h1>
             <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              O Bling precisa ter cadastro correspondente no CorePet. Produtos apenas da loja
-              fisica aparecem em uma area opcional e nao viram pendencia.
+              O Bling precisa ter cadastro correspondente no CorePet. Produtos apenas da loja fisica
+              aparecem em uma area opcional e nao viram pendencia.
             </p>
           </div>
         </div>
