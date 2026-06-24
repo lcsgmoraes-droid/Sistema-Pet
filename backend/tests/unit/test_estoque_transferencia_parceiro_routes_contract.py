@@ -5,7 +5,11 @@ os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test
 os.environ["DEBUG"] = "false"
 
 from app import estoque_transferencia_parceiro_routes
-from app.estoque import transferencia_parceiro_documents
+from app.estoque import (
+    transferencia_parceiro_documents,
+    transferencia_parceiro_schemas,
+    transferencia_parceiro_support,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -77,4 +81,46 @@ def test_documentos_transferencia_parceiro_ficam_em_modulo_dedicado():
     assert (
         estoque_transferencia_parceiro_routes._status_transferencia_parceiro
         is transferencia_parceiro_documents._status_transferencia_parceiro
+    )
+
+
+def test_schemas_transferencia_parceiro_ficam_em_modulo_dedicado():
+    assert (
+        estoque_transferencia_parceiro_routes.TransferenciaParceiroRequest
+        is transferencia_parceiro_schemas.TransferenciaParceiroRequest
+    )
+    assert (
+        estoque_transferencia_parceiro_routes.TransferenciaParceiroRecebimentoRequest
+        is transferencia_parceiro_schemas.TransferenciaParceiroRecebimentoRequest
+    )
+    assert (
+        estoque_transferencia_parceiro_routes.TransferenciaParceiroHistoricoResponse
+        is transferencia_parceiro_schemas.TransferenciaParceiroHistoricoResponse
+    )
+
+
+def test_suporte_transferencia_parceiro_fica_em_modulo_dedicado():
+    assert (
+        estoque_transferencia_parceiro_routes._buscar_conta_transferencia_parceiro
+        is transferencia_parceiro_support._buscar_conta_transferencia_parceiro
+    )
+    assert (
+        estoque_transferencia_parceiro_routes._preparar_itens_transferencia_parceiro
+        is transferencia_parceiro_support._preparar_itens_transferencia_parceiro
+    )
+    assert (
+        estoque_transferencia_parceiro_routes._listar_itens_transferencia_parceiro
+        is transferencia_parceiro_support._listar_itens_transferencia_parceiro
+    )
+
+
+def test_refatoracao_mantem_transferencia_parceiro_sem_arquivo_gigante():
+    assert (
+        len(_source("app/estoque_transferencia_parceiro_routes.py").splitlines()) < 1400
+    )
+    assert (
+        len(_source("app/estoque/transferencia_parceiro_support.py").splitlines()) < 900
+    )
+    assert (
+        len(_source("app/estoque/transferencia_parceiro_schemas.py").splitlines()) < 220
     )
