@@ -34,7 +34,7 @@ def test_recorrencia_gerada_preserva_classificacao_financeira_e_competencia():
 
 
 def test_pagamento_de_recorrencia_reabastece_janela_de_12_meses():
-    source = _source("app/contas_pagar_routes.py")
+    source = _source("app/financeiro/contas_pagar_pagamento_routes.py")
     recorrencia_source = _source("app/financeiro/contas_pagar_recorrencia.py")
 
     assert "_garantir_janela_recorrencia_apos_pagamento(" in recorrencia_source
@@ -49,7 +49,7 @@ def test_pagamento_de_recorrencia_reabastece_janela_de_12_meses():
 
 
 def test_edicao_de_conta_pagar_pode_ativar_recorrencia():
-    source = _source("app/contas_pagar_routes.py")
+    source = _source("app/financeiro/contas_pagar_manutencao_routes.py")
     schemas_source = _source("app/financeiro/contas_pagar_schemas.py")
 
     update_model = schemas_source.split("class ContaPagarUpdate", 1)[1].split(
@@ -79,7 +79,7 @@ def test_edicao_de_conta_pagar_pode_ativar_recorrencia():
 
 
 def test_edicao_recorrente_garante_janela_mesmo_quando_ja_estava_marcada():
-    source = _source("app/contas_pagar_routes.py")
+    source = _source("app/financeiro/contas_pagar_manutencao_routes.py")
     recorrencia_source = _source("app/financeiro/contas_pagar_recorrencia.py")
 
     assert "_garantir_janela_recorrencia_conta(" in recorrencia_source
@@ -93,7 +93,7 @@ def test_edicao_recorrente_garante_janela_mesmo_quando_ja_estava_marcada():
 
 
 def test_recorrencia_tem_exclusao_seletiva_e_edicao_futura():
-    source = _source("app/contas_pagar_routes.py")
+    source = _source("app/financeiro/contas_pagar_manutencao_routes.py")
     recorrencia_source = _source("app/financeiro/contas_pagar_recorrencia.py")
     routes_source = _source("app/financeiro/contas_pagar_recorrencia_routes.py")
     schemas_source = _source("app/financeiro/contas_pagar_schemas.py")
