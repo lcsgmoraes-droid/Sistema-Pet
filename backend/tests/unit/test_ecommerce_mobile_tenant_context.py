@@ -237,9 +237,14 @@ def test_checkout_order_routes_reactivate_tenant_before_pedido_queries():
         source = inspect.getsource(route_handler)
 
         assert "_activate_checkout_tenant_context(identity)" in source
+        query_marker = (
+            "db.query(Pedido)"
+            if "db.query(Pedido)" in source
+            else "list_customer_order_history"
+        )
         assert source.index(
             "_activate_checkout_tenant_context(identity)"
-        ) < source.index("db.query(Pedido)")
+        ) < source.index(query_marker)
 
 
 def test_checkout_pedidos_releases_read_transaction_before_return():
