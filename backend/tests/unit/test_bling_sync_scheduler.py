@@ -18,7 +18,9 @@ def test_reconciliar_status_pedidos_usa_janela_configurada(monkeypatch):
     scheduler._should_defer_secondary_job = lambda job_name: False
 
     monkeypatch.setattr(scheduler_module, "SessionLocal", lambda: db)
-    monkeypatch.setattr(scheduler_module, "BLING_ORDER_STATUS_RECONCILE_DAYS", 90, raising=False)
+    monkeypatch.setattr(
+        scheduler_module, "BLING_ORDER_STATUS_RECONCILE_DAYS", 90, raising=False
+    )
     monkeypatch.setattr(scheduler_module, "BLING_ORDER_STATUS_RECONCILE_LIMIT", 17)
     monkeypatch.setattr(
         scheduler_module,
@@ -42,7 +44,9 @@ def test_reconciliar_nfes_autorizadas_usa_janela_configurada(monkeypatch):
     )
 
     monkeypatch.setattr(scheduler_module, "SessionLocal", lambda: db)
-    monkeypatch.setattr(scheduler_module, "BLING_NFE_AUTH_RECONCILE_DAYS", 90, raising=False)
+    monkeypatch.setattr(
+        scheduler_module, "BLING_NFE_AUTH_RECONCILE_DAYS", 90, raising=False
+    )
     monkeypatch.setattr(scheduler_module, "BLING_NFE_AUTH_RECONCILE_LIMIT", 140)
     monkeypatch.setattr(
         scheduler_module,

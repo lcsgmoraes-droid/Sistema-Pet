@@ -65,7 +65,9 @@ def test_reconciliar_status_atendido_com_nf_autorizada_consolida_venda(monkeypat
         def query(self, model):
             if getattr(model, "__name__", "") == "PedidoIntegradoItem":
                 return FakeQuery(all_result=self.itens)
-            raise AssertionError(f"Modelo inesperado: {getattr(model, '__name__', model)}")
+            raise AssertionError(
+                f"Modelo inesperado: {getattr(model, '__name__', model)}"
+            )
 
         def add(self, obj):
             self.added.append(obj)
@@ -120,7 +122,10 @@ def test_reconciliar_status_atendido_com_nf_autorizada_consolida_venda(monkeypat
     )
     monkeypatch.setattr(
         "app.services.bling_nf_service.processar_nf_autorizada",
-        lambda **kwargs: (chamadas.setdefault("processou_nf", kwargs), "venda_confirmada")[1],
+        lambda **kwargs: (
+            chamadas.setdefault("processou_nf", kwargs),
+            "venda_confirmada",
+        )[1],
     )
 
     resultado = service.reconciliar_status_pedido_local(db, pedido)
