@@ -8,6 +8,51 @@ def _normalizar_codigo_match(valor: Optional[str]) -> str:
     return re.sub(r"[^a-zA-Z0-9]", "", (valor or "").strip()).lower()
 
 
+def _chave_sku_estrita(valor: Optional[str]) -> str:
+    return str(valor or "").strip().lower()
+
+
+def _item_bling_tem_sku_estrito(item: dict, sku_local: Optional[str]) -> bool:
+    sku_normalizado = _chave_sku_estrita(sku_local)
+    if not sku_normalizado:
+        return False
+
+    return sku_normalizado in {
+        chave
+        for chave in [
+            _chave_sku_estrita(item.get("sku")),
+            _chave_sku_estrita(item.get("codigo")),
+        ]
+        if chave
+    }
+
+
+def _escolher_item_sku_estrito(
+    itens: list[dict], codigos_busca: list[str]
+) -> Optional[dict]:
+    codigos_estritos = {
+        chave
+        for chave in [_chave_sku_estrita(codigo) for codigo in codigos_busca]
+        if chave
+    }
+    if not codigos_estritos:
+        return None
+
+    for item in itens:
+        chaves_item = {
+            chave
+            for chave in [
+                _chave_sku_estrita(item.get("sku")),
+                _chave_sku_estrita(item.get("codigo")),
+            ]
+            if chave
+        }
+        if chaves_item.intersection(codigos_estritos):
+            return item
+
+    return None
+
+
 def _texto_limpo(valor: Optional[str]) -> str:
     return str(valor or "").strip()
 
@@ -94,6 +139,23 @@ def _montar_codigos_busca(
                 continue
             vistos.add(chave)
             codigos.append(candidato)
+
+    return codigos
+
+
+def _montar_codigos_busca_estrita(
+    codigo_principal: str, codigos_extras: Optional[list[str]] = None
+) -> list[str]:
+    codigos: list[str] = []
+    vistos: set[str] = set()
+
+    for bruto in [codigo_principal, *(codigos_extras or [])]:
+        codigo = (bruto or "").strip()
+        chave = _chave_sku_estrita(codigo)
+        if not codigo or not chave or chave in vistos:
+            continue
+        vistos.add(chave)
+        codigos.append(codigo)
 
     return codigos
 

@@ -18,6 +18,7 @@ from sqlalchemy import desc, func
 from sqlalchemy.orm import Session, aliased
 
 from app.bling_integration import BlingAPI
+from app.bling_sync.product_matching import _item_bling_tem_sku_estrito
 from app.db import SessionLocal
 from app.models import Tenant
 from app.produtos_models import Produto, ProdutoBlingSync, ProdutoBlingSyncQueue
@@ -340,30 +341,26 @@ def _buscar_produtos_bling(bling: BlingAPI, **params) -> list[dict]:
 
 
 def _escolher_item_por_codigo(itens: list[dict], codigo_busca: str) -> Optional[dict]:
-    codigo_local = _normalizar_texto(codigo_busca).lower()
+    codigo_local = _normalizar_texto(codigo_busca)
     if not codigo_local:
-        return itens[0] if itens else None
+        return None
 
     for item in itens:
-        codigo_item = str(item.get("codigo") or item.get("sku") or "").strip().lower()
-        if codigo_item and codigo_item == codigo_local:
+        if _item_bling_tem_sku_estrito(item, codigo_local):
             return item
 
-    return itens[0] if itens else None
+    return None
 
 
 def _buscar_item_bling_para_produto(
     bling: BlingAPI, codigo_busca: str, nome_busca: str
 ) -> Optional[dict]:
     codigo_busca = _normalizar_texto(codigo_busca)
-    nome_busca = _normalizar_texto(nome_busca)
 
     consultas = []
     if codigo_busca:
         consultas.append({"codigo": codigo_busca, "limite": 50})
         consultas.append({"sku": codigo_busca, "limite": 50})
-    if nome_busca:
-        consultas.append({"nome": nome_busca, "limite": 50})
 
     for params in consultas:
         itens = _buscar_produtos_bling(bling, **params)
