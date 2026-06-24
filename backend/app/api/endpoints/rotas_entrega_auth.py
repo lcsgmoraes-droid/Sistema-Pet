@@ -49,6 +49,20 @@ def _decode_delivery_token(credentials: HTTPAuthorizationCredentials) -> dict:
         raise _credentials_exception() from exc
 
 
+def _has_active_user_tenant(db: Session, user: User, tenant_id: UUID) -> bool:
+    return (
+        db.query(UserTenant)
+        .filter_by(user_id=user.id, tenant_id=tenant_id, is_active=True)
+        .first()
+        is not None
+    )
+
+
+def _tenant_is_available(db: Session, tenant_id: UUID) -> bool:
+    tenant_status = db.query(Tenant.status).filter(Tenant.id == str(tenant_id)).scalar()
+    return _tenant_status_is_active(tenant_status)
+
+
 def _validate_admin_delivery_actor(
     credentials: HTTPAuthorizationCredentials,
     db: Session,
@@ -69,23 +83,13 @@ def _validate_admin_delivery_actor(
     set_current_tenant(tenant_id)
     user = get_current_user_from_token(credentials.credentials, db)
 
-    user_tenant = (
-        db.query(UserTenant)
-        .filter(
-            UserTenant.user_id == user.id,
-            UserTenant.tenant_id == tenant_id,
-            UserTenant.is_active.is_(True),
-        )
-        .first()
-    )
-    if not user_tenant:
+    if not _has_active_user_tenant(db, user, tenant_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Usuario nao tem acesso ativo ao tenant selecionado",
         )
 
-    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
-    if not tenant or not _tenant_status_is_active(tenant.status):
+    if not _tenant_is_available(db, tenant_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tenant inativo ou indisponivel",
