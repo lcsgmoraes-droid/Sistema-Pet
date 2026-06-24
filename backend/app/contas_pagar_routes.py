@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, func, select
 from typing import List, Optional
 from datetime import datetime, date, timedelta
-from pydantic import BaseModel, field_validator
 from decimal import Decimal, ROUND_HALF_UP
 import re
 import unicodedata
@@ -44,8 +43,6 @@ from .financeiro.contas_pagar_recorrencia import (
     _garantir_janela_recorrencia_apos_pagamento,
     _garantir_janela_recorrencia_conta,
     _gerar_contas_recorrentes_ate_janela,
-    _obter_origem_recorrencia,
-    _query_contas_recorrencia,
     calcular_limite_janela_recorrencia,
     calcular_proxima_recorrencia,
 )
@@ -54,9 +51,27 @@ from app.services.reconciliacao_provisao_service import reconciliar_provisao
 
 import logging
 
+from .financeiro.contas_pagar_schemas import (
+    ContaPagarClassificacaoUpdate,
+    ContaPagarCreate,
+    ContaPagarOperacaoRequest,
+    ContaPagarRecorrenciaBulkDelete as ContaPagarRecorrenciaBulkDelete,
+    ContaPagarRecorrenciaItemResponse as ContaPagarRecorrenciaItemResponse,
+    ContaPagarResponse,
+    ContaPagarUpdate,
+    PagamentoCreate,
+)
+from .financeiro.contas_pagar_recorrencia_routes import (
+    excluir_recorrencias_contas_pagar as excluir_recorrencias_contas_pagar,
+    listar_recorrencia_conta_pagar as listar_recorrencia_conta_pagar,
+    processar_recorrencias_contas_pagar as processar_recorrencias_contas_pagar,
+    router as recorrencia_router,
+)
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/contas-pagar", tags=["Contas a Pagar"])
+router.include_router(recorrencia_router)
 BUSCA_ACENTOS = "áàâãäéèêëíìîïóòôõöúùûüç"
 BUSCA_SEM_ACENTOS = "aaaaaeeeeiiiiooooouuuuc"
 
@@ -106,159 +121,7 @@ def _registrar_observacao_operacao_conta_pagar(
 # ============================================================================
 # SCHEMAS
 # ============================================================================
-
-
-class ContaPagarCreate(BaseModel):
-    descricao: str
-    fornecedor_id: Optional[int] = None
-    categoria_id: Optional[int] = None  # UX/Agrupamento
-
-    # ============================
-    # DRE - CAMPOS OBRIGATORIOS (com padrões)
-    # ============================
-    dre_subcategoria_id: Optional[int] = (
-        None  # Obrigatorio via categoria vinculada a DRE ou envio direto
-    )
-    canal: str = (
-        "loja_fisica"  # OBRIGATORIO - loja_fisica, mercado_livre, shopee, amazon
-    )
-    tipo_despesa_id: Optional[int] = None  # FK para TipoDespesa (fixo/variável)
-
-    valor_original: float
-    data_emissao: date
-    data_vencimento: date
-    documento: Optional[str] = None
-    observacoes: Optional[str] = None
-    nota_entrada_id: Optional[int] = None
-
-    # Parcelamento
-    eh_parcelado: bool = False
-    total_parcelas: int = 1
-
-    # Recorrência
-    eh_recorrente: bool = False
-    tipo_recorrencia: Optional[str] = (
-        None  # 'semanal', 'quinzenal', 'mensal', 'personalizado'
-    )
-    intervalo_dias: Optional[int] = None  # Para tipo 'personalizado'
-    data_inicio_recorrencia: Optional[date] = None
-    data_fim_recorrencia: Optional[date] = None  # OU
-    numero_repeticoes: Optional[int] = None  # alternativa ao data_fim
-
-    @field_validator("data_inicio_recorrencia", "data_fim_recorrencia", mode="before")
-    @classmethod
-    def normalizar_datas_recorrencia_vazias(cls, valor):
-        if isinstance(valor, str) and not valor.strip():
-            return None
-        return valor
-
-
-class ContaPagarUpdate(BaseModel):
-    descricao: Optional[str] = None
-    fornecedor_id: Optional[int] = None
-    categoria_id: Optional[int] = None
-    dre_subcategoria_id: Optional[int] = None
-    tipo_despesa_id: Optional[int] = None
-    canal: Optional[str] = None
-    valor_original: Optional[float] = None
-    data_emissao: Optional[date] = None
-    data_vencimento: Optional[date] = None
-    documento: Optional[str] = None
-    observacoes: Optional[str] = None
-    eh_recorrente: Optional[bool] = None
-    tipo_recorrencia: Optional[str] = None
-    intervalo_dias: Optional[int] = None
-    data_inicio_recorrencia: Optional[date] = None
-    data_fim_recorrencia: Optional[date] = None
-    numero_repeticoes: Optional[int] = None
-    aplicar_recorrencia_futura: Optional[bool] = False
-
-    @field_validator("data_inicio_recorrencia", "data_fim_recorrencia", mode="before")
-    @classmethod
-    def normalizar_datas_recorrencia_vazias(cls, valor):
-        if isinstance(valor, str) and not valor.strip():
-            return None
-        return valor
-
-
-class ContaPagarRecorrenciaBulkDelete(BaseModel):
-    ids: List[int]
-
-
-class ContaPagarRecorrenciaItemResponse(BaseModel):
-    id: int
-    descricao: str
-    data_vencimento: date
-    valor_final: float
-    valor_pago: float
-    status: str
-    eh_origem: bool = False
-    pode_excluir: bool = True
-    motivo_bloqueio: Optional[str] = None
-
-
-class ContaPagarClassificacaoUpdate(BaseModel):
-    categoria_id: Optional[int] = None
-    dre_subcategoria_id: Optional[int] = None
-    tipo_despesa_id: Optional[int] = None
-    canal: Optional[str] = None
-
-
-class PagamentoCreate(BaseModel):
-    valor_pago: float
-    data_pagamento: date
-    forma_pagamento_id: Optional[int] = None
-    conta_bancaria_id: Optional[int] = None
-    valor_juros: float = 0
-    valor_multa: float = 0
-    valor_desconto: float = 0
-    observacoes: Optional[str] = None
-
-
-class ContaPagarOperacaoRequest(BaseModel):
-    motivo: Optional[str] = None
-
-
-class ContaPagarResponse(BaseModel):
-    id: int
-    descricao: str
-    fornecedor_nome: Optional[str] = None
-    categoria_id: Optional[int] = None
-    categoria_nome: Optional[str] = None
-    valor_original: float
-    valor_pago: float
-    valor_final: float
-    data_emissao: date
-    data_vencimento: date
-    data_pagamento: Optional[date] = None
-    status: str
-    dias_vencimento: Optional[int] = None
-    eh_parcelado: bool
-    eh_recorrente: bool = False
-    tipo_recorrencia: Optional[str] = None
-    intervalo_dias: Optional[int] = None
-    data_inicio_recorrencia: Optional[date] = None
-    data_fim_recorrencia: Optional[date] = None
-    numero_repeticoes: Optional[int] = None
-    proxima_recorrencia: Optional[date] = None
-    conta_recorrencia_origem_id: Optional[int] = None
-    numero_parcela: Optional[int] = None
-    total_parcelas: Optional[int] = None
-    documento: Optional[str] = None
-    nfe_numero: Optional[str] = None
-    observacoes: Optional[str] = None
-    nota_entrada_id: Optional[int] = None
-    canal: Optional[str] = None
-    dre_subcategoria_id: Optional[int] = None
-    dre_subcategoria_nome: Optional[str] = None
-    tipo_despesa_id: Optional[int] = None
-    tipo_despesa_nome: Optional[str] = None
-    e_custo_fixo: Optional[bool] = None
-    origem_lancamento: Optional[str] = None
-    origem_lancamento_label: Optional[str] = None
-    caixa_referencia: Optional[str] = None
-
-    model_config = {"from_attributes": True}
+# Schemas movidos para app.financeiro.contas_pagar_schemas e reexportados abaixo.
 
 
 def _obter_tipo_produto_revenda_id(db: Session, tenant_id) -> Optional[int]:
@@ -1386,148 +1249,6 @@ def atualizar_conta_pagar(
     }
 
 
-@router.get("/{conta_id}/recorrencia")
-def listar_recorrencia_conta_pagar(
-    conta_id: int,
-    db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
-):
-    """Lista a cadeia recorrente de uma conta para manutencao seletiva."""
-    _, tenant_id = user_and_tenant
-
-    conta = (
-        db.query(ContaPagar)
-        .filter(
-            ContaPagar.id == conta_id,
-            ContaPagar.tenant_id == tenant_id,
-        )
-        .first()
-    )
-    if not conta:
-        raise HTTPException(status_code=404, detail="Conta nao encontrada")
-
-    conta_origem = _obter_origem_recorrencia(db, tenant_id, conta)
-    if not conta_origem:
-        conta_origem = conta
-
-    itens = (
-        _query_contas_recorrencia(db, tenant_id, conta_origem.id)
-        .order_by(
-            ContaPagar.data_vencimento.asc(),
-            ContaPagar.id.asc(),
-        )
-        .all()
-    )
-
-    return {
-        "conta_origem_id": conta_origem.id,
-        "itens": [
-            {
-                "id": item.id,
-                "descricao": item.descricao,
-                "data_vencimento": item.data_vencimento,
-                "valor_final": float(item.valor_final or 0),
-                "valor_pago": float(item.valor_pago or 0),
-                "status": item.status,
-                "eh_origem": item.id == conta_origem.id,
-                "pode_excluir": not (
-                    item.status == "pago"
-                    or (item.valor_pago or Decimal("0")) > 0
-                    or bool(item.pagamentos)
-                ),
-                "motivo_bloqueio": (
-                    "Conta com pagamento registrado"
-                    if item.status == "pago"
-                    or (item.valor_pago or Decimal("0")) > 0
-                    or bool(item.pagamentos)
-                    else None
-                ),
-            }
-            for item in itens
-        ],
-    }
-
-
-@router.post("/recorrencias/excluir")
-def excluir_recorrencias_contas_pagar(
-    payload: ContaPagarRecorrenciaBulkDelete,
-    db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
-):
-    """Exclui lancamentos recorrentes selecionados, desde que nao tenham pagamentos."""
-    _, tenant_id = user_and_tenant
-    ids = sorted({int(item_id) for item_id in payload.ids if item_id})
-    if not ids:
-        raise HTTPException(
-            status_code=422, detail="Selecione pelo menos um lancamento para excluir"
-        )
-
-    contas = (
-        db.query(ContaPagar)
-        .options(joinedload(ContaPagar.pagamentos))
-        .filter(
-            ContaPagar.tenant_id == tenant_id,
-            ContaPagar.id.in_(ids),
-        )
-        .all()
-    )
-    if len(contas) != len(ids):
-        raise HTTPException(
-            status_code=404, detail="Uma ou mais contas nao foram encontradas"
-        )
-
-    contas_por_id = {conta.id: conta for conta in contas}
-    for conta in contas:
-        if (
-            conta.status == "pago"
-            or (conta.valor_pago or Decimal("0")) > 0
-            or conta.pagamentos
-        ):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Conta #{conta.id} possui pagamento registrado e nao pode ser excluida",
-            )
-
-    ids_set = set(ids)
-    for conta in contas:
-        if not conta.eh_recorrente:
-            continue
-        filhas_nao_selecionadas = (
-            db.query(func.count(ContaPagar.id))
-            .filter(
-                ContaPagar.tenant_id == tenant_id,
-                ContaPagar.conta_recorrencia_origem_id == conta.id,
-                ~ContaPagar.id.in_(ids_set),
-            )
-            .scalar()
-            or 0
-        )
-        if filhas_nao_selecionadas:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Para excluir a conta origem da recorrencia, selecione tambem "
-                    "todos os lancamentos futuros sem pagamento."
-                ),
-            )
-
-    contas_para_excluir = sorted(
-        (contas_por_id[conta_id] for conta_id in ids),
-        key=lambda conta: 1 if conta.eh_recorrente else 0,
-    )
-    for conta in contas_para_excluir:
-        db.delete(conta)
-
-    db.commit()
-
-    return {
-        "ok": True,
-        "mensagem": "Lancamentos recorrentes excluidos com sucesso",
-        "ids": ids,
-        "total": len(ids),
-    }
-
-
 @router.delete("/{conta_id}")
 def excluir_conta_pagar(
     conta_id: int,
@@ -2211,83 +1932,4 @@ def dashboard_contas_pagar(
         "proximos_7_dias": float(total_7dias),
         "proximos_30_dias": float(total_30dias),
         "pago_mes_atual": float(total_pago_mes),
-    }
-
-
-# ============================================================================
-# PROCESSAR RECORRÊNCIAS
-# ============================================================================
-
-
-@router.post("/processar-recorrencias")
-async def processar_recorrencias_contas_pagar(
-    db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
-):
-    """
-    Processa contas recorrentes e cria novas contas quando necessário
-    Esta rota deve ser executada periodicamente (diariamente recomendado)
-    """
-    current_user, tenant_id = user_and_tenant
-    hoje = date.today()
-    limite_recorrencia = calcular_limite_janela_recorrencia(hoje)
-    contas_criadas = []
-
-    # Buscar contas recorrentes que precisam manter a janela futura preenchida
-    contas_recorrentes = (
-        db.query(ContaPagar)
-        .filter(
-            and_(
-                ContaPagar.eh_recorrente.is_(True),
-                ContaPagar.proxima_recorrencia <= limite_recorrencia,
-                or_(
-                    ContaPagar.data_fim_recorrencia.is_(None),
-                    ContaPagar.data_fim_recorrencia >= hoje,
-                ),
-            )
-        )
-        .all()
-    )
-
-    for conta_origem in contas_recorrentes:
-        try:
-            novas_contas = _gerar_contas_recorrentes_ate_janela(
-                db=db,
-                tenant_id=tenant_id,
-                conta_origem=conta_origem,
-                limite_recorrencia=limite_recorrencia,
-            )
-            contas_criadas.extend(novas_contas)
-            logger.info(
-                f"Recorrencia #{conta_origem.id}: {len(novas_contas)} conta(s) gerada(s)"
-            )
-
-        except Exception as e:
-            logger.error(
-                f"Erro ao processar recorrencia da conta #{conta_origem.id}: {e}"
-            )
-            continue
-
-    for conta_criada in contas_criadas:
-        try:
-            atualizar_dre_por_lancamento(
-                db=db,
-                tenant_id=tenant_id,
-                dre_subcategoria_id=conta_criada.dre_subcategoria_id,
-                canal=conta_criada.canal,
-                valor=conta_criada.valor_original,
-                data_lancamento=conta_criada.data_vencimento,
-                tipo_movimentacao="DESPESA",
-            )
-        except Exception as e:
-            logger.warning(
-                f"Erro ao atualizar DRE para conta recorrente #{conta_criada.id}: {e}"
-            )
-
-    db.commit()
-
-    return {
-        "message": f"{len(contas_criadas)} conta(s) recorrente(s) processada(s) com sucesso",
-        "contas_criadas": len(contas_criadas),
-        "ids": [c.id for c in contas_criadas],
     }

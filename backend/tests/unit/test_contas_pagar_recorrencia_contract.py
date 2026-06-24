@@ -10,7 +10,7 @@ def _source(relative_path: str) -> str:
 
 def test_recorrencia_usa_janela_rolante_de_12_meses():
     source = _source("app/financeiro/contas_pagar_recorrencia.py")
-    routes_source = _source("app/contas_pagar_routes.py")
+    routes_source = _source("app/financeiro/contas_pagar_recorrencia_routes.py")
 
     assert "RECORRENCIA_JANELA_MESES_PADRAO = 12" in source
     assert "calcular_limite_janela_recorrencia" in source
@@ -50,9 +50,10 @@ def test_pagamento_de_recorrencia_reabastece_janela_de_12_meses():
 
 def test_edicao_de_conta_pagar_pode_ativar_recorrencia():
     source = _source("app/contas_pagar_routes.py")
+    schemas_source = _source("app/financeiro/contas_pagar_schemas.py")
 
-    update_model = source.split("class ContaPagarUpdate", 1)[1].split(
-        "class ContaPagarResponse", 1
+    update_model = schemas_source.split("class ContaPagarUpdate", 1)[1].split(
+        "class ContaPagarRecorrenciaBulkDelete", 1
     )[0]
     for field in [
         "eh_recorrente",
@@ -94,12 +95,14 @@ def test_edicao_recorrente_garante_janela_mesmo_quando_ja_estava_marcada():
 def test_recorrencia_tem_exclusao_seletiva_e_edicao_futura():
     source = _source("app/contas_pagar_routes.py")
     recorrencia_source = _source("app/financeiro/contas_pagar_recorrencia.py")
+    routes_source = _source("app/financeiro/contas_pagar_recorrencia_routes.py")
+    schemas_source = _source("app/financeiro/contas_pagar_schemas.py")
 
-    assert "class ContaPagarRecorrenciaBulkDelete" in source
-    assert "class ContaPagarRecorrenciaItemResponse" in source
-    assert '@router.get("/{conta_id}/recorrencia")' in source
-    assert '@router.post("/recorrencias/excluir")' in source
-    assert "class ContaPagarUpdate" in source
-    assert "aplicar_recorrencia_futura" in source
+    assert "class ContaPagarRecorrenciaBulkDelete" in schemas_source
+    assert "class ContaPagarRecorrenciaItemResponse" in schemas_source
+    assert '@router.get("/{conta_id}/recorrencia")' in routes_source
+    assert '@router.post("/recorrencias/excluir")' in routes_source
+    assert "class ContaPagarUpdate" in schemas_source
+    assert "aplicar_recorrencia_futura" in schemas_source
     assert "_aplicar_edicao_recorrencia_futura(" in recorrencia_source
     assert "_aplicar_edicao_recorrencia_futura(" in source
