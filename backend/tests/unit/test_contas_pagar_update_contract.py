@@ -8,12 +8,18 @@ def test_contas_pagar_tem_endpoint_de_edicao_geral():
     source = (REPO_ROOT / "backend/app/contas_pagar_routes.py").read_text(
         encoding="utf-8"
     )
+    schemas_source = (
+        REPO_ROOT / "backend/app/financeiro/contas_pagar_schemas.py"
+    ).read_text(encoding="utf-8")
+    update_schema = schemas_source.split("class ContaPagarUpdate", 1)[1].split(
+        "class ContaPagarRecorrenciaBulkDelete", 1
+    )[0]
 
     assert '@router.patch("/{conta_id}")' in source
     assert "def atualizar_conta_pagar(" in source
-    assert "fornecedor_id: Optional[int]" in source
-    assert "data_emissao: Optional[date]" in source
-    assert "documento: Optional[str]" in source
+    assert "fornecedor_id: Optional[int]" in update_schema
+    assert "data_emissao: Optional[date]" in update_schema
+    assert "documento: Optional[str]" in update_schema
     assert "valor_final = (" in source
     assert "valor_original + valor_juros + valor_multa - valor_desconto" in source
 
