@@ -209,8 +209,8 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 126 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 36 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 89 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 18 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
@@ -429,6 +429,13 @@ Fatia de 2026-06-25: `backend/app/routes/ecommerce_webhooks.py` virou fachada do
 - `backend/app/routes/ecommerce_webhooks_security.py`: assinatura Pagar.me, tenant do payload/header e dados de idempotencia do evento.
 - `backend/app/routes/ecommerce_webhooks_payment.py`: status de pagamento, busca de pedido por referencia/preferencia e parser de metodo/parcelas.
 - `backend/app/routes/ecommerce_webhooks_sales.py`: integracao do pedido aprovado ao motor de vendas, pos-venda financeiro e evento de campanha.
+
+Fatia de 2026-06-25: `frontend/src/App.jsx` virou shell fino do app:
+
+- `frontend/src/App.jsx`: 1272 -> 26 linhas, mantendo providers, router, toaster, suspense e preloader.
+- `frontend/src/app/lazyPages.jsx`: declaracao central das paginas lazy e funcoes de preload.
+- `frontend/src/app/AppRoutes.jsx`: agregador das rotas publicas, Ops e protegidas.
+- `frontend/src/app/routes/*.jsx`: rotas separadas por dominio: publico, Ops, nucleo protegido, veterinario, banho/tosa, produtos/estoque, vendas/marketing, compras/Bling, financeiro, comissoes, cadastros/admin, configuracoes, entregas e IA.
 
 Maiores arquivos mapeados em 2026-05-04:
 
