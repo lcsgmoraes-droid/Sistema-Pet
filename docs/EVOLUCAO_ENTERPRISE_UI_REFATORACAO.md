@@ -209,8 +209,8 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 133 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 44 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 132 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 43 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
@@ -352,6 +352,16 @@ Fatia de 2026-06-25: `frontend/src/components/PedidosCompra.jsx` virou shell fin
 - `frontend/src/components/compras/pedidosCompraItemController.js`: produtos do fornecedor, itens do pedido, SKU e totais.
 - `frontend/src/components/compras/pedidosCompraFormularioController.js`: formulario, rascunho e fluxo de sugestao.
 - `frontend/src/components/compras/pedidosCompraOperacoesController.js`: criar/editar, envio, exportacao, status, confronto e recebimento.
+
+Fatia de 2026-06-25: `frontend/src/pages/comissoes/ComissoesListagem.jsx` virou shell fino:
+
+- `frontend/src/pages/comissoes/ComissoesListagem.jsx`: 1392 -> 10 linhas.
+- `frontend/src/pages/comissoes/listagem/useComissoesListagemController.js`: estado, carregamento, filtros, selecao e fechamento de comissoes.
+- `frontend/src/pages/comissoes/listagem/ComissoesListagemView.jsx`: composicao da tela, estados de loading/erro/vazio e modal de detalhe.
+- `frontend/src/pages/comissoes/listagem/ComissoesListagemResumo.jsx`: cards do resumo financeiro.
+- `frontend/src/pages/comissoes/listagem/ComissoesListagemFiltros.jsx`: periodo, autocomplete de funcionario/produto/grupo e filtros de status.
+- `frontend/src/pages/comissoes/listagem/ComissoesListagemTabela.jsx`: selecao, tabela, rodape informativo e total pendente filtrado.
+- `frontend/src/pages/comissoes/listagem/ComissoesListagemFechamentoModal.jsx`: fechamento simples ou com pagamento.
 
 Maiores arquivos mapeados em 2026-05-04:
 
