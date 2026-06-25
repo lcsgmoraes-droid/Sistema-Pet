@@ -209,8 +209,8 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 128 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 39 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 127 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 38 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
@@ -407,6 +407,14 @@ Fatia de 2026-06-25: `backend/app/routes/app_mobile_funcionario_pdv_routes.py` v
 - `backend/app/routes/app_mobile_funcionario_pdv/pagamentos.py`: formas ERP, parcelas, bandeira/operadora e validacao de cartao.
 - `backend/app/routes/app_mobile_funcionario_pdv/beneficios.py`: cupons, cashback e beneficios previstos.
 - `backend/app/routes/app_mobile_funcionario_pdv/vendas.py`: salvar venda aberta e finalizar venda pelo fluxo oficial.
+
+Fatia de 2026-06-25: `backend/app/services/bling_nf_service.py` separou helpers de NF Bling:
+
+- `backend/app/services/bling_nf_service.py`: 1351 -> 690 linhas, mantendo o processamento principal e os monkeypatches legados de testes.
+- `backend/app/services/bling_nf/common.py`: constantes e normalizadores compartilhados.
+- `backend/app/services/bling_nf/estoque.py`: produto local, composicao virtual, movimentos esperados, documentacao por NF e baixa de estoque.
+- `backend/app/services/bling_nf/autocadastro.py`: busca no Bling, montagem e autocadastro de produto local por SKU/item.
+- `backend/app/services/bling_nf/desvinculo.py`: helpers de NF vinculada a pedido incorreto, cache e recarga com lock.
 
 Maiores arquivos mapeados em 2026-05-04:
 
