@@ -4,6 +4,25 @@ import api from "../api";
 import CustomerIdentity from "./ui/CustomerIdentity";
 import ProductIdentity from "./ui/ProductIdentity";
 import SaleReference from "./ui/SaleReference";
+import { getStatusBuscaDevolucao } from "../utils/pdvReturnEligibility";
+
+const STATUS_BUSCA_DEVOLUCAO = getStatusBuscaDevolucao().join(",");
+
+function getVendaStatusDevolucaoInfo(status) {
+  if (status === "finalizada") {
+    return { label: "Finalizada", className: "bg-green-100 text-green-800" };
+  }
+  if (status === "baixa_parcial") {
+    return { label: "Parcial", className: "bg-yellow-100 text-yellow-800" };
+  }
+  if (status === "pago_nf") {
+    return { label: "Pago NF", className: "bg-blue-100 text-blue-800" };
+  }
+  if (status === "finalizada_devolucao" || status === "finalizada_devolucao_parcial") {
+    return { label: "Dev. parcial", className: "bg-orange-100 text-orange-800" };
+  }
+  return { label: "Aberta", className: "bg-gray-100 text-gray-800" };
+}
 
 export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, onSucesso }) {
   const [passo, setPasso] = useState(1); // 1: listar vendas, 2: selecionar itens
@@ -27,7 +46,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
     busca: "",
     data_inicio: "",
     data_fim: "",
-    status: "finalizada",
+    status: STATUS_BUSCA_DEVOLUCAO,
   });
 
   const obterDataVenda = (venda) =>
@@ -464,55 +483,53 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {vendas.map((venda) => (
-                    <div
-                      key={venda.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => selecionarVenda(venda)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          selecionarVenda(venda);
-                        }
-                      }}
-                      className="w-full text-left p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-semibold text-gray-900">
-                            <SaleReference sale={venda} />
+                  {vendas.map((venda) => {
+                    const statusInfo = getVendaStatusDevolucaoInfo(venda.status);
+
+                    return (
+                      <div
+                        key={venda.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => selecionarVenda(venda)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            selecionarVenda(venda);
+                          }
+                        }}
+                        className="w-full text-left p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="font-semibold text-gray-900">
+                              <SaleReference sale={venda} />
+                            </div>
+                            <div className="mt-1 text-sm text-gray-600">
+                              <CustomerIdentity
+                                fallback="Consumidor Final"
+                                showLabel
+                                venda={venda}
+                              />
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {formatarDataVenda(venda)}
+                            </div>
                           </div>
-                          <div className="mt-1 text-sm text-gray-600">
-                            <CustomerIdentity fallback="Consumidor Final" showLabel venda={venda} />
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            {formatarDataVenda(venda)}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-lg font-bold text-green-600">
-                            R$ {venda.total.toFixed(2)}
-                          </div>
-                          <div
-                            className={`text-xs mt-1 px-2 py-1 rounded ${
-                              venda.status === "finalizada"
-                                ? "bg-green-100 text-green-800"
-                                : venda.status === "baixa_parcial"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : "bg-gray-100 text-gray-800"
-                            }`}
-                          >
-                            {venda.status === "finalizada"
-                              ? "Finalizada"
-                              : venda.status === "baixa_parcial"
-                                ? "Parcial"
-                                : "Aberta"}
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-green-600">
+                              R$ {venda.total.toFixed(2)}
+                            </div>
+                            <div
+                              className={`text-xs mt-1 px-2 py-1 rounded ${statusInfo.className}`}
+                            >
+                              {statusInfo.label}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 

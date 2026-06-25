@@ -35,6 +35,13 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def normalizar_status_filtro_vendas(status: Optional[str]) -> list[str]:
+    if not status:
+        return []
+
+    return [item.strip() for item in status.split(",") if item.strip()]
+
+
 @router.get("")
 def listar_vendas(
     page: int = Query(1, ge=1),
@@ -70,8 +77,11 @@ def listar_vendas(
         raise HTTPException(status_code=500, detail=f"Erro ao criar query: {str(e)}")
 
     # Aplicar filtros
-    if status:
-        query = query.filter_by(status=status)
+    status_filtrados = normalizar_status_filtro_vendas(status)
+    if len(status_filtrados) == 1:
+        query = query.filter_by(status=status_filtrados[0])
+    elif len(status_filtrados) > 1:
+        query = query.filter(Venda.status.in_(status_filtrados))
 
     if cliente_id:
         query = query.filter_by(cliente_id=cliente_id)
