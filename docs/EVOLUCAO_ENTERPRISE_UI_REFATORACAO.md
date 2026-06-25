@@ -210,8 +210,8 @@ Regras para refatorar sem quebrar producao:
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
 - 137 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 50 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
-- 4 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
+- 49 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 3 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
@@ -302,6 +302,11 @@ Fatia de 2026-06-25: `backend/app/financeiro_routes.py` virou agregador compativ
 - `backend/app/financeiro/fluxo_caixa_schemas.py`: schemas do fluxo de caixa.
 - `backend/app/financeiro/cliente_routes.py`: historico e resumo financeiro do cliente.
 - `backend/app/financeiro/common.py`: gate compartilhado do modulo financeiro ERP.
+
+Fatia de 2026-06-25: `frontend/src/pages/Aba2ConciliacaoRecebimentos.jsx` separou fluxo e renderizacao:
+
+- `frontend/src/pages/Aba2ConciliacaoRecebimentos.jsx`: 1561 -> 682 linhas, mantendo estado, leitura dos arquivos e chamada da API.
+- `frontend/src/pages/conciliacaoRecebimentos/Aba2ConciliacaoRecebimentosView.jsx`: renderizacao da aba, upload dos 3 arquivos, resultado e modais.
 
 Maiores arquivos mapeados em 2026-05-04:
 
