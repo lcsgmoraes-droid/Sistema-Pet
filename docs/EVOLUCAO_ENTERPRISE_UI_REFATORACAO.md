@@ -207,11 +207,11 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
-Inventario atualizado em 2026-06-24, excluindo testes, migrations e builds locais:
+Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 143 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 57 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
-- 11 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
+- 142 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 56 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 10 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
@@ -240,6 +240,13 @@ Fatia de 2026-06-24: `backend/app/api/endpoints/rotas_entrega.py` virou agregado
 - `backend/app/api/endpoints/rotas_entrega_criacao_routes.py`: criacao de rota simples ou multipla.
 - `backend/app/api/endpoints/rotas_entrega_estado_routes.py`: iniciar, reverter, fechar e excluir rota.
 - `backend/app/api/endpoints/rotas_entrega_paradas_routes.py`: recebimento, paradas, reordenacao, entrega, observacao e nao-entrega.
+
+Fatia de 2026-06-25: `backend/app/integracao_bling_pedido_routes.py` virou fachada compativel:
+
+- `backend/app/integracao_bling_pedido_routes.py`: 1730 -> 695 linhas.
+- `backend/app/integracao_bling_pedido_admin_routes.py`: listagem, reconciliacao, consolidacao, confirmacao/cancelamento manual e reprocessamento de pedidos.
+- `backend/app/integracao_bling_pedido_webhook_processor.py`: processamento pesado dos eventos de webhook do Bling.
+- `backend/app/integracao_bling_pedido_payload.py`: helpers de payload e serializacao mantidos da fatia anterior.
 
 Maiores arquivos mapeados em 2026-05-04:
 
@@ -1116,6 +1123,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-06-24: `backend/app/services/base_catalog_import_service.py` virou fachada compativel da importacao do catalogo base, com nucleo/contratos em `base_catalog_import_core.py`, copia de catalogo em `base_catalog_import_catalog.py`, imagens/S3 em `base_catalog_import_images.py` e relacoes de produtos em `base_catalog_import_relations.py`. O service principal caiu de 1743 para 224 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem por `splitlines()` de arquivos `.py` e `.jsx` em `backend/app` + `frontend/src` sem migrations/cache, restam 59 arquivos acima de 1000 linhas, 14 acima de 1500 e 0 acima de 2000.
 - 2026-06-24: `backend/app/comissoes_demonstrativo_routes.py` extraiu schema, calculo do demonstrativo, montagem do detalhe, historico de fechamentos e fechamento financeiro para `backend/app/comissoes_demonstrativo_*.py`, mantendo o router e reexports de compatibilidade. O router principal caiu de 1734 para 875 linhas fisicas; na contagem atual de `backend/app` + `frontend/src`, restam 144 arquivos acima de 700 linhas, 58 acima de 1000, 12 acima de 1500 e 0 acima de 2000.
 - 2026-06-24: `backend/app/api/endpoints/rotas_entrega.py` virou agregador das rotas de entrega, com listagem/detalhe, otimizacao, criacao, estado da rota e paradas separados em `backend/app/api/endpoints/rotas_entrega_*_routes.py`. O router principal caiu de 1732 para 86 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem atual de `backend/app` + `frontend/src`, restam 143 arquivos acima de 700 linhas, 57 acima de 1000, 11 acima de 1500 e 0 acima de 2000.
+- 2026-06-25: `backend/app/integracao_bling_pedido_routes.py` virou fachada compativel da integracao de pedidos Bling, com rotas operacionais em `backend/app/integracao_bling_pedido_admin_routes.py` e processamento pesado de webhook em `backend/app/integracao_bling_pedido_webhook_processor.py`. O router principal caiu de 1730 para 695 linhas fisicas; na contagem atual de `backend/app` + `frontend/src` sem CSS, restam 142 arquivos acima de 700 linhas, 56 acima de 1000, 10 acima de 1500 e 0 acima de 2000.
 
 ### Nao fazer nesta onda
 
