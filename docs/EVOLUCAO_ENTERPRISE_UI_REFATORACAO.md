@@ -209,9 +209,9 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 139 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 52 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
-- 6 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
+- 138 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 51 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 5 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
@@ -282,6 +282,16 @@ Fatia de 2026-06-25: `backend/app/vendas_routes.py` virou agregador compativel:
 - `backend/app/vendas/cancelamento_routes.py`: cancelamento e exclusao logica com auditoria.
 - `backend/app/vendas/status_routes.py`: reabertura, alteracao de status, comissoes e reversoes.
 - `backend/app/vendas/relatorios_routes.py`: resumo operacional de vendas.
+
+Fatia de 2026-06-25: `backend/app/produtos_routes.py` virou agregador compativel:
+
+- `backend/app/produtos_routes.py`: 1617 -> 160 linhas.
+- `backend/app/produtos/codigo_sku_routes.py`: geracao/validacao de codigo de barras e geracao de SKU.
+- `backend/app/produtos/cadastro_routes.py`: criacao, detalhe e edicao completa de produtos.
+- `backend/app/produtos/listagem_routes.py`: listagem geral e vendaveis, preservando filtros e enriquecimento.
+- `backend/app/produtos/variacoes_fusao_routes.py`: variacoes, restauracao, exclusao permanente e fusao.
+- `backend/app/produtos/atualizacao_lote_routes.py`: atualizacao em lote e operacoes de fornecedor/racao.
+- `backend/app/produtos/estado_routes.py`: edicao rapida de preco, exclusao logica e ativacao.
 
 Maiores arquivos mapeados em 2026-05-04:
 
