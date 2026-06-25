@@ -209,8 +209,8 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 131 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 42 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 130 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 41 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
@@ -374,6 +374,16 @@ Fatia de 2026-06-25: `frontend/src/pages/ProdutosForm.jsx` virou shell fino:
 - `frontend/src/pages/produtos/form/ProdutosFormLotesTab.jsx`: controle FIFO e movimentos de estoque.
 - `frontend/src/pages/produtos/form/ProdutosFormVariacoesTab.jsx`: variacoes do produto pai.
 - `frontend/src/pages/produtos/form/ProdutosFormModals.jsx`: modais de fornecedor e movimento de estoque.
+
+Fatia de 2026-06-25: `frontend/src/pages/EstoqueFullNF.jsx` virou shell fino:
+
+- `frontend/src/pages/EstoqueFullNF.jsx`: 1338 -> 8 linhas.
+- `frontend/src/pages/estoqueFullNF/useEstoqueFullNFController.js`: estado, XML, validacao de estoque, baixa FULL, historico, correcao de canal e vinculo DRE.
+- `frontend/src/pages/estoqueFullNF/estoqueFullNFUtils.js`: constantes e helpers puros de quantidade, datas, totais e erros.
+- `frontend/src/pages/estoqueFullNF/EstoqueFullNFView.jsx`: header, abas e composicao da tela.
+- `frontend/src/pages/estoqueFullNF/EstoqueFullNFLancamentoPanel.jsx`: formulario de NF/XML, alerta de estoque, itens e tarifa de envio.
+- `frontend/src/pages/estoqueFullNF/EstoqueFullNFHistoricoPanel.jsx`: historico de baixas e detalhe de itens.
+- `frontend/src/pages/estoqueFullNF/EstoqueFullNFModals.jsx`: conclusao, correcao de canal e vinculo DRE.
 
 Maiores arquivos mapeados em 2026-05-04:
 
