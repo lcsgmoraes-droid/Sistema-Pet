@@ -209,9 +209,9 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 142 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 55 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
-- 9 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
+- 141 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 54 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 8 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
@@ -254,6 +254,15 @@ Fatia de 2026-06-25: `backend/app/conciliacao_services.py` virou fachada compati
 - `backend/app/conciliacao_services_importacao.py`: importacao, validacao em cascata, processamento e reversao.
 - `backend/app/conciliacao_services_stone.py`: conciliacao Stone e upload da aba de vendas.
 - `backend/app/conciliacao_services_recebimentos.py`: validacao e amarracao de recebimentos/vendas.
+
+Fatia de 2026-06-25: `backend/app/services/bling_sync_service.py` virou fachada compativel:
+
+- `backend/app/services/bling_sync_service.py`: 1684 -> 90 linhas.
+- `backend/app/services/bling_sync_shared.py`: constantes, rate limit, consultas globais seguras e helpers de busca.
+- `backend/app/services/bling_sync_queue.py`: fila persistente, retry, snapshots e processamento pendente.
+- `backend/app/services/bling_sync_reprocess.py`: reprocessamento de falhas e execucao imediata controlada.
+- `backend/app/services/bling_sync_reconciliation.py`: reconciliacao recente/geral de saldos.
+- `backend/app/services/bling_sync_auto_link.py`: auto-link por SKU, rotina noturna e health snapshot.
 
 Maiores arquivos mapeados em 2026-05-04:
 
@@ -1132,6 +1141,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-06-24: `backend/app/api/endpoints/rotas_entrega.py` virou agregador das rotas de entrega, com listagem/detalhe, otimizacao, criacao, estado da rota e paradas separados em `backend/app/api/endpoints/rotas_entrega_*_routes.py`. O router principal caiu de 1732 para 86 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem atual de `backend/app` + `frontend/src`, restam 143 arquivos acima de 700 linhas, 57 acima de 1000, 11 acima de 1500 e 0 acima de 2000.
 - 2026-06-25: `backend/app/integracao_bling_pedido_routes.py` virou fachada compativel da integracao de pedidos Bling, com rotas operacionais em `backend/app/integracao_bling_pedido_admin_routes.py` e processamento pesado de webhook em `backend/app/integracao_bling_pedido_webhook_processor.py`. O router principal caiu de 1730 para 695 linhas fisicas; na contagem atual de `backend/app` + `frontend/src` sem CSS, restam 142 arquivos acima de 700 linhas, 56 acima de 1000, 10 acima de 1500 e 0 acima de 2000.
 - 2026-06-25: `backend/app/conciliacao_services.py` virou fachada compativel dos servicos de conciliacao, com importacao/processamento em `backend/app/conciliacao_services_importacao.py`, Stone/upload em `backend/app/conciliacao_services_stone.py` e recebimentos/amarracao em `backend/app/conciliacao_services_recebimentos.py`. O service principal caiu de 1713 para 31 linhas fisicas; na contagem atual de `backend/app` + `frontend/src` sem CSS, restam 142 arquivos acima de 700 linhas, 55 acima de 1000, 9 acima de 1500 e 0 acima de 2000.
+- 2026-06-25: `backend/app/services/bling_sync_service.py` virou fachada compativel da sincronizacao de estoque Bling, com utilitarios/rate limit em `backend/app/services/bling_sync_shared.py`, fila em `backend/app/services/bling_sync_queue.py`, reprocessamento em `backend/app/services/bling_sync_reprocess.py`, reconciliacao em `backend/app/services/bling_sync_reconciliation.py` e auto-link/health em `backend/app/services/bling_sync_auto_link.py`. O service principal caiu de 1684 para 90 linhas fisicas e todos os modulos novos ficaram abaixo de 700 linhas; na contagem atual de `backend/app` + `frontend/src` sem CSS, restam 141 arquivos acima de 700 linhas, 54 acima de 1000, 8 acima de 1500 e 0 acima de 2000.
 
 ### Nao fazer nesta onda
 
