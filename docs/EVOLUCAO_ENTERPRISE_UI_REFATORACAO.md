@@ -210,7 +210,7 @@ Regras para refatorar sem quebrar producao:
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
 - 127 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 38 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 37 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
@@ -415,6 +415,13 @@ Fatia de 2026-06-25: `backend/app/services/bling_nf_service.py` separou helpers 
 - `backend/app/services/bling_nf/estoque.py`: produto local, composicao virtual, movimentos esperados, documentacao por NF e baixa de estoque.
 - `backend/app/services/bling_nf/autocadastro.py`: busca no Bling, montagem e autocadastro de produto local por SKU/item.
 - `backend/app/services/bling_nf/desvinculo.py`: helpers de NF vinculada a pedido incorreto, cache e recarga com lock.
+
+Fatia de 2026-06-25: `backend/app/pedidos_compra/confronto_routes.py` separou calculo e exportacoes do confronto:
+
+- `backend/app/pedidos_compra/confronto_routes.py`: 1338 -> 494 linhas, mantendo paths e reexports legados.
+- `backend/app/pedidos_compra/confronto_calculo.py`: custo final, matching de itens por produto/EAN/codigo e resumo do confronto.
+- `backend/app/pedidos_compra/confronto_exportacao.py`: carga filtrada, CSV, PDF e texto de e-mail ao fornecedor.
+- `backend/app/pedidos_compra/confronto_vinculos.py`: vinculos pedido-NF, legado `nota_entrada_id` e persistencia do resumo.
 
 Maiores arquivos mapeados em 2026-05-04:
 
