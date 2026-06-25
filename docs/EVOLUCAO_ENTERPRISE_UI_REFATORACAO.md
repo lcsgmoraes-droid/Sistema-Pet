@@ -209,8 +209,8 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 135 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 46 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 134 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 45 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
@@ -332,6 +332,16 @@ Fatia de 2026-06-25: `backend/app/produtos_models.py` virou fachada compativel:
 - `backend/app/produtos_estoque_models.py`: imagens, kits, granel, lotes, campanhas de validade, fornecedores, listas de preco, movimentacoes e sync Bling.
 - `backend/app/produtos_compras_models.py`: pedidos de compra, vinculos com NF de entrada, itens, notas de entrada e historico de preco.
 - `backend/app/produtos_lembretes_variacoes_models.py`: lembretes e atributos/variacoes.
+
+Fatia de 2026-06-25: `backend/app/pedidos_compra_routes.py` virou agregador compativel:
+
+- `backend/app/pedidos_compra_routes.py`: 1466 -> 80 linhas, mantendo o prefixo `/pedidos-compra` e os reexports legados.
+- `backend/app/pedidos_compra/schemas.py`: schemas Pydantic de pedidos, envio e recebimento.
+- `backend/app/pedidos_compra/core_routes.py`: listagem, rascunho por fornecedor, detalhe, criacao e edicao.
+- `backend/app/pedidos_compra/envio_routes.py`: status de envio, envio por e-mail/manual, confirmacao, cancelamento e reversao.
+- `backend/app/pedidos_compra/recebimento_routes.py`: recebimento parcial/total com entrada automatica em estoque.
+- `backend/app/pedidos_compra/exportacao_routes.py`: exportacao Excel/PDF.
+- `backend/app/pedidos_compra/sugestao_routes.py`: endpoint de sugestao inteligente de compra.
 
 Maiores arquivos mapeados em 2026-05-04:
 
