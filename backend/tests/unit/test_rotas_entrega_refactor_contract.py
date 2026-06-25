@@ -38,6 +38,10 @@ def test_rotas_entrega_preserva_reexports_operacionais() -> None:
 
 
 def test_rotas_entrega_router_stays_split_across_modules() -> None:
-    assert _line_count("app", "api", "endpoints", "rotas_entrega.py") < 1800
+    assert _line_count("app", "api", "endpoints", "rotas_entrega.py") < 120
     assert _line_count("app", "api", "endpoints", "rotas_entrega_auth.py") >= 120
     assert _line_count("app", "api", "endpoints", "rotas_entrega_tracking.py") >= 250
+    assert _line_count("app", "api", "endpoints", "rotas_entrega_core_routes.py") >= 220
+    assert (
+        _line_count("app", "api", "endpoints", "rotas_entrega_paradas_routes.py") >= 450
+    )

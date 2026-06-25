@@ -19,7 +19,7 @@ def extract_block(source: str, marker: str) -> str:
 
 
 def test_mobile_auth_exposes_funcionario_operational_profile():
-    source = read_repo("backend/app/routes/ecommerce_auth.py")
+    source = read_repo("backend/app/routes/ecommerce_auth_profiles.py")
 
     assert "is_funcionario" in source
     assert '"funcionario"' in source

@@ -104,6 +104,7 @@ def test_funcionario_pdv_does_not_manage_cash_register():
 def test_funcionario_pdv_reuses_open_erp_cash_register_for_tenant():
     source = read_repo(PDV_SOURCE)
     service = read_repo("backend/app/vendas/service.py")
+    finalizacao = read_repo("backend/app/vendas/finalizacao.py")
     caixa_service = read_repo("backend/app/caixa/service.py")
     caixa_block = extract_block(source, "def obter_caixa_aberto_funcionario_pdv")
     finalizar_block = extract_block(source, "def finalizar_venda_funcionario_pdv")
@@ -127,9 +128,9 @@ def test_funcionario_pdv_reuses_open_erp_cash_register_for_tenant():
 
     assert "caixa_id: Optional[int] = None" in service
     assert "permitir_caixa_tenant: bool = False" in service
-    assert "CaixaService.validar_caixa_aberto(" in service
-    assert "caixa_id=caixa_id" in service
-    assert "permitir_caixa_tenant=permitir_caixa_tenant" in service
+    assert "CaixaService.validar_caixa_aberto(" in finalizacao
+    assert "caixa_id=caixa_id" in finalizacao
+    assert "permitir_caixa_tenant=permitir_caixa_tenant" in finalizacao
 
     assert "tenant_id: Optional[str] = None" in caixa_service
     assert "permitir_caixa_tenant: bool = False" in caixa_service

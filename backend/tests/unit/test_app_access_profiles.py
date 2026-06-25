@@ -99,7 +99,7 @@ def test_app_access_service_derives_and_selects_multiple_profiles():
 
 
 def test_ecommerce_auth_exposes_available_profiles_and_select_profile_endpoint():
-    source = read_backend("app/routes/ecommerce_auth.py")
+    source = read_backend("app/routes/ecommerce_auth_profiles.py")
 
     assert "available_profiles" in source
     assert "selected_profile" in source
@@ -107,7 +107,7 @@ def test_ecommerce_auth_exposes_available_profiles_and_select_profile_endpoint()
 
 
 def test_ecommerce_profile_reload_uses_active_profile_from_token_contract():
-    source = read_backend("app/routes/ecommerce_auth.py")
+    source = read_backend("app/routes/ecommerce_auth_profiles.py")
 
     assert "_active_app_profile" in source
     assert 'selected_profile=getattr(current_user, "_active_app_profile"' in source

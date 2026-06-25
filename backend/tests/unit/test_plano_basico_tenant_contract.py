@@ -30,8 +30,23 @@ def test_basic_plan_route_files_use_selected_tenant_dependency():
         "backend/app/clientes_routes.py",
         "backend/app/pets_routes.py",
         "backend/app/produtos_routes.py",
+        "backend/app/produtos/atualizacao_lote_routes.py",
+        "backend/app/produtos/cadastro_routes.py",
+        "backend/app/produtos/codigo_sku_routes.py",
+        "backend/app/produtos/estado_routes.py",
+        "backend/app/produtos/listagem_routes.py",
+        "backend/app/produtos/variacoes_fusao_routes.py",
         "backend/app/vendas_routes.py",
+        "backend/app/vendas/cancelamento_routes.py",
+        "backend/app/vendas/crud_routes.py",
+        "backend/app/vendas/entrega_routes.py",
+        "backend/app/vendas/finalizacao_routes.py",
+        "backend/app/vendas/relatorios_routes.py",
+        "backend/app/vendas/status_routes.py",
         "backend/app/financeiro_routes.py",
+        "backend/app/financeiro/cliente_routes.py",
+        "backend/app/financeiro/config_routes.py",
+        "backend/app/financeiro/fluxo_caixa_routes.py",
         "backend/app/formas_pagamento_routes.py",
         "backend/app/usuarios_routes.py",
         "backend/app/categorias_routes.py",
@@ -213,8 +228,8 @@ def test_modulos_admin_activation_sets_target_tenant_context(monkeypatch):
     assert db.committed is True
 
 
-def test_premium_routers_remain_gated_in_main():
-    main_source = _source("backend/app/main.py")
+def test_premium_routers_remain_gated_in_router_bootstrap():
+    main_source = _source("backend/app/main_routers.py")
     required_gates = {
         "campaigns_router": "campanhas",
         "canal_descontos_router": "campanhas",
@@ -233,7 +248,7 @@ def test_premium_routers_remain_gated_in_main():
     for router_name, modulo in required_gates.items():
         pattern = (
             rf"app\.include_router\(\s*{router_name}\b"
-            rf"[^\n]*dependencies=_module_dependencies\(\"{modulo}\"\)"
+            rf"[\s\S]*?dependencies=_module_dependencies\(\"{modulo}\"\)"
         )
         assert re.search(pattern, main_source), f"{router_name} sem gate {modulo}"
 
@@ -326,42 +341,111 @@ def test_pet_quick_add_blocks_race_without_selected_species():
 
 
 def test_payment_and_operator_catalog_routes_require_sales_or_config_permissions():
-    financeiro_source = _source("backend/app/financeiro_routes.py")
+    financeiro_source = _source("backend/app/financeiro/config_routes.py")
     operadoras_source = _source("backend/app/operadoras_routes.py")
     taxas_source = _source("backend/app/formas_pagamento_routes.py")
 
+    def assert_route_requires(
+        source: str, method: str, path: str, permission_pattern: str
+    ) -> None:
+        pattern = (
+            rf'@router\.{method}\(\s*"{re.escape(path)}"[\s\S]*?\)\s*'
+            rf"{permission_pattern}"
+        )
+        assert re.search(pattern, source)
+
     financeiro_routes = [
-        '@router.get("/formas-pagamento", response_model=List[FormaPagamentoResponse])\n@require_any_permission(("vendas.criar", "configuracoes.editar"))',
-        '@router.post("/formas-pagamento", response_model=FormaPagamentoResponse, status_code=status.HTTP_201_CREATED)\n@require_permission("configuracoes.editar")',
-        '@router.put("/formas-pagamento/{forma_id}", response_model=FormaPagamentoResponse)\n@require_permission("configuracoes.editar")',
-        '@router.delete("/formas-pagamento/{forma_id}", status_code=status.HTTP_204_NO_CONTENT)\n@require_permission("configuracoes.editar")',
+        (
+            "get",
+            "/formas-pagamento",
+            r'@require_any_permission\(\("vendas\.criar", "configuracoes\.editar"\)\)',
+        ),
+        (
+            "post",
+            "/formas-pagamento",
+            r'@require_permission\("configuracoes\.editar"\)',
+        ),
+        (
+            "put",
+            "/formas-pagamento/{forma_id}",
+            r'@require_permission\("configuracoes\.editar"\)',
+        ),
+        (
+            "delete",
+            "/formas-pagamento/{forma_id}",
+            r'@require_permission\("configuracoes\.editar"\)',
+        ),
     ]
 
     operadoras_routes = [
-        '@router.get("", response_model=List[OperadoraCartaoResponse])\n@require_any_permission(("vendas.criar", "configuracoes.editar"))',
-        '@router.get("/padrao", response_model=OperadoraCartaoResponse)\n@require_any_permission(("vendas.criar", "configuracoes.editar"))',
-        '@router.get("/{operadora_id}", response_model=OperadoraCartaoResponse)\n@require_any_permission(("vendas.criar", "configuracoes.editar"))',
-        '@router.post("", response_model=OperadoraCartaoResponse, status_code=status.HTTP_201_CREATED)\n@require_permission("configuracoes.editar")',
-        '@router.put("/{operadora_id}", response_model=OperadoraCartaoResponse)\n@require_permission("configuracoes.editar")',
-        '@router.delete("/{operadora_id}", status_code=status.HTTP_204_NO_CONTENT)\n@require_permission("configuracoes.editar")',
+        (
+            "get",
+            "",
+            r'@require_any_permission\(\("vendas\.criar", "configuracoes\.editar"\)\)',
+        ),
+        (
+            "get",
+            "/padrao",
+            r'@require_any_permission\(\("vendas\.criar", "configuracoes\.editar"\)\)',
+        ),
+        (
+            "get",
+            "/{operadora_id}",
+            r'@require_any_permission\(\("vendas\.criar", "configuracoes\.editar"\)\)',
+        ),
+        (
+            "post",
+            "",
+            r'@require_permission\("configuracoes\.editar"\)',
+        ),
+        (
+            "put",
+            "/{operadora_id}",
+            r'@require_permission\("configuracoes\.editar"\)',
+        ),
+        (
+            "delete",
+            "/{operadora_id}",
+            r'@require_permission\("configuracoes\.editar"\)',
+        ),
     ]
 
     taxas_routes = [
-        '@router.post("/taxas", response_model=FormaPagamentoTaxaResponse)\n@require_permission("configuracoes.editar")',
-        '@router.get("/taxas/{forma_pagamento_id}", response_model=List[FormaPagamentoTaxaResponse])\n@require_any_permission(("vendas.criar", "configuracoes.editar"))',
-        '@router.put("/taxas/{taxa_id}", response_model=FormaPagamentoTaxaResponse)\n@require_permission("configuracoes.editar")',
-        '@router.delete("/taxas/{taxa_id}")\n@require_permission("configuracoes.editar")',
-        '@router.post("/analisar-venda", response_model=AnaliseVendaResponse)\n@require_any_permission(("vendas.criar", "configuracoes.editar"))',
+        (
+            "post",
+            "/taxas",
+            r'@require_permission\("configuracoes\.editar"\)',
+        ),
+        (
+            "get",
+            "/taxas/{forma_pagamento_id}",
+            r'@require_any_permission\(\("vendas\.criar", "configuracoes\.editar"\)\)',
+        ),
+        (
+            "put",
+            "/taxas/{taxa_id}",
+            r'@require_permission\("configuracoes\.editar"\)',
+        ),
+        (
+            "delete",
+            "/taxas/{taxa_id}",
+            r'@require_permission\("configuracoes\.editar"\)',
+        ),
+        (
+            "post",
+            "/analisar-venda",
+            r'@require_any_permission\(\("vendas\.criar", "configuracoes\.editar"\)\)',
+        ),
     ]
 
-    for route in financeiro_routes:
-        assert route in financeiro_source
+    for method, path, permission_pattern in financeiro_routes:
+        assert_route_requires(financeiro_source, method, path, permission_pattern)
 
-    for route in operadoras_routes:
-        assert route in operadoras_source
+    for method, path, permission_pattern in operadoras_routes:
+        assert_route_requires(operadoras_source, method, path, permission_pattern)
 
-    for route in taxas_routes:
-        assert route in taxas_source
+    for method, path, permission_pattern in taxas_routes:
+        assert_route_requires(taxas_source, method, path, permission_pattern)
 
     assert "FormaPagamento.tenant_id == tenant_id" in taxas_source
     assert "FormaPagamentoTaxa.tenant_id == tenant_id" in taxas_source
@@ -461,32 +545,39 @@ def test_basic_finance_sales_menu_matches_direct_route_permissions():
 
 
 def test_financeiro_mixed_router_keeps_premium_endpoints_module_gated():
-    financeiro_source = _source("backend/app/financeiro_routes.py")
+    financeiro_common_source = _source("backend/app/financeiro/common.py")
+    financeiro_config_source = _source("backend/app/financeiro/config_routes.py")
+    fluxo_caixa_source = _source("backend/app/financeiro/fluxo_caixa_routes.py")
+    cliente_source = _source("backend/app/financeiro/cliente_routes.py")
 
     assert (
         'financeiro_erp_required = Depends(require_active_module("financeiro_erp"))'
-        in financeiro_source
+        in financeiro_common_source
     )
 
-    premium_functions = [
+    premium_functions = {
         "def listar_categorias(",
         "def criar_categoria(",
         "def atualizar_categoria(",
         "def desativar_categoria(",
-        "def get_fluxo_caixa(",
-    ]
+    }
 
     for function_name in premium_functions:
-        start = financeiro_source.index(function_name)
-        end = financeiro_source.index("):", start)
-        signature = financeiro_source[start:end]
+        start = financeiro_config_source.index(function_name)
+        end = financeiro_config_source.index("):", start)
+        signature = financeiro_config_source[start:end]
         assert "_module_access: None = financeiro_erp_required" in signature
 
-    cliente_history_start = financeiro_source.index(
+    fluxo_start = fluxo_caixa_source.index("def get_fluxo_caixa(")
+    fluxo_end = fluxo_caixa_source.index("):", fluxo_start)
+    fluxo_signature = fluxo_caixa_source[fluxo_start:fluxo_end]
+    assert "_module_access: None = financeiro_erp_required" in fluxo_signature
+
+    cliente_history_start = cliente_source.index(
         "def get_historico_financeiro_cliente("
     )
-    cliente_history_end = financeiro_source.index("):", cliente_history_start)
-    cliente_history_signature = financeiro_source[
+    cliente_history_end = cliente_source.index("):", cliente_history_start)
+    cliente_history_signature = cliente_source[
         cliente_history_start:cliente_history_end
     ]
     assert (
@@ -497,7 +588,7 @@ def test_financeiro_mixed_router_keeps_premium_endpoints_module_gated():
 
 def test_cliente_financeiro_remains_basic_but_tenant_scoped():
     app_source = _source("frontend/src/App.jsx")
-    financeiro_source = _source("backend/app/financeiro_routes.py")
+    financeiro_source = _source("backend/app/financeiro/cliente_routes.py")
 
     assert 'path="clientes/:clienteId/financeiro"' in app_source
     assert '<ProtectedRoute permission="clientes.visualizar">' in app_source
@@ -563,17 +654,18 @@ def test_basic_direct_urls_apply_same_frontend_permissions_as_menu():
 
 
 def test_financial_chat_ia_is_not_available_in_basic_without_premium_module():
-    main_source = _source("backend/app/main.py")
+    main_source = _source("backend/app/main_routers.py")
     app_source = _source("frontend/src/App.jsx")
     layout_source = _source("frontend/src/components/Layout.jsx") + _source(
         "frontend/src/components/layout/menuConfig.js"
     )
     modulo_bloqueado_source = _source("frontend/src/components/ModuloBloqueado.jsx")
 
-    assert (
-        'app.include_router(chat_router, tags=["IA - Chat Financeiro"], '
-        'dependencies=_module_dependencies("financeiro_erp"))'
-    ) in main_source
+    assert re.search(
+        r"app\.include_router\(\s*chat_router[\s\S]*?"
+        r'dependencies=_module_dependencies\("financeiro_erp"\)',
+        main_source,
+    )
     assert 'path="ia/chat"' in app_source
     assert (
         'element={<ModuleGate modulo="financeiro_erp"><ChatIA /></ModuleGate>}'

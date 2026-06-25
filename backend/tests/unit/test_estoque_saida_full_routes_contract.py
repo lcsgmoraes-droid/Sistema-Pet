@@ -39,7 +39,7 @@ def test_estoque_routes_nao_expõe_mais_rotas_saida_full():
 
 
 def test_main_registra_router_de_saida_full():
-    main_source = _source("app/main.py")
+    main_source = _source("app/main_routers.py")
 
     assert (
         "from app.estoque_saida_full_routes import router as estoque_saida_full_router"

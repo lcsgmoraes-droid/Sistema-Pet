@@ -67,7 +67,9 @@ def test_relatorio_perdas_filtra_descartados_por_padrao():
 
 
 def test_startup_registra_job_automatico_de_validade():
-    main_source = open("backend/app/main.py", "r", encoding="utf-8").read()
+    main_source = open(
+        "backend/app/main_background_jobs.py", "r", encoding="utf-8"
+    ).read()
 
     assert "_loop_estoque_validade" in main_source
     assert "EstoqueValidadeService.processar_lotes_em_risco" in main_source

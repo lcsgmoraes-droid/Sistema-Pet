@@ -1,7 +1,14 @@
 from pathlib import Path
 
 from app import contas_pagar_routes
-from app.financeiro import contas_pagar_recorrencia_routes, contas_pagar_schemas
+from app.financeiro import (
+    contas_pagar_consulta_routes,
+    contas_pagar_criacao_routes,
+    contas_pagar_manutencao_routes,
+    contas_pagar_pagamento_routes,
+    contas_pagar_recorrencia_routes,
+    contas_pagar_schemas,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,6 +35,37 @@ def test_contas_pagar_routes_reexports_schemas_and_recorrencia_handlers():
     )
 
 
+def test_contas_pagar_routes_reexports_split_route_handlers():
+    assert (
+        contas_pagar_routes.criar_conta_pagar
+        is contas_pagar_criacao_routes.criar_conta_pagar
+    )
+    assert (
+        contas_pagar_routes.listar_contas_pagar
+        is contas_pagar_consulta_routes.listar_contas_pagar
+    )
+    assert (
+        contas_pagar_routes.classificar_conta_pagar
+        is contas_pagar_consulta_routes.classificar_conta_pagar
+    )
+    assert (
+        contas_pagar_routes.atualizar_conta_pagar
+        is contas_pagar_manutencao_routes.atualizar_conta_pagar
+    )
+    assert (
+        contas_pagar_routes.buscar_conta_pagar
+        is contas_pagar_manutencao_routes.buscar_conta_pagar
+    )
+    assert (
+        contas_pagar_routes.registrar_pagamento
+        is contas_pagar_pagamento_routes.registrar_pagamento
+    )
+    assert (
+        contas_pagar_routes.dashboard_contas_pagar
+        is contas_pagar_pagamento_routes.dashboard_contas_pagar
+    )
+
+
 def test_recorrencia_routes_are_registered_on_main_router():
     paths = {route.path for route in contas_pagar_routes.router.routes}
 
@@ -38,11 +76,23 @@ def test_recorrencia_routes_are_registered_on_main_router():
 
 def test_contas_pagar_routes_stays_below_large_file_threshold_after_extraction():
     routes_source = ROOT / "app" / "contas_pagar_routes.py"
+    common_source = ROOT / "app" / "financeiro" / "contas_pagar_common.py"
+    criacao_source = ROOT / "app" / "financeiro" / "contas_pagar_criacao_routes.py"
+    consulta_source = ROOT / "app" / "financeiro" / "contas_pagar_consulta_routes.py"
+    manutencao_source = (
+        ROOT / "app" / "financeiro" / "contas_pagar_manutencao_routes.py"
+    )
+    pagamento_source = ROOT / "app" / "financeiro" / "contas_pagar_pagamento_routes.py"
     schemas_source = ROOT / "app" / "financeiro" / "contas_pagar_schemas.py"
     recorrencia_source = (
         ROOT / "app" / "financeiro" / "contas_pagar_recorrencia_routes.py"
     )
 
-    assert len(routes_source.read_text(encoding="utf-8").splitlines()) < 2000
+    assert len(routes_source.read_text(encoding="utf-8").splitlines()) < 150
+    assert len(common_source.read_text(encoding="utf-8").splitlines()) < 250
+    assert len(criacao_source.read_text(encoding="utf-8").splitlines()) < 500
+    assert len(consulta_source.read_text(encoding="utf-8").splitlines()) < 500
+    assert len(manutencao_source.read_text(encoding="utf-8").splitlines()) < 750
+    assert len(pagamento_source.read_text(encoding="utf-8").splitlines()) < 450
     assert len(schemas_source.read_text(encoding="utf-8").splitlines()) > 140
     assert len(recorrencia_source.read_text(encoding="utf-8").splitlines()) > 220

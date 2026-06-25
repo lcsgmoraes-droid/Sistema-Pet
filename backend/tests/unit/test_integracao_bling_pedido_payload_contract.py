@@ -62,8 +62,16 @@ def test_integracao_bling_pedido_routes_mantem_corte_grande():
     payload_source = (
         BACKEND_ROOT / "app/integracao_bling_pedido_payload.py"
     ).read_text(encoding="utf-8")
+    admin_routes_source = (
+        BACKEND_ROOT / "app/integracao_bling_pedido_admin_routes.py"
+    ).read_text(encoding="utf-8")
+    processor_source = (
+        BACKEND_ROOT / "app/integracao_bling_pedido_webhook_processor.py"
+    ).read_text(encoding="utf-8")
 
     assert "def _serializar_pedido_bling(" not in routes_source
     assert "def _resolver_canal_pedido(" not in routes_source
-    assert len(routes_source.splitlines()) < 1800
+    assert len(routes_source.splitlines()) < 800
     assert len(payload_source.splitlines()) < 700
+    assert len(admin_routes_source.splitlines()) < 600
+    assert len(processor_source.splitlines()) < 800

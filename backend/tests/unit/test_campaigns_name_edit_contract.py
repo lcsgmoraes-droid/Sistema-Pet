@@ -9,7 +9,7 @@ def read_repo(path: str) -> str:
 
 
 def test_campaigns_parameter_editor_allows_renaming_default_campaigns():
-    backend = read_repo("backend/app/campaigns/routes.py")
+    backend = read_repo("backend/app/campaigns/campaign_management_routes.py")
     hook = read_repo("frontend/src/hooks/useCampanhasGestao.js")
     main = read_repo("frontend/src/components/campanhas/CampanhasMainContent.jsx")
     list_tab = read_repo("frontend/src/components/campanhas/CampanhasListTab.jsx")

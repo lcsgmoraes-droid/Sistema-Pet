@@ -44,10 +44,10 @@ def test_anular_cupom_reverte_fidelidade_e_marca_voided():
 
     with (
         patch(
-            "app.campaigns.routes.revoke_loyalty_reward_by_coupon",
+            "app.campaigns.coupons_routes.revoke_loyalty_reward_by_coupon",
             return_value={"matched": True, "revoked": True},
         ) as revoke_mock,
-        patch("app.campaigns.routes.log_campaign_event") as audit_mock,
+        patch("app.campaigns.coupons_routes.log_campaign_event") as audit_mock,
     ):
         response = anular_cupom(
             code="FIEL-ABC",
@@ -87,7 +87,9 @@ def test_anular_cupom_rejeita_quando_nao_esta_ativo():
     )
     db = _FakeDB(cupom)
 
-    with patch("app.campaigns.routes.revoke_loyalty_reward_by_coupon") as revoke_mock:
+    with patch(
+        "app.campaigns.coupons_routes.revoke_loyalty_reward_by_coupon"
+    ) as revoke_mock:
         with pytest.raises(HTTPException) as exc:
             anular_cupom(
                 code="CUPOM-USADO",

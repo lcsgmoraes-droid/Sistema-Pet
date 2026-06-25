@@ -207,6 +207,152 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
+Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
+
+- 133 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 44 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
+- 0 arquivos de aplicacao acima de 2000 linhas.
+
+Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
+
+- `backend/app/main.py`: 1744 -> 107 linhas.
+- `backend/app/main_routers.py`: registro de routers e gates de modulos premium.
+- `backend/app/main_background_jobs.py`: loops e controle de jobs de background.
+- `backend/app/main_lifecycle.py`: startup, shutdown e validacao de ambiente.
+- `backend/app/main_http.py`: middlewares e handlers de erro.
+- `backend/app/main_basic_routes.py`: rotas basicas de health/debug.
+
+Fatia de 2026-06-24: `backend/app/comissoes_demonstrativo_routes.py` separou calculo, detalhe e fechamento financeiro:
+
+- `backend/app/comissoes_demonstrativo_routes.py`: 1734 -> 875 linhas.
+- `backend/app/comissoes_demonstrativo_calculo.py`: conversao monetaria, extrato do calculo e campanha do snapshot.
+- `backend/app/comissoes_demonstrativo_detail.py`: montagem do payload de detalhe do demonstrativo.
+- `backend/app/comissoes_demonstrativo_fechamento.py`: fechamento de pendencias, conta a pagar e lancamento previsto.
+- `backend/app/comissoes_demonstrativo_historico_routes.py`: subrouter de historico e detalhe de fechamentos.
+- `backend/app/comissoes_demonstrativo_schemas.py`: schema Pydantic de fechamento.
+
+Fatia de 2026-06-24: `backend/app/api/endpoints/rotas_entrega.py` virou agregador fino:
+
+- `backend/app/api/endpoints/rotas_entrega.py`: 1732 -> 86 linhas.
+- `backend/app/api/endpoints/rotas_entrega_core_routes.py`: listagem, detalhe, atualizacao e rastreio publico.
+- `backend/app/api/endpoints/rotas_entrega_otimizacao_routes.py`: otimizacao de entregas pendentes.
+- `backend/app/api/endpoints/rotas_entrega_criacao_routes.py`: criacao de rota simples ou multipla.
+- `backend/app/api/endpoints/rotas_entrega_estado_routes.py`: iniciar, reverter, fechar e excluir rota.
+- `backend/app/api/endpoints/rotas_entrega_paradas_routes.py`: recebimento, paradas, reordenacao, entrega, observacao e nao-entrega.
+
+Fatia de 2026-06-25: `backend/app/integracao_bling_pedido_routes.py` virou fachada compativel:
+
+- `backend/app/integracao_bling_pedido_routes.py`: 1730 -> 695 linhas.
+- `backend/app/integracao_bling_pedido_admin_routes.py`: listagem, reconciliacao, consolidacao, confirmacao/cancelamento manual e reprocessamento de pedidos.
+- `backend/app/integracao_bling_pedido_webhook_processor.py`: processamento pesado dos eventos de webhook do Bling.
+- `backend/app/integracao_bling_pedido_payload.py`: helpers de payload e serializacao mantidos da fatia anterior.
+
+Fatia de 2026-06-25: `backend/app/conciliacao_services.py` virou fachada compativel:
+
+- `backend/app/conciliacao_services.py`: 1713 -> 31 linhas.
+- `backend/app/conciliacao_services_importacao.py`: importacao, validacao em cascata, processamento e reversao.
+- `backend/app/conciliacao_services_stone.py`: conciliacao Stone e upload da aba de vendas.
+- `backend/app/conciliacao_services_recebimentos.py`: validacao e amarracao de recebimentos/vendas.
+
+Fatia de 2026-06-25: `backend/app/services/bling_sync_service.py` virou fachada compativel:
+
+- `backend/app/services/bling_sync_service.py`: 1684 -> 90 linhas.
+- `backend/app/services/bling_sync_shared.py`: constantes, rate limit, consultas globais seguras e helpers de busca.
+- `backend/app/services/bling_sync_queue.py`: fila persistente, retry, snapshots e processamento pendente.
+- `backend/app/services/bling_sync_reprocess.py`: reprocessamento de falhas e execucao imediata controlada.
+- `backend/app/services/bling_sync_reconciliation.py`: reconciliacao recente/geral de saldos.
+- `backend/app/services/bling_sync_auto_link.py`: auto-link por SKU, rotina noturna e health snapshot.
+
+Fatia de 2026-06-25: `backend/app/bling_sync_routes.py` virou agregador compativel:
+
+- `backend/app/bling_sync_routes.py`: 1646 -> 152 linhas.
+- `backend/app/bling_sync/routes_common.py`: helpers de busca, retry e vinculo seguro.
+- `backend/app/bling_sync/config_routes.py`: configuracao e vinculo manual/automatico.
+- `backend/app/bling_sync/dashboard_routes.py`: health, cobertura, faltantes e criacao local.
+- `backend/app/bling_sync/operational_routes.py`: envio, status, reprocessamento e reconciliacao.
+- `backend/app/bling_sync/webhook_routes.py`: webhook e vinculo em massa por SKU.
+
+Fatia de 2026-06-25: `backend/app/vendas_routes.py` virou agregador compativel:
+
+- `backend/app/vendas_routes.py`: 1655 -> 88 linhas.
+- `backend/app/vendas/crud_routes.py`: listagem, detalhe, criacao e atualizacao de vendas.
+- `backend/app/vendas/entrega_routes.py`: retirada, pronto para retirada e confirmacao de entrega.
+- `backend/app/vendas/finalizacao_routes.py`: finalizacao, comissoes, lembretes e evento de campanha.
+- `backend/app/vendas/cancelamento_routes.py`: cancelamento e exclusao logica com auditoria.
+- `backend/app/vendas/status_routes.py`: reabertura, alteracao de status, comissoes e reversoes.
+- `backend/app/vendas/relatorios_routes.py`: resumo operacional de vendas.
+
+Fatia de 2026-06-25: `backend/app/produtos_routes.py` virou agregador compativel:
+
+- `backend/app/produtos_routes.py`: 1617 -> 160 linhas.
+- `backend/app/produtos/codigo_sku_routes.py`: geracao/validacao de codigo de barras e geracao de SKU.
+- `backend/app/produtos/cadastro_routes.py`: criacao, detalhe e edicao completa de produtos.
+- `backend/app/produtos/listagem_routes.py`: listagem geral e vendaveis, preservando filtros e enriquecimento.
+- `backend/app/produtos/variacoes_fusao_routes.py`: variacoes, restauracao, exclusao permanente e fusao.
+- `backend/app/produtos/atualizacao_lote_routes.py`: atualizacao em lote e operacoes de fornecedor/racao.
+- `backend/app/produtos/estado_routes.py`: edicao rapida de preco, exclusao logica e ativacao.
+
+Fatia de 2026-06-25: `backend/app/financeiro_routes.py` virou agregador compativel:
+
+- `backend/app/financeiro_routes.py`: 1613 -> 70 linhas.
+- `backend/app/financeiro/config_routes.py`: categorias financeiras e formas de pagamento.
+- `backend/app/financeiro/fluxo_caixa_routes.py`: consolidacao do fluxo de caixa.
+- `backend/app/financeiro/fluxo_caixa_periodos.py`: agrupamento por dia, semana e mes.
+- `backend/app/financeiro/fluxo_caixa_schemas.py`: schemas do fluxo de caixa.
+- `backend/app/financeiro/cliente_routes.py`: historico e resumo financeiro do cliente.
+- `backend/app/financeiro/common.py`: gate compartilhado do modulo financeiro ERP.
+
+Fatia de 2026-06-25: `frontend/src/pages/Aba2ConciliacaoRecebimentos.jsx` separou fluxo e renderizacao:
+
+- `frontend/src/pages/Aba2ConciliacaoRecebimentos.jsx`: 1561 -> 682 linhas, mantendo estado, leitura dos arquivos e chamada da API.
+- `frontend/src/pages/conciliacaoRecebimentos/Aba2ConciliacaoRecebimentosView.jsx`: renderizacao da aba, upload dos 3 arquivos, resultado e modais.
+
+Fatia de 2026-06-25: `frontend/src/components/ModalPagamento.jsx` virou orquestrador fino:
+
+- `frontend/src/components/ModalPagamento.jsx`: 1529 -> 14 linhas.
+- `frontend/src/components/modalPagamento/useModalPagamentoController.js`: estado, efeitos, APIs de finalizacao, NFe, margem e simulacao.
+- `frontend/src/components/modalPagamento/ModalPagamentoView.jsx`: shell do modal, resumo/status, rodape e credito excedente.
+- `frontend/src/components/modalPagamento/ModalPagamentoFormaPanel.jsx`: selecao da forma, valores, cartao, NSU, parcelas e adicionar pagamento.
+
+Fatia de 2026-06-25: `frontend/src/pages/CentralNFSaida.jsx` separou controller e paineis:
+
+- `frontend/src/pages/CentralNFSaida.jsx`: 1511 -> 366 linhas, mantendo estado, efeitos, filtros e chamadas de API.
+- `frontend/src/pages/centralNFSaida/CentralNFSaidaView.jsx`: composicao da tela.
+- `frontend/src/pages/centralNFSaida/SefazToolsPanel.jsx`: consulta por chave e rotina automatica SEFAZ.
+- `frontend/src/pages/centralNFSaida/SefazConsultasSessao.jsx`: resultados expansíveis da sessao.
+- `frontend/src/pages/centralNFSaida/NFSaidaList.jsx`: filtros aplicados, estados de lista e acoes por NF.
+- `frontend/src/pages/centralNFSaida/NFSaidaDetalhesModal.jsx`: detalhe completo da nota.
+- `frontend/src/pages/centralNFSaida/NFSaidaCancelamentoModal.jsx`: fluxo visual de cancelamento.
+
+Fatia de 2026-06-25: `backend/app/produtos_models.py` virou fachada compativel:
+
+- `backend/app/produtos_models.py`: 1510 -> 63 linhas, reexportando os nomes legados.
+- `backend/app/produtos_catalogo_models.py`: categorias, marcas, departamentos e produto.
+- `backend/app/produtos_estoque_models.py`: imagens, kits, granel, lotes, campanhas de validade, fornecedores, listas de preco, movimentacoes e sync Bling.
+- `backend/app/produtos_compras_models.py`: pedidos de compra, vinculos com NF de entrada, itens, notas de entrada e historico de preco.
+- `backend/app/produtos_lembretes_variacoes_models.py`: lembretes e atributos/variacoes.
+
+Fatia de 2026-06-25: `backend/app/pedidos_compra_routes.py` virou agregador compativel:
+
+- `backend/app/pedidos_compra_routes.py`: 1466 -> 80 linhas, mantendo o prefixo `/pedidos-compra` e os reexports legados.
+- `backend/app/pedidos_compra/schemas.py`: schemas Pydantic de pedidos, envio e recebimento.
+- `backend/app/pedidos_compra/core_routes.py`: listagem, rascunho por fornecedor, detalhe, criacao e edicao.
+- `backend/app/pedidos_compra/envio_routes.py`: status de envio, envio por e-mail/manual, confirmacao, cancelamento e reversao.
+- `backend/app/pedidos_compra/recebimento_routes.py`: recebimento parcial/total com entrada automatica em estoque.
+- `backend/app/pedidos_compra/exportacao_routes.py`: exportacao Excel/PDF.
+- `backend/app/pedidos_compra/sugestao_routes.py`: endpoint de sugestao inteligente de compra.
+
+Fatia de 2026-06-25: `frontend/src/components/PedidosCompra.jsx` virou shell fino:
+
+- `frontend/src/components/PedidosCompra.jsx`: 1402 -> 10 linhas.
+- `frontend/src/components/compras/usePedidosCompraController.js`: estado, hooks e composicao dos controladores.
+- `frontend/src/components/compras/PedidosCompraView.jsx`: composicao visual de formulario, filtros, tabela e modais.
+- `frontend/src/components/compras/pedidosCompraDataController.js`: listagem, filtros e carregamento inicial.
+- `frontend/src/components/compras/pedidosCompraItemController.js`: produtos do fornecedor, itens do pedido, SKU e totais.
+- `frontend/src/components/compras/pedidosCompraFormularioController.js`: formulario, rascunho e fluxo de sugestao.
+- `frontend/src/components/compras/pedidosCompraOperacoesController.js`: criar/editar, envio, exportacao, status, confronto e recebimento.
+
 Maiores arquivos mapeados em 2026-05-04:
 
 Inventario atualizado em 2026-06-07, excluindo testes e migracoes Alembic da fila operacional:
@@ -1069,6 +1215,23 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-06-24: `backend/app/estoque_transferencia_parceiro_routes.py` extraiu schemas Pydantic para `backend/app/estoque/transferencia_parceiro_schemas.py` e suporte de dominio/consultas/compensacao para `backend/app/estoque/transferencia_parceiro_support.py`, mantendo reexports no router principal. O arquivo principal caiu de 2047 para 1112 linhas fisicas; na contagem fisica atual de `backend/app` + `frontend/src`, restam 69 arquivos acima de 1000 linhas, 25 acima de 1500 e 5 acima de 2000.
 - 2026-06-24: `backend/app/produtos_routes.py` extraiu as rotas de lotes, entrada de estoque e saida FIFO para `backend/app/produtos/lotes_routes.py`, mantendo include no router principal e reexports dos handlers legados. O arquivo principal caiu de 2053 para 1390 linhas fisicas; na contagem fisica atual de `backend/app` + `frontend/src`, restam 53 arquivos acima de 1000 linhas, 14 acima de 1500 e 1 acima de 2000 (`backend/app/integracao_bling_pedido_routes.py`).
 - 2026-06-24: `backend/app/integracao_bling_pedido_routes.py` extraiu helpers de payload, canal, NF resumida, itens e serializacao para `backend/app/integracao_bling_pedido_payload.py`, preservando reexports legados no modulo de rotas. O arquivo principal caiu de 2007 para 1557 linhas fisicas; na contagem fisica atual de `backend/app` + `frontend/src`, restam 53 arquivos acima de 1000 linhas, 14 acima de 1500 e 0 acima de 2000.
+- 2026-06-24: `backend/app/services/bling_flow_monitor_service.py` virou a fachada de orquestracao do monitor Bling e teve utilitarios comuns, diagnostico/NFs recentes e autocorrecao extraidos para `backend/app/services/bling_flow_monitor_utils.py`, `backend/app/services/bling_flow_monitor_diagnostics.py` e `backend/app/services/bling_flow_monitor_autofix.py`. O service principal caiu de 1909 para 800 linhas fisicas; na contagem fisica atual de `backend/app` + `frontend/src`, restam 52 arquivos acima de 1000 linhas, 13 acima de 1500 e 1 acima de 2000 (`backend/app/notas_entrada_routes.py`).
+- 2026-06-24: `backend/app/notas_entrada_routes.py` extraiu processamento, conferencia/devolucao e reversao/estorno para subrouters em `backend/app/notas_entrada/processamento_routes.py`, `backend/app/notas_entrada/conferencia_routes.py` e `backend/app/notas_entrada/reversao_routes.py`, mantendo os paths `/notas-entrada/...` e reexports legados. O router principal caiu de 2162 para 966 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem fisica atual de `backend/app` + `frontend/src`, restam 51 arquivos acima de 1000 linhas, 12 acima de 1500 e 0 acima de 2000.
+- 2026-06-24: `backend/app/vendas/service.py` extraiu a finalizacao de vendas para `backend/app/vendas/finalizacao.py`, a publicacao de eventos para `backend/app/vendas/finalizacao_eventos.py` e o pos-commit financeiro/campanhas para `backend/app/vendas/finalizacao_pos_commit.py`, mantendo `VendaService.finalizar_venda` e `_calcular_pagamentos_finalizacao` como fachada compativel. O service principal caiu de 1785 para 800 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem fisica atual de `backend/app` + `frontend/src`, restam 50 arquivos acima de 1000 linhas, 11 acima de 1500 e 0 acima de 2000.
+- 2026-06-24: `frontend/src/components/ContasPagar.jsx` extraiu filtros, tabela/colunas/acoes em lote, modais e helpers para `frontend/src/components/contas-pagar/*`, mantendo a tela principal como orquestradora de estado e handlers. O componente principal caiu de 1744 para 733 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem fisica atual de `backend/app` + `frontend/src`, restam 49 arquivos acima de 1000 linhas, 10 acima de 1500 e 0 acima de 2000.
+- 2026-06-24: `backend/app/contas_pagar_routes.py` virou agregador das rotas de contas a pagar, com criacao, consulta/classificacao, manutencao, pagamento/dashboard e helpers divididos em `backend/app/financeiro/contas_pagar_*`. O router principal caiu de 1732 para 86 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem fisica atual de `backend/app` + `frontend/src`, restam 48 arquivos acima de 1000 linhas, 9 acima de 1500 e 0 acima de 2000.
+- 2026-06-24: `backend/app/campaigns/routes.py` virou agregador das rotas de campanhas, com helpers comuns, validade, gestao base, cupons, consultas de clientes/extratos e beneficios manuais divididos em `backend/app/campaigns/*_routes.py` e `backend/app/campaigns/routes_common.py`. O router principal caiu de 1708 para 114 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem fisica atual de `backend/app` + `frontend/src`, restam 47 arquivos acima de 1000 linhas, 8 acima de 1500 e 0 acima de 2000.
+- 2026-06-24: `backend/app/relatorio_vendas_routes.py` virou agregador fino do relatorio de vendas, com helpers/calculos comuns, montagem do payload JSON e exportacao PDF separados em `backend/app/relatorio_vendas_common.py`, `backend/app/relatorio_vendas_builder.py` e `backend/app/relatorio_vendas_pdf.py`. O router principal caiu de 1694 para 77 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem fisica atual de `backend/app` + `frontend/src`, restam 46 arquivos acima de 1000 linhas, 7 acima de 1500 e 0 acima de 2000.
+- 2026-06-24: `backend/app/routes/ecommerce_auth.py` virou agregador das rotas de autenticacao e perfil do e-commerce/app, com schemas, contexto JWT/tenant, recuperacao de senha, vinculo de cliente, perfis e beneficios separados em `backend/app/routes/ecommerce_auth_*.py`. O router principal caiu de 1698 para 158 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem fisica atual de `backend/app` + `frontend/src`, restam 45 arquivos acima de 1000 linhas, 6 acima de 1500 e 0 acima de 2000.
+- 2026-06-24: `frontend/src/components/EstoqueBling.jsx` extraiu constantes, widgets, paineis de layout e abas para `frontend/src/components/estoqueBling/*`, mantendo a tela principal como orquestradora de estado e chamadas API. O componente principal caiu de 1677 para 940 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem fisica atual de `backend/app` + `frontend/src`, restam 44 arquivos acima de 1000 linhas, 5 acima de 1500 e 0 acima de 2000.
+- 2026-06-24: `backend/app/services/tenant_onboarding_service.py` virou fachada compativel do onboarding de tenants, com SQL/tenant-safe em `tenant_onboarding_sql.py`, auditoria de instalacoes em `tenant_onboarding_item_installs.py`, copias financeiras em `tenant_onboarding_financial_copies.py`, copias de catalogo em `tenant_onboarding_catalog_copies.py` e a orquestracao em `tenant_onboarding_runner.py`. O service principal caiu de 1791 para 184 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem por `splitlines()` de arquivos `.py` e `.jsx` em `backend/app` + `frontend/src` sem migrations/cache, restam 60 arquivos acima de 1000 linhas, 15 acima de 1500 e 0 acima de 2000.
+- 2026-06-24: `backend/app/services/base_catalog_import_service.py` virou fachada compativel da importacao do catalogo base, com nucleo/contratos em `base_catalog_import_core.py`, copia de catalogo em `base_catalog_import_catalog.py`, imagens/S3 em `base_catalog_import_images.py` e relacoes de produtos em `base_catalog_import_relations.py`. O service principal caiu de 1743 para 224 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem por `splitlines()` de arquivos `.py` e `.jsx` em `backend/app` + `frontend/src` sem migrations/cache, restam 59 arquivos acima de 1000 linhas, 14 acima de 1500 e 0 acima de 2000.
+- 2026-06-24: `backend/app/comissoes_demonstrativo_routes.py` extraiu schema, calculo do demonstrativo, montagem do detalhe, historico de fechamentos e fechamento financeiro para `backend/app/comissoes_demonstrativo_*.py`, mantendo o router e reexports de compatibilidade. O router principal caiu de 1734 para 875 linhas fisicas; na contagem atual de `backend/app` + `frontend/src`, restam 144 arquivos acima de 700 linhas, 58 acima de 1000, 12 acima de 1500 e 0 acima de 2000.
+- 2026-06-24: `backend/app/api/endpoints/rotas_entrega.py` virou agregador das rotas de entrega, com listagem/detalhe, otimizacao, criacao, estado da rota e paradas separados em `backend/app/api/endpoints/rotas_entrega_*_routes.py`. O router principal caiu de 1732 para 86 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem atual de `backend/app` + `frontend/src`, restam 143 arquivos acima de 700 linhas, 57 acima de 1000, 11 acima de 1500 e 0 acima de 2000.
+- 2026-06-25: `backend/app/integracao_bling_pedido_routes.py` virou fachada compativel da integracao de pedidos Bling, com rotas operacionais em `backend/app/integracao_bling_pedido_admin_routes.py` e processamento pesado de webhook em `backend/app/integracao_bling_pedido_webhook_processor.py`. O router principal caiu de 1730 para 695 linhas fisicas; na contagem atual de `backend/app` + `frontend/src` sem CSS, restam 142 arquivos acima de 700 linhas, 56 acima de 1000, 10 acima de 1500 e 0 acima de 2000.
+- 2026-06-25: `backend/app/conciliacao_services.py` virou fachada compativel dos servicos de conciliacao, com importacao/processamento em `backend/app/conciliacao_services_importacao.py`, Stone/upload em `backend/app/conciliacao_services_stone.py` e recebimentos/amarracao em `backend/app/conciliacao_services_recebimentos.py`. O service principal caiu de 1713 para 31 linhas fisicas; na contagem atual de `backend/app` + `frontend/src` sem CSS, restam 142 arquivos acima de 700 linhas, 55 acima de 1000, 9 acima de 1500 e 0 acima de 2000.
+- 2026-06-25: `backend/app/services/bling_sync_service.py` virou fachada compativel da sincronizacao de estoque Bling, com utilitarios/rate limit em `backend/app/services/bling_sync_shared.py`, fila em `backend/app/services/bling_sync_queue.py`, reprocessamento em `backend/app/services/bling_sync_reprocess.py`, reconciliacao em `backend/app/services/bling_sync_reconciliation.py` e auto-link/health em `backend/app/services/bling_sync_auto_link.py`. O service principal caiu de 1684 para 90 linhas fisicas e todos os modulos novos ficaram abaixo de 700 linhas; na contagem atual de `backend/app` + `frontend/src` sem CSS, restam 141 arquivos acima de 700 linhas, 54 acima de 1000, 8 acima de 1500 e 0 acima de 2000.
+- 2026-06-25: `backend/app/bling_sync_routes.py` virou agregador compativel da central de estoque Bling, com helpers comuns em `backend/app/bling_sync/routes_common.py`, configuracao/vinculo em `backend/app/bling_sync/config_routes.py`, dashboards/cobertura em `backend/app/bling_sync/dashboard_routes.py`, operacoes/status/reconciliacao em `backend/app/bling_sync/operational_routes.py` e webhook/vinculo em massa em `backend/app/bling_sync/webhook_routes.py`. O router principal caiu de 1646 para 152 linhas fisicas e todos os modulos novos ficaram abaixo de 700 linhas; na contagem atual de `backend/app` + `frontend/src` sem CSS, restam 140 arquivos acima de 700 linhas, 53 acima de 1000, 7 acima de 1500 e 0 acima de 2000.
 
 ### Nao fazer nesta onda
 

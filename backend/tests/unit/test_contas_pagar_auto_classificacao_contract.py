@@ -24,7 +24,7 @@ def test_chave_de_classificacao_remove_numero_variavel_da_venda():
 
 
 def test_classificar_conta_pagar_aprende_regra_e_aplica_similares():
-    source = _source("backend/app/contas_pagar_routes.py")
+    source = _source("backend/app/financeiro/contas_pagar_consulta_routes.py")
     endpoint = source.split("def classificar_conta_pagar(", 1)[1].split(
         "# ============================================================================\n# BUSCAR CONTA",
         1,
@@ -35,11 +35,8 @@ def test_classificar_conta_pagar_aprende_regra_e_aplica_similares():
 
 
 def test_criacao_manual_de_conta_pagar_usa_classificacao_aprendida():
-    source = _source("backend/app/contas_pagar_routes.py")
-    criar_endpoint = source.split("async def criar_conta_pagar(", 1)[1].split(
-        "# ============================================================================\n# LISTAR CONTAS",
-        1,
-    )[0]
+    source = _source("backend/app/financeiro/contas_pagar_criacao_routes.py")
+    criar_endpoint = source.split("async def criar_conta_pagar(", 1)[1]
 
     assert "aplicar_classificacao_aprendida_conta_pagar(" in criar_endpoint
 
@@ -76,7 +73,7 @@ def test_vendas_service_mantem_imports_publicos_de_pos_processamento():
 
 
 def test_falha_ao_criar_taxa_do_pdv_limpa_transacao_da_venda_finalizada():
-    source = _source("backend/app/vendas/service.py")
+    source = _source("backend/app/vendas/finalizacao_pos_commit.py")
     bloco_taxas = source.split("resultado_taxas = processar_contas_pagar_taxas(", 1)[
         1
     ].split(

@@ -56,7 +56,7 @@ def test_estoque_routes_nao_expõe_mais_decorators_de_transferencia_parceiro():
 
 
 def test_main_registra_router_de_transferencia_parceiro():
-    main_source = _source("app/main.py")
+    main_source = _source("app/main_routers.py")
 
     assert "from app.estoque_transferencia_parceiro_routes import" in main_source
     assert "router as estoque_transferencia_parceiro_router" in main_source

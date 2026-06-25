@@ -9,7 +9,7 @@ def _source(relative_path: str) -> str:
 
 
 def test_contas_pagar_tem_endpoint_delete_seguro_por_tenant():
-    source = _source("app/contas_pagar_routes.py")
+    source = _source("app/financeiro/contas_pagar_manutencao_routes.py")
 
     assert '@router.delete("/{conta_id}")' in source
 
@@ -25,7 +25,7 @@ def test_contas_pagar_tem_endpoint_delete_seguro_por_tenant():
 
 
 def test_contas_pagar_tem_estorno_de_pagamento_seguro_por_tenant():
-    source = _source("app/contas_pagar_routes.py")
+    source = _source("app/financeiro/contas_pagar_manutencao_routes.py")
 
     assert '@router.post("/{conta_id}/estornar")' in source
 
@@ -45,7 +45,7 @@ def test_contas_pagar_tem_estorno_de_pagamento_seguro_por_tenant():
 
 
 def test_contas_pagar_tem_cancelamento_sem_apagar_historico():
-    source = _source("app/contas_pagar_routes.py")
+    source = _source("app/financeiro/contas_pagar_manutencao_routes.py")
 
     assert '@router.post("/{conta_id}/cancelar")' in source
 

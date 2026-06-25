@@ -2,7 +2,10 @@ from uuid import UUID
 import inspect
 
 import app.bling_sync_routes as bling_sync_routes
+import app.services.bling_sync_auto_link as bling_sync_auto_link
+import app.services.bling_sync_reconciliation as bling_sync_reconciliation
 import app.services.bling_sync_service as bling_sync_service
+import app.services.bling_sync_shared as bling_sync_shared
 from app.services.bling_sync_service import BlingSyncService
 from app.tenancy.context import clear_current_tenant, get_current_tenant
 
@@ -23,9 +26,7 @@ def test_recent_reconcile_discovers_tenants_with_authorized_global_sql(monkeypat
         chamadas.append({"db": db, "sql": str(sql), "params": params or {}, **kwargs})
         return [(TENANT_A,), (TENANT_B,)]
 
-    monkeypatch.setattr(
-        bling_sync_service, "execute_tenant_safe_all", fake_execute, raising=False
-    )
+    monkeypatch.setattr(bling_sync_shared, "execute_tenant_safe_all", fake_execute)
 
     db = object()
     resultado = bling_sync_service.listar_tenants_com_produto_bling_sync_recentes(
@@ -48,9 +49,11 @@ def test_reconcile_recent_products_ativa_contexto_por_tenant(monkeypatch):
         def close(self):
             vistos.append(("close", get_current_tenant()))
 
-    monkeypatch.setattr(bling_sync_service, "SessionLocal", lambda: FakeSession())
     monkeypatch.setattr(
-        bling_sync_service,
+        bling_sync_reconciliation, "SessionLocal", lambda: FakeSession()
+    )
+    monkeypatch.setattr(
+        bling_sync_reconciliation,
         "listar_tenants_com_produto_bling_sync_recentes",
         lambda *args, **kwargs: [TENANT_A, TENANT_B],
     )
@@ -92,9 +95,11 @@ def test_reconcile_all_products_ativa_contexto_por_tenant(monkeypatch):
         def close(self):
             vistos.append(("close", get_current_tenant()))
 
-    monkeypatch.setattr(bling_sync_service, "SessionLocal", lambda: FakeSession())
     monkeypatch.setattr(
-        bling_sync_service,
+        bling_sync_reconciliation, "SessionLocal", lambda: FakeSession()
+    )
+    monkeypatch.setattr(
+        bling_sync_reconciliation,
         "listar_tenants_com_produto_bling_sync_ativo",
         lambda *args, **kwargs: [TENANT_A, TENANT_B],
     )
@@ -134,9 +139,9 @@ def test_auto_link_by_sku_global_ativa_contexto_por_tenant(monkeypatch):
         def close(self):
             vistos.append(("close", get_current_tenant()))
 
-    monkeypatch.setattr(bling_sync_service, "SessionLocal", lambda: FakeSession())
+    monkeypatch.setattr(bling_sync_auto_link, "SessionLocal", lambda: FakeSession())
     monkeypatch.setattr(
-        bling_sync_service,
+        bling_sync_auto_link,
         "listar_tenants_com_produtos_sem_vinculo_bling",
         lambda *args, **kwargs: [TENANT_A, TENANT_B],
     )
