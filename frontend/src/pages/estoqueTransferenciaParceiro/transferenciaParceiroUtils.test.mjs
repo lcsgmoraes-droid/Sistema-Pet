@@ -18,6 +18,7 @@ import {
   incrementarItemTransferencia,
   montarCompensacoesBaixaPayload,
   montarCupomTransferencia,
+  montarFiltrosHistoricoTransferenciaParams,
   montarParametrosDocumentoTransferencia,
   montarPayloadTransferencia,
   normalizarColunasDocumentoTransferencia,
@@ -99,6 +100,32 @@ test("factories de estado preservam defaults e overrides da tela", () => {
     recebidas: 2,
     vencidas: 0,
   });
+});
+
+test("montarFiltrosHistoricoTransferenciaParams prioriza pessoa selecionada por id", () => {
+  assert.deepEqual(
+    montarFiltrosHistoricoTransferenciaParams({
+      busca: "Maiara",
+      parceiro_id: "8406",
+      status_filtro: "pendente",
+      data_inicio: "2026-06-01",
+      data_fim: "2026-06-30",
+    }),
+    {
+      parceiro_id: "8406",
+      status_filtro: "pendente",
+      data_inicio: "2026-06-01",
+      data_fim: "2026-06-30",
+    },
+  );
+
+  assert.deepEqual(
+    montarFiltrosHistoricoTransferenciaParams({
+      busca: "TRP-2026",
+      parceiro_id: "",
+    }),
+    { busca: "TRP-2026" },
+  );
 });
 
 test("helpers de item e payload mantem calculos da transferencia", () => {

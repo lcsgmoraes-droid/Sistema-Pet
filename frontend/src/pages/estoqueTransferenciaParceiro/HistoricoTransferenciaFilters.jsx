@@ -1,4 +1,5 @@
 import { formatarMoeda } from "../../api/produtos";
+import PessoaSelector from "../../components/clientes/PessoaSelector";
 import { ResumoTransferenciaCard } from "./transferenciaParceiroComponents";
 
 export default function HistoricoTransferenciaFilters({
@@ -8,6 +9,11 @@ export default function HistoricoTransferenciaFilters({
   totais,
   filtros,
   atualizarFiltro,
+  pessoaSelecionada,
+  sugestoesPessoas,
+  loadingPessoas,
+  onAtualizarBuscaPessoa,
+  onSelecionarPessoa,
   aplicarPeriodoRapido,
   limparFiltros,
   onSubmit,
@@ -75,15 +81,26 @@ export default function HistoricoTransferenciaFilters({
       >
         <div className="xl:col-span-2">
           <label className="mb-2 block text-sm font-medium text-gray-700">
-            Buscar documento ou pessoa
+            Buscar documento ou selecionar pessoa
           </label>
-          <input
-            type="text"
+          <PessoaSelector
+            minChars={2}
             value={filtros.busca}
-            onChange={(event) => atualizarFiltro("busca", event.target.value)}
-            placeholder="Ex.: TRP-2026, nome da pessoa ou observacao"
-            className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            onChange={onAtualizarBuscaPessoa}
+            onSelect={onSelecionarPessoa}
+            placeholder="Ex.: TRP-2026 ou nome da pessoa"
+            showSuggestions={Boolean(sugestoesPessoas?.length)}
+            suggestions={sugestoesPessoas}
+            inputClassName="h-auto rounded-2xl px-4 py-3 text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
           />
+          {pessoaSelecionada?.id ? (
+            <p className="mt-1 text-xs text-blue-700">
+              Pessoa selecionada: {pessoaSelecionada.nome || pessoaSelecionada.razao_social}{" "}
+              {pessoaSelecionada.codigo ? `(codigo ${pessoaSelecionada.codigo})` : ""}
+            </p>
+          ) : loadingPessoas ? (
+            <p className="mt-1 text-xs text-gray-500">Buscando pessoas...</p>
+          ) : null}
         </div>
 
         <div>

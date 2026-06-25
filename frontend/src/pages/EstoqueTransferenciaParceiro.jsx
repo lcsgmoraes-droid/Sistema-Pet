@@ -21,6 +21,7 @@ import {
   inicioDoMesIso,
   montarCompensacoesBaixaPayload,
   montarCupomTransferencia,
+  montarFiltrosHistoricoTransferenciaParams,
   montarParametrosDocumentoTransferencia,
   montarPayloadTransferencia,
   normalizarColunasDocumentoTransferencia,
@@ -86,6 +87,9 @@ export default function EstoqueTransferenciaParceiro() {
   const [filtrosHistoricoAplicados, setFiltrosHistoricoAplicados] = useState(() =>
     criarFiltrosHistoricoTransferencia(),
   );
+  const [pessoaHistoricoSelecionada, setPessoaHistoricoSelecionada] = useState(null);
+  const [sugestoesPessoasHistorico, setSugestoesPessoasHistorico] = useState([]);
+  const [loadingPessoasHistorico, setLoadingPessoasHistorico] = useState(false);
   const [historico, setHistorico] = useState(() => criarHistoricoTransferenciasVazio());
 
   useEffect(() => {
@@ -174,6 +178,36 @@ export default function EstoqueTransferenciaParceiro() {
   useEffect(() => {
     void carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico);
   }, [filtrosHistoricoAplicados, paginaHistorico]);
+
+  useEffect(() => {
+    const termo = filtrosHistoricoForm.busca.trim();
+    if (filtrosHistoricoForm.parceiro_id || termo.length < 2) {
+      setSugestoesPessoasHistorico([]);
+      setLoadingPessoasHistorico(false);
+      return undefined;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setLoadingPessoasHistorico(true);
+        const termoDigitos = termo.replace(/\D/g, "");
+        const termoBusca = termoDigitos.length >= 8 ? termoDigitos : termo;
+        const clientes = await buscarClientes({
+          search: termoBusca,
+          limit: 10,
+          incluir_inativos: true,
+        });
+        setSugestoesPessoasHistorico(clientes);
+      } catch (error) {
+        console.error("Erro ao buscar pessoas para o historico:", error);
+        setSugestoesPessoasHistorico([]);
+      } finally {
+        setLoadingPessoasHistorico(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [filtrosHistoricoForm.busca, filtrosHistoricoForm.parceiro_id]);
 
   useEffect(() => {
     const limparCupom = () => setCupomTransferencia("");
@@ -291,13 +325,8 @@ export default function EstoqueTransferenciaParceiro() {
       const params = {
         page: pagina,
         page_size: 20,
+        ...montarFiltrosHistoricoTransferenciaParams(filtros),
       };
-
-      if (filtros.busca?.trim()) params.busca = filtros.busca.trim();
-      if (filtros.status_filtro) params.status_filtro = filtros.status_filtro;
-      if (filtros.data_inicio) params.data_inicio = filtros.data_inicio;
-      if (filtros.data_fim) params.data_fim = filtros.data_fim;
-      if (filtros.parceiro_id) params.parceiro_id = filtros.parceiro_id;
 
       const response = await api.get("/estoque/transferencia-parceiro/historico", {
         params,
@@ -316,6 +345,30 @@ export default function EstoqueTransferenciaParceiro() {
     setFiltrosHistoricoForm((prev) => ({
       ...prev,
       [campo]: valor,
+    }));
+  };
+
+  const rotuloPessoaHistorico = (pessoa) =>
+    pessoa?.nome || pessoa?.razao_social || pessoa?.nome_fantasia || `Pessoa #${pessoa?.id || ""}`;
+
+  const atualizarBuscaPessoaHistorico = (valor) => {
+    setPessoaHistoricoSelecionada(null);
+    setSugestoesPessoasHistorico([]);
+    setFiltrosHistoricoForm((prev) => ({
+      ...prev,
+      busca: valor,
+      parceiro_id: "",
+    }));
+  };
+
+  const selecionarPessoaHistorico = (pessoa) => {
+    if (!pessoa?.id) return;
+    setPessoaHistoricoSelecionada(pessoa);
+    setSugestoesPessoasHistorico([]);
+    setFiltrosHistoricoForm((prev) => ({
+      ...prev,
+      busca: rotuloPessoaHistorico(pessoa),
+      parceiro_id: String(pessoa.id),
     }));
   };
 
@@ -359,6 +412,8 @@ export default function EstoqueTransferenciaParceiro() {
   const limparFiltrosHistorico = () => {
     setPaginaHistorico(1);
     setSelecionadosHistorico([]);
+    setPessoaHistoricoSelecionada(null);
+    setSugestoesPessoasHistorico([]);
     setFiltrosHistoricoForm(criarFiltrosHistoricoTransferencia());
     setFiltrosHistoricoAplicados(criarFiltrosHistoricoTransferencia());
   };
@@ -367,12 +422,15 @@ export default function EstoqueTransferenciaParceiro() {
     if (!parceiroSelecionado?.id) return;
     setPaginaHistorico(1);
     setSelecionadosHistorico([]);
+    setPessoaHistoricoSelecionada(parceiroSelecionado);
     setFiltrosHistoricoForm((prev) => ({
       ...prev,
+      busca: rotuloPessoaHistorico(parceiroSelecionado),
       parceiro_id: String(parceiroSelecionado.id),
     }));
     setFiltrosHistoricoAplicados((prev) => ({
       ...prev,
+      busca: rotuloPessoaHistorico(parceiroSelecionado),
       parceiro_id: String(parceiroSelecionado.id),
     }));
   };
@@ -760,15 +818,15 @@ export default function EstoqueTransferenciaParceiro() {
       return false;
     }
 
+    const filtrosConsolidados =
+      montarFiltrosHistoricoTransferenciaParams(filtrosHistoricoAplicados);
+    if (filtrosConsolidados.parceiro_id) {
+      filtrosConsolidados.parceiro_id = Number(filtrosConsolidados.parceiro_id);
+    }
+
     const payload = {
       conta_receber_ids: selecionadosHistorico,
-      parceiro_id: filtrosHistoricoAplicados.parceiro_id
-        ? Number(filtrosHistoricoAplicados.parceiro_id)
-        : undefined,
-      status_filtro: filtrosHistoricoAplicados.status_filtro || undefined,
-      busca: filtrosHistoricoAplicados.busca?.trim() || undefined,
-      data_inicio: filtrosHistoricoAplicados.data_inicio || undefined,
-      data_fim: filtrosHistoricoAplicados.data_fim || undefined,
+      ...filtrosConsolidados,
       ...montarParametrosDocumentoTransferencia(colunasDocumento),
     };
 
@@ -1028,6 +1086,11 @@ export default function EstoqueTransferenciaParceiro() {
             totais={historico.totais}
             filtros={filtrosHistoricoForm}
             atualizarFiltro={atualizarFiltroHistorico}
+            pessoaSelecionada={pessoaHistoricoSelecionada}
+            sugestoesPessoas={sugestoesPessoasHistorico}
+            loadingPessoas={loadingPessoasHistorico}
+            onAtualizarBuscaPessoa={atualizarBuscaPessoaHistorico}
+            onSelecionarPessoa={selecionarPessoaHistorico}
             aplicarPeriodoRapido={aplicarPeriodoRapidoHistorico}
             limparFiltros={limparFiltrosHistorico}
             onSubmit={aplicarFiltrosHistorico}

@@ -112,6 +112,22 @@ export function criarFiltrosHistoricoTransferencia(overrides = {}) {
   };
 }
 
+export function montarFiltrosHistoricoTransferenciaParams(filtros = {}) {
+  const params = {};
+
+  if (filtros.parceiro_id) {
+    params.parceiro_id = filtros.parceiro_id;
+  } else if (filtros.busca?.trim()) {
+    params.busca = filtros.busca.trim();
+  }
+
+  if (filtros.status_filtro) params.status_filtro = filtros.status_filtro;
+  if (filtros.data_inicio) params.data_inicio = filtros.data_inicio;
+  if (filtros.data_fim) params.data_fim = filtros.data_fim;
+
+  return params;
+}
+
 export function criarHistoricoTransferenciasVazio(overrides = {}) {
   const { totais, ...rest } = overrides;
   return {
