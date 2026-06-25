@@ -189,22 +189,22 @@ FORBIDDEN_USER_CONTROLLED_LOG_PATTERNS = [
         "sefaz manual sync tenant/user log",
     ),
     (
-        "app/vendas_routes.py",
+        "app/vendas/cancelamento_routes.py",
         r"logger\.info\(\s*\"Cancelando venda por rota DELETE preservando auditoria: venda_id=%s user_id=%s tenant_id=%s\"",
         "sale delete audit user/tenant log",
     ),
     (
-        "app/vendas_routes.py",
+        "app/vendas/cancelamento_routes.py",
         r"logger\.info\(f\".*Dados recebidos: \{dados\}",
         "sale cancel payload log",
     ),
     (
-        "app/vendas_routes.py",
+        "app/vendas/cancelamento_routes.py",
         r"logger\.info\(f\".*Usu.*rio: \{current_user\.nome\} \(ID: \{current_user\.id\}\)",
         "sale cancel user identity log",
     ),
     (
-        "app/vendas_routes.py",
+        "app/vendas/cancelamento_routes.py",
         r"logger\.info\(f\".*Tenant ID: \{tenant_id\}",
         "sale cancel tenant log",
     ),
