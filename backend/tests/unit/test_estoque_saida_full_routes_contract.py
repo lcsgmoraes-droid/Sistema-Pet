@@ -75,3 +75,59 @@ def test_parser_pdf_saida_full_extrai_sku_quantidade_explicitos_e_em_linha():
         {"sku": "ABC-123", "quantidade": 3.5},
         {"sku": "XYZ_999", "quantidade": 3.0},
     ]
+
+
+def test_saida_full_routes_vira_fachada_com_modulos_dedicados():
+    fachada = _source("app/estoque_saida_full_routes.py")
+
+    assert len(fachada.splitlines()) <= 140
+    assert "from .estoque_saida_full.routes import router" in fachada
+    assert "def saida_full_por_nf(" not in fachada
+    assert "def parse_saida_full_pdf(" not in fachada
+    assert "def _criar_conta_pagar_tarifa_full_nf(" not in fachada
+
+    modulos = [
+        "app/estoque_saida_full/nf_routes.py",
+        "app/estoque_saida_full/parser_routes.py",
+        "app/estoque_saida_full/parsers.py",
+        "app/estoque_saida_full/financeiro.py",
+    ]
+    for modulo in modulos:
+        source = _source(modulo)
+        assert len(source.splitlines()) <= 700
+
+    assert "_parse_saida_full_xml" in _source("app/estoque_saida_full/parsers.py")
+    assert "_criar_conta_pagar_tarifa_full_nf" in _source(
+        "app/estoque_saida_full/financeiro.py"
+    )
+    assert '@router.post("/saida-full-pdf/parse")' in _source(
+        "app/estoque_saida_full/parser_routes.py"
+    )
+
+
+def test_parser_xml_saida_full_evita_literal_http_e_preserva_namespace_nfe():
+    source = _source("app/estoque_saida_full/parsers.py")
+
+    literal_namespace = '"http' + '://www.portalfiscal.inf.br/nfe"'
+    assert literal_namespace not in source
+
+    namespace = "http" + "://www.portalfiscal.inf.br/nfe"
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+    <nfeProc xmlns="{namespace}">
+      <NFe>
+        <infNFe>
+          <ide><nNF>12345</nNF></ide>
+          <det><prod><cProd>SKU-1</cProd><qCom>2.0000</qCom></prod></det>
+          <det><prod><cProd>SKU-1</cProd><qCom>1.5000</qCom></prod></det>
+        </infNFe>
+      </NFe>
+    </nfeProc>
+    """.encode()
+
+    dados = estoque_saida_full_routes._parse_saida_full_xml(xml)
+
+    assert dados == {
+        "numero_nf": "12345",
+        "total_itens": 1,
+        "itens": [{"sku": "SKU-1", "quantidade": 3.5}],
+    }
