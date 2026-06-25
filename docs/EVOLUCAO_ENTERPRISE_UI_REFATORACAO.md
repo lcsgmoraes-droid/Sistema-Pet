@@ -209,9 +209,9 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 136 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 47 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
-- 1 arquivo de aplicacao acima de 1500 linhas, criticidade alta.
+- 135 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 46 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
@@ -324,6 +324,14 @@ Fatia de 2026-06-25: `frontend/src/pages/CentralNFSaida.jsx` separou controller 
 - `frontend/src/pages/centralNFSaida/NFSaidaList.jsx`: filtros aplicados, estados de lista e acoes por NF.
 - `frontend/src/pages/centralNFSaida/NFSaidaDetalhesModal.jsx`: detalhe completo da nota.
 - `frontend/src/pages/centralNFSaida/NFSaidaCancelamentoModal.jsx`: fluxo visual de cancelamento.
+
+Fatia de 2026-06-25: `backend/app/produtos_models.py` virou fachada compativel:
+
+- `backend/app/produtos_models.py`: 1510 -> 63 linhas, reexportando os nomes legados.
+- `backend/app/produtos_catalogo_models.py`: categorias, marcas, departamentos e produto.
+- `backend/app/produtos_estoque_models.py`: imagens, kits, granel, lotes, campanhas de validade, fornecedores, listas de preco, movimentacoes e sync Bling.
+- `backend/app/produtos_compras_models.py`: pedidos de compra, vinculos com NF de entrada, itens, notas de entrada e historico de preco.
+- `backend/app/produtos_lembretes_variacoes_models.py`: lembretes e atributos/variacoes.
 
 Maiores arquivos mapeados em 2026-05-04:
 
