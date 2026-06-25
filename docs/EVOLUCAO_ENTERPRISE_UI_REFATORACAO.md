@@ -210,8 +210,8 @@ Regras para refatorar sem quebrar producao:
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
 - 137 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 49 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
-- 3 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
+- 48 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 2 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
@@ -307,6 +307,13 @@ Fatia de 2026-06-25: `frontend/src/pages/Aba2ConciliacaoRecebimentos.jsx` separo
 
 - `frontend/src/pages/Aba2ConciliacaoRecebimentos.jsx`: 1561 -> 682 linhas, mantendo estado, leitura dos arquivos e chamada da API.
 - `frontend/src/pages/conciliacaoRecebimentos/Aba2ConciliacaoRecebimentosView.jsx`: renderizacao da aba, upload dos 3 arquivos, resultado e modais.
+
+Fatia de 2026-06-25: `frontend/src/components/ModalPagamento.jsx` virou orquestrador fino:
+
+- `frontend/src/components/ModalPagamento.jsx`: 1529 -> 14 linhas.
+- `frontend/src/components/modalPagamento/useModalPagamentoController.js`: estado, efeitos, APIs de finalizacao, NFe, margem e simulacao.
+- `frontend/src/components/modalPagamento/ModalPagamentoView.jsx`: shell do modal, resumo/status, rodape e credito excedente.
+- `frontend/src/components/modalPagamento/ModalPagamentoFormaPanel.jsx`: selecao da forma, valores, cartao, NSU, parcelas e adicionar pagamento.
 
 Maiores arquivos mapeados em 2026-05-04:
 
