@@ -209,8 +209,8 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 129 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 40 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 128 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 39 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
@@ -395,6 +395,18 @@ Fatia de 2026-06-25: `backend/app/estoque_saida_full_routes.py` virou fachada co
 - `backend/app/estoque_saida_full/parsers.py`: extracao de SKU/quantidade em PDF e XML.
 - `backend/app/estoque_saida_full/parser_routes.py`: endpoints de parse de PDF/XML.
 - `backend/app/estoque_saida_full/schemas.py`: contratos Pydantic da baixa FULL por NF.
+
+Fatia de 2026-06-25: `backend/app/routes/app_mobile_funcionario_pdv_routes.py` virou fachada compativel:
+
+- `backend/app/routes/app_mobile_funcionario_pdv_routes.py`: 1374 -> 4 linhas.
+- `backend/app/routes/app_mobile_funcionario_pdv/routes.py`: agregador interno das rotas do PDV mobile funcionario.
+- `backend/app/routes/app_mobile_funcionario_pdv/schemas.py`: contratos Pydantic de produto, cliente, caixa, pagamento, beneficios e venda.
+- `backend/app/routes/app_mobile_funcionario_pdv/produtos.py`: busca por termo/codigo de barras, ranking e serializacao de produtos vendaveis.
+- `backend/app/routes/app_mobile_funcionario_pdv/clientes.py`: busca de pessoas e serializacao de detalhes usados pelo app.
+- `backend/app/routes/app_mobile_funcionario_pdv/caixa.py`: reaproveitamento do caixa ERP aberto.
+- `backend/app/routes/app_mobile_funcionario_pdv/pagamentos.py`: formas ERP, parcelas, bandeira/operadora e validacao de cartao.
+- `backend/app/routes/app_mobile_funcionario_pdv/beneficios.py`: cupons, cashback e beneficios previstos.
+- `backend/app/routes/app_mobile_funcionario_pdv/vendas.py`: salvar venda aberta e finalizar venda pelo fluxo oficial.
 
 Maiores arquivos mapeados em 2026-05-04:
 
