@@ -209,9 +209,9 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 140 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 53 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
-- 7 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
+- 139 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 52 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 6 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
@@ -272,6 +272,16 @@ Fatia de 2026-06-25: `backend/app/bling_sync_routes.py` virou agregador compativ
 - `backend/app/bling_sync/dashboard_routes.py`: health, cobertura, faltantes e criacao local.
 - `backend/app/bling_sync/operational_routes.py`: envio, status, reprocessamento e reconciliacao.
 - `backend/app/bling_sync/webhook_routes.py`: webhook e vinculo em massa por SKU.
+
+Fatia de 2026-06-25: `backend/app/vendas_routes.py` virou agregador compativel:
+
+- `backend/app/vendas_routes.py`: 1655 -> 88 linhas.
+- `backend/app/vendas/crud_routes.py`: listagem, detalhe, criacao e atualizacao de vendas.
+- `backend/app/vendas/entrega_routes.py`: retirada, pronto para retirada e confirmacao de entrega.
+- `backend/app/vendas/finalizacao_routes.py`: finalizacao, comissoes, lembretes e evento de campanha.
+- `backend/app/vendas/cancelamento_routes.py`: cancelamento e exclusao logica com auditoria.
+- `backend/app/vendas/status_routes.py`: reabertura, alteracao de status, comissoes e reversoes.
+- `backend/app/vendas/relatorios_routes.py`: resumo operacional de vendas.
 
 Maiores arquivos mapeados em 2026-05-04:
 
