@@ -210,8 +210,8 @@ Regras para refatorar sem quebrar producao:
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
 - 142 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 56 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
-- 10 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
+- 55 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 9 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
@@ -247,6 +247,13 @@ Fatia de 2026-06-25: `backend/app/integracao_bling_pedido_routes.py` virou facha
 - `backend/app/integracao_bling_pedido_admin_routes.py`: listagem, reconciliacao, consolidacao, confirmacao/cancelamento manual e reprocessamento de pedidos.
 - `backend/app/integracao_bling_pedido_webhook_processor.py`: processamento pesado dos eventos de webhook do Bling.
 - `backend/app/integracao_bling_pedido_payload.py`: helpers de payload e serializacao mantidos da fatia anterior.
+
+Fatia de 2026-06-25: `backend/app/conciliacao_services.py` virou fachada compativel:
+
+- `backend/app/conciliacao_services.py`: 1713 -> 31 linhas.
+- `backend/app/conciliacao_services_importacao.py`: importacao, validacao em cascata, processamento e reversao.
+- `backend/app/conciliacao_services_stone.py`: conciliacao Stone e upload da aba de vendas.
+- `backend/app/conciliacao_services_recebimentos.py`: validacao e amarracao de recebimentos/vendas.
 
 Maiores arquivos mapeados em 2026-05-04:
 
@@ -1124,6 +1131,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-06-24: `backend/app/comissoes_demonstrativo_routes.py` extraiu schema, calculo do demonstrativo, montagem do detalhe, historico de fechamentos e fechamento financeiro para `backend/app/comissoes_demonstrativo_*.py`, mantendo o router e reexports de compatibilidade. O router principal caiu de 1734 para 875 linhas fisicas; na contagem atual de `backend/app` + `frontend/src`, restam 144 arquivos acima de 700 linhas, 58 acima de 1000, 12 acima de 1500 e 0 acima de 2000.
 - 2026-06-24: `backend/app/api/endpoints/rotas_entrega.py` virou agregador das rotas de entrega, com listagem/detalhe, otimizacao, criacao, estado da rota e paradas separados em `backend/app/api/endpoints/rotas_entrega_*_routes.py`. O router principal caiu de 1732 para 86 linhas fisicas e todos os modulos novos ficaram abaixo de 1000 linhas; na contagem atual de `backend/app` + `frontend/src`, restam 143 arquivos acima de 700 linhas, 57 acima de 1000, 11 acima de 1500 e 0 acima de 2000.
 - 2026-06-25: `backend/app/integracao_bling_pedido_routes.py` virou fachada compativel da integracao de pedidos Bling, com rotas operacionais em `backend/app/integracao_bling_pedido_admin_routes.py` e processamento pesado de webhook em `backend/app/integracao_bling_pedido_webhook_processor.py`. O router principal caiu de 1730 para 695 linhas fisicas; na contagem atual de `backend/app` + `frontend/src` sem CSS, restam 142 arquivos acima de 700 linhas, 56 acima de 1000, 10 acima de 1500 e 0 acima de 2000.
+- 2026-06-25: `backend/app/conciliacao_services.py` virou fachada compativel dos servicos de conciliacao, com importacao/processamento em `backend/app/conciliacao_services_importacao.py`, Stone/upload em `backend/app/conciliacao_services_stone.py` e recebimentos/amarracao em `backend/app/conciliacao_services_recebimentos.py`. O service principal caiu de 1713 para 31 linhas fisicas; na contagem atual de `backend/app` + `frontend/src` sem CSS, restam 142 arquivos acima de 700 linhas, 55 acima de 1000, 9 acima de 1500 e 0 acima de 2000.
 
 ### Nao fazer nesta onda
 
