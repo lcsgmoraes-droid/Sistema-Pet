@@ -209,8 +209,8 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 134 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 45 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 133 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 44 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
@@ -342,6 +342,16 @@ Fatia de 2026-06-25: `backend/app/pedidos_compra_routes.py` virou agregador comp
 - `backend/app/pedidos_compra/recebimento_routes.py`: recebimento parcial/total com entrada automatica em estoque.
 - `backend/app/pedidos_compra/exportacao_routes.py`: exportacao Excel/PDF.
 - `backend/app/pedidos_compra/sugestao_routes.py`: endpoint de sugestao inteligente de compra.
+
+Fatia de 2026-06-25: `frontend/src/components/PedidosCompra.jsx` virou shell fino:
+
+- `frontend/src/components/PedidosCompra.jsx`: 1402 -> 10 linhas.
+- `frontend/src/components/compras/usePedidosCompraController.js`: estado, hooks e composicao dos controladores.
+- `frontend/src/components/compras/PedidosCompraView.jsx`: composicao visual de formulario, filtros, tabela e modais.
+- `frontend/src/components/compras/pedidosCompraDataController.js`: listagem, filtros e carregamento inicial.
+- `frontend/src/components/compras/pedidosCompraItemController.js`: produtos do fornecedor, itens do pedido, SKU e totais.
+- `frontend/src/components/compras/pedidosCompraFormularioController.js`: formulario, rascunho e fluxo de sugestao.
+- `frontend/src/components/compras/pedidosCompraOperacoesController.js`: criar/editar, envio, exportacao, status, confronto e recebimento.
 
 Maiores arquivos mapeados em 2026-05-04:
 
