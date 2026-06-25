@@ -209,9 +209,9 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 137 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 48 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
-- 2 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
+- 136 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 47 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 1 arquivo de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
@@ -314,6 +314,16 @@ Fatia de 2026-06-25: `frontend/src/components/ModalPagamento.jsx` virou orquestr
 - `frontend/src/components/modalPagamento/useModalPagamentoController.js`: estado, efeitos, APIs de finalizacao, NFe, margem e simulacao.
 - `frontend/src/components/modalPagamento/ModalPagamentoView.jsx`: shell do modal, resumo/status, rodape e credito excedente.
 - `frontend/src/components/modalPagamento/ModalPagamentoFormaPanel.jsx`: selecao da forma, valores, cartao, NSU, parcelas e adicionar pagamento.
+
+Fatia de 2026-06-25: `frontend/src/pages/CentralNFSaida.jsx` separou controller e paineis:
+
+- `frontend/src/pages/CentralNFSaida.jsx`: 1511 -> 366 linhas, mantendo estado, efeitos, filtros e chamadas de API.
+- `frontend/src/pages/centralNFSaida/CentralNFSaidaView.jsx`: composicao da tela.
+- `frontend/src/pages/centralNFSaida/SefazToolsPanel.jsx`: consulta por chave e rotina automatica SEFAZ.
+- `frontend/src/pages/centralNFSaida/SefazConsultasSessao.jsx`: resultados expansíveis da sessao.
+- `frontend/src/pages/centralNFSaida/NFSaidaList.jsx`: filtros aplicados, estados de lista e acoes por NF.
+- `frontend/src/pages/centralNFSaida/NFSaidaDetalhesModal.jsx`: detalhe completo da nota.
+- `frontend/src/pages/centralNFSaida/NFSaidaCancelamentoModal.jsx`: fluxo visual de cancelamento.
 
 Maiores arquivos mapeados em 2026-05-04:
 
