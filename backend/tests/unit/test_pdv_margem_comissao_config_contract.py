@@ -15,7 +15,7 @@ def test_analise_pagamento_usa_configuracao_real_de_comissao():
 
 
 def test_modal_pagamento_envia_vendedor_para_analise_de_margem():
-    source = (REPO_ROOT / "frontend/src/components/ModalPagamento.jsx").read_text(
+    source = (REPO_ROOT / "frontend/src/components/modalPagamentoUtils.js").read_text(
         encoding="utf-8"
     )
 

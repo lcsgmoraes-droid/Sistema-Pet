@@ -24,16 +24,17 @@ def test_seletores_flutuantes_revelam_lista_de_sugestoes():
 
 
 def test_modal_pagamento_leva_para_justificativa_obrigatoria():
-    fonte = _frontend_source("components/ModalPagamento.jsx")
+    hook = _frontend_source("components/modalPagamento/useModalPagamentoController.js")
+    view = _frontend_source("components/modalPagamento/ModalPagamentoView.jsx")
 
-    assert "modalPagamentoContentRef" in fonte
-    assert "justificativaTextareaRef" in fonte
-    assert "revelarJustificativaObrigatoria" in fonte
-    assert 'data-testid="justificativa-margem-obrigatoria"' in fonte
+    assert "modalPagamentoContentRef" in hook
+    assert "justificativaTextareaRef" in hook
+    assert "revelarJustificativaObrigatoria" in hook
+    assert 'data-testid="justificativa-margem-obrigatoria"' in view
 
 
 def test_modal_pagamento_tem_adicionar_pagamento_no_rodape_quando_forma_selecionada():
-    fonte = _frontend_source("components/ModalPagamento.jsx")
+    fonte = _frontend_source("components/modalPagamento/ModalPagamentoView.jsx")
 
     assert 'data-testid="modal-pagamento-footer-adicionar"' in fonte
     assert "Adicionar Pagamento" in fonte
