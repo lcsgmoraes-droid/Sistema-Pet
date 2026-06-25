@@ -12,9 +12,7 @@ from app.produtos_models import EstoqueMovimentacao
 from .common import _text
 
 
-def _numero_nf_pedido(
-    pedido: PedidoIntegrado | None, fallback_nf_id: str | None = None
-) -> str | None:
+def _numero_nf_pedido(pedido: PedidoIntegrado | None) -> str | None:
     payload_bruto = getattr(pedido, "payload", None)
     payload = payload_bruto if isinstance(payload_bruto, dict) else {}
     pedido_payload = (

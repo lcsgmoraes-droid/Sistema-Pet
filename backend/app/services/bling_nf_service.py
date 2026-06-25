@@ -57,7 +57,7 @@ def desvincular_nf_de_pedido_incorreto(
 
     pedido, itens = _recarregar_pedido_e_itens_para_nf(db, pedido, itens)
     nf_id = _text(nf_id)
-    nf_numero = _text(nf_numero) or _numero_nf_pedido(pedido, nf_id)
+    nf_numero = _text(nf_numero) or _numero_nf_pedido(pedido)
     pedido_bling_id_esperado = _text(pedido_bling_id_esperado)
 
     movimentos = (
@@ -312,7 +312,7 @@ def processar_nf_autorizada(
 ) -> str:
     pedido, itens = _recarregar_pedido_e_itens_para_nf(db, pedido, itens)
     pedido_bling_id = getattr(pedido, "pedido_bling_id", None)
-    nf_numero = _numero_nf_pedido(pedido, nf_id)
+    nf_numero = _numero_nf_pedido(pedido)
     if not nf_numero and _text(nf_id):
         nf_numero = (
             db.query(BlingNotaFiscalCache.numero)

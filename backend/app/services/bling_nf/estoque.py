@@ -15,7 +15,7 @@ from .common import _regex_token_numerico, _text
 def buscar_produto_do_item(db: Session, tenant_id, sku: str):
     if not sku:
         return None
-    sku_normalizado = str(sku or "").strip()
+    sku_normalizado = str(sku).strip()
     sku_lower = sku_normalizado.lower()
 
     return (
@@ -164,13 +164,7 @@ def _normalizar_movimentacoes_legadas_para_nf(
     nf_bling_id: str | None,
 ) -> int:
     movimentos_atualizados = 0
-    observacao_nf = (
-        f"Baixa automatica via NF {nf_numero}"
-        if _text(nf_numero)
-        else f"Baixa automatica via NF Bling #{nf_bling_id}"
-        if _text(nf_bling_id)
-        else None
-    )
+    observacao_nf = _observacao_baixa_nf(nf_numero, nf_bling_id)
 
     for movimentacao in movimentos:
         if _text(nf_numero):
@@ -181,6 +175,21 @@ def _normalizar_movimentacoes_legadas_para_nf(
         movimentos_atualizados += 1
 
     return movimentos_atualizados
+
+
+def _observacao_baixa_nf(
+    nf_numero: str | None,
+    nf_bling_id: str | None,
+) -> str | None:
+    nf_numero = _text(nf_numero)
+    if nf_numero:
+        return f"Baixa automatica via NF {nf_numero}"
+
+    nf_bling_id = _text(nf_bling_id)
+    if nf_bling_id:
+        return f"Baixa automatica via NF Bling #{nf_bling_id}"
+
+    return None
 
 
 def _sincronizar_cache_estoque_virtual(
@@ -198,6 +207,145 @@ def _sincronizar_cache_estoque_virtual(
     produto_kit.estoque_atual = estoque_virtual
     db.add(produto_kit)
     return estoque_virtual
+
+
+def _baixar_estoque_produto_simples(
+    *,
+    estoque_service,
+    db: Session,
+    tenant_id,
+    produto: Produto,
+    quantidade: float,
+    motivo: str,
+    referencia_id: int,
+    referencia_tipo: str,
+    user_id: int,
+    documento: str | None = None,
+    observacao: str | None = None,
+) -> dict:
+    resultado = estoque_service.baixar_estoque(
+        produto_id=produto.id,
+        quantidade=quantidade,
+        motivo=motivo,
+        referencia_id=referencia_id,
+        referencia_tipo=referencia_tipo,
+        user_id=user_id,
+        db=db,
+        tenant_id=tenant_id,
+        documento=documento,
+        observacao=observacao,
+    )
+    return {
+        "movimentos": [
+            {
+                "produto_id": produto.id,
+                "produto_nome": resultado.get("produto_nome"),
+                "quantidade": quantidade,
+            }
+        ],
+        "estoques_virtuais": {},
+    }
+
+
+def _produto_componente_ou_erro(
+    db: Session,
+    *,
+    tenant_id,
+    produto: Produto,
+    componente: ProdutoKitComponente,
+) -> Produto:
+    produto_componente = (
+        db.query(Produto)
+        .filter(
+            Produto.id == componente.produto_componente_id,
+            Produto.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if not produto_componente:
+        raise ValueError(
+            f"Componente ID {componente.produto_componente_id} nao encontrado para '{produto.nome}'."
+        )
+    return produto_componente
+
+
+def _baixar_estoque_produto_composto(
+    *,
+    estoque_service,
+    db: Session,
+    tenant_id,
+    produto: Produto,
+    quantidade: float,
+    motivo: str,
+    referencia_id: int,
+    referencia_tipo: str,
+    user_id: int,
+    documento: str | None = None,
+    observacao: str | None = None,
+) -> dict:
+    componentes = (
+        db.query(ProdutoKitComponente)
+        .filter(ProdutoKitComponente.kit_id == produto.id)
+        .all()
+    )
+    if not componentes:
+        raise ValueError(
+            f"Produto composto '{produto.nome}' nao possui componentes cadastrados."
+        )
+
+    movimentos: list[dict] = []
+    kits_recalculados: dict[int, float] = {}
+
+    for componente in componentes:
+        produto_componente = _produto_componente_ou_erro(
+            db,
+            tenant_id=tenant_id,
+            produto=produto,
+            componente=componente,
+        )
+        quantidade_componente = quantidade * float(componente.quantidade or 0)
+        resultado = estoque_service.baixar_estoque(
+            produto_id=produto_componente.id,
+            quantidade=quantidade_componente,
+            motivo=motivo,
+            referencia_id=referencia_id,
+            referencia_tipo=referencia_tipo,
+            user_id=user_id,
+            db=db,
+            tenant_id=tenant_id,
+            documento=documento,
+            observacao=(
+                observacao or f"Componente do produto composto '{produto.nome}'"
+            ),
+        )
+        movimentos.append(
+            {
+                "produto_id": produto_componente.id,
+                "produto_nome": resultado.get("produto_nome"),
+                "quantidade": quantidade_componente,
+                "kit_origem_id": produto.id,
+                "kit_origem_nome": produto.nome,
+            }
+        )
+
+        for (
+            kit_id,
+            estoque_virtual,
+        ) in KitEstoqueService.recalcular_kits_que_usam_produto(
+            db,
+            produto_componente.id,
+        ).items():
+            kits_recalculados[kit_id] = float(estoque_virtual)
+
+    for kit_id, estoque_virtual in list(kits_recalculados.items()):
+        estoque_sincronizado = _sincronizar_cache_estoque_virtual(db, tenant_id, kit_id)
+        if estoque_sincronizado is not None:
+            kits_recalculados[kit_id] = estoque_sincronizado
+
+    return {
+        "movimentos": movimentos,
+        "estoques_virtuais": kits_recalculados,
+    }
 
 
 def baixar_estoque_item_integrado(
@@ -224,98 +372,30 @@ def baixar_estoque_item_integrado(
         )
 
     if produto_usa_composicao_virtual(produto):
-        componentes = (
-            db.query(ProdutoKitComponente)
-            .filter(ProdutoKitComponente.kit_id == produto.id)
-            .all()
+        return _baixar_estoque_produto_composto(
+            estoque_service=EstoqueService,
+            db=db,
+            tenant_id=tenant_id,
+            produto=produto,
+            quantidade=quantidade,
+            motivo=motivo,
+            referencia_id=referencia_id,
+            referencia_tipo=referencia_tipo,
+            user_id=user_id,
+            documento=documento,
+            observacao=observacao,
         )
-        if not componentes:
-            raise ValueError(
-                f"Produto composto '{produto.nome}' nao possui componentes cadastrados."
-            )
 
-        movimentos: list[dict] = []
-        kits_recalculados: dict[int, float] = {}
-
-        for componente in componentes:
-            produto_componente = (
-                db.query(Produto)
-                .filter(
-                    Produto.id == componente.produto_componente_id,
-                    Produto.tenant_id == tenant_id,
-                )
-                .first()
-            )
-            if not produto_componente:
-                raise ValueError(
-                    f"Componente ID {componente.produto_componente_id} nao encontrado para '{produto.nome}'."
-                )
-
-            quantidade_componente = quantidade * float(componente.quantidade or 0)
-            resultado = EstoqueService.baixar_estoque(
-                produto_id=produto_componente.id,
-                quantidade=quantidade_componente,
-                motivo=motivo,
-                referencia_id=referencia_id,
-                referencia_tipo=referencia_tipo,
-                user_id=user_id,
-                db=db,
-                tenant_id=tenant_id,
-                documento=documento,
-                observacao=(
-                    observacao or f"Componente do produto composto '{produto.nome}'"
-                ),
-            )
-            movimentos.append(
-                {
-                    "produto_id": produto_componente.id,
-                    "produto_nome": resultado.get("produto_nome"),
-                    "quantidade": quantidade_componente,
-                    "kit_origem_id": produto.id,
-                    "kit_origem_nome": produto.nome,
-                }
-            )
-
-            for (
-                kit_id,
-                estoque_virtual,
-            ) in KitEstoqueService.recalcular_kits_que_usam_produto(
-                db,
-                produto_componente.id,
-            ).items():
-                kits_recalculados[kit_id] = float(estoque_virtual)
-
-        for kit_id, estoque_virtual in list(kits_recalculados.items()):
-            estoque_sincronizado = _sincronizar_cache_estoque_virtual(
-                db, tenant_id, kit_id
-            )
-            if estoque_sincronizado is not None:
-                kits_recalculados[kit_id] = estoque_sincronizado
-
-        return {
-            "movimentos": movimentos,
-            "estoques_virtuais": kits_recalculados,
-        }
-
-    resultado = EstoqueService.baixar_estoque(
-        produto_id=produto.id,
+    return _baixar_estoque_produto_simples(
+        estoque_service=EstoqueService,
+        db=db,
+        tenant_id=tenant_id,
+        produto=produto,
         quantidade=quantidade,
         motivo=motivo,
         referencia_id=referencia_id,
         referencia_tipo=referencia_tipo,
         user_id=user_id,
-        db=db,
-        tenant_id=tenant_id,
         documento=documento,
         observacao=observacao,
     )
-    return {
-        "movimentos": [
-            {
-                "produto_id": produto.id,
-                "produto_nome": resultado.get("produto_nome"),
-                "quantidade": quantidade,
-            }
-        ],
-        "estoques_virtuais": {},
-    }

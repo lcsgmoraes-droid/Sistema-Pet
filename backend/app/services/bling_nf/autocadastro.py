@@ -102,75 +102,32 @@ def _montar_produto_local_do_bling(
     )
 
 
-def criar_produto_automatico_do_bling_por_item(
-    db: Session,
-    tenant_id,
-    item_bling: dict | None,
-    sku_preferencial: str | None = None,
-):
-    item_bling = item_bling or {}
-    sku_limpo = _texto(
-        sku_preferencial or item_bling.get("sku") or item_bling.get("codigo")
-    )
-    codigo_barras = _texto(item_bling.get("codigoBarras") or item_bling.get("gtin"))
-
-    if sku_limpo:
-        existente = buscar_produto_do_item(db=db, tenant_id=tenant_id, sku=sku_limpo)
-        if existente:
-            return existente
-
-    if codigo_barras:
+def _buscar_produto_existente_por_chaves(db: Session, tenant_id, *chaves):
+    for chave in chaves:
+        chave_limpa = _texto(chave)
+        if not chave_limpa:
+            continue
         existente = buscar_produto_do_item(
-            db=db, tenant_id=tenant_id, sku=codigo_barras
+            db=db,
+            tenant_id=tenant_id,
+            sku=chave_limpa,
         )
         if existente:
             return existente
+    return None
 
+
+def _usuario_padrao_autocadastro(db: Session, tenant_id, *, origem: str):
     usuario = _obter_usuario_padrao_tenant(db=db, tenant_id=tenant_id)
-    if not usuario:
-        logger.warning(
-            "Produto Bling sem usuario padrao no tenant %s para autocadastro", tenant_id
-        )
-        return None
+    if usuario:
+        return usuario
 
-    chave_base = sku_limpo or codigo_barras or _texto(item_bling.get("id"), "BLING")
-    novo_produto = _montar_produto_local_do_bling(
-        item_bling=item_bling,
-        tenant_id=tenant_id,
-        user_id=usuario.id,
-        sku_padrao=chave_base,
+    logger.warning(
+        "Produto Bling sem usuario padrao no tenant %s para autocadastro (%s)",
+        tenant_id,
+        origem,
     )
-
-    if _codigo_ja_existe_global(db, novo_produto.codigo):
-        codigo_original = novo_produto.codigo
-        novo_produto.codigo = _gerar_codigo_fallback(
-            db=db, sku=chave_base, tenant_id=tenant_id
-        )
-        if not (novo_produto.codigo_barras or "").strip():
-            novo_produto.codigo_barras = chave_base[:20]
-        logger.info(
-            "[AUTO-BLING-NF] Ajuste de codigo por colisao global: '%s' -> '%s'",
-            codigo_original,
-            novo_produto.codigo,
-        )
-
-    try:
-        with db.begin_nested():
-            db.add(novo_produto)
-            db.flush()
-        logger.info("Produto Bling criado automaticamente com id=%s", novo_produto.id)
-        return novo_produto
-    except Exception as e:
-        logger.warning("Falha no autocadastro por item do Bling: %s", e)
-        if sku_limpo:
-            existente = buscar_produto_do_item(
-                db=db, tenant_id=tenant_id, sku=sku_limpo
-            )
-            if existente:
-                return existente
-        if codigo_barras:
-            return buscar_produto_do_item(db=db, tenant_id=tenant_id, sku=codigo_barras)
-        return None
+    return None
 
 
 def _slug_codigo(valor: str) -> str:
@@ -198,56 +155,145 @@ def _gerar_codigo_fallback(db: Session, sku: str, tenant_id) -> str:
     return f"AUTO-{tenant_tag}-{int(datetime.now(timezone.utc).timestamp())}"[:50]
 
 
+def _ajustar_codigo_colidido(
+    db: Session,
+    *,
+    produto: Produto,
+    sku_padrao: str,
+    tenant_id,
+) -> None:
+    if not _codigo_ja_existe_global(db, produto.codigo):
+        return
+
+    codigo_original = produto.codigo
+    produto.codigo = _gerar_codigo_fallback(db=db, sku=sku_padrao, tenant_id=tenant_id)
+    if not (produto.codigo_barras or "").strip():
+        produto.codigo_barras = sku_padrao[:20]
+    logger.info(
+        "[AUTO-BLING-NF] Ajuste de codigo por colisao global: '%s' -> '%s'",
+        codigo_original,
+        produto.codigo,
+    )
+
+
+def _salvar_produto_automatico(
+    db: Session,
+    *,
+    produto: Produto,
+    chaves_fallback: tuple[str | None, ...],
+    mensagem_erro: str,
+):
+    try:
+        with db.begin_nested():
+            db.add(produto)
+            db.flush()
+        logger.info("Produto Bling criado automaticamente com id=%s", produto.id)
+        return produto
+    except Exception as e:
+        logger.warning(mensagem_erro, e)
+        return _buscar_produto_existente_por_chaves(
+            db,
+            produto.tenant_id,
+            *chaves_fallback,
+        )
+
+
+def _preparar_produto_automatico(
+    db: Session,
+    *,
+    tenant_id,
+    item_bling: dict,
+    sku_padrao: str,
+    origem: str,
+) -> Produto | None:
+    usuario = _usuario_padrao_autocadastro(db, tenant_id, origem=origem)
+    if not usuario:
+        return None
+
+    produto = _montar_produto_local_do_bling(
+        item_bling=item_bling,
+        tenant_id=tenant_id,
+        user_id=usuario.id,
+        sku_padrao=sku_padrao,
+    )
+    _ajustar_codigo_colidido(
+        db,
+        produto=produto,
+        sku_padrao=sku_padrao,
+        tenant_id=tenant_id,
+    )
+    return produto
+
+
+def criar_produto_automatico_do_bling_por_item(
+    db: Session,
+    tenant_id,
+    item_bling: dict | None,
+    sku_preferencial: str | None = None,
+):
+    item_bling = item_bling or {}
+    sku_limpo = _texto(
+        sku_preferencial or item_bling.get("sku") or item_bling.get("codigo")
+    )
+    codigo_barras = _texto(item_bling.get("codigoBarras") or item_bling.get("gtin"))
+
+    existente = _buscar_produto_existente_por_chaves(
+        db,
+        tenant_id,
+        sku_limpo,
+        codigo_barras,
+    )
+    if existente:
+        return existente
+
+    chave_base = sku_limpo or codigo_barras or _texto(item_bling.get("id"), "BLING")
+    novo_produto = _preparar_produto_automatico(
+        db,
+        tenant_id=tenant_id,
+        item_bling=item_bling,
+        sku_padrao=chave_base,
+        origem="item_nf",
+    )
+    if not novo_produto:
+        return None
+
+    return _salvar_produto_automatico(
+        db,
+        produto=novo_produto,
+        chaves_fallback=(sku_limpo, codigo_barras),
+        mensagem_erro="Falha no autocadastro por item do Bling: %s",
+    )
+
+
 def criar_produto_automatico_do_bling(db: Session, tenant_id, sku: str):
     sku_limpo = (sku or "").strip()
     if not sku_limpo:
         return None
 
-    existente = buscar_produto_do_item(db=db, tenant_id=tenant_id, sku=sku_limpo)
+    existente = _buscar_produto_existente_por_chaves(db, tenant_id, sku_limpo)
     if existente:
         return existente
 
     item_bling = _buscar_produto_bling_por_sku(sku_limpo)
     if not item_bling:
         logger.warning(
-            f"⚠️ SKU {sku_limpo}: produto não encontrado no Bling para autocadastro"
+            "SKU %s: produto nao encontrado no Bling para autocadastro", sku_limpo
         )
         return None
 
-    usuario = _obter_usuario_padrao_tenant(db=db, tenant_id=tenant_id)
-    if not usuario:
-        logger.warning(
-            f"⚠️ SKU {sku_limpo}: não há usuário no tenant para autocadastro do produto"
-        )
-        return None
-
-    novo_produto = _montar_produto_local_do_bling(
-        item_bling=item_bling,
+    novo_produto = _preparar_produto_automatico(
+        db,
         tenant_id=tenant_id,
-        user_id=usuario.id,
+        item_bling=item_bling,
         sku_padrao=sku_limpo,
+        origem="sku",
     )
+    if not novo_produto:
+        return None
 
-    if _codigo_ja_existe_global(db, novo_produto.codigo):
-        codigo_original = novo_produto.codigo
-        novo_produto.codigo = _gerar_codigo_fallback(
-            db=db, sku=sku_limpo, tenant_id=tenant_id
-        )
-        # Mantém o SKU original indexável para busca e baixa por SKU.
-        if not (novo_produto.codigo_barras or "").strip():
-            novo_produto.codigo_barras = sku_limpo[:20]
-        logger.info(
-            f"[AUTO-BLING-NF] Ajuste de código por colisão global: '{codigo_original}' -> '{novo_produto.codigo}'"
-        )
-
-    try:
-        with db.begin_nested():
-            db.add(novo_produto)
-            db.flush()
-        logger.info(
-            f"✅ SKU {sku_limpo}: produto criado automaticamente com id={novo_produto.id}"
-        )
-        return novo_produto
-    except Exception as e:
-        logger.warning(f"⚠️ SKU {sku_limpo}: falha no autocadastro do produto: {e}")
-        return buscar_produto_do_item(db=db, tenant_id=tenant_id, sku=sku_limpo)
+    return _salvar_produto_automatico(
+        db,
+        produto=novo_produto,
+        chaves_fallback=(sku_limpo,),
+        mensagem_erro=f"SKU {sku_limpo}: falha no autocadastro do produto: %s",
+    )
