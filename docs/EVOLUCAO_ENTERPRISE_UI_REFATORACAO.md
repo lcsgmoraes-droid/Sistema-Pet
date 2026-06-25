@@ -209,8 +209,8 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 127 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 37 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 126 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 36 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
@@ -422,6 +422,13 @@ Fatia de 2026-06-25: `backend/app/pedidos_compra/confronto_routes.py` separou ca
 - `backend/app/pedidos_compra/confronto_calculo.py`: custo final, matching de itens por produto/EAN/codigo e resumo do confronto.
 - `backend/app/pedidos_compra/confronto_exportacao.py`: carga filtrada, CSV, PDF e texto de e-mail ao fornecedor.
 - `backend/app/pedidos_compra/confronto_vinculos.py`: vinculos pedido-NF, legado `nota_entrada_id` e persistencia do resumo.
+
+Fatia de 2026-06-25: `backend/app/routes/ecommerce_webhooks.py` virou fachada dos webhooks de pagamento:
+
+- `backend/app/routes/ecommerce_webhooks.py`: 1338 -> 430 linhas, mantendo os endpoints Pagar.me e Mercado Pago e reexports privados de compatibilidade.
+- `backend/app/routes/ecommerce_webhooks_security.py`: assinatura Pagar.me, tenant do payload/header e dados de idempotencia do evento.
+- `backend/app/routes/ecommerce_webhooks_payment.py`: status de pagamento, busca de pedido por referencia/preferencia e parser de metodo/parcelas.
+- `backend/app/routes/ecommerce_webhooks_sales.py`: integracao do pedido aprovado ao motor de vendas, pos-venda financeiro e evento de campanha.
 
 Maiores arquivos mapeados em 2026-05-04:
 
