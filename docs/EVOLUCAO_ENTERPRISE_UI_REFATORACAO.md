@@ -209,8 +209,8 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 89 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 18 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 88 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 17 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
@@ -436,6 +436,15 @@ Fatia de 2026-06-25: `frontend/src/App.jsx` virou shell fino do app:
 - `frontend/src/app/lazyPages.jsx`: declaracao central das paginas lazy e funcoes de preload.
 - `frontend/src/app/AppRoutes.jsx`: agregador das rotas publicas, Ops e protegidas.
 - `frontend/src/app/routes/*.jsx`: rotas separadas por dominio: publico, Ops, nucleo protegido, veterinario, banho/tosa, produtos/estoque, vendas/marketing, compras/Bling, financeiro, comissoes, cadastros/admin, configuracoes, entregas e IA.
+
+Fatia de 2026-06-25: `frontend/src/pages/LGPDOperacional.jsx` virou fachada fina:
+
+- `frontend/src/pages/LGPDOperacional.jsx`: 1289 -> 3 linhas, mantendo a rota publica existente.
+- `frontend/src/pages/lgpd/useLGPDOperacionalController.js`: estado, efeitos, carregamento, solicitacoes, preferencias, exportacao e anonimizacao.
+- `frontend/src/pages/lgpd/LGPDOperacionalPage.jsx`: composicao da pagina, cabecalho, metricas, paineis e modais.
+- `frontend/src/pages/lgpd/LGPDTitularPanel.jsx` e `LGPDSolicitacoesPanel.jsx`: busca do titular e fila de solicitacoes.
+- `frontend/src/pages/lgpd/LGPDRequestModal.jsx`, `LGPDNewRequestModal.jsx`, `LGPDPrivacyModal.jsx` e `LGPDAnonymizeDialog.jsx`: fluxos operacionais isolados.
+- `frontend/scripts/test-lgpd-operacional-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API e modulos LGPD abaixo de 420 linhas.
 
 Maiores arquivos mapeados em 2026-05-04:
 
