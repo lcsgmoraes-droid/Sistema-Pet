@@ -3,7 +3,9 @@ import { actionButtonClasses } from "../ui/actionStyles";
 import { formatPercent } from "../../utils/formatters";
 import { markdownToPlainText } from "../../utils/safeMarkdown";
 import ChannelBadges from "../ui/ChannelBadges";
+import InfoTooltip from "../ui/InfoTooltip";
 import MoneyCell from "../ui/MoneyCell";
+import { MARGEM_HELP_TEXT } from "../produto/produtosPrecoHelpText";
 
 function calcularMargem(preco, custo) {
   if (!preco || preco <= 0) return 0;
@@ -405,7 +407,10 @@ export function createProdutosColunas() {
       visible: true,
       renderHeader: () => (
         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-          Margem
+          <span className="inline-flex w-full items-center justify-end gap-1">
+            Margem
+            <InfoTooltip label="Ajuda sobre margem" text={MARGEM_HELP_TEXT} />
+          </span>
         </th>
       ),
       renderCell: (produto, props) => {
@@ -515,7 +520,12 @@ export function createProdutosColunas() {
         return (
           <td className="px-4 py-3 text-right">
             <div className="flex items-center gap-1 justify-end">
-              <span className={`text-sm font-semibold ${corMargem}`}>{formatPercent(margem)}</span>
+              <span
+                className={`cursor-help text-sm font-semibold ${corMargem}`}
+                title={MARGEM_HELP_TEXT}
+              >
+                {formatPercent(margem)}
+              </span>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
