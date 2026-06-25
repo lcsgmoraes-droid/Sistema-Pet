@@ -209,8 +209,8 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 132 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 43 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 131 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 42 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
@@ -362,6 +362,18 @@ Fatia de 2026-06-25: `frontend/src/pages/comissoes/ComissoesListagem.jsx` virou 
 - `frontend/src/pages/comissoes/listagem/ComissoesListagemFiltros.jsx`: periodo, autocomplete de funcionario/produto/grupo e filtros de status.
 - `frontend/src/pages/comissoes/listagem/ComissoesListagemTabela.jsx`: selecao, tabela, rodape informativo e total pendente filtrado.
 - `frontend/src/pages/comissoes/listagem/ComissoesListagemFechamentoModal.jsx`: fechamento simples ou com pagamento.
+
+Fatia de 2026-06-25: `frontend/src/pages/ProdutosForm.jsx` virou shell fino:
+
+- `frontend/src/pages/ProdutosForm.jsx`: 1358 -> 8 linhas.
+- `frontend/src/pages/produtos/form/useProdutosFormController.js`: estado, carregamento, salvamento, imagens, fornecedores, lotes e variacoes.
+- `frontend/src/pages/produtos/form/ProdutosFormView.jsx`: composicao da tela, header, abas e modais.
+- `frontend/src/pages/produtos/form/ProdutosFormDadosTab.jsx`: dados cadastrais, precos, canais, estoque, lote e status.
+- `frontend/src/pages/produtos/form/ProdutosFormImagensTab.jsx`: upload, imagem principal e exclusao.
+- `frontend/src/pages/produtos/form/ProdutosFormFornecedoresTab.jsx`: tabela e acoes de fornecedores.
+- `frontend/src/pages/produtos/form/ProdutosFormLotesTab.jsx`: controle FIFO e movimentos de estoque.
+- `frontend/src/pages/produtos/form/ProdutosFormVariacoesTab.jsx`: variacoes do produto pai.
+- `frontend/src/pages/produtos/form/ProdutosFormModals.jsx`: modais de fornecedor e movimento de estoque.
 
 Maiores arquivos mapeados em 2026-05-04:
 
