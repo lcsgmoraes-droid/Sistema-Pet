@@ -818,7 +818,8 @@ export default function EstoqueTransferenciaParceiro() {
       return false;
     }
 
-    const filtrosConsolidados = montarFiltrosHistoricoTransferenciaParams(filtrosHistoricoAplicados);
+    const filtrosConsolidados =
+      montarFiltrosHistoricoTransferenciaParams(filtrosHistoricoAplicados);
     if (filtrosConsolidados.parceiro_id) {
       filtrosConsolidados.parceiro_id = Number(filtrosConsolidados.parceiro_id);
     }
