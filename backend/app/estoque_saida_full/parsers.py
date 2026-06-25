@@ -8,6 +8,7 @@ import xml.etree.ElementTree as ET
 from fastapi import HTTPException
 
 
+NFE_NAMESPACE = "http" + "://www.portalfiscal.inf.br/nfe"
 SKU_ROTULOS_EXPLICITOS = ("SKU", "CODIGO")
 QTD_ROTULOS_EXPLICITOS = ("QTD", "QUANTIDADE")
 
@@ -157,7 +158,8 @@ def _xml_find_text(parent, path_ns: str, path_plain: str, ns: dict) -> Optional[
 
 def _parse_saida_full_xml(xml_bytes: bytes) -> dict:
     root = ET.fromstring(xml_bytes)
-    ns = {"nfe": "http://www.portalfiscal.inf.br/nfe"}
+    # Namespace XML oficial da NF-e; nao e usado para conexao de rede.
+    ns = {"nfe": NFE_NAMESPACE}
 
     inf_nfe = root.find(".//nfe:infNFe", ns)
     if inf_nfe is None:
