@@ -209,8 +209,8 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 130 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 41 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 129 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 40 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
@@ -384,6 +384,17 @@ Fatia de 2026-06-25: `frontend/src/pages/EstoqueFullNF.jsx` virou shell fino:
 - `frontend/src/pages/estoqueFullNF/EstoqueFullNFLancamentoPanel.jsx`: formulario de NF/XML, alerta de estoque, itens e tarifa de envio.
 - `frontend/src/pages/estoqueFullNF/EstoqueFullNFHistoricoPanel.jsx`: historico de baixas e detalhe de itens.
 - `frontend/src/pages/estoqueFullNF/EstoqueFullNFModals.jsx`: conclusao, correcao de canal e vinculo DRE.
+
+Fatia de 2026-06-25: `backend/app/estoque_saida_full_routes.py` virou fachada compativel:
+
+- `backend/app/estoque_saida_full_routes.py`: 1385 -> 140 linhas.
+- `backend/app/estoque_saida_full/routes.py`: agregador interno das rotas de NF e parsers.
+- `backend/app/estoque_saida_full/nf_routes.py`: historico, correcao de canal, validacao e baixa por NF.
+- `backend/app/estoque_saida_full/estoque.py`: resolucao de produto, estoque virtual de kit, baixa de componentes e validacao de saldo.
+- `backend/app/estoque_saida_full/financeiro.py`: classificacao DRE, conta a pagar de tarifa e observacao financeira por canal.
+- `backend/app/estoque_saida_full/parsers.py`: extracao de SKU/quantidade em PDF e XML.
+- `backend/app/estoque_saida_full/parser_routes.py`: endpoints de parse de PDF/XML.
+- `backend/app/estoque_saida_full/schemas.py`: contratos Pydantic da baixa FULL por NF.
 
 Maiores arquivos mapeados em 2026-05-04:
 
