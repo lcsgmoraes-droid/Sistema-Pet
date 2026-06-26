@@ -21,6 +21,10 @@ def test_ops_tenants_frontend_route_nav_and_api_contract():
     page_source = (ROOT / "frontend/src/pages/OpsTenants.jsx").read_text(
         encoding="utf-8"
     )
+    feature_source = "\n".join(
+        file_path.read_text(encoding="utf-8")
+        for file_path in sorted((ROOT / "frontend/src/pages/ops-tenants").glob("*.*"))
+    )
 
     assert "<AppRoutes />" in app_source
     assert "OpsLayout" in app_routes_source
@@ -28,7 +32,8 @@ def test_ops_tenants_frontend_route_nav_and_api_contract():
     assert "OpsTenants" in lazy_pages_source
     assert 'path="tenants"' in ops_routes_source
     assert 'to: "/ops/tenants"' in layout_source
-    assert 'api.get("/admin/tenants"' in page_source
-    assert "catalog-import/preview" in page_source
-    assert "catalog-import/apply" in page_source
-    assert "Importar catalogo base" in page_source
+    assert "OpsTenantsPage" in page_source
+    assert 'api.get("/admin/tenants"' in feature_source
+    assert "catalog-import/preview" in feature_source
+    assert "catalog-import/apply" in feature_source
+    assert "Importar catalogo base" in feature_source
