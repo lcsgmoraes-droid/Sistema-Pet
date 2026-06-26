@@ -18,11 +18,14 @@ def test_backend_relatorio_vendas_accepts_and_filters_by_sales_channel():
 
 
 def test_frontend_sends_channel_filter_to_sales_report_requests():
-    source = read("frontend/src/components/VendasFinanceiro.jsx")
+    controller_source = read("frontend/src/components/VendasFinanceiro.jsx")
+    view_source = read("frontend/src/components/financeiro/VendasFinanceiroView.jsx")
 
-    assert "canal_venda: filtroCanalVenda" in source
-    assert "filtroCanalVenda," in source
-    assert "setFiltroCanalVenda={setFiltroCanalVenda}" in source
+    assert "canal_venda: filtroCanalVenda" in controller_source
+    assert "filtroCanalVenda," in controller_source
+    assert "setFiltroCanalVenda," in controller_source
+    assert "filtroCanalVenda={filtroCanalVenda}" in view_source
+    assert "setFiltroCanalVenda={setFiltroCanalVenda}" in view_source
 
 
 def test_sales_report_header_exposes_channel_filter_and_clears_it():
