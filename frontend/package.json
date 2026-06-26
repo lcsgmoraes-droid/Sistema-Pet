@@ -31,6 +31,7 @@
     "test:produtos-relatorio-refactor": "node scripts/test-produtos-relatorio-refactor.mjs",
     "test:produtos-validade-proxima-refactor": "node scripts/test-produtos-validade-proxima-refactor.mjs",
     "test:calculadora-racao-refactor": "node scripts/test-calculadora-racao-refactor.mjs",
+    "test:lembretes-refactor": "node scripts/test-lembretes-refactor.mjs",
     "test:pdv-preco-manual": "node scripts/test-pdv-preco-manual.mjs",
     "test:pdv-produto-busca": "node scripts/test-pdv-produto-busca.mjs",
     "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",
