@@ -7,6 +7,7 @@ import {
   normalizarTexto,
   pontuarBuscaRacao,
 } from "../calculadoraRacaoUtils";
+import { formatarPrecoPorKg } from "../../utils/racaoPrecoKg";
 
 export default function RacaoSearchInput({
   disabled = false,
@@ -145,6 +146,7 @@ export default function RacaoSearchInput({
                 <div className="racao-option-meta">
                   <span>{formatarPeso(produto.peso_embalagem)}</span>
                   <span>{formatarMoeda(produto.preco_venda)}</span>
+                  {formatarPrecoPorKg(produto) && <span>{formatarPrecoPorKg(produto)}</span>}
                   {produto.classificacao_racao && <span>{produto.classificacao_racao}</span>}
                 </div>
                 {!produto.aptidao.apta && (

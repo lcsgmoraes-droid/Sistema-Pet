@@ -1,3 +1,6 @@
+import { formatMoneyBRL } from "../../utils/formatters";
+import { formatarPrecoPorKg } from "../../utils/racaoPrecoKg";
+
 function MelhorOpcaoExplicacao({ comparativo, item }) {
   if (comparativo.length <= 1) return null;
 
@@ -17,8 +20,8 @@ function MelhorOpcaoExplicacao({ comparativo, item }) {
       <p style={{ margin: "0", fontSize: "13px", color: "#047857", lineHeight: "1.5" }}>
         Apesar de{" "}
         {item.classificacao === "premium" || item.classificacao === "super_premium"
-          ? `ter um preco mais alto (R$ ${item.preco.toFixed(2)})`
-          : `custar R$ ${item.preco.toFixed(2)}`}
+          ? `ter um preco mais alto (${formatMoneyBRL(item.preco)})`
+          : `custar ${formatMoneyBRL(item.preco)}`}
         , esta racao{" "}
         {item.classificacao === "super_premium"
           ? "super premium e muito concentrada em nutrientes"
@@ -33,9 +36,10 @@ function MelhorOpcaoExplicacao({ comparativo, item }) {
             <strong>{comparativo[1].quantidade_diaria_g}g/dia</strong>, resultando em um custo
             diario{" "}
             <strong>
-              R$ {(comparativo[1].custo_por_dia - item.custo_por_dia).toFixed(2)} maior
+              {formatMoneyBRL(comparativo[1].custo_por_dia - item.custo_por_dia)} maior
             </strong>{" "}
-            (R$ {item.custo_por_dia.toFixed(2)} vs R$ {comparativo[1].custo_por_dia.toFixed(2)}).
+            ({formatMoneyBRL(item.custo_por_dia)} vs {formatMoneyBRL(comparativo[1].custo_por_dia)}
+            ).
           </>
         )}
       </p>
@@ -46,6 +50,7 @@ function MelhorOpcaoExplicacao({ comparativo, item }) {
 function ComparativoItem({ comparativo, item, menorCusto, produtoIdSelecionado }) {
   const isSelecionada = produtoIdSelecionado && item.produto_id === parseInt(produtoIdSelecionado);
   const isMelhor = item.custo_por_dia === menorCusto;
+  const precoPorKg = formatarPrecoPorKg(item);
 
   return (
     <div
@@ -80,7 +85,7 @@ function ComparativoItem({ comparativo, item, menorCusto, produtoIdSelecionado }
             </span>
           </div>
         </div>
-        <div className="item-price">R$ {item.preco.toFixed(2)}</div>
+        <div className="item-price">{formatMoneyBRL(item.preco)}</div>
       </div>
 
       <div className="item-stats">
@@ -94,12 +99,18 @@ function ComparativoItem({ comparativo, item, menorCusto, produtoIdSelecionado }
         </div>
         <div className="stat-small highlight">
           <span className="label">Custo/dia</span>
-          <span>R$ {item.custo_por_dia.toFixed(2)}</span>
+          <span>{formatMoneyBRL(item.custo_por_dia)}</span>
         </div>
         <div className="stat-small">
           <span className="label">Custo/mes</span>
-          <span>R$ {item.custo_mensal.toFixed(2)}</span>
+          <span>{formatMoneyBRL(item.custo_mensal)}</span>
         </div>
+        {precoPorKg && (
+          <div className="stat-small">
+            <span className="label">Preco/kg</span>
+            <span>{precoPorKg}</span>
+          </div>
+        )}
       </div>
 
       {isMelhor && <MelhorOpcaoExplicacao comparativo={comparativo} item={item} />}
