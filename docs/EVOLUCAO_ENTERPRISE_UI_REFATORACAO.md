@@ -209,11 +209,20 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26 por contagem fisica `splitlines()`, excluindo testes, migrations, CSS e builds locais:
 
-- 109 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 17 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 108 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 12 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 35 arquivos acima de 700 linhas e 5 acima de 1000 linhas.
+
+Fatia seguinte de 2026-06-26: mais cinco arquivos backend sairam da faixa acima de 1000 linhas com subrouters/schemas dedicados:
+
+- `backend/app/notas_entrada_routes.py`: 1095 -> 156 linhas, com uploads em `backend/app/notas_entrada/upload_routes.py` e consulta/exclusao em `backend/app/notas_entrada/consulta_routes.py`.
+- `backend/app/comissoes_routes.py`: 1049 -> 984 linhas, com schemas e normalizacao de payload em `backend/app/comissoes_schemas.py`.
+- `backend/app/analise_racoes_routes.py`: 1040 -> 857 linhas, com schemas em `backend/app/analise_racoes_schemas.py` e filtros/calculos em `backend/app/analise_racoes_filters.py`.
+- `backend/app/conciliacao_aba1_routes.py`: 1038 -> 761 linhas, com schemas em `backend/app/conciliacao_aba1_schemas.py` e historico/upload/atualizacao de operadora em `backend/app/conciliacao_aba1_operacoes_routes.py`.
+- `backend/app/produtos/relatorios_routes.py`: 1016 -> 491 linhas, com validade proxima em `backend/app/produtos/relatorios_validade_routes.py` e valorizacao de estoque em `backend/app/produtos/relatorios_valorizacao_routes.py`.
+- Contrato dedicado: `backend/tests/unit/test_backend_next_large_files_refactor.py`, garantindo que esses cinco arquivos sigam abaixo de 1000 linhas e que os subrouters extraidos continuem registrados.
 
 Fatia de 2026-06-26: os cinco arquivos backend mapeados acima de 1000 linhas sairam dessa faixa com modulos dedicados:
 

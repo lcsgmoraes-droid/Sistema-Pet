@@ -1,3 +1,4 @@
+# ruff: noqa: F401
 # -*- coding: utf-8 -*-
 """
 Rotas de Análise Avançada de Rações
@@ -21,206 +22,22 @@ from .produtos_models import Produto, Marca, Categoria
 from .opcoes_racao_models import LinhaRacao, PorteAnimal, FasePublico, TipoTratamento
 from .vendas_models import VendaItem, Venda
 
+from .analise_racoes_filters import (
+    _produto_eh_racao_expr,
+    _validar_tenant_e_obter_usuario,
+    aplicar_filtros,
+    calcular_margem,
+    calcular_preco_kg,
+)
+from .analise_racoes_schemas import (
+    AnaliseMargemSegmento,
+    ComparacaoMarca,
+    DashboardResumo,
+    FiltrosAnalise,
+    RankingProduto,
+)
+
 router = APIRouter(prefix="/racoes/analises", tags=["Análises Rações"])
-
-
-def _produto_eh_racao_expr():
-    tipo_normalizado = func.lower(func.coalesce(Produto.tipo, ""))
-    classificacao_normalizada = func.lower(
-        func.coalesce(Produto.classificacao_racao, "")
-    )
-    return or_(
-        tipo_normalizado.in_(["raÃ§Ã£o", "racao"]),
-        and_(
-            classificacao_normalizada != "",
-            classificacao_normalizada.notin_(["nao", "nÃ£o"]),
-        ),
-    )
-
-
-# ============================================================================
-# FUNÇÕES AUXILIARES
-# ============================================================================
-
-
-def _validar_tenant_e_obter_usuario(user_and_tenant):
-    """Desempacota e valida user_and_tenant"""
-    current_user, tenant_id = user_and_tenant
-    return current_user, tenant_id
-
-
-def _produto_eh_racao_expr():
-    return or_(Produto.tipo == "ração", Produto.classificacao_racao == "sim")
-
-
-# ============================================================================
-# SCHEMAS
-# ============================================================================
-
-
-def _produto_eh_racao_expr():
-    tipo_normalizado = func.lower(func.coalesce(Produto.tipo, ""))
-    classificacao_normalizada = func.lower(
-        func.coalesce(Produto.classificacao_racao, "")
-    )
-    return or_(
-        tipo_normalizado.like("ra%"),
-        and_(
-            classificacao_normalizada != "",
-            classificacao_normalizada != "nao",
-        ),
-    )
-
-
-class FiltrosAnalise(BaseModel):
-    """Filtros dinâmicos para análises"""
-
-    especies: Optional[List[str]] = None  # dog, cat, both
-    linhas: Optional[List[int]] = None  # IDs da tabela linhas_racao
-    portes: Optional[List[int]] = None  # IDs da tabela portes_animal
-    fases: Optional[List[int]] = None  # IDs da tabela fases_publico
-    tratamentos: Optional[List[int]] = None  # IDs da tabela tipos_tratamento
-    sabores: Optional[List[str]] = None  # Strings de sabor_proteina
-    pesos: Optional[List[float]] = None  # Valores em kg
-    marca_ids: Optional[List[int]] = None
-    categoria_ids: Optional[List[int]] = None
-    margem_min: Optional[float] = None
-    margem_max: Optional[float] = None
-    preco_min: Optional[float] = None
-    preco_max: Optional[float] = None
-    data_inicio: Optional[str] = None  # Para vendas
-    data_fim: Optional[str] = None
-
-
-class AnaliseMargemSegmento(BaseModel):
-    """Resultado de análise de margem por segmento"""
-
-    segmento: str
-    tipo_segmento: str  # "porte", "fase", "sabor", etc
-    total_produtos: int
-    margem_media: float
-    margem_minima: float
-    margem_maxima: float
-    preco_medio_kg: float
-    preco_minimo_kg: float
-    preco_maximo_kg: float
-    total_vendido: Optional[int] = 0
-    faturamento: Optional[float] = 0.0
-
-
-class ComparacaoMarca(BaseModel):
-    """Comparação de preços entre marcas"""
-
-    marca_id: int
-    marca_nome: str
-    total_produtos: int
-    preco_medio_kg: float
-    margem_media: float
-    produto_mais_barato: Dict[str, Any]
-    produto_mais_caro: Dict[str, Any]
-
-
-class RankingProduto(BaseModel):
-    """Produto no ranking de vendas"""
-
-    produto_id: int
-    nome: str
-    marca: str
-    categoria: str
-    quantidade_vendida: int
-    faturamento: float
-    margem_media: float
-    preco_medio_venda: float
-
-
-class DashboardResumo(BaseModel):
-    """Resumo geral do dashboard"""
-
-    total_racoes: int
-    total_classificadas: int
-    percentual_classificadas: float
-    marcas_cadastradas: int
-    faturamento_periodo: float
-    margem_media_geral: float
-    produto_mais_vendido: Optional[Dict[str, Any]] = None
-    segmento_mais_rentavel: Optional[Dict[str, Any]] = None
-
-
-# ============================================================================
-# FUNÇÕES AUXILIARES
-# ============================================================================
-
-
-def aplicar_filtros(query, filtros: FiltrosAnalise):
-    """Aplica filtros usando campos FK para tabelas dinâmicas"""
-
-    if filtros.especies:
-        # especies_indicadas é String ('dog', 'cat', 'both')
-        query = query.filter(Produto.especies_indicadas.in_(filtros.especies))
-
-    if filtros.linhas:
-        # linha_racao_id é FK para tabela linhas_racao
-        query = query.filter(Produto.linha_racao_id.in_(filtros.linhas))
-
-    if filtros.portes:
-        # porte_animal_id é FK para tabela portes_animal
-        query = query.filter(Produto.porte_animal_id.in_(filtros.portes))
-
-    if filtros.fases:
-        # fase_publico_id é FK para tabela fases_publico
-        query = query.filter(Produto.fase_publico_id.in_(filtros.fases))
-
-    if filtros.tratamentos:
-        # tipo_tratamento_id é FK para tabela tipos_tratamento
-        query = query.filter(Produto.tipo_tratamento_id.in_(filtros.tratamentos))
-
-    if filtros.sabores:
-        query = query.filter(Produto.sabor_proteina.in_(filtros.sabores))
-
-    if filtros.pesos:
-        query = query.filter(Produto.peso_embalagem.in_(filtros.pesos))
-
-    if filtros.marca_ids:
-        query = query.filter(Produto.marca_id.in_(filtros.marca_ids))
-
-    if filtros.categoria_ids:
-        query = query.filter(Produto.categoria_id.in_(filtros.categoria_ids))
-
-    # Filtros de margem
-    if filtros.margem_min is not None:
-        query = query.filter(
-            ((Produto.preco_venda - Produto.preco_custo) / Produto.preco_venda * 100)
-            >= filtros.margem_min
-        )
-
-    if filtros.margem_max is not None:
-        query = query.filter(
-            ((Produto.preco_venda - Produto.preco_custo) / Produto.preco_venda * 100)
-            <= filtros.margem_max
-        )
-
-    # Filtros de preço
-    if filtros.preco_min:
-        query = query.filter(Produto.preco_venda >= filtros.preco_min)
-
-    if filtros.preco_max:
-        query = query.filter(Produto.preco_venda <= filtros.preco_max)
-
-    return query
-
-
-def calcular_margem(preco_venda, preco_custo) -> float:
-    """Calcula margem percentual"""
-    if not preco_venda or preco_venda == 0:
-        return 0.0
-    return float((preco_venda - preco_custo) / preco_venda * 100)
-
-
-def calcular_preco_kg(preco_venda, peso_embalagem) -> float:
-    """Calcula preço por kg"""
-    if not peso_embalagem or peso_embalagem == 0:
-        return float(preco_venda)
-    return float(preco_venda / peso_embalagem)
 
 
 # ============================================================================
