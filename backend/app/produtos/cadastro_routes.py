@@ -246,8 +246,8 @@ def obter_produto(
     # PROCESSAR PRODUTOS DO TIPO KIT ou VARIACAO-KIT
     # ========================================
     if produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit:
-        from .services.kit_estoque_service import KitEstoqueService
-        from .services.kit_custo_service import KitCustoService
+        from app.services.kit_estoque_service import KitEstoqueService
+        from app.services.kit_custo_service import KitCustoService
 
         # Buscar composiÃ§Ã£o do KIT
         composicao = KitEstoqueService.obter_detalhes_composicao(
@@ -471,7 +471,7 @@ def atualizar_produto(
     # ATUALIZAR COMPOSIÃ‡ÃƒO DO KIT (se enviado)
     # ========================================
     if composicao_kit is not None and produto_sera_composto:
-        from .services.kit_estoque_service import KitEstoqueService
+        from app.services.kit_estoque_service import KitEstoqueService
 
         # âš ï¸ VALIDAÃ‡ÃƒO OBRIGATÃ“RIA: KIT deve ter pelo menos 1 componente
         if len(composicao_kit) == 0:
@@ -533,7 +533,7 @@ def atualizar_produto(
     produto.updated_at = datetime.utcnow()
 
     try:
-        from .services.kit_custo_service import KitCustoService
+        from app.services.kit_custo_service import KitCustoService
 
         db.flush()
 
@@ -547,7 +547,7 @@ def atualizar_produto(
             produto.tipo_produto in ("KIT", "VARIACAO")
             and produto.tipo_kit == "VIRTUAL"
         ):
-            from .services.kit_estoque_service import KitEstoqueService
+            from app.services.kit_estoque_service import KitEstoqueService
 
             produto.estoque_atual = float(
                 KitEstoqueService.calcular_estoque_virtual_kit(

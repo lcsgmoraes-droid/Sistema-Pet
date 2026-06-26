@@ -5,6 +5,8 @@ Testes unitários da regra de custo automático para produtos compostos.
 from decimal import Decimal
 from types import SimpleNamespace
 
+from app.produtos import cadastro_routes
+from app.produtos.schemas import ProdutoUpdate
 from app import dre_plano_contas_models  # noqa: F401
 from app import financeiro_models  # noqa: F401
 from app.ia import aba7_extrato_models  # noqa: F401
@@ -201,3 +203,43 @@ def test_recalcular_kits_que_usam_produto_atualiza_dependentes(monkeypatch):
     resultado = KitCustoService.recalcular_kits_que_usam_produto(db, 5)
 
     assert resultado == {20: 14}
+
+
+def test_atualizar_produto_com_preco_custo_usa_servicos_globais_de_kit(monkeypatch):
+    produto = SimpleNamespace(
+        id=13995,
+        tenant_id="tenant-teste",
+        codigo="SKU-001",
+        codigo_barras=None,
+        is_parent=False,
+        tipo_produto="SIMPLES",
+        tipo_kit=None,
+        e_granel=False,
+        nome="Racao Teste",
+        ativo=True,
+        situacao=True,
+        anunciar_ecommerce=True,
+        anunciar_app=True,
+        updated_at=None,
+    )
+    db = FakeDB(responses={(Produto, "first"): [produto]})
+
+    monkeypatch.setattr(
+        "app.services.kit_custo_service.KitCustoService.produto_usa_custo_por_componentes",
+        lambda produto: False,
+    )
+    monkeypatch.setattr(
+        "app.services.kit_custo_service.KitCustoService.recalcular_kits_que_usam_produto",
+        lambda db, produto_id: {},
+    )
+    monkeypatch.setattr(cadastro_routes, "obter_produto", lambda produto_id, db, user: produto)
+
+    resultado = cadastro_routes.atualizar_produto.__wrapped__(
+        13995,
+        ProdutoUpdate(preco_custo=42.9),
+        db=db,
+        user_and_tenant=(SimpleNamespace(id=2), "tenant-teste"),
+    )
+
+    assert resultado.preco_custo == 42.9
+    assert db.commit_count == 1
