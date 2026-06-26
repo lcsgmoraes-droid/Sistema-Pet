@@ -37,6 +37,7 @@
     "test:frontend-zero-large-files-refactor": "node scripts/test-frontend-zero-large-files-refactor.mjs",
     "test:large-files-700-batch-refactor": "node scripts/test-large-files-700-batch-refactor.mjs",
     "test:large-files-700-batch-2-refactor": "node scripts/test-large-files-700-batch-2-refactor.mjs",
+    "test:large-files-700-batch-3-refactor": "node scripts/test-large-files-700-batch-3-refactor.mjs",
     "test:pdv-preco-manual": "node scripts/test-pdv-preco-manual.mjs",
     "test:pdv-produto-busca": "node scripts/test-pdv-produto-busca.mjs",
     "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",

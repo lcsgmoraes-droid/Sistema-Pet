@@ -207,14 +207,22 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
-Inventario atualizado em 2026-06-26 por contagem fisica `splitlines()`, excluindo testes, migrations, CSS e builds locais:
+Inventario atualizado em 2026-06-26 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
 
-- 60 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 96 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 41 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 19 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 71 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 25 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+
+Fatia frontend 700 batch 3 de 2026-06-26: quatro telas/componentes grandes sairam da faixa acima de 700 linhas com extracoes maiores de secoes e paineis visuais:
+
+- `frontend/src/pages/comissoes/RelatoriosComissoes.jsx`: 826 -> 328 linhas, com secoes de relatorio em `frontend/src/pages/comissoes/relatorios/RelatoriosComissoesSections.jsx`.
+- `frontend/src/components/ModuloBloqueado.jsx`: 821 -> 422 linhas, com previews animados em `frontend/src/components/moduloBloqueado/ModuloBloqueadoPreviews.jsx`.
+- `frontend/src/components/caixa/ModalFecharCaixaContent.jsx`: 818 -> 373 linhas, com auxiliar de contagem, vendas por forma e dicas de diferenca em `frontend/src/components/caixa/ModalFecharCaixaPanels.jsx`.
+- `frontend/src/components/SugestoesInteligentesRacoes.jsx`: 812 -> 369 linhas, com paineis de resumo, duplicatas, padronizacao e gaps em `frontend/src/components/racoes/SugestoesInteligentesRacoesPanels.jsx`.
+- Contrato dedicado: `frontend/scripts/test-large-files-700-batch-3-refactor.mjs`, garantindo que os alvos e modulos extraidos sigam abaixo de 700 linhas.
 
 Fatia frontend 700 batch 2 de 2026-06-26: quatro telas/componentes grandes sairam da faixa acima de 700 linhas com extracoes de blocos visuais independentes:
 
