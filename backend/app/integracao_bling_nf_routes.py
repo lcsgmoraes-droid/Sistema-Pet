@@ -7,12 +7,35 @@ from datetime import datetime, timezone, timedelta
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
-from app.pedido_integrado_models import PedidoIntegrado
 from app.pedido_integrado_item_models import PedidoIntegradoItem
+from app.integracao_bling_nf_helpers import (
+    _atualizar_cache_nota_webhook,
+    _consolidar_ultima_nf,
+    _dict,
+    _executar_autocadastro_skus,
+    _nf_id_valido,
+    _nf_webhook_autorizada,
+    _nf_webhook_cancelada,
+    _normalizar_resumo_nf,
+    _primeiro_preenchido,
+    _query_itens_sem_produto,
+    _serializar_itens_sem_produto,
+    _status_nota_webhook,
+    _texto,
+)
+from app.integracao_bling_nf_pedidos import (
+    _consultar_relacao_nf_bling,
+    _extrair_numero_pedido_loja_nf,
+    _gerar_provisao_simples_se_aplicavel,
+    _localizar_pedido_local_por_numero_bling,
+    _localizar_pedido_local_por_numero_loja,
+    _loja_id_nf_payload,
+    _registrar_nf_no_pedido,
+    _remover_nf_do_pedido,
+)
 from app.services.bling_nf_service import (
     processar_nf_autorizada,
     processar_nf_cancelada,
-    criar_produto_automatico_do_bling,
     AUTO_CADASTRO_BING_TAG,
     _nf_cache_pertence_a_outro_pedido,
 )
@@ -23,7 +46,6 @@ from app.services.bling_flow_monitor_service import (
     resolver_incidentes_relacionados,
 )
 from app.services.pedido_integrado_consolidation_service import (
-    localizar_pedido_canonico_por_numero_loja,
     localizar_pedido_por_bling_id,
 )
 from app.tenancy.context import set_current_tenant
@@ -60,33 +82,24 @@ router = APIRouter(prefix="/integracoes/bling", tags=["Integração Bling - NF"]
 _NF_SITUACAO_AUTORIZADA = {2, 5, 9}
 _NF_SITUACAO_CANCELADA = {4}
 
-
-from app.integracao_bling_nf_helpers import (
-    _atualizar_cache_nota_webhook,
-    _consolidar_ultima_nf,
-    _dict,
-    _executar_autocadastro_skus,
-    _modelo_nota_bling,
-    _nf_id_valido,
-    _nf_webhook_autorizada,
-    _nf_webhook_cancelada,
-    _normalizar_resumo_nf,
-    _primeiro_preenchido,
-    _query_itens_sem_produto,
-    _serializar_itens_sem_produto,
-    _status_nota_webhook,
-    _texto,
-)
-from app.integracao_bling_nf_pedidos import (
-    _consultar_relacao_nf_bling,
-    _extrair_numero_pedido_loja_nf,
-    _gerar_provisao_simples_se_aplicavel,
-    _localizar_pedido_local_por_numero_bling,
-    _localizar_pedido_local_por_numero_loja,
-    _loja_id_nf_payload,
-    _registrar_nf_no_pedido,
-    _remover_nf_do_pedido,
-)
+__all__ = [
+    "_consolidar_ultima_nf",
+    "_dict",
+    "_consultar_relacao_nf_bling",
+    "_extrair_numero_pedido_loja_nf",
+    "_localizar_pedido_local_por_numero_bling",
+    "_localizar_pedido_local_por_numero_loja",
+    "_loja_id_nf_payload",
+    "_nf_id_valido",
+    "_nf_webhook_autorizada",
+    "_nf_webhook_cancelada",
+    "_normalizar_resumo_nf",
+    "_primeiro_preenchido",
+    "_registrar_nf_no_pedido",
+    "_remover_nf_do_pedido",
+    "_texto",
+    "router",
+]
 
 
 @router.post("/nf")

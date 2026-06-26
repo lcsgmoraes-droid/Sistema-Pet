@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 from app.pedido_integrado_models import PedidoIntegrado
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.services.bling_nf_service import (
-    AUTO_CADASTRO_BING_TAG,
     criar_produto_automatico_do_bling,
 )
 from app.services.nfe_cache_service import upsert_nota_cache

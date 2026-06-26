@@ -11,9 +11,9 @@ PRINCÍPIOS (RISCOS_E_MITIGACOES_CONCILIACAO.md):
 - ✅ Sempre permitir reversão
 """
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query, Form
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
 from fastapi.responses import JSONResponse
-from typing import Optional, List
+from typing import Optional
 from datetime import date
 from pydantic import BaseModel, Field
 

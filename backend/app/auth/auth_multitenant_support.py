@@ -5,7 +5,6 @@ import os
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote
 
 from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session

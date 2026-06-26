@@ -14,6 +14,15 @@ import json
 from pathlib import Path
 from dotenv import dotenv_values
 from app.utils.logger import logger
+from app.bling_integration_fiscal import (
+    _limpar_texto_fiscal,
+    _ncm_basico_aceitavel,
+    _ncm_normalizado,
+    _resolver_fiscal_item_nfe,
+    _sku_produto,
+    aplicar_correcoes_fiscais_venda,
+    prevalidar_fiscal_venda,
+)
 
 # Configurações da API Bling
 BLING_API_BASE_URL = "https://api.bling.com.br/Api/v3"
@@ -25,6 +34,14 @@ TOKEN_CONTROL_FILE = Path("bling_token_control.json")
 _BLING_RATE_LOCK = threading.Lock()
 _BLING_LAST_REQUEST_AT = 0.0
 _BLING_MIN_INTERVAL_SECONDS = 0.42
+
+__all__ = [
+    "BlingAPI",
+    "_montar_url_bling",
+    "aplicar_correcoes_fiscais_venda",
+    "emitir_nfe_venda",
+    "prevalidar_fiscal_venda",
+]
 
 ENV_PATHS = [
     Path("/opt/petshop/.env"),
@@ -67,19 +84,6 @@ def _load_bling_runtime_config() -> Dict[str, str]:
         "enable_jwt": pick("BLING_ENABLE_JWT", "1"),
         "ambiente": pick("BLING_NFE_AMBIENTE", "rascunho"),
     }
-
-
-
-from app.bling_integration_fiscal import (
-    _limpar_texto_fiscal,
-    _ncm_basico_aceitavel,
-    _ncm_normalizado,
-    _resolver_fiscal_item_nfe,
-    _sku_produto,
-    aplicar_correcoes_fiscais_venda,
-    prevalidar_fiscal_venda,
-)
-
 
 def _aguardar_slot_bling() -> None:
     global _BLING_LAST_REQUEST_AT

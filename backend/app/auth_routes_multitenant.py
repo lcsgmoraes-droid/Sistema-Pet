@@ -3,26 +3,21 @@ Rotas de Autenticação Multi-Tenant
 """
 
 import logging
-import hashlib
 import os
-import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.security.jwt_compat import JWTError, jwt
-from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.models import User, Tenant, Role, Permission, RolePermission, UserTenant
+from app.auth import create_access_token as create_access_token  # noqa: F401
 from app.auth import (
     verify_password,
-    create_access_token,
-    create_refresh_token,
     get_current_user,
     hash_password,
 )
@@ -31,7 +26,35 @@ from app.config import JWT_SECRET_KEY as SECRET_KEY
 from app.auth.core import (
     ALGORITHM,
     ACCESS_TOKEN_EXPIRE_DAYS,
-    ACCESS_TOKEN_EXPIRE_SECONDS,
+)
+from app.auth.auth_multitenant_schemas import (
+    ForgotPasswordRequest,
+    LoginRequest,
+    LoginResponse,
+    RefreshTokenRequest,
+    RefreshTokenResponse,
+    RegisterRequest,
+    ResendVerificationRequest,
+    ResetPasswordRequest,
+    SelectTenantRequest,
+    SelectTenantResponse,
+    VerifyEmailRequest,
+)
+from app.auth.auth_multitenant_support import (
+    _auth_payload,
+    _build_email_verification_email,
+    _build_password_reset_email,
+    _create_token_pair,
+    _hash_token,
+    _is_token_expired,
+    _issue_email_verification_token,
+    _issue_password_reset_tokens,
+    _mark_user_consent,
+    _now_utc,
+    _password_reset_token_matches,
+    _resolve_frontend_base_url,
+    _session_expiry_utc,
+    _validate_refresh_tenant,
 )
 from app.session_manager import (
     create_session,
@@ -160,37 +183,6 @@ def grant_all_permissions_to_role(
 # =============================================================================
 # REQUEST/RESPONSE MODELS
 # =============================================================================
-
-
-from app.auth.auth_multitenant_schemas import (
-    ForgotPasswordRequest,
-    LoginRequest,
-    LoginResponse,
-    RefreshTokenRequest,
-    RefreshTokenResponse,
-    RegisterRequest,
-    ResendVerificationRequest,
-    ResetPasswordRequest,
-    SelectTenantRequest,
-    SelectTenantResponse,
-    VerifyEmailRequest,
-)
-from app.auth.auth_multitenant_support import (
-    _auth_payload,
-    _build_email_verification_email,
-    _build_password_reset_email,
-    _create_token_pair,
-    _hash_token,
-    _is_token_expired,
-    _issue_email_verification_token,
-    _issue_password_reset_tokens,
-    _mark_user_consent,
-    _now_utc,
-    _password_reset_token_matches,
-    _resolve_frontend_base_url,
-    _session_expiry_utc,
-    _validate_refresh_tenant,
-)
 
 
 def _send_email_verification(user: User, request: Request) -> bool:
