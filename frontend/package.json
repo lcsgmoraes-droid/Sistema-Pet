@@ -25,6 +25,7 @@
     "test:lgpd-operacional-refactor": "node scripts/test-lgpd-operacional-refactor.mjs",
     "test:ponto-equilibrio-refactor": "node scripts/test-ponto-equilibrio-refactor.mjs",
     "test:comissoes-refactor": "node scripts/test-comissoes-refactor.mjs",
+    "test:categorias-financeiras-refactor": "node scripts/test-categorias-financeiras-refactor.mjs",
     "test:pdv-preco-manual": "node scripts/test-pdv-preco-manual.mjs",
     "test:pdv-produto-busca": "node scripts/test-pdv-produto-busca.mjs",
     "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",

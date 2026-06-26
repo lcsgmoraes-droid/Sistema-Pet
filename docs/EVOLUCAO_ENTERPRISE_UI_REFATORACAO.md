@@ -209,10 +209,11 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26, excluindo testes, migrations, CSS e builds locais:
 
-- 86 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 15 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 85 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 14 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
+- Recorte GUI em `frontend/src`: 45 arquivos acima de 700 linhas e 14 acima de 1000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
 
@@ -464,6 +465,16 @@ Fatia de 2026-06-26: `frontend/src/pages/Comissoes.jsx` virou fachada fina:
 - `frontend/src/pages/comissoes/ComissaoProductTree.jsx`, `ComissaoSelectedItemPanel.jsx`, `ComissaoConfiguredItems.jsx` e `ComissaoPendingConfigurations.jsx`: blocos principais isolados da configuracao.
 - `frontend/src/pages/comissoes/comissoesConstants.js`, `comissoesUtils.js`, `ComissoesPageHeader.jsx`, `ComissoesList.jsx`, `ComissaoParceiroFields.jsx`, `ComissaoRulesPanel.jsx` e `ComissaoModalFooter.jsx`: constantes, helpers e pecas menores reutilizadas pela tela.
 - `frontend/scripts/test-comissoes-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, rota preservada e modulos abaixo de 420 linhas.
+
+Fatia de 2026-06-26: `frontend/src/pages/CategoriasFinanceiras.jsx` virou fachada fina:
+
+- `frontend/src/pages/CategoriasFinanceiras.jsx`: 1146 -> 3 linhas, mantendo a rota publica em `cadastros/categorias-financeiras`.
+- `frontend/src/pages/categorias-financeiras/useCategoriasFinanceirasController.js`: estado, filtros, carregamento de categorias financeiras, categorias DRE e subcategorias DRE.
+- `frontend/src/pages/categorias-financeiras/categoriasFinanceirasPersistence.js`: salvamento, exclusao, classificacao rapida e chamadas para `/categorias-financeiras`, `/dre/categorias` e `/dre/subcategorias`.
+- `frontend/src/pages/categorias-financeiras/CategoriasFinanceirasPage.jsx`, `CategoriasFinanceirasList.jsx`, `CategoriasFinanceirasRow.jsx` e `CategoriasFinanceirasExpandedPanel.jsx`: composicao, lista em cascata, linha principal e painel expandido.
+- `frontend/src/pages/categorias-financeiras/CategoriaFinanceiraModal.jsx`, `CategoriaFinanceiraFormFields.jsx`, `CategoriaFinanceiraSubcategoriasFields.jsx` e `SubcategoriaDREModal.jsx`: formularios e modais isolados.
+- `frontend/src/pages/categorias-financeiras/categoriasFinanceirasConstants.js`, `categoriasFinanceirasUtils.js`, `CategoriasFinanceirasHeader.jsx` e `CategoriasFinanceirasFilters.jsx`: constantes, normalizadores, cabecalho e filtros reutilizados pela tela.
+- `frontend/scripts/test-categorias-financeiras-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, rota preservada e modulos abaixo de 420 linhas.
 
 Maiores arquivos mapeados em 2026-05-04:
 
