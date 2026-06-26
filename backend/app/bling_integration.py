@@ -85,6 +85,7 @@ def _load_bling_runtime_config() -> Dict[str, str]:
         "ambiente": pick("BLING_NFE_AMBIENTE", "rascunho"),
     }
 
+
 def _aguardar_slot_bling() -> None:
     global _BLING_LAST_REQUEST_AT
 

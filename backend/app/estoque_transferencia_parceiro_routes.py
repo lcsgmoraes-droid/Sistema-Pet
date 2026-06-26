@@ -51,7 +51,9 @@ from .estoque.transferencia_parceiro_support import (
     _restaurar_lotes_consumidos_transferencia,
     _texto_limpo,
 )
-from .estoque.transferencia_parceiro_baixa_routes import router as transferencia_parceiro_baixa_router
+from .estoque.transferencia_parceiro_baixa_routes import (
+    router as transferencia_parceiro_baixa_router,
+)
 from .estoque.service import EstoqueService
 from .financeiro_models import ContaReceber
 from .models import Cliente

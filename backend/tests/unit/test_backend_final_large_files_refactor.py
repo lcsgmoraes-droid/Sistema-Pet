@@ -50,7 +50,11 @@ def test_modulos_extraidos_existem_para_ultimos_arquivos_grandes():
 
 
 def test_imports_publicos_antigos_continuam_apontando_para_modulos_novos():
-    from app import auth_routes_multitenant, bling_integration, integracao_bling_nf_routes
+    from app import (
+        auth_routes_multitenant,
+        bling_integration,
+        integracao_bling_nf_routes,
+    )
     from app.auth import auth_multitenant_schemas
     from app import bling_integration_fiscal, integracao_bling_nf_helpers
     from app import integracao_bling_nf_pedidos
@@ -61,8 +65,7 @@ def test_imports_publicos_antigos_continuam_apontando_para_modulos_novos():
         is auth_multitenant_schemas.RegisterRequest
     )
     assert (
-        auth_routes_multitenant.LoginResponse
-        is auth_multitenant_schemas.LoginResponse
+        auth_routes_multitenant.LoginResponse is auth_multitenant_schemas.LoginResponse
     )
     assert (
         bling_integration.prevalidar_fiscal_venda
@@ -89,15 +92,16 @@ def test_imports_publicos_antigos_continuam_apontando_para_modulos_novos():
 def test_router_principal_de_conciliacao_inclui_abas_extraidas():
     source = _source("app/conciliacao_routes.py")
 
-    assert "from .conciliacao_abas_routes import router as conciliacao_abas_router" in source
+    assert (
+        "from .conciliacao_abas_routes import router as conciliacao_abas_router"
+        in source
+    )
     assert "router.include_router(conciliacao_abas_router)" in source
 
 
 def test_router_principal_de_transferencia_inclui_baixas_extraidas():
     source = _source("app/estoque_transferencia_parceiro_routes.py")
 
-    assert (
-        "from .estoque.transferencia_parceiro_baixa_routes import "
-        "router as transferencia_parceiro_baixa_router"
-    ) in source
+    assert ".estoque.transferencia_parceiro_baixa_routes" in source
+    assert "router as transferencia_parceiro_baixa_router" in source
     assert "router.include_router(transferencia_parceiro_baixa_router)" in source

@@ -194,7 +194,6 @@ def _build_email_verification_email(
     return subject, html_body, text_body
 
 
-
 def _is_token_expired(expires_at: datetime | None) -> bool:
     if not expires_at:
         return True
