@@ -209,12 +209,20 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
 
-- 96 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 92 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 - Recorte backend em `backend/app`: 71 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 25 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 21 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+
+Fatia frontend 700 batch 4 de 2026-06-26: quatro telas/componentes grandes sairam da faixa acima de 700 linhas com extracoes de modais e views visuais:
+
+- `frontend/src/pages/ConciliacaoBancaria.jsx`: 859 -> 610 linhas, com modais de classificacao/regras em `frontend/src/pages/conciliacaoBancaria/ConciliacaoBancariaModals.jsx`.
+- `frontend/src/components/DRE.jsx`: 836 -> 379 linhas, com composicao visual em `frontend/src/components/dre/DREView.jsx`.
+- `frontend/src/components/ModalNovaContaReceber.jsx`: 821 -> 320 linhas, com formulario e modal de categoria em `frontend/src/components/contasReceber/ModalNovaContaReceberContent.jsx`.
+- `frontend/src/components/FormasPagamento.jsx`: 819 -> 278 linhas, com tabela e modal em `frontend/src/components/formasPagamento/FormasPagamentoView.jsx`.
+- Contrato dedicado: `frontend/scripts/test-large-files-700-batch-4-refactor.mjs`, garantindo que os alvos e modulos extraidos sigam abaixo de 700 linhas.
 
 Fatia frontend 700 batch 3 de 2026-06-26: quatro telas/componentes grandes sairam da faixa acima de 700 linhas com extracoes maiores de secoes e paineis visuais:
 
