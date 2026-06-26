@@ -207,10 +207,10 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
-Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
+Inventario atualizado em 2026-06-26, excluindo testes, migrations, CSS e builds locais:
 
-- 87 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 16 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 86 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 15 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
@@ -454,6 +454,16 @@ Fatia de 2026-06-25: `frontend/src/pages/PontoEquilibrio.jsx` virou fachada fina
 - `frontend/src/pages/ponto-equilibrio/PontoEquilibrioResumoTab.jsx`, `DetalhamentoMargemPanel.jsx`, `SimuladorImpactoPanel.jsx` e `AnaliseCustosPanel.jsx`: blocos principais isolados.
 - `frontend/src/pages/ponto-equilibrio/pontoEquilibrioConstants.js`, `pontoEquilibrioUtils.js`, `PontoEquilibrioTooltips.jsx` e `PontoEquilibrioMetricCard.jsx`: constantes, helpers e pecas reutilizadas pela tela.
 - `frontend/scripts/test-ponto-equilibrio-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API e modulos abaixo de 420 linhas.
+
+Fatia de 2026-06-26: `frontend/src/pages/Comissoes.jsx` virou fachada fina:
+
+- `frontend/src/pages/Comissoes.jsx`: 1258 -> 3 linhas, mantendo a rota publica em `comissoes`.
+- `frontend/src/pages/comissoes/useComissoesPageController.js`: estado da lista, guia ativa, chamadas para funcionarios/configuracoes e abertura do modal.
+- `frontend/src/pages/comissoes/useComissaoModalController.js`: estado do modal, regras, arvore de produtos, salvamento em lote, atualizacao de regras e remocao de configuracoes.
+- `frontend/src/pages/comissoes/ComissoesPage.jsx` e `ComissaoConfiguracaoModal.jsx`: composicao da pagina e do modal.
+- `frontend/src/pages/comissoes/ComissaoProductTree.jsx`, `ComissaoSelectedItemPanel.jsx`, `ComissaoConfiguredItems.jsx` e `ComissaoPendingConfigurations.jsx`: blocos principais isolados da configuracao.
+- `frontend/src/pages/comissoes/comissoesConstants.js`, `comissoesUtils.js`, `ComissoesPageHeader.jsx`, `ComissoesList.jsx`, `ComissaoParceiroFields.jsx`, `ComissaoRulesPanel.jsx` e `ComissaoModalFooter.jsx`: constantes, helpers e pecas menores reutilizadas pela tela.
+- `frontend/scripts/test-comissoes-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, rota preservada e modulos abaixo de 420 linhas.
 
 Maiores arquivos mapeados em 2026-05-04:
 
