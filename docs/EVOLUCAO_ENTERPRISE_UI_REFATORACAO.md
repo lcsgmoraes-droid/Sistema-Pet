@@ -209,11 +209,11 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26, excluindo testes, migrations, CSS e builds locais:
 
-- 90 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 11 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 89 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 10 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 1 arquivo de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 30 arquivos acima de 700 linhas e 3 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 29 arquivos acima de 700 linhas e 2 acima de 1000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
 
@@ -528,6 +528,14 @@ Fatia de 2026-06-26: `frontend/src/pages/Lembretes.jsx` virou fachada fina:
 - `frontend/src/pages/lembretes/LembretesPage.jsx`, `LembretesHeader.jsx`, `LembretesCampanhasAlertas.jsx`, `LembretesBlingAutocadastros.jsx`, `LembretesDrePendentes.jsx`, `LembretesValidadeSection.jsx`, `LembretesList.jsx` e `LembreteCard.jsx`: composicao da tela e blocos operacionais isolados.
 - `frontend/src/pages/lembretes/lembretesFormatters.js`: datas e valores monetarios usados pelos paineis.
 - `frontend/scripts/test-lembretes-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, rota preservada, endpoints criticos e modulos abaixo de 420 linhas.
+
+Fatia de 2026-06-26: `frontend/src/components/ModalNovaContaPagar.jsx` virou fachada fina:
+
+- `frontend/src/components/ModalNovaContaPagar.jsx`: 1044 -> 2 linhas, mantendo o import publico usado por `ContasPagar.jsx`.
+- `frontend/src/components/modalNovaContaPagar/useModalNovaContaPagarController.js`: estado, efeitos, carga de fornecedores/categorias/DRE/tipos de despesa, salvamento e criacao de categorias.
+- `frontend/src/components/modalNovaContaPagar/contaPagarFormState.js`: estado inicial, normalizacao de datas, montagem de payloads e preview de parcelas.
+- `frontend/src/components/modalNovaContaPagar/ModalNovaContaPagar.jsx`, `ModalNovaContaPagarDialog.jsx`, `ContaPagarBasicFields.jsx`, `ContaPagarRecorrenciaSection.jsx`, `ContaPagarParcelamentoSection.jsx`, `CategoriaFinanceiraModal.jsx` e `CategoriaSubcategoriasFields.jsx`: container, formulario e modais quebrados por responsabilidade.
+- `frontend/scripts/test-modal-nova-conta-pagar-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, import publico preservado, endpoints criticos e modulos abaixo de 420 linhas.
 
 Maiores arquivos mapeados em 2026-05-04:
 
