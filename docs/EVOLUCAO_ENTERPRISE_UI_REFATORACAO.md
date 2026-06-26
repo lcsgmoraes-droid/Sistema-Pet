@@ -209,11 +209,11 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26, excluindo testes, migrations, CSS e builds locais:
 
-- 84 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 13 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
-- 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
+- 94 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 15 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 1 arquivo de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte GUI em `frontend/src`: 44 arquivos acima de 700 linhas e 13 acima de 1000 linhas.
+- Recorte GUI em `frontend/src`: 35 arquivos acima de 700 linhas e 7 acima de 1000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
 
@@ -484,6 +484,15 @@ Fatia de 2026-06-26: `frontend/src/pages/PetDetalhes.jsx` virou fachada fina:
 - `frontend/src/pages/pet-detalhes/PetDetalhesGeralTab.jsx`, `PetDetalhesSaudeTab.jsx`, `PetDetalhesVacinasTab.jsx`, `PetDetalhesConsultasTab.jsx`, `PetDetalhesInternacoesTab.jsx` e `PetDetalhesServicosTab.jsx`: blocos de conteudo por aba isolados.
 - `frontend/src/pages/pet-detalhes/PetDetalhesExamesPanel.jsx`, `PetDetalhesNovoExameForm.jsx`, `PetDetalhesInfoField.jsx`, `petDetalhesConstants.js` e `petDetalhesUtils.js`: exames, formulario, campos, constantes e helpers de filtro/data/listas.
 - `frontend/scripts/test-pet-detalhes-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, rota preservada e modulos abaixo de 420 linhas.
+
+Fatia de 2026-06-26: `frontend/src/pages/OpsTenants.jsx` virou fachada fina:
+
+- `frontend/src/pages/OpsTenants.jsx`: 1130 -> 2 linhas, mantendo a rota Ops em `ops/tenants`.
+- `frontend/src/pages/ops-tenants/useOpsTenantsController.js`: estado, filtros, carregamento de tenants, selecao, simulacao/aplicacao do catalogo base e manutencao comercial.
+- `frontend/src/pages/ops-tenants/OpsTenantsPage.jsx`, `OpsTenantsHeader.jsx`, `OpsTenantsFilters.jsx`, `OpsTenantsTabs.jsx` e `OpsTenantsMetricCard.jsx`: composicao da tela, cabecalho, filtros, abas e metricas.
+- `frontend/src/pages/ops-tenants/OpsTenantsTable.jsx`, `OpsTenantsImportPanel.jsx`, `OpsTenantsGuardrailsPanel.jsx`, `OpsTenantsBillingTab.jsx`, `OpsTenantsCommercialEditPanel.jsx` e `OpsTenantsUsageTab.jsx`: tabela principal, catalogo base, guardrails, cobranca e uso isolados.
+- `frontend/src/pages/ops-tenants/opsTenantsConstants.js`, `opsTenantsFormatters.js` e `OpsTenantsBadge.jsx`: opcoes, formatadores, classes de badge e peca visual compartilhada.
+- `frontend/scripts/test-ops-tenants-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, rota preservada e modulos abaixo de 420 linhas.
 
 Maiores arquivos mapeados em 2026-05-04:
 
