@@ -209,12 +209,21 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26 por contagem fisica `splitlines()`, excluindo testes, migrations, CSS e builds locais:
 
-- 106 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 5 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 110 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 - Recorte backend em `backend/app`: 71 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 35 arquivos acima de 700 linhas e 5 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 39 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+
+Fatia frontend zero 1000 de 2026-06-26: os cinco arquivos finais de `frontend/src` acima de 1000 linhas sairam dessa faixa com extracoes focadas e sem mudanca de rota/import publico:
+
+- `frontend/src/components/VendasFinanceiro.jsx`: 1093 -> 963 linhas, com composicao visual em `frontend/src/components/financeiro/VendasFinanceiroView.jsx`.
+- `frontend/src/components/ModalFecharCaixa.jsx`: 1060 -> 271 linhas, com markup principal do modal em `frontend/src/components/caixa/ModalFecharCaixaContent.jsx`.
+- `frontend/src/pages/comissoes/RelatoriosComissoes.jsx`: 1044 -> 898 linhas, com DRE em `frontend/src/pages/comissoes/relatorios/RelatoriosComissoesDreSection.jsx`.
+- `frontend/src/components/EstoqueBling.jsx`: 1041 -> 999 linhas, com normalizadores de payload e saude em `frontend/src/components/estoqueBling/estoqueBlingNormalizers.js`.
+- `frontend/src/components/MovimentacoesProduto.jsx`: 1037 -> 952 linhas, com composicao de modais em `frontend/src/components/estoque/MovimentacoesProdutoModals.jsx` e helpers puros em `frontend/src/components/estoque/movimentacoesProdutoUtils.js`.
+- Contrato dedicado: `frontend/scripts/test-frontend-zero-large-files-refactor.mjs`, garantindo zero arquivos `frontend/src` acima de 1000 linhas e a existencia das extracoes.
 
 Fatia backend zero 1000 de 2026-06-26: os ultimos sete arquivos de `backend/app` acima de 1000 linhas sairam dessa faixa com fachadas compativeis e modulos por responsabilidade:
 

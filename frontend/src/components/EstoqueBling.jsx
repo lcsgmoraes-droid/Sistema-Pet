@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "react-hot-toast";
 
 import api from "../api";
-import { buildSyncIssue, formatNumber, getErrorMessage, includesSearch } from "./estoqueBlingUtils";
+import { buildSyncIssue, getErrorMessage, includesSearch } from "./estoqueBlingUtils";
 
 import {
   EMPTY_BLING_CONNECTION,
@@ -29,6 +29,13 @@ import {
   EstoqueBlingLinkTab,
   EstoqueBlingLocalTab,
 } from "./estoqueBling/EstoqueBlingTabs";
+import {
+  montarResumoSaudeBling,
+  normalizarFaltantesBling,
+  normalizarProdutosLocaisSemBling,
+  normalizarResumoBling,
+  normalizarVinculosBling,
+} from "./estoqueBling/estoqueBlingNormalizers";
 
 function EstoqueBling() {
   const [activeTab, setActiveTab] = useState("criar");
@@ -61,38 +68,19 @@ function EstoqueBling() {
   const [blingConnection, setBlingConnection] = useState(EMPTY_BLING_CONNECTION);
 
   const applyResumo = (data = {}) => {
-    setCobertura({
-      ...EMPTY_COBERTURA,
-      ...data,
-      snapshot_disponivel: Boolean(data.snapshot_disponivel),
-      precisa_atualizar: Boolean(data.precisa_atualizar),
-    });
+    setCobertura(normalizarResumoBling(data));
   };
 
   const applyFaltantes = (data = {}) => {
-    setFaltantesBling(data.items || []);
-    setFaltantesMeta({
-      ...EMPTY_FALTANTES_META,
-      total: Number(data.total || 0),
-      snapshotDisponivel: Boolean(data.snapshot_disponivel),
-      coletaCompleta: Boolean(data.coleta_bling_completa ?? true),
-      atualizadoEm: data.atualizado_em || null,
-      cacheIdadeSegundos: Number(data.cache_idade_segundos || 0),
-      precisaAtualizar: Boolean(data.precisa_atualizar),
-    });
+    const { items, meta } = normalizarFaltantesBling(data);
+    setFaltantesBling(items);
+    setFaltantesMeta(meta);
   };
 
   const applyVinculos = (data = {}) => {
-    setProdutosSemVinculo(data.items || []);
-    setVinculosMeta({
-      ...EMPTY_VINCULOS_META,
-      total: Number(data.total || 0),
-      snapshotDisponivel: Boolean(data.snapshot_disponivel),
-      atualizadoEm: data.atualizado_em || null,
-      cacheIdadeSegundos: Number(data.cache_idade_segundos || 0),
-      coletaCompleta: Boolean(data.coleta_bling_completa ?? true),
-      precisaAtualizar: Boolean(data.precisa_atualizar),
-    });
+    const { items, meta } = normalizarVinculosBling(data);
+    setProdutosSemVinculo(items);
+    setVinculosMeta(meta);
   };
 
   const loadBlingConnectionStatus = async ({ silent = true } = {}) => {
@@ -162,12 +150,9 @@ function EstoqueBling() {
         },
       });
       const data = response?.data || {};
-      setProdutosLocaisSemBling(data.items || []);
-      setLocalMeta({
-        total: Number(data.total || 0),
-        loaded: true,
-        atualizadoEm: new Date().toISOString(),
-      });
+      const { items, meta } = normalizarProdutosLocaisSemBling(data);
+      setProdutosLocaisSemBling(items);
+      setLocalMeta(meta);
     } catch (error) {
       const message = getErrorMessage(
         error,
@@ -386,42 +371,14 @@ function EstoqueBling() {
     local: localMeta.loaded ? Number(localMeta.total || 0) : "-",
     corrigir: syncLoaded || cobertura.snapshot_disponivel ? syncProblemCount : "-",
   };
-  const knownPendingCount = hasAnySnapshot
-    ? Number(faltantesMeta.snapshotDisponivel ? faltantesMeta.total || 0 : 0) +
-      Number(vinculosMeta.snapshotDisponivel ? vinculosMeta.total || 0 : 0) +
-      Number(syncLoaded || cobertura.snapshot_disponivel ? syncProblemCount : 0)
-    : null;
-  const healthBaseTotal = Math.max(
-    Number(cobertura.total_bling || 0),
-    Number(knownPendingCount || 0),
-    1,
-  );
-  const healthPercent =
-    knownPendingCount === null
-      ? 0
-      : knownPendingCount <= 0
-        ? 100
-        : Math.max(
-            0,
-            Math.min(
-              100,
-              Math.round(((healthBaseTotal - knownPendingCount) / healthBaseTotal) * 100),
-            ),
-          );
-  const healthTone =
-    knownPendingCount === null
-      ? "slate"
-      : knownPendingCount === 0
-        ? "emerald"
-        : knownPendingCount <= 20
-          ? "amber"
-          : "red";
-  const healthDetail =
-    knownPendingCount === null
-      ? "Sem leitura valida ainda. Ao atualizar, a central deve mostrar o termometro e as pendencias abertas."
-      : knownPendingCount === 0
-        ? "Sem pendencias nesta leitura. O catalogo atual ficou coberto e sem fila aberta."
-        : `${formatNumber(knownPendingCount)} pendencia(s) aberta(s) nesta leitura. A central ja mostra o recorte que pede acao.`;
+  const { healthPercent, healthTone, healthDetail } = montarResumoSaudeBling({
+    hasAnySnapshot,
+    faltantesMeta,
+    vinculosMeta,
+    syncLoaded,
+    cobertura,
+    syncProblemCount,
+  });
 
   const applyMassLinkBatchLocally = (result) => {
     const linkedIds = new Set(
