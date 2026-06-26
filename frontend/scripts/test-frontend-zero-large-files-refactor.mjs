@@ -92,8 +92,16 @@ assert(
 
 const relatoriosComissoes = read("src/pages/comissoes/RelatoriosComissoes.jsx");
 assert(
-  relatoriosComissoes.includes("./relatorios/RelatoriosComissoesDreSection"),
-  "RelatoriosComissoes.jsx should delegate DRE rendering to RelatoriosComissoesDreSection",
+  relatoriosComissoes.includes("./relatorios/RelatoriosComissoesSections"),
+  "RelatoriosComissoes.jsx should delegate report sections to RelatoriosComissoesSections",
+);
+
+const relatoriosComissoesSections = read(
+  "src/pages/comissoes/relatorios/RelatoriosComissoesSections.jsx",
+);
+assert(
+  relatoriosComissoesSections.includes("./RelatoriosComissoesDreSection"),
+  "RelatoriosComissoesSections.jsx should delegate DRE rendering to RelatoriosComissoesDreSection",
 );
 
 const estoqueBling = read("src/components/EstoqueBling.jsx");
