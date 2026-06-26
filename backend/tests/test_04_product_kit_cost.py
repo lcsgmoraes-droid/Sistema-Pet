@@ -232,7 +232,9 @@ def test_atualizar_produto_com_preco_custo_usa_servicos_globais_de_kit(monkeypat
         "app.services.kit_custo_service.KitCustoService.recalcular_kits_que_usam_produto",
         lambda db, produto_id: {},
     )
-    monkeypatch.setattr(cadastro_routes, "obter_produto", lambda produto_id, db, user: produto)
+    monkeypatch.setattr(
+        cadastro_routes, "obter_produto", lambda produto_id, db, user: produto
+    )
 
     resultado = cadastro_routes.atualizar_produto.__wrapped__(
         13995,
