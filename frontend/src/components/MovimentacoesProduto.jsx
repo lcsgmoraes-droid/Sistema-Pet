@@ -7,99 +7,24 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "../api";
 import toast from "react-hot-toast";
 import { formatBRL, formatMoneyBRL } from "../utils/formatters";
-import EstoqueLancamentoModal from "./estoque/EstoqueLancamentoModal";
-import GranelLancamentoModal from "./estoque/GranelLancamentoModal";
 import MovimentacoesLancamentosTable from "./estoque/MovimentacoesLancamentosTable";
 import MovimentacoesProdutoHeader from "./estoque/MovimentacoesProdutoHeader";
+import MovimentacoesProdutoModals from "./estoque/MovimentacoesProdutoModals";
 import {
+  CANAIS_DESTAQUE,
+  ESTILOS_CANAIS,
+  LABELS_CANAIS,
+  dataAtualIsoLocalMovimentacao as dataAtualIsoLocal,
+  extrairMensagemErroApiMovimentacao as extrairMensagemErroApi,
+  formatarQuantidadeMovimentacao as formatarQuantidade,
+  getSaldoAposLancamento,
+  parseNumeroInputMovimentacao as parseNumeroInput,
   resolverEstoqueAtualMovimentacoes,
   resolverSaldoDisponivelMovimentacoes,
 } from "./estoque/movimentacoesProdutoUtils";
 import { montarMovimentoBalanco } from "./produtoBalanco/produtosBalancoUtils";
-import ReservasAtivasModal from "./estoque/ReservasAtivasModal";
 import VendasPorCanalPanel from "./estoque/VendasPorCanalPanel";
 import { useModulos } from "../contexts/ModulosContext";
-
-const CANAIS_DESTAQUE = ["loja_fisica", "mercado_livre", "shopee", "amazon"];
-
-const LABELS_CANAIS = {
-  loja_fisica: "Loja Física",
-  mercado_livre: "Mercado Livre",
-  shopee: "Shopee",
-  amazon: "Amazon",
-  site: "Site",
-  instagram: "Instagram",
-  whatsapp: "WhatsApp",
-};
-
-const ESTILOS_CANAIS = {
-  loja_fisica: {
-    card: "bg-emerald-50 border-emerald-200 text-emerald-700",
-    bar: "bg-emerald-400",
-  },
-  mercado_livre: {
-    card: "bg-yellow-50 border-yellow-200 text-yellow-700",
-    bar: "bg-yellow-400",
-  },
-  shopee: {
-    card: "bg-orange-50 border-orange-200 text-orange-700",
-    bar: "bg-orange-400",
-  },
-  amazon: {
-    card: "bg-sky-50 border-sky-200 text-sky-700",
-    bar: "bg-sky-400",
-  },
-  site: {
-    card: "bg-indigo-50 border-indigo-200 text-indigo-700",
-    bar: "bg-indigo-400",
-  },
-  instagram: {
-    card: "bg-pink-50 border-pink-200 text-pink-700",
-    bar: "bg-pink-400",
-  },
-  whatsapp: {
-    card: "bg-green-50 border-green-200 text-green-700",
-    bar: "bg-green-400",
-  },
-};
-
-function formatarQuantidade(valor) {
-  return Number(valor || 0).toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-function parseNumeroInput(valor) {
-  if (valor === null || valor === undefined || valor === "") return 0;
-  if (typeof valor === "number") return Number.isFinite(valor) ? valor : 0;
-
-  const texto = String(valor).trim();
-  const normalizado = texto.includes(",") ? texto.replace(/\./g, "").replace(",", ".") : texto;
-  const numero = Number(normalizado);
-  return Number.isFinite(numero) ? numero : 0;
-}
-
-function dataAtualIsoLocal() {
-  const agora = new Date();
-  const local = new Date(agora.getTime() - agora.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
-}
-
-function extrairMensagemErroApi(error, fallback) {
-  const detalhe = error?.response?.data?.detail ?? error?.response?.data?.message;
-  if (typeof detalhe === "string") return detalhe;
-  if (detalhe && typeof detalhe === "object") {
-    return detalhe.message || detalhe.mensagem || fallback;
-  }
-  return error?.message || fallback;
-}
-
-function getSaldoAposLancamento(movimentacao) {
-  const saldo = movimentacao?.saldo_apos_lancamento ?? movimentacao?.quantidade_nova;
-  const saldoNumerico = Number(saldo);
-  return Number.isFinite(saldoNumerico) ? saldoNumerico : null;
-}
 
 export default function MovimentacoesProduto() {
   const { id } = useParams();
@@ -962,76 +887,65 @@ export default function MovimentacoesProduto() {
         selectedIds={selectedIds}
       />
 
-      {showReservasModal && (
-        <ReservasAtivasModal
-          abrirPedidoReservado={abrirPedidoReservado}
-          formatarQuantidade={formatarQuantidade}
-          onClose={() => setShowReservasModal(false)}
-          reservasAtivas={reservasAtivas}
-        />
-      )}
-
-      {showModal && (
-        <EstoqueLancamentoModal
-          editingMovimentacao={editingMovimentacao}
-          estoqueAtual={estoqueAtual}
-          formData={formData}
-          onClose={() => setShowModal(false)}
-          onSubmit={handleSubmit}
-          produto={produto}
-          produtoEhGranel={produtoEhGranel}
-          setFormData={setFormData}
-          setTipoLancamento={setTipoLancamento}
-          tipoLancamento={tipoLancamento}
-        />
-      )}
-
-      {showGranelModal && (
-        <GranelLancamentoModal
-          atualizarPrecoGranel={atualizarPrecoGranel}
-          baseMargemGranel={baseMargemGranel}
-          baseMargemTexto={baseMargemTexto}
-          buscaGranel={buscaGranel}
-          custoKgGranel={custoKgGranel}
-          diferencaPrecoGranel={diferencaPrecoGranel}
-          formatMoney={formatMoneyBRL}
-          formatPercentual={formatBRL}
-          formatarQuantidade={formatarQuantidade}
-          granelDentroMargemEsperada={granelDentroMargemEsperada}
-          granelProdutos={granelProdutos}
-          granelSelecionadoId={granelSelecionadoId}
-          granelVinculos={granelVinculos}
-          handleAlterarModoPrecoGranel={handleAlterarModoPrecoGranel}
-          handleDesvincularGranel={handleDesvincularGranel}
-          handleSelecionarGranel={handleSelecionarGranel}
-          kgGranelPrevisto={kgGranelPrevisto}
-          loadingGranel={loadingGranel}
-          margemBaseGranel={margemBaseGranel}
-          margemCalculadaGranel={margemCalculadaGranel}
-          margemGranel={margemGranel}
-          modoPrecoGranel={modoPrecoGranel}
-          nomeGranelSelecionado={nomeGranelSelecionado}
-          observacaoGranel={observacaoGranel}
-          onClose={() => setShowGranelModal(false)}
-          onSubmit={handleSubmitGranel}
-          precoMinimoEsperadoGranel={precoMinimoEsperadoGranel}
-          precoVendaAtualGranel={precoVendaAtualGranel}
-          precoVendaGranel={precoVendaGranel}
-          precoVendaKgOrigem={precoVendaKgOrigem}
-          precoVendaSugeridoGranel={precoVendaSugeridoGranel}
-          produto={produto}
-          quantidadeGranel={quantidadeGranel}
-          quantidadeGranelNumero={quantidadeGranelNumero}
-          setAtualizarPrecoGranel={setAtualizarPrecoGranel}
-          setBuscaGranel={setBuscaGranel}
-          setMargemBaseGranel={setMargemBaseGranel}
-          setMargemGranel={setMargemGranel}
-          setObservacaoGranel={setObservacaoGranel}
-          setPrecoVendaGranel={setPrecoVendaGranel}
-          setQuantidadeGranel={setQuantidadeGranel}
-          pesoPacoteOrigem={pesoPacoteOrigem}
-        />
-      )}
+      <MovimentacoesProdutoModals
+        abrirPedidoReservado={abrirPedidoReservado}
+        atualizarPrecoGranel={atualizarPrecoGranel}
+        baseMargemGranel={baseMargemGranel}
+        baseMargemTexto={baseMargemTexto}
+        buscaGranel={buscaGranel}
+        custoKgGranel={custoKgGranel}
+        diferencaPrecoGranel={diferencaPrecoGranel}
+        editingMovimentacao={editingMovimentacao}
+        estoqueAtual={estoqueAtual}
+        formData={formData}
+        formatMoney={formatMoneyBRL}
+        formatPercentual={formatBRL}
+        formatarQuantidade={formatarQuantidade}
+        granelDentroMargemEsperada={granelDentroMargemEsperada}
+        granelProdutos={granelProdutos}
+        granelSelecionadoId={granelSelecionadoId}
+        granelVinculos={granelVinculos}
+        handleAlterarModoPrecoGranel={handleAlterarModoPrecoGranel}
+        handleDesvincularGranel={handleDesvincularGranel}
+        handleSelecionarGranel={handleSelecionarGranel}
+        handleSubmit={handleSubmit}
+        handleSubmitGranel={handleSubmitGranel}
+        kgGranelPrevisto={kgGranelPrevisto}
+        loadingGranel={loadingGranel}
+        margemBaseGranel={margemBaseGranel}
+        margemCalculadaGranel={margemCalculadaGranel}
+        margemGranel={margemGranel}
+        modoPrecoGranel={modoPrecoGranel}
+        nomeGranelSelecionado={nomeGranelSelecionado}
+        observacaoGranel={observacaoGranel}
+        onCloseGranel={() => setShowGranelModal(false)}
+        onCloseLancamento={() => setShowModal(false)}
+        onCloseReservas={() => setShowReservasModal(false)}
+        precoMinimoEsperadoGranel={precoMinimoEsperadoGranel}
+        precoVendaAtualGranel={precoVendaAtualGranel}
+        precoVendaGranel={precoVendaGranel}
+        precoVendaKgOrigem={precoVendaKgOrigem}
+        precoVendaSugeridoGranel={precoVendaSugeridoGranel}
+        produto={produto}
+        produtoEhGranel={produtoEhGranel}
+        quantidadeGranel={quantidadeGranel}
+        quantidadeGranelNumero={quantidadeGranelNumero}
+        reservasAtivas={reservasAtivas}
+        setAtualizarPrecoGranel={setAtualizarPrecoGranel}
+        setBuscaGranel={setBuscaGranel}
+        setFormData={setFormData}
+        setMargemBaseGranel={setMargemBaseGranel}
+        setMargemGranel={setMargemGranel}
+        setObservacaoGranel={setObservacaoGranel}
+        setPrecoVendaGranel={setPrecoVendaGranel}
+        setQuantidadeGranel={setQuantidadeGranel}
+        setTipoLancamento={setTipoLancamento}
+        showGranelModal={showGranelModal}
+        showModal={showModal}
+        showReservasModal={showReservasModal}
+        tipoLancamento={tipoLancamento}
+        pesoPacoteOrigem={pesoPacoteOrigem}
+      />
     </div>
   );
 }
