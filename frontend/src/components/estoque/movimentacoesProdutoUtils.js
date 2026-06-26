@@ -84,6 +84,181 @@ export function getSaldoAposLancamento(movimentacao) {
   return Number.isFinite(saldoNumerico) ? saldoNumerico : null;
 }
 
+export function getMotivoLabelMovimentacao(motivo) {
+  const labels = {
+    compra: "Compra",
+    venda: "Venda",
+    venda_online: "Venda Online",
+    ajuste: "Ajuste",
+    saida_manual: "Saida Manual",
+    devolucao: "Devolucao",
+    perda: "Perda",
+    avaria: "Avaria",
+    roubo: "Roubo/Furto",
+    amostra: "Amostra",
+    uso_interno: "Uso interno",
+    devolucao_fornecedor: "Devolucao ao fornecedor",
+    transferencia: "Transferencia",
+    balanco: "Balanco",
+  };
+  return labels[motivo] || motivo;
+}
+
+export function getOrigemMovimentacao(mov) {
+  if (mov.referencia_tipo === "venda_excluida") {
+    return {
+      texto: `Venda Cancelada #${mov.referencia_id}`,
+      icone: "cancelado",
+      cor: "text-gray-400",
+      link: null,
+    };
+  }
+
+  if (mov.referencia_tipo === "venda") {
+    if (mov.documento && (mov.documento.length === 44 || mov.documento.startsWith("NF"))) {
+      return { texto: `NF ${mov.documento}`, icone: "nf-venda", cor: "text-red-600", link: null };
+    }
+    return {
+      texto: `Pedido #${mov.referencia_id}`,
+      icone: "pedido",
+      cor: "text-orange-600",
+      link: `/pdv?venda=${mov.referencia_id}`,
+    };
+  }
+
+  if (mov.referencia_tipo === "pedido_integrado") {
+    if (mov.nf_numero) {
+      return { texto: `NF ${mov.nf_numero}`, icone: "nf-venda", cor: "text-red-600", link: null };
+    }
+    if (mov.documento) {
+      return {
+        texto: `Pedido Bling #${mov.documento}`,
+        icone: "pedido",
+        cor: "text-orange-600",
+        link: null,
+      };
+    }
+    return {
+      texto: `Pedido Bling #${mov.referencia_id}`,
+      icone: "pedido",
+      cor: "text-orange-600",
+      link: null,
+    };
+  }
+
+  if (mov.motivo === "balanco") {
+    return { texto: "Balanco", icone: "balanco", cor: "text-blue-600", link: null };
+  }
+
+  if (mov.tipo === "saida") {
+    return {
+      texto: getMotivoLabelMovimentacao(mov.motivo),
+      icone: "manual",
+      cor: "text-red-600",
+      link: null,
+    };
+  }
+
+  if (mov.tipo === "entrada" && mov.documento && mov.documento.length === 44) {
+    return {
+      texto: `NF ${mov.documento.substring(25, 34)}`,
+      icone: "nf-entrada",
+      cor: "text-green-600",
+      link: null,
+    };
+  }
+
+  if (mov.tipo === "entrada" && mov.documento) {
+    return {
+      texto: mov.documento,
+      icone: "documento",
+      cor: "text-blue-600",
+      link: `/pdv?venda=${mov.documento}`,
+    };
+  }
+
+  if (mov.tipo === "entrada") {
+    return { texto: "Entrada Manual", icone: "manual", cor: "text-green-600", link: null };
+  }
+
+  return { texto: "Manual", icone: "manual", cor: "text-gray-500", link: null };
+}
+
+export function calcularTotaisMovimentacoes(movimentacoes = []) {
+  return {
+    totalEntradas: movimentacoes
+      .filter((m) => m.tipo === "entrada" && m.status !== "cancelado")
+      .reduce((sum, m) => sum + parseFloat(m.quantidade || 0), 0),
+    totalSaidas: movimentacoes
+      .filter((m) => m.tipo === "saida" && m.status !== "cancelado")
+      .reduce((sum, m) => sum + parseFloat(m.quantidade || 0), 0),
+  };
+}
+
+export function calcularVendasPorCanalMovimentacoes(movimentacoes = []) {
+  const isSaidaVendaVinculada = (mov) => {
+    if (mov?.tipo !== "saida" || mov?.status === "cancelado" || !mov?.canal) {
+      return false;
+    }
+
+    if (mov.referencia_tipo === "venda") {
+      return true;
+    }
+
+    if (mov.referencia_tipo === "pedido_integrado") {
+      return Boolean(
+        mov.nf_numero || (typeof mov.documento === "string" && mov.documento.startsWith("NF ")),
+      );
+    }
+
+    return false;
+  };
+
+  const grupos = {};
+  movimentacoes.filter(isSaidaVendaVinculada).forEach((m) => {
+    const canal = m.canal;
+    if (!grupos[canal]) grupos[canal] = { qtd: 0, valor: 0, count: 0 };
+    grupos[canal].qtd += parseFloat(m.quantidade || 0);
+    grupos[canal].valor += m.preco_venda_unitario
+      ? parseFloat(m.quantidade || 0) * parseFloat(m.preco_venda_unitario)
+      : 0;
+    grupos[canal].count += 1;
+  });
+
+  const temVendasPorCanal = Object.values(grupos).some((g) => g.count > 0);
+  if (!temVendasPorCanal) {
+    return [];
+  }
+
+  CANAIS_DESTAQUE.forEach((canal) => {
+    if (!grupos[canal]) {
+      grupos[canal] = { qtd: 0, valor: 0, count: 0 };
+    }
+  });
+
+  const totalQtd = Object.values(grupos).reduce((s, g) => s + g.qtd, 0);
+  return Object.entries(grupos)
+    .filter(([canal, g]) => g.count > 0 || CANAIS_DESTAQUE.includes(canal))
+    .map(([canal, g]) => ({
+      canal,
+      qtd: g.qtd,
+      valor: g.valor,
+      count: g.count,
+      pct: totalQtd > 0 ? (g.qtd / totalQtd) * 100 : 0,
+    }))
+    .sort((a, b) => {
+      if (b.qtd !== a.qtd) return b.qtd - a.qtd;
+
+      const aIndex = CANAIS_DESTAQUE.indexOf(a.canal);
+      const bIndex = CANAIS_DESTAQUE.indexOf(b.canal);
+      if (aIndex !== -1 || bIndex !== -1) {
+        return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+      }
+
+      return a.canal.localeCompare(b.canal);
+    });
+}
+
 export function produtoUsaEstoqueVirtual(produto) {
   return (
     (produto?.tipo_produto === "KIT" || produto?.tipo_produto === "VARIACAO") &&

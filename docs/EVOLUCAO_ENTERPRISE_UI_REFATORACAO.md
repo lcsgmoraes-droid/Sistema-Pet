@@ -209,12 +209,19 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
 
-- 87 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 83 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 - Recorte backend em `backend/app`: 71 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 16 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 12 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+
+Fatia frontend 700 batch 6 de 2026-06-26: tres arquivos GUI do topo da fila sairam da faixa acima de 700 linhas com extracoes maiores de acoes, exportacoes e fluxo de granel:
+
+- `frontend/src/components/EstoqueBling.jsx`: 998 -> 535 linhas, com handlers de lote, reconexao, reprocessamento, vinculo manual e importacao de imagens em `frontend/src/components/estoqueBling/useEstoqueBlingActions.js`.
+- `frontend/src/components/VendasFinanceiro.jsx`: 962 -> 699 linhas, com exportacao de relatorios, selecao e reprocessamento de rentabilidade em `frontend/src/components/financeiro/vendasFinanceiro/useVendasFinanceiroActions.js`.
+- `frontend/src/components/MovimentacoesProduto.jsx`: 951 -> 631 linhas, com estado/acoes do fluxo granel em `frontend/src/components/estoque/useMovimentacoesProdutoGranel.js` e helpers puros de origem, totais e vendas por canal em `frontend/src/components/estoque/movimentacoesProdutoUtils.js`.
+- Contrato dedicado: `frontend/scripts/test-large-files-700-batch-6-refactor.mjs`, garantindo que os alvos e modulos extraidos sigam abaixo de 700 linhas.
 
 Fatia frontend 700 batch 5 de 2026-06-26: seis telas/componentes grandes sairam da faixa acima de 700 linhas com extracoes maiores de views, cards, tabela e hook de selecao:
 
