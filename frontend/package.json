@@ -35,6 +35,7 @@
     "test:modal-nova-conta-pagar-refactor": "node scripts/test-modal-nova-conta-pagar-refactor.mjs",
     "test:final-gui-large-files-refactor": "node scripts/test-final-gui-large-files-refactor.mjs",
     "test:frontend-zero-large-files-refactor": "node scripts/test-frontend-zero-large-files-refactor.mjs",
+    "test:large-files-700-batch-refactor": "node scripts/test-large-files-700-batch-refactor.mjs",
     "test:pdv-preco-manual": "node scripts/test-pdv-preco-manual.mjs",
     "test:pdv-produto-busca": "node scripts/test-pdv-produto-busca.mjs",
     "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",
