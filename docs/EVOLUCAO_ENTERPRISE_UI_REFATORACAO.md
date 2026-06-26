@@ -209,11 +209,11 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26, excluindo testes, migrations, CSS e builds locais:
 
-- 94 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 15 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 90 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 11 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 1 arquivo de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 31 arquivos acima de 700 linhas e 4 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 30 arquivos acima de 700 linhas e 3 acima de 1000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
 
@@ -520,6 +520,14 @@ Fatia de 2026-06-26: `frontend/src/pages/ProdutosValidadeProxima.jsx` virou fach
 - `frontend/src/pages/produtos-validade-proxima/ProdutosValidadeMobileList.jsx`, `ProdutosValidadeTable.jsx` e `ProdutosValidadePagination.jsx`: renderizacao mobile, tabela desktop e navegacao paginada isoladas.
 - `frontend/src/pages/produtos-validade-proxima/produtosValidadeProximaConstants.js`, `produtosValidadeProximaFormatters.js` e `produtosValidadeProximaCsv.js`: parametros, estados iniciais, badges, datas visuais e geracao CSV separados da UI.
 - `frontend/scripts/test-produtos-validade-proxima-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, imports publicos preservados e modulos abaixo de 420 linhas.
+
+Fatia de 2026-06-26: `frontend/src/pages/Lembretes.jsx` virou fachada fina:
+
+- `frontend/src/pages/Lembretes.jsx`: 1077 -> 2 linhas, mantendo a rota publica em `produtos/lembretes`.
+- `frontend/src/pages/lembretes/useLembretesController.js`: estado, efeitos, carregamento dos lembretes, campanhas, Bling, DRE e protecao por validade.
+- `frontend/src/pages/lembretes/LembretesPage.jsx`, `LembretesHeader.jsx`, `LembretesCampanhasAlertas.jsx`, `LembretesBlingAutocadastros.jsx`, `LembretesDrePendentes.jsx`, `LembretesValidadeSection.jsx`, `LembretesList.jsx` e `LembreteCard.jsx`: composicao da tela e blocos operacionais isolados.
+- `frontend/src/pages/lembretes/lembretesFormatters.js`: datas e valores monetarios usados pelos paineis.
+- `frontend/scripts/test-lembretes-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, rota preservada, endpoints criticos e modulos abaixo de 420 linhas.
 
 Maiores arquivos mapeados em 2026-05-04:
 
