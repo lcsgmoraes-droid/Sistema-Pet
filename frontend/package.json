@@ -29,6 +29,7 @@
     "test:pet-detalhes-refactor": "node scripts/test-pet-detalhes-refactor.mjs",
     "test:ops-tenants-refactor": "node scripts/test-ops-tenants-refactor.mjs",
     "test:produtos-relatorio-refactor": "node scripts/test-produtos-relatorio-refactor.mjs",
+    "test:produtos-validade-proxima-refactor": "node scripts/test-produtos-validade-proxima-refactor.mjs",
     "test:calculadora-racao-refactor": "node scripts/test-calculadora-racao-refactor.mjs",
     "test:pdv-preco-manual": "node scripts/test-pdv-preco-manual.mjs",
     "test:pdv-produto-busca": "node scripts/test-pdv-produto-busca.mjs",

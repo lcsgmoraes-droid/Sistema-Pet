@@ -213,7 +213,7 @@ Inventario atualizado em 2026-06-26, excluindo testes, migrations, CSS e builds 
 - 15 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 1 arquivo de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 32 arquivos acima de 700 linhas e 5 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 31 arquivos acima de 700 linhas e 4 acima de 1000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
 
@@ -511,6 +511,15 @@ Fatia de 2026-06-26: `frontend/src/pages/CalculadoraRacao.jsx` virou fachada fin
 - `frontend/src/pages/calculadora-racao/RacaoSearchInput.jsx`, `CalculadoraRacaoResultadoCard.jsx` e `CalculadoraRacaoComparativoCard.jsx`: busca de racoes, resultado individual e ranking comparativo isolados.
 - `frontend/src/pages/calculadora-racao/calculadoraRacaoApi.js`, `calculadoraRacaoState.js` e `useRacaoSearchEffect.js`: endpoints, payloads/estado derivado e busca com debounce reaproveitados pela tela.
 - `frontend/scripts/test-calculadora-racao-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, rota preservada e modulos abaixo de 420 linhas.
+
+Fatia de 2026-06-26: `frontend/src/pages/ProdutosValidadeProxima.jsx` virou fachada fina:
+
+- `frontend/src/pages/ProdutosValidadeProxima.jsx`: 1113 -> 3 linhas, preservando os imports publicos usados por Alertas de Estoque e Campanhas.
+- `frontend/src/pages/produtos-validade-proxima/useProdutosValidadeProximaController.js`: estado, catalogos, filtros, paginacao, exportacao CSV e exclusao/reinclusao de lotes em campanha.
+- `frontend/src/pages/produtos-validade-proxima/ProdutosValidadeProximaPage.jsx`, `ProdutosValidadeHeader.jsx`, `ProdutosValidadeRuleBanner.jsx`, `ProdutosValidadeFiltros.jsx`, `ProdutosValidadeResumoGrid.jsx` e `ProdutosValidadeLotesPanel.jsx`: composicao da tela, cabecalho, regra automatica, filtros, cards e painel principal.
+- `frontend/src/pages/produtos-validade-proxima/ProdutosValidadeMobileList.jsx`, `ProdutosValidadeTable.jsx` e `ProdutosValidadePagination.jsx`: renderizacao mobile, tabela desktop e navegacao paginada isoladas.
+- `frontend/src/pages/produtos-validade-proxima/produtosValidadeProximaConstants.js`, `produtosValidadeProximaFormatters.js` e `produtosValidadeProximaCsv.js`: parametros, estados iniciais, badges, datas visuais e geracao CSV separados da UI.
+- `frontend/scripts/test-produtos-validade-proxima-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, imports publicos preservados e modulos abaixo de 420 linhas.
 
 Maiores arquivos mapeados em 2026-05-04:
 
@@ -1111,11 +1120,10 @@ Estes arquivos combinam muito botao, modal, card, filtro, tabela ou dashboard. S
 | 3 | `frontend/src/components/EntradaXML.jsx` | Arquivo muito grande, NF/itens/produtos, modais e conciliacao |
 | 4 | `frontend/src/pages/EstoqueTransferenciaParceiro.jsx` | Estoque, produtos, filtros, cards e acoes |
 | 5 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | Produto/canal/markdown/aparencia e telas publicas |
-| 6 | `frontend/src/pages/ProdutosValidadeProxima.jsx` | Produtos, alertas, tabelas e status |
-| 7 | `frontend/src/components/ContasPagar.jsx` e `ContasReceber.jsx` | Financeiro, dinheiro, vencimento, filtros e modais |
-| 8 | `frontend/src/components/DRE.jsx` | Indicadores, periodo, dinheiro, tabelas e exportacoes |
-| 9 | `frontend/src/pages/GerenciamentoPets.jsx` | Cards desalinhados, entidade pet e acoes repetidas |
-| 10 | `frontend/src/pages/comissoes/ComissoesListagem.jsx` | Regras sensiveis, dinheiro, funcionario, tabelas e status |
+| 6 | `frontend/src/components/ContasPagar.jsx` e `ContasReceber.jsx` | Financeiro, dinheiro, vencimento, filtros e modais |
+| 7 | `frontend/src/components/DRE.jsx` | Indicadores, periodo, dinheiro, tabelas e exportacoes |
+| 8 | `frontend/src/pages/GerenciamentoPets.jsx` | Cards desalinhados, entidade pet e acoes repetidas |
+| 9 | `frontend/src/pages/comissoes/ComissoesListagem.jsx` | Regras sensiveis, dinheiro, funcionario, tabelas e status |
 
 ### Padroes repetidos encontrados
 
