@@ -1,17 +1,11 @@
 import { useState, useEffect } from "react";
-import { Plus, Wallet } from "lucide-react";
 import api from "../api";
 import { toast } from "react-hot-toast";
-import ModalNovaContaPagar from "./ModalNovaContaPagar";
 import { safeArray } from "../utils/safeArray";
-import ActionButton from "./ui/ActionButton";
-import LoadingState from "./ui/LoadingState";
+import ContasPagarView from "./contas-pagar/ContasPagarView";
+import useContasPagarSelection from "./contas-pagar/useContasPagarSelection";
 import { formatMoneyCellValue } from "./ui/MoneyCell";
-import PageHeader from "./ui/PageHeader";
 import StatusBadge from "./ui/StatusBadge";
-import ContasPagarFilters from "./contas-pagar/ContasPagarFilters";
-import ContasPagarTable from "./contas-pagar/ContasPagarTable";
-import ContasPagarModals from "./contas-pagar/ContasPagarModals";
 import {
   calcularIntervaloPeriodoRapido,
   extrairMensagemErroPagamento,
@@ -54,7 +48,6 @@ const ContasPagar = () => {
     loading: false,
   });
   const [recorrenciasSelecionadasExclusao, setRecorrenciasSelecionadasExclusao] = useState([]);
-  const [contasSelecionadas, setContasSelecionadas] = useState([]);
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
   const [mostrarModalNovaForma, setMostrarModalNovaForma] = useState(false);
@@ -84,11 +77,6 @@ const ContasPagar = () => {
   useEffect(() => {
     carregarDados();
   }, []);
-
-  useEffect(() => {
-    const idsVisiveis = new Set(safeArray(contas).map((conta) => conta.id));
-    setContasSelecionadas((atuais) => atuais.filter((id) => idsVisiveis.has(id)));
-  }, [contas]);
 
   const carregarFormasPagamento = async () => {
     const response = await api.get("/financeiro/formas-pagamento?apenas_ativas=true");
@@ -245,25 +233,6 @@ const ContasPagar = () => {
     aplicarFiltros(filtrosPadrao);
   };
 
-  const contasVisiveis = safeArray(contas);
-  const contaTemPagamento = (conta) =>
-    Number(conta?.valor_pago || 0) > 0 || ["pago", "parcial"].includes(conta?.status);
-  const contaPodeExcluir = (conta) => !contaTemPagamento(conta);
-  const contaPodeCancelar = (conta) => !contaTemPagamento(conta) && conta?.status !== "cancelado";
-  const contasSelecionadasObjetos = contasVisiveis.filter((conta) =>
-    contasSelecionadas.includes(conta.id),
-  );
-  const totalSelecionadas = contasSelecionadasObjetos.length;
-  const todasVisiveisSelecionadas =
-    contasVisiveis.length > 0 &&
-    contasVisiveis.every((conta) => contasSelecionadas.includes(conta.id));
-  const algumasVisiveisSelecionadas = contasVisiveis.some((conta) =>
-    contasSelecionadas.includes(conta.id),
-  );
-  const haContaPagaSelecionada = contasSelecionadasObjetos.some(contaTemPagamento);
-  const haContaCancelavelSelecionada = contasSelecionadasObjetos.some(contaPodeCancelar);
-  const haContaExcluivelSelecionada = contasSelecionadasObjetos.some(contaPodeExcluir);
-
   const abrirModalPagamento = (conta) => {
     setContaSelecionada(conta);
     // Buscar conta padrão da forma de pagamento se houver
@@ -371,118 +340,28 @@ const ContasPagar = () => {
     }
   };
 
-  const alternarSelecaoConta = (contaId) => {
-    setContasSelecionadas((atuais) =>
-      atuais.includes(contaId) ? atuais.filter((id) => id !== contaId) : [...atuais, contaId],
-    );
-  };
-
-  const selecionarTodasContasVisiveis = (event) => {
-    const selecionar = event.target.checked;
-    if (!selecionar) {
-      setContasSelecionadas([]);
-      return;
-    }
-
-    setContasSelecionadas(contasVisiveis.map((conta) => conta.id));
-  };
-
-  const limparSelecaoContas = () => {
-    setContasSelecionadas([]);
-  };
-
-  const editarContaSelecionada = () => {
-    if (totalSelecionadas !== 1) {
-      toast.error("Selecione apenas um lancamento para editar");
-      return;
-    }
-
-    abrirModalEdicao(contasSelecionadasObjetos[0]);
-  };
-
-  const estornarContasSelecionadas = async () => {
-    const contasParaEstornar = contasSelecionadasObjetos.filter(contaTemPagamento);
-    if (contasParaEstornar.length === 0) {
-      toast.error("Selecione pelo menos uma conta com pagamento para estornar");
-      return;
-    }
-
-    const motivo = window.prompt("Motivo do estorno (opcional):", "");
-    if (motivo === null) return;
-
-    const confirmado = window.confirm(
-      `Estornar pagamento de ${contasParaEstornar.length} lancamento(s)? O saldo bancario sera revertido.`,
-    );
-    if (!confirmado) return;
-
-    try {
-      for (const conta of contasParaEstornar) {
-        await api.post(`/contas-pagar/${conta.id}/estornar`, { motivo });
-      }
-      toast.success("Pagamento(s) estornado(s) com sucesso");
-      limparSelecaoContas();
-      carregarDados();
-    } catch (error) {
-      console.error("Erro ao estornar pagamentos:", error);
-      toast.error(error.response?.data?.detail || "Erro ao estornar pagamento");
-    }
-  };
-
-  const cancelarContasSelecionadas = async () => {
-    const contasParaCancelar = contasSelecionadasObjetos.filter(contaPodeCancelar);
-    if (contasParaCancelar.length === 0) {
-      toast.error("Selecione pelo menos uma conta sem pagamento para cancelar");
-      return;
-    }
-
-    const motivo = window.prompt("Motivo do cancelamento (opcional):", "");
-    if (motivo === null) return;
-
-    const confirmado = window.confirm(
-      `Cancelar ${contasParaCancelar.length} lancamento(s)? O historico sera mantido.`,
-    );
-    if (!confirmado) return;
-
-    try {
-      for (const conta of contasParaCancelar) {
-        await api.post(`/contas-pagar/${conta.id}/cancelar`, { motivo });
-      }
-      toast.success("Lancamento(s) cancelado(s) com sucesso");
-      limparSelecaoContas();
-      carregarDados();
-    } catch (error) {
-      console.error("Erro ao cancelar contas:", error);
-      toast.error(error.response?.data?.detail || "Erro ao cancelar lancamento");
-    }
-  };
-
-  const excluirContasSelecionadas = async () => {
-    const contasParaExcluir = contasSelecionadasObjetos.filter(contaPodeExcluir);
-    if (contasParaExcluir.length === 0) {
-      toast.error("Selecione pelo menos uma conta sem pagamento para excluir");
-      return;
-    }
-
-    const ignoradas = totalSelecionadas - contasParaExcluir.length;
-    const avisoIgnoradas =
-      ignoradas > 0 ? ` ${ignoradas} lancamento(s) com pagamento serao ignorados.` : "";
-    const confirmado = window.confirm(
-      `Excluir ${contasParaExcluir.length} lancamento(s) selecionado(s)?${avisoIgnoradas}`,
-    );
-    if (!confirmado) return;
-
-    try {
-      await api.post("/contas-pagar/recorrencias/excluir", {
-        ids: contasParaExcluir.map((conta) => conta.id),
-      });
-      toast.success("Lancamento(s) excluido(s) com sucesso");
-      limparSelecaoContas();
-      carregarDados();
-    } catch (error) {
-      console.error("Erro ao excluir contas:", error);
-      toast.error(error.response?.data?.detail || "Erro ao excluir lancamentos");
-    }
-  };
+  const {
+    algumasVisiveisSelecionadas,
+    alternarSelecaoConta,
+    cancelarContasSelecionadas,
+    contaTemPagamento,
+    contasSelecionadas,
+    contasVisiveis,
+    editarContaSelecionada,
+    estornarContasSelecionadas,
+    excluirContasSelecionadas,
+    haContaCancelavelSelecionada,
+    haContaExcluivelSelecionada,
+    haContaPagaSelecionada,
+    limparSelecaoContas,
+    selecionarTodasContasVisiveis,
+    todasVisiveisSelecionadas,
+    totalSelecionadas,
+  } = useContasPagarSelection({
+    contas,
+    carregarDados,
+    abrirModalEdicao,
+  });
 
   const excluirContaPagar = async (conta) => {
     if (conta.eh_recorrente || conta.conta_recorrencia_origem_id) {
@@ -700,117 +579,79 @@ const ContasPagar = () => {
     event.preventDefault();
   };
 
-  if (loading) {
-    return <LoadingState label="Carregando contas a pagar..." />;
-  }
-
   return (
-    <div className="p-6">
-      <PageHeader
-        actions={
-          <ActionButton
-            onClick={() => {
-              setContaEdicao(null);
-              setMostrarModalNovaConta(true);
-            }}
-            intent="create"
-            size="md"
-            icon={Plus}
-          >
-            Nova Conta
-          </ActionButton>
-        }
-        className="mb-6"
-        icon={Wallet}
-        subtitle="Gerencie vencimentos, despesas e pagamentos"
-        title="Contas a Pagar"
-      />
-
-      <ContasPagarFilters
-        filtros={filtros}
-        setFiltros={setFiltros}
-        fornecedores={fornecedores}
-        fornecedorFiltroSelecionado={fornecedorFiltroSelecionado}
-        tiposDespesaOrdenados={tiposDespesaOrdenados}
-        aplicarPeriodoRapido={aplicarPeriodoRapido}
-        filtrarDespesasCaixa={filtrarDespesasCaixa}
-        limparFiltros={limparFiltros}
-        aplicarFiltros={aplicarFiltros}
-        handleFiltrosSubmit={handleFiltrosSubmit}
-      />
-
-      <ContasPagarTable
-        contasVisiveis={contasVisiveis}
-        contasSelecionadas={contasSelecionadas}
-        todasVisiveisSelecionadas={todasVisiveisSelecionadas}
-        algumasVisiveisSelecionadas={algumasVisiveisSelecionadas}
-        selecionarTodasContasVisiveis={selecionarTodasContasVisiveis}
-        alternarSelecaoConta={alternarSelecaoConta}
-        getContaTooltip={getContaTooltip}
-        getDescricaoPrincipal={getDescricaoPrincipal}
-        getStatusBadge={getStatusBadge}
-        formatarData={formatarData}
-        abrirModalEdicao={abrirModalEdicao}
-        abrirModalPagamento={abrirModalPagamento}
-        precisaClassificacao={precisaClassificacao}
-        abrirModalClassificacao={abrirModalClassificacao}
-        excluirContaPagar={excluirContaPagar}
-        contaTemPagamento={contaTemPagamento}
-        totalSelecionadas={totalSelecionadas}
-        editarContaSelecionada={editarContaSelecionada}
-        estornarContasSelecionadas={estornarContasSelecionadas}
-        cancelarContasSelecionadas={cancelarContasSelecionadas}
-        excluirContasSelecionadas={excluirContasSelecionadas}
-        limparSelecaoContas={limparSelecaoContas}
-        haContaPagaSelecionada={haContaPagaSelecionada}
-        haContaCancelavelSelecionada={haContaCancelavelSelecionada}
-        haContaExcluivelSelecionada={haContaExcluivelSelecionada}
-      />
-
-      <ContasPagarModals
-        mostrarModalPagamento={mostrarModalPagamento}
-        contaSelecionada={contaSelecionada}
-        setMostrarModalPagamento={setMostrarModalPagamento}
-        formatarMoeda={formatarMoeda}
-        dadosPagamento={dadosPagamento}
-        setDadosPagamento={setDadosPagamento}
-        handleFormaChange={handleFormaChange}
-        formasPagamento={formasPagamento}
-        setMostrarModalNovaForma={setMostrarModalNovaForma}
-        contasBancarias={contasBancarias}
-        registrarPagamento={registrarPagamento}
-        mostrarModalNovaForma={mostrarModalNovaForma}
-        novaFormaData={novaFormaData}
-        setNovaFormaData={setNovaFormaData}
-        salvarNovaForma={salvarNovaForma}
-        mostrarModalClassificacao={mostrarModalClassificacao}
-        setMostrarModalClassificacao={setMostrarModalClassificacao}
-        dadosClassificacao={dadosClassificacao}
-        setDadosClassificacao={setDadosClassificacao}
-        categoriasFinanceiras={categoriasFinanceiras}
-        subcategoriasDre={subcategoriasDre}
-        tiposDespesaOrdenados={tiposDespesaOrdenados}
-        salvarClassificacao={salvarClassificacao}
-        modalExclusaoRecorrencia={modalExclusaoRecorrencia}
-        setModalExclusaoRecorrencia={setModalExclusaoRecorrencia}
-        recorrenciasSelecionadasExclusao={recorrenciasSelecionadasExclusao}
-        setRecorrenciasSelecionadasExclusao={setRecorrenciasSelecionadasExclusao}
-        formatarData={formatarData}
-        alternarRecorrenciaExclusao={alternarRecorrenciaExclusao}
-        confirmarExclusaoRecorrencia={confirmarExclusaoRecorrencia}
-      />
-
-      {/* Modal Nova Conta */}
-      <ModalNovaContaPagar
-        isOpen={mostrarModalNovaConta}
-        contaEdicao={contaEdicao}
-        onClose={() => {
-          setMostrarModalNovaConta(false);
-          setContaEdicao(null);
-        }}
-        onSave={carregarDados}
-      />
-    </div>
+    <ContasPagarView
+      loading={loading}
+      setContaEdicao={setContaEdicao}
+      setMostrarModalNovaConta={setMostrarModalNovaConta}
+      filtros={filtros}
+      setFiltros={setFiltros}
+      fornecedores={fornecedores}
+      fornecedorFiltroSelecionado={fornecedorFiltroSelecionado}
+      tiposDespesaOrdenados={tiposDespesaOrdenados}
+      aplicarPeriodoRapido={aplicarPeriodoRapido}
+      filtrarDespesasCaixa={filtrarDespesasCaixa}
+      limparFiltros={limparFiltros}
+      aplicarFiltros={aplicarFiltros}
+      handleFiltrosSubmit={handleFiltrosSubmit}
+      contasVisiveis={contasVisiveis}
+      contasSelecionadas={contasSelecionadas}
+      todasVisiveisSelecionadas={todasVisiveisSelecionadas}
+      algumasVisiveisSelecionadas={algumasVisiveisSelecionadas}
+      selecionarTodasContasVisiveis={selecionarTodasContasVisiveis}
+      alternarSelecaoConta={alternarSelecaoConta}
+      getContaTooltip={getContaTooltip}
+      getDescricaoPrincipal={getDescricaoPrincipal}
+      getStatusBadge={getStatusBadge}
+      formatarData={formatarData}
+      abrirModalEdicao={abrirModalEdicao}
+      abrirModalPagamento={abrirModalPagamento}
+      precisaClassificacao={precisaClassificacao}
+      abrirModalClassificacao={abrirModalClassificacao}
+      excluirContaPagar={excluirContaPagar}
+      contaTemPagamento={contaTemPagamento}
+      totalSelecionadas={totalSelecionadas}
+      editarContaSelecionada={editarContaSelecionada}
+      estornarContasSelecionadas={estornarContasSelecionadas}
+      cancelarContasSelecionadas={cancelarContasSelecionadas}
+      excluirContasSelecionadas={excluirContasSelecionadas}
+      limparSelecaoContas={limparSelecaoContas}
+      haContaPagaSelecionada={haContaPagaSelecionada}
+      haContaCancelavelSelecionada={haContaCancelavelSelecionada}
+      haContaExcluivelSelecionada={haContaExcluivelSelecionada}
+      mostrarModalPagamento={mostrarModalPagamento}
+      contaSelecionada={contaSelecionada}
+      setMostrarModalPagamento={setMostrarModalPagamento}
+      formatarMoeda={formatarMoeda}
+      dadosPagamento={dadosPagamento}
+      setDadosPagamento={setDadosPagamento}
+      handleFormaChange={handleFormaChange}
+      formasPagamento={formasPagamento}
+      setMostrarModalNovaForma={setMostrarModalNovaForma}
+      contasBancarias={contasBancarias}
+      registrarPagamento={registrarPagamento}
+      mostrarModalNovaForma={mostrarModalNovaForma}
+      novaFormaData={novaFormaData}
+      setNovaFormaData={setNovaFormaData}
+      salvarNovaForma={salvarNovaForma}
+      mostrarModalClassificacao={mostrarModalClassificacao}
+      setMostrarModalClassificacao={setMostrarModalClassificacao}
+      dadosClassificacao={dadosClassificacao}
+      setDadosClassificacao={setDadosClassificacao}
+      categoriasFinanceiras={categoriasFinanceiras}
+      subcategoriasDre={subcategoriasDre}
+      tiposDespesaOrdenados={tiposDespesaOrdenados}
+      salvarClassificacao={salvarClassificacao}
+      modalExclusaoRecorrencia={modalExclusaoRecorrencia}
+      setModalExclusaoRecorrencia={setModalExclusaoRecorrencia}
+      recorrenciasSelecionadasExclusao={recorrenciasSelecionadasExclusao}
+      setRecorrenciasSelecionadasExclusao={setRecorrenciasSelecionadasExclusao}
+      alternarRecorrenciaExclusao={alternarRecorrenciaExclusao}
+      confirmarExclusaoRecorrencia={confirmarExclusaoRecorrencia}
+      mostrarModalNovaConta={mostrarModalNovaConta}
+      contaEdicao={contaEdicao}
+      carregarDados={carregarDados}
+    />
   );
 };
 

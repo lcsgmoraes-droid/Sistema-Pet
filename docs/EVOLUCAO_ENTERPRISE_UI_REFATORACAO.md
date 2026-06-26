@@ -209,12 +209,22 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
 
-- 92 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 87 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 - Recorte backend em `backend/app`: 71 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 21 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 16 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+
+Fatia frontend 700 batch 5 de 2026-06-26: seis telas/componentes grandes sairam da faixa acima de 700 linhas com extracoes maiores de views, cards, tabela e hook de selecao:
+
+- `frontend/src/pages/PetForm.jsx`: 838 -> 363 linhas, com formulario visual em `frontend/src/pages/petForm/PetFormView.jsx`.
+- `frontend/src/pages/ecommerce/EcommerceConfig.jsx`: 813 -> 325 linhas, com configuracao de loja, Mercado Pago e avisos em `frontend/src/pages/ecommerce/EcommerceConfigView.jsx`.
+- `frontend/src/pages/OpsIncidentes.jsx`: 813 -> 189 linhas, com cards/detalhe em `frontend/src/pages/opsIncidentes/OpsIncidentesCards.jsx` e composicao em `frontend/src/pages/opsIncidentes/OpsIncidentesView.jsx`.
+- `frontend/src/components/ContasPagar.jsx`: 818 -> 659 linhas, com composicao visual em `frontend/src/components/contas-pagar/ContasPagarView.jsx` e selecao em massa em `frontend/src/components/contas-pagar/useContasPagarSelection.js`.
+- `frontend/src/components/compras/PedidosCompraSugestaoModal.jsx`: 729 -> 18 linhas, com cabecalho/filtros em `frontend/src/components/compras/PedidosCompraSugestaoHeader.jsx` e tabela/rodape em `frontend/src/components/compras/PedidosCompraSugestaoTable.jsx`.
+- `frontend/src/pages/configuracoes/ConfiguracaoFiscalEmpresa.jsx`: 766 -> 343 linhas, com formulario cadastral/fiscal em `frontend/src/pages/configuracoes/ConfiguracaoFiscalEmpresaView.jsx`.
+- Contrato dedicado: `frontend/scripts/test-large-files-700-batch-5-refactor.mjs`, garantindo que os alvos e modulos extraidos sigam abaixo de 700 linhas.
 
 Fatia frontend 700 batch 4 de 2026-06-26: quatro telas/componentes grandes sairam da faixa acima de 700 linhas com extracoes de modais e views visuais:
 
