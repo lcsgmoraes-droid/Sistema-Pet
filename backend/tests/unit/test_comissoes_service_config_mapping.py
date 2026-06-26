@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from app import comissoes_service
+from app import comissoes_config_service, comissoes_service
 
 
 class FakeResult:
@@ -66,7 +66,7 @@ def test_buscar_configuracao_comissao_nao_depende_da_ordem_fisica_da_tabela(
         )
 
     monkeypatch.setattr(
-        comissoes_service, "execute_tenant_safe", fake_execute_tenant_safe
+        comissoes_config_service, "execute_tenant_safe", fake_execute_tenant_safe
     )
 
     config = comissoes_service.buscar_configuracao_comissao(

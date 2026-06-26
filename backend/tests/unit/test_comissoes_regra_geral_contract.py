@@ -21,7 +21,7 @@ def _frontend_sources(*relative_paths: str) -> str:
 def test_backend_comissoes_aceita_regra_geral_e_usa_como_fallback():
     routes = _backend_source("app/comissoes_routes.py")
     schemas = _backend_source("app/comissoes_schemas.py")
-    service = _backend_source("app/comissoes_service.py")
+    service = _backend_source("app/comissoes_config_service.py")
     models = _backend_source("app/comissoes_models.py")
 
     assert "'geral'" in schemas

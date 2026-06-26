@@ -209,11 +209,23 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26 por contagem fisica `splitlines()`, excluindo testes, migrations, CSS e builds locais:
 
-- 108 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 12 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 106 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 5 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
+- Recorte backend em `backend/app`: 71 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 35 arquivos acima de 700 linhas e 5 acima de 1000 linhas.
+
+Fatia backend zero 1000 de 2026-06-26: os ultimos sete arquivos de `backend/app` acima de 1000 linhas sairam dessa faixa com fachadas compativeis e modulos por responsabilidade:
+
+- `backend/app/ia/aba6_chat_ia.py`: 1132 -> 837 linhas, com respostas deterministicas de IA em `backend/app/ia/aba6_resposta_simples.py`.
+- `backend/app/vendas/pos_processamento.py`: 1127 -> 642 linhas, com DRE de competencia em `backend/app/vendas/dre_pos_processamento.py`.
+- `backend/app/models.py`: 1125 -> 940 linhas, com autorizacao em `backend/app/models_authz.py` e modelos operacionais em `backend/app/models_operacionais.py`.
+- `backend/app/campaigns/loyalty_service.py`: 1112 -> 767 linhas, com recompensas e helpers de fidelidade em `backend/app/campaigns/loyalty_rewards.py`.
+- `backend/app/conciliacao_models.py`: 1054 -> 695 linhas, com recebimentos, metricas e historico em `backend/app/conciliacao_recebimento_models.py`.
+- `backend/app/comissoes_service.py`: 1019 -> 11 linhas, com configuracao/calculo em `backend/app/comissoes_config_service.py` e geracao em `backend/app/comissoes_geracao_service.py`.
+- `backend/app/routes/app_mobile_routes.py`: 1013 -> 805 linhas, com rastreio em `backend/app/routes/app_mobile_rastreio_routes.py`.
+- Contrato dedicado: `backend/tests/unit/test_backend_zero_large_files_refactor.py`, garantindo zero arquivos `backend/app` acima de 1000 linhas, imports publicos compativeis e rota de rastreio registrada.
 
 Fatia seguinte de 2026-06-26: mais cinco arquivos backend sairam da faixa acima de 1000 linhas com subrouters/schemas dedicados:
 
