@@ -209,11 +209,11 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26, excluindo testes, migrations, CSS e builds locais:
 
-- 85 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 14 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 84 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 13 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte GUI em `frontend/src`: 45 arquivos acima de 700 linhas e 14 acima de 1000 linhas.
+- Recorte GUI em `frontend/src`: 44 arquivos acima de 700 linhas e 13 acima de 1000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
 
@@ -475,6 +475,15 @@ Fatia de 2026-06-26: `frontend/src/pages/CategoriasFinanceiras.jsx` virou fachad
 - `frontend/src/pages/categorias-financeiras/CategoriaFinanceiraModal.jsx`, `CategoriaFinanceiraFormFields.jsx`, `CategoriaFinanceiraSubcategoriasFields.jsx` e `SubcategoriaDREModal.jsx`: formularios e modais isolados.
 - `frontend/src/pages/categorias-financeiras/categoriasFinanceirasConstants.js`, `categoriasFinanceirasUtils.js`, `CategoriasFinanceirasHeader.jsx` e `CategoriasFinanceirasFilters.jsx`: constantes, normalizadores, cabecalho e filtros reutilizados pela tela.
 - `frontend/scripts/test-categorias-financeiras-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, rota preservada e modulos abaixo de 420 linhas.
+
+Fatia de 2026-06-26: `frontend/src/pages/PetDetalhes.jsx` virou fachada fina:
+
+- `frontend/src/pages/PetDetalhes.jsx`: 1146 -> 3 linhas, mantendo a rota publica em `pets/:petId`.
+- `frontend/src/pages/pet-detalhes/usePetDetalhesController.js`: estado da ficha, carregamento do pet, modulo veterinario, historicos, filtros, exames e ativacao.
+- `frontend/src/pages/pet-detalhes/PetDetalhesPage.jsx`, `PetDetalhesHeader.jsx`, `PetDetalhesTabs.jsx`, `PetDetalhesLoadingState.jsx` e `PetDetalhesErrorState.jsx`: composicao da pagina, cabecalho, abas e estados.
+- `frontend/src/pages/pet-detalhes/PetDetalhesGeralTab.jsx`, `PetDetalhesSaudeTab.jsx`, `PetDetalhesVacinasTab.jsx`, `PetDetalhesConsultasTab.jsx`, `PetDetalhesInternacoesTab.jsx` e `PetDetalhesServicosTab.jsx`: blocos de conteudo por aba isolados.
+- `frontend/src/pages/pet-detalhes/PetDetalhesExamesPanel.jsx`, `PetDetalhesNovoExameForm.jsx`, `PetDetalhesInfoField.jsx`, `petDetalhesConstants.js` e `petDetalhesUtils.js`: exames, formulario, campos, constantes e helpers de filtro/data/listas.
+- `frontend/scripts/test-pet-detalhes-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, rota preservada e modulos abaixo de 420 linhas.
 
 Maiores arquivos mapeados em 2026-05-04:
 
