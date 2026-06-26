@@ -23,6 +23,7 @@
     "test:mercado-pago-oauth": "node scripts/test-mercado-pago-oauth-return.mjs",
     "test:app-routes-refactor": "node scripts/test-app-routes-refactor.mjs",
     "test:lgpd-operacional-refactor": "node scripts/test-lgpd-operacional-refactor.mjs",
+    "test:ponto-equilibrio-refactor": "node scripts/test-ponto-equilibrio-refactor.mjs",
     "test:pdv-preco-manual": "node scripts/test-pdv-preco-manual.mjs",
     "test:pdv-produto-busca": "node scripts/test-pdv-produto-busca.mjs",
     "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",

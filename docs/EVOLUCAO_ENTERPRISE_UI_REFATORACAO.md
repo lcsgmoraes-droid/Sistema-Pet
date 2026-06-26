@@ -209,8 +209,8 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-25, excluindo testes, migrations, CSS e builds locais:
 
-- 88 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 17 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 87 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 16 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 
@@ -445,6 +445,15 @@ Fatia de 2026-06-25: `frontend/src/pages/LGPDOperacional.jsx` virou fachada fina
 - `frontend/src/pages/lgpd/LGPDTitularPanel.jsx` e `LGPDSolicitacoesPanel.jsx`: busca do titular e fila de solicitacoes.
 - `frontend/src/pages/lgpd/LGPDRequestModal.jsx`, `LGPDNewRequestModal.jsx`, `LGPDPrivacyModal.jsx` e `LGPDAnonymizeDialog.jsx`: fluxos operacionais isolados.
 - `frontend/scripts/test-lgpd-operacional-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API e modulos LGPD abaixo de 420 linhas.
+
+Fatia de 2026-06-25: `frontend/src/pages/PontoEquilibrio.jsx` virou fachada fina:
+
+- `frontend/src/pages/PontoEquilibrio.jsx`: 1274 -> 3 linhas, mantendo a rota publica em `financeiro/ponto-equilibrio`.
+- `frontend/src/pages/ponto-equilibrio/usePontoEquilibrioController.js`: estado, filtros, chamadas para `/financeiro/ponto-equilibrio` e detalhes paginados.
+- `frontend/src/pages/ponto-equilibrio/PontoEquilibrioPage.jsx`: composicao da tela, formula, abas, alertas e drawer de detalhes.
+- `frontend/src/pages/ponto-equilibrio/PontoEquilibrioResumoTab.jsx`, `DetalhamentoMargemPanel.jsx`, `SimuladorImpactoPanel.jsx` e `AnaliseCustosPanel.jsx`: blocos principais isolados.
+- `frontend/src/pages/ponto-equilibrio/pontoEquilibrioConstants.js`, `pontoEquilibrioUtils.js`, `PontoEquilibrioTooltips.jsx` e `PontoEquilibrioMetricCard.jsx`: constantes, helpers e pecas reutilizadas pela tela.
+- `frontend/scripts/test-ponto-equilibrio-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API e modulos abaixo de 420 linhas.
 
 Maiores arquivos mapeados em 2026-05-04:
 
