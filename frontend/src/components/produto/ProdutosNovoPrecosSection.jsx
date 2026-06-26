@@ -1,4 +1,6 @@
 import PromocaoFields from "./PromocaoFields";
+import InfoTooltip from "../ui/InfoTooltip";
+import { MARKUP_HELP_TEXT } from "./produtosPrecoHelpText";
 
 function formatMoeda(value, parseNumber) {
   return value ? `R$ ${parseNumber(value).toFixed(2).replace(".", ",")}` : "R$ 0,00";
@@ -52,7 +54,10 @@ export default function ProdutosNovoPrecosSection({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Markup</label>
+          <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700">
+            Markup
+            <InfoTooltip label="Ajuda sobre markup" text={MARKUP_HELP_TEXT} />
+          </label>
           <input
             type="text"
             value={
