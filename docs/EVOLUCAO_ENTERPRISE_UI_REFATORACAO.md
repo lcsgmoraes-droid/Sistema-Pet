@@ -209,12 +209,20 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26 por contagem fisica `splitlines()`, excluindo testes, migrations, CSS e builds locais:
 
-- 107 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 60 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 71 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 36 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 41 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 19 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+
+Fatia frontend 700 batch 2 de 2026-06-26: quatro telas/componentes grandes sairam da faixa acima de 700 linhas com extracoes de blocos visuais independentes:
+
+- `frontend/src/pages/conciliacaoRecebimentos/Aba2ConciliacaoRecebimentosView.jsx`: 911 -> 436 linhas, com resultado de validacao em `frontend/src/pages/conciliacaoRecebimentos/Aba2RecebimentosResult.jsx` e modais em `frontend/src/pages/conciliacaoRecebimentos/Aba2RecebimentosSections.jsx`.
+- `frontend/src/pages/Aba1ConciliacaoVendasV2.jsx`: 903 -> 576 linhas, com cards de venda/NSU/match em `frontend/src/pages/conciliacao/Aba1ConciliacaoCards.jsx`.
+- `frontend/src/components/ContasReceber.jsx`: 891 -> 465 linhas, com filtros e modais em `frontend/src/components/contasReceber/ContasReceberPanels.jsx`.
+- `frontend/src/components/ModalDevolucao.jsx`: 867 -> 390 linhas, com corpo e rodape do fluxo em `frontend/src/components/devolucao/ModalDevolucaoSections.jsx`.
+- Contrato dedicado: `frontend/scripts/test-large-files-700-batch-2-refactor.mjs`, garantindo que os alvos e modulos extraidos sigam abaixo de 700 linhas.
 
 Fatia frontend 700 batch de 2026-06-26: tres telas grandes sairam da faixa acima de 700 linhas com extracoes de blocos ja isolados:
 
