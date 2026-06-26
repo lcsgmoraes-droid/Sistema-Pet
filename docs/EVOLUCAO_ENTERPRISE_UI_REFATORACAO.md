@@ -213,7 +213,7 @@ Inventario atualizado em 2026-06-26, excluindo testes, migrations, CSS e builds 
 - 15 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 1 arquivo de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte GUI em `frontend/src`: 35 arquivos acima de 700 linhas e 7 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 42 arquivos acima de 700 linhas e 11 acima de 1000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
 
@@ -493,6 +493,15 @@ Fatia de 2026-06-26: `frontend/src/pages/OpsTenants.jsx` virou fachada fina:
 - `frontend/src/pages/ops-tenants/OpsTenantsTable.jsx`, `OpsTenantsImportPanel.jsx`, `OpsTenantsGuardrailsPanel.jsx`, `OpsTenantsBillingTab.jsx`, `OpsTenantsCommercialEditPanel.jsx` e `OpsTenantsUsageTab.jsx`: tabela principal, catalogo base, guardrails, cobranca e uso isolados.
 - `frontend/src/pages/ops-tenants/opsTenantsConstants.js`, `opsTenantsFormatters.js` e `OpsTenantsBadge.jsx`: opcoes, formatadores, classes de badge e peca visual compartilhada.
 - `frontend/scripts/test-ops-tenants-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, rota preservada e modulos abaixo de 420 linhas.
+
+Fatia de 2026-06-26: `frontend/src/pages/ProdutosRelatorio.jsx` virou fachada fina:
+
+- `frontend/src/pages/ProdutosRelatorio.jsx`: 1207 -> 3 linhas, mantendo a rota publica em `produtos/relatorio`.
+- `frontend/src/pages/produtos-relatorio/useProdutosRelatorioController.js`: estado, filtros, autocomplete de produto, paginacao, chamadas para relatorio de movimentacoes/produto e exportacao CSV.
+- `frontend/src/pages/produtos-relatorio/ProdutosRelatorioPage.jsx`, `ProdutosRelatorioHeader.jsx`, `ProdutosRelatorioFiltros.jsx` e `ProdutosRelatorioProdutoPanel.jsx`: composicao da tela, cabecalho, filtros e painel do produto isolados.
+- `frontend/src/pages/produtos-relatorio/ProdutosRelatorioHistoricoVendas.jsx`, `ProdutosRelatorioMovimentacoesTable.jsx`, `ProdutosRelatorioResumoCard.jsx`, `ProdutosRelatorioJanelaVendaCard.jsx` e `ProdutosRelatorioCurvaVendas30Dias.jsx`: historico, tabela operacional, cards e curva de vendas extraidos.
+- `frontend/src/pages/produtos-relatorio/produtosRelatorioConstants.js`, `produtosRelatorioData.js` e `produtosRelatorioFormatters.js`: constantes, normalizacao de payload/parametros e formatadores reutilizados pela tela.
+- `frontend/scripts/test-produtos-relatorio-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, rota preservada e modulos abaixo de 420 linhas.
 
 Maiores arquivos mapeados em 2026-05-04:
 
