@@ -209,11 +209,11 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26, excluindo testes, migrations, CSS e builds locais:
 
-- 89 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 10 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
-- 1 arquivo de aplicacao acima de 1500 linhas, criticidade alta.
+- 75 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 5 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 29 arquivos acima de 700 linhas e 2 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 26 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
 
@@ -536,6 +536,15 @@ Fatia de 2026-06-26: `frontend/src/components/ModalNovaContaPagar.jsx` virou fac
 - `frontend/src/components/modalNovaContaPagar/contaPagarFormState.js`: estado inicial, normalizacao de datas, montagem de payloads e preview de parcelas.
 - `frontend/src/components/modalNovaContaPagar/ModalNovaContaPagar.jsx`, `ModalNovaContaPagarDialog.jsx`, `ContaPagarBasicFields.jsx`, `ContaPagarRecorrenciaSection.jsx`, `ContaPagarParcelamentoSection.jsx`, `CategoriaFinanceiraModal.jsx` e `CategoriaSubcategoriasFields.jsx`: container, formulario e modais quebrados por responsabilidade.
 - `frontend/scripts/test-modal-nova-conta-pagar-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, import publico preservado, endpoints criticos e modulos abaixo de 420 linhas.
+
+Fatia de 2026-06-26: ultimos arquivos GUI acima de 1000 linhas foram quebrados:
+
+- `frontend/src/components/financeiro/vendasFinanceiroUtils.js`: 1133 -> 5 linhas, mantendo a API publica por reexports.
+- `frontend/src/components/financeiro/vendasFinanceiro/*`: Excel, datas/calendario, relatorio/filtros, analises e totalizadores separados por dominio.
+- `frontend/src/pages/EstoqueTransferenciaParceiro.jsx`: 1033 -> 2 linhas, mantendo a rota publica como fachada.
+- `frontend/src/pages/estoqueTransferenciaParceiro/EstoqueTransferenciaParceiroPage.jsx`, `useEstoqueTransferenciaParceiroController.js`, `useTransferenciaLancamentoController.js` e `useTransferenciaHistoricoController.js`: composicao, estado, lancamento, historico, documentos e baixa separados.
+- `frontend/src/pages/estoqueTransferenciaParceiro/HistoricoTransferenciaResults.jsx`: 711 -> 100 linhas, com bulk actions, lista e painel de baixa extraidos.
+- `frontend/scripts/test-final-gui-large-files-refactor.mjs`: contrato de refatoracao garantindo fachadas sem estado/API, endpoints criticos, rota preservada e zero arquivos GUI acima de 1000 linhas.
 
 Maiores arquivos mapeados em 2026-05-04:
 
