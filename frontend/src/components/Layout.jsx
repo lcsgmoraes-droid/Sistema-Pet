@@ -105,6 +105,7 @@ const Layout = () => {
 
   // Estado da calculadora universal
   const [calculadoraAberta, setCalculadoraAberta] = useState(false);
+  const [calculadoraModo, setCalculadoraModo] = useState("calcular");
 
   // Contagem de lembretes pendentes para badge dinâmico
   const [lembretesCount, setLembretesCount] = useState(0);
@@ -622,6 +623,12 @@ const Layout = () => {
         <FloatingCalculatorButton
           onClick={() => {
             console.log("🎯 Layout: Abrindo calculadora...");
+            setCalculadoraModo("calcular");
+            setCalculadoraAberta(true);
+          }}
+          onCompareClick={() => {
+            console.log("Abrindo comparador de preco...");
+            setCalculadoraModo("comparar-preco");
             setCalculadoraAberta(true);
           }}
         />
@@ -656,6 +663,7 @@ const Layout = () => {
       {calculadoraAberta && (
         <ModalCalculadoraUniversal
           isOpen={calculadoraAberta}
+          modoInicial={calculadoraModo}
           onClose={() => {
             console.log("🎯 Layout: Fechando calculadora...");
             setCalculadoraAberta(false);

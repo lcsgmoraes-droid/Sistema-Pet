@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Calculator, Minimize2, Maximize2 } from "lucide-react";
+import { Calculator, Minimize2, Maximize2, Scale } from "lucide-react";
+import { getFloatingCalculatorActions } from "../utils/floatingCalculatorActions";
 
 /**
  * Botão Flutuante da Calculadora de Ração
@@ -10,7 +11,7 @@ import { Calculator, Minimize2, Maximize2 } from "lucide-react";
  * - Arrastável para reposicionar (apenas desktop)
  * - Mobile: fixo no topo direito, sem drag
  */
-export default function FloatingCalculatorButton({ onClick }) {
+export default function FloatingCalculatorButton({ onClick, onCompareClick }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isDragging, setIsDragging] = useState(false);
   const [hasDragged, setHasDragged] = useState(false);
@@ -146,10 +147,19 @@ export default function FloatingCalculatorButton({ onClick }) {
     // Só abre se não houve arraste
     if (!hasDragged) {
       console.log("✅ Abrindo calculadora...");
-      onClick();
+      onClick?.();
     } else {
       console.log("❌ Ignorando clique (foi arraste)");
     }
+  };
+
+  const handleActionClick = (actionId) => {
+    if (hasDragged) return;
+    if (actionId === "comparar-preco") {
+      (onCompareClick || onClick)?.();
+      return;
+    }
+    onClick?.();
   };
 
   const handleToggleMinimize = (e) => {
@@ -313,6 +323,20 @@ export default function FloatingCalculatorButton({ onClick }) {
           >
             🥫 Calcular Ração
           </button>
+
+          {getFloatingCalculatorActions()
+            .filter((action) => action.id === "comparar-preco")
+            .map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                onClick={() => handleActionClick(action.id)}
+                className="calc-button-main flex w-full items-center justify-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-medium text-teal-800 transition-all hover:bg-teal-100 hover:shadow-lg"
+              >
+                <Scale size={16} />
+                {action.label}
+              </button>
+            ))}
 
           {/* Info adicional - Apenas desktop */}
           {!isMobile && (
