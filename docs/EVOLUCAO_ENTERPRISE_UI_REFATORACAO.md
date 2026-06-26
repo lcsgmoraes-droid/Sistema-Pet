@@ -213,7 +213,7 @@ Inventario atualizado em 2026-06-26, excluindo testes, migrations, CSS e builds 
 - 15 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 1 arquivo de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 42 arquivos acima de 700 linhas e 11 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 32 arquivos acima de 700 linhas e 5 acima de 1000 linhas.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
 
@@ -503,6 +503,15 @@ Fatia de 2026-06-26: `frontend/src/pages/ProdutosRelatorio.jsx` virou fachada fi
 - `frontend/src/pages/produtos-relatorio/produtosRelatorioConstants.js`, `produtosRelatorioData.js` e `produtosRelatorioFormatters.js`: constantes, normalizacao de payload/parametros e formatadores reutilizados pela tela.
 - `frontend/scripts/test-produtos-relatorio-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, rota preservada e modulos abaixo de 420 linhas.
 
+Fatia de 2026-06-26: `frontend/src/pages/CalculadoraRacao.jsx` virou fachada fina:
+
+- `frontend/src/pages/CalculadoraRacao.jsx`: 1224 -> 3 linhas, mantendo a rota publica em `calculadora-racao`.
+- `frontend/src/pages/calculadora-racao/useCalculadoraRacaoController.js`: estado, carregamento de pets/racoes, autocomplete, calculo individual e comparacao por racao ou filtros.
+- `frontend/src/pages/calculadora-racao/CalculadoraRacaoPage.jsx`, `CalculadoraRacaoHeader.jsx`, `CalculadoraRacaoForm.jsx`, `CalculadoraRacaoPetFields.jsx`, `CalculadoraRacaoProdutoFields.jsx` e `CalculadoraRacaoComparativoFields.jsx`: composicao da tela e formulario quebrado por responsabilidade.
+- `frontend/src/pages/calculadora-racao/RacaoSearchInput.jsx`, `CalculadoraRacaoResultadoCard.jsx` e `CalculadoraRacaoComparativoCard.jsx`: busca de racoes, resultado individual e ranking comparativo isolados.
+- `frontend/src/pages/calculadora-racao/calculadoraRacaoApi.js`, `calculadoraRacaoState.js` e `useRacaoSearchEffect.js`: endpoints, payloads/estado derivado e busca com debounce reaproveitados pela tela.
+- `frontend/scripts/test-calculadora-racao-refactor.mjs`: contrato de refatoracao garantindo fachada sem estado/API, rota preservada e modulos abaixo de 420 linhas.
+
 Maiores arquivos mapeados em 2026-05-04:
 
 Inventario atualizado em 2026-06-07, excluindo testes e migracoes Alembic da fila operacional:
@@ -566,7 +575,6 @@ Top criticos ainda pendentes no inventario de 2026-06-07:
 | 1560 | `backend/app/conciliacao_services.py` | Critico |
 | 1490 | `backend/app/api/endpoints/rotas_entrega.py` | Prioridade |
 | 1452 | `frontend/src/components/EstoqueBling.jsx` | Prioridade |
-| 1424 | `frontend/src/pages/CalculadoraRacao.jsx` | Prioridade |
 | 1413 | `frontend/src/components/DashboardAnaliseRacoes.jsx` | Prioridade |
 | 844 | `frontend/src/components/MovimentacoesProduto.jsx` | Atencao |
 | 1330 | `backend/app/financeiro_routes.py` | Prioridade |
@@ -958,7 +966,6 @@ Para cada dominio sensivel:
 | `frontend/src/pages/EstoqueTransferenciaParceiro.jsx` | 2418 | Alto |
 | `frontend/src/components/ModalPagamento.jsx` | 1760 | Medio/alto |
 | `frontend/src/pages/ProdutosForm.jsx` | 1670 | Medio/alto |
-| `frontend/src/pages/CalculadoraRacao.jsx` | 1424 | Medio |
 | `frontend/src/components/Layout.jsx` | 1324 | Alto por ser global |
 | `frontend/src/components/DRE.jsx` | 835 | Medio |
 
