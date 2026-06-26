@@ -12,6 +12,7 @@ import QuantidadeInput from "../QuantidadeInput";
 import SubtotalInput from "../SubtotalInput";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { resolveMediaUrl } from "../../utils/mediaUrl";
+import { obterResumoPrecoPorKg } from "../../utils/racaoPrecoKg";
 import { formatarVariacao } from "../../utils/variacoes";
 import ProdutoSelector from "../produtos/ProdutoSelector";
 import CopyableCode from "../ui/CopyableCode";
@@ -52,6 +53,7 @@ function ProdutoSugestaoPDV({
   const precoPDV = obterPrecoPDV(produto);
   const precoOriginal = Number.parseFloat(produto.preco_venda_original ?? produto.preco_venda ?? 0);
   const promocaoAtiva = Boolean(produto.promocao_pdv_ativa);
+  const resumoPrecoKg = obterResumoPrecoPorKg(produto);
 
   return (
     <button
@@ -107,6 +109,11 @@ function ProdutoSugestaoPDV({
                 : produto.estoque_atual !== undefined &&
                   ` | Estoque: ${Math.floor(produto.estoque_atual)}`}
             </div>
+            {resumoPrecoKg.disponivel && (
+              <div className="mt-1 text-xs font-semibold text-teal-700">
+                {resumoPrecoKg.pesoFormatado} - {resumoPrecoKg.precoPorKgFormatado}
+              </div>
+            )}
           </div>
         </div>
         <div className="flex shrink-0 flex-row items-center justify-between gap-2 sm:flex-col sm:items-end sm:justify-start">
@@ -212,6 +219,7 @@ export default function PDVProdutosCard({
                 ? item.estoque_virtual !== undefined && Math.floor(item.estoque_virtual) <= 0
                 : item.estoque_atual !== undefined && Math.floor(item.estoque_atual) <= 0;
             const itemEmPromocao = Boolean(item.em_promocao);
+            const resumoPrecoKg = obterResumoPrecoPorKg(item);
 
             return (
               <div
@@ -325,12 +333,25 @@ export default function PDVProdutosCard({
                             KIT
                           </span>
                         )}
+                        {resumoPrecoKg.disponivel && (
+                          <span
+                            className="inline-flex items-center rounded-full bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-700"
+                            title={`${resumoPrecoKg.pesoFormatado} - ${resumoPrecoKg.precoFormatado}`}
+                          >
+                            {resumoPrecoKg.precoPorKgFormatado}
+                          </span>
+                        )}
                       </div>
                       <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-gray-500">
                         <span>
                           {item.quantidade} Unidade
                           {item.quantidade !== 1 ? "s" : ""} x {formatMoneyBRL(item.preco_unitario)}
                         </span>
+                        {resumoPrecoKg.disponivel && (
+                          <span className="font-medium text-teal-700">
+                            ({resumoPrecoKg.pesoFormatado})
+                          </span>
+                        )}
                         {itemEmPromocao && item.preco_venda_original > item.preco_unitario && (
                           <span className="ml-1 text-xs text-gray-400 line-through">
                             {formatMoneyBRL(item.preco_venda_original)}

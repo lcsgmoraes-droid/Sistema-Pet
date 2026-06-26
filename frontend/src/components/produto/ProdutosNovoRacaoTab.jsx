@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, Save, X } from "lucide-react";
+import { formatarPrecoPorKg } from "../../utils/racaoPrecoKg";
 import TabelaConsumoEditor from "../TabelaConsumoEditor";
 
 export default function ProdutosNovoRacaoTab({
@@ -28,6 +29,7 @@ export default function ProdutosNovoRacaoTab({
   );
   const nomeLinhaSelecionada = linhaSelecionada?.nome || "";
   const quickAddDisponivel = typeof handleCriarOpcaoRacao === "function";
+  const precoPorKgPreview = formatarPrecoPorKg(formData);
 
   const abrirModalOpcao = (tipo, titulo) => {
     setModalOpcao({ tipo, titulo });
@@ -354,6 +356,11 @@ export default function ProdutosNovoRacaoTab({
             <p>
               Peso: <strong>{formData.peso_embalagem}kg</strong>
             </p>
+            {precoPorKgPreview && (
+              <p>
+                Preco/kg: <strong>{precoPorKgPreview}</strong>
+              </p>
+            )}
             <p>
               Linha: <strong>{nomeLinhaSelecionada}</strong>
             </p>

@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { X, ChevronDown, Loader2 } from "lucide-react";
 import api from "../../api";
 import { ehRacao } from "../../helpers/deteccaoRacao"; // 🆕 Helper centralizado
+import { formatMoneyBRL } from "../../utils/formatters";
+import { compararRacoesPorPrecoKg, obterResumoPrecoPorKg } from "../../utils/racaoPrecoKg";
 import "./ModalCalculadoraRacaoPDV.css";
 
 /**
@@ -20,7 +22,7 @@ import "./ModalCalculadoraRacaoPDV.css";
  * ESCOPO DO MODAL:
  * - Exibir APENAS informações objetivas
  * - Consumo diário, duração, custo diário, custo mensal, custo/kg
- * - NÃO fazer comparações
+ * - Comparar racoes do carrinho apenas por preco/kg
  * - NÃO sugerir trocas
  * - NÃO tomar decisões
  */
@@ -38,7 +40,7 @@ export default function ModalCalculadoraRacaoPDV({
   const [mostraDropdown, setMostraDropdown] = useState(false);
 
   // Filtrar apenas rações do carrinho usando helper centralizado
-  const racoes = itensCarrinho.filter((item) => ehRacao(item));
+  const racoes = useMemo(() => itensCarrinho.filter((item) => ehRacao(item)), [itensCarrinho]);
 
   // Debug: Log das rações encontradas
   useEffect(() => {
@@ -68,6 +70,8 @@ export default function ModalCalculadoraRacaoPDV({
 
   // Buscar ração selecionada
   const racaoAtual = racoes.find((r) => r.produto_id === racaoSelecionadaId);
+  const resumoRacaoAtual = useMemo(() => obterResumoPrecoPorKg(racaoAtual), [racaoAtual]);
+  const comparativoPrecoKg = useMemo(() => compararRacoesPorPrecoKg(racoes), [racoes]);
 
   // Função para calcular consumo
   const calcularConsumo = async () => {
@@ -200,10 +204,9 @@ export default function ModalCalculadoraRacaoPDV({
                       >
                         <div className="font-medium text-gray-900">{racao.produto_nome}</div>
                         <div className="text-xs text-gray-500">
-                          {racao.peso_embalagem || racao.peso_pacote_kg
-                            ? `${racao.peso_embalagem || racao.peso_pacote_kg}kg`
-                            : ""}{" "}
-                          • R$ {(racao.preco_unitario || 0).toFixed(2)}
+                          {obterResumoPrecoPorKg(racao).disponivel
+                            ? `${obterResumoPrecoPorKg(racao).pesoFormatado} - ${obterResumoPrecoPorKg(racao).precoFormatado} - ${obterResumoPrecoPorKg(racao).precoPorKgFormatado}`
+                            : "Sem peso/preco para kg"}
                         </div>
                       </button>
                     ))}
@@ -221,20 +224,74 @@ export default function ModalCalculadoraRacaoPDV({
                 <div className="flex justify-between">
                   <span className="text-gray-600">Pacote:</span>
                   <span className="font-medium">
-                    {racaoAtual.peso_pacote_kg ? `${racaoAtual.peso_pacote_kg}kg` : "N/A"}
+                    {resumoRacaoAtual.pesoFormatado || "Sem peso"}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Preço:</span>
                   <span className="font-medium text-blue-600">
-                    R$ {(racaoAtual.preco_unitario || 0).toFixed(2)}
+                    {resumoRacaoAtual.precoFormatado || "Sem preco"}
                   </span>
                 </div>
+                {resumoRacaoAtual.disponivel && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Preco/kg:</span>
+                    <span className="font-semibold text-teal-700">
+                      {resumoRacaoAtual.precoPorKgFormatado}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* Botão Calcular */}
+          {/* Comparativo por kg */}
+          {comparativoPrecoKg.length > 1 && (
+            <div className="rounded-lg border border-teal-200 bg-teal-50 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-bold text-teal-900">Comparativo por kg</h3>
+                <span className="text-xs font-semibold text-teal-700">
+                  {comparativoPrecoKg.length} opcoes
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {comparativoPrecoKg.map((item) => (
+                  <div
+                    key={`${item.produtoId || item.nome}-${item.ordemOriginal}`}
+                    className={`rounded-lg border bg-white p-3 ${
+                      item.melhorOpcao ? "border-teal-400" : "border-teal-100"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-gray-900">
+                          {item.nome}
+                        </div>
+                        <div className="mt-1 text-xs text-gray-500">
+                          {item.pesoFormatado} - {item.precoFormatado}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-sm font-bold text-teal-700">
+                          {item.precoPorKgFormatado}
+                        </div>
+                        <div
+                          className={`mt-0.5 text-xs font-semibold ${
+                            item.melhorOpcao ? "text-green-700" : "text-orange-700"
+                          }`}
+                        >
+                          {item.melhorOpcao ? "Melhor preco/kg" : item.diferencaMelhorFormatada}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Botao Calcular */}
           <button
             onClick={calcularConsumo}
             disabled={carregando || !racaoAtual}
@@ -280,7 +337,7 @@ export default function ModalCalculadoraRacaoPDV({
                 <div className="bg-white rounded p-3 border border-green-100">
                   <div className="text-gray-600 text-xs font-semibold">Custo/Dia</div>
                   <div className="text-lg font-bold text-green-700">
-                    R$ {(resultados.custo_diario || 0).toFixed(2)}
+                    {formatMoneyBRL(resultados.custo_diario || 0)}
                   </div>
                 </div>
 
@@ -288,7 +345,7 @@ export default function ModalCalculadoraRacaoPDV({
                 <div className="bg-white rounded p-3 border border-green-100">
                   <div className="text-gray-600 text-xs font-semibold">Custo/Mês</div>
                   <div className="text-lg font-bold text-green-700">
-                    R$ {(resultados.custo_mensal || 0).toFixed(2)}
+                    {formatMoneyBRL(resultados.custo_mensal || 0)}
                   </div>
                 </div>
 
@@ -296,7 +353,7 @@ export default function ModalCalculadoraRacaoPDV({
                 <div className="bg-white rounded p-3 border border-green-100 col-span-2">
                   <div className="text-gray-600 text-xs font-semibold">Custo/kg</div>
                   <div className="text-lg font-bold text-green-700">
-                    R$ {(resultados.custo_por_kg || 0).toFixed(2)}
+                    {formatMoneyBRL(resultados.custo_por_kg || 0)}
                   </div>
                 </div>
               </div>
