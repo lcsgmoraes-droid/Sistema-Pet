@@ -207,13 +207,22 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
-Inventario atualizado em 2026-06-26, excluindo testes, migrations, CSS e builds locais:
+Inventario atualizado em 2026-06-26 por contagem fisica `splitlines()`, excluindo testes, migrations, CSS e builds locais:
 
-- 75 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 5 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 109 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 17 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 26 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 35 arquivos acima de 700 linhas e 5 acima de 1000 linhas.
+
+Fatia de 2026-06-26: os cinco arquivos backend mapeados acima de 1000 linhas sairam dessa faixa com modulos dedicados:
+
+- `backend/app/auth_routes_multitenant.py`: 1213 -> 946 linhas, com schemas em `backend/app/auth/auth_multitenant_schemas.py` e suporte de tokens/e-mails em `backend/app/auth/auth_multitenant_support.py`.
+- `backend/app/bling_integration.py`: 1236 -> 898 linhas, com pre-validacao/correcoes fiscais em `backend/app/bling_integration_fiscal.py`.
+- `backend/app/conciliacao_routes.py`: 1298 -> 612 linhas, com as rotas das tres abas em `backend/app/conciliacao_abas_routes.py`.
+- `backend/app/estoque_transferencia_parceiro_routes.py`: 1112 -> 806 linhas, com baixa/compensacao/exclusao em `backend/app/estoque/transferencia_parceiro_baixa_routes.py`.
+- `backend/app/integracao_bling_nf_routes.py`: 1206 -> 549 linhas, com helpers de NF em `backend/app/integracao_bling_nf_helpers.py` e vinculo NF-pedido em `backend/app/integracao_bling_nf_pedidos.py`.
+- Contrato dedicado: `backend/tests/unit/test_backend_final_large_files_refactor.py`, garantindo que esses cinco arquivos sigam abaixo de 1000 linhas e que os imports publicos antigos continuem compativeis.
 
 Fatia de 2026-06-24: `backend/app/main.py` foi dividido em bootstrap leve e modulos dedicados:
 
