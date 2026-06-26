@@ -209,12 +209,19 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26 por contagem fisica `splitlines()`, excluindo testes, migrations, CSS e builds locais:
 
-- 110 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 107 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
 - Recorte backend em `backend/app`: 71 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 39 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 36 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+
+Fatia frontend 700 batch de 2026-06-26: tres telas grandes sairam da faixa acima de 700 linhas com extracoes de blocos ja isolados:
+
+- `frontend/src/pages/ecommerce/EcommerceAccountPage.jsx`: 964 -> 166 linhas, com formulario de perfil em `frontend/src/pages/ecommerce/EcommerceAccountProfileForm.jsx`, cards de autenticacao em `frontend/src/pages/ecommerce/EcommerceAccountAuthCards.jsx` e propTypes compartilhados em `frontend/src/pages/ecommerce/ecommerceAccountPropTypes.js`.
+- `frontend/src/pages/BlingFlowMonitor.jsx`: 955 -> 300 linhas, com cards/narrativas em `frontend/src/pages/blingFlowMonitor/BlingFlowMonitorCards.jsx` e fallback de endpoints em `frontend/src/pages/blingFlowMonitor/blingFlowMonitorUtils.js`.
+- `frontend/src/pages/CentralAjuda.jsx`: 951 -> 309 linhas, com base de conhecimento em `frontend/src/pages/centralAjuda/centralAjudaKnowledge.js`.
+- Contrato dedicado: `frontend/scripts/test-large-files-700-batch-refactor.mjs`, garantindo que os alvos e modulos extraidos sigam abaixo de 700 linhas.
 
 Fatia frontend zero 1000 de 2026-06-26: os cinco arquivos finais de `frontend/src` acima de 1000 linhas sairam dessa faixa com extracoes focadas e sem mudanca de rota/import publico:
 
