@@ -53,7 +53,7 @@ def test_checkout_success_screen_does_not_tell_online_customer_to_pay_on_deliver
 
 
 def test_app_order_tracking_accepts_app_channel_sales():
-    source = _read_mobile_source("backend/app/routes/app_mobile_routes.py")
+    source = _read_mobile_source("backend/app/routes/app_mobile_rastreio_routes.py")
 
     assert 'Venda.canal.in_(["ecommerce", "app", "aplicativo"])' in source
 

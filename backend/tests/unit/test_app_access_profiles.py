@@ -48,7 +48,7 @@ def grant(**kwargs):
 
 
 def test_app_access_profile_model_and_migration_exist():
-    models = read_backend("app/models.py")
+    models = read_backend("app/models.py") + read_backend("app/models_authz.py")
     migration = read_backend("alembic/versions/sv20260613a1_app_access_profiles.py")
 
     assert "class AppAccessProfile" in models
