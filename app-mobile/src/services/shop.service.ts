@@ -175,7 +175,8 @@ export async function limparCarrinho(): Promise<void> {
 export async function repetirPedido(pedido: { itens?: { produto_id?: number | null; quantidade: number }[] }): Promise<number> {
   await limparCarrinho();
   let adicionados = 0;
-  for (const item of pedido.itens ?? []) {
+  const itens = Array.isArray(pedido.itens) ? pedido.itens : [];
+  for (const item of itens) {
     if (!item.produto_id) continue;
     try {
       await adicionarAoCarrinho(item.produto_id, item.quantidade);
@@ -333,9 +334,13 @@ export async function compararRacoesCategoria(params: {
 // PEDIDOS - histórico de pedidos do cliente
 // ─────────────────────────────────────────────────────────────
 
+function isPedidoRecord(value: unknown): value is Pedido {
+  return !!value && typeof value === 'object';
+}
+
 export async function listarPedidos(): Promise<Pedido[]> {
   const { data } = await api.get<{ pedidos: Pedido[] }>('/checkout/pedidos');
-  return Array.isArray(data?.pedidos) ? data.pedidos : [];
+  return Array.isArray(data?.pedidos) ? data.pedidos.filter(isPedidoRecord) : [];
 }
 
 export async function consultarStatusPedido(pedidoId: string): Promise<Pedido> {
