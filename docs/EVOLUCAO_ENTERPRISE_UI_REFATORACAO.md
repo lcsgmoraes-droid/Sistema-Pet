@@ -209,13 +209,27 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-27 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
 
-- 71 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 70 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 63 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 62 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 8 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 11 arquivos de teste em `backend/tests` e 2 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 7 de 2026-06-27: `backend/app/compras_pendencias_routes.py` saiu da faixa acima de 700 linhas ao virar fachada de subrouters e helpers focados:
+
+- `backend/app/compras_pendencias_routes.py`: 941 -> 66 linhas, mantendo o prefixo publico `/compras-pendencias`.
+- `backend/app/compras_pendencias_constants.py`: concentra constantes e status validos.
+- `backend/app/compras_pendencias_schemas.py`: concentra payloads de criacao, atualizacao e registro de e-mail.
+- `backend/app/compras_pendencias_utils.py`: concentra normalizacao e formatadores.
+- `backend/app/compras_pendencias_notas.py`: concentra leitura de NF, pedido, fornecedor, divergencias e mensagem sugerida.
+- `backend/app/compras_pendencias_serializacao.py`: concentra historico, sincronizacao de itens e serializacao.
+- `backend/app/compras_pendencias_documentos.py`: concentra geracao de PDF e HTML do e-mail.
+- `backend/app/compras_pendencias_criacao_routes.py`: concentra `POST /compras-pendencias/notas/{nota_id}`.
+- `backend/app/compras_pendencias_consulta_routes.py`: concentra listagem, status de envio, busca e atualizacao.
+- `backend/app/compras_pendencias_email_routes.py`: concentra registro/envio de e-mail, texto e PDF.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_7_refactor.py`, garantindo fachada, paths publicos, exports compartilhados e modulos extraidos abaixo de 700 linhas.
 
 Fatia backend 700 batch 6 de 2026-06-27: `backend/app/dre_routes.py` saiu da faixa acima de 700 linhas ao virar fachada dos endpoints de DRE:
 
