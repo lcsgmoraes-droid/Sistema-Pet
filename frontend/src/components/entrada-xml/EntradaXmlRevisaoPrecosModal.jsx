@@ -1,3 +1,4 @@
+import { useState } from "react";
 import PropTypes from "prop-types";
 import { formatBRL, formatMoneyBRL, formatPercent } from "../../utils/formatters";
 import ExportActionButton from "../ui/ExportActionButton";
@@ -30,6 +31,8 @@ function EntradaXmlRevisaoPrecosModal({
   loading,
   onVoltar,
 }) {
+  const [mostrarConfirmacaoProcessamento, setMostrarConfirmacaoProcessamento] = useState(false);
+
   if (!aberto || !previewProcessamento) return null;
 
   const itensVinculados = (previewProcessamento.itens || []).filter(
@@ -91,7 +94,7 @@ function EntradaXmlRevisaoPrecosModal({
     return true;
   });
 
-  const renderAcoesProcessamento = () => {
+  const renderAcoesProcessamento = ({ modoConfirmacao = false } = {}) => {
     const resumoEstoque = acoes.lancar_estoque ? itensVinculados.length : 0;
     const resumoCustos = acoes.atualizar_custo ? custosAtualizados : 0;
     const resumoPrecos = acoes.atualizar_preco_venda ? precosAlterados : 0;
@@ -100,7 +103,9 @@ function EntradaXmlRevisaoPrecosModal({
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h3 className="text-sm font-bold text-gray-900">Acoes ao processar</h3>
+            <h3 className="text-sm font-bold text-gray-900">
+              {modoConfirmacao ? "O que sera lancado agora" : "Acoes ao processar"}
+            </h3>
             {previewProcessamento.processamento_mensagem && (
               <p className="mt-1 text-sm text-gray-600">
                 {previewProcessamento.processamento_mensagem}
@@ -543,16 +548,59 @@ function EntradaXmlRevisaoPrecosModal({
                 </div>
               </div>
               <button
-                onClick={confirmarProcessamento}
+                onClick={() => setMostrarConfirmacaoProcessamento(true)}
                 disabled={loading}
                 className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-lg shadow disabled:opacity-50 transition-all"
               >
-                {loading ? "Processando..." : "Confirmar e Processar Nota"}
+                {loading ? "Processando..." : "Processar NF"}
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {mostrarConfirmacaoProcessamento && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-gray-50 shadow-xl">
+            <div className="border-b border-gray-200 bg-white px-5 py-4">
+              <h3 className="text-lg font-bold text-gray-900">
+                Confirmacao final do processamento
+              </h3>
+              <p className="mt-1 text-sm text-gray-600">
+                Confira uma ultima vez antes de lancar a NF-e {previewProcessamento.numero_nota}.
+              </p>
+            </div>
+
+            <div className="space-y-4 p-5">
+              {renderAcoesProcessamento({ modoConfirmacao: true })}
+
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                Ao confirmar, o sistema executa somente as opcoes marcadas acima. Se alguma acao
+                estiver desmarcada, ela nao sera lancada nesta NF.
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-3 border-t border-gray-200 bg-white px-5 py-4">
+              <button
+                type="button"
+                onClick={() => setMostrarConfirmacaoProcessamento(false)}
+                disabled={loading}
+                className="rounded-lg border border-gray-300 px-5 py-2.5 font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Voltar para revisar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarProcessamento}
+                disabled={loading}
+                className="rounded-lg bg-green-600 px-6 py-2.5 font-bold text-white shadow hover:bg-green-700 disabled:opacity-50"
+              >
+                {loading ? "Processando..." : "Processar NF agora"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
