@@ -95,13 +95,19 @@ def test_frontend_tem_tela_financeira_de_ponto_equilibrio():
         [
             _frontend_source("src/pages/PontoEquilibrio.jsx"),
             _frontend_source("src/pages/ponto-equilibrio/PontoEquilibrioPage.jsx"),
-            _frontend_source("src/pages/ponto-equilibrio/PontoEquilibrioHeaderFilters.jsx"),
+            _frontend_source(
+                "src/pages/ponto-equilibrio/PontoEquilibrioHeaderFilters.jsx"
+            ),
             _frontend_source("src/pages/ponto-equilibrio/PontoEquilibrioResumoTab.jsx"),
             _frontend_source("src/pages/ponto-equilibrio/pontoEquilibrioConstants.js"),
             _frontend_source("src/pages/ponto-equilibrio/pontoEquilibrioUtils.js"),
-            _frontend_source("src/pages/ponto-equilibrio/usePontoEquilibrioController.js"),
+            _frontend_source(
+                "src/pages/ponto-equilibrio/usePontoEquilibrioController.js"
+            ),
             _frontend_source("src/pages/ponto-equilibrio/DetalhamentoMargemPanel.jsx"),
-            _frontend_source("src/pages/ponto-equilibrio/DetalhesPontoEquilibrioDrawer.jsx"),
+            _frontend_source(
+                "src/pages/ponto-equilibrio/DetalhesPontoEquilibrioDrawer.jsx"
+            ),
             _frontend_source("src/pages/ponto-equilibrio/SimuladorImpactoPanel.jsx"),
             _frontend_source("src/pages/ponto-equilibrio/AnaliseCustosPanel.jsx"),
         ]

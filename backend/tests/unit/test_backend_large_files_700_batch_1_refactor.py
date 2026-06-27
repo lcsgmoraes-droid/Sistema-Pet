@@ -35,7 +35,9 @@ def test_backend_large_files_700_batch_1_extractions_exist_and_stay_small():
 
     for relative_path in extracted_files:
         path = ROOT / relative_path
-        assert path.exists(), f"Missing extracted backend refactor file: {relative_path}"
+        assert path.exists(), (
+            f"Missing extracted backend refactor file: {relative_path}"
+        )
         assert line_count(relative_path) <= 700, (
             f"{relative_path} has {line_count(relative_path)} lines; expected <= 700"
         )
