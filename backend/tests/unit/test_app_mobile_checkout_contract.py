@@ -39,7 +39,7 @@ def test_orders_screen_can_reopen_pending_payment_link():
 
     assert "Linking.openURL(item.payment_url)" in source
     assert "Pagar agora" in source
-    assert 'item.status === "pendente"' in source
+    assert 'statusKey === "pendente"' in source
 
 
 def test_checkout_success_screen_does_not_tell_online_customer_to_pay_on_delivery():
@@ -112,7 +112,7 @@ def test_mobile_orders_screen_polls_pending_orders_until_webhook_updates_status(
 
     assert "PENDING_ORDER_POLL_MS" in orders
     assert "setInterval(carregar, PENDING_ORDER_POLL_MS)" in orders
-    assert 'pedido.status === "pendente"' in orders
+    assert 'getPedidoStatusKey(pedido) === "pendente"' in orders
     assert "hasOpenFulfillmentOrder" in orders
     assert "clearInterval(interval)" in orders
 
@@ -159,6 +159,22 @@ def test_mobile_orders_screen_shows_friendly_empty_and_error_states():
     assert "Nao foi possivel carregar seus pedidos" in orders
     assert "Nenhum pedido feito" in orders
     assert "Tentar novamente" in orders
+
+
+def test_mobile_orders_screen_is_defensive_with_malformed_order_history():
+    orders = _read_mobile_source("app-mobile/src/screens/orders/OrdersScreen.tsx")
+    service = _read_mobile_source("app-mobile/src/services/shop.service.ts")
+
+    assert "function safeText" in orders
+    assert "function getPedidoStatusKey" in orders
+    assert "function getPedidoItens" in orders
+    assert "const itens = getPedidoItens(item)" in orders
+    assert "const totalItens = getPedidoItens(pedido).length" in orders
+    assert "const retiradoPor = safeText(item.retirado_por).trim()" in orders
+    assert "pedido.itens.length" not in orders
+    assert "item.itens?.slice" not in orders
+    assert ".filter(isPedidoRecord)" in service
+    assert "Array.isArray(pedido.itens)" in service
 
 
 def test_profile_points_card_wraps_without_overflow_on_narrow_mobile():

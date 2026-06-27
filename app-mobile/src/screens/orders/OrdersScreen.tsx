@@ -162,21 +162,40 @@ const CANAL_LABELS: Record<string, string> = {
 
 const PENDING_ORDER_POLL_MS = 12_000;
 
-function getCanalLabel(pedido: Pedido): string {
-  if (pedido.canal_label) return pedido.canal_label;
-  const canal = (pedido.canal || pedido.origem || "ecommerce")
+type PedidoItemResumo = NonNullable<Pedido["itens"]>[number];
+
+function safeText(value: unknown, fallback = ""): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return fallback;
+  return String(value);
+}
+
+function getPedidoStatusKey(pedido?: Pedido | null): string {
+  const status = safeText(pedido?.status, "desconhecido").trim().toLowerCase();
+  return status || "desconhecido";
+}
+
+function getPedidoItens(pedido?: Pedido | null): PedidoItemResumo[] {
+  return Array.isArray(pedido?.itens)
+    ? pedido.itens.filter((item): item is PedidoItemResumo => !!item && typeof item === "object")
+    : [];
+}
+
+function getCanalLabel(pedido?: Pedido | null): string {
+  if (pedido?.canal_label) return safeText(pedido.canal_label, "Ecommerce");
+  const canal = safeText(pedido?.canal || pedido?.origem, "ecommerce")
     .trim()
     .toLowerCase()
     .replace(/[-\s]+/g, "_");
   return CANAL_LABELS[canal] || canal.replace(/_/g, " ") || "Ecommerce";
 }
 
-function getEntregaStatusConfig(pedido: Pedido) {
-  const statusEntrega = pedido.status_entrega || "";
+function getEntregaStatusConfig(pedido?: Pedido | null) {
+  const statusEntrega = safeText(pedido?.status_entrega).trim().toLowerCase();
   if (!statusEntrega) return null;
 
-  const retiradaNaLoja = !pedido.tem_entrega && !!pedido.tipo_retirada;
-  if (pedido.tem_entrega && statusEntrega === "entregue") {
+  const retiradaNaLoja = !pedido?.tem_entrega && !!pedido?.tipo_retirada;
+  if (pedido?.tem_entrega && statusEntrega === "entregue") {
     return { label: "Compra com entrega", cor: "#10B981" };
   }
   if (retiradaNaLoja && statusEntrega === "pendente") {
@@ -192,24 +211,24 @@ function getEntregaStatusConfig(pedido: Pedido) {
   return STATUS_ENTREGA[statusEntrega] || null;
 }
 
-function hasOpenFulfillmentOrder(pedido: Pedido): boolean {
+function hasOpenFulfillmentOrder(pedido?: Pedido | null): boolean {
   if (!pedido || pedido.tem_entrega) return false;
-  const statusEntrega = (pedido.status_entrega || "").trim().toLowerCase();
+  const statusEntrega = safeText(pedido.status_entrega).trim().toLowerCase();
   return Boolean(pedido.tipo_retirada) && ["pendente", "pronto"].includes(statusEntrega);
 }
 
-function getPedidoRenderKey(pedido: Pedido, index?: number): string {
-  if (pedido.historico_id) return pedido.historico_id;
-  if (pedido.pedido_id) return `pedido:${pedido.pedido_id}`;
-  if (pedido.venda_id) return `venda:${pedido.venda_id}`;
-  if (pedido.numero) return `numero:${pedido.numero}`;
+function getPedidoRenderKey(pedido?: Pedido | null, index?: number): string {
+  if (pedido?.historico_id) return safeText(pedido.historico_id);
+  if (pedido?.pedido_id) return `pedido:${safeText(pedido.pedido_id)}`;
+  if (pedido?.venda_id) return `venda:${safeText(pedido.venda_id)}`;
+  if (pedido?.numero) return `numero:${safeText(pedido.numero)}`;
   return `pedido-sem-id-${index ?? "item"}`;
 }
 
-function getPedidoTitulo(pedido: Pedido): string {
-  const numero = pedido.pedido_id || pedido.numero || pedido.venda_id;
+function getPedidoTitulo(pedido?: Pedido | null): string {
+  const numero = pedido?.pedido_id || pedido?.numero || pedido?.venda_id;
   if (!numero) return "Pedido";
-  return `#${String(numero).slice(-8).toUpperCase()}`;
+  return `#${safeText(numero).slice(-8).toUpperCase()}`;
 }
 
 export default function OrdersScreen() {
@@ -223,13 +242,14 @@ export default function OrdersScreen() {
 
   async function handleRepetirPedido(pedido: Pedido) {
     const pedidoKey = getPedidoRenderKey(pedido);
+    const totalItens = getPedidoItens(pedido).length;
     setRepetindo(pedidoKey);
     try {
       const adicionados = await repetirPedido(pedido);
       await recarregarCarrinho();
       Alert.alert(
         "🛒 Carrinho atualizado",
-        `${adicionados} de ${pedido.itens.length} produto(s) foram adicionados ao carrinho.`,
+        `${adicionados} de ${totalItens} produto(s) foram adicionados ao carrinho.`,
         [
           { text: "Continuar comprando", style: "cancel" },
           {
@@ -269,7 +289,7 @@ export default function OrdersScreen() {
 
   useEffect(() => {
     const temPedidoPendente = pedidos.some(
-      (pedido) => pedido.status === "pendente",
+      (pedido) => getPedidoStatusKey(pedido) === "pendente",
     );
     const temRetiradaAberta = pedidos.some(hasOpenFulfillmentOrder);
     if (!temPedidoPendente && !temRetiradaAberta) return;
@@ -290,21 +310,30 @@ export default function OrdersScreen() {
   }
 
   function renderPedido({ item }: { item: Pedido }) {
+    if (!item || typeof item !== "object") return null;
+
     const pedidoKey = getPedidoRenderKey(item);
-    const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.desconhecido;
+    const itens = getPedidoItens(item);
+    const itensPreview = itens.slice(0, 3);
+    const itensRestantes = Math.max(itens.length - 3, 0);
+    const statusKey = getPedidoStatusKey(item);
+    const statusEntrega = safeText(item.status_entrega).trim().toLowerCase();
+    const palavraChave = safeText(item.palavra_chave_retirada).trim();
+    const retiradoPor = safeText(item.retirado_por).trim();
+    const cfg = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.desconhecido;
     const temEntrega = Boolean(item.tem_entrega);
     const entregaCfg = getEntregaStatusConfig(item);
     const temPalavraChave =
-      !!item.palavra_chave_retirada &&
-      item.status !== "cancelado" &&
-      item.status_entrega !== "entregue";
+      !!palavraChave &&
+      statusKey !== "cancelado" &&
+      statusEntrega !== "entregue";
     const podeRastrear =
       item.pedido_id &&
       temEntrega &&
       ["aprovado", "em_preparo", "pronto", "pago", "criado"].includes(
-        item.status,
+        statusKey,
       );
-    const podePagarAgora = item.status === "pendente" && !!item.payment_url;
+    const podePagarAgora = statusKey === "pendente" && !!item.payment_url;
     const canalLabel = getCanalLabel(item);
 
     return (
@@ -344,27 +373,27 @@ export default function OrdersScreen() {
             </Text>
           </View>
         )}
-        {!temEntrega && item.status_entrega === "entregue" && item.retirado_por && (
+        {!temEntrega && statusEntrega === "entregue" && !!retiradoPor && (
           <Text style={styles.retiradoPorTexto}>
-            Retirado por {item.retirado_por}
+            Retirado por {retiradoPor}
           </Text>
         )}
 
         {/* Itens */}
         <View style={styles.itensList}>
-          {item.itens?.slice(0, 3).map((it, idx) => (
+          {itensPreview.map((it, idx) => (
             <View key={idx} style={styles.itemLinha}>
               <View style={styles.itemQtdBadge}>
-                <Text style={styles.itemQtd}>{it.quantidade}x</Text>
+                <Text style={styles.itemQtd}>{safeText(it.quantidade, "0")}x</Text>
               </View>
               <Text style={styles.itemNome} numberOfLines={1}>
-                {it.nome}
+                {safeText(it.nome, "Produto")}
               </Text>
             </View>
           ))}
-          {(item.itens?.length ?? 0) > 3 && (
+          {itensRestantes > 0 && (
             <Text style={styles.itemMais}>
-              +{item.itens.length - 3} outros itens
+              +{itensRestantes} outros itens
             </Text>
           )}
         </View>
@@ -378,7 +407,7 @@ export default function OrdersScreen() {
                 Fale no caixa para retirar:
               </Text>
               <Text style={styles.palavraChaveValor}>
-                {item.palavra_chave_retirada?.toUpperCase()}
+                {palavraChave.toUpperCase()}
               </Text>
             </View>
           </View>
