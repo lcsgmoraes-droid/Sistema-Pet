@@ -124,6 +124,7 @@ export default function useProdutosNovoPageComposition({
   const tabsProps = {
     abaAtiva,
     onChangeAba: setAbaAtiva,
+    tipo: formData.tipo,
     tipoProduto: formData.tipo_produto,
     tipoKit: formData.tipo_kit,
   };

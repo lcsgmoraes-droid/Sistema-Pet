@@ -7,6 +7,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 import logging
 
+from app.produtos.estoque_regras import aplicar_regras_servico_sem_estoque
+
 from ..produtos_models import Produto, ProdutoKitComponente
 
 logger = logging.getLogger(__name__)
@@ -86,7 +88,9 @@ class ProdutoService:
         dados["codigo"] = normalizar_sku_produto(dados.get("codigo"))
         validar_sku_unico_produto(db, sku=dados["codigo"], tenant_id=tenant_id)
 
-        _aplicar_regras_granel(dados)
+        tipo_comercial = aplicar_regras_servico_sem_estoque(dados)
+        if tipo_comercial != "servico":
+            _aplicar_regras_granel(dados)
         tipo_produto = dados.get("tipo_produto", "SIMPLES")
 
         # ========================================
@@ -164,8 +168,11 @@ class ProdutoService:
         # CRIAR PRODUTO
         # ========================================
 
-        # Forçar controle_lote=True para todos os produtos
-        dados["controle_lote"] = True
+        if tipo_comercial == "servico":
+            aplicar_regras_servico_sem_estoque(dados)
+        else:
+            # Produtos fisicos usam lotes/FIFO no fluxo atual.
+            dados["controle_lote"] = True
 
         # Remover campos None ou vazios (exceto campos numéricos que podem ser 0)
         dados_limpos = {

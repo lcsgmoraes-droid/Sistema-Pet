@@ -1,5 +1,8 @@
 import { createProduto, updateProduto } from "../api/produtos";
-import { normalizarCodigosBarrasAlternativosPayload } from "../pages/produtosFormUtils";
+import {
+  normalizarCodigosBarrasAlternativosPayload,
+  normalizarTipoComercialProduto,
+} from "../pages/produtosFormUtils";
 import { debugLog } from "../utils/debug";
 import { normalizeMarkdownContent } from "../utils/safeMarkdown";
 
@@ -44,6 +47,8 @@ export default function useProdutosNovoSubmit({
       const lojaFisicaAtiva = formData.ativo !== false && formData.situacao !== false;
       const produtoEhGranel =
         Boolean(formData.e_granel) || (formData.nome || "").toLowerCase().includes("granel");
+      const tipoComercial = normalizarTipoComercialProduto(formData.tipo);
+      const servicoPuro = tipoComercial === "servico";
       const produtoComComposicao =
         formData.tipo_produto === "KIT" ||
         (formData.tipo_produto === "VARIACAO" && formData.tipo_kit);
@@ -51,6 +56,7 @@ export default function useProdutosNovoSubmit({
       const dados = {
         codigo: skuNormalizado,
         nome: formData.nome,
+        tipo: tipoComercial,
         descricao_curta: descricaoNormalizada || null,
         codigo_barras: formData.codigo_barras || null,
         gtin_ean: formData.gtin_ean || null,
@@ -78,20 +84,33 @@ export default function useProdutosNovoSubmit({
         preco_app_promo_fim: formData.preco_app_promo_fim || null,
         anunciar_ecommerce: lojaFisicaAtiva ? Boolean(formData.anunciar_ecommerce) : false,
         anunciar_app: lojaFisicaAtiva ? Boolean(formData.anunciar_app) : false,
-        controle_lote: formData.controle_lote || false,
-        estoque_minimo: formData.estoque_minimo ? parseInt(formData.estoque_minimo) : 0,
-        estoque_maximo: formData.estoque_maximo ? parseInt(formData.estoque_maximo) : null,
-        participa_sugestao_compra: produtoEhGranel
+        controle_lote: servicoPuro ? false : formData.controle_lote || false,
+        estoque_minimo: servicoPuro
+          ? 0
+          : formData.estoque_minimo
+            ? parseInt(formData.estoque_minimo)
+            : 0,
+        estoque_maximo: servicoPuro
+          ? null
+          : formData.estoque_maximo
+            ? parseInt(formData.estoque_maximo)
+            : null,
+        participa_sugestao_compra: servicoPuro || produtoEhGranel
           ? false
           : formData.participa_sugestao_compra !== false,
         categoria_id: formData.categoria_id ? parseInt(formData.categoria_id) : null,
         marca_id: formData.marca_id ? parseInt(formData.marca_id) : null,
         departamento_id: formData.departamento_id ? parseInt(formData.departamento_id) : null,
-        tipo_produto: produtoEhGranel ? "SIMPLES" : formData.tipo_produto || "SIMPLES",
+        tipo_produto: servicoPuro || produtoEhGranel ? "SIMPLES" : formData.tipo_produto || "SIMPLES",
         produto_pai_id: formData.produto_pai_id || null,
-        tipo_kit: produtoComComposicao ? (formData.e_kit_fisico ? "FISICO" : "VIRTUAL") : null,
-        e_kit_fisico: produtoComComposicao ? formData.e_kit_fisico : null,
-        composicao_kit: produtoComComposicao ? composicaoKitNormalizada : null,
+        tipo_kit:
+          !servicoPuro && produtoComComposicao
+            ? formData.e_kit_fisico
+              ? "FISICO"
+              : "VIRTUAL"
+            : null,
+        e_kit_fisico: !servicoPuro && produtoComComposicao ? formData.e_kit_fisico : null,
+        composicao_kit: !servicoPuro && produtoComComposicao ? composicaoKitNormalizada : null,
         e_granel: produtoEhGranel,
         produto_predecessor_id: formData.produto_predecessor_id || null,
         motivo_descontinuacao: formData.motivo_descontinuacao || null,

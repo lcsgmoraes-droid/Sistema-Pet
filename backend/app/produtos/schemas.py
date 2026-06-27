@@ -9,6 +9,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.produtos.estoque_regras import normalizar_tipo_comercial_produto
+
 
 # ==========================================
 # SCHEMAS - CATEGORIAS
@@ -173,6 +175,7 @@ class ProdutoBase(BaseModel):
     categoria_id: Optional[int] = None
     marca_id: Optional[int] = None
     departamento_id: Optional[int] = None
+    tipo: Optional[str] = "produto"
     unidade: str = "UN"
     e_granel: Optional[bool] = False
     participa_sugestao_compra: Optional[bool] = True
@@ -238,6 +241,11 @@ class ProdutoBase(BaseModel):
     produto_predecessor_id: Optional[int] = None  # ID do produto que este substitui
     motivo_descontinuacao: Optional[str] = None  # Motivo da substituiÃ§Ã£o
 
+    @field_validator("tipo", mode="before")
+    @classmethod
+    def normalizar_tipo(cls, value):
+        return normalizar_tipo_comercial_produto(value)
+
 
 class ProdutoCreate(ProdutoBase):
     """
@@ -266,6 +274,7 @@ class ProdutoUpdate(BaseModel):
     categoria_id: Optional[int] = None
     marca_id: Optional[int] = None
     departamento_id: Optional[int] = None
+    tipo: Optional[str] = None
     unidade: Optional[str] = None
     e_granel: Optional[bool] = None
     participa_sugestao_compra: Optional[bool] = None
@@ -329,6 +338,11 @@ class ProdutoUpdate(BaseModel):
     # Sistema Predecessor/Sucessor
     produto_predecessor_id: Optional[int] = None
     motivo_descontinuacao: Optional[str] = None
+
+    @field_validator("tipo", mode="before")
+    @classmethod
+    def normalizar_tipo(cls, value):
+        return normalizar_tipo_comercial_produto(value)
 
 
 class ProdutoAtivoUpdate(BaseModel):

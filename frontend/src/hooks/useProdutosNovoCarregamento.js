@@ -13,6 +13,8 @@ import {
 import {
   montarEstadoProdutoClonado,
   normalizarCodigosBarrasAlternativosCampo,
+  normalizarTipoComercialProduto,
+  produtoControlaEstoque,
 } from "../pages/produtosFormUtils";
 
 const construirListaHierarquica = (categorias, parentId = null, nivel = 0) => {
@@ -184,7 +186,7 @@ export default function useProdutosNovoCarregamento({
         departamento_id: produto.departamento_id || "",
         unidade: produto.unidade || "UN",
         descricao: normalizeMarkdownContent(produto.descricao_curta || ""),
-        tipo: produto.tipo || "produto",
+        tipo: normalizarTipoComercialProduto(produto.tipo),
         preco_custo: produto.preco_custo || "",
         preco_venda: produto.preco_venda || "",
         preco_promocional: produto.preco_promocional || "",
@@ -204,8 +206,14 @@ export default function useProdutosNovoCarregamento({
         situacao: produto.situacao ?? true,
         estoque_minimo: produto.estoque_minimo || "",
         estoque_maximo: produto.estoque_maximo || "",
-        participa_sugestao_compra: produto.participa_sugestao_compra ?? true,
-        controle_lote: produto.controle_lote ?? true,
+        participa_sugestao_compra:
+          normalizarTipoComercialProduto(produto.tipo) === "servico"
+            ? false
+            : produto.participa_sugestao_compra ?? true,
+        controle_lote:
+          normalizarTipoComercialProduto(produto.tipo) === "servico"
+            ? false
+            : produto.controle_lote ?? true,
         markup,
         tipo_produto:
           Boolean(produto.e_granel) || (produto.nome || "").toLowerCase().includes("granel")
@@ -315,7 +323,7 @@ export default function useProdutosNovoCarregamento({
         const lotesRes = await getLotes(id);
         const lotesCarregados = lotesRes.data || [];
         setLotes(lotesCarregados);
-        if (lotesCarregados.length > 0 && !produto.controle_lote) {
+        if (lotesCarregados.length > 0 && !produto.controle_lote && produtoControlaEstoque(produto)) {
           setFormData((prev) => ({ ...prev, controle_lote: true }));
         }
       } catch (error) {

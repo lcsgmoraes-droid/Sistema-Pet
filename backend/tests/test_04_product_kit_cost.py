@@ -132,6 +132,34 @@ def test_produto_service_cria_kit_e_sincroniza_custo(monkeypatch):
     assert db.commit_count == 1
 
 
+def test_produto_service_cria_servico_sem_controle_de_estoque():
+    db = FakeDB()
+
+    produto = ProdutoService.create_produto(
+        dados={
+            "codigo": "CONS-001",
+            "nome": "Consulta clinica",
+            "tipo": "servico",
+            "tipo_produto": "SIMPLES",
+            "preco_custo": 0,
+            "preco_venda": 120,
+            "controle_lote": True,
+            "estoque_minimo": 5,
+            "estoque_maximo": 10,
+            "participa_sugestao_compra": True,
+            "user_id": 1,
+        },
+        db=db,
+        tenant_id="tenant-teste",
+    )
+
+    assert produto.tipo == "servico"
+    assert produto.controle_lote is False
+    assert produto.estoque_minimo == 0
+    assert produto.estoque_maximo is None
+    assert produto.participa_sugestao_compra is False
+
+
 def test_produto_service_nao_transforma_variacao_comum_em_variacao_kit():
     db = FakeDB()
 

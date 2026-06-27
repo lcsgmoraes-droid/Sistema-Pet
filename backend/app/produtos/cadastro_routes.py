@@ -14,6 +14,10 @@ from app.produtos.core import (
     _normalizar_promocao_erp_payload,
     _normalizar_sku_produto,
 )
+from app.produtos.estoque_regras import (
+    aplicar_regras_servico_sem_estoque,
+    normalizar_tipo_comercial_produto,
+)
 from app.produtos.listagem import _resolver_promocao_erp_produto
 from app.produtos.racao import _normalizar_payload_racao
 from app.produtos.schemas import ProdutoCreate, ProdutoResponse, ProdutoUpdate
@@ -373,6 +377,14 @@ def atualizar_produto(
     dados_recebidos = _normalizar_payload_granel(
         _normalizar_payload_racao(dados_recebidos)
     )
+    tipo_comercial_final = normalizar_tipo_comercial_produto(
+        dados_recebidos.get("tipo", produto.tipo)
+    )
+    if tipo_comercial_final == "servico":
+        dados_recebidos["tipo"] = "servico"
+        aplicar_regras_servico_sem_estoque(dados_recebidos)
+    elif "tipo" in dados_recebidos:
+        dados_recebidos["tipo"] = tipo_comercial_final
     dados_recebidos = _normalizar_promocao_erp_payload(dados_recebidos, produto)
 
     # ========================================

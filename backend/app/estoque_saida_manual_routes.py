@@ -34,6 +34,7 @@ from .produtos_models import (
     ProdutoLote,
     EstoqueMovimentacao,
 )
+from .produtos.estoque_regras import mensagem_servico_sem_estoque, produto_eh_servico
 from .bling_estoque_sync import sincronizar_bling_background
 import logging
 
@@ -107,6 +108,9 @@ def saida_estoque(
     # ========================================
     # 🔒 TRAVA 2 — VALIDAÇÃO: PRODUTO PAI NÃO TEM ESTOQUE
     # ========================================
+    if produto_eh_servico(produto):
+        raise HTTPException(status_code=400, detail=mensagem_servico_sem_estoque(produto))
+
     if produto.is_parent:
         raise HTTPException(
             status_code=400,

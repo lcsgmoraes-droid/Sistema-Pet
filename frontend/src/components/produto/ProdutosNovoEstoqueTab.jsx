@@ -1,3 +1,5 @@
+import { produtoControlaEstoque } from "../../pages/produtosFormUtils";
+
 export default function ProdutosNovoEstoqueTab({
   formData,
   formatarData,
@@ -9,6 +11,19 @@ export default function ProdutosNovoEstoqueTab({
   lotes,
   setModalEntrada,
 }) {
+  if (!produtoControlaEstoque(formData)) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+          <p className="mt-4 text-lg font-medium text-gray-900">Servico sem estoque proprio</p>
+          <p className="mt-2 text-sm text-gray-700">
+            Cadastre os insumos consumidos como produtos e movimente o estoque dos insumos.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {formData.tipo_produto === "PAI" ? (

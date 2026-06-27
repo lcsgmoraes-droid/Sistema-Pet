@@ -15,9 +15,11 @@ import {
   montarPayloadFornecedorProduto,
   montarPayloadMovimentoEstoque,
   montarPayloadProdutoParaSalvar,
+  normalizarTipoComercialProduto,
   normalizarCodigosBarrasAlternativosCampo,
   normalizarCodigosBarrasAlternativosPayload,
   organizarCategoriasHierarquicas,
+  produtoControlaEstoque,
   validarArquivoImagemProduto,
   validarProdutoParaSalvar,
 } from "./produtosFormUtils.js";
@@ -284,6 +286,8 @@ test("monta payload numerico para salvar produto respeitando canais ativos", () 
       preco_custo: 12.5,
       preco_venda: 20,
       margem_lucro: 60,
+      tipo: "produto",
+      controle_lote: false,
       estoque_minimo: 0,
       estoque_maximo: 4,
       categoria_id: null,
@@ -293,6 +297,30 @@ test("monta payload numerico para salvar produto respeitando canais ativos", () 
       anunciar_app: false,
     },
   );
+});
+
+test("normaliza tipo comercial e identifica servico como nao estocavel", () => {
+  assert.equal(normalizarTipoComercialProduto("ambos"), "produto_servico");
+  assert.equal(normalizarTipoComercialProduto("servico"), "servico");
+  assert.equal(normalizarTipoComercialProduto("servi\u00e7o"), "servico");
+  assert.equal(produtoControlaEstoque({ tipo: "servico", tipo_produto: "SIMPLES" }), false);
+  assert.equal(
+    produtoControlaEstoque({ tipo: "produto_servico", tipo_produto: "SIMPLES" }),
+    true,
+  );
+});
+
+test("servico puro nao recebe aba de lotes no formulario legado", () => {
+  const abas = montarAbasProdutoFormulario({
+    isEdit: true,
+    imagens: [],
+    fornecedores: [],
+    lotes: [{ id: 20 }],
+    variacoes: [],
+    produto: { tipo: "servico", controle_lote: true, tipo_produto: "SIMPLES" },
+  }).map(({ id }) => id);
+
+  assert.equal(abas.includes("lotes"), false);
 });
 
 test("valida arquivo de imagem permitido para upload do produto", () => {
@@ -373,7 +401,6 @@ test("monta abas do formulario conforme produto e modo de edicao", () => {
       { id: "dados", count: null },
       { id: "imagens", count: 2 },
       { id: "fornecedores", count: 1 },
-      { id: "lotes", count: 3 },
       { id: "variacoes", count: 1 },
     ],
   );

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from .dre_plano_contas_models import DRECategoria, DRESubcategoria, NaturezaDRE
 from .financeiro_models import CategoriaFinanceira, ContaReceber
+from .produtos.estoque_regras import mensagem_servico_sem_estoque, produto_eh_servico
 from .produtos_models import EstoqueMovimentacao, Produto
 from .utils.timezone import to_brasilia
 from .veterinario_models import (
@@ -150,6 +151,11 @@ def _aplicar_baixa_estoque_itens(
             raise HTTPException(
                 status_code=404,
                 detail=f"Produto {item['produto_id']} não encontrado para o procedimento",
+            )
+        if produto_eh_servico(produto):
+            raise HTTPException(
+                status_code=400,
+                detail=mensagem_servico_sem_estoque(produto),
             )
 
         estoque_atual = float(produto.estoque_atual or 0)

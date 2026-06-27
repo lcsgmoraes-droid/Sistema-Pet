@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
+from app.produtos.estoque_regras import mensagem_servico_sem_estoque, produto_eh_servico
 from app.produtos.lotes import _consumir_lotes_fifo_produto
 from app.produtos.schemas import (
     EntradaEstoqueRequest,
@@ -25,6 +26,14 @@ from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _bloquear_estoque_para_servico(produto: Produto) -> None:
+    if produto_eh_servico(produto):
+        raise HTTPException(
+            status_code=400,
+            detail=mensagem_servico_sem_estoque(produto),
+        )
 
 
 # ==========================================
@@ -60,6 +69,8 @@ def criar_lote(
 
     if not produto:
         raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+
+    _bloquear_estoque_para_servico(produto)
 
     # Verificar se nÃºmero de lote jÃ¡ existe para este produto
     lote_existente = (
@@ -181,6 +192,8 @@ def atualizar_lote(
     if not produto:
         raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
 
+    _bloquear_estoque_para_servico(produto)
+
     # Calcular diferenÃ§a de quantidade para ajustar estoque
     diferenca_quantidade = lote_data.quantidade_inicial - lote.quantidade_inicial
 
@@ -242,6 +255,8 @@ def excluir_lote(
     if not produto:
         raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
 
+    _bloquear_estoque_para_servico(produto)
+
     # Atualizar estoque do produto (remover a quantidade do lote)
     produto.estoque_atual = produto.estoque_atual - lote.quantidade_disponivel
 
@@ -288,6 +303,8 @@ def entrada_estoque(
 
     if not produto:
         raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+
+    _bloquear_estoque_para_servico(produto)
 
     # VALIDAÃ‡ÃƒO: Produto PAI nÃ£o pode ter movimentaÃ§Ã£o de estoque
     if produto.is_parent:
@@ -398,6 +415,8 @@ def saida_estoque_fifo(
 
     if not produto:
         raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
+
+    _bloquear_estoque_para_servico(produto)
 
     # VALIDAÃ‡ÃƒO: Produto PAI nÃ£o pode ter movimentaÃ§Ã£o de estoque
     if produto.is_parent:

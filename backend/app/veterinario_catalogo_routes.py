@@ -243,6 +243,7 @@ def listar_produtos_estoque(
         Produto.tenant_id == str(tenant_id),
         Produto.ativo.is_(True),
         Produto.situacao.is_(True),
+        or_(Produto.tipo.is_(None), Produto.tipo != "servico"),
     )
     if busca:
         termo = f"%{busca}%"

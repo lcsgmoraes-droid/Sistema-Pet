@@ -128,7 +128,7 @@ export default function ProdutosNovoDadosBasicosSection({
           >
             <option value="produto">Produto</option>
             <option value="servico">Servico</option>
-            <option value="ambos">Produto e Servico</option>
+            <option value="produto_servico">Produto e Servico</option>
           </select>
         </div>
 

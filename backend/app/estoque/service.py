@@ -15,6 +15,11 @@ from decimal import Decimal
 import json
 import logging
 
+from app.produtos.estoque_regras import (
+    mensagem_servico_sem_estoque,
+    produto_eh_servico,
+    validar_produto_permite_estoque,
+)
 from app.produtos_models import Produto, ProdutoLote, EstoqueMovimentacao
 from app.models import User
 from app.tenancy.rls import sync_rls_tenant
@@ -211,6 +216,14 @@ class EstoqueService:
                 "mensagem": f"Produto ID {produto_id} não encontrado",
             }
 
+        if produto_eh_servico(produto):
+            return {
+                "disponivel": False,
+                "estoque_atual": 0,
+                "estoque_necessario": quantidade,
+                "mensagem": mensagem_servico_sem_estoque(produto),
+            }
+
         estoque_atual = produto.estoque_atual or 0
         disponivel = estoque_atual >= quantidade
 
@@ -270,6 +283,8 @@ class EstoqueService:
             raise ValueError(f"Produto ID {produto_id} não encontrado")
 
         # 🔒 VALIDAÇÃO CRÍTICA: Produto PAI não pode movimentar estoque
+        validar_produto_permite_estoque(produto)
+
         if produto.tipo_produto == "PAI":
             raise ValueError(
                 f"Produto '{produto.nome}' é do tipo PAI e não pode ter estoque movimentado. "
@@ -403,6 +418,8 @@ class EstoqueService:
             raise ValueError(f"Produto ID {produto_id} não encontrado")
 
         # 🔒 VALIDAÇÃO CRÍTICA: Produto PAI não pode movimentar estoque
+        validar_produto_permite_estoque(produto)
+
         if produto.tipo_produto == "PAI":
             raise ValueError(
                 f"Produto '{produto.nome}' é do tipo PAI e não pode ter estoque movimentado. "

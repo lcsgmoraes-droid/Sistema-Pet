@@ -101,6 +101,39 @@ export function deveMostrarTipoProdutoNoFormulario({ tipoProduto } = {}) {
   return tipoProduto !== "VARIACAO";
 }
 
+export function normalizarTipoComercialProduto(tipo) {
+  const valor = String(tipo || "produto")
+    .trim()
+    .toLowerCase();
+  if (valor === "ambos") return "produto_servico";
+  if (valor === "servi\u00e7o") return "servico";
+  if (["produto", "servico", "produto_servico"].includes(valor)) return valor;
+  return "produto";
+}
+
+export function produtoControlaEstoque(produto = {}) {
+  const tipo = normalizarTipoComercialProduto(produto.tipo);
+  return tipo !== "servico" && produto.tipo_produto !== "PAI";
+}
+
+export function aplicarTipoServicoSemEstoque(produto = {}) {
+  const tipo = normalizarTipoComercialProduto(produto.tipo);
+  if (tipo !== "servico") {
+    return { ...produto, tipo };
+  }
+  return {
+    ...produto,
+    tipo,
+    tipo_produto: "SIMPLES",
+    tipo_kit: null,
+    e_kit_fisico: false,
+    controle_lote: false,
+    estoque_minimo: "",
+    estoque_maximo: "",
+    participa_sugestao_compra: false,
+  };
+}
+
 export function montarEstadoProdutoClonado(prod = {}) {
   const tipoOrigem = prod.tipo_produto || "SIMPLES";
   const tipoProduto = tipoOrigem === "VARIACAO" ? "SIMPLES" : tipoOrigem;
@@ -126,7 +159,7 @@ export function montarEstadoProdutoClonado(prod = {}) {
     categoria_id: prod.categoria_id || "",
     marca_id: prod.marca_id || "",
     departamento_id: prod.departamento_id || "",
-    tipo: prod.tipo || "produto",
+    tipo: normalizarTipoComercialProduto(prod.tipo),
     unidade: prod.unidade || "UN",
     descricao: prod.descricao_curta || prod.descricao || "",
     preco_custo: prod.preco_custo || "",
@@ -146,10 +179,13 @@ export function montarEstadoProdutoClonado(prod = {}) {
     anunciar_app: prod.anunciar_app ?? true,
     ativo: true,
     situacao: true,
-    controle_lote: prod.controle_lote ?? true,
+    controle_lote: normalizarTipoComercialProduto(prod.tipo) === "servico" ? false : prod.controle_lote ?? true,
     estoque_minimo: prod.estoque_minimo || "",
     estoque_maximo: prod.estoque_maximo || "",
-    participa_sugestao_compra: prod.participa_sugestao_compra ?? true,
+    participa_sugestao_compra:
+      normalizarTipoComercialProduto(prod.tipo) === "servico"
+        ? false
+        : prod.participa_sugestao_compra ?? true,
     tipo_produto: tipoProduto,
     produto_pai_id: null,
     tipo_kit: produtoComComposicao ? prod.tipo_kit || "VIRTUAL" : null,
@@ -224,7 +260,7 @@ export function montarEstadoProdutoFormulario(prod = {}) {
     categoria_id: prod.categoria_id || "",
     marca_id: prod.marca_id || "",
     departamento_id: prod.departamento_id || "",
-    tipo: prod.tipo || "produto",
+    tipo: normalizarTipoComercialProduto(prod.tipo),
     preco_custo: prod.preco_custo || "",
     preco_venda: prod.preco_venda || "",
     margem_lucro: prod.margem_lucro || "",
@@ -232,7 +268,8 @@ export function montarEstadoProdutoFormulario(prod = {}) {
     estoque_maximo: prod.estoque_maximo || "",
     localizacao: prod.localizacao || "",
     observacoes: prod.observacoes || "",
-    controle_lote: prod.controle_lote || false,
+    controle_lote:
+      normalizarTipoComercialProduto(prod.tipo) === "servico" ? false : prod.controle_lote || false,
     status: prod.status || "ativo",
     preco_ecommerce: prod.preco_ecommerce ?? null,
     preco_ecommerce_promo: prod.preco_ecommerce_promo ?? null,
@@ -313,7 +350,7 @@ export function montarAbasProdutoFormulario({
     { id: "fornecedores", label: "\u{1F3ED} Fornecedores", count: fornecedores.length },
   );
 
-  if (produto.controle_lote) {
+  if (produtoControlaEstoque(produto) && produto.controle_lote) {
     abas.push({ id: "lotes", label: "\u{1F4E6} Lotes", count: lotes.length });
   }
 
@@ -327,19 +364,29 @@ export function montarAbasProdutoFormulario({
 export function montarPayloadProdutoParaSalvar(produto) {
   const { _mostrarCanais, ...restoProduto } = produto;
   const lojaFisicaAtiva = produto.status !== "inativo";
+  const tipo = normalizarTipoComercialProduto(produto.tipo);
+  const servico = tipo === "servico";
 
-  return {
+  const payload = {
     ...restoProduto,
+    tipo,
     preco_custo: parseFloat(produto.preco_custo) || 0,
     preco_venda: parseFloat(produto.preco_venda) || 0,
     margem_lucro: parseFloat(produto.margem_lucro) || 0,
-    estoque_minimo: parseFloat(produto.estoque_minimo) || 0,
-    estoque_maximo: parseFloat(produto.estoque_maximo) || 0,
+    controle_lote: servico ? false : Boolean(produto.controle_lote),
+    estoque_minimo: servico ? 0 : parseFloat(produto.estoque_minimo) || 0,
+    estoque_maximo: servico ? null : parseFloat(produto.estoque_maximo) || 0,
     categoria_id: produto.categoria_id || null,
     marca_id: produto.marca_id || null,
     anunciar_ecommerce: lojaFisicaAtiva ? Boolean(produto.anunciar_ecommerce) : false,
     anunciar_app: lojaFisicaAtiva ? Boolean(produto.anunciar_app) : false,
   };
+
+  if (servico || produto.participa_sugestao_compra !== undefined) {
+    payload.participa_sugestao_compra = servico ? false : produto.participa_sugestao_compra;
+  }
+
+  return payload;
 }
 
 export function montarPayloadFornecedorProduto(dados) {

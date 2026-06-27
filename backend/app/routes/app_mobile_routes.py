@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.models import Cliente, User, UserPushDevice
+from app.produtos.estoque_regras import produto_eh_servico
 from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
 from app.routes.ecommerce_auth import (
     _activate_user_tenant_context,
@@ -254,6 +255,8 @@ def _disable_same_push_token_for_other_users(
 def _produto_permite_balanco_funcionario(
     produto: Produto,
 ) -> tuple[bool, Optional[str]]:
+    if produto_eh_servico(produto):
+        return False, "Servico nao controla estoque. Ajuste os insumos consumidos."
     if getattr(produto, "is_parent", False):
         return False, "Produto pai: ajuste o estoque nas variacoes individuais."
     if produto.tipo_produto == "KIT" and produto.tipo_kit == "VIRTUAL":

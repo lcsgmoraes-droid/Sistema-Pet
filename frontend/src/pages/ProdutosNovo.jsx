@@ -20,6 +20,7 @@ import useProdutosNovoVariacoes from "../hooks/useProdutosNovoVariacoes";
 import useProdutosNovoPageComposition from "../hooks/useProdutosNovoPageComposition";
 import api from "../api";
 import { calcularPrecoVenda, calcularMarkup, formatarMoeda, formatarData } from "../api/produtos";
+import { aplicarTipoServicoSemEstoque } from "./produtosFormUtils";
 
 // Função auxiliar para converter valores sem retornar NaN
 const parseNumber = (valor) => {
@@ -176,7 +177,11 @@ export default function ProdutosNovo() {
 
   const handleChange = (campo, valor) => {
     setFormData((prev) => {
-      const novosDados = { ...prev, [campo]: valor };
+      let novosDados = { ...prev, [campo]: valor };
+
+      if (campo === "tipo") {
+        novosDados = aplicarTipoServicoSemEstoque(novosDados);
+      }
 
       if (campo === "sku" || campo === "codigo") {
         const skuNormalizado = (valor || "").toString().toUpperCase();
