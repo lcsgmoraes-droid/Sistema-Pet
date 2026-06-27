@@ -209,13 +209,23 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-27 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
 
-- 73 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 72 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 65 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 64 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 8 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 11 arquivos de teste em `backend/tests` e 2 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 5 de 2026-06-27: `backend/app/services/ops_dashboard_service.py` saiu da faixa acima de 700 linhas ao virar orquestrador do painel Ops:
+
+- `backend/app/services/ops_dashboard_service.py`: 955 -> 179 linhas, mantendo `build_ops_dashboard` como entrada publica.
+- `backend/app/services/ops_dashboard_utils.py`: concentra helpers de ambiente, datas, eventos e nomes de tenants.
+- `backend/app/services/ops_dashboard_incidents.py`: concentra incidentes por tenant e rota.
+- `backend/app/services/ops_dashboard_actionable_alerts.py`: concentra alertas acionaveis e avaliacao de falhas de deploy.
+- `backend/app/services/ops_dashboard_health.py`: concentra watchdog, self-healing e status atual.
+- `backend/app/services/ops_dashboard_period_alerts.py`: concentra alertas resumidos do periodo.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_5_refactor.py`, garantindo entrada publica, delegacao e modulos extraidos abaixo de 700 linhas.
 
 Fatia backend 700 batch 4 de 2026-06-27: `backend/app/contas_receber_routes.py` saiu da faixa acima de 700 linhas ao virar fachada de schemas, recorrencias e subrouters por responsabilidade:
 
