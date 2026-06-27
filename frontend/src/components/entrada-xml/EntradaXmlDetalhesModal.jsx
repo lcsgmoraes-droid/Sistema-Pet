@@ -44,7 +44,6 @@ function EntradaXmlDetalhesModal({
   notaSelecionada,
   obterConfiguracaoPackItem,
   obterCustoAquisicaoItem,
-  processarNota,
   quantidadesOnline,
   resultadosBuscaProduto,
   resumoConferenciaAtual,
@@ -273,7 +272,6 @@ function EntradaXmlDetalhesModal({
               excluirNota={excluirNota}
               loading={loading}
               notaSelecionada={notaSelecionada}
-              processarNota={processarNota}
               reverterNota={reverterNota}
               salvarTipoRateio={salvarTipoRateio}
               setMostrarDetalhes={setMostrarDetalhes}

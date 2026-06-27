@@ -11,7 +11,6 @@ function EntradaXmlDetalhesFooter({
   excluirNota,
   loading,
   notaSelecionada,
-  processarNota,
   reverterNota,
   salvarTipoRateio,
   setMostrarDetalhes,
@@ -98,24 +97,14 @@ function EntradaXmlDetalhesFooter({
               </ActionButton>
 
               {temProdutosVinculados && (
-                <>
-                  <ActionButton
-                    disabled={loading}
-                    intent="edit"
-                    onClick={() => carregarPreviewProcessamento(notaSelecionada.id)}
-                    size="md"
-                  >
-                    Ajuste de custo
-                  </ActionButton>
-                  <ActionButton
-                    disabled={loading}
-                    intent="create"
-                    onClick={() => processarNota(notaSelecionada.id)}
-                    size="md"
-                  >
-                    {loading ? "Processando..." : "Processar Nota"}
-                  </ActionButton>
-                </>
+                <ActionButton
+                  disabled={loading}
+                  intent="create"
+                  onClick={() => carregarPreviewProcessamento(notaSelecionada.id)}
+                  size="md"
+                >
+                  {loading ? "Carregando revisao..." : "Revisar acoes e processar"}
+                </ActionButton>
               )}
             </>
           )}
