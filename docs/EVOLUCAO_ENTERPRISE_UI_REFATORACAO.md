@@ -209,13 +209,20 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-27 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
 
-- 75 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 74 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 67 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 66 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 8 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 11 arquivos de teste em `backend/tests` e 2 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 3 de 2026-06-27: `backend/app/cliente_info_pdv.py` saiu da faixa acima de 700 linhas ao separar o chat contextual do PDV e os schemas compartilhados:
+
+- `backend/app/cliente_info_pdv.py`: 962 -> 524 linhas, mantendo os endpoints de alertas de carrinho e informacoes PDV.
+- `backend/app/cliente_info_pdv_chat.py`: concentra o endpoint `/clientes/{cliente_id}/chat-pdv`, montagem de contexto e fallback sem IA.
+- `backend/app/cliente_info_pdv_schemas.py`: concentra os schemas `ItemCarrinhoIA`, `AlertasCarrinhoRequest` e `ChatPDVRequest`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_3_refactor.py`, garantindo paths publicos e arquivos abaixo de 700 linhas.
 
 Fatia backend 700 batch 2 de 2026-06-27: `backend/app/comissoes_routes.py` saiu da faixa acima de 700 linhas ao virar fachada de routers menores por responsabilidade:
 
