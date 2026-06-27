@@ -5,19 +5,83 @@ import os
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.auth import create_access_token, create_refresh_token
 from app.auth.core import ACCESS_TOKEN_EXPIRE_SECONDS
-from app.models import Tenant, User, UserTenant
+from app.models import Permission, RolePermission, Tenant, User, UserTenant
+from app.services.email_service import send_email
 
 
 RESET_TOKEN_MINUTES = 30
 EMAIL_VERIFICATION_TOKEN_HOURS = int(os.getenv("EMAIL_VERIFICATION_TOKEN_HOURS", "24"))
+EMAIL_VERIFICATION_REQUIRED = os.getenv(
+    "EMAIL_VERIFICATION_REQUIRED", "true"
+).strip().lower() not in {"0", "false", "no"}
 TERMS_VERSION = os.getenv("TERMS_VERSION", "termos-2026-05-08")
 PRIVACY_VERSION = os.getenv("PRIVACY_VERSION", "privacidade-2026-05-08")
+STRICT_EMAIL_ENVS = {"production", "prod", "staging"}
+LOCAL_REQUEST_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
+ALLOWED_SIGNUP_PLANS = {"basico"}
+DEFAULT_TRIAL_DAYS = 30
+
+
+def _current_environment_name() -> str:
+    return (
+        (os.getenv("ENVIRONMENT") or os.getenv("APP_ENV") or os.getenv("ENV") or "")
+        .strip()
+        .lower()
+    )
+
+
+def _is_local_signup_request(request: Request) -> bool:
+    hostname = (request.url.hostname or "").strip().lower()
+    if hostname in LOCAL_REQUEST_HOSTS:
+        return True
+
+    host_header = (request.headers.get("host") or "").split(":", 1)[0].strip().lower()
+    return host_header in LOCAL_REQUEST_HOSTS
+
+
+def _email_verification_required_for_request(request: Request) -> bool:
+    if not EMAIL_VERIFICATION_REQUIRED:
+        return False
+
+    if _is_local_signup_request(request):
+        return False
+
+    if _current_environment_name() in STRICT_EMAIL_ENVS:
+        return True
+
+    return True
+
+
+def grant_all_permissions_to_role(
+    role_id: int, tenant_id: uuid.UUID, db: Session
+) -> int:
+    all_permissions = db.query(Permission).all()
+    existing_permission_ids = set(
+        db.query(RolePermission.permission_id)
+        .filter(
+            RolePermission.role_id == role_id, RolePermission.tenant_id == tenant_id
+        )
+        .all()
+    )
+    existing_permission_ids = {pid[0] for pid in existing_permission_ids}
+
+    new_permissions_count = 0
+    for permission in all_permissions:
+        if permission.id not in existing_permission_ids:
+            role_permission = RolePermission(
+                role_id=role_id, permission_id=permission.id, tenant_id=tenant_id
+            )
+            db.add(role_permission)
+            new_permissions_count += 1
+
+    return new_permissions_count
 
 
 def _resolve_frontend_base_url(request: Request) -> str:
@@ -192,6 +256,30 @@ def _build_email_verification_email(
         "Se voce nao criou esta conta, ignore este e-mail."
     )
     return subject, html_body, text_body
+
+
+def _send_email_verification(user: User, request: Request) -> bool:
+    raw_token = _issue_email_verification_token(user)
+    verification_link = (
+        f"{_resolve_frontend_base_url(request)}/verificar-email"
+        f"?email={quote(user.email)}&token={quote(raw_token)}"
+    )
+    subject, html_body, text_body = _build_email_verification_email(
+        user, raw_token, verification_link
+    )
+    return send_email(
+        to=user.email,
+        subject=subject,
+        html_body=html_body,
+        text_body=text_body,
+        simulate_if_unconfigured=not EMAIL_VERIFICATION_REQUIRED,
+    )
+
+
+def _email_verification_block(user: User) -> bool:
+    return EMAIL_VERIFICATION_REQUIRED and not bool(
+        getattr(user, "email_verified", False)
+    )
 
 
 def _is_token_expired(expires_at: datetime | None) -> bool:
