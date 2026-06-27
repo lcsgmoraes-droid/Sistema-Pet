@@ -471,6 +471,7 @@ const EntradaXML = () => {
       <EntradaXmlNotasTable
         abrirDetalhes={abrirDetalhes}
         abrirVisualizacao={abrirVisualizacao}
+        carregarPreviewProcessamento={carregarPreviewProcessamento}
         conferenciaStatusMeta={CONFERENCIA_STATUS_META}
         excluirNota={excluirNota}
         filtroStatus={filtroStatus}

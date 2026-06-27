@@ -64,10 +64,13 @@ function EntradaXmlVisualizacaoNotaModal({
   if (!aberto || !notaSelecionada) return null;
 
   const itens = notaSelecionada.itens || [];
-  const podeProcessar =
-    notaSelecionada.status === "pendente" &&
-    Number(notaSelecionada.produtos_vinculados || 0) > 0 &&
-    !notaSelecionada.entrada_estoque_realizada;
+  const temProdutosVinculados = Number(notaSelecionada.produtos_vinculados || 0) > 0;
+  const podeAbrirProcessamento =
+    ["pendente", "processada"].includes(notaSelecionada.status) && temProdutosVinculados;
+  const textoBotaoProcessamento =
+    notaSelecionada.status === "processada"
+      ? "Lancar movimentos pendentes"
+      : "Revisar acoes e processar";
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50">
@@ -308,19 +311,21 @@ function EntradaXmlVisualizacaoNotaModal({
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            {podeProcessar && (
+            {podeAbrirProcessamento && (
               <>
-                <button
-                  onClick={() => onAbrirConferencia(notaSelecionada.id)}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold"
-                >
-                  Conferencia
-                </button>
+                {notaSelecionada.status === "pendente" && (
+                  <button
+                    onClick={() => onAbrirConferencia(notaSelecionada.id)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold"
+                  >
+                    Conferencia
+                  </button>
+                )}
                 <button
                   onClick={() => onAjustarCustos(notaSelecionada.id)}
                   className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold"
                 >
-                  Revisar acoes e processar
+                  {textoBotaoProcessamento}
                 </button>
               </>
             )}

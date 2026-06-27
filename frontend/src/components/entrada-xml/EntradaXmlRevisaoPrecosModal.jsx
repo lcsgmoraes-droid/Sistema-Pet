@@ -62,6 +62,15 @@ function EntradaXmlRevisaoPrecosModal({
     gerar_contas_pagar: true,
     ...(acoesProcessamento || {}),
   };
+  const acoesRealizadas = previewProcessamento.acoes_processamento_realizadas || {};
+  const acaoEstaRealizada = (acao) => Boolean(acoesRealizadas[acao]);
+  const acaoVaiLancarAgora = (acao) => Boolean(acoes[acao]) && !acaoEstaRealizada(acao);
+  const temAcaoSelecionada = [
+    "lancar_estoque",
+    "atualizar_custo",
+    "atualizar_preco_venda",
+    "gerar_contas_pagar",
+  ].some(acaoVaiLancarAgora);
 
   const resumoFiltros = itensVinculados.reduce(
     (acc, item) => {
@@ -95,9 +104,9 @@ function EntradaXmlRevisaoPrecosModal({
   });
 
   const renderAcoesProcessamento = ({ modoConfirmacao = false } = {}) => {
-    const resumoEstoque = acoes.lancar_estoque ? itensVinculados.length : 0;
-    const resumoCustos = acoes.atualizar_custo ? custosAtualizados : 0;
-    const resumoPrecos = acoes.atualizar_preco_venda ? precosAlterados : 0;
+    const resumoEstoque = acaoVaiLancarAgora("lancar_estoque") ? itensVinculados.length : 0;
+    const resumoCustos = acaoVaiLancarAgora("atualizar_custo") ? custosAtualizados : 0;
+    const resumoPrecos = acaoVaiLancarAgora("atualizar_preco_venda") ? precosAlterados : 0;
 
     return (
       <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
@@ -116,7 +125,9 @@ function EntradaXmlRevisaoPrecosModal({
             <span>{resumoEstoque} itens no estoque</span>
             <span>{resumoCustos} custos</span>
             <span>{resumoPrecos} precos</span>
-            <span>{acoes.gerar_contas_pagar ? "Financeiro ativo" : "Sem contas"}</span>
+            <span>
+              {acaoVaiLancarAgora("gerar_contas_pagar") ? "Financeiro ativo" : "Sem contas"}
+            </span>
             <span>
               {itensComValidade} validade{itensComValidade === 1 ? "" : "s"} detectada
               {itensSemValidade > 0 ? `, ${itensSemValidade} sem validade` : ""}
@@ -130,20 +141,34 @@ function EntradaXmlRevisaoPrecosModal({
             ["atualizar_custo", "Atualizar custo dos produtos"],
             ["atualizar_preco_venda", "Atualizar preco de venda revisado"],
             ["gerar_contas_pagar", "Gerar contas a pagar"],
-          ].map(([acao, label]) => (
-            <label
-              key={acao}
-              className="flex min-h-[44px] items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-800"
-            >
-              <input
-                type="checkbox"
-                checked={Boolean(acoes[acao])}
-                onChange={(event) => setAcaoProcessamento(acao, event.target.checked)}
-                className="h-4 w-4 accent-green-600"
-              />
-              <span>{label}</span>
-            </label>
-          ))}
+          ].map(([acao, label]) => {
+            const acaoJaRealizada = acaoEstaRealizada(acao);
+
+            return (
+              <label
+                key={acao}
+                className={`flex min-h-[44px] items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold ${
+                  acaoJaRealizada
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                    : "border-gray-200 bg-gray-50 text-gray-800"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={acaoJaRealizada || Boolean(acoes[acao])}
+                  disabled={loading || acaoJaRealizada}
+                  onChange={(event) => setAcaoProcessamento(acao, event.target.checked)}
+                  className="h-4 w-4 accent-green-600 disabled:cursor-not-allowed"
+                />
+                <span>{label}</span>
+                {acaoJaRealizada && (
+                  <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                    Ja lancado
+                  </span>
+                )}
+              </label>
+            );
+          })}
         </div>
       </div>
     );
@@ -549,7 +574,7 @@ function EntradaXmlRevisaoPrecosModal({
               </div>
               <button
                 onClick={() => setMostrarConfirmacaoProcessamento(true)}
-                disabled={loading}
+                disabled={loading || !temAcaoSelecionada}
                 className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold text-lg shadow disabled:opacity-50 transition-all"
               >
                 {loading ? "Processando..." : "Processar NF"}
@@ -577,6 +602,11 @@ function EntradaXmlRevisaoPrecosModal({
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                 Ao confirmar, o sistema executa somente as opcoes marcadas acima. Se alguma acao
                 estiver desmarcada, ela nao sera lancada nesta NF.
+                {!temAcaoSelecionada && (
+                  <div className="mt-2 font-semibold">
+                    Nenhuma acao pendente esta selecionada para lancar agora.
+                  </div>
+                )}
               </div>
             </div>
 
@@ -592,7 +622,7 @@ function EntradaXmlRevisaoPrecosModal({
               <button
                 type="button"
                 onClick={confirmarProcessamento}
-                disabled={loading}
+                disabled={loading || !temAcaoSelecionada}
                 className="rounded-lg bg-green-600 px-6 py-2.5 font-bold text-white shadow hover:bg-green-700 disabled:opacity-50"
               >
                 {loading ? "Processando..." : "Processar NF agora"}
@@ -618,6 +648,7 @@ EntradaXmlRevisaoPrecosModal.propTypes = {
     fornecedor_nome: PropTypes.string,
     valor_total: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     processamento_mensagem: PropTypes.string,
+    acoes_processamento_realizadas: PropTypes.objectOf(PropTypes.bool),
     itens: PropTypes.arrayOf(PropTypes.object),
   }),
   filtroCusto: PropTypes.string.isRequired,
