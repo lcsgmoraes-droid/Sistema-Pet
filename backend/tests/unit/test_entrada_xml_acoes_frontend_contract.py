@@ -25,3 +25,14 @@ def test_acoes_processamento_aparecem_antes_da_lista_de_itens():
     )
 
     assert source.index("Acoes ao processar") < source.index("{itensFiltrados")
+
+
+def test_processar_nf_abre_confirmacao_final_com_acoes_visiveis():
+    source = read_source(
+        "frontend/src/components/entrada-xml/EntradaXmlRevisaoPrecosModal.jsx"
+    )
+
+    assert "Confirmacao final do processamento" in source
+    assert "setMostrarConfirmacaoProcessamento(true)" in source
+    assert "Processar NF agora" in source
+    assert "onClick={confirmarProcessamento}" in source
