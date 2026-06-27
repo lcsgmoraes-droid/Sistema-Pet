@@ -209,13 +209,22 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-27 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
 
-- 70 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 69 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 62 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 61 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 8 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 11 arquivos de teste em `backend/tests` e 2 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 8 de 2026-06-27: `backend/app/auth_routes_multitenant.py` saiu da faixa acima de 700 linhas ao virar fachada de subrouters de autenticacao:
+
+- `backend/app/auth_routes_multitenant.py`: 939 -> 221 linhas, mantendo o router publico `/auth`, exports historicos e compatibilidade para chamadas diretas em testes.
+- `backend/app/auth/auth_multitenant_account_routes.py`: concentra cadastro, criacao de tenant, onboarding inicial e login multi-tenant.
+- `backend/app/auth/auth_multitenant_recovery_routes.py`: concentra confirmacao de e-mail, reenvio de verificacao, esqueci senha e reset de senha.
+- `backend/app/auth/auth_multitenant_session_routes.py`: concentra refresh token, selecao de tenant, `me-multitenant` e logout.
+- `backend/app/auth/auth_multitenant_support.py`: recebeu politica de verificacao de e-mail, permissoes iniciais e envio de confirmacao compartilhados.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_8_refactor.py`, garantindo fachada, paths publicos, imports antigos e modulos extraidos abaixo de 700 linhas.
 
 Fatia backend 700 batch 7 de 2026-06-27: `backend/app/compras_pendencias_routes.py` saiu da faixa acima de 700 linhas ao virar fachada de subrouters e helpers focados:
 
