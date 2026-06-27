@@ -79,12 +79,13 @@ def test_app_mobile_form_pet_avisa_ao_sair_com_foto_pendente():
     assert "navigation.dispatch(e.data.action)" in source
 
 
-def test_app_mobile_form_pet_nao_abre_editor_nativo_com_cortar():
+def test_app_mobile_form_pet_mantem_editor_nativo_com_orientacao():
     source = (REPO_ROOT / "app-mobile/src/screens/pets/PetFormScreen.tsx").read_text(
         encoding="utf-8"
     )
 
-    assert "allowsEditing: true" not in source
-    assert "allowsEditing: false" in source
+    assert "allowsEditing: true" in source
+    assert "aspect: [1, 1]" in source
+    assert "Cortar confirma o enquadramento" in source
     assert "Foto pronta para salvar" in source
     assert "Salvar foto" in source

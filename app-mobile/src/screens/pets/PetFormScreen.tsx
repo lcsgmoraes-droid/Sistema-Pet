@@ -91,9 +91,21 @@ export default function PetFormScreen({ route, navigation }: Props) {
       Alert.alert('Permissão necessária', 'Permita o acesso à galeria nas configurações do celular.');
       return;
     }
+    Alert.alert(
+      'Enquadrar foto',
+      'Cortar confirma o enquadramento. Depois voce volta para o CorePet e toca em Salvar foto.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Escolher foto', onPress: abrirEditorFoto },
+      ]
+    );
+  }
+
+  async function abrirEditorFoto() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
+      allowsEditing: true,
+      aspect: [1, 1],
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
@@ -101,7 +113,7 @@ export default function PetFormScreen({ route, navigation }: Props) {
       setFotoPendente(result.assets[0].uri);
       Alert.alert(
         'Foto pronta',
-        'Para enviar a nova foto, toque em Salvar alteracoes.',
+        'Enquadramento confirmado. Para enviar a nova foto, toque em Salvar foto.',
         [{ text: 'OK' }]
       );
     }
