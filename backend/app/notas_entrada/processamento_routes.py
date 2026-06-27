@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
-from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
@@ -29,21 +28,25 @@ from app.notas_entrada.fiscal import (
 from app.notas_entrada.processamento_acoes import (
     detectar_contexto_processamento,
     resolver_custo_operacional_entrada,
-    sugerir_acoes_processamento,
+)
+from app.notas_entrada.processamento_precos import (
+    router as precos_router,
+    _aplicar_precos_venda_processamento,
+    _atualizar_custo_produto_entrada,
+    _reverter_historicos_precos_nota,
+    atualizar_precos_produtos,
+    preview_processamento,
 )
 from app.notas_entrada.produtos import (
     _aplicar_codigos_barras_item_no_produto,
     _aplicar_dados_fiscais_item_no_produto,
-    _montar_divergencia_codigo_barras_item,
-    obter_detalhe_vinculo_item,
 )
-from app.notas_entrada.schemas import AtualizarPrecoRequest, ProcessarConfig
+from app.notas_entrada.schemas import ProcessarConfig
 from app.notas_entrada.xml_parser import parse_nfe_xml
 from app.produtos_models import (
     EstoqueMovimentacao,
     NotaEntrada,
     NotaEntradaItem,
-    Produto,
     ProdutoFornecedor,
     ProdutoHistoricoPreco,
     ProdutoLote,
@@ -51,7 +54,7 @@ from app.produtos_models import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
+router.include_router(precos_router)
 
 def _acoes_processamento_dict(config: ProcessarConfig) -> dict:
     return {
@@ -84,416 +87,6 @@ def _carregar_acoes_processamento_nota(nota: NotaEntrada) -> dict:
         "gerar_contas_pagar": legado_processado,
     }
 
-
-def _reverter_historicos_precos_nota(
-    *, produto: Produto, nota: NotaEntrada, db: Session, tenant_id
-) -> int:
-    historicos = (
-        db.query(ProdutoHistoricoPreco)
-        .filter(
-            ProdutoHistoricoPreco.produto_id == produto.id,
-            ProdutoHistoricoPreco.nota_entrada_id == nota.id,
-            ProdutoHistoricoPreco.motivo.in_(["nfe_entrada", "nfe_revisao_precos"]),
-            ProdutoHistoricoPreco.tenant_id == tenant_id,
-        )
-        .order_by(ProdutoHistoricoPreco.id.desc())
-        .all()
-    )
-
-    for historico in historicos:
-        produto.preco_custo = float(historico.preco_custo_anterior or 0)
-        produto.preco_venda = float(historico.preco_venda_anterior or 0)
-        db.delete(historico)
-
-    return len(historicos)
-
-
-def _atualizar_custo_produto_entrada(
-    *,
-    produto: Produto,
-    nota: NotaEntrada,
-    custo_unitario_entrada: float,
-    custo_unitario_manual: float | None,
-    db: Session,
-    current_user,
-    tenant_id,
-) -> bool:
-    preco_custo_anterior = produto.preco_custo or 0
-    if custo_unitario_entrada == preco_custo_anterior:
-        return False
-
-    preco_venda_anterior = produto.preco_venda or 0
-    margem_anterior = (
-        ((preco_venda_anterior - preco_custo_anterior) / preco_venda_anterior * 100)
-        if preco_venda_anterior > 0
-        else 0
-    )
-
-    produto.preco_custo = custo_unitario_entrada
-    preco_venda_novo = produto.preco_venda or 0
-    margem_nova = (
-        ((preco_venda_novo - produto.preco_custo) / preco_venda_novo * 100)
-        if preco_venda_novo > 0
-        else 0
-    )
-    variacao_custo = (
-        ((produto.preco_custo - preco_custo_anterior) / preco_custo_anterior * 100)
-        if preco_custo_anterior > 0
-        else 0
-    )
-
-    db.add(
-        ProdutoHistoricoPreco(
-            produto_id=produto.id,
-            preco_custo_anterior=preco_custo_anterior,
-            preco_custo_novo=produto.preco_custo,
-            preco_venda_anterior=preco_venda_anterior,
-            preco_venda_novo=preco_venda_novo,
-            margem_anterior=margem_anterior,
-            margem_nova=margem_nova,
-            variacao_custo_percentual=variacao_custo,
-            variacao_venda_percentual=0,
-            motivo="nfe_entrada",
-            nota_entrada_id=nota.id,
-            referencia=f"NF-e {nota.numero_nota}",
-            observacoes=(
-                f"Entrada via NF-e: custo alterado de R$ {preco_custo_anterior:.2f} "
-                f"para R$ {produto.preco_custo:.2f}"
-                f"{' (ajuste manual aplicado no processamento)' if custo_unitario_manual is not None else ''}"
-            ),
-            user_id=current_user.id,
-            tenant_id=tenant_id,
-        )
-    )
-    return True
-
-
-# ============================================================================
-# PREVIEW DE ENTRADA NO ESTOQUE - REVISÃƒO DE PREÃ‡OS
-# ============================================================================
-
-
-@router.get("/{nota_id}/preview-processamento")
-def preview_processamento(
-    nota_id: int,
-    db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
-):
-    """
-    Retorna preview da entrada com comparaÃ§Ã£o de custos e preÃ§os atuais
-    """
-    nota = (
-        db.query(NotaEntrada)
-        .options(joinedload(NotaEntrada.itens).joinedload(NotaEntradaItem.produto))
-        .filter(NotaEntrada.id == nota_id)
-        .first()
-    )
-
-    if not nota:
-        raise HTTPException(status_code=404, detail="Nota nÃ£o encontrada")
-
-    if nota.produtos_nao_vinculados > 0:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Existem {nota.produtos_nao_vinculados} produtos nÃ£o vinculados",
-        )
-
-    composicoes_custo = calcular_composicao_custos_nota(nota)
-    preview_itens = []
-
-    for item in nota.itens:
-        composicao_custo = composicoes_custo.get(item.id, {})
-        conferencia_item = _serializar_conferencia_item(item)
-        # Dados do item da NF (sempre presente)
-        dados_pack = calcular_quantidade_custo_efetivos(
-            item.descricao, item.quantidade, item.valor_unitario, item.valor_total
-        )
-
-        item_nf = {
-            "item_id": item.id,
-            "codigo_produto_nf": item.codigo_produto,
-            "descricao_nf": item.descricao,
-            "quantidade_nf": item.quantidade,
-            "valor_unitario_nf": item.valor_unitario,
-            "quantidade_efetiva_nf": dados_pack["quantidade_efetiva"],
-            "custo_unitario_efetivo_nf": dados_pack["custo_unitario_efetivo"],
-            "custo_aquisicao_unitario_nf": composicao_custo.get(
-                "custo_aquisicao_unitario", dados_pack["custo_unitario_efetivo"]
-            ),
-            "custo_aquisicao_total_nf": composicao_custo.get(
-                "custo_aquisicao_total", item.valor_total
-            ),
-            "composicao_custo": composicao_custo,
-            "pack_detectado_automatico": dados_pack["pack_detectado"],
-            "pack_multiplicador_detectado": dados_pack["multiplicador_pack"],
-            "ean_nf": item.ean,
-            "ean_tributario_nf": getattr(item, "ean_tributario", None),
-            "ncm_nf": item.ncm,
-            "vinculado": item.vinculado,
-            "confianca_vinculo": item.confianca_vinculo,
-            "divergencia_codigo_barras": _montar_divergencia_codigo_barras_item(item),
-            **conferencia_item,
-        }
-
-        detalhe_vinculo = obter_detalhe_vinculo_item(item)
-        item_nf["origem_vinculo_automatico"] = detalhe_vinculo["origem"]
-        item_nf["referencia_vinculo"] = detalhe_vinculo["referencia"]
-
-        # Dados do produto vinculado (se houver)
-        produto_vinculado = None
-        if item.produto_id:
-            produto = item.produto
-            custo_atual = produto.preco_custo or 0
-            custo_novo = composicao_custo.get(
-                "custo_aquisicao_unitario", dados_pack["custo_unitario_efetivo"]
-            )
-            variacao_custo = (
-                ((custo_novo - custo_atual) / custo_atual * 100)
-                if custo_atual > 0
-                else 0
-            )
-
-            # Calcular margem de referencia (com custo atual do cadastro)
-            preco_venda_atual = produto.preco_venda or 0
-            if preco_venda_atual > 0 and custo_atual > 0:
-                margem_atual = (
-                    (preco_venda_atual - custo_atual) / preco_venda_atual
-                ) * 100
-            else:
-                margem_atual = 0
-
-            # Calcular margem projetada mantendo o preço de venda atual e aplicando o novo custo
-            if preco_venda_atual > 0 and custo_novo > 0:
-                margem_projetada = (
-                    (preco_venda_atual - custo_novo) / preco_venda_atual
-                ) * 100
-            else:
-                margem_projetada = 0
-
-            produto_vinculado = {
-                "produto_id": produto.id,
-                "produto_codigo": produto.codigo,
-                "produto_nome": produto.nome,
-                "produto_ean": produto.codigo_barras,
-                "produto_codigo_barras": produto.codigo_barras,
-                "produto_gtin_ean": produto.gtin_ean,
-                "produto_ean_tributario": produto.gtin_ean_tributario,
-                "divergencia_codigo_barras": _montar_divergencia_codigo_barras_item(
-                    item
-                ),
-                "custo_anterior": custo_atual,
-                "custo_novo": custo_novo,
-                "variacao_custo_percentual": round(variacao_custo, 2),
-                "preco_venda_atual": preco_venda_atual,
-                "margem_atual": round(margem_atual, 2),
-                "margem_projetada_custo_novo": round(margem_projetada, 2),
-                "estoque_atual": produto.estoque_atual or 0,
-            }
-
-        preview_itens.append({**item_nf, "produto_vinculado": produto_vinculado})
-
-    try:
-        dados_xml = parse_nfe_xml(nota.xml_content)
-    except Exception:
-        dados_xml = {
-            "natureza_operacao": "",
-            "valor_total": nota.valor_total,
-            "itens": [
-                {"cfop": getattr(item, "cfop", None), "valor_total": item.valor_total}
-                for item in nota.itens
-            ],
-        }
-    sugestao_acoes = sugerir_acoes_processamento(dados_xml)
-
-    return {
-        "nota_id": nota.id,
-        "numero_nota": nota.numero_nota,
-        "data_emissao": nota.data_emissao.isoformat() if nota.data_emissao else None,
-        "fornecedor_nome": nota.fornecedor_nome,
-        "fornecedor_cnpj": nota.fornecedor_cnpj,
-        "valor_total": nota.valor_total,
-        "conferencia": _resumir_conferencia_nota(nota),
-        "acoes_processamento_sugeridas": sugestao_acoes["acoes"],
-        "processamento_contexto": sugestao_acoes["contexto"],
-        "processamento_mensagem": sugestao_acoes["mensagem"],
-        "itens": preview_itens,
-    }
-
-
-# ============================================================================
-# ATUALIZAR PREÃ‡OS DOS PRODUTOS
-# ============================================================================
-
-
-def _aplicar_precos_venda_processamento(
-    *,
-    nota: NotaEntrada,
-    precos: List[AtualizarPrecoRequest],
-    db: Session,
-    current_user,
-    tenant_id,
-) -> int:
-    atualizados = 0
-    for preco_data in precos:
-        produto = (
-            db.query(Produto)
-            .filter(Produto.id == preco_data.produto_id, Produto.tenant_id == tenant_id)
-            .first()
-        )
-        if not produto:
-            continue
-
-        preco_venda_anterior = produto.preco_venda or 0
-        preco_custo_anterior = produto.preco_custo or 0
-        if preco_venda_anterior == preco_data.preco_venda:
-            continue
-
-        margem_anterior = (
-            ((preco_venda_anterior - preco_custo_anterior) / preco_venda_anterior * 100)
-            if preco_venda_anterior > 0
-            else 0
-        )
-        produto.preco_venda = preco_data.preco_venda
-        margem_nova = (
-            (
-                (produto.preco_venda - (produto.preco_custo or 0))
-                / produto.preco_venda
-                * 100
-            )
-            if produto.preco_venda > 0
-            else 0
-        )
-        variacao_venda = (
-            ((produto.preco_venda - preco_venda_anterior) / preco_venda_anterior * 100)
-            if preco_venda_anterior > 0
-            else 0
-        )
-
-        db.add(
-            ProdutoHistoricoPreco(
-                produto_id=produto.id,
-                preco_custo_anterior=preco_custo_anterior,
-                preco_custo_novo=produto.preco_custo,
-                preco_venda_anterior=preco_venda_anterior,
-                preco_venda_novo=produto.preco_venda,
-                margem_anterior=margem_anterior,
-                margem_nova=margem_nova,
-                variacao_custo_percentual=0,
-                variacao_venda_percentual=variacao_venda,
-                motivo="nfe_revisao_precos",
-                nota_entrada_id=nota.id,
-                referencia=f"NF-e {nota.numero_nota} - Revisao de precos",
-                observacoes=(
-                    f"Preco ajustado de R$ {preco_venda_anterior:.2f} "
-                    f"para R$ {produto.preco_venda:.2f}"
-                ),
-                user_id=current_user.id,
-                tenant_id=tenant_id,
-            )
-        )
-        atualizados += 1
-
-    return atualizados
-
-
-@router.post("/{nota_id}/atualizar-precos")
-def atualizar_precos_produtos(
-    nota_id: int,
-    precos: List[AtualizarPrecoRequest],
-    db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
-):
-    """
-    Atualiza preÃ§os de venda dos produtos antes de processar a nota
-    Registra histÃ³rico de alteraÃ§Ãµes
-    """
-    current_user, tenant_id = user_and_tenant
-
-    nota = (
-        db.query(NotaEntrada)
-        .filter(NotaEntrada.id == nota_id, NotaEntrada.tenant_id == tenant_id)
-        .first()
-    )
-    if not nota:
-        raise HTTPException(status_code=404, detail="Nota nÃ£o encontrada")
-
-    for preco_data in precos:
-        produto = (
-            db.query(Produto)
-            .filter(Produto.id == preco_data.produto_id, Produto.tenant_id == tenant_id)
-            .first()
-        )
-        if produto:
-            # Capturar valores anteriores
-            preco_venda_anterior = produto.preco_venda
-            preco_custo_anterior = produto.preco_custo
-            margem_anterior = (
-                (
-                    (preco_venda_anterior - preco_custo_anterior)
-                    / preco_venda_anterior
-                    * 100
-                )
-                if preco_venda_anterior > 0
-                else 0
-            )
-
-            # Atualizar preÃ§o
-            produto.preco_venda = preco_data.preco_venda
-
-            # Calcular nova margem
-            margem_nova = (
-                (
-                    (produto.preco_venda - produto.preco_custo)
-                    / produto.preco_venda
-                    * 100
-                )
-                if produto.preco_venda > 0
-                else 0
-            )
-
-            # Registrar histÃ³rico se houve alteraÃ§Ã£o
-            if preco_venda_anterior != produto.preco_venda:
-                variacao_venda = (
-                    (
-                        (produto.preco_venda - preco_venda_anterior)
-                        / preco_venda_anterior
-                        * 100
-                    )
-                    if preco_venda_anterior > 0
-                    else 0
-                )
-
-                historico = ProdutoHistoricoPreco(
-                    produto_id=produto.id,
-                    preco_custo_anterior=preco_custo_anterior,
-                    preco_custo_novo=produto.preco_custo,
-                    preco_venda_anterior=preco_venda_anterior,
-                    preco_venda_novo=produto.preco_venda,
-                    margem_anterior=margem_anterior,
-                    margem_nova=margem_nova,
-                    variacao_custo_percentual=0,  # Custo nÃ£o mudou neste caso
-                    variacao_venda_percentual=variacao_venda,
-                    motivo="nfe_revisao_precos",
-                    nota_entrada_id=nota.id,
-                    referencia=f"NF-e {nota.numero_nota} - RevisÃ£o de PreÃ§os",
-                    observacoes=f"PreÃ§o ajustado de R$ {preco_venda_anterior:.2f} para R$ {produto.preco_venda:.2f} (margem: {margem_anterior:.1f}% â†’ {margem_nova:.1f}%)",
-                    user_id=current_user.id,
-                    tenant_id=tenant_id,
-                )
-                db.add(historico)
-
-                logger.info(
-                    f"ðŸ“Š HistÃ³rico registrado: {produto.nome} - "
-                    f"PreÃ§o R$ {preco_venda_anterior:.2f} â†’ R$ {produto.preco_venda:.2f} "
-                    f"({variacao_venda:+.2f}%)"
-                )
-
-    db.commit()
-
-    return {"message": "PreÃ§os atualizados com sucesso"}
-
-
-# ============================================================================
 # DAR ENTRADA NO ESTOQUE
 # ============================================================================
 
@@ -512,7 +105,7 @@ def processar_entrada_estoque(
     - custos_override: {"item_id": custo_unitario} para custo manual de sistema
     """
     current_user, tenant_id = user_and_tenant
-    logger.info(f"ðŸ“¦ Processando entrada no estoque - Nota {nota_id}")
+    logger.info(f"Ã°Å¸â€œÂ¦ Processando entrada no estoque - Nota {nota_id}")
 
     nota = (
         db.query(NotaEntrada)
@@ -522,17 +115,17 @@ def processar_entrada_estoque(
     )
 
     if not nota:
-        raise HTTPException(status_code=404, detail="Nota nÃ£o encontrada")
+        raise HTTPException(status_code=404, detail="Nota nÃƒÂ£o encontrada")
 
     if nota.entrada_estoque_realizada or nota.status == "processada":
         raise HTTPException(
-            status_code=400, detail="Entrada no estoque jÃ¡ foi realizada"
+            status_code=400, detail="Entrada no estoque jÃƒÂ¡ foi realizada"
         )
 
     if nota.produtos_nao_vinculados > 0:
         raise HTTPException(
             status_code=400,
-            detail=f"Existem {nota.produtos_nao_vinculados} produtos nÃ£o vinculados. "
+            detail=f"Existem {nota.produtos_nao_vinculados} produtos nÃƒÂ£o vinculados. "
             "Vincule todos os produtos antes de processar.",
         )
 
@@ -601,7 +194,7 @@ def processar_entrada_estoque(
                 else item.valor_unitario
             )
             logger.info(
-                f"📦 Pack MANUAL no item {item.id}: x{override_mult} (qtd NF {item.quantidade} → qtd entrada {quantidade_entrada})"
+                f"ðŸ“¦ Pack MANUAL no item {item.id}: x{override_mult} (qtd NF {item.quantidade} â†’ qtd entrada {quantidade_entrada})"
             )
         else:
             dados_pack = calcular_quantidade_custo_efetivos(
@@ -620,7 +213,7 @@ def processar_entrada_estoque(
         if custo_unitario_manual is not None and config.atualizar_custo:
             custo_unitario_entrada = custo_unitario_manual
             logger.info(
-                f"💰 Custo manual aplicado no item {item.id}: "
+                f"ðŸ’° Custo manual aplicado no item {item.id}: "
                 f"R$ {custo_unitario_entrada:.4f} por unidade"
             )
 
@@ -638,7 +231,7 @@ def processar_entrada_estoque(
                 }
             )
             logger.info(
-                f"  ⚠️ {item.produto.nome}: sem entrada em estoque "
+                f"  âš ï¸ {item.produto.nome}: sem entrada em estoque "
                 f"(conferida: {quantidade_base_conferida}, avariada: {conferencia_item['quantidade_avariada']}, "
                 f"faltante: {conferencia_item['quantidade_faltante']})"
             )
@@ -652,11 +245,11 @@ def processar_entrada_estoque(
                 atualizar_custo=False,
             )
 
-        # âœ… REATIVAR produto se estiver inativo
+        # Ã¢Å“â€¦ REATIVAR produto se estiver inativo
         if not produto.ativo:
             produto.ativo = True
             logger.info(
-                f"  â™»ï¸  Produto reativado: {produto.codigo} - {produto.nome}"
+                f"  Ã¢â„¢Â»Ã¯Â¸Â  Produto reativado: {produto.codigo} - {produto.nome}"
             )
 
         # Atualizar dados fiscais do produto com informacoes do XML quando vierem preenchidas.
@@ -669,7 +262,7 @@ def processar_entrada_estoque(
 
         _aplicar_codigos_barras_item_no_produto(produto, item)
 
-        # âœ… VINCULAR ao fornecedor da nota
+        # Ã¢Å“â€¦ VINCULAR ao fornecedor da nota
         if nota.fornecedor_id:
             vinculo_existente = (
                 db.query(ProdutoFornecedor)
@@ -691,16 +284,16 @@ def processar_entrada_estoque(
                 )
                 db.add(novo_vinculo)
                 logger.info(
-                    f"  ðŸ”— Produto {produto.codigo} vinculado ao fornecedor {nota.fornecedor_id}"
+                    f"  Ã°Å¸â€â€” Produto {produto.codigo} vinculado ao fornecedor {nota.fornecedor_id}"
                 )
             else:
-                # Reativar vÃ­nculo se estiver inativo
+                # Reativar vÃƒÂ­nculo se estiver inativo
                 if not vinculo_existente.ativo:
                     vinculo_existente.ativo = True
                     logger.info(
-                        f"  â™»ï¸  VÃ­nculo de fornecedor reativado: {produto.codigo}"
+                        f"  Ã¢â„¢Â»Ã¯Â¸Â  VÃƒÂ­nculo de fornecedor reativado: {produto.codigo}"
                     )
-                # Atualizar preÃ§o de custo no vÃ­nculo
+                # Atualizar preÃƒÂ§o de custo no vÃƒÂ­nculo
                 if config.atualizar_custo:
                     vinculo_existente.preco_custo = custo_unitario_entrada
 
@@ -756,7 +349,7 @@ def processar_entrada_estoque(
         estoque_anterior = produto.estoque_atual or 0
         produto.estoque_atual = estoque_anterior + quantidade_entrada
 
-        # Atualizar preÃ§o de custo e registrar histÃ³rico
+        # Atualizar preÃƒÂ§o de custo e registrar histÃƒÂ³rico
         preco_custo_anterior = produto.preco_custo or 0
         preco_venda_anterior = produto.preco_venda or 0
         margem_anterior = (
@@ -779,7 +372,7 @@ def processar_entrada_estoque(
             else 0
         )
 
-        # Registrar histÃ³rico de preÃ§o se houve alteraÃ§Ã£o
+        # Registrar histÃƒÂ³rico de preÃƒÂ§o se houve alteraÃƒÂ§ÃƒÂ£o
         if alterou_custo:
             variacao_custo = (
                 (
@@ -800,7 +393,7 @@ def processar_entrada_estoque(
                 margem_anterior=margem_anterior,
                 margem_nova=margem_nova,
                 variacao_custo_percentual=variacao_custo,
-                variacao_venda_percentual=0,  # PreÃ§o de venda nÃ£o mudou
+                variacao_venda_percentual=0,  # PreÃƒÂ§o de venda nÃƒÂ£o mudou
                 motivo="nfe_entrada",
                 nota_entrada_id=nota.id,
                 referencia=f"NF-e {nota.numero_nota}",
@@ -815,8 +408,8 @@ def processar_entrada_estoque(
             db.add(historico)
 
             logger.info(
-                f"  ðŸ“Š HistÃ³rico registrado: {produto.nome} - "
-                f"Custo R$ {preco_custo_anterior:.2f} â†’ R$ {produto.preco_custo:.2f} "
+                f"  Ã°Å¸â€œÅ  HistÃƒÂ³rico registrado: {produto.nome} - "
+                f"Custo R$ {preco_custo_anterior:.2f} Ã¢â€ â€™ R$ {produto.preco_custo:.2f} "
                 f"({variacao_custo:+.2f}%)"
             )
 
@@ -888,15 +481,15 @@ def processar_entrada_estoque(
         )
 
         logger.info(
-            f"  âœ… {produto.nome}: +{quantidade_entrada} unidades "
+            f"  Ã¢Å“â€¦ {produto.nome}: +{quantidade_entrada} unidades "
             f"em {len(lotes_criados)} lote(s) "
-            f"(estoque: {estoque_anterior} â†’ {produto.estoque_atual})"
+            f"(estoque: {estoque_anterior} Ã¢â€ â€™ {produto.estoque_atual})"
         )
 
         if multiplicador_pack > 1:
             logger.info(
-                f"  ðŸ“¦ Pack detectado automaticamente no item {item.numero_item}: "
-                f"x{multiplicador_pack} (qtd NF {item.quantidade} â†’ qtd entrada {quantidade_entrada})"
+                f"  Ã°Å¸â€œÂ¦ Pack detectado automaticamente no item {item.numero_item}: "
+                f"x{multiplicador_pack} (qtd NF {item.quantidade} Ã¢â€ â€™ qtd entrada {quantidade_entrada})"
             )
 
     resumo_conferencia = _resumir_conferencia_nota(nota)
@@ -915,7 +508,7 @@ def processar_entrada_estoque(
     nota.entrada_estoque_realizada = bool(config.lancar_estoque)
     nota.processada_em = datetime.utcnow()
 
-    # CRIAR CONTAS A PAGAR apÃ³s processar estoque
+    # CRIAR CONTAS A PAGAR apÃƒÂ³s processar estoque
     contas_ids = []
     try:
         # Buscar dados do XML salvos na nota para pegar duplicatas
@@ -926,10 +519,10 @@ def processar_entrada_estoque(
             if config.gerar_contas_pagar
             else []
         )
-        logger.info(f"ðŸ’° {len(contas_ids)} contas a pagar criadas")
+        logger.info(f"Ã°Å¸â€™Â° {len(contas_ids)} contas a pagar criadas")
     except Exception as e:
-        logger.error(f"âš ï¸ Erro ao criar contas a pagar: {str(e)}")
-        # NÃ£o abortar o processo, apenas avisar
+        logger.error(f"Ã¢Å¡Â Ã¯Â¸Â Erro ao criar contas a pagar: {str(e)}")
+        # NÃƒÂ£o abortar o processo, apenas avisar
 
     db.commit()
 
@@ -944,7 +537,7 @@ def processar_entrada_estoque(
     except Exception as e_sync:
         logger.warning(f"[BLING-SYNC] Erro ao agendar sync (entrada_nfe): {e_sync}")
 
-    # VERIFICAR E NOTIFICAR PENDÊNCIAS DE ESTOQUE
+    # VERIFICAR E NOTIFICAR PENDÃŠNCIAS DE ESTOQUE
     from app.services.pendencia_estoque_service import verificar_e_notificar_pendencias
 
     try:
@@ -963,9 +556,9 @@ def processar_entrada_estoque(
                 )
     except Exception as e:
         logger.error(f"Erro ao notificar pendencias: {str(e)}")
-        # Não abortar, apenas logar o erro
+        # NÃ£o abortar, apenas logar o erro
 
-    logger.info(f"âœ… Entrada processada: {len(itens_processados)} produtos")
+    logger.info(f"Ã¢Å“â€¦ Entrada processada: {len(itens_processados)} produtos")
 
     return {
         "message": "Entrada no estoque realizada com sucesso",

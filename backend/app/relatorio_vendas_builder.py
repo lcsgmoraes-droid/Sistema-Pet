@@ -1,35 +1,28 @@
-"""Montagem do payload JSON do relatorio de vendas."""
+﻿"""Montagem do payload JSON do relatorio de vendas."""
 
-import logging
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import and_, func, or_
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
-from .comissoes_models import ComissaoItem
-from .empresa_config_fiscal_models import EmpresaConfigFiscal
-from .financeiro_models import FormaPagamento
-from .models import Cliente
-from .produtos_models import EstoqueMovimentacao, Produto
 from .relatorio_vendas_common import (
     _as_float,
     _enriquecer_itens_promocionais,
     _normalizar_canal_venda_relatorio,
-    _normalizar_forma_pagamento_label,
     _precisa_reclassificar_campanha,
     _total_recebido_venda,
     _valor_cupom_venda,
     _valores_operacionais_venda,
     _venda_tem_documento_fiscal,
 )
+from .relatorio_vendas_preloads import (
+    carregar_contexto_relatorio_vendas,
+    carregar_vendas_relatorio,
+    montar_agregados_operacionais_relatorio,
+)
 from .services.venda_rentabilidade_snapshot_service import (
     get_or_build_venda_rentabilidade_snapshot,
 )
-from .vendas_models import Venda, VendaItem
-
-
-logger = logging.getLogger(__name__)
 
 
 def montar_relatorio_vendas(
@@ -53,378 +46,34 @@ def montar_relatorio_vendas(
     data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
     canal_normalizado = _normalizar_canal_venda_relatorio(canal_venda)
 
-    filtros_vendas = [
-        Venda.tenant_id == tenant_id,
-        Venda.data_venda >= data_inicio_dt,
-        Venda.data_venda <= data_fim_dt,
-        or_(Venda.status.is_(None), Venda.status != "cancelada"),
-    ]
-    if canal_normalizado:
-        filtros_vendas.append(Venda.canal == canal_normalizado)
-
-    # OTIMIZAÇÃO: Buscar vendas com EAGER LOADING para evitar N+1 queries
-    # Isso carrega todos os relacionamentos de uma vez, reduzindo drasticamente queries ao BD
-    vendas = (
-        db.query(Venda)
-        .options(
-            selectinload(Venda.cliente),
-            selectinload(Venda.usuario),
-            selectinload(Venda.itens)
-            .selectinload(VendaItem.produto)
-            .selectinload(Produto.categoria),
-            selectinload(Venda.itens)
-            .selectinload(VendaItem.produto)
-            .selectinload(Produto.marca),
-            selectinload(Venda.pagamentos),
-        )
-        .filter(and_(*filtros_vendas))
-        .all()
+    vendas = carregar_vendas_relatorio(
+        db=db,
+        tenant_id=tenant_id,
+        data_inicio_dt=data_inicio_dt,
+        data_fim_dt=data_fim_dt,
+        canal_normalizado=canal_normalizado,
     )
-
-    # OTIMIZAÇÃO: Buscar config fiscal UMA VEZ (não para cada venda)
-    # Tratamento de erro caso a tabela não exista
-    try:
-        config_fiscal = (
-            db.query(EmpresaConfigFiscal)
-            .filter(EmpresaConfigFiscal.tenant_id == tenant_id)
-            .first()
-        )
-        impostos_percentual_global = (
-            float(config_fiscal.aliquota_simples_vigente)
-            if config_fiscal and config_fiscal.aliquota_simples_vigente
-            else 0.0
-        )
-    except Exception as e:
-        logger.warning(f"Erro ao buscar config fiscal (tabela pode não existir): {e}")
-        impostos_percentual_global = 0.0
-
-    # OTIMIZAÇÃO: Carregar todas as comissões de uma vez
-    venda_ids = [v.id for v in vendas]
-    comissoes_map = {}
-    if venda_ids:
-        try:
-            comissoes_itens = (
-                db.query(ComissaoItem)
-                .filter(
-                    and_(
-                        ComissaoItem.venda_id.in_(venda_ids),
-                        ComissaoItem.tenant_id == tenant_id,
-                    )
-                )
-                .all()
-            )
-            for com_item in comissoes_itens:
-                if com_item.venda_id not in comissoes_map:
-                    comissoes_map[com_item.venda_id] = []
-                comissoes_map[com_item.venda_id].append(com_item)
-        except Exception as e:
-            logger.warning(f"Erro ao buscar comissões (tabela pode não existir): {e}")
-
-    # OTIMIZAÇÃO: Carregar todas as formas de pagamento ativas de uma vez
-    formas_pagamento_map = {}
-    try:
-        formas_pag_list = (
-            db.query(FormaPagamento)
-            .filter(
-                and_(
-                    FormaPagamento.ativo.is_(True),
-                    FormaPagamento.tenant_id == tenant_id,
-                )
-            )
-            .all()
-        )
-        for fp in formas_pag_list:
-            formas_pagamento_map[fp.nome.lower().strip()] = fp
-    except Exception as e:
-        logger.warning(
-            f"Erro ao buscar formas de pagamento (tabela pode não existir): {e}"
-        )
-
-    # OTIMIZAÇÃO: Carregar resgates de cashback por venda (negative amount, source_id = venda_id)
-    cashback_por_venda = {}  # venda_id → valor resgatado
-    if venda_ids:
-        try:
-            from app.campaigns.models import CashbackTransaction
-
-            resgates = (
-                db.query(
-                    CashbackTransaction.source_id,
-                    func.sum(CashbackTransaction.amount),
-                )
-                .filter(
-                    CashbackTransaction.tenant_id == tenant_id,
-                    CashbackTransaction.amount < 0,
-                    CashbackTransaction.source_id.in_(venda_ids),
-                )
-                .group_by(CashbackTransaction.source_id)
-                .all()
-            )
-            cashback_por_venda = {r[0]: float(abs(r[1])) for r in resgates}
-        except Exception as e:
-            logger.warning(
-                f"Erro ao buscar cashback por venda (tabela pode não existir): {e}"
-            )
-
-    cupons_por_venda = {}
-    if venda_ids:
-        try:
-            from app.campaigns.models import CouponRedemption
-
-            resgates_cupons = (
-                db.query(
-                    CouponRedemption.venda_id,
-                    func.sum(CouponRedemption.discount_applied),
-                )
-                .filter(
-                    CouponRedemption.tenant_id == tenant_id,
-                    CouponRedemption.venda_id.in_(venda_ids),
-                    CouponRedemption.voided_at.is_(None),
-                )
-                .group_by(CouponRedemption.venda_id)
-                .all()
-            )
-            cupons_por_venda = {r[0]: float(r[1] or 0) for r in resgates_cupons}
-        except Exception as e:
-            logger.warning(
-                f"Erro ao buscar cupons por venda (tabela pode nÃ£o existir): {e}"
-            )
-
-    comissao_total_por_venda = {
-        venda_id: round(sum(float(item.valor_comissao or 0) for item in itens), 2)
-        for venda_id, itens in comissoes_map.items()
-    }
-
-    entregadores_map = {}
-    entregador_ids = {
-        v.entregador_id for v in vendas if v.tem_entrega and v.entregador_id
-    }
-    if entregador_ids:
-        try:
-            entregadores = (
-                db.query(Cliente.id, Cliente.taxa_fixa_entrega)
-                .filter(
-                    and_(Cliente.tenant_id == tenant_id, Cliente.id.in_(entregador_ids))
-                )
-                .all()
-            )
-            entregadores_map = {
-                entregador_id: float(taxa_fixa_entrega or 0)
-                for entregador_id, taxa_fixa_entrega in entregadores
-            }
-        except Exception as e:
-            logger.warning(f"Erro ao buscar entregadores para rentabilidade: {e}")
-
-    estoque_custos_por_venda = {}
-    if venda_ids:
-        try:
-            movimentos_estoque = (
-                db.query(EstoqueMovimentacao)
-                .filter(
-                    and_(
-                        EstoqueMovimentacao.tenant_id == tenant_id,
-                        EstoqueMovimentacao.referencia_tipo == "venda",
-                        EstoqueMovimentacao.referencia_id.in_(venda_ids),
-                        EstoqueMovimentacao.tipo == "saida",
-                    )
-                )
-                .all()
-            )
-
-            for movimento in movimentos_estoque:
-                mapa_venda = estoque_custos_por_venda.setdefault(
-                    movimento.referencia_id, {}
-                )
-                mapa_produto = mapa_venda.setdefault(
-                    movimento.produto_id, {"quantidade": 0.0, "valor_total": 0.0}
-                )
-                mapa_produto["quantidade"] += abs(float(movimento.quantidade or 0))
-                mapa_produto["valor_total"] += abs(float(movimento.valor_total or 0))
-        except Exception as e:
-            logger.warning(
-                f"Erro ao buscar movimentacoes de estoque para rentabilidade: {e}"
-            )
-
-    valores_operacionais_por_venda = {
-        venda.id: _valores_operacionais_venda(venda) for venda in vendas
-    }
-
-    # ==============================================
-    # RESUMO (Cards no topo)
-    # ==============================================
-    venda_bruta = sum(v["valor_bruto"] for v in valores_operacionais_por_venda.values())
-    taxa_entrega = sum(
-        v["taxa_entrega"] for v in valores_operacionais_por_venda.values()
+    contexto_relatorio = carregar_contexto_relatorio_vendas(
+        db=db,
+        tenant_id=tenant_id,
+        vendas=vendas,
     )
-    desconto = sum(v["desconto"] for v in valores_operacionais_por_venda.values())
-    venda_liquida = sum(
-        v["valor_liquido"] for v in valores_operacionais_por_venda.values()
-    )
+    impostos_percentual_global = contexto_relatorio["impostos_percentual_global"]
+    comissoes_map = contexto_relatorio["comissoes_map"]
+    comissao_total_por_venda = contexto_relatorio["comissao_total_por_venda"]
+    formas_pagamento_map = contexto_relatorio["formas_pagamento_map"]
+    cashback_por_venda = contexto_relatorio["cashback_por_venda"]
+    cupons_por_venda = contexto_relatorio["cupons_por_venda"]
+    entregadores_map = contexto_relatorio["entregadores_map"]
+    estoque_custos_por_venda = contexto_relatorio["estoque_custos_por_venda"]
 
-    valor_recebido = sum(
-        v["valor_recebido"] for v in valores_operacionais_por_venda.values()
-    )
-    em_aberto = sum(v["saldo_aberto"] for v in valores_operacionais_por_venda.values())
-
-    percentual_desconto = round(
-        (desconto / venda_bruta * 100) if venda_bruta > 0 else 0, 1
-    )
-
-    resumo = {
-        "venda_bruta": round(venda_bruta, 2),
-        "taxa_entrega": round(taxa_entrega, 2),
-        "desconto": round(desconto, 2),
-        "percentual_desconto": percentual_desconto,
-        "venda_liquida": round(venda_liquida, 2),
-        "valor_recebido": round(valor_recebido, 2),
-        "em_aberto": round(em_aberto, 2),
-        "quantidade_vendas": len(vendas),
-    }
-
-    # ==============================================
-    # VENDAS POR DATA
-    # ==============================================
-    vendas_por_data = {}
-    for venda in vendas:
-        data_str = venda.data_venda.date().isoformat()
-        if data_str not in vendas_por_data:
-            vendas_por_data[data_str] = {
-                "data": data_str,
-                "quantidade": 0,
-                "valor_bruto": 0,
-                "taxa_entrega": 0,
-                "desconto": 0,
-                "valor_liquido": 0,
-                "valor_recebido": 0,
-                "saldo_aberto": 0,
-            }
-
-        valores_venda = valores_operacionais_por_venda.get(
-            venda.id
-        ) or _valores_operacionais_venda(venda)
-        vendas_por_data[data_str]["quantidade"] += 1
-        vendas_por_data[data_str]["valor_bruto"] += valores_venda["valor_bruto"]
-        vendas_por_data[data_str]["taxa_entrega"] += valores_venda["taxa_entrega"]
-        vendas_por_data[data_str]["desconto"] += valores_venda["desconto"]
-        vendas_por_data[data_str]["valor_liquido"] += valores_venda["valor_liquido"]
-
-        # OTIMIZAÇÃO: usar pagamentos já carregados
-        vendas_por_data[data_str]["valor_recebido"] += valores_venda["valor_recebido"]
-        vendas_por_data[data_str]["saldo_aberto"] += valores_venda["saldo_aberto"]
-
-    # Calcular ticket médio
-    for data_str in vendas_por_data:
-        qtd = vendas_por_data[data_str]["quantidade"]
-        vendas_por_data[data_str]["ticket_medio"] = round(
-            vendas_por_data[data_str]["valor_liquido"] / qtd if qtd > 0 else 0, 2
-        )
-        vendas_por_data[data_str]["percentual_desconto"] = round(
-            (
-                vendas_por_data[data_str]["desconto"]
-                / vendas_por_data[data_str]["valor_bruto"]
-                * 100
-            )
-            if vendas_por_data[data_str]["valor_bruto"] > 0
-            else 0,
-            1,
-        )
-
-    vendas_por_data_lista = sorted(vendas_por_data.values(), key=lambda x: x["data"])
-
-    # ==============================================
-    # FORMAS DE RECEBIMENTO
-    # ==============================================
-    formas_recebimento = {}
-    for venda in vendas:
-        # OTIMIZAÇÃO: usar pagamentos já carregados
-        for pag in venda.pagamentos:
-            forma_base = _normalizar_forma_pagamento_label(pag.forma_pagamento)
-
-            # Criar chave única com forma + parcelas
-            if pag.numero_parcelas and pag.numero_parcelas > 1:
-                forma_completa = f"{forma_base} {pag.numero_parcelas}x"
-                parcelas = pag.numero_parcelas
-            else:
-                forma_completa = forma_base
-                parcelas = 1
-
-            if forma_completa not in formas_recebimento:
-                formas_recebimento[forma_completa] = {
-                    "forma_pagamento": forma_completa,
-                    "valor_total": 0,
-                    "ordem_forma": forma_base,  # Para ordenar por tipo de pagamento
-                    "ordem_parcelas": parcelas,  # Para ordenar por número de parcelas
-                }
-            formas_recebimento[forma_completa]["valor_total"] += pag.valor
-
-    # Ordenar por tipo de pagamento e depois por número de parcelas (crescente)
-    formas_recebimento_lista = sorted(
-        formas_recebimento.values(),
-        key=lambda x: (x["ordem_forma"], x["ordem_parcelas"]),
-    )
-
-    # Remover campos auxiliares de ordenação
-    for item in formas_recebimento_lista:
-        item.pop("ordem_forma", None)
-        item.pop("ordem_parcelas", None)
-
-    # ==============================================
-    # VENDAS POR FUNCIONÁRIO
-    # ==============================================
-    vendas_por_funcionario = {}
-    for venda in vendas:
-        funcionario_id = venda.user_id
-        # OTIMIZAÇÃO: usar relacionamento usuario já carregado
-        if funcionario_id:
-            nome_func = venda.usuario.nome if venda.usuario else f"ID {funcionario_id}"
-        else:
-            nome_func = "Sem funcionário"
-
-        if nome_func not in vendas_por_funcionario:
-            vendas_por_funcionario[nome_func] = {
-                "funcionario": nome_func,
-                "quantidade": 0,
-                "valor_bruto": 0,
-                "desconto": 0,
-                "valor_liquido": 0,
-            }
-
-        valores_venda = valores_operacionais_por_venda.get(
-            venda.id
-        ) or _valores_operacionais_venda(venda)
-        vendas_por_funcionario[nome_func]["quantidade"] += 1
-        vendas_por_funcionario[nome_func]["valor_bruto"] += valores_venda["valor_bruto"]
-        vendas_por_funcionario[nome_func]["desconto"] += valores_venda["desconto"]
-        vendas_por_funcionario[nome_func]["valor_liquido"] += valores_venda[
-            "valor_liquido"
-        ]
-
-    vendas_por_funcionario_lista = sorted(
-        vendas_por_funcionario.values(), key=lambda x: x["valor_liquido"], reverse=True
-    )
-
-    # ==============================================
-    # VENDAS POR TIPO (Produto/Serviço)
-    # ==============================================
-    vendas_por_tipo = {
-        "Produto": {
-            "tipo": "Produto",
-            "quantidade": 0,
-            "valor_bruto": 0,
-            "desconto": 0,
-            "valor_liquido": 0,
-        }
-    }
-
-    for venda in vendas:
-        valores_venda = valores_operacionais_por_venda.get(
-            venda.id
-        ) or _valores_operacionais_venda(venda)
-        vendas_por_tipo["Produto"]["quantidade"] += 1
-        vendas_por_tipo["Produto"]["valor_bruto"] += valores_venda["valor_bruto"]
-        vendas_por_tipo["Produto"]["desconto"] += valores_venda["desconto"]
-        vendas_por_tipo["Produto"]["valor_liquido"] += valores_venda["valor_liquido"]
-
-    vendas_por_tipo_lista = list(vendas_por_tipo.values())
+    agregados_operacionais = montar_agregados_operacionais_relatorio(vendas)
+    valores_operacionais_por_venda = agregados_operacionais["valores_operacionais_por_venda"]
+    resumo = agregados_operacionais["resumo"]
+    vendas_por_data_lista = agregados_operacionais["vendas_por_data_lista"]
+    formas_recebimento_lista = agregados_operacionais["formas_recebimento_lista"]
+    vendas_por_funcionario_lista = agregados_operacionais["vendas_por_funcionario_lista"]
+    vendas_por_tipo_lista = agregados_operacionais["vendas_por_tipo_lista"]
 
     # ==============================================
     # VENDAS POR GRUPO DE PRODUTO

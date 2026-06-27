@@ -19,6 +19,8 @@ def _ponto_equilibrio_backend_source() -> str:
         [
             _backend_source("app/dashboard_routes.py"),
             _backend_source("app/dashboard/ponto_equilibrio.py"),
+            _backend_source("app/dashboard/ponto_equilibrio_margem.py"),
+            _backend_source("app/dashboard/ponto_equilibrio_classificacao.py"),
             _backend_source("app/dashboard/ponto_equilibrio_routes.py"),
         ]
     )
@@ -86,16 +88,32 @@ def test_api_ponto_equilibrio_tem_detalhes_lazy_para_nao_pesar_resumo():
 
 
 def test_frontend_tem_tela_financeira_de_ponto_equilibrio():
-    app = _frontend_source("src/App.jsx")
+    lazy_pages = _frontend_source("src/app/lazyPages.jsx")
+    finance_routes = _frontend_source("src/app/routes/FinanceRoutes.jsx")
     menu = _frontend_source("src/components/layout/menuConfig.js")
-    page = _frontend_source("src/pages/PontoEquilibrio.jsx")
+    page = "\n".join(
+        [
+            _frontend_source("src/pages/PontoEquilibrio.jsx"),
+            _frontend_source("src/pages/ponto-equilibrio/PontoEquilibrioPage.jsx"),
+            _frontend_source("src/pages/ponto-equilibrio/PontoEquilibrioHeaderFilters.jsx"),
+            _frontend_source("src/pages/ponto-equilibrio/PontoEquilibrioResumoTab.jsx"),
+            _frontend_source("src/pages/ponto-equilibrio/pontoEquilibrioConstants.js"),
+            _frontend_source("src/pages/ponto-equilibrio/pontoEquilibrioUtils.js"),
+            _frontend_source("src/pages/ponto-equilibrio/usePontoEquilibrioController.js"),
+            _frontend_source("src/pages/ponto-equilibrio/DetalhamentoMargemPanel.jsx"),
+            _frontend_source("src/pages/ponto-equilibrio/DetalhesPontoEquilibrioDrawer.jsx"),
+            _frontend_source("src/pages/ponto-equilibrio/SimuladorImpactoPanel.jsx"),
+            _frontend_source("src/pages/ponto-equilibrio/AnaliseCustosPanel.jsx"),
+        ]
+    )
     impact_utils = _frontend_source("src/pages/pontoEquilibrioImpactoUtils.js")
     dashboard = _frontend_source("src/pages/DashboardFinanceiro.jsx")
 
     assert (
-        'const PontoEquilibrio = lazy(() => import("./pages/PontoEquilibrio"))' in app
+        'export const PontoEquilibrio = lazy(() => import("../pages/PontoEquilibrio"))'
+        in lazy_pages
     )
-    assert 'path="financeiro/ponto-equilibrio"' in app
+    assert 'path="financeiro/ponto-equilibrio"' in finance_routes
     assert 'path: "/financeiro/ponto-equilibrio"' in menu
     assert 'label: "Ponto de Equilibrio"' in menu
     assert "Ponto de Equilibrio" in page
