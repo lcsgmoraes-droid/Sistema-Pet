@@ -209,13 +209,22 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-27 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
 
-- 76 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 75 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 68 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 67 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 8 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 11 arquivos de teste em `backend/tests` e 2 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 2 de 2026-06-27: `backend/app/comissoes_routes.py` saiu da faixa acima de 700 linhas ao virar fachada de routers menores por responsabilidade:
+
+- `backend/app/comissoes_routes.py`: 984 -> 54 linhas, mantendo o prefixo publico `/comissoes` e incluindo subrouters dedicados.
+- `backend/app/comissoes_schema_guard.py`: guarda o backfill/compatibilidade de `tenant_id` com sincronizacao RLS antes de ler `clientes`.
+- `backend/app/comissoes_parceiros_routes.py`: concentra listagem de parceiros e configuracoes por parceiro.
+- `backend/app/comissoes_configuracoes_routes.py`: concentra criacao, batch, duplicacao, exclusao e busca de regra aplicavel.
+- `backend/app/comissoes_operacional_routes.py`: concentra itens pendentes, configuracoes do sistema e arvore de produtos.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_2_refactor.py`, garantindo fachada, paths publicos e modulos extraidos abaixo de 700 linhas.
 
 Fatia backend 700 batch 1 de 2026-06-27: tres arquivos backend do topo da fila sairam da faixa acima de 700 linhas com extracoes maiores de preloads, margem/classificacao e processamento de precos:
 
