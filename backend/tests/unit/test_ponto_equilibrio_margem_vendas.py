@@ -11,6 +11,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 
 from app import dashboard_routes
 from app.dashboard import ponto_equilibrio
+from app.dashboard import ponto_equilibrio_margem
 
 
 def test_ponto_equilibrio_module_expoe_helpers_usados_pelo_router():
@@ -196,25 +197,25 @@ def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(
         raising=False,
     )
     monkeypatch.setattr(
-        ponto_equilibrio,
+        ponto_equilibrio_margem,
         "build_venda_rentabilidade_snapshot",
         build_rapido,
         raising=False,
     )
     monkeypatch.setattr(
-        ponto_equilibrio,
+        ponto_equilibrio_margem,
         "_formas_pagamento_map",
         lambda db, tenant_id: chamados.update(formas=chamados["formas"] + 1) or {},
         raising=False,
     )
     monkeypatch.setattr(
-        ponto_equilibrio,
+        ponto_equilibrio_margem,
         "_impostos_percentual",
         lambda db, tenant_id: chamados.update(impostos=chamados["impostos"] + 1) or 7.0,
         raising=False,
     )
     monkeypatch.setattr(
-        ponto_equilibrio,
+        ponto_equilibrio_margem,
         "_bulk_comissoes_por_venda",
         lambda db, tenant_id, venda_ids: (
             chamados.update(comissoes=chamados["comissoes"] + 1) or {}
@@ -222,7 +223,7 @@ def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(
         raising=False,
     )
     monkeypatch.setattr(
-        ponto_equilibrio,
+        ponto_equilibrio_margem,
         "_bulk_cupons_por_venda",
         lambda db, tenant_id, vendas: (
             chamados.update(cupons=chamados["cupons"] + 1) or {}
@@ -230,7 +231,7 @@ def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(
         raising=False,
     )
     monkeypatch.setattr(
-        ponto_equilibrio,
+        ponto_equilibrio_margem,
         "_bulk_cashback_por_venda",
         lambda db, tenant_id, venda_ids: (
             chamados.update(cashback=chamados["cashback"] + 1) or {}
@@ -238,7 +239,7 @@ def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(
         raising=False,
     )
     monkeypatch.setattr(
-        ponto_equilibrio,
+        ponto_equilibrio_margem,
         "_bulk_taxa_operacional_por_venda",
         lambda db, tenant_id, vendas: (
             chamados.update(taxa_operacional=chamados["taxa_operacional"] + 1) or {}
@@ -246,7 +247,7 @@ def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(
         raising=False,
     )
     monkeypatch.setattr(
-        ponto_equilibrio,
+        ponto_equilibrio_margem,
         "_bulk_estoque_custos_por_venda",
         lambda db, tenant_id, venda_ids: (
             chamados.update(estoque=chamados["estoque"] + 1) or {}

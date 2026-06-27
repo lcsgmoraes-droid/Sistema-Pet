@@ -10,10 +10,16 @@ def read(path: str) -> str:
 
 def test_backend_relatorio_vendas_accepts_and_filters_by_sales_channel():
     routes_source = read("backend/app/relatorio_vendas_routes.py")
-    builder_source = read("backend/app/relatorio_vendas_builder.py")
+    builder_source = "\n".join(
+        [
+            read("backend/app/relatorio_vendas_builder.py"),
+            read("backend/app/relatorio_vendas_preloads.py"),
+        ]
+    )
 
     assert "canal_venda: Optional[str] = Query(None)" in routes_source
     assert "_normalizar_canal_venda_relatorio" in routes_source
+    assert "carregar_vendas_relatorio" in builder_source
     assert "Venda.canal == canal_normalizado" in builder_source
 
 
