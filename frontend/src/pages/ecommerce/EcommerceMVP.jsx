@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import ecommerceApi from "../../services/ecommerceApi";
 import { api } from "../../services/api";
@@ -18,11 +18,9 @@ import useEcommerceCheckout from "./useEcommerceCheckout";
 import useEcommerceCustomer from "./useEcommerceCustomer";
 import useEcommerceEngagement from "./useEcommerceEngagement";
 import useEcommerceOrders from "./useEcommerceOrders";
+import useEcommercePaymentReturn from "./useEcommercePaymentReturn";
 import useEcommerceProductModal from "./useEcommerceProductModal";
-import {
-  readMercadoPagoPaymentReturn,
-  stripMercadoPagoPaymentReturnParams,
-} from "../../utils/mercadoPagoPaymentReturn";
+import useEcommerceStorefrontRuntime from "./useEcommerceStorefrontRuntime";
 import { trackPageView, trackViewCart } from "../../services/analytics";
 import {
   DEFAULT_CATALOG_LIMIT,
@@ -36,23 +34,10 @@ import {
 } from "./ecommerceMvpUtils";
 
 export default function EcommerceMVP() {
-  // Inject Plus Jakarta Sans font (matches design system)
-  useEffect(() => {
-    const id = "plus-jakarta-sans-font";
-    if (!document.getElementById(id)) {
-      const link = document.createElement("link");
-      link.id = id;
-      link.rel = "stylesheet";
-      link.href =
-        "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap";
-      document.head.appendChild(link);
-    }
-  }, []);
-
+  const { isMobile } = useEcommerceStorefrontRuntime();
   const location = useLocation();
   const navigate = useNavigate();
   const params = useParams();
-  const handledPaymentReturnSearchRef = useRef("");
 
   const [view, setView] = useState("loja");
   const [authReturnView, setAuthReturnView] = useState("");
@@ -65,16 +50,6 @@ export default function EcommerceMVP() {
   function clearAuthReturnView() {
     setAuthReturnView("");
   }
-
-  // Detecta mobile (< 768px)
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" ? window.innerWidth < 768 : false,
-  );
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
-  }, []);
 
   // Rastreia no Google Analytics sempre que o cliente muda de tela
   useEffect(() => {
@@ -283,34 +258,21 @@ export default function EcommerceMVP() {
     onError: setError,
   });
 
+  useEcommercePaymentReturn({
+    location,
+    navigate,
+    recordOrderId,
+    setError,
+    setSuccess,
+    setView,
+  });
+
   useEffect(() => {
     const viewParam = new URLSearchParams(location.search).get("view");
     if (["loja", "carrinho", "checkout", "pedidos", "conta"].includes(viewParam)) {
       setView(viewParam);
     }
   }, [location.search]);
-
-  useEffect(() => {
-    const paymentReturn = readMercadoPagoPaymentReturn(location.search);
-    if (!paymentReturn) return;
-    if (handledPaymentReturnSearchRef.current === location.search) return;
-    handledPaymentReturnSearchRef.current = location.search;
-
-    setView("pedidos");
-    if (paymentReturn.level === "error") {
-      setError(`${paymentReturn.title}: ${paymentReturn.message}`);
-      setSuccess("");
-    } else {
-      setError("");
-      setSuccess(`${paymentReturn.title}: ${paymentReturn.message}`);
-    }
-    if (paymentReturn.pedidoId) {
-      void recordOrderId(paymentReturn.pedidoId);
-    }
-
-    const cleanedSearch = stripMercadoPagoPaymentReturnParams(location.search);
-    navigate(`${location.pathname}${cleanedSearch ? `?${cleanedSearch}` : ""}`, { replace: true });
-  }, [location.pathname, location.search, navigate, recordOrderId]);
 
   const {
     addressFields,

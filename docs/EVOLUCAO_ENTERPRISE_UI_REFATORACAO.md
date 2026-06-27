@@ -209,12 +209,21 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-26 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
 
-- 83 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 41 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 71 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, incluindo componentes e hooks): 12 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 41 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Observacao: resta 1 arquivo utilitario de teste em `frontend/src` acima de 700 linhas (`frontend/src/components/financeiro/vendasFinanceiroUtils.test.mjs`), fora do inventario de aplicacao.
+
+Fatia frontend 700 batch 7 de 2026-06-26: quatro arquivos GUI do topo da fila sairam da faixa acima de 700 linhas com extracoes maiores de acoes, colunas, view e runtime do ecommerce:
+
+- `frontend/src/components/modalPagamento/useModalPagamentoController.js`: 838 -> 620 linhas, com acoes de pagamento/finalizacao/NF-e em `frontend/src/components/modalPagamento/useModalPagamentoActions.js`.
+- `frontend/src/components/produtos/produtosColumns.jsx`: 762 -> 493 linhas, com colunas de custo, margem e preco em `frontend/src/components/produtos/produtosPricingColumns.jsx`.
+- `frontend/src/pages/ClienteFinanceiro.jsx`: 752 -> 135 linhas, com renderizacao e detalhes em `frontend/src/pages/clienteFinanceiro/ClienteFinanceiroView.jsx`.
+- `frontend/src/pages/ecommerce/EcommerceMVP.jsx`: 728 -> 689 linhas, com retorno de pagamento em `frontend/src/pages/ecommerce/useEcommercePaymentReturn.js` e setup de fonte/mobile em `frontend/src/pages/ecommerce/useEcommerceStorefrontRuntime.js`.
+- Contrato dedicado: `frontend/scripts/test-large-files-700-batch-7-refactor.mjs`, garantindo que os alvos e modulos extraidos sigam abaixo de 700 linhas.
 
 Fatia frontend 700 batch 6 de 2026-06-26: tres arquivos GUI do topo da fila sairam da faixa acima de 700 linhas com extracoes maiores de acoes, exportacoes e fluxo de granel:
 
