@@ -205,6 +205,9 @@ export default function useEntradaXmlRevisaoPrecos({
   const confirmarProcessamento = async () => {
     setLoading(true);
     try {
+      const acoesRealizadas = previewProcessamento?.acoes_processamento_realizadas || {};
+      const acaoPendenteSelecionada = (acao) =>
+        Boolean(acoesProcessamento[acao]) && !acoesRealizadas[acao];
       const precosParaAtualizar = [];
       Object.entries(precosAjustados).forEach(([produtoId, dados]) => {
         const itemOriginal = previewProcessamento.itens.find(
@@ -235,7 +238,7 @@ export default function useEntradaXmlRevisaoPrecos({
       );
       const custosOverride = Object.fromEntries(
         (previewProcessamento.itens || []).flatMap((item) => {
-          if (!acoesProcessamento.atualizar_custo) {
+          if (!acaoPendenteSelecionada("atualizar_custo")) {
             return [];
           }
 
@@ -255,21 +258,22 @@ export default function useEntradaXmlRevisaoPrecos({
         }),
       );
       const response = await api.post(`/notas-entrada/${previewProcessamento.nota_id}/processar`, {
-        lancar_estoque: Boolean(acoesProcessamento.lancar_estoque),
-        atualizar_custo: Boolean(acoesProcessamento.atualizar_custo),
-        atualizar_preco_venda: Boolean(acoesProcessamento.atualizar_preco_venda),
-        gerar_contas_pagar: Boolean(acoesProcessamento.gerar_contas_pagar),
-        precos_venda_override: acoesProcessamento.atualizar_preco_venda ? precosParaAtualizar : [],
+        lancar_estoque: acaoPendenteSelecionada("lancar_estoque"),
+        atualizar_custo: acaoPendenteSelecionada("atualizar_custo"),
+        atualizar_preco_venda: acaoPendenteSelecionada("atualizar_preco_venda"),
+        gerar_contas_pagar: acaoPendenteSelecionada("gerar_contas_pagar"),
+        precos_venda_override: acaoPendenteSelecionada("atualizar_preco_venda")
+          ? precosParaAtualizar
+          : [],
         ...(Object.keys(overridesNaoDefault).length > 0
           ? { multiplicadores_override: overridesNaoDefault }
           : {}),
         ...(Object.keys(custosOverride).length > 0 ? { custos_override: custosOverride } : {}),
       });
 
-      toast.success(
-        `✅ Nota processada! ${response.data.itens_processados} itens lançados no estoque`,
-        { duration: 5000 },
-      );
+      toast.success(response.data.message || "Movimentos da NF processados com sucesso", {
+        duration: 5000,
+      });
 
       setMostrarDetalhes(false);
       setNotaSelecionada(null);

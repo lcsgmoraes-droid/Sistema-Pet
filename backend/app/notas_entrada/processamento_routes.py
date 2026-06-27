@@ -26,7 +26,11 @@ from app.notas_entrada.fiscal import (
     calcular_quantidade_custo_efetivos,
 )
 from app.notas_entrada.processamento_acoes import (
+    calcular_acoes_pendentes_processamento,
+    carregar_acoes_processamento_salvas,
     detectar_contexto_processamento,
+    detectar_acoes_realizadas_processamento,
+    mesclar_acoes_realizadas_processamento,
     resolver_custo_operacional_entrada,
 )
 from app.notas_entrada.processamento_precos import (
@@ -79,26 +83,7 @@ def _acoes_processamento_dict(config: ProcessarConfig) -> dict:
 
 
 def _carregar_acoes_processamento_nota(nota: NotaEntrada) -> dict:
-    if getattr(nota, "processamento_acoes", None):
-        try:
-            dados = json.loads(nota.processamento_acoes)
-            if isinstance(dados, dict):
-                return {
-                    "lancar_estoque": bool(dados.get("lancar_estoque")),
-                    "atualizar_custo": bool(dados.get("atualizar_custo")),
-                    "atualizar_preco_venda": bool(dados.get("atualizar_preco_venda")),
-                    "gerar_contas_pagar": bool(dados.get("gerar_contas_pagar")),
-                }
-        except (TypeError, ValueError):
-            pass
-
-    legado_processado = bool(getattr(nota, "entrada_estoque_realizada", False))
-    return {
-        "lancar_estoque": legado_processado,
-        "atualizar_custo": legado_processado,
-        "atualizar_preco_venda": legado_processado,
-        "gerar_contas_pagar": legado_processado,
-    }
+    return carregar_acoes_processamento_salvas(nota)
 
 
 # DAR ENTRADA NO ESTOQUE
@@ -129,11 +114,32 @@ def processar_entrada_estoque(
     )
 
     if not nota:
-        raise HTTPException(status_code=404, detail="Nota nÃƒÂ£o encontrada")
+        raise HTTPException(status_code=404, detail="Nota nao encontrada")
 
-    if nota.entrada_estoque_realizada or nota.status == "processada":
+    acoes_processamento = _acoes_processamento_dict(config)
+    acoes_realizadas_antes = detectar_acoes_realizadas_processamento(
+        db, nota, tenant_id
+    )
+    acoes_ja_lancadas_selecionadas = [
+        acao
+        for acao, selecionada in acoes_processamento.items()
+        if selecionada and acoes_realizadas_antes.get(acao)
+    ]
+    if acoes_ja_lancadas_selecionadas:
         raise HTTPException(
-            status_code=400, detail="Entrada no estoque jÃƒÂ¡ foi realizada"
+            status_code=400,
+            detail=(
+                "Alguns movimentos ja foram lancados para esta NF: "
+                + ", ".join(acoes_ja_lancadas_selecionadas)
+            ),
+        )
+
+    acoes_pendentes_selecionadas = calcular_acoes_pendentes_processamento(
+        acoes_processamento, acoes_realizadas_antes
+    )
+    if not any(acoes_pendentes_selecionadas.values()):
+        raise HTTPException(
+            status_code=400, detail="Nenhum movimento pendente selecionado"
         )
 
     if nota.produtos_nao_vinculados > 0:
@@ -155,10 +161,12 @@ def processar_entrada_estoque(
             ],
         }
 
-    acoes_processamento = _acoes_processamento_dict(config)
     contexto_processamento = detectar_contexto_processamento(dados_xml_processamento)
     nota.processamento_contexto = contexto_processamento["contexto"]
-    nota.processamento_acoes = json.dumps(acoes_processamento, sort_keys=True)
+    acoes_realizadas_finais = mesclar_acoes_realizadas_processamento(
+        acoes_realizadas_antes, acoes_processamento
+    )
+    nota.processamento_acoes = json.dumps(acoes_realizadas_finais, sort_keys=True)
 
     precos_venda_atualizados = 0
     if config.atualizar_preco_venda and config.precos_venda_override:
@@ -519,7 +527,7 @@ def processar_entrada_estoque(
 
     # Atualizar nota
     nota.status = "processada"
-    nota.entrada_estoque_realizada = bool(config.lancar_estoque)
+    nota.entrada_estoque_realizada = bool(acoes_realizadas_finais["lancar_estoque"])
     nota.processada_em = datetime.utcnow()
 
     # CRIAR CONTAS A PAGAR apÃƒÂ³s processar estoque
@@ -575,7 +583,7 @@ def processar_entrada_estoque(
     logger.info(f"Ã¢Å“â€¦ Entrada processada: {len(itens_processados)} produtos")
 
     return {
-        "message": "Entrada no estoque realizada com sucesso",
+        "message": "Movimentos da NF processados com sucesso",
         "nota_id": nota.id,
         "numero_nota": nota.numero_nota,
         "itens_processados": len(itens_processados),
@@ -583,6 +591,10 @@ def processar_entrada_estoque(
         "custos_atualizados": custos_atualizados,
         "precos_venda_atualizados": precos_venda_atualizados,
         "acoes_processamento": acoes_processamento,
+        "acoes_processamento_realizadas": acoes_realizadas_finais,
+        "acoes_processamento_pendentes": {
+            chave: not realizada for chave, realizada in acoes_realizadas_finais.items()
+        },
         "conferencia": resumo_conferencia,
         "detalhes": itens_processados,
     }

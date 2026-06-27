@@ -77,6 +77,7 @@ function renderConferenciaBadge({
 export default function EntradaXmlNotasTable({
   abrirDetalhes,
   abrirVisualizacao,
+  carregarPreviewProcessamento,
   conferenciaStatusMeta,
   excluirNota,
   filtroStatus,
@@ -179,6 +180,8 @@ export default function EntradaXmlNotasTable({
         const exibirBotaoConferir =
           nota.status === "pendente" &&
           (nota.conferencia_status || "nao_iniciada") === "nao_iniciada";
+        const exibirBotaoMovimentos =
+          nota.status === "processada" && Number(nota.produtos_vinculados || 0) > 0;
 
         return (
           <div className="flex justify-center gap-2">
@@ -208,6 +211,20 @@ export default function EntradaXmlNotasTable({
                 }}
               >
                 Conferir
+              </ActionButton>
+            )}
+            {exibirBotaoMovimentos && (
+              <ActionButton
+                type="button"
+                intent="create"
+                size="xs"
+                title="Lancar movimentos pendentes"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  carregarPreviewProcessamento(nota.id);
+                }}
+              >
+                Lancar movimentos
               </ActionButton>
             )}
             {nota.entrada_estoque_realizada ? (
@@ -276,6 +293,7 @@ export default function EntradaXmlNotasTable({
 EntradaXmlNotasTable.propTypes = {
   abrirDetalhes: PropTypes.func.isRequired,
   abrirVisualizacao: PropTypes.func.isRequired,
+  carregarPreviewProcessamento: PropTypes.func.isRequired,
   conferenciaStatusMeta: PropTypes.objectOf(
     PropTypes.shape({
       cls: PropTypes.string,

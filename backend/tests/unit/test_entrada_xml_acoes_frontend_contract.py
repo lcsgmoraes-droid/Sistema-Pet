@@ -36,3 +36,26 @@ def test_processar_nf_abre_confirmacao_final_com_acoes_visiveis():
     assert "setMostrarConfirmacaoProcessamento(true)" in source
     assert "Processar NF agora" in source
     assert "onClick={confirmarProcessamento}" in source
+
+
+def test_nota_processada_pode_abrir_lancamento_de_movimentos_pendentes():
+    table_source = read_source(
+        "frontend/src/components/entrada-xml/EntradaXmlNotasTable.jsx"
+    )
+    modal_source = read_source(
+        "frontend/src/components/entrada-xml/EntradaXmlVisualizacaoNotaModal.jsx"
+    )
+
+    assert "Lancar movimentos" in table_source
+    assert "Lancar movimentos pendentes" in modal_source
+    assert "carregarPreviewProcessamento(nota.id)" in table_source
+
+
+def test_acoes_ja_lancadas_ficam_bloqueadas_na_revisao():
+    source = read_source(
+        "frontend/src/components/entrada-xml/EntradaXmlRevisaoPrecosModal.jsx"
+    )
+
+    assert "acoes_processamento_realizadas" in source
+    assert "Ja lancado" in source
+    assert "disabled={loading || acaoJaRealizada}" in source

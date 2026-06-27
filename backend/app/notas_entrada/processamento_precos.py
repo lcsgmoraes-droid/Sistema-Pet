@@ -16,7 +16,11 @@ from app.notas_entrada.fiscal import (
     calcular_composicao_custos_nota,
     calcular_quantidade_custo_efetivos,
 )
-from app.notas_entrada.processamento_acoes import sugerir_acoes_processamento
+from app.notas_entrada.processamento_acoes import (
+    calcular_acoes_pendentes_processamento,
+    detectar_acoes_realizadas_processamento,
+    sugerir_acoes_processamento,
+)
 from app.notas_entrada.produtos import (
     _montar_divergencia_codigo_barras_item,
     obter_detalhe_vinculo_item,
@@ -131,10 +135,11 @@ def preview_processamento(
     """
     Retorna preview da entrada com comparaÃƒÂ§ÃƒÂ£o de custos e preÃƒÂ§os atuais
     """
+    _current_user, tenant_id = user_and_tenant
     nota = (
         db.query(NotaEntrada)
         .options(joinedload(NotaEntrada.itens).joinedload(NotaEntradaItem.produto))
-        .filter(NotaEntrada.id == nota_id)
+        .filter(NotaEntrada.id == nota_id, NotaEntrada.tenant_id == tenant_id)
         .first()
     )
 
@@ -253,6 +258,16 @@ def preview_processamento(
             ],
         }
     sugestao_acoes = sugerir_acoes_processamento(dados_xml)
+    acoes_processamento_realizadas = detectar_acoes_realizadas_processamento(
+        db, nota, tenant_id
+    )
+    acoes_processamento_pendentes = {
+        chave: not realizada
+        for chave, realizada in acoes_processamento_realizadas.items()
+    }
+    acoes_sugeridas_pendentes = calcular_acoes_pendentes_processamento(
+        sugestao_acoes["acoes"], acoes_processamento_realizadas
+    )
 
     return {
         "nota_id": nota.id,
@@ -262,7 +277,9 @@ def preview_processamento(
         "fornecedor_cnpj": nota.fornecedor_cnpj,
         "valor_total": nota.valor_total,
         "conferencia": _resumir_conferencia_nota(nota),
-        "acoes_processamento_sugeridas": sugestao_acoes["acoes"],
+        "acoes_processamento_sugeridas": acoes_sugeridas_pendentes,
+        "acoes_processamento_realizadas": acoes_processamento_realizadas,
+        "acoes_processamento_pendentes": acoes_processamento_pendentes,
         "processamento_contexto": sugestao_acoes["contexto"],
         "processamento_mensagem": sugestao_acoes["mensagem"],
         "itens": preview_itens,
