@@ -91,8 +91,7 @@ export default function ClienteFinanceiroView({
   paginacao,
   resumo,
 }) {
-  const temFiltros =
-    filtros.tipo || filtros.status || filtros.data_inicio || filtros.data_fim;
+  const temFiltros = filtros.tipo || filtros.status || filtros.data_inicio || filtros.data_fim;
 
   if (loading && !historico.length) {
     return (
@@ -114,7 +113,12 @@ export default function ClienteFinanceiroView({
             title="Erro ao carregar dados"
             description={error}
             action={
-              <ActionButton onClick={onVoltarClientes} intent="neutral" icon={FiArrowLeft} size="md">
+              <ActionButton
+                onClick={onVoltarClientes}
+                intent="neutral"
+                icon={FiArrowLeft}
+                size="md"
+              >
                 Voltar para Clientes
               </ActionButton>
             }
@@ -500,9 +504,7 @@ function DetalhesVenda({ detalhes, loading }) {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">
-                    Produto
-                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Produto</th>
                   <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">Qtd</th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">
                     Preco Unit.
@@ -544,7 +546,10 @@ function DetalhesVenda({ detalhes, loading }) {
               </tbody>
               <tfoot className="bg-gray-50">
                 <tr>
-                  <td colSpan="5" className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
+                  <td
+                    colSpan="5"
+                    className="px-4 py-3 text-right text-sm font-semibold text-gray-700"
+                  >
                     Total Geral:
                   </td>
                   <td className="px-4 py-3 text-right text-lg font-bold text-green-600">
