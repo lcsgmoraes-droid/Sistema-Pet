@@ -76,15 +76,15 @@ export async function obterStatusPush(): Promise<PushStatus> {
 export async function calcularRacao(
   input: CalculadoraInput
 ): Promise<CalculadoraResultado> {
-  const params: Record<string, string> = {
-    peso_pet_kg: String(input.peso_pet_kg),
+  const payload: Record<string, number | string | null> = {
+    peso_pet_kg: input.peso_pet_kg,
     nivel_atividade: input.nivel_atividade,
   };
-  if (input.produto_id) params.produto_id = String(input.produto_id);
-  if (input.idade_meses) params.idade_meses = String(input.idade_meses);
-  if (input.peso_embalagem_kg) params.peso_embalagem_kg = String(input.peso_embalagem_kg);
-  if (input.preco) params.preco = String(input.preco);
+  if (input.produto_id) payload.produto_id = input.produto_id;
+  if (input.idade_meses) payload.idade_meses = input.idade_meses;
+  if (input.peso_embalagem_kg) payload.peso_embalagem_kg = input.peso_embalagem_kg;
+  if (input.preco) payload.preco = input.preco;
 
-  const { data } = await api.get<CalculadoraResultado>('/produtos/calculadora-racao', { params });
+  const { data } = await api.post<CalculadoraResultado>('/produtos/calculadora-racao', payload);
   return data;
 }

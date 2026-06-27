@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -54,6 +54,36 @@ export default function PetFormScreen({ route, navigation }: Props) {
   const [fotoUrl, setFotoUrl] = useState(petExistente?.foto_url ?? null);
   const [fotoPendente, setFotoPendente] = useState<string | null>(null); // URI local antes do upload
   const [fazendoUpload, setFazendoUpload] = useState(false);
+  const ignorarAvisoSaidaRef = useRef(false);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (!fotoPendente || salvando || fazendoUpload || ignorarAvisoSaidaRef.current) {
+        return;
+      }
+
+      e.preventDefault();
+      Alert.alert(
+        'Foto ainda nao salva',
+        'Voce escolheu uma nova foto. Deseja salvar antes de sair?',
+        [
+          { text: 'Continuar editando', style: 'cancel' },
+          {
+            text: 'Descartar foto',
+            style: 'destructive',
+            onPress: () => {
+              ignorarAvisoSaidaRef.current = true;
+              setFotoPendente(null);
+              navigation.dispatch(e.data.action);
+            },
+          },
+          { text: 'Salvar agora', onPress: () => salvar() },
+        ]
+      );
+    });
+
+    return unsubscribe;
+  }, [fazendoUpload, fotoPendente, navigation, salvando, salvar]);
 
   async function pickFoto() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -68,7 +98,13 @@ export default function PetFormScreen({ route, navigation }: Props) {
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
+      ignorarAvisoSaidaRef.current = false;
       setFotoPendente(result.assets[0].uri);
+      Alert.alert(
+        'Foto pronta',
+        'Para enviar a nova foto, toque em Salvar alteracoes.',
+        [{ text: 'OK' }]
+      );
     }
   }
 
@@ -128,6 +164,7 @@ export default function PetFormScreen({ route, navigation }: Props) {
           setFazendoUpload(false);
         }
       }
+      ignorarAvisoSaidaRef.current = true;
       navigation.goBack();
     } catch (err: any) {
       Alert.alert('Erro', err?.response?.data?.detail || 'Não foi possível salvar.');
@@ -158,6 +195,29 @@ export default function PetFormScreen({ route, navigation }: Props) {
         <View style={{ alignItems: 'center', marginBottom: ESPACO.sm }}>
           <ActivityIndicator size="small" color={CORES.primario} />
           <Text style={{ fontSize: FONTE.pequena, color: CORES.textoSecundario }}>Salvando foto...</Text>
+        </View>
+      )}
+      {fotoPendente && !fazendoUpload && (
+        <View style={styles.fotoPendenteCard}>
+          <Ionicons name="checkmark-circle" size={20} color={CORES.sucesso} />
+          <View style={styles.fotoPendenteTexto}>
+            <Text style={styles.fotoPendenteTitulo}>Foto pronta para salvar</Text>
+            <Text style={styles.fotoPendenteSub}>
+              Toque em Salvar agora ou em Salvar alteracoes no fim da tela.
+            </Text>
+          </View>
+          <View style={styles.fotoPendenteAcoes}>
+            <TouchableOpacity
+              style={[styles.fotoPendenteBotao, salvando && styles.botaoDesativado]}
+              onPress={salvar}
+              disabled={salvando}
+            >
+              <Text style={styles.fotoPendenteBotaoTexto}>Salvar agora</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.fotoPendenteLink} onPress={pickFoto}>
+              <Text style={styles.fotoPendenteLinkTexto}>Trocar foto</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -440,5 +500,52 @@ const styles = StyleSheet.create({
     padding: 6,
     borderWidth: 2,
     borderColor: '#fff',
+  },
+  fotoPendenteCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: ESPACO.sm,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
+    marginBottom: ESPACO.md,
+  },
+  fotoPendenteTexto: { flex: 1 },
+  fotoPendenteTitulo: {
+    fontSize: FONTE.normal,
+    fontWeight: '700',
+    color: CORES.texto,
+    marginBottom: 2,
+  },
+  fotoPendenteSub: {
+    fontSize: FONTE.pequena,
+    color: CORES.textoSecundario,
+    lineHeight: 17,
+  },
+  fotoPendenteAcoes: {
+    alignItems: 'flex-end',
+    gap: ESPACO.xs,
+  },
+  fotoPendenteBotao: {
+    backgroundColor: CORES.sucesso,
+    borderRadius: RAIO.sm,
+    paddingHorizontal: ESPACO.sm,
+    paddingVertical: ESPACO.xs + 2,
+  },
+  fotoPendenteBotaoTexto: {
+    color: '#fff',
+    fontSize: FONTE.pequena,
+    fontWeight: '700',
+  },
+  fotoPendenteLink: {
+    paddingHorizontal: ESPACO.xs,
+    paddingVertical: ESPACO.xs,
+  },
+  fotoPendenteLinkTexto: {
+    color: CORES.primario,
+    fontSize: FONTE.pequena,
+    fontWeight: '600',
   },
 });

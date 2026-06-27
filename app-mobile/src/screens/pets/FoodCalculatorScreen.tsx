@@ -25,6 +25,20 @@ const NIVEIS_ATIVIDADE = [
   { key: 'alto', label: 'Alto', emoji: '🏃', descricao: 'Muito ativo, muito exercício' },
 ];
 
+function mensagemErroCalculadora(err: any, fallback: string) {
+  const detail = err?.response?.data?.detail;
+  if (err?.response?.status === 404) {
+    if (detail && String(detail).toLowerCase() !== 'not found') {
+      return String(detail);
+    }
+    return (
+      'Nao encontrei racoes aptas para esse calculo. ' +
+      'Confira se a racao selecionada tem peso, preco e tabela de consumo preenchidos.'
+    );
+  }
+  return detail || fallback;
+}
+
 interface Props {
   route: { params?: { pet?: Pet } };
 }
@@ -111,6 +125,11 @@ export default function FoodCalculatorScreen({ route }: Props) {
       return;
     }
 
+    if (!racaoSelecionada) {
+      Alert.alert('Campo obrigatorio', 'Selecione a racao principal antes de calcular.');
+      return;
+    }
+
     setCalculando(true);
     setResultadoPrincipal(null);
     setResultadoComparar(null);
@@ -136,7 +155,10 @@ export default function FoodCalculatorScreen({ route }: Props) {
         setResultadoComparar(res2);
       }
     } catch (err: any) {
-      Alert.alert('Erro', err?.response?.data?.detail || 'Não foi possível calcular.');
+      Alert.alert(
+        'Erro',
+        mensagemErroCalculadora(err, 'Nao foi possivel calcular.')
+      );
     } finally {
       setCalculando(false);
     }
@@ -163,8 +185,11 @@ export default function FoodCalculatorScreen({ route }: Props) {
         .slice(0, 3)
         .map((r: any) => ({ ...r, categoria: classif }));
       setMelhoresOpcoes(top3);
-    } catch {
-      Alert.alert('Erro', 'Não foi possível comparar as rações.');
+    } catch (err: any) {
+      Alert.alert(
+        'Erro',
+        mensagemErroCalculadora(err, 'Nao foi possivel comparar as racoes.')
+      );
     } finally {
       setBuscandoMelhor(false);
     }
