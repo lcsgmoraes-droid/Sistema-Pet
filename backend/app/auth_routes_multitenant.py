@@ -61,6 +61,7 @@ from app.auth.auth_multitenant_support import (
 )
 from app.auth.core import ALGORITHM, ACCESS_TOKEN_EXPIRE_DAYS
 from app.config import JWT_SECRET_KEY as SECRET_KEY
+from app.db import get_session
 from app.models import Permission, Role, RolePermission, Tenant, User, UserTenant
 from app.security.jwt_compat import JWTError, jwt
 from app.services.tenant_onboarding_service import onboard_tenant_defaults
@@ -202,6 +203,7 @@ __all__ = [
     "forgot_password",
     "get_current_user",
     "get_me_multitenant",
+    "get_session",
     "grant_all_permissions_to_role",
     "hash_password",
     "jwt",
