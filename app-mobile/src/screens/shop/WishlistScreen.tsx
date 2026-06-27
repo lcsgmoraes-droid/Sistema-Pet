@@ -37,14 +37,18 @@ export default function WishlistScreen() {
     setCarregando(true);
     try {
       await carregarWishlist();
-      if (ids.length === 0) {
+      const wishlistIds = useWishlistStore.getState().ids;
+      if (wishlistIds.length === 0) {
         setProdutos([]);
         return;
       }
       const { produtos: todos } = await listarProdutos();
-      setProdutos(todos.filter((p) => ids.includes(p.id)));
-    } catch {}
-    setCarregando(false);
+      setProdutos(todos.filter((p) => wishlistIds.includes(p.id)));
+    } catch {
+      setProdutos([]);
+    } finally {
+      setCarregando(false);
+    }
   }
 
   async function onRefresh() {
