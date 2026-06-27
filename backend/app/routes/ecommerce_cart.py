@@ -1,5 +1,4 @@
 from uuid import UUID, uuid4
-from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -14,6 +13,11 @@ from app.routes.ecommerce_auth import (
     _activate_user_tenant_context,
     _get_current_ecommerce_user,
 )
+from app.routes.ecommerce_checkout_support import (
+    RESERVA_EXPIRACAO_CARRINHO_MINUTOS as RESERVA_EXPIRACAO_CARRINHO_MINUTOS,
+    RESERVA_EXPIRACAO_PENDENTE_MINUTOS as RESERVA_EXPIRACAO_PENDENTE_MINUTOS,
+    _expirar_reservas_automaticamente as _expirar_reservas_automaticamente,
+)
 from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
@@ -24,8 +28,6 @@ from app.tenancy.context import set_current_tenant
 
 router = APIRouter(prefix="/carrinho", tags=["ecommerce-cart"])
 
-RESERVA_EXPIRACAO_CARRINHO_MINUTOS = 30
-RESERVA_EXPIRACAO_PENDENTE_MINUTOS = 60
 # Carrinho de app/ecommerce nao reserva estoque. Estoque deve ser validado e
 # baixado somente depois de pagamento aprovado e geracao do pedido/venda.
 STATUS_RESERVA_ATIVA = ()
@@ -106,39 +108,6 @@ def _find_or_create_carrinho(db: Session, identity: EcommerceIdentity) -> Pedido
     db.add(carrinho)
     db.flush()
     return carrinho
-
-
-def _expirar_reservas_automaticamente(db: Session, tenant_id: str) -> None:
-    agora = datetime.utcnow()
-    limite_carrinho = agora - timedelta(minutes=RESERVA_EXPIRACAO_CARRINHO_MINUTOS)
-    limite_pendente = agora - timedelta(minutes=RESERVA_EXPIRACAO_PENDENTE_MINUTOS)
-
-    carrinhos_expirados = (
-        db.query(Pedido)
-        .filter(
-            Pedido.tenant_id == tenant_id,
-            Pedido.status == "carrinho",
-            Pedido.created_at < limite_carrinho,
-        )
-        .all()
-    )
-    for pedido in carrinhos_expirados:
-        pedido.status = "expirado"
-
-    pendentes_expirados = (
-        db.query(Pedido)
-        .filter(
-            Pedido.tenant_id == tenant_id,
-            Pedido.status == "pendente",
-            Pedido.created_at < limite_pendente,
-        )
-        .all()
-    )
-    for pedido in pendentes_expirados:
-        pedido.status = "cancelado"
-
-    if carrinhos_expirados or pendentes_expirados:
-        db.flush()
 
 
 def _quantidade_reservada_produto(

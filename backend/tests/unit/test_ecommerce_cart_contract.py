@@ -34,7 +34,9 @@ def test_frontend_carrinho_atualiza_servidor_por_produto_id_e_nao_item_id():
     )
 
     assert "const produtoId = itemAtual?.produto_id" in source
-    assert "'/api/carrinho/atualizar'" in source
+    assert (
+        "'/api/carrinho/atualizar'" in source or '"/api/carrinho/atualizar"' in source
+    )
     assert "{ produto_id: produtoId, quantidade }" in source
     assert "`/api/carrinho/atualizar/${itemId}`" not in source
     assert "`/api/carrinho/remover/${itemId}`" not in source

@@ -43,6 +43,16 @@ def test_ecommerce_checkout_facade_preserva_helpers_publicos():
     )
 
 
+def test_ecommerce_cart_reusa_expiracao_compartilhada():
+    from app.routes import ecommerce_cart
+    from app.routes import ecommerce_checkout_support
+
+    assert (
+        ecommerce_cart._expirar_reservas_automaticamente
+        is ecommerce_checkout_support._expirar_reservas_automaticamente
+    )
+
+
 def test_ecommerce_checkout_rotas_publicas_permanecem_no_router():
     from app.routes import ecommerce_checkout
 

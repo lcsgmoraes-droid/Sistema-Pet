@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import hashlib
 import json
 import os
-import random
+import secrets
 
 from fastapi import Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
@@ -85,7 +85,7 @@ _PALAVRAS_PET = [
 
 def _gerar_palavra_chave_retirada() -> str:
     """Gera código de retirada com 1 palavra do mundo pet, ex: 'patinha'"""
-    return random.choice(_PALAVRAS_PET)
+    return secrets.choice(_PALAVRAS_PET)
 
 
 class EcommerceIdentity(BaseModel):
