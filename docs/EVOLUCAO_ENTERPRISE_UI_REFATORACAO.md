@@ -209,13 +209,24 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-27 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
 
-- 74 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 73 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 66 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 65 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 8 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 11 arquivos de teste em `backend/tests` e 2 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 4 de 2026-06-27: `backend/app/contas_receber_routes.py` saiu da faixa acima de 700 linhas ao virar fachada de schemas, recorrencias e subrouters por responsabilidade:
+
+- `backend/app/contas_receber_routes.py`: 956 -> 49 linhas, mantendo o prefixo publico `/contas-receber` e incluindo os subrouters dedicados.
+- `backend/app/contas_receber_schemas.py`: concentra os schemas `ContaReceberCreate`, `RecebimentoCreate` e `ContaReceberResponse`.
+- `backend/app/contas_receber_recorrencias.py`: concentra o helper `calcular_proxima_recorrencia`.
+- `backend/app/contas_receber_criacao_routes.py`: concentra criacao, parcelas, vinculacao DRE e lancamento financeiro inicial.
+- `backend/app/contas_receber_consulta_routes.py`: concentra listagem, busca individual e dashboard resumido.
+- `backend/app/contas_receber_recebimentos_routes.py`: concentra baixa/recebimento e integracao com comissoes.
+- `backend/app/contas_receber_recorrencias_routes.py`: concentra o processamento de contas recorrentes.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_4_refactor.py`, garantindo fachada, paths publicos, exports compartilhados e modulos extraidos abaixo de 700 linhas.
 
 Fatia backend 700 batch 3 de 2026-06-27: `backend/app/cliente_info_pdv.py` saiu da faixa acima de 700 linhas ao separar o chat contextual do PDV e os schemas compartilhados:
 
