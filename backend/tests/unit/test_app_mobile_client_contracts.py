@@ -21,7 +21,9 @@ def test_app_mobile_upload_foto_pet_deixa_axios_montar_multipart():
     )
 
     upload_start = source.index("export async function uploadFotoPet")
-    upload_source = source[upload_start : source.index("export async function obterCarteirinhaPet")]
+    upload_source = source[
+        upload_start : source.index("export async function obterCarteirinhaPet")
+    ]
 
     assert "Content-Type" not in upload_source
     assert "multipart/form-data" not in upload_source
@@ -29,9 +31,9 @@ def test_app_mobile_upload_foto_pet_deixa_axios_montar_multipart():
 
 
 def test_app_mobile_form_pet_nao_engole_erro_de_upload_foto():
-    source = (
-        REPO_ROOT / "app-mobile/src/screens/pets/PetFormScreen.tsx"
-    ).read_text(encoding="utf-8")
+    source = (REPO_ROOT / "app-mobile/src/screens/pets/PetFormScreen.tsx").read_text(
+        encoding="utf-8"
+    )
 
     assert "catch (uploadErr: any)" in source
     assert "Foto nao salva" in source
