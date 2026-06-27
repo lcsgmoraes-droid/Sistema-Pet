@@ -41,6 +41,7 @@
     "test:large-files-700-batch-4-refactor": "node scripts/test-large-files-700-batch-4-refactor.mjs",
     "test:large-files-700-batch-5-refactor": "node scripts/test-large-files-700-batch-5-refactor.mjs",
     "test:large-files-700-batch-6-refactor": "node scripts/test-large-files-700-batch-6-refactor.mjs",
+    "test:large-files-700-batch-7-refactor": "node scripts/test-large-files-700-batch-7-refactor.mjs",
     "test:pdv-preco-manual": "node scripts/test-pdv-preco-manual.mjs",
     "test:pdv-produto-busca": "node scripts/test-pdv-produto-busca.mjs",
     "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",

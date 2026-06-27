@@ -1,45 +1,30 @@
-import { useCallback, useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+﻿import { useCallback, useState, useEffect, useRef } from "react";
 
-import { finalizarVenda, criarVenda, atualizarVenda } from "../../api/vendas";
-import { verificarEstoqueNegativo } from "../../api/alertasEstoque";
 import api from "../../api";
 import useRevealFloatingPanel from "../../hooks/useRevealFloatingPanel";
 import { formatMoneyBRL } from "../../utils/formatters";
-import {
-  emitirNotaFiscalAssistida,
-  extrairAcaoCorrecaoFiscal,
-  extrairMensagemNFe,
-} from "../../utils/nfeFiscalAssistida";
-import { montarPayloadVenda } from "../../utils/pdvVendaPayload";
 import { useModulos } from "../../contexts/ModulosContext";
+import { useModalPagamentoActions } from "./useModalPagamentoActions";
 import {
   calcularBeneficiosCampanhaPreview,
   calcularFaixasParcelamento,
   calcularCustoTotalItensVenda,
   calcularResumoRecebimento,
   descreverCupomMargem,
-  devePerguntarNotaFiscal,
   ehFormaPagamentoPix,
   avaliarEstadoJustificativaMargem,
   extrairCorIndicadorMargem,
   montarCupomParaFinalizar,
-  montarItensParaVerificarEstoqueNegativo,
-  montarMensagemEstoqueNegativo,
-  montarObservacoesComJustificativaMargem,
   montarFallbackSimulacaoParcelamento,
   montarPagamentoAVista,
-  montarPagamentoRecebido,
   montarPagamentoSimuladoParcelamento,
   montarPagamentosMargem,
   montarPayloadAnaliseMargem,
-  montarVendaParaPersistirComCupom,
   normalizarResultadoSimulacaoParcelamento,
   obterCorParcelamentoAtual,
   obterCorVisualParcelamento,
   obterEstiloVisualParcelamento,
   resolverFaixasParcelamentoDaForma,
-  validarPagamentoParaAdicionar,
 } from "../modalPagamentoUtils";
 
 export default function useModalPagamentoController({
@@ -49,7 +34,6 @@ export default function useModalPagamentoController({
   onConfirmar,
   onVendaAtualizada,
 }) {
-  const navigate = useNavigate();
   const { moduloAtivo } = useModulos();
   const moduloCampanhasAtivo = moduloAtivo("campanhas");
   const [pagamentos, setPagamentos] = useState([]);
@@ -512,255 +496,54 @@ export default function useModalPagamentoController({
     }
   }, [formaPagamentoSelecionada?.id]);
 
-  // Adicionar forma de pagamento
-  const adicionarPagamento = () => {
-    const valor = valorRecebido || 0;
-    const erroValidacao = validarPagamentoParaAdicionar({
-      formaPagamento: formaPagamentoSelecionada,
-      valor,
-      saldoCashback,
-      bandeira,
-      operadora: operadoraSelecionada,
-      numeroParcelas,
-    });
-
-    if (erroValidacao) {
-      setErro(erroValidacao);
-      return;
-    }
-
-    // Permitir valor maior que o restante (para dinheiro com troco)
-    // ou menor (para baixa parcial)
-
-    // DEBUG: Verificar estrutura da forma de pagamento
-    console.log("🔍 DEBUG formaPagamentoSelecionada:", formaPagamentoSelecionada);
-
-    const novoPagamento = montarPagamentoRecebido({
-      formaPagamento: formaPagamentoSelecionada,
-      valor,
-      valorRestante,
-      bandeira,
-      nsuCartao,
-      operadora: operadoraSelecionada,
-      numeroParcelas,
-      troco,
-    });
-    console.log("📤 DEBUG novoPagamento:", novoPagamento);
-
-    // ✅ PASSO 5: Se margem crítica, EXIGIR justificativa (mas NÃO bloquear fluxo)
-    console.log(
-      `♻️ Reutilizando simulação do backend: ${numeroParcelas}x = cor ${corParcelamentoAtual}`,
-    );
-    const margemCritica = margemCriticaAtual;
-
-    if (margemCritica) {
-      if (!justificativaTexto || justificativaTexto.trim().length < 10) {
-        setErroJustificativa(
-          "⚠️ Justificativa obrigatória para margem crítica (mínimo 10 caracteres)",
-        );
-        setErro("Por favor, preencha a justificativa abaixo");
-        revelarJustificativaObrigatoria();
-        return;
-      }
-
-      venda.observacoes = montarObservacoesComJustificativaMargem({
-        observacoesAtuais: venda.observacoes || "",
-        descricaoCupomMargem,
-        justificativaTexto,
-      });
-    }
-
-    // Adicionar pagamento normalmente
-    // Capturar troco excedente ANTES de resetar os estados
-    const trocoParaCredito =
-      opcaoExcedente === "credito" && troco > 0 && formaPagamentoSelecionada?.tipo !== "dinheiro"
-        ? troco
-        : 0;
-
-    setPagamentos([...pagamentos, novoPagamento]);
-    setFormaPagamentoSelecionada(null);
-    setValorRecebido(0);
-    setBandeira("");
-    setOperadoraSelecionada(operadoras.find((op) => op.padrao) || null); // 🆕 Resetar para padrão
-    setNsuCartao(""); // Limpar NSU
-    setNumeroParcelas(1);
-    setErro("");
-    setErroJustificativa("");
-    setOpcaoExcedente(null);
-    // ✅ NÃO limpar justificativaTexto - deve permanecer até finalizar venda
-
-    // Se escolheu gerar crédito, abrir modal após adicionar pagamento
-    if (trocoParaCredito > 0) {
-      setValorExcedente(trocoParaCredito);
-      setMostrarModalCreditoExcedente(true);
-    }
-  };
-
-  // Remover forma de pagamento
-  const removerPagamento = (index) => {
-    setPagamentos(pagamentos.filter((_, i) => i !== index));
-  };
-
-  // Excluir pagamento existente
-  const excluirPagamentoExistente = async (pagamentoId) => {
-    if (!confirm("Deseja realmente excluir este pagamento?")) {
-      return;
-    }
-
-    setLoading(true);
-    setErro("");
-
-    try {
-      console.log(`🗑️ Excluindo pagamento ID ${pagamentoId}...`);
-      await api.delete(`/vendas/pagamentos/${pagamentoId}`);
-      console.log("✅ Pagamento excluído com sucesso!");
-
-      // Recarregar pagamentos do servidor para garantir sincronização
-      const response = await api.get(`/vendas/${venda.id}/pagamentos`);
-      setPagamentosExistentes(response.data.pagamentos || []);
-      setTotalPagoExistente(response.data.total_pago || 0);
-
-      // Se excluiu todos os pagamentos, recarregar a venda para atualizar o status
-      if (response.data.pagamentos.length === 0 && onVendaAtualizada) {
-        await onVendaAtualizada();
-      }
-
-      setErro(""); // Limpar erros anteriores
-    } catch (error) {
-      console.error("❌ Erro ao excluir pagamento:", error);
-      console.error("   Response:", error.response);
-      console.error("   Message:", error.message);
-
-      if (error.message && error.message.includes("CORS")) {
-        setErro(
-          "⚠️ Erro de CORS: O backend precisa ser reiniciado. Feche e abra novamente o servidor backend.",
-        );
-      } else {
-        setErro(error.response?.data?.detail || error.message || "Erro ao excluir pagamento");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const confirmarEstoqueNegativoAntesDeReceber = async () => {
-    const itensParaVerificar = montarItensParaVerificarEstoqueNegativo(venda.itens);
-
-    if (itensParaVerificar.length === 0) {
-      return true;
-    }
-
-    const response = await verificarEstoqueNegativo(itensParaVerificar);
-    const produtosNegativos = response.data || [];
-
-    if (produtosNegativos.length === 0) {
-      return true;
-    }
-
-    return globalThis.confirm(montarMensagemEstoqueNegativo(produtosNegativos));
-  };
-
-  const salvarVendaAbertaParaPagamento = async () => {
-    const vendaParaPersistir = montarVendaParaPersistirComCupom({
-      venda,
-      cupomParaFinalizar,
-    });
-    const payloadVenda = montarPayloadVenda(vendaParaPersistir);
-
-    const vendaIdPersistida = vendaParaPersistir.id;
-    if (!vendaIdPersistida) {
-      const vendaCriada = await criarVenda(payloadVenda);
-      return vendaCriada.id;
-    }
-
-    await atualizarVenda(vendaIdPersistida, payloadVenda);
-    return vendaIdPersistida;
-  };
-
-  // Finalizar venda
-  const handleFinalizar = async () => {
-    // Permitir baixa parcial - nao exigir pagamento total
-    if (!podeConfirmarFinalizacao) {
-      setErro("Adicione pelo menos uma forma de pagamento");
-      return;
-    }
-
-    setLoading(true);
-    setErro("");
-
-    try {
-      const podeContinuar = await confirmarEstoqueNegativoAntesDeReceber();
-      if (!podeContinuar) {
-        setLoading(false);
-        return;
-      }
-
-      // Criar a venda primeiro se ainda nao foi criada
-      const vendaId = await salvarVendaAbertaParaPagamento();
-
-      // Finalizar a venda com os pagamentos
-      const resultado = await finalizarVenda(vendaId, pagamentos, {
-        cupom_code: cupomParaFinalizar?.code || null,
-        cupom_discount_applied: cupomParaFinalizar?.discount_applied ?? null,
-      });
-
-      // Mostrar pergunta sobre NF-e APENAS se pagamento completo
-      setVendaFinalizadaId(vendaId);
-
-      if (devePerguntarNotaFiscal(resultado)) {
-        setMostrarPerguntaNFe(true);
-      } else {
-        onConfirmar();
-      }
-    } catch (error) {
-      console.error("Erro ao finalizar venda:", error);
-      setErro(error.response?.data?.detail || "Erro ao finalizar venda");
-    } finally {
-      setLoading(false);
-    }
-  };
-  // Emitir NF-e
-  const emitirNFe = async (tipoNota) => {
-    setLoading(true);
-    setErro("");
-
-    try {
-      const resultado = await emitirNotaFiscalAssistida({
-        vendaId: vendaFinalizadaId,
-        tipoNota,
-      });
-
-      if (resultado?.cancelado) return;
-
-      const transmissao = resultado?.data?.transmissao;
-      if (transmissao?.success === false) {
-        alert(
-          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada no Bling, mas a transmissao nao foi concluida automaticamente.\n\n${transmissao.erro || ""}`.trim(),
-        );
-      } else {
-        alert(
-          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} enviada para emissao/transmissao com sucesso!`,
-        );
-      }
-      onConfirmar();
-    } catch (error) {
-      console.error("Erro ao emitir nota:", error);
-      const mensagem = extrairMensagemNFe(error);
-      const acaoFiscal = extrairAcaoCorrecaoFiscal(error);
-      setErro(mensagem);
-      if (
-        acaoFiscal &&
-        window.confirm(`${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`)
-      ) {
-        navigate(acaoFiscal.url);
-      } else {
-        alert(mensagem);
-      }
-      return;
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    adicionarPagamento,
+    emitirNFe,
+    excluirPagamentoExistente,
+    handleFinalizar,
+    removerPagamento,
+  } = useModalPagamentoActions({
+    bandeira,
+    corParcelamentoAtual,
+    cupomParaFinalizar,
+    descricaoCupomMargem,
+    formaPagamentoSelecionada,
+    justificativaTexto,
+    margemCriticaAtual,
+    nsuCartao,
+    numeroParcelas,
+    onConfirmar,
+    onVendaAtualizada,
+    operadoraSelecionada,
+    operadoras,
+    opcaoExcedente,
+    pagamentos,
+    podeConfirmarFinalizacao,
+    revelarJustificativaObrigatoria,
+    saldoCashback,
+    setBandeira,
+    setErro,
+    setErroJustificativa,
+    setFormaPagamentoSelecionada,
+    setLoading,
+    setMostrarModalCreditoExcedente,
+    setMostrarPerguntaNFe,
+    setNsuCartao,
+    setNumeroParcelas,
+    setOperadoraSelecionada,
+    setOpcaoExcedente,
+    setPagamentos,
+    setPagamentosExistentes,
+    setTotalPagoExistente,
+    setValorExcedente,
+    setValorRecebido,
+    setVendaFinalizadaId,
+    troco,
+    valorRecebido,
+    valorRestante,
+    venda,
+    vendaFinalizadaId,
+  });
 
   return {
     mostrarPerguntaNFe,
