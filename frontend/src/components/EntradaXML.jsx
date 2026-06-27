@@ -275,7 +275,6 @@ const EntradaXML = () => {
     obterResumoCustoItem,
     precosAjustados,
     previewProcessamento,
-    processarNota,
     setBaseCalculoMargem,
     setAcaoProcessamento,
     setFiltroCusto,
@@ -519,7 +518,6 @@ const EntradaXML = () => {
         notaSelecionada={notaSelecionada}
         obterConfiguracaoPackItem={obterConfiguracaoPackItem}
         obterCustoAquisicaoItem={obterCustoAquisicaoItem}
-        processarNota={processarNota}
         quantidadesOnline={quantidadesOnline}
         resultadosBuscaProduto={resultadosBuscaProduto}
         resumoConferenciaAtual={resumoConferenciaAtual}
@@ -575,7 +573,7 @@ const EntradaXML = () => {
         }}
         onAjustarCustos={(notaId) => {
           setMostrarVisualizacao(false);
-          processarNota(notaId);
+          carregarPreviewProcessamento(notaId);
         }}
       />
       <EntradaXmlRascunhoDevolucaoModal
