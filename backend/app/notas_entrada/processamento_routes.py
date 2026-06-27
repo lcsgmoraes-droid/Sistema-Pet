@@ -100,6 +100,7 @@ def _carregar_acoes_processamento_nota(nota: NotaEntrada) -> dict:
         "gerar_contas_pagar": legado_processado,
     }
 
+
 # DAR ENTRADA NO ESTOQUE
 # ============================================================================
 

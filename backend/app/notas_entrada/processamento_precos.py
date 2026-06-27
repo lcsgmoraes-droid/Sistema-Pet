@@ -33,6 +33,7 @@ from app.produtos_models import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+
 def _reverter_historicos_precos_nota(
     *, produto: Produto, nota: NotaEntrada, db: Session, tenant_id
 ) -> int:
