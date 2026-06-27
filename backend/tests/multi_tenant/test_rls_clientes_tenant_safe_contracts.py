@@ -20,9 +20,9 @@ def test_segmentacao_listar_segmentos_joins_clientes_with_tenant_safe_sql():
 
 
 def test_commission_schema_backfill_syncs_rls_before_reading_clientes():
-    source = _source("comissoes_routes.py")
+    source = _source("comissoes_schema_guard.py")
     block = source.split("def ensure_comissoes_config_schema(", 1)[1].split(
-        "# ==========================================", 1
+        "_comissoes_schema_checked = True", 1
     )[0]
 
     assert "get_current_tenant_id" in source

@@ -10,6 +10,10 @@ def _backend_source(relative_path: str) -> str:
     return (BACKEND_ROOT / relative_path).read_text(encoding="utf-8")
 
 
+def _backend_sources(*relative_paths: str) -> str:
+    return "\n".join(_backend_source(path) for path in relative_paths)
+
+
 def _frontend_source(relative_path: str) -> str:
     return (FRONTEND_ROOT / relative_path).read_text(encoding="utf-8")
 
@@ -19,7 +23,10 @@ def _frontend_sources(*relative_paths: str) -> str:
 
 
 def test_backend_comissoes_aceita_regra_geral_e_usa_como_fallback():
-    routes = _backend_source("app/comissoes_routes.py")
+    routes = _backend_sources(
+        "app/comissoes_parceiros_routes.py",
+        "app/comissoes_configuracoes_routes.py",
+    )
     schemas = _backend_source("app/comissoes_schemas.py")
     service = _backend_source("app/comissoes_config_service.py")
     models = _backend_source("app/comissoes_models.py")
@@ -56,7 +63,7 @@ def test_frontend_comissoes_salva_dia_fechamento_em_pessoa_parceira():
 
 
 def test_backend_listagem_comissoes_mostra_todo_parceiro_ativo():
-    routes = _backend_source("app/comissoes_routes.py")
+    routes = _backend_source("app/comissoes_parceiros_routes.py")
 
     assert "WHERE c.parceiro_ativo = true" in routes
     assert "c.tipo_cadastro IN ('funcionario', 'veterinario', 'outro')" not in routes
