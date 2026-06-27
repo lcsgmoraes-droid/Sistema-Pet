@@ -56,6 +56,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 router.include_router(precos_router)
 
+__all__ = [
+    "_acoes_processamento_dict",
+    "_aplicar_precos_venda_processamento",
+    "_atualizar_custo_produto_entrada",
+    "_carregar_acoes_processamento_nota",
+    "_reverter_historicos_precos_nota",
+    "atualizar_precos_produtos",
+    "preview_processamento",
+    "processar_entrada_estoque",
+    "router",
+]
+
+
 def _acoes_processamento_dict(config: ProcessarConfig) -> dict:
     return {
         "lancar_estoque": bool(config.lancar_estoque),
