@@ -223,16 +223,18 @@ export default function ProfileScreen() {
         <View style={styles.pontosCard}>
           <View style={styles.pontosLeft}>
             <Ionicons name="trophy" size={28} color={CORES.pontos} />
-            <View>
+            <View style={styles.pontosResumo}>
               <Text style={styles.pontosValor}>{pontos} pontos</Text>
               <Text style={styles.pontosLabel}>
                 ~ {formatarMoeda(valorPontos)} em desconto
               </Text>
             </View>
           </View>
+          <View style={styles.pontosInfoSpacer} />
           <View style={styles.pontosInfo}>
-            <Text style={styles.pontosInfoTexto}>
-              R$1 gasto = 1 ponto{"\n"}100 pts = R${PONTOS.REAIS_POR_100_PONTOS} desconto
+            <Text style={styles.pontosInfoTextoLinha}>R$1 gasto = 1 ponto</Text>
+            <Text style={styles.pontosInfoTextoLinha}>
+              100 pts = R${PONTOS.REAIS_POR_100_PONTOS} desconto
             </Text>
           </View>
         </View>
@@ -550,6 +552,7 @@ const styles = StyleSheet.create({
   emailUsuario: { fontSize: FONTE.normal, color: CORES.textoSecundario, marginTop: 2 },
   pontosCard: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
     backgroundColor: "#FFF8E1",
     borderRadius: RAIO.lg,
@@ -561,11 +564,20 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     ...SOMBRA,
   },
-  pontosLeft: { flexDirection: "row", alignItems: "center", gap: ESPACO.sm },
+  pontosLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ESPACO.sm,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  pontosResumo: { flexShrink: 1, minWidth: 0 },
   pontosValor: { fontSize: FONTE.grande, fontWeight: "bold", color: "#92400E" },
-  pontosLabel: { fontSize: FONTE.pequena, color: "#78350F" },
-  pontosInfo: { alignItems: "flex-end" },
-  pontosInfoTexto: { fontSize: FONTE.pequena, color: "#78350F", textAlign: "right" },
+  pontosLabel: { fontSize: FONTE.pequena, color: "#78350F", flexShrink: 1 },
+  pontosInfoSpacer: { flexGrow: 1, minWidth: 0 },
+  pontosInfo: { alignItems: "flex-end", flexShrink: 1, minWidth: 130 },
+  pontosInfoTextoLinha: { fontSize: FONTE.pequena, color: "#78350F", textAlign: "right" },
   secao: {
     backgroundColor: CORES.superficie,
     borderRadius: RAIO.lg,

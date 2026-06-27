@@ -136,6 +136,41 @@ def test_mobile_orders_screen_does_not_show_completed_sales_as_pending_payment()
     assert "?? STATUS_CONFIG.desconhecido" in orders
 
 
+def test_mobile_orders_screen_handles_sales_without_checkout_pedido_id():
+    orders = _read_mobile_source("app-mobile/src/screens/orders/OrdersScreen.tsx")
+    types = _read_mobile_source("app-mobile/src/types/index.ts")
+
+    assert "historico_id?: string | null" in types
+    assert "numero?: string | null" in types
+    assert "pedido_id?: string | null" in types
+    assert "function getPedidoRenderKey" in orders
+    assert "function getPedidoTitulo" in orders
+    assert "item.pedido_id.slice" not in orders
+    assert "keyExtractor={(item, index) => getPedidoRenderKey(item, index)}" in orders
+    assert "const pedidoKey = getPedidoRenderKey(item)" in orders
+    assert "item.pedido_id &&" in orders
+
+
+def test_mobile_orders_screen_shows_friendly_empty_and_error_states():
+    orders = _read_mobile_source("app-mobile/src/screens/orders/OrdersScreen.tsx")
+
+    assert "erroPedidos" in orders
+    assert "setErroPedidos" in orders
+    assert "Nao foi possivel carregar seus pedidos" in orders
+    assert "Nenhum pedido feito" in orders
+    assert "Tentar novamente" in orders
+
+
+def test_profile_points_card_wraps_without_overflow_on_narrow_mobile():
+    profile = _read_mobile_source("app-mobile/src/screens/profile/ProfileScreen.tsx")
+
+    assert 'flexWrap: "wrap"' in profile
+    assert "minWidth: 0" in profile
+    assert "flexShrink: 1" in profile
+    assert "pontosInfoSpacer" in profile
+    assert "pontosInfoTextoLinha" in profile
+
+
 def test_push_registration_handles_firebase_errors_from_native_setup_steps():
     service = _read_mobile_source(
         "app-mobile/src/services/pushNotifications.service.ts"

@@ -172,10 +172,11 @@ export async function limparCarrinho(): Promise<void> {
 }
 
 // Repetir um pedido anterior: limpa o carrinho e re-adiciona os itens
-export async function repetirPedido(pedido: { itens: { produto_id: number; quantidade: number }[] }): Promise<number> {
+export async function repetirPedido(pedido: { itens?: { produto_id?: number | null; quantidade: number }[] }): Promise<number> {
   await limparCarrinho();
   let adicionados = 0;
-  for (const item of pedido.itens) {
+  for (const item of pedido.itens ?? []) {
+    if (!item.produto_id) continue;
     try {
       await adicionarAoCarrinho(item.produto_id, item.quantidade);
       adicionados++;
@@ -334,7 +335,7 @@ export async function compararRacoesCategoria(params: {
 
 export async function listarPedidos(): Promise<Pedido[]> {
   const { data } = await api.get<{ pedidos: Pedido[] }>('/checkout/pedidos');
-  return data.pedidos;
+  return Array.isArray(data?.pedidos) ? data.pedidos : [];
 }
 
 export async function consultarStatusPedido(pedidoId: string): Promise<Pedido> {
