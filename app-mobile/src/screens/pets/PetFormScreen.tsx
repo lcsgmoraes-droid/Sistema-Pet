@@ -116,11 +116,16 @@ export default function PetFormScreen({ route, navigation }: Props) {
         try {
           const petAtualizado = await uploadFotoPet(petSalvo.id, fotoPendente);
           setFotoUrl(petAtualizado.foto_url ?? null);
-        } catch {
-          // Não cancela o fluxo por erro de foto
+          setFotoPendente(null);
+        } catch (uploadErr: any) {
+          Alert.alert(
+            'Foto nao salva',
+            uploadErr?.response?.data?.detail ||
+              'O pet foi salvo, mas a foto nao foi enviada. Tente salvar novamente.'
+          );
+          return;
         } finally {
           setFazendoUpload(false);
-          setFotoPendente(null);
         }
       }
       navigation.goBack();

@@ -295,7 +295,7 @@ export async function calcularRacaoComProduto(params: {
   idade_meses?: number | null;
   nivel_atividade: 'baixo' | 'normal' | 'alto';
 }): Promise<any> {
-  const { data } = await api.post('/api/produtos/calculadora-racao', params);
+  const { data } = await api.post('/produtos/calculadora-racao', params);
   return data;
 }
 
@@ -319,7 +319,7 @@ export async function compararRacoesCategoria(params: {
   if (params.idade_meses) query.idade_meses = params.idade_meses;
   if (params.classificacao) query.classificacao = params.classificacao;
   // Backend aceita POST com params na query string
-  const { data } = await api.post('/api/produtos/comparar-racoes', null, { params: query });
+  const { data } = await api.post('/produtos/comparar-racoes', null, { params: query });
   return data;
 }
 
