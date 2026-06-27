@@ -56,6 +56,16 @@ def test_app_mobile_upload_foto_pet_deixa_axios_montar_multipart():
     assert "api.post<Pet>(`/app/pets/${petId}/foto`, formData)" in upload_source
 
 
+def test_app_mobile_api_remove_content_type_json_para_form_data():
+    source = (REPO_ROOT / "app-mobile/src/services/api.ts").read_text(
+        encoding="utf-8"
+    )
+
+    assert "config.data instanceof FormData" in source
+    assert "deleteHeader('Content-Type')" in source
+    assert "deleteHeader('content-type')" in source
+
+
 def test_app_mobile_form_pet_nao_engole_erro_de_upload_foto():
     source = (REPO_ROOT / "app-mobile/src/screens/pets/PetFormScreen.tsx").read_text(
         encoding="utf-8"
