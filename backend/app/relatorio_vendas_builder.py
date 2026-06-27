@@ -59,7 +59,6 @@ def montar_relatorio_vendas(
         vendas=vendas,
     )
     impostos_percentual_global = contexto_relatorio["impostos_percentual_global"]
-    comissoes_map = contexto_relatorio["comissoes_map"]
     comissao_total_por_venda = contexto_relatorio["comissao_total_por_venda"]
     formas_pagamento_map = contexto_relatorio["formas_pagamento_map"]
     cashback_por_venda = contexto_relatorio["cashback_por_venda"]
