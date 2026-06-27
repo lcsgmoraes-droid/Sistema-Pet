@@ -1,5 +1,5 @@
 import api from './api';
-import { Pet, PetFormData, CalculadoraInput, CalculadoraResultado, PetCarteirinha, PushStatus } from '../types';
+import { Pet, PetFormData, PetCarteirinha, PushStatus } from '../types';
 import { API_BASE_URL } from '../config';
 
 function resolveUrl(url: string | null | undefined): string | null {
@@ -73,18 +73,3 @@ export async function obterStatusPush(): Promise<PushStatus> {
 // Usa o endpoint existente: /produtos/calculadora-racao
 // ─────────────────────────────────────────────────────────────
 
-export async function calcularRacao(
-  input: CalculadoraInput
-): Promise<CalculadoraResultado> {
-  const payload: Record<string, number | string | null> = {
-    peso_pet_kg: input.peso_pet_kg,
-    nivel_atividade: input.nivel_atividade,
-  };
-  if (input.produto_id) payload.produto_id = input.produto_id;
-  if (input.idade_meses) payload.idade_meses = input.idade_meses;
-  if (input.peso_embalagem_kg) payload.peso_embalagem_kg = input.peso_embalagem_kg;
-  if (input.preco) payload.preco = input.preco;
-
-  const { data } = await api.post<CalculadoraResultado>('/produtos/calculadora-racao', payload);
-  return data;
-}

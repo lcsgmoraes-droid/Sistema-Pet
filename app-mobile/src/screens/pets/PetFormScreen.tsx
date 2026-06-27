@@ -93,8 +93,7 @@ export default function PetFormScreen({ route, navigation }: Props) {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
+      allowsEditing: false,
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
@@ -212,7 +211,7 @@ export default function PetFormScreen({ route, navigation }: Props) {
               onPress={salvar}
               disabled={salvando}
             >
-              <Text style={styles.fotoPendenteBotaoTexto}>Salvar agora</Text>
+              <Text style={styles.fotoPendenteBotaoTexto}>Salvar foto</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.fotoPendenteLink} onPress={pickFoto}>
               <Text style={styles.fotoPendenteLinkTexto}>Trocar foto</Text>

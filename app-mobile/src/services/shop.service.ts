@@ -289,16 +289,6 @@ export async function listarRacoesCadastradas(): Promise<RacaoCadastrada[]> {
   }
 }
 
-export async function calcularRacaoComProduto(params: {
-  produto_id?: number | null;
-  peso_pet_kg: number;
-  idade_meses?: number | null;
-  nivel_atividade: 'baixo' | 'normal' | 'alto';
-}): Promise<any> {
-  const { data } = await api.post('/produtos/calculadora-racao', params);
-  return data;
-}
-
 export interface ComparativoRacoes {
   racoes: any[];
   melhor_custo_beneficio: number | null;
@@ -306,21 +296,97 @@ export interface ComparativoRacoes {
   menor_custo_diario: number | null;
 }
 
-export async function compararRacoesCategoria(params: {
+export interface CalculoRacaoLocalParams {
   peso_pet_kg: number;
   idade_meses?: number | null;
-  nivel_atividade: string;
-  classificacao?: string | null;
-}): Promise<ComparativoRacoes> {
-  const query: any = {
-    peso_pet_kg: params.peso_pet_kg,
-    nivel_atividade: params.nivel_atividade,
+  nivel_atividade: 'baixo' | 'normal' | 'alto';
+}
+
+function roundNumber(value: number, digits = 2): number {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
+function calcularQuantidadeDiariaLocal(params: CalculoRacaoLocalParams): number {
+  const pesoPetKg = Number(params.peso_pet_kg || 0);
+  const idadeMeses = params.idade_meses ?? null;
+  const nivelAtividade = params.nivel_atividade;
+  let quantidadeBase = pesoPetKg * 1000 * 0.025;
+
+  if (idadeMeses && idadeMeses < 12) {
+    quantidadeBase *= 1.5;
+  } else if (idadeMeses && idadeMeses > 84) {
+    quantidadeBase *= 0.9;
+  }
+
+  if (nivelAtividade === 'alto') {
+    quantidadeBase *= 1.2;
+  } else if (nivelAtividade === 'baixo') {
+    quantidadeBase *= 0.8;
+  }
+
+  return roundNumber(quantidadeBase, 2);
+}
+
+export function calcularRacaoLocal(
+  racao: RacaoCadastrada,
+  params: CalculoRacaoLocalParams
+) {
+  const pesoEmbalagemKg = Number(racao.peso_embalagem || 0);
+  const preco = Number(racao.preco || 0);
+  const quantidadeDiariaG = calcularQuantidadeDiariaLocal(params);
+  const pesoEmbalagemG = pesoEmbalagemKg * 1000;
+  const duracaoDias =
+    quantidadeDiariaG > 0 ? pesoEmbalagemG / quantidadeDiariaG : 0;
+  const custoPorKg = pesoEmbalagemKg > 0 ? preco / pesoEmbalagemKg : 0;
+  const custoPorDia =
+    pesoEmbalagemG > 0 ? (preco / pesoEmbalagemG) * quantidadeDiariaG : 0;
+
+  return {
+    produto_id: racao.id,
+    produto_nome: racao.nome,
+    classificacao: racao.classificacao_racao ?? null,
+    categoria_racao: racao.categoria_racao ?? null,
+    peso_embalagem_kg: pesoEmbalagemKg,
+    preco,
+    quantidade_diaria_g: quantidadeDiariaG,
+    duracao_dias: roundNumber(duracaoDias, 1),
+    duracao_meses: roundNumber(duracaoDias / 30, 1),
+    custo_por_kg: roundNumber(custoPorKg, 2),
+    custo_por_dia: roundNumber(custoPorDia, 2),
+    custo_mensal: roundNumber(custoPorDia * 30, 2),
+    pet_peso_kg: params.peso_pet_kg,
+    pet_nivel_atividade: params.nivel_atividade,
+    alerta: 'Estimativa baseada no consumo medio. Confira a recomendacao da embalagem.',
   };
-  if (params.idade_meses) query.idade_meses = params.idade_meses;
-  if (params.classificacao) query.classificacao = params.classificacao;
-  // Backend aceita POST com params na query string
-  const { data } = await api.post('/produtos/comparar-racoes', null, { params: query });
-  return data;
+}
+
+export function compararRacoesLocal(
+  racoes: RacaoCadastrada[],
+  params: CalculoRacaoLocalParams & {
+  classificacao?: string | null;
+  }
+): ComparativoRacoes {
+  const resultados = racoes
+    .filter((racao) => {
+      if (params.classificacao && racao.classificacao_racao !== params.classificacao) {
+        return false;
+      }
+      return Number(racao.peso_embalagem || 0) > 0 && Number(racao.preco || 0) > 0;
+    })
+    .map((racao) => calcularRacaoLocal(racao, params))
+    .sort((a, b) => a.custo_por_dia - b.custo_por_dia);
+
+  return {
+    racoes: resultados,
+    melhor_custo_beneficio: resultados[0]?.produto_id ?? null,
+    maior_duracao:
+      resultados.reduce(
+        (best, item) => (item.duracao_dias > (best?.duracao_dias ?? 0) ? item : best),
+        null as (typeof resultados)[number] | null
+      )?.produto_id ?? null,
+    menor_custo_diario: resultados[0]?.produto_id ?? null,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────
