@@ -18,8 +18,10 @@ import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 import { Pedido } from "../../types";
 import { formatarDataHora, formatarMoeda } from "../../utils/format";
 
+type CheckoutPedido = Pedido & { pedido_id: string };
+
 type CheckoutSucessoRoute = RouteProp<
-  { CheckoutSucesso: { pedido: Pedido } },
+  { CheckoutSucesso: { pedido: CheckoutPedido } },
   "CheckoutSucesso"
 >;
 

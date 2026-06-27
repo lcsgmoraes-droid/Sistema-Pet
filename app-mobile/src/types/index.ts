@@ -434,7 +434,10 @@ export interface ItemCarrinho {
 }
 
 export interface Pedido {
-  pedido_id: string;
+  historico_id?: string | null;
+  origem_tipo?: string | null;
+  pedido_id?: string | null;
+  numero?: string | null;
   status: string;
   total: number;
   origem?: string | null;

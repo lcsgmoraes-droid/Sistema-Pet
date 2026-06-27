@@ -198,6 +198,20 @@ function hasOpenFulfillmentOrder(pedido: Pedido): boolean {
   return Boolean(pedido.tipo_retirada) && ["pendente", "pronto"].includes(statusEntrega);
 }
 
+function getPedidoRenderKey(pedido: Pedido, index?: number): string {
+  if (pedido.historico_id) return pedido.historico_id;
+  if (pedido.pedido_id) return `pedido:${pedido.pedido_id}`;
+  if (pedido.venda_id) return `venda:${pedido.venda_id}`;
+  if (pedido.numero) return `numero:${pedido.numero}`;
+  return `pedido-sem-id-${index ?? "item"}`;
+}
+
+function getPedidoTitulo(pedido: Pedido): string {
+  const numero = pedido.pedido_id || pedido.numero || pedido.venda_id;
+  if (!numero) return "Pedido";
+  return `#${String(numero).slice(-8).toUpperCase()}`;
+}
+
 export default function OrdersScreen() {
   const navigation = useNavigation<any>();
   const { carregar: recarregarCarrinho } = useCartStore();
@@ -205,9 +219,11 @@ export default function OrdersScreen() {
   const [carregando, setCarregando] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [repetindo, setRepetindo] = useState<string | null>(null);
+  const [erroPedidos, setErroPedidos] = useState<string | null>(null);
 
   async function handleRepetirPedido(pedido: Pedido) {
-    setRepetindo(pedido.pedido_id);
+    const pedidoKey = getPedidoRenderKey(pedido);
+    setRepetindo(pedidoKey);
     try {
       const adicionados = await repetirPedido(pedido);
       await recarregarCarrinho();
@@ -233,11 +249,16 @@ export default function OrdersScreen() {
   }
 
   const carregar = useCallback(async () => {
+    setErroPedidos(null);
     try {
       const lista = await listarPedidos();
       setPedidos(lista);
-    } catch {}
-    setCarregando(false);
+    } catch {
+      setPedidos([]);
+      setErroPedidos("Nao foi possivel carregar seus pedidos agora.");
+    } finally {
+      setCarregando(false);
+    }
   }, []);
 
   useFocusEffect(
@@ -264,10 +285,12 @@ export default function OrdersScreen() {
   }
 
   function handleRastrear(pedido: Pedido) {
+    if (!pedido.pedido_id) return;
     navigation.navigate("Rastreio", { pedidoId: pedido.pedido_id });
   }
 
   function renderPedido({ item }: { item: Pedido }) {
+    const pedidoKey = getPedidoRenderKey(item);
     const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.desconhecido;
     const temEntrega = Boolean(item.tem_entrega);
     const entregaCfg = getEntregaStatusConfig(item);
@@ -276,6 +299,7 @@ export default function OrdersScreen() {
       item.status !== "cancelado" &&
       item.status_entrega !== "entregue";
     const podeRastrear =
+      item.pedido_id &&
       temEntrega &&
       ["aprovado", "em_preparo", "pronto", "pago", "criado"].includes(
         item.status,
@@ -289,7 +313,7 @@ export default function OrdersScreen() {
         <View style={styles.cardHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.pedidoId}>
-              #{item.pedido_id.slice(-8).toUpperCase()}
+              {getPedidoTitulo(item)}
             </Text>
             <Text style={styles.pedidoData}>
               {formatarDataHora(item.created_at)}
@@ -398,12 +422,12 @@ export default function OrdersScreen() {
             <TouchableOpacity
               style={[
                 styles.btnRepetir,
-                repetindo === item.pedido_id && { opacity: 0.6 },
+                repetindo === pedidoKey && { opacity: 0.6 },
               ]}
               onPress={() => handleRepetirPedido(item)}
-              disabled={repetindo === item.pedido_id}
+              disabled={repetindo === pedidoKey}
             >
-              {repetindo === item.pedido_id ? (
+              {repetindo === pedidoKey ? (
                 <ActivityIndicator size="small" color={CORES.primario} />
               ) : (
                 <>
@@ -434,7 +458,7 @@ export default function OrdersScreen() {
   return (
     <FlatList
       data={pedidos}
-      keyExtractor={(item) => item.pedido_id}
+      keyExtractor={(item, index) => getPedidoRenderKey(item, index)}
       renderItem={renderPedido}
       contentContainerStyle={styles.lista}
       refreshControl={
@@ -458,20 +482,34 @@ export default function OrdersScreen() {
         ) : null
       }
       ListEmptyComponent={
-        <View style={styles.vazio}>
-          <Text style={styles.vazioEmoji}>🛍️</Text>
-          <Text style={styles.vazioTitulo}>Nenhum pedido ainda</Text>
-          <Text style={styles.vazioTexto}>
-            Seus pedidos aparecerão aqui assim que você finalizar uma compra.
-          </Text>
-          <TouchableOpacity
-            style={styles.btnComprar}
-            onPress={() => navigation.navigate("Loja", { screen: "Catalogo" })}
-          >
-            <Ionicons name="storefront-outline" size={16} color="#fff" />
-            <Text style={styles.btnComprarTexto}>Ver produtos</Text>
-          </TouchableOpacity>
-        </View>
+        erroPedidos ? (
+          <View style={styles.vazio}>
+            <Ionicons name="alert-circle-outline" size={56} color={CORES.erro} />
+            <Text style={styles.vazioTitulo}>Nao foi possivel carregar seus pedidos</Text>
+            <Text style={styles.vazioTexto}>
+              Puxe para atualizar ou tente novamente em instantes.
+            </Text>
+            <TouchableOpacity style={styles.btnComprar} onPress={() => carregar()}>
+              <Ionicons name="refresh-outline" size={16} color="#fff" />
+              <Text style={styles.btnComprarTexto}>Tentar novamente</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.vazio}>
+            <Text style={styles.vazioEmoji}>🛍️</Text>
+            <Text style={styles.vazioTitulo}>Nenhum pedido feito</Text>
+            <Text style={styles.vazioTexto}>
+              Seus pedidos aparecerão aqui assim que você finalizar uma compra.
+            </Text>
+            <TouchableOpacity
+              style={styles.btnComprar}
+              onPress={() => navigation.navigate("Loja", { screen: "Catalogo" })}
+            >
+              <Ionicons name="storefront-outline" size={16} color="#fff" />
+              <Text style={styles.btnComprarTexto}>Ver produtos</Text>
+            </TouchableOpacity>
+          </View>
+        )
       }
     />
   );
