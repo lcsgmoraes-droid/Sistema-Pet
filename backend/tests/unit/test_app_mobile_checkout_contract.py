@@ -173,8 +173,23 @@ def test_mobile_orders_screen_is_defensive_with_malformed_order_history():
     assert "const retiradoPor = safeText(item.retirado_por).trim()" in orders
     assert "pedido.itens.length" not in orders
     assert "item.itens?.slice" not in orders
+    assert ".pedido_id.slice" not in orders
     assert ".filter(isPedidoRecord)" in service
     assert "Array.isArray(pedido.itens)" in service
+
+
+def test_mobile_wishlist_empty_state_stops_loading_when_no_favorites():
+    wishlist = _read_mobile_source("app-mobile/src/screens/shop/WishlistScreen.tsx")
+
+    assert "Nenhum favorito ainda" in wishlist
+    assert "finally" in wishlist
+    assert "setCarregando(false)" in wishlist
+    assert "const wishlistIds = useWishlistStore.getState().ids" in wishlist
+    assert not re.search(
+        r"if\s*\(ids\.length === 0\)\s*{\s*setProdutos\(\[\]\);\s*return;",
+        wishlist,
+        re.S,
+    )
 
 
 def test_profile_points_card_wraps_without_overflow_on_narrow_mobile():
