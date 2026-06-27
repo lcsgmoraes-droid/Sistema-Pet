@@ -13,7 +13,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import KeyboardSafeScrollView from '../../components/KeyboardSafeScrollView';
-import { calcularRacaoComProduto, compararRacoesCategoria, listarRacoesCadastradas, RacaoCadastrada, adicionarAoCarrinho } from '../../services/shop.service';
+import {
+  adicionarAoCarrinho,
+  calcularRacaoLocal,
+  compararRacoesLocal,
+  listarRacoesCadastradas,
+  RacaoCadastrada,
+} from '../../services/shop.service';
 import { listarPets } from '../../services/pets.service';
 import { Pet } from '../../types';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../../theme';
@@ -104,10 +110,15 @@ export default function FoodCalculatorScreen({ route }: Props) {
     }
   }
 
-  async function calcular() {
+  function calcular() {
     const peso = parseFloat(pesoPet);
     if (!pesoPet || isNaN(peso) || peso <= 0) {
       Alert.alert('Campo obrigatório', 'Informe o peso do pet em kg.');
+      return;
+    }
+
+    if (!racaoSelecionada) {
+      Alert.alert('Campo obrigatorio', 'Selecione a racao principal antes de calcular.');
       return;
     }
 
@@ -117,26 +128,24 @@ export default function FoodCalculatorScreen({ route }: Props) {
 
     try {
       // Calcular para a ração principal
-      const res1 = await calcularRacaoComProduto({
-        produto_id: racaoSelecionada?.id ?? null,
+      const params = {
         peso_pet_kg: peso,
         idade_meses: idadeMeses ? parseInt(idadeMeses) : null,
         nivel_atividade: nivelAtividade,
-      });
+      };
+      const res1 = calcularRacaoLocal(racaoSelecionada, params);
       setResultadoPrincipal(res1);
 
       // Se tiver ração para comparar, calcular também
       if (racaoComparar) {
-        const res2 = await calcularRacaoComProduto({
-          produto_id: racaoComparar.id,
-          peso_pet_kg: peso,
-          idade_meses: idadeMeses ? parseInt(idadeMeses) : null,
-          nivel_atividade: nivelAtividade,
-        });
+        const res2 = calcularRacaoLocal(racaoComparar, params);
         setResultadoComparar(res2);
       }
     } catch (err: any) {
-      Alert.alert('Erro', err?.response?.data?.detail || 'Não foi possível calcular.');
+      Alert.alert(
+        'Erro',
+        'Nao foi possivel calcular.'
+      );
     } finally {
       setCalculando(false);
     }
@@ -151,7 +160,7 @@ export default function FoodCalculatorScreen({ route }: Props) {
     setBuscandoMelhor(true);
     setMelhoresOpcoes([]);
     try {
-      const comp = await compararRacoesCategoria({
+      const comp = compararRacoesLocal(racoes, {
         peso_pet_kg: peso,
         idade_meses: idadeMeses ? parseInt(idadeMeses) : null,
         nivel_atividade: nivelAtividade,
@@ -162,9 +171,19 @@ export default function FoodCalculatorScreen({ route }: Props) {
         .sort((a: any, b: any) => a.custo_por_dia - b.custo_por_dia)
         .slice(0, 3)
         .map((r: any) => ({ ...r, categoria: classif }));
+      if (top3.length === 0) {
+        Alert.alert(
+          'Nenhuma racao encontrada',
+          'Nao encontrei racoes com peso e preco para esse filtro.'
+        );
+        return;
+      }
       setMelhoresOpcoes(top3);
-    } catch {
-      Alert.alert('Erro', 'Não foi possível comparar as rações.');
+    } catch (err: any) {
+      Alert.alert(
+        'Erro',
+        'Nao foi possivel comparar as racoes.'
+      );
     } finally {
       setBuscandoMelhor(false);
     }

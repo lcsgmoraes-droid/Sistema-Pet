@@ -13,10 +13,30 @@ const api = axios.create({
   },
 });
 
+function removeJsonContentTypeForFormData(config: any) {
+  if (typeof FormData === 'undefined' || !(config.data instanceof FormData) || !config.headers) {
+    return;
+  }
+
+  const deleteHeader = (name: string) => {
+    if (typeof config.headers.delete === 'function') {
+      config.headers.delete(name);
+      return;
+    }
+
+    delete config.headers[name];
+  };
+
+  deleteHeader('Content-Type');
+  deleteHeader('content-type');
+}
+
 // ─── Interceptor de Request ─────────────────────────────────────────────────
 // Injeta token JWT + X-Tenant-ID dinamicamente em cada chamada
 api.interceptors.request.use(
   async (config) => {
+    removeJsonContentTypeForFormData(config);
+
     try {
       // Token de autenticação
       const token = await SecureStore.getItemAsync('auth_token');

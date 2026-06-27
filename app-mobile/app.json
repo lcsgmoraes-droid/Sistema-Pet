@@ -50,7 +50,7 @@
         "android.permission.SYSTEM_ALERT_WINDOW"
       ],
       "runtimeVersion": "1.0.0",
-      "versionCode": 4
+      "versionCode": 5
     },
     "web": {
       "favicon": "./assets/favicon.png"
