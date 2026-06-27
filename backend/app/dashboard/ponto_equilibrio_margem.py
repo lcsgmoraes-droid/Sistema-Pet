@@ -27,6 +27,8 @@ from ..dre_canais_routes import (
     _snapshot_pronto,
 )
 from .ponto_equilibrio_classificacao import _classificar_conta_ponto_equilibrio
+
+
 def _round_money(value) -> float:
     return round(float(value or 0), 2)
 
@@ -355,6 +357,7 @@ def _somar_componentes_margem_vendas_pe(
             "componentes": componentes,
         },
     }
+
 
 def _adicionar_meses(data_base: date, meses: int) -> date:
     indice_mes = data_base.year * 12 + data_base.month - 1 + meses

@@ -1,4 +1,4 @@
-﻿"""Montagem do payload JSON do relatorio de vendas."""
+"""Montagem do payload JSON do relatorio de vendas."""
 
 from datetime import date, datetime
 from typing import Optional
@@ -67,11 +67,15 @@ def montar_relatorio_vendas(
     estoque_custos_por_venda = contexto_relatorio["estoque_custos_por_venda"]
 
     agregados_operacionais = montar_agregados_operacionais_relatorio(vendas)
-    valores_operacionais_por_venda = agregados_operacionais["valores_operacionais_por_venda"]
+    valores_operacionais_por_venda = agregados_operacionais[
+        "valores_operacionais_por_venda"
+    ]
     resumo = agregados_operacionais["resumo"]
     vendas_por_data_lista = agregados_operacionais["vendas_por_data_lista"]
     formas_recebimento_lista = agregados_operacionais["formas_recebimento_lista"]
-    vendas_por_funcionario_lista = agregados_operacionais["vendas_por_funcionario_lista"]
+    vendas_por_funcionario_lista = agregados_operacionais[
+        "vendas_por_funcionario_lista"
+    ]
     vendas_por_tipo_lista = agregados_operacionais["vendas_por_tipo_lista"]
 
     # ==============================================

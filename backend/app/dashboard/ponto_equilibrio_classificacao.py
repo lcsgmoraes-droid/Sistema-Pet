@@ -24,6 +24,7 @@ def _normalizar_texto_pe(valor: str) -> str:
     texto = texto.replace("-", " ")
     return re.sub(r"\s+", " ", texto).strip()
 
+
 PE_TERMOS_FIXOS = (
     "pro labore",
     "prolabore",

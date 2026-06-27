@@ -61,7 +61,9 @@ def carregar_contexto_relatorio_vendas(*, db: Session, tenant_id, vendas) -> dic
     comissoes_map = _carregar_comissoes_por_venda(db, tenant_id, venda_ids)
 
     return {
-        "impostos_percentual_global": _carregar_impostos_percentual_global(db, tenant_id),
+        "impostos_percentual_global": _carregar_impostos_percentual_global(
+            db, tenant_id
+        ),
         "comissoes_map": comissoes_map,
         "comissao_total_por_venda": {
             venda_id: round(sum(float(item.valor_comissao or 0) for item in itens), 2)
@@ -192,7 +194,9 @@ def _carregar_cashback_por_venda(db: Session, tenant_id, venda_ids: list[int]) -
         from app.campaigns.models import CashbackTransaction
 
         resgates = (
-            db.query(CashbackTransaction.source_id, func.sum(CashbackTransaction.amount))
+            db.query(
+                CashbackTransaction.source_id, func.sum(CashbackTransaction.amount)
+            )
             .filter(
                 CashbackTransaction.tenant_id == tenant_id,
                 CashbackTransaction.amount < 0,
@@ -217,7 +221,9 @@ def _carregar_cupons_por_venda(db: Session, tenant_id, venda_ids: list[int]) -> 
         from app.campaigns.models import CouponRedemption
 
         resgates_cupons = (
-            db.query(CouponRedemption.venda_id, func.sum(CouponRedemption.discount_applied))
+            db.query(
+                CouponRedemption.venda_id, func.sum(CouponRedemption.discount_applied)
+            )
             .filter(
                 CouponRedemption.tenant_id == tenant_id,
                 CouponRedemption.venda_id.in_(venda_ids),
@@ -228,13 +234,17 @@ def _carregar_cupons_por_venda(db: Session, tenant_id, venda_ids: list[int]) -> 
         )
         return {row[0]: float(row[1] or 0) for row in resgates_cupons}
     except Exception as exc:
-        logger.warning(f"Erro ao buscar cupons por venda (tabela pode nao existir): {exc}")
+        logger.warning(
+            f"Erro ao buscar cupons por venda (tabela pode nao existir): {exc}"
+        )
         return {}
 
 
 def _carregar_entregadores_map(db: Session, tenant_id, vendas) -> dict:
     entregador_ids = {
-        venda.entregador_id for venda in vendas if venda.tem_entrega and venda.entregador_id
+        venda.entregador_id
+        for venda in vendas
+        if venda.tem_entrega and venda.entregador_id
     }
     if not entregador_ids:
         return {}
@@ -242,7 +252,9 @@ def _carregar_entregadores_map(db: Session, tenant_id, vendas) -> dict:
     try:
         entregadores = (
             db.query(Cliente.id, Cliente.taxa_fixa_entrega)
-            .filter(and_(Cliente.tenant_id == tenant_id, Cliente.id.in_(entregador_ids)))
+            .filter(
+                and_(Cliente.tenant_id == tenant_id, Cliente.id.in_(entregador_ids))
+            )
             .all()
         )
         return {
@@ -254,7 +266,9 @@ def _carregar_entregadores_map(db: Session, tenant_id, vendas) -> dict:
         return {}
 
 
-def _carregar_estoque_custos_por_venda(db: Session, tenant_id, venda_ids: list[int]) -> dict:
+def _carregar_estoque_custos_por_venda(
+    db: Session, tenant_id, venda_ids: list[int]
+) -> dict:
     estoque_custos_por_venda = {}
     if not venda_ids:
         return estoque_custos_por_venda
@@ -274,7 +288,9 @@ def _carregar_estoque_custos_por_venda(db: Session, tenant_id, venda_ids: list[i
         )
 
         for movimento in movimentos_estoque:
-            mapa_venda = estoque_custos_por_venda.setdefault(movimento.referencia_id, {})
+            mapa_venda = estoque_custos_por_venda.setdefault(
+                movimento.referencia_id, {}
+            )
             mapa_produto = mapa_venda.setdefault(
                 movimento.produto_id, {"quantidade": 0.0, "valor_total": 0.0}
             )
@@ -316,7 +332,9 @@ def _montar_vendas_por_data(vendas, valores_operacionais_por_venda: dict) -> lis
         qtd = item["quantidade"]
         item["ticket_medio"] = round(item["valor_liquido"] / qtd if qtd > 0 else 0, 2)
         item["percentual_desconto"] = round(
-            (item["desconto"] / item["valor_bruto"] * 100) if item["valor_bruto"] > 0 else 0,
+            (item["desconto"] / item["valor_bruto"] * 100)
+            if item["valor_bruto"] > 0
+            else 0,
             1,
         )
 
@@ -354,7 +372,9 @@ def _montar_formas_recebimento(vendas) -> list[dict]:
     return formas_recebimento_lista
 
 
-def _montar_vendas_por_funcionario(vendas, valores_operacionais_por_venda: dict) -> list[dict]:
+def _montar_vendas_por_funcionario(
+    vendas, valores_operacionais_por_venda: dict
+) -> list[dict]:
     vendas_por_funcionario = {}
     for venda in vendas:
         funcionario_id = venda.user_id
@@ -383,7 +403,9 @@ def _montar_vendas_por_funcionario(vendas, valores_operacionais_por_venda: dict)
         ]
 
     return sorted(
-        vendas_por_funcionario.values(), key=lambda item: item["valor_liquido"], reverse=True
+        vendas_por_funcionario.values(),
+        key=lambda item: item["valor_liquido"],
+        reverse=True,
     )
 
 
