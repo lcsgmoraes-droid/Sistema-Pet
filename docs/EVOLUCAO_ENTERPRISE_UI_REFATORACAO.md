@@ -209,13 +209,22 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-27 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
 
-- 72 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 71 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 64 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 63 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 8 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 11 arquivos de teste em `backend/tests` e 2 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 6 de 2026-06-27: `backend/app/dre_routes.py` saiu da faixa acima de 700 linhas ao virar fachada dos endpoints de DRE:
+
+- `backend/app/dre_routes.py`: 949 -> 39 linhas, mantendo o prefixo publico `/financeiro/dre` e incluindo os subrouters dedicados.
+- `backend/app/dre_schemas.py`: concentra `DREResponse` e `DREDetalhado`.
+- `backend/app/dre_calculos.py`: concentra CMV, frete de notas de entrada, despesas por categoria e taxas de cartao.
+- `backend/app/dre_base_routes.py`: concentra os endpoints `GET /financeiro/dre` e `GET /financeiro/dre/detalhado`.
+- `backend/app/dre_export_routes.py`: concentra as exportacoes `GET /financeiro/dre/export/pdf` e `GET /financeiro/dre/export/excel`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_6_refactor.py`, garantindo fachada, paths publicos, exports compartilhados e modulos extraidos abaixo de 700 linhas.
 
 Fatia backend 700 batch 5 de 2026-06-27: `backend/app/services/ops_dashboard_service.py` saiu da faixa acima de 700 linhas ao virar orquestrador do painel Ops:
 
