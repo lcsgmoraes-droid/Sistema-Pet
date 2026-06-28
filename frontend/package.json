@@ -46,6 +46,7 @@
     "test:pdv-produto-busca": "node scripts/test-pdv-produto-busca.mjs",
     "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",
     "test:vendas-reprocessamento-feedback": "node scripts/test-vendas-reprocessamento-feedback.mjs",
+    "test:onboarding-inicial": "node scripts/test-onboarding-inicial-contract.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

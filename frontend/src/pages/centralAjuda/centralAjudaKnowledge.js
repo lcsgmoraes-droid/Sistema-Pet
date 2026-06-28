@@ -13,6 +13,58 @@ import {
 } from "react-icons/fi";
 
 export const BASE_CONHECIMENTO = [
+  {
+    modulo: "primeiros-passos",
+    label: "Primeiros Passos",
+    icone: FiBookOpen,
+    cor: "emerald",
+    artigos: [
+      {
+        titulo: "Primeiros passos para configurar o Sistema Pet",
+        tags: ["inicio", "configuracao", "onboarding", "primeiros passos"],
+        conteudo: [
+          "Comece pela aba **Ajuda e Planos -> Introducao Guiada**.",
+          "Siga a ordem: empresa e fiscal, financeiro obrigatorio, cadastros base, PDV/caixa, compras/estoque, modulos da operacao e validacao final.",
+          "Os itens obrigatorios deixam o sistema pronto para vender e conferir dinheiro.",
+          "Os itens condicionais aparecem quando a empresa usa modulo extra, como Entregas, Banho & Tosa, Veterinario, Ecommerce, Campanhas, WhatsApp ou Bling.",
+        ],
+      },
+      {
+        titulo: "Financeiro obrigatorio antes da primeira venda",
+        tags: ["financeiro", "formas de pagamento", "bancos", "dre", "caixa"],
+        conteudo: [
+          "Antes da primeira venda real, confira **Bancos**, **Formas de Pagamento**, **Operadoras de Cartao**, **Categorias Financeiras** e **DRE**.",
+          "Acesse **Cadastros -> Bancos** em `/cadastros/financeiro/bancos`.",
+          "Acesse **Cadastros -> Formas de Pagamento** em `/cadastros/financeiro/formas-pagamento`.",
+          "Acesse **Cadastros -> Operadoras de Cartao** em `/cadastros/financeiro/operadoras` se vender em cartao.",
+          "Sem essa base, a venda ate pode acontecer, mas recebimentos, taxas e relatorios ficam menos confiaveis.",
+        ],
+      },
+      {
+        titulo: "Compras, entrada XML e Bling",
+        tags: ["compras", "entrada xml", "bling", "estoque", "nota"],
+        conteudo: [
+          "Use **Compras -> Pedidos de Compra** em `/compras/pedidos` para controlar reposicao por fornecedor.",
+          "Use **Compras -> Central NF-e Entradas** em `/compras/entrada-xml` para conferir XML, custos, frete, impostos, divergencias e estoque.",
+          "Use **Produtos / Estoque -> Sinc. Bling** em `/produtos/sinc-bling` quando a empresa usa integracao Bling.",
+          "Depois de processar uma entrada, confira o produto, o custo e o estoque antes de considerar a implantacao pronta.",
+        ],
+      },
+      {
+        titulo: "Configuracoes por modulo",
+        tags: ["modulos", "ecommerce", "campanhas", "veterinario", "banho e tosa"],
+        conteudo: [
+          "Cada modulo tem configuracao propria e deve ser revisado somente quando estiver ativo para a empresa.",
+          "Ecommerce: `/ecommerce/configuracoes` e `/ecommerce/aparencia`.",
+          "Campanhas: `/campanhas`.",
+          "Banho & Tosa: `/banho-tosa/servicos`, `/banho-tosa/parametros`, `/banho-tosa/agenda`.",
+          "Veterinario: `/veterinario/configuracoes`, `/veterinario/agenda`, `/veterinario/catalogo`.",
+          "Entregas: `/configuracoes/entregas` e `/entregas/abertas`.",
+        ],
+      },
+    ],
+  },
+
   // ────────────── DASHBOARD ──────────────
   {
     modulo: "dashboard",

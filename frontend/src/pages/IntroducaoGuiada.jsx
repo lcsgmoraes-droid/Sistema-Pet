@@ -8,297 +8,17 @@ import {
   FiRotateCcw,
 } from "react-icons/fi";
 import api from "../api";
+import {
+  BADGE_LABELS,
+  SECOES_ONBOARDING,
+  buildGuiaHref,
+  flattenOnboardingItems,
+} from "./introducaoGuiada/introducaoGuiadaConfig";
+import { executarIntroducaoChecks } from "./introducaoGuiada/introducaoGuiadaChecks";
 
 const STORAGE_KEY = "introducao_guiada_v1";
 
-const SECOES = [
-  {
-    id: "empresa",
-    titulo: "1) Base da empresa e fiscal",
-    itens: [
-      {
-        id: "empresa-fiscal",
-        titulo: "Preencher configuracao fiscal da empresa",
-        obrigatorio: true,
-        onde: "/configuracoes/fiscal",
-        resultado: "Impostos e analise de margem ficam coerentes.",
-        autoCheckKey: "empresaFiscal",
-      },
-      {
-        id: "empresa-dados",
-        titulo: "Preencher dados cadastrais (CNPJ, razao social, endereco)",
-        obrigatorio: true,
-        onde: "/configuracoes/fiscal",
-        resultado: "Base pronta para emissao e documentos.",
-        autoCheckKey: "empresaDados",
-      },
-      {
-        id: "empresa-margens-pdv",
-        titulo: "Definir limites de margem do PDV (verde/amarelo/vermelho)",
-        obrigatorio: false,
-        onde: "/configuracoes/geral",
-        resultado: "Analise do PDV passa a seguir a sua regra de margem.",
-      },
-      {
-        id: "empresa-mensagens-pdv",
-        titulo: "Ajustar mensagens da analise de margem no PDV",
-        obrigatorio: false,
-        onde: "/configuracoes/geral",
-        resultado: "Equipe recebe alertas claros no fechamento da venda.",
-      },
-      {
-        id: "empresa-meta-faturamento",
-        titulo: "Configurar meta de faturamento mensal",
-        obrigatorio: false,
-        onde: "/configuracoes/geral",
-        resultado: "Dashboard passa a comparar a operacao contra a meta.",
-      },
-      {
-        id: "empresa-alertas-estoque",
-        titulo: "Definir alertas de estoque (percentual e dias parado)",
-        obrigatorio: false,
-        onde: "/configuracoes/geral",
-        resultado: "Sistema antecipa ruptura e produtos sem giro.",
-      },
-    ],
-  },
-  {
-    id: "financeiro-estrutura",
-    titulo: "2) Estrutura financeira obrigatoria",
-    itens: [
-      {
-        id: "contas-bancarias",
-        titulo: "Cadastrar bancos/caixas/carteiras",
-        obrigatorio: true,
-        onde: "/cadastros/financeiro/bancos",
-        resultado: "Sistema sabe de onde vem e para onde vai o dinheiro.",
-        autoCheckKey: "contasBancarias",
-      },
-      {
-        id: "formas-pagamento",
-        titulo: "Cadastrar formas de pagamento",
-        obrigatorio: true,
-        onde: "/cadastros/financeiro/formas-pagamento",
-        resultado: "PDV consegue finalizar vendas e gerar recebiveis.",
-        autoCheckKey: "formasPagamento",
-      },
-      {
-        id: "operadoras-cartao",
-        titulo: "Cadastrar operadoras de cartao (se usar cartao)",
-        obrigatorio: false,
-        condicao: "Obrigatorio se vender em cartao",
-        onde: "/cadastros/financeiro/operadoras",
-        resultado: "Consolidacao e conciliacao de cartao mais confiaveis.",
-        autoCheckKey: "operadoras",
-      },
-      {
-        id: "categorias-financeiras",
-        titulo: "Cadastrar categorias financeiras (receita/custo/despesa)",
-        obrigatorio: true,
-        onde: "/cadastros/categorias-financeiras",
-        resultado: "Fluxo de caixa e DRE passam a classificar corretamente.",
-      },
-    ],
-  },
-  {
-    id: "cadastros-base",
-    titulo: "3) Cadastros base de operacao",
-    itens: [
-      {
-        id: "categorias-produto",
-        titulo: "Cadastrar categorias e subcategorias de produto",
-        obrigatorio: true,
-        onde: "/cadastros/categorias",
-        resultado: "Produtos ficam organizados e comissao por categoria funciona.",
-        autoCheckKey: "categoriasProduto",
-      },
-      {
-        id: "produtos",
-        titulo: "Cadastrar produtos vendaveis",
-        obrigatorio: true,
-        onde: "/produtos",
-        resultado: "PDV e estoque conseguem operar normalmente.",
-        autoCheckKey: "produtos",
-      },
-      {
-        id: "pessoas",
-        titulo: "Cadastrar pessoas (clientes/fornecedores/vet/funcionarios)",
-        obrigatorio: true,
-        onde: "/pessoas",
-        resultado: "Vendas, compras e financeiro com vinculo correto.",
-        autoCheckKey: "pessoas",
-      },
-      {
-        id: "pets",
-        titulo: "Cadastrar pets (opcional, recomendado)",
-        obrigatorio: false,
-        onde: "/pets",
-        resultado: "Historico de atendimento e recorrencia por pet.",
-        autoCheckKey: "pets",
-      },
-      {
-        id: "especies-racas",
-        titulo: "Revisar especies e racas",
-        obrigatorio: false,
-        onde: "/cadastros/especies-racas",
-        resultado: "Cadastro de pets mais padronizado.",
-      },
-    ],
-  },
-  {
-    id: "config-vertical",
-    titulo: "4) Configuracoes por tipo de operacao",
-    itens: [
-      {
-        id: "entrega-config",
-        titulo: "Configurar entregas (taxas, raio, origem)",
-        obrigatorio: false,
-        condicao: "Obrigatorio se usar entrega",
-        onde: "/configuracoes/entregas",
-        resultado: "Vendas com entrega calculam valor e rota corretamente.",
-        autoCheckKey: "configEntrega",
-      },
-      {
-        id: "entregador",
-        titulo: "Cadastrar entregador(es)",
-        obrigatorio: false,
-        condicao: "Obrigatorio se usar entrega",
-        onde: "/pessoas",
-        resultado: "Venda com entrega passa na validacao de entregador.",
-        autoCheckKey: "entregadores",
-      },
-      {
-        id: "comissao-func",
-        titulo: "Definir funcionarios comissionados",
-        obrigatorio: false,
-        condicao: "Obrigatorio se pagar comissao",
-        onde: "/comissoes",
-        resultado: "Sistema identifica quem recebe comissao.",
-      },
-      {
-        id: "comissao-regras",
-        titulo: "Configurar regras de comissao (categoria/subcategoria/produto)",
-        obrigatorio: false,
-        condicao: "Obrigatorio se pagar comissao",
-        onde: "/comissoes",
-        resultado: "Calculo de comissao automatico na finalizacao da venda.",
-        autoCheckKey: "comissoesConfig",
-      },
-      {
-        id: "racao-opcoes",
-        titulo: "Cadastrar opcoes de classificacao de racao",
-        obrigatorio: false,
-        condicao: "Obrigatorio se vender racao com analise",
-        onde: "/cadastros/opcoes-racao",
-        resultado: "Alertas e analises de racao mais completos.",
-        autoCheckKey: "opcoesRacao",
-      },
-      {
-        id: "estoque-config",
-        titulo: "Revisar configuracoes de estoque",
-        obrigatorio: false,
-        onde: "/configuracoes/estoque",
-        resultado: "Menos ruptura e menos erro de movimentacao.",
-      },
-    ],
-  },
-  {
-    id: "operacao",
-    titulo: "5) Validacao da operacao ponta a ponta",
-    itens: [
-      {
-        id: "abrir-caixa",
-        titulo: "Abrir caixa no PDV com saldo inicial",
-        obrigatorio: true,
-        onde: "/pdv",
-        resultado: "Usuario pronto para venda presencial.",
-        autoCheckKey: "caixaAberto",
-      },
-      {
-        id: "venda-sem-entrega",
-        titulo: "Lancar 1 venda sem entrega",
-        obrigatorio: true,
-        onde: "/pdv",
-        resultado: "Fluxo basico de venda validado.",
-        autoCheckKey: "temVendas",
-      },
-      {
-        id: "venda-com-entrega",
-        titulo: "Lancar 1 venda com entrega",
-        obrigatorio: false,
-        condicao: "Se usar entrega",
-        onde: "/pdv",
-        resultado: "Fluxo de entrega validado do inicio ao fim.",
-      },
-      {
-        id: "venda-com-comissao",
-        titulo: "Lancar 1 venda com comissao",
-        obrigatorio: false,
-        condicao: "Se usar comissao",
-        onde: "/pdv",
-        resultado: "Comissao gerada conforme regra configurada.",
-      },
-      {
-        id: "fechar-caixa",
-        titulo: "Fechar caixa e conferir diferenca",
-        obrigatorio: true,
-        onde: "/meus-caixas",
-        resultado: "Conferencia diaria finalizada sem pendencias.",
-      },
-    ],
-  },
-  {
-    id: "gestao",
-    titulo: "6) Gestao e acompanhamento",
-    itens: [
-      {
-        id: "contas-receber",
-        titulo: "Conferir contas a receber geradas",
-        obrigatorio: true,
-        onde: "/financeiro/contas-receber",
-        resultado: "Ciclo de recebimento funcionando.",
-      },
-      {
-        id: "contas-pagar",
-        titulo: "Lancar contas a pagar iniciais",
-        obrigatorio: true,
-        onde: "/financeiro/contas-pagar",
-        resultado: "Resultado financeiro com custos reais.",
-      },
-      {
-        id: "fluxo-caixa",
-        titulo: "Validar fluxo de caixa",
-        obrigatorio: true,
-        onde: "/financeiro/fluxo-caixa",
-        resultado: "Entrada e saida batendo com a operacao.",
-      },
-      {
-        id: "dre",
-        titulo: "Classificar e revisar DRE",
-        obrigatorio: true,
-        onde: "/financeiro/dre",
-        resultado: "Indicadores de lucro e margem confiaveis.",
-      },
-      {
-        id: "relatorios-vendas",
-        titulo: "Revisar relatorios de vendas",
-        obrigatorio: true,
-        onde: "/financeiro/relatorio-vendas",
-        resultado: "Visao gerencial pronta para decisao.",
-      },
-    ],
-  },
-];
-
-function toCount(data) {
-  if (Array.isArray(data)) return data.length;
-  if (!data || typeof data !== "object") return 0;
-  if (Array.isArray(data.items)) return data.items.length;
-  if (Array.isArray(data.data)) return data.data.length;
-  if (typeof data.total === "number") return data.total;
-  if (typeof data.count === "number") return data.count;
-  return 0;
-}
+const SECOES = SECOES_ONBOARDING;
 
 function makeStorageKey() {
   try {
@@ -309,11 +29,6 @@ function makeStorageKey() {
   } catch {
     return STORAGE_KEY;
   }
-}
-
-function buildGuiaHref(path, guiaId) {
-  const sep = path.includes("?") ? "&" : "?";
-  return `${path}${sep}guia=${encodeURIComponent(guiaId)}`;
 }
 
 export default function IntroducaoGuiada() {
@@ -342,92 +57,7 @@ export default function IntroducaoGuiada() {
 
   const executarChecksAutomaticos = async () => {
     setCarregandoChecks(true);
-
-    const results = {
-      empresaFiscal: false,
-      empresaDados: false,
-      contasBancarias: false,
-      formasPagamento: false,
-      operadoras: false,
-      categoriasProduto: false,
-      produtos: false,
-      pessoas: false,
-      pets: false,
-      configEntrega: false,
-      entregadores: false,
-      comissoesConfig: false,
-      opcoesRacao: false,
-      caixaAberto: false,
-      temVendas: false,
-    };
-
-    const chamadas = [
-      api.get("/empresa/fiscal").then((res) => {
-        const data = res.data || {};
-        results.empresaFiscal = Boolean(
-          data.regime_tributario || data.cnae_principal || data.aliquota_simples_vigente,
-        );
-      }),
-      api.get("/empresa/dados-cadastrais").then((res) => {
-        const data = res.data || {};
-        results.empresaDados = Boolean(
-          data.cnpj &&
-          data.razao_social &&
-          data.endereco &&
-          data.numero &&
-          data.bairro &&
-          data.cidade &&
-          data.uf,
-        );
-      }),
-      api.get("/contas-bancarias?apenas_ativas=true").then((res) => {
-        results.contasBancarias = toCount(res.data) > 0;
-      }),
-      api.get("/financeiro/formas-pagamento?apenas_ativas=true").then((res) => {
-        results.formasPagamento = toCount(res.data) > 0;
-      }),
-      api.get("/operadoras-cartao?apenas_ativas=true").then((res) => {
-        results.operadoras = toCount(res.data) > 0;
-      }),
-      api.get("/produtos/categorias").then((res) => {
-        results.categoriasProduto = toCount(res.data) > 0;
-      }),
-      api.get("/produtos?per_page=1").then((res) => {
-        const data = res.data || {};
-        results.produtos = Boolean(
-          (Array.isArray(data.produtos) && data.produtos.length > 0) || data.total > 0,
-        );
-      }),
-      api.get("/clientes/?limit=1").then((res) => {
-        results.pessoas = toCount(res.data) > 0;
-      }),
-      api.get("/pets?limit=1").then((res) => {
-        results.pets = toCount(res.data) > 0;
-      }),
-      api.get("/configuracoes/entregas").then((res) => {
-        const data = res.data || {};
-        results.configEntrega = Object.keys(data).length > 0;
-      }),
-      api.get("/clientes/?is_entregador=true&incluir_inativos=false&limit=1").then((res) => {
-        results.entregadores = toCount(res.data) > 0;
-      }),
-      api.get("/comissoes/configuracoes/funcionarios").then((res) => {
-        const lista = res.data?.data || [];
-        results.comissoesConfig = lista.some((f) => Number(f.total_configuracoes || 0) > 0);
-      }),
-      api.get("/opcoes-racao/linhas?apenas_ativos=false").then((res) => {
-        results.opcoesRacao = toCount(res.data) > 0;
-      }),
-      api.get("/caixas/aberto").then((res) => {
-        results.caixaAberto = Boolean(res.data?.id);
-      }),
-      api.get("/vendas?page=1&per_page=1").then((res) => {
-        const data = res.data || {};
-        results.temVendas = Number(data.total || 0) > 0;
-      }),
-    ];
-
-    await Promise.all(chamadas.map((p) => p.catch(() => null)));
+    const results = await executarIntroducaoChecks(api);
     setAutoChecks(results);
     setCarregandoChecks(false);
   };
@@ -436,7 +66,7 @@ export default function IntroducaoGuiada() {
     executarChecksAutomaticos();
   }, []);
 
-  const todosItens = useMemo(() => SECOES.flatMap((secao) => secao.itens), []);
+  const todosItens = useMemo(() => flattenOnboardingItems(SECOES), []);
 
   const total = todosItens.length;
   const concluidos = todosItens.filter((item) => {
@@ -507,7 +137,8 @@ export default function IntroducaoGuiada() {
             key={secao.id}
             className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm"
           >
-            <h3 className="text-lg font-bold text-gray-900 mb-4">{secao.titulo}</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">{secao.titulo}</h3>
+            {secao.resumo && <p className="text-sm text-gray-600 mb-4">{secao.resumo}</p>}
 
             <div className="space-y-3">
               {secao.itens.map((item) => {
@@ -515,7 +146,13 @@ export default function IntroducaoGuiada() {
                   ? Boolean(autoChecks[item.autoCheckKey])
                   : false;
                 const concluido = autoConcluido || Boolean(marcados[item.id]);
-                const badgeObrigatorio = item.obrigatorio ? "Obrigatorio" : "Opcional";
+                const badgeLabel = BADGE_LABELS[item.tipo] || "Recomendado";
+                const badgeClass =
+                  item.tipo === "obrigatorio"
+                    ? "bg-red-100 text-red-700"
+                    : item.tipo === "condicional"
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-gray-100 text-gray-600";
 
                 return (
                   <div
@@ -540,10 +177,8 @@ export default function IntroducaoGuiada() {
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2 mb-1">
                           <p className="text-sm font-semibold text-gray-900">{item.titulo}</p>
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded-full ${item.obrigatorio ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"}`}
-                          >
-                            {badgeObrigatorio}
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${badgeClass}`}>
+                            {badgeLabel}
                           </span>
                           {autoConcluido && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
