@@ -30,6 +30,7 @@ Guia mestre:
 | Preparar base demo para gravacao | `docs/marketing/BASE_DEMO_GRAVACAO.md` | Tenant/base demonstracao sem dados reais |
 | Validar dados demo de marketing | `scripts/test_marketing_demo_package.py` | JSON em `docs/marketing/base-demo/` |
 | Gerar manifesto seed demo | `scripts/gerar_seed_base_demo_marketing.py` | `scripts/test_marketing_demo_seed_plan.py` |
+| Simular aplicacao seed demo | `scripts/aplicar_seed_base_demo_marketing.py` | `scripts/test_marketing_demo_seed_apply.py` |
 | Capturar telas demo | `docs/marketing/PLANO_CAPTURA_TELAS_DEMO.md` | Base demo validada e sistema atual |
 | Roteiros de venda | `docs/marketing/ROTEIROS_CRIATIVOS_VENDA.md` | Matriz de criativos e dados ficticios |
 | Demos de funcionalidades | `docs/marketing/ROTEIROS_DEMO_FUNCIONALIDADES.md` | Sistema em ambiente demo |
