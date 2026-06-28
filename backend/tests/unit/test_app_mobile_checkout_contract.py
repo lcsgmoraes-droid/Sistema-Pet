@@ -235,6 +235,19 @@ def test_mobile_catalog_uses_customer_filter_modal_instead_of_admin_chips():
     assert "Mais prontos" not in catalog
 
 
+def test_pet_photo_flow_guides_crop_and_protects_unsaved_photo():
+    pet_form = _read_mobile_source("app-mobile/src/screens/pets/PetFormScreen.tsx")
+
+    assert "ImagePicker.launchImageLibraryAsync" in pet_form
+    assert "allowsEditing: true" in pet_form
+    assert "Cortar" in pet_form
+    assert "navigation.addListener('beforeRemove'" in pet_form
+    assert "fotoPendente" in pet_form
+    assert "Salvar alterações" in pet_form
+    assert "Sair sem salvar" in pet_form
+    assert "Salvar foto" in pet_form
+
+
 def test_profile_points_card_wraps_without_overflow_on_narrow_mobile():
     profile = _read_mobile_source("app-mobile/src/screens/profile/ProfileScreen.tsx")
 
