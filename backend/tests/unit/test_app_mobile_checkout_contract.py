@@ -197,11 +197,29 @@ def test_mobile_home_prioritizes_shopping_and_compacts_scan_feature():
 
     assert "Comprar por pet" in home
     assert "scannerCardCompacto" in home
+    assert "MaterialCommunityIcons" in home
+    assert "FontAwesome6" not in home
     assert "iconName" in home
+    assert 'iconName="dog"' in home
+    assert 'iconName="cat"' in home
+    assert 'iconFamily="food-bag-bone"' in home
+    assert 'iconName="food-bag-bone"' in home
+    assert 'name="bone"' in home
+    assert "RacaoFoodBagIcon" in home
+    assert "react-native-svg" in home
+    assert 'iconName="bowl-food"' not in home
+    assert 'iconName="bowl-mix-outline"' not in home
+    assert "RacaoBowlBoneIcon" not in home
+    assert 'iconName="stethoscope"' in home
+    assert "petChipIconDiscreto" in home
+    assert "petChipIconMascote" not in home
     assert "Veterinário" in home
     assert "Banho & Tosa" in home
     assert "Pedidos" in home
     assert "Benefícios" in home
+    assert 'iconName="sparkles-outline"' not in home
+    assert 'iconName="nutrition-outline"' not in home
+    assert 'iconName="medical-outline"' not in home
     assert 'iconText="VET"' not in home
     assert 'iconText="Ped"' not in home
     assert 'iconText="Pts"' not in home

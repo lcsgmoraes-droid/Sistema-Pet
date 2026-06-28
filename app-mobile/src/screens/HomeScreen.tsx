@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import {
@@ -10,12 +10,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 import HeaderProfileActions from '../components/HeaderProfileActions';
 import { listarProdutos } from '../services/shop.service';
 import { useAuthStore } from '../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../theme';
 import { Produto } from '../types';
 import { formatarMoeda } from '../utils/format';
+
+type HomeIconFamily = 'ionicons' | 'material-community' | 'food-bag-bone';
+type HomeIconName =
+  | React.ComponentProps<typeof Ionicons>['name']
+  | React.ComponentProps<typeof MaterialCommunityIcons>['name']
+  | 'food-bag-bone';
 
 export default function HomeScreen() {
   const { user } = useAuthStore();
@@ -107,21 +114,24 @@ export default function HomeScreen() {
         </View>
         <View style={styles.petChips}>
           <CategoriaPetChip
-            iconName="paw-outline"
+            iconFamily="material-community"
+            iconName="dog"
             label="Cães"
             cor="#E0F2FE"
             corTexto="#0369A1"
             onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
           />
           <CategoriaPetChip
-            iconName="sparkles-outline"
+            iconFamily="material-community"
+            iconName="cat"
             label="Gatos"
             cor="#FAE8FF"
             corTexto="#86198F"
             onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
           />
           <CategoriaPetChip
-            iconName="nutrition-outline"
+            iconFamily="food-bag-bone"
+            iconName="food-bag-bone"
             label="Rações"
             cor="#DCFCE7"
             corTexto="#166534"
@@ -148,7 +158,8 @@ export default function HomeScreen() {
             onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
           />
           <Atalho
-            iconName="medical-outline"
+            iconFamily="material-community"
+            iconName="stethoscope"
             titulo="Veterinário"
             cor="#EEF2FF"
             corTexto="#4338CA"
@@ -211,13 +222,15 @@ export default function HomeScreen() {
 }
 
 function Atalho({
+  iconFamily,
   iconName,
   titulo,
   cor,
   corTexto,
   onPress,
 }: {
-  iconName: React.ComponentProps<typeof Ionicons>['name'];
+  iconFamily?: HomeIconFamily;
+  iconName: HomeIconName;
   titulo: string;
   cor: string;
   corTexto: string;
@@ -225,20 +238,22 @@ function Atalho({
 }) {
   return (
     <TouchableOpacity style={[styles.atalho, { backgroundColor: cor }]} onPress={onPress}>
-      <Ionicons name={iconName} size={22} color={corTexto} />
+      <HomeIcon family={iconFamily} name={iconName} size={22} color={corTexto} />
       <Text style={[styles.atalhoTexto, { color: corTexto }]}>{titulo}</Text>
     </TouchableOpacity>
   );
 }
 
 function CategoriaPetChip({
+  iconFamily,
   iconName,
   label,
   cor,
   corTexto,
   onPress,
 }: {
-  iconName: React.ComponentProps<typeof Ionicons>['name'];
+  iconFamily?: HomeIconFamily;
+  iconName: HomeIconName;
   label: string;
   cor: string;
   corTexto: string;
@@ -246,9 +261,112 @@ function CategoriaPetChip({
 }) {
   return (
     <TouchableOpacity style={[styles.petChip, { backgroundColor: cor }]} onPress={onPress}>
-      <Ionicons name={iconName} size={18} color={corTexto} />
+      <HomeIcon
+        family={iconFamily}
+        name={iconName}
+        size={22}
+        color={corTexto}
+        style={styles.petChipIconDiscreto}
+      />
       <Text style={[styles.petChipTexto, { color: corTexto }]}>{label}</Text>
     </TouchableOpacity>
+  );
+}
+
+function HomeIcon({
+  family = 'ionicons',
+  name,
+  size,
+  color,
+  style,
+}: {
+  family?: HomeIconFamily;
+  name: HomeIconName;
+  size: number;
+  color: string;
+  style?: object;
+}) {
+  if (family === 'food-bag-bone') {
+    return <RacaoFoodBagIcon size={size} color={color} style={style} />;
+  }
+
+  if (family === 'material-community') {
+    return (
+      <MaterialCommunityIcons
+        name={name as React.ComponentProps<typeof MaterialCommunityIcons>['name']}
+        size={size}
+        color={color}
+        style={style}
+      />
+    );
+  }
+
+  return (
+    <Ionicons
+      name={name as React.ComponentProps<typeof Ionicons>['name']}
+      size={size}
+      color={color}
+      style={style}
+    />
+  );
+}
+
+function RacaoFoodBagIcon({
+  size,
+  color,
+  style,
+}: {
+  size: number;
+  color: string;
+  style?: object;
+}) {
+  const largura = size + 10;
+  const altura = size + 8;
+  const boneSize = Math.max(12, Math.round(size * 0.62));
+
+  return (
+    <View style={[styles.racaoChipIcon, { width: largura, height: altura }, style]}>
+      <Svg width={largura} height={altura} viewBox="0 0 32 30">
+        <Path
+          d="M8.2 11.2C8.2 8 10.7 5.8 13.5 6C14.4 3.8 17.6 3.8 18.5 6C21.3 5.8 23.8 8 23.8 11.2"
+          fill="none"
+          stroke={color}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2.4}
+        />
+        <Circle cx={12.8} cy={8.9} r={0.9} fill={color} />
+        <Circle cx={16} cy={7.8} r={0.9} fill={color} />
+        <Circle cx={19.2} cy={8.9} r={0.9} fill={color} />
+        <Path
+          d="M4.8 12.4H27.2"
+          fill="none"
+          stroke={color}
+          strokeLinecap="round"
+          strokeWidth={2.8}
+        />
+        <Path
+          d="M6.2 13.8L4.9 27H27.1L25.8 13.8"
+          fill="none"
+          stroke={color}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2.3}
+        />
+      </Svg>
+      <MaterialCommunityIcons
+        name="bone"
+        size={boneSize}
+        color={color}
+        style={[
+          styles.racaoChipBagBoneIcon,
+          {
+            left: Math.round(size * 0.36),
+            top: Math.round(size * 0.58),
+          },
+        ]}
+      />
+    </View>
   );
 }
 
@@ -360,9 +478,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: ESPACO.md,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: ESPACO.xs,
   },
-  petChipTexto: { fontSize: FONTE.normal, fontWeight: '800' },
+  petChipTexto: {
+    fontSize: FONTE.normal,
+    fontWeight: '800',
+  },
+  petChipIconDiscreto: {
+    opacity: 0.94,
+  },
+  racaoChipIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  racaoChipBagBoneIcon: {
+    position: 'absolute',
+    transform: [{ rotate: '-32deg' }],
+  },
   atalhos: { flexDirection: 'row', flexWrap: 'wrap', gap: ESPACO.sm },
   atalho: {
     width: '31%',
