@@ -5,8 +5,10 @@ Uso: base para gravar videos do sistema e criar criativos de venda.
 Documentos complementares:
 
 - `docs/marketing/GUIA_PRODUCAO_VIDEO_IA.md`
+- `docs/marketing/BASE_DEMO_GRAVACAO.md`
 - `docs/marketing/ROTEIROS_CRIATIVOS_VENDA.md`
 - `docs/marketing/ROTEIROS_DEMO_FUNCIONALIDADES.md`
+- `docs/marketing/PACOTE_INICIAL_VIDEOS.md`
 
 ## Videos demonstrativos
 

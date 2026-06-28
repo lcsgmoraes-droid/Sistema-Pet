@@ -27,8 +27,10 @@ Guia mestre:
 | Implantacao inicial | `docs/implantacao/GUIA_IMPLANTACAO_INICIAL.md` | Introducao Guiada em `/ajuda` |
 | Criativos e videos do sistema | `docs/marketing/MATRIZ_CRIATIVOS_SISTEMA.md` | Guia de implantacao e telas reais |
 | Produzir videos com IA | `docs/marketing/GUIA_PRODUCAO_VIDEO_IA.md` | Roteiros de venda e demos por funcionalidade |
+| Preparar base demo para gravacao | `docs/marketing/BASE_DEMO_GRAVACAO.md` | Tenant/base demonstracao sem dados reais |
 | Roteiros de venda | `docs/marketing/ROTEIROS_CRIATIVOS_VENDA.md` | Matriz de criativos e dados ficticios |
 | Demos de funcionalidades | `docs/marketing/ROTEIROS_DEMO_FUNCIONALIDADES.md` | Sistema em ambiente demo |
+| Pacote inicial de videos | `docs/marketing/PACOTE_INICIAL_VIDEOS.md` | Base demo e roteiros aprovados |
 | Demo Veterinario | `docs/GUIA_DEMO_VETERINARIO_CLINICA.md` | Roteiro de demo e limites de piloto |
 | Maiara/Vet/Admin SaaS | `docs/CRONOGRAMA_MAIARA_VETERINARIO_ADMIN_SAAS.md` | Preparacao de demo, padronizacao Vet e admin global |
 | Habilitar app mobile por tenant | `docs/GUIA_HABILITAR_APP_MOBILE_TENANT.md` | Checklist de slug, cidade, perfil e modulos |
@@ -52,8 +54,10 @@ Guia mestre:
 | Implantacao inicial | `docs/implantacao/GUIA_IMPLANTACAO_INICIAL.md` |
 | Criativos e videos | `docs/marketing/MATRIZ_CRIATIVOS_SISTEMA.md` |
 | Producao de videos com IA | `docs/marketing/GUIA_PRODUCAO_VIDEO_IA.md` |
+| Base demo para gravacao | `docs/marketing/BASE_DEMO_GRAVACAO.md` |
 | Roteiros de criativos de venda | `docs/marketing/ROTEIROS_CRIATIVOS_VENDA.md` |
 | Roteiros de demos | `docs/marketing/ROTEIROS_DEMO_FUNCIONALIDADES.md` |
+| Pacote inicial de videos | `docs/marketing/PACOTE_INICIAL_VIDEOS.md` |
 | Demo/Piloto Veterinario | `docs/GUIA_DEMO_VETERINARIO_CLINICA.md` |
 | Maiara, Veterinario e Admin SaaS | `docs/CRONOGRAMA_MAIARA_VETERINARIO_ADMIN_SAAS.md` |
 | App mobile por tenant | `docs/GUIA_HABILITAR_APP_MOBILE_TENANT.md` |
