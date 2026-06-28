@@ -231,7 +231,10 @@ def test_mobile_notification_button_reflects_permission_state():
     assert 'import * as Notifications from "expo-notifications"' in actions
     assert "Notifications.getPermissionsAsync" in actions
     assert "notificacoesAtivadas" in actions
-    assert 'name={notificacoesAtivadas ? "notifications" : "notifications-outline"}' in actions
+    assert (
+        'name={notificacoesAtivadas ? "notifications" : "notifications-outline"}'
+        in actions
+    )
 
 
 def test_mobile_catalog_uses_customer_filter_modal_instead_of_admin_chips():
@@ -266,7 +269,7 @@ def test_mobile_catalog_uses_customer_filter_modal_instead_of_admin_chips():
     assert "pesos_embalagem_kg" in service
     assert "marca: str | None = Query(default=None)" in ecommerce
     assert "peso_embalagem_kg: float | None = Query(default=None)" in ecommerce
-    assert "@router.get(\"/produtos/filtros\")" in ecommerce
+    assert '@router.get("/produtos/filtros")' in ecommerce
     assert "distinct(Produto.peso_embalagem)" in ecommerce
     assert "PESO_EMBALAGEM_OPTIONS" not in catalog
     assert "Até 1 kg" not in catalog
