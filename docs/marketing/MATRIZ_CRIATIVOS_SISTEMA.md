@@ -9,6 +9,7 @@ Documentos complementares:
 - `docs/marketing/ROTEIROS_CRIATIVOS_VENDA.md`
 - `docs/marketing/ROTEIROS_DEMO_FUNCIONALIDADES.md`
 - `docs/marketing/PACOTE_INICIAL_VIDEOS.md`
+- `docs/marketing/PLANO_CAPTURA_TELAS_DEMO.md`
 
 ## Videos demonstrativos
 

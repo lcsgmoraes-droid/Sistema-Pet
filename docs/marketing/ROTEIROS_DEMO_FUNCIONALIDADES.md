@@ -7,6 +7,8 @@ produto.
 ## Preparacao da base demo
 
 Para a preparacao completa, use `docs/marketing/BASE_DEMO_GRAVACAO.md`.
+Para gravar os takes em ordem, use
+`docs/marketing/PLANO_CAPTURA_TELAS_DEMO.md`.
 
 Use dados ficticios consistentes:
 
