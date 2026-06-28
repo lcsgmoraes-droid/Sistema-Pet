@@ -209,13 +209,23 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-28 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 17 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 16 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 17 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 16 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 23 de 2026-06-28: `backend/app/services/bling_flow_monitor_diagnostics.py` saiu da faixa acima de 700 linhas ao virar fachada compativel dos diagnosticos do monitor Bling:
+
+- `backend/app/services/bling_flow_monitor_diagnostics.py`: 813 -> 83 linhas fisicas, mantendo os reexports historicos consumidos por auditoria, incidentes, autocorrecao e service principal.
+- `backend/app/services/bling_flow_monitor_diagnostics_parts/context.py`: concentra contexto de pedido/NF, canal, loja e total.
+- `backend/app/services/bling_flow_monitor_diagnostics_parts/recent_nfs.py`: concentra cache, busca e conciliacao de NFs recentes.
+- `backend/app/services/bling_flow_monitor_diagnostics_parts/inventory.py`: concentra busca de produto por SKU/codigo de barras e contagem de movimentacoes de estoque vinculadas a NF.
+- `backend/app/services/bling_flow_monitor_diagnostics_parts/incident_builder.py`: concentra a montagem padronizada de incidentes.
+- `backend/app/services/bling_flow_monitor_diagnostics_parts/pedido_diagnostics.py`: concentra a regra principal de diagnostico do pedido integrado.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_23_refactor.py`, garantindo reexports e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 22 de 2026-06-28: `backend/app/analise_racoes_routes.py` saiu da faixa acima de 700 linhas ao virar agregador das rotas de analise avancada de racoes:
 
