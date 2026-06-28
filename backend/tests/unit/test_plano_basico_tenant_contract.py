@@ -783,7 +783,12 @@ def test_lembretes_use_selected_tenant_context():
 
 def test_chat_ia_conversation_history_uses_selected_tenant_context():
     chat_routes_source = _source("backend/app/chat_routes.py")
-    chat_service_source = _source("backend/app/ia/aba6_chat_ia.py")
+    chat_service_source = "\n".join(
+        [
+            _source("backend/app/ia/aba6_chat_ia_parts/conversas.py"),
+            _source("backend/app/ia/aba6_chat_ia_parts/mensagens.py"),
+        ]
+    )
 
     assert (
         "listar_conversas_service(db, usuario_id, tenant_id, limit)"
@@ -811,7 +816,7 @@ def test_chat_ia_conversation_history_uses_selected_tenant_context():
 def test_ia_fluxo_caixa_uses_selected_tenant_context():
     ia_routes_source = _source("backend/app/ia_routes.py")
     fluxo_source = _source("backend/app/ia/aba5_fluxo_caixa.py")
-    chat_service_source = _source("backend/app/ia/aba6_chat_ia.py")
+    chat_service_source = _source("backend/app/ia/aba6_chat_ia_parts/contexto.py")
 
     assert (
         "calcular_indices_saude(usuario_id, db, tenant_id=tenant_id)"

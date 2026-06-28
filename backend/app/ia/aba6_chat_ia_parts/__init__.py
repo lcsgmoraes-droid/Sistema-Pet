@@ -1,17 +1,12 @@
-"""
-ABA 6: Chat IA - Logica de Negocio.
+"""Partes extraidas do servico de chat IA."""
 
-Fachada publica mantida para os imports existentes. A implementacao foi
-separada em `app.ia.aba6_chat_ia_parts` para reduzir o arquivo monolitico.
-"""
-
-from app.ia.aba6_chat_ia_parts import (
-    ChatIAService,
+from app.ia.aba6_chat_ia_parts.facade import (
     criar_conversa_service,
     deletar_conversa_service,
     enviar_mensagem_service,
     listar_conversas_service,
 )
+from app.ia.aba6_chat_ia_parts.service import ChatIAService
 
 __all__ = [
     "ChatIAService",
