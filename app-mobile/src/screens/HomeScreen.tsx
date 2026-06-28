@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import {
@@ -10,12 +10,19 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 import HeaderProfileActions from '../components/HeaderProfileActions';
 import { listarProdutos } from '../services/shop.service';
 import { useAuthStore } from '../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../theme';
 import { Produto } from '../types';
 import { formatarMoeda } from '../utils/format';
+
+type HomeIconFamily = 'ionicons' | 'material-community' | 'food-bag-bone';
+type HomeIconName =
+  | React.ComponentProps<typeof Ionicons>['name']
+  | React.ComponentProps<typeof MaterialCommunityIcons>['name']
+  | 'food-bag-bone';
 
 export default function HomeScreen() {
   const { user } = useAuthStore();
@@ -82,60 +89,106 @@ export default function HomeScreen() {
       </View>
 
       <TouchableOpacity
-        style={styles.scannerCard}
+        style={styles.scannerCardCompacto}
         onPress={() => navigation.navigate('Loja', { screen: 'BarcodeScanner' })}
         activeOpacity={0.85}
       >
+        <View style={styles.scannerIconBox}>
+          <Ionicons name="barcode-outline" size={24} color={CORES.primario} />
+        </View>
         <View style={styles.scannerInfo}>
           <Text style={styles.scannerTitulo}>Comprar sem fila</Text>
           <Text style={styles.scannerTexto}>
-            Escaneie produtos na prateleira, monte seu carrinho e acompanhe os beneficios disponiveis.
+            Escaneie produtos na prateleira.
           </Text>
         </View>
-        <Ionicons name="barcode-outline" size={48} color="rgba(255,255,255,0.7)" />
+        <Ionicons name="chevron-forward" size={20} color={CORES.textoClaro} />
       </TouchableOpacity>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitulo}>Comprar por pet</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}>
+            <Text style={styles.verTodos}>Ver loja</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.petChips}>
+          <CategoriaPetChip
+            iconFamily="material-community"
+            iconName="dog"
+            label="Cães"
+            cor="#E0F2FE"
+            corTexto="#0369A1"
+            onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
+          />
+          <CategoriaPetChip
+            iconFamily="material-community"
+            iconName="cat"
+            label="Gatos"
+            cor="#FAE8FF"
+            corTexto="#86198F"
+            onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
+          />
+          <CategoriaPetChip
+            iconFamily="food-bag-bone"
+            iconName="food-bag-bone"
+            label="Rações"
+            cor="#DCFCE7"
+            corTexto="#166534"
+            onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
+          />
+          <CategoriaPetChip
+            iconName="pricetag-outline"
+            label="Ofertas"
+            cor="#FEF3C7"
+            corTexto="#92400E"
+            onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
+          />
+        </View>
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitulo}>Acesso rapido</Text>
         <View style={styles.atalhos}>
           <Atalho
-            iconText="Loja"
-            titulo="Produtos"
+            iconName="storefront-outline"
+            titulo="Loja"
             cor="#EFF6FF"
             corTexto={CORES.primario}
             onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
           />
           <Atalho
-            iconText="VET"
-            titulo="Veterinario"
+            iconFamily="material-community"
+            iconName="stethoscope"
+            titulo="Veterinário"
             cor="#EEF2FF"
             corTexto="#4338CA"
             onPress={abrirVeterinario}
           />
           <Atalho
-            iconText="Calc"
+            iconName="calculator-outline"
             titulo="Calculadora"
             cor="#F0FDF4"
             corTexto={CORES.sucesso}
             onPress={() => navigation.navigate('Pets', { screen: 'CalculadoraRacao' })}
           />
           <Atalho
-            iconText="BT"
+            iconName="cut-outline"
             titulo="Banho & Tosa"
             cor="#ECFEFF"
             corTexto="#0E7490"
             onPress={() => navigation.navigate('Pets', { screen: 'BanhoTosa' })}
           />
           <Atalho
-            iconText="Ped"
+            iconName="receipt-outline"
             titulo="Pedidos"
             cor="#FDF4FF"
             corTexto="#9333EA"
             onPress={() => navigation.navigate('Pedidos')}
           />
           <Atalho
-            iconText="Pts"
-            titulo="Beneficios"
+            iconName="gift-outline"
+            titulo="Benefícios"
             cor="#FEF3C7"
             corTexto="#92400E"
             onPress={() => navigation.navigate('Beneficios')}
@@ -169,13 +222,15 @@ export default function HomeScreen() {
 }
 
 function Atalho({
-  iconText,
+  iconFamily,
+  iconName,
   titulo,
   cor,
   corTexto,
   onPress,
 }: {
-  iconText: string;
+  iconFamily?: HomeIconFamily;
+  iconName: HomeIconName;
   titulo: string;
   cor: string;
   corTexto: string;
@@ -183,9 +238,135 @@ function Atalho({
 }) {
   return (
     <TouchableOpacity style={[styles.atalho, { backgroundColor: cor }]} onPress={onPress}>
-      <Text style={[styles.atalhoIcon, { color: corTexto }]}>{iconText}</Text>
+      <HomeIcon family={iconFamily} name={iconName} size={22} color={corTexto} />
       <Text style={[styles.atalhoTexto, { color: corTexto }]}>{titulo}</Text>
     </TouchableOpacity>
+  );
+}
+
+function CategoriaPetChip({
+  iconFamily,
+  iconName,
+  label,
+  cor,
+  corTexto,
+  onPress,
+}: {
+  iconFamily?: HomeIconFamily;
+  iconName: HomeIconName;
+  label: string;
+  cor: string;
+  corTexto: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={[styles.petChip, { backgroundColor: cor }]} onPress={onPress}>
+      <HomeIcon
+        family={iconFamily}
+        name={iconName}
+        size={22}
+        color={corTexto}
+        style={styles.petChipIconDiscreto}
+      />
+      <Text style={[styles.petChipTexto, { color: corTexto }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function HomeIcon({
+  family = 'ionicons',
+  name,
+  size,
+  color,
+  style,
+}: {
+  family?: HomeIconFamily;
+  name: HomeIconName;
+  size: number;
+  color: string;
+  style?: object;
+}) {
+  if (family === 'food-bag-bone') {
+    return <RacaoFoodBagIcon size={size} color={color} style={style} />;
+  }
+
+  if (family === 'material-community') {
+    return (
+      <MaterialCommunityIcons
+        name={name as React.ComponentProps<typeof MaterialCommunityIcons>['name']}
+        size={size}
+        color={color}
+        style={style}
+      />
+    );
+  }
+
+  return (
+    <Ionicons
+      name={name as React.ComponentProps<typeof Ionicons>['name']}
+      size={size}
+      color={color}
+      style={style}
+    />
+  );
+}
+
+function RacaoFoodBagIcon({
+  size,
+  color,
+  style,
+}: {
+  size: number;
+  color: string;
+  style?: object;
+}) {
+  const largura = size + 10;
+  const altura = size + 8;
+  const boneSize = Math.max(12, Math.round(size * 0.62));
+
+  return (
+    <View style={[styles.racaoChipIcon, { width: largura, height: altura }, style]}>
+      <Svg width={largura} height={altura} viewBox="0 0 32 30">
+        <Path
+          d="M8.2 11.2C8.2 8 10.7 5.8 13.5 6C14.4 3.8 17.6 3.8 18.5 6C21.3 5.8 23.8 8 23.8 11.2"
+          fill="none"
+          stroke={color}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2.4}
+        />
+        <Circle cx={12.8} cy={8.9} r={0.9} fill={color} />
+        <Circle cx={16} cy={7.8} r={0.9} fill={color} />
+        <Circle cx={19.2} cy={8.9} r={0.9} fill={color} />
+        <Path
+          d="M4.8 12.4H27.2"
+          fill="none"
+          stroke={color}
+          strokeLinecap="round"
+          strokeWidth={2.8}
+        />
+        <Path
+          d="M6.2 13.8L4.9 27H27.1L25.8 13.8"
+          fill="none"
+          stroke={color}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2.3}
+        />
+      </Svg>
+      <MaterialCommunityIcons
+        name="bone"
+        size={boneSize}
+        color={color}
+        style={[
+          styles.racaoChipBagBoneIcon,
+          {
+            left: Math.round(size * 0.36),
+            top: Math.round(size * 0.58),
+          },
+        ]}
+      />
+    </View>
   );
 }
 
@@ -246,19 +427,31 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   pontosTexto: { fontSize: FONTE.normal, fontWeight: 'bold', color: '#92400E' },
-  scannerCard: {
-    margin: ESPACO.lg,
-    backgroundColor: CORES.primario,
-    borderRadius: RAIO.lg,
-    padding: ESPACO.lg,
+  scannerCardCompacto: {
+    marginHorizontal: ESPACO.lg,
+    marginTop: ESPACO.lg,
+    marginBottom: ESPACO.md,
+    backgroundColor: CORES.superficie,
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: CORES.borda,
     ...SOMBRA,
   },
-  scannerInfo: { flex: 1, paddingRight: ESPACO.md },
-  scannerTitulo: { fontSize: FONTE.grande, fontWeight: 'bold', color: '#fff', marginBottom: 6 },
-  scannerTexto: { fontSize: FONTE.pequena, color: 'rgba(255,255,255,0.85)', lineHeight: 18 },
+  scannerIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: RAIO.md,
+    backgroundColor: CORES.primarioClaro,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: ESPACO.sm,
+  },
+  scannerInfo: { flex: 1, minWidth: 0, paddingRight: ESPACO.sm },
+  scannerTitulo: { fontSize: FONTE.normal, fontWeight: '800', color: CORES.texto, marginBottom: 2 },
+  scannerTexto: { fontSize: FONTE.pequena, color: CORES.textoSecundario, lineHeight: 16 },
   section: { paddingHorizontal: ESPACO.lg, marginBottom: ESPACO.lg },
   sectionHeader: {
     flexDirection: 'row',
@@ -273,16 +466,48 @@ const styles = StyleSheet.create({
     marginBottom: ESPACO.sm,
   },
   verTodos: { fontSize: FONTE.normal, color: CORES.primario, fontWeight: '500' },
+  petChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: ESPACO.sm,
+  },
+  petChip: {
+    width: '48%',
+    minHeight: 48,
+    borderRadius: RAIO.md,
+    paddingHorizontal: ESPACO.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: ESPACO.xs,
+  },
+  petChipTexto: {
+    fontSize: FONTE.normal,
+    fontWeight: '800',
+  },
+  petChipIconDiscreto: {
+    opacity: 0.94,
+  },
+  racaoChipIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  racaoChipBagBoneIcon: {
+    position: 'absolute',
+    transform: [{ rotate: '-32deg' }],
+  },
   atalhos: { flexDirection: 'row', flexWrap: 'wrap', gap: ESPACO.sm },
   atalho: {
     width: '31%',
     borderRadius: RAIO.md,
-    paddingVertical: ESPACO.md,
+    minHeight: 78,
+    paddingHorizontal: ESPACO.xs,
+    paddingVertical: ESPACO.sm,
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
+    gap: 6,
   },
-  atalhoIcon: { fontSize: 13, fontWeight: '900', letterSpacing: 0.3 },
-  atalhoTexto: { fontSize: FONTE.pequena, fontWeight: '600' },
+  atalhoTexto: { fontSize: FONTE.pequena, fontWeight: '700', textAlign: 'center' },
   produtosGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

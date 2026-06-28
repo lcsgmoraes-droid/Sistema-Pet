@@ -3,12 +3,12 @@ import unicodedata
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
-from sqlalchemy import and_, case, func, or_
+from sqlalchemy import and_, case, distinct, func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db import get_session
 from app.models import Tenant
-from app.produtos_models import Categoria, Produto
+from app.produtos_models import Categoria, Marca, Produto
 from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
@@ -280,6 +280,77 @@ def tenant_context(
     }
 
 
+@router.get("/produtos/filtros")
+def listar_filtros_produtos_publicos(
+    tenant_ref: tuple[str, str] = Depends(_resolve_tenant_ref),
+    busca: str | None = Query(default=None),
+    canal: str | None = Query(default=None),
+    x_canal_venda: str | None = Header(default=None, alias="X-Canal-Venda"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_session),
+):
+    tenant = _get_active_tenant(db, tenant_ref)
+    canal_resolvido = canal or x_canal_venda
+    if not canal_resolvido and authorization:
+        canal_resolvido = "app"
+    canal_normalizado = _normalize_sales_channel(canal_resolvido)
+
+    base_filters = [
+        Produto.tenant_id == tenant.id,
+        Produto.ativo.is_(True),
+        Produto.situacao.is_not(False),
+        Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+    ]
+
+    if canal_normalizado == "app":
+        base_filters.append(Produto.anunciar_app.is_(True))
+    else:
+        base_filters.append(Produto.anunciar_ecommerce.is_(True))
+
+    if busca:
+        termo = busca.strip()
+        like_termo = f"%{termo}%"
+        base_filters.append(
+            or_(
+                func.unaccent(Produto.nome).ilike(func.unaccent(like_termo)),
+                Produto.codigo.ilike(like_termo),
+                Produto.codigo_barras.ilike(like_termo),
+            )
+        )
+
+    marcas = (
+        db.query(Marca.nome)
+        .join(Produto, Produto.marca_id == Marca.id)
+        .filter(
+            *base_filters,
+            Marca.nome.isnot(None),
+            func.length(func.trim(Marca.nome)) > 0,
+        )
+        .distinct()
+        .order_by(func.lower(Marca.nome).asc())
+        .all()
+    )
+    pesos = (
+        db.query(distinct(Produto.peso_embalagem))
+        .filter(
+            *base_filters,
+            Produto.peso_embalagem.isnot(None),
+            Produto.peso_embalagem > 0,
+        )
+        .order_by(Produto.peso_embalagem.asc())
+        .all()
+    )
+
+    return {
+        "marcas": [row[0] for row in marcas if row[0]],
+        "pesos_embalagem_kg": [
+            round(float(row[0]), 3)
+            for row in pesos
+            if row[0] is not None and float(row[0]) > 0
+        ],
+    }
+
+
 @router.get("/produtos")
 def listar_produtos_publicos(
     tenant_ref: tuple[str, str] = Depends(_resolve_tenant_ref),
@@ -290,6 +361,8 @@ def listar_produtos_publicos(
     apenas_com_estoque: bool = Query(default=False),
     apenas_com_imagem: bool = Query(default=False),
     ordenacao: str = Query(default="prontos"),
+    marca: str | None = Query(default=None),
+    peso_embalagem_kg: float | None = Query(default=None),
     canal: str | None = Query(default=None),
     x_canal_venda: str | None = Header(default=None, alias="X-Canal-Venda"),
     authorization: str | None = Header(default=None, alias="Authorization"),
@@ -379,6 +452,21 @@ def listar_produtos_publicos(
     if apenas_com_imagem:
         query = query.filter(tem_imagem_expr)
         categorias_query = categorias_query.filter(tem_imagem_expr)
+
+    if marca:
+        marca_norm = marca.strip().lower()
+        marca_filter = Produto.marca.has(func.lower(Marca.nome) == marca_norm)
+        query = query.filter(marca_filter)
+        categorias_query = categorias_query.filter(marca_filter)
+
+    if peso_embalagem_kg is not None and peso_embalagem_kg > 0:
+        margem_peso = 0.001
+        peso_filter = and_(
+            Produto.peso_embalagem >= peso_embalagem_kg - margem_peso,
+            Produto.peso_embalagem <= peso_embalagem_kg + margem_peso,
+        )
+        query = query.filter(peso_filter)
+        categorias_query = categorias_query.filter(peso_filter)
 
     categorias = _serialize_catalog_categories(
         categorias_query.group_by(Produto.categoria_id, category_name_expr)

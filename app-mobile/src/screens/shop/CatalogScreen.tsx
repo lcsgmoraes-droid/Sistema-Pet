@@ -10,10 +10,13 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { CatalogOrder, listarProdutos, registrarAviseme } from '../../services/shop.service';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CatalogOrder, listarOpcoesFiltrosCatalogo, listarProdutos, registrarAviseme } from '../../services/shop.service';
 import { useCartStore } from '../../store/cart.store';
 import { useWishlistStore } from '../../store/wishlist.store';
 import { useAuthStore } from '../../store/auth.store';
@@ -22,36 +25,136 @@ import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../../theme';
 import { formatarMoeda } from '../../utils/format';
 
 const ORDER_OPTIONS: Array<{ value: CatalogOrder; label: string }> = [
-  { value: 'prontos', label: 'Mais prontos' },
+  { value: 'prontos', label: 'Relevância' },
   { value: 'nome', label: 'A-Z' },
   { value: 'menor_preco', label: 'Menor preço' },
   { value: 'maior_preco', label: 'Maior preço' },
 ];
 
-function nextCatalogOrder(current: CatalogOrder): CatalogOrder {
-  const currentIndex = ORDER_OPTIONS.findIndex((item) => item.value === current);
-  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % ORDER_OPTIONS.length : 0;
-  return ORDER_OPTIONS[nextIndex].value;
+type EspecieFiltro = 'todos' | 'cao' | 'gato';
+type PesoEmbalagemFiltro = number | null;
+
+type CatalogoFiltros = {
+  especie: EspecieFiltro;
+  pesoEmbalagem: PesoEmbalagemFiltro;
+  marca: string;
+};
+
+const FILTROS_PADRAO: CatalogoFiltros = {
+  especie: 'todos',
+  pesoEmbalagem: null,
+  marca: '',
+};
+
+const ESPECIE_OPTIONS: Array<{ value: EspecieFiltro; label: string }> = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'cao', label: 'Cão' },
+  { value: 'gato', label: 'Gato' },
+];
+
+function normalizarTexto(value: string | null | undefined): string {
+  return (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function textoProduto(produto: Produto): string {
+  return normalizarTexto(
+    [produto.nome, produto.categoria_nome, produto.marca_nome, produto.descricao]
+      .filter(Boolean)
+      .join(' ')
+  );
+}
+
+function combinaEspecie(texto: string, especie: EspecieFiltro): boolean {
+  if (especie === 'todos') return true;
+
+  const termosCao = /\b(cao|caes|canin|cachorro|dog|puppy)\b/;
+  const termosGato = /\b(gato|gatos|felin|cat|kitten)\b/;
+
+  if (especie === 'cao') {
+    if (termosCao.test(texto)) return true;
+    return !termosGato.test(texto);
+  }
+
+  if (termosGato.test(texto)) return true;
+  return !termosCao.test(texto);
+}
+
+function normalizarPesoEmbalagem(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const peso = typeof value === 'string' ? Number(value.replace(',', '.').trim()) : Number(value);
+  if (!Number.isFinite(peso) || peso <= 0) return null;
+  return Number(peso.toFixed(3));
+}
+
+function formatarPesoEmbalagemFiltro(peso: number): string {
+  const valor = Number(peso.toFixed(3));
+  return `${String(valor).replace('.', ',')} kg`;
+}
+
+function combinaPesoEmbalagem(peso: number | null | undefined, filtro: PesoEmbalagemFiltro): boolean {
+  if (filtro === null) return true;
+  const pesoKg = normalizarPesoEmbalagem(peso);
+  return pesoKg !== null && Math.abs(pesoKg - filtro) < 0.001;
+}
+
+function aplicarFiltrosCatalogo(produto: Produto, filtros: CatalogoFiltros): boolean {
+  const texto = textoProduto(produto);
+
+  if (filtros.marca && produto.marca_nome !== filtros.marca) return false;
+  if (!combinaEspecie(texto, filtros.especie)) return false;
+  if (!combinaPesoEmbalagem(produto.peso_embalagem_kg, filtros.pesoEmbalagem)) return false;
+
+  return true;
 }
 
 export default function CatalogScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { adicionar, totalItens } = useCartStore();
   const { ids: wishlistIds, carregar: carregarWishlist, toggle: toggleWishlist } = useWishlistStore();
   const { user } = useAuthStore();
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [busca, setBusca] = useState('');
+  const [buscaMarca, setBuscaMarca] = useState('');
   const [pagina, setPagina] = useState(1);
   const [total, setTotal] = useState(0);
   const [carregando, setCarregando] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [somenteComEstoque, setSomenteComEstoque] = useState(false);
-  const [somenteComImagem, setSomenteComImagem] = useState(false);
+  const [modalFiltrosVisivel, setModalFiltrosVisivel] = useState(false);
+  const [filtros, setFiltros] = useState<CatalogoFiltros>(FILTROS_PADRAO);
   const [ordenacao, setOrdenacao] = useState<CatalogOrder>('prontos');
+  const [marcasDisponiveis, setMarcasDisponiveis] = useState<string[]>([]);
+  const [pesosEmbalagemDisponiveis, setPesosEmbalagemDisponiveis] = useState<number[]>([]);
 
   const ordenacaoLabel = useMemo(
-    () => ORDER_OPTIONS.find((item) => item.value === ordenacao)?.label ?? 'Mais prontos',
+    () => ORDER_OPTIONS.find((item) => item.value === ordenacao)?.label ?? 'Relevância',
     [ordenacao]
+  );
+
+  const marcasFiltradas = useMemo(
+    () => {
+      const termo = normalizarTexto(buscaMarca);
+      return marcasDisponiveis
+        .filter((marca) => !termo || normalizarTexto(marca).includes(termo))
+        .slice(0, 8);
+    },
+    [buscaMarca, marcasDisponiveis]
+  );
+
+  const produtosFiltrados = useMemo(
+    () => produtos.filter((produto) => aplicarFiltrosCatalogo(produto, filtros)),
+    [filtros, produtos]
+  );
+
+  const filtrosAtivos = useMemo(
+    () =>
+      Number(filtros.especie !== FILTROS_PADRAO.especie) +
+      Number(filtros.pesoEmbalagem !== FILTROS_PADRAO.pesoEmbalagem) +
+      Number(!!filtros.marca),
+    [filtros]
   );
 
   const carregar = useCallback(
@@ -59,17 +162,30 @@ export default function CatalogScreen() {
       if (pg === 1) setCarregando(true);
 
       try {
-        const { produtos: novos, total: totalRecebido } = await listarProdutos({
+        const produtosPromise = listarProdutos({
           pagina: pg,
           busca: q || undefined,
-          somenteComEstoque,
-          somenteComImagem,
           ordenacao,
           cacheBust: pg === 1 ? Date.now() : undefined,
+          limit: filtrosAtivos > 0 ? 500 : undefined,
+          marca: filtros.marca || undefined,
+          pesoEmbalagemKg: filtros.pesoEmbalagem ?? undefined,
         });
+        const opcoesPromise =
+          pg === 1
+            ? listarOpcoesFiltrosCatalogo({ busca: q || undefined, ordenacao })
+            : Promise.resolve(null);
+        const [{ produtos: novos, total: totalRecebido }, opcoes] = await Promise.all([
+          produtosPromise,
+          opcoesPromise,
+        ]);
 
         if (pg === 1) {
           setProdutos(novos);
+          if (opcoes) {
+            setMarcasDisponiveis(opcoes.marcas);
+            setPesosEmbalagemDisponiveis(opcoes.pesos_embalagem_kg);
+          }
         } else {
           setProdutos((prev) => [...prev, ...novos]);
         }
@@ -85,7 +201,7 @@ export default function CatalogScreen() {
         setCarregando(false);
       }
     },
-    [ordenacao, somenteComEstoque, somenteComImagem]
+    [filtros.marca, filtros.pesoEmbalagem, filtrosAtivos, ordenacao]
   );
 
   useEffect(() => {
@@ -113,6 +229,19 @@ export default function CatalogScreen() {
     if (!carregando && produtos.length < total) {
       carregar(pagina + 1, busca);
     }
+  }
+
+  function limparFiltros() {
+    setFiltros(FILTROS_PADRAO);
+    setBuscaMarca('');
+  }
+
+  function selecionarFiltro<K extends keyof CatalogoFiltros>(campo: K, valor: CatalogoFiltros[K]) {
+    setFiltros((atuais) => ({ ...atuais, [campo]: valor }));
+  }
+
+  function selecionarPesoEmbalagem(peso: number | null) {
+    setFiltros((atuais) => ({ ...atuais, pesoEmbalagem: peso }));
   }
 
   function renderProduto({ item }: { item: Produto }) {
@@ -175,7 +304,7 @@ export default function CatalogScreen() {
             {semEstoque
               ? 'Volta em breve'
               : Number.isFinite(estoqueDisponivel) && estoqueDisponivel > 0
-                ? `Em estoque: ${estoqueDisponivel}`
+                ? `Disponível: ${estoqueDisponivel}`
                 : 'Disponível'}
           </Text>
 
@@ -253,6 +382,22 @@ export default function CatalogScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
+          style={[styles.botaoScanner, filtrosAtivos > 0 && styles.botaoFiltroAtivo]}
+          onPress={() => setModalFiltrosVisivel(true)}
+        >
+          <Ionicons
+            name="funnel-outline"
+            size={22}
+            color={filtrosAtivos > 0 ? '#fff' : CORES.primario}
+          />
+          {filtrosAtivos > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeNum}>{filtrosAtivos}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={[styles.botaoScanner, { backgroundColor: CORES.primario }]}
           onPress={() => navigation.navigate('Carrinho')}
         >
@@ -265,34 +410,13 @@ export default function CatalogScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.filtrosContainer}>
-        <View style={styles.filtrosRow}>
-          <TouchableOpacity
-            style={[styles.filtroChip, somenteComEstoque && styles.filtroChipAtivo]}
-            onPress={() => setSomenteComEstoque((value) => !value)}
-          >
-            <Text style={[styles.filtroChipTexto, somenteComEstoque && styles.filtroChipTextoAtivo]}>
-              Em estoque
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.filtroChip, somenteComImagem && styles.filtroChipAtivo]}
-            onPress={() => setSomenteComImagem((value) => !value)}
-          >
-            <Text style={[styles.filtroChipTexto, somenteComImagem && styles.filtroChipTextoAtivo]}>
-              Com foto
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.filtroChip} onPress={() => setOrdenacao((value) => nextCatalogOrder(value))}>
-            <Text style={styles.filtroChipTexto}>{ordenacaoLabel}</Text>
-          </TouchableOpacity>
-        </View>
-
+      <View style={styles.resumoContainer}>
         <Text style={styles.resumoCatalogo}>
-          Mostrando {produtos.length} de {total || produtos.length} produtos
+          {filtrosAtivos > 0
+            ? `${produtosFiltrados.length} produto(s) filtrado(s)`
+            : `Mostrando ${produtos.length} de ${total || produtos.length} produtos`}
         </Text>
+        <Text style={styles.ordenacaoResumo}>{ordenacaoLabel}</Text>
       </View>
 
       {carregando && pagina === 1 ? (
@@ -301,7 +425,7 @@ export default function CatalogScreen() {
         </View>
       ) : (
         <FlatList
-          data={produtos}
+          data={produtosFiltrados}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderProduto}
           numColumns={2}
@@ -319,7 +443,158 @@ export default function CatalogScreen() {
           }
         />
       )}
+
+      <Modal
+        visible={modalFiltrosVisivel}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalFiltrosVisivel(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitulo}>Filtros</Text>
+                <Text style={styles.modalSubtitulo}>Encontre produtos por pet, pacote e marca.</Text>
+              </View>
+              <TouchableOpacity onPress={() => setModalFiltrosVisivel(false)} style={styles.modalFechar}>
+                <Ionicons name="close" size={22} color={CORES.texto} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.modalScroll}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={[styles.modalConteudo, { paddingBottom: 120 + insets.bottom }]}
+            >
+              <FiltroSecao titulo="Espécie">
+                {ESPECIE_OPTIONS.map((item) => (
+                  <OpcaoFiltro
+                    key={item.value}
+                    label={item.label}
+                    selecionado={filtros.especie === item.value}
+                    onPress={() => selecionarFiltro('especie', item.value)}
+                  />
+                ))}
+              </FiltroSecao>
+
+              <FiltroSecao titulo="Peso da embalagem">
+                <OpcaoFiltro
+                  label="Todos"
+                  selecionado={filtros.pesoEmbalagem === null}
+                  onPress={() => selecionarPesoEmbalagem(null)}
+                />
+                {pesosEmbalagemDisponiveis.map((peso) => (
+                  <OpcaoFiltro
+                    key={String(peso)}
+                    label={formatarPesoEmbalagemFiltro(peso)}
+                    selecionado={filtros.pesoEmbalagem === peso}
+                    onPress={() => selecionarPesoEmbalagem(peso)}
+                  />
+                ))}
+                {pesosEmbalagemDisponiveis.length === 0 && (
+                  <Text style={styles.filtroVazioTexto}>Nenhum peso cadastrado.</Text>
+                )}
+              </FiltroSecao>
+
+              <FiltroSecao titulo="Marca">
+                <View style={styles.marcaBuscaContainer}>
+                  <Ionicons name="search-outline" size={16} color={CORES.textoClaro} />
+                  <TextInput
+                    style={styles.marcaBuscaInput}
+                    placeholder="Buscar marca"
+                    placeholderTextColor={CORES.textoClaro}
+                    value={buscaMarca}
+                    onChangeText={setBuscaMarca}
+                    returnKeyType="search"
+                  />
+                  {buscaMarca.length > 0 && (
+                    <TouchableOpacity onPress={() => setBuscaMarca('')}>
+                      <Ionicons name="close-circle" size={18} color={CORES.textoClaro} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <OpcaoFiltro
+                  label="Todas"
+                  selecionado={!filtros.marca}
+                  onPress={() => {
+                    selecionarFiltro('marca', '');
+                    setBuscaMarca('');
+                  }}
+                />
+                {filtros.marca ? (
+                  <Text style={styles.marcaSelecionadaTexto}>Selecionada: {filtros.marca}</Text>
+                ) : null}
+                {marcasFiltradas.map((marca) => (
+                  <OpcaoFiltro
+                    key={marca}
+                    label={marca}
+                    selecionado={filtros.marca === marca}
+                    onPress={() => {
+                      selecionarFiltro('marca', marca);
+                      setBuscaMarca(marca);
+                    }}
+                  />
+                ))}
+                {marcasFiltradas.length === 0 && (
+                  <Text style={styles.filtroVazioTexto}>Nenhuma marca encontrada.</Text>
+                )}
+              </FiltroSecao>
+
+              <FiltroSecao titulo="Ordenar por">
+                {ORDER_OPTIONS.map((item) => (
+                  <OpcaoFiltro
+                    key={item.value}
+                    label={item.label}
+                    selecionado={ordenacao === item.value}
+                    onPress={() => setOrdenacao(item.value)}
+                  />
+                ))}
+              </FiltroSecao>
+            </ScrollView>
+
+            <View style={[styles.modalAcoes, { paddingBottom: Math.max(ESPACO.xl, insets.bottom + ESPACO.md) }]}>
+              <TouchableOpacity style={styles.botaoLimpar} onPress={limparFiltros}>
+                <Text style={styles.botaoLimparTexto}>Limpar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.botaoAplicar} onPress={() => setModalFiltrosVisivel(false)}>
+                <Text style={styles.botaoAplicarTexto}>Aplicar filtros</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
+  );
+}
+
+function FiltroSecao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.filtroSecao}>
+      <Text style={styles.filtroSecaoTitulo}>{titulo}</Text>
+      <View style={styles.filtroOpcoes}>{children}</View>
+    </View>
+  );
+}
+
+function OpcaoFiltro({
+  label,
+  selecionado,
+  onPress,
+}: {
+  label: string;
+  selecionado: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.filtroChip, selecionado && styles.filtroChipAtivo]}
+      onPress={onPress}
+    >
+      <Text style={[styles.filtroChipTexto, selecionado && styles.filtroChipTextoAtivo]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -354,6 +629,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  botaoFiltroAtivo: {
+    backgroundColor: CORES.primario,
+  },
   badge: {
     position: 'absolute',
     top: -4,
@@ -366,17 +644,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badgeNum: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
-  filtrosContainer: {
+  resumoContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: ESPACO.sm,
     paddingHorizontal: ESPACO.md,
     paddingBottom: ESPACO.sm,
     backgroundColor: CORES.superficie,
     borderBottomWidth: 1,
     borderBottomColor: CORES.borda,
-  },
-  filtrosRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: ESPACO.xs,
   },
   filtroChip: {
     borderWidth: 1,
@@ -402,6 +679,134 @@ const styles = StyleSheet.create({
     marginTop: ESPACO.xs,
     fontSize: 12,
     color: CORES.textoClaro,
+  },
+  ordenacaoResumo: {
+    fontSize: 12,
+    color: CORES.primario,
+    fontWeight: '700',
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(17, 24, 39, 0.45)',
+  },
+  modalCard: {
+    height: '88%',
+    backgroundColor: CORES.superficie,
+    borderTopLeftRadius: RAIO.lg,
+    borderTopRightRadius: RAIO.lg,
+    paddingTop: ESPACO.md,
+  },
+  modalScroll: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: ESPACO.lg,
+    paddingBottom: ESPACO.md,
+    borderBottomWidth: 1,
+    borderBottomColor: CORES.borda,
+  },
+  modalTitulo: {
+    fontSize: FONTE.grande,
+    fontWeight: '800',
+    color: CORES.texto,
+  },
+  modalSubtitulo: {
+    marginTop: 2,
+    fontSize: FONTE.pequena,
+    color: CORES.textoSecundario,
+  },
+  modalFechar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: CORES.fundo,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalConteudo: {
+    padding: ESPACO.lg,
+    paddingBottom: ESPACO.md,
+    gap: ESPACO.lg,
+  },
+  filtroSecao: {
+    gap: ESPACO.sm,
+  },
+  filtroSecaoTitulo: {
+    fontSize: FONTE.normal,
+    fontWeight: '800',
+    color: CORES.texto,
+  },
+  filtroOpcoes: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: ESPACO.xs,
+  },
+  marcaBuscaContainer: {
+    width: '100%',
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ESPACO.xs,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    borderRadius: RAIO.md,
+    paddingHorizontal: ESPACO.sm,
+    backgroundColor: CORES.fundo,
+  },
+  marcaBuscaInput: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: FONTE.normal,
+    color: CORES.texto,
+    paddingVertical: 8,
+  },
+  marcaSelecionadaTexto: {
+    width: '100%',
+    fontSize: FONTE.pequena,
+    fontWeight: '700',
+    color: CORES.primario,
+  },
+  filtroVazioTexto: {
+    width: '100%',
+    fontSize: FONTE.pequena,
+    color: CORES.textoClaro,
+  },
+  modalAcoes: {
+    flexDirection: 'row',
+    gap: ESPACO.sm,
+    padding: ESPACO.lg,
+    paddingTop: ESPACO.md,
+    borderTopWidth: 1,
+    borderTopColor: CORES.borda,
+  },
+  botaoLimpar: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: RAIO.md,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  botaoLimparTexto: {
+    color: CORES.textoSecundario,
+    fontWeight: '800',
+  },
+  botaoAplicar: {
+    flex: 1.4,
+    minHeight: 44,
+    borderRadius: RAIO.md,
+    backgroundColor: CORES.primario,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  botaoAplicarTexto: {
+    color: '#fff',
+    fontWeight: '800',
   },
   lista: { padding: ESPACO.sm, paddingBottom: ESPACO.lg },
   colunaPar: { justifyContent: 'space-between', paddingHorizontal: ESPACO.xs, alignItems: 'stretch' },

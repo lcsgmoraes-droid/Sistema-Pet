@@ -47,9 +47,7 @@ export async function uploadFotoPet(petId: number, localUri: string): Promise<Pe
   const formData = new FormData();
   formData.append('file', { uri: localUri, name: filename, type } as any);
 
-  const { data } = await api.post<Pet>(`/app/pets/${petId}/foto`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  const { data } = await api.post<Pet>(`/app/pets/${petId}/foto`, formData);
   return mapPet(data);
 }
 

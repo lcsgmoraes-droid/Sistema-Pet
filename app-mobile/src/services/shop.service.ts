@@ -56,6 +56,11 @@ export async function registrarAviseme(
 
 export type CatalogOrder = 'prontos' | 'nome' | 'menor_preco' | 'maior_preco';
 
+export type CatalogoFiltroOpcoes = {
+  marcas: string[];
+  pesos_embalagem_kg: number[];
+};
+
 export async function listarProdutos(params?: {
   pagina?: number;
   busca?: string;
@@ -64,9 +69,12 @@ export async function listarProdutos(params?: {
   somenteComImagem?: boolean;
   ordenacao?: CatalogOrder;
   cacheBust?: number;
+  limit?: number;
+  marca?: string;
+  pesoEmbalagemKg?: number;
 }): Promise<{ produtos: Produto[]; total: number }> {
   const paginaAtual = Math.max(1, Number(params?.pagina || 1));
-  const limit = 40;
+  const limit = Math.min(500, Math.max(1, Number(params?.limit || 40)));
   const offset = (paginaAtual - 1) * limit;
 
   const { data } = await api.get('/ecommerce/produtos', {
@@ -79,6 +87,8 @@ export async function listarProdutos(params?: {
       apenas_com_estoque: params?.somenteComEstoque || undefined,
       apenas_com_imagem: params?.somenteComImagem || undefined,
       ordenacao: params?.ordenacao || 'prontos',
+      marca: params?.marca || undefined,
+      peso_embalagem_kg: params?.pesoEmbalagemKg ?? undefined,
     },
   });
   // Backend retorna { items: [...] } — adaptar para o formato do app
@@ -107,6 +117,82 @@ export async function listarProdutos(params?: {
     };
   });
   return { produtos, total: Number(data?.total ?? produtos.length) };
+}
+
+function normalizarPesoOpcao(value: unknown): number | null {
+  const peso = toNumberOrNull(value);
+  if (!peso || peso <= 0) return null;
+  return Number(peso.toFixed(3));
+}
+
+function opcoesFiltrosDeProdutos(produtos: Produto[]): CatalogoFiltroOpcoes {
+  const marcas = Array.from(
+    new Set(
+      produtos
+        .map((produto) => produto.marca_nome?.trim())
+        .filter((marca): marca is string => !!marca)
+    )
+  ).sort((a, b) => a.localeCompare(b));
+
+  const pesos_embalagem_kg = Array.from(
+    new Set(
+      produtos
+        .map((produto) => normalizarPesoOpcao(produto.peso_embalagem_kg))
+        .filter((peso): peso is number => peso !== null)
+    )
+  ).sort((a, b) => a - b);
+
+  return { marcas, pesos_embalagem_kg };
+}
+
+function normalizarOpcoesFiltrosCatalogo(data: any): CatalogoFiltroOpcoes {
+  const marcasRaw = Array.isArray(data?.marcas) ? data.marcas : [];
+  const marcasNormalizadas = marcasRaw
+    .map((marca: any) => (typeof marca === 'string' ? marca : marca?.nome))
+    .map((marca: unknown): string => String(marca ?? '').trim())
+    .filter((marca: string) => marca.length > 0);
+  const marcas = Array.from(new Set<string>(marcasNormalizadas)).sort((a, b) => a.localeCompare(b));
+
+  const pesosRaw = Array.isArray(data?.pesos_embalagem_kg)
+    ? data.pesos_embalagem_kg
+    : Array.isArray(data?.pesos)
+      ? data.pesos
+      : [];
+  const pesosNormalizados = pesosRaw
+    .map(normalizarPesoOpcao)
+    .filter((peso: number | null): peso is number => peso !== null);
+  const pesos_embalagem_kg = Array.from(new Set<number>(pesosNormalizados)).sort((a, b) => a - b);
+
+  return { marcas, pesos_embalagem_kg };
+}
+
+export async function listarOpcoesFiltrosCatalogo(params?: {
+  busca?: string;
+  ordenacao?: CatalogOrder;
+}): Promise<CatalogoFiltroOpcoes> {
+  try {
+    const { data } = await api.get('/ecommerce/produtos/filtros', {
+      params: {
+        busca: params?.busca,
+        canal: 'app',
+        cache_bust: Date.now(),
+      },
+    });
+    return normalizarOpcoesFiltrosCatalogo(data);
+  } catch {
+    try {
+      const { produtos } = await listarProdutos({
+        pagina: 1,
+        busca: params?.busca,
+        ordenacao: params?.ordenacao,
+        limit: 500,
+        cacheBust: Date.now(),
+      });
+      return opcoesFiltrosDeProdutos(produtos);
+    } catch {
+      return { marcas: [], pesos_embalagem_kg: [] };
+    }
+  }
 }
 
 export async function buscarProdutoPorBarcode(barcode: string): Promise<Produto | null> {

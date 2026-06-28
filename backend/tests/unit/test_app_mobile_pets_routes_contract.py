@@ -9,6 +9,9 @@ from app.routes import app_mobile_pets_routes
 from app.routes import app_mobile_routes
 
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
 EXPECTED_SUBROUTES = {
     ("/pets", "GET"),
     ("/pets", "POST"),
@@ -21,6 +24,10 @@ EXPECTED_SUBROUTES = {
 EXPECTED_PUBLIC_ROUTES = {
     (f"/app{path}", method) for path, method in EXPECTED_SUBROUTES
 }
+
+
+def _read_mobile_source(relative_path: str) -> str:
+    return (REPO_ROOT / relative_path).read_text(encoding="utf-8")
 
 
 def _route_signatures(router):
@@ -136,3 +143,24 @@ def test_app_mobile_pets_serializadores_preservam_carteirinha():
             "arquivo_url": "/uploads/exame.pdf",
         }
     ]
+
+
+def test_app_mobile_upload_foto_pet_deixa_axios_montar_multipart():
+    source = _read_mobile_source("app-mobile/src/services/pets.service.ts")
+
+    upload_start = source.index("export async function uploadFotoPet")
+    upload_source = source[
+        upload_start : source.index("export async function obterCarteirinhaPet")
+    ]
+
+    assert "Content-Type" not in upload_source
+    assert "multipart/form-data" not in upload_source
+    assert "api.post<Pet>(`/app/pets/${petId}/foto`, formData)" in upload_source
+
+
+def test_app_mobile_api_remove_content_type_json_para_form_data():
+    source = _read_mobile_source("app-mobile/src/services/api.ts")
+
+    assert "config.data instanceof FormData" in source
+    assert "deleteHeader('Content-Type')" in source
+    assert "deleteHeader('content-type')" in source

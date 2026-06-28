@@ -192,6 +192,109 @@ def test_mobile_wishlist_empty_state_stops_loading_when_no_favorites():
     )
 
 
+def test_mobile_home_prioritizes_shopping_and_compacts_scan_feature():
+    home = _read_mobile_source("app-mobile/src/screens/HomeScreen.tsx")
+
+    assert "Comprar por pet" in home
+    assert "scannerCardCompacto" in home
+    assert "MaterialCommunityIcons" in home
+    assert "FontAwesome6" not in home
+    assert "iconName" in home
+    assert 'iconName="dog"' in home
+    assert 'iconName="cat"' in home
+    assert 'iconFamily="food-bag-bone"' in home
+    assert 'iconName="food-bag-bone"' in home
+    assert 'name="bone"' in home
+    assert "RacaoFoodBagIcon" in home
+    assert "react-native-svg" in home
+    assert 'iconName="bowl-food"' not in home
+    assert 'iconName="bowl-mix-outline"' not in home
+    assert "RacaoBowlBoneIcon" not in home
+    assert 'iconName="stethoscope"' in home
+    assert "petChipIconDiscreto" in home
+    assert "petChipIconMascote" not in home
+    assert "Veterinário" in home
+    assert "Banho & Tosa" in home
+    assert "Pedidos" in home
+    assert "Benefícios" in home
+    assert 'iconName="sparkles-outline"' not in home
+    assert 'iconName="nutrition-outline"' not in home
+    assert 'iconName="medical-outline"' not in home
+    assert 'iconText="VET"' not in home
+    assert 'iconText="Ped"' not in home
+    assert 'iconText="Pts"' not in home
+
+
+def test_mobile_notification_button_reflects_permission_state():
+    actions = _read_mobile_source("app-mobile/src/components/HeaderProfileActions.tsx")
+
+    assert 'import * as Notifications from "expo-notifications"' in actions
+    assert "Notifications.getPermissionsAsync" in actions
+    assert "notificacoesAtivadas" in actions
+    assert (
+        'name={notificacoesAtivadas ? "notifications" : "notifications-outline"}'
+        in actions
+    )
+
+
+def test_mobile_catalog_uses_customer_filter_modal_instead_of_admin_chips():
+    catalog = _read_mobile_source("app-mobile/src/screens/shop/CatalogScreen.tsx")
+    service = _read_mobile_source("app-mobile/src/services/shop.service.ts")
+    ecommerce = _read_mobile_source("backend/app/routes/ecommerce_public.py")
+
+    assert "Modal" in catalog
+    assert "modalFiltrosVisivel" in catalog
+    assert "useSafeAreaInsets" in catalog
+    assert "insets.bottom" in catalog
+    assert "contentContainerStyle={[" in catalog
+    assert "paddingBottom: 120 + insets.bottom" in catalog
+    assert "style={styles.modalScroll}" in catalog
+    assert "Espécie" in catalog
+    assert "Peso da embalagem" in catalog
+    assert "Marca" in catalog
+    assert "buscaMarca" in catalog
+    assert "setBuscaMarca" in catalog
+    assert "Buscar marca" in catalog
+    assert "marcasFiltradas" in catalog
+    assert "pesosEmbalagemDisponiveis" in catalog
+    assert "formatarPesoEmbalagemFiltro" in catalog
+    assert "selecionarPesoEmbalagem" in catalog
+    assert "limit: filtrosAtivos > 0 ? 500 : undefined" in catalog
+    assert "aplicarFiltrosCatalogo" in catalog
+    assert "peso_embalagem_kg" in catalog
+    assert "Cão" in catalog
+    assert "Gato" in catalog
+    assert "listarOpcoesFiltrosCatalogo" in service
+    assert "pesoEmbalagemKg" in service
+    assert "pesos_embalagem_kg" in service
+    assert "marca: str | None = Query(default=None)" in ecommerce
+    assert "peso_embalagem_kg: float | None = Query(default=None)" in ecommerce
+    assert '@router.get("/produtos/filtros")' in ecommerce
+    assert "distinct(Produto.peso_embalagem)" in ecommerce
+    assert "PESO_EMBALAGEM_OPTIONS" not in catalog
+    assert "Até 1 kg" not in catalog
+    assert "Até 3 kg" not in catalog
+    assert "Até 10 kg" not in catalog
+    assert "Até 15 kg" not in catalog
+    assert "Peso do pet" not in catalog
+    assert "Em estoque" not in catalog
+    assert "Com foto" not in catalog
+    assert "Mais prontos" not in catalog
+
+
+def test_pet_photo_flow_guides_crop_and_protects_unsaved_photo():
+    pet_form = _read_mobile_source("app-mobile/src/screens/pets/PetFormScreen.tsx")
+
+    assert "ImagePicker.launchImageLibraryAsync" in pet_form
+    assert "allowsEditing: true" in pet_form
+    assert "Cortar" in pet_form
+    assert "navigation.addListener('beforeRemove'" in pet_form
+    assert "fotoPendente" in pet_form
+    assert "Salvar alterações" in pet_form
+    assert "Sair sem salvar" in pet_form
+    assert "Salvar foto" in pet_form
+
+
 def test_profile_points_card_wraps_without_overflow_on_narrow_mobile():
     profile = _read_mobile_source("app-mobile/src/screens/profile/ProfileScreen.tsx")
 
