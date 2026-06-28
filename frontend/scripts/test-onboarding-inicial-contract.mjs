@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import process from "node:process";
 import {
   SECOES_ONBOARDING,
   buildGuiaHref,
   flattenOnboardingItems,
 } from "../src/pages/introducaoGuiada/introducaoGuiadaConfig.js";
+
+const root = process.cwd();
 
 const REQUIRED_SECTIONS = [
   "empresa-acesso",
@@ -69,5 +74,21 @@ assert.equal(
   buildGuiaHref("/pdv?origem=ajuda", "venda-teste"),
   "/pdv?origem=ajuda&guia=venda-teste",
 );
+
+const ajudaSource = fs.readFileSync(
+  path.join(root, "src/pages/centralAjuda/centralAjudaKnowledge.js"),
+  "utf8",
+);
+
+for (const requiredText of [
+  "Primeiros passos para configurar o Sistema Pet",
+  "Financeiro obrigatorio antes da primeira venda",
+  "Compras, entrada XML e Bling",
+  "/cadastros/financeiro/formas-pagamento",
+  "/compras/entrada-xml",
+  "/ecommerce/configuracoes",
+]) {
+  assert(ajudaSource.includes(requiredText), `Central de Ajuda sem texto: ${requiredText}`);
+}
 
 console.log("Onboarding inicial contract OK");
