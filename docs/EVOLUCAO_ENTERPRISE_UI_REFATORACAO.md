@@ -207,15 +207,25 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
-Inventario atualizado em 2026-06-27 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
+Inventario atualizado em 2026-06-28 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
 
-- 67 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 28 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 59 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 8 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Observacao: fora do inventario de aplicacao, ainda ha 11 arquivos de teste em `backend/tests` e 2 em `frontend/src` acima de 700 linhas.
+- Recorte backend em `backend/app`: 28 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 1 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 11 de 2026-06-28: `backend/app/sugestoes_racoes_routes.py` saiu da faixa acima de 700 linhas ao virar agregador das sugestoes inteligentes de racoes:
+
+- `backend/app/sugestoes_racoes_routes.py`: 907 -> 48 linhas, mantendo o prefixo publico `/racoes/sugestoes` e os imports historicos de schemas, helpers e handlers.
+- `backend/app/racoes_sugestoes_duplicatas_routes.py`: concentra deteccao, ignorar falso positivo e mesclagem de duplicatas.
+- `backend/app/racoes_sugestoes_padronizacao_routes.py`: concentra a montagem de sugestoes estruturadas de nomes.
+- `backend/app/racoes_sugestoes_gaps_routes.py`: concentra os gaps de estoque por segmento e faturamento.
+- `backend/app/racoes_sugestoes_relatorio_routes.py`: concentra o relatorio consolidado e score de saude do cadastro.
+- `backend/app/racoes_sugestoes_common.py` e `backend/app/racoes_sugestoes_schemas.py`: concentram helper compartilhado e contratos Pydantic.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_11_refactor.py`, garantindo fachada, paths publicos, imports reexportados e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 10 de 2026-06-27: `backend/app/routes/ecommerce_checkout.py` saiu da faixa acima de 700 linhas ao separar suporte de checkout:
 
