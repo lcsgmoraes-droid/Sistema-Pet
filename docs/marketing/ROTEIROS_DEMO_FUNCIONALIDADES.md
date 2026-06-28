@@ -6,6 +6,8 @@ produto.
 
 ## Preparacao da base demo
 
+Para a preparacao completa, use `docs/marketing/BASE_DEMO_GRAVACAO.md`.
+
 Use dados ficticios consistentes:
 
 - Cliente: Maria Oliveira.
