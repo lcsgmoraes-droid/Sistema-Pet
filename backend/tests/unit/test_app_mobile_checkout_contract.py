@@ -192,6 +192,19 @@ def test_mobile_wishlist_empty_state_stops_loading_when_no_favorites():
     )
 
 
+def test_pet_photo_flow_guides_crop_and_protects_unsaved_photo():
+    pet_form = _read_mobile_source("app-mobile/src/screens/pets/PetFormScreen.tsx")
+
+    assert "ImagePicker.launchImageLibraryAsync" in pet_form
+    assert "allowsEditing: true" in pet_form
+    assert "Cortar" in pet_form
+    assert "navigation.addListener('beforeRemove'" in pet_form
+    assert "fotoPendente" in pet_form
+    assert "Salvar alterações" in pet_form
+    assert "Sair sem salvar" in pet_form
+    assert "Salvar foto" in pet_form
+
+
 def test_profile_points_card_wraps_without_overflow_on_narrow_mobile():
     profile = _read_mobile_source("app-mobile/src/screens/profile/ProfileScreen.tsx")
 
