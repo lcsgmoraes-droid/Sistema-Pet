@@ -1,0 +1,260 @@
+{
+  "metadata": {
+    "nome": "Base Demo Sistema Pet",
+    "versao": "2026-06-28",
+    "uso": "Gravacao de criativos, demos e onboarding",
+    "ambiente_recomendado": "tenant_demo",
+    "observacao": "Todos os dados sao ficticios e devem ser usados apenas em ambiente de demonstracao."
+  },
+  "empresa": {
+    "nome_fantasia": "Pet Feliz Demo",
+    "razao_social": "Pet Feliz Demonstracao Ltda",
+    "cnpj": "00.000.000/0001-00",
+    "cidade": "Sao Paulo",
+    "uf": "SP",
+    "email": "demo@sistemapet.local",
+    "telefone": "(11) 0000-0000",
+    "segmento": "Pet shop com banho e tosa, veterinario e ecommerce"
+  },
+  "usuarios": [
+    {
+      "nome": "Lucas Demo",
+      "email": "lucas.demo@sistemapet.local",
+      "perfil": "Administrador"
+    },
+    {
+      "nome": "Atendente Demo",
+      "email": "atendimento.demo@sistemapet.local",
+      "perfil": "Operacao"
+    }
+  ],
+  "financeiro": {
+    "bancos": [
+      {
+        "nome": "Conta Banco Demo",
+        "tipo": "Conta corrente",
+        "saldo_inicial": 2500.0
+      }
+    ],
+    "formas_pagamento": [
+      {
+        "nome": "PIX",
+        "tipo": "avista"
+      },
+      {
+        "nome": "Dinheiro",
+        "tipo": "avista"
+      },
+      {
+        "nome": "Cartao credito",
+        "tipo": "cartao"
+      },
+      {
+        "nome": "Cartao debito",
+        "tipo": "cartao"
+      }
+    ],
+    "categorias": [
+      "Venda de produtos",
+      "Venda de servicos",
+      "Compra de mercadorias",
+      "Taxas de cartao"
+    ],
+    "impostos": [
+      {
+        "nome": "Tributacao demo",
+        "descricao": "Configuracao fiscal ficticia para explicar custo, venda e margem."
+      }
+    ]
+  },
+  "fornecedores": [
+    {
+      "nome": "Distribuidora Pet Brasil",
+      "email": "fornecedor.demo@sistemapet.local",
+      "telefone": "(11) 0000-0001"
+    }
+  ],
+  "produtos": [
+    {
+      "sku": "DEMO-RACAO-10KG",
+      "nome": "Racao Adulto 10kg",
+      "categoria": "Racoes",
+      "preco_venda": 189.9,
+      "custo": 128.0,
+      "estoque_inicial": 20
+    },
+    {
+      "sku": "DEMO-SHAMPOO-500ML",
+      "nome": "Shampoo Neutro Pet 500ml",
+      "categoria": "Higiene",
+      "preco_venda": 39.9,
+      "custo": 18.0,
+      "estoque_inicial": 15
+    },
+    {
+      "sku": "DEMO-COLEIRA-M",
+      "nome": "Coleira Ajustavel M",
+      "categoria": "Acessorios",
+      "preco_venda": 49.9,
+      "custo": 22.0,
+      "estoque_inicial": 12
+    },
+    {
+      "sku": "DEMO-PETISCO-120G",
+      "nome": "Petisco Natural 120g",
+      "categoria": "Petiscos",
+      "preco_venda": 24.9,
+      "custo": 10.0,
+      "estoque_inicial": 30
+    }
+  ],
+  "clientes": [
+    {
+      "nome": "Maria Oliveira",
+      "email": "maria.demo@sistemapet.local",
+      "telefone": "(11) 0000-1001"
+    },
+    {
+      "nome": "Joao Santos",
+      "email": "joao.demo@sistemapet.local",
+      "telefone": "(11) 0000-1002"
+    },
+    {
+      "nome": "Ana Costa",
+      "email": "ana.demo@sistemapet.local",
+      "telefone": "(11) 0000-1003"
+    }
+  ],
+  "pets": [
+    {
+      "nome": "Thor",
+      "tutor": "Maria Oliveira",
+      "especie": "Cachorro",
+      "raca": "Golden Retriever",
+      "uso": "Venda, banho e tosa, veterinario"
+    },
+    {
+      "nome": "Luna",
+      "tutor": "Joao Santos",
+      "especie": "Cachorro",
+      "raca": "Shih Tzu",
+      "uso": "Agenda cheia e historico"
+    },
+    {
+      "nome": "Mel",
+      "tutor": "Ana Costa",
+      "especie": "Gato",
+      "raca": "SRD",
+      "uso": "Ecommerce/app"
+    }
+  ],
+  "servicos": [
+    {
+      "nome": "Banho medio completo",
+      "duracao_minutos": 60,
+      "preco": 79.9,
+      "modulo": "banho_tosa"
+    },
+    {
+      "nome": "Tosa higienica",
+      "duracao_minutos": 45,
+      "preco": 59.9,
+      "modulo": "banho_tosa"
+    },
+    {
+      "nome": "Avaliacao preventiva",
+      "duracao_minutos": 30,
+      "preco": 120.0,
+      "modulo": "veterinario"
+    },
+    {
+      "nome": "Vacinacao demo",
+      "duracao_minutos": 20,
+      "preco": 95.0,
+      "modulo": "veterinario"
+    }
+  ],
+  "compras": [
+    {
+      "fornecedor": "Distribuidora Pet Brasil",
+      "itens": [
+        {
+          "sku": "DEMO-RACAO-10KG",
+          "quantidade": 10
+        },
+        {
+          "sku": "DEMO-SHAMPOO-500ML",
+          "quantidade": 8
+        },
+        {
+          "sku": "DEMO-PETISCO-120G",
+          "quantidade": 20
+        }
+      ],
+      "status_gravacao": "Manter uma compra pendente para mostrar conferencia antes/depois."
+    }
+  ],
+  "ecommerce": {
+    "loja": "Pet Feliz Demo Online",
+    "produtos_publicados": [
+      "DEMO-RACAO-10KG",
+      "DEMO-SHAMPOO-500ML",
+      "DEMO-COLEIRA-M",
+      "DEMO-PETISCO-120G"
+    ],
+    "pedidos_demo": [
+      {
+        "cliente": "Ana Costa",
+        "status": "Pendente"
+      },
+      {
+        "cliente": "Maria Oliveira",
+        "status": "Finalizado"
+      }
+    ]
+  },
+  "videos_prioritarios": [
+    {
+      "titulo": "Estoque que some",
+      "tipo": "venda",
+      "duracao_segundos": 20,
+      "formato": "9:16",
+      "status": "roteiro_pronto"
+    },
+    {
+      "titulo": "Recebimentos baguncados",
+      "tipo": "venda",
+      "duracao_segundos": 30,
+      "formato": "9:16",
+      "status": "roteiro_pronto"
+    },
+    {
+      "titulo": "Lucro real",
+      "tipo": "venda",
+      "duracao_segundos": 25,
+      "formato": "9:16",
+      "status": "roteiro_pronto"
+    },
+    {
+      "titulo": "Configuracao inicial",
+      "tipo": "demo",
+      "duracao_segundos": 60,
+      "formato": "16:9 e 9:16",
+      "status": "roteiro_pronto"
+    },
+    {
+      "titulo": "Produto, PDV e estoque",
+      "tipo": "demo",
+      "duracao_segundos": 60,
+      "formato": "16:9 e 9:16",
+      "status": "roteiro_pronto"
+    },
+    {
+      "titulo": "Financeiro antes da primeira venda",
+      "tipo": "demo",
+      "duracao_segundos": 75,
+      "formato": "16:9",
+      "status": "roteiro_pronto"
+    }
+  ]
+}

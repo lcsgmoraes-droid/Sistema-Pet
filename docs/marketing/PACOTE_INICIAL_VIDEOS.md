@@ -2,6 +2,8 @@
 
 Uso: organizar a primeira leva de criativos e demonstracoes do Sistema Pet.
 
+Dados estruturados: `docs/marketing/base-demo/dados_base_demo_sistema_pet.json`.
+
 ## Objetivo da primeira leva
 
 Criar um conjunto pequeno, coerente e reutilizavel:
