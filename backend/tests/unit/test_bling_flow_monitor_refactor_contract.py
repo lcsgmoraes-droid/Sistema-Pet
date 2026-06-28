@@ -1,6 +1,8 @@
 from pathlib import Path
 
 from app.services import bling_flow_monitor_autofix as autofix
+from app.services import bling_flow_monitor_auditoria as auditoria
+from app.services import bling_flow_monitor_incidents as incidents
 from app.services import bling_flow_monitor_diagnostics as diagnostics
 from app.services import bling_flow_monitor_service as service
 from app.services import bling_flow_monitor_utils as utils
@@ -32,8 +34,10 @@ def test_bling_flow_monitor_service_fica_somente_com_orquestracao():
     assert "def diagnosticar_pedido_integrado(" not in source
     assert "def autocorrigir_incidente(" not in source
     assert "def _obter_nfs_recentes_bling(" not in source
-    assert len(source.splitlines()) < 900
+    assert len(source.splitlines()) < 700
     assert (
         len(Path(diagnostics.__file__).read_text(encoding="utf-8").splitlines()) < 850
     )
     assert len(Path(autofix.__file__).read_text(encoding="utf-8").splitlines()) < 500
+    assert len(Path(auditoria.__file__).read_text(encoding="utf-8").splitlines()) < 700
+    assert len(Path(incidents.__file__).read_text(encoding="utf-8").splitlines()) < 700

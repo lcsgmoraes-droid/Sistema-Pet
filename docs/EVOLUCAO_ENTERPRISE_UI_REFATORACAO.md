@@ -209,13 +209,21 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-28 por contagem fisica `ReadAllLines`/`splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais. A batch 13 corrigiu a metodologia do contador: as rodadas anteriores usavam uma contagem que ignorava linhas em branco, por isso o numero operacional voltou a refletir a linha fisica real.
 
-- 62 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 23 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 54 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 8 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Observacao: fora do inventario de aplicacao, ainda ha 11 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+- Recorte backend em `backend/app`: 23 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 16 de 2026-06-28: `backend/app/services/bling_flow_monitor_service.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do monitor Bling:
+
+- `backend/app/services/bling_flow_monitor_service.py`: 800 -> 289 linhas, mantendo os imports publicos historicos e wrappers patchaveis para `sync_rls_tenant`, eventos, incidentes e auditoria.
+- `backend/app/services/bling_flow_monitor_constants.py`: concentra severidades, status finais e codigos monitorados.
+- `backend/app/services/bling_flow_monitor_incidents.py`: concentra registro de eventos, abertura/resolucao de incidentes e vinculo NF/pedido.
+- `backend/app/services/bling_flow_monitor_auditoria.py`: concentra auditoria periodica, resumo do monitoramento e execucao background.
+- Contrato atualizado: `backend/tests/unit/test_bling_flow_monitor_refactor_contract.py`, garantindo reexports legados e modulos novos abaixo de 700 linhas.
 
 Fatia backend 700 batch 15 de 2026-06-28: `backend/app/financeiro_models.py` saiu da faixa acima de 700 linhas ao virar fachada compativel dos models ORM financeiros:
 
