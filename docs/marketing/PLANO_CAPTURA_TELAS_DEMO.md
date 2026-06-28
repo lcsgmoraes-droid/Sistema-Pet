@@ -37,11 +37,13 @@ Regra central: Nao gravar dados reais.
 3. Rodar `python scripts/test_marketing_demo_seed_apply.py`.
 4. Rodar `python scripts/validar_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --markdown`.
 5. Gerar o manifesto com `python scripts/gerar_seed_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --tenant-slug tenant_demo --format markdown`.
-6. Simular a aplicacao com `python scripts/aplicar_seed_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --tenant-slug tenant_demo --dry-run`.
-7. Confirmar que a tela nao exibe CPF, CNPJ real, telefone real, email real, token ou webhook.
-8. Fechar notificacoes, abas pessoais e extensoes visiveis.
-9. Abrir somente a tela inicial do take.
-10. Conferir se o dado demo aparece com nome consistente.
+6. Simular a aplicacao com `python scripts/aplicar_seed_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --tenant-slug atacadaopetpp --tenant-email atacadaopetpp@gmail.com --dry-run`.
+7. Se o tenant for DEV/demo confirmado, aplicar os cadastros-base seguros com `python scripts/aplicar_seed_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --tenant-slug atacadaopetpp --tenant-email atacadaopetpp@gmail.com --environment development --apply`.
+8. Conferir manualmente empresa, usuarios, impostos, compras, ecommerce e servicos veterinarios, pois a aplicacao automatica ainda pula essas secoes.
+9. Confirmar que a tela nao exibe CPF, CNPJ real, telefone real, email real, token ou webhook.
+10. Fechar notificacoes, abas pessoais e extensoes visiveis.
+11. Abrir somente a tela inicial do take.
+12. Conferir se o dado demo aparece com nome consistente.
 
 ## Fila de takes prioritarios
 
