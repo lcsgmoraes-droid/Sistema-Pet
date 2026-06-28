@@ -218,18 +218,44 @@ def test_mobile_notification_button_reflects_permission_state():
 
 def test_mobile_catalog_uses_customer_filter_modal_instead_of_admin_chips():
     catalog = _read_mobile_source("app-mobile/src/screens/shop/CatalogScreen.tsx")
+    service = _read_mobile_source("app-mobile/src/services/shop.service.ts")
+    ecommerce = _read_mobile_source("backend/app/routes/ecommerce_public.py")
 
     assert "Modal" in catalog
     assert "modalFiltrosVisivel" in catalog
+    assert "useSafeAreaInsets" in catalog
+    assert "insets.bottom" in catalog
+    assert "contentContainerStyle={[" in catalog
+    assert "paddingBottom: 120 + insets.bottom" in catalog
+    assert "style={styles.modalScroll}" in catalog
     assert "Espécie" in catalog
-    assert "Peso do pet" in catalog
+    assert "Peso da embalagem" in catalog
     assert "Marca" in catalog
+    assert "buscaMarca" in catalog
+    assert "setBuscaMarca" in catalog
+    assert "Buscar marca" in catalog
+    assert "marcasFiltradas" in catalog
+    assert "pesosEmbalagemDisponiveis" in catalog
+    assert "formatarPesoEmbalagemFiltro" in catalog
+    assert "selecionarPesoEmbalagem" in catalog
+    assert "limit: filtrosAtivos > 0 ? 500 : undefined" in catalog
     assert "aplicarFiltrosCatalogo" in catalog
+    assert "peso_embalagem_kg" in catalog
     assert "Cão" in catalog
     assert "Gato" in catalog
-    assert "Até 3 kg" in catalog
-    assert "Até 10 kg" in catalog
-    assert "Até 15 kg" in catalog
+    assert "listarOpcoesFiltrosCatalogo" in service
+    assert "pesoEmbalagemKg" in service
+    assert "pesos_embalagem_kg" in service
+    assert "marca: str | None = Query(default=None)" in ecommerce
+    assert "peso_embalagem_kg: float | None = Query(default=None)" in ecommerce
+    assert "@router.get(\"/produtos/filtros\")" in ecommerce
+    assert "distinct(Produto.peso_embalagem)" in ecommerce
+    assert "PESO_EMBALAGEM_OPTIONS" not in catalog
+    assert "Até 1 kg" not in catalog
+    assert "Até 3 kg" not in catalog
+    assert "Até 10 kg" not in catalog
+    assert "Até 15 kg" not in catalog
+    assert "Peso do pet" not in catalog
     assert "Em estoque" not in catalog
     assert "Com foto" not in catalog
     assert "Mais prontos" not in catalog

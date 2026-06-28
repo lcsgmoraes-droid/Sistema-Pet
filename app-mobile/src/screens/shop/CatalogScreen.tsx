@@ -15,7 +15,8 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { CatalogOrder, listarProdutos, registrarAviseme } from '../../services/shop.service';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CatalogOrder, listarOpcoesFiltrosCatalogo, listarProdutos, registrarAviseme } from '../../services/shop.service';
 import { useCartStore } from '../../store/cart.store';
 import { useWishlistStore } from '../../store/wishlist.store';
 import { useAuthStore } from '../../store/auth.store';
@@ -31,17 +32,17 @@ const ORDER_OPTIONS: Array<{ value: CatalogOrder; label: string }> = [
 ];
 
 type EspecieFiltro = 'todos' | 'cao' | 'gato';
-type PesoPetFiltro = 'todos' | 'ate3' | 'ate10' | 'ate15' | 'acima15';
+type PesoEmbalagemFiltro = number | null;
 
 type CatalogoFiltros = {
   especie: EspecieFiltro;
-  pesoPet: PesoPetFiltro;
+  pesoEmbalagem: PesoEmbalagemFiltro;
   marca: string;
 };
 
 const FILTROS_PADRAO: CatalogoFiltros = {
   especie: 'todos',
-  pesoPet: 'todos',
+  pesoEmbalagem: null,
   marca: '',
 };
 
@@ -49,14 +50,6 @@ const ESPECIE_OPTIONS: Array<{ value: EspecieFiltro; label: string }> = [
   { value: 'todos', label: 'Todos' },
   { value: 'cao', label: 'Cão' },
   { value: 'gato', label: 'Gato' },
-];
-
-const PESO_PET_OPTIONS: Array<{ value: PesoPetFiltro; label: string }> = [
-  { value: 'todos', label: 'Todos' },
-  { value: 'ate3', label: 'Até 3 kg' },
-  { value: 'ate10', label: 'Até 10 kg' },
-  { value: 'ate15', label: 'Até 15 kg' },
-  { value: 'acima15', label: 'Acima de 15 kg' },
 ];
 
 function normalizarTexto(value: string | null | undefined): string {
@@ -89,12 +82,22 @@ function combinaEspecie(texto: string, especie: EspecieFiltro): boolean {
   return !termosCao.test(texto);
 }
 
-function combinaPesoPet(texto: string, pesoPet: PesoPetFiltro): boolean {
-  if (pesoPet === 'todos') return true;
-  if (pesoPet === 'ate3') return !/\b(grande|gigante|large|15\s?kg|20\s?kg)\b/.test(texto);
-  if (pesoPet === 'ate10') return !/\b(gigante|giant|20\s?kg|25\s?kg)\b/.test(texto);
-  if (pesoPet === 'ate15') return !/\b(gigante|giant|25\s?kg)\b/.test(texto);
-  return !/\b(mini|toy|filhote|pequeno|small)\b/.test(texto);
+function normalizarPesoEmbalagem(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const peso = typeof value === 'string' ? Number(value.replace(',', '.').trim()) : Number(value);
+  if (!Number.isFinite(peso) || peso <= 0) return null;
+  return Number(peso.toFixed(3));
+}
+
+function formatarPesoEmbalagemFiltro(peso: number): string {
+  const valor = Number(peso.toFixed(3));
+  return `${String(valor).replace('.', ',')} kg`;
+}
+
+function combinaPesoEmbalagem(peso: number | null | undefined, filtro: PesoEmbalagemFiltro): boolean {
+  if (filtro === null) return true;
+  const pesoKg = normalizarPesoEmbalagem(peso);
+  return pesoKg !== null && Math.abs(pesoKg - filtro) < 0.001;
 }
 
 function aplicarFiltrosCatalogo(produto: Produto, filtros: CatalogoFiltros): boolean {
@@ -102,18 +105,20 @@ function aplicarFiltrosCatalogo(produto: Produto, filtros: CatalogoFiltros): boo
 
   if (filtros.marca && produto.marca_nome !== filtros.marca) return false;
   if (!combinaEspecie(texto, filtros.especie)) return false;
-  if (!combinaPesoPet(texto, filtros.pesoPet)) return false;
+  if (!combinaPesoEmbalagem(produto.peso_embalagem_kg, filtros.pesoEmbalagem)) return false;
 
   return true;
 }
 
 export default function CatalogScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const { adicionar, totalItens } = useCartStore();
   const { ids: wishlistIds, carregar: carregarWishlist, toggle: toggleWishlist } = useWishlistStore();
   const { user } = useAuthStore();
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [busca, setBusca] = useState('');
+  const [buscaMarca, setBuscaMarca] = useState('');
   const [pagina, setPagina] = useState(1);
   const [total, setTotal] = useState(0);
   const [carregando, setCarregando] = useState(false);
@@ -121,22 +126,22 @@ export default function CatalogScreen() {
   const [modalFiltrosVisivel, setModalFiltrosVisivel] = useState(false);
   const [filtros, setFiltros] = useState<CatalogoFiltros>(FILTROS_PADRAO);
   const [ordenacao, setOrdenacao] = useState<CatalogOrder>('prontos');
+  const [marcasDisponiveis, setMarcasDisponiveis] = useState<string[]>([]);
+  const [pesosEmbalagemDisponiveis, setPesosEmbalagemDisponiveis] = useState<number[]>([]);
 
   const ordenacaoLabel = useMemo(
     () => ORDER_OPTIONS.find((item) => item.value === ordenacao)?.label ?? 'Relevância',
     [ordenacao]
   );
 
-  const marcasDisponiveis = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          produtos
-            .map((produto) => produto.marca_nome?.trim())
-            .filter((marca): marca is string => !!marca)
-        )
-      ).sort((a, b) => a.localeCompare(b)),
-    [produtos]
+  const marcasFiltradas = useMemo(
+    () => {
+      const termo = normalizarTexto(buscaMarca);
+      return marcasDisponiveis
+        .filter((marca) => !termo || normalizarTexto(marca).includes(termo))
+        .slice(0, 8);
+    },
+    [buscaMarca, marcasDisponiveis]
   );
 
   const produtosFiltrados = useMemo(
@@ -147,7 +152,7 @@ export default function CatalogScreen() {
   const filtrosAtivos = useMemo(
     () =>
       Number(filtros.especie !== FILTROS_PADRAO.especie) +
-      Number(filtros.pesoPet !== FILTROS_PADRAO.pesoPet) +
+      Number(filtros.pesoEmbalagem !== FILTROS_PADRAO.pesoEmbalagem) +
       Number(!!filtros.marca),
     [filtros]
   );
@@ -157,15 +162,30 @@ export default function CatalogScreen() {
       if (pg === 1) setCarregando(true);
 
       try {
-        const { produtos: novos, total: totalRecebido } = await listarProdutos({
+        const produtosPromise = listarProdutos({
           pagina: pg,
           busca: q || undefined,
           ordenacao,
           cacheBust: pg === 1 ? Date.now() : undefined,
+          limit: filtrosAtivos > 0 ? 500 : undefined,
+          marca: filtros.marca || undefined,
+          pesoEmbalagemKg: filtros.pesoEmbalagem ?? undefined,
         });
+        const opcoesPromise =
+          pg === 1
+            ? listarOpcoesFiltrosCatalogo({ busca: q || undefined, ordenacao })
+            : Promise.resolve(null);
+        const [{ produtos: novos, total: totalRecebido }, opcoes] = await Promise.all([
+          produtosPromise,
+          opcoesPromise,
+        ]);
 
         if (pg === 1) {
           setProdutos(novos);
+          if (opcoes) {
+            setMarcasDisponiveis(opcoes.marcas);
+            setPesosEmbalagemDisponiveis(opcoes.pesos_embalagem_kg);
+          }
         } else {
           setProdutos((prev) => [...prev, ...novos]);
         }
@@ -181,7 +201,7 @@ export default function CatalogScreen() {
         setCarregando(false);
       }
     },
-    [ordenacao]
+    [filtros.marca, filtros.pesoEmbalagem, filtrosAtivos, ordenacao]
   );
 
   useEffect(() => {
@@ -213,10 +233,15 @@ export default function CatalogScreen() {
 
   function limparFiltros() {
     setFiltros(FILTROS_PADRAO);
+    setBuscaMarca('');
   }
 
   function selecionarFiltro<K extends keyof CatalogoFiltros>(campo: K, valor: CatalogoFiltros[K]) {
     setFiltros((atuais) => ({ ...atuais, [campo]: valor }));
+  }
+
+  function selecionarPesoEmbalagem(peso: number | null) {
+    setFiltros((atuais) => ({ ...atuais, pesoEmbalagem: peso }));
   }
 
   function renderProduto({ item }: { item: Produto }) {
@@ -430,14 +455,18 @@ export default function CatalogScreen() {
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitulo}>Filtros</Text>
-                <Text style={styles.modalSubtitulo}>Encontre produtos por perfil do pet.</Text>
+                <Text style={styles.modalSubtitulo}>Encontre produtos por pet, pacote e marca.</Text>
               </View>
               <TouchableOpacity onPress={() => setModalFiltrosVisivel(false)} style={styles.modalFechar}>
                 <Ionicons name="close" size={22} color={CORES.texto} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalConteudo}>
+            <ScrollView
+              style={styles.modalScroll}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={[styles.modalConteudo, { paddingBottom: 120 + insets.bottom }]}
+            >
               <FiltroSecao titulo="Espécie">
                 {ESPECIE_OPTIONS.map((item) => (
                   <OpcaoFiltro
@@ -449,31 +478,67 @@ export default function CatalogScreen() {
                 ))}
               </FiltroSecao>
 
-              <FiltroSecao titulo="Peso do pet">
-                {PESO_PET_OPTIONS.map((item) => (
+              <FiltroSecao titulo="Peso da embalagem">
+                <OpcaoFiltro
+                  label="Todos"
+                  selecionado={filtros.pesoEmbalagem === null}
+                  onPress={() => selecionarPesoEmbalagem(null)}
+                />
+                {pesosEmbalagemDisponiveis.map((peso) => (
                   <OpcaoFiltro
-                    key={item.value}
-                    label={item.label}
-                    selecionado={filtros.pesoPet === item.value}
-                    onPress={() => selecionarFiltro('pesoPet', item.value)}
+                    key={String(peso)}
+                    label={formatarPesoEmbalagemFiltro(peso)}
+                    selecionado={filtros.pesoEmbalagem === peso}
+                    onPress={() => selecionarPesoEmbalagem(peso)}
                   />
                 ))}
+                {pesosEmbalagemDisponiveis.length === 0 && (
+                  <Text style={styles.filtroVazioTexto}>Nenhum peso cadastrado.</Text>
+                )}
               </FiltroSecao>
 
               <FiltroSecao titulo="Marca">
+                <View style={styles.marcaBuscaContainer}>
+                  <Ionicons name="search-outline" size={16} color={CORES.textoClaro} />
+                  <TextInput
+                    style={styles.marcaBuscaInput}
+                    placeholder="Buscar marca"
+                    placeholderTextColor={CORES.textoClaro}
+                    value={buscaMarca}
+                    onChangeText={setBuscaMarca}
+                    returnKeyType="search"
+                  />
+                  {buscaMarca.length > 0 && (
+                    <TouchableOpacity onPress={() => setBuscaMarca('')}>
+                      <Ionicons name="close-circle" size={18} color={CORES.textoClaro} />
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <OpcaoFiltro
                   label="Todas"
                   selecionado={!filtros.marca}
-                  onPress={() => selecionarFiltro('marca', '')}
+                  onPress={() => {
+                    selecionarFiltro('marca', '');
+                    setBuscaMarca('');
+                  }}
                 />
-                {marcasDisponiveis.map((marca) => (
+                {filtros.marca ? (
+                  <Text style={styles.marcaSelecionadaTexto}>Selecionada: {filtros.marca}</Text>
+                ) : null}
+                {marcasFiltradas.map((marca) => (
                   <OpcaoFiltro
                     key={marca}
                     label={marca}
                     selecionado={filtros.marca === marca}
-                    onPress={() => selecionarFiltro('marca', marca)}
+                    onPress={() => {
+                      selecionarFiltro('marca', marca);
+                      setBuscaMarca(marca);
+                    }}
                   />
                 ))}
+                {marcasFiltradas.length === 0 && (
+                  <Text style={styles.filtroVazioTexto}>Nenhuma marca encontrada.</Text>
+                )}
               </FiltroSecao>
 
               <FiltroSecao titulo="Ordenar por">
@@ -488,7 +553,7 @@ export default function CatalogScreen() {
               </FiltroSecao>
             </ScrollView>
 
-            <View style={styles.modalAcoes}>
+            <View style={[styles.modalAcoes, { paddingBottom: Math.max(ESPACO.xl, insets.bottom + ESPACO.md) }]}>
               <TouchableOpacity style={styles.botaoLimpar} onPress={limparFiltros}>
                 <Text style={styles.botaoLimparTexto}>Limpar</Text>
               </TouchableOpacity>
@@ -626,11 +691,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(17, 24, 39, 0.45)',
   },
   modalCard: {
-    maxHeight: '88%',
+    height: '88%',
     backgroundColor: CORES.superficie,
     borderTopLeftRadius: RAIO.lg,
     borderTopRightRadius: RAIO.lg,
     paddingTop: ESPACO.md,
+  },
+  modalScroll: {
+    flex: 1,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -676,6 +744,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: ESPACO.xs,
+  },
+  marcaBuscaContainer: {
+    width: '100%',
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ESPACO.xs,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    borderRadius: RAIO.md,
+    paddingHorizontal: ESPACO.sm,
+    backgroundColor: CORES.fundo,
+  },
+  marcaBuscaInput: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: FONTE.normal,
+    color: CORES.texto,
+    paddingVertical: 8,
+  },
+  marcaSelecionadaTexto: {
+    width: '100%',
+    fontSize: FONTE.pequena,
+    fontWeight: '700',
+    color: CORES.primario,
+  },
+  filtroVazioTexto: {
+    width: '100%',
+    fontSize: FONTE.pequena,
+    color: CORES.textoClaro,
   },
   modalAcoes: {
     flexDirection: 'row',
