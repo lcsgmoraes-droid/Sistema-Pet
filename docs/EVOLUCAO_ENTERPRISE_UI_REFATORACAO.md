@@ -209,13 +209,20 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-28 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
 
-- 28 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 27 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 28 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 27 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 1 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 12 de 2026-06-28: `backend/app/campaigns/scheduler.py` saiu da faixa acima de 700 linhas ao virar orquestrador leve dos jobs de campanhas:
+
+- `backend/app/campaigns/scheduler.py`: 812 -> 169 linhas, mantendo `CampaignScheduler`, os mesmos IDs de jobs APScheduler e o import publico `seed_campaigns_for_tenant`.
+- `backend/app/campaigns/scheduler_jobs.py`: concentra sorteios automaticos, destaque mensal, auto-seed, publicacao de eventos agendados e expiracao/alertas de cashback.
+- `backend/app/campaigns/scheduler_seed.py`: concentra as campanhas padrao e a funcao idempotente de seed por tenant.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_12_refactor.py`, garantindo jobs registrados, delegacao dos metodos privados, reexports publicos e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 11 de 2026-06-28: `backend/app/sugestoes_racoes_routes.py` saiu da faixa acima de 700 linhas ao virar agregador das sugestoes inteligentes de racoes:
 
