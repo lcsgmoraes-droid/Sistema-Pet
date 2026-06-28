@@ -1,6 +1,6 @@
 # Indice operacional do Sistema Pet
 
-Atualizado em: 2026-05-19
+Atualizado em: 2026-06-28
 
 Este e o ponto de entrada oficial da documentacao. Se houver conflito entre este
 indice e um documento historico, use este indice e o guia mestre de maturidade.
@@ -24,6 +24,8 @@ Guia mestre:
 | Observabilidade e auditoria | `docs/RETENCAO_LOGS_AUDITORIA.md` | Painel Ops e logs JSONL |
 | Estrutura/refatoracao | `docs/auditorias/estrutura-geral-definition-of-done.md` | Testes focados da fatia |
 | Vender Plano Basico | `docs/GUIA_VENDA_PLANO_BASICO.md` | Checklist de onboarding e clientes piloto |
+| Implantacao inicial | `docs/implantacao/GUIA_IMPLANTACAO_INICIAL.md` | Introducao Guiada em `/ajuda` |
+| Criativos e videos do sistema | `docs/marketing/MATRIZ_CRIATIVOS_SISTEMA.md` | Guia de implantacao e telas reais |
 | Demo Veterinario | `docs/GUIA_DEMO_VETERINARIO_CLINICA.md` | Roteiro de demo e limites de piloto |
 | Maiara/Vet/Admin SaaS | `docs/CRONOGRAMA_MAIARA_VETERINARIO_ADMIN_SAAS.md` | Preparacao de demo, padronizacao Vet e admin global |
 | Habilitar app mobile por tenant | `docs/GUIA_HABILITAR_APP_MOBILE_TENANT.md` | Checklist de slug, cidade, perfil e modulos |
@@ -44,6 +46,8 @@ Guia mestre:
 | Observabilidade/auditoria | `docs/RETENCAO_LOGS_AUDITORIA.md` |
 | Portabilidade/configuracao | `docs/DEV_ENVIRONMENT_CHECK.md` |
 | Venda do Plano Basico | `docs/GUIA_VENDA_PLANO_BASICO.md` |
+| Implantacao inicial | `docs/implantacao/GUIA_IMPLANTACAO_INICIAL.md` |
+| Criativos e videos | `docs/marketing/MATRIZ_CRIATIVOS_SISTEMA.md` |
 | Demo/Piloto Veterinario | `docs/GUIA_DEMO_VETERINARIO_CLINICA.md` |
 | Maiara, Veterinario e Admin SaaS | `docs/CRONOGRAMA_MAIARA_VETERINARIO_ADMIN_SAAS.md` |
 | App mobile por tenant | `docs/GUIA_HABILITAR_APP_MOBILE_TENANT.md` |
