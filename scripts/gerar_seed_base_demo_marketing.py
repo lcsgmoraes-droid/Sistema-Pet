@@ -15,14 +15,19 @@ from validar_base_demo_marketing import (
 
 SEED_NAME = "marketing_base_demo"
 
+SECTION_FINANCEIRO_BANCOS = "financeiro.bancos"
+SECTION_FINANCEIRO_FORMAS_PAGAMENTO = "financeiro.formas_pagamento"
+SECTION_FINANCEIRO_CATEGORIAS = "financeiro.categorias"
+SECTION_FINANCEIRO_IMPOSTOS = "financeiro.impostos"
+
 
 SECTION_ORDER = [
     "empresa",
     "usuarios",
-    "financeiro.bancos",
-    "financeiro.formas_pagamento",
-    "financeiro.categorias",
-    "financeiro.impostos",
+    SECTION_FINANCEIRO_BANCOS,
+    SECTION_FINANCEIRO_FORMAS_PAGAMENTO,
+    SECTION_FINANCEIRO_CATEGORIAS,
+    SECTION_FINANCEIRO_IMPOSTOS,
     "fornecedores",
     "clientes",
     "pets",
@@ -37,10 +42,10 @@ SECTION_ORDER = [
 SECTION_LABELS = {
     "empresa": "Empresa",
     "usuarios": "Usuarios",
-    "financeiro.bancos": "Bancos/contas",
-    "financeiro.formas_pagamento": "Formas de pagamento",
-    "financeiro.categorias": "Categorias financeiras",
-    "financeiro.impostos": "Impostos/configuracao fiscal",
+    SECTION_FINANCEIRO_BANCOS: "Bancos/contas",
+    SECTION_FINANCEIRO_FORMAS_PAGAMENTO: "Formas de pagamento",
+    SECTION_FINANCEIRO_CATEGORIAS: "Categorias financeiras",
+    SECTION_FINANCEIRO_IMPOSTOS: "Impostos/configuracao fiscal",
     "fornecedores": "Fornecedores",
     "clientes": "Clientes",
     "pets": "Pets",
@@ -98,16 +103,16 @@ def _action_notes(section: str) -> list[str]:
             "Criar usuarios demo apenas se o ambiente permitir login ficticio.",
             "Nao criar senha real neste manifesto.",
         ],
-        "financeiro.bancos": [
+        SECTION_FINANCEIRO_BANCOS: [
             "Criar antes de formas de pagamento que apontam para conta destino.",
         ],
-        "financeiro.formas_pagamento": [
+        SECTION_FINANCEIRO_FORMAS_PAGAMENTO: [
             "Criar antes de gravar venda PDV ou recebimento demo.",
         ],
-        "financeiro.categorias": [
+        SECTION_FINANCEIRO_CATEGORIAS: [
             "Classificar receitas e despesas para relatorios.",
         ],
-        "financeiro.impostos": [
+        SECTION_FINANCEIRO_IMPOSTOS: [
             "Usar apenas configuracao fiscal ficticia para explicacao de custo.",
         ],
         "fornecedores": [
@@ -207,14 +212,6 @@ def render_markdown(plan: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def write_output(content: str, output_path: Path | None) -> None:
-    if output_path is None:
-        print(content)
-        return
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(content + "\n", encoding="utf-8")
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Gera manifesto de seed para a base demo de marketing."
@@ -232,12 +229,6 @@ def main(argv: list[str] | None = None) -> int:
         choices=["json", "markdown"],
         default="markdown",
         help="Formato de saida.",
-    )
-    parser.add_argument(
-        "--out",
-        type=Path,
-        default=None,
-        help="Arquivo de saida opcional. Se omitido, imprime no console.",
     )
     args = parser.parse_args(argv)
 
@@ -257,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         content = render_markdown(plan)
 
-    write_output(content, args.out)
+    print(content)
     return 0
 
 

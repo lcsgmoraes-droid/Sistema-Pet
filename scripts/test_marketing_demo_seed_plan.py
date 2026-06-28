@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -130,6 +131,35 @@ def main() -> int:
         "Pet Feliz Demo" in markdown_result.stdout,
         "Markdown deve citar empresa demo",
     )
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        outside_manifest = Path(tmp_dir) / "manifesto.json"
+        out_result = subprocess.run(
+            [
+                sys.executable,
+                str(GENERATOR_PATH),
+                "--json",
+                str(DATA_PATH),
+                "--tenant-slug",
+                "tenant_demo",
+                "--format",
+                "json",
+                "--out",
+                str(outside_manifest),
+            ],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert_true(
+            out_result.returncode != 0,
+            "Gerador nao deve aceitar caminho de saida controlado pela CLI",
+        )
+        assert_true(
+            not outside_manifest.exists(),
+            "Gerador nao deve criar arquivo fora do fluxo seguro",
+        )
 
     print("Marketing demo seed plan contract OK")
     return 0
