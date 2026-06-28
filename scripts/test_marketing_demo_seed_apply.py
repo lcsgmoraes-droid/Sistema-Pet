@@ -11,6 +11,14 @@ DATA_PATH = (
     ROOT / "docs" / "marketing" / "base-demo" / "dados_base_demo_sistema_pet.json"
 )
 APPLIER_PATH = ROOT / "scripts" / "aplicar_seed_base_demo_marketing.py"
+DEMO_TENANT_EMAIL = "corepeterp@gmail.com"
+REAL_TENANT_EMAIL = "atacadaopetpp" + "@gmail.com"
+OLD_DEMO_TENANT_EMAIL = "demo.atacadaopetpp@sistemapet.local"
+MARKETING_DOCS = [
+    ROOT / "docs" / "marketing" / "BASE_DEMO_GRAVACAO.md",
+    ROOT / "docs" / "marketing" / "PACOTE_INICIAL_VIDEOS.md",
+    ROOT / "docs" / "marketing" / "PLANO_CAPTURA_TELAS_DEMO.md",
+]
 
 
 class RecordingRepository:
@@ -42,7 +50,7 @@ class FakeUserModel:
 class FakeUser:
     id = 44
     tenant_id = "tenant-123"
-    email = "atacadaopetpp@gmail.com"
+    email = DEMO_TENANT_EMAIL
 
 
 class EmptyTenantUser:
@@ -197,17 +205,32 @@ def main() -> int:
     payload = json.loads(DATA_PATH.read_text(encoding="utf-8"))
     plan = build_seed_plan(payload, tenant_slug="tenant_demo")
 
+    for doc_path in MARKETING_DOCS:
+        doc_content = doc_path.read_text(encoding="utf-8")
+        assert_true(
+            REAL_TENANT_EMAIL not in doc_content,
+            f"{doc_path.name} nao deve apontar para tenant real ja usado",
+        )
+        assert_true(
+            OLD_DEMO_TENANT_EMAIL not in doc_content,
+            f"{doc_path.name} nao deve apontar para email demo antigo",
+        )
+        assert_true(
+            DEMO_TENANT_EMAIL in doc_content,
+            f"{doc_path.name} deve apontar para o tenant demo atual",
+        )
+
     dry_repo = RecordingRepository()
     dry_result = apply_seed_plan(
         plan,
         repository=dry_repo,
         dry_run=True,
         environment="development",
-        tenant_email="atacadaopetpp@gmail.com",
+        tenant_email=DEMO_TENANT_EMAIL,
     )
     assert_true(dry_result["dry_run"] is True, "Dry-run deve ser explicito")
     assert_true(
-        dry_result["tenant_email"] == "atacadaopetpp@gmail.com",
+        dry_result["tenant_email"] == DEMO_TENANT_EMAIL,
         "Dry-run deve registrar o email do tenant alvo",
     )
     assert_true(dry_result["total_actions"] == 14, "Dry-run deve cobrir manifesto")
@@ -257,7 +280,7 @@ def main() -> int:
             "--tenant-slug",
             "tenant_demo",
             "--tenant-email",
-            "atacadaopetpp@gmail.com",
+            DEMO_TENANT_EMAIL,
             "--dry-run",
         ],
         cwd=ROOT,
@@ -269,7 +292,7 @@ def main() -> int:
     cli_payload = json.loads(cli_result.stdout)
     assert_true(cli_payload["dry_run"] is True, "CLI deve executar dry-run")
     assert_true(
-        cli_payload["tenant_email"] == "atacadaopetpp@gmail.com",
+        cli_payload["tenant_email"] == DEMO_TENANT_EMAIL,
         "CLI deve manter email do tenant alvo no resumo",
     )
     assert_true(cli_payload["total_actions"] == 14, "CLI deve resumir acoes")
@@ -327,7 +350,7 @@ def main() -> int:
             "--tenant-slug",
             "tenant_demo",
             "--tenant-email",
-            "atacadaopetpp@gmail.com",
+            DEMO_TENANT_EMAIL,
             "--environment",
             "production",
             "--apply",
@@ -348,13 +371,13 @@ def main() -> int:
 
     context = resolve_tenant_context_by_email(
         FakeDb(FakeUser()),
-        " AtacadaoPetPP@GMAIL.COM ",
+        " CorePetERP@GMAIL.COM ",
         user_model=FakeUserModel,
     )
     assert_true(
         context
         == {
-            "tenant_email": "atacadaopetpp@gmail.com",
+            "tenant_email": DEMO_TENANT_EMAIL,
             "tenant_id": "tenant-123",
             "user_id": 44,
         },
@@ -364,7 +387,7 @@ def main() -> int:
     try:
         resolve_tenant_context_by_email(
             FakeDb(None),
-            "atacadaopetpp@gmail.com",
+            DEMO_TENANT_EMAIL,
             user_model=FakeUserModel,
         )
     except ValueError as exc:
@@ -454,7 +477,7 @@ def main() -> int:
     context_events: list[object] = []
     tenant_apply_result = apply_seed_plan_for_tenant_email(
         plan,
-        tenant_email=" AtacadaoPetPP@GMAIL.COM ",
+        tenant_email=" CorePetERP@GMAIL.COM ",
         session_factory=lambda: apply_session,
         environment="development",
         models=FAKE_SEED_MODELS,
@@ -467,7 +490,7 @@ def main() -> int:
         "Aplicacao por tenant email deve sair do dry-run",
     )
     assert_true(
-        tenant_apply_result["tenant_email"] == "atacadaopetpp@gmail.com",
+        tenant_apply_result["tenant_email"] == DEMO_TENANT_EMAIL,
         "Aplicacao deve normalizar o email alvo",
     )
     assert_true(
