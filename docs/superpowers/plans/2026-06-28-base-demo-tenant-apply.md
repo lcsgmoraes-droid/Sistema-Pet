@@ -18,7 +18,7 @@
 
 - [ ] **Step 1: Write the failing test**
 
-Add assertions that `apply_seed_plan(..., tenant_email="atacadaopetpp@gmail.com")` includes `tenant_email` in the result and that CLI dry-run accepts `--tenant-email atacadaopetpp@gmail.com`.
+Add assertions that `apply_seed_plan(..., tenant_email="demo.atacadaopetpp@sistemapet.local")` includes `tenant_email` in the result and that CLI dry-run accepts `--tenant-email demo.atacadaopetpp@sistemapet.local`.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -42,7 +42,7 @@ Expected: PASS with `Marketing demo seed apply contract OK`.
 
 - [ ] **Step 1: Write the failing test**
 
-Add a fake session/query test for `resolve_tenant_context_by_email(fake_db, "atacadaopetpp@gmail.com")`, expecting tenant id, user id, and normalized email.
+Add a fake session/query test for `resolve_tenant_context_by_email(fake_db, "demo.atacadaopetpp@sistemapet.local")`, expecting tenant id, user id, and normalized email.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -91,7 +91,7 @@ Expected: PASS.
 
 - [ ] **Step 1: Update docs**
 
-Document the dry-run command with `--tenant-email atacadaopetpp@gmail.com`, explain that real apply is only for DEV/demo and not a production deploy.
+Document the dry-run command with `--tenant-email demo.atacadaopetpp@sistemapet.local`, explain that real apply is only for DEV/demo and not a production deploy.
 
 - [ ] **Step 2: Run focused checks**
 
