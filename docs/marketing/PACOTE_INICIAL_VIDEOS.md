@@ -4,6 +4,7 @@ Uso: organizar a primeira leva de criativos e demonstracoes do Sistema Pet.
 
 Dados estruturados: `docs/marketing/base-demo/dados_base_demo_sistema_pet.json`.
 Plano de captura: `docs/marketing/PLANO_CAPTURA_TELAS_DEMO.md`.
+Manifesto de seed: `scripts/gerar_seed_base_demo_marketing.py`.
 
 ## Objetivo da primeira leva
 
@@ -222,6 +223,7 @@ Para cada video:
 - Nome do arquivo segue `GUIA_PRODUCAO_VIDEO_IA.md`.
 - Tela gravada existe no sistema atual.
 - Base demo nao tem dados reais.
+- Manifesto de seed demo foi gerado antes de gravar.
 - Gancho aparece nos primeiros 3 segundos.
 - Legenda esta legivel no celular.
 - CTA aparece no final.

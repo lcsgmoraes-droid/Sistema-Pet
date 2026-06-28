@@ -8,6 +8,8 @@ Arquivos executaveis da base demo:
 - Dados estruturados: `docs/marketing/base-demo/dados_base_demo_sistema_pet.json`
 - Validador/checklist: `scripts/validar_base_demo_marketing.py`
 - Contrato: `scripts/test_marketing_demo_package.py`
+- Manifesto de seed: `scripts/gerar_seed_base_demo_marketing.py`
+- Contrato do manifesto: `scripts/test_marketing_demo_seed_plan.py`
 
 ## Objetivo
 
@@ -149,7 +151,9 @@ Evitar:
 ## Checklist antes de gravar
 
 - Rodar `python scripts/test_marketing_demo_package.py`.
+- Rodar `python scripts/test_marketing_demo_seed_plan.py`.
 - Rodar `python scripts/validar_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --markdown`.
+- Gerar o manifesto com `python scripts/gerar_seed_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --tenant-slug tenant_demo --format markdown`.
 - Separar a fila de takes em `docs/marketing/PLANO_CAPTURA_TELAS_DEMO.md`.
 - A base abre sem erros.
 - Todas as telas dos roteiros carregam.
