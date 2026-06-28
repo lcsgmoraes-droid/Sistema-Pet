@@ -207,15 +207,24 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
-Inventario atualizado em 2026-06-28 por contagem fisica `ReadAllLines`/`splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais. A batch 13 corrigiu a metodologia do contador: as rodadas anteriores usavam uma contagem que ignorava linhas em branco, por isso o numero operacional voltou a refletir a linha fisica real.
+Inventario atualizado em 2026-06-28 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 21 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 20 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 21 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 20 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 19 de 2026-06-28: `backend/app/veterinario_internacao_routes.py` saiu da faixa acima de 700 linhas ao virar agregador das rotas de internacao veterinaria:
+
+- `backend/app/veterinario_internacao_routes.py`: 883 -> 16 linhas, mantendo o `router` publico usado por `veterinario_routes.py`.
+- `backend/app/veterinario_internacao_routes_parts/listagem_config_routes.py`: concentra listagem de internacoes e configuracao de baias.
+- `backend/app/veterinario_internacao_routes_parts/agenda_routes.py`: concentra agenda, conclusao e cancelamento de procedimentos de internacao.
+- `backend/app/veterinario_internacao_routes_parts/mutacao_routes.py`: concentra criacao, evolucao clinica, procedimento e alta.
+- `backend/app/veterinario_internacao_routes_parts/historico_routes.py`: concentra detalhe da internacao e historico por pet.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_19_refactor.py`, garantindo endpoints publicos, ordem de rotas estaticas e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 18 de 2026-06-28: `backend/app/vendas/service.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do orquestrador central de vendas:
 
