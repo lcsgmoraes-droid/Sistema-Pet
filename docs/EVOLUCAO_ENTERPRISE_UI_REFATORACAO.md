@@ -209,13 +209,22 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-28 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 20 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 19 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 20 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 19 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 20 de 2026-06-28: `backend/app/veterinario_agenda_routes.py` saiu da faixa acima de 700 linhas ao virar agregador das rotas de agenda veterinaria:
+
+- `backend/app/veterinario_agenda_routes.py`: 836 -> 41 linhas fisicas, mantendo o `router` publico e reexports dos handlers historicos.
+- `backend/app/veterinario_agenda_routes_parts/cadastros_routes.py`: concentra veterinarios e consultorios.
+- `backend/app/veterinario_agenda_routes_parts/pets_routes.py`: concentra pets acessiveis ao modulo veterinario.
+- `backend/app/veterinario_agenda_routes_parts/calendario_routes.py`: concentra calendario, token, ICS autenticado e feed publico.
+- `backend/app/veterinario_agenda_routes_parts/agendamentos_routes.py`: concentra listagem, diagnostico push, criacao, atualizacao, remocao e desfazer inicio de atendimento.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_20_refactor.py`, garantindo endpoints publicos, reexports e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 19 de 2026-06-28: `backend/app/veterinario_internacao_routes.py` saiu da faixa acima de 700 linhas ao virar agregador das rotas de internacao veterinaria:
 
