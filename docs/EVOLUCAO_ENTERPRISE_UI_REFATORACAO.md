@@ -209,13 +209,22 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-28 por contagem fisica `ReadAllLines`/`splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais. A batch 13 corrigiu a metodologia do contador: as rodadas anteriores usavam uma contagem que ignorava linhas em branco, por isso o numero operacional voltou a refletir a linha fisica real.
 
-- 63 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 62 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 55 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 54 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 8 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 11 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 15 de 2026-06-28: `backend/app/financeiro_models.py` saiu da faixa acima de 700 linhas ao virar fachada compativel dos models ORM financeiros:
+
+- `backend/app/financeiro_models.py`: 925 -> 50 linhas, mantendo os imports publicos historicos de categorias, contas, pagamentos, caixa, lancamentos e conciliacao.
+- `backend/app/financeiro/models_catalogos.py`: concentra `CategoriaFinanceira`, `FormaPagamento` e `TipoDespesa`.
+- `backend/app/financeiro/models_contas.py`: concentra `ContaPagar`, `ContaReceber`, `Pagamento` e `Recebimento`.
+- `backend/app/financeiro/models_caixa.py`: concentra `ContaBancaria`, `MovimentacaoFinanceira`, `LancamentoManual` e `LancamentoRecorrente`.
+- `backend/app/financeiro/models_conciliacao.py`: concentra extratos, movimentacoes bancarias, regras de conciliacao, provisoes e templates de adquirente.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_15_refactor.py`, garantindo reexports publicos e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 14 de 2026-06-28: `backend/app/db/sql_audit.py` saiu da faixa acima de 700 linhas ao virar fachada do hook SQLAlchemy de auditoria:
 
