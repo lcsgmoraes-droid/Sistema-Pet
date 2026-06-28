@@ -2,6 +2,12 @@
 
 Uso: base para gravar videos do sistema e criar criativos de venda.
 
+Documentos complementares:
+
+- `docs/marketing/GUIA_PRODUCAO_VIDEO_IA.md`
+- `docs/marketing/ROTEIROS_CRIATIVOS_VENDA.md`
+- `docs/marketing/ROTEIROS_DEMO_FUNCIONALIDADES.md`
+
 ## Videos demonstrativos
 
 | Tema | Roteiro curto | Tela base | Duracao sugerida |
