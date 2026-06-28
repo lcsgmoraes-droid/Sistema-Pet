@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -62,6 +63,25 @@ def main() -> int:
         "Nenhum dado sensivel aparente" in result.stdout,
         "Checklist nao registra seguranca",
     )
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        outside_json = Path(tmp_dir) / "dados_base_demo_sistema_pet.json"
+        outside_json.write_text(json.dumps(payload), encoding="utf-8")
+        outside_result = subprocess.run(
+            [sys.executable, str(VALIDATOR_PATH), "--json", str(outside_json)],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert_true(
+            outside_result.returncode != 0,
+            "Validador deve recusar JSON fora do repositorio",
+        )
+        assert_true(
+            "fora do repositorio" in outside_result.stderr,
+            "Erro deve explicar restricao de caminho",
+        )
 
     print("Marketing demo package contract OK")
     return 0

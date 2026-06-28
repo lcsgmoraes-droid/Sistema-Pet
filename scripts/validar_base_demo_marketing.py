@@ -8,6 +8,10 @@ from pathlib import Path
 from typing import Any
 
 
+ROOT = Path(__file__).resolve().parents[1]
+ALLOWED_DATA_DIR = ROOT / "docs" / "marketing" / "base-demo"
+
+
 REQUIRED_TOP_LEVEL = [
     "metadata",
     "empresa",
@@ -42,6 +46,18 @@ REAL_EMAIL_DOMAINS = (
 )
 
 
+def resolve_demo_json_path(path: Path) -> Path:
+    resolved = path.resolve()
+    allowed_root = ALLOWED_DATA_DIR.resolve()
+    if not resolved.is_relative_to(allowed_root):
+        raise ValueError(
+            f"Caminho do JSON fora do repositorio/base demo permitida: {resolved}"
+        )
+    if not resolved.is_file():
+        raise ValueError(f"Arquivo JSON da base demo nao encontrado: {resolved}")
+    return resolved
+
+
 def load_payload(path: Path) -> dict[str, Any]:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -65,50 +81,75 @@ def iter_strings(value: Any) -> list[str]:
     return []
 
 
-def validate_payload(payload: dict[str, Any]) -> list[str]:
+def validate_required_sections(payload: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-
     for key in REQUIRED_TOP_LEVEL:
         if key not in payload:
             errors.append(f"Secao obrigatoria ausente: {key}")
+    return errors
 
+
+def validate_min_counts(payload: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
     for key, minimum in MIN_COUNTS.items():
         value = payload.get(key, [])
         if not isinstance(value, list) or len(value) < minimum:
             errors.append(f"Secao {key} deve ter ao menos {minimum} itens")
+    return errors
 
+
+def validate_empresa(payload: dict[str, Any]) -> list[str]:
     empresa = payload.get("empresa", {})
     if empresa.get("nome_fantasia") != "Pet Feliz Demo":
-        errors.append("Empresa demo deve ser Pet Feliz Demo")
+        return ["Empresa demo deve ser Pet Feliz Demo"]
+    return []
 
+
+def collect_product_skus(payload: dict[str, Any]) -> set[str]:
     products = payload.get("produtos", [])
-    product_skus = {
-        product.get("sku") for product in products if isinstance(product, dict)
-    }
+    return {product.get("sku") for product in products if isinstance(product, dict)}
+
+
+def validate_products(payload: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    required_fields = [
+        "sku",
+        "nome",
+        "categoria",
+        "preco_venda",
+        "custo",
+        "estoque_inicial",
+    ]
+    products = payload.get("produtos", [])
     for product in products:
         if not isinstance(product, dict):
             errors.append("Produto invalido encontrado")
             continue
-        for field in [
-            "sku",
-            "nome",
-            "categoria",
-            "preco_venda",
-            "custo",
-            "estoque_inicial",
-        ]:
+        for field in required_fields:
             if field not in product:
                 errors.append(f"Produto sem campo obrigatorio: {field}")
+    return errors
 
+
+def validate_ecommerce(payload: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
     ecommerce = payload.get("ecommerce", {})
+    product_skus = collect_product_skus(payload)
     for sku in ecommerce.get("produtos_publicados", []):
         if sku not in product_skus:
             errors.append(f"SKU publicado no ecommerce nao existe em produtos: {sku}")
+    return errors
 
+
+def validate_first_video(payload: dict[str, Any]) -> list[str]:
     first_video = (payload.get("videos_prioritarios") or [{}])[0]
     if first_video.get("titulo") != "Estoque que some":
-        errors.append("Primeiro video prioritario deve ser Estoque que some")
+        return ["Primeiro video prioritario deve ser Estoque que some"]
+    return []
 
+
+def validate_sensitive_strings(payload: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
     for text in iter_strings(payload):
         lowered = text.lower()
         if any(domain in lowered for domain in REAL_EMAIL_DOMAINS):
@@ -117,7 +158,22 @@ def validate_payload(payload: dict[str, Any]) -> list[str]:
             )
         if re.search(r"\b\d{3}\.\d{3}\.\d{3}-\d{2}\b", text):
             errors.append(f"CPF aparente encontrado: {text}")
+    return errors
 
+
+def validate_payload(payload: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    validators = [
+        validate_required_sections,
+        validate_min_counts,
+        validate_empresa,
+        validate_products,
+        validate_ecommerce,
+        validate_first_video,
+        validate_sensitive_strings,
+    ]
+    for validator in validators:
+        errors.extend(validator(payload))
     return errors
 
 
@@ -176,7 +232,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    payload = load_payload(args.json)
+    try:
+        json_path = resolve_demo_json_path(args.json)
+        payload = load_payload(json_path)
+    except ValueError as exc:
+        print(f"ERRO: {exc}", file=sys.stderr)
+        return 1
+
     errors = validate_payload(payload)
     if errors:
         for error in errors:
