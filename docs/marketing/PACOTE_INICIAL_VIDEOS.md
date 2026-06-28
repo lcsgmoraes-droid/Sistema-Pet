@@ -3,6 +3,7 @@
 Uso: organizar a primeira leva de criativos e demonstracoes do Sistema Pet.
 
 Dados estruturados: `docs/marketing/base-demo/dados_base_demo_sistema_pet.json`.
+Plano de captura: `docs/marketing/PLANO_CAPTURA_TELAS_DEMO.md`.
 
 ## Objetivo da primeira leva
 
@@ -24,7 +25,7 @@ Criar um conjunto pequeno, coerente e reutilizavel:
 | 5 | Produto, PDV e estoque | Demo | 60s | 16:9 e 9:16 | `ROTEIROS_DEMO_FUNCIONALIDADES.md` |
 | 6 | Financeiro antes da primeira venda | Demo | 75s | 16:9 | `ROTEIROS_DEMO_FUNCIONALIDADES.md` |
 | 7 | Como configurar do zero | Onboarding | 3 a 5 min | 16:9 | `GUIA_IMPLANTACAO_INICIAL.md` |
-| 8 | Visao geral Sistema Pet | Apresentacao | 5 a 8 min | 16:9 | Matriz + telas reais |
+| 8 | Visao geral Sistema Pet | Apresentacao | 5 a 8 min | 16:9 | Matriz + plano de captura |
 
 ## Lote 1 - Criativos de venda
 
@@ -42,6 +43,8 @@ Gravar:
 1. Produto com estoque.
 2. Venda no PDV.
 3. Tela de estoque/alertas.
+
+Takes base: 07, 08 e 09 em `PLANO_CAPTURA_TELAS_DEMO.md`.
 
 Mensagem:
 
@@ -69,6 +72,8 @@ Gravar:
 2. Venda no PDV.
 3. Contas a receber.
 
+Takes base: 03, 05 e 06 em `PLANO_CAPTURA_TELAS_DEMO.md`.
+
 Mensagem:
 
 ```text
@@ -94,6 +99,8 @@ Gravar:
 1. Relatorio de vendas.
 2. Dashboard financeiro ou DRE.
 3. Indicadores de resultado.
+
+Takes base: 04, 07, 11 e 19 em `PLANO_CAPTURA_TELAS_DEMO.md`.
 
 Mensagem:
 
@@ -226,11 +233,11 @@ Para cada video:
 
 | Video | Roteiro | Base demo | Gravado | Editado | Publicado |
 |---|---|---|---|---|---|
-| Estoque que some | Pronto | Pendente | Pendente | Pendente | Pendente |
-| Recebimentos baguncados | Pronto | Pendente | Pendente | Pendente | Pendente |
-| Lucro real | Pronto | Pendente | Pendente | Pendente | Pendente |
-| Configuracao inicial | Pronto | Pendente | Pendente | Pendente | Pendente |
-| Produto, PDV e estoque | Pronto | Pendente | Pendente | Pendente | Pendente |
-| Financeiro antes da primeira venda | Pronto | Pendente | Pendente | Pendente | Pendente |
-| Como configurar do zero | Pronto | Pendente | Pendente | Pendente | Pendente |
+| Estoque que some | Pronto | Dados validados | Pendente | Pendente | Pendente |
+| Recebimentos baguncados | Pronto | Dados validados | Pendente | Pendente | Pendente |
+| Lucro real | Pronto | Dados validados | Pendente | Pendente | Pendente |
+| Configuracao inicial | Pronto | Dados validados | Pendente | Pendente | Pendente |
+| Produto, PDV e estoque | Pronto | Dados validados | Pendente | Pendente | Pendente |
+| Financeiro antes da primeira venda | Pronto | Dados validados | Pendente | Pendente | Pendente |
+| Como configurar do zero | Pronto | Dados validados | Pendente | Pendente | Pendente |
 | Visao geral Sistema Pet | Pendente | Pendente | Pendente | Pendente | Pendente |

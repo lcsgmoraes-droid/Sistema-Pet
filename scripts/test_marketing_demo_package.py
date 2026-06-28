@@ -12,6 +12,9 @@ DATA_PATH = (
     ROOT / "docs" / "marketing" / "base-demo" / "dados_base_demo_sistema_pet.json"
 )
 VALIDATOR_PATH = ROOT / "scripts" / "validar_base_demo_marketing.py"
+CAPTURE_PLAN_PATH = ROOT / "docs" / "marketing" / "PLANO_CAPTURA_TELAS_DEMO.md"
+PACKAGE_PATH = ROOT / "docs" / "marketing" / "PACOTE_INICIAL_VIDEOS.md"
+INDEX_PATH = ROOT / "docs" / "INDICE_OPERACIONAL.md"
 
 
 def assert_true(condition: bool, message: str) -> None:
@@ -26,6 +29,10 @@ def main() -> int:
     assert_true(
         VALIDATOR_PATH.exists(),
         f"Validador da base demo nao encontrado: {VALIDATOR_PATH}",
+    )
+    assert_true(
+        CAPTURE_PLAN_PATH.exists(),
+        f"Plano de captura demo nao encontrado: {CAPTURE_PLAN_PATH}",
     )
 
     payload = json.loads(DATA_PATH.read_text(encoding="utf-8"))
@@ -82,6 +89,30 @@ def main() -> int:
             "fora do repositorio" in outside_result.stderr,
             "Erro deve explicar restricao de caminho",
         )
+
+    capture_plan = CAPTURE_PLAN_PATH.read_text(encoding="utf-8")
+    for expected_text in [
+        "Fila de takes prioritarios",
+        "Configuracao inicial",
+        "Financeiro antes da primeira venda",
+        "Produto, PDV e estoque",
+        "Nao gravar dados reais",
+    ]:
+        assert_true(
+            expected_text in capture_plan,
+            f"Plano de captura nao contem: {expected_text}",
+        )
+
+    package_text = PACKAGE_PATH.read_text(encoding="utf-8")
+    index_text = INDEX_PATH.read_text(encoding="utf-8")
+    assert_true(
+        "PLANO_CAPTURA_TELAS_DEMO.md" in package_text,
+        "Pacote inicial nao aponta para o plano de captura",
+    )
+    assert_true(
+        "PLANO_CAPTURA_TELAS_DEMO.md" in index_text,
+        "Indice operacional nao aponta para o plano de captura",
+    )
 
     print("Marketing demo package contract OK")
     return 0
