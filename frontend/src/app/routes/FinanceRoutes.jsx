@@ -30,7 +30,14 @@ export function createFinanceRoutes() {
       <Route
         path="financeiro/vendas"
         element={
-          <ProtectedRoute anyOfPermissions={["relatorios.financeiro", "clientes.visualizar"]}>
+          <ProtectedRoute
+            anyOfPermissions={[
+              "relatorios.financeiro",
+              "financeiro.vendas",
+              "clientes.visualizar",
+              "vendas.criar",
+            ]}
+          >
             <VendasFinanceiro />
           </ProtectedRoute>
         }

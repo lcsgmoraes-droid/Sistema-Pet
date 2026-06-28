@@ -209,13 +209,23 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-28 por contagem fisica `ReadAllLines`/`splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais. A batch 13 corrigiu a metodologia do contador: as rodadas anteriores usavam uma contagem que ignorava linhas em branco, por isso o numero operacional voltou a refletir a linha fisica real.
 
-- 23 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 22 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 23 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 22 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 17 de 2026-06-28: `backend/app/comissoes_avancadas_routes.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das rotas avancadas de comissoes:
+
+- `backend/app/comissoes_avancadas_routes.py`: 797 -> 29 linhas, mantendo o `router` publico com prefixo `/comissoes` e reexports dos handlers historicos.
+- `backend/app/comissoes_avancadas/conferencia_routes.py`: concentra a conferencia avancada com filtros por funcionario, produto, grupo e periodo.
+- `backend/app/comissoes_avancadas/pagamento_routes.py`: concentra formas de pagamento e fechamento com pagamento/compensacao.
+- `backend/app/comissoes_avancadas/common.py`: concentra logger estruturado compartilhado.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_17_refactor.py`, garantindo endpoints publicos, reexports e modulos abaixo de 700 linhas.
+- Contrato enterprise saneado: `backend/tests/unit/test_plano_basico_tenant_contract.py` passou a ler as rotas extraidas em `frontend/src/app/routes`, mantendo a cobertura de permissoes diretas apos a refatoracao do `App.jsx`.
+- Ajuste de permissao relacionado: `frontend/src/app/routes/FinanceRoutes.jsx` alinha a rota direta `financeiro/vendas` ao menu, aceitando `relatorios.financeiro`, `financeiro.vendas`, `clientes.visualizar` ou `vendas.criar`.
 
 Fatia backend 700 batch 16 de 2026-06-28: `backend/app/services/bling_flow_monitor_service.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do monitor Bling:
 

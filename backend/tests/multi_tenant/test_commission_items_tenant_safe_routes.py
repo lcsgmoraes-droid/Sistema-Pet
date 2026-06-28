@@ -6,6 +6,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 ROUTE_FILES = (
     PROJECT_ROOT / "app" / "comissoes_avancadas_routes.py",
+    PROJECT_ROOT / "app" / "comissoes_avancadas" / "conferencia_routes.py",
+    PROJECT_ROOT / "app" / "comissoes_avancadas" / "pagamento_routes.py",
     PROJECT_ROOT / "app" / "comissoes_diagnostico_routes.py",
     PROJECT_ROOT / "app" / "routers" / "relatorios_comissoes.py",
 )
