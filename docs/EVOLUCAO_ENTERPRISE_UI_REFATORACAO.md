@@ -209,13 +209,22 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-28 por contagem fisica `ReadAllLines`/`splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais. A batch 13 corrigiu a metodologia do contador: as rodadas anteriores usavam uma contagem que ignorava linhas em branco, por isso o numero operacional voltou a refletir a linha fisica real.
 
-- 64 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 63 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 56 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 55 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 8 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 11 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 14 de 2026-06-28: `backend/app/db/sql_audit.py` saiu da faixa acima de 700 linhas ao virar fachada do hook SQLAlchemy de auditoria:
+
+- `backend/app/db/sql_audit.py`: 923 -> 442 linhas, mantendo `audit_raw_sql`, `TENANT_TABLES`, `WHITELIST_TABLES`, `SQL_AUDIT_STATS`, config de enforcement e helpers historicos reexportados.
+- `backend/app/db/sql_audit_config.py`: concentra leitura de ambiente, aliases e validacao de nivel de enforcement.
+- `backend/app/db/sql_audit_tables.py`: concentra catalogo de tabelas multi-tenant e whitelist.
+- `backend/app/db/sql_audit_classifier.py`: concentra extracao de tabelas, classificacao de risco e filtro de statements auditaveis.
+- `backend/app/db/sql_audit_metrics.py`: concentra contadores, snapshot e payload publico de metricas.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_14_refactor.py`, garantindo reexports publicos, classificacao/metricas e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 13 de 2026-06-28: `backend/app/services/lgpd_service.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das operacoes LGPD:
 

@@ -17,13 +17,59 @@ Fase: 1.4.3-D (Enforcement)
 """
 
 import logging
-import traceback
-import re
 import os
+import traceback
 from datetime import datetime
-from typing import Any, List, Tuple
+from typing import Any
 from sqlalchemy import event
 from sqlalchemy.engine import Engine, Connection
+
+from app.db.sql_audit_classifier import (
+    classify_raw_sql_risk,
+    extract_table_names as _extract_table_names,
+    is_raw_sql_text as _is_raw_sql_text,
+    should_audit_statement as _should_audit_statement,
+)
+from app.db.sql_audit_config import (
+    PROD_LIKE_ENVIRONMENTS,
+    VALID_ENFORCEMENT_LEVELS,
+    current_environment_name as _current_environment_name,
+    env_truthy as _env_truthy,
+    normalize_enforcement_level as _normalize_enforcement_level,
+)
+from app.db.sql_audit_metrics import (
+    SNAPSHOT_INTERVAL,
+    SQL_AUDIT_STATS,
+    build_audit_stats,
+    increment_stats as _increment_stats,
+    log_snapshot as _log_snapshot,
+    reset_stats as _reset_audit_stats,
+)
+from app.db.sql_audit_tables import TENANT_TABLES, WHITELIST_TABLES
+
+__all__ = [
+    "RawSQLEnforcementError",
+    "PROD_LIKE_ENVIRONMENTS",
+    "SNAPSHOT_INTERVAL",
+    "SQL_AUDIT_ENFORCE",
+    "SQL_AUDIT_ENFORCE_LEVEL",
+    "SQL_AUDIT_ENFORCE_LEVEL_RAW",
+    "SQL_AUDIT_ENVIRONMENT",
+    "SQL_AUDIT_STATS",
+    "TENANT_TABLES",
+    "WHITELIST_TABLES",
+    "_env_truthy",
+    "_extract_table_names",
+    "_normalize_enforcement_level",
+    "audit_raw_sql",
+    "classify_raw_sql_risk",
+    "disable_sql_audit",
+    "enable_sql_audit",
+    "get_audit_stats",
+    "get_enforcement_config",
+    "is_enforcement_enabled",
+    "reset_audit_stats",
+]
 
 
 # =============================================================================
@@ -65,39 +111,6 @@ if not logger.handlers:
 # CONFIGURAÇÃO DE ENFORCEMENT - FASE 1.4.3-D
 # =============================================================================
 
-# Ler flags de ambiente
-PROD_LIKE_ENVIRONMENTS = {"production", "prod", "staging"}
-
-
-def _current_environment_name() -> str:
-    return (
-        (os.getenv("ENVIRONMENT") or os.getenv("APP_ENV") or os.getenv("ENV") or "")
-        .strip()
-        .lower()
-    )
-
-
-def _env_truthy(name: str, default: bool = False) -> bool:
-    raw_value = os.getenv(name)
-    if raw_value is None:
-        return default
-    return raw_value.strip().lower() in {"true", "1", "yes", "y", "on"}
-
-
-def _normalize_enforcement_level(raw_value: str | None) -> tuple[str, str]:
-    raw_level = (raw_value or "HIGH").strip().upper()
-    aliases = {
-        "ERROR": "HIGH",
-        "WARN": "HIGH",
-        "WARNING": "HIGH",
-        "STRICT": "MEDIUM",
-        "HIGH": "HIGH",
-        "MEDIUM": "MEDIUM",
-        "LOW": "LOW",
-    }
-    return aliases.get(raw_level, "HIGH"), raw_level
-
-
 SQL_AUDIT_ENVIRONMENT = _current_environment_name()
 SQL_AUDIT_ENFORCE = _env_truthy(
     "SQL_AUDIT_ENFORCE",
@@ -108,15 +121,7 @@ SQL_AUDIT_ENFORCE_LEVEL, SQL_AUDIT_ENFORCE_LEVEL_RAW = _normalize_enforcement_le
 )
 
 # Validar level
-if SQL_AUDIT_ENFORCE_LEVEL_RAW not in (
-    "HIGH",
-    "MEDIUM",
-    "LOW",
-    "ERROR",
-    "WARN",
-    "WARNING",
-    "STRICT",
-):
+if SQL_AUDIT_ENFORCE_LEVEL_RAW not in VALID_ENFORCEMENT_LEVELS:
     logger.warning(
         f"⚠️  SQL_AUDIT_ENFORCE_LEVEL inválido: {SQL_AUDIT_ENFORCE_LEVEL_RAW}. "
         f"Usando default: HIGH"
@@ -130,428 +135,6 @@ if SQL_AUDIT_ENFORCE:
     )
 else:
     logger.info("🔓 SQL Audit enforcement desativado (apenas logging)")
-
-
-# =============================================================================
-# MÉTRICAS EM MEMÓRIA - FASE 1.4.3-C
-# =============================================================================
-
-SQL_AUDIT_STATS = {
-    "total": 0,
-    "HIGH": 0,
-    "MEDIUM": 0,
-    "LOW": 0,
-    "by_file": {},  # {"comissoes_routes.py": 42, ...}
-    "by_table": {},  # {"comissoes_itens": 35, ...}
-    "last_snapshot": None,
-}
-
-# Logar snapshot a cada N eventos
-SNAPSHOT_INTERVAL = 50
-
-
-# =============================================================================
-# CLASSIFICAÇÃO DE RISCO - TABELAS
-# =============================================================================
-
-# Tabelas multi-tenant que OBRIGATORIAMENTE precisam de tenant_filter
-TENANT_TABLES = {
-    # Comissões (42 queries no inventário)
-    "comissoes_itens",
-    "comissoes_vendedores",
-    "comissoes_configuracao",
-    "comissoes_provisoes",
-    "comissoes_estornos",
-    # Vendas
-    "vendas",
-    "venda_baixas",
-    "venda_itens",
-    "venda_pagamentos",
-    "vendas_itens",
-    "vendas_pagamentos",
-    # Estoque
-    "produtos",
-    "produto_bling_sync",
-    "produto_bling_sync_queue",
-    "produto_granel_vinculos",
-    "produto_imagens",
-    "produto_kit_componentes",
-    "produtos_historico_precos",
-    "locais_estoque",
-    "estoque_movimentacoes",
-    "estoque_reservas",
-    # Financeiro
-    "contas_pagar",
-    "contas_receber",
-    "ecommerce_payment_gateway_configs",
-    "lancamentos_financeiros",
-    "caixa_movimentacoes",
-    "conciliacao_cartao",
-    # Clientes/Pets
-    "canal_descontos",
-    "clientes",
-    "pets",
-    "agendamentos",
-    # Notas Fiscais
-    "nota_fiscal_item_rateio_canal",
-    "nota_fiscal_rateio_canal",
-    "notas_entrada",
-    "notas_entrada_itens",
-    "notas_saida",
-    "notas_saida_itens",
-    # Pedidos
-    "pedido_itens",
-    "pedidos",
-    "pedidos_compra",
-    "pedidos_compra_itens",
-    "pedidos_integrados",
-    "pedidos_integrados_itens",
-    # Configurações por tenant
-    "usuarios",
-    "funcionarios",
-    "cargos",
-    "permissions_users",
-    # WhatsApp
-    "whatsapp_messages",
-    "whatsapp_contacts",
-    "conversas_ia",
-    "mensagens_chat",
-    "contexto_financeiro_chat",
-    # Relatórios
-    "dre_categorias_analise",
-    "dre_comparacoes",
-    "dre_detalhe_canais",
-    "dre_insights",
-    "dre_lancamentos",
-    "dre_periodos",
-    "dre_plano_contas",
-    "dre_produtos",
-    "indices_mercado",
-}
-
-# Tabelas de sistema que NÃO precisam de tenant_filter
-WHITELIST_TABLES = {
-    # Autenticação e controle
-    "tenants",
-    "permissions",
-    "roles",
-    "sessions",
-    # Sistema
-    "alembic_version",
-    "migrations",
-    # Catálogos globais
-    "fiscal_catalogo_produtos",
-    "fiscal_estado_padrao",
-    # PostgreSQL system
-    "pg_catalog",
-    "information_schema",
-}
-
-
-# =============================================================================
-# FUNÇÕES DE CLASSIFICAÇÃO
-# =============================================================================
-
-
-def _extract_table_names(sql: str) -> List[str]:
-    """
-    Extrai nomes de tabelas do SQL usando regex simples.
-
-    Ignora aliases curtos (1-2 chars como 'v', 'ci', 't1').
-
-    Args:
-        sql: SQL statement
-
-    Returns:
-        List[str]: Lista de nomes de tabelas encontrados
-    """
-    sql_lower = sql.lower()
-    tables = []
-
-    # Padrões comuns: FROM table, JOIN table, INTO table, UPDATE table
-    patterns = [
-        r"\bfrom\s+(\w+)",
-        r"\bjoin\s+(\w+)",
-        r"\binto\s+(\w+)",
-        r"\bupdate\s+(\w+)",
-    ]
-
-    for pattern in patterns:
-        matches = re.findall(pattern, sql_lower)
-        tables.extend(matches)
-
-    # Filtrar aliases comuns (1-2 caracteres: v, ci, t1, etc.)
-    # Tabelas reais geralmente têm 3+ caracteres
-    tables = [t for t in tables if len(t) >= 3]
-
-    # Remover duplicatas mantendo ordem
-    seen = set()
-    unique_tables = []
-    for table in tables:
-        if table not in seen:
-            seen.add(table)
-            unique_tables.append(table)
-
-    return unique_tables
-
-
-def classify_raw_sql_risk(
-    sql: str, has_tenant_filter: bool = False
-) -> Tuple[str, List[str]]:
-    """
-    Classifica o risco de segurança de uma query RAW SQL.
-
-    Níveis de Risco:
-    - HIGH: Tabela multi-tenant SEM {tenant_filter} → VAZAMENTO DE DADOS
-    - MEDIUM: RAW SQL fora do helper mas em tabela whitelist
-    - LOW: Query de sistema, health check, admin
-
-    Args:
-        sql: SQL statement a ser classificado
-        has_tenant_filter: Se a query contém {tenant_filter}
-
-    Returns:
-        Tuple[risk_level, tables_detected]:
-            - risk_level: "HIGH", "MEDIUM" ou "LOW"
-            - tables_detected: Lista de tabelas identificadas
-    """
-    sql_lower = sql.lower().strip()
-    tables = _extract_table_names(sql)
-
-    # === RISCO BAIXO (LOW) ===
-
-    # 1. Queries de health check
-    if any(
-        pattern in sql_lower
-        for pattern in [
-            "select 1",
-            "select version()",
-            "show server_version",
-            "pg_is_in_recovery",
-        ]
-    ):
-        return ("LOW", [])
-
-    # 2. Queries de sistema PostgreSQL
-    if any(
-        pattern in sql_lower
-        for pattern in [
-            "pg_catalog",
-            "information_schema",
-            "pg_stat_",
-            "pg_class",
-        ]
-    ):
-        return ("LOW", tables)
-
-    # 3. Transações e controle
-    if sql_lower in ["begin", "commit", "rollback", "savepoint"]:
-        return ("LOW", [])
-
-    # 4. Alembic migrations
-    if "alembic_version" in sql_lower:
-        return ("LOW", ["alembic_version"])
-
-    # === RISCO ALTO (HIGH) ===
-
-    # Detectar se toca tabela multi-tenant SEM filtro de tenant
-    tenant_tables_touched = [t for t in tables if t in TENANT_TABLES]
-
-    if tenant_tables_touched and not has_tenant_filter:
-        # CRÍTICO: Acesso a dados multi-tenant sem isolamento!
-        return ("HIGH", tenant_tables_touched)
-
-    # === RISCO MÉDIO (MEDIUM) ===
-
-    # 1. Tabelas whitelist (sistema, não precisam filtro)
-    whitelist_tables_touched = [t for t in tables if t in WHITELIST_TABLES]
-    if whitelist_tables_touched:
-        return ("MEDIUM", whitelist_tables_touched)
-
-    # 2. DDL statements (CREATE, ALTER, DROP)
-    if any(
-        pattern in sql_lower
-        for pattern in [
-            "create table",
-            "alter table",
-            "drop table",
-            "create index",
-            "drop index",
-        ]
-    ):
-        return ("MEDIUM", tables)
-
-    # 3. Queries complexas com joins/CTEs (pode ser legítimo mas precisa revisão)
-    if "with " in sql_lower or "cte" in sql_lower:
-        return ("MEDIUM", tables)
-
-    # 4. Nenhuma tabela detectada (pode ser subquery, função, etc.)
-    if not tables:
-        return ("MEDIUM", [])
-
-    # === DEFAULT: RISCO MÉDIO ===
-    # Se chegou aqui, não sabemos classificar com certeza
-    return ("MEDIUM", tables)
-
-
-def _increment_stats(
-    risk_level: str, tables_detected: List[str], file_origin: str
-) -> None:
-    """
-    Incrementa contadores de métricas em memória.
-
-    Args:
-        risk_level: HIGH, MEDIUM ou LOW
-        tables_detected: Lista de tabelas detectadas
-        file_origin: Arquivo de origem da query
-    """
-    # Incrementar total
-    SQL_AUDIT_STATS["total"] += 1
-
-    # Incrementar por risk level
-    if risk_level in SQL_AUDIT_STATS:
-        SQL_AUDIT_STATS[risk_level] += 1
-
-    # Incrementar por arquivo
-    if file_origin:
-        if file_origin not in SQL_AUDIT_STATS["by_file"]:
-            SQL_AUDIT_STATS["by_file"][file_origin] = 0
-        SQL_AUDIT_STATS["by_file"][file_origin] += 1
-
-    # Incrementar por tabela
-    for table in tables_detected:
-        if table not in SQL_AUDIT_STATS["by_table"]:
-            SQL_AUDIT_STATS["by_table"][table] = 0
-        SQL_AUDIT_STATS["by_table"][table] += 1
-
-
-def _log_snapshot() -> None:
-    """
-    Loga snapshot das métricas acumuladas.
-
-    Mostra:
-    - Total de queries auditadas
-    - Distribuição por risco (HIGH/MEDIUM/LOW)
-    - Top 5 arquivos com mais queries
-    - Top 5 tabelas mais acessadas
-    """
-    total = SQL_AUDIT_STATS["total"]
-
-    if total == 0:
-        return
-
-    # Calcular percentuais
-    high_pct = (SQL_AUDIT_STATS["HIGH"] / total * 100) if total > 0 else 0
-    medium_pct = (SQL_AUDIT_STATS["MEDIUM"] / total * 100) if total > 0 else 0
-    low_pct = (SQL_AUDIT_STATS["LOW"] / total * 100) if total > 0 else 0
-
-    # Top 5 arquivos
-    top_files = sorted(
-        SQL_AUDIT_STATS["by_file"].items(), key=lambda x: x[1], reverse=True
-    )[:5]
-
-    # Top 5 tabelas
-    top_tables = sorted(
-        SQL_AUDIT_STATS["by_table"].items(), key=lambda x: x[1], reverse=True
-    )[:5]
-
-    # Atualizar timestamp
-    SQL_AUDIT_STATS["last_snapshot"] = datetime.utcnow().isoformat()
-
-    # Log estruturado
-    logger.warning(
-        "📊 SQL AUDIT SNAPSHOT",
-        extra={
-            "event": "sql_audit_snapshot",
-            "timestamp": SQL_AUDIT_STATS["last_snapshot"],
-            "total_queries": total,
-            "high_count": SQL_AUDIT_STATS["HIGH"],
-            "medium_count": SQL_AUDIT_STATS["MEDIUM"],
-            "low_count": SQL_AUDIT_STATS["LOW"],
-            "top_files": dict(top_files),
-            "top_tables": dict(top_tables),
-        },
-    )
-
-    # Log legível
-    files_str = (
-        "\n    ".join(
-            [
-                f"{i + 1}. {file}: {count} queries"
-                for i, (file, count) in enumerate(top_files)
-            ]
-        )
-        if top_files
-        else "none"
-    )
-
-    tables_str = (
-        "\n    ".join(
-            [
-                f"{i + 1}. {table}: {count} accesses"
-                for i, (table, count) in enumerate(top_tables)
-            ]
-        )
-        if top_tables
-        else "none"
-    )
-
-    logger.warning(
-        f"\n"
-        f"{'=' * 80}\n"
-        f"📊 SQL AUDIT SNAPSHOT - {total} queries audited\n"
-        f"{'=' * 80}\n"
-        f"📈 By Risk Level:\n"
-        f"  🔴 HIGH:   {SQL_AUDIT_STATS['HIGH']:3d} ({high_pct:5.1f}%)\n"
-        f"  🟡 MEDIUM: {SQL_AUDIT_STATS['MEDIUM']:3d} ({medium_pct:5.1f}%)\n"
-        f"  🟢 LOW:    {SQL_AUDIT_STATS['LOW']:3d} ({low_pct:5.1f}%)\n"
-        f"\n"
-        f"📂 Top Files:\n"
-        f"    {files_str}\n"
-        f"\n"
-        f"📊 Top Tables:\n"
-        f"    {tables_str}\n"
-        f"{'=' * 80}\n"
-    )
-
-
-def _is_raw_sql_text(statement: str) -> bool:
-    """
-    Verifica se o statement é RAW SQL (não é query ORM).
-
-    ORM gera SQL como:
-    - SELECT table.column FROM table WHERE ...
-    - INSERT INTO table (col1, col2) VALUES (?, ?)
-
-    RAW SQL tipicamente tem características como:
-    - Espaçamento irregular
-    - Comentários SQL
-    - Funções complexas
-    - CTEs (WITH ...)
-    """
-    if not statement:
-        return False
-
-    statement_lower = statement.lower().strip()
-
-    # Indicadores de RAW SQL
-    raw_sql_indicators = [
-        "-- ",  # Comentários SQL
-        "/* ",  # Comentários multi-linha
-        "with ",  # CTEs
-        "::text",  # Casting PostgreSQL
-        "::jsonb",
-        "coalesce(",
-        "array_agg(",
-        "string_agg(",
-        "json_build_object(",
-    ]
-
-    for indicator in raw_sql_indicators:
-        if indicator in statement_lower:
-            return True
-
-    return False
 
 
 def _get_call_origin() -> tuple[str, str, int]:
@@ -610,50 +193,6 @@ def _is_from_tenant_safe_helper(stack_trace: str) -> bool:
     ]
 
     return any(indicator in stack_trace for indicator in indicators)
-
-
-def _should_audit_statement(statement: str) -> bool:
-    """
-    Verifica se o statement deve ser auditado.
-
-    Ignora:
-    - Queries de migrations (alembic)
-    - Queries de sistema (pg_catalog)
-    - Queries de health check
-    - Queries vazias
-
-    Args:
-        statement: SQL statement
-
-    Returns:
-        bool: True se deve auditar, False caso contrário
-    """
-    if not statement or len(statement.strip()) < 10:
-        return False
-
-    statement_lower = statement.lower()
-
-    # Ignorar queries de sistema
-    ignore_patterns = [
-        "pg_catalog",
-        "information_schema",
-        "pg_stat_",
-        "pg_class",
-        "alembic_version",
-        "select version()",
-        "show server_version",
-        "set time zone",
-        "begin",
-        "commit",
-        "rollback",
-        "savepoint",
-    ]
-
-    for pattern in ignore_patterns:
-        if pattern in statement_lower:
-            return False
-
-    return True
 
 
 @event.listens_for(Engine, "before_cursor_execute", retval=False)
@@ -857,38 +396,18 @@ def get_audit_stats() -> dict:
     Returns:
         dict: Métricas completas (total, by risk, by file, by table)
     """
-    # Adicionar status do listener
-    stats = SQL_AUDIT_STATS.copy()
-    stats["status"] = "active"
-    stats["listener_registered"] = event.contains(
-        Engine, "before_cursor_execute", audit_raw_sql
+    return build_audit_stats(
+        listener_registered=event.contains(
+            Engine, "before_cursor_execute", audit_raw_sql
+        )
     )
-
-    # Top 10 arquivos
-    stats["top_files"] = sorted(
-        SQL_AUDIT_STATS["by_file"].items(), key=lambda x: x[1], reverse=True
-    )[:10]
-
-    # Top 10 tabelas
-    stats["top_tables"] = sorted(
-        SQL_AUDIT_STATS["by_table"].items(), key=lambda x: x[1], reverse=True
-    )[:10]
-
-    return stats
 
 
 def reset_audit_stats() -> None:
     """
     Reseta todas as métricas (útil para testes).
     """
-    SQL_AUDIT_STATS["total"] = 0
-    SQL_AUDIT_STATS["HIGH"] = 0
-    SQL_AUDIT_STATS["MEDIUM"] = 0
-    SQL_AUDIT_STATS["LOW"] = 0
-    SQL_AUDIT_STATS["by_file"] = {}
-    SQL_AUDIT_STATS["by_table"] = {}
-    SQL_AUDIT_STATS["last_snapshot"] = None
-    logger.info("📊 SQL Audit stats reset")
+    _reset_audit_stats()
 
 
 def is_enforcement_enabled() -> bool:
