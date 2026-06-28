@@ -3,6 +3,12 @@
 Uso: preparar um ambiente ficticio e consistente para gravar videos do Sistema
 Pet sem expor dados reais de clientes.
 
+Arquivos executaveis da base demo:
+
+- Dados estruturados: `docs/marketing/base-demo/dados_base_demo_sistema_pet.json`
+- Validador/checklist: `scripts/validar_base_demo_marketing.py`
+- Contrato: `scripts/test_marketing_demo_package.py`
+
 ## Objetivo
 
 A base demo precisa permitir gravar:
@@ -142,6 +148,8 @@ Evitar:
 
 ## Checklist antes de gravar
 
+- Rodar `python scripts/test_marketing_demo_package.py`.
+- Rodar `python scripts/validar_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --markdown`.
 - A base abre sem erros.
 - Todas as telas dos roteiros carregam.
 - Os dados ficticios aparecem com nomes consistentes.

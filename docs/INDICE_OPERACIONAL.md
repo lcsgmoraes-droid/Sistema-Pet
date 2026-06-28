@@ -28,6 +28,7 @@ Guia mestre:
 | Criativos e videos do sistema | `docs/marketing/MATRIZ_CRIATIVOS_SISTEMA.md` | Guia de implantacao e telas reais |
 | Produzir videos com IA | `docs/marketing/GUIA_PRODUCAO_VIDEO_IA.md` | Roteiros de venda e demos por funcionalidade |
 | Preparar base demo para gravacao | `docs/marketing/BASE_DEMO_GRAVACAO.md` | Tenant/base demonstracao sem dados reais |
+| Validar dados demo de marketing | `scripts/test_marketing_demo_package.py` | JSON em `docs/marketing/base-demo/` |
 | Roteiros de venda | `docs/marketing/ROTEIROS_CRIATIVOS_VENDA.md` | Matriz de criativos e dados ficticios |
 | Demos de funcionalidades | `docs/marketing/ROTEIROS_DEMO_FUNCIONALIDADES.md` | Sistema em ambiente demo |
 | Pacote inicial de videos | `docs/marketing/PACOTE_INICIAL_VIDEOS.md` | Base demo e roteiros aprovados |
