@@ -209,13 +209,21 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-28 por contagem fisica `ReadAllLines`/`splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais. A batch 13 corrigiu a metodologia do contador: as rodadas anteriores usavam uma contagem que ignorava linhas em branco, por isso o numero operacional voltou a refletir a linha fisica real.
 
-- 22 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 21 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 22 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 21 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 18 de 2026-06-28: `backend/app/vendas/service.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do orquestrador central de vendas:
+
+- `backend/app/vendas/service.py`: 800 -> 76 linhas, mantendo `VendaService` e os reexports publicos historicos.
+- `backend/app/vendas/estoque_baixa.py`: concentra a baixa de estoque de produto simples, variacao, kit fisico e kit virtual.
+- `backend/app/vendas/cancelamento_service.py`: concentra o cancelamento atomico com estornos de estoque, financeiro, entrega, comissoes, campanhas e evento de dominio.
+- `backend/app/vendas/numeracao.py`: concentra a numeracao sequencial por tenant.
+- Contrato atualizado: `backend/tests/unit/test_vendas_service_refactor_contract.py`, garantindo API publica, modulos abaixo de 700 linhas e delegacao da fachada.
 
 Fatia backend 700 batch 17 de 2026-06-28: `backend/app/comissoes_avancadas_routes.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das rotas avancadas de comissoes:
 
