@@ -209,13 +209,22 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-28 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 15 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 14 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 15 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 14 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 25 de 2026-06-28: `backend/app/bling_integration.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do cliente Bling v3:
+
+- `backend/app/bling_integration.py`: 903 -> 56 linhas fisicas, mantendo `BlingAPI`, constantes, helpers de rate limit/url e reexports fiscais historicos.
+- `backend/app/bling_integration_parts/core.py`: concentra configuracao, token, rate limit, request HTTP, renovacao e validacao de conexao.
+- `backend/app/bling_integration_parts/notas.py`: concentra emissao, payload, consulta, listagem, cancelamento, CC-e, XML e DANFE de NF-e/NFC-e.
+- `backend/app/bling_integration_parts/catalogo.py`: concentra produtos, estoque, pedidos de venda e naturezas de operacao.
+- `backend/app/bling_integration_parts/api.py`: compoe `BlingAPI` a partir dos mixins especializados.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_25_refactor.py`, garantindo reexports, MRO publica e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 24 de 2026-06-28: `backend/app/campaigns/statement_service.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do extrato de campanhas por cliente:
 
