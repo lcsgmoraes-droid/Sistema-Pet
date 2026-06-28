@@ -65,7 +65,7 @@ def test_whatsapp_security_routes_use_selected_tenant_dependency():
 
 def test_whatsapp_security_background_callers_manage_tenant_context():
     security_source = _source("backend/app/whatsapp/security.py")
-    privacy_ops_source = _source("backend/app/services/lgpd_service.py")
+    privacy_ops_source = _source("backend/app/services/lgpd_consents.py")
     notification_source = _source("backend/app/campaigns/notification_service.py")
 
     assert (

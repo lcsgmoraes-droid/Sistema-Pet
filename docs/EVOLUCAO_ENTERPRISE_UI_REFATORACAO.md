@@ -207,15 +207,60 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
-Inventario atualizado em 2026-06-28 por contagem fisica `splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais:
+Inventario atualizado em 2026-06-28 por contagem fisica `ReadAllLines`/`splitlines()` dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais. A batch 13 corrigiu a metodologia do contador: as rodadas anteriores usavam uma contagem que ignorava linhas em branco, por isso o numero operacional voltou a refletir a linha fisica real.
 
-- 27 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 22 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 27 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 22 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 1 em `frontend/src` acima de 700 linhas.
+- Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 17 de 2026-06-28: `backend/app/comissoes_avancadas_routes.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das rotas avancadas de comissoes:
+
+- `backend/app/comissoes_avancadas_routes.py`: 797 -> 29 linhas, mantendo o `router` publico com prefixo `/comissoes` e reexports dos handlers historicos.
+- `backend/app/comissoes_avancadas/conferencia_routes.py`: concentra a conferencia avancada com filtros por funcionario, produto, grupo e periodo.
+- `backend/app/comissoes_avancadas/pagamento_routes.py`: concentra formas de pagamento e fechamento com pagamento/compensacao.
+- `backend/app/comissoes_avancadas/common.py`: concentra logger estruturado compartilhado.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_17_refactor.py`, garantindo endpoints publicos, reexports e modulos abaixo de 700 linhas.
+- Contrato enterprise saneado: `backend/tests/unit/test_plano_basico_tenant_contract.py` passou a ler as rotas extraidas em `frontend/src/app/routes`, mantendo a cobertura de permissoes diretas apos a refatoracao do `App.jsx`.
+- Ajuste de permissao relacionado: `frontend/src/app/routes/FinanceRoutes.jsx` alinha a rota direta `financeiro/vendas` ao menu, aceitando `relatorios.financeiro`, `financeiro.vendas`, `clientes.visualizar` ou `vendas.criar`.
+
+Fatia backend 700 batch 16 de 2026-06-28: `backend/app/services/bling_flow_monitor_service.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do monitor Bling:
+
+- `backend/app/services/bling_flow_monitor_service.py`: 800 -> 289 linhas, mantendo os imports publicos historicos e wrappers patchaveis para `sync_rls_tenant`, eventos, incidentes e auditoria.
+- `backend/app/services/bling_flow_monitor_constants.py`: concentra severidades, status finais e codigos monitorados.
+- `backend/app/services/bling_flow_monitor_incidents.py`: concentra registro de eventos, abertura/resolucao de incidentes e vinculo NF/pedido.
+- `backend/app/services/bling_flow_monitor_auditoria.py`: concentra auditoria periodica, resumo do monitoramento e execucao background.
+- Contrato atualizado: `backend/tests/unit/test_bling_flow_monitor_refactor_contract.py`, garantindo reexports legados e modulos novos abaixo de 700 linhas.
+
+Fatia backend 700 batch 15 de 2026-06-28: `backend/app/financeiro_models.py` saiu da faixa acima de 700 linhas ao virar fachada compativel dos models ORM financeiros:
+
+- `backend/app/financeiro_models.py`: 925 -> 50 linhas, mantendo os imports publicos historicos de categorias, contas, pagamentos, caixa, lancamentos e conciliacao.
+- `backend/app/financeiro/models_catalogos.py`: concentra `CategoriaFinanceira`, `FormaPagamento` e `TipoDespesa`.
+- `backend/app/financeiro/models_contas.py`: concentra `ContaPagar`, `ContaReceber`, `Pagamento` e `Recebimento`.
+- `backend/app/financeiro/models_caixa.py`: concentra `ContaBancaria`, `MovimentacaoFinanceira`, `LancamentoManual` e `LancamentoRecorrente`.
+- `backend/app/financeiro/models_conciliacao.py`: concentra extratos, movimentacoes bancarias, regras de conciliacao, provisoes e templates de adquirente.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_15_refactor.py`, garantindo reexports publicos e modulos abaixo de 700 linhas.
+
+Fatia backend 700 batch 14 de 2026-06-28: `backend/app/db/sql_audit.py` saiu da faixa acima de 700 linhas ao virar fachada do hook SQLAlchemy de auditoria:
+
+- `backend/app/db/sql_audit.py`: 923 -> 442 linhas, mantendo `audit_raw_sql`, `TENANT_TABLES`, `WHITELIST_TABLES`, `SQL_AUDIT_STATS`, config de enforcement e helpers historicos reexportados.
+- `backend/app/db/sql_audit_config.py`: concentra leitura de ambiente, aliases e validacao de nivel de enforcement.
+- `backend/app/db/sql_audit_tables.py`: concentra catalogo de tabelas multi-tenant e whitelist.
+- `backend/app/db/sql_audit_classifier.py`: concentra extracao de tabelas, classificacao de risco e filtro de statements auditaveis.
+- `backend/app/db/sql_audit_metrics.py`: concentra contadores, snapshot e payload publico de metricas.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_14_refactor.py`, garantindo reexports publicos, classificacao/metricas e modulos abaixo de 700 linhas.
+
+Fatia backend 700 batch 13 de 2026-06-28: `backend/app/services/lgpd_service.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das operacoes LGPD:
+
+- `backend/app/services/lgpd_service.py`: 927 -> 46 linhas, mantendo `PrivacyOpsService`, `PREFERENCE_TYPES` e helpers historicos reexportados.
+- `backend/app/services/lgpd_consents.py`: concentra consentimentos, preferencias e contexto tenant-safe do WhatsApp.
+- `backend/app/services/lgpd_requests.py`: concentra criacao, listagem e processamento de solicitacoes do titular.
+- `backend/app/services/lgpd_customer_data.py`: concentra dossie/exportacao e anonimizacao auditavel de cliente.
+- `backend/app/services/lgpd_audit.py`, `backend/app/services/lgpd_serializers.py` e `backend/app/services/lgpd_utils.py`: concentram auditoria, serializadores e helpers compartilhados.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_13_refactor.py`, garantindo fachada publica, mixins extraidos e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 12 de 2026-06-28: `backend/app/campaigns/scheduler.py` saiu da faixa acima de 700 linhas ao virar orquestrador leve dos jobs de campanhas:
 
