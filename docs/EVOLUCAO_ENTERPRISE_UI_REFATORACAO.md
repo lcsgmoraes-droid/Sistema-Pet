@@ -209,13 +209,24 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-28 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 14 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 13 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 14 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 13 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 26 de 2026-06-28: `backend/app/ia/aba6_chat_ia.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do servico de chat IA:
+
+- `backend/app/ia/aba6_chat_ia.py`: 837 -> 22 linhas fisicas, mantendo `ChatIAService` e os helpers publicos consumidos por `backend/app/chat_routes.py`.
+- `backend/app/ia/aba6_chat_ia_parts/conversas.py`: concentra criacao, listagem, busca e exclusao de conversas com tenant selecionado.
+- `backend/app/ia/aba6_chat_ia_parts/mensagens.py`: concentra persistencia e historico de mensagens com filtro de tenant.
+- `backend/app/ia/aba6_chat_ia_parts/periodos.py`: concentra normalizacao de texto, deteccao de periodos e comparacoes.
+- `backend/app/ia/aba6_chat_ia_parts/metricas.py`: concentra consultas agregadas de vendas, DRE simplificada, produtos, rankings e resumo executivo.
+- `backend/app/ia/aba6_chat_ia_parts/contexto.py`: concentra o contexto financeiro usado para resposta do chat.
+- `backend/app/ia/aba6_chat_ia_parts/respostas.py`: concentra a orquestracao de mensagem do usuario, resposta assistente e delegacao para regras simples.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_26_refactor.py`, garantindo facade publica e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 25 de 2026-06-28: `backend/app/bling_integration.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do cliente Bling v3:
 
@@ -510,7 +521,7 @@ Fatia frontend zero 1000 de 2026-06-26: os cinco arquivos finais de `frontend/sr
 
 Fatia backend zero 1000 de 2026-06-26: os ultimos sete arquivos de `backend/app` acima de 1000 linhas sairam dessa faixa com fachadas compativeis e modulos por responsabilidade:
 
-- `backend/app/ia/aba6_chat_ia.py`: 1132 -> 837 linhas, com respostas deterministicas de IA em `backend/app/ia/aba6_resposta_simples.py`.
+- `backend/app/ia/aba6_chat_ia.py`: 1132 -> 837 linhas nesta etapa, com respostas deterministicas de IA em `backend/app/ia/aba6_resposta_simples.py`; depois complementado pela fatia backend 700 batch 26.
 - `backend/app/vendas/pos_processamento.py`: 1127 -> 642 linhas, com DRE de competencia em `backend/app/vendas/dre_pos_processamento.py`.
 - `backend/app/models.py`: 1125 -> 940 linhas, com autorizacao em `backend/app/models_authz.py` e modelos operacionais em `backend/app/models_operacionais.py`.
 - `backend/app/campaigns/loyalty_service.py`: 1112 -> 767 linhas, com recompensas e helpers de fidelidade em `backend/app/campaigns/loyalty_rewards.py`.

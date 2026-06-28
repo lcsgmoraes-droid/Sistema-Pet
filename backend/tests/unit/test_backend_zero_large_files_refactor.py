@@ -20,6 +20,15 @@ TARGET_FILES = [
 ]
 
 EXTRACTED_MODULES = [
+    "app.ia.aba6_chat_ia_parts",
+    "app.ia.aba6_chat_ia_parts.base",
+    "app.ia.aba6_chat_ia_parts.contexto",
+    "app.ia.aba6_chat_ia_parts.conversas",
+    "app.ia.aba6_chat_ia_parts.mensagens",
+    "app.ia.aba6_chat_ia_parts.metricas",
+    "app.ia.aba6_chat_ia_parts.periodos",
+    "app.ia.aba6_chat_ia_parts.respostas",
+    "app.ia.aba6_chat_ia_parts.service",
     "app.ia.aba6_resposta_simples",
     "app.vendas.dre_pos_processamento",
     "app.models_authz",
