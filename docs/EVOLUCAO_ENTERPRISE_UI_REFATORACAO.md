@@ -209,13 +209,22 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-28 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 19 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 18 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 19 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 18 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 21 de 2026-06-28: `backend/app/formas_pagamento_routes.py` saiu da faixa acima de 700 linhas ao virar agregador das rotas de formas de pagamento, taxas e analise de venda:
+
+- `backend/app/formas_pagamento_routes.py`: 864 -> 34 linhas fisicas, mantendo o `router` publico com prefixo `/formas-pagamento` e reexports historicos.
+- `backend/app/formas_pagamento_routes_parts/schemas.py`: concentra os schemas de taxas e analise de venda.
+- `backend/app/formas_pagamento_routes_parts/taxas_routes.py`: concentra criacao, listagem, atualizacao e remocao de taxas.
+- `backend/app/formas_pagamento_routes_parts/analise_routes.py`: concentra a analise financeira da venda no PDV sem alterar a regra de calculo.
+- `backend/app/formas_pagamento_routes_parts/impostos_routes.py`: concentra listagem, criacao e definicao de imposto padrao.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_21_refactor.py`, garantindo endpoints publicos, reexports e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 20 de 2026-06-28: `backend/app/veterinario_agenda_routes.py` saiu da faixa acima de 700 linhas ao virar agregador das rotas de agenda veterinaria:
 
