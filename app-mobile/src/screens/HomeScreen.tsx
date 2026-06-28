@@ -82,60 +82,102 @@ export default function HomeScreen() {
       </View>
 
       <TouchableOpacity
-        style={styles.scannerCard}
+        style={styles.scannerCardCompacto}
         onPress={() => navigation.navigate('Loja', { screen: 'BarcodeScanner' })}
         activeOpacity={0.85}
       >
+        <View style={styles.scannerIconBox}>
+          <Ionicons name="barcode-outline" size={24} color={CORES.primario} />
+        </View>
         <View style={styles.scannerInfo}>
           <Text style={styles.scannerTitulo}>Comprar sem fila</Text>
           <Text style={styles.scannerTexto}>
-            Escaneie produtos na prateleira, monte seu carrinho e acompanhe os beneficios disponiveis.
+            Escaneie produtos na prateleira.
           </Text>
         </View>
-        <Ionicons name="barcode-outline" size={48} color="rgba(255,255,255,0.7)" />
+        <Ionicons name="chevron-forward" size={20} color={CORES.textoClaro} />
       </TouchableOpacity>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitulo}>Comprar por pet</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}>
+            <Text style={styles.verTodos}>Ver loja</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.petChips}>
+          <CategoriaPetChip
+            iconName="paw-outline"
+            label="Cães"
+            cor="#E0F2FE"
+            corTexto="#0369A1"
+            onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
+          />
+          <CategoriaPetChip
+            iconName="sparkles-outline"
+            label="Gatos"
+            cor="#FAE8FF"
+            corTexto="#86198F"
+            onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
+          />
+          <CategoriaPetChip
+            iconName="nutrition-outline"
+            label="Rações"
+            cor="#DCFCE7"
+            corTexto="#166534"
+            onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
+          />
+          <CategoriaPetChip
+            iconName="pricetag-outline"
+            label="Ofertas"
+            cor="#FEF3C7"
+            corTexto="#92400E"
+            onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
+          />
+        </View>
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitulo}>Acesso rapido</Text>
         <View style={styles.atalhos}>
           <Atalho
-            iconText="Loja"
-            titulo="Produtos"
+            iconName="storefront-outline"
+            titulo="Loja"
             cor="#EFF6FF"
             corTexto={CORES.primario}
             onPress={() => navigation.navigate('Loja', { screen: 'Catalogo' })}
           />
           <Atalho
-            iconText="VET"
-            titulo="Veterinario"
+            iconName="medical-outline"
+            titulo="Veterinário"
             cor="#EEF2FF"
             corTexto="#4338CA"
             onPress={abrirVeterinario}
           />
           <Atalho
-            iconText="Calc"
+            iconName="calculator-outline"
             titulo="Calculadora"
             cor="#F0FDF4"
             corTexto={CORES.sucesso}
             onPress={() => navigation.navigate('Pets', { screen: 'CalculadoraRacao' })}
           />
           <Atalho
-            iconText="BT"
+            iconName="cut-outline"
             titulo="Banho & Tosa"
             cor="#ECFEFF"
             corTexto="#0E7490"
             onPress={() => navigation.navigate('Pets', { screen: 'BanhoTosa' })}
           />
           <Atalho
-            iconText="Ped"
+            iconName="receipt-outline"
             titulo="Pedidos"
             cor="#FDF4FF"
             corTexto="#9333EA"
             onPress={() => navigation.navigate('Pedidos')}
           />
           <Atalho
-            iconText="Pts"
-            titulo="Beneficios"
+            iconName="gift-outline"
+            titulo="Benefícios"
             cor="#FEF3C7"
             corTexto="#92400E"
             onPress={() => navigation.navigate('Beneficios')}
@@ -169,13 +211,13 @@ export default function HomeScreen() {
 }
 
 function Atalho({
-  iconText,
+  iconName,
   titulo,
   cor,
   corTexto,
   onPress,
 }: {
-  iconText: string;
+  iconName: React.ComponentProps<typeof Ionicons>['name'];
   titulo: string;
   cor: string;
   corTexto: string;
@@ -183,8 +225,29 @@ function Atalho({
 }) {
   return (
     <TouchableOpacity style={[styles.atalho, { backgroundColor: cor }]} onPress={onPress}>
-      <Text style={[styles.atalhoIcon, { color: corTexto }]}>{iconText}</Text>
+      <Ionicons name={iconName} size={22} color={corTexto} />
       <Text style={[styles.atalhoTexto, { color: corTexto }]}>{titulo}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function CategoriaPetChip({
+  iconName,
+  label,
+  cor,
+  corTexto,
+  onPress,
+}: {
+  iconName: React.ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  cor: string;
+  corTexto: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={[styles.petChip, { backgroundColor: cor }]} onPress={onPress}>
+      <Ionicons name={iconName} size={18} color={corTexto} />
+      <Text style={[styles.petChipTexto, { color: corTexto }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -246,19 +309,31 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   pontosTexto: { fontSize: FONTE.normal, fontWeight: 'bold', color: '#92400E' },
-  scannerCard: {
-    margin: ESPACO.lg,
-    backgroundColor: CORES.primario,
-    borderRadius: RAIO.lg,
-    padding: ESPACO.lg,
+  scannerCardCompacto: {
+    marginHorizontal: ESPACO.lg,
+    marginTop: ESPACO.lg,
+    marginBottom: ESPACO.md,
+    backgroundColor: CORES.superficie,
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: CORES.borda,
     ...SOMBRA,
   },
-  scannerInfo: { flex: 1, paddingRight: ESPACO.md },
-  scannerTitulo: { fontSize: FONTE.grande, fontWeight: 'bold', color: '#fff', marginBottom: 6 },
-  scannerTexto: { fontSize: FONTE.pequena, color: 'rgba(255,255,255,0.85)', lineHeight: 18 },
+  scannerIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: RAIO.md,
+    backgroundColor: CORES.primarioClaro,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: ESPACO.sm,
+  },
+  scannerInfo: { flex: 1, minWidth: 0, paddingRight: ESPACO.sm },
+  scannerTitulo: { fontSize: FONTE.normal, fontWeight: '800', color: CORES.texto, marginBottom: 2 },
+  scannerTexto: { fontSize: FONTE.pequena, color: CORES.textoSecundario, lineHeight: 16 },
   section: { paddingHorizontal: ESPACO.lg, marginBottom: ESPACO.lg },
   sectionHeader: {
     flexDirection: 'row',
@@ -273,16 +348,33 @@ const styles = StyleSheet.create({
     marginBottom: ESPACO.sm,
   },
   verTodos: { fontSize: FONTE.normal, color: CORES.primario, fontWeight: '500' },
+  petChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: ESPACO.sm,
+  },
+  petChip: {
+    width: '48%',
+    minHeight: 48,
+    borderRadius: RAIO.md,
+    paddingHorizontal: ESPACO.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ESPACO.xs,
+  },
+  petChipTexto: { fontSize: FONTE.normal, fontWeight: '800' },
   atalhos: { flexDirection: 'row', flexWrap: 'wrap', gap: ESPACO.sm },
   atalho: {
     width: '31%',
     borderRadius: RAIO.md,
-    paddingVertical: ESPACO.md,
+    minHeight: 78,
+    paddingHorizontal: ESPACO.xs,
+    paddingVertical: ESPACO.sm,
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
+    gap: 6,
   },
-  atalhoIcon: { fontSize: 13, fontWeight: '900', letterSpacing: 0.3 },
-  atalhoTexto: { fontSize: FONTE.pequena, fontWeight: '600' },
+  atalhoTexto: { fontSize: FONTE.pequena, fontWeight: '700', textAlign: 'center' },
   produtosGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

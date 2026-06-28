@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import * as Notifications from "expo-notifications";
 import * as AuthService from "../services/auth.service";
 import { ensurePushNotificationsRegistered } from "../services/pushNotifications.service";
 import { useAuthStore } from "../store/auth.store";
@@ -19,9 +20,26 @@ export default function HeaderProfileActions({
   const { user, logout, selectProfile, updateUser } = useAuthStore();
   const [loadingProfiles, setLoadingProfiles] = useState(false);
   const [activatingNotifications, setActivatingNotifications] = useState(false);
+  const [notificacoesAtivadas, setNotificacoesAtivadas] = useState(false);
   const available_profiles = user?.available_profiles ?? [];
   const currentProfile = user?.selected_profile ?? user?.perfil_operacional ?? "cliente";
   const canSwitch = available_profiles.length > 1;
+
+  useEffect(() => {
+    let mounted = true;
+
+    Notifications.getPermissionsAsync()
+      .then((permission) => {
+        if (mounted) setNotificacoesAtivadas(permission.status === "granted");
+      })
+      .catch(() => {
+        if (mounted) setNotificacoesAtivadas(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const trocarPerfil = async () => {
     setLoadingProfiles(true);
@@ -76,8 +94,10 @@ export default function HeaderProfileActions({
     setActivatingNotifications(true);
     try {
       const result = await ensurePushNotificationsRegistered();
+      setNotificacoesAtivadas(result.status === "registered" || result.permissionStatus === "granted");
       Alert.alert("Notificacoes", result.message);
     } catch (err: any) {
+      setNotificacoesAtivadas(false);
       Alert.alert(
         "Notificacoes",
         err?.message || "Nao foi possivel ativar notificacoes.",
@@ -98,7 +118,7 @@ export default function HeaderProfileActions({
         {activatingNotifications ? (
           <ActivityIndicator color={color} size="small" />
         ) : (
-          <Ionicons name="notifications-outline" size={18} color={color} />
+          <Ionicons name={notificacoesAtivadas ? "notifications" : "notifications-outline"} size={18} color={color} />
         )}
         <Text style={[styles.text, { color }]}>Notif.</Text>
       </TouchableOpacity>

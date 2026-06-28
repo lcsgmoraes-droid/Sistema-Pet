@@ -10,6 +10,8 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,16 +24,87 @@ import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../../theme';
 import { formatarMoeda } from '../../utils/format';
 
 const ORDER_OPTIONS: Array<{ value: CatalogOrder; label: string }> = [
-  { value: 'prontos', label: 'Mais prontos' },
+  { value: 'prontos', label: 'Relevância' },
   { value: 'nome', label: 'A-Z' },
   { value: 'menor_preco', label: 'Menor preço' },
   { value: 'maior_preco', label: 'Maior preço' },
 ];
 
-function nextCatalogOrder(current: CatalogOrder): CatalogOrder {
-  const currentIndex = ORDER_OPTIONS.findIndex((item) => item.value === current);
-  const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % ORDER_OPTIONS.length : 0;
-  return ORDER_OPTIONS[nextIndex].value;
+type EspecieFiltro = 'todos' | 'cao' | 'gato';
+type PesoPetFiltro = 'todos' | 'ate3' | 'ate10' | 'ate15' | 'acima15';
+
+type CatalogoFiltros = {
+  especie: EspecieFiltro;
+  pesoPet: PesoPetFiltro;
+  marca: string;
+};
+
+const FILTROS_PADRAO: CatalogoFiltros = {
+  especie: 'todos',
+  pesoPet: 'todos',
+  marca: '',
+};
+
+const ESPECIE_OPTIONS: Array<{ value: EspecieFiltro; label: string }> = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'cao', label: 'Cão' },
+  { value: 'gato', label: 'Gato' },
+];
+
+const PESO_PET_OPTIONS: Array<{ value: PesoPetFiltro; label: string }> = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'ate3', label: 'Até 3 kg' },
+  { value: 'ate10', label: 'Até 10 kg' },
+  { value: 'ate15', label: 'Até 15 kg' },
+  { value: 'acima15', label: 'Acima de 15 kg' },
+];
+
+function normalizarTexto(value: string | null | undefined): string {
+  return (value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function textoProduto(produto: Produto): string {
+  return normalizarTexto(
+    [produto.nome, produto.categoria_nome, produto.marca_nome, produto.descricao]
+      .filter(Boolean)
+      .join(' ')
+  );
+}
+
+function combinaEspecie(texto: string, especie: EspecieFiltro): boolean {
+  if (especie === 'todos') return true;
+
+  const termosCao = /\b(cao|caes|canin|cachorro|dog|puppy)\b/;
+  const termosGato = /\b(gato|gatos|felin|cat|kitten)\b/;
+
+  if (especie === 'cao') {
+    if (termosCao.test(texto)) return true;
+    return !termosGato.test(texto);
+  }
+
+  if (termosGato.test(texto)) return true;
+  return !termosCao.test(texto);
+}
+
+function combinaPesoPet(texto: string, pesoPet: PesoPetFiltro): boolean {
+  if (pesoPet === 'todos') return true;
+  if (pesoPet === 'ate3') return !/\b(grande|gigante|large|15\s?kg|20\s?kg)\b/.test(texto);
+  if (pesoPet === 'ate10') return !/\b(gigante|giant|20\s?kg|25\s?kg)\b/.test(texto);
+  if (pesoPet === 'ate15') return !/\b(gigante|giant|25\s?kg)\b/.test(texto);
+  return !/\b(mini|toy|filhote|pequeno|small)\b/.test(texto);
+}
+
+function aplicarFiltrosCatalogo(produto: Produto, filtros: CatalogoFiltros): boolean {
+  const texto = textoProduto(produto);
+
+  if (filtros.marca && produto.marca_nome !== filtros.marca) return false;
+  if (!combinaEspecie(texto, filtros.especie)) return false;
+  if (!combinaPesoPet(texto, filtros.pesoPet)) return false;
+
+  return true;
 }
 
 export default function CatalogScreen() {
@@ -45,13 +118,38 @@ export default function CatalogScreen() {
   const [total, setTotal] = useState(0);
   const [carregando, setCarregando] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [somenteComEstoque, setSomenteComEstoque] = useState(false);
-  const [somenteComImagem, setSomenteComImagem] = useState(false);
+  const [modalFiltrosVisivel, setModalFiltrosVisivel] = useState(false);
+  const [filtros, setFiltros] = useState<CatalogoFiltros>(FILTROS_PADRAO);
   const [ordenacao, setOrdenacao] = useState<CatalogOrder>('prontos');
 
   const ordenacaoLabel = useMemo(
-    () => ORDER_OPTIONS.find((item) => item.value === ordenacao)?.label ?? 'Mais prontos',
+    () => ORDER_OPTIONS.find((item) => item.value === ordenacao)?.label ?? 'Relevância',
     [ordenacao]
+  );
+
+  const marcasDisponiveis = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          produtos
+            .map((produto) => produto.marca_nome?.trim())
+            .filter((marca): marca is string => !!marca)
+        )
+      ).sort((a, b) => a.localeCompare(b)),
+    [produtos]
+  );
+
+  const produtosFiltrados = useMemo(
+    () => produtos.filter((produto) => aplicarFiltrosCatalogo(produto, filtros)),
+    [filtros, produtos]
+  );
+
+  const filtrosAtivos = useMemo(
+    () =>
+      Number(filtros.especie !== FILTROS_PADRAO.especie) +
+      Number(filtros.pesoPet !== FILTROS_PADRAO.pesoPet) +
+      Number(!!filtros.marca),
+    [filtros]
   );
 
   const carregar = useCallback(
@@ -62,8 +160,6 @@ export default function CatalogScreen() {
         const { produtos: novos, total: totalRecebido } = await listarProdutos({
           pagina: pg,
           busca: q || undefined,
-          somenteComEstoque,
-          somenteComImagem,
           ordenacao,
           cacheBust: pg === 1 ? Date.now() : undefined,
         });
@@ -85,7 +181,7 @@ export default function CatalogScreen() {
         setCarregando(false);
       }
     },
-    [ordenacao, somenteComEstoque, somenteComImagem]
+    [ordenacao]
   );
 
   useEffect(() => {
@@ -113,6 +209,14 @@ export default function CatalogScreen() {
     if (!carregando && produtos.length < total) {
       carregar(pagina + 1, busca);
     }
+  }
+
+  function limparFiltros() {
+    setFiltros(FILTROS_PADRAO);
+  }
+
+  function selecionarFiltro<K extends keyof CatalogoFiltros>(campo: K, valor: CatalogoFiltros[K]) {
+    setFiltros((atuais) => ({ ...atuais, [campo]: valor }));
   }
 
   function renderProduto({ item }: { item: Produto }) {
@@ -175,7 +279,7 @@ export default function CatalogScreen() {
             {semEstoque
               ? 'Volta em breve'
               : Number.isFinite(estoqueDisponivel) && estoqueDisponivel > 0
-                ? `Em estoque: ${estoqueDisponivel}`
+                ? `Disponível: ${estoqueDisponivel}`
                 : 'Disponível'}
           </Text>
 
@@ -253,6 +357,22 @@ export default function CatalogScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
+          style={[styles.botaoScanner, filtrosAtivos > 0 && styles.botaoFiltroAtivo]}
+          onPress={() => setModalFiltrosVisivel(true)}
+        >
+          <Ionicons
+            name="funnel-outline"
+            size={22}
+            color={filtrosAtivos > 0 ? '#fff' : CORES.primario}
+          />
+          {filtrosAtivos > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeNum}>{filtrosAtivos}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={[styles.botaoScanner, { backgroundColor: CORES.primario }]}
           onPress={() => navigation.navigate('Carrinho')}
         >
@@ -265,34 +385,13 @@ export default function CatalogScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.filtrosContainer}>
-        <View style={styles.filtrosRow}>
-          <TouchableOpacity
-            style={[styles.filtroChip, somenteComEstoque && styles.filtroChipAtivo]}
-            onPress={() => setSomenteComEstoque((value) => !value)}
-          >
-            <Text style={[styles.filtroChipTexto, somenteComEstoque && styles.filtroChipTextoAtivo]}>
-              Em estoque
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.filtroChip, somenteComImagem && styles.filtroChipAtivo]}
-            onPress={() => setSomenteComImagem((value) => !value)}
-          >
-            <Text style={[styles.filtroChipTexto, somenteComImagem && styles.filtroChipTextoAtivo]}>
-              Com foto
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.filtroChip} onPress={() => setOrdenacao((value) => nextCatalogOrder(value))}>
-            <Text style={styles.filtroChipTexto}>{ordenacaoLabel}</Text>
-          </TouchableOpacity>
-        </View>
-
+      <View style={styles.resumoContainer}>
         <Text style={styles.resumoCatalogo}>
-          Mostrando {produtos.length} de {total || produtos.length} produtos
+          {filtrosAtivos > 0
+            ? `${produtosFiltrados.length} produto(s) filtrado(s)`
+            : `Mostrando ${produtos.length} de ${total || produtos.length} produtos`}
         </Text>
+        <Text style={styles.ordenacaoResumo}>{ordenacaoLabel}</Text>
       </View>
 
       {carregando && pagina === 1 ? (
@@ -301,7 +400,7 @@ export default function CatalogScreen() {
         </View>
       ) : (
         <FlatList
-          data={produtos}
+          data={produtosFiltrados}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderProduto}
           numColumns={2}
@@ -319,7 +418,118 @@ export default function CatalogScreen() {
           }
         />
       )}
+
+      <Modal
+        visible={modalFiltrosVisivel}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setModalFiltrosVisivel(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitulo}>Filtros</Text>
+                <Text style={styles.modalSubtitulo}>Encontre produtos por perfil do pet.</Text>
+              </View>
+              <TouchableOpacity onPress={() => setModalFiltrosVisivel(false)} style={styles.modalFechar}>
+                <Ionicons name="close" size={22} color={CORES.texto} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalConteudo}>
+              <FiltroSecao titulo="Espécie">
+                {ESPECIE_OPTIONS.map((item) => (
+                  <OpcaoFiltro
+                    key={item.value}
+                    label={item.label}
+                    selecionado={filtros.especie === item.value}
+                    onPress={() => selecionarFiltro('especie', item.value)}
+                  />
+                ))}
+              </FiltroSecao>
+
+              <FiltroSecao titulo="Peso do pet">
+                {PESO_PET_OPTIONS.map((item) => (
+                  <OpcaoFiltro
+                    key={item.value}
+                    label={item.label}
+                    selecionado={filtros.pesoPet === item.value}
+                    onPress={() => selecionarFiltro('pesoPet', item.value)}
+                  />
+                ))}
+              </FiltroSecao>
+
+              <FiltroSecao titulo="Marca">
+                <OpcaoFiltro
+                  label="Todas"
+                  selecionado={!filtros.marca}
+                  onPress={() => selecionarFiltro('marca', '')}
+                />
+                {marcasDisponiveis.map((marca) => (
+                  <OpcaoFiltro
+                    key={marca}
+                    label={marca}
+                    selecionado={filtros.marca === marca}
+                    onPress={() => selecionarFiltro('marca', marca)}
+                  />
+                ))}
+              </FiltroSecao>
+
+              <FiltroSecao titulo="Ordenar por">
+                {ORDER_OPTIONS.map((item) => (
+                  <OpcaoFiltro
+                    key={item.value}
+                    label={item.label}
+                    selecionado={ordenacao === item.value}
+                    onPress={() => setOrdenacao(item.value)}
+                  />
+                ))}
+              </FiltroSecao>
+            </ScrollView>
+
+            <View style={styles.modalAcoes}>
+              <TouchableOpacity style={styles.botaoLimpar} onPress={limparFiltros}>
+                <Text style={styles.botaoLimparTexto}>Limpar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.botaoAplicar} onPress={() => setModalFiltrosVisivel(false)}>
+                <Text style={styles.botaoAplicarTexto}>Aplicar filtros</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
+  );
+}
+
+function FiltroSecao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.filtroSecao}>
+      <Text style={styles.filtroSecaoTitulo}>{titulo}</Text>
+      <View style={styles.filtroOpcoes}>{children}</View>
+    </View>
+  );
+}
+
+function OpcaoFiltro({
+  label,
+  selecionado,
+  onPress,
+}: {
+  label: string;
+  selecionado: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.filtroChip, selecionado && styles.filtroChipAtivo]}
+      onPress={onPress}
+    >
+      <Text style={[styles.filtroChipTexto, selecionado && styles.filtroChipTextoAtivo]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -354,6 +564,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  botaoFiltroAtivo: {
+    backgroundColor: CORES.primario,
+  },
   badge: {
     position: 'absolute',
     top: -4,
@@ -366,17 +579,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badgeNum: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
-  filtrosContainer: {
+  resumoContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: ESPACO.sm,
     paddingHorizontal: ESPACO.md,
     paddingBottom: ESPACO.sm,
     backgroundColor: CORES.superficie,
     borderBottomWidth: 1,
     borderBottomColor: CORES.borda,
-  },
-  filtrosRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: ESPACO.xs,
   },
   filtroChip: {
     borderWidth: 1,
@@ -402,6 +614,101 @@ const styles = StyleSheet.create({
     marginTop: ESPACO.xs,
     fontSize: 12,
     color: CORES.textoClaro,
+  },
+  ordenacaoResumo: {
+    fontSize: 12,
+    color: CORES.primario,
+    fontWeight: '700',
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(17, 24, 39, 0.45)',
+  },
+  modalCard: {
+    maxHeight: '88%',
+    backgroundColor: CORES.superficie,
+    borderTopLeftRadius: RAIO.lg,
+    borderTopRightRadius: RAIO.lg,
+    paddingTop: ESPACO.md,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: ESPACO.lg,
+    paddingBottom: ESPACO.md,
+    borderBottomWidth: 1,
+    borderBottomColor: CORES.borda,
+  },
+  modalTitulo: {
+    fontSize: FONTE.grande,
+    fontWeight: '800',
+    color: CORES.texto,
+  },
+  modalSubtitulo: {
+    marginTop: 2,
+    fontSize: FONTE.pequena,
+    color: CORES.textoSecundario,
+  },
+  modalFechar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: CORES.fundo,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalConteudo: {
+    padding: ESPACO.lg,
+    paddingBottom: ESPACO.md,
+    gap: ESPACO.lg,
+  },
+  filtroSecao: {
+    gap: ESPACO.sm,
+  },
+  filtroSecaoTitulo: {
+    fontSize: FONTE.normal,
+    fontWeight: '800',
+    color: CORES.texto,
+  },
+  filtroOpcoes: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: ESPACO.xs,
+  },
+  modalAcoes: {
+    flexDirection: 'row',
+    gap: ESPACO.sm,
+    padding: ESPACO.lg,
+    paddingTop: ESPACO.md,
+    borderTopWidth: 1,
+    borderTopColor: CORES.borda,
+  },
+  botaoLimpar: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: RAIO.md,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  botaoLimparTexto: {
+    color: CORES.textoSecundario,
+    fontWeight: '800',
+  },
+  botaoAplicar: {
+    flex: 1.4,
+    minHeight: 44,
+    borderRadius: RAIO.md,
+    backgroundColor: CORES.primario,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  botaoAplicarTexto: {
+    color: '#fff',
+    fontWeight: '800',
   },
   lista: { padding: ESPACO.sm, paddingBottom: ESPACO.lg },
   colunaPar: { justifyContent: 'space-between', paddingHorizontal: ESPACO.xs, alignItems: 'stretch' },

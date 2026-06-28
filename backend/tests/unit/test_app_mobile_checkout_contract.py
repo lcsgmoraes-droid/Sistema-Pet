@@ -192,6 +192,49 @@ def test_mobile_wishlist_empty_state_stops_loading_when_no_favorites():
     )
 
 
+def test_mobile_home_prioritizes_shopping_and_compacts_scan_feature():
+    home = _read_mobile_source("app-mobile/src/screens/HomeScreen.tsx")
+
+    assert "Comprar por pet" in home
+    assert "scannerCardCompacto" in home
+    assert "iconName" in home
+    assert "Veterinário" in home
+    assert "Banho & Tosa" in home
+    assert "Pedidos" in home
+    assert "Benefícios" in home
+    assert 'iconText="VET"' not in home
+    assert 'iconText="Ped"' not in home
+    assert 'iconText="Pts"' not in home
+
+
+def test_mobile_notification_button_reflects_permission_state():
+    actions = _read_mobile_source("app-mobile/src/components/HeaderProfileActions.tsx")
+
+    assert 'import * as Notifications from "expo-notifications"' in actions
+    assert "Notifications.getPermissionsAsync" in actions
+    assert "notificacoesAtivadas" in actions
+    assert 'name={notificacoesAtivadas ? "notifications" : "notifications-outline"}' in actions
+
+
+def test_mobile_catalog_uses_customer_filter_modal_instead_of_admin_chips():
+    catalog = _read_mobile_source("app-mobile/src/screens/shop/CatalogScreen.tsx")
+
+    assert "Modal" in catalog
+    assert "modalFiltrosVisivel" in catalog
+    assert "Espécie" in catalog
+    assert "Peso do pet" in catalog
+    assert "Marca" in catalog
+    assert "aplicarFiltrosCatalogo" in catalog
+    assert "Cão" in catalog
+    assert "Gato" in catalog
+    assert "Até 3 kg" in catalog
+    assert "Até 10 kg" in catalog
+    assert "Até 15 kg" in catalog
+    assert "Em estoque" not in catalog
+    assert "Com foto" not in catalog
+    assert "Mais prontos" not in catalog
+
+
 def test_profile_points_card_wraps_without_overflow_on_narrow_mobile():
     profile = _read_mobile_source("app-mobile/src/screens/profile/ProfileScreen.tsx")
 
