@@ -209,13 +209,24 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-28 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 16 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 15 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 16 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 15 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 24 de 2026-06-28: `backend/app/campaigns/statement_service.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do extrato de campanhas por cliente:
+
+- `backend/app/campaigns/statement_service.py`: 829 -> 63 linhas fisicas, mantendo `build_campaign_customer_statement` e os helpers legados reexportados.
+- `backend/app/campaigns/statement_service_parts/builder.py`: concentra a orquestracao do extrato, filtros, ordenacao, enriquecimento e saldo atual.
+- `backend/app/campaigns/statement_service_parts/common.py`: concentra helpers de data, moeda, campanha, cupom e normalizacao de eventos.
+- `backend/app/campaigns/statement_service_parts/loyalty.py`: concentra eventos de carimbos e execucoes de fidelidade.
+- `backend/app/campaigns/statement_service_parts/coupons.py`: concentra carregamento de resgates e eventos de cupons/conversoes.
+- `backend/app/campaigns/statement_service_parts/cashback.py`: concentra eventos e saldo atual de cashback.
+- `backend/app/campaigns/statement_service_parts/ranking.py`: concentra eventos de ranking, enriquecimento de vendas e saldos correntes.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_24_refactor.py`, garantindo reexports e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 23 de 2026-06-28: `backend/app/services/bling_flow_monitor_diagnostics.py` saiu da faixa acima de 700 linhas ao virar fachada compativel dos diagnosticos do monitor Bling:
 
