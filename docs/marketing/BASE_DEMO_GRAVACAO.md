@@ -10,7 +10,7 @@ Arquivos executaveis da base demo:
 - Contrato: `scripts/test_marketing_demo_package.py`
 - Manifesto de seed: `scripts/gerar_seed_base_demo_marketing.py`
 - Contrato do manifesto: `scripts/test_marketing_demo_seed_plan.py`
-- Aplicador dry-run: `scripts/aplicar_seed_base_demo_marketing.py`
+- Aplicador dry-run/apply DEV: `scripts/aplicar_seed_base_demo_marketing.py`
 - Contrato do aplicador: `scripts/test_marketing_demo_seed_apply.py`
 
 ## Objetivo
@@ -34,6 +34,14 @@ A base demo precisa permitir gravar:
 - Nao gravar chaves de API, tokens, webhooks ou configuracoes sensiveis.
 - Nao gravar ambiente de producao.
 - Nao misturar base demo com operacao real.
+- Rodar `--apply` somente em tenant DEV/demo confirmado.
+- O tenant operacional desta leva e `atacadaopetpp@gmail.com`.
+- A aplicacao automatica atual cria apenas cadastros-base seguros: bancos,
+  formas de pagamento, categorias financeiras, fornecedores, clientes, pets,
+  produtos e servicos de banho/tosa.
+- A aplicacao automatica ainda pula empresa, usuarios, impostos, compras,
+  ecommerce, videos e servicos veterinarios; estes continuam em conferencia
+  manual antes da gravacao.
 
 ## Identidade da empresa demo
 
@@ -157,7 +165,8 @@ Evitar:
 - Rodar `python scripts/test_marketing_demo_seed_apply.py`.
 - Rodar `python scripts/validar_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --markdown`.
 - Gerar o manifesto com `python scripts/gerar_seed_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --tenant-slug tenant_demo --format markdown`.
-- Simular a aplicacao com `python scripts/aplicar_seed_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --tenant-slug tenant_demo --dry-run`.
+- Simular a aplicacao com `python scripts/aplicar_seed_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --tenant-slug atacadaopetpp --tenant-email atacadaopetpp@gmail.com --dry-run`.
+- Aplicar em DEV/demo, somente apos conferir o dry-run, com `python scripts/aplicar_seed_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --tenant-slug atacadaopetpp --tenant-email atacadaopetpp@gmail.com --environment development --apply`.
 - Separar a fila de takes em `docs/marketing/PLANO_CAPTURA_TELAS_DEMO.md`.
 - A base abre sem erros.
 - Todas as telas dos roteiros carregam.

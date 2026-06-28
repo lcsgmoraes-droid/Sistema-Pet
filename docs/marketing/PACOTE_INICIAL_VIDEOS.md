@@ -5,7 +5,8 @@ Uso: organizar a primeira leva de criativos e demonstracoes do Sistema Pet.
 Dados estruturados: `docs/marketing/base-demo/dados_base_demo_sistema_pet.json`.
 Plano de captura: `docs/marketing/PLANO_CAPTURA_TELAS_DEMO.md`.
 Manifesto de seed: `scripts/gerar_seed_base_demo_marketing.py`.
-Aplicador dry-run: `scripts/aplicar_seed_base_demo_marketing.py`.
+Aplicador dry-run/apply DEV: `scripts/aplicar_seed_base_demo_marketing.py`.
+Tenant demo desta leva: `atacadaopetpp@gmail.com`.
 
 ## Objetivo da primeira leva
 
@@ -225,7 +226,8 @@ Para cada video:
 - Tela gravada existe no sistema atual.
 - Base demo nao tem dados reais.
 - Manifesto de seed demo foi gerado antes de gravar.
-- Aplicador dry-run foi executado antes de mexer no tenant demo.
+- Aplicador dry-run foi executado com `--tenant-email atacadaopetpp@gmail.com`.
+- `--apply` foi usado somente em DEV/demo confirmado, nunca em producao.
 - Gancho aparece nos primeiros 3 segundos.
 - Legenda esta legivel no celular.
 - CTA aparece no final.
