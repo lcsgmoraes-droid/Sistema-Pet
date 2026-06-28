@@ -361,7 +361,13 @@ def test_pet_quick_add_blocks_race_without_selected_species():
 def test_payment_and_operator_catalog_routes_require_sales_or_config_permissions():
     financeiro_source = _source("backend/app/financeiro/config_routes.py")
     operadoras_source = _source("backend/app/operadoras_routes.py")
-    taxas_source = _source("backend/app/formas_pagamento_routes.py")
+    taxas_source = "\n".join(
+        [
+            _source("backend/app/formas_pagamento_routes_parts/taxas_routes.py"),
+            _source("backend/app/formas_pagamento_routes_parts/analise_routes.py"),
+            _source("backend/app/formas_pagamento_routes_parts/impostos_routes.py"),
+        ]
+    )
 
     def assert_route_requires(
         source: str, method: str, path: str, permission_pattern: str
