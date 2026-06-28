@@ -70,12 +70,12 @@ export async function executarIntroducaoChecks(api) {
         const { data = {} } = await api.get("/empresa/dados-cadastrais");
         return Boolean(
           data.cnpj &&
-            data.razao_social &&
-            data.endereco &&
-            data.numero &&
-            data.bairro &&
-            data.cidade &&
-            data.uf,
+          data.razao_social &&
+          data.endereco &&
+          data.numero &&
+          data.bairro &&
+          data.cidade &&
+          data.uf,
         );
       },
     ],
@@ -105,15 +105,14 @@ export async function executarIntroducaoChecks(api) {
         return categorias > 0 && subcategorias > 0;
       },
     ],
-    [
-      "categoriasProduto",
-      async () => toCount((await api.get("/produtos/categorias")).data) > 0,
-    ],
+    ["categoriasProduto", async () => toCount((await api.get("/produtos/categorias")).data) > 0],
     [
       "produtos",
       async () => {
         const { data = {} } = await api.get("/produtos?per_page=1");
-        return Boolean((Array.isArray(data.produtos) && data.produtos.length > 0) || data.total > 0);
+        return Boolean(
+          (Array.isArray(data.produtos) && data.produtos.length > 0) || data.total > 0,
+        );
       },
     ],
     [
@@ -136,14 +135,8 @@ export async function executarIntroducaoChecks(api) {
       "temVendas",
       async () => Number((await api.get("/vendas?page=1&per_page=1")).data?.total || 0) > 0,
     ],
-    [
-      "pedidoCompra",
-      async () => toCount((await api.get("/compras/pedidos?limit=1")).data) > 0,
-    ],
-    [
-      "entradaXml",
-      async () => toCount((await api.get("/compras/entrada-xml?limit=1")).data) > 0,
-    ],
+    ["pedidoCompra", async () => toCount((await api.get("/compras/pedidos?limit=1")).data) > 0],
+    ["entradaXml", async () => toCount((await api.get("/compras/entrada-xml?limit=1")).data) > 0],
     ["blingConfig", async () => toCount((await api.get("/bling/status")).data) > 0],
     [
       "configEntrega",
@@ -152,8 +145,9 @@ export async function executarIntroducaoChecks(api) {
     [
       "entregadores",
       async () =>
-        toCount((await api.get("/clientes/?is_entregador=true&incluir_inativos=false&limit=1")).data) >
-        0,
+        toCount(
+          (await api.get("/clientes/?is_entregador=true&incluir_inativos=false&limit=1")).data,
+        ) > 0,
     ],
     [
       "comissoesConfig",
