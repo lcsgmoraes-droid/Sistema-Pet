@@ -94,3 +94,18 @@ export function toggleMenuFavorite(favorites = [], item) {
 
   return [...normalized, target];
 }
+
+export function reorderMenuFavorites(favorites = [], activePath, overPath) {
+  const normalized = normalizeMenuFavorites(favorites);
+  const fromIndex = normalized.findIndex((favorite) => favorite.path === activePath);
+  const toIndex = normalized.findIndex((favorite) => favorite.path === overPath);
+
+  if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) {
+    return normalized;
+  }
+
+  const reordered = [...normalized];
+  const [moved] = reordered.splice(fromIndex, 1);
+  reordered.splice(toIndex, 0, moved);
+  return reordered;
+}
