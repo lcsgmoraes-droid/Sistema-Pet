@@ -209,13 +209,20 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 2 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 1 arquivo de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 2 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 1 arquivo acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 38 de 2026-06-30: `backend/app/comissoes_demonstrativo_routes.py` saiu da faixa acima de 700 linhas ao extrair as rotas administrativas do demonstrativo de comissoes:
+
+- `backend/app/comissoes_demonstrativo_routes.py`: 740 -> 637 linhas com conteudo, mantendo listagem, resumo, abertas, fechamento por funcionario e detalhe como router agregador.
+- `backend/app/comissoes_demonstrativo_admin_routes.py`: concentra `/comissoes/funcionarios` e `/comissoes/fechar`, incluindo consulta de funcionarios com comissoes e fechamento via `fechar_comissoes_pendentes`.
+- O agregador principal inclui `admin_router`, preservando os paths publicos e reexports `listar_funcionarios_comissoes` e `fechar_comissoes`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_38_refactor.py`, garantindo reexports publicos, subrouter incluido e ambos os modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 37 de 2026-06-30: `backend/app/clientes/financeiro_routes.py` saiu da faixa acima de 700 linhas ao extrair a baixa financeira em lote de vendas:
 
