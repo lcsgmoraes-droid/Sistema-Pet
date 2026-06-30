@@ -207,15 +207,24 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
-Inventario atualizado em 2026-06-28 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
+Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 13 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 12 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 13 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 12 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 27 de 2026-06-30: `backend/app/pedidos_compra/sugestao.py` saiu da faixa acima de 700 linhas ao virar fachada compativel dos helpers de sugestao de compra:
+
+- `backend/app/pedidos_compra/sugestao.py`: 796 -> 55 linhas fisicas, mantendo constantes e helpers historicos reexportados.
+- `backend/app/pedidos_compra/sugestao_parts/base.py`: concentra constantes, normalizacao numerica/data e estrutura inicial de estatisticas.
+- `backend/app/pedidos_compra/sugestao_parts/vendas.py`: concentra somatorios de vendas, granel, movimentacoes complementares e resultado agregado.
+- `backend/app/pedidos_compra/sugestao_parts/planejamento.py`: concentra selecao de produtos, dias com estoque, planejamento de compra e resposta final.
+- `backend/app/pedidos_compra/sugestao_parts/itens.py`: concentra observacoes, montagem do item de sugestao e tendencia de vendas.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_27_refactor.py`, garantindo facade publica e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 26 de 2026-06-28: `backend/app/ia/aba6_chat_ia.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do servico de chat IA:
 
