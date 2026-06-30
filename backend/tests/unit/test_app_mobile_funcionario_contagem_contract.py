@@ -94,7 +94,8 @@ def test_mobile_employee_count_service_screen_and_navigation_exist():
     assert "/app/funcionario/contagens" in service
     assert "/app/funcionario/contagens/fornecedores/buscar" in service
     assert "expo-file-system" in service
-    assert "expo-sharing" in service
+    assert 'Share } from "react-native"' in service
+    assert "expo-sharing" not in service
     assert "CameraView" in screen
     assert "salvarContagemFuncionario" in screen
     assert "baixarContagemFuncionario" in screen
