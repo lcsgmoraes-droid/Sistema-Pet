@@ -10,6 +10,7 @@ const readRepo = (path) => readFileSync(join(root, "..", path), "utf8");
 const indexHtml = read("index.html");
 const login = read("src/pages/Login.jsx");
 const layout = read("src/components/Layout.jsx");
+const layoutSidebar = read("src/components/layout/LayoutSidebar.jsx");
 const legalPage = read("src/pages/LegalPage.jsx");
 const blingIntegracao = read("src/pages/configuracoes/BlingIntegracao.jsx");
 const favicon = read("public/favicon.svg");
@@ -34,9 +35,9 @@ assert.match(login, /\/brand\/corepet\/corepet-horizontal\.png/);
 assert.doesNotMatch(login, /Pet Shop Pro/);
 assert.match(login, /Gestao integrada para petshops/);
 
-assert.match(layout, /\/brand\/corepet\/corepet-horizontal\.png/);
+assert.match(layoutSidebar, /\/brand\/corepet\/corepet-horizontal\.png/);
 assert.match(layout, /\/brand\/corepet\/corepet-icon-64\.png/);
-assert.doesNotMatch(layout, /Pet Shop Pro/);
+assert.doesNotMatch(layout + layoutSidebar, /Pet Shop Pro/);
 
 assert.match(legalPage, /atacadaopetpp@gmail\.com/);
 assert.doesNotMatch(legalPage, /admin@mlprohub\.com\.br/);
