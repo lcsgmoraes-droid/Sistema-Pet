@@ -83,6 +83,23 @@ from app.routes.app_mobile_funcionario_estoque_routes import (
     registrar_balanco_funcionario_estoque as registrar_balanco_funcionario_estoque,
     router as funcionario_estoque_router,
 )
+from app.routes.app_mobile_funcionario_contagem_routes import (
+    FuncionarioContagemArquivoResponse as FuncionarioContagemArquivoResponse,
+    FuncionarioContagemFornecedorResponse as FuncionarioContagemFornecedorResponse,
+    FuncionarioContagemItemRequest as FuncionarioContagemItemRequest,
+    FuncionarioContagemItemResponse as FuncionarioContagemItemResponse,
+    FuncionarioContagemRequest as FuncionarioContagemRequest,
+    FuncionarioContagemResponse as FuncionarioContagemResponse,
+    FuncionarioContagemResumoResponse as FuncionarioContagemResumoResponse,
+    _colunas_exportacao_contagem as _colunas_exportacao_contagem,
+    buscar_fornecedores_contagem_funcionario as buscar_fornecedores_contagem_funcionario,
+    criar_contagem_funcionario as criar_contagem_funcionario,
+    exportar_contagem_funcionario as exportar_contagem_funcionario,
+    exportar_contagem_funcionario_mobile as exportar_contagem_funcionario_mobile,
+    listar_contagens_funcionario as listar_contagens_funcionario,
+    obter_contagem_funcionario as obter_contagem_funcionario,
+    router as funcionario_contagem_router,
+)
 from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
@@ -117,6 +134,7 @@ router = APIRouter(prefix="/app", tags=["App Mobile"])
 router.include_router(pets_router)
 router.include_router(funcionario_pdv_router)
 router.include_router(funcionario_estoque_router)
+router.include_router(funcionario_contagem_router)
 router.include_router(rastreio_router)
 
 

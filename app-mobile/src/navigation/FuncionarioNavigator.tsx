@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 import HeaderProfileActions from "../components/HeaderProfileActions";
 import FuncionarioBalancoScreen from "../screens/funcionario/FuncionarioBalancoScreen";
+import FuncionarioContagemScreen from "../screens/funcionario/FuncionarioContagemScreen";
 import FuncionarioHomeScreen from "../screens/funcionario/FuncionarioHomeScreen";
 import FuncionarioPdvScreen from "../screens/funcionario/FuncionarioPdvScreen";
 import { FuncionarioStackParamList } from "../types/funcionarioNavigation";
@@ -29,6 +30,11 @@ export default function FuncionarioNavigator() {
         name="FuncionarioBalanco"
         component={FuncionarioBalancoScreen}
         options={{ title: "Balanco de Estoque" }}
+      />
+      <Stack.Screen
+        name="FuncionarioContagem"
+        component={FuncionarioContagemScreen}
+        options={{ title: "Contagem" }}
       />
       <Stack.Screen
         name="FuncionarioPdv"
