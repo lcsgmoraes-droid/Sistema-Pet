@@ -93,6 +93,10 @@ export async function obterContagemFuncionario(contagemId: number): Promise<Func
   return normalizarContagem(response.data);
 }
 
+export async function excluirContagemFuncionario(contagemId: number): Promise<void> {
+  await api.delete(`/app/funcionario/contagens/${contagemId}`);
+}
+
 export async function baixarContagemFuncionario(
   contagemId: number,
   formato: "pdf" | "xlsx",

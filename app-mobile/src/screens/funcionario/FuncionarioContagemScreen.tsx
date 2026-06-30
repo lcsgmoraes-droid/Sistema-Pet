@@ -17,6 +17,7 @@ import KeyboardSafeScrollView from "../../components/KeyboardSafeScrollView";
 import {
   baixarContagemFuncionario,
   buscarFornecedoresContagemFuncionario,
+  excluirContagemFuncionario,
   listarContagensFuncionario,
   obterContagemFuncionario,
   salvarContagemFuncionario,
@@ -125,6 +126,7 @@ export default function FuncionarioContagemScreen() {
   const [contagemSalva, setContagemSalva] = useState<FuncionarioContagem | null>(null);
   const [contagensRecentes, setContagensRecentes] = useState<FuncionarioContagemResumo[]>([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+  const [excluindoContagemId, setExcluindoContagemId] = useState<number | null>(null);
   const ultimoScan = useRef("");
   const produtoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fornecedorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -188,6 +190,21 @@ export default function FuncionarioContagemScreen() {
 
   function invalidarContagemSalva() {
     if (contagemSalva) setContagemSalva(null);
+  }
+
+  function limparContagemAtual() {
+    setProduto(null);
+    setBuscaManual("");
+    setSugestoes([]);
+    setQuantidade("1");
+    setObservacaoItem("");
+    setItens([]);
+    setTitulo("Contagem para devolucao");
+    setObservacao("");
+    setFornecedor(null);
+    setBuscaFornecedor("");
+    setFornecedores([]);
+    setContagemSalva(null);
   }
 
   function selecionarProduto(item: FuncionarioProdutoEstoque) {
@@ -425,6 +442,36 @@ export default function FuncionarioContagemScreen() {
       Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel abrir a contagem."));
     } finally {
       setCarregandoHistorico(false);
+    }
+  }
+
+  function confirmarExcluirContagem(contagem: FuncionarioContagemResumo) {
+    Alert.alert(
+      "Excluir contagem",
+      `Deseja excluir a contagem #${contagem.id}? Essa acao nao mexe no estoque.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Excluir",
+          style: "destructive",
+          onPress: () => excluirContagem(contagem.id),
+        },
+      ],
+    );
+  }
+
+  async function excluirContagem(contagemId: number) {
+    setExcluindoContagemId(contagemId);
+    try {
+      await excluirContagemFuncionario(contagemId);
+      setContagensRecentes((atuais) => atuais.filter((item) => item.id !== contagemId));
+      if (contagemSalva?.id === contagemId) {
+        limparContagemAtual();
+      }
+    } catch (error: any) {
+      Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel excluir a contagem."));
+    } finally {
+      setExcluindoContagemId(null);
     }
   }
 
@@ -745,15 +792,28 @@ export default function FuncionarioContagemScreen() {
             {carregandoHistorico ? <ActivityIndicator color={CORES.primario} /> : null}
           </View>
           {contagensRecentes.slice(0, 5).map((item) => (
-            <TouchableOpacity key={item.id} style={styles.historicoItem} onPress={() => abrirContagem(item.id)}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.historicoTitulo}>{item.titulo}</Text>
-                <Text style={styles.historicoMeta}>
-                  #{item.id} | {item.total_itens} item(ns) | {item.fornecedor_nome || "Sem fornecedor"}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={CORES.textoClaro} />
-            </TouchableOpacity>
+            <View key={item.id} style={styles.historicoItem}>
+              <TouchableOpacity style={styles.historicoAbrir} onPress={() => abrirContagem(item.id)}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.historicoTitulo}>{item.titulo}</Text>
+                  <Text style={styles.historicoMeta}>
+                    #{item.id} | {item.total_itens} item(ns) | {item.fornecedor_nome || "Sem fornecedor"}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={CORES.textoClaro} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.botaoExcluirHistorico}
+                onPress={() => confirmarExcluirContagem(item)}
+                disabled={excluindoContagemId === item.id}
+              >
+                {excluindoContagemId === item.id ? (
+                  <ActivityIndicator color={CORES.erro} size="small" />
+                ) : (
+                  <Ionicons name="trash-outline" size={18} color={CORES.erro} />
+                )}
+              </TouchableOpacity>
+            </View>
           ))}
         </View>
       ) : null}
@@ -997,8 +1057,17 @@ const styles = StyleSheet.create({
     borderRadius: RAIO.md,
     padding: ESPACO.md,
   },
+  historicoAbrir: { flex: 1, flexDirection: "row", alignItems: "center", gap: ESPACO.sm },
   historicoTitulo: { fontSize: FONTE.normal, fontWeight: "800", color: CORES.texto },
   historicoMeta: { fontSize: FONTE.pequena, color: CORES.textoSecundario, marginTop: 2 },
+  botaoExcluirHistorico: {
+    width: 38,
+    height: 38,
+    borderRadius: RAIO.circulo,
+    backgroundColor: "#FEE2E2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   botaoPrimario: {
     backgroundColor: CORES.primario,
     borderRadius: RAIO.md,
