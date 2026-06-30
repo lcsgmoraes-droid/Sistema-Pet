@@ -209,13 +209,21 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 6 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 5 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 6 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 5 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 34 de 2026-06-30: `backend/app/routes/app_mobile_routes.py` saiu da faixa acima de 700 linhas ao extrair as rotas de estoque operacional do funcionario:
+
+- `backend/app/routes/app_mobile_routes.py`: 728 -> 423 linhas com conteudo, mantendo `router`, schemas, handlers publicos e helpers historicos reexportados.
+- `backend/app/routes/app_mobile_funcionario_estoque_routes.py`: concentra schemas, helpers e endpoints de busca por produto, busca por barcode e balanco de estoque por funcionario.
+- A fachada principal inclui o novo subrouter preservando o prefixo publico `/app/funcionario/estoque`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_34_refactor.py`, garantindo reexports publicos, subrouter incluido e modulos abaixo de 700 linhas.
+- Contratos existentes de app mobile foram atualizados para procurar a logica de estoque no modulo dedicado.
 
 Fatia backend 700 batch 33 de 2026-06-30: `backend/app/funcionarios_routes.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das rotas de funcionarios/RH:
 
