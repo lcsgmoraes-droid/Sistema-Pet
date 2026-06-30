@@ -24,25 +24,25 @@ def test_fornecedor_rapido_permite_pf_pj_e_envia_documento_correto():
 def test_fornecedor_rapido_salva_na_base_de_pessoas_como_fornecedor():
     frontend_api = _read("frontend/src/api/clientes.js")
     selector = _read("frontend/src/components/fornecedores/FornecedorSelector.jsx")
-    clientes_routes = _read("backend/app/clientes_routes.py")
+    clientes_crud = _read("backend/app/clientes/crud_routes.py")
 
-    assert "api.post('/clientes/', dados)" in frontend_api
+    assert 'api.post("/clientes/", dados)' in frontend_api
     assert 'tipo_cadastro: "fornecedor"' in selector
-    assert "novo_cliente = Cliente(" in clientes_routes
-    assert "**dados_cliente" in clientes_routes
+    assert "novo_cliente = Cliente(" in clientes_crud
+    assert "**dados_cliente" in clientes_crud
 
 
 def test_mensagens_do_cadastro_rapido_nao_voltam_com_mojibake():
     selector = _read("frontend/src/components/fornecedores/FornecedorSelector.jsx")
-    clientes_routes = _read("backend/app/clientes_routes.py")
+    clientes_crud = _read("backend/app/clientes/crud_routes.py")
 
     assert "Cadastro rápido para continuar o fluxo." in selector
-    assert "CNPJ é obrigatório para Pessoa Jurídica" in clientes_routes
+    assert "CNPJ é obrigatório para Pessoa Jurídica" in clientes_crud
     assert (
         "Já existe um {cliente_data.tipo_cadastro} cadastrado com este CPF"
-        in clientes_routes
+        in clientes_crud
     )
     assert (
         "Já existe um {cliente_data.tipo_cadastro} cadastrado com este CNPJ"
-        in clientes_routes
+        in clientes_crud
     )
