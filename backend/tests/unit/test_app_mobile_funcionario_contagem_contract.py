@@ -46,6 +46,21 @@ def test_employee_count_exports_follow_value_checkboxes():
     assert "Total venda" in source
 
 
+def test_employee_count_delete_is_scoped_to_employee_and_tenant():
+    source = read_repo("backend/app/routes/app_mobile_funcionario_contagem_routes.py")
+    delete_block = extract_block(source, "def excluir_contagem_funcionario")
+
+    assert "@router.delete(" in source
+    assert '"/funcionario/contagens/{contagem_id}"' in source
+    assert "_get_contagem_funcionario_or_404(" in delete_block
+    assert "funcionario.id" in delete_block
+    assert "tenant_id" in delete_block
+    assert "db.delete(contagem)" in delete_block
+    assert "db.commit()" in delete_block
+    assert "EstoqueMovimentacao" not in delete_block
+    assert "Produto.estoque_atual" not in delete_block
+
+
 def test_employee_count_allows_optional_supplier_search():
     source = read_repo("backend/app/routes/app_mobile_funcionario_contagem_routes.py")
     supplier_block = extract_block(
@@ -93,6 +108,8 @@ def test_mobile_employee_count_service_screen_and_navigation_exist():
 
     assert "/app/funcionario/contagens" in service
     assert "/app/funcionario/contagens/fornecedores/buscar" in service
+    assert "excluirContagemFuncionario" in service
+    assert "api.delete(`/app/funcionario/contagens/${contagemId}`)" in service
     assert "expo-file-system" in service
     assert 'Share } from "react-native"' in service
     assert "expo-sharing" not in service
@@ -105,6 +122,8 @@ def test_mobile_employee_count_service_screen_and_navigation_exist():
     assert "Adicionar item" in screen
     assert "PDF" in screen
     assert "Excel" in screen
+    assert "confirmarExcluirContagem" in screen
+    assert "Excluir contagem" in screen
     assert "FuncionarioContagem" in navigator
     assert "FuncionarioContagem" in route_types
     assert "Contagem" in home

@@ -623,6 +623,22 @@ def obter_contagem_funcionario(
     return _serialize_contagem(contagem)
 
 
+@router.delete(
+    "/funcionario/contagens/{contagem_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def excluir_contagem_funcionario(
+    contagem_id: int,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    contagem = _get_contagem_funcionario_or_404(
+        db, contagem_id, funcionario.id, tenant_id
+    )
+    db.delete(contagem)
+    db.commit()
+
+
 @router.get("/funcionario/contagens/{contagem_id}/export/{formato}")
 def exportar_contagem_funcionario(
     contagem_id: int,
