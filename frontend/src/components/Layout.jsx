@@ -25,9 +25,11 @@ import { useEscapeFallbackForVisibleModals } from "../utils/modalEscape";
 import { isVeterinarioProfile } from "../utils/veterinarioPerfil";
 import FloatingCalculatorButton from "./FloatingCalculatorButton";
 import {
+  FAVORITE_DRAG_CLICK_SUPPRESSION_MS,
   buildVisibleMenuFavorites,
   normalizeMenuFavorites,
   reorderMenuFavorites,
+  shouldBlockFavoriteShortcutClick,
   toggleMenuFavorite,
 } from "./layout/menuFavorites";
 import { createLayoutMenuItems } from "./layout/menuConfig";
@@ -42,7 +44,7 @@ function sameFavoritePathOrder(left = [], right = []) {
   return left.every((favorite, index) => favorite.path === right[index]?.path);
 }
 
-function FavoriteShortcut({ favorite, active }) {
+function FavoriteShortcut({ favorite, active, onClick }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: favorite.path,
   });
@@ -65,6 +67,7 @@ function FavoriteShortcut({ favorite, active }) {
     >
       <Link
         to={favorite.path}
+        onClick={onClick}
         className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold shadow-sm transition-colors ${
           active
             ? "border-[#0f8b8d] bg-[#d8eee9] text-[#0f5f63]"
@@ -177,6 +180,10 @@ const Layout = () => {
   const lembretesPollingRef = useRef(false);
   const [telaBloqueadaSuspeita, setTelaBloqueadaSuspeita] = useState(false);
   const overlaySuspeitoDesdeRef = useRef(new Map());
+  const favoriteDragClickGuardRef = useRef({
+    isDragging: false,
+    suppressClickUntil: 0,
+  });
   const favoriteDragSensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 },
@@ -519,7 +526,36 @@ const Layout = () => {
     }
   };
 
+  const markFavoriteDragStarted = () => {
+    favoriteDragClickGuardRef.current = {
+      isDragging: true,
+      suppressClickUntil: Date.now() + FAVORITE_DRAG_CLICK_SUPPRESSION_MS,
+    };
+  };
+
+  const markFavoriteDragFinished = () => {
+    favoriteDragClickGuardRef.current = {
+      isDragging: false,
+      suppressClickUntil: Date.now() + FAVORITE_DRAG_CLICK_SUPPRESSION_MS,
+    };
+  };
+
+  const handleFavoriteShortcutClick = (event) => {
+    const guard = favoriteDragClickGuardRef.current;
+    const shouldBlockClick = shouldBlockFavoriteShortcutClick({
+      isDragging: guard.isDragging,
+      suppressClickUntil: guard.suppressClickUntil,
+    });
+
+    if (!shouldBlockClick) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
   const handleFavoriteDragEnd = async ({ active, over }) => {
+    markFavoriteDragFinished();
+
     if (!over || active.id === over.id) return;
 
     const favoritosAnteriores = menuFavorites;
@@ -777,7 +813,9 @@ const Layout = () => {
             <DndContext
               sensors={favoriteDragSensors}
               collisionDetection={closestCenter}
+              onDragStart={markFavoriteDragStarted}
               onDragEnd={handleFavoriteDragEnd}
+              onDragCancel={markFavoriteDragFinished}
             >
               <SortableContext
                 items={visibleMenuFavorites.map((favorite) => favorite.path)}
@@ -789,6 +827,7 @@ const Layout = () => {
                       key={favorite.path}
                       favorite={favorite}
                       active={isActive(favorite.path)}
+                      onClick={handleFavoriteShortcutClick}
                     />
                   ))}
                 </div>
