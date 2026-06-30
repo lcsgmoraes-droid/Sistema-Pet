@@ -209,13 +209,23 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 8 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 7 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 8 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 7 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 32 de 2026-06-30: `backend/app/calculadora_racao.py` saiu da faixa acima de 700 linhas ao virar fachada compativel da calculadora de racao, e backups versionados foram removidos da arvore principal:
+
+- `backend/app/calculadora_racao.py`: 743 -> 62 linhas com conteudo, mantendo `router`, schemas, handlers publicos e helpers historicos reexportados.
+- `backend/app/racao_calculadora/schemas.py`: concentra contratos Pydantic da calculadora e das opcoes de racao.
+- `backend/app/racao_calculadora/core.py`: concentra validacao de aptidao, campos bloqueantes e calculos de quantidade/duracao/custo.
+- `backend/app/racao_calculadora/options.py`: concentra filtros SQL, busca textual e serializacao das opcoes da calculadora.
+- `backend/app/racao_calculadora/routes.py`: concentra os endpoints `/calculadora-racao/opcoes`, `/calculadora-racao` e `/comparar-racoes`.
+- Backups removidos: `backend/app/vendas_routes.py.backup_indent` e `backend/app/whatsapp/analytics_backup.py`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_32_refactor.py`, garantindo fachada publica, modulos abaixo de 700 linhas e remocao dos backups versionados.
 
 Fatia backend 700 batch 31 de 2026-06-30: `backend/app/clientes_routes.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das rotas de clientes, fornecedores, pets e pessoas operacionais:
 
@@ -2185,8 +2195,6 @@ Este documento mapeia telas, rotas e CTAs principais de negócio. Ele cobre bem 
   - `frontend/src/pages/ConciliacaoCartoes_backup_pre_6ajustes.jsx`
   - `backend/app/conciliacao_routes_old.py`
   - `backend/app/notas_entrada_routes_backup_20260205_181349.py`
-  - `backend/app/vendas_routes.py.backup_indent`
-  - `backend/app/whatsapp/analytics_backup.py`
 
 ### 5.2 Observabilidade e ruído operacional
 

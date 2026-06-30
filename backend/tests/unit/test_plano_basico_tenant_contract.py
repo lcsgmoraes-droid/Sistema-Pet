@@ -73,6 +73,7 @@ def test_basic_plan_route_files_use_selected_tenant_dependency():
         "backend/app/chat_routes.py",
         "backend/app/opcoes_racao_routes.py",
         "backend/app/calculadora_racao.py",
+        "backend/app/racao_calculadora/routes.py",
         "backend/app/api/racao_calculadora_routes.py",
     ]
 
@@ -293,7 +294,7 @@ def test_rbac_admin_routes_require_user_management_permission():
 
 def test_racao_catalog_and_calculator_routes_require_product_permissions():
     opcoes_source = _source("backend/app/opcoes_racao_routes.py")
-    calculadora_source = _source("backend/app/calculadora_racao.py")
+    calculadora_source = _source("backend/app/racao_calculadora/routes.py")
     internal_source = _source("backend/app/api/racao_calculadora_routes.py")
 
     assert opcoes_source.count('@require_permission("produtos.visualizar")') >= 6
