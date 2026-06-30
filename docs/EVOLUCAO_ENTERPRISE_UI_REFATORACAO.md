@@ -215,7 +215,18 @@ Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com cont
 - 0 arquivos de aplicacao acima de 2000 linhas.
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Observacao: fora do inventario de aplicacao, ainda ha 7 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+- Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia testes 700 batch 40 de 2026-06-30: `backend/tests/test_analytics_routes.py` saiu da faixa acima de 700 linhas ao dividir os contratos da API de analytics por responsabilidade:
+
+- `backend/tests/test_analytics_routes.py`: 1491 linhas com conteudo removidas do arquivo monolitico.
+- `backend/tests/analytics/conftest.py`: concentra fixtures de cliente, autenticacao e banco.
+- `backend/tests/analytics/analytics_test_helpers.py`: concentra dados mock compartilhados.
+- `backend/tests/analytics/test_analytics_routes_endpoints.py`: cobre sucesso, validacao e comportamento read-only.
+- `backend/tests/analytics/test_analytics_routes_errors.py`: cobre resiliencia e sanitizacao de erros.
+- `backend/tests/analytics/test_analytics_routes_security.py`: cobre autenticacao, tenant, ataques e parametros extremos.
+- `backend/tests/analytics/test_analytics_routes_contracts.py`: cobre schemas de resposta.
+- Contrato dedicado: `backend/tests/unit/test_backend_test_large_files_700_batch_40_refactor.py`, garantindo a remocao do arquivo monolitico e todos os arquivos fatiados abaixo de 700 linhas.
 
 Fatia backend/frontend 700 batch 39 de 2026-06-30: `backend/app/models.py` e `frontend/src/components/Layout.jsx` sairam da faixa acima de 700 linhas ao extrair cadastros centrais e a sidebar do layout:
 
