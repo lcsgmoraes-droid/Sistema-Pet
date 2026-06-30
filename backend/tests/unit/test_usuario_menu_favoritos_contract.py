@@ -31,11 +31,15 @@ def test_usuario_menu_favoritos_model_and_migration_contract():
     assert "sa.ForeignKeyConstraint([\"user_id\"], [\"users.id\"]" in migration
     assert "uq_usuario_menu_favoritos_tenant_user_path" in migration
     assert "ix_usuario_menu_favoritos_tenant_user_position" in migration
+    assert "from app.tenant_rls_migration import apply_tenant_rls" in migration
+    assert "USUARIO_MENU_FAVORITOS_RLS_TABLES" in migration
+    assert "apply_tenant_rls(" in migration
+    assert "enable=True" in migration
+    assert "enable=False" in migration
 
 
 def test_usuario_menu_favoritos_routes_contract():
     routes = read_repo("backend/app/usuarios_routes.py")
-    main_routers = read_repo("backend/app/main_routers.py")
 
     assert "UsuarioMenuFavorito" in routes
     assert "MAX_MENU_FAVORITOS = 8" in routes
@@ -47,5 +51,3 @@ def test_usuario_menu_favoritos_routes_contract():
     assert "len(payload.items) > MAX_MENU_FAVORITOS" in routes
     assert "db.query(UsuarioMenuFavorito)" in routes
     assert "UsuarioMenuFavorito(" in routes
-
-    assert "from app.usuario_menu_favoritos_models import UsuarioMenuFavorito" in main_routers

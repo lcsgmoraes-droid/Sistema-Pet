@@ -11,11 +11,16 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from app.tenant_rls_migration import apply_tenant_rls
+
 
 revision: str = "uv20260630a1"
 down_revision: Union[str, Sequence[str], None] = "zz20260624a1"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
+
+
+USUARIO_MENU_FAVORITOS_RLS_TABLES = ("usuario_menu_favoritos",)
 
 
 def upgrade() -> None:
@@ -57,9 +62,21 @@ def upgrade() -> None:
         ["tenant_id", "user_id", "position"],
         unique=False,
     )
+    apply_tenant_rls(
+        op_module=op,
+        sa_module=sa,
+        table_names=USUARIO_MENU_FAVORITOS_RLS_TABLES,
+        enable=True,
+    )
 
 
 def downgrade() -> None:
+    apply_tenant_rls(
+        op_module=op,
+        sa_module=sa,
+        table_names=USUARIO_MENU_FAVORITOS_RLS_TABLES,
+        enable=False,
+    )
     op.drop_index("ix_usuario_menu_favoritos_tenant_user_position", table_name="usuario_menu_favoritos")
     op.drop_index("ix_usuario_menu_favoritos_user_id", table_name="usuario_menu_favoritos")
     op.drop_index("ix_usuario_menu_favoritos_tenant_id", table_name="usuario_menu_favoritos")

@@ -51,7 +51,9 @@ function ModuloMenuIndicator({
 function FavoriteToggle({ item, active, onToggleFavorite, className = "" }) {
   if (!onToggleFavorite || !item?.path) return null;
 
-  const label = active ? `Remover ${item.label} dos favoritos` : `Adicionar ${item.label} aos favoritos`;
+  const label = active
+    ? `Remover ${item.label} dos favoritos`
+    : `Adicionar ${item.label} aos favoritos`;
 
   return (
     <button
@@ -62,7 +64,9 @@ function FavoriteToggle({ item, active, onToggleFavorite, className = "" }) {
         onToggleFavorite(item);
       }}
       className={`rounded p-1 transition-colors ${
-        active ? "text-amber-500 hover:bg-amber-50" : "text-gray-300 hover:bg-white/70 hover:text-amber-500"
+        active
+          ? "text-amber-500 hover:bg-amber-50"
+          : "text-gray-300 hover:bg-white/70 hover:text-amber-500"
       } ${className}`}
       title={label}
       aria-label={label}

@@ -100,7 +100,6 @@ from app.api.endpoints.whatsapp import (
 from app.api.endpoints.segmentacao import router as segmentacao_router
 from app.pdv_ai_routes import router as pdv_ai_router
 from app.usuarios_routes import router as usuarios_router
-from app.usuario_menu_favoritos_models import UsuarioMenuFavorito
 from app.roles_routes import router as roles_router
 from app.permissions_routes import router as permissions_router
 from app.api.pdv_internal_routes import router as pdv_internal_router
