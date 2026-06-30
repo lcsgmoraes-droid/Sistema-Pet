@@ -14,7 +14,7 @@ def read_repo(path: str) -> str:
 
 
 def test_funcionarios_backend_exposes_explicit_activate_endpoint():
-    source = read_backend("app/funcionarios_routes.py")
+    source = read_backend("app/funcionarios/base_routes.py")
 
     assert '@router.post("/{funcionario_id}/ativar"' in source
     assert "funcionario.ativo = True" in source
@@ -30,7 +30,12 @@ def test_funcionarios_page_shows_activate_button_for_inactive_rows():
 
 
 def test_funcionarios_rh_exposes_app_access_controls():
-    backend_source = read_backend("app/funcionarios_routes.py")
+    backend_source = "\n".join(
+        [
+            read_backend("app/funcionarios/helpers.py"),
+            read_backend("app/funcionarios/schemas.py"),
+        ]
+    )
     page_source = read_repo("frontend/src/pages/RH/Funcionarios.jsx")
 
     assert "app_access_profiles" in backend_source
