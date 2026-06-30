@@ -821,7 +821,15 @@ def test_chat_ia_conversation_history_uses_selected_tenant_context():
 
 def test_ia_fluxo_caixa_uses_selected_tenant_context():
     ia_routes_source = _source("backend/app/ia_routes.py")
-    fluxo_source = _source("backend/app/ia/aba5_fluxo_caixa.py")
+    fluxo_source = "\n".join(
+        [
+            _source("backend/app/ia/aba5_fluxo_caixa.py"),
+            _source("backend/app/ia/aba5_fluxo_caixa_parts/base.py"),
+            _source("backend/app/ia/aba5_fluxo_caixa_parts/indices.py"),
+            _source("backend/app/ia/aba5_fluxo_caixa_parts/projecoes.py"),
+            _source("backend/app/ia/aba5_fluxo_caixa_parts/acoes.py"),
+        ]
+    )
     chat_service_source = _source("backend/app/ia/aba6_chat_ia_parts/contexto.py")
 
     assert (
