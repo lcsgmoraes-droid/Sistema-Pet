@@ -1,4 +1,5 @@
 export const MAX_MENU_FAVORITES = 8;
+export const FAVORITE_DRAG_CLICK_SUPPRESSION_MS = 350;
 
 function cleanText(value) {
   return String(value ?? "").trim();
@@ -108,4 +109,12 @@ export function reorderMenuFavorites(favorites = [], activePath, overPath) {
   const [moved] = reordered.splice(fromIndex, 1);
   reordered.splice(toIndex, 0, moved);
   return reordered;
+}
+
+export function shouldBlockFavoriteShortcutClick({
+  isDragging = false,
+  suppressClickUntil = 0,
+  now = Date.now(),
+} = {}) {
+  return Boolean(isDragging || suppressClickUntil > now);
 }

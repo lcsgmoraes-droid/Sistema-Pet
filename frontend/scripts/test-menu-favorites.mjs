@@ -7,6 +7,7 @@ import {
   flattenMenuItemsForFavorites,
   normalizeMenuFavorites,
   reorderMenuFavorites,
+  shouldBlockFavoriteShortcutClick,
   toggleMenuFavorite,
 } from "../src/components/layout/menuFavorites.js";
 
@@ -112,6 +113,12 @@ test("reorderMenuFavorites preserva ordem quando o alvo nao existe", () => {
     reorderMenuFavorites(favoritos, "/produtos", "/financeiro").map((entry) => entry.path),
     ["/pdv", "/produtos"],
   );
+});
+
+test("shouldBlockFavoriteShortcutClick bloqueia clique durante ou logo apos arraste", () => {
+  assert.equal(shouldBlockFavoriteShortcutClick({ isDragging: true, now: 1000 }), true);
+  assert.equal(shouldBlockFavoriteShortcutClick({ suppressClickUntil: 1300, now: 1200 }), true);
+  assert.equal(shouldBlockFavoriteShortcutClick({ suppressClickUntil: 1300, now: 1400 }), false);
 });
 
 test("normalizeMenuFavorites limpa dados de API e remove duplicados", () => {
