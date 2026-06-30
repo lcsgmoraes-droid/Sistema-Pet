@@ -1,25 +1,31 @@
-"""Helpers publicos de sugestao de compra."""
+"""Partes extraidas da sugestao de compra."""
 
-from app.pedidos_compra.sugestao_parts import (
+from app.pedidos_compra.sugestao_parts.base import (
     JANELAS_GIRO_SUGESTAO,
     MARGEM_SEGURANCA_COMPRA_DIAS,
     MAX_MULTIPLICADOR_AJUSTE_RUPTURA,
     MIN_DIAS_COM_ESTOQUE_AJUSTE_RUPTURA,
     MIN_VENDAS_AJUSTE_RUPTURA,
-    _calcular_dias_com_estoque,
-    _calcular_planejamento_compra_sugestao,
-    _calcular_tendencia_vendas_sugestao,
     _datetime_naive_utc_sugestao,
     _float_seguro_sugestao,
     _formatar_origem_venda,
-    _gerar_observacao,
-    _montar_item_sugestao_compra,
-    _montar_resposta_sugestao_compra,
-    _montar_resultado_vendas_sugestao,
     _nova_stats_venda_sugestao,
     _round_seguro_sugestao,
     _sanitizar_json_sugestao,
+)
+from app.pedidos_compra.sugestao_parts.itens import (
+    _calcular_tendencia_vendas_sugestao,
+    _gerar_observacao,
+    _montar_item_sugestao_compra,
+)
+from app.pedidos_compra.sugestao_parts.planejamento import (
+    _calcular_dias_com_estoque,
+    _calcular_planejamento_compra_sugestao,
+    _montar_resposta_sugestao_compra,
     _selecionar_produtos_fornecedor_sugestao,
+)
+from app.pedidos_compra.sugestao_parts.vendas import (
+    _montar_resultado_vendas_sugestao,
     _somar_conversao_granel_sugestao,
     _somar_conversoes_granel_rows_sugestao,
     _somar_movimentacoes_complementares_sugestao,
