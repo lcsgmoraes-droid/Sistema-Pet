@@ -209,13 +209,23 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 7 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 6 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 7 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 6 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 33 de 2026-06-30: `backend/app/funcionarios_routes.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das rotas de funcionarios/RH:
+
+- `backend/app/funcionarios_routes.py`: 724 -> 59 linhas com conteudo, mantendo `router`, schemas, handlers publicos e helpers historicos reexportados.
+- `backend/app/funcionarios/schemas.py`: concentra contratos Pydantic de cadastro, remuneracao e eventos de RH.
+- `backend/app/funcionarios/helpers.py`: concentra serializacao de cargo/funcionario, perfis de acesso do app e busca de cargo por tenant.
+- `backend/app/funcionarios/base_routes.py`: concentra listagem, detalhe, remuneracao, criacao, atualizacao, ativacao e inativacao de funcionarios.
+- `backend/app/funcionarios/eventos_routes.py`: concentra ferias, decimo terceiro e provisoes de RH.
+- `backend/app/funcionarios/routes.py`: agrega os subrouters preservando prefixo publico `/funcionarios`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_33_refactor.py`, garantindo fachada publica, ordem das rotas e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 32 de 2026-06-30: `backend/app/calculadora_racao.py` saiu da faixa acima de 700 linhas ao virar fachada compativel da calculadora de racao, e backups versionados foram removidos da arvore principal:
 
