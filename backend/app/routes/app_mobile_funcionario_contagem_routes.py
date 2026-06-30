@@ -233,9 +233,17 @@ def _gerar_pdf_contagem(
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
         from reportlab.lib.units import mm
-        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from reportlab.platypus import (
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
     except ImportError as exc:
-        raise HTTPException(status_code=500, detail="Biblioteca reportlab nao instalada.") from exc
+        raise HTTPException(
+            status_code=500, detail="Biblioteca reportlab nao instalada."
+        ) from exc
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -255,17 +263,25 @@ def _gerar_pdf_contagem(
         spaceAfter=8,
     )
     texto_style = styles["Normal"]
-    pequeno_style = ParagraphStyle("PequenoContagem", parent=styles["Normal"], fontSize=8)
+    pequeno_style = ParagraphStyle(
+        "PequenoContagem", parent=styles["Normal"], fontSize=8
+    )
 
     fornecedor = contagem.fornecedor_nome_snapshot or "Nao informado"
-    criado = contagem.created_at.strftime("%d/%m/%Y %H:%M") if contagem.created_at else "-"
+    criado = (
+        contagem.created_at.strftime("%d/%m/%Y %H:%M") if contagem.created_at else "-"
+    )
     story = [
         Paragraph(html.escape(contagem.titulo or "Contagem"), titulo_style),
         Paragraph(f"<b>Fornecedor:</b> {html.escape(fornecedor)}", texto_style),
         Paragraph(f"<b>Data:</b> {criado}", texto_style),
     ]
     if contagem.observacao:
-        story.append(Paragraph(f"<b>Observacao:</b> {html.escape(contagem.observacao)}", texto_style))
+        story.append(
+            Paragraph(
+                f"<b>Observacao:</b> {html.escape(contagem.observacao)}", texto_style
+            )
+        )
     story.append(Spacer(1, 8))
 
     colunas = _colunas_exportacao_contagem(mostrar_custo, mostrar_venda)
@@ -287,7 +303,12 @@ def _gerar_pdf_contagem(
                 ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D1D5DB")),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F9FAFB")]),
+                (
+                    "ROWBACKGROUNDS",
+                    (0, 1),
+                    (-1, -1),
+                    [colors.white, colors.HexColor("#F9FAFB")],
+                ),
             ]
         )
     )
@@ -323,7 +344,9 @@ def _gerar_excel_contagem(
         from openpyxl.styles import Alignment, Font, PatternFill
         from openpyxl.utils import get_column_letter
     except ImportError as exc:
-        raise HTTPException(status_code=500, detail="Biblioteca openpyxl nao instalada.") from exc
+        raise HTTPException(
+            status_code=500, detail="Biblioteca openpyxl nao instalada."
+        ) from exc
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -332,19 +355,26 @@ def _gerar_excel_contagem(
 
     ws.append([contagem.titulo or "Contagem"])
     ws.append(["Fornecedor", contagem.fornecedor_nome_snapshot or "Nao informado"])
-    ws.append([
-        "Data",
-        contagem.created_at.strftime("%d/%m/%Y %H:%M") if contagem.created_at else "-",
-    ])
+    ws.append(
+        [
+            "Data",
+            contagem.created_at.strftime("%d/%m/%Y %H:%M")
+            if contagem.created_at
+            else "-",
+        ]
+    )
     if contagem.observacao:
         ws.append(["Observacao", contagem.observacao])
     ws.append([])
     cabecalho_linha = ws.max_row + 1
     ws.append([label for label, _chave in colunas])
     for item in contagem.itens:
-        ws.append([
-            _valor_item_exportacao(item, chave, formatado=False) for _label, chave in colunas
-        ])
+        ws.append(
+            [
+                _valor_item_exportacao(item, chave, formatado=False)
+                for _label, chave in colunas
+            ]
+        )
 
     header_fill = PatternFill("solid", fgColor="1F2937")
     for cell in ws[cabecalho_linha]:
@@ -352,7 +382,12 @@ def _gerar_excel_contagem(
         cell.fill = header_fill
         cell.alignment = Alignment(horizontal="center")
 
-    money_columns = {"preco_custo_snapshot", "preco_venda_snapshot", "total_custo", "total_venda"}
+    money_columns = {
+        "preco_custo_snapshot",
+        "preco_venda_snapshot",
+        "total_custo",
+        "total_venda",
+    }
     for column_index, (_label, chave) in enumerate(colunas, start=1):
         letter = get_column_letter(column_index)
         largura = 16
@@ -363,7 +398,7 @@ def _gerar_excel_contagem(
         ws.column_dimensions[letter].width = largura
         if chave == "quantidade":
             for row in range(cabecalho_linha + 1, ws.max_row + 1):
-                ws.cell(row=row, column=column_index).number_format = '#,##0.000'
+                ws.cell(row=row, column=column_index).number_format = "#,##0.000"
         if chave in money_columns:
             for row in range(cabecalho_linha + 1, ws.max_row + 1):
                 ws.cell(row=row, column=column_index).number_format = '"R$" #,##0.00'
@@ -372,7 +407,7 @@ def _gerar_excel_contagem(
     total_quantidade = sum(float(item.quantidade or 0) for item in contagem.itens)
     ws.cell(total_row, 1, "Quantidade total")
     ws.cell(total_row, 2, total_quantidade)
-    ws.cell(total_row, 2).number_format = '#,##0.000'
+    ws.cell(total_row, 2).number_format = "#,##0.000"
     total_row += 1
     if mostrar_custo:
         ws.cell(total_row, 1, "Total custo")
@@ -544,11 +579,15 @@ def criar_contagem_funcionario(
         db.add(item)
 
     db.commit()
-    contagem = _get_contagem_funcionario_or_404(db, contagem.id, funcionario.id, tenant_id)
+    contagem = _get_contagem_funcionario_or_404(
+        db, contagem.id, funcionario.id, tenant_id
+    )
     return _serialize_contagem(contagem)
 
 
-@router.get("/funcionario/contagens", response_model=list[FuncionarioContagemResumoResponse])
+@router.get(
+    "/funcionario/contagens", response_model=list[FuncionarioContagemResumoResponse]
+)
 def listar_contagens_funcionario(
     limit: int = Query(default=20, ge=1, le=100),
     current_user: User = Depends(_get_current_ecommerce_user),
@@ -569,14 +608,18 @@ def listar_contagens_funcionario(
     return [_serialize_contagem_resumo(contagem) for contagem in contagens]
 
 
-@router.get("/funcionario/contagens/{contagem_id}", response_model=FuncionarioContagemResponse)
+@router.get(
+    "/funcionario/contagens/{contagem_id}", response_model=FuncionarioContagemResponse
+)
 def obter_contagem_funcionario(
     contagem_id: int,
     current_user: User = Depends(_get_current_ecommerce_user),
     db: Session = Depends(get_session),
 ):
     funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
-    contagem = _get_contagem_funcionario_or_404(db, contagem_id, funcionario.id, tenant_id)
+    contagem = _get_contagem_funcionario_or_404(
+        db, contagem_id, funcionario.id, tenant_id
+    )
     return _serialize_contagem(contagem)
 
 
@@ -590,7 +633,9 @@ def exportar_contagem_funcionario(
     db: Session = Depends(get_session),
 ):
     funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
-    contagem = _get_contagem_funcionario_or_404(db, contagem_id, funcionario.id, tenant_id)
+    contagem = _get_contagem_funcionario_or_404(
+        db, contagem_id, funcionario.id, tenant_id
+    )
     arquivo, filename, mime_type = _gerar_arquivo_contagem(
         contagem,
         formato,
@@ -617,7 +662,9 @@ def exportar_contagem_funcionario_mobile(
     db: Session = Depends(get_session),
 ):
     funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
-    contagem = _get_contagem_funcionario_or_404(db, contagem_id, funcionario.id, tenant_id)
+    contagem = _get_contagem_funcionario_or_404(
+        db, contagem_id, funcionario.id, tenant_id
+    )
     arquivo, filename, mime_type = _gerar_arquivo_contagem(
         contagem,
         formato,

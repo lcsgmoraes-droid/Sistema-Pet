@@ -48,7 +48,9 @@ def test_employee_count_exports_follow_value_checkboxes():
 
 def test_employee_count_allows_optional_supplier_search():
     source = read_repo("backend/app/routes/app_mobile_funcionario_contagem_routes.py")
-    supplier_block = extract_block(source, "def buscar_fornecedores_contagem_funcionario")
+    supplier_block = extract_block(
+        source, "def buscar_fornecedores_contagem_funcionario"
+    )
 
     assert '"/funcionario/contagens/fornecedores/buscar"' in source
     assert "Cliente.tenant_id == tenant_id" in supplier_block
@@ -62,7 +64,9 @@ def test_employee_count_models_and_migration_are_registered():
     models = read_repo("backend/app/funcionario_contagem_models.py")
     produtos_models = read_repo("backend/app/produtos_models.py")
     db_base = read_repo("backend/app/db/base.py")
-    migration_files = list((REPO_ROOT / "backend/alembic/versions").glob("*funcionario_contagens*.py"))
+    migration_files = list(
+        (REPO_ROOT / "backend/alembic/versions").glob("*funcionario_contagens*.py")
+    )
 
     assert '__tablename__ = "funcionario_contagens"' in models
     assert '__tablename__ = "funcionario_contagem_itens"' in models
@@ -79,7 +83,9 @@ def test_employee_count_models_and_migration_are_registered():
 
 def test_mobile_employee_count_service_screen_and_navigation_exist():
     service = read_repo("app-mobile/src/services/funcionarioContagem.service.ts")
-    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioContagemScreen.tsx")
+    screen = read_repo(
+        "app-mobile/src/screens/funcionario/FuncionarioContagemScreen.tsx"
+    )
     navigator = read_repo("app-mobile/src/navigation/FuncionarioNavigator.tsx")
     home = read_repo("app-mobile/src/screens/funcionario/FuncionarioHomeScreen.tsx")
     types = read_repo("app-mobile/src/types/index.ts")

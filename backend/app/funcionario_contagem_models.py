@@ -13,8 +13,12 @@ class FuncionarioContagem(BaseTenantModel):
     __tablename__ = "funcionario_contagens"
     __table_args__ = (
         Index("ix_funcionario_contagens_tenant_created", "tenant_id", "created_at"),
-        Index("ix_funcionario_contagens_tenant_funcionario", "tenant_id", "funcionario_id"),
-        Index("ix_funcionario_contagens_tenant_fornecedor", "tenant_id", "fornecedor_id"),
+        Index(
+            "ix_funcionario_contagens_tenant_funcionario", "tenant_id", "funcionario_id"
+        ),
+        Index(
+            "ix_funcionario_contagens_tenant_fornecedor", "tenant_id", "fornecedor_id"
+        ),
         {"extend_existing": True},
     )
 
@@ -42,13 +46,19 @@ class FuncionarioContagemItem(BaseTenantModel):
 
     __tablename__ = "funcionario_contagem_itens"
     __table_args__ = (
-        Index("ix_funcionario_contagem_itens_tenant_contagem", "tenant_id", "contagem_id"),
-        Index("ix_funcionario_contagem_itens_tenant_produto", "tenant_id", "produto_id"),
+        Index(
+            "ix_funcionario_contagem_itens_tenant_contagem", "tenant_id", "contagem_id"
+        ),
+        Index(
+            "ix_funcionario_contagem_itens_tenant_produto", "tenant_id", "produto_id"
+        ),
         {"extend_existing": True},
     )
 
     contagem_id = Column(
-        Integer, ForeignKey("funcionario_contagens.id", ondelete="CASCADE"), nullable=False
+        Integer,
+        ForeignKey("funcionario_contagens.id", ondelete="CASCADE"),
+        nullable=False,
     )
     produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False)
     ordem = Column(Integer, nullable=False, default=0)
