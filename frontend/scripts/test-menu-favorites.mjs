@@ -6,6 +6,8 @@ import {
   buildVisibleMenuFavorites,
   flattenMenuItemsForFavorites,
   normalizeMenuFavorites,
+  reorderMenuFavorites,
+  shouldBlockFavoriteShortcutClick,
   toggleMenuFavorite,
 } from "../src/components/layout/menuFavorites.js";
 
@@ -86,6 +88,37 @@ test("toggleMenuFavorite bloqueia inclusao acima do limite", () => {
       }),
     /maximo 8 favoritos/i,
   );
+});
+
+test("reorderMenuFavorites reordena favoritos existentes pelo caminho", () => {
+  const favoritos = [
+    { path: "/pdv", label: "PDV (Vendas)", icon_key: "shopping-cart" },
+    { path: "/produtos", label: "Listar Produtos", icon_key: "package" },
+    { path: "/produtos/balanco", label: "Balanco", icon_key: "clipboard-list" },
+  ];
+
+  assert.deepEqual(
+    reorderMenuFavorites(favoritos, "/produtos", "/pdv").map((entry) => entry.path),
+    ["/produtos", "/pdv", "/produtos/balanco"],
+  );
+});
+
+test("reorderMenuFavorites preserva ordem quando o alvo nao existe", () => {
+  const favoritos = [
+    { path: "/pdv", label: "PDV (Vendas)", icon_key: "shopping-cart" },
+    { path: "/produtos", label: "Listar Produtos", icon_key: "package" },
+  ];
+
+  assert.deepEqual(
+    reorderMenuFavorites(favoritos, "/produtos", "/financeiro").map((entry) => entry.path),
+    ["/pdv", "/produtos"],
+  );
+});
+
+test("shouldBlockFavoriteShortcutClick bloqueia clique durante ou logo apos arraste", () => {
+  assert.equal(shouldBlockFavoriteShortcutClick({ isDragging: true, now: 1000 }), true);
+  assert.equal(shouldBlockFavoriteShortcutClick({ suppressClickUntil: 1300, now: 1200 }), true);
+  assert.equal(shouldBlockFavoriteShortcutClick({ suppressClickUntil: 1300, now: 1400 }), false);
 });
 
 test("normalizeMenuFavorites limpa dados de API e remove duplicados", () => {
