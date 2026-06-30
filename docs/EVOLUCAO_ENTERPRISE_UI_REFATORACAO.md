@@ -209,13 +209,21 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 9 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 8 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 9 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 8 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 31 de 2026-06-30: `backend/app/clientes_routes.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das rotas de clientes, fornecedores, pets e pessoas operacionais:
+
+- `backend/app/clientes_routes.py`: 910 -> 153 linhas fisicas, mantendo `router`, schemas, handlers publicos e helpers legados como `_obter_cliente_ou_404` e `gerar_codigo_cliente`.
+- `backend/app/clientes/common.py`: centraliza normalizacao de telefone, validacao tenant/user, busca de cliente 404, metadados de criacao e geracao de codigo.
+- `backend/app/clientes/crud_routes.py`: concentra criacao, listagem, detalhe, atualizacao e exclusao logica de clientes/fornecedores, preservando validacoes de documentos, entregador padrao e desativacao de comissoes.
+- `backend/app/clientes/racas_routes.py`: concentra rotas de racas e mantem `/racas` antes de `/{cliente_id}` para preservar resolucao de path.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_31_refactor.py`, garantindo fachada publica, ordem sensivel das rotas e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 30 de 2026-06-30: `backend/app/notas_entrada/upload_routes.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das rotas de upload de notas de entrada:
 
