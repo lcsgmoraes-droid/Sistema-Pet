@@ -209,13 +209,20 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 4 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 3 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 4 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 3 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 36 de 2026-06-30: `backend/app/estoque_transferencia_parceiro_routes.py` saiu da faixa acima de 700 linhas ao extrair as mutacoes de transferencia para parceiro:
+
+- `backend/app/estoque_transferencia_parceiro_routes.py`: 729 -> 357 linhas com conteudo, mantendo router agregador, historico, PDF consolidado/unitario e envio por e-mail.
+- `backend/app/estoque/transferencia_parceiro_mutacao_routes.py`: concentra criacao e edicao da transferencia, baixa/estorno de estoque, financeiro e sync Bling.
+- O agregador principal inclui `transferencia_parceiro_mutacao_router` e `transferencia_parceiro_baixa_router`, preservando paths publicos sob `/estoque/transferencia-parceiro`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_36_refactor.py`, garantindo reexports publicos, delegacao e ambos os modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 35 de 2026-06-30: `backend/app/vendas/finalizacao.py` saiu da faixa acima de 700 linhas ao extrair pagamentos da finalizacao de vendas:
 
