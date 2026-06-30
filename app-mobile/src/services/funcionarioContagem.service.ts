@@ -1,6 +1,7 @@
 import * as FileSystem from "expo-file-system";
-import { Share } from "react-native";
+import { NativeModules, Platform, Share } from "react-native";
 import api from "./api";
+import { compartilharArquivoGerado } from "./funcionarioContagemArquivo";
 import {
   FuncionarioContagem,
   FuncionarioContagemArquivo,
@@ -114,10 +115,10 @@ export async function baixarContagemFuncionario(
   file.create();
   file.write(arquivo.base64, { encoding: "base64" });
 
-  await Share.share({
-    title: arquivo.filename,
-    message: file.uri,
-    url: file.uri,
+  await compartilharArquivoGerado(arquivo, file, {
+    platform: Platform.OS,
+    nativeShare: NativeModules.FuncionarioFileShare,
+    share: (content) => Share.share(content as Parameters<typeof Share.share>[0]),
   });
   return file.uri;
 }
