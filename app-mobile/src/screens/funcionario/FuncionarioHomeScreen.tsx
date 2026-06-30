@@ -30,6 +30,17 @@ export default function FuncionarioHomeScreen() {
         <Ionicons name="chevron-forward" size={20} color={CORES.textoClaro} />
       </TouchableOpacity>
 
+      <TouchableOpacity style={styles.acao} onPress={() => navigation.navigate("FuncionarioContagem")}>
+        <View style={[styles.acaoIcone, { backgroundColor: "#FEF3C7" }]}>
+          <Ionicons name="clipboard-outline" size={24} color={CORES.aviso} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.acaoTitulo}>Contagem</Text>
+          <Text style={styles.acaoTexto}>Bipar produtos, salvar a lista e gerar PDF ou Excel.</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={CORES.textoClaro} />
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.acao} onPress={() => navigation.navigate("FuncionarioPdv")}>
         <View style={[styles.acaoIcone, { backgroundColor: "#DBEAFE" }]}>
           <Ionicons name="cart-outline" size={24} color={CORES.primario} />
