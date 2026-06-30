@@ -1,4 +1,4 @@
-import { FiChevronDown, FiChevronRight, FiLock, FiUnlock } from "react-icons/fi";
+import { FiChevronDown, FiChevronRight, FiLock, FiStar, FiUnlock } from "react-icons/fi";
 import { Link } from "react-router-dom";
 import TooltipPremium from "../TooltipPremium";
 
@@ -48,6 +48,39 @@ function ModuloMenuIndicator({
   return null;
 }
 
+function FavoriteToggle({ item, active, onToggleFavorite, className = "" }) {
+  if (!onToggleFavorite || !item?.path) return null;
+
+  const label = active ? `Remover ${item.label} dos favoritos` : `Adicionar ${item.label} aos favoritos`;
+
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onToggleFavorite(item);
+      }}
+      className={`rounded p-1 transition-colors ${
+        active ? "text-amber-500 hover:bg-amber-50" : "text-gray-300 hover:bg-white/70 hover:text-amber-500"
+      } ${className}`}
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+    >
+      <FiStar className={`h-3.5 w-3.5 ${active ? "fill-current" : ""}`} />
+    </button>
+  );
+}
+
+function favoriteItem(item, fallback) {
+  return {
+    ...item,
+    iconKey: item.iconKey ?? fallback?.iconKey,
+    icon: item.icon ?? fallback?.icon,
+  };
+}
+
 export default function SidebarMenu({
   menuItems,
   sidebarOpen,
@@ -56,6 +89,8 @@ export default function SidebarMenu({
   isActive,
   onToggleSubmenu,
   onMenuClick,
+  favoritePaths,
+  onToggleFavorite,
   devControlesAtivos,
   moduloAtivo,
   onToggleModuloDev,
@@ -110,18 +145,22 @@ export default function SidebarMenu({
                   <div className="mt-1 mb-2 space-y-0.5 md:space-y-1">
                     {Array.isArray(item.submenu) &&
                       item.submenu.map((subitem) => (
-                        <Link
+                        <div
                           key={subitem.path}
-                          to={subitem.path}
-                          onClick={onMenuClick}
                           className={`flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2 mx-1 md:mx-2 ml-8 md:ml-12 rounded-lg transition-all text-xs md:text-sm ${
                             isActive(subitem.path)
                               ? "bg-white text-indigo-600 shadow-sm font-medium"
                               : "text-gray-600 hover:bg-white/50"
                           }`}
                         >
-                          {sidebarOpen && <span>{subitem.label}</span>}
-                          {!sidebarOpen && <span className="sr-only">{subitem.label}</span>}
+                          <Link
+                            to={subitem.path}
+                            onClick={onMenuClick}
+                            className="flex min-w-0 flex-1 items-center"
+                          >
+                            {sidebarOpen && <span className="truncate">{subitem.label}</span>}
+                            {!sidebarOpen && <span className="sr-only">{subitem.label}</span>}
+                          </Link>
                           {subitem.modulo && sidebarOpen && (
                             <ModuloMenuIndicator
                               modulo={subitem.modulo}
@@ -132,26 +171,39 @@ export default function SidebarMenu({
                               iconClassName="w-3 h-3 flex-shrink-0"
                             />
                           )}
-                        </Link>
+                          {sidebarOpen && (
+                            <FavoriteToggle
+                              item={favoriteItem(subitem, item)}
+                              active={favoritePaths?.has(subitem.path)}
+                              onToggleFavorite={onToggleFavorite}
+                            />
+                          )}
+                        </div>
                       ))}
                   </div>
                 )}
               </>
             ) : (
-              <Link
-                to={item.path}
-                onClick={onMenuClick}
+              <div
                 className={`flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 my-0.5 md:my-1 rounded-lg transition-all text-sm md:text-base ${
                   isActive(item.path)
                     ? "bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 shadow-sm"
                     : "text-gray-700 hover:bg-white/60"
                 }`}
-                title={!sidebarOpen ? item.label : ""}
               >
-                <item.icon className="text-base md:text-lg flex-shrink-0" />
+                <Link
+                  to={item.path}
+                  onClick={onMenuClick}
+                  className="flex min-w-0 flex-1 items-center gap-2 md:gap-3"
+                  title={!sidebarOpen ? item.label : ""}
+                >
+                  <item.icon className="text-base md:text-lg flex-shrink-0" />
+                  {sidebarOpen && (
+                    <span className="truncate font-medium text-xs md:text-sm">{item.label}</span>
+                  )}
+                </Link>
                 {sidebarOpen && (
-                  <div className="flex items-center justify-between flex-1">
-                    <span className="font-medium text-xs md:text-sm">{item.label}</span>
+                  <div className="flex shrink-0 items-center gap-1">
                     {item.modulo ? (
                       <ModuloMenuIndicator
                         modulo={item.modulo}
@@ -166,9 +218,14 @@ export default function SidebarMenu({
                     ) : item.badge ? (
                       <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></span>
                     ) : null}
+                    <FavoriteToggle
+                      item={favoriteItem(item)}
+                      active={favoritePaths?.has(item.path)}
+                      onToggleFavorite={onToggleFavorite}
+                    />
                   </div>
                 )}
-              </Link>
+              </div>
             )}
           </div>
         ))}

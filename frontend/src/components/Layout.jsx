@@ -1,6 +1,7 @@
 import { CalendarDays, FlaskConical, Stethoscope, Syringe } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FiCreditCard, FiFileText, FiHelpCircle, FiLogOut, FiMenu, FiX } from "react-icons/fi";
+import { toast } from "react-hot-toast";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useModulos } from "../contexts/ModulosContext";
@@ -8,6 +9,11 @@ import { api } from "../services/api";
 import { useEscapeFallbackForVisibleModals } from "../utils/modalEscape";
 import { isVeterinarioProfile } from "../utils/veterinarioPerfil";
 import FloatingCalculatorButton from "./FloatingCalculatorButton";
+import {
+  buildVisibleMenuFavorites,
+  normalizeMenuFavorites,
+  toggleMenuFavorite,
+} from "./layout/menuFavorites";
 import { createLayoutMenuItems } from "./layout/menuConfig";
 import SidebarMenu from "./layout/SidebarMenu";
 import ModalCalculadoraUniversal from "./ModalCalculadoraUniversal";
@@ -109,6 +115,7 @@ const Layout = () => {
 
   // Contagem de lembretes pendentes para badge dinâmico
   const [lembretesCount, setLembretesCount] = useState(0);
+  const [menuFavorites, setMenuFavorites] = useState([]);
   const lembretesPollingRef = useRef(false);
   const [telaBloqueadaSuspeita, setTelaBloqueadaSuspeita] = useState(false);
   const overlaySuspeitoDesdeRef = useRef(new Map());
@@ -347,6 +354,33 @@ const Layout = () => {
     return () => clearInterval(interval);
   }, [moduloAtivo, modulosAtivos]);
 
+  useEffect(() => {
+    let ativo = true;
+
+    const carregarMenuFavorites = async () => {
+      if (!user) {
+        setMenuFavorites([]);
+        return;
+      }
+
+      try {
+        const response = await api.get("/usuarios/me/menu-favoritos");
+        if (ativo) {
+          setMenuFavorites(normalizeMenuFavorites(response?.data?.items || []));
+        }
+      } catch {
+        if (ativo) {
+          setMenuFavorites([]);
+        }
+      }
+    };
+
+    carregarMenuFavorites();
+    return () => {
+      ativo = false;
+    };
+  }, [user?.id, user?.tenant_id]);
+
   const allMenuItems = createLayoutMenuItems({ lembretesCount });
 
   const itemLiberadoPorModulo = (item) => !item.modulo || moduloAtivo(item.modulo);
@@ -385,6 +419,39 @@ const Layout = () => {
     // Verifica se usuário tem a permissão do menu principal
     return itemLiberadoPorPermissao(item);
   });
+
+  const visibleMenuFavorites = useMemo(
+    () => buildVisibleMenuFavorites(menuFavorites, menuItems),
+    [menuFavorites, menuItems],
+  );
+  const favoritePaths = useMemo(
+    () => new Set(menuFavorites.map((favorite) => favorite.path)),
+    [menuFavorites],
+  );
+
+  const handleToggleFavorite = async (item) => {
+    const favoritosAnteriores = menuFavorites;
+    let proximosFavoritos;
+
+    try {
+      proximosFavoritos = toggleMenuFavorite(favoritosAnteriores, item);
+    } catch (error) {
+      toast.error(error?.message || "Nao foi possivel alterar favoritos.");
+      return;
+    }
+
+    setMenuFavorites(proximosFavoritos);
+
+    try {
+      const response = await api.put("/usuarios/me/menu-favoritos", {
+        items: proximosFavoritos,
+      });
+      setMenuFavorites(normalizeMenuFavorites(response?.data?.items || proximosFavoritos));
+    } catch {
+      setMenuFavorites(favoritosAnteriores);
+      toast.error("Nao foi possivel salvar favoritos agora.");
+    }
+  };
 
   useEffect(() => {
     setSubmenusOpen((prev) => {
@@ -522,6 +589,8 @@ const Layout = () => {
             isActive={isActive}
             onToggleSubmenu={handleToggleSubmenu}
             onMenuClick={handleMenuClick}
+            favoritePaths={favoritePaths}
+            onToggleFavorite={handleToggleFavorite}
             devControlesAtivos={devControlesAtivos}
             moduloAtivo={moduloAtivo}
             onToggleModuloDev={onToggleModuloDev}
@@ -609,6 +678,30 @@ const Layout = () => {
             </div>
           </div>
         </header>
+
+        {visibleMenuFavorites.length > 0 && !isBradescoOrganizerRoute && (
+          <div className="shrink-0 border-b border-gray-200 bg-white/95 px-3 py-2 md:px-6">
+            <div className="flex items-center gap-2 overflow-x-auto">
+              {visibleMenuFavorites.map((favorite) => {
+                const Icon = favorite.icon;
+                return (
+                  <Link
+                    key={favorite.path}
+                    to={favorite.path}
+                    className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold transition-colors ${
+                      isActive(favorite.path)
+                        ? "border-[#0f8b8d] bg-[#d8eee9] text-[#0f5f63]"
+                        : "border-gray-200 bg-white text-gray-700 hover:border-[#b9ddd8] hover:bg-[#f4fbfa]"
+                    }`}
+                  >
+                    {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" /> : null}
+                    <span className="whitespace-nowrap">{favorite.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Page Content */}
         <main
