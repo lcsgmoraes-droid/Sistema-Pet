@@ -11,11 +11,19 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
+from app.tenant_rls_migration import apply_tenant_rls
+
 
 revision: str = "zwa20260630a1"
 down_revision: Union[str, Sequence[str], None] = "uv20260630a1"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
+
+
+FUNCIONARIO_CONTAGENS_RLS_TABLES = (
+    "funcionario_contagens",
+    "funcionario_contagem_itens",
+)
 
 
 def _has_table(table_name: str) -> bool:
@@ -96,9 +104,21 @@ def upgrade() -> None:
     _create_index("ix_funcionario_contagens_tenant_fornecedor", "funcionario_contagens", ["tenant_id", "fornecedor_id"])
     _create_index("ix_funcionario_contagem_itens_tenant_contagem", "funcionario_contagem_itens", ["tenant_id", "contagem_id"])
     _create_index("ix_funcionario_contagem_itens_tenant_produto", "funcionario_contagem_itens", ["tenant_id", "produto_id"])
+    apply_tenant_rls(
+        op_module=op,
+        sa_module=sa,
+        table_names=FUNCIONARIO_CONTAGENS_RLS_TABLES,
+        enable=True,
+    )
 
 
 def downgrade() -> None:
+    apply_tenant_rls(
+        op_module=op,
+        sa_module=sa,
+        table_names=FUNCIONARIO_CONTAGENS_RLS_TABLES,
+        enable=False,
+    )
     if _has_table("funcionario_contagem_itens"):
         op.drop_table("funcionario_contagem_itens")
     if _has_table("funcionario_contagens"):

@@ -73,6 +73,8 @@ def test_employee_count_models_and_migration_are_registered():
     migration = migration_files[0].read_text(encoding="utf-8")
     assert "funcionario_contagens" in migration
     assert "funcionario_contagem_itens" in migration
+    assert "apply_tenant_rls" in migration
+    assert "FUNCIONARIO_CONTAGENS_RLS_TABLES" in migration
 
 
 def test_mobile_employee_count_service_screen_and_navigation_exist():
