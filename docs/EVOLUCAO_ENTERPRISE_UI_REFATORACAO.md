@@ -209,13 +209,20 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 5 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 4 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 5 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 4 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 35 de 2026-06-30: `backend/app/vendas/finalizacao.py` saiu da faixa acima de 700 linhas ao extrair pagamentos da finalizacao de vendas:
+
+- `backend/app/vendas/finalizacao.py`: 727 -> 491 linhas com conteudo, mantendo a orquestracao atomica, eventos, baixa de estoque, financeiro e pos-commit.
+- `backend/app/vendas/finalizacao_pagamentos.py`: concentra calculo de saldos, consumo de cupom, validacao de operadora/NSU, registro de pagamento, credito de cliente, cashback e movimentacao de caixa.
+- `VendaService._calcular_pagamentos_finalizacao` continua reexportado pela fachada historica via `app.vendas.finalizacao`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_35_refactor.py`, garantindo reexports publicos, delegacao para o novo modulo e ambos os arquivos abaixo de 700 linhas.
 
 Fatia backend 700 batch 34 de 2026-06-30: `backend/app/routes/app_mobile_routes.py` saiu da faixa acima de 700 linhas ao extrair as rotas de estoque operacional do funcionario:
 
