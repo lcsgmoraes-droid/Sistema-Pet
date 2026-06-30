@@ -42,6 +42,31 @@ __all__ = [
 ]
 
 
+def _buscar_parceiro_transferencia(db: Session, tenant_id, parceiro_id: int):
+    parceiro = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == parceiro_id,
+            Cliente.tenant_id == tenant_id,
+            or_(Cliente.ativo.is_(True), Cliente.ativo.is_(None)),
+        )
+        .first()
+    )
+    if not parceiro:
+        raise HTTPException(status_code=404, detail="Pessoa nao encontrada")
+    return parceiro
+
+
+def _validar_itens_transferencia(payload: TransferenciaParceiroRequest):
+    itens_validos = [item for item in payload.itens if float(item.quantidade or 0) > 0]
+    if not itens_validos:
+        raise HTTPException(
+            status_code=400,
+            detail="Informe ao menos um item com quantidade maior que zero",
+        )
+    return itens_validos
+
+
 @router.post("/transferencia-parceiro", status_code=status.HTTP_201_CREATED)
 @require_permission("produtos.editar")
 def transferir_estoque_para_parceiro(
@@ -59,24 +84,8 @@ def transferir_estoque_para_parceiro(
     """
     current_user, tenant_id = user_and_tenant
 
-    parceiro = (
-        db.query(Cliente)
-        .filter(
-            Cliente.id == payload.parceiro_id,
-            Cliente.tenant_id == tenant_id,
-            or_(Cliente.ativo.is_(True), Cliente.ativo.is_(None)),
-        )
-        .first()
-    )
-    if not parceiro:
-        raise HTTPException(status_code=404, detail="Pessoa nao encontrada")
-
-    itens_validos = [item for item in payload.itens if float(item.quantidade or 0) > 0]
-    if not itens_validos:
-        raise HTTPException(
-            status_code=400,
-            detail="Informe ao menos um item com quantidade maior que zero",
-        )
+    parceiro = _buscar_parceiro_transferencia(db, tenant_id, payload.parceiro_id)
+    itens_validos = _validar_itens_transferencia(payload)
 
     codigo_transferencia = (
         _texto_limpo(payload.documento) or _gerar_codigo_transferencia_parceiro()
@@ -233,24 +242,8 @@ def editar_transferencia_parceiro(
             detail="Transferencia cancelada nao pode ser editada.",
         )
 
-    parceiro = (
-        db.query(Cliente)
-        .filter(
-            Cliente.id == payload.parceiro_id,
-            Cliente.tenant_id == tenant_id,
-            or_(Cliente.ativo.is_(True), Cliente.ativo.is_(None)),
-        )
-        .first()
-    )
-    if not parceiro:
-        raise HTTPException(status_code=404, detail="Pessoa nao encontrada")
-
-    itens_validos = [item for item in payload.itens if float(item.quantidade or 0) > 0]
-    if not itens_validos:
-        raise HTTPException(
-            status_code=400,
-            detail="Informe ao menos um item com quantidade maior que zero",
-        )
+    parceiro = _buscar_parceiro_transferencia(db, tenant_id, payload.parceiro_id)
+    itens_validos = _validar_itens_transferencia(payload)
 
     codigo_transferencia = (
         _texto_limpo(payload.documento)
