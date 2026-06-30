@@ -61,7 +61,7 @@ def test_layout_fatia_39_extrai_sidebar_sem_mudar_orquestrador():
     layout_source = _source("frontend/src/components/Layout.jsx")
     sidebar_source = _source("frontend/src/components/layout/LayoutSidebar.jsx")
 
-    assert "from \"./layout/LayoutSidebar\"" in layout_source
+    assert 'from "./layout/LayoutSidebar"' in layout_source
     assert "<LayoutSidebar" in layout_source
     assert "const COREPET_LOGO" not in layout_source
     assert "Meu Plano" not in layout_source
