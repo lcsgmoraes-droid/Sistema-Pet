@@ -209,13 +209,22 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 12 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 11 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 12 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 11 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 28 de 2026-06-30: `backend/app/ia/aba5_fluxo_caixa.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do fluxo de caixa preditivo:
+
+- `backend/app/ia/aba5_fluxo_caixa.py`: 844 -> 52 linhas fisicas, mantendo as funcoes publicas e helpers historicos reexportados.
+- `backend/app/ia/aba5_fluxo_caixa_parts/base.py`: concentra resolucao de tenant, tempo UTC e saldo realizado atual.
+- `backend/app/ia/aba5_fluxo_caixa_parts/projecoes.py`: concentra fallback estatico, persistencia, Prophet e consulta de projecoes futuras.
+- `backend/app/ia/aba5_fluxo_caixa_parts/indices.py`: concentra calculo/cache dos indices de saude do caixa.
+- `backend/app/ia/aba5_fluxo_caixa_parts/acoes.py`: concentra simulacao de cenario, alertas e registro manual de movimentacao.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_28_refactor.py`, garantindo facade publica e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 27 de 2026-06-30: `backend/app/pedidos_compra/sugestao.py` saiu da faixa acima de 700 linhas ao virar fachada compativel dos helpers de sugestao de compra:
 
