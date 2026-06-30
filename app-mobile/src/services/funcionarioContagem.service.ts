@@ -1,5 +1,5 @@
 import * as FileSystem from "expo-file-system";
-import * as Sharing from "expo-sharing";
+import { Share } from "react-native";
 import api from "./api";
 import {
   FuncionarioContagem,
@@ -114,11 +114,10 @@ export async function baixarContagemFuncionario(
   file.create();
   file.write(arquivo.base64, { encoding: "base64" });
 
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(file.uri, {
-      mimeType: arquivo.mime_type,
-      dialogTitle: "Compartilhar contagem",
-    });
-  }
+  await Share.share({
+    title: arquivo.filename,
+    message: file.uri,
+    url: file.uri,
+  });
   return file.uri;
 }
