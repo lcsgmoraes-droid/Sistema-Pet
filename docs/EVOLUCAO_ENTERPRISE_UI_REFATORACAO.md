@@ -209,13 +209,22 @@ Regras para refatorar sem quebrar producao:
 
 Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
 
-- 10 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 9 arquivos de aplicacao acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 10 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- Recorte backend em `backend/app`: 9 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+
+Fatia backend 700 batch 30 de 2026-06-30: `backend/app/notas_entrada/upload_routes.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das rotas de upload de notas de entrada:
+
+- `backend/app/notas_entrada/upload_routes.py`: 800 -> 111 linhas fisicas, mantendo `router`, handlers publicos e reexports legados como `_montar_sugestao_sku_produto` e `parse_nfe_xml`.
+- `backend/app/notas_entrada/upload_routes_parts/common.py`: centraliza criacao da nota, matching de produtos, criacao dos itens, contadores e resposta padrao.
+- `backend/app/notas_entrada/upload_routes_parts/xml_route.py`: concentra o upload unitario de XML de NF-e, com a rota reduzida a validacao/orquestracao.
+- `backend/app/notas_entrada/upload_routes_parts/pdf_route.py`: concentra o upload de PDF de pedido/romaneio com XML sintetico, delegando persistencia ao fluxo comum.
+- `backend/app/notas_entrada/upload_routes_parts/lote_xml_route.py`: concentra o upload em lote de XMLs, reaproveitando o mesmo fluxo comum por arquivo.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_30_refactor.py`, garantindo facade publica, ordem das rotas, reexports legados, processamento compartilhado e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 29 de 2026-06-30: `backend/app/dre_ia_routes.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das rotas de DRE Inteligente:
 
