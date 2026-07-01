@@ -1,6 +1,7 @@
 import { formatarMoeda } from "../../api/produtos";
 import BaixaLoteAcertoDireto from "./BaixaLoteAcertoDireto";
 import BaixaLoteTransferenciaLista from "./BaixaLoteTransferenciaLista";
+import { calcularResumoEncontroContasParceiro } from "./transferenciaParceiroUtils";
 
 function ResumoBaixaLoteCard({ titulo, valor, destaque = "text-slate-900" }) {
   return (
@@ -78,6 +79,59 @@ function ContasPagarCompensacaoLote({
   );
 }
 
+function ResumoEncontroContas({ resumo }) {
+  const diferencaAbsoluta = Math.abs(resumo.diferencaCompensacao || 0);
+  const status =
+    resumo.status === "fechado"
+      ? {
+          titulo: "Fechado",
+          texto: "Valores batem para o acerto.",
+          classe: "border-emerald-200 bg-emerald-50 text-emerald-800",
+        }
+      : resumo.status === "excedente"
+        ? {
+            titulo: "Excedente",
+            texto: "Compensacao acima da baixa aplicada.",
+            classe: "border-red-200 bg-red-50 text-red-800",
+          }
+        : {
+            titulo: "Pendente",
+            texto: "Ainda falta compensar ou receber.",
+            classe: "border-amber-200 bg-amber-50 text-amber-800",
+          };
+
+  return (
+    <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <ResumoBaixaLoteCard
+        titulo="Baixa aplicada"
+        valor={resumo.totalAplicado}
+        destaque="text-emerald-700"
+      />
+      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          Disponivel para acerto
+        </p>
+        <p className="mt-1 text-base font-bold text-slate-900">
+          {formatarMoeda(resumo.totalDisponivel)}
+        </p>
+        <p className="mt-1 text-xs text-slate-500">
+          Entradas do parceiro: {formatarMoeda(resumo.totalDisponivelEntradas)}
+        </p>
+      </div>
+      <ResumoBaixaLoteCard
+        titulo="Compensado agora"
+        valor={resumo.totalCompensado}
+        destaque="text-amber-700"
+      />
+      <div className={`rounded-xl border px-4 py-3 ${status.classe}`}>
+        <p className="text-xs font-medium uppercase tracking-wide">{status.titulo}</p>
+        <p className="mt-1 text-base font-bold">{formatarMoeda(diferencaAbsoluta)}</p>
+        <p className="mt-1 text-xs">{status.texto}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function BaixaLoteTransferenciaPanel({
   pessoaNome,
   form,
@@ -102,6 +156,12 @@ export default function BaixaLoteTransferenciaPanel({
   onFechar,
   onConfirmar,
 }) {
+  const resumoEncontroContas = calcularResumoEncontroContasParceiro({
+    totalAplicado,
+    totalCompensado,
+    contasPagar: contasPagarCompensacao,
+  });
+
   return (
     <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -248,6 +308,7 @@ export default function BaixaLoteTransferenciaPanel({
 
       {form.modo_baixa === "acerto" ? (
         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <ResumoEncontroContas resumo={resumoEncontroContas} />
           <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-sm font-semibold text-amber-950">Contas a pagar para compensar</p>
