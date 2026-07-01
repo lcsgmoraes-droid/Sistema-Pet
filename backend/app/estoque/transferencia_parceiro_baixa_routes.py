@@ -146,7 +146,15 @@ def registrar_recebimento_transferencia_parceiro(
         sum(float(item.valor_compensado or 0) for item in compensacoes_payload),
         2,
     )
-    if compensacoes_payload and abs(total_compensado - valor_recebido) > 0.01:
+    if modo_baixa == "acerto" and not compensacoes_payload:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "No acerto, selecione uma conta a pagar ou lance uma divida "
+                "para compensar."
+            ),
+        )
+    if modo_baixa == "acerto" and abs(total_compensado - valor_recebido) > 0.01:
         raise HTTPException(
             status_code=400,
             detail=(

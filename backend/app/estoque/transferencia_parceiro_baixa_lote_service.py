@@ -260,6 +260,14 @@ def aplicar_compensacoes_acerto_lote(
         if _valor_compensacao_payload(item) > 0
     ]
     if not compensacoes_validas:
+        if total_baixa > CENTAVO:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "No acerto, selecione uma conta a pagar ou lance uma "
+                    "divida para compensar."
+                ),
+            )
         return []
 
     total_compensado = sum(

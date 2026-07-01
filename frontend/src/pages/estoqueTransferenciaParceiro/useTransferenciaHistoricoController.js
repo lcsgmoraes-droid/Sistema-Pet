@@ -19,6 +19,7 @@ import {
   montarParametrosDocumentoTransferencia,
   normalizarColunasDocumentoTransferencia,
   normalizarNumero,
+  obterErroAcertoTransferencia,
 } from "./transferenciaParceiroUtils";
 import useTransferenciaBaixaLoteController from "./useTransferenciaBaixaLoteController";
 export default function useTransferenciaHistoricoController({
@@ -522,14 +523,14 @@ export default function useTransferenciaHistoricoController({
       (acumulado, item) => acumulado + Number(item.valor_compensado || 0),
       0,
     );
-    if (
-      formBaixa.modo_baixa === "acerto" &&
-      compensacoesPayload.length > 0 &&
-      Math.abs(totalCompensado - valorRecebido) > 0.01
-    ) {
-      toast.error(
-        "No acerto com contas selecionadas, o total compensado precisa bater com o valor da baixa.",
-      );
+    const erroAcerto = obterErroAcertoTransferencia({
+      modoBaixa: formBaixa.modo_baixa,
+      totalBaixa: valorRecebido,
+      totalCompensado,
+      temCompensacao: compensacoesPayload.length > 0,
+    });
+    if (erroAcerto) {
+      toast.error(erroAcerto);
       return;
     }
 

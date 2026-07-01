@@ -8,6 +8,7 @@ import {
   distribuirCompensacaoAutomatica,
   montarBaixaLoteTransferenciaPayload,
   normalizarNumero,
+  obterErroAcertoTransferencia,
 } from "./transferenciaParceiroUtils";
 
 const PREVIEW_VAZIO = {
@@ -211,12 +212,14 @@ export default function useTransferenciaBaixaLoteController({
         (valor) => normalizarNumero(valor) > 0,
       ) ||
       (Number.isFinite(valorNovaContaPagar) && valorNovaContaPagar > 0);
-    if (
-      formBaixaLote.modo_baixa === "acerto" &&
-      temCompensacao &&
-      Math.abs(totalCompensadoBaixaLote - totalAplicadoBaixaLote) > 0.01
-    ) {
-      toast.error("No acerto, o total compensado precisa bater com o total aplicado.");
+    const erroAcerto = obterErroAcertoTransferencia({
+      modoBaixa: formBaixaLote.modo_baixa,
+      totalBaixa: totalAplicadoBaixaLote,
+      totalCompensado: totalCompensadoBaixaLote,
+      temCompensacao,
+    });
+    if (erroAcerto) {
+      toast.error(erroAcerto);
       return;
     }
 

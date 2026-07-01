@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import * as transferenciaParceiroUtils from "./transferenciaParceiroUtils.js";
 import {
   calcularDiferencaLancadaTransferencia,
   calcularResumoEncontroContasParceiro,
@@ -392,6 +393,37 @@ test("montarBaixaLoteTransferenciaPayload inclui nova conta a pagar no acerto", 
         observacao: "Produtos pegos no parceiro",
       },
     },
+  );
+});
+
+test("obterErroAcertoTransferencia exige compensacao no modo acerto", () => {
+  assert.equal(typeof transferenciaParceiroUtils.obterErroAcertoTransferencia, "function");
+  assert.equal(
+    transferenciaParceiroUtils.obterErroAcertoTransferencia({
+      modoBaixa: "acerto",
+      totalBaixa: 100,
+      totalCompensado: 0,
+      temCompensacao: false,
+    }),
+    "No acerto, selecione uma conta a pagar ou lance uma divida para compensar.",
+  );
+  assert.equal(
+    transferenciaParceiroUtils.obterErroAcertoTransferencia({
+      modoBaixa: "acerto",
+      totalBaixa: 100,
+      totalCompensado: 80,
+      temCompensacao: true,
+    }),
+    "No acerto, o total compensado precisa bater com o total da baixa.",
+  );
+  assert.equal(
+    transferenciaParceiroUtils.obterErroAcertoTransferencia({
+      modoBaixa: "recebimento",
+      totalBaixa: 100,
+      totalCompensado: 0,
+      temCompensacao: false,
+    }),
+    null,
   );
 });
 

@@ -414,6 +414,22 @@ export function distribuirCompensacaoAutomatica(valorBase, contas = []) {
   return proximaCompensacao;
 }
 
+export function obterErroAcertoTransferencia({
+  modoBaixa,
+  totalBaixa,
+  totalCompensado,
+  temCompensacao,
+} = {}) {
+  if (String(modoBaixa || "") !== "acerto") return null;
+  if (!temCompensacao) {
+    return "No acerto, selecione uma conta a pagar ou lance uma divida para compensar.";
+  }
+  if (Math.abs(normalizarNumero(totalCompensado) - normalizarNumero(totalBaixa)) > 0.01) {
+    return "No acerto, o total compensado precisa bater com o total da baixa.";
+  }
+  return null;
+}
+
 function arredondarCentavos(valor) {
   const numero = Number(valor);
   if (!Number.isFinite(numero)) return 0;
