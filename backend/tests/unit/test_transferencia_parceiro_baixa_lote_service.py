@@ -10,6 +10,7 @@ os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test
 os.environ["DEBUG"] = "false"
 
 from app.estoque.transferencia_parceiro_baixa_lote_service import (
+    aplicar_compensacoes_acerto_lote,
     aplicar_baixa_lote_transferencia,
     criar_conta_pagar_acerto_lote,
     distribuir_baixa_transferencias,
@@ -193,3 +194,21 @@ def test_nova_conta_pagar_acerto_so_pode_ser_usada_no_modo_acerto():
 
     assert exc_info.value.status_code == 400
     assert "modo acerto" in exc_info.value.detail.lower()
+
+
+def test_acerto_lote_exige_compensacao_real():
+    with pytest.raises(HTTPException) as exc_info:
+        aplicar_compensacoes_acerto_lote(
+            _FakeSession(),
+            tenant_id="tenant-1",
+            parceiro_id=8406,
+            user_id=99,
+            data_pagamento=date(2026, 7, 1),
+            forma_pagamento=SimpleNamespace(id=10),
+            compensacoes_payload=[],
+            total_baixa=Decimal("100.00"),
+            documento_lote="TRP-LOTE-1",
+        )
+
+    assert exc_info.value.status_code == 400
+    assert "compensar" in exc_info.value.detail.lower()
