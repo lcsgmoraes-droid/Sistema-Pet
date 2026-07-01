@@ -414,6 +414,49 @@ export function distribuirCompensacaoAutomatica(valorBase, contas = []) {
   return proximaCompensacao;
 }
 
+function arredondarCentavos(valor) {
+  const numero = Number(valor);
+  if (!Number.isFinite(numero)) return 0;
+  return Number(numero.toFixed(2));
+}
+
+export function calcularResumoEncontroContasParceiro({
+  totalAplicado = 0,
+  totalCompensado = 0,
+  contasPagar = [],
+} = {}) {
+  const aplicado = arredondarCentavos(normalizarNumero(totalAplicado));
+  const compensado = arredondarCentavos(normalizarNumero(totalCompensado));
+  const contas = Array.isArray(contasPagar) ? contasPagar : [];
+  const totalDisponivel = arredondarCentavos(
+    contas.reduce((soma, conta) => soma + normalizarNumero(conta?.saldo_aberto), 0),
+  );
+  const totalDisponivelEntradas = arredondarCentavos(
+    contas.reduce((soma, conta) => {
+      if (conta?.origem_acerto !== "entrada_parceiro") return soma;
+      return soma + normalizarNumero(conta?.saldo_aberto);
+    }, 0),
+  );
+  const diferencaCompensacao = arredondarCentavos(aplicado - compensado);
+  const saldoLiquidoDisponivel = arredondarCentavos(totalDisponivel - aplicado);
+  const status =
+    Math.abs(diferencaCompensacao) < 0.01
+      ? "fechado"
+      : diferencaCompensacao > 0
+        ? "faltando"
+        : "excedente";
+
+  return {
+    totalAplicado: aplicado,
+    totalCompensado: compensado,
+    totalDisponivel,
+    totalDisponivelEntradas,
+    diferencaCompensacao,
+    saldoLiquidoDisponivel,
+    status,
+  };
+}
+
 export function baixarArquivoBlob(blob, nomeArquivo) {
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
