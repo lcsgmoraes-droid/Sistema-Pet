@@ -38,7 +38,9 @@ def test_acerto_individual_exige_compensacao_real(monkeypatch):
         observacoes="",
     )
 
-    monkeypatch.setattr(routes, "_buscar_conta_transferencia_parceiro", lambda *_args: conta)
+    monkeypatch.setattr(
+        routes, "_buscar_conta_transferencia_parceiro", lambda *_args: conta
+    )
     monkeypatch.setattr(routes, "_saldo_conta_receber", lambda _conta: 100.0)
     monkeypatch.setattr(
         routes,
