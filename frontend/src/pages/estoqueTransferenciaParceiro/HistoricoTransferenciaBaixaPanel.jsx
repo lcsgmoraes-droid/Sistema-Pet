@@ -111,7 +111,7 @@ export default function HistoricoTransferenciaBaixaPanel({
         <div className="space-y-4">
           <div>
             <label className="mb-2 block text-sm font-medium text-emerald-900">Tipo de baixa</label>
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-3">
               <button
                 type="button"
                 onClick={() =>
@@ -153,6 +153,28 @@ export default function HistoricoTransferenciaBaixaPanel({
                   Ideal para o mata quando a pessoa tambem tem contas com voce.
                 </p>
               </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setFormBaixa((prev) => ({
+                    ...prev,
+                    modo_baixa: "produto_devolvido",
+                    forma_pagamento_id: "",
+                    compensacoes: {},
+                    devolver_estoque: Boolean(prev.devolver_estoque),
+                  }))
+                }
+                className={`rounded-2xl border px-4 py-3 text-left transition ${
+                  formBaixa.modo_baixa === "produto_devolvido"
+                    ? "border-sky-500 bg-white shadow-sm"
+                    : "border-sky-200 bg-sky-50 hover:bg-white"
+                }`}
+              >
+                <p className="text-sm font-semibold text-sky-900">Produto devolvido</p>
+                <p className="mt-1 text-xs text-sky-800">
+                  Baixa sem financeiro, com opcao de voltar os itens ao estoque.
+                </p>
+              </button>
             </div>
           </div>
 
@@ -181,7 +203,9 @@ export default function HistoricoTransferenciaBaixaPanel({
                 Opcional. Se nao informar, a baixa fica sem forma vinculada.
               </p>
             </div>
-          ) : (
+          ) : null}
+
+          {formBaixa.modo_baixa === "acerto" ? (
             <div className="space-y-3">
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 O sistema vai registrar esta baixa usando a forma de pagamento{" "}
@@ -252,7 +276,32 @@ export default function HistoricoTransferenciaBaixaPanel({
                 />
               </div>
             </div>
-          )}
+          ) : null}
+
+          {formBaixa.modo_baixa === "produto_devolvido" ? (
+            <div className="rounded-2xl border border-sky-200 bg-white p-4 text-sm text-sky-900">
+              <label className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={Boolean(formBaixa.devolver_estoque)}
+                  onChange={(event) =>
+                    setFormBaixa((prev) => ({
+                      ...prev,
+                      devolver_estoque: event.target.checked,
+                    }))
+                  }
+                  className="mt-1 h-4 w-4 rounded border-sky-300 text-sky-600 focus:ring-sky-500"
+                />
+                <span>
+                  <span className="block font-semibold">Voltar produto ao estoque</span>
+                  <span className="mt-1 block text-xs text-sky-800">
+                    Marcado: devolve os itens e exige baixa total. Desmarcado: apenas baixa o saldo
+                    com observacao.
+                  </span>
+                </span>
+              </label>
+            </div>
+          ) : null}
         </div>
 
         <div className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm text-emerald-900">
@@ -266,7 +315,9 @@ export default function HistoricoTransferenciaBaixaPanel({
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <div>
-          <label className="mb-2 block text-sm font-medium text-emerald-900">Valor recebido</label>
+          <label className="mb-2 block text-sm font-medium text-emerald-900">
+            {formBaixa.modo_baixa === "produto_devolvido" ? "Valor a baixar" : "Valor recebido"}
+          </label>
           <input
             type="number"
             min="0.01"
@@ -280,7 +331,9 @@ export default function HistoricoTransferenciaBaixaPanel({
         </div>
         <div>
           <label className="mb-2 block text-sm font-medium text-emerald-900">
-            Data do recebimento
+            {formBaixa.modo_baixa === "produto_devolvido"
+              ? "Data da devolucao"
+              : "Data do recebimento"}
           </label>
           <input
             type="date"
@@ -303,7 +356,11 @@ export default function HistoricoTransferenciaBaixaPanel({
           onChange={(event) =>
             setFormBaixa((prev) => ({ ...prev, observacao: event.target.value }))
           }
-          placeholder="Opcional. Ex.: pix recebido hoje, acerto parcial da remessa."
+          placeholder={
+            formBaixa.modo_baixa === "produto_devolvido"
+              ? "Obrigatorio se nao voltar ao estoque. Ex.: item ja havia sido devolvido antes."
+              : "Opcional. Ex.: pix recebido hoje, acerto parcial da remessa."
+          }
           className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
         />
       </div>

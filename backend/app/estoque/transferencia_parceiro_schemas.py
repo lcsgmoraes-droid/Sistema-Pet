@@ -58,6 +58,7 @@ class TransferenciaParceiroRecebimentoRequest(BaseModel):
     data_recebimento: date = Field(default_factory=date.today)
     modo_baixa: str = Field(default="recebimento")
     forma_pagamento_id: Optional[int] = None
+    devolver_estoque: bool = False
     compensacoes: List[TransferenciaParceiroCompensacaoContaRequest] = Field(
         default_factory=list
     )

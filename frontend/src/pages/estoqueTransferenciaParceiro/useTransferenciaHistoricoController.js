@@ -11,7 +11,7 @@ import {
   criarHistoricoTransferenciasVazio,
   distribuirCompensacaoAutomatica,
   fimDoMesBaseIso,
-  hojeIso,
+  montarBaixaTransferenciaPayload,
   inicioDoMesIso,
   montarCompensacoesBaixaPayload,
   montarCupomTransferencia,
@@ -533,20 +533,35 @@ export default function useTransferenciaHistoricoController({
       toast.error(erroAcerto);
       return;
     }
+    if (
+      formBaixa.modo_baixa === "produto_devolvido" &&
+      formBaixa.devolver_estoque &&
+      Math.abs(valorRecebido - Number(registro.saldo_aberto || 0)) > 0.01
+    ) {
+      toast.error("Produto devolvido com volta ao estoque exige baixa integral da transferencia.");
+      return;
+    }
+    if (
+      formBaixa.modo_baixa === "produto_devolvido" &&
+      !formBaixa.devolver_estoque &&
+      !formBaixa.observacao.trim()
+    ) {
+      toast.error("Informe uma observacao quando produto devolvido nao volta para o estoque.");
+      return;
+    }
+
+    const payload = montarBaixaTransferenciaPayload({
+      form: formBaixa,
+      valorRecebido,
+      compensacoesPayload,
+    });
 
     try {
       setContaRecebendo(registro.conta_receber_id);
-      await api.post(`/estoque/transferencia-parceiro/${registro.conta_receber_id}/receber`, {
-        valor_recebido: valorRecebido,
-        data_recebimento: formBaixa.data_recebimento || hojeIso(),
-        modo_baixa: formBaixa.modo_baixa || "recebimento",
-        forma_pagamento_id:
-          formBaixa.modo_baixa === "recebimento" && formBaixa.forma_pagamento_id
-            ? Number(formBaixa.forma_pagamento_id)
-            : undefined,
-        compensacoes: formBaixa.modo_baixa === "acerto" ? compensacoesPayload : undefined,
-        observacao: formBaixa.observacao.trim() || undefined,
-      });
+      await api.post(
+        `/estoque/transferencia-parceiro/${registro.conta_receber_id}/receber`,
+        payload,
+      );
       toast.success("Baixa registrada com sucesso.");
       fecharBaixaTransferencia();
       void Promise.all([

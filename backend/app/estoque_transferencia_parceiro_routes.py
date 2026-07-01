@@ -171,7 +171,8 @@ def listar_transferencias_para_parceiro(
         cliente = conta.cliente
         ultimo_recebimento = _obter_ultimo_recebimento_transferencia(conta)
         modo_baixa, modo_baixa_label = _detectar_modo_baixa_transferencia(
-            ultimo_recebimento
+            ultimo_recebimento,
+            observacoes_conta=conta.observacoes,
         )
         forma_pagamento = (
             getattr(ultimo_recebimento, "forma_pagamento", None)
