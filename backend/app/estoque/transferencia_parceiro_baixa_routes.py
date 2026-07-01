@@ -15,6 +15,10 @@ from app.estoque.transferencia_parceiro_documents import (
     _saldo_conta_receber,
     _status_transferencia_parceiro,
 )
+from app.estoque.transferencia_parceiro_baixa_lote_service import (
+    _registrar_lancamento_financeiro,
+    resolver_data_recebimento_financeiro,
+)
 from app.estoque.transferencia_parceiro_schemas import (
     TransferenciaParceiroContaPagarCompensacaoItem,
     TransferenciaParceiroContaPagarCompensacaoResponse,
@@ -39,6 +43,7 @@ from app.estoque.transferencia_parceiro_support import (
     _texto_limpo,
 )
 from app.financeiro_models import Recebimento
+from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from app.produtos_models import EstoqueMovimentacao
 from app.security.permissions_decorator import require_permission
 
@@ -235,7 +240,6 @@ def registrar_recebimento_transferencia_parceiro(
 
     valor_recebido_total = round(float(conta.valor_recebido or 0) + valor_recebido, 2)
     conta.valor_recebido = Decimal(str(valor_recebido_total))
-    conta.data_recebimento = payload.data_recebimento or date.today()
     conta.status = (
         "recebido"
         if abs(float(conta.valor_final or 0) - valor_recebido_total) < 0.01
@@ -259,9 +263,17 @@ def registrar_recebimento_transferencia_parceiro(
     if forma_pagamento:
         conta.forma_pagamento_id = forma_pagamento.id
 
+    data_recebimento_base = payload.data_recebimento or date.today()
+    conta.data_recebimento = (
+        resolver_data_recebimento_financeiro(data_recebimento_base, forma_pagamento)
+        if modo_baixa == "recebimento"
+        else data_recebimento_base
+    )
+
     modo_label = _label_modo_baixa_transferencia(modo_baixa) or "Recebimento"
     compensacoes_processadas: list[dict] = []
     movimentacoes_estoque: list[int] = []
+    lancamento_financeiro_id = None
     if modo_baixa == "acerto" and compensacoes_payload:
         compensacoes_processadas = _aplicar_compensacoes_contas_pagar_transferencia(
             db,
@@ -309,6 +321,19 @@ def registrar_recebimento_transferencia_parceiro(
         )
         db.add(recebimento)
 
+    valor_lancamento = Decimal(str(valor_recebido))
+    if modo_baixa == "recebimento":
+        lancamento_financeiro_id = _registrar_lancamento_financeiro(
+            db,
+            conta=conta,
+            valor=valor_lancamento,
+            data_recebimento=conta.data_recebimento,
+            forma_pagamento=forma_pagamento,
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+            historico=historico,
+        )
+
     if modo_baixa == "produto_devolvido" and devolver_estoque:
         movimentacoes_estoque = _estornar_estoque_transferencia_devolvida(
             db,
@@ -320,6 +345,20 @@ def registrar_recebimento_transferencia_parceiro(
 
     db.commit()
     db.refresh(conta)
+
+    if modo_baixa == "recebimento" and getattr(conta, "dre_subcategoria_id", None):
+        try:
+            atualizar_dre_por_lancamento(
+                db=db,
+                tenant_id=tenant_id,
+                dre_subcategoria_id=conta.dre_subcategoria_id,
+                canal=conta.canal or "transferencia_parceiro",
+                valor=valor_lancamento,
+                data_lancamento=conta.data_recebimento,
+                tipo_movimentacao="RECEITA",
+            )
+        except Exception as exc:
+            logger.warning("Erro ao atualizar DRE da baixa individual: %s", exc)
 
     status_resolvido, status_label = _status_transferencia_parceiro(conta)
 
@@ -337,6 +376,7 @@ def registrar_recebimento_transferencia_parceiro(
         "modo_baixa_label": modo_label,
         "forma_pagamento_id": forma_pagamento.id if forma_pagamento else None,
         "forma_pagamento_nome": _texto_limpo(getattr(forma_pagamento, "nome", None)),
+        "lancamento_financeiro_id": lancamento_financeiro_id,
         "compensacoes": compensacoes_processadas,
         "devolver_estoque": devolver_estoque,
         "movimentacoes_estoque": movimentacoes_estoque,
