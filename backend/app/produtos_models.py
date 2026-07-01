@@ -25,6 +25,10 @@ from .produtos_estoque_models import (
     ProdutoListaPreco,
     ProdutoLote,
 )
+from .funcionario_contagem_models import (
+    FuncionarioContagem,
+    FuncionarioContagemItem,
+)
 from .produtos_lembretes_variacoes_models import (
     Lembrete,
     ProdutoAtributo,
@@ -38,6 +42,8 @@ __all__ = [
     "Categoria",
     "Departamento",
     "EstoqueMovimentacao",
+    "FuncionarioContagem",
+    "FuncionarioContagemItem",
     "GranelConversao",
     "Lembrete",
     "ListaPreco",

@@ -27,12 +27,14 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/dashboard",
       icon: FiHome,
+      iconKey: "home",
       label: "Dashboard",
       permission: "relatorios.gerencial",
     }, // Precisa de permissão
     {
       path: "/dashboard-gerencial",
       icon: FiBarChart2,
+      iconKey: "bar-chart",
       label: "Dashboard Gerencial",
       highlight: true,
       permission: "relatorios.gerencial",
@@ -40,12 +42,14 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/clientes",
       icon: FiUsers,
+      iconKey: "users",
       label: "Pessoas",
       permission: "clientes.visualizar",
     },
     {
       path: "/pets",
       icon: PawPrint,
+      iconKey: "paw-print",
       label: "Pets",
       highlight: true,
       permission: "clientes.visualizar",
@@ -53,6 +57,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/veterinario",
       icon: Stethoscope,
+      iconKey: "stethoscope",
       label: "Veterinário",
       highlight: true,
       modulo: "veterinario",
@@ -118,6 +123,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/banho-tosa",
       icon: Scissors,
+      iconKey: "scissors",
       label: "Banho & Tosa",
       highlight: true,
       modulo: "banho_tosa",
@@ -178,6 +184,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/produtos",
       icon: FiPackage,
+      iconKey: "package",
       label: "Produtos / Estoque",
       permission: "produtos.visualizar",
       submenu: [
@@ -227,6 +234,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/lembretes",
       icon: FiBell,
+      iconKey: "bell",
       label: "Lembretes",
       badge: lembretesCount > 0,
       permission: null,
@@ -234,18 +242,21 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/calculadora-racao",
       icon: FiTarget,
+      iconKey: "target",
       label: "Calculadora de Ração",
       permission: "produtos.visualizar",
     },
     {
       path: "/pdv",
       icon: FiShoppingCart,
+      iconKey: "shopping-cart",
       label: "PDV (Vendas)",
       permission: "vendas.criar",
     },
     {
       path: "/campanhas",
       icon: FiGift,
+      iconKey: "gift",
       label: "Campanhas",
       modulo: "campanhas",
       permission: "vendas.criar",
@@ -253,6 +264,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/ecommerce",
       icon: FiGlobe,
+      iconKey: "globe",
       label: "E-commerce",
       modulo: "ecommerce",
       permission: "vendas.visualizar",
@@ -282,6 +294,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/vendas/bling-pedidos",
       icon: FiShoppingBag,
+      iconKey: "shopping-bag",
       label: "Pedidos Bling",
       modulo: "bling",
       permission: "compras.sincronizacao_bling",
@@ -289,6 +302,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/vendas/bling-monitor",
       icon: FiActivity,
+      iconKey: "activity",
       label: "Monitor Bling",
       modulo: "bling",
       permission: "compras.sincronizacao_bling",
@@ -296,6 +310,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/notas-fiscais/saida",
       icon: FiFileText,
+      iconKey: "file-text",
       label: "NF de Saída",
       modulo: "fiscal",
       permission: "vendas.visualizar",
@@ -303,6 +318,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/compras",
       icon: FiBox,
+      iconKey: "box",
       label: "Compras",
       modulo: "compras",
       permission: "compras.gerenciar",
@@ -327,6 +343,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/financeiro",
       icon: FiTrendingUp,
+      iconKey: "trending-up",
       label: "Financeiro",
       permission: "relatorios.financeiro",
       anyOfPermissions: [
@@ -401,6 +418,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/comissoes",
       icon: FiDollarSign,
+      iconKey: "dollar-sign",
       label: "Comissões",
       modulo: "comissoes",
       permission: "relatorios.financeiro", // Vinculado a relatórios financeiros
@@ -435,6 +453,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/entregas",
       icon: FiTruck,
+      iconKey: "truck",
       label: "Entregas",
       modulo: "entregas",
       permission: "vendas.visualizar", // Vinculado a vendas
@@ -464,6 +483,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/cadastros",
       icon: FiSettings,
+      iconKey: "settings",
       label: "Cadastros",
       permission: "configuracoes.editar", // Vinculado a configurações
       submenu: [
@@ -530,6 +550,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/rh",
       icon: FiBriefcase,
+      iconKey: "briefcase",
       label: "Recursos Humanos",
       modulo: "rh",
       permission: "usuarios.manage", // Vinculado a gerenciar usuários
@@ -544,6 +565,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/ia",
       icon: FiCpu,
+      iconKey: "cpu",
       label: "Inteligência Artificial",
       permission: null, // Menu principal sempre visível
       submenu: [
@@ -570,6 +592,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/admin",
       icon: FiShield,
+      iconKey: "shield",
       label: "Administração",
       permission: "usuarios.manage",
       submenu: [
@@ -593,6 +616,7 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
     {
       path: "/configuracoes",
       icon: FiSettings,
+      iconKey: "settings",
       label: "Configurações",
       permission: "configuracoes.editar",
       submenu: [

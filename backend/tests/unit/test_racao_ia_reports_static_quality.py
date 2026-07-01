@@ -15,6 +15,10 @@ def _source(path: str) -> str:
 def test_racao_ia_report_files_do_not_use_datetime_utcnow():
     for path in (
         "app/ia/aba5_fluxo_caixa.py",
+        "app/ia/aba5_fluxo_caixa_parts/base.py",
+        "app/ia/aba5_fluxo_caixa_parts/indices.py",
+        "app/ia/aba5_fluxo_caixa_parts/projecoes.py",
+        "app/ia/aba5_fluxo_caixa_parts/acoes.py",
         "app/ia/aba7_dre.py",
     ):
         assert "datetime.utcnow(" not in _source(path)

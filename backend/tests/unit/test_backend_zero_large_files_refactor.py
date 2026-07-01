@@ -20,9 +20,19 @@ TARGET_FILES = [
 ]
 
 EXTRACTED_MODULES = [
+    "app.ia.aba6_chat_ia_parts",
+    "app.ia.aba6_chat_ia_parts.base",
+    "app.ia.aba6_chat_ia_parts.contexto",
+    "app.ia.aba6_chat_ia_parts.conversas",
+    "app.ia.aba6_chat_ia_parts.mensagens",
+    "app.ia.aba6_chat_ia_parts.metricas",
+    "app.ia.aba6_chat_ia_parts.periodos",
+    "app.ia.aba6_chat_ia_parts.respostas",
+    "app.ia.aba6_chat_ia_parts.service",
     "app.ia.aba6_resposta_simples",
     "app.vendas.dre_pos_processamento",
     "app.models_authz",
+    "app.models_cadastros",
     "app.models_operacionais",
     "app.campaigns.loyalty_rewards",
     "app.conciliacao_recebimento_models",
@@ -67,7 +77,7 @@ def test_modulos_extraidos_da_fatia_zero_backend_existentes():
 def test_fachadas_publicas_preservam_funcoes_e_models_extraidos():
     from app import comissoes_config_service, comissoes_service
     from app import conciliacao_models, conciliacao_recebimento_models
-    from app import models, models_operacionais
+    from app import models, models_cadastros, models_operacionais
     from app.campaigns import loyalty_rewards, loyalty_service
     from app.vendas import dre_pos_processamento, pos_processamento
 
@@ -80,6 +90,8 @@ def test_fachadas_publicas_preservam_funcoes_e_models_extraidos():
         is comissoes_config_service.buscar_configuracao_comissao
     )
     assert loyalty_service._give_loyalty_reward is loyalty_rewards._give_loyalty_reward
+    assert models.Cliente is models_cadastros.Cliente
+    assert models.Pet is models_cadastros.Pet
     assert models.FeatureFlag is models_operacionais.FeatureFlag
     assert (
         conciliacao_models.ConciliacaoRecebimento

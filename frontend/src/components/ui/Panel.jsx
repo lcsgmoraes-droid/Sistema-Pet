@@ -25,7 +25,7 @@ const Panel = forwardRef(function Panel(
       ref={ref}
       {...props}
       className={[
-        "rounded-lg border border-slate-200 bg-white shadow-sm",
+        "rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100",
         PADDING[padding] || PADDING.md,
         className,
       ]
@@ -39,8 +39,14 @@ const Panel = forwardRef(function Panel(
             .join(" ")}
         >
           <div>
-            {title && <h2 className="text-base font-semibold text-slate-900">{title}</h2>}
-            {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
+            {title && (
+              <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                {title}
+              </h2>
+            )}
+            {subtitle && (
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
+            )}
           </div>
           {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
         </div>

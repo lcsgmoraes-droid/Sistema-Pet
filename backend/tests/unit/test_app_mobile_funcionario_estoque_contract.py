@@ -28,7 +28,7 @@ def test_mobile_auth_exposes_funcionario_operational_profile():
 
 
 def test_employee_stock_routes_search_erp_products_not_public_app_catalog():
-    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    source = read_repo("backend/app/routes/app_mobile_funcionario_estoque_routes.py")
 
     assert '"/funcionario/estoque/produtos/buscar"' in source
     assert '"/funcionario/estoque/produtos/barcode/{barcode}"' in source
@@ -45,7 +45,7 @@ def test_employee_stock_routes_search_erp_products_not_public_app_catalog():
 
 
 def test_employee_stock_balance_uses_final_count_difference():
-    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    source = read_repo("backend/app/routes/app_mobile_funcionario_estoque_routes.py")
     block = extract_block(source, "def registrar_balanco_funcionario_estoque")
 
     assert "FuncionarioBalancoRequest" in source
@@ -100,12 +100,15 @@ def test_mobile_employee_stock_adjustment_hides_current_stock_and_uses_autocompl
 
 
 def test_employee_stock_search_ranks_full_phrase_before_loose_code_digits():
-    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    source = read_repo("backend/app/routes/app_mobile_funcionario_estoque_routes.py")
+    search_helpers_source = read_repo(
+        "backend/app/routes/app_mobile_funcionario_pdv/produtos.py"
+    )
     search_block = extract_block(source, "def buscar_produtos_funcionario_estoque")
 
     assert "_produto_busca_filtros_funcionario(termo)" in search_block
     assert "_produto_busca_rank_funcionario(termo)" in search_block
-    assert "_termo_parece_codigo_produto_funcionario" in source
+    assert "_termo_parece_codigo_produto_funcionario" in search_helpers_source
     assert "_barcode_filters_for_produto(termo_digits)" not in search_block
 
 

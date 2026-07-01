@@ -278,6 +278,66 @@ export interface FuncionarioBalancoResponse {
   mensagem: string;
 }
 
+export interface FuncionarioContagemFornecedor {
+  id: number;
+  nome: string;
+  documento?: string | null;
+}
+
+export interface FuncionarioContagemItemPayload {
+  produto_id: number;
+  quantidade: number;
+  observacao?: string | null;
+}
+
+export interface FuncionarioContagemPayload {
+  titulo?: string | null;
+  fornecedor_id?: number | null;
+  observacao?: string | null;
+  itens: FuncionarioContagemItemPayload[];
+}
+
+export interface FuncionarioContagemItem {
+  id: number;
+  produto_id: number;
+  codigo?: string | null;
+  codigo_barras?: string | null;
+  gtin_ean?: string | null;
+  nome: string;
+  unidade: string;
+  quantidade: number;
+  preco_custo: number;
+  preco_venda: number;
+  observacao?: string | null;
+}
+
+export interface FuncionarioContagemResumo {
+  id: number;
+  titulo: string;
+  status: string;
+  fornecedor_id?: number | null;
+  fornecedor_nome?: string | null;
+  observacao?: string | null;
+  total_itens: number;
+  quantidade_total: number;
+  created_at: string;
+}
+
+export interface FuncionarioContagem extends FuncionarioContagemResumo {
+  itens: FuncionarioContagemItem[];
+}
+
+export interface FuncionarioContagemArquivo {
+  filename: string;
+  mime_type: string;
+  base64: string;
+}
+
+export interface FuncionarioContagemExportOptions {
+  mostrar_custo?: boolean;
+  mostrar_venda?: boolean;
+}
+
 export interface FuncionarioPdvProduto {
   id: number;
   nome: string;

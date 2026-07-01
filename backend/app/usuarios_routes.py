@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 from app.db import get_session
 from app.auth import get_current_user_and_tenant
 from app.auth.core import hash_password
 from app.security.permissions_decorator import require_permission
 from app.models import User, UserTenant, Role
+from app.usuario_menu_favoritos_models import UsuarioMenuFavorito
 from app.services.business_audit_service import (
     build_user_access_metadata,
     log_business_event,
@@ -19,6 +20,7 @@ from app.session_manager import revoke_all_sessions
 from app.tenancy.rls import sync_rls_auth_email, sync_rls_auth_user
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
+MAX_MENU_FAVORITOS = 8
 
 
 class UserCreate(BaseModel):
@@ -44,6 +46,106 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class MenuFavoritoItem(BaseModel):
+    path: str = Field(min_length=1, max_length=255)
+    label: str = Field(min_length=1, max_length=120)
+    icon_key: str | None = Field(default=None, max_length=80)
+
+
+class MenuFavoritosPayload(BaseModel):
+    items: list[MenuFavoritoItem] = Field(default_factory=list)
+
+
+def _serializar_menu_favorito(favorito: UsuarioMenuFavorito) -> dict:
+    return {
+        "path": favorito.path,
+        "label": favorito.label,
+        "icon_key": favorito.icon_key,
+    }
+
+
+def _normalizar_menu_favoritos(items: list[MenuFavoritoItem]) -> list[MenuFavoritoItem]:
+    normalizados: list[MenuFavoritoItem] = []
+    vistos: set[str] = set()
+    for item in items:
+        path = item.path.strip()
+        label = item.label.strip()
+        icon_key = item.icon_key.strip() if item.icon_key else None
+        if not path or not label:
+            raise HTTPException(
+                status_code=400,
+                detail="Favorito precisa ter caminho e nome.",
+            )
+        if path in vistos:
+            continue
+        vistos.add(path)
+        normalizados.append(MenuFavoritoItem(path=path, label=label, icon_key=icon_key))
+    return normalizados
+
+
+@router.get("/me/menu-favoritos")
+def listar_meus_menu_favoritos(
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    current_user, tenant_id = user_and_tenant
+    favoritos = (
+        db.query(UsuarioMenuFavorito)
+        .filter(
+            UsuarioMenuFavorito.tenant_id == tenant_id,
+            UsuarioMenuFavorito.user_id == current_user.id,
+        )
+        .order_by(UsuarioMenuFavorito.position.asc(), UsuarioMenuFavorito.id.asc())
+        .all()
+    )
+    return {"items": [_serializar_menu_favorito(favorito) for favorito in favoritos]}
+
+
+@router.put("/me/menu-favoritos")
+def salvar_meus_menu_favoritos(
+    payload: MenuFavoritosPayload,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    if len(payload.items) > MAX_MENU_FAVORITOS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Escolha no maximo {MAX_MENU_FAVORITOS} favoritos.",
+        )
+
+    current_user, tenant_id = user_and_tenant
+    favoritos = _normalizar_menu_favoritos(payload.items)
+    if len(favoritos) > MAX_MENU_FAVORITOS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Escolha no maximo {MAX_MENU_FAVORITOS} favoritos.",
+        )
+
+    (
+        db.query(UsuarioMenuFavorito)
+        .filter(
+            UsuarioMenuFavorito.tenant_id == tenant_id,
+            UsuarioMenuFavorito.user_id == current_user.id,
+        )
+        .delete(synchronize_session=False)
+    )
+
+    for position, item in enumerate(favoritos):
+        db.add(
+            UsuarioMenuFavorito(
+                tenant_id=tenant_id,
+                user_id=current_user.id,
+                path=item.path,
+                label=item.label,
+                icon_key=item.icon_key,
+                position=position,
+            )
+        )
+
+    db.commit()
+    return {"items": [item.model_dump() for item in favoritos]}
 
 
 def _email_ja_cadastrado_globalmente(db: Session, email: str) -> bool:

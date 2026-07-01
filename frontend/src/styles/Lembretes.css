@@ -3,9 +3,34 @@
    ==================== */
 
 .lembretes-container {
+  --lembretes-panel-bg: #ffffff;
+  --lembretes-warning-bg: #fff7ed;
+  --lembretes-warning-border: #fed7aa;
+  --lembretes-warning-border-strong: #fbbf24;
+  --lembretes-warning-icon: #c2410c;
+  --lembretes-warning-title: #9a3412;
+  --lembretes-warning-text: #7c2d12;
+  --lembretes-info-bg: #eff6ff;
+  --lembretes-info-border: #bfdbfe;
+  --lembretes-info-title: #1d4ed8;
+  --lembretes-info-text: #1e40af;
   padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
+}
+
+.dark .lembretes-container {
+  --lembretes-panel-bg: #0f172a;
+  --lembretes-warning-bg: rgba(245, 158, 11, 0.12);
+  --lembretes-warning-border: rgba(251, 191, 36, 0.34);
+  --lembretes-warning-border-strong: rgba(251, 191, 36, 0.42);
+  --lembretes-warning-icon: #fbbf24;
+  --lembretes-warning-title: #fcd34d;
+  --lembretes-warning-text: #fde68a;
+  --lembretes-info-bg: rgba(59, 130, 246, 0.12);
+  --lembretes-info-border: rgba(96, 165, 250, 0.34);
+  --lembretes-info-title: #93c5fd;
+  --lembretes-info-text: #bfdbfe;
 }
 
 .lembretes-header {
@@ -289,6 +314,61 @@
   padding: 40px;
   font-size: 16px;
   color: #666;
+}
+
+.dark .lembretes-header h1 {
+  color: #e5edf7;
+}
+
+.dark .stat-card,
+.dark .empty-state,
+.dark .section {
+  background: #0f172a;
+  border: 1px solid #334155;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
+}
+
+.dark .stat-number,
+.dark .empty-state h2,
+.dark .card-header h4,
+.dark .detail-row .value {
+  color: #e5edf7;
+}
+
+.dark .stat-label,
+.dark .empty-state p,
+.dark .detail-row .label,
+.dark .loading {
+  color: #94a3b8;
+}
+
+.dark .empty-state svg {
+  color: #475569;
+}
+
+.dark .section-title {
+  border-bottom-color: #334155;
+}
+
+.dark .lembrete-card {
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+.dark .lembrete-card.vencido {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.dark .lembrete-card.proximo {
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.dark .lembrete-card.futuro {
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.dark .progress-bar-container {
+  background: #334155;
 }
 
 /* Responsivo */

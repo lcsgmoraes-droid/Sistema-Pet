@@ -73,6 +73,7 @@ def test_basic_plan_route_files_use_selected_tenant_dependency():
         "backend/app/chat_routes.py",
         "backend/app/opcoes_racao_routes.py",
         "backend/app/calculadora_racao.py",
+        "backend/app/racao_calculadora/routes.py",
         "backend/app/api/racao_calculadora_routes.py",
     ]
 
@@ -293,7 +294,7 @@ def test_rbac_admin_routes_require_user_management_permission():
 
 def test_racao_catalog_and_calculator_routes_require_product_permissions():
     opcoes_source = _source("backend/app/opcoes_racao_routes.py")
-    calculadora_source = _source("backend/app/calculadora_racao.py")
+    calculadora_source = _source("backend/app/racao_calculadora/routes.py")
     internal_source = _source("backend/app/api/racao_calculadora_routes.py")
 
     assert opcoes_source.count('@require_permission("produtos.visualizar")') >= 6
@@ -361,7 +362,13 @@ def test_pet_quick_add_blocks_race_without_selected_species():
 def test_payment_and_operator_catalog_routes_require_sales_or_config_permissions():
     financeiro_source = _source("backend/app/financeiro/config_routes.py")
     operadoras_source = _source("backend/app/operadoras_routes.py")
-    taxas_source = _source("backend/app/formas_pagamento_routes.py")
+    taxas_source = "\n".join(
+        [
+            _source("backend/app/formas_pagamento_routes_parts/taxas_routes.py"),
+            _source("backend/app/formas_pagamento_routes_parts/analise_routes.py"),
+            _source("backend/app/formas_pagamento_routes_parts/impostos_routes.py"),
+        ]
+    )
 
     def assert_route_requires(
         source: str, method: str, path: str, permission_pattern: str
@@ -783,7 +790,12 @@ def test_lembretes_use_selected_tenant_context():
 
 def test_chat_ia_conversation_history_uses_selected_tenant_context():
     chat_routes_source = _source("backend/app/chat_routes.py")
-    chat_service_source = _source("backend/app/ia/aba6_chat_ia.py")
+    chat_service_source = "\n".join(
+        [
+            _source("backend/app/ia/aba6_chat_ia_parts/conversas.py"),
+            _source("backend/app/ia/aba6_chat_ia_parts/mensagens.py"),
+        ]
+    )
 
     assert (
         "listar_conversas_service(db, usuario_id, tenant_id, limit)"
@@ -810,8 +822,16 @@ def test_chat_ia_conversation_history_uses_selected_tenant_context():
 
 def test_ia_fluxo_caixa_uses_selected_tenant_context():
     ia_routes_source = _source("backend/app/ia_routes.py")
-    fluxo_source = _source("backend/app/ia/aba5_fluxo_caixa.py")
-    chat_service_source = _source("backend/app/ia/aba6_chat_ia.py")
+    fluxo_source = "\n".join(
+        [
+            _source("backend/app/ia/aba5_fluxo_caixa.py"),
+            _source("backend/app/ia/aba5_fluxo_caixa_parts/base.py"),
+            _source("backend/app/ia/aba5_fluxo_caixa_parts/indices.py"),
+            _source("backend/app/ia/aba5_fluxo_caixa_parts/projecoes.py"),
+            _source("backend/app/ia/aba5_fluxo_caixa_parts/acoes.py"),
+        ]
+    )
+    chat_service_source = _source("backend/app/ia/aba6_chat_ia_parts/contexto.py")
 
     assert (
         "calcular_indices_saude(usuario_id, db, tenant_id=tenant_id)"

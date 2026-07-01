@@ -207,15 +207,167 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
-Inventario atualizado em 2026-06-28 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
+Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo do recorte backend/web rastreado, excluindo testes, migrations, CSS e builds locais.
 
-- 15 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
-- 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
-- 0 arquivos de aplicacao acima de 2000 linhas.
-- Recorte backend em `backend/app`: 15 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
+- 0 arquivos de aplicacao backend/web acima de 700 linhas, em atencao.
+- 0 arquivos de aplicacao backend/web acima de 1000 linhas, prioridade de refatoracao.
+- 0 arquivos de aplicacao backend/web acima de 1500 linhas, criticidade alta.
+- 0 arquivos de aplicacao backend/web acima de 2000 linhas.
+- Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+- Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+- Observacao mobile: `app-mobile/src` ainda tem 11 arquivos acima de 700 linhas; eles ficam como frente separada do app quando a prioridade voltar para mobile.
+
+Fatia testes 700 batch 41 de 2026-06-30: `backend/tests/multi_tenant/test_phase3_tenant_onboarding_service.py` saiu da faixa acima de 700 linhas ao dividir os contratos de onboarding multitenant por responsabilidade:
+
+- `backend/tests/multi_tenant/test_phase3_tenant_onboarding_service.py`: 1133 linhas com conteudo removidas do arquivo monolitico.
+- `backend/tests/multi_tenant/tenant_onboarding_test_helpers.py`: concentra fixture SQLite, dados base, proxy de sessao e helpers compartilhados.
+- `backend/tests/multi_tenant/test_tenant_onboarding_service_core.py`: cobre dry-run, aplicacao, idempotencia, isolamento, catalogo opcional e erros de schema.
+- `backend/tests/multi_tenant/test_tenant_onboarding_template_contract.py`: cobre contrato dos templates sem writes.
+- `backend/tests/multi_tenant/test_tenant_onboarding_script.py`: cobre CLI/script de onboarding, health checks, template check, migrations e readiness de signup.
+- `backend/tests/multi_tenant/test_tenant_onboarding_sequence.py`: cobre sincronizacao de sequence Postgres antes de inserts conhecidos.
+- Contrato dedicado: `backend/tests/unit/test_backend_test_large_files_700_batch_41_refactor.py`, garantindo a remocao do arquivo monolitico e todos os arquivos fatiados abaixo de 700 linhas.
+
+Fatia testes 700 batch 40 de 2026-06-30: `backend/tests/test_analytics_routes.py` saiu da faixa acima de 700 linhas ao dividir os contratos da API de analytics por responsabilidade:
+
+- `backend/tests/test_analytics_routes.py`: 1491 linhas com conteudo removidas do arquivo monolitico.
+- `backend/tests/analytics/conftest.py`: concentra fixtures de cliente, autenticacao e banco.
+- `backend/tests/analytics/analytics_test_helpers.py`: concentra dados mock compartilhados.
+- `backend/tests/analytics/test_analytics_routes_endpoints.py`: cobre sucesso, validacao e comportamento read-only.
+- `backend/tests/analytics/test_analytics_routes_errors.py`: cobre resiliencia e sanitizacao de erros.
+- `backend/tests/analytics/test_analytics_routes_security.py`: cobre autenticacao, tenant, ataques e parametros extremos.
+- `backend/tests/analytics/test_analytics_routes_contracts.py`: cobre schemas de resposta.
+- Contrato dedicado: `backend/tests/unit/test_backend_test_large_files_700_batch_40_refactor.py`, garantindo a remocao do arquivo monolitico e todos os arquivos fatiados abaixo de 700 linhas.
+
+Fatia backend/frontend 700 batch 39 de 2026-06-30: `backend/app/models.py` e `frontend/src/components/Layout.jsx` sairam da faixa acima de 700 linhas ao extrair cadastros centrais e a sidebar do layout:
+
+- `backend/app/models.py`: 767 -> 514 linhas com conteudo, mantendo fachada publica e reexports.
+- `backend/app/models_cadastros.py`: concentra `FornecedorGrupo`, `Cliente`, `Especie`, `Raca` e `Pet`, preservando tabelas e metadata.
+- `frontend/src/components/Layout.jsx`: 801 -> 688 linhas com conteudo, mantendo orquestracao de estado, favoritos, overlays e conteudo.
+- `frontend/src/components/layout/LayoutSidebar.jsx`: concentra logo/sidebar, controles dev de modulos, menu lateral e acoes inferiores.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_39_refactor.py`, garantindo reexports, metadata, extracao da sidebar e modulos abaixo de 700 linhas.
+
+Fatia backend 700 batch 38 de 2026-06-30: `backend/app/comissoes_demonstrativo_routes.py` saiu da faixa acima de 700 linhas ao extrair as rotas administrativas do demonstrativo de comissoes:
+
+- `backend/app/comissoes_demonstrativo_routes.py`: 740 -> 637 linhas com conteudo, mantendo listagem, resumo, abertas, fechamento por funcionario e detalhe como router agregador.
+- `backend/app/comissoes_demonstrativo_admin_routes.py`: concentra `/comissoes/funcionarios` e `/comissoes/fechar`, incluindo consulta de funcionarios com comissoes e fechamento via `fechar_comissoes_pendentes`.
+- O agregador principal inclui `admin_router`, preservando os paths publicos e reexports `listar_funcionarios_comissoes` e `fechar_comissoes`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_38_refactor.py`, garantindo reexports publicos, subrouter incluido e ambos os modulos abaixo de 700 linhas.
+
+Fatia backend 700 batch 37 de 2026-06-30: `backend/app/clientes/financeiro_routes.py` saiu da faixa acima de 700 linhas ao extrair a baixa financeira em lote de vendas:
+
+- `backend/app/clientes/financeiro_routes.py`: 730 -> 439 linhas com conteudo, mantendo credito, historico de compras, vendas em aberto e historico legado como router agregador.
+- `backend/app/clientes/financeiro_baixa_lote_routes.py`: concentra o POST de baixa em lote, com caixa, contas a receber, recebimentos, fluxo de caixa, snapshot de rentabilidade e eventos de campanhas.
+- O agregador principal inclui `financeiro_baixa_lote_router` e reexporta `baixar_vendas_lote`, preservando o path publico `/clientes/{cliente_id}/baixar-vendas-lote`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_37_refactor.py`, garantindo reexport publico, subrouter incluido e ambos os modulos abaixo de 700 linhas.
+
+Fatia backend 700 batch 36 de 2026-06-30: `backend/app/estoque_transferencia_parceiro_routes.py` saiu da faixa acima de 700 linhas ao extrair as mutacoes de transferencia para parceiro:
+
+- `backend/app/estoque_transferencia_parceiro_routes.py`: 729 -> 357 linhas com conteudo, mantendo router agregador, historico, PDF consolidado/unitario e envio por e-mail.
+- `backend/app/estoque/transferencia_parceiro_mutacao_routes.py`: concentra criacao e edicao da transferencia, baixa/estorno de estoque, financeiro e sync Bling.
+- O agregador principal inclui `transferencia_parceiro_mutacao_router` e `transferencia_parceiro_baixa_router`, preservando paths publicos sob `/estoque/transferencia-parceiro`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_36_refactor.py`, garantindo reexports publicos, delegacao e ambos os modulos abaixo de 700 linhas.
+
+Fatia backend 700 batch 35 de 2026-06-30: `backend/app/vendas/finalizacao.py` saiu da faixa acima de 700 linhas ao extrair pagamentos da finalizacao de vendas:
+
+- `backend/app/vendas/finalizacao.py`: 727 -> 491 linhas com conteudo, mantendo a orquestracao atomica, eventos, baixa de estoque, financeiro e pos-commit.
+- `backend/app/vendas/finalizacao_pagamentos.py`: concentra calculo de saldos, consumo de cupom, validacao de operadora/NSU, registro de pagamento, credito de cliente, cashback e movimentacao de caixa.
+- `VendaService._calcular_pagamentos_finalizacao` continua reexportado pela fachada historica via `app.vendas.finalizacao`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_35_refactor.py`, garantindo reexports publicos, delegacao para o novo modulo e ambos os arquivos abaixo de 700 linhas.
+
+Fatia backend 700 batch 34 de 2026-06-30: `backend/app/routes/app_mobile_routes.py` saiu da faixa acima de 700 linhas ao extrair as rotas de estoque operacional do funcionario:
+
+- `backend/app/routes/app_mobile_routes.py`: 728 -> 423 linhas com conteudo, mantendo `router`, schemas, handlers publicos e helpers historicos reexportados.
+- `backend/app/routes/app_mobile_funcionario_estoque_routes.py`: concentra schemas, helpers e endpoints de busca por produto, busca por barcode e balanco de estoque por funcionario.
+- A fachada principal inclui o novo subrouter preservando o prefixo publico `/app/funcionario/estoque`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_34_refactor.py`, garantindo reexports publicos, subrouter incluido e modulos abaixo de 700 linhas.
+- Contratos existentes de app mobile foram atualizados para procurar a logica de estoque no modulo dedicado.
+
+Fatia backend 700 batch 33 de 2026-06-30: `backend/app/funcionarios_routes.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das rotas de funcionarios/RH:
+
+- `backend/app/funcionarios_routes.py`: 724 -> 59 linhas com conteudo, mantendo `router`, schemas, handlers publicos e helpers historicos reexportados.
+- `backend/app/funcionarios/schemas.py`: concentra contratos Pydantic de cadastro, remuneracao e eventos de RH.
+- `backend/app/funcionarios/helpers.py`: concentra serializacao de cargo/funcionario, perfis de acesso do app e busca de cargo por tenant.
+- `backend/app/funcionarios/base_routes.py`: concentra listagem, detalhe, remuneracao, criacao, atualizacao, ativacao e inativacao de funcionarios.
+- `backend/app/funcionarios/eventos_routes.py`: concentra ferias, decimo terceiro e provisoes de RH.
+- `backend/app/funcionarios/routes.py`: agrega os subrouters preservando prefixo publico `/funcionarios`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_33_refactor.py`, garantindo fachada publica, ordem das rotas e modulos abaixo de 700 linhas.
+
+Fatia backend 700 batch 32 de 2026-06-30: `backend/app/calculadora_racao.py` saiu da faixa acima de 700 linhas ao virar fachada compativel da calculadora de racao, e backups versionados foram removidos da arvore principal:
+
+- `backend/app/calculadora_racao.py`: 743 -> 62 linhas com conteudo, mantendo `router`, schemas, handlers publicos e helpers historicos reexportados.
+- `backend/app/racao_calculadora/schemas.py`: concentra contratos Pydantic da calculadora e das opcoes de racao.
+- `backend/app/racao_calculadora/core.py`: concentra validacao de aptidao, campos bloqueantes e calculos de quantidade/duracao/custo.
+- `backend/app/racao_calculadora/options.py`: concentra filtros SQL, busca textual e serializacao das opcoes da calculadora.
+- `backend/app/racao_calculadora/routes.py`: concentra os endpoints `/calculadora-racao/opcoes`, `/calculadora-racao` e `/comparar-racoes`.
+- Backups removidos: `backend/app/vendas_routes.py.backup_indent` e `backend/app/whatsapp/analytics_backup.py`.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_32_refactor.py`, garantindo fachada publica, modulos abaixo de 700 linhas e remocao dos backups versionados.
+
+Fatia backend 700 batch 31 de 2026-06-30: `backend/app/clientes_routes.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das rotas de clientes, fornecedores, pets e pessoas operacionais:
+
+- `backend/app/clientes_routes.py`: 910 -> 153 linhas fisicas, mantendo `router`, schemas, handlers publicos e helpers legados como `_obter_cliente_ou_404` e `gerar_codigo_cliente`.
+- `backend/app/clientes/common.py`: centraliza normalizacao de telefone, validacao tenant/user, busca de cliente 404, metadados de criacao e geracao de codigo.
+- `backend/app/clientes/crud_routes.py`: concentra criacao, listagem, detalhe, atualizacao e exclusao logica de clientes/fornecedores, preservando validacoes de documentos, entregador padrao e desativacao de comissoes.
+- `backend/app/clientes/racas_routes.py`: concentra rotas de racas e mantem `/racas` antes de `/{cliente_id}` para preservar resolucao de path.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_31_refactor.py`, garantindo fachada publica, ordem sensivel das rotas e modulos abaixo de 700 linhas.
+
+Fatia backend 700 batch 30 de 2026-06-30: `backend/app/notas_entrada/upload_routes.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das rotas de upload de notas de entrada:
+
+- `backend/app/notas_entrada/upload_routes.py`: 800 -> 111 linhas fisicas, mantendo `router`, handlers publicos e reexports legados como `_montar_sugestao_sku_produto` e `parse_nfe_xml`.
+- `backend/app/notas_entrada/upload_routes_parts/common.py`: centraliza criacao da nota, matching de produtos, criacao dos itens, contadores e resposta padrao.
+- `backend/app/notas_entrada/upload_routes_parts/xml_route.py`: concentra o upload unitario de XML de NF-e, com a rota reduzida a validacao/orquestracao.
+- `backend/app/notas_entrada/upload_routes_parts/pdf_route.py`: concentra o upload de PDF de pedido/romaneio com XML sintetico, delegando persistencia ao fluxo comum.
+- `backend/app/notas_entrada/upload_routes_parts/lote_xml_route.py`: concentra o upload em lote de XMLs, reaproveitando o mesmo fluxo comum por arquivo.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_30_refactor.py`, garantindo facade publica, ordem das rotas, reexports legados, processamento compartilhado e modulos abaixo de 700 linhas.
+
+Fatia backend 700 batch 29 de 2026-06-30: `backend/app/dre_ia_routes.py` saiu da faixa acima de 700 linhas ao virar fachada compativel das rotas de DRE Inteligente:
+
+- `backend/app/dre_ia_routes.py`: 880 -> 92 linhas fisicas, mantendo o `router`, schemas e handlers historicos reexportados.
+- `backend/app/dre_ia_routes_parts/dependencies.py`: concentra a dependency `_usuario_dre` com contexto tenant selecionado.
+- `backend/app/dre_ia_routes_parts/schemas.py`: concentra schemas Pydantic da DRE IA, DRE por canal e DRE detalhada.
+- `backend/app/dre_ia_routes_parts/base_routes.py`: concentra calculo, listagem, comparacao, indices de mercado e atalhos mensais.
+- `backend/app/dre_ia_routes_parts/anomalias_export_routes.py`: concentra anomalias e exportacoes PDF/Excel.
+- `backend/app/dre_ia_routes_parts/canal_routes.py`: concentra DRE por canal e consolidado de canais.
+- `backend/app/dre_ia_routes_parts/detalhada_routes.py`: concentra DRE detalhada, consolidado novo e alocacao de despesas.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_29_refactor.py`, garantindo facade publica, ordem das rotas e modulos abaixo de 700 linhas.
+
+Fatia backend 700 batch 28 de 2026-06-30: `backend/app/ia/aba5_fluxo_caixa.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do fluxo de caixa preditivo:
+
+- `backend/app/ia/aba5_fluxo_caixa.py`: 844 -> 52 linhas fisicas, mantendo as funcoes publicas e helpers historicos reexportados.
+- `backend/app/ia/aba5_fluxo_caixa_parts/base.py`: concentra resolucao de tenant, tempo UTC e saldo realizado atual.
+- `backend/app/ia/aba5_fluxo_caixa_parts/projecoes.py`: concentra fallback estatico, persistencia, Prophet e consulta de projecoes futuras.
+- `backend/app/ia/aba5_fluxo_caixa_parts/indices.py`: concentra calculo/cache dos indices de saude do caixa.
+- `backend/app/ia/aba5_fluxo_caixa_parts/acoes.py`: concentra simulacao de cenario, alertas e registro manual de movimentacao.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_28_refactor.py`, garantindo facade publica e modulos abaixo de 700 linhas.
+
+Fatia backend 700 batch 27 de 2026-06-30: `backend/app/pedidos_compra/sugestao.py` saiu da faixa acima de 700 linhas ao virar fachada compativel dos helpers de sugestao de compra:
+
+- `backend/app/pedidos_compra/sugestao.py`: 796 -> 55 linhas fisicas, mantendo constantes e helpers historicos reexportados.
+- `backend/app/pedidos_compra/sugestao_parts/base.py`: concentra constantes, normalizacao numerica/data e estrutura inicial de estatisticas.
+- `backend/app/pedidos_compra/sugestao_parts/vendas.py`: concentra somatorios de vendas, granel, movimentacoes complementares e resultado agregado.
+- `backend/app/pedidos_compra/sugestao_parts/planejamento.py`: concentra selecao de produtos, dias com estoque, planejamento de compra e resposta final.
+- `backend/app/pedidos_compra/sugestao_parts/itens.py`: concentra observacoes, montagem do item de sugestao e tendencia de vendas.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_27_refactor.py`, garantindo facade publica e modulos abaixo de 700 linhas.
+
+Fatia backend 700 batch 26 de 2026-06-28: `backend/app/ia/aba6_chat_ia.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do servico de chat IA:
+
+- `backend/app/ia/aba6_chat_ia.py`: 837 -> 22 linhas fisicas, mantendo `ChatIAService` e os helpers publicos consumidos por `backend/app/chat_routes.py`.
+- `backend/app/ia/aba6_chat_ia_parts/conversas.py`: concentra criacao, listagem, busca e exclusao de conversas com tenant selecionado.
+- `backend/app/ia/aba6_chat_ia_parts/mensagens.py`: concentra persistencia e historico de mensagens com filtro de tenant.
+- `backend/app/ia/aba6_chat_ia_parts/periodos.py`: concentra normalizacao de texto, deteccao de periodos e comparacoes.
+- `backend/app/ia/aba6_chat_ia_parts/metricas.py`: concentra consultas agregadas de vendas, DRE simplificada, produtos, rankings e resumo executivo.
+- `backend/app/ia/aba6_chat_ia_parts/contexto.py`: concentra o contexto financeiro usado para resposta do chat.
+- `backend/app/ia/aba6_chat_ia_parts/respostas.py`: concentra a orquestracao de mensagem do usuario, resposta assistente e delegacao para regras simples.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_26_refactor.py`, garantindo facade publica e modulos abaixo de 700 linhas.
+
+Fatia backend 700 batch 25 de 2026-06-28: `backend/app/bling_integration.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do cliente Bling v3:
+
+- `backend/app/bling_integration.py`: 903 -> 56 linhas fisicas, mantendo `BlingAPI`, constantes, helpers de rate limit/url e reexports fiscais historicos.
+- `backend/app/bling_integration_parts/core.py`: concentra configuracao, token, rate limit, request HTTP, renovacao e validacao de conexao.
+- `backend/app/bling_integration_parts/notas.py`: concentra emissao, payload, consulta, listagem, cancelamento, CC-e, XML e DANFE de NF-e/NFC-e.
+- `backend/app/bling_integration_parts/catalogo.py`: concentra produtos, estoque, pedidos de venda e naturezas de operacao.
+- `backend/app/bling_integration_parts/api.py`: compoe `BlingAPI` a partir dos mixins especializados.
+- Contrato dedicado: `backend/tests/unit/test_backend_large_files_700_batch_25_refactor.py`, garantindo reexports, MRO publica e modulos abaixo de 700 linhas.
 
 Fatia backend 700 batch 24 de 2026-06-28: `backend/app/campaigns/statement_service.py` saiu da faixa acima de 700 linhas ao virar fachada compativel do extrato de campanhas por cliente:
 
@@ -501,7 +653,7 @@ Fatia frontend zero 1000 de 2026-06-26: os cinco arquivos finais de `frontend/sr
 
 Fatia backend zero 1000 de 2026-06-26: os ultimos sete arquivos de `backend/app` acima de 1000 linhas sairam dessa faixa com fachadas compativeis e modulos por responsabilidade:
 
-- `backend/app/ia/aba6_chat_ia.py`: 1132 -> 837 linhas, com respostas deterministicas de IA em `backend/app/ia/aba6_resposta_simples.py`.
+- `backend/app/ia/aba6_chat_ia.py`: 1132 -> 837 linhas nesta etapa, com respostas deterministicas de IA em `backend/app/ia/aba6_resposta_simples.py`; depois complementado pela fatia backend 700 batch 26.
 - `backend/app/vendas/pos_processamento.py`: 1127 -> 642 linhas, com DRE de competencia em `backend/app/vendas/dre_pos_processamento.py`.
 - `backend/app/models.py`: 1125 -> 940 linhas, com autorizacao em `backend/app/models_authz.py` e modelos operacionais em `backend/app/models_operacionais.py`.
 - `backend/app/campaigns/loyalty_service.py`: 1112 -> 767 linhas, com recompensas e helpers de fidelidade em `backend/app/campaigns/loyalty_rewards.py`.
@@ -2119,8 +2271,6 @@ Este documento mapeia telas, rotas e CTAs principais de negócio. Ele cobre bem 
   - `frontend/src/pages/ConciliacaoCartoes_backup_pre_6ajustes.jsx`
   - `backend/app/conciliacao_routes_old.py`
   - `backend/app/notas_entrada_routes_backup_20260205_181349.py`
-  - `backend/app/vendas_routes.py.backup_indent`
-  - `backend/app/whatsapp/analytics_backup.py`
 
 ### 5.2 Observabilidade e ruído operacional
 

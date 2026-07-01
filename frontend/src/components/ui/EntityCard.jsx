@@ -18,11 +18,18 @@ export function EntityInfoRow({
         .filter(Boolean)
         .join(" ")}
     >
-      <span className={["font-medium text-slate-700", labelClassName].filter(Boolean).join(" ")}>
+      <span
+        className={["font-medium text-slate-700 dark:text-slate-300", labelClassName]
+          .filter(Boolean)
+          .join(" ")}
+      >
         {label}
       </span>
       <span
-        className={["min-h-[20px] min-w-0 break-words text-slate-900", valueClassName]
+        className={[
+          "min-h-[20px] min-w-0 break-words text-slate-900 dark:text-slate-100",
+          valueClassName,
+        ]
           .filter(Boolean)
           .join(" ")}
       >
@@ -55,9 +62,11 @@ export default function EntityCard({
   return (
     <article
       className={[
-        "flex h-full flex-col rounded-lg border bg-white shadow-sm transition",
+        "flex h-full flex-col rounded-lg border bg-white shadow-sm transition dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100",
         compact ? "min-h-0 p-0" : "min-h-[300px] p-5 hover:shadow-md",
-        inactive ? "border-red-200 bg-slate-50" : "border-slate-200",
+        inactive
+          ? "border-red-200 bg-slate-50 dark:border-red-500/30 dark:bg-red-500/10"
+          : "border-slate-200",
         className,
       ]
         .filter(Boolean)
@@ -68,11 +77,15 @@ export default function EntityCard({
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
               {title ? (
-                <h3 className="truncate text-lg font-bold text-slate-950">{title}</h3>
+                <h3 className="truncate text-lg font-bold text-slate-950 dark:text-slate-100">
+                  {title}
+                </h3>
               ) : null}
               {statusIcon ? <span className="shrink-0">{statusIcon}</span> : null}
             </div>
-            {subtitle ? <p className="mt-1 text-sm text-slate-500">{subtitle}</p> : null}
+            {subtitle ? (
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
+            ) : null}
           </div>
           {media ? <div className="shrink-0">{media}</div> : null}
         </div>
