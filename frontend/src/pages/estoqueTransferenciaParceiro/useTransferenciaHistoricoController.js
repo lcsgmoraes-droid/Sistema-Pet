@@ -11,7 +11,7 @@ import {
   criarHistoricoTransferenciasVazio,
   distribuirCompensacaoAutomatica,
   fimDoMesBaseIso,
-  hojeIso,
+  montarBaixaTransferenciaPayload,
   inicioDoMesIso,
   montarCompensacoesBaixaPayload,
   montarCupomTransferencia,
@@ -19,6 +19,7 @@ import {
   montarParametrosDocumentoTransferencia,
   normalizarColunasDocumentoTransferencia,
   normalizarNumero,
+  obterErroAcertoTransferencia,
 } from "./transferenciaParceiroUtils";
 import useTransferenciaBaixaLoteController from "./useTransferenciaBaixaLoteController";
 export default function useTransferenciaHistoricoController({
@@ -522,30 +523,45 @@ export default function useTransferenciaHistoricoController({
       (acumulado, item) => acumulado + Number(item.valor_compensado || 0),
       0,
     );
+    const erroAcerto = obterErroAcertoTransferencia({
+      modoBaixa: formBaixa.modo_baixa,
+      totalBaixa: valorRecebido,
+      totalCompensado,
+      temCompensacao: compensacoesPayload.length > 0,
+    });
+    if (erroAcerto) {
+      toast.error(erroAcerto);
+      return;
+    }
     if (
-      formBaixa.modo_baixa === "acerto" &&
-      compensacoesPayload.length > 0 &&
-      Math.abs(totalCompensado - valorRecebido) > 0.01
+      formBaixa.modo_baixa === "produto_devolvido" &&
+      formBaixa.devolver_estoque &&
+      Math.abs(valorRecebido - Number(registro.saldo_aberto || 0)) > 0.01
     ) {
-      toast.error(
-        "No acerto com contas selecionadas, o total compensado precisa bater com o valor da baixa.",
-      );
+      toast.error("Produto devolvido com volta ao estoque exige baixa integral da transferencia.");
+      return;
+    }
+    if (
+      formBaixa.modo_baixa === "produto_devolvido" &&
+      !formBaixa.devolver_estoque &&
+      !formBaixa.observacao.trim()
+    ) {
+      toast.error("Informe uma observacao quando produto devolvido nao volta para o estoque.");
       return;
     }
 
+    const payload = montarBaixaTransferenciaPayload({
+      form: formBaixa,
+      valorRecebido,
+      compensacoesPayload,
+    });
+
     try {
       setContaRecebendo(registro.conta_receber_id);
-      await api.post(`/estoque/transferencia-parceiro/${registro.conta_receber_id}/receber`, {
-        valor_recebido: valorRecebido,
-        data_recebimento: formBaixa.data_recebimento || hojeIso(),
-        modo_baixa: formBaixa.modo_baixa || "recebimento",
-        forma_pagamento_id:
-          formBaixa.modo_baixa === "recebimento" && formBaixa.forma_pagamento_id
-            ? Number(formBaixa.forma_pagamento_id)
-            : undefined,
-        compensacoes: formBaixa.modo_baixa === "acerto" ? compensacoesPayload : undefined,
-        observacao: formBaixa.observacao.trim() || undefined,
-      });
+      await api.post(
+        `/estoque/transferencia-parceiro/${registro.conta_receber_id}/receber`,
+        payload,
+      );
       toast.success("Baixa registrada com sucesso.");
       fecharBaixaTransferencia();
       void Promise.all([
@@ -675,6 +691,7 @@ export default function useTransferenciaHistoricoController({
     fecharBaixaLoteTransferencia: baixaLote.fecharBaixaLoteTransferencia,
     carregarPreviewBaixaLoteTransferencia: baixaLote.carregarPreviewBaixaLoteTransferencia,
     registrarBaixaLoteTransferencia: baixaLote.registrarBaixaLoteTransferencia,
+    ajustarBaixaAoSaldoAcerto: baixaLote.ajustarBaixaAoSaldoAcerto,
     atualizarValorAplicacaoBaixaLote: baixaLote.atualizarValorAplicacaoBaixaLote,
     alternarAplicacaoBaixaLote: baixaLote.alternarAplicacaoBaixaLote,
     atualizarValorCompensacaoBaixaLote: baixaLote.atualizarValorCompensacaoBaixaLote,

@@ -55,6 +55,7 @@ export default function HistoricoTransferenciaResults({
   onToggleAplicacaoBaixaLote,
   onAtualizarValorAplicacaoBaixaLote,
   onAtualizarValorCompensacaoBaixaLote,
+  onAjustarBaixaAoSaldoAcerto,
   onPreencherCompensacaoAutomaticaBaixaLote,
   onLimparCompensacoesBaixaLote,
   onFecharBaixaLoteTransferencia,
@@ -90,6 +91,7 @@ export default function HistoricoTransferenciaResults({
       onToggleAplicacao={onToggleAplicacaoBaixaLote}
       onAtualizarValorAplicacao={onAtualizarValorAplicacaoBaixaLote}
       onAtualizarValorCompensacao={onAtualizarValorCompensacaoBaixaLote}
+      onAjustarBaixaAoSaldoAcerto={onAjustarBaixaAoSaldoAcerto}
       onPreencherCompensacaoAutomatica={onPreencherCompensacaoAutomaticaBaixaLote}
       onLimparCompensacoesBaixa={onLimparCompensacoesBaixaLote}
       onFechar={onFecharBaixaLoteTransferencia}

@@ -140,6 +140,7 @@ export default function useEstoqueTransferenciaParceiroController() {
       onToggleAplicacaoBaixaLote: historico.alternarAplicacaoBaixaLote,
       onAtualizarValorAplicacaoBaixaLote: historico.atualizarValorAplicacaoBaixaLote,
       onAtualizarValorCompensacaoBaixaLote: historico.atualizarValorCompensacaoBaixaLote,
+      onAjustarBaixaAoSaldoAcerto: historico.ajustarBaixaAoSaldoAcerto,
       onPreencherCompensacaoAutomaticaBaixaLote: historico.preencherCompensacaoAutomaticaBaixaLote,
       onLimparCompensacoesBaixaLote: historico.limparCompensacoesBaixaLote,
       onFecharBaixaLoteTransferencia: historico.fecharBaixaLoteTransferencia,

@@ -106,6 +106,7 @@ export function criarFormBaixaTransferencia(overrides = {}) {
     data_recebimento: hojeIso(),
     modo_baixa: "recebimento",
     forma_pagamento_id: "",
+    devolver_estoque: false,
     observacao: "",
     ...overrides,
     compensacoes: overrides.compensacoes || {},
@@ -301,6 +302,32 @@ export function montarCompensacoesBaixaPayload(compensacoes = {}) {
     );
 }
 
+export function montarBaixaTransferenciaPayload({
+  form = {},
+  valorRecebido,
+  compensacoesPayload = [],
+} = {}) {
+  const modoBaixa = form.modo_baixa || "recebimento";
+  const payload = {
+    valor_recebido: valorRecebido,
+    data_recebimento: form.data_recebimento || hojeIso(),
+    modo_baixa: modoBaixa,
+    compensacoes: modoBaixa === "acerto" ? compensacoesPayload : undefined,
+  };
+
+  if (modoBaixa === "recebimento" && form.forma_pagamento_id) {
+    payload.forma_pagamento_id = Number(form.forma_pagamento_id);
+  }
+  if (form.observacao?.trim()) {
+    payload.observacao = form.observacao.trim();
+  }
+  if (modoBaixa === "produto_devolvido") {
+    payload.devolver_estoque = Boolean(form.devolver_estoque);
+  }
+
+  return payload;
+}
+
 export function distribuirBaixaTransferencias(valorBase, registros = [], ordem = "antiga") {
   let restante = normalizarNumero(valorBase);
   if (!Number.isFinite(restante) || restante <= 0) return {};
@@ -412,6 +439,73 @@ export function distribuirCompensacaoAutomatica(valorBase, contas = []) {
   });
 
   return proximaCompensacao;
+}
+
+export function obterErroAcertoTransferencia({
+  modoBaixa,
+  totalBaixa,
+  totalCompensado,
+  temCompensacao,
+} = {}) {
+  if (String(modoBaixa || "") !== "acerto") return null;
+  if (!temCompensacao) {
+    return "No acerto, selecione uma conta a pagar ou lance uma divida para compensar.";
+  }
+  if (Math.abs(normalizarNumero(totalCompensado) - normalizarNumero(totalBaixa)) > 0.01) {
+    return "No acerto, o total compensado precisa bater com o total da baixa.";
+  }
+  return null;
+}
+
+function arredondarCentavos(valor) {
+  const numero = Number(valor);
+  if (!Number.isFinite(numero)) return 0;
+  return Number(numero.toFixed(2));
+}
+
+export function calcularResumoEncontroContasParceiro({
+  totalAplicado = 0,
+  totalCompensado = 0,
+  contasPagar = [],
+} = {}) {
+  const aplicado = arredondarCentavos(normalizarNumero(totalAplicado));
+  const compensado = arredondarCentavos(normalizarNumero(totalCompensado));
+  const contas = Array.isArray(contasPagar) ? contasPagar : [];
+  const totalDisponivel = arredondarCentavos(
+    contas.reduce((soma, conta) => soma + normalizarNumero(conta?.saldo_aberto), 0),
+  );
+  const totalDisponivelEntradas = arredondarCentavos(
+    contas.reduce((soma, conta) => {
+      if (conta?.origem_acerto !== "entrada_parceiro") return soma;
+      return soma + normalizarNumero(conta?.saldo_aberto);
+    }, 0),
+  );
+  const diferencaCompensacao = arredondarCentavos(aplicado - compensado);
+  const saldoLiquidoDisponivel = arredondarCentavos(totalDisponivel - aplicado);
+  const valorSugeridoAcerto = arredondarCentavos(Math.min(aplicado, totalDisponivel));
+  const saldoReceberRemanescente = arredondarCentavos(Math.max(aplicado - valorSugeridoAcerto, 0));
+  const saldoPagarRemanescente = arredondarCentavos(
+    Math.max(totalDisponivel - valorSugeridoAcerto, 0),
+  );
+  const status =
+    Math.abs(diferencaCompensacao) < 0.01
+      ? "fechado"
+      : diferencaCompensacao > 0
+        ? "faltando"
+        : "excedente";
+
+  return {
+    totalAplicado: aplicado,
+    totalCompensado: compensado,
+    totalDisponivel,
+    totalDisponivelEntradas,
+    diferencaCompensacao,
+    saldoLiquidoDisponivel,
+    valorSugeridoAcerto,
+    saldoReceberRemanescente,
+    saldoPagarRemanescente,
+    status,
+  };
 }
 
 export function baixarArquivoBlob(blob, nomeArquivo) {

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import * as transferenciaParceiroUtils from "./transferenciaParceiroUtils.js";
 import {
   calcularDiferencaLancadaTransferencia,
+  calcularResumoEncontroContasParceiro,
   calcularTotalDiferencaLancadaTransferencia,
   COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO,
   COLUNAS_DOCUMENTO_TRANSFERENCIA_RETIRADA,
@@ -390,6 +392,128 @@ test("montarBaixaLoteTransferenciaPayload inclui nova conta a pagar no acerto", 
         documento: "ACERTO-1",
         observacao: "Produtos pegos no parceiro",
       },
+    },
+  );
+});
+
+test("montarBaixaTransferenciaPayload inclui devolucao de estoque na baixa individual", () => {
+  assert.equal(typeof transferenciaParceiroUtils.montarBaixaTransferenciaPayload, "function");
+  assert.deepEqual(
+    transferenciaParceiroUtils.montarBaixaTransferenciaPayload({
+      valorRecebido: 100,
+      form: {
+        modo_baixa: "produto_devolvido",
+        data_recebimento: "2026-07-01",
+        forma_pagamento_id: "3",
+        observacao: "Produto retornou",
+        devolver_estoque: true,
+      },
+      compensacoesPayload: [{ conta_pagar_id: 1, valor_compensado: 100 }],
+    }),
+    {
+      valor_recebido: 100,
+      data_recebimento: "2026-07-01",
+      modo_baixa: "produto_devolvido",
+      compensacoes: undefined,
+      observacao: "Produto retornou",
+      devolver_estoque: true,
+    },
+  );
+});
+
+test("obterErroAcertoTransferencia exige compensacao no modo acerto", () => {
+  assert.equal(typeof transferenciaParceiroUtils.obterErroAcertoTransferencia, "function");
+  assert.equal(
+    transferenciaParceiroUtils.obterErroAcertoTransferencia({
+      modoBaixa: "acerto",
+      totalBaixa: 100,
+      totalCompensado: 0,
+      temCompensacao: false,
+    }),
+    "No acerto, selecione uma conta a pagar ou lance uma divida para compensar.",
+  );
+  assert.equal(
+    transferenciaParceiroUtils.obterErroAcertoTransferencia({
+      modoBaixa: "acerto",
+      totalBaixa: 100,
+      totalCompensado: 80,
+      temCompensacao: true,
+    }),
+    "No acerto, o total compensado precisa bater com o total da baixa.",
+  );
+  assert.equal(
+    transferenciaParceiroUtils.obterErroAcertoTransferencia({
+      modoBaixa: "recebimento",
+      totalBaixa: 100,
+      totalCompensado: 0,
+      temCompensacao: false,
+    }),
+    null,
+  );
+});
+
+test("calcularResumoEncontroContasParceiro resume saldo disponivel e diferenca do acerto", () => {
+  assert.deepEqual(
+    calcularResumoEncontroContasParceiro({
+      totalAplicado: "1000",
+      totalCompensado: "800",
+      contasPagar: [
+        { saldo_aberto: "400,00", origem_acerto: "entrada_parceiro" },
+        { saldo_aberto: 300, origem_acerto: "financeiro" },
+        { saldo_aberto: "", origem_acerto: "entrada_parceiro" },
+      ],
+    }),
+    {
+      totalAplicado: 1000,
+      totalCompensado: 800,
+      totalDisponivel: 700,
+      totalDisponivelEntradas: 400,
+      diferencaCompensacao: 200,
+      saldoLiquidoDisponivel: -300,
+      valorSugeridoAcerto: 700,
+      saldoReceberRemanescente: 300,
+      saldoPagarRemanescente: 0,
+      status: "faltando",
+    },
+  );
+
+  assert.equal(
+    calcularResumoEncontroContasParceiro({
+      totalAplicado: 500,
+      totalCompensado: 500,
+      contasPagar: [{ saldo_aberto: 900 }],
+    }).status,
+    "fechado",
+  );
+
+  assert.equal(
+    calcularResumoEncontroContasParceiro({
+      totalAplicado: 500,
+      totalCompensado: 650,
+      contasPagar: [{ saldo_aberto: 900 }],
+    }).status,
+    "excedente",
+  );
+});
+
+test("calcularResumoEncontroContasParceiro calcula saldo remanescente do acerto", () => {
+  assert.deepEqual(
+    calcularResumoEncontroContasParceiro({
+      totalAplicado: 500,
+      totalCompensado: 0,
+      contasPagar: [{ saldo_aberto: 900 }],
+    }),
+    {
+      totalAplicado: 500,
+      totalCompensado: 0,
+      totalDisponivel: 900,
+      totalDisponivelEntradas: 0,
+      diferencaCompensacao: 500,
+      saldoLiquidoDisponivel: 400,
+      valorSugeridoAcerto: 500,
+      saldoReceberRemanescente: 0,
+      saldoPagarRemanescente: 400,
+      status: "faltando",
     },
   );
 });

@@ -2,11 +2,13 @@ import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../../api";
 import {
+  calcularResumoEncontroContasParceiro,
   criarFormBaixaTransferencia,
   distribuirBaixaTransferencias,
   distribuirCompensacaoAutomatica,
   montarBaixaLoteTransferenciaPayload,
   normalizarNumero,
+  obterErroAcertoTransferencia,
 } from "./transferenciaParceiroUtils";
 
 const PREVIEW_VAZIO = {
@@ -156,6 +158,43 @@ export default function useTransferenciaBaixaLoteController({
     );
   };
 
+  const ajustarBaixaAoSaldoAcerto = async () => {
+    const valorInformado = normalizarNumero(formBaixaLote.valor_total);
+    const saldoAberto = Number(
+      previewBaixaLote.total_aberto || historico?.totais?.saldo_aberto || 0,
+    );
+    const valorBase =
+      Number.isFinite(valorInformado) && valorInformado > 0 ? valorInformado : saldoAberto;
+    const resumo = calcularResumoEncontroContasParceiro({
+      totalAplicado: valorBase,
+      contasPagar: contasPagarCompensacao,
+    });
+    const valorAjustado = resumo.valorSugeridoAcerto;
+
+    if (!Number.isFinite(valorAjustado) || valorAjustado <= 0) {
+      toast.error("Nao ha saldo disponivel para acerto.");
+      return;
+    }
+
+    const valorFormatado = valorAjustado.toFixed(2);
+    const previewCarregado = await carregarPreviewBaixaLoteTransferencia({
+      valor_total: valorFormatado,
+      ordem: formBaixaLote.ordem || "antiga",
+    });
+    if (!previewCarregado) return;
+
+    setFormBaixaLote((prev) => ({
+      ...prev,
+      valor_total: valorFormatado,
+      modo_baixa: "acerto",
+      compensacoes: distribuirCompensacaoAutomatica(valorAjustado, contasPagarCompensacao),
+      nova_conta_pagar_acerto: {
+        ...(prev.nova_conta_pagar_acerto || {}),
+        valor: "",
+      },
+    }));
+  };
+
   const registrarBaixaLoteTransferencia = async () => {
     const pessoa = resolverPessoaBaixaLote();
     if (!pessoa?.id) {
@@ -173,12 +212,14 @@ export default function useTransferenciaBaixaLoteController({
         (valor) => normalizarNumero(valor) > 0,
       ) ||
       (Number.isFinite(valorNovaContaPagar) && valorNovaContaPagar > 0);
-    if (
-      formBaixaLote.modo_baixa === "acerto" &&
-      temCompensacao &&
-      Math.abs(totalCompensadoBaixaLote - totalAplicadoBaixaLote) > 0.01
-    ) {
-      toast.error("No acerto, o total compensado precisa bater com o total aplicado.");
+    const erroAcerto = obterErroAcertoTransferencia({
+      modoBaixa: formBaixaLote.modo_baixa,
+      totalBaixa: totalAplicadoBaixaLote,
+      totalCompensado: totalCompensadoBaixaLote,
+      temCompensacao,
+    });
+    if (erroAcerto) {
+      toast.error(erroAcerto);
       return;
     }
 
@@ -221,6 +262,7 @@ export default function useTransferenciaBaixaLoteController({
     fecharBaixaLoteTransferencia,
     carregarPreviewBaixaLoteTransferencia,
     registrarBaixaLoteTransferencia,
+    ajustarBaixaAoSaldoAcerto,
     atualizarValorAplicacaoBaixaLote: (contaReceberId, valor) =>
       setAplicacoesBaixaLote((prev) => ({ ...(prev || {}), [contaReceberId]: valor })),
     alternarAplicacaoBaixaLote: (registro, marcado) =>
