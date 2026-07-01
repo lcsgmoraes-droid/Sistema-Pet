@@ -7,6 +7,7 @@ import {
   baixarArquivoBlob,
   criarFiltrosHistoricoTransferencia,
   criarFormBaixaTransferencia,
+  criarHistoricoEntradasParceiroVazio,
   criarHistoricoTransferenciasVazio,
   distribuirCompensacaoAutomatica,
   fimDoMesBaseIso,
@@ -49,7 +50,9 @@ export default function useTransferenciaHistoricoController({
   const [contasPagarCompensacao, setContasPagarCompensacao] = useState([]);
   const [loadingContasPagarCompensacao, setLoadingContasPagarCompensacao] = useState(false);
   const [paginaHistorico, setPaginaHistorico] = useState(1);
+  const [paginaEntradasParceiro, setPaginaEntradasParceiro] = useState(1);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
+  const [loadingEntradasParceiro, setLoadingEntradasParceiro] = useState(false);
   const [filtrosHistoricoForm, setFiltrosHistoricoForm] = useState(() =>
     criarFiltrosHistoricoTransferencia(),
   );
@@ -60,6 +63,9 @@ export default function useTransferenciaHistoricoController({
   const [sugestoesPessoasHistorico, setSugestoesPessoasHistorico] = useState([]);
   const [loadingPessoasHistorico, setLoadingPessoasHistorico] = useState(false);
   const [historico, setHistorico] = useState(() => criarHistoricoTransferenciasVazio());
+  const [entradasParceiro, setEntradasParceiro] = useState(() =>
+    criarHistoricoEntradasParceiroVazio(),
+  );
   async function carregarFormasPagamento() {
     try {
       setLoadingFormasPagamento(true);
@@ -95,6 +101,27 @@ export default function useTransferenciaHistoricoController({
     }
   }
 
+  async function carregarEntradasParceiro(filtros, pagina = 1) {
+    try {
+      setLoadingEntradasParceiro(true);
+      const params = {
+        page: pagina,
+        page_size: 8,
+        ...montarFiltrosHistoricoTransferenciaParams(filtros),
+      };
+
+      const response = await api.get("/estoque/transferencia-parceiro/entrada-parceiro/historico", {
+        params,
+      });
+      setEntradasParceiro(response.data);
+    } catch (error) {
+      console.error("Erro ao carregar entradas de parceiro:", error);
+      setEntradasParceiro(criarHistoricoEntradasParceiroVazio());
+    } finally {
+      setLoadingEntradasParceiro(false);
+    }
+  }
+
   useEffect(() => {
     void carregarFormasPagamento();
   }, []);
@@ -102,6 +129,10 @@ export default function useTransferenciaHistoricoController({
   useEffect(() => {
     void carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico);
   }, [filtrosHistoricoAplicados, paginaHistorico]);
+
+  useEffect(() => {
+    void carregarEntradasParceiro(filtrosHistoricoAplicados, paginaEntradasParceiro);
+  }, [filtrosHistoricoAplicados, paginaEntradasParceiro]);
 
   useEffect(() => {
     const termo = filtrosHistoricoForm.busca.trim();
@@ -245,6 +276,7 @@ export default function useTransferenciaHistoricoController({
     }
 
     setPaginaHistorico(1);
+    setPaginaEntradasParceiro(1);
     setSelecionadosHistorico([]);
     setFiltrosHistoricoForm((prev) => ({ ...prev, data_inicio: dataInicio, data_fim: dataFim }));
     setFiltrosHistoricoAplicados((prev) => ({
@@ -257,12 +289,14 @@ export default function useTransferenciaHistoricoController({
   const aplicarFiltrosHistorico = (event) => {
     event.preventDefault();
     setPaginaHistorico(1);
+    setPaginaEntradasParceiro(1);
     setSelecionadosHistorico([]);
     setFiltrosHistoricoAplicados({ ...filtrosHistoricoForm });
   };
 
   const limparFiltrosHistorico = () => {
     setPaginaHistorico(1);
+    setPaginaEntradasParceiro(1);
     setSelecionadosHistorico([]);
     setPessoaHistoricoSelecionada(null);
     setSugestoesPessoasHistorico([]);
@@ -274,6 +308,7 @@ export default function useTransferenciaHistoricoController({
     if (!parceiroSelecionado?.id) return;
     const rotulo = rotuloPessoaHistorico(parceiroSelecionado);
     setPaginaHistorico(1);
+    setPaginaEntradasParceiro(1);
     setSelecionadosHistorico([]);
     setPessoaHistoricoSelecionada(parceiroSelecionado);
     setFiltrosHistoricoForm((prev) => ({
@@ -513,7 +548,10 @@ export default function useTransferenciaHistoricoController({
       });
       toast.success("Baixa registrada com sucesso.");
       fecharBaixaTransferencia();
-      void carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico);
+      void Promise.all([
+        carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico),
+        carregarEntradasParceiro(filtrosHistoricoAplicados, paginaEntradasParceiro),
+      ]);
       setAbaAtiva?.("historico");
     } catch (error) {
       console.error("Erro ao registrar baixa da transferencia:", error);
@@ -540,7 +578,10 @@ export default function useTransferenciaHistoricoController({
       if (transferenciaEditando?.conta_receber_id === registro.conta_receber_id) {
         limparLancamentoAtual?.();
       }
-      void carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico);
+      void Promise.all([
+        carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico),
+        carregarEntradasParceiro(filtrosHistoricoAplicados, paginaEntradasParceiro),
+      ]);
     } catch (error) {
       console.error("Erro ao excluir transferencia:", error);
       toast.error(error?.response?.data?.detail || "Nao foi possivel excluir a transferencia.");
@@ -551,12 +592,19 @@ export default function useTransferenciaHistoricoController({
 
   const recarregarPrimeiraPagina = async () => {
     setPaginaHistorico(1);
+    setPaginaEntradasParceiro(1);
     setSelecionadosHistorico([]);
-    await carregarHistoricoTransferencias(filtrosHistoricoAplicados, 1);
+    await Promise.all([
+      carregarHistoricoTransferencias(filtrosHistoricoAplicados, 1),
+      carregarEntradasParceiro(filtrosHistoricoAplicados, 1),
+    ]);
   };
 
   const recarregarPaginaAtual = () =>
-    carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico);
+    Promise.all([
+      carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico),
+      carregarEntradasParceiro(filtrosHistoricoAplicados, paginaEntradasParceiro),
+    ]);
 
   return {
     contaGerandoPdf,
@@ -590,7 +638,10 @@ export default function useTransferenciaHistoricoController({
     loadingContasPagarCompensacao,
     paginaHistorico,
     setPaginaHistorico,
+    paginaEntradasParceiro,
+    setPaginaEntradasParceiro,
     loadingHistorico,
+    loadingEntradasParceiro,
     filtrosHistoricoForm,
     filtrosHistoricoAplicados,
     pessoaHistoricoSelecionada,
@@ -598,6 +649,7 @@ export default function useTransferenciaHistoricoController({
     sugestoesPessoasHistorico,
     loadingPessoasHistorico,
     historico,
+    entradasParceiro,
     totalCompensadoBaixa,
     todosPaginaSelecionados,
     totalPaginasHistorico,

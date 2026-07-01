@@ -10,6 +10,7 @@ import {
   criarFormBaixaTransferencia,
   criarFormTransferencia,
   criarHistoricoTransferenciasVazio,
+  criarHistoricoEntradasParceiroVazio,
   criarItemTransferencia,
   criarItensEdicaoTransferencia,
   distribuirBaixaTransferencias,
@@ -96,6 +97,7 @@ test("factories de estado preservam defaults e overrides da tela", () => {
     parceiro_id: "",
   });
   assert.equal(criarHistoricoTransferenciasVazio().totais.saldo_aberto, 0);
+  assert.equal(criarHistoricoEntradasParceiroVazio().totais.valor_pago, 0);
   assert.deepEqual(criarHistoricoTransferenciasVazio({ totais: { recebidas: 2 } }).totais, {
     total_registros: 0,
     valor_total: 0,

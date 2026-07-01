@@ -2,6 +2,7 @@ export function StatusTransferenciaBadge({ status, label }) {
   const estilos = {
     pendente: "bg-amber-100 text-amber-800",
     parcial: "bg-sky-100 text-sky-800",
+    pago: "bg-emerald-100 text-emerald-800",
     recebido: "bg-emerald-100 text-emerald-800",
     vencido: "bg-rose-100 text-rose-800",
     cancelado: "bg-slate-200 text-slate-700",

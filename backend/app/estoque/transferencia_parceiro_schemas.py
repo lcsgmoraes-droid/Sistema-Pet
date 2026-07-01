@@ -60,6 +60,44 @@ class TransferenciaParceiroEntradaResponse(BaseModel):
     movimentacoes_estoque: List[int] = Field(default_factory=list)
 
 
+class TransferenciaParceiroEntradaHistoricoItem(BaseModel):
+    conta_pagar_id: int
+    documento: Optional[str] = None
+    parceiro_id: Optional[int] = None
+    parceiro_nome: str
+    parceiro_codigo: Optional[str] = None
+    descricao: str
+    data_emissao: Optional[date] = None
+    data_vencimento: Optional[date] = None
+    data_pagamento: Optional[date] = None
+    status: str
+    status_label: str
+    valor_original: float = 0
+    valor_pago: float = 0
+    saldo_aberto: float = 0
+    estoque_atualizado: bool = False
+    observacoes: Optional[str] = None
+
+
+class TransferenciaParceiroEntradaHistoricoTotais(BaseModel):
+    total_registros: int = 0
+    valor_total: float = 0
+    valor_pago: float = 0
+    saldo_aberto: float = 0
+    pendentes: int = 0
+    pagas: int = 0
+    vencidas: int = 0
+
+
+class TransferenciaParceiroEntradaHistoricoResponse(BaseModel):
+    items: List[TransferenciaParceiroEntradaHistoricoItem] = Field(default_factory=list)
+    totais: TransferenciaParceiroEntradaHistoricoTotais
+    total: int
+    page: int
+    page_size: int
+    pages: int
+
+
 class TransferenciaParceiroEnviarEmailRequest(BaseModel):
     email: Optional[str] = None
     assunto: Optional[str] = None

@@ -162,6 +162,28 @@ export function criarHistoricoTransferenciasVazio(overrides = {}) {
   };
 }
 
+export function criarHistoricoEntradasParceiroVazio(overrides = {}) {
+  const { totais, ...rest } = overrides;
+  return {
+    items: [],
+    total: 0,
+    page: 1,
+    page_size: 20,
+    pages: 0,
+    totais: {
+      total_registros: 0,
+      valor_total: 0,
+      valor_pago: 0,
+      saldo_aberto: 0,
+      pendentes: 0,
+      pagas: 0,
+      vencidas: 0,
+      ...(totais || {}),
+    },
+    ...rest,
+  };
+}
+
 export function criarItemTransferencia(produto, timestamp = Date.now()) {
   const custoUnitario = Number(produto?.preco_custo || 0);
   return {

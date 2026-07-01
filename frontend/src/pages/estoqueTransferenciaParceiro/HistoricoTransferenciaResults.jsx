@@ -1,10 +1,13 @@
 import BaixaLoteTransferenciaPanel from "./BaixaLoteTransferenciaPanel";
+import HistoricoEntradaParceiroPanel from "./HistoricoEntradaParceiroPanel";
 import HistoricoTransferenciaBulkActions from "./HistoricoTransferenciaBulkActions";
 import HistoricoTransferenciaLista from "./HistoricoTransferenciaLista";
 
 export default function HistoricoTransferenciaResults({
   loadingHistorico,
+  loadingEntradasParceiro,
   historico,
+  entradasParceiro,
   pessoaBaixaLoteNome,
   selecionadosHistorico,
   todosPaginaSelecionados,
@@ -34,6 +37,7 @@ export default function HistoricoTransferenciaResults({
   contaExcluindo,
   totalPaginasHistorico,
   paginaHistorico,
+  paginaEntradasParceiro,
   onAlternarSelecaoPaginaHistorico,
   onLimparSelecaoHistorico,
   onAbrirModalDocumentoTransferencia,
@@ -56,6 +60,7 @@ export default function HistoricoTransferenciaResults({
   onFecharBaixaLoteTransferencia,
   onRegistrarBaixaLoteTransferencia,
   onSetPaginaHistorico,
+  onSetPaginaEntradasParceiro,
 }) {
   if (loadingHistorico) {
     return (
@@ -96,6 +101,12 @@ export default function HistoricoTransferenciaResults({
     return (
       <div className="space-y-4 px-6 py-5">
         {baixaLotePanel}
+        <HistoricoEntradaParceiroPanel
+          entradasParceiro={entradasParceiro}
+          loading={loadingEntradasParceiro}
+          pagina={paginaEntradasParceiro}
+          onSetPagina={onSetPaginaEntradasParceiro}
+        />
         <div className="py-8 text-center">
           <p className="text-base font-semibold text-gray-900">Nenhuma transferencia encontrada</p>
           <p className="mt-2 text-sm text-gray-500">
@@ -109,6 +120,12 @@ export default function HistoricoTransferenciaResults({
   return (
     <div className="space-y-4 px-6 py-5">
       {baixaLotePanel}
+      <HistoricoEntradaParceiroPanel
+        entradasParceiro={entradasParceiro}
+        loading={loadingEntradasParceiro}
+        pagina={paginaEntradasParceiro}
+        onSetPagina={onSetPaginaEntradasParceiro}
+      />
       <HistoricoTransferenciaBulkActions
         selecionadosHistorico={selecionadosHistorico}
         todosPaginaSelecionados={todosPaginaSelecionados}

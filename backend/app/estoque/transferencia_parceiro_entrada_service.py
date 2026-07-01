@@ -4,8 +4,8 @@ from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import HTTPException
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy import desc, or_
+from sqlalchemy.orm import Session, joinedload
 
 from app.bling_estoque_sync import sincronizar_bling_background
 from app.financeiro_models import ContaPagar
@@ -15,6 +15,7 @@ from app.produtos_models import EstoqueMovimentacao, Produto
 
 CENTAVO = Decimal("0.01")
 MOTIVO_ENTRADA_PARCEIRO = "transf_parceiro_entrada"
+CANAL_ENTRADA_PARCEIRO = "transferencia_parceiro_entrada"
 
 
 def _texto_limpo(valor) -> str | None:
@@ -28,6 +29,72 @@ def _decimal_monetario(valor) -> Decimal:
     if valor is None:
         return Decimal("0.00")
     return Decimal(str(valor)).quantize(CENTAVO, rounding=ROUND_HALF_UP)
+
+
+def _data_ref(valor):
+    if isinstance(valor, date):
+        return valor
+    if isinstance(valor, str) and valor:
+        return date.fromisoformat(valor)
+    return None
+
+
+def _saldo_conta_pagar_decimal(conta) -> Decimal:
+    valor_final = _decimal_monetario(getattr(conta, "valor_final", 0))
+    valor_pago = _decimal_monetario(getattr(conta, "valor_pago", 0))
+    saldo = valor_final - valor_pago
+    return max(saldo, Decimal("0.00")).quantize(CENTAVO, rounding=ROUND_HALF_UP)
+
+
+def _status_entrada_parceiro(conta, *, hoje=None) -> tuple[str, str]:
+    status_atual = str(getattr(conta, "status", "") or "").strip().lower()
+    saldo_aberto = _saldo_conta_pagar_decimal(conta)
+    data_hoje = _data_ref(hoje) or date.today()
+    data_vencimento = _data_ref(getattr(conta, "data_vencimento", None))
+
+    if status_atual in {"pago", "recebido"} or saldo_aberto <= 0:
+        return "pago", "Paga"
+    if status_atual in {"cancelado", "cancelada"}:
+        return "cancelado", "Cancelada"
+    if data_vencimento and data_vencimento < data_hoje:
+        return "vencido", "Vencida"
+    if status_atual == "parcial":
+        return "parcial", "Parcial"
+    return "pendente", "Pendente"
+
+
+def normalizar_status_filtro_entrada(status_filtro: str | None) -> str:
+    status_normalizado = (status_filtro or "").strip().lower()
+    if status_normalizado in {"recebido", "recebida", "paga"}:
+        return "pago"
+    return status_normalizado
+
+
+def serializar_entrada_parceiro(conta, *, hoje=None) -> dict:
+    parceiro = getattr(conta, "fornecedor", None)
+    status, status_label = _status_entrada_parceiro(conta, hoje=hoje)
+    saldo_aberto = _saldo_conta_pagar_decimal(conta)
+    observacoes = _texto_limpo(getattr(conta, "observacoes", None))
+
+    return {
+        "conta_pagar_id": int(conta.id),
+        "documento": _texto_limpo(getattr(conta, "documento", None)),
+        "parceiro_id": getattr(conta, "fornecedor_id", None),
+        "parceiro_nome": getattr(parceiro, "nome", None)
+        or getattr(conta, "descricao", "Parceiro nao encontrado"),
+        "parceiro_codigo": getattr(parceiro, "codigo", None),
+        "descricao": getattr(conta, "descricao", ""),
+        "data_emissao": _data_ref(getattr(conta, "data_emissao", None)),
+        "data_vencimento": _data_ref(getattr(conta, "data_vencimento", None)),
+        "data_pagamento": _data_ref(getattr(conta, "data_pagamento", None)),
+        "status": status,
+        "status_label": status_label,
+        "valor_original": float(_decimal_monetario(getattr(conta, "valor_original", 0))),
+        "valor_pago": float(_decimal_monetario(getattr(conta, "valor_pago", 0))),
+        "saldo_aberto": float(saldo_aberto),
+        "estoque_atualizado": "estoque atualizado: sim" in (observacoes or "").lower(),
+        "observacoes": observacoes,
+    }
 
 
 def _gerar_documento_entrada_parceiro() -> str:
@@ -250,7 +317,7 @@ def registrar_entrada_parceiro(db: Session, *, tenant_id, user_id: int, payload)
         tenant_id=str(tenant_id),
         descricao=f"Entrada de parceiro - {parceiro.nome}",
         fornecedor_id=parceiro.id,
-        canal="transferencia_parceiro_entrada",
+        canal=CANAL_ENTRADA_PARCEIRO,
         valor_original=total_divida,
         valor_pago=Decimal("0.00"),
         valor_final=total_divida,
@@ -305,4 +372,76 @@ def registrar_entrada_parceiro(db: Session, *, tenant_id, user_id: int, payload)
         "total_divida": float(total_divida),
         "entrar_estoque": bool(payload.entrar_estoque),
         "movimentacoes_estoque": movimentacao_ids,
+    }
+
+
+def listar_entradas_parceiro(
+    db: Session,
+    *,
+    tenant_id,
+    page: int = 1,
+    page_size: int = 20,
+    parceiro_id: int | None = None,
+    status_filtro: str | None = None,
+    busca: str | None = None,
+    data_inicio=None,
+    data_fim=None,
+) -> dict:
+    page = max(int(page or 1), 1)
+    page_size = min(max(int(page_size or 20), 1), 100)
+    termo_busca = (busca or "").strip()
+    status_normalizado = normalizar_status_filtro_entrada(status_filtro)
+
+    query = (
+        db.query(ContaPagar)
+        .options(joinedload(ContaPagar.fornecedor))
+        .filter(
+            ContaPagar.tenant_id == str(tenant_id),
+            ContaPagar.canal == CANAL_ENTRADA_PARCEIRO,
+        )
+    )
+
+    if parceiro_id:
+        query = query.filter(ContaPagar.fornecedor_id == int(parceiro_id))
+    if data_inicio:
+        query = query.filter(ContaPagar.data_emissao >= data_inicio)
+    if data_fim:
+        query = query.filter(ContaPagar.data_emissao <= data_fim)
+    if termo_busca:
+        busca_pattern = f"%{termo_busca}%"
+        query = query.outerjoin(Cliente, Cliente.id == ContaPagar.fornecedor_id).filter(
+            or_(
+                ContaPagar.documento.ilike(busca_pattern),
+                ContaPagar.descricao.ilike(busca_pattern),
+                ContaPagar.observacoes.ilike(busca_pattern),
+                Cliente.nome.ilike(busca_pattern),
+                Cliente.codigo.ilike(busca_pattern),
+            )
+        )
+
+    contas = query.order_by(desc(ContaPagar.data_emissao), desc(ContaPagar.id)).all()
+    registros = [serializar_entrada_parceiro(conta) for conta in contas]
+    if status_normalizado:
+        registros = [item for item in registros if item["status"] == status_normalizado]
+
+    totais = {
+        "total_registros": len(registros),
+        "valor_total": round(sum(item["valor_original"] for item in registros), 2),
+        "valor_pago": round(sum(item["valor_pago"] for item in registros), 2),
+        "saldo_aberto": round(sum(item["saldo_aberto"] for item in registros), 2),
+        "pendentes": sum(1 for item in registros if item["status"] in {"pendente", "parcial"}),
+        "pagas": sum(1 for item in registros if item["status"] == "pago"),
+        "vencidas": sum(1 for item in registros if item["status"] == "vencido"),
+    }
+    total = len(registros)
+    pages = (total + page_size - 1) // page_size if total else 0
+    offset = (page - 1) * page_size
+
+    return {
+        "items": registros[offset : offset + page_size],
+        "totais": totais,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": pages,
     }
