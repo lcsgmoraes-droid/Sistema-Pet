@@ -21,6 +21,8 @@ from .estoque.transferencia_parceiro_schemas import (
     TransferenciaParceiroContaPagarCompensacaoItem,
     TransferenciaParceiroContaPagarCompensacaoResponse,
     TransferenciaParceiroEnviarEmailRequest,
+    TransferenciaParceiroEntradaRequest,
+    TransferenciaParceiroEntradaResponse,
     TransferenciaParceiroHistoricoItem,
     TransferenciaParceiroHistoricoMovItem,
     TransferenciaParceiroHistoricoResponse,
@@ -46,6 +48,9 @@ from .estoque.transferencia_parceiro_baixa_routes import (
 from .estoque.transferencia_parceiro_baixa_lote_routes import (
     router as transferencia_parceiro_baixa_lote_router,
 )
+from .estoque.transferencia_parceiro_entrada_routes import (
+    router as transferencia_parceiro_entrada_router,
+)
 from .estoque.transferencia_parceiro_mutacao_routes import (
     editar_transferencia_parceiro,
     router as transferencia_parceiro_mutacao_router,
@@ -61,6 +66,8 @@ __all__ = [
     "TransferenciaParceiroContaPagarCompensacaoItem",
     "TransferenciaParceiroContaPagarCompensacaoResponse",
     "TransferenciaParceiroEnviarEmailRequest",
+    "TransferenciaParceiroEntradaRequest",
+    "TransferenciaParceiroEntradaResponse",
     "TransferenciaParceiroHistoricoItem",
     "TransferenciaParceiroHistoricoMovItem",
     "TransferenciaParceiroHistoricoResponse",
@@ -393,5 +400,6 @@ def enviar_email_transferencia_parceiro(
 
 
 router.include_router(transferencia_parceiro_mutacao_router)
+router.include_router(transferencia_parceiro_entrada_router)
 router.include_router(transferencia_parceiro_baixa_router)
 router.include_router(transferencia_parceiro_baixa_lote_router)

@@ -27,6 +27,39 @@ class TransferenciaParceiroRequest(BaseModel):
     )
 
 
+class TransferenciaParceiroEntradaItemRequest(BaseModel):
+    """Item recebido de parceiro, com divida opcionalmente entrando no estoque."""
+
+    produto_id: int
+    quantidade: float = Field(gt=0)
+    custo_unitario: Optional[float] = Field(default=None, ge=0)
+    valor_total: Optional[float] = Field(default=None, ge=0)
+
+
+class TransferenciaParceiroEntradaRequest(BaseModel):
+    """Entrada de produto vindo de parceiro, gerando conta a pagar."""
+
+    parceiro_id: int
+    data_emissao: Optional[date] = None
+    data_vencimento: Optional[date] = None
+    documento: Optional[str] = None
+    observacao: Optional[str] = None
+    entrar_estoque: bool = True
+    itens: List[TransferenciaParceiroEntradaItemRequest] = Field(
+        default_factory=list, min_items=1
+    )
+
+
+class TransferenciaParceiroEntradaResponse(BaseModel):
+    sucesso: bool
+    documento: str
+    conta_pagar_id: int
+    parceiro_id: int
+    total_divida: float
+    entrar_estoque: bool
+    movimentacoes_estoque: List[int] = Field(default_factory=list)
+
+
 class TransferenciaParceiroEnviarEmailRequest(BaseModel):
     email: Optional[str] = None
     assunto: Optional[str] = None

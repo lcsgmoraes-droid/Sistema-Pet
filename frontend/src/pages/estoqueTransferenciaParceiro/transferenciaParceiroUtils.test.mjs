@@ -21,6 +21,7 @@ import {
   incrementarItemTransferencia,
   montarCompensacoesBaixaPayload,
   montarCupomTransferencia,
+  montarEntradaParceiroPayload,
   montarBaixaLoteTransferenciaPayload,
   montarFiltrosHistoricoTransferenciaParams,
   montarParametrosDocumentoTransferencia,
@@ -177,6 +178,43 @@ test("helpers de item e payload mantem calculos da transferencia", () => {
           quantidade: 1,
           custo_unitario: 20.5,
           valor_total: 20.5,
+        },
+      ],
+    },
+  );
+});
+
+test("montarEntradaParceiroPayload envia divida e opcao de entrada no estoque", () => {
+  const item = {
+    produto_id: 10,
+    quantidade: 2,
+    custo_unitario: 25,
+    total_item: 50,
+  };
+
+  assert.deepEqual(
+    montarEntradaParceiroPayload(
+      7,
+      {
+        data_vencimento: "2026-07-31",
+        documento: " ENT-1 ",
+        observacao: " produto emprestado ",
+        entrar_estoque: true,
+      },
+      [item],
+    ),
+    {
+      parceiro_id: 7,
+      data_vencimento: "2026-07-31",
+      documento: "ENT-1",
+      observacao: "produto emprestado",
+      entrar_estoque: true,
+      itens: [
+        {
+          produto_id: 10,
+          quantidade: 2,
+          custo_unitario: 25,
+          valor_total: 50,
         },
       ],
     },

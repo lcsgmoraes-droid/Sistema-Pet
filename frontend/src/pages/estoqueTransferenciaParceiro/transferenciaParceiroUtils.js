@@ -81,6 +81,8 @@ export function extrairObservacaoManualTransferencia(valor) {
 
 export function criarFormTransferencia(overrides = {}) {
   return {
+    tipo_operacao: "saida_parceiro",
+    entrar_estoque: true,
     parceiro_id: "",
     data_vencimento: fimDoMesIso(),
     documento: "",
@@ -237,6 +239,30 @@ export function montarPayloadTransferencia(parceiroId, form, itens) {
       valor_total: Number(item.total_item || 0),
     })),
   };
+}
+
+export function montarEntradaParceiroPayload(parceiroId, form, itens) {
+  const payload = {
+    parceiro_id: Number(parceiroId),
+    data_emissao: form.data_emissao || undefined,
+    data_vencimento: form.data_vencimento || undefined,
+    documento: form.documento?.trim() || undefined,
+    observacao: form.observacao?.trim() || undefined,
+    entrar_estoque: Boolean(form.entrar_estoque),
+    itens: itens.map((item) => ({
+      produto_id: Number(item.produto_id),
+      quantidade: Number(item.quantidade),
+      custo_unitario: Number(item.custo_unitario || 0),
+      valor_total: Number(item.total_item || 0),
+    })),
+  };
+
+  if (!payload.data_emissao) delete payload.data_emissao;
+  if (!payload.data_vencimento) delete payload.data_vencimento;
+  if (!payload.documento) delete payload.documento;
+  if (!payload.observacao) delete payload.observacao;
+
+  return payload;
 }
 
 export function montarCompensacoesBaixaPayload(compensacoes = {}) {
