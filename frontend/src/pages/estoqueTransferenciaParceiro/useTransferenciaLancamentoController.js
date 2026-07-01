@@ -4,12 +4,14 @@ import api from "../../api";
 import { buscarClientes } from "../../api/clientes";
 import { getProdutos } from "../../api/produtos";
 import {
+  calcularTotalDiferencaLancadaTransferencia,
   criarFormTransferencia,
   criarItemTransferencia,
   criarItensEdicaoTransferencia,
   extrairListaProdutos,
   extrairObservacaoManualTransferencia,
   incrementarItemTransferencia,
+  montarEntradaParceiroPayload,
   montarPayloadTransferencia,
   normalizarNumero,
   produtoConfereCodigo,
@@ -119,6 +121,11 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
 
   const totalRessarcimento = useMemo(
     () => itens.reduce((acumulado, item) => acumulado + Number(item.total_item || 0), 0),
+    [itens],
+  );
+
+  const totalDiferencaLancada = useMemo(
+    () => calcularTotalDiferencaLancadaTransferencia(itens),
     [itens],
   );
 
@@ -311,6 +318,7 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
     setDropdownParceiroAberto(false);
     setForm(
       criarFormTransferencia({
+        tipo_operacao: "saida_parceiro",
         parceiro_id: registro.parceiro_id ? String(registro.parceiro_id) : "",
         data_vencimento: registro.data_vencimento || criarFormTransferencia().data_vencimento,
         documento: registro.documento || "",
@@ -352,19 +360,30 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
 
     try {
       setSalvando(true);
-      const payload = montarPayloadTransferencia(parceiroSelecionado.id, form, itens);
-      const response = transferenciaEditando?.conta_receber_id
-        ? await api.put(
-            `/estoque/transferencia-parceiro/${transferenciaEditando.conta_receber_id}`,
-            payload,
-          )
-        : await api.post("/estoque/transferencia-parceiro", payload);
+      const entradaParceiro = form.tipo_operacao === "entrada_parceiro";
+      if (entradaParceiro && transferenciaEditando?.conta_receber_id) {
+        toast.error("Edicao de transferencia enviada nao pode virar entrada de parceiro.");
+        return;
+      }
+
+      const payload = entradaParceiro
+        ? montarEntradaParceiroPayload(parceiroSelecionado.id, form, itens)
+        : montarPayloadTransferencia(parceiroSelecionado.id, form, itens);
+      const response = entradaParceiro
+        ? await api.post("/estoque/transferencia-parceiro/entrada-parceiro", payload)
+        : transferenciaEditando?.conta_receber_id
+          ? await api.put(
+              `/estoque/transferencia-parceiro/${transferenciaEditando.conta_receber_id}`,
+              payload,
+            )
+          : await api.post("/estoque/transferencia-parceiro", payload);
       const documentoGerado = response?.data?.documento || "registrada";
-      toast.success(
-        transferenciaEditando?.conta_receber_id
+      const mensagemSucesso = entradaParceiro
+        ? `Entrada ${documentoGerado} registrada e divida criada.`
+        : transferenciaEditando?.conta_receber_id
           ? `Transferencia ${documentoGerado} atualizada com sucesso.`
-          : `Transferencia ${documentoGerado} registrada com sucesso.`,
-      );
+          : `Transferencia ${documentoGerado} registrada com sucesso.`;
+      toast.success(mensagemSucesso);
 
       limparLancamentoAtual();
       await onTransferenciaSalva?.();
@@ -400,6 +419,7 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
     transferenciaEditando,
     totalQuantidade,
     totalRessarcimento,
+    totalDiferencaLancada,
     itensSemValor,
     selecionarParceiro,
     limparParceiro,

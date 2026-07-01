@@ -1,27 +1,43 @@
+import BaixaLoteTransferenciaPanel from "./BaixaLoteTransferenciaPanel";
+import HistoricoEntradaParceiroPanel from "./HistoricoEntradaParceiroPanel";
 import HistoricoTransferenciaBulkActions from "./HistoricoTransferenciaBulkActions";
 import HistoricoTransferenciaLista from "./HistoricoTransferenciaLista";
 
 export default function HistoricoTransferenciaResults({
   loadingHistorico,
+  loadingEntradasParceiro,
   historico,
+  entradasParceiro,
+  pessoaBaixaLoteNome,
   selecionadosHistorico,
   todosPaginaSelecionados,
   gerandoPdfConsolidado,
   historicoExpandidoIds,
   baixaAbertaId,
+  baixaLoteAberta,
   formBaixa,
   setFormBaixa,
+  formBaixaLote,
+  setFormBaixaLote,
+  previewBaixaLote,
+  aplicacoesBaixaLote,
   loadingFormasPagamento,
   formasPagamento,
   totalCompensadoBaixa,
+  totalAplicadoBaixaLote,
+  totalCompensadoBaixaLote,
+  diferencaAplicacaoBaixaLote,
+  loadingPreviewBaixaLote,
   loadingContasPagarCompensacao,
   contasPagarCompensacao,
   contaRecebendo,
+  salvandoBaixaLote,
   contaGerandoPdf,
   contaEnviandoEmail,
   contaExcluindo,
   totalPaginasHistorico,
   paginaHistorico,
+  paginaEntradasParceiro,
   onAlternarSelecaoPaginaHistorico,
   onLimparSelecaoHistorico,
   onAbrirModalDocumentoTransferencia,
@@ -35,7 +51,16 @@ export default function HistoricoTransferenciaResults({
   onAtualizarValorCompensacao,
   onFecharBaixaTransferencia,
   onRegistrarBaixaTransferencia,
+  onRecalcularPreviewBaixaLote,
+  onToggleAplicacaoBaixaLote,
+  onAtualizarValorAplicacaoBaixaLote,
+  onAtualizarValorCompensacaoBaixaLote,
+  onPreencherCompensacaoAutomaticaBaixaLote,
+  onLimparCompensacoesBaixaLote,
+  onFecharBaixaLoteTransferencia,
+  onRegistrarBaixaLoteTransferencia,
   onSetPaginaHistorico,
+  onSetPaginaEntradasParceiro,
 }) {
   if (loadingHistorico) {
     return (
@@ -45,19 +70,62 @@ export default function HistoricoTransferenciaResults({
     );
   }
 
+  const baixaLotePanel = baixaLoteAberta ? (
+    <BaixaLoteTransferenciaPanel
+      pessoaNome={pessoaBaixaLoteNome}
+      form={formBaixaLote}
+      setForm={setFormBaixaLote}
+      preview={previewBaixaLote}
+      loadingPreview={loadingPreviewBaixaLote}
+      salvando={salvandoBaixaLote}
+      formasPagamento={formasPagamento}
+      loadingFormasPagamento={loadingFormasPagamento}
+      aplicacoes={aplicacoesBaixaLote}
+      totalAplicado={totalAplicadoBaixaLote}
+      totalCompensado={totalCompensadoBaixaLote}
+      diferencaAplicacao={diferencaAplicacaoBaixaLote}
+      contasPagarCompensacao={contasPagarCompensacao}
+      loadingContasPagarCompensacao={loadingContasPagarCompensacao}
+      onRecalcularPreview={onRecalcularPreviewBaixaLote}
+      onToggleAplicacao={onToggleAplicacaoBaixaLote}
+      onAtualizarValorAplicacao={onAtualizarValorAplicacaoBaixaLote}
+      onAtualizarValorCompensacao={onAtualizarValorCompensacaoBaixaLote}
+      onPreencherCompensacaoAutomatica={onPreencherCompensacaoAutomaticaBaixaLote}
+      onLimparCompensacoesBaixa={onLimparCompensacoesBaixaLote}
+      onFechar={onFecharBaixaLoteTransferencia}
+      onConfirmar={onRegistrarBaixaLoteTransferencia}
+    />
+  ) : null;
+
   if (historico.items.length === 0) {
     return (
-      <div className="px-6 py-12 text-center">
-        <p className="text-base font-semibold text-gray-900">Nenhuma transferencia encontrada</p>
-        <p className="mt-2 text-sm text-gray-500">
-          Ajuste os filtros acima ou registre uma nova transferencia para comecar o historico.
-        </p>
+      <div className="space-y-4 px-6 py-5">
+        {baixaLotePanel}
+        <HistoricoEntradaParceiroPanel
+          entradasParceiro={entradasParceiro}
+          loading={loadingEntradasParceiro}
+          pagina={paginaEntradasParceiro}
+          onSetPagina={onSetPaginaEntradasParceiro}
+        />
+        <div className="py-8 text-center">
+          <p className="text-base font-semibold text-gray-900">Nenhuma transferencia encontrada</p>
+          <p className="mt-2 text-sm text-gray-500">
+            Ajuste os filtros acima ou registre uma nova transferencia para comecar o historico.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-4 px-6 py-5">
+      {baixaLotePanel}
+      <HistoricoEntradaParceiroPanel
+        entradasParceiro={entradasParceiro}
+        loading={loadingEntradasParceiro}
+        pagina={paginaEntradasParceiro}
+        onSetPagina={onSetPaginaEntradasParceiro}
+      />
       <HistoricoTransferenciaBulkActions
         selecionadosHistorico={selecionadosHistorico}
         todosPaginaSelecionados={todosPaginaSelecionados}

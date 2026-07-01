@@ -81,6 +81,8 @@ export function extrairObservacaoManualTransferencia(valor) {
 
 export function criarFormTransferencia(overrides = {}) {
   return {
+    tipo_operacao: "saida_parceiro",
+    entrar_estoque: true,
     parceiro_id: "",
     data_vencimento: fimDoMesIso(),
     documento: "",
@@ -90,6 +92,15 @@ export function criarFormTransferencia(overrides = {}) {
 }
 
 export function criarFormBaixaTransferencia(overrides = {}) {
+  const novaContaPagarAcerto = {
+    descricao: "",
+    valor: "",
+    data_vencimento: hojeIso(),
+    documento: "",
+    observacao: "",
+    ...(overrides.nova_conta_pagar_acerto || {}),
+  };
+
   return {
     valor_recebido: "",
     data_recebimento: hojeIso(),
@@ -98,6 +109,7 @@ export function criarFormBaixaTransferencia(overrides = {}) {
     observacao: "",
     ...overrides,
     compensacoes: overrides.compensacoes || {},
+    nova_conta_pagar_acerto: novaContaPagarAcerto,
   };
 }
 
@@ -150,6 +162,28 @@ export function criarHistoricoTransferenciasVazio(overrides = {}) {
   };
 }
 
+export function criarHistoricoEntradasParceiroVazio(overrides = {}) {
+  const { totais, ...rest } = overrides;
+  return {
+    items: [],
+    total: 0,
+    page: 1,
+    page_size: 20,
+    pages: 0,
+    totais: {
+      total_registros: 0,
+      valor_total: 0,
+      valor_pago: 0,
+      saldo_aberto: 0,
+      pendentes: 0,
+      pagas: 0,
+      vencidas: 0,
+      ...(totais || {}),
+    },
+    ...rest,
+  };
+}
+
 export function criarItemTransferencia(produto, timestamp = Date.now()) {
   const custoUnitario = Number(produto?.preco_custo || 0);
   return {
@@ -159,6 +193,7 @@ export function criarItemTransferencia(produto, timestamp = Date.now()) {
     codigo: produto.codigo,
     codigo_barras: produto.codigo_barras,
     estoque_atual: Number(produto?.estoque_atual || 0),
+    custo_base_unitario: custoUnitario,
     custo_unitario: custoUnitario,
     quantidade: 1,
     total_item: custoUnitario,
@@ -183,10 +218,34 @@ export function criarItensEdicaoTransferencia(registro, timestamp = Date.now()) 
     codigo: item.codigo,
     codigo_barras: item.codigo_barras,
     estoque_atual: Number(item.estoque_atual || 0),
+    custo_base_unitario: Number(item.custo_base_unitario ?? item.custo_unitario ?? 0),
     custo_unitario: Number(item.custo_unitario || 0),
     quantidade: Number(item.quantidade || 0),
     total_item: Number(item.valor_total || 0),
   }));
+}
+
+export function calcularDiferencaLancadaTransferencia(item = {}) {
+  const quantidade = normalizarNumero(item.quantidade);
+  const custoBase = normalizarNumero(item.custo_base_unitario ?? item.preco_custo);
+  const valorUnitarioLancado = normalizarNumero(item.custo_unitario);
+  const totalLancado =
+    item.total_item === "" || item.total_item === null || item.total_item === undefined
+      ? quantidade * valorUnitarioLancado
+      : normalizarNumero(item.total_item);
+
+  if (!Number.isFinite(quantidade) || !Number.isFinite(custoBase)) return 0;
+  if (!Number.isFinite(totalLancado)) return 0;
+
+  return Number((totalLancado - quantidade * custoBase).toFixed(2));
+}
+
+export function calcularTotalDiferencaLancadaTransferencia(itens = []) {
+  const total = (Array.isArray(itens) ? itens : []).reduce(
+    (acumulado, item) => acumulado + calcularDiferencaLancadaTransferencia(item),
+    0,
+  );
+  return Number(total.toFixed(2));
 }
 
 export function montarPayloadTransferencia(parceiroId, form, itens) {
@@ -204,6 +263,30 @@ export function montarPayloadTransferencia(parceiroId, form, itens) {
   };
 }
 
+export function montarEntradaParceiroPayload(parceiroId, form, itens) {
+  const payload = {
+    parceiro_id: Number(parceiroId),
+    data_emissao: form.data_emissao || undefined,
+    data_vencimento: form.data_vencimento || undefined,
+    documento: form.documento?.trim() || undefined,
+    observacao: form.observacao?.trim() || undefined,
+    entrar_estoque: Boolean(form.entrar_estoque),
+    itens: itens.map((item) => ({
+      produto_id: Number(item.produto_id),
+      quantidade: Number(item.quantidade),
+      custo_unitario: Number(item.custo_unitario || 0),
+      valor_total: Number(item.total_item || 0),
+    })),
+  };
+
+  if (!payload.data_emissao) delete payload.data_emissao;
+  if (!payload.data_vencimento) delete payload.data_vencimento;
+  if (!payload.documento) delete payload.documento;
+  if (!payload.observacao) delete payload.observacao;
+
+  return payload;
+}
+
 export function montarCompensacoesBaixaPayload(compensacoes = {}) {
   return Object.entries(compensacoes)
     .map(([contaPagarId, valor]) => ({
@@ -216,6 +299,100 @@ export function montarCompensacoesBaixaPayload(compensacoes = {}) {
         item.valor_compensado > 0 &&
         item.conta_pagar_id > 0,
     );
+}
+
+export function distribuirBaixaTransferencias(valorBase, registros = [], ordem = "antiga") {
+  let restante = normalizarNumero(valorBase);
+  if (!Number.isFinite(restante) || restante <= 0) return {};
+
+  const direcaoNova = ["nova", "mais_nova", "desc", "descendente"].includes(
+    String(ordem || "")
+      .trim()
+      .toLowerCase(),
+  );
+  const ordenados = [...(Array.isArray(registros) ? registros : [])].sort((a, b) => {
+    const dataA = String(a?.data_emissao || a?.data_vencimento || "");
+    const dataB = String(b?.data_emissao || b?.data_vencimento || "");
+    const comparacaoData = dataA.localeCompare(dataB);
+    if (comparacaoData !== 0) return direcaoNova ? -comparacaoData : comparacaoData;
+    const idA = Number(a?.conta_receber_id || 0);
+    const idB = Number(b?.conta_receber_id || 0);
+    return direcaoNova ? idB - idA : idA - idB;
+  });
+
+  const aplicacoes = {};
+  ordenados.forEach((registro) => {
+    if (restante <= 0) return;
+    const contaId = Number(registro?.conta_receber_id || 0);
+    const saldo = Number(registro?.saldo_aberto || 0);
+    if (!contaId || saldo <= 0) return;
+
+    const valorAplicado = Math.min(restante, saldo);
+    if (valorAplicado > 0) {
+      aplicacoes[contaId] = valorAplicado.toFixed(2);
+      restante = Number((restante - valorAplicado).toFixed(2));
+    }
+  });
+
+  return aplicacoes;
+}
+
+export function montarBaixaLoteTransferenciaPayload({
+  parceiroId,
+  form,
+  aplicacoes = {},
+  compensacoes = {},
+}) {
+  const compensacoesPayload = montarCompensacoesBaixaPayload(compensacoes);
+  const novaContaPagarAcerto = form.nova_conta_pagar_acerto || {};
+  const valorNovaContaPagar = normalizarNumero(novaContaPagarAcerto.valor);
+  const payload = {
+    parceiro_id: Number(parceiroId),
+    modo_baixa: form.modo_baixa || "recebimento",
+    data_recebimento: form.data_recebimento || hojeIso(),
+    forma_pagamento_id:
+      form.modo_baixa === "recebimento" && form.forma_pagamento_id
+        ? Number(form.forma_pagamento_id)
+        : undefined,
+    observacao: form.observacao?.trim() || undefined,
+    devolver_estoque: Boolean(form.devolver_estoque),
+    aplicacoes: Object.entries(aplicacoes)
+      .map(([contaReceberId, valor]) => ({
+        conta_receber_id: Number(contaReceberId),
+        valor_baixado: normalizarNumero(valor),
+      }))
+      .filter(
+        (item) =>
+          item.conta_receber_id > 0 &&
+          Number.isFinite(item.valor_baixado) &&
+          item.valor_baixado > 0,
+      ),
+    compensacoes: form.modo_baixa === "acerto" ? compensacoesPayload : [],
+  };
+
+  if (
+    payload.modo_baixa === "acerto" &&
+    Number.isFinite(valorNovaContaPagar) &&
+    valorNovaContaPagar > 0
+  ) {
+    payload.nova_conta_pagar_acerto = {
+      descricao: novaContaPagarAcerto.descricao?.trim() || undefined,
+      valor: valorNovaContaPagar,
+      data_vencimento: novaContaPagarAcerto.data_vencimento || form.data_recebimento || hojeIso(),
+      documento: novaContaPagarAcerto.documento?.trim() || undefined,
+      observacao: novaContaPagarAcerto.observacao?.trim() || undefined,
+    };
+    Object.keys(payload.nova_conta_pagar_acerto).forEach((chave) => {
+      if (payload.nova_conta_pagar_acerto[chave] === undefined) {
+        delete payload.nova_conta_pagar_acerto[chave];
+      }
+    });
+  }
+
+  if (!payload.forma_pagamento_id) delete payload.forma_pagamento_id;
+  if (!payload.observacao) delete payload.observacao;
+
+  return payload;
 }
 
 export function distribuirCompensacaoAutomatica(valorBase, contas = []) {

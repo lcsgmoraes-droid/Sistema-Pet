@@ -5,6 +5,15 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from app.estoque.transferencia_parceiro_entrada_schemas import (
+    TransferenciaParceiroEntradaHistoricoItem as TransferenciaParceiroEntradaHistoricoItem,
+    TransferenciaParceiroEntradaHistoricoResponse as TransferenciaParceiroEntradaHistoricoResponse,
+    TransferenciaParceiroEntradaHistoricoTotais as TransferenciaParceiroEntradaHistoricoTotais,
+    TransferenciaParceiroEntradaItemRequest as TransferenciaParceiroEntradaItemRequest,
+    TransferenciaParceiroEntradaRequest as TransferenciaParceiroEntradaRequest,
+    TransferenciaParceiroEntradaResponse as TransferenciaParceiroEntradaResponse,
+)
+
 
 class TransferenciaParceiroItemRequest(BaseModel):
     """Item da transferencia de estoque para parceiro."""
@@ -71,6 +80,9 @@ class TransferenciaParceiroContaPagarCompensacaoItem(BaseModel):
     conta_pagar_id: int
     descricao: str
     documento: Optional[str] = None
+    canal: Optional[str] = None
+    origem_acerto: str = "financeiro"
+    origem_label: str = "Financeiro"
     data_emissao: Optional[date] = None
     data_vencimento: Optional[date] = None
     status: str

@@ -42,6 +42,22 @@ def test_transferencia_parceiro_routes_ficam_em_router_dedicado():
         "/estoque/transferencia-parceiro/{conta_receber_id}/receber",
         "POST",
     ) in routes
+    assert (
+        "/estoque/transferencia-parceiro/baixa-lote/preview",
+        "POST",
+    ) in routes
+    assert (
+        "/estoque/transferencia-parceiro/baixa-lote",
+        "POST",
+    ) in routes
+    assert (
+        "/estoque/transferencia-parceiro/entrada-parceiro",
+        "POST",
+    ) in routes
+    assert (
+        "/estoque/transferencia-parceiro/entrada-parceiro/historico",
+        "GET",
+    ) in routes
     assert ("/estoque/transferencia-parceiro/{conta_receber_id}", "DELETE") in routes
 
 

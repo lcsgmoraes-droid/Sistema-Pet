@@ -16,8 +16,11 @@ export default function HistoricoTransferenciaFilters({
   onSelecionarPessoa,
   aplicarPeriodoRapido,
   limparFiltros,
+  onAbrirBaixaLoteTransferencia,
   onSubmit,
 }) {
+  const baixaPorValorDisponivel = Boolean(pessoaSelecionada?.id || filtros.parceiro_id);
+
   return (
     <>
       <div className="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 xl:flex-row xl:items-start xl:justify-between">
@@ -45,6 +48,15 @@ export default function HistoricoTransferenciaFilters({
           >
             Atualizar historico
           </button>
+          {baixaPorValorDisponivel ? (
+            <button
+              type="button"
+              onClick={onAbrirBaixaLoteTransferencia}
+              className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+            >
+              Registrar acerto
+            </button>
+          ) : null}
         </div>
       </div>
 

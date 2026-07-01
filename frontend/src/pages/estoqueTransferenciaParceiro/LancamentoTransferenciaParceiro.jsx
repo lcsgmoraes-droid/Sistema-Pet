@@ -29,6 +29,7 @@ export default function LancamentoTransferenciaParceiro({
   itens,
   totalQuantidade,
   totalRessarcimento,
+  totalDiferencaLancada,
   registrarTransferencia,
   salvando,
   modoEdicao,
@@ -38,6 +39,8 @@ export default function LancamentoTransferenciaParceiro({
   atualizarTotalItem,
   removerItem,
 }) {
+  const entradaParceiro = form.tipo_operacao === "entrada_parceiro";
+
   return (
     <div className="space-y-6">
       <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -47,12 +50,46 @@ export default function LancamentoTransferenciaParceiro({
               1. Pessoa responsavel e dados da transferencia
             </h2>
             <p className="mt-1 text-sm text-gray-600">
-              Primeiro selecione quem vai ressarcir o custo desta saida.
+              {entradaParceiro
+                ? "Registre de quem veio o produto e a divida que sera criada."
+                : "Primeiro selecione quem sera responsavel pelo ressarcimento ou acerto."}
             </p>
           </div>
         </div>
 
         <div className="mt-5 grid gap-4">
+          {!modoEdicao ? (
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                Tipo de lancamento
+              </label>
+              <div className="grid gap-2 rounded-2xl border border-gray-200 bg-slate-50 p-1 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => atualizarCampo("tipo_operacao", "saida_parceiro")}
+                  className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                    !entradaParceiro
+                      ? "bg-white text-blue-700 shadow-sm"
+                      : "text-slate-600 hover:bg-white"
+                  }`}
+                >
+                  Saida para parceiro
+                </button>
+                <button
+                  type="button"
+                  onClick={() => atualizarCampo("tipo_operacao", "entrada_parceiro")}
+                  className={`rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                    entradaParceiro
+                      ? "bg-white text-blue-700 shadow-sm"
+                      : "text-slate-600 hover:bg-white"
+                  }`}
+                >
+                  Entrada do parceiro
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <div ref={parceiroRef} className="relative">
             <label className="mb-2 block text-sm font-medium text-gray-700">
               Pessoa / parceiro
@@ -133,7 +170,7 @@ export default function LancamentoTransferenciaParceiro({
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
-                Vencimento do ressarcimento
+                {entradaParceiro ? "Vencimento da divida" : "Vencimento do ressarcimento"}
               </label>
               <input
                 type="date"
@@ -157,6 +194,23 @@ export default function LancamentoTransferenciaParceiro({
             </div>
           </div>
 
+          {entradaParceiro ? (
+            <label className="flex items-start gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-900">
+              <input
+                type="checkbox"
+                checked={Boolean(form.entrar_estoque)}
+                onChange={(event) => atualizarCampo("entrar_estoque", event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-emerald-300 text-emerald-700 focus:ring-emerald-200"
+              />
+              <span>
+                <span className="block font-semibold">Entrar produtos no estoque</span>
+                <span className="mt-1 block">
+                  Se desmarcar, o sistema cria apenas a divida para acerto futuro.
+                </span>
+              </span>
+            </label>
+          ) : null}
+
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">Observacao</label>
             <textarea
@@ -174,7 +228,9 @@ export default function LancamentoTransferenciaParceiro({
         <div>
           <h2 className="text-lg font-semibold text-gray-900">2. Produtos</h2>
           <p className="mt-1 text-sm text-gray-600">
-            Pesquise por nome, SKU, codigo ou codigo de barras e monte a transferencia.
+            {entradaParceiro
+              ? "Pesquise os produtos recebidos do parceiro para gerar a divida."
+              : "Pesquise por nome, SKU, codigo ou codigo de barras e monte a transferencia."}
           </p>
         </div>
 
@@ -229,8 +285,9 @@ export default function LancamentoTransferenciaParceiro({
         </div>
 
         <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
-          Depois de selecionar o produto, confira quantidade e valores na lista abaixo. O botao de
-          registrar fica junto da conferencia final.
+          {entradaParceiro
+            ? "Depois de selecionar o produto, confira quantidade e valor da divida antes de registrar."
+            : "Depois de selecionar o produto, confira quantidade e valores na lista abaixo. O botao de registrar fica junto da conferencia final."}
         </div>
       </section>
 
@@ -239,14 +296,16 @@ export default function LancamentoTransferenciaParceiro({
           <div>
             <h2 className="text-lg font-semibold text-gray-900">3. Itens da transferencia</h2>
             <p className="mt-1 text-sm text-gray-600">
-              Ajuste as quantidades e confira o total de ressarcimento antes de salvar.
+              {entradaParceiro
+                ? "Ajuste as quantidades e o valor que voce deve ao parceiro."
+                : "Ajuste as quantidades, valor lancado e total antes de salvar."}
             </p>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
               {itens.length} item(ns) | {formatarQuantidade(totalQuantidade)} un |{" "}
-              {formatarMoeda(totalRessarcimento)}
+              {entradaParceiro ? "Divida" : "Valor lancado"} {formatarMoeda(totalRessarcimento)}
             </div>
             <button
               type="button"
@@ -260,12 +319,14 @@ export default function LancamentoTransferenciaParceiro({
                   : "Registrando..."
                 : modoEdicao
                   ? "Salvar edicao"
-                  : "Registrar transferencia"}
+                  : entradaParceiro
+                    ? "Registrar entrada"
+                    : "Registrar transferencia"}
             </button>
           </div>
         </div>
 
-        <div className="grid gap-3 border-b border-gray-100 px-6 py-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 border-b border-gray-100 px-6 py-4 md:grid-cols-2 xl:grid-cols-5">
           <ResumoTransferenciaCard
             titulo="Itens"
             valor={String(itens.length)}
@@ -275,14 +336,30 @@ export default function LancamentoTransferenciaParceiro({
           <ResumoTransferenciaCard
             titulo="Quantidade total"
             valor={formatarQuantidade(totalQuantidade)}
-            descricao="Unidades que sairao do estoque."
+            descricao={
+              entradaParceiro
+                ? "Unidades recebidas do parceiro."
+                : "Unidades que sairao do estoque."
+            }
             destaque="blue"
           />
           <ResumoTransferenciaCard
-            titulo="Ressarcimento"
+            titulo={entradaParceiro ? "Divida gerada" : "Valor lancado"}
             valor={formatarMoeda(totalRessarcimento)}
-            descricao="Total do acerto financeiro."
+            descricao={
+              entradaParceiro
+                ? "Total que ficara no contas a pagar."
+                : "Total combinado para esta transferencia."
+            }
             destaque="emerald"
+          />
+          <ResumoTransferenciaCard
+            titulo="Dif. sobre custo"
+            valor={formatarMoeda(totalDiferencaLancada)}
+            descricao="Comparacao com o custo base dos itens."
+            destaque={
+              totalDiferencaLancada < 0 ? "amber" : totalDiferencaLancada > 0 ? "emerald" : "slate"
+            }
           />
           <ResumoTransferenciaCard
             titulo="Itens sem valor"
@@ -296,7 +373,9 @@ export default function LancamentoTransferenciaParceiro({
           <div className="px-6 py-12 text-center">
             <p className="text-base font-semibold text-gray-900">Nenhum item adicionado ainda</p>
             <p className="mt-2 text-sm text-gray-500">
-              Use a busca acima para incluir os produtos que sairao para a pessoa responsavel.
+              {entradaParceiro
+                ? "Use a busca acima para incluir os produtos recebidos do parceiro."
+                : "Use a busca acima para incluir os produtos que sairao para a pessoa responsavel."}
             </p>
           </div>
         ) : (
@@ -306,9 +385,10 @@ export default function LancamentoTransferenciaParceiro({
                 <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
                   <th className="px-6 py-4">Produto</th>
                   <th className="px-6 py-4">Estoque atual</th>
-                  <th className="px-6 py-4">Custo unit.</th>
+                  <th className="px-6 py-4">Custo base</th>
+                  <th className="px-6 py-4">Valor unit. lancado</th>
                   <th className="px-6 py-4">Quantidade</th>
-                  <th className="px-6 py-4">Total</th>
+                  <th className="px-6 py-4">Total lancado</th>
                   <th className="px-6 py-4 text-right">Acoes</th>
                 </tr>
               </thead>
@@ -326,6 +406,9 @@ export default function LancamentoTransferenciaParceiro({
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700">
                         {formatarQuantidade(item.estoque_atual)}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-slate-700">
+                        {formatarMoeda(item.custo_base_unitario || 0)}
                       </td>
                       <td className="px-6 py-4">
                         <input
