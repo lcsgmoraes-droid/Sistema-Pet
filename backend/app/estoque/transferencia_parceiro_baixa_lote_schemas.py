@@ -41,7 +41,9 @@ class TransferenciaParceiroBaixaLoteRequest(BaseModel):
         default_factory=list, min_items=1
     )
     compensacoes: list = Field(default_factory=list)
-    nova_conta_pagar_acerto: Optional[TransferenciaParceiroNovaContaPagarAcertoRequest] = None
+    nova_conta_pagar_acerto: Optional[
+        TransferenciaParceiroNovaContaPagarAcertoRequest
+    ] = None
 
 
 class TransferenciaParceiroBaixaLotePreviewItem(BaseModel):
@@ -76,7 +78,9 @@ class TransferenciaParceiroBaixaLoteResponse(BaseModel):
     modo_baixa: str
     total_baixado: float
     total_itens: int
-    items: List[TransferenciaParceiroBaixaLoteResultadoItem] = Field(default_factory=list)
+    items: List[TransferenciaParceiroBaixaLoteResultadoItem] = Field(
+        default_factory=list
+    )
     recebimentos_criados: List[int] = Field(default_factory=list)
     pagamentos_criados: List[int] = Field(default_factory=list)
     contas_pagar_criadas: List[int] = Field(default_factory=list)

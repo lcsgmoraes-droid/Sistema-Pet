@@ -49,11 +49,7 @@ _REFERENCIA_DEVOLUCAO_TRANSFERENCIA_PARCEIRO = "transf_devolucao"
 
 def _texto_ascii(valor) -> str:
     texto = str(valor or "").strip().lower()
-    return (
-        unicodedata.normalize("NFD", texto)
-        .encode("ascii", "ignore")
-        .decode("ascii")
-    )
+    return unicodedata.normalize("NFD", texto).encode("ascii", "ignore").decode("ascii")
 
 
 def decimal_monetario(valor) -> Decimal:
@@ -133,8 +129,7 @@ def normalizar_modo_baixa_lote(valor: str | None) -> str:
         raise HTTPException(
             status_code=400,
             detail=(
-                "Modo de baixa invalido. Use recebimento, acerto ou "
-                "produto_devolvido."
+                "Modo de baixa invalido. Use recebimento, acerto ou produto_devolvido."
             ),
         )
     return modo
@@ -149,9 +144,7 @@ def resolver_data_recebimento_financeiro(data_base: date, forma_pagamento) -> da
     if "cartao" not in tipo and not gera_recebivel:
         return data_base
 
-    dias_antecipado = getattr(
-        forma_pagamento, "dias_recebimento_antecipado", None
-    )
+    dias_antecipado = getattr(forma_pagamento, "dias_recebimento_antecipado", None)
     if dias_antecipado is not None:
         dias = int(dias_antecipado or 0)
     else:
@@ -180,9 +173,7 @@ def buscar_transferencias_abertas_para_baixa(
             ContaReceber.tenant_id == str(tenant_id),
             ContaReceber.canal == "transferencia_parceiro",
             ContaReceber.cliente_id == parceiro_id,
-            ContaReceber.status.notin_(
-                ["recebido", "pago", "cancelado", "cancelada"]
-            ),
+            ContaReceber.status.notin_(["recebido", "pago", "cancelado", "cancelada"]),
         )
     )
 
@@ -264,7 +255,9 @@ def aplicar_compensacoes_acerto_lote(
     documento_lote: str,
 ) -> list[int]:
     compensacoes_validas = [
-        item for item in (compensacoes_payload or []) if _valor_compensacao_payload(item) > 0
+        item
+        for item in (compensacoes_payload or [])
+        if _valor_compensacao_payload(item) > 0
     ]
     if not compensacoes_validas:
         return []
@@ -530,10 +523,12 @@ def aplicar_baixa_lote_transferencia(
             conta.forma_pagamento_id = forma_pagamento.id
 
         modo_label = _MODOS_BAIXA_LOTE[modo_baixa]
-        detalhe_forma = (
-            f" | Forma: {forma_pagamento.nome}" if forma_pagamento else ""
+        detalhe_forma = f" | Forma: {forma_pagamento.nome}" if forma_pagamento else ""
+        detalhe_obs = (
+            f" - {payload.observacao.strip()}"
+            if _texto_limpo(payload.observacao)
+            else ""
         )
-        detalhe_obs = f" - {payload.observacao.strip()}" if _texto_limpo(payload.observacao) else ""
         historico = (
             f"{modo_label} em lote {payload.data_recebimento.strftime('%d/%m/%Y')}: "
             f"R$ {float(valor_baixado):.2f}{detalhe_forma}{detalhe_obs}"
@@ -648,7 +643,9 @@ def aplicar_baixa_lote_transferencia(
     }
 
 
-def atualizar_dre_baixa_lote(db: Session, *, tenant_id, lancamentos: list[tuple]) -> None:
+def atualizar_dre_baixa_lote(
+    db: Session, *, tenant_id, lancamentos: list[tuple]
+) -> None:
     for dre_subcategoria_id, valor, data_lancamento, canal in lancamentos:
         if not dre_subcategoria_id:
             continue

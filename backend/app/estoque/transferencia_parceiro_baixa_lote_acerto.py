@@ -11,6 +11,7 @@ from app.financeiro_models import ContaPagar
 
 CENTAVO = Decimal("0.01")
 
+
 def _payload_get(payload, campo: str, default=None):
     if isinstance(payload, dict):
         return payload.get(campo, default)

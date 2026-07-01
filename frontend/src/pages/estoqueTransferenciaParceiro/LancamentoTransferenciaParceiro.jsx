@@ -246,8 +246,8 @@ export default function LancamentoTransferenciaParceiro({
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
-              {itens.length} item(ns) | {formatarQuantidade(totalQuantidade)} un |{" "}
-              Valor lancado {formatarMoeda(totalRessarcimento)}
+              {itens.length} item(ns) | {formatarQuantidade(totalQuantidade)} un | Valor lancado{" "}
+              {formatarMoeda(totalRessarcimento)}
             </div>
             <button
               type="button"
@@ -290,11 +290,7 @@ export default function LancamentoTransferenciaParceiro({
             valor={formatarMoeda(totalDiferencaLancada)}
             descricao="Comparacao com o custo base dos itens."
             destaque={
-              totalDiferencaLancada < 0
-                ? "amber"
-                : totalDiferencaLancada > 0
-                  ? "emerald"
-                  : "slate"
+              totalDiferencaLancada < 0 ? "amber" : totalDiferencaLancada > 0 ? "emerald" : "slate"
             }
           />
           <ResumoTransferenciaCard

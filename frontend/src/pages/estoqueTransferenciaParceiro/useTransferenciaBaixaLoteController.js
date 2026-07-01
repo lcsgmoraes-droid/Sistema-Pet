@@ -50,20 +50,17 @@ export default function useTransferenciaBaixaLoteController({
     [aplicacoesBaixaLote],
   );
 
-  const totalCompensadoBaixaLote = useMemo(
-    () => {
-      const totalContasExistentes = Object.values(formBaixaLote.compensacoes || {}).reduce(
-        (acumulado, valor) => {
-          const numero = normalizarNumero(valor);
-          return acumulado + (Number.isFinite(numero) ? numero : 0);
-        },
-        0,
-      );
-      const valorNovaConta = normalizarNumero(formBaixaLote.nova_conta_pagar_acerto?.valor);
-      return totalContasExistentes + (Number.isFinite(valorNovaConta) ? valorNovaConta : 0);
-    },
-    [formBaixaLote.compensacoes, formBaixaLote.nova_conta_pagar_acerto?.valor],
-  );
+  const totalCompensadoBaixaLote = useMemo(() => {
+    const totalContasExistentes = Object.values(formBaixaLote.compensacoes || {}).reduce(
+      (acumulado, valor) => {
+        const numero = normalizarNumero(valor);
+        return acumulado + (Number.isFinite(numero) ? numero : 0);
+      },
+      0,
+    );
+    const valorNovaConta = normalizarNumero(formBaixaLote.nova_conta_pagar_acerto?.valor);
+    return totalContasExistentes + (Number.isFinite(valorNovaConta) ? valorNovaConta : 0);
+  }, [formBaixaLote.compensacoes, formBaixaLote.nova_conta_pagar_acerto?.valor]);
 
   const diferencaAplicacaoBaixaLote = Math.max(
     (normalizarNumero(formBaixaLote.valor_total) || 0) - totalAplicadoBaixaLote,
@@ -106,9 +103,7 @@ export default function useTransferenciaBaixaLoteController({
       });
       const preview = response.data || PREVIEW_VAZIO;
       setPreviewBaixaLote(preview);
-      setAplicacoesBaixaLote(
-        distribuirBaixaTransferencias(valorTotal, preview.items || [], ordem),
-      );
+      setAplicacoesBaixaLote(distribuirBaixaTransferencias(valorTotal, preview.items || [], ordem));
       const primeiraConta = preview.items?.[0]?.conta_receber_id;
       if (primeiraConta) void carregarContasPagarCompensacao?.(primeiraConta);
       return true;
@@ -259,7 +254,6 @@ export default function useTransferenciaBaixaLoteController({
         ),
       }));
     },
-    limparCompensacoesBaixaLote: () =>
-      setFormBaixaLote((prev) => ({ ...prev, compensacoes: {} })),
+    limparCompensacoesBaixaLote: () => setFormBaixaLote((prev) => ({ ...prev, compensacoes: {} })),
   };
 }

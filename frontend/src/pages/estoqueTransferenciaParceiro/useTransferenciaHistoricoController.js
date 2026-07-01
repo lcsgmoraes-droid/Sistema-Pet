@@ -643,8 +643,7 @@ export default function useTransferenciaHistoricoController({
       }));
     },
     limparCompensacoesBaixa: () => setFormBaixa((prev) => ({ ...prev, compensacoes: {} })),
-    preencherCompensacaoAutomaticaBaixaLote:
-      baixaLote.preencherCompensacaoAutomaticaBaixaLote,
+    preencherCompensacaoAutomaticaBaixaLote: baixaLote.preencherCompensacaoAutomaticaBaixaLote,
     limparCompensacoesBaixaLote: baixaLote.limparCompensacoesBaixaLote,
     excluirTransferencia,
     recarregarPrimeiraPagina,

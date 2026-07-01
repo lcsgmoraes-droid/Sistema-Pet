@@ -330,8 +330,7 @@ export function montarBaixaLoteTransferenciaPayload({
     payload.nova_conta_pagar_acerto = {
       descricao: novaContaPagarAcerto.descricao?.trim() || undefined,
       valor: valorNovaContaPagar,
-      data_vencimento:
-        novaContaPagarAcerto.data_vencimento || form.data_recebimento || hojeIso(),
+      data_vencimento: novaContaPagarAcerto.data_vencimento || form.data_recebimento || hojeIso(),
       documento: novaContaPagarAcerto.documento?.trim() || undefined,
       observacao: novaContaPagarAcerto.observacao?.trim() || undefined,
     };

@@ -155,9 +155,7 @@ export default function BaixaLoteTransferenciaPanel({
           </label>
           <select
             value={form.modo_baixa}
-            onChange={(event) =>
-              setForm((prev) => ({ ...prev, modo_baixa: event.target.value }))
-            }
+            onChange={(event) => setForm((prev) => ({ ...prev, modo_baixa: event.target.value }))}
             className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
           >
             <option value="recebimento">Recebimento financeiro</option>
@@ -219,7 +217,11 @@ export default function BaixaLoteTransferenciaPanel({
         <ResumoBaixaLoteCard titulo="Aberto" valor={preview.total_aberto || 0} />
         <ResumoBaixaLoteCard titulo="Sugerido" valor={preview.total_sugerido || 0} />
         <ResumoBaixaLoteCard titulo="Aplicado" valor={totalAplicado} destaque="text-emerald-700" />
-        <ResumoBaixaLoteCard titulo="Diferenca" valor={diferencaAplicacao} destaque="text-amber-700" />
+        <ResumoBaixaLoteCard
+          titulo="Diferenca"
+          valor={diferencaAplicacao}
+          destaque="text-amber-700"
+        />
       </div>
 
       <div className="mt-4">
