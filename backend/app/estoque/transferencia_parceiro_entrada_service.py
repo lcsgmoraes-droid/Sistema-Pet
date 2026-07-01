@@ -89,7 +89,9 @@ def serializar_entrada_parceiro(conta, *, hoje=None) -> dict:
         "data_pagamento": _data_ref(getattr(conta, "data_pagamento", None)),
         "status": status,
         "status_label": status_label,
-        "valor_original": float(_decimal_monetario(getattr(conta, "valor_original", 0))),
+        "valor_original": float(
+            _decimal_monetario(getattr(conta, "valor_original", 0))
+        ),
         "valor_pago": float(_decimal_monetario(getattr(conta, "valor_pago", 0))),
         "saldo_aberto": float(saldo_aberto),
         "estoque_atualizado": "estoque atualizado: sim" in (observacoes or "").lower(),
@@ -288,13 +290,17 @@ def _registrar_movimentacoes_entrada(
     return movimentacao_ids
 
 
-def registrar_entrada_parceiro(db: Session, *, tenant_id, user_id: int, payload) -> dict:
+def registrar_entrada_parceiro(
+    db: Session, *, tenant_id, user_id: int, payload
+) -> dict:
     parceiro = _buscar_parceiro_entrada(db, tenant_id, int(payload.parceiro_id))
     documento = _texto_limpo(payload.documento) or _gerar_documento_entrada_parceiro()
 
     conta_existente = (
         db.query(ContaPagar)
-        .filter(ContaPagar.tenant_id == str(tenant_id), ContaPagar.documento == documento)
+        .filter(
+            ContaPagar.tenant_id == str(tenant_id), ContaPagar.documento == documento
+        )
         .first()
     )
     if conta_existente:
@@ -429,7 +435,9 @@ def listar_entradas_parceiro(
         "valor_total": round(sum(item["valor_original"] for item in registros), 2),
         "valor_pago": round(sum(item["valor_pago"] for item in registros), 2),
         "saldo_aberto": round(sum(item["saldo_aberto"] for item in registros), 2),
-        "pendentes": sum(1 for item in registros if item["status"] in {"pendente", "parcial"}),
+        "pendentes": sum(
+            1 for item in registros if item["status"] in {"pendente", "parcial"}
+        ),
         "pagas": sum(1 for item in registros if item["status"] == "pago"),
         "vencidas": sum(1 for item in registros if item["status"] == "vencido"),
     }
