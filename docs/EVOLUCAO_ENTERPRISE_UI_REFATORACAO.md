@@ -207,15 +207,26 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
-Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo dos arquivos rastreados, excluindo testes, migrations, CSS e builds locais.
+Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo do recorte backend/web rastreado, excluindo testes, migrations, CSS e builds locais.
 
-- 0 arquivos de aplicacao acima de 700 linhas, em atencao.
-- 0 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
-- 0 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
-- 0 arquivos de aplicacao acima de 2000 linhas.
+- 0 arquivos de aplicacao backend/web acima de 700 linhas, em atencao.
+- 0 arquivos de aplicacao backend/web acima de 1000 linhas, prioridade de refatoracao.
+- 0 arquivos de aplicacao backend/web acima de 1500 linhas, criticidade alta.
+- 0 arquivos de aplicacao backend/web acima de 2000 linhas.
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Observacao: fora do inventario de aplicacao, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+- Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+- Observacao mobile: `app-mobile/src` ainda tem 11 arquivos acima de 700 linhas; eles ficam como frente separada do app quando a prioridade voltar para mobile.
+
+Fatia testes 700 batch 41 de 2026-06-30: `backend/tests/multi_tenant/test_phase3_tenant_onboarding_service.py` saiu da faixa acima de 700 linhas ao dividir os contratos de onboarding multitenant por responsabilidade:
+
+- `backend/tests/multi_tenant/test_phase3_tenant_onboarding_service.py`: 1133 linhas com conteudo removidas do arquivo monolitico.
+- `backend/tests/multi_tenant/tenant_onboarding_test_helpers.py`: concentra fixture SQLite, dados base, proxy de sessao e helpers compartilhados.
+- `backend/tests/multi_tenant/test_tenant_onboarding_service_core.py`: cobre dry-run, aplicacao, idempotencia, isolamento, catalogo opcional e erros de schema.
+- `backend/tests/multi_tenant/test_tenant_onboarding_template_contract.py`: cobre contrato dos templates sem writes.
+- `backend/tests/multi_tenant/test_tenant_onboarding_script.py`: cobre CLI/script de onboarding, health checks, template check, migrations e readiness de signup.
+- `backend/tests/multi_tenant/test_tenant_onboarding_sequence.py`: cobre sincronizacao de sequence Postgres antes de inserts conhecidos.
+- Contrato dedicado: `backend/tests/unit/test_backend_test_large_files_700_batch_41_refactor.py`, garantindo a remocao do arquivo monolitico e todos os arquivos fatiados abaixo de 700 linhas.
 
 Fatia testes 700 batch 40 de 2026-06-30: `backend/tests/test_analytics_routes.py` saiu da faixa acima de 700 linhas ao dividir os contratos da API de analytics por responsabilidade:
 
