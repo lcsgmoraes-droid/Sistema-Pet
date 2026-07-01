@@ -23,6 +23,17 @@ export interface AppAccessProfile {
   source?: string | null;
 }
 
+export interface EcommerceDeliveryAddress {
+  entrega_nome?: string | null;
+  entrega_cep?: string | null;
+  entrega_endereco?: string | null;
+  entrega_numero?: string | null;
+  entrega_complemento?: string | null;
+  entrega_bairro?: string | null;
+  entrega_cidade?: string | null;
+  entrega_estado?: string | null;
+}
+
 export interface EcommerceUser {
   id: number;
   email: string;
@@ -35,9 +46,13 @@ export interface EcommerceUser {
   cep?: string | null;
   endereco?: string | null;
   numero?: string | null;
+  complemento?: string | null;
   bairro?: string | null;
   cidade?: string | null;
   estado?: string | null;
+  endereco_entrega?: string | null;
+  usar_endereco_entrega_diferente?: boolean | null;
+  endereco_entrega_detalhado?: EcommerceDeliveryAddress | null;
   // perfil entregador
   is_entregador?: boolean;
   funcionario_id?: number | null;
