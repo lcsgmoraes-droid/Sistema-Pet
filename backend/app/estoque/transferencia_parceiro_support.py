@@ -204,6 +204,15 @@ def _status_conta_pagar_compensacao(conta: ContaPagar) -> tuple[str, str]:
     return "pendente", "Pendente"
 
 
+def _origem_conta_pagar_compensacao(conta: ContaPagar) -> tuple[str, str]:
+    canal = str(getattr(conta, "canal", "") or "").strip().lower()
+    if canal == "transferencia_parceiro_entrada":
+        return "entrada_parceiro", "Entrada do parceiro"
+    if canal == "transferencia_parceiro":
+        return "acerto_direto", "Acerto direto"
+    return "financeiro", "Financeiro"
+
+
 def _buscar_conta_transferencia_parceiro(
     db: Session,
     tenant_id: int | str,

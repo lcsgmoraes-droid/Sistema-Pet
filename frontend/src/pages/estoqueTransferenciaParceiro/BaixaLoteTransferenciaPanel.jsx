@@ -35,32 +35,45 @@ function ContasPagarCompensacaoLote({
 
   return (
     <div className="space-y-2">
-      {contas.map((conta) => (
-        <div
-          key={conta.conta_pagar_id}
-          className="grid gap-3 rounded-xl border border-amber-100 bg-white p-3 md:grid-cols-[1fr_140px_150px] md:items-center"
-        >
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              {conta.documento || `Conta #${conta.conta_pagar_id}`}
+      {contas.map((conta) => {
+        const origemEntrada = conta.origem_acerto === "entrada_parceiro";
+        const classeOrigem = origemEntrada
+          ? "border-blue-200 bg-blue-50 text-blue-700"
+          : "border-slate-200 bg-slate-50 text-slate-600";
+        return (
+          <div
+            key={conta.conta_pagar_id}
+            className="grid gap-3 rounded-xl border border-amber-100 bg-white p-3 md:grid-cols-[1fr_140px_150px] md:items-center"
+          >
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold text-slate-900">
+                  {conta.documento || `Conta #${conta.conta_pagar_id}`}
+                </p>
+                <span
+                  className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${classeOrigem}`}
+                >
+                  {conta.origem_label || "Financeiro"}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-slate-500">{conta.descricao}</p>
+            </div>
+            <p className="text-sm font-semibold text-amber-700 md:text-right">
+              {formatarMoeda(conta.saldo_aberto)}
             </p>
-            <p className="text-xs text-slate-500">{conta.descricao}</p>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={compensacoes?.[conta.conta_pagar_id] || ""}
+              onChange={(event) =>
+                onAtualizarValorCompensacao(conta.conta_pagar_id, event.target.value)
+              }
+              className="rounded-lg border border-slate-300 px-3 py-2 text-right text-sm text-slate-900 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+            />
           </div>
-          <p className="text-sm font-semibold text-amber-700 md:text-right">
-            {formatarMoeda(conta.saldo_aberto)}
-          </p>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={compensacoes?.[conta.conta_pagar_id] || ""}
-            onChange={(event) =>
-              onAtualizarValorCompensacao(conta.conta_pagar_id, event.target.value)
-            }
-            className="rounded-lg border border-slate-300 px-3 py-2 text-right text-sm text-slate-900 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
-          />
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

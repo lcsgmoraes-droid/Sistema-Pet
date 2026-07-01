@@ -25,51 +25,65 @@ function CompensacaoContasPagar({
 
   return (
     <div className="mt-4 space-y-3">
-      {contasPagarCompensacao.map((contaPagar) => (
-        <div
-          key={contaPagar.conta_pagar_id}
-          className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-        >
-          <div className="grid gap-3 xl:grid-cols-[1.6fr_0.8fr_0.8fr_0.9fr] xl:items-center">
-            <div>
-              <p className="text-sm font-semibold text-slate-900">
-                {contaPagar.documento || `Conta #${contaPagar.conta_pagar_id}`}
-              </p>
-              <p className="mt-1 text-sm text-slate-700">{contaPagar.descricao}</p>
-              <p className="mt-1 text-xs text-slate-500">
-                Vencimento: {formatarData(contaPagar.data_vencimento)} | {contaPagar.status_label}
-              </p>
-            </div>
-            <div className="text-sm text-slate-700">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Saldo</p>
-              <p className="mt-1 font-semibold text-slate-900">
-                {formatarMoeda(contaPagar.saldo_aberto)}
-              </p>
-            </div>
-            <div className="text-sm text-slate-700">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Ja pago</p>
-              <p className="mt-1 font-semibold text-slate-900">
-                {formatarMoeda(contaPagar.valor_pago)}
-              </p>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
-                Valor a compensar
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={formBaixa.compensacoes?.[contaPagar.conta_pagar_id] || ""}
-                onChange={(event) =>
-                  onAtualizarValorCompensacao(contaPagar.conta_pagar_id, event.target.value)
-                }
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
-              />
+      {contasPagarCompensacao.map((contaPagar) => {
+        const origemEntrada = contaPagar.origem_acerto === "entrada_parceiro";
+        const classeOrigem = origemEntrada
+          ? "border-blue-200 bg-blue-50 text-blue-700"
+          : "border-slate-200 bg-white text-slate-600";
+        return (
+          <div
+            key={contaPagar.conta_pagar_id}
+            className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+          >
+            <div className="grid gap-3 xl:grid-cols-[1.6fr_0.8fr_0.8fr_0.9fr] xl:items-center">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-slate-900">
+                    {contaPagar.documento || `Conta #${contaPagar.conta_pagar_id}`}
+                  </p>
+                  <span
+                    className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${classeOrigem}`}
+                  >
+                    {contaPagar.origem_label || "Financeiro"}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-slate-700">{contaPagar.descricao}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Vencimento: {formatarData(contaPagar.data_vencimento)} |{" "}
+                  {contaPagar.status_label}
+                </p>
+              </div>
+              <div className="text-sm text-slate-700">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Saldo</p>
+                <p className="mt-1 font-semibold text-slate-900">
+                  {formatarMoeda(contaPagar.saldo_aberto)}
+                </p>
+              </div>
+              <div className="text-sm text-slate-700">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Ja pago</p>
+                <p className="mt-1 font-semibold text-slate-900">
+                  {formatarMoeda(contaPagar.valor_pago)}
+                </p>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Valor a compensar
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formBaixa.compensacoes?.[contaPagar.conta_pagar_id] || ""}
+                  onChange={(event) =>
+                    onAtualizarValorCompensacao(contaPagar.conta_pagar_id, event.target.value)
+                  }
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                />
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

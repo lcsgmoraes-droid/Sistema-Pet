@@ -32,6 +32,7 @@ from app.estoque.transferencia_parceiro_support import (
     _label_modo_baixa_transferencia,
     _normalizar_modo_baixa_transferencia,
     _obter_ou_criar_forma_pagamento_acerto,
+    _origem_conta_pagar_compensacao,
     _restaurar_lotes_consumidos_transferencia,
     _saldo_conta_pagar,
     _status_conta_pagar_compensacao,
@@ -70,12 +71,16 @@ def listar_contas_pagar_compensacao_transferencia(
     for conta_pagar in contas:
         saldo_aberto = _saldo_conta_pagar(conta_pagar)
         status_conta, status_label = _status_conta_pagar_compensacao(conta_pagar)
+        origem_acerto, origem_label = _origem_conta_pagar_compensacao(conta_pagar)
         total_disponivel += saldo_aberto
         items.append(
             TransferenciaParceiroContaPagarCompensacaoItem(
                 conta_pagar_id=conta_pagar.id,
                 descricao=conta_pagar.descricao,
                 documento=conta_pagar.documento,
+                canal=conta_pagar.canal,
+                origem_acerto=origem_acerto,
+                origem_label=origem_label,
                 data_emissao=conta_pagar.data_emissao,
                 data_vencimento=conta_pagar.data_vencimento,
                 status=status_conta,
