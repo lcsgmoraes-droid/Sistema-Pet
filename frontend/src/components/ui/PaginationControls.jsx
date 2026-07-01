@@ -4,9 +4,9 @@ const PAGE_SIZE_OPTIONS = [10, 20, 30, 50, 100];
 
 const VARIANT_CLASSES = {
   inline: "flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-between",
-  top: "mt-6 flex w-full flex-col gap-3 rounded-t-lg border border-gray-200 bg-gray-50 px-4 py-3 md:flex-row md:items-center md:justify-between",
+  top: "mt-6 flex w-full flex-col gap-3 rounded-t-lg border border-gray-200 bg-gray-50 px-4 py-3 md:flex-row md:items-center md:justify-between dark:border-slate-700 dark:bg-slate-900",
   bottom:
-    "flex w-full flex-col gap-3 border-t border-gray-200 bg-gray-50 px-4 py-3 md:flex-row md:items-center md:justify-between",
+    "flex w-full flex-col gap-3 border-t border-gray-200 bg-gray-50 px-4 py-3 md:flex-row md:items-center md:justify-between dark:border-slate-700 dark:bg-slate-900",
 };
 
 function cx(...classes) {
@@ -63,14 +63,14 @@ export default function PaginationControls({
   return (
     <div className={cx(containerClassName, className)}>
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
-        <span className="text-sm text-gray-600">
+        <span className="text-sm text-gray-600 dark:text-slate-300">
           Mostrando {startItem} a {endItem} de {totalItems} {itemName}
         </span>
         <select
           value={itemsPerPage}
           onChange={(event) => onItemsPerPageChange?.(Number(event.target.value))}
           disabled={disabled}
-          className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+          className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-sm outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-cyan-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-500"
         >
           {pageSizeOptions.map((option) => (
             <option key={option} value={option}>
@@ -101,7 +101,7 @@ export default function PaginationControls({
           Anterior
         </button>
 
-        <span className="text-sm font-medium text-gray-600 sm:hidden">
+        <span className="text-sm font-medium text-gray-600 dark:text-slate-300 sm:hidden">
           {safeCurrentPage}/{pageCount}
         </span>
 

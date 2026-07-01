@@ -12,6 +12,7 @@
     "test:theme-preference": "node scripts/test-theme-preference.mjs",
     "test:theme-integration": "node scripts/test-theme-integration-contract.mjs",
     "test:dark-theme-css": "node scripts/test-dark-theme-css.mjs",
+    "test:ui-dark-classes": "node scripts/test-ui-dark-classes.mjs",
     "test:auth-storage": "node scripts/test-token-storage.mjs",
     "test:auth-refresh": "node scripts/test-refresh-manager.mjs",
     "test:corepet-branding": "node scripts/test-corepet-branding.mjs",

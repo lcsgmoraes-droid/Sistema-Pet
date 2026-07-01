@@ -111,11 +111,11 @@ export default function AutocompleteSelect({
   return (
     <div className={`relative ${className}`.trim()} ref={containerRef}>
       {showLabel && label ? (
-        <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">{label}</label>
       ) : null}
 
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
         <input
           type="text"
           value={termo}
@@ -125,7 +125,7 @@ export default function AutocompleteSelect({
           placeholder={searchPlaceholder || placeholder}
           disabled={disabled}
           className={[
-            "h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-16 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500",
+            "h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-16 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-cyan-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-500",
             inputClassName,
           ]
             .filter(Boolean)
@@ -138,7 +138,7 @@ export default function AutocompleteSelect({
               type="button"
               onClick={limpar}
               disabled={disabled}
-              className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+              className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-200"
               title="Limpar"
             >
               <X className="h-4 w-4" />
@@ -148,7 +148,7 @@ export default function AutocompleteSelect({
             type="button"
             onClick={() => setAberto((prev) => !prev)}
             disabled={disabled}
-            className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+            className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50 dark:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-200"
             title="Abrir lista"
           >
             <ChevronDown className={`h-4 w-4 transition ${aberto ? "rotate-180" : ""}`} />
@@ -159,10 +159,10 @@ export default function AutocompleteSelect({
       {aberto && !disabled ? (
         <div
           ref={panelRef}
-          className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg"
+          className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-900"
         >
           {opcoesFiltradas.length === 0 ? (
-            <div className="px-4 py-3 text-sm text-slate-500">{emptyLabel}</div>
+            <div className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{emptyLabel}</div>
           ) : (
             opcoesFiltradas.map((option) => {
               const optionValue = String(getOptionValue(option));
@@ -174,13 +174,15 @@ export default function AutocompleteSelect({
                   key={optionValue}
                   type="button"
                   onClick={() => selecionar(option)}
-                  className={`w-full border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50 ${
-                    ativo ? "bg-blue-50 text-blue-800" : "text-slate-800"
+                  className={`w-full border-b border-slate-100 px-4 py-3 text-left last:border-b-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800 ${
+                    ativo
+                      ? "bg-blue-50 text-blue-800 dark:bg-blue-500/15 dark:text-blue-200"
+                      : "text-slate-800 dark:text-slate-100"
                   }`}
                 >
                   <div className="truncate text-sm font-medium">{getOptionLabel(option)}</div>
                   {meta ? (
-                    <div className="mt-0.5 truncate text-xs text-slate-500">{meta}</div>
+                    <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{meta}</div>
                   ) : null}
                 </button>
               );
