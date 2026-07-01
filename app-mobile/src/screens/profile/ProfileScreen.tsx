@@ -21,18 +21,31 @@ import { AppProfileType } from "../../types";
 
 export default function ProfileScreen() {
   const { user, logout, updateUser, selectProfile } = useAuthStore();
+  const entregaDetalhada = user?.endereco_entrega_detalhado ?? {};
   const [editando, setEditando] = useState(false);
   const [editandoEndereco, setEditandoEndereco] = useState(false);
+  const [editandoEnderecoEntrega, setEditandoEnderecoEntrega] = useState(false);
   const [nome, setNome] = useState(user?.nome ?? "");
   const [telefone, setTelefone] = useState(user?.telefone ?? "");
   const [cpf, setCpf] = useState(user?.cpf ?? "");
   const [cep, setCep] = useState(user?.cep ?? "");
   const [rua, setRua] = useState(user?.endereco ?? "");
   const [numero, setNumero] = useState(user?.numero ?? "");
+  const [complemento, setComplemento] = useState(user?.complemento ?? "");
   const [bairro, setBairro] = useState(user?.bairro ?? "");
   const [cidade, setCidade] = useState(user?.cidade ?? "");
   const [estado, setEstado] = useState(user?.estado ?? "");
+  const [usarEnderecoEntregaDiferente, setUsarEnderecoEntregaDiferente] = useState(Boolean(user?.usar_endereco_entrega_diferente));
+  const [entregaNome, setEntregaNome] = useState(entregaDetalhada.entrega_nome ?? "");
+  const [entregaCep, setEntregaCep] = useState(entregaDetalhada.entrega_cep ?? "");
+  const [entregaEndereco, setEntregaEndereco] = useState(entregaDetalhada.entrega_endereco ?? "");
+  const [entregaNumero, setEntregaNumero] = useState(entregaDetalhada.entrega_numero ?? "");
+  const [entregaComplemento, setEntregaComplemento] = useState(entregaDetalhada.entrega_complemento ?? "");
+  const [entregaBairro, setEntregaBairro] = useState(entregaDetalhada.entrega_bairro ?? "");
+  const [entregaCidade, setEntregaCidade] = useState(entregaDetalhada.entrega_cidade ?? "");
+  const [entregaEstado, setEntregaEstado] = useState(entregaDetalhada.entrega_estado ?? "");
   const [buscandoCep, setBuscandoCep] = useState(false);
+  const [buscandoCepEntrega, setBuscandoCepEntrega] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [trocandoPerfil, setTrocandoPerfil] = useState(false);
   const [ativandoNotificacoes, setAtivandoNotificacoes] = useState(false);
@@ -45,15 +58,33 @@ export default function ProfileScreen() {
     setCep(user?.cep ?? "");
     setRua(user?.endereco ?? "");
     setNumero(user?.numero ?? "");
+    setComplemento(user?.complemento ?? "");
     setBairro(user?.bairro ?? "");
     setCidade(user?.cidade ?? "");
     setEstado(user?.estado ?? "");
+    const entregaAtual = user?.endereco_entrega_detalhado ?? {};
+    setUsarEnderecoEntregaDiferente(Boolean(user?.usar_endereco_entrega_diferente));
+    setEntregaNome(entregaAtual.entrega_nome ?? "");
+    setEntregaCep(entregaAtual.entrega_cep ?? "");
+    setEntregaEndereco(entregaAtual.entrega_endereco ?? "");
+    setEntregaNumero(entregaAtual.entrega_numero ?? "");
+    setEntregaComplemento(entregaAtual.entrega_complemento ?? "");
+    setEntregaBairro(entregaAtual.entrega_bairro ?? "");
+    setEntregaCidade(entregaAtual.entrega_cidade ?? "");
+    setEntregaEstado(entregaAtual.entrega_estado ?? "");
   }, [user]);
 
   const pontos = user?.pontos ?? 0;
   const valorPontos = (pontos / 100) * PONTOS.REAIS_POR_100_PONTOS;
+  const complementoEndereco = user?.complemento ? ` - ${user.complemento}` : "";
   const enderecoCompleto = user?.cidade
-    ? `${user?.endereco ?? ""}, ${user?.numero ?? "s/n"} - ${user?.bairro ?? ""} - ${user?.cidade}/${user?.estado ?? ""}`
+    ? `${user?.endereco ?? ""}, ${user?.numero ?? "s/n"}${complementoEndereco} - ${user?.bairro ?? ""} - ${user?.cidade}/${user?.estado ?? ""}`
+    : null;
+  const complementoEnderecoEntrega = entregaDetalhada.entrega_complemento
+    ? ` - ${entregaDetalhada.entrega_complemento}`
+    : "";
+  const enderecoEntregaCompleto = user?.usar_endereco_entrega_diferente && entregaDetalhada.entrega_cidade
+    ? `${entregaDetalhada.entrega_endereco ?? ""}, ${entregaDetalhada.entrega_numero ?? "s/n"}${complementoEnderecoEntrega} - ${entregaDetalhada.entrega_bairro ?? ""} - ${entregaDetalhada.entrega_cidade}/${entregaDetalhada.entrega_estado ?? ""}`
     : null;
   const available_profiles = user?.available_profiles ?? [];
   const perfilAtual = user?.selected_profile ?? user?.perfil_operacional ?? "cliente";
@@ -78,6 +109,29 @@ export default function ProfileScreen() {
       // Mantem os dados atuais quando o CEP falhar.
     } finally {
       setBuscandoCep(false);
+    }
+  }
+
+  async function buscarCepEntrega(value: string) {
+    const numeros = value.replace(/\D/g, "");
+    setEntregaCep(numeros.length <= 5 ? numeros : `${numeros.slice(0, 5)}-${numeros.slice(5, 8)}`);
+
+    if (numeros.length !== 8) return;
+
+    setBuscandoCepEntrega(true);
+    try {
+      const resp = await fetch(`https://viacep.com.br/ws/${numeros}/json/`);
+      const data = await resp.json();
+      if (!data.erro) {
+        setEntregaEndereco(data.logradouro ?? entregaEndereco);
+        setEntregaBairro(data.bairro ?? entregaBairro);
+        setEntregaCidade(data.localidade ?? entregaCidade);
+        setEntregaEstado(data.uf ?? entregaEstado);
+      }
+    } catch {
+      // Mantem os dados atuais quando o CEP falhar.
+    } finally {
+      setBuscandoCepEntrega(false);
     }
   }
 
@@ -110,6 +164,7 @@ export default function ProfileScreen() {
         cep: cep.trim() || undefined,
         endereco: rua.trim() || undefined,
         numero: numero.trim() || undefined,
+        complemento: complemento.trim() || undefined,
         bairro: bairro.trim() || undefined,
         cidade: cidade.trim() || undefined,
         estado: estado.trim() || undefined,
@@ -122,6 +177,50 @@ export default function ProfileScreen() {
         err?.response?.data?.detail ||
         err?.message ||
         "Nao foi possivel salvar o endereco.";
+      Alert.alert("Erro", String(mensagem));
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function salvarEnderecoEntrega() {
+    if (usarEnderecoEntregaDiferente) {
+      const camposObrigatorios = [
+        entregaNome,
+        entregaEndereco,
+        entregaNumero,
+        entregaBairro,
+        entregaCidade,
+        entregaEstado,
+      ].every((valor) => valor.trim());
+
+      if (!camposObrigatorios) {
+        Alert.alert("Endereco incompleto", "Preencha nome, rua, numero, bairro, cidade e UF da entrega.");
+        return;
+      }
+    }
+
+    setSalvando(true);
+    try {
+      const updated = await updateProfile({
+        usar_endereco_entrega_diferente: usarEnderecoEntregaDiferente,
+        entrega_nome: entregaNome.trim() || undefined,
+        entrega_cep: entregaCep.trim() || undefined,
+        entrega_endereco: entregaEndereco.trim() || undefined,
+        entrega_numero: entregaNumero.trim() || undefined,
+        entrega_complemento: entregaComplemento.trim() || undefined,
+        entrega_bairro: entregaBairro.trim() || undefined,
+        entrega_cidade: entregaCidade.trim() || undefined,
+        entrega_estado: entregaEstado.trim() || undefined,
+      });
+      updateUser(updated);
+      setEditandoEnderecoEntrega(false);
+      Alert.alert("Salvo", "Endereco de entrega atualizado com sucesso.");
+    } catch (err: any) {
+      const mensagem =
+        err?.response?.data?.detail ||
+        err?.message ||
+        "Nao foi possivel salvar o endereco de entrega.";
       Alert.alert("Erro", String(mensagem));
     } finally {
       setSalvando(false);
@@ -400,17 +499,26 @@ export default function ProfileScreen() {
                   </Campo>
                 </View>
                 <View style={{ flex: 2 }}>
-                  <Campo label="Bairro">
+                  <Campo label="Complemento">
                     <TextInput
                       style={styles.input}
-                      value={bairro}
-                      onChangeText={setBairro}
-                      placeholder="Bairro"
+                      value={complemento}
+                      onChangeText={setComplemento}
+                      placeholder="Apto, bloco, casa..."
                       placeholderTextColor={CORES.textoClaro}
                     />
                   </Campo>
                 </View>
               </View>
+              <Campo label="Bairro">
+                <TextInput
+                  style={styles.input}
+                  value={bairro}
+                  onChangeText={setBairro}
+                  placeholder="Bairro"
+                  placeholderTextColor={CORES.textoClaro}
+                />
+              </Campo>
               <View style={styles.linha}>
                 <View style={{ flex: 2 }}>
                   <Campo label="Cidade">
@@ -454,6 +562,160 @@ export default function ProfileScreen() {
           ) : (
             <Text style={styles.textoSuporte}>
               Cadastre seu endereco para agilizar o checkout de entregas.
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.secao}>
+          <View style={styles.secaoHeader}>
+            <Text style={styles.secaoTitulo}>Endereco de entrega</Text>
+            {!editandoEnderecoEntrega ? (
+              <TouchableOpacity onPress={() => setEditandoEnderecoEntrega(true)}>
+                <Text style={styles.editarTexto}>
+                  {enderecoEntregaCompleto ? "Editar" : "Cadastrar"}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={() => setEditandoEnderecoEntrega(false)}>
+                <Text style={[styles.editarTexto, { color: CORES.erro }]}>Cancelar</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {editandoEnderecoEntrega ? (
+            <>
+              <TouchableOpacity
+                style={styles.toggleLinha}
+                onPress={() => setUsarEnderecoEntregaDiferente((valor) => !valor)}
+              >
+                <Ionicons
+                  name={usarEnderecoEntregaDiferente ? "checkbox-outline" : "square-outline"}
+                  size={22}
+                  color={usarEnderecoEntregaDiferente ? CORES.primario : CORES.textoSecundario}
+                />
+                <Text style={styles.toggleTexto}>Usar endereco de entrega diferente</Text>
+              </TouchableOpacity>
+
+              {usarEnderecoEntregaDiferente ? (
+                <>
+                  <Campo label="Nome para entrega">
+                    <TextInput
+                      style={styles.input}
+                      value={entregaNome}
+                      onChangeText={setEntregaNome}
+                      placeholder="Nome de quem recebe"
+                      placeholderTextColor={CORES.textoClaro}
+                    />
+                  </Campo>
+                  <Campo label={buscandoCepEntrega ? "CEP da entrega (buscando...)" : "CEP da entrega"}>
+                    <TextInput
+                      style={styles.input}
+                      value={entregaCep}
+                      onChangeText={buscarCepEntrega}
+                      placeholder="00000-000"
+                      placeholderTextColor={CORES.textoClaro}
+                      keyboardType="numeric"
+                      maxLength={9}
+                    />
+                  </Campo>
+                  <Campo label="Rua / Avenida da entrega">
+                    <TextInput
+                      style={styles.input}
+                      value={entregaEndereco}
+                      onChangeText={setEntregaEndereco}
+                      placeholder="Rua..."
+                      placeholderTextColor={CORES.textoClaro}
+                    />
+                  </Campo>
+                  <View style={styles.linha}>
+                    <View style={{ flex: 1 }}>
+                      <Campo label="Numero da entrega">
+                        <TextInput
+                          style={styles.input}
+                          value={entregaNumero}
+                          onChangeText={setEntregaNumero}
+                          placeholder="123"
+                          placeholderTextColor={CORES.textoClaro}
+                          keyboardType="numeric"
+                        />
+                      </Campo>
+                    </View>
+                    <View style={{ flex: 2 }}>
+                      <Campo label="Complemento da entrega">
+                        <TextInput
+                          style={styles.input}
+                          value={entregaComplemento}
+                          onChangeText={setEntregaComplemento}
+                          placeholder="Apto, bloco, casa..."
+                          placeholderTextColor={CORES.textoClaro}
+                        />
+                      </Campo>
+                    </View>
+                  </View>
+                  <Campo label="Bairro da entrega">
+                    <TextInput
+                      style={styles.input}
+                      value={entregaBairro}
+                      onChangeText={setEntregaBairro}
+                      placeholder="Bairro"
+                      placeholderTextColor={CORES.textoClaro}
+                    />
+                  </Campo>
+                  <View style={styles.linha}>
+                    <View style={{ flex: 2 }}>
+                      <Campo label="Cidade da entrega">
+                        <TextInput
+                          style={styles.input}
+                          value={entregaCidade}
+                          onChangeText={setEntregaCidade}
+                          placeholder="Cidade"
+                          placeholderTextColor={CORES.textoClaro}
+                        />
+                      </Campo>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Campo label="UF">
+                        <TextInput
+                          style={styles.input}
+                          value={entregaEstado}
+                          onChangeText={setEntregaEstado}
+                          placeholder="SP"
+                          placeholderTextColor={CORES.textoClaro}
+                          autoCapitalize="characters"
+                          maxLength={2}
+                        />
+                      </Campo>
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <Text style={styles.textoSuporte}>
+                  A entrega vai usar o endereco padrao cadastrado acima.
+                </Text>
+              )}
+
+              <SaveButton
+                label="Salvar endereco de entrega"
+                loading={salvando}
+                onPress={salvarEnderecoEntrega}
+              />
+            </>
+          ) : enderecoEntregaCompleto ? (
+            <View style={styles.enderecoCard}>
+              <Ionicons name="cube" size={20} color={CORES.primario} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.enderecoTexto}>{enderecoEntregaCompleto}</Text>
+                {entregaDetalhada.entrega_nome && (
+                  <Text style={styles.enderecoSub}>Recebe: {entregaDetalhada.entrega_nome}</Text>
+                )}
+                {entregaDetalhada.entrega_cep && (
+                  <Text style={styles.enderecoSub}>CEP: {entregaDetalhada.entrega_cep}</Text>
+                )}
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.textoSuporte}>
+              Por enquanto, a entrega usa o endereco padrao. Cadastre outro endereco se precisar.
             </Text>
           )}
         </View>
@@ -688,6 +950,14 @@ const styles = StyleSheet.create({
     fontSize: FONTE.normal,
   },
   linha: { flexDirection: "row", gap: ESPACO.sm },
+  toggleLinha: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ESPACO.sm,
+    marginBottom: ESPACO.sm,
+  },
+  toggleTexto: { fontSize: FONTE.normal, color: CORES.texto, fontWeight: "600" },
   enderecoCard: {
     flexDirection: "row",
     alignItems: "flex-start",

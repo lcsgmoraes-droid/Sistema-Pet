@@ -39,21 +39,43 @@ export default function CartScreen() {
   const [tipoRetirada, setTipoRetirada] = useState<'proprio' | 'terceiro'>('proprio');
   const [isDrive, setIsDrive] = useState(false); // Drive-thru: cliente aguarda no carro
 
+  const entregaDetalhada = user?.endereco_entrega_detalhado;
+  const usarEntregaDetalhada = Boolean(user?.usar_endereco_entrega_diferente && entregaDetalhada?.entrega_cidade);
+  const enderecoInicial = usarEntregaDetalhada
+    ? {
+        cep: entregaDetalhada?.entrega_cep ?? '',
+        rua: entregaDetalhada?.entrega_endereco ?? '',
+        numero: entregaDetalhada?.entrega_numero ?? '',
+        complemento: entregaDetalhada?.entrega_complemento ?? '',
+        bairro: entregaDetalhada?.entrega_bairro ?? '',
+        cidade: entregaDetalhada?.entrega_cidade ?? '',
+        estado: entregaDetalhada?.entrega_estado ?? '',
+      }
+    : {
+        cep: user?.cep ?? '',
+        rua: user?.endereco ?? '',
+        numero: user?.numero ?? '',
+        complemento: user?.complemento ?? '',
+        bairro: user?.bairro ?? '',
+        cidade: user?.cidade ?? '',
+        estado: user?.estado ?? '',
+      };
+
   // Endereço: salvo (do perfil) ou outro
-  const enderecoSalvo = user?.cidade
-    ? `${user?.endereco ?? ''}${user?.numero ? ', ' + user.numero : ''} - ${user?.bairro ?? ''} - ${user?.cidade}/${user?.estado ?? ''}`
+  const enderecoSalvo = enderecoInicial.cidade
+    ? `${enderecoInicial.rua}${enderecoInicial.numero ? ', ' + enderecoInicial.numero : ''}${enderecoInicial.complemento ? ' - ' + enderecoInicial.complemento : ''} - ${enderecoInicial.bairro} - ${enderecoInicial.cidade}/${enderecoInicial.estado}`
     : null;
   const [usarEnderecoSalvo, setUsarEnderecoSalvo] = useState(true);
 
   // Modal endereço outro
   const [modalEnderecoAberto, setModalEnderecoAberto] = useState(false);
-  const [cep, setCep] = useState(user?.cep ?? '');
-  const [rua, setRua] = useState(user?.endereco ?? '');
-  const [numero, setNumero] = useState(user?.numero ?? '');
-  const [complemento, setComplemento] = useState('');
-  const [bairro, setBairro] = useState(user?.bairro ?? '');
-  const [cidade, setCidade] = useState(user?.cidade ?? '');
-  const [estado, setEstado] = useState(user?.estado ?? '');
+  const [cep, setCep] = useState(enderecoInicial.cep);
+  const [rua, setRua] = useState(enderecoInicial.rua);
+  const [numero, setNumero] = useState(enderecoInicial.numero);
+  const [complemento, setComplemento] = useState(enderecoInicial.complemento);
+  const [bairro, setBairro] = useState(enderecoInicial.bairro);
+  const [cidade, setCidade] = useState(enderecoInicial.cidade);
+  const [estado, setEstado] = useState(enderecoInicial.estado);
   const [buscandoCep, setBuscandoCep] = useState(false);
 
   useEffect(() => {

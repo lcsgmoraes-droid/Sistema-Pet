@@ -2,6 +2,17 @@ import * as SecureStore from 'expo-secure-store';
 import api from './api';
 import { AppProfileType, AuthResponse, EcommerceUser } from '../types';
 
+type EcommerceProfileUpdate = Partial<EcommerceUser> & {
+  entrega_nome?: string | null;
+  entrega_cep?: string | null;
+  entrega_endereco?: string | null;
+  entrega_numero?: string | null;
+  entrega_complemento?: string | null;
+  entrega_bairro?: string | null;
+  entrega_cidade?: string | null;
+  entrega_estado?: string | null;
+};
+
 export async function login(email: string, password: string): Promise<AuthResponse> {
   const { data } = await api.post<AuthResponse>('/ecommerce/auth/login', { email, password });
   if (data.access_token) {
@@ -56,7 +67,7 @@ export async function getProfile(): Promise<EcommerceUser> {
   return data;
 }
 
-export async function updateProfile(updates: Partial<EcommerceUser>): Promise<EcommerceUser> {
+export async function updateProfile(updates: EcommerceProfileUpdate): Promise<EcommerceUser> {
   const { data } = await api.put<EcommerceUser>('/ecommerce/auth/perfil', updates);
   return data;
 }
