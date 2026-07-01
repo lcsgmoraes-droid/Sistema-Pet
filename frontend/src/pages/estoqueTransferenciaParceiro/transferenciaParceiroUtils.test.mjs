@@ -413,6 +413,9 @@ test("calcularResumoEncontroContasParceiro resume saldo disponivel e diferenca d
       totalDisponivelEntradas: 400,
       diferencaCompensacao: 200,
       saldoLiquidoDisponivel: -300,
+      valorSugeridoAcerto: 700,
+      saldoReceberRemanescente: 300,
+      saldoPagarRemanescente: 0,
       status: "faltando",
     },
   );
@@ -433,6 +436,28 @@ test("calcularResumoEncontroContasParceiro resume saldo disponivel e diferenca d
       contasPagar: [{ saldo_aberto: 900 }],
     }).status,
     "excedente",
+  );
+});
+
+test("calcularResumoEncontroContasParceiro calcula saldo remanescente do acerto", () => {
+  assert.deepEqual(
+    calcularResumoEncontroContasParceiro({
+      totalAplicado: 500,
+      totalCompensado: 0,
+      contasPagar: [{ saldo_aberto: 900 }],
+    }),
+    {
+      totalAplicado: 500,
+      totalCompensado: 0,
+      totalDisponivel: 900,
+      totalDisponivelEntradas: 0,
+      diferencaCompensacao: 500,
+      saldoLiquidoDisponivel: 400,
+      valorSugeridoAcerto: 500,
+      saldoReceberRemanescente: 0,
+      saldoPagarRemanescente: 400,
+      status: "faltando",
+    },
   );
 });
 

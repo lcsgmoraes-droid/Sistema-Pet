@@ -81,6 +81,8 @@ function ContasPagarCompensacaoLote({
 
 function ResumoEncontroContas({ resumo }) {
   const diferencaAbsoluta = Math.abs(resumo.diferencaCompensacao || 0);
+  const saldoReceberRemanescente = Number(resumo.saldoReceberRemanescente || 0);
+  const saldoPagarRemanescente = Number(resumo.saldoPagarRemanescente || 0);
   const status =
     resumo.status === "fechado"
       ? {
@@ -127,6 +129,17 @@ function ResumoEncontroContas({ resumo }) {
         <p className="text-xs font-medium uppercase tracking-wide">{status.titulo}</p>
         <p className="mt-1 text-base font-bold">{formatarMoeda(diferencaAbsoluta)}</p>
         <p className="mt-1 text-xs">{status.texto}</p>
+        <p className="mt-1 text-xs">Sugerido: {formatarMoeda(resumo.valorSugeridoAcerto)}</p>
+        {saldoReceberRemanescente > 0 ? (
+          <p className="mt-1 text-xs">
+            A receber remanescente: {formatarMoeda(saldoReceberRemanescente)}
+          </p>
+        ) : null}
+        {saldoPagarRemanescente > 0 ? (
+          <p className="mt-1 text-xs">
+            A pagar remanescente: {formatarMoeda(saldoPagarRemanescente)}
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -151,6 +164,7 @@ export default function BaixaLoteTransferenciaPanel({
   onToggleAplicacao,
   onAtualizarValorAplicacao,
   onAtualizarValorCompensacao,
+  onAjustarBaixaAoSaldoAcerto,
   onPreencherCompensacaoAutomatica,
   onLimparCompensacoesBaixa,
   onFechar,
@@ -317,6 +331,14 @@ export default function BaixaLoteTransferenciaPanel({
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onAjustarBaixaAoSaldoAcerto}
+                disabled={loadingPreview}
+                className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:text-emerald-300"
+              >
+                Ajustar ao saldo
+              </button>
               <button
                 type="button"
                 onClick={onPreencherCompensacaoAutomatica}
