@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../../api";
 import {
+  calcularResumoEncontroContasParceiro,
   criarFormBaixaTransferencia,
   distribuirBaixaTransferencias,
   distribuirCompensacaoAutomatica,
@@ -156,6 +157,43 @@ export default function useTransferenciaBaixaLoteController({
     );
   };
 
+  const ajustarBaixaAoSaldoAcerto = async () => {
+    const valorInformado = normalizarNumero(formBaixaLote.valor_total);
+    const saldoAberto = Number(
+      previewBaixaLote.total_aberto || historico?.totais?.saldo_aberto || 0,
+    );
+    const valorBase =
+      Number.isFinite(valorInformado) && valorInformado > 0 ? valorInformado : saldoAberto;
+    const resumo = calcularResumoEncontroContasParceiro({
+      totalAplicado: valorBase,
+      contasPagar: contasPagarCompensacao,
+    });
+    const valorAjustado = resumo.valorSugeridoAcerto;
+
+    if (!Number.isFinite(valorAjustado) || valorAjustado <= 0) {
+      toast.error("Nao ha saldo disponivel para acerto.");
+      return;
+    }
+
+    const valorFormatado = valorAjustado.toFixed(2);
+    const previewCarregado = await carregarPreviewBaixaLoteTransferencia({
+      valor_total: valorFormatado,
+      ordem: formBaixaLote.ordem || "antiga",
+    });
+    if (!previewCarregado) return;
+
+    setFormBaixaLote((prev) => ({
+      ...prev,
+      valor_total: valorFormatado,
+      modo_baixa: "acerto",
+      compensacoes: distribuirCompensacaoAutomatica(valorAjustado, contasPagarCompensacao),
+      nova_conta_pagar_acerto: {
+        ...(prev.nova_conta_pagar_acerto || {}),
+        valor: "",
+      },
+    }));
+  };
+
   const registrarBaixaLoteTransferencia = async () => {
     const pessoa = resolverPessoaBaixaLote();
     if (!pessoa?.id) {
@@ -221,6 +259,7 @@ export default function useTransferenciaBaixaLoteController({
     fecharBaixaLoteTransferencia,
     carregarPreviewBaixaLoteTransferencia,
     registrarBaixaLoteTransferencia,
+    ajustarBaixaAoSaldoAcerto,
     atualizarValorAplicacaoBaixaLote: (contaReceberId, valor) =>
       setAplicacoesBaixaLote((prev) => ({ ...(prev || {}), [contaReceberId]: valor })),
     alternarAplicacaoBaixaLote: (registro, marcado) =>

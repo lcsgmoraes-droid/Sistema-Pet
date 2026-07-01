@@ -675,6 +675,7 @@ export default function useTransferenciaHistoricoController({
     fecharBaixaLoteTransferencia: baixaLote.fecharBaixaLoteTransferencia,
     carregarPreviewBaixaLoteTransferencia: baixaLote.carregarPreviewBaixaLoteTransferencia,
     registrarBaixaLoteTransferencia: baixaLote.registrarBaixaLoteTransferencia,
+    ajustarBaixaAoSaldoAcerto: baixaLote.ajustarBaixaAoSaldoAcerto,
     atualizarValorAplicacaoBaixaLote: baixaLote.atualizarValorAplicacaoBaixaLote,
     alternarAplicacaoBaixaLote: baixaLote.alternarAplicacaoBaixaLote,
     atualizarValorCompensacaoBaixaLote: baixaLote.atualizarValorCompensacaoBaixaLote,

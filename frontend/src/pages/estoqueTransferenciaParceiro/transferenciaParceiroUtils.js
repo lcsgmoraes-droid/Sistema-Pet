@@ -439,6 +439,11 @@ export function calcularResumoEncontroContasParceiro({
   );
   const diferencaCompensacao = arredondarCentavos(aplicado - compensado);
   const saldoLiquidoDisponivel = arredondarCentavos(totalDisponivel - aplicado);
+  const valorSugeridoAcerto = arredondarCentavos(Math.min(aplicado, totalDisponivel));
+  const saldoReceberRemanescente = arredondarCentavos(Math.max(aplicado - valorSugeridoAcerto, 0));
+  const saldoPagarRemanescente = arredondarCentavos(
+    Math.max(totalDisponivel - valorSugeridoAcerto, 0),
+  );
   const status =
     Math.abs(diferencaCompensacao) < 0.01
       ? "fechado"
@@ -453,6 +458,9 @@ export function calcularResumoEncontroContasParceiro({
     totalDisponivelEntradas,
     diferencaCompensacao,
     saldoLiquidoDisponivel,
+    valorSugeridoAcerto,
+    saldoReceberRemanescente,
+    saldoPagarRemanescente,
     status,
   };
 }
