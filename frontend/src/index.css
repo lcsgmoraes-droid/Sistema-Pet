@@ -25,7 +25,315 @@ body,
 
 body {
   overflow-x: hidden;
-  background: #f8fafc;
+  background: var(--color-app-bg);
+  color: var(--color-text-primary);
+}
+
+:root {
+  color-scheme: light;
+  --color-app-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-surface-muted: #f1f5f9;
+  --color-surface-subtle: #f8fafc;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #334155;
+  --color-text-muted: #64748b;
+  --color-border: #e2e8f0;
+  --color-border-subtle: #f1f5f9;
+  --color-control-bg: #ffffff;
+  --color-control-disabled: #f1f5f9;
+  --color-focus: #0f8b8d;
+  --color-overlay: rgba(15, 23, 42, 0.42);
+  --color-chart-grid: #e2e8f0;
+  --color-chart-tooltip-bg: #ffffff;
+}
+
+.dark {
+  color-scheme: dark;
+  --color-app-bg: #020617;
+  --color-surface: #0f172a;
+  --color-surface-elevated: #111c2f;
+  --color-surface-muted: #162033;
+  --color-surface-subtle: #1e293b;
+  --color-text-primary: #e5edf7;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-border: #334155;
+  --color-border-subtle: #1e293b;
+  --color-control-bg: #111827;
+  --color-control-disabled: #1e293b;
+  --color-focus: #22d3ee;
+  --color-overlay: rgba(2, 6, 23, 0.72);
+  --color-chart-grid: #334155;
+  --color-chart-tooltip-bg: #0f172a;
+}
+
+html,
+body,
+#root {
+  background: var(--color-app-bg);
+}
+
+.dark ::selection {
+  background: rgba(34, 211, 238, 0.28);
+  color: #f8fafc;
+}
+
+.dark .bg-white {
+  background-color: var(--color-surface);
+}
+
+.dark .bg-gray-50,
+.dark .bg-slate-50 {
+  background-color: var(--color-surface-muted);
+}
+
+.dark .bg-gray-100,
+.dark .bg-slate-100 {
+  background-color: var(--color-surface-subtle);
+}
+
+.dark .bg-gray-200,
+.dark .bg-slate-200 {
+  background-color: #334155;
+}
+
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-slate-950,
+.dark .text-slate-900,
+.dark .text-slate-800 {
+  color: var(--color-text-primary);
+}
+
+.dark .text-gray-700,
+.dark .text-gray-600,
+.dark .text-slate-700,
+.dark .text-slate-600 {
+  color: var(--color-text-secondary);
+}
+
+.dark .text-gray-500,
+.dark .text-gray-400,
+.dark .text-slate-500,
+.dark .text-slate-400 {
+  color: var(--color-text-muted);
+}
+
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300,
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-300 {
+  border-color: var(--color-border);
+}
+
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--color-border);
+}
+
+.dark .shadow,
+.dark .shadow-sm,
+.dark .shadow-md,
+.dark .shadow-lg,
+.dark .shadow-xl,
+.dark .shadow-2xl,
+.dark .shadow-card,
+.dark .shadow-soft {
+  --tw-shadow-color: rgba(0, 0, 0, 0.48);
+}
+
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark select,
+.dark textarea {
+  background-color: var(--color-control-bg);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b;
+}
+
+.dark input:disabled,
+.dark select:disabled,
+.dark textarea:disabled {
+  background-color: var(--color-control-disabled);
+  color: #64748b;
+}
+
+.dark input[type="checkbox"],
+.dark input[type="radio"] {
+  border-color: #64748b;
+}
+
+.dark table {
+  color: var(--color-text-secondary);
+}
+
+.dark thead,
+.dark th {
+  color: var(--color-text-secondary);
+}
+
+.dark tbody tr:hover {
+  background-color: rgba(30, 41, 59, 0.76);
+}
+
+.dark [role="dialog"] {
+  color: var(--color-text-primary);
+}
+
+.dark .bg-blue-50 {
+  background-color: rgba(37, 99, 235, 0.16);
+}
+
+.dark .bg-indigo-50 {
+  background-color: rgba(79, 70, 229, 0.16);
+}
+
+.dark .bg-cyan-50 {
+  background-color: rgba(8, 145, 178, 0.16);
+}
+
+.dark .bg-emerald-50,
+.dark .bg-green-50 {
+  background-color: rgba(5, 150, 105, 0.16);
+}
+
+.dark .bg-amber-50,
+.dark .bg-yellow-50 {
+  background-color: rgba(217, 119, 6, 0.16);
+}
+
+.dark .bg-orange-50 {
+  background-color: rgba(234, 88, 12, 0.16);
+}
+
+.dark .bg-red-50 {
+  background-color: rgba(220, 38, 38, 0.16);
+}
+
+.dark .bg-purple-50,
+.dark .bg-violet-50 {
+  background-color: rgba(124, 58, 237, 0.16);
+}
+
+.dark .text-blue-700,
+.dark .text-blue-600 {
+  color: #93c5fd;
+}
+
+.dark .text-indigo-700,
+.dark .text-indigo-600 {
+  color: #a5b4fc;
+}
+
+.dark .text-cyan-700,
+.dark .text-cyan-600 {
+  color: #67e8f9;
+}
+
+.dark .text-emerald-700,
+.dark .text-emerald-600,
+.dark .text-green-700,
+.dark .text-green-600 {
+  color: #86efac;
+}
+
+.dark .text-amber-700,
+.dark .text-amber-600,
+.dark .text-yellow-700,
+.dark .text-yellow-600 {
+  color: #fcd34d;
+}
+
+.dark .text-orange-700,
+.dark .text-orange-600 {
+  color: #fdba74;
+}
+
+.dark .text-red-700,
+.dark .text-red-600 {
+  color: #fca5a5;
+}
+
+.dark .text-purple-700,
+.dark .text-purple-600,
+.dark .text-violet-700,
+.dark .text-violet-600 {
+  color: #c4b5fd;
+}
+
+.dark .border-blue-200,
+.dark .border-indigo-200,
+.dark .border-cyan-200,
+.dark .border-emerald-200,
+.dark .border-green-200,
+.dark .border-amber-200,
+.dark .border-yellow-200,
+.dark .border-orange-200,
+.dark .border-red-200,
+.dark .border-purple-200,
+.dark .border-violet-200 {
+  border-color: rgba(148, 163, 184, 0.34);
+}
+
+.corepet-toast {
+  background: var(--color-surface-elevated) !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16) !important;
+}
+
+.dark .corepet-toast {
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.52) !important;
+}
+
+.dark .recharts-cartesian-grid line {
+  stroke: var(--color-chart-grid);
+}
+
+.dark .recharts-cartesian-axis line,
+.dark .recharts-cartesian-axis-tick-line {
+  stroke: #475569;
+}
+
+.dark .recharts-text,
+.dark .recharts-label,
+.dark .recharts-cartesian-axis-tick-value {
+  fill: var(--color-text-muted);
+}
+
+.dark .recharts-legend-item-text {
+  color: var(--color-text-secondary) !important;
+}
+
+.dark .recharts-default-tooltip {
+  background-color: var(--color-chart-tooltip-bg) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+}
+
+.dark .recharts-tooltip-label,
+.dark .recharts-tooltip-item {
+  color: var(--color-text-primary) !important;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
 }
 
 .erp-shell,
