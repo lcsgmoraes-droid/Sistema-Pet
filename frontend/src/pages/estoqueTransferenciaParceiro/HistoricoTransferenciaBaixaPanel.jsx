@@ -49,8 +49,7 @@ function CompensacaoContasPagar({
                 </div>
                 <p className="mt-1 text-sm text-slate-700">{contaPagar.descricao}</p>
                 <p className="mt-1 text-xs text-slate-500">
-                  Vencimento: {formatarData(contaPagar.data_vencimento)} |{" "}
-                  {contaPagar.status_label}
+                  Vencimento: {formatarData(contaPagar.data_vencimento)} | {contaPagar.status_label}
                 </p>
               </div>
               <div className="text-sm text-slate-700">

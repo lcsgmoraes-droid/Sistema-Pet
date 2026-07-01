@@ -6,12 +6,12 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from app.estoque.transferencia_parceiro_entrada_schemas import (
-    TransferenciaParceiroEntradaHistoricoItem,
-    TransferenciaParceiroEntradaHistoricoResponse,
-    TransferenciaParceiroEntradaHistoricoTotais,
-    TransferenciaParceiroEntradaItemRequest,
-    TransferenciaParceiroEntradaRequest,
-    TransferenciaParceiroEntradaResponse,
+    TransferenciaParceiroEntradaHistoricoItem as TransferenciaParceiroEntradaHistoricoItem,
+    TransferenciaParceiroEntradaHistoricoResponse as TransferenciaParceiroEntradaHistoricoResponse,
+    TransferenciaParceiroEntradaHistoricoTotais as TransferenciaParceiroEntradaHistoricoTotais,
+    TransferenciaParceiroEntradaItemRequest as TransferenciaParceiroEntradaItemRequest,
+    TransferenciaParceiroEntradaRequest as TransferenciaParceiroEntradaRequest,
+    TransferenciaParceiroEntradaResponse as TransferenciaParceiroEntradaResponse,
 )
 
 
