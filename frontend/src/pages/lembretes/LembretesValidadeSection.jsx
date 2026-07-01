@@ -28,12 +28,22 @@ function ValidadeInativa({ controller }) {
       }}
     >
       <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-        <FiAlertTriangle style={{ color: "var(--lembretes-warning-icon, #c2410c)", marginTop: "3px" }} />
+        <FiAlertTriangle
+          style={{ color: "var(--lembretes-warning-icon, #c2410c)", marginTop: "3px" }}
+        />
         <div>
-          <p style={{ margin: "0 0 4px", fontWeight: 700, color: "var(--lembretes-warning-title, #9a3412)" }}>
+          <p
+            style={{
+              margin: "0 0 4px",
+              fontWeight: 700,
+              color: "var(--lembretes-warning-title, #9a3412)",
+            }}
+          >
             Protecao por validade desativada
           </p>
-          <p style={{ margin: 0, color: "var(--lembretes-warning-text, #7c2d12)", fontSize: "13px" }}>
+          <p
+            style={{ margin: 0, color: "var(--lembretes-warning-text, #7c2d12)", fontSize: "13px" }}
+          >
             Ative a protecao para retirar automaticamente os lotes que vencem em ate{" "}
             {controller.validadeConfig.dias || 15} dia(s) e gerar pendencias aqui.
           </p>
@@ -63,7 +73,13 @@ function ValidadeAtiva({ controller }) {
       }}
     >
       <div>
-        <p style={{ margin: "0 0 4px", fontWeight: 700, color: "var(--lembretes-info-title, #1d4ed8)" }}>
+        <p
+          style={{
+            margin: "0 0 4px",
+            fontWeight: 700,
+            color: "var(--lembretes-info-title, #1d4ed8)",
+          }}
+        >
           Protecao por validade ativa
         </p>
         <p style={{ margin: 0, color: "var(--lembretes-info-text, #1e40af)", fontSize: "13px" }}>
@@ -98,10 +114,22 @@ function ValidadePendencias({ controller }) {
           gap: "10px",
         }}
       >
-        <span style={{ fontWeight: "700", color: "var(--lembretes-warning-title, #92400e)", fontSize: "14px" }}>
+        <span
+          style={{
+            fontWeight: "700",
+            color: "var(--lembretes-warning-title, #92400e)",
+            fontSize: "14px",
+          }}
+        >
           Produtos removidos por validade
         </span>
-        <span style={{ fontWeight: "700", color: "var(--lembretes-warning-title, #92400e)", fontSize: "14px" }}>
+        <span
+          style={{
+            fontWeight: "700",
+            color: "var(--lembretes-warning-title, #92400e)",
+            fontSize: "14px",
+          }}
+        >
           {controller.validadePendencias.length}
         </span>
         <VerificarValidadeButton controller={controller} />
@@ -149,19 +177,35 @@ function ValidadePendenciaCard({ item, onResolver }) {
         style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}
       >
         <div>
-          <p style={{ margin: "0 0 4px", color: "var(--lembretes-warning-title, #78350f)", fontWeight: 700 }}>
+          <p
+            style={{
+              margin: "0 0 4px",
+              color: "var(--lembretes-warning-title, #78350f)",
+              fontWeight: 700,
+            }}
+          >
             {item.produto_nome || "Produto sem nome"}
           </p>
-          <p style={{ margin: 0, color: "var(--lembretes-warning-text, #92400e)", fontSize: "13px" }}>
+          <p
+            style={{ margin: 0, color: "var(--lembretes-warning-text, #92400e)", fontSize: "13px" }}
+          >
             Lote {item.lote_nome || item.lote_id} - vence em{" "}
             {formatarDataValidade(item.data_validade)}
           </p>
         </div>
         <div style={{ textAlign: "right" }}>
-          <p style={{ margin: "0 0 4px", color: "var(--lembretes-warning-title, #78350f)", fontWeight: 700 }}>
+          <p
+            style={{
+              margin: "0 0 4px",
+              color: "var(--lembretes-warning-title, #78350f)",
+              fontWeight: 700,
+            }}
+          >
             {Number(item.quantidade_bloqueada || 0).toLocaleString("pt-BR")} un.
           </p>
-          <p style={{ margin: 0, color: "var(--lembretes-warning-text, #92400e)", fontSize: "13px" }}>
+          <p
+            style={{ margin: 0, color: "var(--lembretes-warning-text, #92400e)", fontSize: "13px" }}
+          >
             Custo estimado: {formatarMoeda(item.custo_total_estimado)}
           </p>
         </div>

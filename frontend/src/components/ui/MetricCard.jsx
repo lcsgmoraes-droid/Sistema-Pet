@@ -53,9 +53,10 @@ export default function MetricCard({
       </div>
       <div>
         <div
-          className={["font-bold leading-tight text-slate-950 dark:text-slate-100", sizeClasses.value].join(
-            " ",
-          )}
+          className={[
+            "font-bold leading-tight text-slate-950 dark:text-slate-100",
+            sizeClasses.value,
+          ].join(" ")}
         >
           {value ?? "-"}
         </div>

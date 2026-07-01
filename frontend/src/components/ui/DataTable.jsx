@@ -163,22 +163,26 @@ export default function DataTable({
             .join(" ")}
         >
           <thead
-            className={["bg-slate-100 dark:bg-slate-800", theadClassName]
-              .filter(Boolean)
-              .join(" ")}
+            className={["bg-slate-100 dark:bg-slate-800", theadClassName].filter(Boolean).join(" ")}
           >
             <tr>{columns.map((column) => renderHeaderCell(column, headerContext))}</tr>
           </thead>
           <tbody className={tbodyClassName}>
             {loading ? (
               <tr>
-                <td colSpan={colSpan} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                <td
+                  colSpan={colSpan}
+                  className="px-4 py-8 text-center text-slate-500 dark:text-slate-400"
+                >
                   {loadingMessage}
                 </td>
               </tr>
             ) : data.length === 0 ? (
               <tr>
-                <td colSpan={colSpan} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                <td
+                  colSpan={colSpan}
+                  className="px-4 py-8 text-center text-slate-500 dark:text-slate-400"
+                >
                   {emptyMessage}
                 </td>
               </tr>

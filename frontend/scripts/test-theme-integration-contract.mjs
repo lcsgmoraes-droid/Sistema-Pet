@@ -17,7 +17,10 @@ const toggle = readFileSync(
 assert.ok(app.includes("ThemeProvider"), "App must wrap routes in ThemeProvider");
 assert.ok(layout.includes("ThemeToggle"), "Main layout must expose ThemeToggle");
 assert.ok(opsLayout.includes("ThemeToggle"), "Ops layout must expose ThemeToggle");
-assert.ok(indexHtml.includes("corepet_theme"), "index.html must apply stored theme before React paints");
+assert.ok(
+  indexHtml.includes("corepet_theme"),
+  "index.html must apply stored theme before React paints",
+);
 assert.ok(themeContext.includes("useTheme"), "ThemeContext must export useTheme");
 assert.ok(toggle.includes("aria-pressed"), "ThemeToggle must expose pressed state");
 assert.ok(toggle.includes("Moon") && toggle.includes("Sun"), "ThemeToggle must use moon/sun icons");

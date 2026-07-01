@@ -350,8 +350,14 @@ const ModuloBloqueado = ({ modulo, children }) => {
                       <li key={`${secao.titulo}-${b.texto}`} className="flex items-start gap-2.5">
                         <FiCheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-sm font-medium text-gray-800 dark:text-slate-100">{b.texto}</p>
-                          {b.detalhe && <p className="text-xs text-gray-500 mt-0.5 dark:text-slate-400">{b.detalhe}</p>}
+                          <p className="text-sm font-medium text-gray-800 dark:text-slate-100">
+                            {b.texto}
+                          </p>
+                          {b.detalhe && (
+                            <p className="text-xs text-gray-500 mt-0.5 dark:text-slate-400">
+                              {b.detalhe}
+                            </p>
+                          )}
                         </div>
                       </li>
                     ))}
@@ -367,7 +373,10 @@ const ModuloBloqueado = ({ modulo, children }) => {
                   <p className="text-xs text-gray-400 dark:text-slate-400">Tipo de acesso</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-slate-100">
                     Beta
-                    <span className="text-base font-normal text-gray-400 dark:text-slate-400"> acompanhado</span>
+                    <span className="text-base font-normal text-gray-400 dark:text-slate-400">
+                      {" "}
+                      acompanhado
+                    </span>
                   </p>
                 </div>
                 {extras.payback && (

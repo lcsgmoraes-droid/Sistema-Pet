@@ -50,9 +50,10 @@ export default function SegmentedControl({
               "rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-50",
               optionSize,
               active
-                ? option.activeClassName || "bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-200"
+                ? option.activeClassName ||
+                    "bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-200"
                 : option.inactiveClassName ||
-                  "text-slate-600 hover:bg-white/80 dark:text-slate-300 dark:hover:bg-slate-800",
+                    "text-slate-600 hover:bg-white/80 dark:text-slate-300 dark:hover:bg-slate-800",
             )}
           >
             {option.label}

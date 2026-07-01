@@ -44,7 +44,9 @@ const Panel = forwardRef(function Panel(
                 {title}
               </h2>
             )}
-            {subtitle && <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>}
+            {subtitle && (
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
+            )}
           </div>
           {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
         </div>

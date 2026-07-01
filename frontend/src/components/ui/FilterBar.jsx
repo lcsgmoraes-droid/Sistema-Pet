@@ -8,7 +8,11 @@ export function FilterRow({ children, className = "" }) {
 
 export function FilterAdvanced({ children, className = "" }) {
   return (
-    <div className={["border-t border-slate-200 pt-4 dark:border-slate-700", className].filter(Boolean).join(" ")}>
+    <div
+      className={["border-t border-slate-200 pt-4 dark:border-slate-700", className]
+        .filter(Boolean)
+        .join(" ")}
+    >
       {children}
     </div>
   );

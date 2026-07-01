@@ -37,11 +37,16 @@ export default function EmptyState({
     >
       {renderIcon(
         icon,
-        cx("mx-auto text-slate-300 dark:text-slate-600", compact ? "mb-2 h-8 w-8" : "mb-3 h-10 w-10"),
+        cx(
+          "mx-auto text-slate-300 dark:text-slate-600",
+          compact ? "mb-2 h-8 w-8" : "mb-3 h-10 w-10",
+        ),
       )}
       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">{title}</div>
       {description ? (
-        <div className="mx-auto mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">{description}</div>
+        <div className="mx-auto mt-1 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+          {description}
+        </div>
       ) : null}
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>

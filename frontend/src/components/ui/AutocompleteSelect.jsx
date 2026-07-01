@@ -111,7 +111,9 @@ export default function AutocompleteSelect({
   return (
     <div className={`relative ${className}`.trim()} ref={containerRef}>
       {showLabel && label ? (
-        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">{label}</label>
+        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          {label}
+        </label>
       ) : null}
 
       <div className="relative">
@@ -182,7 +184,9 @@ export default function AutocompleteSelect({
                 >
                   <div className="truncate text-sm font-medium">{getOptionLabel(option)}</div>
                   {meta ? (
-                    <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{meta}</div>
+                    <div className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                      {meta}
+                    </div>
                   ) : null}
                 </button>
               );
