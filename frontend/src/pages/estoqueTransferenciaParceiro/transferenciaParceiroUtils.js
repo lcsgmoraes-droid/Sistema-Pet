@@ -218,6 +218,79 @@ export function montarCompensacoesBaixaPayload(compensacoes = {}) {
     );
 }
 
+export function distribuirBaixaTransferencias(valorBase, registros = [], ordem = "antiga") {
+  let restante = normalizarNumero(valorBase);
+  if (!Number.isFinite(restante) || restante <= 0) return {};
+
+  const direcaoNova = ["nova", "mais_nova", "desc", "descendente"].includes(
+    String(ordem || "")
+      .trim()
+      .toLowerCase(),
+  );
+  const ordenados = [...(Array.isArray(registros) ? registros : [])].sort((a, b) => {
+    const dataA = String(a?.data_emissao || a?.data_vencimento || "");
+    const dataB = String(b?.data_emissao || b?.data_vencimento || "");
+    const comparacaoData = dataA.localeCompare(dataB);
+    if (comparacaoData !== 0) return direcaoNova ? -comparacaoData : comparacaoData;
+    const idA = Number(a?.conta_receber_id || 0);
+    const idB = Number(b?.conta_receber_id || 0);
+    return direcaoNova ? idB - idA : idA - idB;
+  });
+
+  const aplicacoes = {};
+  ordenados.forEach((registro) => {
+    if (restante <= 0) return;
+    const contaId = Number(registro?.conta_receber_id || 0);
+    const saldo = Number(registro?.saldo_aberto || 0);
+    if (!contaId || saldo <= 0) return;
+
+    const valorAplicado = Math.min(restante, saldo);
+    if (valorAplicado > 0) {
+      aplicacoes[contaId] = valorAplicado.toFixed(2);
+      restante = Number((restante - valorAplicado).toFixed(2));
+    }
+  });
+
+  return aplicacoes;
+}
+
+export function montarBaixaLoteTransferenciaPayload({
+  parceiroId,
+  form,
+  aplicacoes = {},
+  compensacoes = {},
+}) {
+  const compensacoesPayload = montarCompensacoesBaixaPayload(compensacoes);
+  const payload = {
+    parceiro_id: Number(parceiroId),
+    modo_baixa: form.modo_baixa || "recebimento",
+    data_recebimento: form.data_recebimento || hojeIso(),
+    forma_pagamento_id:
+      form.modo_baixa === "recebimento" && form.forma_pagamento_id
+        ? Number(form.forma_pagamento_id)
+        : undefined,
+    observacao: form.observacao?.trim() || undefined,
+    devolver_estoque: Boolean(form.devolver_estoque),
+    aplicacoes: Object.entries(aplicacoes)
+      .map(([contaReceberId, valor]) => ({
+        conta_receber_id: Number(contaReceberId),
+        valor_baixado: normalizarNumero(valor),
+      }))
+      .filter(
+        (item) =>
+          item.conta_receber_id > 0 &&
+          Number.isFinite(item.valor_baixado) &&
+          item.valor_baixado > 0,
+      ),
+    compensacoes: form.modo_baixa === "acerto" ? compensacoesPayload : [],
+  };
+
+  if (!payload.forma_pagamento_id) delete payload.forma_pagamento_id;
+  if (!payload.observacao) delete payload.observacao;
+
+  return payload;
+}
+
 export function distribuirCompensacaoAutomatica(valorBase, contas = []) {
   let restante = normalizarNumero(valorBase);
   const proximaCompensacao = {};

@@ -19,6 +19,7 @@ import {
   normalizarColunasDocumentoTransferencia,
   normalizarNumero,
 } from "./transferenciaParceiroUtils";
+import useTransferenciaBaixaLoteController from "./useTransferenciaBaixaLoteController";
 export default function useTransferenciaHistoricoController({
   parceiroSelecionado,
   transferenciaEditando,
@@ -194,6 +195,19 @@ export default function useTransferenciaHistoricoController({
 
   const rotuloPessoaHistorico = (pessoa) =>
     pessoa?.nome || pessoa?.razao_social || pessoa?.nome_fantasia || `Pessoa #${pessoa?.id || ""}`;
+
+  const baixaLote = useTransferenciaBaixaLoteController({
+    historico,
+    filtrosHistoricoAplicados,
+    pessoaHistoricoSelecionada,
+    parceiroSelecionado,
+    contasPagarCompensacao,
+    setContasPagarCompensacao,
+    carregarContasPagarCompensacao,
+    carregarHistoricoTransferencias,
+    paginaHistorico,
+    rotuloPessoa: rotuloPessoaHistorico,
+  });
 
   const atualizarFiltroHistorico = (campo, valor) => {
     setFiltrosHistoricoForm((prev) => ({ ...prev, [campo]: valor }));
@@ -554,12 +568,22 @@ export default function useTransferenciaHistoricoController({
       setColunasDocumentoTransferencia(normalizarColunasDocumentoTransferencia(colunas)),
     contaEnviandoEmail,
     contaRecebendo,
+    salvandoBaixaLote: baixaLote.salvandoBaixaLote,
+    loadingPreviewBaixaLote: baixaLote.loadingPreviewBaixaLote,
     contaExcluindo,
+    baixaLoteAberta: baixaLote.baixaLoteAberta,
     selecionadosHistorico,
     historicoExpandidoIds,
     baixaAbertaId,
     formBaixa,
     setFormBaixa,
+    formBaixaLote: baixaLote.formBaixaLote,
+    setFormBaixaLote: baixaLote.setFormBaixaLote,
+    previewBaixaLote: baixaLote.previewBaixaLote,
+    aplicacoesBaixaLote: baixaLote.aplicacoesBaixaLote,
+    totalAplicadoBaixaLote: baixaLote.totalAplicadoBaixaLote,
+    totalCompensadoBaixaLote: baixaLote.totalCompensadoBaixaLote,
+    diferencaAplicacaoBaixaLote: baixaLote.diferencaAplicacaoBaixaLote,
     formasPagamento,
     loadingFormasPagamento,
     contasPagarCompensacao,
@@ -570,6 +594,7 @@ export default function useTransferenciaHistoricoController({
     filtrosHistoricoForm,
     filtrosHistoricoAplicados,
     pessoaHistoricoSelecionada,
+    pessoaBaixaLoteNome: baixaLote.pessoaBaixaLoteNome,
     sugestoesPessoasHistorico,
     loadingPessoasHistorico,
     historico,
@@ -594,6 +619,13 @@ export default function useTransferenciaHistoricoController({
     abrirBaixaTransferencia,
     fecharBaixaTransferencia,
     registrarBaixaTransferencia,
+    abrirBaixaLoteTransferencia: baixaLote.abrirBaixaLoteTransferencia,
+    fecharBaixaLoteTransferencia: baixaLote.fecharBaixaLoteTransferencia,
+    carregarPreviewBaixaLoteTransferencia: baixaLote.carregarPreviewBaixaLoteTransferencia,
+    registrarBaixaLoteTransferencia: baixaLote.registrarBaixaLoteTransferencia,
+    atualizarValorAplicacaoBaixaLote: baixaLote.atualizarValorAplicacaoBaixaLote,
+    alternarAplicacaoBaixaLote: baixaLote.alternarAplicacaoBaixaLote,
+    atualizarValorCompensacaoBaixaLote: baixaLote.atualizarValorCompensacaoBaixaLote,
     atualizarValorCompensacao: (contaPagarId, valor) =>
       setFormBaixa((prev) => ({
         ...prev,
@@ -611,6 +643,9 @@ export default function useTransferenciaHistoricoController({
       }));
     },
     limparCompensacoesBaixa: () => setFormBaixa((prev) => ({ ...prev, compensacoes: {} })),
+    preencherCompensacaoAutomaticaBaixaLote:
+      baixaLote.preencherCompensacaoAutomaticaBaixaLote,
+    limparCompensacoesBaixaLote: baixaLote.limparCompensacoesBaixaLote,
     excluirTransferencia,
     recarregarPrimeiraPagina,
     recarregarPaginaAtual,

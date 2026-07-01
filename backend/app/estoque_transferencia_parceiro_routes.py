@@ -54,6 +54,9 @@ from .estoque.transferencia_parceiro_support import (
 from .estoque.transferencia_parceiro_baixa_routes import (
     router as transferencia_parceiro_baixa_router,
 )
+from .estoque.transferencia_parceiro_baixa_lote_routes import (
+    router as transferencia_parceiro_baixa_lote_router,
+)
 from .estoque.service import EstoqueService
 from .financeiro_models import ContaReceber
 from .models import Cliente
@@ -795,3 +798,4 @@ def enviar_email_transferencia_parceiro(
 
 
 router.include_router(transferencia_parceiro_baixa_router)
+router.include_router(transferencia_parceiro_baixa_lote_router)

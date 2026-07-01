@@ -10,6 +10,7 @@ import {
   criarHistoricoTransferenciasVazio,
   criarItemTransferencia,
   criarItensEdicaoTransferencia,
+  distribuirBaixaTransferencias,
   documentoTransferenciaTemValores,
   distribuirCompensacaoAutomatica,
   extrairListaProdutos,
@@ -18,6 +19,7 @@ import {
   incrementarItemTransferencia,
   montarCompensacoesBaixaPayload,
   montarCupomTransferencia,
+  montarBaixaLoteTransferenciaPayload,
   montarFiltrosHistoricoTransferenciaParams,
   montarParametrosDocumentoTransferencia,
   montarPayloadTransferencia,
@@ -221,6 +223,63 @@ test("helpers de edicao e baixa normalizam itens e compensacoes", () => {
       { conta_pagar_id: 2, saldo_aberto: 30 },
     ]),
     { 1: "20.00", 2: "15.00" },
+  );
+});
+
+test("distribuirBaixaTransferencias preenche valores da mais antiga para a mais nova", () => {
+  const registros = [
+    { conta_receber_id: 1, data_emissao: "2026-06-01", saldo_aberto: 400 },
+    { conta_receber_id: 2, data_emissao: "2026-06-02", saldo_aberto: 400 },
+    { conta_receber_id: 3, data_emissao: "2026-06-03", saldo_aberto: 400 },
+  ];
+
+  assert.deepEqual(distribuirBaixaTransferencias("1000", registros, "antiga"), {
+    1: "400.00",
+    2: "400.00",
+    3: "200.00",
+  });
+});
+
+test("distribuirBaixaTransferencias pode priorizar a transferencia mais nova", () => {
+  const registros = [
+    { conta_receber_id: 1, data_emissao: "2026-06-01", saldo_aberto: 400 },
+    { conta_receber_id: 2, data_emissao: "2026-06-02", saldo_aberto: 400 },
+    { conta_receber_id: 3, data_emissao: "2026-06-03", saldo_aberto: 400 },
+  ];
+
+  assert.deepEqual(distribuirBaixaTransferencias("700", registros, "nova"), {
+    3: "400.00",
+    2: "300.00",
+  });
+});
+
+test("montarBaixaLoteTransferenciaPayload envia apenas aplicacoes marcadas com valor", () => {
+  assert.deepEqual(
+    montarBaixaLoteTransferenciaPayload({
+      parceiroId: 7,
+      form: {
+        modo_baixa: "recebimento",
+        data_recebimento: "2026-07-01",
+        forma_pagamento_id: "3",
+        observacao: "Pix recebido",
+        devolver_estoque: false,
+      },
+      aplicacoes: { 10: "100", 11: "", 12: "0", 13: "25,50" },
+      compensacoes: {},
+    }),
+    {
+      parceiro_id: 7,
+      modo_baixa: "recebimento",
+      data_recebimento: "2026-07-01",
+      forma_pagamento_id: 3,
+      observacao: "Pix recebido",
+      devolver_estoque: false,
+      aplicacoes: [
+        { conta_receber_id: 10, valor_baixado: 100 },
+        { conta_receber_id: 13, valor_baixado: 25.5 },
+      ],
+      compensacoes: [],
+    },
   );
 });
 
