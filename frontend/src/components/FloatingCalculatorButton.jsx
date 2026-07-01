@@ -51,21 +51,22 @@ export default function FloatingCalculatorButton({ onClick, onCompareClick }) {
     }
 
     const saved = localStorage.getItem("calc_button_pos");
+    const startsMinimized = localStorage.getItem("calc_button_minimizado") === "true";
     const defaultPos = {
-      x: window.innerWidth - 150,
-      y: window.innerHeight - 150,
+      x: window.innerWidth - (startsMinimized ? 150 : 220),
+      y: window.innerHeight - (startsMinimized ? 150 : 240),
     };
 
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         // Verificar se a posição salva está dentro da tela
-        return getSafePosition(parsed, true);
+        return getSafePosition(parsed, startsMinimized);
       } catch {
-        return defaultPos;
+        return getSafePosition(defaultPos, startsMinimized);
       }
     }
-    return defaultPos;
+    return getSafePosition(defaultPos, startsMinimized);
   });
 
   // Estado de minimizado
@@ -73,6 +74,16 @@ export default function FloatingCalculatorButton({ onClick, onCompareClick }) {
     return localStorage.getItem("calc_button_minimizado") === "true";
   });
   const efetivamenteMinimizado = isMobile || minimizado;
+
+  useEffect(() => {
+    if (isMobile) return;
+
+    const safePos = getSafePosition(position, efetivamenteMinimizado);
+    if (safePos.x !== position.x || safePos.y !== position.y) {
+      setPosition(safePos);
+      localStorage.setItem("calc_button_pos", JSON.stringify(safePos));
+    }
+  }, [efetivamenteMinimizado, isMobile]);
 
   const handleMouseDown = (e) => {
     // Desabilitar drag em mobile

@@ -251,18 +251,18 @@ const ModuloBloqueado = ({ modulo, children }) => {
 
   if (moduloForaOfertaPublica(modulo)) {
     return (
-      <div className="min-h-full bg-slate-50 p-4 md:p-6 flex items-start justify-center">
-        <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+      <div className="min-h-full bg-slate-50 p-4 md:p-6 flex items-start justify-center dark:bg-slate-950">
+        <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300">
             <FiLock className="h-6 w-6" />
           </div>
-          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
             Recurso fora da oferta atual
           </p>
-          <h2 className="mt-2 text-2xl font-bold text-slate-900">
+          <h2 className="mt-2 text-2xl font-bold text-slate-900 dark:text-slate-100">
             Este recurso nao esta disponivel para novos tenants.
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
+          <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300">
             O trial publico libera o Plano Basico completo por 30 dias. Modulos avancados entram
             apenas como Beta acompanhado, quando fizer sentido para o cliente e para a operacao.
           </p>
@@ -290,20 +290,20 @@ const ModuloBloqueado = ({ modulo, children }) => {
   const Preview = PREVIEWS[modulo] ?? null;
 
   return (
-    <div className="min-h-full bg-gradient-to-br from-indigo-50 to-purple-50 p-4 md:p-6 flex items-start justify-center">
+    <div className="min-h-full bg-gradient-to-br from-indigo-50 to-purple-50 p-4 md:p-6 flex items-start justify-center dark:from-slate-950 dark:to-slate-900">
       <div className="w-full max-w-4xl">
         {/* Cabecalho */}
         <div className="text-center mb-5">
-          <div className="inline-flex items-center gap-2 bg-white border border-indigo-200 rounded-full px-4 py-1.5 shadow-sm mb-3">
-            <FiTrendingUp className="w-3.5 h-3.5 text-indigo-500" />
-            <span className="text-xs font-semibold text-indigo-600">
+          <div className="inline-flex items-center gap-2 bg-white border border-indigo-200 rounded-full px-4 py-1.5 shadow-sm mb-3 dark:border-indigo-400/30 dark:bg-indigo-500/10">
+            <FiTrendingUp className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-300" />
+            <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-200">
               {betaPublico
                 ? "Modulo Beta — piloto acompanhado"
                 : "Modulo controlado — acesso sob liberacao"}
             </span>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-1">{info.nome}</h2>
-          <p className="text-gray-500 text-sm">{info.descricao}</p>
+          <h2 className="text-2xl font-bold text-gray-800 mb-1 dark:text-slate-100">{info.nome}</h2>
+          <p className="text-gray-500 text-sm dark:text-slate-400">{info.descricao}</p>
         </div>
 
         {/* Banner ROI */}
@@ -315,12 +315,12 @@ const ModuloBloqueado = ({ modulo, children }) => {
         <div className={`grid gap-6 ${Preview ? "lg:grid-cols-2" : "max-w-md mx-auto"}`}>
           {/* Preview visual */}
           {Preview && (
-            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 shadow-inner">
+            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 shadow-inner dark:border-slate-700 dark:bg-slate-900">
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-2 h-2 rounded-full bg-red-400" />
                 <div className="w-2 h-2 rounded-full bg-amber-400" />
                 <div className="w-2 h-2 rounded-full bg-green-400" />
-                <span className="text-xs text-gray-400 ml-1 font-mono">
+                <span className="text-xs text-gray-400 ml-1 font-mono dark:text-slate-500">
                   como vai ficar na sua conta
                 </span>
               </div>
@@ -331,8 +331,8 @@ const ModuloBloqueado = ({ modulo, children }) => {
           )}
 
           {/* Card de preco */}
-          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 flex flex-col">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">
+          <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 flex flex-col dark:border-slate-700 dark:bg-slate-900">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4 dark:text-slate-400">
               O que voce ganha
             </p>
 
@@ -340,9 +340,9 @@ const ModuloBloqueado = ({ modulo, children }) => {
               {secoesBeneficios.map((secao) => (
                 <div
                   key={secao.titulo}
-                  className="rounded-xl border border-gray-100 bg-gray-50/60 p-3"
+                  className="rounded-xl border border-gray-100 bg-gray-50/60 p-3 dark:border-slate-700 dark:bg-slate-800/80"
                 >
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-2 dark:text-slate-400">
                     {secao.titulo}
                   </p>
                   <ul className="space-y-2.5">
@@ -350,8 +350,8 @@ const ModuloBloqueado = ({ modulo, children }) => {
                       <li key={`${secao.titulo}-${b.texto}`} className="flex items-start gap-2.5">
                         <FiCheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-sm font-medium text-gray-800">{b.texto}</p>
-                          {b.detalhe && <p className="text-xs text-gray-500 mt-0.5">{b.detalhe}</p>}
+                          <p className="text-sm font-medium text-gray-800 dark:text-slate-100">{b.texto}</p>
+                          {b.detalhe && <p className="text-xs text-gray-500 mt-0.5 dark:text-slate-400">{b.detalhe}</p>}
                         </div>
                       </li>
                     ))}
@@ -361,17 +361,17 @@ const ModuloBloqueado = ({ modulo, children }) => {
             </div>
 
             {/* Acesso */}
-            <div className="mt-5 pt-5 border-t border-gray-100">
+            <div className="mt-5 pt-5 border-t border-gray-100 dark:border-slate-700">
               <div className="flex items-end justify-between mb-1">
                 <div>
-                  <p className="text-xs text-gray-400">Tipo de acesso</p>
-                  <p className="text-3xl font-bold text-gray-900">
+                  <p className="text-xs text-gray-400 dark:text-slate-400">Tipo de acesso</p>
+                  <p className="text-3xl font-bold text-gray-900 dark:text-slate-100">
                     Beta
-                    <span className="text-base font-normal text-gray-400"> acompanhado</span>
+                    <span className="text-base font-normal text-gray-400 dark:text-slate-400"> acompanhado</span>
                   </p>
                 </div>
                 {extras.payback && (
-                  <p className="text-xs text-green-600 font-semibold text-right max-w-[130px] leading-tight">
+                  <p className="text-xs text-green-600 font-semibold text-right max-w-[130px] leading-tight dark:text-green-300">
                     👉 {extras.payback}
                   </p>
                 )}
@@ -391,7 +391,7 @@ const ModuloBloqueado = ({ modulo, children }) => {
                 href={`https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(`Quero saber mais sobre o modulo ${info.nome}`)}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-center gap-2 w-full mt-2 text-green-600 hover:text-green-700 font-medium py-2 px-4 rounded-xl border border-green-200 hover:bg-green-50 transition-colors"
+                className="flex items-center justify-center gap-2 w-full mt-2 text-green-600 hover:text-green-700 font-medium py-2 px-4 rounded-xl border border-green-200 hover:bg-green-50 transition-colors dark:border-green-400/30 dark:text-green-300 dark:hover:bg-green-500/10 dark:hover:text-green-200"
               >
                 <FiMessageCircle className="w-4 h-4" />
                 Tirar duvidas pelo WhatsApp
@@ -400,13 +400,13 @@ const ModuloBloqueado = ({ modulo, children }) => {
 
             {/* Rodape */}
             <div className="flex flex-col items-center gap-2 mt-4">
-              <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
+              <div className="flex items-center justify-center gap-2 text-xs text-gray-400 dark:text-slate-400">
                 <FiLock className="w-3 h-3 flex-shrink-0" />
                 <span>Liberacao manual por tenant, com acompanhamento do piloto.</span>
               </div>
               <Link
                 to="/ajuda"
-                className="inline-flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 font-medium transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-700 font-medium transition-colors dark:text-indigo-300 dark:hover:text-indigo-200"
               >
                 <FiHelpCircle className="w-3.5 h-3.5" />
                 Ver todos os planos e duvidas frequentes
