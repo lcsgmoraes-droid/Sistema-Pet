@@ -10,6 +10,10 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from app.estoque.service import EstoqueService
+from app.estoque.transferencia_parceiro_baixa_lote_acerto import (
+    criar_conta_pagar_acerto_lote,
+    valor_conta_pagar_acerto_payload,
+)
 from app.estoque.transferencia_parceiro_documents import (
     _saldo_conta_receber,
     _status_transferencia_parceiro,
@@ -434,6 +438,13 @@ def aplicar_baixa_lote_transferencia(
     payload,
 ) -> dict:
     modo_baixa = normalizar_modo_baixa_lote(payload.modo_baixa)
+    nova_conta_pagar_acerto = getattr(payload, "nova_conta_pagar_acerto", None)
+    if nova_conta_pagar_acerto and modo_baixa != "acerto":
+        raise HTTPException(
+            status_code=400,
+            detail="Nova conta a pagar de acerto so pode ser usada no modo acerto.",
+        )
+
     aplicacoes = [
         item
         for item in (payload.aplicacoes or [])
@@ -588,7 +599,29 @@ def aplicar_baixa_lote_transferencia(
         )
 
     pagamentos_criados = []
+    contas_pagar_criadas = []
     if modo_baixa == "acerto":
+        compensacoes_payload = list(payload.compensacoes or [])
+        if nova_conta_pagar_acerto:
+            conta_pagar_criada = criar_conta_pagar_acerto_lote(
+                db,
+                tenant_id=tenant_id,
+                parceiro_id=int(payload.parceiro_id),
+                user_id=user_id,
+                data_emissao=payload.data_recebimento,
+                payload=nova_conta_pagar_acerto,
+                documento_lote=documento_lote,
+            )
+            contas_pagar_criadas.append(conta_pagar_criada.id)
+            compensacoes_payload.append(
+                {
+                    "conta_pagar_id": conta_pagar_criada.id,
+                    "valor_compensado": float(
+                        valor_conta_pagar_acerto_payload(nova_conta_pagar_acerto)
+                    ),
+                }
+            )
+
         pagamentos_criados = aplicar_compensacoes_acerto_lote(
             db,
             tenant_id=tenant_id,
@@ -596,7 +629,7 @@ def aplicar_baixa_lote_transferencia(
             user_id=user_id,
             data_pagamento=payload.data_recebimento,
             forma_pagamento=forma_pagamento,
-            compensacoes_payload=payload.compensacoes or [],
+            compensacoes_payload=compensacoes_payload,
             total_baixa=total_baixado.quantize(CENTAVO),
             documento_lote=documento_lote,
         )
@@ -609,6 +642,7 @@ def aplicar_baixa_lote_transferencia(
         "items": resultados,
         "recebimentos_criados": recebimentos_criados,
         "pagamentos_criados": pagamentos_criados,
+        "contas_pagar_criadas": contas_pagar_criadas,
         "movimentacoes_estoque": movimentacoes_estoque,
         "_dre_lancamentos": lancamentos_dre,
     }

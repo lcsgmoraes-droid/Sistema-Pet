@@ -51,12 +51,18 @@ export default function useTransferenciaBaixaLoteController({
   );
 
   const totalCompensadoBaixaLote = useMemo(
-    () =>
-      Object.values(formBaixaLote.compensacoes || {}).reduce((acumulado, valor) => {
-        const numero = normalizarNumero(valor);
-        return acumulado + (Number.isFinite(numero) ? numero : 0);
-      }, 0),
-    [formBaixaLote.compensacoes],
+    () => {
+      const totalContasExistentes = Object.values(formBaixaLote.compensacoes || {}).reduce(
+        (acumulado, valor) => {
+          const numero = normalizarNumero(valor);
+          return acumulado + (Number.isFinite(numero) ? numero : 0);
+        },
+        0,
+      );
+      const valorNovaConta = normalizarNumero(formBaixaLote.nova_conta_pagar_acerto?.valor);
+      return totalContasExistentes + (Number.isFinite(valorNovaConta) ? valorNovaConta : 0);
+    },
+    [formBaixaLote.compensacoes, formBaixaLote.nova_conta_pagar_acerto?.valor],
   );
 
   const diferencaAplicacaoBaixaLote = Math.max(
@@ -166,9 +172,12 @@ export default function useTransferenciaBaixaLoteController({
       return;
     }
 
-    const temCompensacao = Object.values(formBaixaLote.compensacoes || {}).some(
-      (valor) => normalizarNumero(valor) > 0,
-    );
+    const valorNovaContaPagar = normalizarNumero(formBaixaLote.nova_conta_pagar_acerto?.valor);
+    const temCompensacao =
+      Object.values(formBaixaLote.compensacoes || {}).some(
+        (valor) => normalizarNumero(valor) > 0,
+      ) ||
+      (Number.isFinite(valorNovaContaPagar) && valorNovaContaPagar > 0);
     if (
       formBaixaLote.modo_baixa === "acerto" &&
       temCompensacao &&

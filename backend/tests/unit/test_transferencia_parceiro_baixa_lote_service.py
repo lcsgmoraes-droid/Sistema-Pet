@@ -10,6 +10,8 @@ os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test
 os.environ["DEBUG"] = "false"
 
 from app.estoque.transferencia_parceiro_baixa_lote_service import (
+    aplicar_baixa_lote_transferencia,
+    criar_conta_pagar_acerto_lote,
     distribuir_baixa_transferencias,
     normalizar_modo_baixa_lote,
     resolver_data_recebimento_financeiro,
@@ -27,6 +29,19 @@ def _conta(conta_id, data_emissao, saldo_aberto, valor_recebido=0):
         valor_recebido=Decimal(str(valor_recebido)),
         documento=f"TRP-{conta_id}",
     )
+
+
+class _FakeSession:
+    def __init__(self):
+        self.added = []
+
+    def add(self, item):
+        self.added.append(item)
+
+    def flush(self):
+        for index, item in enumerate(self.added, start=1):
+            if getattr(item, "id", None) is None:
+                item.id = index
 
 
 def test_distribuir_valor_mais_antigo_primeiro_deixa_ultima_parcial():
@@ -126,3 +141,55 @@ def test_resolver_data_recebimento_financeiro_prefere_antecipacao_configurada():
     )
 
     assert data_resolvida == date(2026, 7, 3)
+
+
+def test_criar_conta_pagar_acerto_lote_vincula_parceiro_e_valor_total():
+    db = _FakeSession()
+    payload = SimpleNamespace(
+        descricao="Compra mercadoria parceira",
+        valor=250,
+        data_vencimento=date(2026, 7, 10),
+        documento="ACERTO-1",
+        observacao="Produtos pegos no parceiro",
+        categoria_id=None,
+        dre_subcategoria_id=None,
+        tipo_despesa_id=None,
+    )
+
+    conta = criar_conta_pagar_acerto_lote(
+        db,
+        tenant_id="tenant-1",
+        parceiro_id=8406,
+        user_id=99,
+        data_emissao=date(2026, 7, 1),
+        payload=payload,
+        documento_lote="TRP-LOTE-1",
+    )
+
+    assert conta.id == 1
+    assert conta.fornecedor_id == 8406
+    assert conta.valor_original == Decimal("250.00")
+    assert conta.valor_final == Decimal("250.00")
+    assert conta.valor_pago == Decimal("0.00")
+    assert conta.status == "pendente"
+    assert conta.documento == "ACERTO-1"
+    assert "TRP-LOTE-1" in conta.observacoes
+
+
+def test_nova_conta_pagar_acerto_so_pode_ser_usada_no_modo_acerto():
+    payload = SimpleNamespace(
+        modo_baixa="recebimento",
+        nova_conta_pagar_acerto=SimpleNamespace(valor=100),
+        aplicacoes=[],
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        aplicar_baixa_lote_transferencia(
+            _FakeSession(),
+            tenant_id="tenant-1",
+            user_id=99,
+            payload=payload,
+        )
+
+    assert exc_info.value.status_code == 400
+    assert "modo acerto" in exc_info.value.detail.lower()

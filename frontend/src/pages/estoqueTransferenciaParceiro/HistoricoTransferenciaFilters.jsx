@@ -54,7 +54,7 @@ export default function HistoricoTransferenciaFilters({
               onClick={onAbrirBaixaLoteTransferencia}
               className="rounded-xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
             >
-              Baixa por valor
+              Registrar acerto
             </button>
           ) : null}
         </div>

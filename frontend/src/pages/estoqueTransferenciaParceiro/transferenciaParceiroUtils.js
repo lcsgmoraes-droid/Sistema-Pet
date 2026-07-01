@@ -90,6 +90,15 @@ export function criarFormTransferencia(overrides = {}) {
 }
 
 export function criarFormBaixaTransferencia(overrides = {}) {
+  const novaContaPagarAcerto = {
+    descricao: "",
+    valor: "",
+    data_vencimento: hojeIso(),
+    documento: "",
+    observacao: "",
+    ...(overrides.nova_conta_pagar_acerto || {}),
+  };
+
   return {
     valor_recebido: "",
     data_recebimento: hojeIso(),
@@ -98,6 +107,7 @@ export function criarFormBaixaTransferencia(overrides = {}) {
     observacao: "",
     ...overrides,
     compensacoes: overrides.compensacoes || {},
+    nova_conta_pagar_acerto: novaContaPagarAcerto,
   };
 }
 
@@ -261,6 +271,8 @@ export function montarBaixaLoteTransferenciaPayload({
   compensacoes = {},
 }) {
   const compensacoesPayload = montarCompensacoesBaixaPayload(compensacoes);
+  const novaContaPagarAcerto = form.nova_conta_pagar_acerto || {};
+  const valorNovaContaPagar = normalizarNumero(novaContaPagarAcerto.valor);
   const payload = {
     parceiro_id: Number(parceiroId),
     modo_baixa: form.modo_baixa || "recebimento",
@@ -284,6 +296,26 @@ export function montarBaixaLoteTransferenciaPayload({
       ),
     compensacoes: form.modo_baixa === "acerto" ? compensacoesPayload : [],
   };
+
+  if (
+    payload.modo_baixa === "acerto" &&
+    Number.isFinite(valorNovaContaPagar) &&
+    valorNovaContaPagar > 0
+  ) {
+    payload.nova_conta_pagar_acerto = {
+      descricao: novaContaPagarAcerto.descricao?.trim() || undefined,
+      valor: valorNovaContaPagar,
+      data_vencimento:
+        novaContaPagarAcerto.data_vencimento || form.data_recebimento || hojeIso(),
+      documento: novaContaPagarAcerto.documento?.trim() || undefined,
+      observacao: novaContaPagarAcerto.observacao?.trim() || undefined,
+    };
+    Object.keys(payload.nova_conta_pagar_acerto).forEach((chave) => {
+      if (payload.nova_conta_pagar_acerto[chave] === undefined) {
+        delete payload.nova_conta_pagar_acerto[chave];
+      }
+    });
+  }
 
   if (!payload.forma_pagamento_id) delete payload.forma_pagamento_id;
   if (!payload.observacao) delete payload.observacao;

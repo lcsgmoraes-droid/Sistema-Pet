@@ -283,6 +283,45 @@ test("montarBaixaLoteTransferenciaPayload envia apenas aplicacoes marcadas com v
   );
 });
 
+test("montarBaixaLoteTransferenciaPayload inclui nova conta a pagar no acerto", () => {
+  assert.deepEqual(
+    montarBaixaLoteTransferenciaPayload({
+      parceiroId: 7,
+      form: {
+        modo_baixa: "acerto",
+        data_recebimento: "2026-07-01",
+        observacao: "Mata mensal",
+        devolver_estoque: false,
+        nova_conta_pagar_acerto: {
+          descricao: "Compra mercadoria parceira",
+          valor: "250,50",
+          data_vencimento: "2026-07-10",
+          documento: "ACERTO-1",
+          observacao: "Produtos pegos no parceiro",
+        },
+      },
+      aplicacoes: { 10: "250,50" },
+      compensacoes: {},
+    }),
+    {
+      parceiro_id: 7,
+      modo_baixa: "acerto",
+      data_recebimento: "2026-07-01",
+      observacao: "Mata mensal",
+      devolver_estoque: false,
+      aplicacoes: [{ conta_receber_id: 10, valor_baixado: 250.5 }],
+      compensacoes: [],
+      nova_conta_pagar_acerto: {
+        descricao: "Compra mercadoria parceira",
+        valor: 250.5,
+        data_vencimento: "2026-07-10",
+        documento: "ACERTO-1",
+        observacao: "Produtos pegos no parceiro",
+      },
+    },
+  );
+});
+
 test("montarCupomTransferencia respeita colunas de retirada sem valores financeiros", () => {
   const cupom = montarCupomTransferencia(
     {
