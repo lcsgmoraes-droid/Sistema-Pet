@@ -396,6 +396,31 @@ test("montarBaixaLoteTransferenciaPayload inclui nova conta a pagar no acerto", 
   );
 });
 
+test("montarBaixaTransferenciaPayload inclui devolucao de estoque na baixa individual", () => {
+  assert.equal(typeof transferenciaParceiroUtils.montarBaixaTransferenciaPayload, "function");
+  assert.deepEqual(
+    transferenciaParceiroUtils.montarBaixaTransferenciaPayload({
+      valorRecebido: 100,
+      form: {
+        modo_baixa: "produto_devolvido",
+        data_recebimento: "2026-07-01",
+        forma_pagamento_id: "3",
+        observacao: "Produto retornou",
+        devolver_estoque: true,
+      },
+      compensacoesPayload: [{ conta_pagar_id: 1, valor_compensado: 100 }],
+    }),
+    {
+      valor_recebido: 100,
+      data_recebimento: "2026-07-01",
+      modo_baixa: "produto_devolvido",
+      compensacoes: undefined,
+      observacao: "Produto retornou",
+      devolver_estoque: true,
+    },
+  );
+});
+
 test("obterErroAcertoTransferencia exige compensacao no modo acerto", () => {
   assert.equal(typeof transferenciaParceiroUtils.obterErroAcertoTransferencia, "function");
   assert.equal(

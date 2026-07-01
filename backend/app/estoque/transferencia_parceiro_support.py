@@ -44,6 +44,7 @@ _REFERENCIA_TRANSFERENCIA_PARCEIRO_EDICAO = "transf_edit"
 _MODO_BAIXA_TRANSFERENCIA_LABELS = {
     "recebimento": "Recebimento",
     "acerto": "Acerto / Compensacao",
+    "produto_devolvido": "Produto devolvido",
 }
 
 
@@ -148,7 +149,9 @@ def _normalizar_modo_baixa_transferencia(valor: str | None) -> str:
     if modo not in _MODO_BAIXA_TRANSFERENCIA_LABELS:
         raise HTTPException(
             status_code=400,
-            detail="Modo de baixa invalido. Use recebimento ou acerto.",
+            detail=(
+                "Modo de baixa invalido. Use recebimento, acerto ou produto_devolvido."
+            ),
         )
     return modo
 
@@ -474,8 +477,15 @@ def _obter_ultimo_recebimento_transferencia(conta: ContaReceber) -> Recebimento 
 
 def _detectar_modo_baixa_transferencia(
     recebimento: Recebimento | None,
+    *,
+    observacoes_conta: str | None = None,
 ) -> tuple[str | None, str | None]:
     if not recebimento:
+        observacoes = (_texto_limpo(observacoes_conta) or "").lower()
+        if "produto devolvido" in observacoes:
+            return "produto_devolvido", _label_modo_baixa_transferencia(
+                "produto_devolvido"
+            )
         return None, None
 
     forma_nome = _texto_limpo(

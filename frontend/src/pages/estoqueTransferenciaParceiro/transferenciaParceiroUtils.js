@@ -106,6 +106,7 @@ export function criarFormBaixaTransferencia(overrides = {}) {
     data_recebimento: hojeIso(),
     modo_baixa: "recebimento",
     forma_pagamento_id: "",
+    devolver_estoque: false,
     observacao: "",
     ...overrides,
     compensacoes: overrides.compensacoes || {},
@@ -299,6 +300,32 @@ export function montarCompensacoesBaixaPayload(compensacoes = {}) {
         item.valor_compensado > 0 &&
         item.conta_pagar_id > 0,
     );
+}
+
+export function montarBaixaTransferenciaPayload({
+  form = {},
+  valorRecebido,
+  compensacoesPayload = [],
+} = {}) {
+  const modoBaixa = form.modo_baixa || "recebimento";
+  const payload = {
+    valor_recebido: valorRecebido,
+    data_recebimento: form.data_recebimento || hojeIso(),
+    modo_baixa: modoBaixa,
+    compensacoes: modoBaixa === "acerto" ? compensacoesPayload : undefined,
+  };
+
+  if (modoBaixa === "recebimento" && form.forma_pagamento_id) {
+    payload.forma_pagamento_id = Number(form.forma_pagamento_id);
+  }
+  if (form.observacao?.trim()) {
+    payload.observacao = form.observacao.trim();
+  }
+  if (modoBaixa === "produto_devolvido") {
+    payload.devolver_estoque = Boolean(form.devolver_estoque);
+  }
+
+  return payload;
 }
 
 export function distribuirBaixaTransferencias(valorBase, registros = [], ordem = "antiga") {
