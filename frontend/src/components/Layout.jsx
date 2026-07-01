@@ -35,6 +35,7 @@ import {
 import LayoutSidebar from "./layout/LayoutSidebar";
 import { createLayoutMenuItems } from "./layout/menuConfig";
 import ModalCalculadoraUniversal from "./ModalCalculadoraUniversal";
+import ThemeToggle from "./theme/ThemeToggle";
 
 const COREPET_ICON = "/brand/corepet/corepet-icon-64.png";
 
@@ -608,7 +609,7 @@ const Layout = () => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="erp-shell flex h-screen min-w-0 bg-gray-50">
+    <div className="erp-shell flex h-screen min-w-0 bg-gray-50 dark:bg-slate-950">
       {/* Backdrop para mobile */}
       {isMobile && sidebarOpen && effectiveSidebarVisible && (
         <div
@@ -654,7 +655,7 @@ const Layout = () => {
       {/* Main Content */}
       <div className="erp-main-column flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Header */}
-        <header className="erp-topbar flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-3 md:px-6 md:py-4">
+        <header className="erp-topbar flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-3 md:px-6 md:py-4 dark:border-slate-800 dark:bg-slate-950">
           {/* Menu Hamburguer (Mobile) */}
           {isMobile && effectiveSidebarVisible && (
             <button
@@ -681,9 +682,12 @@ const Layout = () => {
 
           {/* User Info */}
           <div className="flex items-center gap-2 md:gap-3 ml-auto">
+            <ThemeToggle />
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-gray-900">{user?.nome || user?.email}</p>
-              <p className="text-xs text-gray-500">{user?.email}</p>
+              <p className="text-sm font-medium text-gray-900 dark:text-slate-100">
+                {user?.nome || user?.email}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-slate-400">{user?.email}</p>
             </div>
             <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#0f5f63] flex items-center justify-center text-white font-bold text-sm md:text-base">
               {user?.nome?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase()}
@@ -692,7 +696,7 @@ const Layout = () => {
         </header>
 
         {visibleMenuFavorites.length > 0 && !isBradescoOrganizerRoute && (
-          <div className="shrink-0 border-b border-gray-200 bg-white/95 px-3 py-2 md:px-6">
+          <div className="shrink-0 border-b border-gray-200 bg-white/95 px-3 py-2 md:px-6 dark:border-slate-800 dark:bg-slate-950/95">
             <DndContext
               sensors={favoriteDragSensors}
               collisionDetection={closestCenter}

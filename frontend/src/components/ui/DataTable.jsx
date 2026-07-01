@@ -32,6 +32,7 @@ function renderDefaultHeaderCell(column, content) {
       key={column.key}
       className={[
         "px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600",
+        "dark:text-slate-300",
         ALIGN_CLASSES[column.align || "left"],
         column.headerClassName,
       ]
@@ -144,7 +145,7 @@ export default function DataTable({
         <div
           ref={topScrollRef}
           onScroll={() => sincronizarRolagem(topScrollRef.current, bottomScrollRef.current)}
-          className="sticky top-0 z-30 h-4 overflow-x-auto overflow-y-hidden border-b border-slate-100 bg-white"
+          className="sticky top-0 z-30 h-4 overflow-x-auto overflow-y-hidden border-b border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900"
           aria-hidden="true"
         >
           <div style={{ width: scrollMetrics.scrollWidth, height: 1 }} />
@@ -157,21 +158,31 @@ export default function DataTable({
       >
         <table
           ref={tableRef}
-          className={["w-full border-collapse text-sm", tableClassName].filter(Boolean).join(" ")}
+          className={["w-full border-collapse text-sm dark:text-slate-300", tableClassName]
+            .filter(Boolean)
+            .join(" ")}
         >
-          <thead className={["bg-slate-100", theadClassName].filter(Boolean).join(" ")}>
+          <thead
+            className={["bg-slate-100 dark:bg-slate-800", theadClassName].filter(Boolean).join(" ")}
+          >
             <tr>{columns.map((column) => renderHeaderCell(column, headerContext))}</tr>
           </thead>
           <tbody className={tbodyClassName}>
             {loading ? (
               <tr>
-                <td colSpan={colSpan} className="px-4 py-8 text-center text-slate-500">
+                <td
+                  colSpan={colSpan}
+                  className="px-4 py-8 text-center text-slate-500 dark:text-slate-400"
+                >
                   {loadingMessage}
                 </td>
               </tr>
             ) : data.length === 0 ? (
               <tr>
-                <td colSpan={colSpan} className="px-4 py-8 text-center text-slate-500">
+                <td
+                  colSpan={colSpan}
+                  className="px-4 py-8 text-center text-slate-500 dark:text-slate-400"
+                >
                   {emptyMessage}
                 </td>
               </tr>
@@ -188,7 +199,7 @@ export default function DataTable({
                       ref={getRowRef ? (element) => getRowRef(row, rowIndex, element) : undefined}
                       onClick={clickable ? (event) => onRowClick(row, rowIndex, event) : undefined}
                       className={[
-                        "border-b border-slate-100 transition hover:bg-slate-50",
+                        "border-b border-slate-100 transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/70",
                         clickable ? "cursor-pointer" : "",
                         resolveClassName(rowClassName, row, rowIndex),
                       ]

@@ -13,6 +13,7 @@ import {
 } from "react-icons/fi";
 
 import { useAuth } from "../contexts/AuthContext";
+import ThemeToggle from "./theme/ThemeToggle";
 
 const navItems = [
   {
@@ -59,7 +60,7 @@ export default function OpsLayout() {
   const roleName = user?.role?.name || "admin";
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-950">
+    <div className="min-h-screen bg-slate-100 text-slate-950 dark:bg-slate-950 dark:text-slate-100">
       <aside className="fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r border-slate-800 bg-slate-950 text-white shadow-xl">
         <div className="border-b border-slate-800 px-5 py-5">
           <div className="flex items-center gap-3">
@@ -151,17 +152,22 @@ export default function OpsLayout() {
       </aside>
 
       <div className="min-h-screen pl-72">
-        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 px-6 py-4 backdrop-blur">
+        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 px-6 py-4 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-blue-600">
                 <FiBarChart2 className="h-4 w-4" />
                 Plataforma CorePet
               </div>
-              <h1 className="mt-1 text-xl font-bold text-slate-950">Central de saude e suporte</h1>
+              <h1 className="mt-1 text-xl font-bold text-slate-950 dark:text-slate-100">
+                Central de saude e suporte
+              </h1>
             </div>
-            <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-              Operacao monitorada
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+                Operacao monitorada
+              </div>
             </div>
           </div>
         </header>

@@ -34,10 +34,10 @@ export default function LayoutSidebar({
               sidebarOpen ? "translate-x-0" : "-translate-x-full"
             }`
           : `${sidebarOpen ? "w-64" : "w-20"} transition-all duration-300`
-      } erp-sidebar bg-gradient-to-b from-[#f4fbfa] to-[#fff8ea] border-r border-[#d8eee9] flex flex-col shadow-lg`}
+      } erp-sidebar bg-gradient-to-b from-[#f4fbfa] to-[#fff8ea] border-r border-[#d8eee9] flex flex-col shadow-lg dark:border-slate-800 dark:from-slate-950 dark:to-slate-900`}
     >
       <div
-        className={`p-4 flex items-center border-b border-[#d8eee9] bg-white/70 ${!isMobile && !sidebarOpen ? "justify-center" : "justify-between"}`}
+        className={`p-4 flex items-center border-b border-[#d8eee9] bg-white/70 dark:border-slate-800 dark:bg-slate-950/80 ${!isMobile && !sidebarOpen ? "justify-center" : "justify-between"}`}
       >
         <div className="flex items-center gap-3">
           {!isMobile && (
@@ -56,10 +56,10 @@ export default function LayoutSidebar({
                 alt="CorePet"
                 className="h-9 w-auto max-w-[148px] object-contain"
               />
-              <p className="mt-1 text-xs text-gray-500">Central de Gestao</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">Central de Gestao</p>
               {devControlesAtivos && sidebarOpen && (
                 <div className="mt-2 space-y-1.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[#0f8b8d]">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-[#0f8b8d] dark:text-cyan-300">
                     DEV modulos: {getModoDevLabel()}
                   </p>
                   <div className="flex gap-1.5">
@@ -67,8 +67,8 @@ export default function LayoutSidebar({
                       onClick={() => definirModoDevModulos("normal")}
                       className={`px-2 py-1 rounded text-[10px] border ${
                         devModoModulos === "normal"
-                          ? "bg-[#d8eee9] border-[#b9ddd8] text-[#0f5f63]"
-                          : "bg-white/70 border-gray-200 text-gray-500"
+                          ? "bg-[#d8eee9] border-[#b9ddd8] text-[#0f5f63] dark:border-cyan-400/40 dark:bg-cyan-500/15 dark:text-cyan-200"
+                          : "bg-white/70 border-gray-200 text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
                       }`}
                     >
                       Normal
@@ -77,8 +77,8 @@ export default function LayoutSidebar({
                       onClick={() => definirModoDevModulos("all_unlocked")}
                       className={`px-2 py-1 rounded text-[10px] border ${
                         devModoModulos === "all_unlocked"
-                          ? "bg-green-100 border-green-200 text-green-700"
-                          : "bg-white/70 border-gray-200 text-gray-500"
+                          ? "bg-green-100 border-green-200 text-green-700 dark:border-green-400/40 dark:bg-green-500/15 dark:text-green-200"
+                          : "bg-white/70 border-gray-200 text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
                       }`}
                     >
                       Liberar tudo
@@ -87,8 +87,8 @@ export default function LayoutSidebar({
                       onClick={() => definirModoDevModulos("all_locked")}
                       className={`px-2 py-1 rounded text-[10px] border ${
                         devModoModulos === "all_locked"
-                          ? "bg-amber-100 border-amber-200 text-amber-700"
-                          : "bg-white/70 border-gray-200 text-gray-500"
+                          ? "bg-amber-100 border-amber-200 text-amber-700 dark:border-amber-400/40 dark:bg-amber-500/15 dark:text-amber-200"
+                          : "bg-white/70 border-gray-200 text-gray-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
                       }`}
                     >
                       Bloquear premium
@@ -103,13 +103,13 @@ export default function LayoutSidebar({
         {(isMobile || sidebarOpen) && (
           <button
             onClick={() => (isMobile ? setSidebarOpen(false) : setSidebarVisible(false))}
-            className="p-2 hover:bg-[#d8eee9] rounded-lg transition-colors"
+            className="p-2 hover:bg-[#d8eee9] rounded-lg transition-colors dark:hover:bg-slate-800"
             title={isMobile ? "Fechar menu" : "Esconder menu completamente"}
           >
             {isMobile ? (
-              <FiX className="w-6 h-6 text-[#0f5f63]" />
+              <FiX className="w-6 h-6 text-[#0f5f63] dark:text-cyan-200" />
             ) : (
-              <FiX className="w-5 h-5 text-[#0f5f63]" />
+              <FiX className="w-5 h-5 text-[#0f5f63] dark:text-cyan-200" />
             )}
           </button>
         )}
@@ -130,11 +130,11 @@ export default function LayoutSidebar({
         onToggleModuloDev={onToggleModuloDev}
       />
 
-      <div className="border-t border-[#d8eee9] bg-white/40">
+      <div className="border-t border-[#d8eee9] bg-white/40 dark:border-slate-800 dark:bg-slate-950/80">
         <Link
           to="/meu-plano"
           onClick={handleMenuClick}
-          className="w-full flex items-center gap-3 px-4 py-2.5 mx-2 mt-2 rounded-lg text-emerald-700 hover:bg-emerald-50 transition-all"
+          className="w-full flex items-center gap-3 px-4 py-2.5 mx-2 mt-2 rounded-lg text-emerald-700 hover:bg-emerald-50 transition-all dark:text-emerald-300 dark:hover:bg-emerald-500/10"
           title={!sidebarOpen ? "Meu Plano" : ""}
         >
           <FiCreditCard className="text-lg flex-shrink-0" />
@@ -143,7 +143,7 @@ export default function LayoutSidebar({
         <Link
           to="/ajuda"
           onClick={handleMenuClick}
-          className="w-full flex items-center gap-3 px-4 py-2.5 mx-2 mt-1 rounded-lg text-[#0f5f63] hover:bg-[#d8eee9] transition-all"
+          className="w-full flex items-center gap-3 px-4 py-2.5 mx-2 mt-1 rounded-lg text-[#0f5f63] hover:bg-[#d8eee9] transition-all dark:text-cyan-200 dark:hover:bg-slate-800"
           title={!sidebarOpen ? "Ajuda & Planos" : ""}
         >
           <FiHelpCircle className="text-lg flex-shrink-0" />
@@ -151,7 +151,7 @@ export default function LayoutSidebar({
         </Link>
         <button
           onClick={logout}
-          className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-2 rounded-lg text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all text-left"
+          className="w-full flex items-center gap-3 px-4 py-3 mx-2 my-2 rounded-lg text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all text-left dark:text-slate-300 dark:hover:bg-red-500/10 dark:hover:text-red-200"
           title={!sidebarOpen ? "Sair" : ""}
         >
           <FiLogOut className="text-lg" />

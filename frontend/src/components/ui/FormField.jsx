@@ -1,17 +1,17 @@
 const toneClasses = {
   default: {
     checkbox:
-      "inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700",
-    label: "text-xs font-medium text-slate-600",
+      "inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200",
+    label: "text-xs font-medium text-slate-600 dark:text-slate-300",
     control:
-      "mt-1 h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400",
+      "mt-1 h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-cyan-400 dark:disabled:bg-slate-800 dark:disabled:text-slate-500",
   },
   warm: {
     checkbox:
-      "flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700",
-    label: "text-xs font-bold uppercase tracking-[0.12em] text-slate-500",
+      "flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200",
+    label: "text-xs font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400",
     control:
-      "mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:text-slate-400",
+      "mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-900 dark:focus:ring-orange-400/30 dark:disabled:bg-slate-800 dark:disabled:text-slate-500",
   },
 };
 
@@ -51,7 +51,7 @@ export function FormField({
       {error ? (
         <span className="mt-1 block text-xs text-red-600">{error}</span>
       ) : help ? (
-        <span className="mt-1 block text-xs text-slate-500">{help}</span>
+        <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{help}</span>
       ) : null}
     </label>
   );

@@ -39,7 +39,7 @@ export default function PageHeader({
         {icon ? (
           <div
             className={[
-              "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 shadow-sm",
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 shadow-sm dark:bg-blue-500/10 dark:text-blue-200",
               iconClassName,
             ]
               .filter(Boolean)
@@ -51,7 +51,9 @@ export default function PageHeader({
 
         <div className="min-w-0">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <h1 className="truncate text-xl font-bold text-slate-950">{title}</h1>
+            <h1 className="truncate text-xl font-bold text-slate-950 dark:text-slate-100">
+              {title}
+            </h1>
             {onTour ? (
               <IconActionButton
                 icon={HelpCircle}
@@ -63,7 +65,9 @@ export default function PageHeader({
               />
             ) : null}
           </div>
-          {subtitle ? <p className="text-xs text-slate-500">{subtitle}</p> : null}
+          {subtitle ? (
+            <p className="text-xs text-slate-500 dark:text-slate-400">{subtitle}</p>
+          ) : null}
         </div>
       </div>
 

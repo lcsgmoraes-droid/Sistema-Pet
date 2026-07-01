@@ -27,7 +27,7 @@ export default function SegmentedControl({
     <div
       aria-label={ariaLabel}
       className={cx(
-        "inline-flex rounded-lg border border-slate-200 bg-slate-50 font-semibold",
+        "inline-flex rounded-lg border border-slate-200 bg-slate-50 font-semibold dark:border-slate-700 dark:bg-slate-900",
         containerSize,
         className,
       )}
@@ -50,8 +50,10 @@ export default function SegmentedControl({
               "rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-50",
               optionSize,
               active
-                ? option.activeClassName || "bg-white text-blue-700 shadow-sm"
-                : option.inactiveClassName || "text-slate-600 hover:bg-white/80",
+                ? option.activeClassName ||
+                    "bg-white text-blue-700 shadow-sm dark:bg-slate-800 dark:text-blue-200"
+                : option.inactiveClassName ||
+                    "text-slate-600 hover:bg-white/80 dark:text-slate-300 dark:hover:bg-slate-800",
             )}
           >
             {option.label}
