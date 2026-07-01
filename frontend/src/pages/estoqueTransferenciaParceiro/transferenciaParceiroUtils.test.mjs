@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  calcularDiferencaLancadaTransferencia,
+  calcularTotalDiferencaLancadaTransferencia,
   COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO,
   COLUNAS_DOCUMENTO_TRANSFERENCIA_RETIRADA,
   criarFiltrosHistoricoTransferencia,
@@ -147,6 +149,7 @@ test("helpers de item e payload mantem calculos da transferencia", () => {
     codigo: "DEF",
     codigo_barras: "789",
     estoque_atual: 3,
+    custo_base_unitario: 20.5,
     custo_unitario: 20.5,
     quantidade: 1,
     total_item: 20.5,
@@ -180,6 +183,34 @@ test("helpers de item e payload mantem calculos da transferencia", () => {
   );
 });
 
+test("helpers calculam diferenca do valor lancado contra o custo base", () => {
+  assert.equal(
+    calcularDiferencaLancadaTransferencia({
+      quantidade: 2,
+      custo_base_unitario: 20,
+      custo_unitario: 25,
+      total_item: 50,
+    }),
+    10,
+  );
+  assert.equal(
+    calcularDiferencaLancadaTransferencia({
+      quantidade: 1,
+      custo_base_unitario: 20,
+      custo_unitario: 18,
+      total_item: 18,
+    }),
+    -2,
+  );
+  assert.equal(
+    calcularTotalDiferencaLancadaTransferencia([
+      { quantidade: 2, custo_base_unitario: 20, total_item: 50 },
+      { quantidade: 1, custo_base_unitario: 20, total_item: 18 },
+    ]),
+    8,
+  );
+});
+
 test("helpers de edicao e baixa normalizam itens e compensacoes", () => {
   assert.deepEqual(
     criarItensEdicaoTransferencia(
@@ -208,6 +239,7 @@ test("helpers de edicao e baixa normalizam itens e compensacoes", () => {
         codigo: "DEF",
         codigo_barras: "789",
         estoque_atual: 3,
+        custo_base_unitario: 20,
         custo_unitario: 20,
         quantidade: 2,
         total_item: 40,

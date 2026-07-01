@@ -169,6 +169,7 @@ export function criarItemTransferencia(produto, timestamp = Date.now()) {
     codigo: produto.codigo,
     codigo_barras: produto.codigo_barras,
     estoque_atual: Number(produto?.estoque_atual || 0),
+    custo_base_unitario: custoUnitario,
     custo_unitario: custoUnitario,
     quantidade: 1,
     total_item: custoUnitario,
@@ -193,10 +194,34 @@ export function criarItensEdicaoTransferencia(registro, timestamp = Date.now()) 
     codigo: item.codigo,
     codigo_barras: item.codigo_barras,
     estoque_atual: Number(item.estoque_atual || 0),
+    custo_base_unitario: Number(item.custo_base_unitario ?? item.custo_unitario ?? 0),
     custo_unitario: Number(item.custo_unitario || 0),
     quantidade: Number(item.quantidade || 0),
     total_item: Number(item.valor_total || 0),
   }));
+}
+
+export function calcularDiferencaLancadaTransferencia(item = {}) {
+  const quantidade = normalizarNumero(item.quantidade);
+  const custoBase = normalizarNumero(item.custo_base_unitario ?? item.preco_custo);
+  const valorUnitarioLancado = normalizarNumero(item.custo_unitario);
+  const totalLancado =
+    item.total_item === "" || item.total_item === null || item.total_item === undefined
+      ? quantidade * valorUnitarioLancado
+      : normalizarNumero(item.total_item);
+
+  if (!Number.isFinite(quantidade) || !Number.isFinite(custoBase)) return 0;
+  if (!Number.isFinite(totalLancado)) return 0;
+
+  return Number((totalLancado - quantidade * custoBase).toFixed(2));
+}
+
+export function calcularTotalDiferencaLancadaTransferencia(itens = []) {
+  const total = (Array.isArray(itens) ? itens : []).reduce(
+    (acumulado, item) => acumulado + calcularDiferencaLancadaTransferencia(item),
+    0,
+  );
+  return Number(total.toFixed(2));
 }
 
 export function montarPayloadTransferencia(parceiroId, form, itens) {

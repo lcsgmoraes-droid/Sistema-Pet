@@ -29,6 +29,7 @@ export default function LancamentoTransferenciaParceiro({
   itens,
   totalQuantidade,
   totalRessarcimento,
+  totalDiferencaLancada,
   registrarTransferencia,
   salvando,
   modoEdicao,
@@ -47,7 +48,7 @@ export default function LancamentoTransferenciaParceiro({
               1. Pessoa responsavel e dados da transferencia
             </h2>
             <p className="mt-1 text-sm text-gray-600">
-              Primeiro selecione quem vai ressarcir o custo desta saida.
+              Primeiro selecione quem sera responsavel pelo ressarcimento ou acerto.
             </p>
           </div>
         </div>
@@ -239,14 +240,14 @@ export default function LancamentoTransferenciaParceiro({
           <div>
             <h2 className="text-lg font-semibold text-gray-900">3. Itens da transferencia</h2>
             <p className="mt-1 text-sm text-gray-600">
-              Ajuste as quantidades e confira o total de ressarcimento antes de salvar.
+              Ajuste as quantidades, valor lancado e total antes de salvar.
             </p>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
               {itens.length} item(ns) | {formatarQuantidade(totalQuantidade)} un |{" "}
-              {formatarMoeda(totalRessarcimento)}
+              Valor lancado {formatarMoeda(totalRessarcimento)}
             </div>
             <button
               type="button"
@@ -265,7 +266,7 @@ export default function LancamentoTransferenciaParceiro({
           </div>
         </div>
 
-        <div className="grid gap-3 border-b border-gray-100 px-6 py-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 border-b border-gray-100 px-6 py-4 md:grid-cols-2 xl:grid-cols-5">
           <ResumoTransferenciaCard
             titulo="Itens"
             valor={String(itens.length)}
@@ -279,10 +280,22 @@ export default function LancamentoTransferenciaParceiro({
             destaque="blue"
           />
           <ResumoTransferenciaCard
-            titulo="Ressarcimento"
+            titulo="Valor lancado"
             valor={formatarMoeda(totalRessarcimento)}
-            descricao="Total do acerto financeiro."
+            descricao="Total combinado para esta transferencia."
             destaque="emerald"
+          />
+          <ResumoTransferenciaCard
+            titulo="Dif. sobre custo"
+            valor={formatarMoeda(totalDiferencaLancada)}
+            descricao="Comparacao com o custo base dos itens."
+            destaque={
+              totalDiferencaLancada < 0
+                ? "amber"
+                : totalDiferencaLancada > 0
+                  ? "emerald"
+                  : "slate"
+            }
           />
           <ResumoTransferenciaCard
             titulo="Itens sem valor"
@@ -306,9 +319,10 @@ export default function LancamentoTransferenciaParceiro({
                 <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
                   <th className="px-6 py-4">Produto</th>
                   <th className="px-6 py-4">Estoque atual</th>
-                  <th className="px-6 py-4">Custo unit.</th>
+                  <th className="px-6 py-4">Custo base</th>
+                  <th className="px-6 py-4">Valor unit. lancado</th>
                   <th className="px-6 py-4">Quantidade</th>
-                  <th className="px-6 py-4">Total</th>
+                  <th className="px-6 py-4">Total lancado</th>
                   <th className="px-6 py-4 text-right">Acoes</th>
                 </tr>
               </thead>
@@ -326,6 +340,9 @@ export default function LancamentoTransferenciaParceiro({
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-700">
                         {formatarQuantidade(item.estoque_atual)}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-slate-700">
+                        {formatarMoeda(item.custo_base_unitario || 0)}
                       </td>
                       <td className="px-6 py-4">
                         <input

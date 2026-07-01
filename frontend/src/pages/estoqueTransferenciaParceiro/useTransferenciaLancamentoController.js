@@ -4,6 +4,7 @@ import api from "../../api";
 import { buscarClientes } from "../../api/clientes";
 import { getProdutos } from "../../api/produtos";
 import {
+  calcularTotalDiferencaLancadaTransferencia,
   criarFormTransferencia,
   criarItemTransferencia,
   criarItensEdicaoTransferencia,
@@ -119,6 +120,11 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
 
   const totalRessarcimento = useMemo(
     () => itens.reduce((acumulado, item) => acumulado + Number(item.total_item || 0), 0),
+    [itens],
+  );
+
+  const totalDiferencaLancada = useMemo(
+    () => calcularTotalDiferencaLancadaTransferencia(itens),
     [itens],
   );
 
@@ -400,6 +406,7 @@ export default function useTransferenciaLancamentoController({ setAbaAtiva } = {
     transferenciaEditando,
     totalQuantidade,
     totalRessarcimento,
+    totalDiferencaLancada,
     itensSemValor,
     selecionarParceiro,
     limparParceiro,

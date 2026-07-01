@@ -60,6 +60,7 @@ export default function useEstoqueTransferenciaParceiroController() {
       itens: lancamento.itens,
       totalQuantidade: lancamento.totalQuantidade,
       totalRessarcimento: lancamento.totalRessarcimento,
+      totalDiferencaLancada: lancamento.totalDiferencaLancada,
       registrarTransferencia: () =>
         void lancamento.registrarTransferencia(historico.recarregarPrimeiraPagina),
       salvando: lancamento.salvando,
