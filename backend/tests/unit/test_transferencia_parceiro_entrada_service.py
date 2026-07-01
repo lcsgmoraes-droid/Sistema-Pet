@@ -42,7 +42,9 @@ def test_preparar_itens_entrada_parceiro_usa_total_lancado_e_soma_divida():
     }
     itens = [
         SimpleNamespace(produto_id=10, quantidade=2, custo_unitario=25, valor_total=50),
-        SimpleNamespace(produto_id=11, quantidade=1, custo_unitario=None, valor_total=None),
+        SimpleNamespace(
+            produto_id=11, quantidade=1, custo_unitario=None, valor_total=None
+        ),
     ]
 
     processados, total = preparar_itens_entrada_parceiro(produtos, itens)
@@ -72,7 +74,11 @@ def test_preparar_itens_entrada_parceiro_rejeita_total_zerado():
     with pytest.raises(HTTPException) as exc_info:
         preparar_itens_entrada_parceiro(
             produtos,
-            [SimpleNamespace(produto_id=10, quantidade=1, custo_unitario=0, valor_total=0)],
+            [
+                SimpleNamespace(
+                    produto_id=10, quantidade=1, custo_unitario=0, valor_total=0
+                )
+            ],
         )
 
     assert exc_info.value.status_code == 400
