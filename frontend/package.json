@@ -9,6 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint:core": "eslint \"src/**/*.{js,jsx,ts,tsx,mjs,cjs}\" scripts --max-warnings=0",
     "format:core:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,mjs,cjs,css,md}\" scripts",
+    "test:theme-preference": "node scripts/test-theme-preference.mjs",
     "test:auth-storage": "node scripts/test-token-storage.mjs",
     "test:auth-refresh": "node scripts/test-refresh-manager.mjs",
     "test:corepet-branding": "node scripts/test-corepet-branding.mjs",
