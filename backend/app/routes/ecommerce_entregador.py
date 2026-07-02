@@ -227,7 +227,10 @@ def listar_entregas_abertas(
         .filter(
             Venda.tenant_id == tenant_id,
             Venda.tem_entrega.is_(True),
-            or_(Venda.status_entrega == "pendente", Venda.status_entrega.is_(None)),
+            or_(
+                Venda.status_entrega.in_(["pendente", "pronto"]),
+                Venda.status_entrega.is_(None),
+            ),
             Venda.endereco_entrega.isnot(None),
             or_(Venda.entregador_id == cliente.id, Venda.entregador_id.is_(None)),
         )
@@ -280,7 +283,10 @@ def otimizar_entregas_selecionadas(
             Venda.tenant_id == tenant_id,
             Venda.id.in_(payload.venda_ids),
             Venda.tem_entrega.is_(True),
-            or_(Venda.status_entrega == "pendente", Venda.status_entrega.is_(None)),
+            or_(
+                Venda.status_entrega.in_(["pendente", "pronto"]),
+                Venda.status_entrega.is_(None),
+            ),
             Venda.endereco_entrega.isnot(None),
             or_(Venda.entregador_id == cliente.id, Venda.entregador_id.is_(None)),
         )
@@ -332,7 +338,10 @@ def criar_rota_por_entregador(
             Venda.tenant_id == tenant_id,
             Venda.id.in_(payload.venda_ids),
             Venda.tem_entrega.is_(True),
-            or_(Venda.status_entrega == "pendente", Venda.status_entrega.is_(None)),
+            or_(
+                Venda.status_entrega.in_(["pendente", "pronto"]),
+                Venda.status_entrega.is_(None),
+            ),
             Venda.endereco_entrega.isnot(None),
             or_(Venda.entregador_id == cliente.id, Venda.entregador_id.is_(None)),
         )

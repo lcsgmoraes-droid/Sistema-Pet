@@ -155,7 +155,7 @@ def listar_vendas_pendentes_entrega(
     """
     Lista vendas com entrega pendente (sem rota criada ainda).
 
-    CRITÉRIO: tem_entrega = true E status_entrega = 'pendente' ou NULL
+    CRITÉRIO: tem_entrega = true E status_entrega = 'pendente', 'pronto' ou NULL
     Exclui vendas que já estão em rota, entregues ou canceladas.
 
     Retorna em ordem:
@@ -167,15 +167,16 @@ def listar_vendas_pendentes_entrega(
     user, tenant_id = user_and_tenant
 
     # Buscar vendas com entrega pendente
-    # CRITÉRIO: tem_entrega = true E status_entrega = 'pendente' ou NULL
+    # CRITÉRIO: tem_entrega = true E status_entrega = 'pendente', 'pronto' ou NULL
     # Exclui: 'em_rota', 'entregue', 'cancelada'
     vendas = (
         db.query(Venda)
         .filter(
             Venda.tenant_id == tenant_id,
             Venda.tem_entrega.is_(True),
-            # Aceita apenas vendas pendentes (ainda não entraram em rota)
-            (Venda.status_entrega == "pendente") | Venda.status_entrega.is_(None),
+            # Aceita vendas fora de rota, inclusive pedido online ja separado.
+            Venda.status_entrega.in_(["pendente", "pronto"])
+            | Venda.status_entrega.is_(None),
         )
         .order_by(
             # Primeiro: vendas com ordem otimizada
