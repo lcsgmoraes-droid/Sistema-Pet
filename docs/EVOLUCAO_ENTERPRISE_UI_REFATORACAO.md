@@ -216,7 +216,17 @@ Inventario atualizado em 2026-07-02 pela contagem operacional de linhas com cont
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
-- Observacao mobile: `app-mobile/src` ainda tem 7 arquivos acima de 700 linhas; a frente mobile foi iniciada e deve seguir separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+- Observacao mobile: `app-mobile/src` ainda tem 6 arquivos acima de 700 linhas; a frente mobile foi iniciada e deve seguir separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+
+Fatia mobile 700 batch 47 de 2026-07-02: `app-mobile/src/screens/pets/FoodCalculatorScreen.tsx` saiu da faixa acima de 700 linhas ao separar a calculadora de racao em conteudo, seletores, cards de resultado, styles e utils:
+
+- `app-mobile/src/screens/pets/FoodCalculatorScreen.tsx`: 959 -> 207 linhas com conteudo, mantendo carregamento de racoes/pets, calculo, comparacao e carrinho.
+- `app-mobile/src/screens/pets/food-calculator/FoodCalculatorContent.tsx`: concentra formulario, atividades, top 3, comparativo e composicao dos seletores.
+- `app-mobile/src/screens/pets/food-calculator/FoodCalculatorSelectors.tsx`: concentra modal de selecao de pet/racao e busca.
+- `app-mobile/src/screens/pets/food-calculator/FoodCalculatorResultCards.tsx`: concentra campo de formulario e cards/itens de resultado.
+- `app-mobile/src/screens/pets/food-calculator/FoodCalculatorStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/pets/food-calculator/FoodCalculatorUtils.ts`: concentra tipos do seletor, atividade e constantes.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-47-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
 
 Fatia mobile 700 batch 46 de 2026-07-02: `app-mobile/src/screens/pets/PetDetailScreen.tsx` saiu da faixa acima de 700 linhas ao separar detalhes do pet em conteudo, componentes compartilhados, folheto de vacinas, modal, styles e utils:
 
