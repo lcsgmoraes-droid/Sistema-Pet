@@ -43,57 +43,57 @@ const ModalRecebimento = ({ pedido, onClose, onReceber }) => {
             const itemPendente = { ...item, quantidade_pedida: quantidadePendente };
 
             return (
-            <div key={item.id} className="border rounded-lg p-4">
-              <div className="font-semibold mb-2">{item.produto_nome}</div>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">Pedido:</span>
-                  <span
-                    className="ml-2 font-semibold"
-                    title={montarTooltipQuantidadeCompraPedido(item)}
-                  >
-                    {formatarQuantidadeCompraPedido(item)}
-                  </span>
+              <div key={item.id} className="border rounded-lg p-4">
+                <div className="font-semibold mb-2">{item.produto_nome}</div>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Pedido:</span>
+                    <span
+                      className="ml-2 font-semibold"
+                      title={montarTooltipQuantidadeCompraPedido(item)}
+                    >
+                      {formatarQuantidadeCompraPedido(item)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Já Recebido:</span>
+                    <span
+                      className="ml-2 font-semibold"
+                      title={montarTooltipQuantidadeCompraPedido(itemRecebido)}
+                    >
+                      {formatarQuantidadeCompraPedido(itemRecebido)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Pendente:</span>
+                    <span className="ml-2 font-semibold text-orange-600">
+                      {formatarQuantidadeCompraPedido(itemPendente)}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-gray-600">Já Recebido:</span>
-                  <span
-                    className="ml-2 font-semibold"
-                    title={montarTooltipQuantidadeCompraPedido(itemRecebido)}
-                  >
-                    {formatarQuantidadeCompraPedido(itemRecebido)}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-600">Pendente:</span>
-                  <span className="ml-2 font-semibold text-orange-600">
-                    {formatarQuantidadeCompraPedido(itemPendente)}
-                  </span>
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Quantidade a receber ({item.unidade_compra || "UN"})
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max={itensRecebimento[index].max}
+                    value={itensRecebimento[index].quantidade_recebida}
+                    onChange={(e) => {
+                      const novoValor = parseFloat(e.target.value) || 0;
+                      const novaLista = [...itensRecebimento];
+                      novaLista[index].quantidade_recebida = Math.min(
+                        novoValor,
+                        novaLista[index].max,
+                      );
+                      setItensRecebimento(novaLista);
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
               </div>
-              <div className="mt-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quantidade a receber ({item.unidade_compra || "UN"})
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max={itensRecebimento[index].max}
-                  value={itensRecebimento[index].quantidade_recebida}
-                  onChange={(e) => {
-                    const novoValor = parseFloat(e.target.value) || 0;
-                    const novaLista = [...itensRecebimento];
-                    novaLista[index].quantidade_recebida = Math.min(
-                      novoValor,
-                      novaLista[index].max,
-                    );
-                    setItensRecebimento(novaLista);
-                  }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
             );
           })}
         </div>

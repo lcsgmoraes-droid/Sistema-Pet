@@ -602,7 +602,9 @@ def _ensure_financial_category(
     )
 
 
-def _ensure_accounting_setup(db, *, tenant_id: str, user_id: int) -> dict[str, dict[str, Any]]:
+def _ensure_accounting_setup(
+    db, *, tenant_id: str, user_id: int
+) -> dict[str, dict[str, Any]]:
     dre_specs = {
         "receita_produtos": (
             "Receitas de Vendas",
@@ -742,13 +744,23 @@ def _ensure_accounting_setup(db, *, tenant_id: str, user_id: int) -> dict[str, d
     }
 
     category_specs = {
-        "receita_produtos": ("Receitas de Vendas", "receita", "#059669", "shopping-cart"),
+        "receita_produtos": (
+            "Receitas de Vendas",
+            "receita",
+            "#059669",
+            "shopping-cart",
+        ),
         "receita_app": ("Vendas App", "receita", "#0F766E", "smartphone"),
         "receita_ecommerce": ("Vendas Ecommerce", "receita", "#2563EB", "globe"),
         "descontos": ("Descontos Concedidos", "despesa", "#EA580C", "badge-percent"),
         "cmv": ("CMV", "despesa", "#475569", "package"),
         "taxas_cartao": ("Taxas de Cartao", "despesa", "#7C3AED", "credit-card"),
-        "comissoes_vendas": ("Comissoes de Vendas", "despesa", "#4F46E5", "badge-dollar-sign"),
+        "comissoes_vendas": (
+            "Comissoes de Vendas",
+            "despesa",
+            "#4F46E5",
+            "badge-dollar-sign",
+        ),
         "frete_vendas": ("Fretes sobre Vendas", "despesa", "#0891B2", "truck"),
         "repasse_entrega": ("Repasse Entregador", "despesa", "#0E7490", "route"),
         "compra_mercadorias": ("Compra de Mercadorias", "despesa", "#92400E", "boxes"),
@@ -1822,12 +1834,34 @@ def _ensure_fallback_products(db, *, tenant_id: str, user_id: int) -> None:
     if int(count or 0) >= 4:
         return
 
-    category_id = _ensure_demo_product_category(db, tenant_id=tenant_id, user_id=user_id)
+    category_id = _ensure_demo_product_category(
+        db, tenant_id=tenant_id, user_id=user_id
+    )
     products = [
-        ("DEMO-RACAO-10KG", "Racao Premium Adulto 10kg", Decimal("128.00"), Decimal("189.90")),
-        ("DEMO-RACAO-FILHOTE", "Racao Filhote Frango 3kg", Decimal("42.00"), Decimal("69.90")),
-        ("DEMO-PETISCO-120G", "Petisco Natural 120g", Decimal("10.00"), Decimal("24.90")),
-        ("DEMO-SHAMPOO-500ML", "Shampoo Neutro 500ml", Decimal("18.00"), Decimal("39.90")),
+        (
+            "DEMO-RACAO-10KG",
+            "Racao Premium Adulto 10kg",
+            Decimal("128.00"),
+            Decimal("189.90"),
+        ),
+        (
+            "DEMO-RACAO-FILHOTE",
+            "Racao Filhote Frango 3kg",
+            Decimal("42.00"),
+            Decimal("69.90"),
+        ),
+        (
+            "DEMO-PETISCO-120G",
+            "Petisco Natural 120g",
+            Decimal("10.00"),
+            Decimal("24.90"),
+        ),
+        (
+            "DEMO-SHAMPOO-500ML",
+            "Shampoo Neutro 500ml",
+            Decimal("18.00"),
+            Decimal("39.90"),
+        ),
         ("DEMO-COLEIRA-M", "Coleira Ajustavel M", Decimal("22.00"), Decimal("49.90")),
         ("DEMO-AREIA-4KG", "Areia Higienica 4kg", Decimal("16.00"), Decimal("32.90")),
     ]
@@ -1949,7 +1983,12 @@ def _demo_price_profile_for_product(
         return money(price * Decimal("0.62")), money(price)
 
     if weight_kg and weight_kg < Decimal("1"):
-        prices = [Decimal("19.90"), Decimal("24.90"), Decimal("34.90"), Decimal("49.90")]
+        prices = [
+            Decimal("19.90"),
+            Decimal("24.90"),
+            Decimal("34.90"),
+            Decimal("49.90"),
+        ]
         price = prices[idx % len(prices)]
         return money(price * Decimal("0.48")), money(price)
 
@@ -2026,7 +2065,9 @@ def _product_pool(db, *, tenant_id: str, user_id: int) -> list[dict[str, Any]]:
     return products
 
 
-def _sale_items(products: list[dict[str, Any]], scenario: SaleScenario) -> list[dict[str, Any]]:
+def _sale_items(
+    products: list[dict[str, Any]], scenario: SaleScenario
+) -> list[dict[str, Any]]:
     items = []
     for idx, qty in scenario.items:
         product = products[idx % len(products)]
@@ -2095,7 +2136,9 @@ def _insert_cashier(
     bank_cash_id: int,
     base_date: date,
 ) -> int:
-    opened_at = datetime.combine(base_date - timedelta(days=10), time(hour=8, minute=30))
+    opened_at = datetime.combine(
+        base_date - timedelta(days=10), time(hour=8, minute=30)
+    )
     return int(
         _scalar(
             db,
@@ -2140,14 +2183,18 @@ def _insert_sale(
     cashier_id: int,
 ) -> dict[str, Any]:
     sale_day = base_date - timedelta(days=scenario.days_ago)
-    sale_dt = datetime.combine(sale_day, time(hour=10 + scenario.days_ago % 6, minute=15))
+    sale_dt = datetime.combine(
+        sale_day, time(hour=10 + scenario.days_ago % 6, minute=15)
+    )
     subtotal = money(sum(item["subtotal"] for item in items))
     discount = _discount_for(scenario, subtotal)
     total = money(subtotal - discount + scenario.delivery_fee)
     cmv = money(sum(item["product"]["preco_custo"] * item["qty"] for item in items))
     received_amount = money(total * scenario.received_ratio)
     payment = _payment_profile(support, scenario.payment_key)
-    card_fee = money(total * payment["fee_percent"] / Decimal("100") + payment["fee_fixed"])
+    card_fee = money(
+        total * payment["fee_percent"] / Decimal("100") + payment["fee_fixed"]
+    )
     due_days = scenario.due_in_days or payment["due_days"]
     due_date = sale_day + timedelta(days=due_days)
     received_date = sale_day if scenario.received_ratio > 0 else None
@@ -2246,7 +2293,9 @@ def _insert_sale(
                 "driver_id": driver_id,
                 "delivery_address": _delivery_address(db, client_id),
                 "delivery_km": scenario.delivery_km or None,
-                "delivery_obs": "Demo operacional - entrega com rota" if scenario.delivery else None,
+                "delivery_obs": "Demo operacional - entrega com rota"
+                if scenario.delivery
+                else None,
                 "delivery_status": _sale_delivery_status(scenario.route_status),
                 "delivery_date": sale_dt + timedelta(hours=2)
                 if scenario.route_status == "concluida"
@@ -2260,9 +2309,15 @@ def _insert_sale(
                 "finalized_at": sale_dt if scenario.received_ratio >= 1 else None,
                 "sale_dt": sale_dt,
                 "snapshot": json.dumps(snapshot, default=decimal_json),
-                "tipo_retirada": "proprio" if scenario.order_id and not scenario.delivery else None,
-                "palavra_chave": "core-demo" if scenario.order_id and not scenario.delivery else None,
-                "retirado_por": "Cliente demo" if scenario.order_id and not scenario.delivery else None,
+                "tipo_retirada": "proprio"
+                if scenario.order_id and not scenario.delivery
+                else None,
+                "palavra_chave": "core-demo"
+                if scenario.order_id and not scenario.delivery
+                else None,
+                "retirado_por": "Cliente demo"
+                if scenario.order_id and not scenario.delivery
+                else None,
                 "tenant_id": tenant_id,
             },
         )
@@ -2305,7 +2360,9 @@ def _insert_sale(
             "installments": scenario.installments,
             "transaction": f"DEMO-TX-{scenario.number[-3:]}",
             "authorization": f"DEMO-AUT-{scenario.number[-3:]}",
-            "nsu": f"DEMO-NSU-{scenario.number[-3:]}" if payment["fee_percent"] else None,
+            "nsu": f"DEMO-NSU-{scenario.number[-3:]}"
+            if payment["fee_percent"]
+            else None,
             "conciliation_status": "conciliado"
             if scenario.received_ratio >= 1
             else "nao_conciliado",
@@ -2662,7 +2719,9 @@ def _insert_receivable(
                 "discount": discount,
                 "sale_day": sale_day,
                 "due_date": due_date,
-                "received_date": received_date if scenario.received_ratio >= 1 else None,
+                "received_date": received_date
+                if scenario.received_ratio >= 1
+                else None,
                 "status": status,
                 "parcelado": scenario.installments > 1,
                 "installments": scenario.installments,
@@ -2673,23 +2732,33 @@ def _insert_receivable(
                 "nsu": f"DEMO-NSU-{scenario.number[-3:]}"
                 if scenario.payment_key in {"debito", "credito"}
                 else None,
-                "adquirente": "Stone" if scenario.payment_key in {"debito", "credito"} else None,
+                "adquirente": "Stone"
+                if scenario.payment_key in {"debito", "credito"}
+                else None,
                 "conciliado": scenario.received_ratio >= 1,
-                "data_conciliacao": received_date if scenario.received_ratio >= 1 else None,
+                "data_conciliacao": received_date
+                if scenario.received_ratio >= 1
+                else None,
                 "status_conciliacao": "liquidada"
                 if scenario.received_ratio >= 1
                 else "confirmada_operadora"
                 if scenario.received_ratio > 0
                 else "prevista",
-                "taxa_mdr": Decimal("3.49") if scenario.payment_key == "credito" else Decimal("1.89")
+                "taxa_mdr": Decimal("3.49")
+                if scenario.payment_key == "credito"
+                else Decimal("1.89")
                 if scenario.payment_key == "debito"
                 else None,
                 "liquid_estimated": liquid_estimated,
-                "liquid_real": liquid_estimated if scenario.received_ratio >= 1 else None,
+                "liquid_real": liquid_estimated
+                if scenario.received_ratio >= 1
+                else None,
                 "tipo_recebimento": "parcela_individual"
                 if scenario.installments > 1
                 else "avista",
-                "data_liquidacao": received_date if scenario.received_ratio >= 1 else None,
+                "data_liquidacao": received_date
+                if scenario.received_ratio >= 1
+                else None,
                 "user_id": user_id,
                 "tenant_id": tenant_id,
             },
@@ -2757,9 +2826,7 @@ def _insert_commissions_for_sale(
                 Decimal("0"),
             )
         )
-        full_commission = money(
-            full_base * DEFAULT_COMMISSION_PERCENT / Decimal("100")
-        )
+        full_commission = money(full_base * DEFAULT_COMMISSION_PERCENT / Decimal("100"))
         generated_commission = money(full_commission * paid_ratio)
         if generated_commission <= 0:
             continue
@@ -3188,7 +3255,11 @@ def _insert_route(
     address: str,
 ) -> None:
     started = sale_dt + timedelta(hours=1)
-    finished = started + timedelta(minutes=45) if scenario.route_status == "concluida" else None
+    finished = (
+        started + timedelta(minutes=45)
+        if scenario.route_status == "concluida"
+        else None
+    )
     route_id = int(
         _scalar(
             db,
@@ -3571,7 +3642,9 @@ def _insert_stock_purchase_movements(
         )
 
 
-def _finalize_product_stock(db, *, tenant_id: str, products: Iterable[dict[str, Any]]) -> None:
+def _finalize_product_stock(
+    db, *, tenant_id: str, products: Iterable[dict[str, Any]]
+) -> None:
     for product in products:
         final_qty = money(product["baseline"] - product["sold_qty"])
         db.execute(
