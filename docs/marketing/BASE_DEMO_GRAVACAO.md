@@ -5,6 +5,7 @@ Pet sem expor dados reais de clientes.
 
 Arquivos executaveis da base demo:
 
+- Seed operacional local: `backend/app/scripts/seed_demo_operacional.py`
 - Dados estruturados: `docs/marketing/base-demo/dados_base_demo_sistema_pet.json`
 - Validador/checklist: `scripts/validar_base_demo_marketing.py`
 - Contrato: `scripts/test_marketing_demo_package.py`
@@ -12,6 +13,49 @@ Arquivos executaveis da base demo:
 - Contrato do manifesto: `scripts/test_marketing_demo_seed_plan.py`
 - Aplicador dry-run/apply DEV: `scripts/aplicar_seed_base_demo_marketing.py`
 - Contrato do aplicador: `scripts/test_marketing_demo_seed_apply.py`
+
+## Base operacional validada em 2026-06-28
+
+Tenant local de gravacao:
+
+| Campo | Valor |
+|---|---|
+| Email | `corepeterp@gmail.com` |
+| Senha local | `12345678` |
+| URL local | `http://127.0.0.1:5173/login` |
+| Tenant id local | `569aa16d-f13c-422f-b23e-a15fa9bbfd68` |
+| Fonte de catalogo | Snapshot reduzido da loja `atacadaopetpp@gmail.com` |
+
+Comando usado para recriar a base operacional em DEV/local:
+
+```powershell
+$env:DATABASE_URL='postgresql+psycopg2://postgres:postgres@localhost:5433/petshop_dev'
+$env:ENVIRONMENT='development'
+python backend/app/scripts/seed_demo_operacional.py --target-email corepeterp@gmail.com --source-email atacadaopetpp@gmail.com --base-date 2026-06-28 --apply
+```
+
+Resultado validado:
+
+- 50 produtos reais ativos, todos com imagem.
+- 0 produtos fallback `DEMO-*` ativos.
+- 18 faixas de preco, sem preco zerado.
+- 6 vendas demo com canais ERP/PDV, ecommerce e app.
+- 17 contas a pagar, 6 contas a receber e 5 recebimentos.
+- 3 rotas de entrega com entregador cadastrado.
+- 17 movimentacoes de estoque.
+- 11 movimentacoes financeiras.
+- 8 itens de comissao para Beatriz Vendedora Demo.
+- Imposto demo de 6,25% e comissao demo de 4%.
+
+Telas ja conferidas para gravacao:
+
+- `/financeiro/vendas`: lista de vendas com margem, CMV, imposto, desconto, taxa de pagamento, campanha e comissao.
+- `/produtos`: 50 produtos reais, imagens e precos plausiveis.
+- `/calculadora-racao`: comparativo de racoes funcionando com 10 opcoes e custo por dia.
+- `/comissoes`: Beatriz Vendedora Demo aparece com 1 regra geral.
+- `/comissoes/abertas`: 8 comissoes pendentes, total R$ 60,13.
+- `/entregas/rotas`: rotas pendente e em rota com Carlos Entregador Demo.
+- `/financeiro`: dashboard executivo com leitura automatica, alertas e contas vencidas.
 
 ## Objetivo
 
@@ -38,12 +82,10 @@ A base demo precisa permitir gravar:
 - Nao usar tenant/e-mail ja utilizado por operacao real.
 - E-mail sugerido para criar o tenant demo desta leva:
   `corepeterp@gmail.com`.
-- A aplicacao automatica atual cria apenas cadastros-base seguros: bancos,
-  formas de pagamento, categorias financeiras, fornecedores, clientes, pets,
-  produtos e servicos de banho/tosa.
-- A aplicacao automatica ainda pula empresa, usuarios, impostos, compras,
-  ecommerce, videos e servicos veterinarios; estes continuam em conferencia
-  manual antes da gravacao.
+- A seed operacional atual cria a historia principal de vendas, financeiro,
+  estoque, entregas, RH e comissoes para gravacao local.
+- Banho e tosa, veterinario, XML real e integracoes externas continuam em
+  conferencia manual antes de entrarem nos videos.
 
 ## Identidade da empresa demo
 
@@ -75,12 +117,16 @@ A base demo precisa permitir gravar:
 
 ## Produtos demo
 
-| Produto | Categoria | Preco venda | Custo sugerido | Estoque inicial |
-|---|---|---:|---:|---:|
-| Racao Adulto 10kg | Racoes | 189,90 | 128,00 | 20 |
-| Shampoo Neutro Pet 500ml | Higiene | 39,90 | 18,00 | 15 |
-| Coleira Ajustavel M | Acessorios | 49,90 | 22,00 | 12 |
-| Petisco Natural 120g | Petiscos | 24,90 | 10,00 | 30 |
+A base validada usa 50 produtos reais importados da base do Lucas, priorizando
+produtos com imagem. Exemplos bons para gravacao:
+
+| Produto | Uso visual | Faixa validada |
+|---|---|---|
+| Racao Bob Dog Premium Gourmet 25KG | Comparador de racao | R$ 219,90 |
+| Racao Special Dog Junior 20kg | Comparador de racao | R$ 219,90 |
+| Racao Bionatural Prime Adultos 15kg | Comparador de racao | R$ 169,90 |
+| Racao Special Cat Ultralife 10,1kg | Comparador de racao | R$ 129,90 a R$ 159,90 |
+| Petiscos e snacks com imagem | Tela de produtos/estoque | R$ 19,90 a R$ 59,90 |
 
 ## Clientes e pets demo
 
@@ -160,11 +206,18 @@ Evitar:
 12. Configurar ecommerce/app demo.
 13. Conferir relatorios com dados suficientes.
 
+Para a base `corepeterp@gmail.com`, a gravacao deve comecar por telas ja
+populadas: vendas, produtos, calculadora de racao, comissoes, entregas,
+contas a pagar/receber, fluxo de caixa, DRE e dashboard financeiro. Evitar
+comecar pelo dashboard financeiro se o objetivo do criativo for venda; ele
+mostra um cenario de alerta, melhor para falar de controle e risco.
+
 ## Checklist antes de gravar
 
 - Rodar `python scripts/test_marketing_demo_package.py`.
 - Rodar `python scripts/test_marketing_demo_seed_plan.py`.
 - Rodar `python scripts/test_marketing_demo_seed_apply.py`.
+- Rodar `python -m pytest backend/tests/unit/test_seed_demo_operacional.py`.
 - Rodar `python scripts/validar_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --markdown`.
 - Gerar o manifesto com `python scripts/gerar_seed_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --tenant-slug tenant_demo --format markdown`.
 - Simular a aplicacao com `python scripts/aplicar_seed_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --tenant-slug corepeterp_demo --tenant-email corepeterp@gmail.com --dry-run`.
@@ -174,11 +227,12 @@ Evitar:
 - Todas as telas dos roteiros carregam.
 - Os dados ficticios aparecem com nomes consistentes.
 - Existem vendas suficientes para relatorios.
-- Existem produtos com estoque.
-- Existe ao menos uma compra/entrada XML.
-- Existem agendamentos de banho e tosa.
-- Existe um atendimento veterinario demo.
-- Existe um pedido ecommerce/app demo.
+- Existem produtos reais com imagem, estoque, custo e preco.
+- Existem contas a pagar, contas a receber, recebimentos e movimentacoes financeiras.
+- Existem rotas de entrega e custos de entrega.
+- Existem funcionarios/RH e vendedor comissionado.
+- Existe pedido ecommerce/app demo.
+- Compra/XML, banho e tosa e veterinario ainda precisam de conferencia manual antes de gravar.
 - Nenhuma tela exibe dado sensivel real.
 
 ## Evidencias da base demo

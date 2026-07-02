@@ -133,6 +133,9 @@ class PedidoCompraItem(BaseTenantModel):
     # Quantidades
     quantidade_pedida = Column(Float, nullable=False)
     quantidade_recebida = Column(Float, default=0)
+    unidade_compra = Column(String(10), nullable=False, default="UN")
+    quantidade_por_embalagem = Column(Float, nullable=False, default=1)
+    quantidade_total_unidades = Column(Float, nullable=False, default=0)
 
     # Valores
     preco_unitario = Column(Float, nullable=False)

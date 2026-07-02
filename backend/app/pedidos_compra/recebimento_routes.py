@@ -15,6 +15,7 @@ from ..produtos_models import (
     Produto,
     ProdutoLote,
 )
+from .quantidades import calcular_quantidade_total_unidades
 from .schemas import RecebimentoPedidoRequest
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,11 @@ def receber_pedido(
 
         # Atualizar quantidade recebida
         item.quantidade_recebida += receb_item.quantidade_recebida
+        quantidade_recebida_unidades = calcular_quantidade_total_unidades(
+            receb_item.quantidade_recebida,
+            getattr(item, "unidade_compra", None),
+            getattr(item, "quantidade_por_embalagem", None),
+        )
 
         # Atualizar status do item
         if item.quantidade_recebida >= item.quantidade_pedida:
@@ -116,8 +122,8 @@ def receber_pedido(
         lote = ProdutoLote(
             produto_id=produto.id,
             nome_lote=numero_lote,
-            quantidade_inicial=receb_item.quantidade_recebida,
-            quantidade_disponivel=receb_item.quantidade_recebida,
+            quantidade_inicial=quantidade_recebida_unidades,
+            quantidade_disponivel=quantidade_recebida_unidades,
             quantidade_reservada=0,
             custo_unitario=custo_unitario_lote,
             data_fabricacao=None,
@@ -132,15 +138,15 @@ def receber_pedido(
         # Atualizar estoque do produto
         produto.estoque_atual = (
             produto.estoque_atual or 0
-        ) + receb_item.quantidade_recebida
+        ) + quantidade_recebida_unidades
 
         # Recalcular custo médio ponderado
         if produto.custo_medio:
             estoque_anterior = (
                 produto.estoque_atual or 0
-            ) - receb_item.quantidade_recebida
+            ) - quantidade_recebida_unidades
             valor_anterior = estoque_anterior * produto.custo_medio
-            valor_entrada = receb_item.quantidade_recebida * lote.custo_unitario
+            valor_entrada = quantidade_recebida_unidades * lote.custo_unitario
             produto.custo_medio = (
                 valor_anterior + valor_entrada
             ) / produto.estoque_atual
@@ -152,12 +158,12 @@ def receber_pedido(
             produto_id=produto.id,
             lote_id=lote.id,
             tipo_movimentacao="entrada",
-            quantidade=receb_item.quantidade_recebida,
+            quantidade=quantidade_recebida_unidades,
             custo_unitario=lote.custo_unitario,
             motivo=f"Recebimento do pedido {pedido.numero_pedido}",
             documento=pedido.numero_pedido,
             estoque_anterior=(produto.estoque_atual or 0)
-            - receb_item.quantidade_recebida,
+            - quantidade_recebida_unidades,
             estoque_atual=produto.estoque_atual,
             user_id=current_user.id,
             tenant_id=tenant_id,
@@ -170,6 +176,7 @@ def receber_pedido(
                 "produto_id": produto.id,
                 "produto_nome": produto.nome,
                 "quantidade_recebida": receb_item.quantidade_recebida,
+                "quantidade_recebida_unidades": quantidade_recebida_unidades,
                 "lote": numero_lote,
                 "status": item.status,
             }
@@ -178,7 +185,7 @@ def receber_pedido(
 
         logger.info(
             f"  ✅ Item {item.id}: {produto.nome} - "
-            f"{receb_item.quantidade_recebida} unidades recebidas"
+            f"{quantidade_recebida_unidades} unidades recebidas"
         )
 
     # Atualizar status do pedido

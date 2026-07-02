@@ -28,6 +28,34 @@ Ao final da captura, deve existir material bruto suficiente para montar:
 | Narracao | Preferir gravar tela limpa e narrar depois |
 | Corte | Cada take deve ter inicio e fim claros |
 
+## Fila validada para a base `corepeterp@gmail.com`
+
+Estes takes ja foram conferidos no navegador local em 2026-06-28 e podem ser
+gravados primeiro.
+
+| Take | Video principal | Formato | Tela inicial | O que mostrar | Observacao de gravacao |
+|---|---|---|---|---|---|
+| V01 | Visao geral de vendas | 16:9 | `/financeiro/vendas` | Lista de Vendas com 6 vendas, canais, margem, CMV, imposto, desconto, taxa, comissao e campanha | Melhor tela para abrir apresentacao operacional |
+| V02 | Lucro real | 16:9 e corte 9:16 | `/financeiro/vendas` | Cards de venda bruta, liquida, custo, lucro e margem | Dar zoom em um indicador por vez |
+| V03 | Recebimentos baguncados | 16:9 | `/financeiro/contas-receber` | Contas a receber, recebidos e previsao de recebimento | Mostrar venda aberta e venda baixada |
+| V04 | Contas a pagar | 16:9 | `/financeiro/contas-pagar` | Despesas fixas, taxas de cartao, entregas, comissoes e impostos | Usar como ponte para DRE/ponto de equilibrio |
+| V05 | Fluxo de caixa | 16:9 | `/financeiro/fluxo-caixa` | Entradas, saidas, previsto e realizado | Bom para explicar previsao vs efetivo |
+| V06 | DRE e resultado | 16:9 | `/financeiro/dre` | Receita, impostos, CMV, despesas e resultado | Nao comecar por aqui em criativo curto |
+| V07 | Produtos reais | 16:9 e 9:16 | `/produtos` | 50 produtos reais com imagem, custo, margem, preco, estoque e canais app/ecommerce | Evitar produtos com nome longo demais no corte vertical |
+| V08 | Comparador de racao | 16:9 e 9:16 | `/calculadora-racao` | Peso 12kg, idade 36 meses, Comparar Todas, custo/dia e preco/kg | Este e o take mais forte para diferencial de produto |
+| V09 | Comissoes configuradas | 16:9 | `/comissoes` | Beatriz Vendedora Demo com 1 regra geral | Mostra que a tela de cadastro nao esta vazia |
+| V10 | Comissoes em aberto | 16:9 | `/comissoes/abertas` | 8 comissoes, total R$ 60,13, funcionario e ultima venda | Usar depois de vendas para conectar causa e efeito |
+| V11 | Rotas de entrega | 16:9 | `/entregas/rotas` | Carlos Entregador Demo, rota pendente e rota em andamento | Bom para mostrar processo operacional fora do caixa |
+| V12 | Dashboard financeiro | 16:9 | `/financeiro` | Leitura automatica, risco elevado, alertas e contas vencidas | Usar como criativo de controle/alerta, nao como primeiro take comercial |
+
+Takes ainda pendentes de revisao antes de gravar:
+
+- Banho e tosa.
+- Veterinario.
+- Entrada XML real.
+- Integracoes Bling/WhatsApp.
+- Configuracao publica do ecommerce se for mostrar link externo.
+
 ## Conferencia antes de gravar
 
 Regra central: Nao gravar dados reais.
@@ -39,11 +67,12 @@ Regra central: Nao gravar dados reais.
 5. Gerar o manifesto com `python scripts/gerar_seed_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --tenant-slug tenant_demo --format markdown`.
 6. Simular a aplicacao com `python scripts/aplicar_seed_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --tenant-slug corepeterp_demo --tenant-email corepeterp@gmail.com --dry-run`.
 7. Se o tenant for DEV/demo confirmado, aplicar os cadastros-base seguros com `python scripts/aplicar_seed_base_demo_marketing.py --json docs/marketing/base-demo/dados_base_demo_sistema_pet.json --tenant-slug corepeterp_demo --tenant-email corepeterp@gmail.com --environment development --apply`.
-8. Conferir manualmente empresa, usuarios, impostos, compras, ecommerce e servicos veterinarios, pois a aplicacao automatica ainda pula essas secoes.
-9. Confirmar que a tela nao exibe CPF, CNPJ real, telefone real, email real, token ou webhook.
-10. Fechar notificacoes, abas pessoais e extensoes visiveis.
-11. Abrir somente a tela inicial do take.
-12. Conferir se o dado demo aparece com nome consistente.
+8. Recriar a base operacional local com `backend/app/scripts/seed_demo_operacional.py`, quando o objetivo for gravar vendas, financeiro, produtos, entregas e comissoes.
+9. Conferir manualmente empresa, usuarios, compras/XML, ecommerce externo, banho e tosa e veterinario quando estes modulos entrarem no video.
+10. Confirmar que a tela nao exibe CPF, CNPJ real, telefone real, email real, token ou webhook.
+11. Fechar notificacoes, abas pessoais e extensoes visiveis.
+12. Abrir somente a tela inicial do take.
+13. Conferir se o dado demo aparece com nome consistente.
 
 ## Fila de takes prioritarios
 

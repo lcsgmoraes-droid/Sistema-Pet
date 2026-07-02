@@ -67,6 +67,8 @@ export function createPedidosCompraOperacoesController({
         itens: formData.itens.map((item) => ({
           produto_id: item.produto_id,
           quantidade_pedida: parseFloat(item.quantidade_pedida),
+          unidade_compra: item.unidade_compra || "UN",
+          quantidade_por_embalagem: parseFloat(item.quantidade_por_embalagem || 1),
           preco_unitario: parseFloat(item.preco_unitario),
           desconto_item: parseFloat(item.desconto_item || 0),
         })),
@@ -337,6 +339,8 @@ export function createPedidosCompraOperacoesController({
         itens: formData.itens.map((item) => ({
           produto_id: item.produto_id,
           quantidade_pedida: parseFloat(item.quantidade_pedida),
+          unidade_compra: item.unidade_compra || "UN",
+          quantidade_por_embalagem: parseFloat(item.quantidade_por_embalagem || 1),
           preco_unitario: parseFloat(item.preco_unitario),
           desconto_item: parseFloat(item.desconto_item || 0),
         })),

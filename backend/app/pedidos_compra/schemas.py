@@ -6,6 +6,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from .exportacao import PEDIDO_EXPORT_COLUNAS_DEFAULT
+from .quantidades import UNIDADE_COMPRA_PADRAO
 
 
 class PedidoCompraItemRequest(BaseModel):
@@ -13,6 +14,8 @@ class PedidoCompraItemRequest(BaseModel):
 
     produto_id: int
     quantidade_pedida: float = Field(gt=0)
+    unidade_compra: str = Field(default=UNIDADE_COMPRA_PADRAO, max_length=10)
+    quantidade_por_embalagem: float = Field(default=1, gt=0)
     preco_unitario: float = Field(ge=0)
     desconto_item: float = Field(default=0, ge=0)
 

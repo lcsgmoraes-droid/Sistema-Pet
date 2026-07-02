@@ -21,6 +21,8 @@ const FORM_DATA_INICIAL = {
 const ITEM_FORM_INICIAL = {
   produto_id: "",
   quantidade_pedida: "",
+  unidade_compra: "UN",
+  quantidade_por_embalagem: "1",
   preco_unitario: "",
 };
 

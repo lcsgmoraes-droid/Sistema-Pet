@@ -328,10 +328,19 @@ def _insert_and_lookup(
     lookup_params: dict[str, Any],
 ) -> int:
     table_columns = _columns(db, table_name)
+    dialect_name = db.get_bind().dialect.name
     filtered = {
         key: value
         for key, value in values.items()
         if key in table_columns and key != "id"
+    }
+    filtered = {
+        key: (
+            _json_bind_value(value, dialect_name)
+            if isinstance(value, (dict, list))
+            else value
+        )
+        for key, value in filtered.items()
     }
     if "created_at" in table_columns and "created_at" not in filtered:
         filtered["created_at"] = _now()
@@ -369,3 +378,11 @@ def _existing_id_by_name(
         ),
         {"tenant_id": tenant_id, "nome": name},
     ).scalar()
+
+
+def _json_bind_value(value: dict[str, Any] | list[Any], dialect_name: str) -> Any:
+    if dialect_name == "postgresql":
+        from psycopg2.extras import Json
+
+        return Json(value)
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)
