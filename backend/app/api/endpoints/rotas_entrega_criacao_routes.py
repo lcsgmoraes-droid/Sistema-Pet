@@ -85,7 +85,10 @@ def criar_rota(
         if actor.entregador is not None:
             vendas_query = vendas_query.filter(
                 Venda.tem_entrega.is_(True),
-                or_(Venda.status_entrega == "pendente", Venda.status_entrega.is_(None)),
+                or_(
+                    Venda.status_entrega.in_(["pendente", "pronto"]),
+                    Venda.status_entrega.is_(None),
+                ),
                 Venda.endereco_entrega.isnot(None),
                 or_(
                     Venda.entregador_id == actor.entregador.id,
@@ -235,7 +238,10 @@ def criar_rota(
     if actor.entregador is not None:
         venda_query = venda_query.filter(
             Venda.tem_entrega.is_(True),
-            or_(Venda.status_entrega == "pendente", Venda.status_entrega.is_(None)),
+            or_(
+                Venda.status_entrega.in_(["pendente", "pronto"]),
+                Venda.status_entrega.is_(None),
+            ),
             Venda.endereco_entrega.isnot(None),
             or_(
                 Venda.entregador_id == actor.entregador.id,

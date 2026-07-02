@@ -1,5 +1,9 @@
 import { useState } from "react";
 import { toast } from "react-hot-toast";
+import {
+  formatarQuantidadeCompraPedido,
+  montarTooltipQuantidadeCompraPedido,
+} from "./pedidoCompraUtils";
 
 // Modal de Recebimento
 const ModalRecebimento = ({ pedido, onClose, onReceber }) => {
@@ -33,28 +37,43 @@ const ModalRecebimento = ({ pedido, onClose, onReceber }) => {
         <h2 className="text-xl font-bold mb-4">📦 Receber Pedido {pedido.numero_pedido}</h2>
 
         <div className="space-y-4">
-          {pedido.itens.map((item, index) => (
+          {pedido.itens.map((item, index) => {
+            const quantidadePendente = item.quantidade_pedida - item.quantidade_recebida;
+            const itemRecebido = { ...item, quantidade_pedida: item.quantidade_recebida };
+            const itemPendente = { ...item, quantidade_pedida: quantidadePendente };
+
+            return (
             <div key={item.id} className="border rounded-lg p-4">
               <div className="font-semibold mb-2">{item.produto_nome}</div>
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
                   <span className="text-gray-600">Pedido:</span>
-                  <span className="ml-2 font-semibold">{item.quantidade_pedida}</span>
+                  <span
+                    className="ml-2 font-semibold"
+                    title={montarTooltipQuantidadeCompraPedido(item)}
+                  >
+                    {formatarQuantidadeCompraPedido(item)}
+                  </span>
                 </div>
                 <div>
                   <span className="text-gray-600">Já Recebido:</span>
-                  <span className="ml-2 font-semibold">{item.quantidade_recebida}</span>
+                  <span
+                    className="ml-2 font-semibold"
+                    title={montarTooltipQuantidadeCompraPedido(itemRecebido)}
+                  >
+                    {formatarQuantidadeCompraPedido(itemRecebido)}
+                  </span>
                 </div>
                 <div>
                   <span className="text-gray-600">Pendente:</span>
                   <span className="ml-2 font-semibold text-orange-600">
-                    {item.quantidade_pedida - item.quantidade_recebida}
+                    {formatarQuantidadeCompraPedido(itemPendente)}
                   </span>
                 </div>
               </div>
               <div className="mt-3">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quantidade a Receber
+                  Quantidade a receber ({item.unidade_compra || "UN"})
                 </label>
                 <input
                   type="number"
@@ -75,7 +94,8 @@ const ModalRecebimento = ({ pedido, onClose, onReceber }) => {
                 />
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="flex gap-4 mt-6">

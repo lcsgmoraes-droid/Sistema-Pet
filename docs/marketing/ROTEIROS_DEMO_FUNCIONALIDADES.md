@@ -12,13 +12,14 @@ Para gravar os takes em ordem, use
 
 Use dados ficticios consistentes:
 
-- Cliente: Maria Oliveira.
-- Pet: Thor.
-- Produto: Racao Adulto 10kg.
-- Servico: Banho medio completo.
-- Veterinario: Dra. Ana Martins.
+- Cliente: Ana Costa, Joao Santos ou Maria Oliveira.
+- Vendedora: Beatriz Vendedora Demo.
+- Entregador: Carlos Entregador Demo.
+- Produto: Racao Special Dog Junior 20kg ou Racao Bob Dog Premium Gourmet 25KG.
+- Servico: Banho medio completo, quando o modulo estiver revisado.
+- Veterinario: Dra. Ana Martins, quando o modulo estiver revisado.
 - Fornecedor: Distribuidora Pet Brasil.
-- Forma de pagamento: PIX e Cartao de credito.
+- Forma de pagamento: PIX, Dinheiro, Cartao de debito e Cartao de credito.
 - Banco: Conta Banco Demo.
 - Categoria financeira: Venda de produtos.
 
@@ -95,6 +96,36 @@ Checklist:
 - Mostrar PIX e Cartao como exemplos.
 - Nao usar valores reais.
 
+## Demo 2A - Vendas com rentabilidade
+
+| Campo | Conteudo |
+|---|---|
+| Objetivo | Mostrar que cada venda carrega canal, forma de pagamento, desconto, imposto, comissao, custo e lucro |
+| Duracao | 60s |
+| Telas | `/financeiro/vendas` |
+
+Sequencia:
+
+1. Abrir `/financeiro/vendas`.
+2. Clicar em `Lista de Vendas`, se a aba ainda nao estiver ativa.
+3. Mostrar filtros por periodo, canal, funcionario, forma e categoria.
+4. Dar zoom nos totais: venda bruta, liquida, valor recebido, custo, lucro e margem.
+5. Descer para a tabela e mostrar venda baixada, venda aberta, ecommerce e campanha.
+
+Narracao:
+
+```text
+Aqui a venda deixa de ser so um numero.
+O sistema junta canal, desconto, taxa de entrega, taxa de pagamento, imposto, custo e comissao.
+Com isso, o gestor enxerga a margem da venda e entende o que realmente ficou para a loja.
+```
+
+Checklist:
+
+- Usar o periodo `Este mes`.
+- Mostrar `DEMO-VEN-001` como venda baixada e `DEMO-VEN-004` como ecommerce aberta.
+- Nao comecar a apresentacao pelo dashboard financeiro se o foco for venda comercial.
+
 ## Demo 3 - Produto, PDV e estoque
 
 | Campo | Conteudo |
@@ -125,6 +156,37 @@ Checklist:
 - Mostrar produto antes e depois da venda quando possivel.
 - Evitar carrinho com muitos itens.
 - Usar apenas um produto para ficar didatico.
+
+## Demo 3A - Comparador de racao
+
+| Campo | Conteudo |
+|---|---|
+| Objetivo | Mostrar diferencial consultivo: comparar racoes por custo por dia, duracao e preco por kg |
+| Duracao | 45s |
+| Telas | `/calculadora-racao` |
+
+Sequencia:
+
+1. Abrir `/calculadora-racao`.
+2. Preencher peso do pet com `12`.
+3. Preencher idade com `36`.
+4. Clicar em `Comparar Todas`.
+5. Mostrar `Comparativo de Racoes (10)`.
+6. Dar zoom em custo/dia, custo/mes, duracao e explicacao da melhor opcao.
+
+Narracao:
+
+```text
+Preco de pacote nem sempre mostra o melhor custo para o tutor.
+Na calculadora, a loja compara racoes pelo consumo diario, duracao do pacote e custo por mes.
+Isso ajuda a vender com argumento, nao so com preco.
+```
+
+Checklist:
+
+- Usar produtos reais da base demo com imagem.
+- Conferir que a melhor opcao nao esta com preco zerado.
+- Evitar mostrar muitos cards ao mesmo tempo no corte vertical.
 
 ## Demo 4 - Compras e entrada XML
 
@@ -245,6 +307,63 @@ Checklist:
 - Mostrar apenas loja demo.
 - Evitar prometer venda garantida.
 - Deixar claro que ecommerce depende da configuracao do tenant.
+
+## Demo 7A - Entregas e rotas
+
+| Campo | Conteudo |
+|---|---|
+| Objetivo | Mostrar que vendas com entrega viram rota e custo operacional |
+| Duracao | 60s |
+| Telas | `/entregas/rotas`, `/entregas/abertas`, `/entregas/financeiro` |
+
+Sequencia:
+
+1. Abrir `/entregas/rotas`.
+2. Mostrar Carlos Entregador Demo.
+3. Mostrar uma rota pendente e uma rota em andamento.
+4. Abrir rastreio ou detalhe apenas se estiver limpo para gravacao.
+5. Conectar com o financeiro de entregas, quando fizer sentido.
+
+Narracao:
+
+```text
+Venda com entrega nao termina no caixa.
+Ela precisa virar rota, ter entregador, status e custo para a operacao.
+No Sistema Pet, a entrega entra na mesma historia de venda, financeiro e resultado.
+```
+
+Checklist:
+
+- Usar `DEMO-ROT-002` e `DEMO-ROT-003`.
+- Nao prometer rastreio ao vivo se nao houver localizacao ativa.
+
+## Demo 7B - Comissoes
+
+| Campo | Conteudo |
+|---|---|
+| Objetivo | Mostrar regra de comissao e comissoes geradas por venda |
+| Duracao | 45s |
+| Telas | `/comissoes`, `/comissoes/abertas`, `/comissoes/relatorios` |
+
+Sequencia:
+
+1. Abrir `/comissoes`.
+2. Mostrar Beatriz Vendedora Demo com 1 regra geral.
+3. Abrir `/comissoes/abertas`.
+4. Mostrar 8 comissoes e total pendente.
+5. Se houver tempo, abrir relatorio por produto.
+
+Narracao:
+
+```text
+Quando a loja trabalha com vendedor comissionado, a regra precisa estar clara.
+Depois da venda, o sistema mostra quanto ficou pendente para cada pessoa e ajuda a conferir o pagamento.
+```
+
+Checklist:
+
+- Usar Beatriz Vendedora Demo.
+- Mostrar a regra antes do valor em aberto para a narrativa fazer sentido.
 
 ## Demo 8 - Relatorios gerenciais
 

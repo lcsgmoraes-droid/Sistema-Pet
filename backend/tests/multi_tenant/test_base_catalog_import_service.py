@@ -262,6 +262,8 @@ def catalog_session():
             sabor_proteina_id INTEGER,
             apresentacao_peso_id INTEGER,
             imagem_principal TEXT,
+            tabela_consumo JSON,
+            variation_attributes JSON,
             ativo BOOLEAN,
             produto_predecessor_id INTEGER,
             created_at TEXT,
@@ -770,6 +772,39 @@ def test_import_remaps_product_relations_and_images(catalog_session):
     assert TARGET_TENANT in image["url"]
     assert f"/{predecessor['id']}/" in image["url"]
     assert one_target_product(catalog_session)["imagem_principal"] == image["url"]
+
+
+def test_import_serializes_json_product_fields_from_snapshot_rows(
+    catalog_session, monkeypatch
+):
+    _seed_basic_catalog(catalog_session)
+    original_select_rows = base_catalog_import_catalog._select_rows
+
+    def select_rows_with_json(db, table_name, tenant_id):
+        rows = original_select_rows(db, table_name, tenant_id)
+        if table_name == "produtos":
+            for row in rows:
+                row["tabela_consumo"] = [{"peso": "15kg", "dose_diaria": "250g"}]
+                row["variation_attributes"] = {"peso": "15kg", "sabor": "Frango"}
+        return rows
+
+    monkeypatch.setattr(
+        base_catalog_import_catalog, "_select_rows", select_rows_with_json
+    )
+
+    import_base_catalog(
+        db=catalog_session,
+        source_tenant_id=SOURCE_TENANT,
+        target_tenant_id=TARGET_TENANT,
+        user_id=10,
+        dry_run=False,
+        image_copier=fake_image_copier,
+    )
+    catalog_session.commit()
+
+    product = one_target_product(catalog_session)
+    assert '"dose_diaria": "250g"' in product["tabela_consumo"]
+    assert '"sabor": "Frango"' in product["variation_attributes"]
 
 
 def test_import_syncs_rls_context_for_source_and_target_product_relations(

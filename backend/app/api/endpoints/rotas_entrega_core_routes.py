@@ -174,8 +174,9 @@ def listar_vendas_pendentes_entrega(
         .filter(
             Venda.tenant_id == tenant_id,
             Venda.tem_entrega.is_(True),
-            # Aceita apenas vendas pendentes (ainda não entraram em rota)
-            (Venda.status_entrega == "pendente") | Venda.status_entrega.is_(None),
+            # Aceita vendas fora de rota, inclusive pedido online ja separado.
+            Venda.status_entrega.in_(["pendente", "pronto"])
+            | Venda.status_entrega.is_(None),
         )
         .order_by(
             # Primeiro: vendas com ordem otimizada

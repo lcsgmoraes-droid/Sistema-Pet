@@ -294,6 +294,77 @@ Mostrar que o usuario novo tem um passo a passo inicial para configurar empresa,
 financeiro, impostos, produtos e operacao antes da primeira venda.
 ```
 
+## Criativo 9 - Comparador de racao
+
+| Campo | Conteudo |
+|---|---|
+| Dor | Cliente escolhe racao so pelo preco do pacote |
+| Tela base | `/calculadora-racao` |
+| Duracao | 25s |
+| CTA | Venda racao com argumento |
+
+Narracao:
+
+```text
+A racao mais barata no pacote nem sempre e a melhor no mes.
+No Sistema Pet, voce compara racoes pelo consumo diario, duracao, custo por dia e preco por quilo.
+Assim a loja ajuda o tutor a decidir com mais clareza.
+Sistema Pet: venda com informacao, nao so com desconto.
+```
+
+Texto na tela:
+
+```text
+Qual racao compensa mais?
+Custo por dia
+Duracao do pacote
+Preco por kg
+```
+
+Prompt para IA:
+
+```text
+Crie um video vertical de 25 segundos mostrando a calculadora de racao do Sistema Pet.
+Use a tela real com peso do pet, comparar todas e resultado por custo/dia. O tom deve ser
+consultivo, para dono de pet shop que quer vender racao com argumento. Nao prometer aumento
+garantido de vendas.
+```
+
+## Criativo 10 - Entrega com custo claro
+
+| Campo | Conteudo |
+|---|---|
+| Dor | Loja entrega, mas nao sabe custo e status da rota |
+| Tela base | `/entregas/rotas`, `/entregas/financeiro`, `/financeiro/vendas` |
+| Duracao | 30s |
+| CTA | Controle suas entregas |
+
+Narracao:
+
+```text
+Entrega tambem precisa de gestao.
+Nao basta vender: tem rota, entregador, taxa, custo e status para acompanhar.
+No Sistema Pet, a venda com entrega entra na operacao e conversa com o financeiro.
+Controle suas entregas com mais clareza.
+```
+
+Texto na tela:
+
+```text
+Venda com entrega
+Rota criada
+Custo da entrega
+Financeiro conectado
+```
+
+Prompt para IA:
+
+```text
+Crie um criativo de 30 segundos para Sistema Pet com foco em entregas. Mostrar rotas,
+entregador, status e conexao com financeiro. Linguagem simples para dono de pet shop,
+sem prometer rastreio ao vivo se a tela nao estiver mostrando localizacao ativa.
+```
+
 ## Variacoes rapidas de ganchos
 
 - "Seu pet shop vende, mas voce sabe o que realmente sobra?"
@@ -303,6 +374,8 @@ financeiro, impostos, produtos e operacao antes da primeira venda.
 - "Compra, XML, custo e estoque no mesmo fluxo."
 - "O cliente compra no balcao. E fora dele?"
 - "Configurar certo no inicio evita dor de cabeca depois."
+- "A racao barata no pacote e barata por dia?"
+- "Entrega saiu da loja, mas ficou clara no financeiro?"
 
 ## CTAs reutilizaveis
 

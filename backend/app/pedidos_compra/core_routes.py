@@ -13,6 +13,11 @@ from ..db import get_session
 from ..models import Cliente
 from ..produtos_models import PedidoCompra, PedidoCompraItem, Produto
 from .exportacao import _montar_resposta_pedido_detalhada
+from .quantidades import (
+    calcular_quantidade_total_unidades,
+    normalizar_quantidade_por_embalagem,
+    normalizar_unidade_compra,
+)
 from .schemas import PedidoCompraRequest, PedidoCompraResponse
 from .sugestao_queries import _resolver_fornecedores_compra
 
@@ -272,7 +277,12 @@ def criar_pedido(
 
     # Calcular totais
     valor_total = sum(
-        (item.preco_unitario - item.desconto_item) * item.quantidade_pedida
+        (item.preco_unitario - item.desconto_item)
+        * calcular_quantidade_total_unidades(
+            item.quantidade_pedida,
+            item.unidade_compra,
+            item.quantidade_por_embalagem,
+        )
         for item in request.itens
     )
     valor_final = valor_total + request.valor_frete - request.valor_desconto
@@ -301,15 +311,27 @@ def criar_pedido(
 
     # Criar itens
     for item_req in request.itens:
+        unidade_compra = normalizar_unidade_compra(item_req.unidade_compra)
+        quantidade_por_embalagem = normalizar_quantidade_por_embalagem(
+            unidade_compra, item_req.quantidade_por_embalagem
+        )
+        quantidade_total_unidades = calcular_quantidade_total_unidades(
+            item_req.quantidade_pedida,
+            unidade_compra,
+            quantidade_por_embalagem,
+        )
         valor_item = (
             item_req.preco_unitario - item_req.desconto_item
-        ) * item_req.quantidade_pedida
+        ) * quantidade_total_unidades
 
         item = PedidoCompraItem(
             pedido_compra_id=pedido.id,
             produto_id=item_req.produto_id,
             quantidade_pedida=item_req.quantidade_pedida,
             quantidade_recebida=0,
+            unidade_compra=unidade_compra,
+            quantidade_por_embalagem=quantidade_por_embalagem,
+            quantidade_total_unidades=quantidade_total_unidades,
             preco_unitario=item_req.preco_unitario,
             desconto_item=item_req.desconto_item,
             valor_total=valor_item,
@@ -366,7 +388,12 @@ def atualizar_pedido(
 
     # Recalcular totais
     valor_total = sum(
-        (item.preco_unitario - item.desconto_item) * item.quantidade_pedida
+        (item.preco_unitario - item.desconto_item)
+        * calcular_quantidade_total_unidades(
+            item.quantidade_pedida,
+            item.unidade_compra,
+            item.quantidade_por_embalagem,
+        )
         for item in request.itens
     )
     valor_final = valor_total + request.valor_frete - request.valor_desconto
@@ -388,15 +415,27 @@ def atualizar_pedido(
 
     # Adicionar novos itens
     for item_req in request.itens:
+        unidade_compra = normalizar_unidade_compra(item_req.unidade_compra)
+        quantidade_por_embalagem = normalizar_quantidade_por_embalagem(
+            unidade_compra, item_req.quantidade_por_embalagem
+        )
+        quantidade_total_unidades = calcular_quantidade_total_unidades(
+            item_req.quantidade_pedida,
+            unidade_compra,
+            quantidade_por_embalagem,
+        )
         valor_item = (
             item_req.preco_unitario - item_req.desconto_item
-        ) * item_req.quantidade_pedida
+        ) * quantidade_total_unidades
 
         item = PedidoCompraItem(
             pedido_compra_id=pedido.id,
             produto_id=item_req.produto_id,
             quantidade_pedida=item_req.quantidade_pedida,
             quantidade_recebida=0,
+            unidade_compra=unidade_compra,
+            quantidade_por_embalagem=quantidade_por_embalagem,
+            quantidade_total_unidades=quantidade_total_unidades,
             preco_unitario=item_req.preco_unitario,
             desconto_item=item_req.desconto_item,
             valor_total=valor_item,

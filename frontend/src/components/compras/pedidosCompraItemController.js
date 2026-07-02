@@ -1,6 +1,11 @@
 import { toast } from "react-hot-toast";
 import api from "../../api";
-import { numeroSeguro } from "./pedidoCompraUtils";
+import {
+  calcularQuantidadeTotalUnidadesPedido,
+  normalizarQuantidadePorEmbalagemPedido,
+  normalizarUnidadeCompraPedido,
+  numeroSeguro,
+} from "./pedidoCompraUtils";
 
 export function createPedidosCompraItemController({
   formData,
@@ -64,10 +69,17 @@ export function createPedidosCompraItemController({
         setItemForm({
           ...itemForm,
           produto_id: produtoId,
+          quantidade_por_embalagem:
+            itemForm.quantidade_por_embalagem || produto.itens_por_caixa || "1",
           preco_unitario: produto.preco_custo.toFixed(2),
         });
       } else {
-        setItemForm({ ...itemForm, produto_id: produtoId });
+        setItemForm({
+          ...itemForm,
+          produto_id: produtoId,
+          quantidade_por_embalagem:
+            itemForm.quantidade_por_embalagem || produto.itens_por_caixa || "1",
+        });
       }
     }
   };
@@ -83,9 +95,27 @@ export function createPedidosCompraItemController({
     const preco = parseFloat(itemForm.preco_unitario);
     const produtoId = parseInt(itemForm.produto_id);
     const produtoCodigo = produto?.codigo || produto?.sku || "";
+    const unidadeCompra = normalizarUnidadeCompraPedido(itemForm.unidade_compra);
+    const quantidadePorEmbalagem = normalizarQuantidadePorEmbalagemPedido(
+      unidadeCompra,
+      itemForm.quantidade_por_embalagem || produto?.itens_por_caixa || 1,
+    );
+    const quantidadeTotalUnidades = calcularQuantidadeTotalUnidadesPedido({
+      quantidade_pedida: quantidade,
+      unidade_compra: unidadeCompra,
+      quantidade_por_embalagem: quantidadePorEmbalagem,
+    });
 
     // Verificar se produto já existe no pedido
-    const itemExistenteIndex = formData.itens.findIndex((item) => item.produto_id === produtoId);
+    const itemExistenteIndex = formData.itens.findIndex(
+      (item) =>
+        item.produto_id === produtoId &&
+        normalizarUnidadeCompraPedido(item.unidade_compra) === unidadeCompra &&
+        normalizarQuantidadePorEmbalagemPedido(
+          item.unidade_compra,
+          item.quantidade_por_embalagem,
+        ) === quantidadePorEmbalagem,
+    );
 
     if (itemExistenteIndex !== -1) {
       // Produto já existe - perguntar ao usuário
@@ -104,12 +134,21 @@ export function createPedidosCompraItemController({
       if (confirmar) {
         // Somar quantidade ao item existente
         const novosItens = [...formData.itens];
+        const quantidadeSomada = itemExistente.quantidade_pedida + quantidade;
+        const quantidadeTotalSomada = calcularQuantidadeTotalUnidadesPedido({
+          quantidade_pedida: quantidadeSomada,
+          unidade_compra: unidadeCompra,
+          quantidade_por_embalagem: quantidadePorEmbalagem,
+        });
         novosItens[itemExistenteIndex] = {
           ...itemExistente,
           produto_codigo: itemExistente.produto_codigo || produtoCodigo,
-          quantidade_pedida: itemExistente.quantidade_pedida + quantidade,
+          quantidade_pedida: quantidadeSomada,
+          unidade_compra: unidadeCompra,
+          quantidade_por_embalagem: quantidadePorEmbalagem,
+          quantidade_total_unidades: quantidadeTotalSomada,
           preco_unitario: preco, // Atualiza com o novo preço
-          total: (itemExistente.quantidade_pedida + quantidade) * preco,
+          total: quantidadeTotalSomada * preco,
         };
 
         setFormData({
@@ -141,9 +180,12 @@ export function createPedidosCompraItemController({
           produto_nome: produto.nome,
           produto_codigo: produtoCodigo,
           quantidade_pedida: quantidade,
+          unidade_compra: unidadeCompra,
+          quantidade_por_embalagem: quantidadePorEmbalagem,
+          quantidade_total_unidades: quantidadeTotalUnidades,
           preco_unitario: preco,
           desconto_item: 0,
-          total: quantidade * preco,
+          total: quantidadeTotalUnidades * preco,
         },
       ],
     });
@@ -173,15 +215,28 @@ export function createPedidosCompraItemController({
           [campo]: numeroSeguro(valor),
         };
         const quantidade = numeroSeguro(proximoItem.quantidade_pedida);
+        const unidadeCompra = normalizarUnidadeCompraPedido(proximoItem.unidade_compra);
+        const quantidadePorEmbalagem = normalizarQuantidadePorEmbalagemPedido(
+          unidadeCompra,
+          proximoItem.quantidade_por_embalagem,
+        );
+        const quantidadeTotalUnidades = calcularQuantidadeTotalUnidadesPedido({
+          quantidade_pedida: quantidade,
+          unidade_compra: unidadeCompra,
+          quantidade_por_embalagem: quantidadePorEmbalagem,
+        });
         const preco = numeroSeguro(proximoItem.preco_unitario);
         const desconto = numeroSeguro(proximoItem.desconto_item);
 
         return {
           ...proximoItem,
           quantidade_pedida: quantidade,
+          unidade_compra: unidadeCompra,
+          quantidade_por_embalagem: quantidadePorEmbalagem,
+          quantidade_total_unidades: quantidadeTotalUnidades,
           preco_unitario: preco,
           desconto_item: desconto,
-          total: (preco - desconto) * quantidade,
+          total: (preco - desconto) * quantidadeTotalUnidades,
         };
       });
 

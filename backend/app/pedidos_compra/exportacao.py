@@ -10,12 +10,18 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models import Cliente
+from app.pedidos_compra.quantidades import (
+    calcular_quantidade_total_unidades,
+    formatar_quantidade_compra_documento,
+    normalizar_quantidade_por_embalagem,
+    normalizar_unidade_compra,
+)
 from app.produtos_models import Marca, PedidoCompra, Produto
 
 PEDIDO_EXPORT_COLUNAS_META = {
     "codigo": {"titulo": "Codigo", "excel_width": 14, "pdf_width_mm": 22},
     "produto": {"titulo": "Descricao", "excel_width": 42, "pdf_width_mm": 68},
-    "quantidade": {"titulo": "Quantidade", "excel_width": 14, "pdf_width_mm": 20},
+    "quantidade": {"titulo": "Quantidade", "excel_width": 22, "pdf_width_mm": 28},
     "preco_unitario": {"titulo": "Custo Unit.", "excel_width": 16, "pdf_width_mm": 24},
     "desconto": {"titulo": "Desconto", "excel_width": 14, "pdf_width_mm": 18},
     "total": {"titulo": "Total", "excel_width": 16, "pdf_width_mm": 22},
@@ -192,14 +198,29 @@ def _montar_linhas_exportacao_pedido(
 
     for item in pedido.itens:
         produto = produtos_por_id.get(item.produto_id)
+        unidade_compra = normalizar_unidade_compra(
+            getattr(item, "unidade_compra", None)
+        )
+        quantidade_por_embalagem = normalizar_quantidade_por_embalagem(
+            unidade_compra, getattr(item, "quantidade_por_embalagem", None)
+        )
+        quantidade_total_unidades = calcular_quantidade_total_unidades(
+            item.quantidade_pedida, unidade_compra, quantidade_por_embalagem
+        )
         linhas.append(
             {
                 "codigo": produto.codigo if produto else "",
                 "produto": produto.nome if produto else f"Produto {item.produto_id}",
-                "quantidade": item.quantidade_pedida or 0,
+                "quantidade": formatar_quantidade_compra_documento(
+                    item.quantidade_pedida,
+                    unidade_compra,
+                    quantidade_por_embalagem,
+                ),
                 "preco_unitario": item.preco_unitario or 0,
                 "desconto": item.desconto_item or 0,
-                "total": item.valor_total or 0,
+                "total": item.valor_total
+                or quantidade_total_unidades
+                * ((item.preco_unitario or 0) - (item.desconto_item or 0)),
             }
         )
 
@@ -237,6 +258,18 @@ def _montar_resposta_pedido_detalhada(pedido: PedidoCompra) -> dict:
                 "produto_codigo": item.produto.codigo if item.produto else None,
                 "quantidade_pedida": item.quantidade_pedida,
                 "quantidade_recebida": item.quantidade_recebida,
+                "unidade_compra": normalizar_unidade_compra(
+                    getattr(item, "unidade_compra", None)
+                ),
+                "quantidade_por_embalagem": normalizar_quantidade_por_embalagem(
+                    getattr(item, "unidade_compra", None),
+                    getattr(item, "quantidade_por_embalagem", None),
+                ),
+                "quantidade_total_unidades": calcular_quantidade_total_unidades(
+                    item.quantidade_pedida,
+                    getattr(item, "unidade_compra", None),
+                    getattr(item, "quantidade_por_embalagem", None),
+                ),
                 "preco_unitario": item.preco_unitario,
                 "desconto_item": item.desconto_item,
                 "valor_total": item.valor_total,
@@ -318,8 +351,7 @@ def _gerar_excel_pedido_bytes(
                 cell.value = float(valor or 0)
                 cell.number_format = "R$ #,##0.00"
             elif coluna == "quantidade":
-                cell.value = float(valor or 0)
-                cell.number_format = "#,##0.00"
+                cell.value = str(valor or "")
             else:
                 cell.value = valor
         row += 1
@@ -447,7 +479,7 @@ def _gerar_pdf_pedido_bytes(
             if coluna == "produto":
                 linha_formatada.append(Paragraph(str(valor or ""), produto_style))
             elif coluna == "quantidade":
-                linha_formatada.append(_formatar_quantidade_documento(valor))
+                linha_formatada.append(str(valor or ""))
             elif coluna in PEDIDO_EXPORT_COLUNAS_FINANCEIRAS:
                 linha_formatada.append(f"R$ {float(valor or 0):.2f}")
             else:

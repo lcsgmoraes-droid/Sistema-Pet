@@ -1,6 +1,13 @@
 import FornecedorSelector from "../fornecedores/FornecedorSelector";
 import ProductIdentity from "../ui/ProductIdentity";
-import { normalizarTextoBusca } from "./pedidoCompraUtils";
+import {
+  formatarQuantidadeCompraPedido,
+  montarTooltipQuantidadeCompraPedido,
+  normalizarQuantidadePorEmbalagemPedido,
+  normalizarTextoBusca,
+  normalizarUnidadeCompraPedido,
+  UNIDADES_COMPRA_OPCOES,
+} from "./pedidoCompraUtils";
 
 export default function PedidoCompraFormulario({
   mostrarForm,
@@ -49,6 +56,21 @@ export default function PedidoCompraFormulario({
   const fornecedorSelecionado = fornecedores.find(
     (fornecedor) => Number(fornecedor.id) === Number(formData.fornecedor_id),
   );
+  const unidadeCompraAtual = normalizarUnidadeCompraPedido(itemForm.unidade_compra);
+  const itemUsaEmbalagem = unidadeCompraAtual !== "UN";
+  const produtoSelecionadoItem = produtos.find(
+    (produto) => Number(produto.id) === Number(itemForm.produto_id),
+  );
+  const quantidadePorEmbalagemAtual = normalizarQuantidadePorEmbalagemPedido(
+    unidadeCompraAtual,
+    itemForm.quantidade_por_embalagem || produtoSelecionadoItem?.itens_por_caixa || 1,
+  );
+  const itemPreview = {
+    quantidade_pedida: itemForm.quantidade_pedida,
+    unidade_compra: unidadeCompraAtual,
+    quantidade_por_embalagem: quantidadePorEmbalagemAtual,
+  };
+  const tooltipQuantidadeItem = montarTooltipQuantidadeCompraPedido(itemPreview);
 
   const limparFornecedorSelecionado = () => {
     setFormData((prev) => ({ ...prev, fornecedor_id: "", itens: [] }));
@@ -165,8 +187,8 @@ export default function PedidoCompraFormulario({
 
         <div className="border-t pt-4">
           <h3 className="font-semibold mb-4">Itens do Pedido ({formData.itens.length})</h3>
-          <div className="grid grid-cols-4 gap-4 mb-4">
-            <div className="col-span-2 relative">
+          <div className="grid grid-cols-1 gap-3 mb-4 md:grid-cols-12">
+            <div className="relative md:col-span-4">
               <input
                 value={produtoTexto}
                 onChange={(e) => {
@@ -234,19 +256,68 @@ export default function PedidoCompraFormulario({
                   </div>
                 )}
             </div>
-            <input
-              type="number"
-              step="0.01"
-              placeholder="Quantidade"
-              value={itemForm.quantidade_pedida}
-              onChange={(e) => setItemForm({ ...itemForm, quantidade_pedida: e.target.value })}
-              className="px-4 py-2 border border-gray-300 rounded-lg"
-            />
-            <div className="flex gap-2">
+            <div className="md:col-span-2">
               <input
                 type="number"
                 step="0.01"
-                placeholder="Preço"
+                placeholder="Quantidade"
+                value={itemForm.quantidade_pedida}
+                onChange={(e) => setItemForm({ ...itemForm, quantidade_pedida: e.target.value })}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+              />
+              {itemForm.quantidade_pedida && (
+                <div
+                  className="mt-1 text-xs font-semibold text-slate-600"
+                  title={tooltipQuantidadeItem}
+                >
+                  {formatarQuantidadeCompraPedido(itemPreview)}
+                </div>
+              )}
+            </div>
+            <select
+              value={unidadeCompraAtual}
+              onChange={(e) => {
+                const unidade = e.target.value;
+                const proximaQuantidadePorEmbalagem =
+                  unidade === "UN"
+                    ? "1"
+                    : itemForm.quantidade_por_embalagem ||
+                      produtoSelecionadoItem?.itens_por_caixa ||
+                      "1";
+                setItemForm({
+                  ...itemForm,
+                  unidade_compra: unidade,
+                  quantidade_por_embalagem: proximaQuantidadePorEmbalagem,
+                });
+              }}
+              className="px-4 py-2 border border-gray-300 rounded-lg md:col-span-2"
+              title="Unidade usada para pedir ao fornecedor"
+            >
+              {UNIDADES_COMPRA_OPCOES.map((opcao) => (
+                <option key={opcao.value} value={opcao.value}>
+                  {opcao.label}
+                </option>
+              ))}
+            </select>
+            {itemUsaEmbalagem && (
+              <input
+                type="number"
+                min="1"
+                step="1"
+                placeholder="Unid./emb."
+                value={itemForm.quantidade_por_embalagem}
+                onChange={(e) =>
+                  setItemForm({ ...itemForm, quantidade_por_embalagem: e.target.value })
+                }
+                className="px-4 py-2 border border-gray-300 rounded-lg md:col-span-2"
+                title="Quantas unidades vendaveis vem em cada caixa, fardo ou pacote"
+              />
+            )}
+            <div className={`flex gap-2 ${itemUsaEmbalagem ? "md:col-span-2" : "md:col-span-4"}`}>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Custo/unid."
                 value={itemForm.preco_unitario}
                 onChange={(e) => setItemForm({ ...itemForm, preco_unitario: e.target.value })}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg"
@@ -268,7 +339,7 @@ export default function PedidoCompraFormulario({
                   <tr>
                     <th className="w-12 px-4 py-2 text-left text-sm font-semibold">#</th>
                     <th className="px-4 py-2 text-left text-sm font-semibold">Produto</th>
-                    <th className="px-4 py-2 text-right text-sm font-semibold">Qtd</th>
+                    <th className="px-4 py-2 text-right text-sm font-semibold">Qtd Compra</th>
                     <th className="px-4 py-2 text-right text-sm font-semibold">Preço</th>
                     <th className="px-4 py-2 text-right text-sm font-semibold">Total</th>
                     <th className="px-4 py-2"></th>
@@ -287,7 +358,10 @@ export default function PedidoCompraFormulario({
                           nameClassName="font-medium text-gray-900"
                         />
                       </td>
-                      <td className="px-4 py-2 text-right">
+                      <td
+                        className="px-4 py-2 text-right"
+                        title={montarTooltipQuantidadeCompraPedido(item)}
+                      >
                         <input
                           type="number"
                           min="0.01"
@@ -298,6 +372,9 @@ export default function PedidoCompraFormulario({
                           }
                           className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-right focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                         />
+                        <div className="mt-1 text-xs font-semibold text-slate-600">
+                          {formatarQuantidadeCompraPedido(item)}
+                        </div>
                       </td>
                       <td className="px-4 py-2 text-right">
                         R$ {numeroSeguro(item.preco_unitario).toFixed(2)}

@@ -12,6 +12,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { api } from "../services/api";
 import { getAccessToken } from "../auth/tokenStorage";
 import { useAuth } from "./AuthContext";
+import { shouldShowDevModuleControls } from "./modulosDevControls";
 
 const ModulosContext = createContext();
 const DEV_MODULOS_STORAGE_KEY = "dev_modulos_config";
@@ -226,7 +227,7 @@ export const ModulosProvider = ({ children }) => {
   const [planoAtual, setPlanoAtual] = useState(null);
   const [assinaturaAtual, setAssinaturaAtual] = useState(null);
   const [trialPadrao, setTrialPadrao] = useState(null);
-  const devControlesAtivos = import.meta.env.DEV;
+  const devControlesAtivos = shouldShowDevModuleControls(import.meta.env);
   const [devModulosConfig, setDevModulosConfig] = useState(() => {
     if (!devControlesAtivos) {
       return { modo: "normal", overrides: {} };
