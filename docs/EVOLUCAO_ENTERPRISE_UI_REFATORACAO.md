@@ -216,7 +216,18 @@ Inventario atualizado em 2026-07-02 pela contagem operacional de linhas com cont
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
-- Observacao mobile: `app-mobile/src` ainda tem 10 arquivos acima de 700 linhas; a frente mobile foi iniciada e deve seguir separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+- Observacao mobile: `app-mobile/src` ainda tem 9 arquivos acima de 700 linhas; a frente mobile foi iniciada e deve seguir separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+
+Fatia mobile 700 batch 44 de 2026-07-02: `app-mobile/src/screens/benefits/BeneficiosScreen.tsx` saiu da faixa acima de 700 linhas ao separar beneficios em secoes, styles e helpers:
+
+- `app-mobile/src/screens/benefits/BeneficiosScreen.tsx`: 1231 -> 96 linhas com conteudo, mantendo carregamento, refresh, erro e navegacao.
+- `app-mobile/src/screens/benefits/beneficios/BeneficiosRankingSection.tsx`: concentra ranking, vantagens e progresso de nivel.
+- `app-mobile/src/screens/benefits/beneficios/BeneficiosStampAndLevelsSections.tsx`: concentra cartao fidelidade e proximos niveis.
+- `app-mobile/src/screens/benefits/beneficios/BeneficiosCashbackSection.tsx`: concentra saldo, extrato, sugestao e alerta de expiracao do cashback.
+- `app-mobile/src/screens/benefits/beneficios/BeneficiosCouponsSection.tsx`: concentra lista, copia e estados dos cupons.
+- `app-mobile/src/screens/benefits/beneficios/BeneficiosStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/benefits/beneficios/BeneficiosUtils.ts`: concentra tipos, constantes de niveis, normalizacao e formatadores.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-44-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
 
 Fatia mobile 700 batch 43 de 2026-07-02: `app-mobile/src/screens/entregador/DetalheEntregaScreen.tsx` saiu da faixa acima de 700 linhas ao separar detalhe de entrega em conteudo, card de parada, modais, styles e helpers:
 
