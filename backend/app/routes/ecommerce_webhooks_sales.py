@@ -41,7 +41,7 @@ def _resolver_status_entrega_online(
         return None
 
     if tem_entrega:
-        return "entregue"
+        return "pendente"
 
     retirada = str(tipo_retirada or "").strip().lower()
     if retirada in {"proprio", "terceiro", "app_loja"}:

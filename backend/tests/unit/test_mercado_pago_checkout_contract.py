@@ -293,7 +293,7 @@ def test_webhook_integracao_define_status_operacional_por_modo():
             tipo_retirada="entrega",
             canal_origem="ecommerce",
         )
-        == "entregue"
+        == "pendente"
     )
     assert (
         ecommerce_webhooks._resolver_status_entrega_online(
