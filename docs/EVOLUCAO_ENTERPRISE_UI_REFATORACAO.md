@@ -216,7 +216,18 @@ Inventario atualizado em 2026-07-02 pela contagem operacional de linhas com cont
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
-- Observacao mobile: `app-mobile/src` ainda tem 6 arquivos acima de 700 linhas; a frente mobile foi iniciada e deve seguir separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+- Observacao mobile: `app-mobile/src` ainda tem 5 arquivos acima de 700 linhas; a frente mobile foi iniciada e deve seguir separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+
+Fatia mobile 700 batch 48 de 2026-07-02: `app-mobile/src/screens/profile/ProfileScreen.tsx` saiu da faixa acima de 700 linhas ao separar perfil em conteudo, secoes pessoais, secoes de endereco, componentes compartilhados, styles e utils:
+
+- `app-mobile/src/screens/profile/ProfileScreen.tsx`: 953 -> 334 linhas com conteudo, mantendo estado, CEP, salvamento de perfil/endereco, troca de acesso, notificacoes e logout.
+- `app-mobile/src/screens/profile/profile/ProfileContent.tsx`: concentra a composicao da tela e a ordem das secoes.
+- `app-mobile/src/screens/profile/profile/ProfilePersonalSections.tsx`: concentra avatar, pontos, troca de perfil, dados pessoais, notificacoes e logout.
+- `app-mobile/src/screens/profile/profile/ProfileAddressSections.tsx`: concentra endereco padrao, endereco de entrega e formulario de entrega.
+- `app-mobile/src/screens/profile/profile/ProfileSharedComponents.tsx`: concentra campo, linha de informacao, botao de salvar e cabecalho de secao.
+- `app-mobile/src/screens/profile/profile/ProfileStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/profile/profile/ProfileUtils.ts`: concentra CEP, montagem de enderecos e validacao de campos obrigatorios da entrega.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-48-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
 
 Fatia mobile 700 batch 47 de 2026-07-02: `app-mobile/src/screens/pets/FoodCalculatorScreen.tsx` saiu da faixa acima de 700 linhas ao separar a calculadora de racao em conteudo, seletores, cards de resultado, styles e utils:
 

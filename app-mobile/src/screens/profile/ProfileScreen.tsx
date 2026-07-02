@@ -1,23 +1,20 @@
-import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import KeyboardSafeScrollView from "../../components/KeyboardSafeScrollView";
+import { Alert } from "react-native";
+
 import * as AuthService from "../../services/auth.service";
+import { PONTOS } from "../../config";
 import { updateProfile } from "../../services/auth.service";
 import { ensurePushNotificationsRegistered } from "../../services/pushNotifications.service";
 import { useAuthStore } from "../../store/auth.store";
-import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
-import { PONTOS } from "../../config";
-import { formatarMoeda } from "../../utils/format";
-import { AppProfileType } from "../../types";
+import type { AppProfileType } from "../../types";
+import { ProfileContent } from "./profile/ProfileContent";
+import {
+  buildDefaultAddress,
+  buildDeliveryAddress,
+  formatCepInput,
+  getCurrentProfile,
+  hasRequiredDeliveryAddress,
+} from "./profile/ProfileUtils";
 
 export default function ProfileScreen() {
   const { user, logout, updateUser, selectProfile } = useAuthStore();
@@ -35,7 +32,9 @@ export default function ProfileScreen() {
   const [bairro, setBairro] = useState(user?.bairro ?? "");
   const [cidade, setCidade] = useState(user?.cidade ?? "");
   const [estado, setEstado] = useState(user?.estado ?? "");
-  const [usarEnderecoEntregaDiferente, setUsarEnderecoEntregaDiferente] = useState(Boolean(user?.usar_endereco_entrega_diferente));
+  const [usarEnderecoEntregaDiferente, setUsarEnderecoEntregaDiferente] = useState(
+    Boolean(user?.usar_endereco_entrega_diferente),
+  );
   const [entregaNome, setEntregaNome] = useState(entregaDetalhada.entrega_nome ?? "");
   const [entregaCep, setEntregaCep] = useState(entregaDetalhada.entrega_cep ?? "");
   const [entregaEndereco, setEntregaEndereco] = useState(entregaDetalhada.entrega_endereco ?? "");
@@ -76,22 +75,14 @@ export default function ProfileScreen() {
 
   const pontos = user?.pontos ?? 0;
   const valorPontos = (pontos / 100) * PONTOS.REAIS_POR_100_PONTOS;
-  const complementoEndereco = user?.complemento ? ` - ${user.complemento}` : "";
-  const enderecoCompleto = user?.cidade
-    ? `${user?.endereco ?? ""}, ${user?.numero ?? "s/n"}${complementoEndereco} - ${user?.bairro ?? ""} - ${user?.cidade}/${user?.estado ?? ""}`
-    : null;
-  const complementoEnderecoEntrega = entregaDetalhada.entrega_complemento
-    ? ` - ${entregaDetalhada.entrega_complemento}`
-    : "";
-  const enderecoEntregaCompleto = user?.usar_endereco_entrega_diferente && entregaDetalhada.entrega_cidade
-    ? `${entregaDetalhada.entrega_endereco ?? ""}, ${entregaDetalhada.entrega_numero ?? "s/n"}${complementoEnderecoEntrega} - ${entregaDetalhada.entrega_bairro ?? ""} - ${entregaDetalhada.entrega_cidade}/${entregaDetalhada.entrega_estado ?? ""}`
-    : null;
-  const available_profiles = user?.available_profiles ?? [];
-  const perfilAtual = user?.selected_profile ?? user?.perfil_operacional ?? "cliente";
+  const enderecoCompleto = buildDefaultAddress(user);
+  const enderecoEntregaCompleto = buildDeliveryAddress(user, entregaDetalhada);
+  const availableProfiles = user?.available_profiles ?? [];
+  const perfilAtual = getCurrentProfile(user);
 
   async function buscarCep(value: string) {
     const numeros = value.replace(/\D/g, "");
-    setCep(numeros.length <= 5 ? numeros : `${numeros.slice(0, 5)}-${numeros.slice(5, 8)}`);
+    setCep(formatCepInput(value));
 
     if (numeros.length !== 8) return;
 
@@ -114,7 +105,7 @@ export default function ProfileScreen() {
 
   async function buscarCepEntrega(value: string) {
     const numeros = value.replace(/\D/g, "");
-    setEntregaCep(numeros.length <= 5 ? numeros : `${numeros.slice(0, 5)}-${numeros.slice(5, 8)}`);
+    setEntregaCep(formatCepInput(value));
 
     if (numeros.length !== 8) return;
 
@@ -147,10 +138,7 @@ export default function ProfileScreen() {
       setEditando(false);
       Alert.alert("Salvo", "Seus dados foram atualizados.");
     } catch (err: any) {
-      const mensagem =
-        err?.response?.data?.detail ||
-        err?.message ||
-        "Nao foi possivel salvar seus dados.";
+      const mensagem = err?.response?.data?.detail || err?.message || "Nao foi possivel salvar seus dados.";
       Alert.alert("Erro", String(mensagem));
     } finally {
       setSalvando(false);
@@ -173,10 +161,7 @@ export default function ProfileScreen() {
       setEditandoEndereco(false);
       Alert.alert("Salvo", "Endereco atualizado com sucesso.");
     } catch (err: any) {
-      const mensagem =
-        err?.response?.data?.detail ||
-        err?.message ||
-        "Nao foi possivel salvar o endereco.";
+      const mensagem = err?.response?.data?.detail || err?.message || "Nao foi possivel salvar o endereco.";
       Alert.alert("Erro", String(mensagem));
     } finally {
       setSalvando(false);
@@ -184,20 +169,19 @@ export default function ProfileScreen() {
   }
 
   async function salvarEnderecoEntrega() {
-    if (usarEnderecoEntregaDiferente) {
-      const camposObrigatorios = [
+    if (
+      usarEnderecoEntregaDiferente &&
+      !hasRequiredDeliveryAddress({
         entregaNome,
         entregaEndereco,
         entregaNumero,
         entregaBairro,
         entregaCidade,
         entregaEstado,
-      ].every((valor) => valor.trim());
-
-      if (!camposObrigatorios) {
-        Alert.alert("Endereco incompleto", "Preencha nome, rua, numero, bairro, cidade e UF da entrega.");
-        return;
-      }
+      })
+    ) {
+      Alert.alert("Endereco incompleto", "Preencha nome, rua, numero, bairro, cidade e UF da entrega.");
+      return;
     }
 
     setSalvando(true);
@@ -235,10 +219,7 @@ export default function ProfileScreen() {
       await selectProfile(profileType);
       Alert.alert("Pronto", "Acesso alterado com sucesso.");
     } catch (err: any) {
-      const mensagem =
-        err?.response?.data?.detail ||
-        err?.message ||
-        "Nao foi possivel trocar o acesso.";
+      const mensagem = err?.response?.data?.detail || err?.message || "Nao foi possivel trocar o acesso.";
       Alert.alert("Erro", String(mensagem));
     } finally {
       setTrocandoPerfil(false);
@@ -251,8 +232,7 @@ export default function ProfileScreen() {
       const freshUser = await AuthService.getProfile();
       updateUser(freshUser);
       const freshProfiles = freshUser.available_profiles ?? [];
-      const freshCurrentProfile =
-        freshUser.selected_profile ?? freshUser.perfil_operacional ?? perfilAtual;
+      const freshCurrentProfile = freshUser.selected_profile ?? freshUser.perfil_operacional ?? perfilAtual;
       const profileOptions = freshProfiles
         .filter((profile) => profile.type !== freshCurrentProfile)
         .map((profile) => ({
@@ -305,688 +285,72 @@ export default function ProfileScreen() {
   }
 
   return (
-    <KeyboardSafeScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
-      >
-        <View style={styles.avatarSection}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarLetter}>
-              {user?.nome ? user.nome[0].toUpperCase() : "U"}
-            </Text>
-          </View>
-          <Text style={styles.nomeUsuario}>{user?.nome || "Meu perfil"}</Text>
-          <Text style={styles.emailUsuario}>{user?.email}</Text>
-        </View>
-
-        <View style={styles.pontosCard}>
-          <View style={styles.pontosLeft}>
-            <Ionicons name="trophy" size={28} color={CORES.pontos} />
-            <View style={styles.pontosResumo}>
-              <Text style={styles.pontosValor}>{pontos} pontos</Text>
-              <Text style={styles.pontosLabel}>
-                ~ {formatarMoeda(valorPontos)} em desconto
-              </Text>
-            </View>
-          </View>
-          <View style={styles.pontosInfoSpacer} />
-          <View style={styles.pontosInfo}>
-            <Text style={styles.pontosInfoTextoLinha}>R$1 gasto = 1 ponto</Text>
-            <Text style={styles.pontosInfoTextoLinha}>
-              100 pts = R${PONTOS.REAIS_POR_100_PONTOS} desconto
-            </Text>
-          </View>
-        </View>
-
-        {available_profiles.length > 1 && (
-          <View style={styles.secao}>
-            <Text style={styles.secaoTitulo}>Trocar perfil</Text>
-            <Text style={styles.textoSuporte}>
-              Acesso atual: {perfilAtual}
-            </Text>
-            <View style={styles.perfisGrid}>
-              {available_profiles.map((profile) => {
-                const selecionado = profile.type === perfilAtual;
-                return (
-                  <TouchableOpacity
-                    key={profile.type}
-                    style={[
-                      styles.perfilBotao,
-                      selecionado && styles.perfilBotaoAtivo,
-                    ]}
-                    onPress={() => trocarPerfil(profile.type)}
-                    disabled={selecionado || trocandoPerfil}
-                  >
-                    <Text
-                      style={[
-                        styles.perfilBotaoTexto,
-                        selecionado && styles.perfilBotaoTextoAtivo,
-                      ]}
-                    >
-                      {profile.label || profile.type}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <TouchableOpacity
-              style={[styles.botaoPerfilAtualizar, trocandoPerfil && { opacity: 0.7 }]}
-              onPress={abrirTrocaPerfil}
-              disabled={trocandoPerfil}
-            >
-              {trocandoPerfil ? (
-                <ActivityIndicator color={CORES.primario} />
-              ) : (
-                <>
-                  <Ionicons name="swap-horizontal-outline" size={18} color={CORES.primario} />
-                  <Text style={styles.botaoPerfilAtualizarTexto}>Ver acessos disponiveis</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <View style={styles.secao}>
-          <View style={styles.secaoHeader}>
-            <Text style={styles.secaoTitulo}>Dados pessoais</Text>
-            {!editando ? (
-              <TouchableOpacity onPress={() => setEditando(true)}>
-                <Text style={styles.editarTexto}>Editar</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity onPress={() => setEditando(false)}>
-                <Text style={[styles.editarTexto, { color: CORES.erro }]}>Cancelar</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {editando ? (
-            <>
-              <Campo label="Nome">
-                <TextInput
-                  style={styles.input}
-                  value={nome}
-                  onChangeText={setNome}
-                  placeholder="Seu nome"
-                  placeholderTextColor={CORES.textoClaro}
-                />
-              </Campo>
-              <Campo label="Telefone">
-                <TextInput
-                  style={styles.input}
-                  value={telefone}
-                  onChangeText={setTelefone}
-                  placeholder="(99) 99999-9999"
-                  placeholderTextColor={CORES.textoClaro}
-                  keyboardType="phone-pad"
-                />
-              </Campo>
-              <Campo label="CPF">
-                <TextInput
-                  style={styles.input}
-                  value={cpf}
-                  onChangeText={setCpf}
-                  placeholder="000.000.000-00"
-                  placeholderTextColor={CORES.textoClaro}
-                  keyboardType="numeric"
-                />
-              </Campo>
-              <SaveButton
-                label="Salvar alteracoes"
-                loading={salvando}
-                onPress={salvarPerfil}
-              />
-            </>
-          ) : (
-            <>
-              <InfoRow label="E-mail" valor={user?.email} />
-              <InfoRow label="Nome" valor={user?.nome || "-"} />
-              <InfoRow label="Telefone" valor={user?.telefone || "-"} />
-              <InfoRow label="CPF" valor={user?.cpf || "-"} />
-            </>
-          )}
-        </View>
-
-        <View style={styles.secao}>
-          <View style={styles.secaoHeader}>
-            <Text style={styles.secaoTitulo}>Endereco padrao</Text>
-            {!editandoEndereco ? (
-              <TouchableOpacity onPress={() => setEditandoEndereco(true)}>
-                <Text style={styles.editarTexto}>
-                  {enderecoCompleto ? "Editar" : "Cadastrar"}
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity onPress={() => setEditandoEndereco(false)}>
-                <Text style={[styles.editarTexto, { color: CORES.erro }]}>Cancelar</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {editandoEndereco ? (
-            <>
-              <Campo label={buscandoCep ? "CEP (buscando...)" : "CEP"}>
-                <TextInput
-                  style={styles.input}
-                  value={cep}
-                  onChangeText={buscarCep}
-                  placeholder="00000-000"
-                  placeholderTextColor={CORES.textoClaro}
-                  keyboardType="numeric"
-                  maxLength={9}
-                />
-              </Campo>
-              <Campo label="Rua / Avenida">
-                <TextInput
-                  style={styles.input}
-                  value={rua}
-                  onChangeText={setRua}
-                  placeholder="Rua..."
-                  placeholderTextColor={CORES.textoClaro}
-                />
-              </Campo>
-              <View style={styles.linha}>
-                <View style={{ flex: 1 }}>
-                  <Campo label="Numero">
-                    <TextInput
-                      style={styles.input}
-                      value={numero}
-                      onChangeText={setNumero}
-                      placeholder="123"
-                      placeholderTextColor={CORES.textoClaro}
-                      keyboardType="numeric"
-                    />
-                  </Campo>
-                </View>
-                <View style={{ flex: 2 }}>
-                  <Campo label="Complemento">
-                    <TextInput
-                      style={styles.input}
-                      value={complemento}
-                      onChangeText={setComplemento}
-                      placeholder="Apto, bloco, casa..."
-                      placeholderTextColor={CORES.textoClaro}
-                    />
-                  </Campo>
-                </View>
-              </View>
-              <Campo label="Bairro">
-                <TextInput
-                  style={styles.input}
-                  value={bairro}
-                  onChangeText={setBairro}
-                  placeholder="Bairro"
-                  placeholderTextColor={CORES.textoClaro}
-                />
-              </Campo>
-              <View style={styles.linha}>
-                <View style={{ flex: 2 }}>
-                  <Campo label="Cidade">
-                    <TextInput
-                      style={styles.input}
-                      value={cidade}
-                      onChangeText={setCidade}
-                      placeholder="Cidade"
-                      placeholderTextColor={CORES.textoClaro}
-                    />
-                  </Campo>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Campo label="UF">
-                    <TextInput
-                      style={styles.input}
-                      value={estado}
-                      onChangeText={setEstado}
-                      placeholder="SP"
-                      placeholderTextColor={CORES.textoClaro}
-                      autoCapitalize="characters"
-                      maxLength={2}
-                    />
-                  </Campo>
-                </View>
-              </View>
-              <SaveButton
-                label="Salvar endereco"
-                loading={salvando}
-                onPress={salvarEndereco}
-              />
-            </>
-          ) : enderecoCompleto ? (
-            <View style={styles.enderecoCard}>
-              <Ionicons name="location" size={20} color={CORES.primario} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.enderecoTexto}>{enderecoCompleto}</Text>
-                {user?.cep && <Text style={styles.enderecoSub}>CEP: {user.cep}</Text>}
-              </View>
-            </View>
-          ) : (
-            <Text style={styles.textoSuporte}>
-              Cadastre seu endereco para agilizar o checkout de entregas.
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.secao}>
-          <View style={styles.secaoHeader}>
-            <Text style={styles.secaoTitulo}>Endereco de entrega</Text>
-            {!editandoEnderecoEntrega ? (
-              <TouchableOpacity onPress={() => setEditandoEnderecoEntrega(true)}>
-                <Text style={styles.editarTexto}>
-                  {enderecoEntregaCompleto ? "Editar" : "Cadastrar"}
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity onPress={() => setEditandoEnderecoEntrega(false)}>
-                <Text style={[styles.editarTexto, { color: CORES.erro }]}>Cancelar</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {editandoEnderecoEntrega ? (
-            <>
-              <TouchableOpacity
-                style={styles.toggleLinha}
-                onPress={() => setUsarEnderecoEntregaDiferente((valor) => !valor)}
-              >
-                <Ionicons
-                  name={usarEnderecoEntregaDiferente ? "checkbox-outline" : "square-outline"}
-                  size={22}
-                  color={usarEnderecoEntregaDiferente ? CORES.primario : CORES.textoSecundario}
-                />
-                <Text style={styles.toggleTexto}>Usar endereco de entrega diferente</Text>
-              </TouchableOpacity>
-
-              {usarEnderecoEntregaDiferente ? (
-                <>
-                  <Campo label="Nome para entrega">
-                    <TextInput
-                      style={styles.input}
-                      value={entregaNome}
-                      onChangeText={setEntregaNome}
-                      placeholder="Nome de quem recebe"
-                      placeholderTextColor={CORES.textoClaro}
-                    />
-                  </Campo>
-                  <Campo label={buscandoCepEntrega ? "CEP da entrega (buscando...)" : "CEP da entrega"}>
-                    <TextInput
-                      style={styles.input}
-                      value={entregaCep}
-                      onChangeText={buscarCepEntrega}
-                      placeholder="00000-000"
-                      placeholderTextColor={CORES.textoClaro}
-                      keyboardType="numeric"
-                      maxLength={9}
-                    />
-                  </Campo>
-                  <Campo label="Rua / Avenida da entrega">
-                    <TextInput
-                      style={styles.input}
-                      value={entregaEndereco}
-                      onChangeText={setEntregaEndereco}
-                      placeholder="Rua..."
-                      placeholderTextColor={CORES.textoClaro}
-                    />
-                  </Campo>
-                  <View style={styles.linha}>
-                    <View style={{ flex: 1 }}>
-                      <Campo label="Numero da entrega">
-                        <TextInput
-                          style={styles.input}
-                          value={entregaNumero}
-                          onChangeText={setEntregaNumero}
-                          placeholder="123"
-                          placeholderTextColor={CORES.textoClaro}
-                          keyboardType="numeric"
-                        />
-                      </Campo>
-                    </View>
-                    <View style={{ flex: 2 }}>
-                      <Campo label="Complemento da entrega">
-                        <TextInput
-                          style={styles.input}
-                          value={entregaComplemento}
-                          onChangeText={setEntregaComplemento}
-                          placeholder="Apto, bloco, casa..."
-                          placeholderTextColor={CORES.textoClaro}
-                        />
-                      </Campo>
-                    </View>
-                  </View>
-                  <Campo label="Bairro da entrega">
-                    <TextInput
-                      style={styles.input}
-                      value={entregaBairro}
-                      onChangeText={setEntregaBairro}
-                      placeholder="Bairro"
-                      placeholderTextColor={CORES.textoClaro}
-                    />
-                  </Campo>
-                  <View style={styles.linha}>
-                    <View style={{ flex: 2 }}>
-                      <Campo label="Cidade da entrega">
-                        <TextInput
-                          style={styles.input}
-                          value={entregaCidade}
-                          onChangeText={setEntregaCidade}
-                          placeholder="Cidade"
-                          placeholderTextColor={CORES.textoClaro}
-                        />
-                      </Campo>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Campo label="UF">
-                        <TextInput
-                          style={styles.input}
-                          value={entregaEstado}
-                          onChangeText={setEntregaEstado}
-                          placeholder="SP"
-                          placeholderTextColor={CORES.textoClaro}
-                          autoCapitalize="characters"
-                          maxLength={2}
-                        />
-                      </Campo>
-                    </View>
-                  </View>
-                </>
-              ) : (
-                <Text style={styles.textoSuporte}>
-                  A entrega vai usar o endereco padrao cadastrado acima.
-                </Text>
-              )}
-
-              <SaveButton
-                label="Salvar endereco de entrega"
-                loading={salvando}
-                onPress={salvarEnderecoEntrega}
-              />
-            </>
-          ) : enderecoEntregaCompleto ? (
-            <View style={styles.enderecoCard}>
-              <Ionicons name="cube" size={20} color={CORES.primario} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.enderecoTexto}>{enderecoEntregaCompleto}</Text>
-                {entregaDetalhada.entrega_nome && (
-                  <Text style={styles.enderecoSub}>Recebe: {entregaDetalhada.entrega_nome}</Text>
-                )}
-                {entregaDetalhada.entrega_cep && (
-                  <Text style={styles.enderecoSub}>CEP: {entregaDetalhada.entrega_cep}</Text>
-                )}
-              </View>
-            </View>
-          ) : (
-            <Text style={styles.textoSuporte}>
-              Por enquanto, a entrega usa o endereco padrao. Cadastre outro endereco se precisar.
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.secao}>
-          <View style={styles.secaoHeader}>
-            <Text style={styles.secaoTitulo}>Notificacoes de pedidos</Text>
-          </View>
-          {statusNotificacoes && (
-            <Text style={styles.textoSuporte}>{statusNotificacoes}</Text>
-          )}
-          <TouchableOpacity
-            style={[styles.botaoNotificacoes, ativandoNotificacoes && { opacity: 0.7 }]}
-            onPress={ativarNotificacoes}
-            disabled={ativandoNotificacoes}
-          >
-            {ativandoNotificacoes ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="notifications-outline" size={20} color="#fff" />
-                <Text style={styles.botaoNotificacoesTexto}>Ativar notificacoes</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity style={styles.botaoSair} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color={CORES.erro} />
-          <Text style={styles.botaoSairTexto}>Sair da conta</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.versao}>CorePet v1.0.0</Text>
-        <View style={{ height: ESPACO.xxl }} />
-    </KeyboardSafeScrollView>
+    <ProfileContent
+      user={user}
+      pontos={pontos}
+      valorPontos={valorPontos}
+      availableProfiles={availableProfiles}
+      perfilAtual={perfilAtual}
+      trocandoPerfil={trocandoPerfil}
+      onTrocarPerfil={trocarPerfil}
+      onAbrirTrocaPerfil={abrirTrocaPerfil}
+      editando={editando}
+      setEditando={setEditando}
+      nome={nome}
+      setNome={setNome}
+      telefone={telefone}
+      setTelefone={setTelefone}
+      cpf={cpf}
+      setCpf={setCpf}
+      salvando={salvando}
+      onSalvarPerfil={salvarPerfil}
+      editandoEndereco={editandoEndereco}
+      setEditandoEndereco={setEditandoEndereco}
+      enderecoCompleto={enderecoCompleto}
+      cep={cep}
+      rua={rua}
+      numero={numero}
+      complemento={complemento}
+      bairro={bairro}
+      cidade={cidade}
+      estado={estado}
+      setRua={setRua}
+      setNumero={setNumero}
+      setComplemento={setComplemento}
+      setBairro={setBairro}
+      setCidade={setCidade}
+      setEstado={setEstado}
+      buscandoCep={buscandoCep}
+      onBuscarCep={buscarCep}
+      onSalvarEndereco={salvarEndereco}
+      editandoEnderecoEntrega={editandoEnderecoEntrega}
+      setEditandoEnderecoEntrega={setEditandoEnderecoEntrega}
+      entregaDetalhada={entregaDetalhada}
+      enderecoEntregaCompleto={enderecoEntregaCompleto}
+      usarEnderecoEntregaDiferente={usarEnderecoEntregaDiferente}
+      setUsarEnderecoEntregaDiferente={setUsarEnderecoEntregaDiferente}
+      entregaNome={entregaNome}
+      entregaCep={entregaCep}
+      entregaEndereco={entregaEndereco}
+      entregaNumero={entregaNumero}
+      entregaComplemento={entregaComplemento}
+      entregaBairro={entregaBairro}
+      entregaCidade={entregaCidade}
+      entregaEstado={entregaEstado}
+      setEntregaNome={setEntregaNome}
+      setEntregaEndereco={setEntregaEndereco}
+      setEntregaNumero={setEntregaNumero}
+      setEntregaComplemento={setEntregaComplemento}
+      setEntregaBairro={setEntregaBairro}
+      setEntregaCidade={setEntregaCidade}
+      setEntregaEstado={setEntregaEstado}
+      buscandoCepEntrega={buscandoCepEntrega}
+      onBuscarCepEntrega={buscarCepEntrega}
+      onSalvarEnderecoEntrega={salvarEnderecoEntrega}
+      statusNotificacoes={statusNotificacoes}
+      ativandoNotificacoes={ativandoNotificacoes}
+      onAtivarNotificacoes={ativarNotificacoes}
+      onLogout={handleLogout}
+    />
   );
 }
-
-function Campo({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View style={styles.campo}>
-      <Text style={styles.campoLabel}>{label}</Text>
-      {children}
-    </View>
-  );
-}
-
-function InfoRow({ label, valor }: { label: string; valor?: string | null }) {
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValor}>{valor || "-"}</Text>
-    </View>
-  );
-}
-
-function SaveButton({
-  label,
-  loading,
-  onPress,
-}: {
-  label: string;
-  loading: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      style={[styles.botaoSalvar, loading && { opacity: 0.7 }]}
-      onPress={onPress}
-      disabled={loading}
-    >
-      {loading ? (
-        <ActivityIndicator color="#fff" />
-      ) : (
-        <Text style={styles.botaoSalvarTexto}>{label}</Text>
-      )}
-    </TouchableOpacity>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: CORES.fundo },
-  content: { padding: ESPACO.lg, paddingBottom: 140 },
-  avatarSection: { alignItems: "center", marginBottom: ESPACO.lg },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: CORES.primario,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: ESPACO.sm,
-  },
-  avatarLetter: { fontSize: 36, color: "#fff", fontWeight: "700" },
-  nomeUsuario: { fontSize: FONTE.titulo, fontWeight: "bold", color: CORES.texto },
-  emailUsuario: { fontSize: FONTE.normal, color: CORES.textoSecundario, marginTop: 2 },
-  pontosCard: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    backgroundColor: "#FFF8E1",
-    borderRadius: RAIO.lg,
-    padding: ESPACO.lg,
-    marginBottom: ESPACO.lg,
-    borderWidth: 1,
-    borderColor: "#FFE082",
-    gap: ESPACO.md,
-    justifyContent: "space-between",
-    ...SOMBRA,
-  },
-  pontosLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: ESPACO.sm,
-    flexGrow: 1,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  pontosResumo: { flexShrink: 1, minWidth: 0 },
-  pontosValor: { fontSize: FONTE.grande, fontWeight: "bold", color: "#92400E" },
-  pontosLabel: { fontSize: FONTE.pequena, color: "#78350F", flexShrink: 1 },
-  pontosInfoSpacer: { flexGrow: 1, minWidth: 0 },
-  pontosInfo: { alignItems: "flex-end", flexShrink: 1, minWidth: 130 },
-  pontosInfoTextoLinha: { fontSize: FONTE.pequena, color: "#78350F", textAlign: "right" },
-  secao: {
-    backgroundColor: CORES.superficie,
-    borderRadius: RAIO.lg,
-    padding: ESPACO.lg,
-    marginBottom: ESPACO.lg,
-    ...SOMBRA,
-  },
-  secaoHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: ESPACO.md,
-  },
-  secaoTitulo: { fontSize: FONTE.grande, fontWeight: "bold", color: CORES.texto },
-  perfisGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: ESPACO.sm,
-    marginTop: ESPACO.md,
-  },
-  perfilBotao: {
-    borderWidth: 1,
-    borderColor: CORES.primario,
-    borderRadius: RAIO.md,
-    paddingHorizontal: ESPACO.md,
-    paddingVertical: ESPACO.sm,
-    backgroundColor: CORES.superficie,
-  },
-  perfilBotaoAtivo: {
-    backgroundColor: CORES.primario,
-  },
-  perfilBotaoTexto: {
-    color: CORES.primario,
-    fontSize: FONTE.normal,
-    fontWeight: "700",
-  },
-  perfilBotaoTextoAtivo: {
-    color: "#fff",
-  },
-  botaoPerfilAtualizar: {
-    minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: ESPACO.sm,
-    borderWidth: 1,
-    borderColor: CORES.primario,
-    borderRadius: RAIO.md,
-    marginTop: ESPACO.md,
-    paddingHorizontal: ESPACO.md,
-    paddingVertical: ESPACO.sm,
-    backgroundColor: "#EFF6FF",
-  },
-  botaoPerfilAtualizarTexto: {
-    color: CORES.primario,
-    fontSize: FONTE.normal,
-    fontWeight: "700",
-  },
-  editarTexto: { color: CORES.primario, fontWeight: "500" },
-  infoRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: ESPACO.sm },
-  infoLabel: { fontSize: FONTE.normal, color: CORES.textoSecundario },
-  infoValor: {
-    fontSize: FONTE.normal,
-    color: CORES.texto,
-    fontWeight: "500",
-    flex: 1,
-    textAlign: "right",
-  },
-  campo: { marginBottom: ESPACO.sm },
-  campoLabel: {
-    fontSize: FONTE.pequena,
-    fontWeight: "600",
-    color: CORES.textoSecundario,
-    marginBottom: 4,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: CORES.borda,
-    borderRadius: RAIO.md,
-    paddingHorizontal: ESPACO.md,
-    paddingVertical: ESPACO.sm,
-    fontSize: FONTE.normal,
-    color: CORES.texto,
-    backgroundColor: CORES.fundo,
-  },
-  botaoSalvar: {
-    backgroundColor: CORES.primario,
-    borderRadius: RAIO.md,
-    paddingVertical: ESPACO.sm + 4,
-    alignItems: "center",
-    marginTop: ESPACO.sm,
-  },
-  botaoSalvarTexto: { color: "#fff", fontWeight: "bold", fontSize: FONTE.normal },
-  botaoNotificacoes: {
-    minHeight: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: ESPACO.sm,
-    backgroundColor: CORES.primario,
-    borderRadius: RAIO.md,
-    paddingVertical: ESPACO.sm + 4,
-    marginTop: ESPACO.md,
-  },
-  botaoNotificacoesTexto: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: FONTE.normal,
-  },
-  linha: { flexDirection: "row", gap: ESPACO.sm },
-  toggleLinha: {
-    minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: ESPACO.sm,
-    marginBottom: ESPACO.sm,
-  },
-  toggleTexto: { fontSize: FONTE.normal, color: CORES.texto, fontWeight: "600" },
-  enderecoCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: ESPACO.sm,
-    backgroundColor: "#EFF6FF",
-    borderRadius: RAIO.md,
-    padding: ESPACO.md,
-    borderWidth: 1,
-    borderColor: "#BFDBFE",
-  },
-  enderecoTexto: { fontSize: FONTE.normal, color: CORES.texto, flex: 1 },
-  enderecoSub: { fontSize: FONTE.pequena, color: CORES.textoSecundario, marginTop: 2 },
-  textoSuporte: {
-    fontSize: FONTE.normal,
-    color: CORES.textoSecundario,
-    lineHeight: 20,
-  },
-  botaoSair: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: ESPACO.sm,
-    paddingVertical: ESPACO.md,
-    borderWidth: 1,
-    borderColor: CORES.erro,
-    borderRadius: RAIO.md,
-    marginBottom: ESPACO.sm,
-    backgroundColor: "#FEF2F2",
-  },
-  botaoSairTexto: { color: CORES.erro, fontWeight: "bold", fontSize: FONTE.normal },
-  versao: { textAlign: "center", fontSize: FONTE.pequena, color: CORES.textoClaro },
-});
