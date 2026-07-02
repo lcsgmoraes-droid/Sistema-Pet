@@ -25,9 +25,14 @@ def test_demo_operacional_scenarios_cover_sales_story():
     assert any(scenario.coupon for scenario in scenarios)
     assert any(scenario.discount_value > 0 for scenario in scenarios)
     assert any(scenario.discount_percent > 0 for scenario in scenarios)
-    assert any(Decimal("0") < scenario.received_ratio < Decimal("1") for scenario in scenarios)
+    assert any(
+        Decimal("0") < scenario.received_ratio < Decimal("1") for scenario in scenarios
+    )
     assert any(scenario.received_ratio == Decimal("0") for scenario in scenarios)
-    assert any(scenario.payment_key == "credito" and scenario.installments > 1 for scenario in scenarios)
+    assert any(
+        scenario.payment_key == "credito" and scenario.installments > 1
+        for scenario in scenarios
+    )
     assert any(scenario.order_origin == "app" for scenario in scenarios)
     assert any(scenario.order_origin == "web" for scenario in scenarios)
     assert any(getattr(scenario, "commissioned", False) for scenario in scenarios)
@@ -84,9 +89,7 @@ def test_product_pool_ignores_demo_fallback_when_real_catalog_exists(monkeypatch
     monkeypatch.setattr(seed_demo_operacional, "_scalar", fake_scalar)
     monkeypatch.setattr(seed_demo_operacional, "_all_mappings", fake_all_mappings)
 
-    seed_demo_operacional._product_pool(
-        FakeDb(), tenant_id="tenant-demo", user_id=10
-    )
+    seed_demo_operacional._product_pool(FakeDb(), tenant_id="tenant-demo", user_id=10)
 
     assert executed_queries
     assert "codigo NOT ILIKE 'DEMO-%'" in executed_queries[0]
@@ -102,13 +105,20 @@ def test_product_pool_deactivates_demo_fallback_when_real_catalog_exists(monkeyp
             executed_queries.append(str(query))
             return None
 
-    monkeypatch.setattr(seed_demo_operacional, "_ensure_fallback_products", lambda *a, **k: None)
-    monkeypatch.setattr(seed_demo_operacional, "_has_enough_real_products", lambda *a, **k: True)
+    monkeypatch.setattr(
+        seed_demo_operacional, "_ensure_fallback_products", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        seed_demo_operacional, "_has_enough_real_products", lambda *a, **k: True
+    )
     monkeypatch.setattr(seed_demo_operacional, "_all_mappings", lambda *a, **k: [])
 
     seed_demo_operacional._product_pool(FakeDb(), tenant_id="tenant-demo", user_id=10)
 
-    assert any("codigo ILIKE 'DEMO-%'" in sql and "ativo = false" in sql for sql in executed_queries)
+    assert any(
+        "codigo ILIKE 'DEMO-%'" in sql and "ativo = false" in sql
+        for sql in executed_queries
+    )
 
 
 def test_product_pool_assigns_curated_prices_to_real_catalog(monkeypatch):
@@ -133,11 +143,19 @@ def test_product_pool_assigns_curated_prices_to_real_catalog(monkeypatch):
         for idx in range(8)
     ]
 
-    monkeypatch.setattr(seed_demo_operacional, "_ensure_fallback_products", lambda *a, **k: None)
-    monkeypatch.setattr(seed_demo_operacional, "_has_enough_real_products", lambda *a, **k: True)
-    monkeypatch.setattr(seed_demo_operacional, "_all_mappings", lambda *a, **k: products)
+    monkeypatch.setattr(
+        seed_demo_operacional, "_ensure_fallback_products", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        seed_demo_operacional, "_has_enough_real_products", lambda *a, **k: True
+    )
+    monkeypatch.setattr(
+        seed_demo_operacional, "_all_mappings", lambda *a, **k: products
+    )
 
-    pool = seed_demo_operacional._product_pool(FakeDb(), tenant_id="tenant-demo", user_id=10)
+    pool = seed_demo_operacional._product_pool(
+        FakeDb(), tenant_id="tenant-demo", user_id=10
+    )
 
     assert len({product["preco_venda"] for product in pool}) >= 6
     assert Decimal("49.90") not in {product["preco_venda"] for product in pool[:6]}
@@ -152,8 +170,12 @@ def test_product_pool_normalizes_demo_catalog_page_size(monkeypatch):
         def execute(self, *args, **kwargs):
             return None
 
-    monkeypatch.setattr(seed_demo_operacional, "_ensure_fallback_products", lambda *a, **k: None)
-    monkeypatch.setattr(seed_demo_operacional, "_has_enough_real_products", lambda *a, **k: True)
+    monkeypatch.setattr(
+        seed_demo_operacional, "_ensure_fallback_products", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        seed_demo_operacional, "_has_enough_real_products", lambda *a, **k: True
+    )
 
     def fake_all_mappings(db, sql, params):
         executed_queries.append(sql)
