@@ -70,4 +70,6 @@ def formatar_quantidade_compra_documento(
         return f"{quantidade_texto} {unidade}"
 
     total_unidades = calcular_quantidade_total_unidades(quantidade, unidade, fator)
-    return f"{quantidade_texto} {unidade} ({_formatar_numero_curto(total_unidades)} unid)"
+    return (
+        f"{quantidade_texto} {unidade} ({_formatar_numero_curto(total_unidades)} unid)"
+    )
