@@ -207,7 +207,7 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
-Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo do recorte backend/web rastreado, excluindo testes, migrations, CSS e builds locais.
+Inventario atualizado em 2026-07-02 pela contagem operacional de linhas com conteudo do recorte backend/web rastreado, excluindo testes, migrations, CSS e builds locais.
 
 - 0 arquivos de aplicacao backend/web acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao backend/web acima de 1000 linhas, prioridade de refatoracao.
@@ -216,7 +216,17 @@ Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com cont
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
-- Observacao mobile: `app-mobile/src` ainda tem 11 arquivos acima de 700 linhas; eles ficam como frente separada do app quando a prioridade voltar para mobile.
+- Observacao mobile: `app-mobile/src` ainda tem 11 arquivos acima de 700 linhas; a frente mobile foi iniciada e deve seguir separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+
+Fatia mobile 700 batch 42 de 2026-07-02: `app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx` saiu da faixa acima de 700 linhas ao separar o PDV rapido do funcionario em composicao, scanner, imagem, styles e helpers:
+
+- `app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx`: 1577 -> 598 linhas com conteudo, mantendo estado, efeitos, calculos e chamadas de servico.
+- `app-mobile/src/screens/funcionario/pdv/FuncionarioPdvContent.tsx`: concentra o layout operacional do PDV, comprador, beneficios, pagamento e resumo.
+- `app-mobile/src/screens/funcionario/pdv/FuncionarioPdvScanner.tsx`: concentra permissao de camera e leitura de codigo de barras.
+- `app-mobile/src/screens/funcionario/pdv/FuncionarioPdvProductImage.tsx`: concentra imagem/placeholder de produto.
+- `app-mobile/src/screens/funcionario/pdv/FuncionarioPdvStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/funcionario/pdv/FuncionarioPdvUtils.ts`: concentra constantes de pagamento, parsing e formatadores de quantidade/valor.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-42-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
 
 Fatia testes 700 batch 41 de 2026-06-30: `backend/tests/multi_tenant/test_phase3_tenant_onboarding_service.py` saiu da faixa acima de 700 linhas ao dividir os contratos de onboarding multitenant por responsabilidade:
 
