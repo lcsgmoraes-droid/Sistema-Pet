@@ -216,7 +216,17 @@ Inventario atualizado em 2026-07-02 pela contagem operacional de linhas com cont
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
-- Observacao mobile: `app-mobile/src` ainda tem 5 arquivos acima de 700 linhas; a frente mobile foi iniciada e deve seguir separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+- Observacao mobile: `app-mobile/src` ainda tem 4 arquivos acima de 700 linhas; a frente mobile segue separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+
+Fatia mobile 700 batch 49 de 2026-07-02: `app-mobile/src/screens/shop/CatalogScreen.tsx` saiu da faixa acima de 700 linhas ao separar catalogo em conteudo, card de produto, modal de filtros, styles e utils:
+
+- `app-mobile/src/screens/shop/CatalogScreen.tsx`: 855 -> 217 linhas com conteudo, mantendo busca, paginacao, filtros, wishlist, carrinho e avise-me.
+- `app-mobile/src/screens/shop/catalog/CatalogContent.tsx`: concentra toolbar, resumo, lista, estados vazios/carregamento e composicao do modal.
+- `app-mobile/src/screens/shop/catalog/CatalogProductCard.tsx`: concentra card do produto, badges, preco, estoque, wishlist, adicionar e avise-me.
+- `app-mobile/src/screens/shop/catalog/CatalogFilterModal.tsx`: concentra modal de filtros, chips, busca de marca e ordenacao.
+- `app-mobile/src/screens/shop/catalog/CatalogStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/shop/catalog/CatalogUtils.ts`: concentra tipos, opcoes e helpers de filtros.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-49-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
 
 Fatia mobile 700 batch 48 de 2026-07-02: `app-mobile/src/screens/profile/ProfileScreen.tsx` saiu da faixa acima de 700 linhas ao separar perfil em conteudo, secoes pessoais, secoes de endereco, componentes compartilhados, styles e utils:
 
