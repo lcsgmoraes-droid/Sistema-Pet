@@ -216,7 +216,17 @@ Inventario atualizado em 2026-07-02 pela contagem operacional de linhas com cont
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
-- Observacao mobile: `app-mobile/src` ainda tem 11 arquivos acima de 700 linhas; a frente mobile foi iniciada e deve seguir separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+- Observacao mobile: `app-mobile/src` ainda tem 10 arquivos acima de 700 linhas; a frente mobile foi iniciada e deve seguir separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+
+Fatia mobile 700 batch 43 de 2026-07-02: `app-mobile/src/screens/entregador/DetalheEntregaScreen.tsx` saiu da faixa acima de 700 linhas ao separar detalhe de entrega em conteudo, card de parada, modais, styles e helpers:
+
+- `app-mobile/src/screens/entregador/DetalheEntregaScreen.tsx`: 1394 -> 460 linhas com conteudo, mantendo estado, efeitos, GPS, reordenacao e chamadas de servico.
+- `app-mobile/src/screens/entregador/detalhe/DetalheEntregaContent.tsx`: concentra resumo da rota, botoes principais, lista reordenavel e composicao dos modais.
+- `app-mobile/src/screens/entregador/detalhe/DetalheEntregaStopCard.tsx`: concentra o card de parada, status, mapa, telefone, recebimento, detalhes e acoes de entrega.
+- `app-mobile/src/screens/entregador/detalhe/DetalheEntregaModals.tsx`: concentra modais de reordenacao, nao entrega, recebimento e detalhes da venda.
+- `app-mobile/src/screens/entregador/detalhe/DetalheEntregaStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/entregador/detalhe/DetalheEntregaUtils.ts`: concentra tipos, helpers de erro, mapas, telefone, localizacao opcional e regras de reordenacao.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-43-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
 
 Fatia mobile 700 batch 42 de 2026-07-02: `app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx` saiu da faixa acima de 700 linhas ao separar o PDV rapido do funcionario em composicao, scanner, imagem, styles e helpers:
 
