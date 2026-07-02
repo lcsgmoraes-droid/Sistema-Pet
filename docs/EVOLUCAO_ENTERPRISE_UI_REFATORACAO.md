@@ -216,7 +216,18 @@ Inventario atualizado em 2026-07-02 pela contagem operacional de linhas com cont
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
-- Observacao mobile: `app-mobile/src` ainda tem 8 arquivos acima de 700 linhas; a frente mobile foi iniciada e deve seguir separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+- Observacao mobile: `app-mobile/src` ainda tem 7 arquivos acima de 700 linhas; a frente mobile foi iniciada e deve seguir separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+
+Fatia mobile 700 batch 46 de 2026-07-02: `app-mobile/src/screens/pets/PetDetailScreen.tsx` saiu da faixa acima de 700 linhas ao separar detalhes do pet em conteudo, componentes compartilhados, folheto de vacinas, modal, styles e utils:
+
+- `app-mobile/src/screens/pets/PetDetailScreen.tsx`: 972 -> 73 linhas com conteudo, mantendo carregamento, foco automatico de secoes, abertura de arquivo e estado do modal.
+- `app-mobile/src/screens/pets/detail/PetDetailContent.tsx`: concentra cabecalho, navegacao rapida, alertas, vacinas, exames e consultas.
+- `app-mobile/src/screens/pets/detail/PetDetailSharedComponents.tsx`: concentra `Section`, card de resumo e botao de navegacao rapida.
+- `app-mobile/src/screens/pets/detail/PetDetailVaccineBooklet.tsx`: concentra a carteirinha paginada de vacinas.
+- `app-mobile/src/screens/pets/detail/PetDetailVaccineModal.tsx`: concentra o modal da vacina e a carteira virtual.
+- `app-mobile/src/screens/pets/detail/PetDetailStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/pets/detail/PetDetailUtils.ts`: concentra idade, status de vacina, cores e resumo de hash.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-46-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
 
 Fatia mobile 700 batch 45 de 2026-07-02: `app-mobile/src/screens/funcionario/FuncionarioContagemScreen.tsx` saiu da faixa acima de 700 linhas ao separar a contagem operacional do funcionario em conteudo, scanner, componentes de item, styles e utils:
 
