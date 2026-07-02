@@ -17,6 +17,9 @@ def test_app_mobile_push_registration_has_manual_profile_action():
     service = service_path.read_text(encoding="utf-8")
     hook = read("app-mobile/src/hooks/usePushNotifications.ts")
     profile = read("app-mobile/src/screens/profile/ProfileScreen.tsx")
+    profile_sections = read(
+        "app-mobile/src/screens/profile/profile/ProfilePersonalSections.tsx"
+    )
 
     assert "ensurePushNotificationsRegistered" in service
     assert 'status: "expo_go"' in service
@@ -36,8 +39,10 @@ def test_app_mobile_push_registration_has_manual_profile_action():
     assert "getExpoPushTokenAsync" not in hook
 
     assert "ativarNotificacoes" in profile
-    assert "Notificacoes de pedidos" in profile
     assert "ensurePushNotificationsRegistered" in profile
+    assert "NotificationsSection" in profile_sections
+    assert "Notificacoes de pedidos" in profile_sections
+    assert "Ativar notificacoes" in profile_sections
 
 
 def test_push_devices_migration_backfills_existing_user_tokens():

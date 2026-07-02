@@ -207,7 +207,7 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
-Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com conteudo do recorte backend/web rastreado, excluindo testes, migrations, CSS e builds locais.
+Inventario atualizado em 2026-07-02 pela contagem operacional de linhas com conteudo do recorte backend/web rastreado, excluindo testes, migrations, CSS e builds locais.
 
 - 0 arquivos de aplicacao backend/web acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao backend/web acima de 1000 linhas, prioridade de refatoracao.
@@ -216,7 +216,90 @@ Inventario atualizado em 2026-06-30 pela contagem operacional de linhas com cont
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
-- Observacao mobile: `app-mobile/src` ainda tem 11 arquivos acima de 700 linhas; eles ficam como frente separada do app quando a prioridade voltar para mobile.
+- Observacao mobile: `app-mobile/src` ainda tem 4 arquivos acima de 700 linhas; a frente mobile segue separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+
+Fatia mobile 700 batch 49 de 2026-07-02: `app-mobile/src/screens/shop/CatalogScreen.tsx` saiu da faixa acima de 700 linhas ao separar catalogo em conteudo, card de produto, modal de filtros, styles e utils:
+
+- `app-mobile/src/screens/shop/CatalogScreen.tsx`: 855 -> 217 linhas com conteudo, mantendo busca, paginacao, filtros, wishlist, carrinho e avise-me.
+- `app-mobile/src/screens/shop/catalog/CatalogContent.tsx`: concentra toolbar, resumo, lista, estados vazios/carregamento e composicao do modal.
+- `app-mobile/src/screens/shop/catalog/CatalogProductCard.tsx`: concentra card do produto, badges, preco, estoque, wishlist, adicionar e avise-me.
+- `app-mobile/src/screens/shop/catalog/CatalogFilterModal.tsx`: concentra modal de filtros, chips, busca de marca e ordenacao.
+- `app-mobile/src/screens/shop/catalog/CatalogStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/shop/catalog/CatalogUtils.ts`: concentra tipos, opcoes e helpers de filtros.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-49-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
+
+Fatia mobile 700 batch 48 de 2026-07-02: `app-mobile/src/screens/profile/ProfileScreen.tsx` saiu da faixa acima de 700 linhas ao separar perfil em conteudo, secoes pessoais, secoes de endereco, componentes compartilhados, styles e utils:
+
+- `app-mobile/src/screens/profile/ProfileScreen.tsx`: 953 -> 334 linhas com conteudo, mantendo estado, CEP, salvamento de perfil/endereco, troca de acesso, notificacoes e logout.
+- `app-mobile/src/screens/profile/profile/ProfileContent.tsx`: concentra a composicao da tela e a ordem das secoes.
+- `app-mobile/src/screens/profile/profile/ProfilePersonalSections.tsx`: concentra avatar, pontos, troca de perfil, dados pessoais, notificacoes e logout.
+- `app-mobile/src/screens/profile/profile/ProfileAddressSections.tsx`: concentra endereco padrao, endereco de entrega e formulario de entrega.
+- `app-mobile/src/screens/profile/profile/ProfileSharedComponents.tsx`: concentra campo, linha de informacao, botao de salvar e cabecalho de secao.
+- `app-mobile/src/screens/profile/profile/ProfileStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/profile/profile/ProfileUtils.ts`: concentra CEP, montagem de enderecos e validacao de campos obrigatorios da entrega.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-48-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
+
+Fatia mobile 700 batch 47 de 2026-07-02: `app-mobile/src/screens/pets/FoodCalculatorScreen.tsx` saiu da faixa acima de 700 linhas ao separar a calculadora de racao em conteudo, seletores, cards de resultado, styles e utils:
+
+- `app-mobile/src/screens/pets/FoodCalculatorScreen.tsx`: 959 -> 207 linhas com conteudo, mantendo carregamento de racoes/pets, calculo, comparacao e carrinho.
+- `app-mobile/src/screens/pets/food-calculator/FoodCalculatorContent.tsx`: concentra formulario, atividades, top 3, comparativo e composicao dos seletores.
+- `app-mobile/src/screens/pets/food-calculator/FoodCalculatorSelectors.tsx`: concentra modal de selecao de pet/racao e busca.
+- `app-mobile/src/screens/pets/food-calculator/FoodCalculatorResultCards.tsx`: concentra campo de formulario e cards/itens de resultado.
+- `app-mobile/src/screens/pets/food-calculator/FoodCalculatorStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/pets/food-calculator/FoodCalculatorUtils.ts`: concentra tipos do seletor, atividade e constantes.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-47-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
+
+Fatia mobile 700 batch 46 de 2026-07-02: `app-mobile/src/screens/pets/PetDetailScreen.tsx` saiu da faixa acima de 700 linhas ao separar detalhes do pet em conteudo, componentes compartilhados, folheto de vacinas, modal, styles e utils:
+
+- `app-mobile/src/screens/pets/PetDetailScreen.tsx`: 972 -> 73 linhas com conteudo, mantendo carregamento, foco automatico de secoes, abertura de arquivo e estado do modal.
+- `app-mobile/src/screens/pets/detail/PetDetailContent.tsx`: concentra cabecalho, navegacao rapida, alertas, vacinas, exames e consultas.
+- `app-mobile/src/screens/pets/detail/PetDetailSharedComponents.tsx`: concentra `Section`, card de resumo e botao de navegacao rapida.
+- `app-mobile/src/screens/pets/detail/PetDetailVaccineBooklet.tsx`: concentra a carteirinha paginada de vacinas.
+- `app-mobile/src/screens/pets/detail/PetDetailVaccineModal.tsx`: concentra o modal da vacina e a carteira virtual.
+- `app-mobile/src/screens/pets/detail/PetDetailStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/pets/detail/PetDetailUtils.ts`: concentra idade, status de vacina, cores e resumo de hash.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-46-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
+
+Fatia mobile 700 batch 45 de 2026-07-02: `app-mobile/src/screens/funcionario/FuncionarioContagemScreen.tsx` saiu da faixa acima de 700 linhas ao separar a contagem operacional do funcionario em conteudo, scanner, componentes de item, styles e utils:
+
+- `app-mobile/src/screens/funcionario/FuncionarioContagemScreen.tsx`: 1054 -> 450 linhas com conteudo, mantendo estado, efeitos, busca, leitura de codigo de barras, historico e chamadas de servico.
+- `app-mobile/src/screens/funcionario/contagem/FuncionarioContagemContent.tsx`: concentra cabecalho, fornecedor, busca manual, selecao de produto, itens contados, totais, exportacao e historico recente.
+- `app-mobile/src/screens/funcionario/contagem/FuncionarioContagemScanner.tsx`: concentra permissao de camera e leitura por barcode.
+- `app-mobile/src/screens/funcionario/contagem/FuncionarioContagemItemComponents.tsx`: concentra imagem de produto e checkbox de opcoes de arquivo.
+- `app-mobile/src/screens/funcionario/contagem/FuncionarioContagemStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/funcionario/contagem/FuncionarioContagemUtils.ts`: concentra tipo local, parse de quantidade, formatador e normalizacao de erro de API.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-45-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
+
+Fatia mobile 700 batch 44 de 2026-07-02: `app-mobile/src/screens/benefits/BeneficiosScreen.tsx` saiu da faixa acima de 700 linhas ao separar beneficios em secoes, styles e helpers:
+
+- `app-mobile/src/screens/benefits/BeneficiosScreen.tsx`: 1231 -> 96 linhas com conteudo, mantendo carregamento, refresh, erro e navegacao.
+- `app-mobile/src/screens/benefits/beneficios/BeneficiosRankingSection.tsx`: concentra ranking, vantagens e progresso de nivel.
+- `app-mobile/src/screens/benefits/beneficios/BeneficiosStampAndLevelsSections.tsx`: concentra cartao fidelidade e proximos niveis.
+- `app-mobile/src/screens/benefits/beneficios/BeneficiosCashbackSection.tsx`: concentra saldo, extrato, sugestao e alerta de expiracao do cashback.
+- `app-mobile/src/screens/benefits/beneficios/BeneficiosCouponsSection.tsx`: concentra lista, copia e estados dos cupons.
+- `app-mobile/src/screens/benefits/beneficios/BeneficiosStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/benefits/beneficios/BeneficiosUtils.ts`: concentra tipos, constantes de niveis, normalizacao e formatadores.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-44-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
+
+Fatia mobile 700 batch 43 de 2026-07-02: `app-mobile/src/screens/entregador/DetalheEntregaScreen.tsx` saiu da faixa acima de 700 linhas ao separar detalhe de entrega em conteudo, card de parada, modais, styles e helpers:
+
+- `app-mobile/src/screens/entregador/DetalheEntregaScreen.tsx`: 1394 -> 460 linhas com conteudo, mantendo estado, efeitos, GPS, reordenacao e chamadas de servico.
+- `app-mobile/src/screens/entregador/detalhe/DetalheEntregaContent.tsx`: concentra resumo da rota, botoes principais, lista reordenavel e composicao dos modais.
+- `app-mobile/src/screens/entregador/detalhe/DetalheEntregaStopCard.tsx`: concentra o card de parada, status, mapa, telefone, recebimento, detalhes e acoes de entrega.
+- `app-mobile/src/screens/entregador/detalhe/DetalheEntregaModals.tsx`: concentra modais de reordenacao, nao entrega, recebimento e detalhes da venda.
+- `app-mobile/src/screens/entregador/detalhe/DetalheEntregaStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/entregador/detalhe/DetalheEntregaUtils.ts`: concentra tipos, helpers de erro, mapas, telefone, localizacao opcional e regras de reordenacao.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-43-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
+
+Fatia mobile 700 batch 42 de 2026-07-02: `app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx` saiu da faixa acima de 700 linhas ao separar o PDV rapido do funcionario em composicao, scanner, imagem, styles e helpers:
+
+- `app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx`: 1577 -> 598 linhas com conteudo, mantendo estado, efeitos, calculos e chamadas de servico.
+- `app-mobile/src/screens/funcionario/pdv/FuncionarioPdvContent.tsx`: concentra o layout operacional do PDV, comprador, beneficios, pagamento e resumo.
+- `app-mobile/src/screens/funcionario/pdv/FuncionarioPdvScanner.tsx`: concentra permissao de camera e leitura de codigo de barras.
+- `app-mobile/src/screens/funcionario/pdv/FuncionarioPdvProductImage.tsx`: concentra imagem/placeholder de produto.
+- `app-mobile/src/screens/funcionario/pdv/FuncionarioPdvStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/funcionario/pdv/FuncionarioPdvUtils.ts`: concentra constantes de pagamento, parsing e formatadores de quantidade/valor.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-42-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
 
 Fatia testes 700 batch 41 de 2026-06-30: `backend/tests/multi_tenant/test_phase3_tenant_onboarding_service.py` saiu da faixa acima de 700 linhas ao dividir os contratos de onboarding multitenant por responsabilidade:
 
