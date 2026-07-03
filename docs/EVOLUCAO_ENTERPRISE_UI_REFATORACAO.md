@@ -216,7 +216,16 @@ Inventario atualizado em 2026-07-02 pela contagem operacional de linhas com cont
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
-- Observacao mobile: `app-mobile/src` ainda tem 4 arquivos acima de 700 linhas; a frente mobile segue separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+- Observacao mobile: `app-mobile/src` ainda tem 3 arquivos acima de 700 linhas; a frente mobile segue separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+
+Fatia mobile 700 batch 50 de 2026-07-03: `app-mobile/src/screens/veterinario/VetAgendaScreen.tsx` saiu da faixa acima de 700 linhas ao separar agenda veterinaria em conteudo, modal de agendamento, styles e utils:
+
+- `app-mobile/src/screens/veterinario/VetAgendaScreen.tsx`: 822 -> 283 linhas com conteudo, mantendo carregamento de agenda, modos dia/semana/mes, navegacao, busca de pet, consultorios, calendario, horarios e criacao de consulta.
+- `app-mobile/src/screens/veterinario/vet-agenda/VetAgendaContent.tsx`: concentra loading, cabecalho, segmentacao de modo, navegacao de periodo, grupos de agendamentos, cards e estado vazio.
+- `app-mobile/src/screens/veterinario/vet-agenda/VetAgendaAppointmentModal.tsx`: concentra modal de nova consulta, busca de pet, chips de consultorio, calendario, horarios, duracao, motivo e acao de salvar.
+- `app-mobile/src/screens/veterinario/vet-agenda/VetAgendaStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/veterinario/vet-agenda/VetAgendaUtils.ts`: concentra tipos, datas, periodo da agenda, calendario, horarios, formulario e helpers de erro.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-50-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
 
 Fatia mobile 700 batch 49 de 2026-07-02: `app-mobile/src/screens/shop/CatalogScreen.tsx` saiu da faixa acima de 700 linhas ao separar catalogo em conteudo, card de produto, modal de filtros, styles e utils:
 
