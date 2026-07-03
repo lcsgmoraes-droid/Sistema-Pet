@@ -399,9 +399,9 @@ def _resolver_produto_local(
 def _mesmo_sku(sku_a: str | None, sku_b: str | None) -> bool:
     sku_a_limpo = _texto(sku_a)
     sku_b_limpo = _texto(sku_b)
-    return bool(sku_a_limpo) and (sku_a_limpo or "").lower() == (
-        sku_b_limpo or ""
-    ).lower()
+    return (
+        bool(sku_a_limpo) and (sku_a_limpo or "").lower() == (sku_b_limpo or "").lower()
+    )
 
 
 def _bling_produto_id_do_item_pedido(
