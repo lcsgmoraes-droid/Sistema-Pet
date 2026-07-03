@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any

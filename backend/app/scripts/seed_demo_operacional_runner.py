@@ -6,8 +6,6 @@ from dataclasses import asdict
 from datetime import date
 from typing import Any
 
-from sqlalchemy import text
-
 from app.scripts.seed_demo_operacional_catalog import (
     _cleanup_previous_demo,
     _product_pool,

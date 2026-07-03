@@ -8,11 +8,7 @@ from typing import Any, Iterable
 
 from sqlalchemy import text
 
-from app.scripts.seed_demo_operacional_data import (
-    FixedPayable,
-    build_fixed_payables,
-    money,
-)
+from app.scripts.seed_demo_operacional_data import build_fixed_payables, money
 from app.scripts.seed_demo_operacional_db import _scalar
 
 

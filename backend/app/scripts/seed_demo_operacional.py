@@ -18,12 +18,12 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(backend_path))
 
 
-from app.scripts.seed_demo_operacional_accounting import (  # noqa: E402
+from app.scripts.seed_demo_operacional_accounting import (  # noqa: E402,F401
     _ensure_accounting_setup,
     _ensure_dre_subcategory,
     _ensure_financial_category,
 )
-from app.scripts.seed_demo_operacional_catalog import (  # noqa: E402
+from app.scripts.seed_demo_operacional_catalog import (  # noqa: E402,F401
     _cleanup_previous_demo,
     _demo_price_profile_for_product,
     _deactivate_demo_fallback_products,
@@ -34,7 +34,7 @@ from app.scripts.seed_demo_operacional_catalog import (  # noqa: E402
     _product_pool,
     _sale_items,
 )
-from app.scripts.seed_demo_operacional_data import (  # noqa: E402
+from app.scripts.seed_demo_operacional_data import (  # noqa: E402,F401
     CENT,
     DEFAULT_COMMISSION_PERCENT,
     DEFAULT_SOURCE_EMAIL,
@@ -49,7 +49,7 @@ from app.scripts.seed_demo_operacional_data import (  # noqa: E402
     decimal_json,
     money,
 )
-from app.scripts.seed_demo_operacional_db import (  # noqa: E402
+from app.scripts.seed_demo_operacional_db import (  # noqa: E402,F401
     _all_mappings,
     _maybe_import_catalog,
     _one_mapping,
@@ -58,11 +58,11 @@ from app.scripts.seed_demo_operacional_db import (  # noqa: E402
     _scalar,
     _set_tenant_context,
 )
-from app.scripts.seed_demo_operacional_logistics import (  # noqa: E402
+from app.scripts.seed_demo_operacional_logistics import (  # noqa: E402,F401
     _insert_order,
     _insert_route,
 )
-from app.scripts.seed_demo_operacional_movements import (  # noqa: E402
+from app.scripts.seed_demo_operacional_movements import (  # noqa: E402,F401
     _finalize_product_stock,
     _insert_bank_movement,
     _insert_cash_movement,
@@ -72,18 +72,18 @@ from app.scripts.seed_demo_operacional_movements import (  # noqa: E402
     _insert_payable_with_payment,
     _insert_stock_purchase_movements,
 )
-from app.scripts.seed_demo_operacional_payments import (  # noqa: E402
+from app.scripts.seed_demo_operacional_payments import (  # noqa: E402,F401
     _PAYMENT_PROFILES,
     _ensure_bank_account,
     _ensure_commission_configuration,
     _ensure_payment_method,
     _ensure_tax_configuration,
 )
-from app.scripts.seed_demo_operacional_runner import (  # noqa: E402
+from app.scripts.seed_demo_operacional_runner import (  # noqa: E402,F401
     _summarize,
     apply_operational_seed,
 )
-from app.scripts.seed_demo_operacional_sales_core import (  # noqa: E402
+from app.scripts.seed_demo_operacional_sales_core import (  # noqa: E402,F401
     _delivery_address,
     _discount_for,
     _insert_cashier,
@@ -91,14 +91,14 @@ from app.scripts.seed_demo_operacional_sales_core import (  # noqa: E402
     _payment_profile,
     _sale_delivery_status,
 )
-from app.scripts.seed_demo_operacional_sales_finance import (  # noqa: E402
+from app.scripts.seed_demo_operacional_sales_finance import (  # noqa: E402,F401
     _insert_commissions_for_sale,
     _insert_receipt,
     _insert_receivable,
     _insert_sale_baixa,
     _insert_sale_item,
 )
-from app.scripts.seed_demo_operacional_support import (  # noqa: E402
+from app.scripts.seed_demo_operacional_support import (  # noqa: E402,F401
     _ensure_cargo,
     _ensure_delivery_config,
     _ensure_person,
