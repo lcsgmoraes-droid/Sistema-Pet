@@ -261,9 +261,7 @@ export default function PedidoCompraFormulario({
                 )}
             </div>
             <div className="md:col-span-2">
-              <label className="mb-1 block text-xs font-semibold text-slate-600">
-                Qtd. pedida
-              </label>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Qtd. pedida</label>
               <input
                 type="number"
                 step="0.01"

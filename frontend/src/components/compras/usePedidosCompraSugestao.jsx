@@ -209,11 +209,7 @@ export default function usePedidosCompraSugestao({
     const unidade = normalizarUnidadeCompraPedido(unidadeCompra);
     const base = obterEmbalagemBaseSugestao(sugestao);
     const proximaQuantidadePorEmbalagem =
-      unidade === "UN"
-        ? 1
-        : base.unidade_compra === unidade
-          ? base.quantidade_por_embalagem
-          : null;
+      unidade === "UN" ? 1 : base.unidade_compra === unidade ? base.quantidade_por_embalagem : null;
 
     setEmbalagensEditadas((prev) => ({
       ...prev,
