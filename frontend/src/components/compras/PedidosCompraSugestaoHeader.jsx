@@ -30,7 +30,6 @@ export default function PedidosCompraSugestaoHeader({
   limparEstadosSugestao,
   sugestoes,
   produtosSelecionados,
-  obterQuantidadeInteira,
   obterQuantidadeTotalUnidadesSugestao,
   calcularValorTotalSugestao,
 }) {

@@ -65,7 +65,9 @@ def _gerar_observacao(
     return " | ".join(observacoes) if observacoes else "Estoque adequado"
 
 
-def _resolver_embalagem_sugestao(produto, embalagem_historica: Optional[dict] = None) -> dict:
+def _resolver_embalagem_sugestao(
+    produto, embalagem_historica: Optional[dict] = None
+) -> dict:
     if embalagem_historica:
         unidade_historica = normalizar_unidade_compra(
             embalagem_historica.get("unidade_compra")

@@ -11,7 +11,13 @@ from sqlalchemy.orm import Session
 from ..auth.dependencies import get_current_user_and_tenant
 from ..db import get_session
 from ..models import Cliente
-from ..produtos_models import Marca, PedidoCompra, PedidoCompraItem, Produto, ProdutoFornecedor
+from ..produtos_models import (
+    Marca,
+    PedidoCompra,
+    PedidoCompraItem,
+    Produto,
+    ProdutoFornecedor,
+)
 from .sugestao import (
     JANELAS_GIRO_SUGESTAO,
     _calcular_dias_com_estoque,
