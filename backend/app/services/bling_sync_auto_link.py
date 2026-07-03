@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from sqlalchemy.orm import Session, aliased
 
 from app.bling_integration import BlingAPI
 from app.db import SessionLocal
@@ -26,30 +27,58 @@ from .bling_sync_shared import (
 class BlingSyncAutoLinkMixin:
     """Auto-link de produtos por SKU e visao operacional."""
 
+    @staticmethod
+    def _get_or_create_sync(db: Session, produto: Produto) -> ProdutoBlingSync:
+        query = db.query(ProdutoBlingSync).filter(
+            ProdutoBlingSync.produto_id == produto.id,
+            ProdutoBlingSync.tenant_id == produto.tenant_id,
+        )
+        sync = query.first()
+        if not sync:
+            sync = ProdutoBlingSync(tenant_id=produto.tenant_id, produto_id=produto.id)
+            db.add(sync)
+        return sync
+
+    @classmethod
+    def _marcar_auto_link_sem_match(cls, db: Session, produto: Produto) -> None:
+        sync = cls._get_or_create_sync(db, produto)
+        sync.sincronizar = False
+        sync.estoque_compartilhado = False
+        sync.status = "sem_vinculo"
+        sync.erro_mensagem = "Produto nao encontrado no Bling por SKU no auto-vinculo."
+        sync.updated_at = utc_now()
+
     @classmethod
     def _auto_link_by_sku_for_tenant(cls, tenant_id, limit: int) -> Dict[str, Any]:
         db = SessionLocal()
         try:
-            subq_vinculados = (
-                db.query(ProdutoBlingSync.produto_id)
-                .filter(
-                    ProdutoBlingSync.tenant_id == tenant_id,
-                    ProdutoBlingSync.bling_produto_id.isnot(None),
-                    ProdutoBlingSync.bling_produto_id != "",
-                )
-                .subquery()
-            )
+            sync_candidato = aliased(ProdutoBlingSync)
 
             produtos = (
                 db.query(Produto)
+                .outerjoin(
+                    sync_candidato,
+                    (sync_candidato.produto_id == Produto.id)
+                    & (sync_candidato.tenant_id == tenant_id),
+                )
                 .filter(
                     Produto.tenant_id == tenant_id,
                     Produto.codigo.isnot(None),
                     Produto.codigo != "",
                     Produto.tipo_produto != "PAI",
                 )
-                .filter(Produto.id.notin_(subq_vinculados))
-                .order_by(Produto.id.asc())
+                .filter(
+                    or_(
+                        sync_candidato.id.is_(None),
+                        sync_candidato.bling_produto_id.is_(None),
+                        sync_candidato.bling_produto_id == "",
+                    )
+                )
+                .order_by(
+                    sync_candidato.updated_at.asc().nullsfirst(),
+                    Produto.updated_at.desc().nullslast(),
+                    Produto.id.asc(),
+                )
                 .limit(limit)
                 .all()
             )
@@ -67,30 +96,20 @@ class BlingSyncAutoLinkMixin:
                         nome_busca=produto.nome or "",
                     )
                     if not item:
+                        cls._marcar_auto_link_sem_match(db, produto)
                         nao_encontrados += 1
                         continue
 
                     bling_id = str(item.get("id") or "").strip()
                     if not bling_id:
+                        cls._marcar_auto_link_sem_match(db, produto)
                         nao_encontrados += 1
                         continue
 
-                    sync = (
-                        db.query(ProdutoBlingSync)
-                        .filter(
-                            ProdutoBlingSync.produto_id == produto.id,
-                            ProdutoBlingSync.tenant_id == produto.tenant_id,
-                        )
-                        .first()
-                    )
-                    if not sync:
-                        sync = ProdutoBlingSync(
-                            tenant_id=produto.tenant_id, produto_id=produto.id
-                        )
-                        db.add(sync)
-
+                    sync = cls._get_or_create_sync(db, produto)
                     sync.bling_produto_id = bling_id
                     sync.sincronizar = True
+                    sync.estoque_compartilhado = True
                     sync.status = "ativo"
                     sync.erro_mensagem = None
                     sync.updated_at = utc_now()

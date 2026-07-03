@@ -44,6 +44,7 @@ export default function MovimentacoesProduto() {
   const [editingMovimentacao, setEditingMovimentacao] = useState(null);
   const [syncProduto, setSyncProduto] = useState(null);
   const [forcandoSync, setForcandoSync] = useState(false);
+  const [forcandoVinculoBling, setForcandoVinculoBling] = useState(false);
   const [showReservasModal, setShowReservasModal] = useState(false);
   const [loadingReservas, setLoadingReservas] = useState(false);
   const [reservasAtivas, setReservasAtivas] = useState([]);
@@ -180,6 +181,32 @@ export default function MovimentacoesProduto() {
     } finally {
       setForcandoSync(false);
     }
+  };
+
+  const handleForcarVinculoBling = async () => {
+    if (!moduloBlingAtivo) {
+      toast.error("Integração Bling não está disponível neste plano.");
+      return;
+    }
+
+    try {
+      setForcandoVinculoBling(true);
+      const response = await api.post(`/estoque/sync/vincular-automatico/${id}`);
+      const data = response?.data || {};
+      toast.success(data.message || "Produto vinculado ao Bling pelo SKU.");
+      await carregarDados();
+    } catch (error) {
+      toast.error(extrairMensagemErroApi(error, "Nao foi possivel vincular este SKU no Bling."));
+    } finally {
+      setForcandoVinculoBling(false);
+    }
+  };
+
+  const handleAcaoPrincipalBling = () => {
+    if (syncProduto?.bling_produto_id) {
+      return handleForcarSyncProduto();
+    }
+    return handleForcarVinculoBling();
   };
 
   const abrirModalReservas = async () => {
@@ -523,10 +550,11 @@ export default function MovimentacoesProduto() {
         estoqueMinimo={estoqueMinimo}
         estoqueReservado={estoqueReservado}
         forcandoSync={forcandoSync}
+        forcandoVinculoBling={forcandoVinculoBling}
         formatarQuantidade={formatarQuantidade}
         loadingReservas={loadingReservas}
         onAbrirPainelBling={() => navigate("/produtos/sinc-bling")}
-        onForcarSyncProduto={handleForcarSyncProduto}
+        onForcarSyncProduto={handleAcaoPrincipalBling}
         onIncluirLancamento={handleIncluirLancamento}
         onLancarGranel={abrirModalGranel}
         onVoltarProdutos={() => navigate("/produtos")}

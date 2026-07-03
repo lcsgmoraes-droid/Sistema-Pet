@@ -9,6 +9,7 @@ from app.db import get_session
 from app.pedido_integrado_models import PedidoIntegrado
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.estoque_reserva_service import EstoqueReservaService
+from app.bling_sync.routes_common import _upsert_sync_vinculo
 from app.integracao_bling_nf_routes import (
     _dict,
     _nf_id_valido,
@@ -395,6 +396,25 @@ def _resolver_produto_local(
     )
 
 
+def _mesmo_sku(sku_a: str | None, sku_b: str | None) -> bool:
+    sku_a_limpo = _texto(sku_a)
+    sku_b_limpo = _texto(sku_b)
+    return (
+        bool(sku_a_limpo) and (sku_a_limpo or "").lower() == (sku_b_limpo or "").lower()
+    )
+
+
+def _bling_produto_id_do_item_pedido(
+    pedido: PedidoIntegrado, item: PedidoIntegradoItem
+) -> str | None:
+    pedido_payload = _payload_principal(_dict(getattr(pedido, "payload", None)))
+    for raw_item in pedido_payload.get("itens") or []:
+        item_payload = _normalizar_item_payload(raw_item)
+        if _mesmo_sku(item_payload.get("sku"), item.sku):
+            return _texto(item_payload.get("produto_bling_id"))
+    return None
+
+
 def _baixar_item_pedido(
     db: Session,
     pedido: PedidoIntegrado,
@@ -418,6 +438,18 @@ def _baixar_item_pedido(
     )
     if not user_id_execucao:
         return "Nenhum usuario valido encontrado para registrar a baixa automatica"
+
+    bling_produto_id = _bling_produto_id_do_item_pedido(pedido, item)
+    if bling_produto_id:
+        try:
+            _upsert_sync_vinculo(db, pedido.tenant_id, produto, bling_produto_id)
+        except Exception as e:
+            logger.warning(
+                "[BLING PEDIDO] Nao foi possivel vincular SKU %s ao produto Bling %s: %s",
+                item.sku,
+                bling_produto_id,
+                e,
+            )
 
     baixar_estoque_item_integrado(
         db=db,
