@@ -216,7 +216,16 @@ Inventario atualizado em 2026-07-02 pela contagem operacional de linhas com cont
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
-- Observacao mobile: `app-mobile/src` ainda tem 1 arquivo acima de 700 linhas; a frente mobile segue separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+- Observacao mobile: `app-mobile/src` esta com 0 arquivos acima de 700 linhas; a frente mobile zerou as telas grandes mantendo separacao por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+
+Fatia mobile 700 batch 53 de 2026-07-03: `app-mobile/src/screens/orders/TrackDeliveryScreen.tsx` saiu da faixa acima de 700 linhas ao separar rastreio em conteudo, mapa, styles e utils:
+
+- `app-mobile/src/screens/orders/TrackDeliveryScreen.tsx`: 704 -> 146 linhas com conteudo, mantendo carregamento do rastreio, refresh, polling adaptativo, animacao do marcador, trilha da rota, abertura do Google Maps e tratamento de oscilacao de rede.
+- `app-mobile/src/screens/orders/track-delivery/TrackDeliveryContent.tsx`: concentra loading, erro, retirada na loja, pedido recebido, rota ativa, progresso, endereco, entrega concluida e atualizacao automatica.
+- `app-mobile/src/screens/orders/track-delivery/TrackDeliveryMap.tsx`: concentra mapa ao vivo, polilinha, marcador animado e legenda de GPS.
+- `app-mobile/src/screens/orders/track-delivery/TrackDeliveryStyles.ts`: concentra estilos da tela de rastreio.
+- `app-mobile/src/screens/orders/track-delivery/TrackDeliveryUtils.ts`: concentra tipos, status, helpers de animacao, trilha, bearing, URL do Maps, intervalos e formatacao de datas.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-53-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas e sem sinais de mojibake.
 
 Fatia mobile 700 batch 52 de 2026-07-03: `app-mobile/src/screens/orders/OrdersScreen.tsx` saiu da faixa acima de 700 linhas ao separar pedidos em conteudo, card, styles e utils:
 
