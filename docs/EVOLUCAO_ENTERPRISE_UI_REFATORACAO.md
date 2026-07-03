@@ -207,7 +207,7 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
-Inventario atualizado em 2026-07-02 pela contagem operacional de linhas com conteudo do recorte backend/web rastreado, excluindo testes, migrations, CSS e builds locais.
+Inventario atualizado em 2026-07-03 pela contagem operacional de linhas com conteudo do recorte backend/web rastreado, excluindo testes, migrations, CSS e builds locais.
 
 - 0 arquivos de aplicacao backend/web acima de 700 linhas, em atencao.
 - 0 arquivos de aplicacao backend/web acima de 1000 linhas, prioridade de refatoracao.
@@ -217,6 +217,17 @@ Inventario atualizado em 2026-07-02 pela contagem operacional de linhas com cont
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
 - Observacao mobile: `app-mobile/src` esta com 0 arquivos acima de 700 linhas; a frente mobile zerou as telas grandes mantendo separacao por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+- Observacao operacional: no inventario amplo `backend` + `frontend/src` + `app-mobile/src`, ainda ha 9 arquivos acima de 700 linhas: 5 testes backend, 2 migrations geradas e 2 scripts/importadores legados fora de `backend/app`.
+
+Fatia scripts 700 batch 54 de 2026-07-03: `backend/app/scripts/seed_demo_operacional.py` saiu da faixa critica ao virar fachada de CLI/compatibilidade e separar responsabilidades por modulo:
+
+- `backend/app/scripts/seed_demo_operacional.py`: 3665 -> 163 linhas com conteudo, mantendo `--apply`, `--skip-catalog-import`, bloqueio de producao e exports antigos.
+- `backend/app/scripts/seed_demo_operacional_data.py`: concentra dataclasses, constantes, cenarios de venda, contas fixas, `money` e serializacao JSON.
+- `backend/app/scripts/seed_demo_operacional_db.py`: concentra resolucao de tenant, contexto RLS, importacao opcional de catalogo e helpers SQL.
+- `backend/app/scripts/seed_demo_operacional_accounting.py`, `seed_demo_operacional_payments.py` e `seed_demo_operacional_support.py`: concentram DRE/categorias, formas de pagamento, impostos, comissoes, cargos, pessoas e configuracao de entrega.
+- `backend/app/scripts/seed_demo_operacional_catalog.py`, `seed_demo_operacional_sales_core.py`, `seed_demo_operacional_sales_finance.py`, `seed_demo_operacional_movements.py` e `seed_demo_operacional_logistics.py`: concentram catalogo/produtos, vendas, recebiveis/comissoes, movimentos financeiros/estoque, rotas e pedidos.
+- `backend/app/scripts/seed_demo_operacional_runner.py`: concentra o fluxo de aplicacao/dry-run e resumo final do seed.
+- Contrato dedicado: `backend/tests/unit/test_seed_demo_operacional_refactor_contract.py`, garantindo a fachada e os modulos abaixo de 700 linhas, preservando parser CLI, dry-run com skip de catalogo e exports de compatibilidade.
 
 Fatia mobile 700 batch 53 de 2026-07-03: `app-mobile/src/screens/orders/TrackDeliveryScreen.tsx` saiu da faixa acima de 700 linhas ao separar rastreio em conteudo, mapa, styles e utils:
 
