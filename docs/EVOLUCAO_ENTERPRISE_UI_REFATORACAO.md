@@ -216,7 +216,17 @@ Inventario atualizado em 2026-07-02 pela contagem operacional de linhas com cont
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
-- Observacao mobile: `app-mobile/src` ainda tem 3 arquivos acima de 700 linhas; a frente mobile segue separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+- Observacao mobile: `app-mobile/src` ainda tem 2 arquivos acima de 700 linhas; a frente mobile segue separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+
+Fatia mobile 700 batch 51 de 2026-07-03: `app-mobile/src/screens/shop/CartScreen.tsx` saiu da faixa acima de 700 linhas ao separar carrinho em conteudo, card de item, modal de endereco, styles e utils:
+
+- `app-mobile/src/screens/shop/CartScreen.tsx`: 776 -> 263 linhas com conteudo, mantendo carregamento do carrinho, CEP, recebimento, pagamento online, limpeza, atualizacao de itens e checkout.
+- `app-mobile/src/screens/shop/cart/CartContent.tsx`: concentra estado vazio, lista, forma de recebimento, endereco, pagamento e rodape.
+- `app-mobile/src/screens/shop/cart/CartItemCard.tsx`: concentra card de produto no carrinho, imagem, controles de quantidade e subtotal.
+- `app-mobile/src/screens/shop/cart/CartAddressModal.tsx`: concentra modal de endereco de entrega e campos de CEP/endereco.
+- `app-mobile/src/screens/shop/cart/CartStyles.ts`: concentra estilos da tela.
+- `app-mobile/src/screens/shop/cart/CartUtils.ts`: concentra tipos e helpers de endereco, CEP, recebimento e pagamento.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-51-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas.
 
 Fatia mobile 700 batch 50 de 2026-07-03: `app-mobile/src/screens/veterinario/VetAgendaScreen.tsx` saiu da faixa acima de 700 linhas ao separar agenda veterinaria em conteudo, modal de agendamento, styles e utils:
 
