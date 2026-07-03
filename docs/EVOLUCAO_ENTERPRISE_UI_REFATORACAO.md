@@ -217,7 +217,17 @@ Inventario atualizado em 2026-07-03 pela contagem operacional de linhas com cont
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
 - Observacao mobile: `app-mobile/src` esta com 0 arquivos acima de 700 linhas; a frente mobile zerou as telas grandes mantendo separacao por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
-- Observacao operacional: no inventario amplo `backend` + `frontend/src` + `app-mobile/src`, ainda ha 9 arquivos acima de 700 linhas: 5 testes backend, 2 migrations geradas e 2 scripts/importadores legados fora de `backend/app`.
+- Observacao operacional: no inventario amplo `backend` + `frontend/src` + `app-mobile/src`, ainda ha 8 arquivos acima de 700 linhas: 5 testes backend, 2 migrations geradas e 1 script/importador legado fora de `backend/app`.
+
+Fatia scripts 700 batch 55 de 2026-07-03: `backend/scripts/enriquecer_produtos_bling_sku.py` saiu da faixa acima de 700 linhas ao virar fachada de CLI/compatibilidade e separar carregamento, classificacao, DB e processamento por modulo:
+
+- `backend/scripts/enriquecer_produtos_bling_sku.py`: 834 -> 73 linhas com conteudo, mantendo `--bling-csv`, `--estrutura-csv`, `--tenant-id`, `--apply`, `--sample-limit` e `--output-dir`.
+- `backend/scripts/enriquecer_produtos_bling_types.py` e `enriquecer_produtos_bling_utils.py`: concentram dataclasses, normalizacao, parsing numerico, chaves de familia e mapeamento fiscal basico.
+- `backend/scripts/enriquecer_produtos_bling_loaders.py`: concentra leitura dos CSVs do Bling e de estrutura/composicao de kits.
+- `backend/scripts/enriquecer_produtos_bling_classification.py`: concentra padroes familiares e defaults de departamento/categoria sem acoplamento direto com SQLAlchemy.
+- `backend/scripts/enriquecer_produtos_bling_db.py`: concentra imports e helpers dependentes de banco, carregados apenas durante a execucao real.
+- `backend/scripts/enriquecer_produtos_bling_processing.py`: concentra o fluxo de dry-run/aplicacao, relatorios CSV e atualizacao dos produtos.
+- Contrato dedicado: `backend/tests/unit/test_enriquecer_produtos_bling_sku_refactor_contract.py`, garantindo fachada e modulos abaixo de 700 linhas, exports de compatibilidade e `--help` sem exigir `DATABASE_URL`.
 
 Fatia scripts 700 batch 54 de 2026-07-03: `backend/app/scripts/seed_demo_operacional.py` saiu da faixa critica ao virar fachada de CLI/compatibilidade e separar responsabilidades por modulo:
 
