@@ -117,6 +117,7 @@ export default function MovimentacoesProdutoHeader({
   estoqueMinimo,
   estoqueReservado,
   forcandoSync,
+  forcandoVinculoBling,
   formatarQuantidade,
   loadingReservas,
   onAbrirPainelBling,
@@ -137,6 +138,14 @@ export default function MovimentacoesProdutoHeader({
 }) {
   const estoqueVisual = resolveEstoqueVisual(estoqueAtual, estoqueMinimo);
   const disponivelVisual = resolveDisponivelVisual(saldoAposReserva, estoqueMinimo);
+  const blingButtonLoading = forcandoSync || forcandoVinculoBling;
+  const blingButtonLabel = syncDisponivel
+    ? forcandoSync
+      ? "Enviando sync..."
+      : "Forcar sync no Bling"
+    : forcandoVinculoBling
+      ? "Vinculando..."
+      : "Forcar vinculo";
 
   return (
     <>
@@ -228,13 +237,13 @@ export default function MovimentacoesProdutoHeader({
                     {mostrarControlesBling ? (
                       <>
                         <ActionButton
-                          disabled={!syncDisponivel || forcandoSync}
+                          disabled={blingButtonLoading}
                           icon={RefreshCcw}
                           intent="info"
                           onClick={onForcarSyncProduto}
                           tone="soft"
                         >
-                          {forcandoSync ? "Enviando sync..." : "Forcar sync no Bling"}
+                          {blingButtonLabel}
                         </ActionButton>
 
                         <ActionButton icon={ExternalLink} onClick={onAbrirPainelBling} tone="soft">

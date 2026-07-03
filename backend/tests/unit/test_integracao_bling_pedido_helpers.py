@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 from app.integracao_bling_pedido_routes import (
+    _baixar_item_pedido,
     _confirmar_pedido,
     _montar_payload_pedido,
     _normalizar_canal,
@@ -531,6 +532,57 @@ def test_confirmar_pedido_sem_nf_nao_baixa_estoque_nem_marca_item(monkeypatch):
     assert confirmados == []
     assert item.vendido_em is None
     assert eventos[0]["payload"]["baixa_estoque_status"] == "nf_pendente"
+
+
+def test_baixar_item_pedido_vincula_produto_bling_do_payload_por_sku(monkeypatch):
+    db = Mock()
+    produto = SimpleNamespace(id=14002, tenant_id="tenant-1", codigo="NTDRTR00026")
+    pedido = SimpleNamespace(
+        id=6028,
+        tenant_id="tenant-1",
+        pedido_bling_numero="16575",
+        payload={
+            "pedido": {
+                "itens": [
+                    {
+                        "codigo": "NTDRTR00026",
+                        "produto": {"id": 16666308523},
+                        "quantidade": 1,
+                    }
+                ]
+            }
+        },
+    )
+    item = SimpleNamespace(sku="NTDRTR00026", quantidade=1)
+    vinculos = []
+
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._resolver_produto_local",
+        lambda **kwargs: produto,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._upsert_sync_vinculo",
+        lambda db, tenant_id, produto, bling_produto_id: vinculos.append(
+            (db, tenant_id, produto.id, bling_produto_id)
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.baixar_estoque_item_integrado",
+        lambda **kwargs: None,
+    )
+
+    erro = _baixar_item_pedido(
+        db=db,
+        pedido=pedido,
+        item=item,
+        motivo="venda_bling",
+        observacao="Baixa automatica",
+        user_id=2,
+    )
+
+    assert erro is None
+    assert vinculos == [(db, "tenant-1", 14002, "16666308523")]
 
 
 def test_order_updated_atendido_com_nf_autorizada_consolida_venda(monkeypatch):

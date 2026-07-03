@@ -115,5 +115,14 @@ assert(
   movimentacoesProduto.includes("./estoque/MovimentacoesProdutoModals"),
   "MovimentacoesProduto.jsx should delegate modal composition to MovimentacoesProdutoModals",
 );
+assert(
+  movimentacoesProduto.includes("/estoque/sync/vincular-automatico/"),
+  "MovimentacoesProduto.jsx should allow forcing a Bling link for one product",
+);
+const movimentacoesProdutoHeader = read("src/components/estoque/MovimentacoesProdutoHeader.jsx");
+assert(
+  movimentacoesProdutoHeader.includes("Forcar vinculo"),
+  "MovimentacoesProdutoHeader.jsx should expose the force-link label when product has no Bling link",
+);
 
 console.log("Frontend zero large files refactor contract OK");
