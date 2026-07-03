@@ -35,13 +35,16 @@ def normalizar_unidade_compra(valor: Optional[str]) -> str:
 
 def normalizar_quantidade_por_embalagem(
     unidade_compra: Optional[str], quantidade_por_embalagem: Optional[float]
-) -> float:
+) -> Optional[float]:
     unidade = normalizar_unidade_compra(unidade_compra)
     if unidade == UNIDADE_COMPRA_PADRAO:
         return 1
 
-    quantidade = _numero_seguro(quantidade_por_embalagem, fallback=1)
-    return quantidade if quantidade > 0 else 1
+    if quantidade_por_embalagem in (None, ""):
+        return None
+
+    quantidade = _numero_seguro(quantidade_por_embalagem)
+    return quantidade if quantidade > 0 else None
 
 
 def calcular_quantidade_total_unidades(
@@ -53,7 +56,7 @@ def calcular_quantidade_total_unidades(
     fator = normalizar_quantidade_por_embalagem(
         unidade_compra, quantidade_por_embalagem
     )
-    return round(quantidade * fator, 4)
+    return round(quantidade * (fator or 1), 4)
 
 
 def formatar_quantidade_compra_documento(
@@ -66,7 +69,7 @@ def formatar_quantidade_compra_documento(
     fator = normalizar_quantidade_por_embalagem(unidade, quantidade_por_embalagem)
     quantidade_texto = _formatar_numero_curto(quantidade)
 
-    if unidade == UNIDADE_COMPRA_PADRAO or fator <= 1:
+    if unidade == UNIDADE_COMPRA_PADRAO or not fator or fator <= 1:
         return f"{quantidade_texto} {unidade}"
 
     total_unidades = calcular_quantidade_total_unidades(quantidade, unidade, fator)

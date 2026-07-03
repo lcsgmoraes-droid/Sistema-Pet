@@ -5,13 +5,13 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_
+from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
 from ..auth.dependencies import get_current_user_and_tenant
 from ..db import get_session
 from ..models import Cliente
-from ..produtos_models import Marca, Produto, ProdutoFornecedor
+from ..produtos_models import Marca, PedidoCompra, PedidoCompraItem, Produto, ProdutoFornecedor
 from .sugestao import (
     JANELAS_GIRO_SUGESTAO,
     _calcular_dias_com_estoque,
@@ -31,6 +31,45 @@ from .sugestao_queries import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _carregar_embalagens_historicas_sugestao(
+    db: Session,
+    tenant_id: int,
+    produto_ids: list[int],
+    fornecedor_ids: list[int],
+) -> dict[int, dict]:
+    if not produto_ids or not fornecedor_ids:
+        return {}
+
+    rows = (
+        db.query(
+            PedidoCompraItem.produto_id,
+            PedidoCompraItem.unidade_compra,
+            PedidoCompraItem.quantidade_por_embalagem,
+        )
+        .join(PedidoCompra, PedidoCompra.id == PedidoCompraItem.pedido_compra_id)
+        .filter(
+            PedidoCompra.tenant_id == tenant_id,
+            PedidoCompraItem.tenant_id == tenant_id,
+            PedidoCompra.fornecedor_id.in_(fornecedor_ids),
+            PedidoCompraItem.produto_id.in_(produto_ids),
+        )
+        .order_by(desc(PedidoCompra.updated_at), desc(PedidoCompraItem.id))
+        .all()
+    )
+
+    historico = {}
+    for produto_id, unidade_compra, quantidade_por_embalagem in rows:
+        if produto_id in historico:
+            continue
+
+        historico[produto_id] = {
+            "unidade_compra": unidade_compra,
+            "quantidade_por_embalagem": quantidade_por_embalagem,
+        }
+
+    return historico
 
 
 @router.get("/sugestao/{fornecedor_id}")
@@ -205,6 +244,12 @@ def sugerir_pedido_inteligente(
 
     # Bulk queries de vendas — 2 queries no total em vez de N queries individuais
     ids_produtos = [p.id for p, _pf, _marca in produtos_fornecedor]
+    embalagens_historicas = _carregar_embalagens_historicas_sugestao(
+        db,
+        tenant_id,
+        ids_produtos,
+        fornecedor_ids,
+    )
     vendas_por_produto = _carregar_vendas_sugestao(
         db,
         tenant_id,
@@ -321,6 +366,7 @@ def sugerir_pedido_inteligente(
                 tendencia=tendencia,
                 preco_unitario=preco_unitario,
                 valor_sugestao=valor_sugestao,
+                embalagem_historica=embalagens_historicas.get(produto.id),
             )
             sugestoes.append(sugestao)
             valor_total += valor_sugestao

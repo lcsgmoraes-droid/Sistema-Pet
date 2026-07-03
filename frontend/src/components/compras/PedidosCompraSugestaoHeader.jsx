@@ -29,6 +29,8 @@ export default function PedidosCompraSugestaoHeader({
   sugestoes,
   produtosSelecionados,
   obterQuantidadeInteira,
+  obterQuantidadeTotalUnidadesSugestao,
+  calcularValorTotalSugestao,
 }) {
   return (
     <>
@@ -231,15 +233,16 @@ export default function PedidosCompraSugestaoHeader({
                         produtosSelecionados.includes(s.produto_id),
                       );
                       const totalQtd = selecionados.reduce(
-                        (sum, s) => sum + obterQuantidadeInteira(s),
+                        (sum, s) => sum + obterQuantidadeTotalUnidadesSugestao(s),
                         0,
                       );
                       const totalPeso = selecionados.reduce(
-                        (sum, s) => sum + obterQuantidadeInteira(s) * (s.peso_bruto || 0),
+                        (sum, s) =>
+                          sum + obterQuantidadeTotalUnidadesSugestao(s) * (s.peso_bruto || 0),
                         0,
                       );
                       const totalValor = selecionados.reduce(
-                        (sum, s) => sum + obterQuantidadeInteira(s) * s.preco_unitario,
+                        (sum, s) => sum + calcularValorTotalSugestao(s),
                         0,
                       );
                       return (

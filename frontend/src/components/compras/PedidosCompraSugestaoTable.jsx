@@ -1,4 +1,5 @@
 import FornecedorIdentity from "../ui/FornecedorIdentity";
+import PedidosCompraSugestaoUnidadeCell from "./PedidosCompraSugestaoUnidadeCell";
 
 export default function PedidosCompraSugestaoTable({
   modoAplicacaoSugestao,
@@ -26,6 +27,13 @@ export default function PedidosCompraSugestaoTable({
   consumoFoiAjustado,
   incluirGrupoFornecedor,
   obterQuantidadeInteira,
+  obterEmbalagemSugestao,
+  atualizarUnidadeCompraSugestao,
+  atualizarQuantidadePorEmbalagemSugestao,
+  marcarQuantidadePorEmbalagemDesconhecida,
+  formatarQuantidadeCompraSugestao,
+  montarTooltipQuantidadeCompraSugestao,
+  calcularValorTotalSugestao,
   atualizarQuantidadeSugerida,
   setProdutoEditandoQuantidade,
   fecharModalSugestao,
@@ -153,9 +161,15 @@ export default function PedidosCompraSugestaoTable({
                         </th>
                         <th
                           className={`${classeCabecalhoTabelaSugestao} text-right`}
-                          title="Quantidade para cobrir a cobertura escolhida. Prazo de entrega e margem entram quando o estoque atual não cobre a reposição. Você pode editar."
+                          title="Unidade usada para pedir ao fornecedor e quantidade de unidades por caixa, fardo ou pacote."
                         >
-                          Qtd Sugerida ℹ️
+                          Unidade ℹ️
+                        </th>
+                        <th
+                          className={`${classeCabecalhoTabelaSugestao} text-right`}
+                          title="Quantidade a pedir na unidade escolhida. Ex: 14 CX quando cada caixa tem 12 unidades."
+                        >
+                          Qtd. pedida ℹ️
                         </th>
                         <th
                           className={`${classeCabecalhoTabelaSugestao} text-right`}
@@ -341,13 +355,30 @@ export default function PedidosCompraSugestaoTable({
                               : "∞"}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        <PedidosCompraSugestaoUnidadeCell
+                          sugestao={sugestao}
+                          obterEmbalagemSugestao={obterEmbalagemSugestao}
+                          atualizarUnidadeCompraSugestao={atualizarUnidadeCompraSugestao}
+                          atualizarQuantidadePorEmbalagemSugestao={
+                            atualizarQuantidadePorEmbalagemSugestao
+                          }
+                          marcarQuantidadePorEmbalagemDesconhecida={
+                            marcarQuantidadePorEmbalagemDesconhecida
+                          }
+                          formatarQuantidadeCompraSugestao={formatarQuantidadeCompraSugestao}
+                          montarTooltipQuantidadeCompraSugestao={
+                            montarTooltipQuantidadeCompraSugestao
+                          }
+                        />
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <input
                           type="text"
                           inputMode="numeric"
                           pattern="[0-9]*"
                           value={obterQuantidadeInteira(sugestao)}
-                          title={montarTooltipGiroSugestao(sugestao)}
+                          title={montarTooltipQuantidadeCompraSugestao(sugestao)}
                           onChange={(e) =>
                             atualizarQuantidadeSugerida(sugestao.produto_id, e.target.value)
                           }
@@ -367,7 +398,7 @@ export default function PedidosCompraSugestaoTable({
                         R$ {sugestao.preco_unitario.toFixed(2)}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold">
-                        R$ {(obterQuantidadeInteira(sugestao) * sugestao.preco_unitario).toFixed(2)}
+                        R$ {calcularValorTotalSugestao(sugestao).toFixed(2)}
                       </td>
                       <td className="px-4 py-3">
                         <span
@@ -419,7 +450,7 @@ export default function PedidosCompraSugestaoTable({
                     R${" "}
                     {sugestoes
                       .filter((s) => produtosSelecionados.includes(s.produto_id))
-                      .reduce((sum, s) => sum + obterQuantidadeInteira(s) * s.preco_unitario, 0)
+                      .reduce((sum, s) => sum + calcularValorTotalSugestao(s), 0)
                       .toFixed(2)}
                   </strong>
                 </div>

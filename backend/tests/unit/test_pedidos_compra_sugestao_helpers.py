@@ -450,6 +450,7 @@ def test_montar_item_sugestao_compra_preserva_payload_operacional():
         codigo="SKU-10",
         codigo_barras="789",
         marca_id=5,
+        itens_por_caixa=None,
         peso_embalagem=None,
         peso_bruto=12.5,
         peso_liquido=11.0,
@@ -530,6 +531,68 @@ def test_montar_item_sugestao_compra_preserva_payload_operacional():
     assert item["estoque_derivado"] is True
     assert item["prioridade"] == "CR\u00cdTICO"
     assert item["observacao"].startswith("Urgente: estoque cobre menos de 3 dias")
+
+
+def test_montar_item_sugestao_compra_converte_quantidade_por_embalagem_historica():
+    produto = SimpleNamespace(
+        id=11,
+        nome="Sache Frango",
+        codigo="SKU-11",
+        codigo_barras="78911",
+        marca_id=None,
+        itens_por_caixa=12,
+        peso_embalagem=None,
+        peso_bruto=None,
+        peso_liquido=None,
+    )
+    produto_fornecedor = SimpleNamespace(fornecedor_id=20)
+    planejamento = {
+        "consumo_observado": 4,
+        "consumo_ajustado": 4,
+        "consumo_base": 4,
+        "consumo_diario": 4,
+        "dias_estoque": 1,
+        "ajuste_ruptura_aplicado": False,
+        "motivo_ajuste_ruptura": None,
+        "margem_seguranca_dias": 7,
+        "dias_reposicao": 7,
+        "lead_time_incluido_no_alvo": True,
+        "dias_total_cobertura": 42,
+        "estoque_para_calculo": 0,
+        "quantidade_sugerida": 168,
+        "prioridade": "CR\u00cdTICO",
+    }
+
+    item = sugestao_helpers._montar_item_sugestao_compra(
+        produto=produto,
+        produto_fornecedor=produto_fornecedor,
+        marca=None,
+        fornecedor_grupo=None,
+        fornecedores_por_id={20: "Fornecedor A"},
+        estoque_info={},
+        vendas_stats={},
+        vendas_janelas={},
+        vendas_periodo=168,
+        estoque_atual=0,
+        estoque_minimo=0,
+        dias_com_estoque=90,
+        dias_sem_estoque=0,
+        teve_ruptura=False,
+        ruptura_ativa=True,
+        lead_time=7,
+        dias_cobertura=30,
+        planejamento=planejamento,
+        tendencia="EST\u00c1VEL",
+        preco_unitario=3,
+        valor_sugestao=504,
+        embalagem_historica={"unidade_compra": "CX", "quantidade_por_embalagem": 12},
+    )
+
+    assert item["unidade_compra_sugerida"] == "CX"
+    assert item["quantidade_por_embalagem_sugerida"] == 12
+    assert item["quantidade_compra_sugerida"] == 14
+    assert item["quantidade_total_unidades_sugerida"] == 168
+    assert item["embalagem_sugestao_origem"] == "historico"
 
 
 def test_selecionar_produtos_fornecedor_sugestao_deduplica_por_prioridade():

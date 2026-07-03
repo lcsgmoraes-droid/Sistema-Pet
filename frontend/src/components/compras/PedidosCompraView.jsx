@@ -23,9 +23,12 @@ export default function PedidosCompraView({ controller }) {
     atualizarFiltroPedidos,
     atualizarItemPedido,
     atualizarQuantidadeSugerida,
+    atualizarQuantidadePorEmbalagemSugestao,
+    atualizarUnidadeCompraSugestao,
     buscarSugestoes,
     cabecalhoTabelaSugestaoRef,
     calcularTotal,
+    calcularValorTotalSugestao,
     cancelarPedido,
     carregarDados,
     classeCabecalhoTabelaSugestao,
@@ -64,6 +67,7 @@ export default function PedidosCompraView({ controller }) {
     fornecedorTexto,
     fornecedores,
     fornecedoresOrdenados,
+    formatarQuantidadeCompraSugestao,
     formatarQuantidadeCurta,
     grupoFornecedorAtual,
     grupoFornecedorForm,
@@ -82,9 +86,11 @@ export default function PedidosCompraView({ controller }) {
     marcasFornecedor,
     marcasSelecionadas,
     marcarComoEnviadoManualmente,
+    marcarQuantidadePorEmbalagemDesconhecida,
     modoAplicacaoSugestao,
     modoEdicao,
     montarTooltipGiroSugestao,
+    montarTooltipQuantidadeCompraSugestao,
     mostrarConfronto,
     mostrarFiltroMarcas,
     mostrarForm,
@@ -97,9 +103,11 @@ export default function PedidosCompraView({ controller }) {
     mostrarSugestao,
     mostrarSugestoesProduto,
     numeroSeguro,
+    obterEmbalagemSugestao,
     obterFornecedorPorId,
     obterGrupoDoFornecedor,
     obterQuantidadeInteira,
+    obterQuantidadeTotalUnidadesSugestao,
     obterSkuItemPedido,
     obterVendaJanelaSugestao,
     pedidoConfronto,
@@ -326,6 +334,14 @@ export default function PedidosCompraView({ controller }) {
         sugestoes={sugestoes}
         produtosSelecionados={produtosSelecionados}
         obterQuantidadeInteira={obterQuantidadeInteira}
+        obterEmbalagemSugestao={obterEmbalagemSugestao}
+        atualizarUnidadeCompraSugestao={atualizarUnidadeCompraSugestao}
+        atualizarQuantidadePorEmbalagemSugestao={atualizarQuantidadePorEmbalagemSugestao}
+        marcarQuantidadePorEmbalagemDesconhecida={marcarQuantidadePorEmbalagemDesconhecida}
+        formatarQuantidadeCompraSugestao={formatarQuantidadeCompraSugestao}
+        montarTooltipQuantidadeCompraSugestao={montarTooltipQuantidadeCompraSugestao}
+        obterQuantidadeTotalUnidadesSugestao={obterQuantidadeTotalUnidadesSugestao}
+        calcularValorTotalSugestao={calcularValorTotalSugestao}
         modoAplicacaoSugestao={modoAplicacaoSugestao}
         mostrarSoPreenchidos={mostrarSoPreenchidos}
         setMostrarSoPreenchidos={setMostrarSoPreenchidos}

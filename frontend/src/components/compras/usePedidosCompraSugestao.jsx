@@ -2,7 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import api from "../../api";
 import { useEscapeToClose } from "../../utils/modalEscape";
-import { clonarItensPedido, consolidarItensPedido, textoContemTokens } from "./pedidoCompraUtils";
+import {
+  calcularQuantidadeTotalUnidadesPedido,
+  clonarItensPedido,
+  consolidarItensPedido,
+  formatarQuantidadeCompraPedido,
+  montarTooltipQuantidadeCompraPedido,
+  normalizarQuantidadePorEmbalagemPedido,
+  normalizarUnidadeCompraPedido,
+  textoContemTokens,
+} from "./pedidoCompraUtils";
 
 export default function usePedidosCompraSugestao({
   formData,
@@ -20,6 +29,7 @@ export default function usePedidosCompraSugestao({
   const [incluirAlerta, setIncluirAlerta] = useState(true);
   const [produtosSelecionados, setProdutosSelecionados] = useState([]);
   const [quantidadesEditadas, setQuantidadesEditadas] = useState({});
+  const [embalagensEditadas, setEmbalagensEditadas] = useState({});
   const [filtroSugestao, setFiltroSugestao] = useState("");
   const [mostrarSoPreenchidos, setMostrarSoPreenchidos] = useState(false);
   const [marcasSelecionadas, setMarcasSelecionadas] = useState([]);
@@ -39,6 +49,7 @@ export default function usePedidosCompraSugestao({
     setSugestoes([]);
     setProdutosSelecionados([]);
     setQuantidadesEditadas({});
+    setEmbalagensEditadas({});
     setFiltroSugestao("");
     setMostrarSoPreenchidos(false);
     setMarcasSelecionadas([]);
@@ -74,6 +85,7 @@ export default function usePedidosCompraSugestao({
       setSugestoes(novasSugestoes);
       setProdutosSelecionados([]);
       setQuantidadesEditadas({});
+      setEmbalagensEditadas({});
 
       if (novasSugestoes.length === 0) {
         toast("Nenhuma sugestao encontrada com os filtros aplicados");
@@ -112,13 +124,148 @@ export default function usePedidosCompraSugestao({
     }));
   };
 
+  const obterEmbalagemBaseSugestao = (sugestao) => {
+    const unidade = normalizarUnidadeCompraPedido(sugestao?.unidade_compra_sugerida);
+    const quantidadePorEmbalagem = normalizarQuantidadePorEmbalagemPedido(
+      unidade,
+      sugestao?.quantidade_por_embalagem_sugerida,
+    );
+
+    return {
+      unidade_compra: unidade,
+      quantidade_por_embalagem: quantidadePorEmbalagem,
+      origem: sugestao?.embalagem_sugestao_origem || "unitario",
+    };
+  };
+
+  const obterEmbalagemSugestao = (sugestao) => ({
+    ...obterEmbalagemBaseSugestao(sugestao),
+    ...(embalagensEditadas[sugestao.produto_id] || {}),
+  });
+
+  const calcularQuantidadeCompraBaseSugestao = (sugestao) => {
+    const embalagem = obterEmbalagemSugestao(sugestao);
+    const quantidadeUnidades = Number(sugestao?.quantidade_sugerida || 0);
+
+    if (
+      embalagem.unidade_compra !== "UN" &&
+      embalagem.quantidade_por_embalagem &&
+      embalagem.quantidade_por_embalagem > 1
+    ) {
+      return Math.ceil(quantidadeUnidades / embalagem.quantidade_por_embalagem);
+    }
+
+    if (
+      sugestao?.quantidade_compra_sugerida !== undefined &&
+      sugestao?.quantidade_compra_sugerida !== null &&
+      embalagem.unidade_compra === normalizarUnidadeCompraPedido(sugestao.unidade_compra_sugerida)
+    ) {
+      return Math.ceil(Number(sugestao.quantidade_compra_sugerida || 0));
+    }
+
+    return Math.ceil(quantidadeUnidades);
+  };
+
   const obterQuantidadeFinal = (sugestao) =>
     quantidadesEditadas[sugestao.produto_id] !== undefined
       ? quantidadesEditadas[sugestao.produto_id]
-      : sugestao.quantidade_sugerida;
+      : calcularQuantidadeCompraBaseSugestao(sugestao);
 
   const obterQuantidadeInteira = (sugestao) =>
     Math.max(0, Math.ceil(obterQuantidadeFinal(sugestao)));
+
+  const montarItemCompraSugestao = (sugestao) => {
+    const embalagem = obterEmbalagemSugestao(sugestao);
+    return {
+      quantidade_pedida: obterQuantidadeInteira(sugestao),
+      unidade_compra: embalagem.unidade_compra,
+      quantidade_por_embalagem: embalagem.quantidade_por_embalagem,
+    };
+  };
+
+  const formatarQuantidadeCompraSugestao = (sugestao) =>
+    formatarQuantidadeCompraPedido(montarItemCompraSugestao(sugestao));
+
+  const montarTooltipQuantidadeCompraSugestao = (sugestao) => {
+    const embalagem = obterEmbalagemSugestao(sugestao);
+    const tooltip = montarTooltipQuantidadeCompraPedido(montarItemCompraSugestao(sugestao));
+    const origem =
+      embalagem.origem === "historico"
+        ? "Sugestao baseada na ultima unidade usada neste produto."
+        : embalagem.origem === "cadastro_produto"
+          ? "Sugestao baseada no cadastro do produto."
+          : "";
+
+    return [tooltip, origem].filter(Boolean).join("\n");
+  };
+
+  const obterQuantidadeTotalUnidadesSugestao = (sugestao) =>
+    calcularQuantidadeTotalUnidadesPedido(montarItemCompraSugestao(sugestao));
+
+  const calcularValorTotalSugestao = (sugestao) =>
+    obterQuantidadeTotalUnidadesSugestao(sugestao) * Number(sugestao.preco_unitario || 0);
+
+  const atualizarUnidadeCompraSugestao = (sugestao, unidadeCompra) => {
+    const unidade = normalizarUnidadeCompraPedido(unidadeCompra);
+    const base = obterEmbalagemBaseSugestao(sugestao);
+    const proximaQuantidadePorEmbalagem =
+      unidade === "UN"
+        ? 1
+        : base.unidade_compra === unidade
+          ? base.quantidade_por_embalagem
+          : null;
+
+    setEmbalagensEditadas((prev) => ({
+      ...prev,
+      [sugestao.produto_id]: {
+        unidade_compra: unidade,
+        quantidade_por_embalagem: proximaQuantidadePorEmbalagem,
+        origem: "manual",
+      },
+    }));
+    setQuantidadesEditadas((prev) => {
+      const proximo = { ...prev };
+      delete proximo[sugestao.produto_id];
+      return proximo;
+    });
+  };
+
+  const atualizarQuantidadePorEmbalagemSugestao = (sugestao, valor) => {
+    const embalagem = obterEmbalagemSugestao(sugestao);
+    setEmbalagensEditadas((prev) => ({
+      ...prev,
+      [sugestao.produto_id]: {
+        ...embalagem,
+        quantidade_por_embalagem: normalizarQuantidadePorEmbalagemPedido(
+          embalagem.unidade_compra,
+          valor,
+        ),
+        origem: "manual",
+      },
+    }));
+    setQuantidadesEditadas((prev) => {
+      const proximo = { ...prev };
+      delete proximo[sugestao.produto_id];
+      return proximo;
+    });
+  };
+
+  const marcarQuantidadePorEmbalagemDesconhecida = (sugestao) => {
+    const embalagem = obterEmbalagemSugestao(sugestao);
+    setEmbalagensEditadas((prev) => ({
+      ...prev,
+      [sugestao.produto_id]: {
+        ...embalagem,
+        quantidade_por_embalagem: null,
+        origem: "manual",
+      },
+    }));
+    setQuantidadesEditadas((prev) => {
+      const proximo = { ...prev };
+      delete proximo[sugestao.produto_id];
+      return proximo;
+    });
+  };
 
   const formatarQuantidadeCurta = (valor, casas = 2) => {
     const numero = Number(valor || 0);
@@ -234,6 +381,7 @@ export default function usePedidosCompraSugestao({
     filtroSugestao,
     mostrarSoPreenchidos,
     quantidadesEditadas,
+    embalagensEditadas,
     produtoEditandoQuantidade,
   ]);
 
@@ -269,7 +417,7 @@ export default function usePedidosCompraSugestao({
       sugestoes
         .filter((s) => produtosSelecionados.includes(s.produto_id))
         .filter((s) => obterQuantidadeInteira(s) > 0),
-    [sugestoes, produtosSelecionados, quantidadesEditadas],
+    [sugestoes, produtosSelecionados, quantidadesEditadas, embalagensEditadas],
   );
 
   const resumoMarcasSelecionadas = useMemo(() => {
@@ -290,6 +438,7 @@ export default function usePedidosCompraSugestao({
     setMostrarSugestao(false);
     setProdutosSelecionados([]);
     setQuantidadesEditadas({});
+    setEmbalagensEditadas({});
     setFiltroSugestao("");
     setMostrarSoPreenchidos(false);
     setMarcasSelecionadas([]);
@@ -392,19 +541,20 @@ export default function usePedidosCompraSugestao({
 
   const classeCabecalhoTabelaSugestao =
     "border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.04em] text-slate-600 whitespace-nowrap shadow-[inset_0_-1px_0_rgba(203,213,225,0.9)]";
-  const classeTabelaSugestao = "w-full min-w-[1180px] table-fixed border-separate border-spacing-0";
+  const classeTabelaSugestao = "w-full min-w-[1440px] table-fixed border-separate border-spacing-0";
   const renderColGroupSugestao = () => (
     <colgroup>
       <col style={{ width: "3%" }} />
-      <col style={{ width: "8%" }} />
-      <col style={{ width: "34%" }} />
       <col style={{ width: "7%" }} />
-      <col style={{ width: "8%" }} />
-      <col style={{ width: "8%" }} />
-      <col style={{ width: "9%" }} />
-      <col style={{ width: "8%" }} />
+      <col style={{ width: "29%" }} />
+      <col style={{ width: "6%" }} />
+      <col style={{ width: "7%" }} />
+      <col style={{ width: "7%" }} />
+      <col style={{ width: "14%" }} />
       <col style={{ width: "8%" }} />
       <col style={{ width: "7%" }} />
+      <col style={{ width: "7%" }} />
+      <col style={{ width: "5%" }} />
     </colgroup>
   );
 
@@ -419,6 +569,8 @@ export default function usePedidosCompraSugestao({
       .map((sugestao) => ({
         sugestao,
         quantidade: obterQuantidadeInteira(sugestao),
+        embalagem: obterEmbalagemSugestao(sugestao),
+        quantidadeTotalUnidades: obterQuantidadeTotalUnidadesSugestao(sugestao),
       }))
       .filter((item) => item.quantidade > 0);
 
@@ -429,18 +581,20 @@ export default function usePedidosCompraSugestao({
       return;
     }
 
-    const novosItens = produtosParaAdicionar.map(({ sugestao, quantidade }) => ({
-      produto_id: sugestao.produto_id,
-      produto_nome: sugestao.produto_nome,
-      produto_codigo: sugestao.produto_sku || "",
-      quantidade_pedida: quantidade,
-      unidade_compra: "UN",
-      quantidade_por_embalagem: 1,
-      quantidade_total_unidades: quantidade,
-      preco_unitario: sugestao.preco_unitario,
-      desconto_item: 0,
-      total: quantidade * sugestao.preco_unitario,
-    }));
+    const novosItens = produtosParaAdicionar.map(
+      ({ sugestao, quantidade, embalagem, quantidadeTotalUnidades }) => ({
+        produto_id: sugestao.produto_id,
+        produto_nome: sugestao.produto_nome,
+        produto_codigo: sugestao.produto_sku || "",
+        quantidade_pedida: quantidade,
+        unidade_compra: embalagem.unidade_compra,
+        quantidade_por_embalagem: embalagem.quantidade_por_embalagem,
+        quantidade_total_unidades: quantidadeTotalUnidades,
+        preco_unitario: sugestao.preco_unitario,
+        desconto_item: 0,
+        total: quantidadeTotalUnidades * sugestao.preco_unitario,
+      }),
+    );
 
     const itensAtualizados =
       modoAplicacaoSugestao === "replace"
@@ -502,6 +656,14 @@ export default function usePedidosCompraSugestao({
     toggleSelecionarProduto,
     atualizarQuantidadeSugerida,
     obterQuantidadeInteira,
+    obterEmbalagemSugestao,
+    atualizarUnidadeCompraSugestao,
+    atualizarQuantidadePorEmbalagemSugestao,
+    marcarQuantidadePorEmbalagemDesconhecida,
+    formatarQuantidadeCompraSugestao,
+    montarTooltipQuantidadeCompraSugestao,
+    obterQuantidadeTotalUnidadesSugestao,
+    calcularValorTotalSugestao,
     formatarQuantidadeCurta,
     obterVendaJanelaSugestao,
     montarTooltipGiroSugestao,
