@@ -40,7 +40,10 @@ def test_seed_demo_operacional_fatia_54_divide_script_em_modulos_focados():
 
 
 def test_seed_demo_operacional_fatia_54_fica_abaixo_de_700_linhas_nao_vazias():
-    counts = {relative_path: _non_empty_line_count(relative_path) for relative_path in SEED_DEMO_FILES}
+    counts = {
+        relative_path: _non_empty_line_count(relative_path)
+        for relative_path in SEED_DEMO_FILES
+    }
 
     assert all(lines < 700 for lines in counts.values()), counts
 

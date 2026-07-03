@@ -87,7 +87,9 @@ def test_product_pool_ignores_demo_fallback_when_real_catalog_exists(monkeypatch
         return []
 
     monkeypatch.setattr(seed_demo_operacional_catalog, "_scalar", fake_scalar)
-    monkeypatch.setattr(seed_demo_operacional_catalog, "_all_mappings", fake_all_mappings)
+    monkeypatch.setattr(
+        seed_demo_operacional_catalog, "_all_mappings", fake_all_mappings
+    )
 
     seed_demo_operacional_catalog._product_pool(
         FakeDb(), tenant_id="tenant-demo", user_id=10
@@ -113,7 +115,9 @@ def test_product_pool_deactivates_demo_fallback_when_real_catalog_exists(monkeyp
     monkeypatch.setattr(
         seed_demo_operacional_catalog, "_has_enough_real_products", lambda *a, **k: True
     )
-    monkeypatch.setattr(seed_demo_operacional_catalog, "_all_mappings", lambda *a, **k: [])
+    monkeypatch.setattr(
+        seed_demo_operacional_catalog, "_all_mappings", lambda *a, **k: []
+    )
 
     seed_demo_operacional_catalog._product_pool(
         FakeDb(), tenant_id="tenant-demo", user_id=10
@@ -185,7 +189,9 @@ def test_product_pool_normalizes_demo_catalog_page_size(monkeypatch):
         executed_queries.append(sql)
         return []
 
-    monkeypatch.setattr(seed_demo_operacional_catalog, "_all_mappings", fake_all_mappings)
+    monkeypatch.setattr(
+        seed_demo_operacional_catalog, "_all_mappings", fake_all_mappings
+    )
 
     seed_demo_operacional_catalog._product_pool(
         FakeDb(), tenant_id="tenant-demo", user_id=10
@@ -196,7 +202,9 @@ def test_product_pool_normalizes_demo_catalog_page_size(monkeypatch):
 
 
 def test_demo_price_profile_respects_ration_package_size():
-    from app.scripts.seed_demo_operacional_catalog import _demo_price_profile_for_product
+    from app.scripts.seed_demo_operacional_catalog import (
+        _demo_price_profile_for_product,
+    )
 
     cost_20kg, price_20kg = _demo_price_profile_for_product(
         {"nome": "Racao Special Dog Junior 20kg"}, 0
