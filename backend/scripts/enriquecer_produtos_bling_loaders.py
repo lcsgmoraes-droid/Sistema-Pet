@@ -15,9 +15,19 @@ from enriquecer_produtos_bling_utils import (
 )
 
 
-def load_bling_rows(csv_path: Path) -> List[BlingRow]:
+def _validated_csv_path(csv_path: Path, allowed_root: Optional[Path]) -> Path:
+    safe_path = csv_path.resolve(strict=True)
+    if allowed_root is not None:
+        safe_path.relative_to(allowed_root.resolve())
+    return safe_path
+
+
+def load_bling_rows(
+    csv_path: Path, allowed_root: Optional[Path] = None
+) -> List[BlingRow]:
     rows: List[BlingRow] = []
-    with csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
+    safe_path = _validated_csv_path(csv_path, allowed_root)
+    with safe_path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle, delimiter=";")
         for raw in reader:
             sku = pick(raw, ["Código", "Codigo", "codigo"])
@@ -73,12 +83,15 @@ def load_bling_rows(csv_path: Path) -> List[BlingRow]:
     return rows
 
 
-def load_kit_costs(csv_path: Optional[Path]) -> Dict[str, float]:
+def load_kit_costs(
+    csv_path: Optional[Path], allowed_root: Optional[Path] = None
+) -> Dict[str, float]:
     if not csv_path or not csv_path.exists():
         return {}
 
     costs: Dict[str, float] = {}
-    with csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
+    safe_path = _validated_csv_path(csv_path, allowed_root)
+    with safe_path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle, delimiter=";")
         for raw in reader:
             comp_code = normalize_text(raw.get("Código da composição"))

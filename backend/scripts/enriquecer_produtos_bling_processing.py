@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from uuid import UUID
 
 from enriquecer_produtos_bling_classification import (
@@ -13,7 +14,7 @@ from enriquecer_produtos_bling_classification import (
     build_family_defaults,
 )
 from enriquecer_produtos_bling_loaders import load_bling_rows, load_kit_costs
-from enriquecer_produtos_bling_types import FamilyDefaults
+from enriquecer_produtos_bling_types import BlingRow, FamilyDefaults
 from enriquecer_produtos_bling_utils import (
     build_family_key,
     map_origem,
@@ -23,44 +24,167 @@ from enriquecer_produtos_bling_utils import (
 )
 
 
-def write_csv(path: Path, rows: List[Dict[str, object]], headers: List[str]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=headers, delimiter=";")
-        writer.writeheader()
-        for row in rows:
-            writer.writerow(row)
+@dataclass
+class RunPaths:
+    bling_csv: Path
+    estrutura_csv: Optional[Path]
+    output_dir: Path
 
 
-def run(args: argparse.Namespace) -> int:
-    repo_root = Path(__file__).resolve().parents[2]
+@dataclass
+class DbDependencies:
+    Categoria: Any
+    Cliente: Any
+    Departamento: Any
+    Marca: Any
+    Produto: Any
+    SessionLocal: Callable[[], Any]
+    detect_single_tenant_id: Callable[..., UUID]
+    find_user_id: Callable[..., int]
+    get_or_create_categoria: Callable[..., Any]
+    get_or_create_departamento: Callable[..., Any]
+    get_or_create_fornecedor: Callable[..., Any]
+    get_or_create_marca: Callable[..., Any]
 
-    bling_csv = Path(args.bling_csv)
-    if not bling_csv.is_absolute():
-        bling_csv = repo_root / bling_csv
-    if not bling_csv.exists():
-        print(f"ERRO: CSV Bling nao encontrado: {bling_csv}")
-        return 1
 
-    estrutura_csv: Optional[Path] = None
-    if args.estrutura_csv:
-        estrutura_csv = Path(args.estrutura_csv)
-        if not estrutura_csv.is_absolute():
-            estrutura_csv = repo_root / estrutura_csv
-        if not estrutura_csv.exists():
-            print(
-                f"AVISO: CSV estrutura nao encontrado, seguindo sem custo de kit: {estrutura_csv}"
-            )
-            estrutura_csv = None
+@dataclass
+class RelatedCaches:
+    marcas: Dict[str, Any] = field(default_factory=dict)
+    departamentos: Dict[str, Any] = field(default_factory=dict)
+    categorias: Dict[str, Any] = field(default_factory=dict)
+    fornecedores: Dict[str, Any] = field(default_factory=dict)
 
-    output_dir = Path(args.output_dir)
-    if not output_dir.is_absolute():
-        output_dir = repo_root / output_dir
+    def clear(self) -> None:
+        self.marcas.clear()
+        self.departamentos.clear()
+        self.categorias.clear()
+        self.fornecedores.clear()
 
-    bling_rows = load_bling_rows(bling_csv)
-    kit_costs = load_kit_costs(estrutura_csv)
-    family_defaults = build_family_defaults(bling_rows)
 
+@dataclass
+class ProcessingCounters:
+    matched: int = 0
+    updated: int = 0
+    skipped_multiple: int = 0
+    skipped_not_found: int = 0
+    kit_cost_applied: int = 0
+
+
+@dataclass
+class ResolvedFields:
+    family_key: str
+    departamento: str
+    categoria: str
+    marca: str
+    fornecedor: str
+    descricao_curta: str
+    descricao_complementar: str
+    ncm: str
+    cest: str
+    origem: str
+    perfil_tributario: str
+
+
+@dataclass
+class RelatedEntities:
+    departamento_id: Optional[int]
+    categoria_id: Optional[int]
+    marca: Any
+    fornecedor: Any
+
+
+@dataclass
+class ProcessingContext:
+    db: Any
+    dbx: DbDependencies
+    tenant_id: UUID
+    user_id: int
+    by_sku: Dict[str, List[Any]]
+    family_defaults: Dict[str, FamilyDefaults]
+    family_dep_ids: Dict[str, Optional[int]]
+    family_cat_ids: Dict[str, Optional[int]]
+    kit_costs: Dict[str, float]
+    apply_mode: bool
+    caches: RelatedCaches = field(default_factory=RelatedCaches)
+
+
+def _csv_candidate(repo_root: Path, raw_path: str, label: str) -> Path:
+    raw_text = normalize_text(raw_path)
+    if not raw_text:
+        raise ValueError(f"{label} nao informado.")
+
+    path = Path(raw_text)
+    candidate = path if path.is_absolute() else repo_root / path
+    resolved = candidate.resolve(strict=False)
+    _ensure_inside_repo(repo_root, resolved, label)
+    if resolved.suffix.lower() != ".csv":
+        raise ValueError(f"{label} deve apontar para um arquivo .csv: {resolved}")
+    return resolved
+
+
+def _ensure_inside_repo(repo_root: Path, path: Path, label: str) -> None:
+    root = repo_root.resolve()
+    try:
+        path.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(
+            f"{label} fora da raiz permitida do repositorio: {path}"
+        ) from exc
+
+
+def resolve_existing_csv_path(repo_root: Path, raw_path: str, label: str) -> Path:
+    csv_path = _csv_candidate(repo_root, raw_path, label)
+    if not csv_path.exists():
+        raise FileNotFoundError(f"{label} nao encontrado: {csv_path}")
+    if not csv_path.is_file():
+        raise ValueError(f"{label} nao e um arquivo: {csv_path}")
+    return csv_path
+
+
+def resolve_optional_csv_path(
+    repo_root: Path, raw_path: Optional[str], label: str
+) -> tuple[Optional[Path], Optional[str]]:
+    if not raw_path:
+        return None, None
+
+    csv_path = _csv_candidate(repo_root, raw_path, label)
+    if not csv_path.exists():
+        warning = (
+            f"AVISO: {label} nao encontrado, seguindo sem custo de kit: {csv_path}"
+        )
+        return None, warning
+    if not csv_path.is_file():
+        raise ValueError(f"{label} nao e um arquivo: {csv_path}")
+    return csv_path, None
+
+
+def resolve_output_dir(repo_root: Path, raw_path: str) -> Path:
+    raw_text = normalize_text(raw_path)
+    output_dir = (
+        Path(raw_text) if raw_text else Path("data/imports/bling_enriquecimento")
+    )
+    resolved = (
+        output_dir if output_dir.is_absolute() else repo_root / output_dir
+    ).resolve(strict=False)
+    _ensure_inside_repo(repo_root, resolved, "Pasta de saida")
+    return resolved
+
+
+def resolve_run_paths(args: argparse.Namespace, repo_root: Path) -> RunPaths:
+    bling_csv = resolve_existing_csv_path(repo_root, args.bling_csv, "CSV Bling")
+    estrutura_csv, warning = resolve_optional_csv_path(
+        repo_root, args.estrutura_csv, "CSV estrutura"
+    )
+    if warning:
+        print(warning)
+    return RunPaths(
+        bling_csv=bling_csv,
+        estrutura_csv=estrutura_csv,
+        output_dir=resolve_output_dir(repo_root, args.output_dir),
+    )
+
+
+def load_db_dependencies() -> DbDependencies:
     from enriquecer_produtos_bling_db import (
         Categoria,
         Cliente,
@@ -76,399 +200,537 @@ def run(args: argparse.Namespace) -> int:
         get_or_create_marca,
     )
 
-    db = SessionLocal()
+    return DbDependencies(
+        Categoria=Categoria,
+        Cliente=Cliente,
+        Departamento=Departamento,
+        Marca=Marca,
+        Produto=Produto,
+        SessionLocal=SessionLocal,
+        detect_single_tenant_id=detect_single_tenant_id,
+        find_user_id=find_user_id,
+        get_or_create_categoria=get_or_create_categoria,
+        get_or_create_departamento=get_or_create_departamento,
+        get_or_create_fornecedor=get_or_create_fornecedor,
+        get_or_create_marca=get_or_create_marca,
+    )
+
+
+def write_csv(path: Path, rows: List[Dict[str, object]], headers: List[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=headers, delimiter=";")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+
+
+def build_product_index(produtos: List[Any]) -> Dict[str, List[Any]]:
+    by_sku: Dict[str, List[Any]] = {}
+    for produto in produtos:
+        key = normalize_key(produto.codigo)
+        if key:
+            by_sku.setdefault(key, []).append(produto)
+    return by_sku
+
+
+def build_context(
+    db: Any,
+    dbx: DbDependencies,
+    args: argparse.Namespace,
+    family_defaults: Dict[str, FamilyDefaults],
+    kit_costs: Dict[str, float],
+) -> tuple[ProcessingContext, List[Any]]:
+    tenant_id = (
+        UUID(args.tenant_id) if args.tenant_id else dbx.detect_single_tenant_id(db)
+    )
+    user_id = dbx.find_user_id(db, tenant_id)
+    produtos = (
+        db.query(dbx.Produto)
+        .filter(
+            dbx.Produto.tenant_id == tenant_id,
+            dbx.Produto.codigo.isnot(None),
+            dbx.Produto.codigo != "",
+        )
+        .all()
+    )
+    family_dep_ids, family_cat_ids = build_existing_classification_defaults(produtos)
+    context = ProcessingContext(
+        db=db,
+        dbx=dbx,
+        tenant_id=tenant_id,
+        user_id=user_id,
+        by_sku=build_product_index(produtos),
+        family_defaults=family_defaults,
+        family_dep_ids=family_dep_ids,
+        family_cat_ids=family_cat_ids,
+        kit_costs=kit_costs,
+        apply_mode=args.apply,
+    )
+    return context, produtos
+
+
+def resolve_fields(
+    row: BlingRow,
+    produto: Any,
+    family_defaults: Dict[str, FamilyDefaults],
+) -> ResolvedFields:
+    family_key = build_family_key(row.nome or produto.nome)
+    family_default = family_defaults.get(family_key, FamilyDefaults())
+    return ResolvedFields(
+        family_key=family_key,
+        departamento=row.departamento or family_default.departamento,
+        categoria=row.categoria or family_default.categoria,
+        marca=row.marca or family_default.marca,
+        fornecedor=row.fornecedor or family_default.fornecedor,
+        descricao_curta=row.descricao_curta or family_default.descricao_curta,
+        descricao_complementar=(
+            row.descricao_complementar or family_default.descricao_complementar
+        ),
+        ncm=row.ncm or family_default.ncm,
+        cest=row.cest or family_default.cest,
+        origem=row.origem or family_default.origem,
+        perfil_tributario=(row.perfil_tributario or family_default.perfil_tributario),
+    )
+
+
+def resolve_related_entities(
+    ctx: ProcessingContext,
+    fields: ResolvedFields,
+    apply_mode: bool,
+) -> RelatedEntities:
+    dep = ctx.dbx.get_or_create_departamento(
+        ctx.db,
+        ctx.tenant_id,
+        ctx.user_id,
+        ctx.caches.departamentos,
+        fields.departamento,
+        apply_mode,
+    )
+    departamento_id = dep.id if dep else ctx.family_dep_ids.get(fields.family_key)
+    cat = ctx.dbx.get_or_create_categoria(
+        ctx.db,
+        ctx.tenant_id,
+        ctx.user_id,
+        ctx.caches.categorias,
+        fields.categoria,
+        departamento_id,
+        apply_mode,
+    )
+    categoria_id = cat.id if cat else ctx.family_cat_ids.get(fields.family_key)
+    marca = ctx.dbx.get_or_create_marca(
+        ctx.db,
+        ctx.tenant_id,
+        ctx.user_id,
+        ctx.caches.marcas,
+        fields.marca,
+        apply_mode,
+    )
+    fornecedor = ctx.dbx.get_or_create_fornecedor(
+        ctx.db,
+        ctx.tenant_id,
+        ctx.user_id,
+        ctx.caches.fornecedores,
+        fields.fornecedor,
+        apply_mode,
+    )
+    return RelatedEntities(
+        departamento_id=departamento_id,
+        categoria_id=categoria_id,
+        marca=marca,
+        fornecedor=fornecedor,
+    )
+
+
+def _set_cost_if_changed(
+    produto: Any,
+    new_preco_custo: Optional[float],
+    changes: List[str],
+    apply_mode: bool,
+) -> None:
+    if new_preco_custo is None:
+        return
+
+    new_value = float(new_preco_custo)
+    if (produto.preco_custo or 0.0) == new_value:
+        return
+
+    changes.append(f"preco_custo: {produto.preco_custo} -> {new_preco_custo}")
+    if apply_mode:
+        produto.preco_custo = new_value
+
+
+def _set_attr_if_changed(
+    produto: Any,
+    attr: str,
+    target: Any,
+    changes: List[str],
+    detail: str | Callable[[Any, Any], str],
+    apply_mode: bool,
+    normalizer: Optional[Callable[[Any], Any]] = None,
+) -> None:
+    if target is None or target == "":
+        return
+
+    current = getattr(produto, attr)
+    current_value = normalizer(current) if normalizer else current
+    target_value = normalizer(target) if normalizer else target
+    if current_value == target_value:
+        return
+
+    changes.append(detail(current, target) if callable(detail) else detail)
+    if apply_mode:
+        setattr(produto, attr, target)
+
+
+def collect_product_changes(
+    ctx: ProcessingContext,
+    row: BlingRow,
+    produto: Any,
+    fields: ResolvedFields,
+    entities: RelatedEntities,
+    sku_key: str,
+    apply_mode: bool,
+    count_kit: bool,
+) -> tuple[List[str], int]:
+    changes: List[str] = []
+    new_preco_custo = row.preco_custo
+    kit_cost = ctx.kit_costs.get(sku_key)
+    kit_applied = 0
+    if kit_cost is not None:
+        new_preco_custo = kit_cost
+        kit_applied = 1 if count_kit else 0
+
+    # IMPORTANTE: nao mexer em preco_venda
+    _set_cost_if_changed(produto, new_preco_custo, changes, apply_mode)
+    _set_attr_if_changed(
+        produto,
+        "departamento_id",
+        entities.departamento_id,
+        changes,
+        lambda current, target: f"departamento_id: {current} -> {target}",
+        apply_mode,
+    )
+    _set_attr_if_changed(
+        produto,
+        "categoria_id",
+        entities.categoria_id,
+        changes,
+        lambda current, target: f"categoria_id: {current} -> {target}",
+        apply_mode,
+    )
+    _set_attr_if_changed(
+        produto,
+        "marca_id",
+        entities.marca.id if entities.marca else None,
+        changes,
+        lambda current, target: f"marca_id: {current} -> {target}",
+        apply_mode,
+    )
+    _set_attr_if_changed(
+        produto,
+        "fornecedor_id",
+        entities.fornecedor.id if entities.fornecedor else None,
+        changes,
+        lambda current, target: f"fornecedor_id: {current} -> {target}",
+        apply_mode,
+    )
+    _set_attr_if_changed(
+        produto,
+        "codigo_barras",
+        only_digits(row.codigo_barras)[:13],
+        changes,
+        "codigo_barras atualizado",
+        apply_mode,
+        normalize_text,
+    )
+    _set_attr_if_changed(
+        produto,
+        "ncm",
+        only_digits(fields.ncm)[:8],
+        changes,
+        "ncm atualizado",
+        apply_mode,
+        normalize_text,
+    )
+    _set_attr_if_changed(
+        produto,
+        "cest",
+        only_digits(fields.cest)[:7],
+        changes,
+        "cest atualizado",
+        apply_mode,
+        normalize_text,
+    )
+    _set_attr_if_changed(
+        produto,
+        "origem",
+        map_origem(fields.origem),
+        changes,
+        "origem atualizada",
+        apply_mode,
+        normalize_text,
+    )
+    _set_attr_if_changed(
+        produto,
+        "perfil_tributario",
+        fields.perfil_tributario,
+        changes,
+        "perfil_tributario atualizado",
+        apply_mode,
+        normalize_text,
+    )
+    _set_attr_if_changed(
+        produto,
+        "descricao_curta",
+        fields.descricao_curta,
+        changes,
+        "descricao_curta atualizada",
+        apply_mode,
+        normalize_text,
+    )
+    _set_attr_if_changed(
+        produto,
+        "descricao_completa",
+        fields.descricao_complementar,
+        changes,
+        "descricao_completa atualizada",
+        apply_mode,
+        normalize_text,
+    )
+    return changes, kit_applied
+
+
+def apply_product_row(
+    ctx: ProcessingContext,
+    row: BlingRow,
+    produto: Any,
+    apply_mode: bool,
+    count_kit: bool,
+) -> tuple[List[str], int]:
+    sku_key = normalize_key(row.sku)
+    fields = resolve_fields(row, produto, ctx.family_defaults)
+    entities = resolve_related_entities(ctx, fields, apply_mode)
+    return collect_product_changes(
+        ctx,
+        row,
+        produto,
+        fields,
+        entities,
+        sku_key,
+        apply_mode,
+        count_kit,
+    )
+
+
+def append_preview(
+    rows: List[Dict[str, object]],
+    row: BlingRow,
+    produto: Optional[Any],
+    status: str,
+    detalhes: str,
+) -> None:
+    rows.append(
+        {
+            "sku": row.sku,
+            "produto_id": produto.id if produto else "",
+            "produto_nome": produto.nome if produto else "",
+            "status": status,
+            "detalhes": detalhes,
+        }
+    )
+
+
+def append_update(
+    rows: List[Dict[str, object]],
+    row: BlingRow,
+    produto: Any,
+    detalhes: str,
+) -> None:
+    rows.append(
+        {
+            "sku": row.sku,
+            "produto_id": produto.id,
+            "produto_nome": produto.nome,
+            "detalhes": detalhes,
+        }
+    )
+
+
+def process_bling_row(
+    ctx: ProcessingContext,
+    row: BlingRow,
+    preview_rows: List[Dict[str, object]],
+    update_rows: List[Dict[str, object]],
+    counters: ProcessingCounters,
+) -> None:
+    candidates = ctx.by_sku.get(normalize_key(row.sku), [])
+    if not candidates:
+        counters.skipped_not_found += 1
+        append_preview(
+            preview_rows, row, None, "SEM_MATCH", "SKU nao encontrado no sistema"
+        )
+        return
+
+    if len(candidates) > 1:
+        counters.skipped_multiple += 1
+        detalhes = f"SKU com {len(candidates)} produtos no sistema"
+        append_preview(preview_rows, row, None, "AMBIGUO", detalhes)
+        return
+
+    produto = candidates[0]
+    counters.matched += 1
+    changes, kit_count = apply_product_row(ctx, row, produto, ctx.apply_mode, True)
+    counters.kit_cost_applied += kit_count
+    detalhes = " | ".join(changes)
+    status = "SEM_ALTERACAO"
+    if changes:
+        counters.updated += 1
+        status = "ATUALIZAR" if not ctx.apply_mode else "ATUALIZADO"
+        append_update(update_rows, row, produto, detalhes)
+    append_preview(preview_rows, row, produto, status, detalhes)
+
+
+def process_rows(
+    ctx: ProcessingContext,
+    bling_rows: List[BlingRow],
+) -> tuple[List[Dict[str, object]], List[Dict[str, object]], ProcessingCounters]:
+    counters = ProcessingCounters()
+    preview_rows: List[Dict[str, object]] = []
+    update_rows: List[Dict[str, object]] = []
+    for row in bling_rows:
+        process_bling_row(ctx, row, preview_rows, update_rows, counters)
+    return preview_rows, update_rows, counters
+
+
+def _find_sample_product(ctx: ProcessingContext, row: BlingRow) -> Optional[Any]:
+    candidates = ctx.by_sku.get(normalize_key(row.sku), [])
+    if len(candidates) != 1:
+        return None
+    return (
+        ctx.db.query(ctx.dbx.Produto)
+        .filter(ctx.dbx.Produto.id == candidates[0].id)
+        .first()
+    )
+
+
+def reapply_sample_rows(
+    ctx: ProcessingContext,
+    bling_rows: List[BlingRow],
+    update_rows: List[Dict[str, object]],
+) -> None:
+    ctx.caches.clear()
+    sample_skus = {normalize_key(str(row["sku"])) for row in update_rows}
+    for row in bling_rows:
+        if normalize_key(row.sku) not in sample_skus:
+            continue
+        produto = _find_sample_product(ctx, row)
+        if produto:
+            apply_product_row(ctx, row, produto, True, False)
+
+
+def apply_sample_limit(
+    ctx: ProcessingContext,
+    produtos: List[Any],
+    bling_rows: List[BlingRow],
+    update_rows: List[Dict[str, object]],
+    sample_limit: Optional[int],
+) -> List[Dict[str, object]]:
+    if not sample_limit or sample_limit <= 0:
+        return update_rows
+
+    limited_rows = update_rows[:sample_limit]
+    sample_ids = {
+        int(row["produto_id"]) for row in limited_rows if row.get("produto_id")
+    }
+    for produto in produtos:
+        if produto.id not in sample_ids:
+            ctx.db.expire(produto)
+
+    ctx.db.rollback()
+    reapply_sample_rows(ctx, bling_rows, limited_rows)
+    return limited_rows
+
+
+def build_summary(
+    paths: RunPaths,
+    ctx: ProcessingContext,
+    bling_rows: List[BlingRow],
+    counters: ProcessingCounters,
+    sample_limit: Optional[int],
+) -> List[str]:
+    return [
+        f"bling_csv={paths.bling_csv}",
+        f"estrutura_csv={paths.estrutura_csv or ''}",
+        f"tenant_id={ctx.tenant_id}",
+        f"modo_apply={ctx.apply_mode}",
+        f"sample_limit={sample_limit}",
+        f"total_bling={len(bling_rows)}",
+        f"match_por_sku={counters.matched}",
+        f"sem_match={counters.skipped_not_found}",
+        f"sku_ambiguo={counters.skipped_multiple}",
+        f"produtos_com_alteracoes={counters.updated}",
+        f"custo_kit_aplicado={counters.kit_cost_applied}",
+        "regra_preco_venda=NAO_ALTERAR",
+    ]
+
+
+def write_reports(
+    paths: RunPaths,
+    preview_rows: List[Dict[str, object]],
+    update_rows: List[Dict[str, object]],
+    summary: List[str],
+) -> None:
+    write_csv(
+        paths.output_dir / "preview_enriquecimento.csv",
+        preview_rows,
+        ["sku", "produto_id", "produto_nome", "status", "detalhes"],
+    )
+    write_csv(
+        paths.output_dir / "alteracoes_planejadas.csv",
+        update_rows,
+        ["sku", "produto_id", "produto_nome", "detalhes"],
+    )
+    (paths.output_dir / "resumo.txt").write_text("\n".join(summary), encoding="utf-8")
+
+
+def print_summary(paths: RunPaths, summary: List[str]) -> None:
+    print("Processamento concluido.")
+    print(f"Relatorios: {paths.output_dir}")
+    for line in summary[5:]:
+        print(f"- {line}")
+
+
+def run(args: argparse.Namespace) -> int:
+    repo_root = Path(__file__).resolve().parents[2]
     try:
-        tenant_id = (
-            UUID(args.tenant_id) if args.tenant_id else detect_single_tenant_id(db)
-        )
-        user_id = find_user_id(db, tenant_id)
+        paths = resolve_run_paths(args, repo_root)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"ERRO: {exc}")
+        return 1
 
-        produtos = (
-            db.query(Produto)
-            .filter(
-                Produto.tenant_id == tenant_id,
-                Produto.codigo.isnot(None),
-                Produto.codigo != "",
-            )
-            .all()
-        )
-        by_sku: Dict[str, List[Produto]] = {}
-        for p in produtos:
-            key = normalize_key(p.codigo)
-            if not key:
-                continue
-            by_sku.setdefault(key, []).append(p)
+    bling_rows = load_bling_rows(paths.bling_csv, repo_root)
+    kit_costs = load_kit_costs(paths.estrutura_csv, repo_root)
+    family_defaults = build_family_defaults(bling_rows)
+    dbx = load_db_dependencies()
 
-        marca_cache: Dict[str, Marca] = {}
-        dep_cache: Dict[str, Departamento] = {}
-        cat_cache: Dict[str, Categoria] = {}
-        forn_cache: Dict[str, Cliente] = {}
-        family_dep_ids, family_cat_ids = build_existing_classification_defaults(
-            produtos
-        )
-
-        preview_rows: List[Dict[str, object]] = []
-        update_rows: List[Dict[str, object]] = []
-
-        matched = 0
-        updated = 0
-        skipped_multiple = 0
-        skipped_not_found = 0
-        kit_cost_applied = 0
-
-        for row in bling_rows:
-            sku_key = normalize_key(row.sku)
-            candidates = by_sku.get(sku_key, [])
-            if not candidates:
-                skipped_not_found += 1
-                preview_rows.append(
-                    {
-                        "sku": row.sku,
-                        "produto_id": "",
-                        "produto_nome": "",
-                        "status": "SEM_MATCH",
-                        "detalhes": "SKU nao encontrado no sistema",
-                    }
-                )
-                continue
-
-            if len(candidates) > 1:
-                skipped_multiple += 1
-                preview_rows.append(
-                    {
-                        "sku": row.sku,
-                        "produto_id": "",
-                        "produto_nome": "",
-                        "status": "AMBIGUO",
-                        "detalhes": f"SKU com {len(candidates)} produtos no sistema",
-                    }
-                )
-                continue
-
-            produto = candidates[0]
-            matched += 1
-
-            family_key = build_family_key(row.nome or produto.nome)
-            family_default = family_defaults.get(family_key, FamilyDefaults())
-
-            resolved_departamento = row.departamento or family_default.departamento
-            resolved_categoria = row.categoria or family_default.categoria
-            resolved_marca = row.marca or family_default.marca
-            resolved_fornecedor = row.fornecedor or family_default.fornecedor
-            resolved_descricao_curta = (
-                row.descricao_curta or family_default.descricao_curta
-            )
-            resolved_descricao_complementar = (
-                row.descricao_complementar or family_default.descricao_complementar
-            )
-            resolved_ncm = row.ncm or family_default.ncm
-            resolved_cest = row.cest or family_default.cest
-            resolved_origem = row.origem or family_default.origem
-            resolved_perfil_tributario = (
-                row.perfil_tributario or family_default.perfil_tributario
-            )
-
-            dep = get_or_create_departamento(
-                db, tenant_id, user_id, dep_cache, resolved_departamento, args.apply
-            )
-            inferred_dep_id = dep.id if dep else family_dep_ids.get(family_key)
-            cat = get_or_create_categoria(
-                db,
-                tenant_id,
-                user_id,
-                cat_cache,
-                resolved_categoria,
-                inferred_dep_id,
-                args.apply,
-            )
-            inferred_cat_id = cat.id if cat else family_cat_ids.get(family_key)
-            marca = get_or_create_marca(
-                db, tenant_id, user_id, marca_cache, resolved_marca, args.apply
-            )
-            forn = get_or_create_fornecedor(
-                db, tenant_id, user_id, forn_cache, resolved_fornecedor, args.apply
-            )
-
-            new_preco_custo = row.preco_custo
-            kit_cost = kit_costs.get(sku_key)
-            if kit_cost is not None:
-                new_preco_custo = kit_cost
-                kit_cost_applied += 1
-
-            changes: List[str] = []
-
-            # IMPORTANTE: nao mexer em preco_venda
-            if new_preco_custo is not None and (produto.preco_custo or 0.0) != float(
-                new_preco_custo
-            ):
-                changes.append(
-                    f"preco_custo: {produto.preco_custo} -> {new_preco_custo}"
-                )
-                if args.apply:
-                    produto.preco_custo = float(new_preco_custo)
-
-            target_departamento_id = dep.id if dep else inferred_dep_id
-            if (
-                target_departamento_id
-                and produto.departamento_id != target_departamento_id
-            ):
-                changes.append(
-                    f"departamento_id: {produto.departamento_id} -> {target_departamento_id}"
-                )
-                if args.apply:
-                    produto.departamento_id = target_departamento_id
-
-            target_categoria_id = cat.id if cat else inferred_cat_id
-            if target_categoria_id and produto.categoria_id != target_categoria_id:
-                changes.append(
-                    f"categoria_id: {produto.categoria_id} -> {target_categoria_id}"
-                )
-                if args.apply:
-                    produto.categoria_id = target_categoria_id
-
-            if marca and produto.marca_id != marca.id:
-                changes.append(f"marca_id: {produto.marca_id} -> {marca.id}")
-                if args.apply:
-                    produto.marca_id = marca.id
-
-            if forn and produto.fornecedor_id != forn.id:
-                changes.append(f"fornecedor_id: {produto.fornecedor_id} -> {forn.id}")
-                if args.apply:
-                    produto.fornecedor_id = forn.id
-
-            codigo_barras_digits = only_digits(row.codigo_barras)[:13]
-            if (
-                codigo_barras_digits
-                and normalize_text(produto.codigo_barras) != codigo_barras_digits
-            ):
-                changes.append("codigo_barras atualizado")
-                if args.apply:
-                    produto.codigo_barras = codigo_barras_digits
-
-            ncm_digits = only_digits(resolved_ncm)[:8]
-            if ncm_digits and normalize_text(produto.ncm) != ncm_digits:
-                changes.append("ncm atualizado")
-                if args.apply:
-                    produto.ncm = ncm_digits
-
-            cest_digits = only_digits(resolved_cest)[:7]
-            if cest_digits and normalize_text(produto.cest) != cest_digits:
-                changes.append("cest atualizado")
-                if args.apply:
-                    produto.cest = cest_digits
-
-            origem = map_origem(resolved_origem)
-            if origem and normalize_text(produto.origem) != origem:
-                changes.append("origem atualizada")
-                if args.apply:
-                    produto.origem = origem
-
-            if (
-                resolved_perfil_tributario
-                and normalize_text(produto.perfil_tributario)
-                != resolved_perfil_tributario
-            ):
-                changes.append("perfil_tributario atualizado")
-                if args.apply:
-                    produto.perfil_tributario = resolved_perfil_tributario
-
-            if (
-                resolved_descricao_curta
-                and normalize_text(produto.descricao_curta) != resolved_descricao_curta
-            ):
-                changes.append("descricao_curta atualizada")
-                if args.apply:
-                    produto.descricao_curta = resolved_descricao_curta
-
-            if (
-                resolved_descricao_complementar
-                and normalize_text(produto.descricao_completa)
-                != resolved_descricao_complementar
-            ):
-                changes.append("descricao_completa atualizada")
-                if args.apply:
-                    produto.descricao_completa = resolved_descricao_complementar
-
-            status = "SEM_ALTERACAO"
-            details = ""
-            if changes:
-                updated += 1
-                status = "ATUALIZAR" if not args.apply else "ATUALIZADO"
-                details = " | ".join(changes)
-                update_rows.append(
-                    {
-                        "sku": row.sku,
-                        "produto_id": produto.id,
-                        "produto_nome": produto.nome,
-                        "detalhes": details,
-                    }
-                )
-
-            preview_rows.append(
-                {
-                    "sku": row.sku,
-                    "produto_id": produto.id,
-                    "produto_nome": produto.nome,
-                    "status": status,
-                    "detalhes": details,
-                }
-            )
-
-        if args.sample_limit and args.sample_limit > 0:
-            update_rows = update_rows[: args.sample_limit]
-
+    db = dbx.SessionLocal()
+    try:
+        ctx, produtos = build_context(db, dbx, args, family_defaults, kit_costs)
+        preview_rows, update_rows, counters = process_rows(ctx, bling_rows)
         if args.apply:
-            if args.sample_limit and args.sample_limit > 0:
-                sample_ids = {
-                    int(r["produto_id"]) for r in update_rows if r.get("produto_id")
-                }
-                # rollback parcial: aplica somente amostra
-                for produto in produtos:
-                    if produto.id not in sample_ids:
-                        db.expire(produto)
-                # Reaplicar somente amostra a partir do preview (sem mexer em preco_venda)
-                db.rollback()
-
-                # Segunda passada para amostra, simples e deterministica
-                marca_cache.clear()
-                dep_cache.clear()
-                cat_cache.clear()
-                forn_cache.clear()
-                sample_skus = {normalize_key(r["sku"]) for r in update_rows}
-
-                for row in bling_rows:
-                    if normalize_key(row.sku) not in sample_skus:
-                        continue
-                    candidates = by_sku.get(normalize_key(row.sku), [])
-                    if len(candidates) != 1:
-                        continue
-                    produto = (
-                        db.query(Produto).filter(Produto.id == candidates[0].id).first()
-                    )
-                    if not produto:
-                        continue
-
-                    family_key = build_family_key(row.nome or produto.nome)
-                    family_default = family_defaults.get(family_key, FamilyDefaults())
-
-                    resolved_departamento = (
-                        row.departamento or family_default.departamento
-                    )
-                    resolved_categoria = row.categoria or family_default.categoria
-                    resolved_marca = row.marca or family_default.marca
-                    resolved_fornecedor = row.fornecedor or family_default.fornecedor
-                    resolved_descricao_curta = (
-                        row.descricao_curta or family_default.descricao_curta
-                    )
-                    resolved_descricao_complementar = (
-                        row.descricao_complementar
-                        or family_default.descricao_complementar
-                    )
-                    resolved_ncm = row.ncm or family_default.ncm
-                    resolved_cest = row.cest or family_default.cest
-                    resolved_origem = row.origem or family_default.origem
-                    resolved_perfil_tributario = (
-                        row.perfil_tributario or family_default.perfil_tributario
-                    )
-
-                    dep = get_or_create_departamento(
-                        db, tenant_id, user_id, dep_cache, resolved_departamento, True
-                    )
-                    inferred_dep_id = dep.id if dep else family_dep_ids.get(family_key)
-                    cat = get_or_create_categoria(
-                        db,
-                        tenant_id,
-                        user_id,
-                        cat_cache,
-                        resolved_categoria,
-                        inferred_dep_id,
-                        True,
-                    )
-                    inferred_cat_id = cat.id if cat else family_cat_ids.get(family_key)
-                    marca = get_or_create_marca(
-                        db, tenant_id, user_id, marca_cache, resolved_marca, True
-                    )
-                    forn = get_or_create_fornecedor(
-                        db, tenant_id, user_id, forn_cache, resolved_fornecedor, True
-                    )
-
-                    new_preco_custo = row.preco_custo
-                    kit_cost = kit_costs.get(normalize_key(row.sku))
-                    if kit_cost is not None:
-                        new_preco_custo = kit_cost
-
-                    if new_preco_custo is not None:
-                        produto.preco_custo = float(new_preco_custo)
-                    if dep:
-                        produto.departamento_id = dep.id
-                    elif inferred_dep_id:
-                        produto.departamento_id = inferred_dep_id
-                    if cat:
-                        produto.categoria_id = cat.id
-                    elif inferred_cat_id:
-                        produto.categoria_id = inferred_cat_id
-                    if marca:
-                        produto.marca_id = marca.id
-                    if forn:
-                        produto.fornecedor_id = forn.id
-
-                    codigo_barras_digits = only_digits(row.codigo_barras)[:13]
-                    if codigo_barras_digits:
-                        produto.codigo_barras = codigo_barras_digits
-
-                    ncm_digits = only_digits(resolved_ncm)[:8]
-                    if ncm_digits:
-                        produto.ncm = ncm_digits
-
-                    cest_digits = only_digits(resolved_cest)[:7]
-                    if cest_digits:
-                        produto.cest = cest_digits
-
-                    origem = map_origem(resolved_origem)
-                    if origem:
-                        produto.origem = origem
-
-                    if resolved_perfil_tributario:
-                        produto.perfil_tributario = resolved_perfil_tributario
-                    if resolved_descricao_curta:
-                        produto.descricao_curta = resolved_descricao_curta
-                    if resolved_descricao_complementar:
-                        produto.descricao_completa = resolved_descricao_complementar
-
+            update_rows = apply_sample_limit(
+                ctx,
+                produtos,
+                bling_rows,
+                update_rows,
+                args.sample_limit,
+            )
             db.commit()
 
-        write_csv(
-            output_dir / "preview_enriquecimento.csv",
-            preview_rows,
-            ["sku", "produto_id", "produto_nome", "status", "detalhes"],
-        )
-        write_csv(
-            output_dir / "alteracoes_planejadas.csv",
-            update_rows,
-            ["sku", "produto_id", "produto_nome", "detalhes"],
-        )
-
-        resumo = [
-            f"bling_csv={bling_csv}",
-            f"estrutura_csv={estrutura_csv or ''}",
-            f"tenant_id={tenant_id}",
-            f"modo_apply={args.apply}",
-            f"sample_limit={args.sample_limit}",
-            f"total_bling={len(bling_rows)}",
-            f"match_por_sku={matched}",
-            f"sem_match={skipped_not_found}",
-            f"sku_ambiguo={skipped_multiple}",
-            f"produtos_com_alteracoes={updated}",
-            f"custo_kit_aplicado={kit_cost_applied}",
-            "regra_preco_venda=NAO_ALTERAR",
-        ]
-        (output_dir / "resumo.txt").write_text("\n".join(resumo), encoding="utf-8")
-
-        print("Processamento concluido.")
-        print(f"Relatorios: {output_dir}")
-        for line in resumo[5:]:
-            print(f"- {line}")
-
+        summary = build_summary(paths, ctx, bling_rows, counters, args.sample_limit)
+        write_reports(paths, preview_rows, update_rows, summary)
+        print_summary(paths, summary)
     finally:
         db.close()
 

@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT_DIR = REPO_ROOT / "backend" / "scripts"
@@ -61,6 +63,27 @@ def test_enriquecer_bling_fatia_55_preserva_exports_compatibilidade():
         assert facade.normalize_text is utils.normalize_text
         assert facade.load_bling_rows is loaders.load_bling_rows
         assert facade.run is processing.run
+    finally:
+        sys.path.remove(str(SCRIPT_DIR))
+
+
+def test_enriquecer_bling_fatia_55_valida_csv_dentro_da_raiz(tmp_path):
+    sys.path.insert(0, str(SCRIPT_DIR))
+    try:
+        from enriquecer_produtos_bling_processing import resolve_existing_csv_path
+
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        valid_csv = repo_root / "bling.csv"
+        valid_csv.write_text("Codigo;Descricao\n1;Produto\n", encoding="utf-8")
+        outside_csv = tmp_path / "fora.csv"
+        outside_csv.write_text("Codigo;Descricao\n1;Produto\n", encoding="utf-8")
+
+        assert (
+            resolve_existing_csv_path(repo_root, "bling.csv", "CSV Bling") == valid_csv
+        )
+        with pytest.raises(ValueError, match="fora da raiz permitida"):
+            resolve_existing_csv_path(repo_root, str(outside_csv), "CSV Bling")
     finally:
         sys.path.remove(str(SCRIPT_DIR))
 

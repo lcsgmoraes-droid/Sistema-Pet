@@ -18,15 +18,13 @@ class ExistingProdutoLike(Protocol):
 def choose_most_common_text(values: Dict[str, int]) -> str:
     if not values:
         return ""
-    return sorted(values.items(), key=lambda item: (-item[1], -len(item[0]), item[0]))[
-        0
-    ][0]
+    return min(values.items(), key=lambda item: (-item[1], -len(item[0]), item[0]))[0]
 
 
 def choose_most_common_int(values: Dict[int, int]) -> Optional[int]:
     if not values:
         return None
-    return sorted(values.items(), key=lambda item: (-item[1], item[0]))[0][0]
+    return min(values.items(), key=lambda item: (-item[1], item[0]))[0]
 
 
 def build_family_defaults(rows: List[BlingRow]) -> Dict[str, FamilyDefaults]:
