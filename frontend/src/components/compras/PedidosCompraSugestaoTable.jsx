@@ -1,4 +1,5 @@
 import FornecedorIdentity from "../ui/FornecedorIdentity";
+import { AlertCircle, CheckSquare, MinusCircle } from "lucide-react";
 import PedidosCompraSugestaoUnidadeCell from "./PedidosCompraSugestaoUnidadeCell";
 
 export default function PedidosCompraSugestaoTable({
@@ -51,7 +52,7 @@ export default function PedidosCompraSugestaoTable({
         {loadingSugestao ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
               <p className="text-gray-600">Analisando produtos e calculando sugestões...</p>
             </div>
           </div>
@@ -80,21 +81,24 @@ export default function PedidosCompraSugestaoTable({
                     </label>
                     <button
                       onClick={selecionarTodosCriticos}
-                      className="rounded-lg bg-red-100 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-200"
+                      className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50"
                     >
-                      🔴 Selecionar Todos Críticos
+                      <AlertCircle className="h-4 w-4" />
+                      Selecionar criticos
                     </button>
                     <button
                       onClick={selecionarPreenchidosVisiveis}
-                      className="rounded-lg bg-green-100 px-4 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-200"
+                      className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
                     >
-                      ✅ Selecionar Preenchidos
+                      <CheckSquare className="h-4 w-4" />
+                      Selecionar preenchidos
                     </button>
                     <button
                       onClick={desmarcarVisiveis}
-                      className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                     >
-                      ⛔ Desmarcar Visíveis
+                      <MinusCircle className="h-4 w-4" />
+                      Desmarcar visiveis
                     </button>
                   </div>
                   <span className="text-sm text-gray-500 xl:ml-auto">
@@ -204,7 +208,7 @@ export default function PedidosCompraSugestaoTable({
                     <tr
                       key={sugestao.produto_id}
                       className={`hover:bg-gray-50 ${
-                        produtosSelecionados.includes(sugestao.produto_id) ? "bg-purple-50" : ""
+                        produtosSelecionados.includes(sugestao.produto_id) ? "bg-teal-50" : ""
                       }`}
                     >
                       <td className="px-4 py-3">
@@ -391,7 +395,7 @@ export default function PedidosCompraSugestaoTable({
                             atualizarQuantidadeSugerida(sugestao.produto_id, valorAtual);
                           }}
                           onWheel={(e) => e.currentTarget.blur()}
-                          className="w-20 px-2 py-1 text-right font-bold text-purple-600 border rounded focus:ring-2 focus:ring-purple-300"
+                          className="w-20 rounded-lg border border-slate-300 px-2 py-1 text-right font-bold text-teal-700 focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
                         />
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -411,13 +415,12 @@ export default function PedidosCompraSugestaoTable({
                           }`}
                         >
                           {sugestao.tendencia === "CRESCIMENTO"
-                            ? "📈"
+                            ? "Alta"
                             : sugestao.tendencia === "QUEDA"
-                              ? "📉"
+                              ? "Queda"
                               : sugestao.tendencia === "ESTÁVEL"
-                                ? "➡️"
-                                : "—"}
-                          {sugestao.tendencia}
+                                ? "Estavel"
+                                : sugestao.tendencia}
                         </span>
                       </td>
                     </tr>
@@ -437,15 +440,15 @@ export default function PedidosCompraSugestaoTable({
               <div className="font-semibold mb-1">Resumo da Sugestão:</div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  🔴 <strong>{sugestoes.filter((s) => s.prioridade === "CRÍTICO").length}</strong>{" "}
+                  <strong>{sugestoes.filter((s) => s.prioridade === "CRÍTICO").length}</strong>{" "}
                   críticos
                 </div>
                 <div>
-                  ⚠️ <strong>{sugestoes.filter((s) => s.prioridade === "ALERTA").length}</strong> em
+                  <strong>{sugestoes.filter((s) => s.prioridade === "ALERTA").length}</strong> em
                   alerta
                 </div>
                 <div>
-                  💰 Total:{" "}
+                  Total:{" "}
                   <strong>
                     R${" "}
                     {sugestoes
@@ -466,7 +469,7 @@ export default function PedidosCompraSugestaoTable({
               <button
                 onClick={adicionarSugestoesAoPedido}
                 disabled={selecionadosComQuantidade.length === 0}
-                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-3 rounded-lg bg-teal-600 text-white font-semibold hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {modoAplicacaoSugestao === "replace"
                   ? `Substituir rascunho com ${selecionadosComQuantidade.length} produtos`

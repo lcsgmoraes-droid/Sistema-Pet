@@ -17,7 +17,7 @@ export default function PedidosCompraSugestaoUnidadeCell({
       <select
         value={embalagem.unidade_compra}
         onChange={(e) => atualizarUnidadeCompraSugestao(sugestao, e.target.value)}
-        className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+        className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-700 focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
         title="Unidade usada para pedir ao fornecedor"
       >
         {UNIDADES_COMPRA_OPCOES.map((opcao) => (
@@ -35,7 +35,7 @@ export default function PedidosCompraSugestaoUnidadeCell({
             step="1"
             value={embalagem.quantidade_por_embalagem ?? ""}
             onChange={(e) => atualizarQuantidadePorEmbalagemSugestao(sugestao, e.target.value)}
-            className="h-9 min-w-0 flex-1 rounded-lg border border-slate-300 px-2 text-right text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+            className="h-9 min-w-0 flex-1 rounded-lg border border-slate-300 px-2 text-right text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
             placeholder="unid."
             title={`Unidades vendaveis por ${embalagem.unidade_compra}`}
           />

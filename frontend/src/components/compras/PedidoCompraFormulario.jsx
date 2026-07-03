@@ -1,5 +1,6 @@
 import FornecedorSelector from "../fornecedores/FornecedorSelector";
 import ProductIdentity from "../ui/ProductIdentity";
+import { Check, Lightbulb, Plus, Save, X } from "lucide-react";
 import {
   formatarQuantidadeCompraPedido,
   montarTooltipQuantidadeCompraPedido,
@@ -83,20 +84,21 @@ export default function PedidoCompraFormulario({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">
-          {modoEdicao ? "✏️ Editar Pedido" : "Novo Pedido de Compra"}
+    <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
+        <h2 className="text-xl font-bold text-slate-900">
+          {modoEdicao ? "Editar Pedido" : "Novo Pedido de Compra"}
         </h2>
         <button
           type="button"
           onClick={fecharFormularioPedido}
-          className="text-gray-500 hover:text-gray-700"
+          className="rounded-lg p-2 text-slate-500 transition hover:bg-white hover:text-slate-900"
+          title="Fechar formulario"
         >
-          ✖️
+          <X className="h-5 w-5" />
         </button>
       </div>
-      <form onSubmit={modoEdicao ? editarPedido : handleSubmit} className="space-y-6">
+      <form onSubmit={modoEdicao ? editarPedido : handleSubmit} className="space-y-6 p-6">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Fornecedor *</label>
@@ -164,11 +166,12 @@ export default function PedidoCompraFormulario({
                 type="button"
                 onClick={abrirFluxoSugestaoInteligente}
                 disabled={loadingPrepararSugestao}
-                className="mt-2 w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center justify-center gap-2"
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-teal-700 disabled:opacity-60"
               >
+                <Lightbulb className="h-4 w-4" />
                 {loadingPrepararSugestao
                   ? "Verificando rascunho..."
-                  : "💡 Sugestão Inteligente de Pedido"}
+                  : "Sugestao Inteligente de Pedido"}
               </button>
             )}
           </div>
@@ -356,7 +359,7 @@ export default function PedidoCompraFormulario({
                   className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
                   title="Adicionar item ao pedido"
                 >
-                  +
+                  <Plus className="h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -459,9 +462,21 @@ export default function PedidoCompraFormulario({
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700 disabled:bg-gray-400"
         >
-          {loading ? "⏳ Processando..." : modoEdicao ? "✏️ Salvar Alterações" : "✅ Criar Pedido"}
+          {loading ? (
+            "Processando..."
+          ) : modoEdicao ? (
+            <>
+              <Save className="h-4 w-4" />
+              Salvar alteracoes
+            </>
+          ) : (
+            <>
+              <Check className="h-4 w-4" />
+              Criar Pedido
+            </>
+          )}
         </button>
       </form>
     </div>
