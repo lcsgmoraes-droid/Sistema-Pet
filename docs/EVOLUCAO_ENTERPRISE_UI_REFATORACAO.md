@@ -216,7 +216,16 @@ Inventario atualizado em 2026-07-02 pela contagem operacional de linhas com cont
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
-- Observacao mobile: `app-mobile/src` ainda tem 2 arquivos acima de 700 linhas; a frente mobile segue separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+- Observacao mobile: `app-mobile/src` ainda tem 1 arquivo acima de 700 linhas; a frente mobile segue separando telas por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
+
+Fatia mobile 700 batch 52 de 2026-07-03: `app-mobile/src/screens/orders/OrdersScreen.tsx` saiu da faixa acima de 700 linhas ao separar pedidos em conteudo, card, styles e utils:
+
+- `app-mobile/src/screens/orders/OrdersScreen.tsx`: 715 -> 107 linhas com conteudo, mantendo carregamento, refresh, polling de pedidos pendentes/retiradas abertas, repetir pedido, pagamento online e rastreio.
+- `app-mobile/src/screens/orders/orders/OrdersContent.tsx`: concentra loading, lista, cabecalho, estados vazios/erro, refresh e composicao dos cards.
+- `app-mobile/src/screens/orders/orders/OrderCard.tsx`: concentra card do pedido, status, canal, entrega, itens, palavra-chave, total e acoes.
+- `app-mobile/src/screens/orders/orders/OrdersStyles.ts`: concentra estilos da tela de pedidos.
+- `app-mobile/src/screens/orders/orders/OrdersUtils.ts`: concentra status, tipos e helpers de pedido, entrega, canal, chave de renderizacao e polling.
+- Contrato dedicado: `app-mobile/scripts/test-large-files-700-batch-52-refactor.mjs`, garantindo a tela e os modulos fatiados abaixo de 700 linhas e sem sinais de mojibake.
 
 Fatia mobile 700 batch 51 de 2026-07-03: `app-mobile/src/screens/shop/CartScreen.tsx` saiu da faixa acima de 700 linhas ao separar carrinho em conteudo, card de item, modal de endereco, styles e utils:
 
