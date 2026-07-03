@@ -31,3 +31,19 @@ def test_schema_item_pedido_guarda_unidade_compra_e_embalagem():
 
     assert item.unidade_compra == "FD"
     assert item.quantidade_por_embalagem == 24
+
+
+def test_embalagem_pode_ficar_sem_fator_sem_gerar_total_falso():
+    item = PedidoCompraItemRequest(
+        produto_id=10,
+        quantidade_pedida=2,
+        preco_unitario=4.5,
+        unidade_compra="CX",
+        quantidade_por_embalagem=None,
+    )
+
+    assert item.unidade_compra == "CX"
+    assert item.quantidade_por_embalagem is None
+    assert normalizar_quantidade_por_embalagem("CX", None) is None
+    assert calcular_quantidade_total_unidades(2, "CX", None) == 2
+    assert formatar_quantidade_compra_documento(2, "CX", None) == "2 CX"

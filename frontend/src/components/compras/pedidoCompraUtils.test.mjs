@@ -6,6 +6,7 @@ import {
   formatarQuantidadeCompraPedido,
   montarTooltipQuantidadeCompraPedido,
   normalizarItemPedido,
+  normalizarQuantidadePorEmbalagemPedido,
 } from "./pedidoCompraUtils.js";
 
 test("formatarQuantidadeCompraPedido mostra embalagem com total em unidades", () => {
@@ -38,4 +39,20 @@ test("formatarQuantidadeCompraPedido preserva unitario simples", () => {
   assert.equal(item.quantidade_total_unidades, 12);
   assert.equal(formatarQuantidadeCompraPedido(item), "12 UN");
   assert.equal(montarTooltipQuantidadeCompraPedido(item), "");
+});
+
+test("formatarQuantidadeCompraPedido permite embalagem sem fator conhecido", () => {
+  const item = {
+    quantidade_pedida: 2,
+    unidade_compra: "CX",
+    quantidade_por_embalagem: "",
+  };
+
+  assert.equal(normalizarQuantidadePorEmbalagemPedido("CX", ""), null);
+  assert.equal(calcularQuantidadeTotalUnidadesPedido(item), 2);
+  assert.equal(formatarQuantidadeCompraPedido(item), "2 CX");
+  assert.equal(
+    montarTooltipQuantidadeCompraPedido(item),
+    "Quantidade por CX ainda nao informada. O pedido sera enviado sem conversao para unidades.",
+  );
 });

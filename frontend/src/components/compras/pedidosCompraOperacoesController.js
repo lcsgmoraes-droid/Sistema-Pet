@@ -19,6 +19,16 @@ function extrairEmailFornecedor(fornecedor) {
   return (emailValido || "").trim();
 }
 
+function serializarQuantidadePorEmbalagem(item) {
+  const unidadeCompra = item.unidade_compra || "UN";
+  if (unidadeCompra === "UN") {
+    return 1;
+  }
+
+  const quantidade = Number(item.quantidade_por_embalagem);
+  return Number.isFinite(quantidade) && quantidade > 0 ? quantidade : null;
+}
+
 export function createPedidosCompraOperacoesController({
   aplicarPedidoNoFormulario,
   carregarDados,
@@ -68,7 +78,7 @@ export function createPedidosCompraOperacoesController({
           produto_id: item.produto_id,
           quantidade_pedida: parseFloat(item.quantidade_pedida),
           unidade_compra: item.unidade_compra || "UN",
-          quantidade_por_embalagem: parseFloat(item.quantidade_por_embalagem || 1),
+          quantidade_por_embalagem: serializarQuantidadePorEmbalagem(item),
           preco_unitario: parseFloat(item.preco_unitario),
           desconto_item: parseFloat(item.desconto_item || 0),
         })),
@@ -340,7 +350,7 @@ export function createPedidosCompraOperacoesController({
           produto_id: item.produto_id,
           quantidade_pedida: parseFloat(item.quantidade_pedida),
           unidade_compra: item.unidade_compra || "UN",
-          quantidade_por_embalagem: parseFloat(item.quantidade_por_embalagem || 1),
+          quantidade_por_embalagem: serializarQuantidadePorEmbalagem(item),
           preco_unitario: parseFloat(item.preco_unitario),
           desconto_item: parseFloat(item.desconto_item || 0),
         })),

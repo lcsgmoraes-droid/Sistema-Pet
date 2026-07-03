@@ -1,3 +1,5 @@
+import { RefreshCw, Search, X } from "lucide-react";
+
 export default function PedidosCompraSugestaoHeader({
   fecharModalSugestao,
   filtroSugestao,
@@ -28,39 +30,41 @@ export default function PedidosCompraSugestaoHeader({
   limparEstadosSugestao,
   sugestoes,
   produtosSelecionados,
-  obterQuantidadeInteira,
+  obterQuantidadeTotalUnidadesSugestao,
+  calcularValorTotalSugestao,
 }) {
   return (
     <>
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 via-violet-600 to-indigo-600 px-4 py-3 text-white shadow-sm">
+      <div className="border-b border-slate-200 bg-white px-5 py-4 text-slate-900 shadow-sm">
         <div className="flex flex-col gap-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-purple-100/90">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-teal-700">
                 Sugestão Inteligente
               </div>
               <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <h2 className="text-lg font-bold leading-tight">
                   Pedido guiado por vendas e estoque
                 </h2>
-                <p className="text-xs text-purple-100/85">
+                <p className="text-xs text-slate-500">
                   Ajuste rápido dos filtros sem perder área útil.
                 </p>
               </div>
             </div>
             <button
               onClick={fecharModalSugestao}
-              className="shrink-0 rounded-lg p-2 text-white transition hover:bg-white/15"
+              className="shrink-0 rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+              title="Fechar sugestao"
             >
-              ✕
+              <X className="h-5 w-5" />
             </button>
           </div>
 
           {/* Filtros */}
           <div className="grid gap-2 xl:grid-cols-12">
             <div className="xl:col-span-4">
-              <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-purple-100">
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">
                 Buscar por nome ou SKU
               </label>
               <input
@@ -68,17 +72,17 @@ export default function PedidosCompraSugestaoHeader({
                 placeholder="Ex: Special Dog, SKU 211..."
                 value={filtroSugestao}
                 onChange={(e) => setFiltroSugestao(e.target.value)}
-                className="h-11 w-full rounded-lg border border-white/20 bg-white px-3 text-gray-800 shadow-sm focus:ring-2 focus:ring-purple-300"
+                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-800 shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
               />
             </div>
             <div ref={filtroMarcasRef} className="relative sm:col-span-2 xl:col-span-3">
-              <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-purple-100">
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">
                 Marcas
               </label>
               <button
                 type="button"
                 onClick={() => setMostrarFiltroMarcas((aberto) => !aberto)}
-                className="flex h-11 w-full items-center justify-between rounded-lg border border-white/20 bg-white px-3 text-left text-gray-800 shadow-sm transition hover:bg-purple-50"
+                className="flex h-11 w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 text-left text-slate-800 shadow-sm transition hover:bg-slate-50"
               >
                 <span className="truncate">{resumoMarcasSelecionadas}</span>
                 <span
@@ -89,11 +93,11 @@ export default function PedidosCompraSugestaoHeader({
               </button>
 
               {mostrarFiltroMarcas && (
-                <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-purple-200 bg-white text-gray-800 shadow-2xl">
+                <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white text-gray-800 shadow-2xl">
                   <button
                     type="button"
                     onClick={() => setMarcasSelecionadas([])}
-                    className="flex w-full items-center justify-between border-b border-gray-100 px-3 py-2 text-sm font-medium transition hover:bg-purple-50"
+                    className="flex w-full items-center justify-between border-b border-gray-100 px-3 py-2 text-sm font-medium transition hover:bg-slate-50"
                   >
                     <span className="flex items-center gap-2">
                       <input
@@ -113,7 +117,7 @@ export default function PedidosCompraSugestaoHeader({
                     {marcasFornecedor.map((marca) => (
                       <label
                         key={marca.id}
-                        className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm transition hover:bg-purple-50"
+                        className="flex cursor-pointer items-center gap-2 px-3 py-2 text-sm transition hover:bg-slate-50"
                       >
                         <input
                           type="checkbox"
@@ -129,13 +133,13 @@ export default function PedidosCompraSugestaoHeader({
               )}
             </div>
             <div className="sm:col-span-1 xl:col-span-2">
-              <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-purple-100">
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">
                 Período
               </label>
               <select
                 value={periodoSugestao}
                 onChange={(e) => setPeriodoSugestao(parseInt(e.target.value))}
-                className="h-11 w-full rounded-lg border border-white/20 bg-white px-3 text-gray-800 shadow-sm focus:ring-2 focus:ring-purple-300"
+                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-800 shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
               >
                 <option value={30}>Últimos 30 dias</option>
                 <option value={60}>Últimos 60 dias</option>
@@ -144,13 +148,13 @@ export default function PedidosCompraSugestaoHeader({
               </select>
             </div>
             <div className="sm:col-span-1 xl:col-span-2">
-              <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-purple-100">
+              <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">
                 Cobertura
               </label>
               <select
                 value={diasCobertura}
                 onChange={(e) => setDiasCobertura(parseInt(e.target.value))}
-                className="h-11 w-full rounded-lg border border-white/20 bg-white px-3 text-gray-800 shadow-sm focus:ring-2 focus:ring-purple-300"
+                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-800 shadow-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-100"
               >
                 <option value={15}>15 dias</option>
                 <option value={30}>30 dias</option>
@@ -166,14 +170,24 @@ export default function PedidosCompraSugestaoHeader({
               <button
                 onClick={() => buscarSugestoes()}
                 disabled={loadingSugestao}
-                className="flex h-11 w-full items-center justify-center rounded-lg bg-white px-4 text-sm font-semibold text-purple-700 shadow-sm transition hover:bg-purple-50 disabled:opacity-50"
+                className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-teal-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-700 disabled:opacity-50"
               >
-                {loadingSugestao ? "🔄 Analisando..." : "🔍 Atualizar"}
+                {loadingSugestao ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Analisando
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-4 w-4" />
+                    Atualizar
+                  </>
+                )}
               </button>
             </div>
             <div className="xl:col-span-12">
-              <div className="flex flex-col gap-2 rounded-2xl border border-white/15 bg-white/10 px-3 py-2 xl:flex-row xl:items-center xl:justify-between">
-                <div className="flex flex-wrap items-center gap-4 text-sm text-white">
+              <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 xl:flex-row xl:items-center xl:justify-between">
+                <div className="flex flex-wrap items-center gap-4 text-sm text-slate-700">
                   <label className="flex cursor-pointer items-center gap-2">
                     <input
                       type="checkbox"
@@ -192,7 +206,7 @@ export default function PedidosCompraSugestaoHeader({
                     />
                     <span>Incluir Alertas</span>
                   </label>
-                  <label className="flex cursor-pointer items-center gap-2 rounded-full bg-white/10 px-3 py-1">
+                  <label className="flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1">
                     <input
                       type="checkbox"
                       checked={apenasFornecedorPrincipal}
@@ -209,7 +223,7 @@ export default function PedidosCompraSugestaoHeader({
                     </span>
                   </label>
                   {grupoFornecedorAtual && (
-                    <label className="flex cursor-pointer items-center gap-2 rounded-full bg-white/10 px-3 py-1">
+                    <label className="flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1">
                       <input
                         type="checkbox"
                         checked={incluirGrupoFornecedor}
@@ -225,34 +239,34 @@ export default function PedidosCompraSugestaoHeader({
                 </div>
 
                 {sugestoes.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-purple-100">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
                     {(() => {
                       const selecionados = sugestoes.filter((s) =>
                         produtosSelecionados.includes(s.produto_id),
                       );
                       const totalQtd = selecionados.reduce(
-                        (sum, s) => sum + obterQuantidadeInteira(s),
+                        (sum, s) => sum + obterQuantidadeTotalUnidadesSugestao(s),
                         0,
                       );
                       const totalPeso = selecionados.reduce(
-                        (sum, s) => sum + obterQuantidadeInteira(s) * (s.peso_bruto || 0),
+                        (sum, s) =>
+                          sum + obterQuantidadeTotalUnidadesSugestao(s) * (s.peso_bruto || 0),
                         0,
                       );
                       const totalValor = selecionados.reduce(
-                        (sum, s) => sum + obterQuantidadeInteira(s) * s.preco_unitario,
+                        (sum, s) => sum + calcularValorTotalSugestao(s),
                         0,
                       );
                       return (
                         <>
-                          <span className="rounded-full bg-white/10 px-2.5 py-1">
-                            📦 <strong className="text-white">{totalQtd}</strong> unidades
+                          <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">
+                            <strong className="text-slate-900">{totalQtd}</strong> unidades
                           </span>
-                          <span className="rounded-full bg-white/10 px-2.5 py-1">
-                            ⚖️ <strong className="text-white">{totalPeso.toFixed(1)} kg</strong>
+                          <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">
+                            <strong className="text-slate-900">{totalPeso.toFixed(1)} kg</strong>
                           </span>
-                          <span className="rounded-full bg-white/10 px-2.5 py-1">
-                            💰{" "}
-                            <strong className="text-white">
+                          <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">
+                            <strong className="text-slate-900">
                               R${" "}
                               {totalValor.toLocaleString("pt-BR", {
                                 minimumFractionDigits: 2,

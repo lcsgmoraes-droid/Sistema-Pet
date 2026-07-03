@@ -1,5 +1,6 @@
 import FornecedorSelector from "../fornecedores/FornecedorSelector";
 import ProductIdentity from "../ui/ProductIdentity";
+import { Check, Lightbulb, Plus, Save, X } from "lucide-react";
 import {
   formatarQuantidadeCompraPedido,
   montarTooltipQuantidadeCompraPedido,
@@ -63,7 +64,7 @@ export default function PedidoCompraFormulario({
   );
   const quantidadePorEmbalagemAtual = normalizarQuantidadePorEmbalagemPedido(
     unidadeCompraAtual,
-    itemForm.quantidade_por_embalagem || produtoSelecionadoItem?.itens_por_caixa || 1,
+    itemForm.quantidade_por_embalagem,
   );
   const itemPreview = {
     quantidade_pedida: itemForm.quantidade_pedida,
@@ -83,20 +84,21 @@ export default function PedidoCompraFormulario({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold">
-          {modoEdicao ? "✏️ Editar Pedido" : "Novo Pedido de Compra"}
+    <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
+        <h2 className="text-xl font-bold text-slate-900">
+          {modoEdicao ? "Editar Pedido" : "Novo Pedido de Compra"}
         </h2>
         <button
           type="button"
           onClick={fecharFormularioPedido}
-          className="text-gray-500 hover:text-gray-700"
+          className="rounded-lg p-2 text-slate-500 transition hover:bg-white hover:text-slate-900"
+          title="Fechar formulario"
         >
-          ✖️
+          <X className="h-5 w-5" />
         </button>
       </div>
-      <form onSubmit={modoEdicao ? editarPedido : handleSubmit} className="space-y-6">
+      <form onSubmit={modoEdicao ? editarPedido : handleSubmit} className="space-y-6 p-6">
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Fornecedor *</label>
@@ -164,11 +166,12 @@ export default function PedidoCompraFormulario({
                 type="button"
                 onClick={abrirFluxoSugestaoInteligente}
                 disabled={loadingPrepararSugestao}
-                className="mt-2 w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-4 py-2 rounded-lg font-semibold hover:from-purple-700 hover:to-indigo-700 transition-all flex items-center justify-center gap-2"
+                className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-teal-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-teal-700 disabled:opacity-60"
               >
+                <Lightbulb className="h-4 w-4" />
                 {loadingPrepararSugestao
                   ? "Verificando rascunho..."
-                  : "💡 Sugestão Inteligente de Pedido"}
+                  : "Sugestao Inteligente de Pedido"}
               </button>
             )}
           </div>
@@ -189,6 +192,7 @@ export default function PedidoCompraFormulario({
           <h3 className="font-semibold mb-4">Itens do Pedido ({formData.itens.length})</h3>
           <div className="grid grid-cols-1 gap-3 mb-4 md:grid-cols-12">
             <div className="relative md:col-span-4">
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Produto</label>
               <input
                 value={produtoTexto}
                 onChange={(e) => {
@@ -257,10 +261,11 @@ export default function PedidoCompraFormulario({
                 )}
             </div>
             <div className="md:col-span-2">
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Qtd. pedida</label>
               <input
                 type="number"
                 step="0.01"
-                placeholder="Quantidade"
+                placeholder="Ex: 2"
                 value={itemForm.quantidade_pedida}
                 onChange={(e) => setItemForm({ ...itemForm, quantidade_pedida: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
@@ -274,61 +279,87 @@ export default function PedidoCompraFormulario({
                 </div>
               )}
             </div>
-            <select
-              value={unidadeCompraAtual}
-              onChange={(e) => {
-                const unidade = e.target.value;
-                const proximaQuantidadePorEmbalagem =
-                  unidade === "UN"
-                    ? "1"
-                    : itemForm.quantidade_por_embalagem ||
-                      produtoSelecionadoItem?.itens_por_caixa ||
-                      "1";
-                setItemForm({
-                  ...itemForm,
-                  unidade_compra: unidade,
-                  quantidade_por_embalagem: proximaQuantidadePorEmbalagem,
-                });
-              }}
-              className="px-4 py-2 border border-gray-300 rounded-lg md:col-span-2"
-              title="Unidade usada para pedir ao fornecedor"
-            >
-              {UNIDADES_COMPRA_OPCOES.map((opcao) => (
-                <option key={opcao.value} value={opcao.value}>
-                  {opcao.label}
-                </option>
-              ))}
-            </select>
-            {itemUsaEmbalagem && (
-              <input
-                type="number"
-                min="1"
-                step="1"
-                placeholder="Unid./emb."
-                value={itemForm.quantidade_por_embalagem}
-                onChange={(e) =>
-                  setItemForm({ ...itemForm, quantidade_por_embalagem: e.target.value })
-                }
-                className="px-4 py-2 border border-gray-300 rounded-lg md:col-span-2"
-                title="Quantas unidades vendaveis vem em cada caixa, fardo ou pacote"
-              />
-            )}
-            <div className={`flex gap-2 ${itemUsaEmbalagem ? "md:col-span-2" : "md:col-span-4"}`}>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="Custo/unid."
-                value={itemForm.preco_unitario}
-                onChange={(e) => setItemForm({ ...itemForm, preco_unitario: e.target.value })}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg"
-              />
-              <button
-                type="button"
-                onClick={adicionarItem}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Unidade</label>
+              <select
+                value={unidadeCompraAtual}
+                onChange={(e) => {
+                  const unidade = e.target.value;
+                  const quantidadeAtual =
+                    itemForm.quantidade_por_embalagem && itemForm.quantidade_por_embalagem !== "1"
+                      ? itemForm.quantidade_por_embalagem
+                      : "";
+                  const proximaQuantidadePorEmbalagem =
+                    unidade === "UN"
+                      ? "1"
+                      : quantidadeAtual || produtoSelecionadoItem?.itens_por_caixa || "";
+                  setItemForm({
+                    ...itemForm,
+                    unidade_compra: unidade,
+                    quantidade_por_embalagem: proximaQuantidadePorEmbalagem,
+                  });
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                title="Unidade usada para pedir ao fornecedor"
               >
-                ➕
-              </button>
+                {UNIDADES_COMPRA_OPCOES.map((opcao) => (
+                  <option key={opcao.value} value={opcao.value}>
+                    {opcao.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {itemUsaEmbalagem && (
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs font-semibold text-slate-600">
+                  Unid. por {unidadeCompraAtual}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="Opcional"
+                    value={itemForm.quantidade_por_embalagem}
+                    onChange={(e) =>
+                      setItemForm({ ...itemForm, quantidade_por_embalagem: e.target.value })
+                    }
+                    className="min-w-0 flex-1 px-4 py-2 border border-gray-300 rounded-lg"
+                    title="Quantas unidades vendaveis vem em cada caixa, fardo ou pacote"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setItemForm({ ...itemForm, quantidade_por_embalagem: "" })}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    title="Deixar a quantidade por embalagem para conferir na entrada da nota"
+                  >
+                    Nao sei
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className={itemUsaEmbalagem ? "md:col-span-2" : "md:col-span-4"}>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">
+                Custo unitario
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="R$"
+                  value={itemForm.preco_unitario}
+                  onChange={(e) => setItemForm({ ...itemForm, preco_unitario: e.target.value })}
+                  className="min-w-0 flex-1 px-4 py-2 border border-gray-300 rounded-lg"
+                />
+                <button
+                  type="button"
+                  onClick={adicionarItem}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                  title="Adicionar item ao pedido"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -339,7 +370,7 @@ export default function PedidoCompraFormulario({
                   <tr>
                     <th className="w-12 px-4 py-2 text-left text-sm font-semibold">#</th>
                     <th className="px-4 py-2 text-left text-sm font-semibold">Produto</th>
-                    <th className="px-4 py-2 text-right text-sm font-semibold">Qtd Compra</th>
+                    <th className="px-4 py-2 text-right text-sm font-semibold">Qtd. pedida</th>
                     <th className="px-4 py-2 text-right text-sm font-semibold">Preço</th>
                     <th className="px-4 py-2 text-right text-sm font-semibold">Total</th>
                     <th className="px-4 py-2"></th>
@@ -429,9 +460,21 @@ export default function PedidoCompraFormulario({
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-3 font-semibold text-white hover:bg-blue-700 disabled:bg-gray-400"
         >
-          {loading ? "⏳ Processando..." : modoEdicao ? "✏️ Salvar Alterações" : "✅ Criar Pedido"}
+          {loading ? (
+            "Processando..."
+          ) : modoEdicao ? (
+            <>
+              <Save className="h-4 w-4" />
+              Salvar alteracoes
+            </>
+          ) : (
+            <>
+              <Check className="h-4 w-4" />
+              Criar Pedido
+            </>
+          )}
         </button>
       </form>
     </div>

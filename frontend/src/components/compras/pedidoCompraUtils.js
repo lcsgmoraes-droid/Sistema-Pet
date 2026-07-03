@@ -57,8 +57,12 @@ export const normalizarQuantidadePorEmbalagemPedido = (unidadeCompra, valor) => 
     return 1;
   }
 
+  if (valor === null || valor === undefined || valor === "") {
+    return null;
+  }
+
   const quantidade = numeroSeguro(valor);
-  return quantidade > 0 ? quantidade : 1;
+  return quantidade > 0 ? quantidade : null;
 };
 
 export const calcularQuantidadeTotalUnidadesPedido = (item = {}) => {
@@ -67,7 +71,7 @@ export const calcularQuantidadeTotalUnidadesPedido = (item = {}) => {
     unidade,
     item.quantidade_por_embalagem,
   );
-  return numeroSeguro(item.quantidade_pedida) * quantidadePorEmbalagem;
+  return numeroSeguro(item.quantidade_pedida) * (quantidadePorEmbalagem || 1);
 };
 
 export const formatarNumeroPedidoCurto = (valor) => {
@@ -87,7 +91,11 @@ export const formatarQuantidadeCompraPedido = (item = {}) => {
     item.quantidade_por_embalagem,
   );
 
-  if (!UNIDADES_COMPRA_COM_EMBALAGEM.has(unidade) || quantidadePorEmbalagem <= 1) {
+  if (
+    !UNIDADES_COMPRA_COM_EMBALAGEM.has(unidade) ||
+    !quantidadePorEmbalagem ||
+    quantidadePorEmbalagem <= 1
+  ) {
     return `${quantidadeTexto} ${unidade}`;
   }
 
@@ -102,7 +110,15 @@ export const montarTooltipQuantidadeCompraPedido = (item = {}) => {
     item.quantidade_por_embalagem,
   );
 
-  if (!UNIDADES_COMPRA_COM_EMBALAGEM.has(unidade) || quantidadePorEmbalagem <= 1) {
+  if (!UNIDADES_COMPRA_COM_EMBALAGEM.has(unidade)) {
+    return "";
+  }
+
+  if (!quantidadePorEmbalagem) {
+    return `Quantidade por ${unidade} ainda nao informada. O pedido sera enviado sem conversao para unidades.`;
+  }
+
+  if (quantidadePorEmbalagem <= 1) {
     return "";
   }
 
@@ -121,7 +137,7 @@ export const normalizarItemPedido = (item = {}) => {
   const quantidadeTotalUnidades =
     quantidadeTotalUnidadesInformada > 0
       ? quantidadeTotalUnidadesInformada
-      : quantidade * quantidadePorEmbalagem;
+      : quantidade * (quantidadePorEmbalagem || 1);
   const preco = numeroSeguro(item.preco_unitario);
   const desconto = numeroSeguro(item.desconto_item);
   const totalInformado = Number(item.total ?? item.valor_total);
@@ -158,7 +174,7 @@ export const consolidarItensPedido = (
     const chave = [
       produtoId,
       normalizado.unidade_compra,
-      normalizado.quantidade_por_embalagem,
+      normalizado.quantidade_por_embalagem ?? "indefinida",
     ].join(":");
 
     if (!Number.isFinite(produtoId) || produtoId <= 0) {
@@ -263,7 +279,8 @@ export const converterPedidoParaFormData = (pedido) => ({
       produto_codigo: item.produto_codigo || item.codigo || item.sku || "",
       quantidade_pedida: item.quantidade_pedida,
       unidade_compra: item.unidade_compra || UNIDADE_COMPRA_PADRAO,
-      quantidade_por_embalagem: item.quantidade_por_embalagem || 1,
+      quantidade_por_embalagem:
+        item.quantidade_por_embalagem ?? (item.unidade_compra === UNIDADE_COMPRA_PADRAO ? 1 : null),
       quantidade_total_unidades: item.quantidade_total_unidades,
       preco_unitario: item.preco_unitario,
       desconto_item: item.desconto_item || 0,

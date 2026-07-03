@@ -1,10 +1,16 @@
 """Montagem de itens da sugestao de compra."""
 
+from math import ceil
 from typing import Optional
 
 from app.pedidos_compra.sugestao_parts.base import (
     _float_seguro_sugestao,
     _round_seguro_sugestao,
+)
+from app.pedidos_compra.quantidades import (
+    UNIDADE_COMPRA_PADRAO,
+    normalizar_quantidade_por_embalagem,
+    normalizar_unidade_compra,
 )
 
 
@@ -59,6 +65,66 @@ def _gerar_observacao(
     return " | ".join(observacoes) if observacoes else "Estoque adequado"
 
 
+def _resolver_embalagem_sugestao(
+    produto, embalagem_historica: Optional[dict] = None
+) -> dict:
+    if embalagem_historica:
+        unidade_historica = normalizar_unidade_compra(
+            embalagem_historica.get("unidade_compra")
+        )
+        return {
+            "unidade_compra": unidade_historica,
+            "quantidade_por_embalagem": normalizar_quantidade_por_embalagem(
+                unidade_historica,
+                embalagem_historica.get("quantidade_por_embalagem"),
+            ),
+            "origem": "historico",
+        }
+
+    itens_por_caixa = normalizar_quantidade_por_embalagem(
+        "CX", getattr(produto, "itens_por_caixa", None)
+    )
+    if itens_por_caixa and itens_por_caixa > 1:
+        return {
+            "unidade_compra": "CX",
+            "quantidade_por_embalagem": itens_por_caixa,
+            "origem": "cadastro_produto",
+        }
+
+    return {
+        "unidade_compra": UNIDADE_COMPRA_PADRAO,
+        "quantidade_por_embalagem": 1,
+        "origem": "unitario",
+    }
+
+
+def _converter_quantidade_sugerida_por_embalagem(
+    quantidade_sugerida: float,
+    unidade_compra: str,
+    quantidade_por_embalagem: Optional[float],
+) -> dict:
+    quantidade_base = max(0, _float_seguro_sugestao(quantidade_sugerida))
+    quantidade_compra = ceil(quantidade_base)
+
+    if unidade_compra == UNIDADE_COMPRA_PADRAO:
+        return {
+            "quantidade_compra": quantidade_compra,
+            "quantidade_total_unidades": quantidade_compra,
+        }
+
+    if quantidade_por_embalagem and quantidade_por_embalagem > 1:
+        quantidade_compra = ceil(quantidade_base / quantidade_por_embalagem)
+        return {
+            "quantidade_compra": quantidade_compra,
+            "quantidade_total_unidades": quantidade_compra * quantidade_por_embalagem,
+        }
+
+    return {
+        "quantidade_compra": quantidade_compra,
+        "quantidade_total_unidades": None,
+    }
+
+
 def _montar_item_sugestao_compra(
     *,
     produto,
@@ -82,6 +148,7 @@ def _montar_item_sugestao_compra(
     tendencia: str,
     preco_unitario: float,
     valor_sugestao: float,
+    embalagem_historica: Optional[dict] = None,
 ) -> dict:
     vendas_janelas = vendas_janelas or {}
     vendas_stats = vendas_stats or {}
@@ -95,6 +162,15 @@ def _montar_item_sugestao_compra(
     dias_estoque = planejamento["dias_estoque"]
     ajuste_ruptura_aplicado = planejamento["ajuste_ruptura_aplicado"]
     motivo_ajuste_ruptura = planejamento["motivo_ajuste_ruptura"]
+    quantidade_sugerida = _round_seguro_sugestao(planejamento["quantidade_sugerida"], 2)
+    embalagem_sugestao = _resolver_embalagem_sugestao(produto, embalagem_historica)
+    unidade_compra_sugerida = embalagem_sugestao["unidade_compra"]
+    quantidade_por_embalagem_sugerida = embalagem_sugestao["quantidade_por_embalagem"]
+    quantidade_convertida = _converter_quantidade_sugerida_por_embalagem(
+        quantidade_sugerida,
+        unidade_compra_sugerida,
+        quantidade_por_embalagem_sugerida,
+    )
 
     return {
         "produto_id": produto.id,
@@ -141,9 +217,14 @@ def _montar_item_sugestao_compra(
         "estoque_para_calculo": _round_seguro_sugestao(
             planejamento["estoque_para_calculo"], 3
         ),
-        "quantidade_sugerida": _round_seguro_sugestao(
-            planejamento["quantidade_sugerida"], 2
-        ),
+        "quantidade_sugerida": quantidade_sugerida,
+        "unidade_compra_sugerida": unidade_compra_sugerida,
+        "quantidade_por_embalagem_sugerida": quantidade_por_embalagem_sugerida,
+        "quantidade_compra_sugerida": quantidade_convertida["quantidade_compra"],
+        "quantidade_total_unidades_sugerida": quantidade_convertida[
+            "quantidade_total_unidades"
+        ],
+        "embalagem_sugestao_origem": embalagem_sugestao["origem"],
         "preco_unitario": _float_seguro_sugestao(preco_unitario),
         "valor_total": _round_seguro_sugestao(valor_sugestao, 2),
         "peso_bruto": _float_seguro_sugestao(

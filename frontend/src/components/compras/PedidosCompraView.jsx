@@ -2,6 +2,7 @@ import PedidoCompraFormulario from "./PedidoCompraFormulario";
 import PedidosCompraFiltros from "./PedidosCompraFiltros";
 import PedidosCompraModalsLayer from "./PedidosCompraModalsLayer";
 import PedidosCompraTabela from "./PedidosCompraTabela";
+import { Plus, X } from "lucide-react";
 
 export default function PedidosCompraView({ controller }) {
   const {
@@ -23,9 +24,12 @@ export default function PedidosCompraView({ controller }) {
     atualizarFiltroPedidos,
     atualizarItemPedido,
     atualizarQuantidadeSugerida,
+    atualizarQuantidadePorEmbalagemSugestao,
+    atualizarUnidadeCompraSugestao,
     buscarSugestoes,
     cabecalhoTabelaSugestaoRef,
     calcularTotal,
+    calcularValorTotalSugestao,
     cancelarPedido,
     carregarDados,
     classeCabecalhoTabelaSugestao,
@@ -64,6 +68,7 @@ export default function PedidosCompraView({ controller }) {
     fornecedorTexto,
     fornecedores,
     fornecedoresOrdenados,
+    formatarQuantidadeCompraSugestao,
     formatarQuantidadeCurta,
     grupoFornecedorAtual,
     grupoFornecedorForm,
@@ -82,9 +87,11 @@ export default function PedidosCompraView({ controller }) {
     marcasFornecedor,
     marcasSelecionadas,
     marcarComoEnviadoManualmente,
+    marcarQuantidadePorEmbalagemDesconhecida,
     modoAplicacaoSugestao,
     modoEdicao,
     montarTooltipGiroSugestao,
+    montarTooltipQuantidadeCompraSugestao,
     mostrarConfronto,
     mostrarFiltroMarcas,
     mostrarForm,
@@ -97,9 +104,11 @@ export default function PedidosCompraView({ controller }) {
     mostrarSugestao,
     mostrarSugestoesProduto,
     numeroSeguro,
+    obterEmbalagemSugestao,
     obterFornecedorPorId,
     obterGrupoDoFornecedor,
     obterQuantidadeInteira,
+    obterQuantidadeTotalUnidadesSugestao,
     obterSkuItemPedido,
     obterVendaJanelaSugestao,
     pedidoConfronto,
@@ -163,7 +172,7 @@ export default function PedidosCompraView({ controller }) {
     <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">🛒 Pedidos de Compra</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Pedidos de Compra</h1>
           <p className="text-gray-600">Gerencie seus pedidos aos fornecedores</p>
         </div>
         <button
@@ -175,9 +184,19 @@ export default function PedidosCompraView({ controller }) {
 
             abrirNovoFormulario();
           }}
-          className="inline-flex items-center gap-2 border border-blue-200 bg-blue-50 text-blue-700 px-5 py-2.5 rounded-lg font-semibold hover:bg-blue-100 transition-colors"
+          className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-5 py-2.5 font-semibold text-blue-700 transition-colors hover:bg-blue-100"
         >
-          {mostrarForm ? "❌ Cancelar" : "➕ Novo Pedido"}
+          {mostrarForm ? (
+            <>
+              <X className="h-4 w-4" />
+              Cancelar
+            </>
+          ) : (
+            <>
+              <Plus className="h-4 w-4" />
+              Novo Pedido
+            </>
+          )}
         </button>
       </div>
 
@@ -326,6 +345,14 @@ export default function PedidosCompraView({ controller }) {
         sugestoes={sugestoes}
         produtosSelecionados={produtosSelecionados}
         obterQuantidadeInteira={obterQuantidadeInteira}
+        obterEmbalagemSugestao={obterEmbalagemSugestao}
+        atualizarUnidadeCompraSugestao={atualizarUnidadeCompraSugestao}
+        atualizarQuantidadePorEmbalagemSugestao={atualizarQuantidadePorEmbalagemSugestao}
+        marcarQuantidadePorEmbalagemDesconhecida={marcarQuantidadePorEmbalagemDesconhecida}
+        formatarQuantidadeCompraSugestao={formatarQuantidadeCompraSugestao}
+        montarTooltipQuantidadeCompraSugestao={montarTooltipQuantidadeCompraSugestao}
+        obterQuantidadeTotalUnidadesSugestao={obterQuantidadeTotalUnidadesSugestao}
+        calcularValorTotalSugestao={calcularValorTotalSugestao}
         modoAplicacaoSugestao={modoAplicacaoSugestao}
         mostrarSoPreenchidos={mostrarSoPreenchidos}
         setMostrarSoPreenchidos={setMostrarSoPreenchidos}

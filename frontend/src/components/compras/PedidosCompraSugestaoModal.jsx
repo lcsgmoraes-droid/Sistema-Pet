@@ -7,8 +7,8 @@ export default function PedidosCompraSugestaoModal(props) {
   if (!mostrarSugestao) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white w-full h-full flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45">
+      <div className="flex h-full w-full flex-col bg-white">
         <PedidosCompraSugestaoHeader {...props} />
         <PedidosCompraSugestaoTable {...props} />
       </div>

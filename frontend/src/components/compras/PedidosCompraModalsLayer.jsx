@@ -83,6 +83,14 @@ export default function PedidosCompraModalsLayer({
   sugestoes,
   produtosSelecionados,
   obterQuantidadeInteira,
+  obterEmbalagemSugestao,
+  atualizarUnidadeCompraSugestao,
+  atualizarQuantidadePorEmbalagemSugestao,
+  marcarQuantidadePorEmbalagemDesconhecida,
+  formatarQuantidadeCompraSugestao,
+  montarTooltipQuantidadeCompraSugestao,
+  obterQuantidadeTotalUnidadesSugestao,
+  calcularValorTotalSugestao,
   modoAplicacaoSugestao,
   mostrarSoPreenchidos,
   setMostrarSoPreenchidos,
@@ -245,6 +253,14 @@ export default function PedidosCompraModalsLayer({
         sugestoes={sugestoes}
         produtosSelecionados={produtosSelecionados}
         obterQuantidadeInteira={obterQuantidadeInteira}
+        obterEmbalagemSugestao={obterEmbalagemSugestao}
+        atualizarUnidadeCompraSugestao={atualizarUnidadeCompraSugestao}
+        atualizarQuantidadePorEmbalagemSugestao={atualizarQuantidadePorEmbalagemSugestao}
+        marcarQuantidadePorEmbalagemDesconhecida={marcarQuantidadePorEmbalagemDesconhecida}
+        formatarQuantidadeCompraSugestao={formatarQuantidadeCompraSugestao}
+        montarTooltipQuantidadeCompraSugestao={montarTooltipQuantidadeCompraSugestao}
+        obterQuantidadeTotalUnidadesSugestao={obterQuantidadeTotalUnidadesSugestao}
+        calcularValorTotalSugestao={calcularValorTotalSugestao}
         modoAplicacaoSugestao={modoAplicacaoSugestao}
         mostrarSoPreenchidos={mostrarSoPreenchidos}
         setMostrarSoPreenchidos={setMostrarSoPreenchidos}
