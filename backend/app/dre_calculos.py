@@ -10,7 +10,7 @@ from .financeiro_models import ContaPagar
 from .vendas_models import Venda, VendaItem
 
 
-def calcular_cmv(db: Session, mes: int, ano: int) -> Decimal:
+def calcular_cmv(db: Session, mes: int, ano: int, tenant_id: str) -> Decimal:
     """
     Calcula o Custo das Mercadorias Vendidas (CMV)
     CMV = Custo real dos produtos vendidos no período
@@ -22,6 +22,7 @@ def calcular_cmv(db: Session, mes: int, ano: int) -> Decimal:
             and_(
                 extract("month", Venda.data_venda) == mes,
                 extract("year", Venda.data_venda) == ano,
+                Venda.tenant_id == tenant_id,
                 Venda.status.in_(["finalizada", "pago_nf", "baixa_parcial"]),
             )
         )
@@ -32,7 +33,14 @@ def calcular_cmv(db: Session, mes: int, ano: int) -> Decimal:
 
     for venda in vendas:
         # Soma o custo de cada item vendido
-        itens = db.query(VendaItem).filter(VendaItem.venda_id == venda.id).all()
+        itens = (
+            db.query(VendaItem)
+            .filter(
+                VendaItem.tenant_id == tenant_id,
+                VendaItem.venda_id == venda.id,
+            )
+            .all()
+        )
 
         for item in itens:
             if item.produto and item.produto.preco_custo:
@@ -42,7 +50,9 @@ def calcular_cmv(db: Session, mes: int, ano: int) -> Decimal:
     return cmv_total
 
 
-def calcular_frete_notas_entrada(db: Session, mes: int, ano: int) -> Decimal:
+def calcular_frete_notas_entrada(
+    db: Session, mes: int, ano: int, tenant_id: str
+) -> Decimal:
     """
     Calcula o total de frete das notas de entrada do período
     O frete é despesa operacional, não CMV
@@ -55,6 +65,7 @@ def calcular_frete_notas_entrada(db: Session, mes: int, ano: int) -> Decimal:
             and_(
                 extract("month", NotaEntrada.data_emissao) == mes,
                 extract("year", NotaEntrada.data_emissao) == ano,
+                NotaEntrada.tenant_id == tenant_id,
             )
         )
         .all()
@@ -68,7 +79,9 @@ def calcular_frete_notas_entrada(db: Session, mes: int, ano: int) -> Decimal:
     return frete_total
 
 
-def obter_despesas_por_categoria(db: Session, mes: int, ano: int) -> dict:
+def obter_despesas_por_categoria(
+    db: Session, mes: int, ano: int, tenant_id: str
+) -> dict:
     """
     Agrupa despesas por categoria
     Categorias principais:
@@ -86,7 +99,11 @@ def obter_despesas_por_categoria(db: Session, mes: int, ano: int) -> dict:
     subcategorias_taxas_ids = [
         s.id
         for s in db.query(DRESubcategoria)
-        .filter(DRESubcategoria.categoria_id == 7, DRESubcategoria.ativo.is_(True))
+        .filter(
+            DRESubcategoria.tenant_id == tenant_id,
+            DRESubcategoria.categoria_id == 7,
+            DRESubcategoria.ativo.is_(True),
+        )
         .all()
     ]
 
@@ -94,7 +111,9 @@ def obter_despesas_por_categoria(db: Session, mes: int, ano: int) -> dict:
     filtros = [
         extract("month", ContaPagar.data_emissao) == mes,
         extract("year", ContaPagar.data_emissao) == ano,
+        ContaPagar.tenant_id == tenant_id,
         ContaPagar.nota_entrada_id.is_(None),  # EXCLUI compras de mercadorias (CMV)
+        ContaPagar.status != "cancelado",
     ]
     if subcategorias_taxas_ids:
         filtros.append(
@@ -177,7 +196,7 @@ def obter_despesas_por_categoria(db: Session, mes: int, ano: int) -> dict:
     return categorias
 
 
-def calcular_taxas_cartao(db: Session, mes: int, ano: int) -> Decimal:
+def calcular_taxas_cartao(db: Session, mes: int, ano: int, tenant_id: str) -> Decimal:
     """
     Calcula o total de taxas de cartão/PIX do período a partir das contas a pagar.
     Usa a categoria_id=7 (Taxas Financeiras) para identificar as subcategorias corretas.
@@ -186,7 +205,11 @@ def calcular_taxas_cartao(db: Session, mes: int, ano: int) -> Decimal:
     subcategorias_taxas = (
         db.query(DRESubcategoria)
         .filter(
-            and_(DRESubcategoria.categoria_id == 7, DRESubcategoria.ativo.is_(True))
+            and_(
+                DRESubcategoria.tenant_id == tenant_id,
+                DRESubcategoria.categoria_id == 7,
+                DRESubcategoria.ativo.is_(True),
+            )
         )
         .all()
     )
@@ -203,6 +226,7 @@ def calcular_taxas_cartao(db: Session, mes: int, ano: int) -> Decimal:
             and_(
                 extract("month", ContaPagar.data_emissao) == mes,
                 extract("year", ContaPagar.data_emissao) == ano,
+                ContaPagar.tenant_id == tenant_id,
                 ContaPagar.dre_subcategoria_id.in_(subcategoria_ids),
                 ContaPagar.status != "cancelado",
             )
