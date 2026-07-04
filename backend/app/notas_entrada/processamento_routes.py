@@ -532,19 +532,26 @@ def processar_entrada_estoque(
 
     # CRIAR CONTAS A PAGAR apÃƒÂ³s processar estoque
     contas_ids = []
-    try:
-        # Buscar dados do XML salvos na nota para pegar duplicatas
-        dados_xml = dados_xml_processamento
-
-        contas_ids = (
-            criar_contas_pagar_da_nota(nota, dados_xml, db, current_user.id, tenant_id)
-            if config.gerar_contas_pagar
-            else []
-        )
-        logger.info(f"Ã°Å¸â€™Â° {len(contas_ids)} contas a pagar criadas")
-    except Exception as e:
-        logger.error(f"Ã¢Å¡Â Ã¯Â¸Â Erro ao criar contas a pagar: {str(e)}")
-        # NÃƒÂ£o abortar o processo, apenas avisar
+    if config.gerar_contas_pagar:
+        try:
+            # Buscar dados do XML salvos na nota para pegar duplicatas
+            dados_xml = dados_xml_processamento
+            contas_ids = criar_contas_pagar_da_nota(
+                nota, dados_xml, db, current_user.id, tenant_id
+            )
+            logger.info(f"Ã°Å¸â€™Â° {len(contas_ids)} contas a pagar criadas")
+        except Exception as exc:
+            db.rollback()
+            logger.exception("Erro ao criar contas a pagar da NF %s", nota.numero_nota)
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Erro ao gerar contas a pagar da NF. "
+                    "Nenhum movimento foi confirmado."
+                ),
+            ) from exc
+    else:
+        logger.info("Geracao de contas a pagar desmarcada para NF %s", nota.numero_nota)
 
     db.commit()
 

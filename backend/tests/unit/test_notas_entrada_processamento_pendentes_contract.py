@@ -72,3 +72,14 @@ def test_processamento_permite_nota_processada_com_acoes_pendentes():
     assert 'detail="Entrada no estoque j' not in source
     assert "Nenhum movimento pendente selecionado" in source
     assert "mesclar_acoes_realizadas_processamento" in source
+
+
+def test_processamento_aborta_quando_financeiro_da_nf_falha():
+    source = read_source("backend/app/notas_entrada/processamento_routes.py")
+    bloco_financeiro = source.split("# CRIAR CONTAS A PAGAR", 1)[1].split(
+        "db.commit()", 1
+    )[0]
+
+    assert "db.rollback()" in bloco_financeiro
+    assert "raise HTTPException" in bloco_financeiro
+    assert "Nao abortar" not in bloco_financeiro
