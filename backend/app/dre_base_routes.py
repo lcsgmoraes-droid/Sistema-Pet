@@ -39,6 +39,8 @@ def gerar_dre(
         raise HTTPException(status_code=400, detail="Mês deve estar entre 1 e 12")
 
     # Nome do mês
+    _current_user, tenant_id = user_and_tenant
+
     meses = [
         "",
         "Janeiro",
@@ -65,6 +67,7 @@ def gerar_dre(
             and_(
                 extract("month", Venda.data_venda) == mes,
                 extract("year", Venda.data_venda) == ano,
+                Venda.tenant_id == tenant_id,
                 Venda.status.in_(["finalizada", "pago_nf", "baixa_parcial"]),
             )
         )
@@ -88,7 +91,7 @@ def gerar_dre(
 
     # ========== 4. CMV ==========
 
-    cmv = calcular_cmv(db, mes, ano)
+    cmv = calcular_cmv(db, mes, ano, tenant_id)
 
     # ========== 5. LUCRO BRUTO ==========
 
@@ -99,10 +102,10 @@ def gerar_dre(
 
     # ========== 6. DESPESAS OPERACIONAIS ==========
 
-    categorias_despesas = obter_despesas_por_categoria(db, mes, ano)
-    taxas_cartao = calcular_taxas_cartao(db, mes, ano)
+    categorias_despesas = obter_despesas_por_categoria(db, mes, ano, tenant_id)
+    taxas_cartao = calcular_taxas_cartao(db, mes, ano, tenant_id)
     frete_compras = calcular_frete_notas_entrada(
-        db, mes, ano
+        db, mes, ano, tenant_id
     )  # Frete de notas de entrada
 
     despesas_pessoal = categorias_despesas["Despesas com Pessoal"]
@@ -186,6 +189,7 @@ def gerar_dre_detalhado(
     """
 
     # Gera o DRE básico
+    _current_user, tenant_id = user_and_tenant
     dre = gerar_dre(ano=ano, mes=mes, db=db, user_and_tenant=user_and_tenant)
 
     # Busca detalhes das despesas (EXCLUINDO fornecedores)
@@ -196,7 +200,9 @@ def gerar_dre_detalhado(
             and_(
                 extract("month", ContaPagar.data_emissao) == mes,  # ✅ Competência
                 extract("year", ContaPagar.data_emissao) == ano,
+                ContaPagar.tenant_id == tenant_id,
                 ContaPagar.fornecedor_id.is_(None),  # EXCLUI pagamentos a fornecedores
+                ContaPagar.status != "cancelado",
             )
         )
         .all()
@@ -221,6 +227,7 @@ def gerar_dre_detalhado(
             and_(
                 extract("month", Venda.data_venda) == mes,
                 extract("year", Venda.data_venda) == ano,
+                Venda.tenant_id == tenant_id,
                 Venda.status.in_(["finalizada", "pago_nf", "baixa_parcial"]),
             )
         )
