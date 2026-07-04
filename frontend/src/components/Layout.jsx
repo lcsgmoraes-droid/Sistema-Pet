@@ -23,6 +23,11 @@ import { useModulos } from "../contexts/ModulosContext";
 import { api } from "../services/api";
 import { useEscapeFallbackForVisibleModals } from "../utils/modalEscape";
 import { isVeterinarioProfile } from "../utils/veterinarioPerfil";
+import {
+  FLOATING_CALCULATOR_ENABLED_KEY,
+  FLOATING_CALCULATOR_PREF_EVENT,
+  isFloatingCalculatorEnabled,
+} from "../utils/floatingCalculatorPreference";
 import FloatingCalculatorButton from "./FloatingCalculatorButton";
 import {
   FAVORITE_DRAG_CLICK_SUPPRESSION_MS,
@@ -173,6 +178,9 @@ const Layout = () => {
   // Estado da calculadora universal
   const [calculadoraAberta, setCalculadoraAberta] = useState(false);
   const [calculadoraModo, setCalculadoraModo] = useState("calcular");
+  const [calculadoraFlutuanteAtiva, setCalculadoraFlutuanteAtiva] = useState(() =>
+    isFloatingCalculatorEnabled(),
+  );
 
   // Contagem de lembretes pendentes para badge dinâmico
   const [lembretesCount, setLembretesCount] = useState(0);
@@ -202,6 +210,24 @@ const Layout = () => {
     { path: "/veterinario/vacinas", label: "Vacinas", icon: Syringe },
     { path: "/veterinario/exames", label: "Exames", icon: FlaskConical },
   ];
+
+  useEffect(() => {
+    const atualizarCalculadoraFlutuante = (event) => {
+      if (event.type === "storage" && event.key !== FLOATING_CALCULATOR_ENABLED_KEY) {
+        return;
+      }
+
+      setCalculadoraFlutuanteAtiva(event.detail?.enabled ?? isFloatingCalculatorEnabled());
+    };
+
+    window.addEventListener(FLOATING_CALCULATOR_PREF_EVENT, atualizarCalculadoraFlutuante);
+    window.addEventListener("storage", atualizarCalculadoraFlutuante);
+
+    return () => {
+      window.removeEventListener(FLOATING_CALCULATOR_PREF_EVENT, atualizarCalculadoraFlutuante);
+      window.removeEventListener("storage", atualizarCalculadoraFlutuante);
+    };
+  }, []);
 
   const neutralizarOverlay = (elementoOverlay) => {
     if (!elementoOverlay) return;
@@ -732,7 +758,7 @@ const Layout = () => {
       </div>
 
       {/* Botão flutuante da calculadora */}
-      {!exibirAtalhosVetMobile && (
+      {calculadoraFlutuanteAtiva && !exibirAtalhosVetMobile && (
         <FloatingCalculatorButton
           onClick={() => {
             console.log("🎯 Layout: Abrindo calculadora...");
