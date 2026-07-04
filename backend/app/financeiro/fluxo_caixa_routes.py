@@ -16,6 +16,7 @@ from app.financeiro.fluxo_caixa_schemas import (
     FluxoCaixaMovimentacao,
     FluxoCaixaResponse,
 )
+from app.tenancy.context import set_current_tenant
 
 router = APIRouter()
 
@@ -43,6 +44,7 @@ def get_fluxo_caixa(
     - agrupamento: 'dia', 'semana' ou 'mes'
     """
     current_user, tenant_id = current_user_and_tenant
+    set_current_tenant(tenant_id)
     from app.vendas_models import Venda
     from app.financeiro_models import (
         ContaPagar,
@@ -176,6 +178,7 @@ def get_fluxo_caixa(
         .filter(
             and_(
                 ContaPagar.user_id == current_user.id,
+                ContaPagar.tenant_id == tenant_id,
                 ContaPagar.data_pagamento >= dt_inicio,
                 ContaPagar.data_pagamento <= dt_fim,
                 ContaPagar.status == "pago",
@@ -206,6 +209,7 @@ def get_fluxo_caixa(
         db.query(LancamentoManual)
         .filter(
             and_(
+                LancamentoManual.tenant_id == tenant_id,
                 LancamentoManual.data_lancamento >= dt_inicio,
                 LancamentoManual.data_lancamento <= dt_fim,
                 LancamentoManual.status == "realizado",
@@ -241,6 +245,7 @@ def get_fluxo_caixa(
         db.query(FluxoCaixa)
         .filter(
             and_(
+                FluxoCaixa.tenant_id == tenant_id,
                 FluxoCaixa.usuario_id == current_user.id,
                 FluxoCaixa.data_movimentacao >= dt_inicio_datetime,
                 FluxoCaixa.data_movimentacao <= dt_fim_datetime,
@@ -256,11 +261,18 @@ def get_fluxo_caixa(
         if fluxo.origem_tipo == "conta_receber" and fluxo.origem_id:
             conta = (
                 db.query(ContaReceber)
-                .filter(ContaReceber.id == fluxo.origem_id)
+                .filter(
+                    ContaReceber.id == fluxo.origem_id,
+                    ContaReceber.tenant_id == tenant_id,
+                )
                 .first()
             )
             if conta and conta.venda_id:
-                venda = db.query(Venda).filter(Venda.id == conta.venda_id).first()
+                venda = (
+                    db.query(Venda)
+                    .filter(Venda.id == conta.venda_id, Venda.tenant_id == tenant_id)
+                    .first()
+                )
                 if venda:
                     numero_venda_fluxo = venda.numero_venda
 
@@ -324,6 +336,7 @@ def get_fluxo_caixa(
         .filter(
             and_(
                 ContaPagar.user_id == current_user.id,
+                ContaPagar.tenant_id == tenant_id,
                 ContaPagar.data_vencimento >= dt_inicio,
                 ContaPagar.data_vencimento <= dt_fim,
                 ContaPagar.status.in_(["pendente", "atrasado"]),
@@ -356,6 +369,7 @@ def get_fluxo_caixa(
         db.query(LancamentoManual)
         .filter(
             and_(
+                LancamentoManual.tenant_id == tenant_id,
                 LancamentoManual.data_lancamento >= dt_inicio,
                 LancamentoManual.data_lancamento <= dt_fim,
                 LancamentoManual.status == "previsto",
@@ -383,6 +397,7 @@ def get_fluxo_caixa(
         db.query(FluxoCaixa)
         .filter(
             and_(
+                FluxoCaixa.tenant_id == tenant_id,
                 FluxoCaixa.usuario_id == current_user.id,
                 FluxoCaixa.data_prevista >= dt_inicio_datetime,
                 FluxoCaixa.data_prevista <= dt_fim_datetime,
@@ -398,11 +413,18 @@ def get_fluxo_caixa(
         if fluxo.origem_tipo == "conta_receber" and fluxo.origem_id:
             conta = (
                 db.query(ContaReceber)
-                .filter(ContaReceber.id == fluxo.origem_id)
+                .filter(
+                    ContaReceber.id == fluxo.origem_id,
+                    ContaReceber.tenant_id == tenant_id,
+                )
                 .first()
             )
             if conta and conta.venda_id:
-                venda = db.query(Venda).filter(Venda.id == conta.venda_id).first()
+                venda = (
+                    db.query(Venda)
+                    .filter(Venda.id == conta.venda_id, Venda.tenant_id == tenant_id)
+                    .first()
+                )
                 if venda:
                     numero_venda_fluxo = venda.numero_venda
 
@@ -430,6 +452,7 @@ def get_fluxo_caixa(
             .filter(
                 and_(
                     Venda.user_id == current_user.id,
+                    Venda.tenant_id == tenant_id,
                     Venda.numero_venda.like(f"%{numero_venda}%"),
                 )
             )
@@ -453,7 +476,10 @@ def get_fluxo_caixa(
                     # Buscar a conta para verificar venda_id
                     conta = (
                         db.query(ContaReceber)
-                        .filter(ContaReceber.id == mov.origem_id)
+                        .filter(
+                            ContaReceber.id == mov.origem_id,
+                            ContaReceber.tenant_id == tenant_id,
+                        )
                         .first()
                     )
                     if conta and conta.venda_id in vendas_ids:
