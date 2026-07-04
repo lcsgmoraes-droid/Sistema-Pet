@@ -120,7 +120,30 @@ def get_fluxo_caixa(
         .all()
     )
 
+    vendas_com_lancamento_manual = set()
+    if vendas:
+        documentos_venda = [f"VENDA-{venda.id}" for venda in vendas]
+        documentos_lancados = (
+            db.query(LancamentoManual.documento)
+            .filter(
+                and_(
+                    LancamentoManual.tenant_id == tenant_id,
+                    LancamentoManual.documento.in_(documentos_venda),
+                )
+            )
+            .all()
+        )
+        vendas_com_lancamento_manual = {
+            int(str(documento).split("-")[1])
+            for (documento,) in documentos_lancados
+            if str(documento or "").startswith("VENDA-")
+            and str(documento).split("-")[1].isdigit()
+        }
+
     for venda in vendas:
+        if venda.id in vendas_com_lancamento_manual:
+            continue
+
         movimentacoes.append(
             FluxoCaixaMovimentacao(
                 data=venda.data_venda.date()

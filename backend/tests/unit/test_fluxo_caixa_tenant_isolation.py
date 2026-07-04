@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
@@ -7,6 +7,7 @@ from app.financeiro.fluxo_caixa_routes import get_fluxo_caixa
 from app.financeiro_models import LancamentoManual
 from app.ia.aba5_models import FluxoCaixa
 from app.tenancy.context import set_current_tenant
+from app.vendas_models import Venda
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -45,6 +46,31 @@ def _criar_lancamento_manual(
     db_session.add(lancamento)
     db_session.flush()
     return lancamento
+
+
+def _criar_venda_finalizada(
+    db_session,
+    *,
+    tenant_id,
+    user_id: int,
+    numero_venda: str,
+    valor: str,
+) -> Venda:
+    set_current_tenant(UUID(str(tenant_id)))
+    venda = Venda(
+        tenant_id=UUID(str(tenant_id)),
+        user_id=user_id,
+        vendedor_id=user_id,
+        numero_venda=numero_venda,
+        subtotal=Decimal(valor),
+        total=Decimal(valor),
+        status="finalizada",
+        data_venda=datetime(2026, 6, 10, 10, 0, 0),
+        canal="loja_fisica",
+    )
+    db_session.add(venda)
+    db_session.flush()
+    return venda
 
 
 def test_fluxo_caixa_filtra_lancamentos_manuais_pelo_tenant(
@@ -122,3 +148,58 @@ def test_fluxo_caixa_filtra_lancamentos_manuais_pelo_tenant(
     assert "Entrada Clinica prevista" not in descricoes
     assert resposta.total_realizado_entradas == 125.0
     assert resposta.total_previsto_entradas == 50.0
+
+
+def test_fluxo_caixa_nao_duplica_venda_quando_existe_lancamento_manual(
+    db_session, tenant_factory, user_factory
+):
+    FluxoCaixa.__table__.create(bind=db_session.get_bind(), checkfirst=True)
+
+    tenant = tenant_factory(nome="Atacadao")
+    usuario = user_factory(tenant_id=tenant.id, email="fluxo.duplicidade@test.com")
+
+    venda_com_lancamento = _criar_venda_finalizada(
+        db_session,
+        tenant_id=tenant.id,
+        user_id=usuario.id,
+        numero_venda="202606100001",
+        valor="100.00",
+    )
+    _criar_lancamento_manual(
+        db_session,
+        tenant_id=tenant.id,
+        user_id=usuario.id,
+        descricao="Venda 202606100001 - A receber",
+        valor="100.00",
+        status="realizado",
+    ).documento = f"VENDA-{venda_com_lancamento.id}"
+
+    venda_sem_lancamento = _criar_venda_finalizada(
+        db_session,
+        tenant_id=tenant.id,
+        user_id=usuario.id,
+        numero_venda="202606100002",
+        valor="80.00",
+    )
+
+    db_session.flush()
+    set_current_tenant(UUID(str(tenant.id)))
+
+    resposta = get_fluxo_caixa(
+        data_inicio="2026-06-01",
+        data_fim="2026-06-30",
+        db=db_session,
+        current_user_and_tenant=(usuario, UUID(str(tenant.id))),
+    )
+
+    movimentos_por_origem = {
+        (mov.origem_tipo, mov.origem_id): mov for mov in resposta.movimentacoes
+    }
+
+    assert ("venda", venda_com_lancamento.id) not in movimentos_por_origem
+    assert any(
+        mov.origem_tipo == "lancamento_manual" and mov.valor == 100.0
+        for mov in resposta.movimentacoes
+    )
+    assert ("venda", venda_sem_lancamento.id) in movimentos_por_origem
+    assert resposta.total_realizado_entradas == 180.0
