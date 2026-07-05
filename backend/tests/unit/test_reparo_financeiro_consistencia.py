@@ -97,6 +97,7 @@ def _session():
                 data_vencimento TEXT NOT NULL,
                 data_recebimento TEXT,
                 status TEXT NOT NULL,
+                conciliado BOOLEAN NOT NULL,
                 eh_parcelado BOOLEAN,
                 numero_parcela INTEGER,
                 total_parcelas INTEGER,
@@ -235,14 +236,15 @@ def _session():
                 id, tenant_id, descricao, cliente_id, forma_pagamento_id,
                 dre_subcategoria_id, canal, valor_original, valor_recebido,
                 valor_final, data_emissao, data_vencimento, status, eh_parcelado,
-                numero_parcela, total_parcelas, venda_id, documento, user_id
+                conciliado, numero_parcela, total_parcelas, venda_id, documento,
+                user_id
             )
             VALUES
-              (20, :tenant, 'parcela 1', 11, 7, 1, 'loja_fisica', 10.01, 0, 10.01, '2026-06-06', '2026-07-06', 'pendente', 1, 1, 3, 2, 'VENDA-2', 99),
-              (21, :tenant, 'parcela 2', 11, 7, 1, 'loja_fisica', 10.01, 0, 10.01, '2026-06-06', '2026-08-05', 'pendente', 1, 2, 3, 2, 'VENDA-2', 99),
-              (22, :tenant, 'parcela 3', 11, 7, 1, 'loja_fisica', 10.01, 0, 10.01, '2026-06-06', '2026-09-04', 'pendente', 1, 3, 3, 2, 'VENDA-2', 99),
-              (30, :tenant, 'recebida 1', 12, 7, 1, 'loja_fisica', 10.01, 10.01, 10.01, '2026-06-07', '2026-06-07', 'recebido', 1, 1, 2, 3, 'VENDA-3', 99),
-              (31, :tenant, 'recebida 2', 12, 7, 1, 'loja_fisica', 10.00, 10.00, 10.00, '2026-06-07', '2026-06-07', 'recebido', 1, 2, 2, 3, 'VENDA-3', 99)
+              (20, :tenant, 'parcela 1', 11, 7, 1, 'loja_fisica', 10.01, 0, 10.01, '2026-06-06', '2026-07-06', 'pendente', 0, 1, 1, 3, 2, 'VENDA-2', 99),
+              (21, :tenant, 'parcela 2', 11, 7, 1, 'loja_fisica', 10.01, 0, 10.01, '2026-06-06', '2026-08-05', 'pendente', 0, 1, 2, 3, 2, 'VENDA-2', 99),
+              (22, :tenant, 'parcela 3', 11, 7, 1, 'loja_fisica', 10.01, 0, 10.01, '2026-06-06', '2026-09-04', 'pendente', 0, 1, 3, 3, 2, 'VENDA-2', 99),
+              (30, :tenant, 'recebida 1', 12, 7, 1, 'loja_fisica', 10.01, 10.01, 10.01, '2026-06-07', '2026-06-07', 'recebido', 0, 1, 1, 2, 3, 'VENDA-3', 99),
+              (31, :tenant, 'recebida 2', 12, 7, 1, 'loja_fisica', 10.00, 10.00, 10.00, '2026-06-07', '2026-06-07', 'recebido', 0, 1, 2, 2, 3, 'VENDA-3', 99)
             """
         ),
         {"tenant": TENANT},
