@@ -96,42 +96,40 @@ def _proxima_data_recorrente(
     return _data_com_dia_seguro(ano_atual, mes_atual, lancamento.dia_vencimento)
 
 
-def _get_lancamento_manual_or_404(
-    db: Session, tenant_id, lancamento_id: int
-) -> LancamentoManual:
+def _get_lancamento_or_404(db: Session, model, tenant_id, lancamento_id: int, detail):
     lancamento = (
-        db.query(LancamentoManual)
+        db.query(model)
         .filter(
-            LancamentoManual.id == lancamento_id,
-            LancamentoManual.tenant_id == tenant_id,
+            model.id == lancamento_id,
+            model.tenant_id == tenant_id,
         )
         .first()
     )
 
     if not lancamento:
-        raise HTTPException(status_code=404, detail="Lançamento não encontrado")
+        raise HTTPException(status_code=404, detail=detail)
 
     return lancamento
+
+
+def _get_lancamento_manual_or_404(
+    db: Session, tenant_id, lancamento_id: int
+) -> LancamentoManual:
+    return _get_lancamento_or_404(
+        db, LancamentoManual, tenant_id, lancamento_id, "Lançamento não encontrado"
+    )
 
 
 def _get_lancamento_recorrente_or_404(
     db: Session, tenant_id, lancamento_id: int
 ) -> LancamentoRecorrente:
-    lancamento = (
-        db.query(LancamentoRecorrente)
-        .filter(
-            LancamentoRecorrente.id == lancamento_id,
-            LancamentoRecorrente.tenant_id == tenant_id,
-        )
-        .first()
+    return _get_lancamento_or_404(
+        db,
+        LancamentoRecorrente,
+        tenant_id,
+        lancamento_id,
+        "Lançamento recorrente não encontrado",
     )
-
-    if not lancamento:
-        raise HTTPException(
-            status_code=404, detail="Lançamento recorrente não encontrado"
-        )
-
-    return lancamento
 
 
 def _aplicar_update_lancamento(lancamento, update_data: dict, normalizar_campo) -> None:

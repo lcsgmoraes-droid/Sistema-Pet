@@ -53,6 +53,11 @@ def test_lancamento_manual_respostas_usam_colunas_existentes():
 
 def test_lancamento_manual_crud_isola_tenant():
     source = _source("app/lancamentos_routes.py")
+    generic_lookup = _function(
+        source,
+        "def _get_lancamento_or_404(",
+        "def _get_lancamento_manual_or_404(",
+    )
     lookup = _function(
         source,
         "def _get_lancamento_manual_or_404(",
@@ -91,8 +96,9 @@ def test_lancamento_manual_crud_isola_tenant():
     )
 
     assert "LancamentoManual.tenant_id == tenant_id" in listar
-    assert "LancamentoManual.id == lancamento_id" in lookup
-    assert "LancamentoManual.tenant_id == tenant_id" in lookup
+    assert ".id == lancamento_id" in generic_lookup
+    assert ".tenant_id == tenant_id" in generic_lookup
+    assert "LancamentoManual" in lookup
     assert "_get_lancamento_manual_or_404(db, tenant_id, lancamento_id)" in obter
     assert "_get_lancamento_manual_or_404(db, tenant_id, lancamento_id)" in atualizar
     assert "_get_lancamento_manual_or_404(db, tenant_id, lancamento_id)" in excluir
@@ -103,6 +109,11 @@ def test_lancamento_manual_crud_isola_tenant():
 
 def test_lancamento_recorrente_crud_e_geracao_isolam_tenant():
     source = _source("app/lancamentos_routes.py")
+    generic_lookup = _function(
+        source,
+        "def _get_lancamento_or_404(",
+        "def _get_lancamento_manual_or_404(",
+    )
     lookup = _function(
         source,
         "def _get_lancamento_recorrente_or_404(",
@@ -134,8 +145,9 @@ def test_lancamento_recorrente_crud_e_geracao_isolam_tenant():
     assert "user_id=current_user.id" in criar
     assert "tenant_id=tenant_id" in criar
     assert "LancamentoRecorrente.tenant_id == tenant_id" in listar
-    assert "LancamentoRecorrente.id == lancamento_id" in lookup
-    assert "LancamentoRecorrente.tenant_id == tenant_id" in lookup
+    assert ".id == lancamento_id" in generic_lookup
+    assert ".tenant_id == tenant_id" in generic_lookup
+    assert "LancamentoRecorrente" in lookup
     assert "_get_lancamento_recorrente_or_404(db, tenant_id, lancamento_id)" in gerar
     assert "_atualizar_lancamento_recorrente_campos(lancamento, update_data)" in source
     assert "_aplicar_update_lancamento(" in update_helper
