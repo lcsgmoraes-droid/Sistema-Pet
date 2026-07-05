@@ -61,7 +61,7 @@ DATA: 2025-01-23
 
 import logging
 from typing import Dict, Any, List, Optional
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
@@ -76,6 +76,24 @@ class ContasReceberService:
     Este serviço é STATELESS e todos os métodos são estáticos.
     Não mantém estado entre chamadas.
     """
+
+    @staticmethod
+    def _distribuir_valor_parcelas(
+        valor_total: Decimal, numero_parcelas: int
+    ) -> List[Decimal]:
+        """Distribui parcelas em centavos preservando exatamente o total."""
+        if numero_parcelas < 1:
+            raise ValueError("numero_parcelas deve ser maior que zero")
+
+        centavo = Decimal("0.01")
+        total = Decimal(str(valor_total)).quantize(centavo, rounding=ROUND_HALF_UP)
+        valor_base = (total / numero_parcelas).quantize(centavo, rounding=ROUND_HALF_UP)
+        parcelas = [valor_base for _ in range(max(numero_parcelas - 1, 0))]
+        ultima = (total - sum(parcelas, Decimal("0.00"))).quantize(
+            centavo, rounding=ROUND_HALF_UP
+        )
+        parcelas.append(ultima)
+        return parcelas
 
     @staticmethod
     def criar_de_venda(
@@ -243,17 +261,19 @@ class ContasReceberService:
             else getattr(pagamento, "valor", 0)
         )
         valor_total = Decimal(str(valor))
-        valor_parcela = valor_total / numero_parcelas
+        valores_parcelas = ContasReceberService._distribuir_valor_parcelas(
+            valor_total, numero_parcelas
+        )
 
         contas_ids = []
         lancamentos_ids = []  # LancamentoManual é gerenciado pelo service.py (não criar aqui)
 
         logger.debug(
-            f"💳 Criando {numero_parcelas} parcelas de R$ {float(valor_parcela):.2f} "
+            f"💳 Criando {numero_parcelas} parcelas "
             f"(Total: R$ {float(valor_total):.2f})"
         )
 
-        for i in range(1, numero_parcelas + 1):
+        for i, valor_parcela in enumerate(valores_parcelas, start=1):
             data_vencimento = date.today() + timedelta(days=30 * i)
 
             # Criar conta a receber
