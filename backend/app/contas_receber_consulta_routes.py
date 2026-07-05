@@ -34,12 +34,12 @@ def listar_contas_receber(
     """
     Lista contas a receber com filtros
     """
-    current_user, _tenant_id = user_and_tenant
+    _current_user, tenant_id = user_and_tenant
 
     query = (
         db.query(ContaReceber)
         .options(joinedload(ContaReceber.categoria))
-        .filter(ContaReceber.user_id == current_user.id)
+        .filter(ContaReceber.tenant_id == tenant_id)
     )
 
     # Filtros
@@ -61,7 +61,7 @@ def listar_contas_receber(
         vendas_ids = (
             db.query(Venda.id)
             .filter(
-                Venda.user_id == current_user.id,
+                Venda.tenant_id == tenant_id,
                 Venda.numero_venda.like(f"%{numero_venda}%"),
             )
             .subquery()
@@ -98,7 +98,14 @@ def listar_contas_receber(
         # Buscar nome do cliente
         cliente_nome = None
         if conta.cliente_id:
-            cliente = db.query(Cliente).filter(Cliente.id == conta.cliente_id).first()
+            cliente = (
+                db.query(Cliente)
+                .filter(
+                    Cliente.id == conta.cliente_id,
+                    Cliente.tenant_id == tenant_id,
+                )
+                .first()
+            )
             if cliente:
                 cliente_nome = cliente.nome
 
@@ -107,7 +114,14 @@ def listar_contas_receber(
         if conta.venda_id:
             from app.vendas_models import Venda
 
-            venda = db.query(Venda).filter(Venda.id == conta.venda_id).first()
+            venda = (
+                db.query(Venda)
+                .filter(
+                    Venda.id == conta.venda_id,
+                    Venda.tenant_id == tenant_id,
+                )
+                .first()
+            )
             if venda:
                 numero_venda = venda.numero_venda
 
@@ -160,12 +174,17 @@ def buscar_conta_receber(
     from .vendas_models import Venda
     from .financeiro_models import ContaBancaria
 
+    _current_user, tenant_id = user_and_tenant
+
     conta = (
         db.query(ContaReceber)
         .options(
             joinedload(ContaReceber.categoria), joinedload(ContaReceber.recebimentos)
         )
-        .filter(ContaReceber.id == conta_id)
+        .filter(
+            ContaReceber.id == conta_id,
+            ContaReceber.tenant_id == tenant_id,
+        )
         .first()
     )
 
@@ -175,21 +194,39 @@ def buscar_conta_receber(
     # Buscar cliente
     cliente = None
     if conta.cliente_id:
-        cliente = db.query(Cliente).filter(Cliente.id == conta.cliente_id).first()
+        cliente = (
+            db.query(Cliente)
+            .filter(
+                Cliente.id == conta.cliente_id,
+                Cliente.tenant_id == tenant_id,
+            )
+            .first()
+        )
 
     # Buscar venda (se houver)
     venda = None
     if conta.venda_id:
-        venda = db.query(Venda).filter(Venda.id == conta.venda_id).first()
+        venda = (
+            db.query(Venda)
+            .filter(
+                Venda.id == conta.venda_id,
+                Venda.tenant_id == tenant_id,
+            )
+            .first()
+        )
 
     # Buscar recebimentos com conta bancÃ¡ria
     recebimentos_detalhados = []
     for r in conta.recebimentos:
         conta_bancaria = None
-        if r.conta_bancaria_id:
+        conta_bancaria_id = getattr(r, "conta_bancaria_id", None)
+        if conta_bancaria_id:
             conta_bancaria = (
                 db.query(ContaBancaria)
-                .filter(ContaBancaria.id == r.conta_bancaria_id)
+                .filter(
+                    ContaBancaria.id == conta_bancaria_id,
+                    ContaBancaria.tenant_id == tenant_id,
+                )
                 .first()
             )
 
@@ -199,7 +236,7 @@ def buscar_conta_receber(
                 "valor": float(r.valor_recebido),
                 "data": r.data_recebimento,
                 "forma_pagamento_id": r.forma_pagamento_id,
-                "conta_bancaria_id": r.conta_bancaria_id,
+                "conta_bancaria_id": conta_bancaria_id,
                 "conta_bancaria_nome": conta_bancaria.nome if conta_bancaria else None,
                 "observacoes": r.observacoes,
             }
@@ -269,12 +306,18 @@ def dashboard_contas_receber(
     """
     Resumo financeiro de contas a receber
     """
+    _current_user, tenant_id = user_and_tenant
     hoje = date.today()
 
     # Total pendente
     total_pendente = (
         db.query(func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido))
-        .filter(ContaReceber.status.in_(["pendente", "parcial", "vencido"]))
+        .filter(
+            and_(
+                ContaReceber.tenant_id == tenant_id,
+                ContaReceber.status.in_(["pendente", "parcial", "vencido"]),
+            )
+        )
         .scalar()
         or 0
     )
@@ -283,7 +326,11 @@ def dashboard_contas_receber(
     total_vencido = (
         db.query(func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido))
         .filter(
-            and_(ContaReceber.status == "pendente", ContaReceber.data_vencimento < hoje)
+            and_(
+                ContaReceber.tenant_id == tenant_id,
+                ContaReceber.status == "pendente",
+                ContaReceber.data_vencimento < hoje,
+            )
         )
         .scalar()
         or 0
@@ -292,7 +339,11 @@ def dashboard_contas_receber(
     count_vencidas = (
         db.query(func.count(ContaReceber.id))
         .filter(
-            and_(ContaReceber.status == "pendente", ContaReceber.data_vencimento < hoje)
+            and_(
+                ContaReceber.tenant_id == tenant_id,
+                ContaReceber.status == "pendente",
+                ContaReceber.data_vencimento < hoje,
+            )
         )
         .scalar()
     )
@@ -302,7 +353,9 @@ def dashboard_contas_receber(
         db.query(func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido))
         .filter(
             and_(
-                ContaReceber.status == "pendente", ContaReceber.data_vencimento == hoje
+                ContaReceber.tenant_id == tenant_id,
+                ContaReceber.status == "pendente",
+                ContaReceber.data_vencimento == hoje,
             )
         )
         .scalar()
@@ -315,6 +368,7 @@ def dashboard_contas_receber(
         db.query(func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido))
         .filter(
             and_(
+                ContaReceber.tenant_id == tenant_id,
                 ContaReceber.status == "pendente",
                 ContaReceber.data_vencimento.between(hoje, data_7dias),
             )
@@ -329,6 +383,7 @@ def dashboard_contas_receber(
         db.query(func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido))
         .filter(
             and_(
+                ContaReceber.tenant_id == tenant_id,
                 ContaReceber.status == "pendente",
                 ContaReceber.data_vencimento.between(hoje, data_30dias),
             )
@@ -343,6 +398,7 @@ def dashboard_contas_receber(
         db.query(func.sum(ContaReceber.valor_recebido))
         .filter(
             and_(
+                ContaReceber.tenant_id == tenant_id,
                 ContaReceber.data_recebimento >= primeiro_dia_mes,
                 ContaReceber.data_recebimento <= hoje,
             )

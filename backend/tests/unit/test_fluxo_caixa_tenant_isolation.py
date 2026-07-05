@@ -4,7 +4,7 @@ from pathlib import Path
 from uuid import UUID
 
 from app.financeiro.fluxo_caixa_routes import get_fluxo_caixa
-from app.financeiro_models import LancamentoManual
+from app.financeiro_models import ContaPagar, LancamentoManual
 from app.ia.aba5_models import FluxoCaixa
 from app.tenancy.context import set_current_tenant
 from app.vendas_models import Venda
@@ -71,6 +71,34 @@ def _criar_venda_finalizada(
     db_session.add(venda)
     db_session.flush()
     return venda
+
+
+def _criar_conta_pagar_pendente(
+    db_session,
+    *,
+    tenant_id,
+    user_id: int,
+    descricao: str,
+    valor: str,
+) -> ContaPagar:
+    set_current_tenant(UUID(str(tenant_id)))
+    conta = ContaPagar(
+        tenant_id=UUID(str(tenant_id)),
+        user_id=user_id,
+        descricao=descricao,
+        valor_original=Decimal(valor),
+        valor_pago=Decimal("0.00"),
+        valor_desconto=Decimal("0.00"),
+        valor_juros=Decimal("0.00"),
+        valor_multa=Decimal("0.00"),
+        valor_final=Decimal(valor),
+        data_emissao=date(2026, 6, 1),
+        data_vencimento=date(2026, 6, 20),
+        status="pendente",
+    )
+    db_session.add(conta)
+    db_session.flush()
+    return conta
 
 
 def test_fluxo_caixa_filtra_lancamentos_manuais_pelo_tenant(
@@ -203,3 +231,48 @@ def test_fluxo_caixa_nao_duplica_venda_quando_existe_lancamento_manual(
     )
     assert ("venda", venda_sem_lancamento.id) in movimentos_por_origem
     assert resposta.total_realizado_entradas == 180.0
+
+
+def test_fluxo_caixa_inclui_contas_pagar_do_tenant_mesmo_de_outro_usuario(
+    db_session, tenant_factory, user_factory
+):
+    FluxoCaixa.__table__.create(bind=db_session.get_bind(), checkfirst=True)
+
+    tenant = tenant_factory(nome="Atacadao")
+    gestor = user_factory(tenant_id=tenant.id, email="gestor.fluxo@test.com")
+    financeiro = user_factory(tenant_id=tenant.id, email="financeiro.fluxo@test.com")
+    outro_tenant = tenant_factory(nome="Clinica Sao Jose")
+    usuario_outro = user_factory(
+        tenant_id=outro_tenant.id, email="financeiro.outro@test.com"
+    )
+
+    conta_tenant = _criar_conta_pagar_pendente(
+        db_session,
+        tenant_id=tenant.id,
+        user_id=financeiro.id,
+        descricao="Fornecedor do Atacadao",
+        valor="321.45",
+    )
+    _criar_conta_pagar_pendente(
+        db_session,
+        tenant_id=outro_tenant.id,
+        user_id=usuario_outro.id,
+        descricao="Fornecedor de outro tenant",
+        valor="999.99",
+    )
+
+    set_current_tenant(UUID(str(tenant.id)))
+    resposta = get_fluxo_caixa(
+        data_inicio="2026-06-01",
+        data_fim="2026-06-30",
+        db=db_session,
+        current_user_and_tenant=(gestor, UUID(str(tenant.id))),
+    )
+
+    movimentos_por_origem = {
+        (mov.origem_tipo, mov.origem_id): mov for mov in resposta.movimentacoes
+    }
+
+    assert ("conta_pagar", conta_tenant.id) in movimentos_por_origem
+    assert movimentos_por_origem[("conta_pagar", conta_tenant.id)].valor == 321.45
+    assert all(mov.valor != 999.99 for mov in resposta.movimentacoes)

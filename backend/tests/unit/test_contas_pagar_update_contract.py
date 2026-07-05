@@ -54,7 +54,10 @@ def test_registrar_pagamento_normaliza_valores_antigos_e_respeita_tenant():
     assert (
         "conta.valor_pago = _decimal_monetario(conta.valor_pago)" in registrar_pagamento
     )
-    assert "valor_centavos = _valor_reais_para_centavos" in registrar_pagamento
+    assert "_valor_reais_para_centavos" not in registrar_pagamento
+    assert "valor_centavos" not in registrar_pagamento
+    assert "valor=valor_total_pagamento" in registrar_pagamento
+    assert "conta_bancaria.saldo_atual -= valor_total_pagamento" in registrar_pagamento
 
 
 def test_registrar_pagamento_valida_forma_pagamento_do_tenant_antes_de_gravar():

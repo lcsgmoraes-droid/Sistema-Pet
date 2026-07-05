@@ -101,11 +101,6 @@ def listar_contas(
 
     contas = query.order_by(ContaBancaria.nome).all()
 
-    # Converter saldos (centavos → reais) - force float para JSON
-    for conta in contas:
-        conta.saldo_inicial = float(conta.saldo_inicial) / 100
-        conta.saldo_atual = float(conta.saldo_atual) / 100
-
     return contas
 
 
@@ -127,10 +122,6 @@ def obter_conta(
 
     if not conta:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
-
-    # Converter saldos (centavos → reais) - force float para JSON
-    conta.saldo_inicial = float(conta.saldo_inicial) / 100
-    conta.saldo_atual = float(conta.saldo_atual) / 100
 
     return conta
 
@@ -172,8 +163,7 @@ def criar_conta(
                 status_code=400, detail="Já existe uma conta com este nome"
             )
 
-        # Converter saldo (reais → centavos) usando Decimal para compatibilidade com Numeric
-        # CORREÇÃO: Não multiplicar por 100 - o banco já aceita decimal direto
+        # Saldo é armazenado em reais usando Decimal para compatibilidade com Numeric.
         saldo_decimal = Decimal(str(conta_data.saldo_inicial))
 
         # CORREÇÃO CRÍTICA: Garantir que user_id não seja None
@@ -213,6 +203,7 @@ def criar_conta(
                 origem_tipo="abertura_conta",
                 status="realizado",
                 descricao=f"Saldo inicial da conta {nova_conta.nome}",
+                user_id=user_id,
                 tenant_id=tenant_id,
             )
             db.add(movimentacao)
@@ -272,10 +263,6 @@ def atualizar_conta(
         db.commit()
         db.refresh(conta)
 
-        # Converter saldos (centavos → reais) - force float para JSON
-        conta.saldo_inicial = float(conta.saldo_inicial) / 100
-        conta.saldo_atual = float(conta.saldo_atual) / 100
-
         print(f"[DEBUG] Conta {conta_id} atualizada com sucesso")
         return conta
 
@@ -315,7 +302,12 @@ def excluir_conta(
     # Verificar se tem movimentações
     tem_movimentacoes = (
         db.query(MovimentacaoFinanceira)
-        .filter(MovimentacaoFinanceira.conta_bancaria_id == conta_id)
+        .filter(
+            and_(
+                MovimentacaoFinanceira.conta_bancaria_id == conta_id,
+                MovimentacaoFinanceira.tenant_id == tenant_id,
+            )
+        )
         .count()
         > 0
     )
@@ -353,12 +345,11 @@ def ajustar_saldo(
     if not conta:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
 
-    # Converter novo saldo (reais → centavos) usando Decimal
-    novo_saldo_centavos = Decimal(str(ajuste.novo_saldo * 100))
-    saldo_atual_centavos = conta.saldo_atual
+    novo_saldo = Decimal(str(ajuste.novo_saldo)).quantize(Decimal("0.01"))
+    saldo_atual = Decimal(str(conta.saldo_atual or 0)).quantize(Decimal("0.01"))
 
     # Calcular diferença
-    diferenca = novo_saldo_centavos - saldo_atual_centavos
+    diferenca = novo_saldo - saldo_atual
 
     if diferenca == 0:
         raise HTTPException(status_code=400, detail="Novo saldo é igual ao saldo atual")
@@ -376,22 +367,23 @@ def ajustar_saldo(
         origem_tipo="ajuste_manual",
         status="realizado",
         descricao=f"Ajuste de saldo: {ajuste.descricao}",
+        user_id=current_user.id,
         tenant_id=tenant_id,
     )
 
     db.add(movimentacao)
 
     # Atualizar saldo da conta
-    conta.saldo_atual = novo_saldo_centavos
+    conta.saldo_atual = novo_saldo
 
     db.commit()
     db.refresh(conta)
 
     return {
         "message": "Saldo ajustado com sucesso",
-        "saldo_anterior": float(saldo_atual_centavos) / 100,
-        "saldo_novo": float(novo_saldo_centavos) / 100,
-        "diferenca": float(diferenca) / 100,
+        "saldo_anterior": float(saldo_atual),
+        "saldo_novo": float(novo_saldo),
+        "diferenca": float(diferenca),
         "movimentacao_id": movimentacao.id,
     }
 
@@ -423,7 +415,10 @@ def listar_movimentacoes(
 
     # Buscar movimentações
     query = db.query(MovimentacaoFinanceira).filter(
-        MovimentacaoFinanceira.conta_bancaria_id == conta_id
+        and_(
+            MovimentacaoFinanceira.conta_bancaria_id == conta_id,
+            MovimentacaoFinanceira.tenant_id == tenant_id,
+        )
     )
 
     if tipo:
@@ -438,10 +433,6 @@ def listar_movimentacoes(
         .limit(limit)
         .all()
     )
-
-    # Converter valores (centavos → reais) - force float para JSON
-    for mov in movimentacoes:
-        mov.valor = float(mov.valor) / 100
 
     return movimentacoes
 
@@ -469,7 +460,7 @@ def resumo_saldos(
     }
 
     for conta in contas:
-        saldo_reais = float(conta.saldo_atual) / 100
+        saldo_reais = float(conta.saldo_atual or 0)
         resumo["total_geral"] += saldo_reais
 
         # Usar get para evitar KeyError com tipos não mapeados
