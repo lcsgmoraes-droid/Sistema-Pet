@@ -25,7 +25,7 @@ async def processar_recorrencias_contas_receber(
     Processa contas recorrentes e cria novas contas quando necessÃ¡rio
     Esta rota deve ser executada periodicamente (diariamente recomendado)
     """
-    _current_user, _tenant_id = user_and_tenant
+    current_user, tenant_id = user_and_tenant
     hoje = date.today()
     contas_criadas = []
 
@@ -35,6 +35,7 @@ async def processar_recorrencias_contas_receber(
         .filter(
             and_(
                 ContaReceber.eh_recorrente.is_(True),
+                ContaReceber.tenant_id == tenant_id,
                 ContaReceber.proxima_recorrencia <= hoje,
                 or_(
                     ContaReceber.data_fim_recorrencia.is_(None),
@@ -52,7 +53,10 @@ async def processar_recorrencias_contas_receber(
                 # Contar quantas contas jÃ¡ foram geradas
                 count_geradas = (
                     db.query(func.count(ContaReceber.id))
-                    .filter(ContaReceber.conta_recorrencia_origem_id == conta_origem.id)
+                    .filter(
+                        ContaReceber.conta_recorrencia_origem_id == conta_origem.id,
+                        ContaReceber.tenant_id == tenant_id,
+                    )
                     .scalar()
                 )
 
@@ -80,9 +84,11 @@ async def processar_recorrencias_contas_receber(
                 observacoes=f"Gerada automaticamente da recorrÃªncia #{conta_origem.id}",
                 conta_recorrencia_origem_id=conta_origem.id,
                 user_id=conta_origem.user_id,
+                tenant_id=tenant_id,
             )
 
             db.add(nova_conta)
+            db.flush()
             contas_criadas.append(nova_conta)
 
             # Atualizar prÃ³xima recorrÃªncia da conta origem
@@ -99,12 +105,14 @@ async def processar_recorrencias_contas_receber(
                     valor=nova_conta.valor_original,
                     descricao=nova_conta.descricao,
                     data_lancamento=hoje,
-                    data_prevista=nova_data_vencimento,
-                    data_efetivacao=None,
+                    data_competencia=nova_data_vencimento,
                     categoria_id=nova_conta.categoria_id,
                     status="previsto",
+                    documento=f"CONTA-RECEBER-{nova_conta.id}",
                     observacoes=f"Gerado automaticamente da recorrÃªncia #{conta_origem.id}",
                     gerado_automaticamente=True,
+                    user_id=current_user.id,
+                    tenant_id=tenant_id,
                 )
                 db.add(lancamento)
             except Exception as e:
