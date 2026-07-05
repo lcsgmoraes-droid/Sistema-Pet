@@ -2,10 +2,12 @@
 Rotas para Lançamentos Manuais e Recorrentes do Fluxo de Caixa
 """
 
+import calendar
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import Optional, List
 from pydantic import BaseModel
 from decimal import Decimal
@@ -23,6 +25,44 @@ from .financeiro_models import (
 )
 
 router = APIRouter(prefix="/lancamentos", tags=["Lançamentos"])
+
+
+def _parse_date(value: Optional[str]) -> Optional[date]:
+    if not value:
+        return None
+    return datetime.strptime(value, "%Y-%m-%d").date()
+
+
+def _realizado_em_from_date(value: Optional[date]) -> Optional[datetime]:
+    if not value:
+        return None
+    return datetime.combine(value, datetime.min.time())
+
+
+def _format_date(value) -> Optional[str]:
+    if not value:
+        return None
+    return value.isoformat()
+
+
+def _format_datetime(value) -> str:
+    if not value:
+        return ""
+    return value.isoformat()
+
+
+def _base_recorrencia(lancamento: LancamentoRecorrente) -> date:
+    if not lancamento.ultimo_mes_gerado:
+        return lancamento.data_inicio
+
+    if isinstance(lancamento.ultimo_mes_gerado, date):
+        return lancamento.ultimo_mes_gerado
+
+    ultimo_mes = str(lancamento.ultimo_mes_gerado)
+    if len(ultimo_mes) == 7:
+        return datetime.strptime(f"{ultimo_mes}-01", "%Y-%m-%d").date()
+
+    return datetime.strptime(ultimo_mes[:10], "%Y-%m-%d").date()
 
 
 # ============= SCHEMAS =============
@@ -160,18 +200,14 @@ def criar_lancamento_manual(
             status_code=400, detail="Status deve ser 'previsto' ou 'realizado'"
         )
 
-    # Converter datas
-    data_lancamento = datetime.strptime(lancamento.data_lancamento, "%Y-%m-%d").date()
-    data_prevista = (
-        datetime.strptime(lancamento.data_prevista, "%Y-%m-%d").date()
-        if lancamento.data_prevista
-        else None
+    # Converter datas da API legada para as colunas atuais do modelo
+    data_lancamento = _parse_date(lancamento.data_lancamento)
+    data_prevista = _parse_date(lancamento.data_prevista)
+    data_efetivacao = _parse_date(lancamento.data_efetivacao)
+    data_realizacao = data_efetivacao or (
+        data_lancamento if lancamento.status == "realizado" else None
     )
-    data_efetivacao = (
-        datetime.strptime(lancamento.data_efetivacao, "%Y-%m-%d").date()
-        if lancamento.data_efetivacao
-        else None
-    )
+    realizado_em = _realizado_em_from_date(data_realizacao)
 
     # Criar lançamento
     novo_lancamento = LancamentoManual(
@@ -179,14 +215,16 @@ def criar_lancamento_manual(
         valor=Decimal(str(lancamento.valor)),
         descricao=lancamento.descricao,
         data_lancamento=data_lancamento,
-        data_prevista=data_prevista,
-        data_efetivacao=data_efetivacao,
+        data_competencia=data_prevista or data_lancamento,
+        realizado_em=realizado_em,
         categoria_id=lancamento.categoria_id,
         conta_bancaria_id=lancamento.conta_bancaria_id,
         status=lancamento.status,
         observacoes=lancamento.observacoes,
         gerado_automaticamente=lancamento.gerado_automaticamente,
         confianca_ia=lancamento.confianca_ia,
+        user_id=current_user.id,
+        tenant_id=tenant_id,
     )
 
     db.add(novo_lancamento)
@@ -207,12 +245,13 @@ def criar_lancamento_manual(
                 else Decimal("0"),
                 data_emissao=data_lancamento,
                 data_vencimento=data_prevista or data_lancamento,
-                data_pagamento=data_efetivacao
+                data_pagamento=data_realizacao
                 if lancamento.status == "realizado"
                 else None,
                 status="pago" if lancamento.status == "realizado" else "pendente",
                 observacoes=f"Gerado automaticamente do lançamento manual #{novo_lancamento.id}. {lancamento.observacoes or ''}",
                 user_id=current_user.id,
+                tenant_id=tenant_id,
             )
             db.add(conta_pagar)
 
@@ -230,12 +269,13 @@ def criar_lancamento_manual(
                 else Decimal("0"),
                 data_emissao=data_lancamento,
                 data_vencimento=data_prevista or data_lancamento,
-                data_recebimento=data_efetivacao
+                data_recebimento=data_realizacao
                 if lancamento.status == "realizado"
                 else None,
                 status="recebido" if lancamento.status == "realizado" else "pendente",
                 observacoes=f"Gerado automaticamente do lançamento manual #{novo_lancamento.id}. {lancamento.observacoes or ''}",
                 user_id=current_user.id,
+                tenant_id=tenant_id,
             )
             db.add(conta_receber)
 
@@ -261,9 +301,9 @@ def listar_lancamentos_manuais(
     auth=Depends(get_current_user_and_tenant),
 ):
     """Listar lançamentos manuais com filtros"""
-    current_user, tenant_id = auth
+    _current_user, tenant_id = auth
 
-    query = db.query(LancamentoManual)
+    query = db.query(LancamentoManual).filter(LancamentoManual.tenant_id == tenant_id)
 
     # Aplicar filtros
     if data_inicio:
@@ -300,10 +340,15 @@ def obter_lancamento_manual(
     auth=Depends(get_current_user_and_tenant),
 ):
     """Obter detalhes de um lançamento manual"""
-    current_user, tenant_id = auth
+    _current_user, tenant_id = auth
 
     lancamento = (
-        db.query(LancamentoManual).filter(LancamentoManual.id == lancamento_id).first()
+        db.query(LancamentoManual)
+        .filter(
+            LancamentoManual.id == lancamento_id,
+            LancamentoManual.tenant_id == tenant_id,
+        )
+        .first()
     )
 
     if not lancamento:
@@ -320,10 +365,15 @@ def atualizar_lancamento_manual(
     auth=Depends(get_current_user_and_tenant),
 ):
     """Atualizar lançamento manual"""
-    current_user, tenant_id = auth
+    _current_user, tenant_id = auth
 
     lancamento = (
-        db.query(LancamentoManual).filter(LancamentoManual.id == lancamento_id).first()
+        db.query(LancamentoManual)
+        .filter(
+            LancamentoManual.id == lancamento_id,
+            LancamentoManual.tenant_id == tenant_id,
+        )
+        .first()
     )
 
     if not lancamento:
@@ -333,13 +383,22 @@ def atualizar_lancamento_manual(
     update_data = lancamento_update.model_dump(exclude_unset=True)
 
     for field, value in update_data.items():
-        if field in ["data_lancamento", "data_prevista", "data_efetivacao"] and value:
-            value = datetime.strptime(value, "%Y-%m-%d").date()
+        if field == "data_lancamento":
+            value = _parse_date(value)
+        elif field == "data_prevista":
+            lancamento.data_competencia = _parse_date(value)
+            continue
+        elif field == "data_efetivacao":
+            lancamento.realizado_em = _realizado_em_from_date(_parse_date(value))
+            continue
         elif field == "valor" and value:
             value = Decimal(str(value))
         setattr(lancamento, field, value)
 
-    lancamento.atualizado_em = datetime.utcnow()
+    if lancamento.status == "realizado" and not lancamento.realizado_em:
+        lancamento.realizado_em = datetime.utcnow()
+
+    lancamento.updated_at = datetime.utcnow()
 
     db.commit()
     db.refresh(lancamento)
@@ -354,10 +413,15 @@ def excluir_lancamento_manual(
     auth=Depends(get_current_user_and_tenant),
 ):
     """Excluir lançamento manual"""
-    current_user, tenant_id = auth
+    _current_user, tenant_id = auth
 
     lancamento = (
-        db.query(LancamentoManual).filter(LancamentoManual.id == lancamento_id).first()
+        db.query(LancamentoManual)
+        .filter(
+            LancamentoManual.id == lancamento_id,
+            LancamentoManual.tenant_id == tenant_id,
+        )
+        .first()
     )
 
     if not lancamento:
@@ -394,12 +458,8 @@ def criar_lancamento_recorrente(
         )
 
     # Converter datas
-    data_inicio = datetime.strptime(lancamento.data_inicio, "%Y-%m-%d").date()
-    data_fim = (
-        datetime.strptime(lancamento.data_fim, "%Y-%m-%d").date()
-        if lancamento.data_fim
-        else None
-    )
+    data_inicio = _parse_date(lancamento.data_inicio)
+    data_fim = _parse_date(lancamento.data_fim)
 
     # Criar lançamento recorrente
     novo_lancamento = LancamentoRecorrente(
@@ -412,10 +472,12 @@ def criar_lancamento_recorrente(
         dia_vencimento=lancamento.dia_vencimento,
         data_inicio=data_inicio,
         data_fim=data_fim,
-        gerar_automaticamente=lancamento.gerar_automaticamente,
+        ativo=lancamento.gerar_automaticamente,
         gerar_com_antecedencia_dias=lancamento.gerar_com_antecedencia_dias,
         permite_ajuste_ia=lancamento.permite_ajuste_ia,
         observacoes=lancamento.observacoes,
+        user_id=current_user.id,
+        tenant_id=tenant_id,
     )
 
     db.add(novo_lancamento)
@@ -434,9 +496,11 @@ def listar_lancamentos_recorrentes(
     auth=Depends(get_current_user_and_tenant),
 ):
     """Listar lançamentos recorrentes"""
-    current_user, tenant_id = auth
+    _current_user, tenant_id = auth
 
-    query = db.query(LancamentoRecorrente)
+    query = db.query(LancamentoRecorrente).filter(
+        LancamentoRecorrente.tenant_id == tenant_id
+    )
 
     if tipo:
         query = query.filter(LancamentoRecorrente.tipo == tipo)
@@ -462,11 +526,14 @@ def obter_lancamento_recorrente(
     auth=Depends(get_current_user_and_tenant),
 ):
     """Obter detalhes de um lançamento recorrente"""
-    current_user, tenant_id = auth
+    _current_user, tenant_id = auth
 
     lancamento = (
         db.query(LancamentoRecorrente)
-        .filter(LancamentoRecorrente.id == lancamento_id)
+        .filter(
+            LancamentoRecorrente.id == lancamento_id,
+            LancamentoRecorrente.tenant_id == tenant_id,
+        )
         .first()
     )
 
@@ -486,11 +553,14 @@ def atualizar_lancamento_recorrente(
     auth=Depends(get_current_user_and_tenant),
 ):
     """Atualizar lançamento recorrente"""
-    current_user, tenant_id = auth
+    _current_user, tenant_id = auth
 
     lancamento = (
         db.query(LancamentoRecorrente)
-        .filter(LancamentoRecorrente.id == lancamento_id)
+        .filter(
+            LancamentoRecorrente.id == lancamento_id,
+            LancamentoRecorrente.tenant_id == tenant_id,
+        )
         .first()
     )
 
@@ -504,12 +574,14 @@ def atualizar_lancamento_recorrente(
 
     for field, value in update_data.items():
         if field in ["data_inicio", "data_fim"] and value:
-            value = datetime.strptime(value, "%Y-%m-%d").date()
+            value = _parse_date(value)
         elif field == "valor_medio" and value:
             value = Decimal(str(value))
+        elif field == "gerar_automaticamente":
+            field = "ativo"
         setattr(lancamento, field, value)
 
-    lancamento.atualizado_em = datetime.utcnow()
+    lancamento.updated_at = datetime.utcnow()
 
     db.commit()
     db.refresh(lancamento)
@@ -524,11 +596,14 @@ def excluir_lancamento_recorrente(
     auth=Depends(get_current_user_and_tenant),
 ):
     """Excluir lançamento recorrente"""
-    current_user, tenant_id = auth
+    _current_user, tenant_id = auth
 
     lancamento = (
         db.query(LancamentoRecorrente)
-        .filter(LancamentoRecorrente.id == lancamento_id)
+        .filter(
+            LancamentoRecorrente.id == lancamento_id,
+            LancamentoRecorrente.tenant_id == tenant_id,
+        )
         .first()
     )
 
@@ -555,7 +630,10 @@ def gerar_proximas_parcelas(
 
     lancamento = (
         db.query(LancamentoRecorrente)
-        .filter(LancamentoRecorrente.id == lancamento_id)
+        .filter(
+            LancamentoRecorrente.id == lancamento_id,
+            LancamentoRecorrente.tenant_id == tenant_id,
+        )
         .first()
     )
 
@@ -570,10 +648,7 @@ def gerar_proximas_parcelas(
         )
 
     # Determinar data inicial para geração
-    if lancamento.ultimo_mes_gerado:
-        data_inicial = lancamento.ultimo_mes_gerado
-    else:
-        data_inicial = lancamento.data_inicio
+    data_inicial = _base_recorrencia(lancamento)
 
     parcelas_criadas = []
 
@@ -589,12 +664,19 @@ def gerar_proximas_parcelas(
                 ano_atual += 1
 
             # Ajustar dia se necessário
-            import calendar
-
             ultimo_dia_mes = calendar.monthrange(ano_atual, mes_atual)[1]
             dia = min(lancamento.dia_vencimento, ultimo_dia_mes)
 
             proxima_data = datetime(ano_atual, mes_atual, dia).date()
+        elif lancamento.frequencia == "semanal":
+            proxima_data = data_inicial + timedelta(weeks=i)
+        elif lancamento.frequencia == "anual":
+            ano_atual = data_inicial.year + i
+            ultimo_dia_mes = calendar.monthrange(ano_atual, data_inicial.month)[1]
+            dia = min(lancamento.dia_vencimento, ultimo_dia_mes)
+            proxima_data = date(ano_atual, data_inicial.month, dia)
+        else:
+            raise HTTPException(status_code=400, detail="FrequÃªncia invÃ¡lida")
 
         # Verificar se já passou da data_fim
         if lancamento.data_fim and proxima_data > lancamento.data_fim:
@@ -605,7 +687,8 @@ def gerar_proximas_parcelas(
             db.query(LancamentoManual)
             .filter(
                 and_(
-                    LancamentoManual.descricao.like(f"%{lancamento.descricao}%"),
+                    LancamentoManual.tenant_id == tenant_id,
+                    LancamentoManual.lancamento_recorrente_id == lancamento.id,
                     LancamentoManual.data_lancamento == proxima_data,
                 )
             )
@@ -619,11 +702,14 @@ def gerar_proximas_parcelas(
                 valor=lancamento.valor_medio,
                 descricao=f"{lancamento.descricao} - {proxima_data.strftime('%m/%Y')}",
                 data_lancamento=proxima_data,
-                data_prevista=proxima_data,
+                data_competencia=proxima_data,
                 categoria_id=lancamento.categoria_id,
                 conta_bancaria_id=lancamento.conta_bancaria_id,
                 status="previsto",
                 gerado_automaticamente=True,
+                lancamento_recorrente_id=lancamento.id,
+                user_id=current_user.id,
+                tenant_id=tenant_id,
                 observacoes=f"Gerado automaticamente de lançamento recorrente #{lancamento.id}",
             )
 
@@ -633,7 +719,7 @@ def gerar_proximas_parcelas(
     # Atualizar último_mes_gerado
     if parcelas_criadas:
         ultima_data = max(p.data_lancamento for p in parcelas_criadas)
-        lancamento.ultimo_mes_gerado = ultima_data
+        lancamento.ultimo_mes_gerado = ultima_data.strftime("%Y-%m")
 
     db.commit()
 
@@ -655,7 +741,10 @@ def _build_lancamento_manual_response(
     if lancamento.categoria_id:
         categoria = (
             db.query(CategoriaFinanceira)
-            .filter(CategoriaFinanceira.id == lancamento.categoria_id)
+            .filter(
+                CategoriaFinanceira.id == lancamento.categoria_id,
+                CategoriaFinanceira.tenant_id == lancamento.tenant_id,
+            )
             .first()
         )
         if categoria:
@@ -665,7 +754,10 @@ def _build_lancamento_manual_response(
     if lancamento.conta_bancaria_id:
         conta = (
             db.query(ContaBancaria)
-            .filter(ContaBancaria.id == lancamento.conta_bancaria_id)
+            .filter(
+                ContaBancaria.id == lancamento.conta_bancaria_id,
+                ContaBancaria.tenant_id == lancamento.tenant_id,
+            )
             .first()
         )
         if conta:
@@ -677,11 +769,9 @@ def _build_lancamento_manual_response(
         "valor": float(lancamento.valor),
         "descricao": lancamento.descricao,
         "data_lancamento": lancamento.data_lancamento.isoformat(),
-        "data_prevista": lancamento.data_prevista.isoformat()
-        if lancamento.data_prevista
-        else None,
-        "data_efetivacao": lancamento.data_efetivacao.isoformat()
-        if lancamento.data_efetivacao
+        "data_prevista": _format_date(lancamento.data_competencia),
+        "data_efetivacao": _format_date(lancamento.realizado_em.date())
+        if lancamento.realizado_em
         else None,
         "categoria_id": lancamento.categoria_id,
         "categoria_nome": categoria_nome,
@@ -691,8 +781,8 @@ def _build_lancamento_manual_response(
         "observacoes": lancamento.observacoes,
         "gerado_automaticamente": lancamento.gerado_automaticamente,
         "confianca_ia": lancamento.confianca_ia,
-        "criado_em": lancamento.criado_em.isoformat(),
-        "atualizado_em": lancamento.atualizado_em.isoformat(),
+        "criado_em": _format_datetime(lancamento.created_at),
+        "atualizado_em": _format_datetime(lancamento.updated_at),
     }
 
 
@@ -705,7 +795,10 @@ def _build_lancamento_recorrente_response(
     if lancamento.categoria_id:
         categoria = (
             db.query(CategoriaFinanceira)
-            .filter(CategoriaFinanceira.id == lancamento.categoria_id)
+            .filter(
+                CategoriaFinanceira.id == lancamento.categoria_id,
+                CategoriaFinanceira.tenant_id == lancamento.tenant_id,
+            )
             .first()
         )
         if categoria:
@@ -715,7 +808,10 @@ def _build_lancamento_recorrente_response(
     if lancamento.conta_bancaria_id:
         conta = (
             db.query(ContaBancaria)
-            .filter(ContaBancaria.id == lancamento.conta_bancaria_id)
+            .filter(
+                ContaBancaria.id == lancamento.conta_bancaria_id,
+                ContaBancaria.tenant_id == lancamento.tenant_id,
+            )
             .first()
         )
         if conta:
@@ -734,14 +830,12 @@ def _build_lancamento_recorrente_response(
         "dia_vencimento": lancamento.dia_vencimento,
         "data_inicio": lancamento.data_inicio.isoformat(),
         "data_fim": lancamento.data_fim.isoformat() if lancamento.data_fim else None,
-        "gerar_automaticamente": lancamento.gerar_automaticamente,
+        "gerar_automaticamente": lancamento.ativo,
         "gerar_com_antecedencia_dias": lancamento.gerar_com_antecedencia_dias,
-        "ultimo_mes_gerado": lancamento.ultimo_mes_gerado.isoformat()
-        if lancamento.ultimo_mes_gerado
-        else None,
+        "ultimo_mes_gerado": lancamento.ultimo_mes_gerado,
         "permite_ajuste_ia": lancamento.permite_ajuste_ia,
         "observacoes": lancamento.observacoes,
         "ativo": lancamento.ativo,
-        "criado_em": lancamento.criado_em.isoformat(),
-        "atualizado_em": lancamento.atualizado_em.isoformat(),
+        "criado_em": _format_datetime(lancamento.created_at),
+        "atualizado_em": _format_datetime(lancamento.updated_at),
     }
