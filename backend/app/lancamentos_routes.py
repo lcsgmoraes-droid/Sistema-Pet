@@ -71,6 +71,31 @@ def _data_com_dia_seguro(ano: int, mes: int, dia_vencimento: int) -> date:
     return date(ano, mes, dia)
 
 
+def _proxima_data_recorrente(
+    lancamento: LancamentoRecorrente, data_inicial: date, indice: int
+) -> date:
+    if lancamento.frequencia == "semanal":
+        return data_inicial + timedelta(weeks=indice)
+
+    if lancamento.frequencia == "anual":
+        return _data_com_dia_seguro(
+            data_inicial.year + indice,
+            data_inicial.month,
+            lancamento.dia_vencimento,
+        )
+
+    if lancamento.frequencia != "mensal":
+        raise HTTPException(status_code=400, detail="Frequência inválida")
+
+    mes_atual = data_inicial.month + indice
+    ano_atual = data_inicial.year
+    while mes_atual > 12:
+        mes_atual -= 12
+        ano_atual += 1
+
+    return _data_com_dia_seguro(ano_atual, mes_atual, lancamento.dia_vencimento)
+
+
 def _get_lancamento_manual_or_404(
     db: Session, tenant_id, lancamento_id: int
 ) -> LancamentoManual:
@@ -109,41 +134,53 @@ def _get_lancamento_recorrente_or_404(
     return lancamento
 
 
+def _aplicar_update_lancamento(lancamento, update_data: dict, normalizar_campo) -> None:
+    for field, value in update_data.items():
+        normalizado = normalizar_campo(lancamento, field, value)
+        if normalizado is None:
+            continue
+        field, value = normalizado
+        setattr(lancamento, field, value)
+
+    lancamento.updated_at = datetime.utcnow()
+
+
+def _normalizar_campo_manual(lancamento: LancamentoManual, field: str, value):
+    if field == "data_lancamento":
+        return field, _parse_date(value)
+    if field == "data_prevista":
+        lancamento.data_competencia = _parse_date(value)
+        return None
+    if field == "data_efetivacao":
+        lancamento.realizado_em = _realizado_em_from_date(_parse_date(value))
+        return None
+    if field == "valor" and value:
+        return field, Decimal(str(value))
+    return field, value
+
+
+def _normalizar_campo_recorrente(_lancamento, field: str, value):
+    if field in ["data_inicio", "data_fim"] and value:
+        return field, _parse_date(value)
+    if field == "valor_medio" and value:
+        return field, Decimal(str(value))
+    if field == "gerar_automaticamente":
+        return "ativo", value
+    return field, value
+
+
 def _atualizar_lancamento_manual_campos(
     lancamento: LancamentoManual, update_data: dict
 ) -> None:
-    for field, value in update_data.items():
-        if field == "data_lancamento":
-            value = _parse_date(value)
-        elif field == "data_prevista":
-            lancamento.data_competencia = _parse_date(value)
-            continue
-        elif field == "data_efetivacao":
-            lancamento.realizado_em = _realizado_em_from_date(_parse_date(value))
-            continue
-        elif field == "valor" and value:
-            value = Decimal(str(value))
-        setattr(lancamento, field, value)
-
+    _aplicar_update_lancamento(lancamento, update_data, _normalizar_campo_manual)
     if lancamento.status == "realizado" and not lancamento.realizado_em:
         lancamento.realizado_em = datetime.utcnow()
-
-    lancamento.updated_at = datetime.utcnow()
 
 
 def _atualizar_lancamento_recorrente_campos(
     lancamento: LancamentoRecorrente, update_data: dict
 ) -> None:
-    for field, value in update_data.items():
-        if field in ["data_inicio", "data_fim"] and value:
-            value = _parse_date(value)
-        elif field == "valor_medio" and value:
-            value = Decimal(str(value))
-        elif field == "gerar_automaticamente":
-            field = "ativo"
-        setattr(lancamento, field, value)
-
-    lancamento.updated_at = datetime.utcnow()
+    _aplicar_update_lancamento(lancamento, update_data, _normalizar_campo_recorrente)
 
 
 # ============= SCHEMAS =============
@@ -630,28 +667,7 @@ def gerar_proximas_parcelas(
 
     # Gerar parcelas para os próximos meses
     for i in range(1, meses + 1):
-        # Calcular próxima data
-        if lancamento.frequencia == "mensal":
-            mes_atual = data_inicial.month + i
-            ano_atual = data_inicial.year
-
-            while mes_atual > 12:
-                mes_atual -= 12
-                ano_atual += 1
-
-            # Ajustar dia se necessário
-            proxima_data = _data_com_dia_seguro(
-                ano_atual, mes_atual, lancamento.dia_vencimento
-            )
-        elif lancamento.frequencia == "semanal":
-            proxima_data = data_inicial + timedelta(weeks=i)
-        elif lancamento.frequencia == "anual":
-            ano_atual = data_inicial.year + i
-            proxima_data = _data_com_dia_seguro(
-                ano_atual, data_inicial.month, lancamento.dia_vencimento
-            )
-        else:
-            raise HTTPException(status_code=400, detail="FrequÃªncia invÃ¡lida")
+        proxima_data = _proxima_data_recorrente(lancamento, data_inicial, i)
 
         # Verificar se já passou da data_fim
         if lancamento.data_fim and proxima_data > lancamento.data_fim:

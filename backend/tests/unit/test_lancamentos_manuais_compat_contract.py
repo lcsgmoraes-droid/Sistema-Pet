@@ -63,6 +63,11 @@ def test_lancamento_manual_crud_isola_tenant():
         "def _atualizar_lancamento_manual_campos(",
         "def _atualizar_lancamento_recorrente_campos(",
     )
+    generic_update = _function(
+        source,
+        "def _aplicar_update_lancamento(",
+        "def _normalizar_campo_manual(",
+    )
 
     listar = _function(
         source,
@@ -92,7 +97,8 @@ def test_lancamento_manual_crud_isola_tenant():
     assert "_get_lancamento_manual_or_404(db, tenant_id, lancamento_id)" in atualizar
     assert "_get_lancamento_manual_or_404(db, tenant_id, lancamento_id)" in excluir
     assert "_atualizar_lancamento_manual_campos(lancamento, update_data)" in atualizar
-    assert "lancamento.updated_at = datetime.utcnow()" in update_helper
+    assert "_aplicar_update_lancamento(" in update_helper
+    assert "lancamento.updated_at = datetime.utcnow()" in generic_update
 
 
 def test_lancamento_recorrente_crud_e_geracao_isolam_tenant():
@@ -132,7 +138,7 @@ def test_lancamento_recorrente_crud_e_geracao_isolam_tenant():
     assert "LancamentoRecorrente.tenant_id == tenant_id" in lookup
     assert "_get_lancamento_recorrente_or_404(db, tenant_id, lancamento_id)" in gerar
     assert "_atualizar_lancamento_recorrente_campos(lancamento, update_data)" in source
-    assert "lancamento.updated_at = datetime.utcnow()" in update_helper
+    assert "_aplicar_update_lancamento(" in update_helper
     assert "LancamentoManual.tenant_id == tenant_id" in gerar
     assert "data_prevista=" not in gerar
     assert "data_competencia=proxima_data" in gerar
