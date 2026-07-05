@@ -196,6 +196,138 @@ def _fetch_pagamentos_venda(
     )
 
 
+def _skip_venda_sem_pagamento(venda: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "tipo": "venda_sem_pagamento",
+        "venda_id": int(venda["venda_id"]),
+        "numero_venda": venda["numero_venda"],
+        "motivo": "Venda finalizada sem venda_pagamentos para reconstruir CR.",
+    }
+
+
+def _cr_parcela_state(
+    *,
+    numero_parcelas: int,
+    idx: int,
+    pagamento_date: date,
+    prazo: int,
+    recebido: bool,
+    valor_parcela: Decimal,
+) -> tuple[date, str, Decimal, date | None]:
+    if numero_parcelas > 1:
+        return (
+            pagamento_date + timedelta(days=30 * idx),
+            "pendente",
+            Decimal("0.00"),
+            None,
+        )
+    if recebido:
+        return pagamento_date, "recebido", valor_parcela, pagamento_date
+    return pagamento_date + timedelta(days=prazo), "pendente", Decimal("0.00"), None
+
+
+def _cr_descricao(venda: dict[str, Any], forma_nome: str, idx: int, total: int) -> str:
+    if total == 1:
+        return f"Venda {venda['numero_venda']} - {forma_nome}"
+    return f"Venda {venda['numero_venda']} - Parcela {idx}/{total}"
+
+
+def _build_cr_action(
+    *,
+    venda: dict[str, Any],
+    tenant_id: str,
+    forma: dict[str, Any] | None,
+    forma_nome: str,
+    dre_subcategoria_id: int,
+    numero_parcelas: int,
+    idx: int,
+    valor_parcela: Decimal,
+    vencimento: date,
+    status: str,
+    valor_recebido: Decimal,
+    data_recebimento: date | None,
+) -> dict[str, Any]:
+    return {
+        "tipo": "criar_conta_receber",
+        "venda_id": int(venda["venda_id"]),
+        "numero_venda": venda["numero_venda"],
+        "cliente_id": venda["cliente_id"],
+        "forma_pagamento_id": int(forma["id"]) if forma else None,
+        "dre_subcategoria_id": dre_subcategoria_id,
+        "canal": venda["canal"] or "loja_fisica",
+        "valor_original": _money_str(valor_parcela),
+        "valor_recebido": _money_str(valor_recebido),
+        "valor_final": _money_str(valor_parcela),
+        "data_emissao": _as_date(venda["data_venda"]).isoformat(),
+        "data_vencimento": vencimento.isoformat(),
+        "data_recebimento": _date_str(data_recebimento),
+        "status": status,
+        "eh_parcelado": numero_parcelas > 1,
+        "numero_parcela": idx if numero_parcelas > 1 else None,
+        "total_parcelas": numero_parcelas if numero_parcelas > 1 else None,
+        "documento": f"VENDA-{venda['venda_id']}",
+        "descricao": _cr_descricao(venda, forma_nome, idx, numero_parcelas),
+        "observacoes": (
+            "Reparo financeiro historico: CR reconstruido a partir de venda_pagamentos."
+        ),
+        "user_id": int(venda["user_id"]),
+        "tenant_id": tenant_id,
+    }
+
+
+def _build_cr_actions_for_pagamento(
+    db: Session,
+    *,
+    tenant_id: str,
+    venda: dict[str, Any],
+    pagamento: dict[str, Any],
+    dre_subcategoria_id: int,
+) -> list[dict[str, Any]]:
+    forma_nome = str(pagamento["forma_pagamento"])
+    forma = _resolve_forma_pagamento(
+        db, tenant_id=tenant_id, forma_pagamento=forma_nome
+    )
+    numero_parcelas = max(int(pagamento["numero_parcelas"] or 1), 1)
+    valores = ContasReceberService._distribuir_valor_parcelas(
+        _money(pagamento["valor"]), numero_parcelas
+    )
+    pagamento_date = _as_date(pagamento["data_pagamento"] or venda["data_venda"])
+    prazo = _prazo_forma(forma)
+    recebido = _is_recebimento_imediato(
+        forma_nome=forma_nome,
+        forma=forma,
+        numero_parcelas=numero_parcelas,
+    )
+
+    actions: list[dict[str, Any]] = []
+    for idx, valor_parcela in enumerate(valores, start=1):
+        vencimento, status, valor_recebido, data_recebimento = _cr_parcela_state(
+            numero_parcelas=numero_parcelas,
+            idx=idx,
+            pagamento_date=pagamento_date,
+            prazo=prazo,
+            recebido=recebido,
+            valor_parcela=valor_parcela,
+        )
+        actions.append(
+            _build_cr_action(
+                venda=venda,
+                tenant_id=tenant_id,
+                forma=forma,
+                forma_nome=forma_nome,
+                dre_subcategoria_id=dre_subcategoria_id,
+                numero_parcelas=numero_parcelas,
+                idx=idx,
+                valor_parcela=valor_parcela,
+                vencimento=vencimento,
+                status=status,
+                valor_recebido=valor_recebido,
+                data_recebimento=data_recebimento,
+            )
+        )
+    return actions
+
+
 def _build_cr_missing_actions(
     db: Session, *, tenant_id: str, params: dict[str, Any]
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -208,92 +340,19 @@ def _build_cr_missing_actions(
             db, tenant_id=tenant_id, venda_id=int(venda["venda_id"])
         )
         if not pagamentos:
-            skipped.append(
-                {
-                    "tipo": "venda_sem_pagamento",
-                    "venda_id": int(venda["venda_id"]),
-                    "numero_venda": venda["numero_venda"],
-                    "motivo": "Venda finalizada sem venda_pagamentos para reconstruir CR.",
-                }
-            )
+            skipped.append(_skip_venda_sem_pagamento(venda))
             continue
 
         for pagamento in pagamentos:
-            forma_nome = str(pagamento["forma_pagamento"])
-            forma = _resolve_forma_pagamento(
-                db, tenant_id=tenant_id, forma_pagamento=forma_nome
-            )
-            numero_parcelas = max(int(pagamento["numero_parcelas"] or 1), 1)
-            valor_total = _money(pagamento["valor"])
-            valores = ContasReceberService._distribuir_valor_parcelas(
-                valor_total, numero_parcelas
-            )
-            pagamento_date = _as_date(
-                pagamento["data_pagamento"] or venda["data_venda"]
-            )
-            emissao = _as_date(venda["data_venda"])
-            prazo = _prazo_forma(forma)
-            recebido = _is_recebimento_imediato(
-                forma_nome=forma_nome,
-                forma=forma,
-                numero_parcelas=numero_parcelas,
-            )
-
-            for idx, valor_parcela in enumerate(valores, start=1):
-                if numero_parcelas > 1:
-                    vencimento = pagamento_date + timedelta(days=30 * idx)
-                    status = "pendente"
-                    valor_recebido = Decimal("0.00")
-                    data_recebimento = None
-                elif recebido:
-                    vencimento = pagamento_date
-                    status = "recebido"
-                    valor_recebido = valor_parcela
-                    data_recebimento = pagamento_date
-                else:
-                    vencimento = pagamento_date + timedelta(days=prazo)
-                    status = "pendente"
-                    valor_recebido = Decimal("0.00")
-                    data_recebimento = None
-
-                actions.append(
-                    {
-                        "tipo": "criar_conta_receber",
-                        "venda_id": int(venda["venda_id"]),
-                        "numero_venda": venda["numero_venda"],
-                        "cliente_id": venda["cliente_id"],
-                        "forma_pagamento_id": int(forma["id"]) if forma else None,
-                        "dre_subcategoria_id": dre_subcategoria_id,
-                        "canal": venda["canal"] or "loja_fisica",
-                        "valor_original": _money_str(valor_parcela),
-                        "valor_recebido": _money_str(valor_recebido),
-                        "valor_final": _money_str(valor_parcela),
-                        "data_emissao": emissao.isoformat(),
-                        "data_vencimento": vencimento.isoformat(),
-                        "data_recebimento": _date_str(data_recebimento),
-                        "status": status,
-                        "eh_parcelado": numero_parcelas > 1,
-                        "numero_parcela": idx if numero_parcelas > 1 else None,
-                        "total_parcelas": numero_parcelas
-                        if numero_parcelas > 1
-                        else None,
-                        "documento": f"VENDA-{venda['venda_id']}",
-                        "descricao": (
-                            f"Venda {venda['numero_venda']} - {forma_nome}"
-                            if numero_parcelas == 1
-                            else (
-                                f"Venda {venda['numero_venda']} - "
-                                f"Parcela {idx}/{numero_parcelas}"
-                            )
-                        ),
-                        "observacoes": (
-                            "Reparo financeiro historico: CR reconstruido "
-                            "a partir de venda_pagamentos."
-                        ),
-                        "user_id": int(venda["user_id"]),
-                        "tenant_id": tenant_id,
-                    }
+            actions.extend(
+                _build_cr_actions_for_pagamento(
+                    db,
+                    tenant_id=tenant_id,
+                    venda=venda,
+                    pagamento=pagamento,
+                    dre_subcategoria_id=dre_subcategoria_id,
                 )
+            )
 
     return actions, skipped
 
