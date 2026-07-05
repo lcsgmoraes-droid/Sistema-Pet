@@ -114,7 +114,7 @@ def criar_contas_pagar_da_nota(
             logger.info(
                 "Conta criada: %s - R$ %.2f - Venc: %s",
                 dup["numero"],
-                dup["valor"],
+                valor_reais,
                 dup["vencimento"].strftime("%d/%m/%Y"),
             )
         except Exception as exc:

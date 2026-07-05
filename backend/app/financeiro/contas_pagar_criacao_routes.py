@@ -371,14 +371,16 @@ async def criar_conta_pagar(
                     valor=conta_criada.valor_original,
                     descricao=conta_criada.descricao,
                     data_lancamento=conta_criada.data_emissao,
-                    data_prevista=conta_criada.data_vencimento,
-                    data_efetivacao=None,  # Ainda não pago
+                    data_competencia=conta_criada.data_vencimento,
                     categoria_id=conta_criada.categoria_id,
                     conta_bancaria_id=None,
                     status="previsto",
+                    documento=f"CONTA-PAGAR-{conta_criada.id}",
                     observacoes=f"Gerado automaticamente da conta a pagar #{conta_criada.id}",
                     gerado_automaticamente=True,
                     confianca_ia=None,
+                    user_id=current_user.id,
+                    tenant_id=tenant_id,
                 )
                 db.add(lancamento)
             except Exception as e:

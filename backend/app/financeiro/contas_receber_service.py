@@ -485,6 +485,7 @@ class ContasReceberService:
             db.query(ContaReceber)
             .filter(
                 ContaReceber.venda_id == venda_id,
+                ContaReceber.tenant_id == tenant_id,
                 ContaReceber.status.in_(["pendente", "parcial", "vencido"]),
             )
             .order_by(ContaReceber.data_vencimento)
@@ -505,7 +506,11 @@ class ContasReceberService:
         # Buscar forma de pagamento
         forma_pag = (
             db.query(FormaPagamento)
-            .filter(FormaPagamento.nome.ilike(f"%{forma_pagamento_nome}%"))
+            .filter(
+                FormaPagamento.nome.ilike(f"%{forma_pagamento_nome}%"),
+                FormaPagamento.tenant_id == tenant_id,
+                FormaPagamento.ativo.is_(True),
+            )
             .first()
         )
         forma_pag_id = forma_pag.id if forma_pag else None
@@ -639,6 +644,7 @@ class ContasReceberService:
         lancamentos_previstos = (
             db.query(LancamentoManual)
             .filter(
+                LancamentoManual.tenant_id == tenant_id,
                 LancamentoManual.documento == f"VENDA-{venda_id}",
                 LancamentoManual.status == "previsto",
                 LancamentoManual.tipo == "entrada",
