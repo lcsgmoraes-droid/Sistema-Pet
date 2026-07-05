@@ -4,7 +4,7 @@ import logging
 from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -212,10 +212,21 @@ async def registrar_pagamento(
     lancamento = (
         db.query(LancamentoManual)
         .filter(
+            LancamentoManual.tenant_id == tenant_id,
             LancamentoManual.tipo == "saida",
             LancamentoManual.status == "previsto",
-            LancamentoManual.valor == conta.valor_original,
             LancamentoManual.gerado_automaticamente.is_(True),
+            or_(
+                LancamentoManual.documento == f"CONTA-PAGAR-{conta.id}",
+                LancamentoManual.observacoes
+                == f"Gerado automaticamente da conta a pagar #{conta.id}",
+                LancamentoManual.observacoes.like(
+                    f"Gerado automaticamente da conta a pagar #{conta.id}.%"
+                ),
+                LancamentoManual.observacoes.like(
+                    f"Gerado automaticamente da conta a pagar #{conta.id} (%"
+                ),
+            ),
         )
         .order_by(LancamentoManual.id.desc())
         .first()
@@ -290,7 +301,10 @@ def dashboard_contas_pagar(
     # Total pendente
     total_pendente = (
         db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
-        .filter(ContaPagar.status.in_(["pendente", "parcial", "vencido"]))
+        .filter(
+            ContaPagar.tenant_id == tenant_id,
+            ContaPagar.status.in_(["pendente", "parcial", "vencido"]),
+        )
         .scalar()
         or 0
     )
@@ -299,7 +313,11 @@ def dashboard_contas_pagar(
     total_vencido = (
         db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
         .filter(
-            and_(ContaPagar.status == "pendente", ContaPagar.data_vencimento < hoje)
+            and_(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.status == "pendente",
+                ContaPagar.data_vencimento < hoje,
+            )
         )
         .scalar()
         or 0
@@ -308,7 +326,11 @@ def dashboard_contas_pagar(
     count_vencidas = (
         db.query(func.count(ContaPagar.id))
         .filter(
-            and_(ContaPagar.status == "pendente", ContaPagar.data_vencimento < hoje)
+            and_(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.status == "pendente",
+                ContaPagar.data_vencimento < hoje,
+            )
         )
         .scalar()
     )
@@ -317,7 +339,11 @@ def dashboard_contas_pagar(
     total_vence_hoje = (
         db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
         .filter(
-            and_(ContaPagar.status == "pendente", ContaPagar.data_vencimento == hoje)
+            and_(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.status == "pendente",
+                ContaPagar.data_vencimento == hoje,
+            )
         )
         .scalar()
         or 0
@@ -329,6 +355,7 @@ def dashboard_contas_pagar(
         db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
         .filter(
             and_(
+                ContaPagar.tenant_id == tenant_id,
                 ContaPagar.status == "pendente",
                 ContaPagar.data_vencimento.between(hoje, data_7dias),
             )
@@ -343,6 +370,7 @@ def dashboard_contas_pagar(
         db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
         .filter(
             and_(
+                ContaPagar.tenant_id == tenant_id,
                 ContaPagar.status == "pendente",
                 ContaPagar.data_vencimento.between(hoje, data_30dias),
             )
@@ -357,6 +385,7 @@ def dashboard_contas_pagar(
         db.query(func.sum(ContaPagar.valor_pago))
         .filter(
             and_(
+                ContaPagar.tenant_id == tenant_id,
                 ContaPagar.data_pagamento >= primeiro_dia_mes,
                 ContaPagar.data_pagamento <= hoje,
             )

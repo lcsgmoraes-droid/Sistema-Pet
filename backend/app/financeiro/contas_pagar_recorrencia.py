@@ -136,6 +136,7 @@ def _gerar_contas_recorrentes_ate_janela(
 
         db.add(nova_conta)
         contas_criadas.append(nova_conta)
+        db.flush()
 
         lancamento = LancamentoManual(
             tipo="saida",
@@ -146,7 +147,10 @@ def _gerar_contas_recorrentes_ate_janela(
             categoria_id=nova_conta.categoria_id,
             status="previsto",
             documento=nova_conta.documento,
-            observacoes=f"Gerado automaticamente da recorrencia #{conta_origem.id}",
+            observacoes=(
+                f"Gerado automaticamente da conta a pagar #{nova_conta.id} "
+                f"(recorrencia #{conta_origem.id})"
+            ),
             gerado_automaticamente=True,
             user_id=conta_origem.user_id,
             tenant_id=tenant_id,
