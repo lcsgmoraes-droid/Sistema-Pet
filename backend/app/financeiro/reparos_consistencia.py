@@ -552,7 +552,7 @@ def _insert_conta_receber(db: Session, action: dict[str, Any]) -> int:
                 dre_subcategoria_id, canal, valor_original, valor_recebido,
                 valor_desconto, valor_juros, valor_multa, valor_final,
                 data_emissao, data_vencimento, data_recebimento, status,
-                eh_parcelado, numero_parcela, total_parcelas, venda_id,
+                conciliado, eh_parcelado, numero_parcela, total_parcelas, venda_id,
                 documento, observacoes, user_id, tenant_id
             )
             VALUES (
@@ -560,7 +560,7 @@ def _insert_conta_receber(db: Session, action: dict[str, Any]) -> int:
                 :dre_subcategoria_id, :canal, :valor_original, :valor_recebido,
                 0, 0, 0, :valor_final,
                 :data_emissao, :data_vencimento, :data_recebimento, :status,
-                :eh_parcelado, :numero_parcela, :total_parcelas, :venda_id,
+                false, :eh_parcelado, :numero_parcela, :total_parcelas, :venda_id,
                 :documento, :observacoes, :user_id, :tenant_id
             )
             RETURNING id
