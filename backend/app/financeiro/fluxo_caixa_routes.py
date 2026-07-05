@@ -43,7 +43,7 @@ def get_fluxo_caixa(
     Parâmetros:
     - agrupamento: 'dia', 'semana' ou 'mes'
     """
-    current_user, tenant_id = current_user_and_tenant
+    _current_user, tenant_id = current_user_and_tenant
     set_current_tenant(tenant_id)
     from app.vendas_models import Venda
     from app.financeiro_models import (
@@ -77,7 +77,6 @@ def get_fluxo_caixa(
         contas = (
             db.query(ContaBancaria)
             .filter(
-                ContaBancaria.user_id == current_user.id,
                 ContaBancaria.tenant_id == tenant_id,
             )
             .all()
@@ -92,7 +91,6 @@ def get_fluxo_caixa(
             .filter(
                 and_(
                     ContaBancaria.id.in_(filtro_conta),
-                    ContaBancaria.user_id == current_user.id,
                     ContaBancaria.tenant_id == tenant_id,
                 )
             )
@@ -110,7 +108,6 @@ def get_fluxo_caixa(
         db.query(Venda)
         .filter(
             and_(
-                Venda.user_id == current_user.id,
                 Venda.tenant_id == tenant_id,
                 Venda.data_venda >= dt_inicio,
                 Venda.data_venda <= dt_fim,
@@ -200,7 +197,6 @@ def get_fluxo_caixa(
         db.query(ContaPagar)
         .filter(
             and_(
-                ContaPagar.user_id == current_user.id,
                 ContaPagar.tenant_id == tenant_id,
                 ContaPagar.data_pagamento >= dt_inicio,
                 ContaPagar.data_pagamento <= dt_fim,
@@ -269,7 +265,6 @@ def get_fluxo_caixa(
         .filter(
             and_(
                 FluxoCaixa.tenant_id == tenant_id,
-                FluxoCaixa.usuario_id == current_user.id,
                 FluxoCaixa.data_movimentacao >= dt_inicio_datetime,
                 FluxoCaixa.data_movimentacao <= dt_fim_datetime,
                 FluxoCaixa.status == "realizado",
@@ -358,7 +353,6 @@ def get_fluxo_caixa(
         db.query(ContaPagar)
         .filter(
             and_(
-                ContaPagar.user_id == current_user.id,
                 ContaPagar.tenant_id == tenant_id,
                 ContaPagar.data_vencimento >= dt_inicio,
                 ContaPagar.data_vencimento <= dt_fim,
@@ -421,7 +415,6 @@ def get_fluxo_caixa(
         .filter(
             and_(
                 FluxoCaixa.tenant_id == tenant_id,
-                FluxoCaixa.usuario_id == current_user.id,
                 FluxoCaixa.data_prevista >= dt_inicio_datetime,
                 FluxoCaixa.data_prevista <= dt_fim_datetime,
                 FluxoCaixa.status == "previsto",
@@ -474,7 +467,6 @@ def get_fluxo_caixa(
             db.query(Venda.id)
             .filter(
                 and_(
-                    Venda.user_id == current_user.id,
                     Venda.tenant_id == tenant_id,
                     Venda.numero_venda.like(f"%{numero_venda}%"),
                 )

@@ -12,7 +12,6 @@ from app.db import get_session
 from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from app.financeiro.contas_pagar_common import (
     _decimal_monetario,
-    _valor_reais_para_centavos,
 )
 from app.financeiro.contas_pagar_recorrencia import (
     _garantir_janela_recorrencia_apos_pagamento,
@@ -172,14 +171,11 @@ async def registrar_pagamento(
                 detail=f"Conta bancária '{conta_bancaria.nome}' está inativa",
             )
 
-        # Converter valor para centavos
-        valor_centavos = _valor_reais_para_centavos(valor_total_pagamento)
-
         # Criar movimentação financeira (SAÍDA)
         movimentacao = MovimentacaoFinanceira(
             conta_bancaria_id=conta_bancaria.id,
             tipo="saida",
-            valor=valor_centavos,
+            valor=valor_total_pagamento,
             descricao=f"Pagamento: {conta.descricao}",
             data_movimento=datetime.combine(
                 pagamento.data_pagamento, datetime.min.time()
@@ -197,11 +193,11 @@ async def registrar_pagamento(
         db.add(movimentacao)
 
         # Atualizar saldo da conta bancária (DÉBITO)
-        conta_bancaria.saldo_atual -= valor_centavos
+        conta_bancaria.saldo_atual -= valor_total_pagamento
 
         logger.info(
             f"🏦 Movimentação bancária criada: {conta_bancaria.nome} "
-            f"-R$ {valor_total_pagamento:.2f} (Saldo: R$ {conta_bancaria.saldo_atual / 100:.2f})"
+            f"-R$ {valor_total_pagamento:.2f} (Saldo: R$ {conta_bancaria.saldo_atual:.2f})"
         )
 
     # ========================================

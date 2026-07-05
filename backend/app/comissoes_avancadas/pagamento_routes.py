@@ -510,10 +510,17 @@ async def fechar_com_pagamento_parcial(
         # FASE 7: CRIAR MOVIMENTAÇÃO FINANCEIRA (SOMENTE SE VALOR_LIQUIDO > 0)
         # ========================================================================
         if valor_liquido > 0 and conta_bancaria_id:
+            valor_liquido_decimal = Decimal(str(valor_liquido)).quantize(
+                Decimal("0.01")
+            )
+
             # Buscar conta bancária
             conta_bancaria = (
                 db.query(ContaBancaria)
-                .filter(ContaBancaria.id == conta_bancaria_id)
+                .filter(
+                    ContaBancaria.id == conta_bancaria_id,
+                    ContaBancaria.tenant_id == tenant_id,
+                )
                 .first()
             )
 
@@ -529,14 +536,11 @@ async def fechar_com_pagamento_parcial(
                     detail=f"Conta bancária '{conta_bancaria.nome}' está inativa",
                 )
 
-            # Converter valor para centavos
-            valor_centavos = int(valor_liquido * 100)
-
             # Criar movimentação financeira (SAÍDA)
             movimentacao = MovimentacaoFinanceira(
                 conta_bancaria_id=conta_bancaria.id,
                 tipo="saida",
-                valor=valor_centavos,
+                valor=valor_liquido_decimal,
                 descricao=f"Pgto comissão {funcionario_nome} (bruto: R$ {valor_total_comissoes:.2f} - comp: R$ {valor_compensado:.2f})",
                 data_movimento=data_pagamento,
                 categoria_id=categoria_comissao.id,
@@ -546,15 +550,16 @@ async def fechar_com_pagamento_parcial(
                 origem_id=conta_pagar.id,
                 observacoes=f"Compensação: R$ {valor_compensado:.2f}",
                 user_id=current_user.id,
+                tenant_id=tenant_id,
             )
             db.add(movimentacao)
 
             # Atualizar saldo da conta bancária (DÉBITO)
-            conta_bancaria.saldo_atual -= valor_centavos
+            conta_bancaria.saldo_atual -= valor_liquido_decimal
 
             logger.info(
                 f"🏦 Movimentação bancária criada: {conta_bancaria.nome} "
-                f"-R$ {valor_liquido:.2f} (Saldo: R$ {conta_bancaria.saldo_atual / 100:.2f})"
+                f"-R$ {valor_liquido:.2f} (Saldo: R$ {conta_bancaria.saldo_atual:.2f})"
             )
         elif valor_liquido == 0:
             logger.info(
