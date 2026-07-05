@@ -9,6 +9,8 @@ def _source(relative_path: str) -> str:
 
 
 def _function(source: str, signature: str, next_marker: str) -> str:
+    assert signature in source
+    assert next_marker in source
     return source.split(signature, 1)[1].split(next_marker, 1)[0]
 
 
@@ -51,6 +53,16 @@ def test_lancamento_manual_respostas_usam_colunas_existentes():
 
 def test_lancamento_manual_crud_isola_tenant():
     source = _source("app/lancamentos_routes.py")
+    lookup = _function(
+        source,
+        "def _get_lancamento_manual_or_404(",
+        "def _get_lancamento_recorrente_or_404(",
+    )
+    update_helper = _function(
+        source,
+        "def _atualizar_lancamento_manual_campos(",
+        "def _atualizar_lancamento_recorrente_campos(",
+    )
 
     listar = _function(
         source,
@@ -74,14 +86,27 @@ def test_lancamento_manual_crud_isola_tenant():
     )
 
     assert "LancamentoManual.tenant_id == tenant_id" in listar
-    assert "LancamentoManual.tenant_id == tenant_id" in obter
-    assert "LancamentoManual.tenant_id == tenant_id" in atualizar
-    assert "LancamentoManual.tenant_id == tenant_id" in excluir
-    assert "lancamento.updated_at = datetime.utcnow()" in atualizar
+    assert "LancamentoManual.id == lancamento_id" in lookup
+    assert "LancamentoManual.tenant_id == tenant_id" in lookup
+    assert "_get_lancamento_manual_or_404(db, tenant_id, lancamento_id)" in obter
+    assert "_get_lancamento_manual_or_404(db, tenant_id, lancamento_id)" in atualizar
+    assert "_get_lancamento_manual_or_404(db, tenant_id, lancamento_id)" in excluir
+    assert "_atualizar_lancamento_manual_campos(lancamento, update_data)" in atualizar
+    assert "lancamento.updated_at = datetime.utcnow()" in update_helper
 
 
 def test_lancamento_recorrente_crud_e_geracao_isolam_tenant():
     source = _source("app/lancamentos_routes.py")
+    lookup = _function(
+        source,
+        "def _get_lancamento_recorrente_or_404(",
+        "def _atualizar_lancamento_manual_campos(",
+    )
+    update_helper = _function(
+        source,
+        "def _atualizar_lancamento_recorrente_campos(",
+        "# ============= SCHEMAS",
+    )
     criar = _function(
         source,
         "def criar_lancamento_recorrente(",
@@ -103,7 +128,11 @@ def test_lancamento_recorrente_crud_e_geracao_isolam_tenant():
     assert "user_id=current_user.id" in criar
     assert "tenant_id=tenant_id" in criar
     assert "LancamentoRecorrente.tenant_id == tenant_id" in listar
-    assert "LancamentoRecorrente.tenant_id == tenant_id" in gerar
+    assert "LancamentoRecorrente.id == lancamento_id" in lookup
+    assert "LancamentoRecorrente.tenant_id == tenant_id" in lookup
+    assert "_get_lancamento_recorrente_or_404(db, tenant_id, lancamento_id)" in gerar
+    assert "_atualizar_lancamento_recorrente_campos(lancamento, update_data)" in source
+    assert "lancamento.updated_at = datetime.utcnow()" in update_helper
     assert "LancamentoManual.tenant_id == tenant_id" in gerar
     assert "data_prevista=" not in gerar
     assert "data_competencia=proxima_data" in gerar
