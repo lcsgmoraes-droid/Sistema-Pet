@@ -16,6 +16,26 @@ PRODUTO_GTIN_COLUMNS = [
     ]
     if column is not None
 ]
+PRODUTO_EAN_ALTERNATIVO_COLUMN = getattr(Produto, "codigos_barras_alternativos", None)
+PRODUTO_CODIGO_EXATO_COLUMNS = [
+    column
+    for column in [
+        Produto.codigo,
+        PRODUTO_SKU_COLUMN,
+        Produto.codigo_barras,
+        *PRODUTO_GTIN_COLUMNS,
+    ]
+    if column is not None
+]
+PRODUTO_EAN_SEARCH_COLUMNS = [
+    column
+    for column in [
+        Produto.codigo_barras,
+        *PRODUTO_GTIN_COLUMNS,
+        PRODUTO_EAN_ALTERNATIVO_COLUMN,
+    ]
+    if column is not None
+]
 
 
 def _build_produto_search_order_clause(termo_busca: Optional[str]):
@@ -25,43 +45,53 @@ def _build_produto_search_order_clause(termo_busca: Optional[str]):
         return [Produto.created_at.desc()]
 
     termo_lower = termo.lower()
-    if PRODUTO_SKU_COLUMN is None:
-        return [
-            case(
-                (func.lower(func.coalesce(Produto.codigo, "")) == termo_lower, 1),
-                (
-                    func.lower(func.coalesce(Produto.codigo_barras, "")) == termo_lower,
-                    2,
-                ),
-                (func.lower(func.coalesce(Produto.nome, "")) == termo_lower, 3),
-                (Produto.codigo.ilike(f"{termo}%"), 4),
-                (Produto.codigo_barras.ilike(f"{termo}%"), 5),
-                (Produto.nome.ilike(f"{termo}%"), 6),
-                (Produto.codigo.ilike(f"%{termo}%"), 7),
-                (Produto.codigo_barras.ilike(f"%{termo}%"), 8),
-                (Produto.nome.ilike(f"%{termo}%"), 9),
-                else_=10,
-            ),
-            Produto.nome.asc(),
-            Produto.created_at.desc(),
-        ]
+    contains_pattern = f"%{termo}%"
+    prefix_pattern = f"{termo}%"
+    order_cases = []
+    prioridade = 1
+
+    for column in PRODUTO_CODIGO_EXATO_COLUMNS:
+        order_cases.append((func.lower(func.coalesce(column, "")) == termo_lower, prioridade))
+        prioridade += 1
+
+    if PRODUTO_EAN_ALTERNATIVO_COLUMN is not None:
+        order_cases.append((PRODUTO_EAN_ALTERNATIVO_COLUMN.ilike(contains_pattern), prioridade))
+        prioridade += 1
+
+    digitos = _only_digits(termo)
+    if (
+        PRODUTO_EAN_ALTERNATIVO_COLUMN is not None
+        and len(digitos) >= 4
+        and _should_use_digit_fallback(termo)
+    ):
+        order_cases.append(
+            (_digits_expr(PRODUTO_EAN_ALTERNATIVO_COLUMN).ilike(f"%{digitos}%"), prioridade)
+        )
+        prioridade += 1
+
+    order_cases.append((func.lower(func.coalesce(Produto.nome, "")) == termo_lower, prioridade))
+    prioridade += 1
+
+    for column in PRODUTO_CODIGO_EXATO_COLUMNS:
+        order_cases.append((column.ilike(prefix_pattern), prioridade))
+        prioridade += 1
+
+    if PRODUTO_EAN_ALTERNATIVO_COLUMN is not None:
+        order_cases.append((PRODUTO_EAN_ALTERNATIVO_COLUMN.ilike(contains_pattern), prioridade))
+        prioridade += 1
+
+    order_cases.append((Produto.nome.ilike(prefix_pattern), prioridade))
+    prioridade += 1
+
+    for column in PRODUTO_CODIGO_EXATO_COLUMNS:
+        order_cases.append((column.ilike(contains_pattern), prioridade))
+        prioridade += 1
+
+    order_cases.append((Produto.nome.ilike(contains_pattern), prioridade))
+    prioridade += 1
 
     return [
-        case(
-            (func.lower(func.coalesce(Produto.codigo, "")) == termo_lower, 1),
-            (func.lower(func.coalesce(PRODUTO_SKU_COLUMN, "")) == termo_lower, 2),
-            (func.lower(func.coalesce(Produto.codigo_barras, "")) == termo_lower, 3),
-            (func.lower(func.coalesce(Produto.nome, "")) == termo_lower, 4),
-            (Produto.codigo.ilike(f"{termo}%"), 5),
-            (PRODUTO_SKU_COLUMN.ilike(f"{termo}%"), 6),
-            (Produto.codigo_barras.ilike(f"{termo}%"), 7),
-            (Produto.nome.ilike(f"{termo}%"), 8),
-            (Produto.codigo.ilike(f"%{termo}%"), 9),
-            (PRODUTO_SKU_COLUMN.ilike(f"%{termo}%"), 10),
-            (Produto.codigo_barras.ilike(f"%{termo}%"), 11),
-            (Produto.nome.ilike(f"%{termo}%"), 12),
-            else_=13,
-        ),
+        case(*order_cases, else_=prioridade),
         Produto.nome.asc(),
         Produto.created_at.desc(),
     ]
@@ -95,8 +125,7 @@ def _produto_search_conditions(palavra: str):
     conditions = [
         _unaccent_ilike(Produto.nome, busca_pattern),
         _unaccent_ilike(Produto.codigo, busca_pattern),
-        _unaccent_ilike(Produto.codigo_barras, busca_pattern),
-        *[_unaccent_ilike(column, busca_pattern) for column in PRODUTO_GTIN_COLUMNS],
+        *[_unaccent_ilike(column, busca_pattern) for column in PRODUTO_EAN_SEARCH_COLUMNS],
         Produto.marca.has(_unaccent_ilike(Marca.nome, busca_pattern)),
         Produto.categoria.has(_unaccent_ilike(Categoria.nome, busca_pattern)),
         Produto.departamento.has(_unaccent_ilike(Departamento.nome, busca_pattern)),
@@ -111,10 +140,9 @@ def _produto_search_conditions(palavra: str):
         conditions.extend(
             [
                 _digits_expr(Produto.codigo).ilike(digitos_pattern),
-                _digits_expr(Produto.codigo_barras).ilike(digitos_pattern),
                 *[
                     _digits_expr(column).ilike(digitos_pattern)
-                    for column in PRODUTO_GTIN_COLUMNS
+                    for column in PRODUTO_EAN_SEARCH_COLUMNS
                 ],
             ]
         )
@@ -135,30 +163,44 @@ def _produto_search_conditions_fast(palavra: str):
     contains_pattern = f"%{termo}%"
     conditions = [
         Produto.codigo.ilike(prefix_pattern),
-        Produto.codigo_barras.ilike(prefix_pattern),
-        *[column.ilike(prefix_pattern) for column in PRODUTO_GTIN_COLUMNS],
+        *[
+            column.ilike(prefix_pattern)
+            for column in PRODUTO_EAN_SEARCH_COLUMNS
+            if column is not PRODUTO_EAN_ALTERNATIVO_COLUMN
+        ],
         Produto.nome.ilike(contains_pattern),
     ]
 
     if PRODUTO_SKU_COLUMN is not None:
         conditions.append(PRODUTO_SKU_COLUMN.ilike(prefix_pattern))
 
+    if PRODUTO_EAN_ALTERNATIVO_COLUMN is not None:
+        conditions.append(PRODUTO_EAN_ALTERNATIVO_COLUMN.ilike(contains_pattern))
+
     digitos = _only_digits(termo)
     if len(digitos) >= 4 and _should_use_digit_fallback(termo):
         digits_prefix = f"{digitos}%"
+        digits_contains = f"%{digitos}%"
         conditions.extend(
             [
                 Produto.codigo == termo,
-                Produto.codigo_barras == termo,
-                *[column == termo for column in PRODUTO_GTIN_COLUMNS],
+                *[
+                    column == termo
+                    for column in PRODUTO_EAN_SEARCH_COLUMNS
+                    if column is not PRODUTO_EAN_ALTERNATIVO_COLUMN
+                ],
                 _digits_expr(Produto.codigo).like(digits_prefix),
-                _digits_expr(Produto.codigo_barras).like(digits_prefix),
                 *[
                     _digits_expr(column).like(digits_prefix)
-                    for column in PRODUTO_GTIN_COLUMNS
+                    for column in PRODUTO_EAN_SEARCH_COLUMNS
+                    if column is not PRODUTO_EAN_ALTERNATIVO_COLUMN
                 ],
             ]
         )
+        if PRODUTO_EAN_ALTERNATIVO_COLUMN is not None:
+            conditions.append(
+                _digits_expr(PRODUTO_EAN_ALTERNATIVO_COLUMN).like(digits_contains)
+            )
         if PRODUTO_SKU_COLUMN is not None:
             conditions.extend(
                 [

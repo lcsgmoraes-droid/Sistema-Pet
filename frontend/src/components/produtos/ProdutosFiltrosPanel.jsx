@@ -1,6 +1,7 @@
 import FilterBar from "../ui/FilterBar";
 import FornecedorSelector from "../fornecedores/FornecedorSelector";
 import { CategoriaProdutoSelector, MarcaProdutoSelector } from "./CatalogoProdutoSelectors";
+import ProdutoSelector from "./ProdutoSelector";
 
 export default function ProdutosFiltrosPanel({
   categorias,
@@ -23,12 +24,12 @@ export default function ProdutosFiltrosPanel({
     <FilterBar id="tour-produtos-filtros" className="mb-4 md:mb-6" onSubmit={handleSubmit}>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-7 md:gap-4">
         <div id="tour-produtos-busca" className="md:col-span-2">
-          <input
-            type="text"
-            placeholder="Buscar por codigo, nome ou codigo de barras..."
+          <ProdutoSelector
+            placeholder="Buscar por SKU, nome ou qualquer EAN..."
             value={filtros.busca}
-            onChange={(event) => handleFiltroChange("busca", event.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            onChange={(valor) => handleFiltroChange("busca", valor)}
+            showSuggestions={false}
+            inputClassName="w-full border-gray-300"
           />
         </div>
 
