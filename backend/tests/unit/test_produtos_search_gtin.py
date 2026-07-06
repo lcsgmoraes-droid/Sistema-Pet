@@ -19,8 +19,7 @@ def test_busca_de_produtos_inclui_gtin_comercial_e_tributario():
 
 def test_ordenacao_de_busca_prioriza_todos_os_eans_cadastrados():
     expressao_ordenacao = " ".join(
-        str(clausula)
-        for clausula in _build_produto_search_order_clause("0186361")
+        str(clausula) for clausula in _build_produto_search_order_clause("0186361")
     )
 
     assert "gtin_ean" in expressao_ordenacao
