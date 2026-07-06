@@ -61,6 +61,10 @@ def test_contas_pagar_routes_reexports_split_route_handlers():
         is contas_pagar_pagamento_routes.registrar_pagamento
     )
     assert (
+        contas_pagar_routes.registrar_pagamento_lote
+        is contas_pagar_pagamento_routes.registrar_pagamento_lote
+    )
+    assert (
         contas_pagar_routes.dashboard_contas_pagar
         is contas_pagar_pagamento_routes.dashboard_contas_pagar
     )
@@ -72,6 +76,7 @@ def test_recorrencia_routes_are_registered_on_main_router():
     assert "/contas-pagar/{conta_id}/recorrencia" in paths
     assert "/contas-pagar/recorrencias/excluir" in paths
     assert "/contas-pagar/processar-recorrencias" in paths
+    assert "/contas-pagar/pagar-lote" in paths
 
 
 def test_contas_pagar_routes_stays_below_large_file_threshold_after_extraction():

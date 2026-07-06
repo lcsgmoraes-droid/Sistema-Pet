@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import ActionButton from "../ui/ActionButton";
 import DataTable from "../ui/DataTable";
@@ -18,6 +19,20 @@ const STATUS_META = {
   pendente: { label: "Pendente", intent: "warning" },
   processada: { label: "Conciliada", intent: "success" },
 };
+
+const FILTROS_CONFERENCIA = [
+  { value: "todos", label: "Todas" },
+  { value: "nao_iniciada", label: "Nao conferidas" },
+  { value: "sem_divergencia", label: "Sem divergencia" },
+  { value: "com_divergencia", label: "Com divergencia" },
+];
+
+const normalizarBuscaNota = (valor) =>
+  String(valor || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
 
 function NotaStatusBadge({ status }) {
   const meta = STATUS_META[status] || {
@@ -86,14 +101,64 @@ export default function EntradaXmlNotasTable({
   reverterNota,
   setFiltroStatus,
 }) {
-  const notas =
-    filtroStatus === "todos"
-      ? notasEntrada
-      : notasEntrada.filter((nota) => nota.status === filtroStatus);
+  const [filtrosNotas, setFiltrosNotas] = useState({
+    fornecedor: "",
+    nf: "",
+    data_inicio: "",
+    data_fim: "",
+    conferencia: "todos",
+  });
+
+  const limparFiltrosNotas = () => {
+    setFiltrosNotas({
+      fornecedor: "",
+      nf: "",
+      data_inicio: "",
+      data_fim: "",
+      conferencia: "todos",
+    });
+  };
+
+  const notas = useMemo(() => {
+    const fornecedorBusca = normalizarBuscaNota(filtrosNotas.fornecedor);
+    const nfBusca = normalizarBuscaNota(filtrosNotas.nf);
+
+    return notasEntrada.filter((nota) => {
+      if (filtroStatus !== "todos" && nota.status !== filtroStatus) return false;
+
+      if (fornecedorBusca) {
+        const fornecedorTexto = normalizarBuscaNota(
+          `${nota.fornecedor_nome || ""} ${nota.fornecedor_cnpj || ""}`,
+        );
+        if (!fornecedorTexto.includes(fornecedorBusca)) return false;
+      }
+
+      if (nfBusca) {
+        const nfTexto = normalizarBuscaNota(`${nota.numero_nota || ""} ${nota.chave_acesso || ""}`);
+        if (!nfTexto.includes(nfBusca)) return false;
+      }
+
+      if (filtrosNotas.data_inicio || filtrosNotas.data_fim) {
+        const dataEmissao = String(nota.data_emissao || "").slice(0, 10);
+        if (filtrosNotas.data_inicio && dataEmissao < filtrosNotas.data_inicio) return false;
+        if (filtrosNotas.data_fim && dataEmissao > filtrosNotas.data_fim) return false;
+      }
+
+      if (
+        filtrosNotas.conferencia !== "todos" &&
+        (nota.conferencia_status || "nao_iniciada") !== filtrosNotas.conferencia
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [filtroStatus, filtrosNotas, notasEntrada]);
+
   const emptyMessage =
     notasEntrada.length === 0
       ? "Nenhuma nota fiscal importada. Importe um XML ou busque pela SEFAZ."
-      : `Nenhuma nota com status "${filtroStatus}".`;
+      : "Nenhuma nota encontrada com os filtros atuais.";
 
   const columns = [
     {
@@ -277,6 +342,78 @@ export default function EntradaXmlNotasTable({
         />
       }
     >
+      <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+          <div className="md:col-span-3">
+            <label className="mb-1 block text-sm font-medium text-slate-700">Fornecedor</label>
+            <input
+              type="text"
+              className="w-full rounded border border-slate-300 px-3 py-2"
+              placeholder="Nome ou CNPJ"
+              value={filtrosNotas.fornecedor}
+              onChange={(event) =>
+                setFiltrosNotas({ ...filtrosNotas, fornecedor: event.target.value })
+              }
+            />
+          </div>
+          <div className="md:col-span-3">
+            <label className="mb-1 block text-sm font-medium text-slate-700">NF ou chave</label>
+            <input
+              type="text"
+              className="w-full rounded border border-slate-300 px-3 py-2"
+              placeholder="Numero ou chave"
+              value={filtrosNotas.nf}
+              onChange={(event) => setFiltrosNotas({ ...filtrosNotas, nf: event.target.value })}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-slate-700">Data inicial</label>
+            <input
+              type="date"
+              className="w-full rounded border border-slate-300 px-3 py-2"
+              value={filtrosNotas.data_inicio}
+              onChange={(event) =>
+                setFiltrosNotas({ ...filtrosNotas, data_inicio: event.target.value })
+              }
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-slate-700">Data final</label>
+            <input
+              type="date"
+              className="w-full rounded border border-slate-300 px-3 py-2"
+              value={filtrosNotas.data_fim}
+              onChange={(event) =>
+                setFiltrosNotas({ ...filtrosNotas, data_fim: event.target.value })
+              }
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-slate-700">Conferencia</label>
+            <select
+              className="w-full rounded border border-slate-300 px-3 py-2"
+              value={filtrosNotas.conferencia}
+              onChange={(event) =>
+                setFiltrosNotas({ ...filtrosNotas, conferencia: event.target.value })
+              }
+            >
+              {FILTROS_CONFERENCIA.map((filtro) => (
+                <option key={filtro.value} value={filtro.value}>
+                  {filtro.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <span className="text-sm text-slate-500">
+            {notas.length} de {notasEntrada.length} nota(s)
+          </span>
+          <ActionButton intent="neutral" tone="soft" size="sm" onClick={limparFiltrosNotas}>
+            Limpar filtros
+          </ActionButton>
+        </div>
+      </div>
       <DataTable
         columns={columns}
         data={notas}

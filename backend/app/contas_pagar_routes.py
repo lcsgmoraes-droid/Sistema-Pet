@@ -31,6 +31,7 @@ from .financeiro.contas_pagar_manutencao_routes import (
 from .financeiro.contas_pagar_pagamento_routes import (
     dashboard_contas_pagar,
     registrar_pagamento,
+    registrar_pagamento_lote,
     router as pagamento_router,
 )
 from .financeiro.contas_pagar_recorrencia_routes import (
@@ -48,6 +49,7 @@ from .financeiro.contas_pagar_schemas import (
     ContaPagarResponse,
     ContaPagarUpdate,
     PagamentoCreate,
+    PagamentoLoteCreate,
 )
 
 router = APIRouter(prefix="/contas-pagar", tags=["Contas a Pagar"])
@@ -66,6 +68,7 @@ __all__ = [
     "ContaPagarResponse",
     "ContaPagarUpdate",
     "PagamentoCreate",
+    "PagamentoLoteCreate",
     "atualizar_conta_pagar",
     "buscar_conta_pagar",
     "cancelar_conta_pagar",
@@ -79,6 +82,7 @@ __all__ = [
     "listar_recorrencia_conta_pagar",
     "processar_recorrencias_contas_pagar",
     "registrar_pagamento",
+    "registrar_pagamento_lote",
     "router",
     "_decimal_monetario",
     "_expressao_texto_busca",
