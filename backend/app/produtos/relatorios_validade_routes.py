@@ -36,6 +36,7 @@ from app.produtos.relatorios import (
     _parse_relatorio_datetime,
     _serializar_movimentacao_relatorio,
 )
+from app.produtos.search import _produto_search_conditions
 from app.produtos.schemas import (
     RelatorioValidadeProximaItem,
     RelatorioValidadeProximaResponse,
@@ -66,7 +67,6 @@ from app.services.validade_campanha_service import (
 from app.vendas_models import Venda, VendaItem
 
 router = APIRouter()
-PRODUTO_SKU_COLUMN = getattr(Produto, "sku", None)
 
 
 @router.get(
@@ -129,25 +129,12 @@ def relatorio_validade_proxima(
     if termo_busca:
         for palavra in _palavras_busca_produto(termo_busca):
             busca_pattern = f"%{palavra}%"
-            if PRODUTO_SKU_COLUMN is None:
-                query_base = query_base.filter(
-                    or_(
-                        Produto.nome.ilike(busca_pattern),
-                        Produto.codigo.ilike(busca_pattern),
-                        Produto.codigo_barras.ilike(busca_pattern),
-                        ProdutoLote.nome_lote.ilike(busca_pattern),
-                    )
+            query_base = query_base.filter(
+                or_(
+                    _produto_search_conditions(palavra),
+                    ProdutoLote.nome_lote.ilike(busca_pattern),
                 )
-            else:
-                query_base = query_base.filter(
-                    or_(
-                        Produto.nome.ilike(busca_pattern),
-                        Produto.codigo.ilike(busca_pattern),
-                        PRODUTO_SKU_COLUMN.ilike(busca_pattern),
-                        Produto.codigo_barras.ilike(busca_pattern),
-                        ProdutoLote.nome_lote.ilike(busca_pattern),
-                    )
-                )
+            )
 
     if categoria_id:
         query_base = query_base.filter(Produto.categoria_id == categoria_id)

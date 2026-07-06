@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getProdutos } from "../api/produtos";
+import { produtoCorrespondeBusca } from "../utils/pdvProdutoBuscaUtils";
 
 const PRODUTOS_PERSISTIR_KEY = "produtos_persistir_busca";
 const PRODUTOS_FILTROS_KEY = "produtos_filtros_v2";
@@ -145,27 +146,9 @@ export default function useProdutosListagem({
   const produtosFiltrados = useMemo(() => {
     let produtosTemp = [...produtosBrutos];
     const buscaNormalizada = normalizeSearchText(filtros.busca).trim();
-    const termosBusca = buscaNormalizada.split(/\s+/).filter(Boolean);
     const buscaAtiva = Boolean(buscaNormalizada);
-    const produtoCorrespondeBusca = (produto) => {
-      const campos = [produto.codigo, produto.sku, produto.codigo_barras, produto.nome].map(
-        (value) => normalizeSearchText(value || ""),
-      );
-      const camposDigitos = [produto.codigo, produto.sku, produto.codigo_barras].map((value) =>
-        normalizeSearchText(value || "").replace(/\D/g, ""),
-      );
-
-      return termosBusca.every((termo) => {
-        const termoDigitos = termo.replace(/\D/g, "");
-        const correspondeTexto = campos.some((campo) => campo.includes(termo));
-
-        if (correspondeTexto || !termoDigitos) {
-          return correspondeTexto;
-        }
-
-        return camposDigitos.some((campo) => campo.includes(termoDigitos));
-      });
-    };
+    const correspondeBusca = (produto) =>
+      produtoCorrespondeBusca(produto, buscaNormalizada, normalizeSearchText);
 
     if (!filtros.mostrarPaisVariacoes) {
       return produtosTemp.filter((p) => (p.tipo_produto || "SIMPLES") === "SIMPLES");
@@ -179,7 +162,7 @@ export default function useProdutosListagem({
     const paisExpandidosSet = new Set((paisExpandidos || []).map(normalizeExpandId));
 
     produtosTemp.forEach((produto) => {
-      if (!produtoCorrespondeBusca(produto)) return;
+      if (!correspondeBusca(produto)) return;
 
       if (produto.tipo_produto === "PAI") {
         paisVisiveisPorBusca.add(normalizeExpandId(produto.id));
@@ -193,20 +176,18 @@ export default function useProdutosListagem({
 
     produtosTemp = produtosTemp.filter((p) => {
       if (p.tipo_produto === "PAI") {
-        return paisVisiveisPorBusca.has(normalizeExpandId(p.id)) || produtoCorrespondeBusca(p);
+        return paisVisiveisPorBusca.has(normalizeExpandId(p.id)) || correspondeBusca(p);
       }
 
       if (p.tipo_produto !== "VARIACAO") {
-        return produtoCorrespondeBusca(p);
+        return correspondeBusca(p);
       }
 
       if (!p.produto_pai_id || !paisVisiveisPorBusca.has(normalizeExpandId(p.produto_pai_id))) {
-        return produtoCorrespondeBusca(p);
+        return correspondeBusca(p);
       }
 
-      return (
-        produtoCorrespondeBusca(p) || paisExpandidosSet.has(normalizeExpandId(p.produto_pai_id))
-      );
+      return correspondeBusca(p) || paisExpandidosSet.has(normalizeExpandId(p.produto_pai_id));
     });
 
     return ordenarProdutosAgrupados(produtosTemp, paisExpandidos);

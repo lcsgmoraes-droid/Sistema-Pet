@@ -16,7 +16,7 @@ export default function ProdutoSelector({
   onFocus,
   onKeyDown,
   onSelect,
-  placeholder = "Digite o nome, codigo de barras ou SKU...",
+  placeholder = "Digite nome, SKU ou qualquer EAN...",
   renderSuggestion,
   showSuggestions = false,
   suggestions = [],
