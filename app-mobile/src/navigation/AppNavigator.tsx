@@ -24,6 +24,9 @@ const appLinking = {
   prefixes: ["corepet://app", "corepet://", "https://corepet.com.br/app"],
   config: {
     screens: {
+      Login: "login",
+      Register: "cadastro",
+      ForgotPassword: "recuperar-senha",
       Pedidos: {
         screens: {
           ListaPedidos: "pedidos",
