@@ -1,4 +1,4 @@
-import { Ban, Edit3, RotateCcw, Trash2 } from "lucide-react";
+import { Ban, Edit3, RotateCcw, Trash2, Wallet } from "lucide-react";
 import ActionButton from "../ui/ActionButton";
 import DataTable from "../ui/DataTable";
 import MoneyCell from "../ui/MoneyCell";
@@ -22,11 +22,13 @@ export default function ContasPagarTable({
   excluirContaPagar,
   contaTemPagamento,
   totalSelecionadas,
+  abrirPagamentoEmLote,
   editarContaSelecionada,
   estornarContasSelecionadas,
   cancelarContasSelecionadas,
   excluirContasSelecionadas,
   limparSelecaoContas,
+  haContaPagavelSelecionada,
   haContaPagaSelecionada,
   haContaCancelavelSelecionada,
   haContaExcluivelSelecionada,
@@ -239,6 +241,17 @@ export default function ContasPagarTable({
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <ActionButton
+                intent="create"
+                size="xs"
+                icon={Wallet}
+                disabled={!haContaPagavelSelecionada}
+                onClick={abrirPagamentoEmLote}
+                title="Baixar em lote os lancamentos selecionados com saldo aberto"
+                type="button"
+              >
+                Pagar selecionados
+              </ActionButton>
               <ActionButton
                 intent="edit"
                 tone="soft"

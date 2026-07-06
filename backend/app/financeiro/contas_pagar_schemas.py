@@ -113,6 +113,22 @@ class PagamentoCreate(BaseModel):
     observacoes: Optional[str] = None
 
 
+class PagamentoLoteCreate(BaseModel):
+    conta_ids: List[int]
+    data_pagamento: date
+    forma_pagamento_id: Optional[int] = None
+    conta_bancaria_id: Optional[int] = None
+    observacoes: Optional[str] = None
+
+    @field_validator("conta_ids")
+    @classmethod
+    def validar_conta_ids(cls, valor):
+        ids_unicos = list(dict.fromkeys(int(item) for item in valor if item))
+        if not ids_unicos:
+            raise ValueError("Selecione pelo menos uma conta para pagar.")
+        return ids_unicos
+
+
 class ContaPagarOperacaoRequest(BaseModel):
     motivo: Optional[str] = None
 

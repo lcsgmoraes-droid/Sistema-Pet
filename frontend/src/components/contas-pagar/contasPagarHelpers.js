@@ -40,6 +40,35 @@ export function calcularIntervaloPeriodoRapido(periodo) {
   };
 }
 
+export function criarFiltrosPadraoContasPagar() {
+  const hoje = calcularIntervaloPeriodoRapido("hoje");
+  return {
+    status: "todos",
+    fornecedor_id: null,
+    data_inicio: hoje.data_inicio,
+    data_fim: hoje.data_fim,
+    apenas_vencidas: false,
+    apenas_vencer: false,
+    numero_nf: "",
+    tipo_custo: "todos",
+    origem: "todos",
+    busca: "",
+    data_campo: "vencimento",
+    fornecedor_busca: "",
+    tipo_despesa_id: "",
+    periodo_rapido: "hoje",
+    ocultar_taxas_cartao: true,
+    apenas_taxas_cartao: false,
+  };
+}
+
+export function ehTaxaCartao(conta) {
+  const texto = `${conta?.descricao || ""} ${conta?.documento || ""}`.toLowerCase();
+  return (
+    texto.includes("taxa credito") || texto.includes("taxa debito") || texto.includes("taxa cartao")
+  );
+}
+
 export function extrairMensagemErroPagamento(error) {
   const detail = error?.response?.data?.detail ?? error?.response?.data?.message;
 

@@ -51,6 +51,24 @@ def test_nota_processada_pode_abrir_lancamento_de_movimentos_pendentes():
     assert "carregarPreviewProcessamento(nota.id)" in table_source
 
 
+def test_entrada_xml_lista_tem_filtros_operacionais_de_nf():
+    table_source = read_source(
+        "frontend/src/components/entrada-xml/EntradaXmlNotasTable.jsx"
+    )
+
+    assert "filtrosNotas" in table_source
+    assert "setFiltrosNotas" in table_source
+    assert "Fornecedor" in table_source
+    assert "NF ou chave" in table_source
+    assert "Data inicial" in table_source
+    assert "Data final" in table_source
+    assert "Conferencia" in table_source
+    assert "limparFiltrosNotas" in table_source
+    assert "nota.fornecedor_nome" in table_source
+    assert "nota.numero_nota" in table_source
+    assert "nota.chave_acesso" in table_source
+
+
 def test_acoes_ja_lancadas_ficam_bloqueadas_na_revisao():
     source = read_source(
         "frontend/src/components/entrada-xml/EntradaXmlRevisaoPrecosModal.jsx"

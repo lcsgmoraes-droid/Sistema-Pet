@@ -7,6 +7,7 @@ import PageHeader from "../ui/PageHeader";
 import ContasPagarFilters from "./ContasPagarFilters";
 import ContasPagarTable from "./ContasPagarTable";
 import ContasPagarModals from "./ContasPagarModals";
+import ContasPagarPagamentoLoteModal from "./ContasPagarPagamentoLoteModal";
 
 export default function ContasPagarView({
   loading,
@@ -19,11 +20,14 @@ export default function ContasPagarView({
   tiposDespesaOrdenados,
   aplicarPeriodoRapido,
   filtrarDespesasCaixa,
+  filtrarTaxasCartao,
+  alternarOcultarTaxasCartao,
   limparFiltros,
   aplicarFiltros,
   handleFiltrosSubmit,
   contasVisiveis,
   contasSelecionadas,
+  contasSelecionadasObjetos,
   todasVisiveisSelecionadas,
   algumasVisiveisSelecionadas,
   selecionarTodasContasVisiveis,
@@ -39,11 +43,13 @@ export default function ContasPagarView({
   excluirContaPagar,
   contaTemPagamento,
   totalSelecionadas,
+  abrirPagamentoEmLote,
   editarContaSelecionada,
   estornarContasSelecionadas,
   cancelarContasSelecionadas,
   excluirContasSelecionadas,
   limparSelecaoContas,
+  haContaPagavelSelecionada,
   haContaPagaSelecionada,
   haContaCancelavelSelecionada,
   haContaExcluivelSelecionada,
@@ -53,6 +59,13 @@ export default function ContasPagarView({
   formatarMoeda,
   dadosPagamento,
   setDadosPagamento,
+  mostrarModalPagamentoLote,
+  setMostrarModalPagamentoLote,
+  dadosPagamentoLote,
+  setDadosPagamentoLote,
+  handleFormaPagamentoLoteChange,
+  registrarPagamentoEmLote,
+  saldoTotalPagamentoLote,
   handleFormaChange,
   formasPagamento,
   setMostrarModalNovaForma,
@@ -113,6 +126,8 @@ export default function ContasPagarView({
         tiposDespesaOrdenados={tiposDespesaOrdenados}
         aplicarPeriodoRapido={aplicarPeriodoRapido}
         filtrarDespesasCaixa={filtrarDespesasCaixa}
+        filtrarTaxasCartao={filtrarTaxasCartao}
+        alternarOcultarTaxasCartao={alternarOcultarTaxasCartao}
         limparFiltros={limparFiltros}
         aplicarFiltros={aplicarFiltros}
         handleFiltrosSubmit={handleFiltrosSubmit}
@@ -121,6 +136,7 @@ export default function ContasPagarView({
       <ContasPagarTable
         contasVisiveis={contasVisiveis}
         contasSelecionadas={contasSelecionadas}
+        contasSelecionadasObjetos={contasSelecionadasObjetos}
         todasVisiveisSelecionadas={todasVisiveisSelecionadas}
         algumasVisiveisSelecionadas={algumasVisiveisSelecionadas}
         selecionarTodasContasVisiveis={selecionarTodasContasVisiveis}
@@ -136,14 +152,30 @@ export default function ContasPagarView({
         excluirContaPagar={excluirContaPagar}
         contaTemPagamento={contaTemPagamento}
         totalSelecionadas={totalSelecionadas}
+        abrirPagamentoEmLote={abrirPagamentoEmLote}
         editarContaSelecionada={editarContaSelecionada}
         estornarContasSelecionadas={estornarContasSelecionadas}
         cancelarContasSelecionadas={cancelarContasSelecionadas}
         excluirContasSelecionadas={excluirContasSelecionadas}
         limparSelecaoContas={limparSelecaoContas}
+        haContaPagavelSelecionada={haContaPagavelSelecionada}
         haContaPagaSelecionada={haContaPagaSelecionada}
         haContaCancelavelSelecionada={haContaCancelavelSelecionada}
         haContaExcluivelSelecionada={haContaExcluivelSelecionada}
+      />
+
+      <ContasPagarPagamentoLoteModal
+        aberto={mostrarModalPagamentoLote}
+        contasSelecionadasObjetos={contasSelecionadasObjetos}
+        contasBancarias={contasBancarias}
+        dadosPagamentoLote={dadosPagamentoLote}
+        formasPagamento={formasPagamento}
+        formatarMoeda={formatarMoeda}
+        handleFormaPagamentoLoteChange={handleFormaPagamentoLoteChange}
+        onClose={() => setMostrarModalPagamentoLote(false)}
+        onConfirmar={registrarPagamentoEmLote}
+        saldoTotalPagamentoLote={saldoTotalPagamentoLote}
+        setDadosPagamentoLote={setDadosPagamentoLote}
       />
 
       <ContasPagarModals

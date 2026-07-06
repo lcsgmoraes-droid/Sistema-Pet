@@ -17,6 +17,23 @@ def contas_pagar_source() -> str:
             "frontend/src/components/contas-pagar/ContasPagarFilters.jsx",
             "frontend/src/components/contas-pagar/ContasPagarTable.jsx",
             "frontend/src/components/contas-pagar/ContasPagarModals.jsx",
+            "frontend/src/components/contas-pagar/ContasPagarPagamentoLoteModal.jsx",
+            "frontend/src/components/contas-pagar/useContasPagarSelection.js",
+        )
+    )
+
+
+def modal_conta_pagar_source() -> str:
+    return "\n".join(
+        read_repo(path)
+        for path in (
+            "frontend/src/components/ModalNovaContaPagar.jsx",
+            "frontend/src/components/modalNovaContaPagar/ModalNovaContaPagar.jsx",
+            "frontend/src/components/modalNovaContaPagar/useModalNovaContaPagarController.js",
+            "frontend/src/components/modalNovaContaPagar/contaPagarFormState.js",
+            "frontend/src/components/modalNovaContaPagar/ModalNovaContaPagarDialog.jsx",
+            "frontend/src/components/modalNovaContaPagar/ContaPagarBasicFields.jsx",
+            "frontend/src/components/modalNovaContaPagar/ContaPagarRecorrenciaSection.jsx",
         )
     )
 
@@ -27,7 +44,9 @@ def test_contas_pagar_foi_dividido_em_componentes_menores():
         "frontend/src/components/contas-pagar/ContasPagarFilters.jsx": 400,
         "frontend/src/components/contas-pagar/ContasPagarTable.jsx": 500,
         "frontend/src/components/contas-pagar/ContasPagarModals.jsx": 700,
+        "frontend/src/components/contas-pagar/ContasPagarPagamentoLoteModal.jsx": 220,
         "frontend/src/components/contas-pagar/contasPagarHelpers.js": 150,
+        "frontend/src/components/contas-pagar/useContasPagarSelection.js": 220,
     }
 
     for path, limite in arquivos.items():
@@ -60,13 +79,14 @@ def test_contas_pagar_lista_abre_edicao_de_lancamento():
 
 
 def test_modal_conta_pagar_suporta_modo_edicao():
-    source = read_repo("frontend/src/components/ModalNovaContaPagar.jsx")
+    source = modal_conta_pagar_source()
 
     assert "contaEdicao" in source
     assert "isEditando" in source
-    assert "api.patch(`/contas-pagar/${contaEdicao.id}`" in source
+    assert "api.patch(" in source
+    assert "`/contas-pagar/${contaEdicao.id}`" in source
     assert "Editar Conta a Pagar" in source
-    assert "Salvar Alteracoes" in source
+    assert "Salvar Altera" in source
 
 
 def test_contas_pagar_lista_edita_e_exclui_sem_botao_ver():
@@ -81,7 +101,7 @@ def test_contas_pagar_lista_edita_e_exclui_sem_botao_ver():
 
 
 def test_edicao_de_conta_pagar_expoe_recorrencia_no_modal():
-    source = read_repo("frontend/src/components/ModalNovaContaPagar.jsx")
+    source = modal_conta_pagar_source()
 
     assert "eh_recorrente: Boolean(conta?.eh_recorrente)" in source
     assert 'tipo_recorrencia: conta?.tipo_recorrencia || "mensal"' in source
@@ -91,10 +111,10 @@ def test_edicao_de_conta_pagar_expoe_recorrencia_no_modal():
         in source
     )
 
-    trecho_recorrencia = source.split("{/* Recorr", 1)[1].split("{/* Parcelamento", 1)[
-        0
-    ]
-    assert "!isEditando" not in trecho_recorrencia
+    recorrencia_source = read_repo(
+        "frontend/src/components/modalNovaContaPagar/ContaPagarRecorrenciaSection.jsx"
+    )
+    assert "!isEditando" not in recorrencia_source
 
 
 def test_contas_pagar_mantem_acoes_visiveis_com_textos_longos():
@@ -109,7 +129,7 @@ def test_contas_pagar_mantem_acoes_visiveis_com_textos_longos():
 
 def test_contas_pagar_frontend_trata_recorrencia_em_lote():
     source = contas_pagar_source()
-    modal_source = read_repo("frontend/src/components/ModalNovaContaPagar.jsx")
+    modal_source = modal_conta_pagar_source()
 
     assert "carregarRecorrenciaExclusao" in source
     assert "recorrenciasSelecionadasExclusao" in source
@@ -122,7 +142,7 @@ def test_contas_pagar_frontend_trata_recorrencia_em_lote():
 
 
 def test_modal_conta_pagar_nao_envia_data_recorrencia_vazia():
-    source = read_repo("frontend/src/components/ModalNovaContaPagar.jsx")
+    source = modal_conta_pagar_source()
 
     assert "normalizarDataOpcionalRecorrencia" in source
     assert "data_inicio_recorrencia:" in source
@@ -192,15 +212,41 @@ def test_contas_pagar_lista_tem_selecao_e_acoes_em_lote():
     source = contas_pagar_source()
 
     assert "contasSelecionadas" in source
+    assert "contasSelecionadasObjetos" in source
     assert "alternarSelecaoConta" in source
     assert "selecionarTodasContasVisiveis" in source
     assert "contas-pagar-select-all" in source
     assert "contas-pagar-select-row" in source
     assert "Acoes em lote" in source
+    assert "Pagar selecionados" in source
+    assert "abrirPagamentoEmLote" in source
     assert "Editar selecionado" in source
     assert "Estornar pagamento" in source
     assert "Cancelar lancamento" in source
     assert "Excluir selecionados" in source
+
+
+def test_contas_pagar_frontend_abre_hoje_e_oculta_taxas_cartao():
+    source = contas_pagar_source()
+
+    assert 'periodo_rapido: "hoje"' in source
+    assert "criarFiltrosPadraoContasPagar" in source
+    assert "ocultar_taxas_cartao" in source
+    assert "Taxas de cartao" in source
+    assert "Ocultar taxas" in source
+    assert "filtrarTaxasCartao" in source
+
+
+def test_contas_pagar_frontend_tem_modal_de_pagamento_em_lote():
+    source = contas_pagar_source()
+
+    assert "mostrarModalPagamentoLote" in source
+    assert "dadosPagamentoLote" in source
+    assert "registrarPagamentoEmLote" in source
+    assert 'api.post("/contas-pagar/pagar-lote"' in source
+    assert "Pagamento em lote" in source
+    assert "Saldo total selecionado" in source
+    assert "conta_ids: contasParaPagamentoLote.map" in source
 
 
 def test_contas_pagar_frontend_chama_endpoints_de_estorno_cancelamento_e_exclusao_em_lote():
@@ -215,7 +261,7 @@ def test_contas_pagar_frontend_chama_endpoints_de_estorno_cancelamento_e_exclusa
 
 
 def test_modal_conta_pagar_pergunta_antes_de_replicar_nome_recorrente():
-    source = read_repo("frontend/src/components/ModalNovaContaPagar.jsx")
+    source = modal_conta_pagar_source()
 
     assert "confirmarReplicacaoDescricao" in source
     assert "window.confirm" in source

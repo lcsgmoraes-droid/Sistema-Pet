@@ -51,6 +51,8 @@ def listar_contas_pagar(
     data_fim: Optional[date] = Query(None),
     apenas_vencidas: bool = Query(False),
     apenas_vencer: bool = Query(False),
+    ocultar_taxas_cartao: bool = Query(False),
+    apenas_taxas_cartao: bool = Query(False),
     numero_nf: Optional[str] = Query(None),
     limit: int = Query(100, le=500),
     offset: int = Query(0, ge=0),
@@ -131,6 +133,19 @@ def listar_contas_pagar(
                 ContaPagar.fornecedor_id.in_(fornecedores_match),
             )
         )
+
+    taxa_cartao_condition = or_(
+        _expressao_texto_busca(ContaPagar.descricao).like("%taxa credito%"),
+        _expressao_texto_busca(ContaPagar.descricao).like("%taxa debito%"),
+        _expressao_texto_busca(ContaPagar.descricao).like("%taxa cartao%"),
+        _expressao_texto_busca(ContaPagar.documento).like("%taxa credito%"),
+        _expressao_texto_busca(ContaPagar.documento).like("%taxa debito%"),
+        _expressao_texto_busca(ContaPagar.documento).like("%taxa cartao%"),
+    )
+    if apenas_taxas_cartao:
+        query = query.filter(taxa_cartao_condition)
+    elif ocultar_taxas_cartao:
+        query = query.filter(~taxa_cartao_condition)
 
     data_column = ContaPagar.data_vencimento
     if data_campo == "pagamento":

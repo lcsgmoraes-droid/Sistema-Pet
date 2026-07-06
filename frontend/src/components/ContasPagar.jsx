@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import api from "../api";
 import { toast } from "react-hot-toast";
 import { safeArray } from "../utils/safeArray";
@@ -8,6 +8,7 @@ import { formatMoneyCellValue } from "./ui/MoneyCell";
 import StatusBadge from "./ui/StatusBadge";
 import {
   calcularIntervaloPeriodoRapido,
+  criarFiltrosPadraoContasPagar,
   extrairMensagemErroPagamento,
   formatarDataISO,
 } from "./contas-pagar/contasPagarHelpers";
@@ -15,22 +16,7 @@ import {
 const ContasPagar = () => {
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filtros, setFiltros] = useState({
-    status: "todos",
-    fornecedor_id: null,
-    data_inicio: "",
-    data_fim: "",
-    apenas_vencidas: false,
-    apenas_vencer: false,
-    numero_nf: "",
-    tipo_custo: "todos",
-    origem: "todos",
-    busca: "",
-    data_campo: "vencimento",
-    fornecedor_busca: "",
-    tipo_despesa_id: "",
-    periodo_rapido: "",
-  });
+  const [filtros, setFiltros] = useState(criarFiltrosPadraoContasPagar);
 
   const [fornecedores, setFornecedores] = useState([]);
   const [categoriasFinanceiras, setCategoriasFinanceiras] = useState([]);
@@ -38,6 +24,7 @@ const ContasPagar = () => {
   const [tiposDespesa, setTiposDespesa] = useState([]);
   const [contaSelecionada, setContaSelecionada] = useState(null);
   const [mostrarModalPagamento, setMostrarModalPagamento] = useState(false);
+  const [mostrarModalPagamentoLote, setMostrarModalPagamentoLote] = useState(false);
   const [mostrarModalNovaConta, setMostrarModalNovaConta] = useState(false);
   const [contaEdicao, setContaEdicao] = useState(null);
   const [mostrarModalClassificacao, setMostrarModalClassificacao] = useState(false);
@@ -73,6 +60,12 @@ const ContasPagar = () => {
     valor_desconto: 0,
     observacoes: "",
   });
+  const [dadosPagamentoLote, setDadosPagamentoLote] = useState({
+    data_pagamento: formatarDataISO(new Date()),
+    forma_pagamento_id: "",
+    conta_bancaria_id: "",
+    observacoes: "",
+  });
 
   useEffect(() => {
     carregarDados();
@@ -89,6 +82,32 @@ const ContasPagar = () => {
     }));
   };
 
+  const montarParamsFiltros = (filtrosParaAplicar = filtros) => {
+    const params = new URLSearchParams();
+    params.append("_t", Date.now());
+    if (filtrosParaAplicar.status !== "todos") params.append("status", filtrosParaAplicar.status);
+    if (filtrosParaAplicar.fornecedor_id)
+      params.append("fornecedor_id", filtrosParaAplicar.fornecedor_id);
+    if (filtrosParaAplicar.data_inicio)
+      params.append("data_inicio", filtrosParaAplicar.data_inicio);
+    if (filtrosParaAplicar.data_fim) params.append("data_fim", filtrosParaAplicar.data_fim);
+    if (filtrosParaAplicar.apenas_vencidas) params.append("apenas_vencidas", "true");
+    if (filtrosParaAplicar.apenas_vencer) params.append("apenas_vencer", "true");
+    if (filtrosParaAplicar.ocultar_taxas_cartao) params.append("ocultar_taxas_cartao", "true");
+    if (filtrosParaAplicar.apenas_taxas_cartao) params.append("apenas_taxas_cartao", "true");
+    if (filtrosParaAplicar.numero_nf) params.append("numero_nf", filtrosParaAplicar.numero_nf);
+    if (filtrosParaAplicar.tipo_custo !== "todos")
+      params.append("tipo_custo", filtrosParaAplicar.tipo_custo);
+    if (filtrosParaAplicar.origem !== "todos") params.append("origem", filtrosParaAplicar.origem);
+    if (filtrosParaAplicar.busca) params.append("busca", filtrosParaAplicar.busca);
+    if (filtrosParaAplicar.fornecedor_busca)
+      params.append("fornecedor_nome", filtrosParaAplicar.fornecedor_busca);
+    if (filtrosParaAplicar.data_campo) params.append("data_campo", filtrosParaAplicar.data_campo);
+    if (filtrosParaAplicar.tipo_despesa_id)
+      params.append("tipo_despesa_id", filtrosParaAplicar.tipo_despesa_id);
+    return params;
+  };
+
   const carregarDados = async () => {
     try {
       const [
@@ -100,7 +119,7 @@ const ContasPagar = () => {
         subcategoriasRes,
         tiposRes,
       ] = await Promise.allSettled([
-        api.get(`/contas-pagar/?_t=${Date.now()}`),
+        api.get(`/contas-pagar/?${montarParamsFiltros(filtros)}`),
         api.get(`/clientes/?tipo_cadastro=fornecedor`),
         carregarFormasPagamento(),
         api.get(`/contas-bancarias?apenas_ativas=true`),
@@ -149,47 +168,12 @@ const ContasPagar = () => {
     }
   };
 
-  const filtrosPadrao = {
-    status: "todos",
-    fornecedor_id: null,
-    data_inicio: "",
-    data_fim: "",
-    apenas_vencidas: false,
-    apenas_vencer: false,
-    numero_nf: "",
-    tipo_custo: "todos",
-    origem: "todos",
-    busca: "",
-    data_campo: "vencimento",
-    fornecedor_busca: "",
-    tipo_despesa_id: "",
-    periodo_rapido: "",
-  };
+  const filtrosPadrao = criarFiltrosPadraoContasPagar();
 
   const aplicarFiltros = async (filtrosParaAplicar = filtros) => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (filtrosParaAplicar.status !== "todos") params.append("status", filtrosParaAplicar.status);
-      if (filtrosParaAplicar.fornecedor_id)
-        params.append("fornecedor_id", filtrosParaAplicar.fornecedor_id);
-      if (filtrosParaAplicar.data_inicio)
-        params.append("data_inicio", filtrosParaAplicar.data_inicio);
-      if (filtrosParaAplicar.data_fim) params.append("data_fim", filtrosParaAplicar.data_fim);
-      if (filtrosParaAplicar.apenas_vencidas) params.append("apenas_vencidas", "true");
-      if (filtrosParaAplicar.apenas_vencer) params.append("apenas_vencer", "true");
-      if (filtrosParaAplicar.numero_nf) params.append("numero_nf", filtrosParaAplicar.numero_nf);
-      if (filtrosParaAplicar.tipo_custo !== "todos")
-        params.append("tipo_custo", filtrosParaAplicar.tipo_custo);
-      if (filtrosParaAplicar.origem !== "todos") params.append("origem", filtrosParaAplicar.origem);
-      if (filtrosParaAplicar.busca) params.append("busca", filtrosParaAplicar.busca);
-      if (filtrosParaAplicar.fornecedor_busca)
-        params.append("fornecedor_nome", filtrosParaAplicar.fornecedor_busca);
-      if (filtrosParaAplicar.data_campo) params.append("data_campo", filtrosParaAplicar.data_campo);
-      if (filtrosParaAplicar.tipo_despesa_id)
-        params.append("tipo_despesa_id", filtrosParaAplicar.tipo_despesa_id);
-
-      const response = await api.get(`/contas-pagar/?${params}`);
+      const response = await api.get(`/contas-pagar/?${montarParamsFiltros(filtrosParaAplicar)}`);
 
       setContas(safeArray(response.data));
     } catch (error) {
@@ -209,9 +193,36 @@ const ContasPagar = () => {
       data_campo: filtros.data_campo || "pagamento",
       data_inicio: filtros.data_inicio,
       data_fim: filtros.data_fim,
+      periodo_rapido: filtros.periodo_rapido || "",
+      ocultar_taxas_cartao: false,
+      apenas_taxas_cartao: false,
     };
     setFiltros(filtrosCaixa);
     aplicarFiltros(filtrosCaixa);
+  };
+
+  const filtrarTaxasCartao = () => {
+    const filtrosTaxas = {
+      ...filtrosPadrao,
+      data_inicio: filtros.data_inicio,
+      data_fim: filtros.data_fim,
+      data_campo: filtros.data_campo || "vencimento",
+      periodo_rapido: filtros.periodo_rapido || "",
+      ocultar_taxas_cartao: false,
+      apenas_taxas_cartao: true,
+    };
+    setFiltros(filtrosTaxas);
+    aplicarFiltros(filtrosTaxas);
+  };
+
+  const alternarOcultarTaxasCartao = (ocultar) => {
+    const novosFiltros = {
+      ...filtros,
+      ocultar_taxas_cartao: ocultar,
+      apenas_taxas_cartao: false,
+    };
+    setFiltros(novosFiltros);
+    aplicarFiltros(novosFiltros);
   };
 
   const aplicarPeriodoRapido = (periodo) => {
@@ -346,12 +357,14 @@ const ContasPagar = () => {
     cancelarContasSelecionadas,
     contaTemPagamento,
     contasSelecionadas,
+    contasSelecionadasObjetos,
     contasVisiveis,
     editarContaSelecionada,
     estornarContasSelecionadas,
     excluirContasSelecionadas,
     haContaCancelavelSelecionada,
     haContaExcluivelSelecionada,
+    haContaPagavelSelecionada,
     haContaPagaSelecionada,
     limparSelecaoContas,
     selecionarTodasContasVisiveis,
@@ -362,6 +375,103 @@ const ContasPagar = () => {
     carregarDados,
     abrirModalEdicao,
   });
+
+  const contasParaPagamentoLote = useMemo(
+    () =>
+      safeArray(contasSelecionadasObjetos).filter(
+        (conta) =>
+          !["pago", "cancelado"].includes(conta.status) &&
+          Number(conta.valor_final || 0) > Number(conta.valor_pago || 0),
+      ),
+    [contasSelecionadasObjetos],
+  );
+
+  const saldoTotalPagamentoLote = useMemo(
+    () =>
+      contasParaPagamentoLote.reduce(
+        (total, conta) => total + (Number(conta.valor_final || 0) - Number(conta.valor_pago || 0)),
+        0,
+      ),
+    [contasParaPagamentoLote],
+  );
+
+  const abrirPagamentoEmLote = () => {
+    if (contasParaPagamentoLote.length === 0) {
+      toast.error("Selecione pelo menos uma conta com saldo aberto para pagar");
+      return;
+    }
+
+    setDadosPagamentoLote({
+      data_pagamento: formatarDataISO(new Date()),
+      forma_pagamento_id: "",
+      conta_bancaria_id: "",
+      observacoes: "",
+    });
+    setMostrarModalPagamentoLote(true);
+  };
+
+  const handleFormaPagamentoLoteChange = (formaId) => {
+    const forma = formasPagamento.find((f) => f.id === parseInt(formaId, 10));
+    setDadosPagamentoLote({
+      ...dadosPagamentoLote,
+      forma_pagamento_id: parseInt(formaId, 10) || "",
+      conta_bancaria_id:
+        forma?.conta_bancaria_destino_id || dadosPagamentoLote.conta_bancaria_id || "",
+    });
+  };
+
+  const confirmarSaldoNegativoPagamentoEmLote = () => {
+    const contaBancaria = safeArray(contasBancarias).find(
+      (conta) => Number(conta.id) === Number(dadosPagamentoLote.conta_bancaria_id),
+    );
+
+    if (!contaBancaria || saldoTotalPagamentoLote <= Number(contaBancaria.saldo_atual || 0)) {
+      return true;
+    }
+
+    const saldoDepois = Number(contaBancaria.saldo_atual || 0) - saldoTotalPagamentoLote;
+    const mensagem = [
+      `Saldo insuficiente na conta bancaria "${contaBancaria.nome}".`,
+      "",
+      `Saldo atual: ${formatarMoeda(contaBancaria.saldo_atual || 0)}`,
+      `Pagamento em lote: ${formatarMoeda(saldoTotalPagamentoLote)}`,
+      `A conta ficara negativa em ${formatarMoeda(Math.abs(saldoDepois))}.`,
+      "",
+      "Deseja baixar mesmo assim?",
+    ].join("\n");
+
+    return window.confirm(mensagem);
+  };
+
+  const registrarPagamentoEmLote = async () => {
+    if (contasParaPagamentoLote.length === 0) {
+      toast.error("Selecione pelo menos uma conta com saldo aberto para pagar");
+      return;
+    }
+    if (!confirmarSaldoNegativoPagamentoEmLote()) {
+      return;
+    }
+
+    try {
+      const response = await api.post("/contas-pagar/pagar-lote", {
+        conta_ids: contasParaPagamentoLote.map((conta) => conta.id),
+        data_pagamento: dadosPagamentoLote.data_pagamento || formatarDataISO(new Date()),
+        forma_pagamento_id: dadosPagamentoLote.forma_pagamento_id || null,
+        conta_bancaria_id: dadosPagamentoLote.conta_bancaria_id || null,
+        observacoes: dadosPagamentoLote.observacoes,
+      });
+
+      toast.success(
+        `${response.data?.pagamentos_registrados || contasParaPagamentoLote.length} pagamento(s) registrado(s)`,
+      );
+      setMostrarModalPagamentoLote(false);
+      limparSelecaoContas();
+      carregarDados();
+    } catch (error) {
+      console.error("Erro ao registrar pagamentos em lote:", error);
+      toast.error(extrairMensagemErroPagamento(error));
+    }
+  };
 
   const excluirContaPagar = async (conta) => {
     if (conta.eh_recorrente || conta.conta_recorrencia_origem_id) {
@@ -591,11 +701,14 @@ const ContasPagar = () => {
       tiposDespesaOrdenados={tiposDespesaOrdenados}
       aplicarPeriodoRapido={aplicarPeriodoRapido}
       filtrarDespesasCaixa={filtrarDespesasCaixa}
+      filtrarTaxasCartao={filtrarTaxasCartao}
+      alternarOcultarTaxasCartao={alternarOcultarTaxasCartao}
       limparFiltros={limparFiltros}
       aplicarFiltros={aplicarFiltros}
       handleFiltrosSubmit={handleFiltrosSubmit}
       contasVisiveis={contasVisiveis}
       contasSelecionadas={contasSelecionadas}
+      contasSelecionadasObjetos={contasParaPagamentoLote}
       todasVisiveisSelecionadas={todasVisiveisSelecionadas}
       algumasVisiveisSelecionadas={algumasVisiveisSelecionadas}
       selecionarTodasContasVisiveis={selecionarTodasContasVisiveis}
@@ -611,11 +724,13 @@ const ContasPagar = () => {
       excluirContaPagar={excluirContaPagar}
       contaTemPagamento={contaTemPagamento}
       totalSelecionadas={totalSelecionadas}
+      abrirPagamentoEmLote={abrirPagamentoEmLote}
       editarContaSelecionada={editarContaSelecionada}
       estornarContasSelecionadas={estornarContasSelecionadas}
       cancelarContasSelecionadas={cancelarContasSelecionadas}
       excluirContasSelecionadas={excluirContasSelecionadas}
       limparSelecaoContas={limparSelecaoContas}
+      haContaPagavelSelecionada={haContaPagavelSelecionada}
       haContaPagaSelecionada={haContaPagaSelecionada}
       haContaCancelavelSelecionada={haContaCancelavelSelecionada}
       haContaExcluivelSelecionada={haContaExcluivelSelecionada}
@@ -625,6 +740,13 @@ const ContasPagar = () => {
       formatarMoeda={formatarMoeda}
       dadosPagamento={dadosPagamento}
       setDadosPagamento={setDadosPagamento}
+      mostrarModalPagamentoLote={mostrarModalPagamentoLote}
+      setMostrarModalPagamentoLote={setMostrarModalPagamentoLote}
+      dadosPagamentoLote={dadosPagamentoLote}
+      setDadosPagamentoLote={setDadosPagamentoLote}
+      handleFormaPagamentoLoteChange={handleFormaPagamentoLoteChange}
+      registrarPagamentoEmLote={registrarPagamentoEmLote}
+      saldoTotalPagamentoLote={saldoTotalPagamentoLote}
       handleFormaChange={handleFormaChange}
       formasPagamento={formasPagamento}
       setMostrarModalNovaForma={setMostrarModalNovaForma}

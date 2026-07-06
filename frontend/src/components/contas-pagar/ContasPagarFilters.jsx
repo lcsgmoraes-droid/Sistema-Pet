@@ -11,6 +11,8 @@ export default function ContasPagarFilters({
   tiposDespesaOrdenados,
   aplicarPeriodoRapido,
   filtrarDespesasCaixa,
+  filtrarTaxasCartao,
+  alternarOcultarTaxasCartao,
   limparFiltros,
   aplicarFiltros,
   handleFiltrosSubmit,
@@ -208,6 +210,15 @@ export default function ContasPagarFilters({
               <input
                 type="checkbox"
                 className="w-4 h-4"
+                checked={filtros.ocultar_taxas_cartao}
+                onChange={(e) => alternarOcultarTaxasCartao(e.target.checked)}
+              />
+              <span className="text-sm">Ocultar taxas</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="w-4 h-4"
                 checked={filtros.apenas_vencidas}
                 onChange={(e) =>
                   setFiltros({
@@ -237,6 +248,15 @@ export default function ContasPagarFilters({
           </div>
 
           <div className="md:col-span-5 flex flex-wrap items-end justify-end gap-2">
+            <ActionButton
+              intent="warning"
+              tone="soft"
+              size="sm"
+              onClick={filtrarTaxasCartao}
+              type="button"
+            >
+              Taxas de cartao
+            </ActionButton>
             <ActionButton
               intent="warning"
               tone="soft"

@@ -16,6 +16,9 @@ export default function useContasPagarSelection({ contas, carregarDados, abrirMo
 
   const contaTemPagamento = (conta) =>
     Number(conta?.valor_pago || 0) > 0 || ["pago", "parcial"].includes(conta?.status);
+  const contaPodePagar = (conta) =>
+    !["pago", "cancelado"].includes(conta?.status) &&
+    Number(conta?.valor_final || 0) > Number(conta?.valor_pago || 0);
   const contaPodeExcluir = (conta) => !contaTemPagamento(conta);
   const contaPodeCancelar = (conta) => !contaTemPagamento(conta) && conta?.status !== "cancelado";
 
@@ -30,6 +33,7 @@ export default function useContasPagarSelection({ contas, carregarDados, abrirMo
     contasSelecionadas.includes(conta.id),
   );
   const haContaPagaSelecionada = contasSelecionadasObjetos.some(contaTemPagamento);
+  const haContaPagavelSelecionada = contasSelecionadasObjetos.some(contaPodePagar);
   const haContaCancelavelSelecionada = contasSelecionadasObjetos.some(contaPodeCancelar);
   const haContaExcluivelSelecionada = contasSelecionadasObjetos.some(contaPodeExcluir);
 
@@ -152,12 +156,14 @@ export default function useContasPagarSelection({ contas, carregarDados, abrirMo
     cancelarContasSelecionadas,
     contaTemPagamento,
     contasSelecionadas,
+    contasSelecionadasObjetos,
     contasVisiveis,
     editarContaSelecionada,
     estornarContasSelecionadas,
     excluirContasSelecionadas,
     haContaCancelavelSelecionada,
     haContaExcluivelSelecionada,
+    haContaPagavelSelecionada,
     haContaPagaSelecionada,
     limparSelecaoContas,
     selecionarTodasContasVisiveis,
