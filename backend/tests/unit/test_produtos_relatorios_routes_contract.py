@@ -13,6 +13,12 @@ def _route_paths(router):
     return {getattr(route, "path", None) for route in router.routes}
 
 
+def _read_repo(path):
+    from pathlib import Path
+
+    return (Path(__file__).resolve().parents[3] / path).read_text(encoding="utf-8")
+
+
 def test_produtos_relatorios_routes_ficam_em_subrouter_dedicado():
     from app.produtos.relatorios_routes import router
 
@@ -23,3 +29,12 @@ def test_produtos_router_inclui_relatorios_sem_mudar_paths():
     from app.produtos_routes import router
 
     assert EXPECTED_PRODUTOS_RELATORIO_PATHS.issubset(_route_paths(router))
+
+
+def test_relatorios_com_busca_de_produto_usam_regra_central_de_eans():
+    validade = _read_repo("backend/app/produtos/relatorios_validade_routes.py")
+    valorizacao = _read_repo("backend/app/produtos/relatorios_valorizacao_routes.py")
+
+    assert "_produto_search_conditions(palavra)" in validade
+    assert "ProdutoLote.nome_lote.ilike(busca_pattern)" in validade
+    assert "_produto_search_conditions(palavra)" in valorizacao
