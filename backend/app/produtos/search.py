@@ -51,11 +51,15 @@ def _build_produto_search_order_clause(termo_busca: Optional[str]):
     prioridade = 1
 
     for column in PRODUTO_CODIGO_EXATO_COLUMNS:
-        order_cases.append((func.lower(func.coalesce(column, "")) == termo_lower, prioridade))
+        order_cases.append(
+            (func.lower(func.coalesce(column, "")) == termo_lower, prioridade)
+        )
         prioridade += 1
 
     if PRODUTO_EAN_ALTERNATIVO_COLUMN is not None:
-        order_cases.append((PRODUTO_EAN_ALTERNATIVO_COLUMN.ilike(contains_pattern), prioridade))
+        order_cases.append(
+            (PRODUTO_EAN_ALTERNATIVO_COLUMN.ilike(contains_pattern), prioridade)
+        )
         prioridade += 1
 
     digitos = _only_digits(termo)
@@ -65,11 +69,16 @@ def _build_produto_search_order_clause(termo_busca: Optional[str]):
         and _should_use_digit_fallback(termo)
     ):
         order_cases.append(
-            (_digits_expr(PRODUTO_EAN_ALTERNATIVO_COLUMN).ilike(f"%{digitos}%"), prioridade)
+            (
+                _digits_expr(PRODUTO_EAN_ALTERNATIVO_COLUMN).ilike(f"%{digitos}%"),
+                prioridade,
+            )
         )
         prioridade += 1
 
-    order_cases.append((func.lower(func.coalesce(Produto.nome, "")) == termo_lower, prioridade))
+    order_cases.append(
+        (func.lower(func.coalesce(Produto.nome, "")) == termo_lower, prioridade)
+    )
     prioridade += 1
 
     for column in PRODUTO_CODIGO_EXATO_COLUMNS:
@@ -77,7 +86,9 @@ def _build_produto_search_order_clause(termo_busca: Optional[str]):
         prioridade += 1
 
     if PRODUTO_EAN_ALTERNATIVO_COLUMN is not None:
-        order_cases.append((PRODUTO_EAN_ALTERNATIVO_COLUMN.ilike(contains_pattern), prioridade))
+        order_cases.append(
+            (PRODUTO_EAN_ALTERNATIVO_COLUMN.ilike(contains_pattern), prioridade)
+        )
         prioridade += 1
 
     order_cases.append((Produto.nome.ilike(prefix_pattern), prioridade))
@@ -125,7 +136,10 @@ def _produto_search_conditions(palavra: str):
     conditions = [
         _unaccent_ilike(Produto.nome, busca_pattern),
         _unaccent_ilike(Produto.codigo, busca_pattern),
-        *[_unaccent_ilike(column, busca_pattern) for column in PRODUTO_EAN_SEARCH_COLUMNS],
+        *[
+            _unaccent_ilike(column, busca_pattern)
+            for column in PRODUTO_EAN_SEARCH_COLUMNS
+        ],
         Produto.marca.has(_unaccent_ilike(Marca.nome, busca_pattern)),
         Produto.categoria.has(_unaccent_ilike(Categoria.nome, busca_pattern)),
         Produto.departamento.has(_unaccent_ilike(Departamento.nome, busca_pattern)),
