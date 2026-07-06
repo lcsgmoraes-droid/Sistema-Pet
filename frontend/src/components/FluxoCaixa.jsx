@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../api";
 import {
@@ -9,6 +10,7 @@ import {
   Brain,
   AlertTriangle,
   Sparkles,
+  Landmark,
 } from "lucide-react";
 import ChatIAModal from "./ChatIAModal";
 import ProjecoesIA from "./ProjecoesIA";
@@ -57,6 +59,7 @@ const FLUXO_CAIXA_TABS = [
 ];
 
 const FluxoCaixa = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [dados, setDados] = useState(null);
 
@@ -317,15 +320,26 @@ const FluxoCaixa = () => {
     <div className="p-6 space-y-6">
       <PageHeader
         actions={
-          <ActionButton
-            onClick={() => setChatIAAberto(true)}
-            intent="neutral"
-            tone="soft"
-            size="md"
-            icon={Brain}
-          >
-            Chat IA
-          </ActionButton>
+          <>
+            <ActionButton
+              onClick={() => navigate("/financeiro/ajuste-saldos")}
+              intent="neutral"
+              tone="soft"
+              size="md"
+              icon={Landmark}
+            >
+              Ajustar saldos
+            </ActionButton>
+            <ActionButton
+              onClick={() => setChatIAAberto(true)}
+              intent="neutral"
+              tone="soft"
+              size="md"
+              icon={Brain}
+            >
+              Chat IA
+            </ActionButton>
+          </>
         }
         icon={DollarSign}
         subtitle="Previsto vs realizado, com lançamentos automáticos de contas a pagar e receber"

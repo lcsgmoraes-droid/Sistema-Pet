@@ -377,6 +377,12 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
           permission: "financeiro.fluxo_caixa",
         },
         {
+          path: "/financeiro/ajuste-saldos",
+          label: "Ajuste de Saldos",
+          modulo: "financeiro_erp",
+          permission: "financeiro.fluxo_caixa",
+        },
+        {
           path: "/financeiro/dre",
           label: "DRE",
           modulo: "financeiro_erp",

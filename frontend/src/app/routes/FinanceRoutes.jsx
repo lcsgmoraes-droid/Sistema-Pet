@@ -1,6 +1,7 @@
 import { Route } from "react-router-dom";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import {
+  AjusteSaldosBancarios,
   ConciliacaoBancaria,
   ConciliacaoCartoesTabs,
   ContasPagar,
@@ -53,6 +54,7 @@ export function createFinanceRoutes() {
       <Route path="financeiro/ponto-equilibrio" element={financeiroPage(<PontoEquilibrio />)} />
       <Route path="financeiro/contas-pagar" element={financeiroPage(<ContasPagar />)} />
       <Route path="financeiro/contas-receber" element={financeiroPage(<ContasReceber />)} />
+      <Route path="financeiro/ajuste-saldos" element={financeiroPage(<AjusteSaldosBancarios />)} />
       <Route
         path="financeiro/conciliacao-3abas"
         element={financeiroPage(<ConciliacaoCartoesTabs />)}
