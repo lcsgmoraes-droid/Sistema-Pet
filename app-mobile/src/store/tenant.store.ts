@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import { Linking } from 'react-native';
 import { create } from 'zustand';
-import { API_BASE_URL } from '../config';
+import api from '../services/api';
 
 export interface TenantInfo {
   id: string;
@@ -28,18 +28,19 @@ interface TenantState {
 
 const STORAGE_KEY = 'tenant_info';
 const API_UNAVAILABLE_MESSAGE = 'Servico temporariamente indisponivel. Tente novamente em instantes.';
+const API_NETWORK_MESSAGE = 'Nao foi possivel conectar ao CorePet. Verifique sua internet e tente novamente.';
 
-function apiPublicBaseUrl(): string {
-  return API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
-}
-
-async function apiErrorMessage(response: Response, fallback: string): Promise<string> {
-  if (response.status >= 500) {
+function apiErrorMessage(error: any, fallback: string): string {
+  const status = error?.response?.status;
+  if (status >= 500) {
     return API_UNAVAILABLE_MESSAGE;
   }
 
-  const body = await response.json().catch(() => ({}));
-  return body.detail || fallback;
+  if (!error?.response) {
+    return API_NETWORK_MESSAGE;
+  }
+
+  return error.response?.data?.detail || fallback;
 }
 
 export function extractStoreSlug(input: string): string {
@@ -99,13 +100,12 @@ async function fetchTenantBySlug(slug: string): Promise<TenantInfo> {
     throw new Error('Informe o codigo ou QR Code da loja.');
   }
 
-  const response = await fetch(`${apiPublicBaseUrl()}/api/ecommerce/tenant-slug/${slugLimpo}`);
-
-  if (!response.ok) {
-    throw new Error(await apiErrorMessage(response, 'Loja nao encontrada. Verifique o codigo.'));
+  try {
+    const { data } = await api.get<TenantInfo>(`/ecommerce/tenant-slug/${slugLimpo}`);
+    return data;
+  } catch (error: any) {
+    throw new Error(apiErrorMessage(error, 'Loja nao encontrada. Verifique o codigo.'));
   }
-
-  return response.json();
 }
 
 export const useTenantStore = create<TenantState>()((set) => ({
@@ -144,17 +144,18 @@ export const useTenantStore = create<TenantState>()((set) => ({
     const cidadeLimpa = cidade.trim();
     if (!cidadeLimpa) return [];
 
-    const params = new URLSearchParams({ cidade: cidadeLimpa });
-    if (uf?.trim()) params.set('uf', uf.trim().slice(0, 2).toUpperCase());
+    const params: Record<string, string> = { cidade: cidadeLimpa };
+    if (uf?.trim()) params.uf = uf.trim().slice(0, 2).toUpperCase();
 
-    const response = await fetch(`${apiPublicBaseUrl()}/api/ecommerce/tenants/sugerir?${params.toString()}`);
-    if (!response.ok) {
-      if (response.status === 404) return [];
-      throw new Error(await apiErrorMessage(response, 'Nao foi possivel buscar lojas pela localizacao.'));
+    try {
+      const { data } = await api.get<{ lojas?: TenantInfo[] }>('/ecommerce/tenants/sugerir', {
+        params,
+      });
+      return Array.isArray(data.lojas) ? data.lojas : [];
+    } catch (error: any) {
+      if (error?.response?.status === 404) return [];
+      throw new Error(apiErrorMessage(error, 'Nao foi possivel buscar lojas pela localizacao.'));
     }
-
-    const data = await response.json().catch(() => ({ lojas: [] }));
-    return Array.isArray(data.lojas) ? data.lojas : [];
   },
 
   confirmarTenant: async (tenant: TenantInfo) => {
