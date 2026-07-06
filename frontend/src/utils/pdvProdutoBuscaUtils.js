@@ -71,12 +71,9 @@ export function produtoCorrespondeBusca(
   if (termosBusca.length === 0) return true;
 
   const codigos = codigosProdutoParaBusca(produto);
-  const camposTexto = [
-    produto?.nome,
-    produto?.descricao,
-    produto?.descricao_curta,
-    ...codigos,
-  ].map((value) => normalizarTexto(value || ""));
+  const camposTexto = [produto?.nome, produto?.descricao, produto?.descricao_curta, ...codigos].map(
+    (value) => normalizarTexto(value || ""),
+  );
   const camposDigitos = codigos.map((codigo) => apenasDigitos(codigo));
 
   return termosBusca.every((termoBusca) => {
