@@ -27,9 +27,19 @@ interface TenantState {
 }
 
 const STORAGE_KEY = 'tenant_info';
+const API_UNAVAILABLE_MESSAGE = 'Servico temporariamente indisponivel. Tente novamente em instantes.';
 
 function apiPublicBaseUrl(): string {
   return API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
+}
+
+async function apiErrorMessage(response: Response, fallback: string): Promise<string> {
+  if (response.status >= 500) {
+    return API_UNAVAILABLE_MESSAGE;
+  }
+
+  const body = await response.json().catch(() => ({}));
+  return body.detail || fallback;
 }
 
 export function extractStoreSlug(input: string): string {
@@ -92,8 +102,7 @@ async function fetchTenantBySlug(slug: string): Promise<TenantInfo> {
   const response = await fetch(`${apiPublicBaseUrl()}/api/ecommerce/tenant-slug/${slugLimpo}`);
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.detail || 'Loja nao encontrada. Verifique o codigo.');
+    throw new Error(await apiErrorMessage(response, 'Loja nao encontrada. Verifique o codigo.'));
   }
 
   return response.json();
@@ -139,7 +148,10 @@ export const useTenantStore = create<TenantState>()((set) => ({
     if (uf?.trim()) params.set('uf', uf.trim().slice(0, 2).toUpperCase());
 
     const response = await fetch(`${apiPublicBaseUrl()}/api/ecommerce/tenants/sugerir?${params.toString()}`);
-    if (!response.ok) return [];
+    if (!response.ok) {
+      if (response.status === 404) return [];
+      throw new Error(await apiErrorMessage(response, 'Nao foi possivel buscar lojas pela localizacao.'));
+    }
 
     const data = await response.json().catch(() => ({ lojas: [] }));
     return Array.isArray(data.lojas) ? data.lojas : [];
