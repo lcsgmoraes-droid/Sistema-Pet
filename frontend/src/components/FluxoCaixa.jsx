@@ -322,13 +322,13 @@ const FluxoCaixa = () => {
         actions={
           <>
             <ActionButton
-              onClick={() => navigate("/financeiro/ajuste-saldos")}
+              onClick={() => navigate("/financeiro/bancos")}
               intent="neutral"
               tone="soft"
               size="md"
               icon={Landmark}
             >
-              Ajustar saldos
+              Bancos
             </ActionButton>
             <ActionButton
               onClick={() => setChatIAAberto(true)}

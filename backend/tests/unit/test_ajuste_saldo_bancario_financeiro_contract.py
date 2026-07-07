@@ -11,31 +11,41 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_ajuste_saldo_bancario_fica_no_modulo_financeiro():
+def test_bancos_fica_no_modulo_financeiro_com_extrato_e_modal():
     lazy_pages = _read(FRONTEND_ROOT / "app" / "lazyPages.jsx")
     finance_routes = _read(FRONTEND_ROOT / "app" / "routes" / "FinanceRoutes.jsx")
     menu_config = _read(FRONTEND_ROOT / "components" / "layout" / "menuConfig.js")
     contas_bancarias = _read(FRONTEND_ROOT / "components" / "ContasBancarias.jsx")
+    bancos_page = _read(FRONTEND_ROOT / "pages" / "BancosFinanceiro.jsx")
 
-    assert "AjusteSaldosBancarios" in lazy_pages
-    assert "AjusteSaldosBancarios" in finance_routes
-    assert 'path="financeiro/ajuste-saldos"' in finance_routes
-    assert 'path: "/financeiro/ajuste-saldos"' in menu_config
+    assert "BancosFinanceiro" in lazy_pages
+    assert "BancosFinanceiro" in finance_routes
+    assert 'path="financeiro/bancos"' in finance_routes
+    assert 'path: "/financeiro/bancos"' in menu_config
+    assert 'label: "Bancos"' in menu_config
+    assert "Extrato" in bancos_page
+    assert "modalAjuste" in bancos_page
+    assert "/movimentacoes" in bancos_page
+    assert "/ajustar-saldo" in bancos_page
 
     assert "Ajustar saldo" not in contas_bancarias
     assert "/ajustar-saldo" not in contas_bancarias
 
 
-def test_tela_financeira_ajuste_saldos_expoe_fluxo_em_lote():
-    source = _read(FRONTEND_ROOT / "pages" / "AjusteSaldosBancarios.jsx")
+def test_tela_bancos_expoe_ajuste_por_modal_e_saldo_por_conta():
+    source = _read(FRONTEND_ROOT / "pages" / "BancosFinanceiro.jsx")
     currency_input = _read(FRONTEND_ROOT / "components" / "CurrencyInput.jsx")
 
-    assert "Ajuste de saldos bancarios" in source
+    assert 'title="Bancos"' in source
     assert 'api.get("/contas-bancarias?apenas_ativas=true")' in source
+    assert "carregarMovimentacoes" in source
+    assert "/movimentacoes" in source
     assert "/ajustar-saldo" in source
+    assert "modalAjuste" in source
+    assert "resetarModalAjuste" in source
+    assert "resetarModalAjuste();" in source
     assert "novo_saldo" in source
     assert "descricao" in source
-    assert "Ajustar todos" in source
     assert "Ajustar saldo" in source
     assert "saldoAtualSistema" in source
     assert "diferenca" in source
