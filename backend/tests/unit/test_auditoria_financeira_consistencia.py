@@ -74,7 +74,25 @@ def _session():
                 status TEXT,
                 valor_final NUMERIC(12,2) NOT NULL,
                 valor_pago NUMERIC(12,2) NOT NULL,
-                nota_entrada_id INTEGER
+                nota_entrada_id INTEGER,
+                documento TEXT,
+                observacoes TEXT
+            )
+            """
+        )
+    )
+    db.execute(
+        text(
+            """
+            CREATE TABLE movimentacoes_caixa (
+                id INTEGER PRIMARY KEY,
+                tenant_id TEXT NOT NULL,
+                tipo TEXT,
+                valor NUMERIC(12,2) NOT NULL,
+                descricao TEXT,
+                categoria TEXT,
+                documento TEXT,
+                data_movimento TEXT
             )
             """
         )
@@ -149,15 +167,30 @@ def _session():
         text(
             """
             INSERT INTO contas_pagar (
-                id, tenant_id, descricao, data_pagamento, status, valor_final, valor_pago, nota_entrada_id
+                id, tenant_id, descricao, data_pagamento, status, valor_final, valor_pago,
+                nota_entrada_id, documento, observacoes
             )
             VALUES
-              (200, :tenant, 'legacy paid', '2026-06-05', 'pago', 80.00, 80.00, NULL),
-              (201, :tenant, 'ok paid', '2026-06-06', 'pago', 20.00, 20.00, NULL),
-              (202, :outro, 'outro', '2026-06-05', 'pago', 90.00, 90.00, NULL)
+              (200, :tenant, 'legacy paid', '2026-06-05', 'pago', 80.00, 80.00, NULL, '', ''),
+              (201, :tenant, 'ok paid', '2026-06-06', 'pago', 20.00, 20.00, NULL, '', ''),
+              (203, :tenant, 'Despesa rapida caixa', '2026-06-07', 'pago', 42.50, 42.50, NULL, '', 'Gerada automaticamente pelo PDV (Caixa #12)'),
+              (202, :outro, 'outro', '2026-06-05', 'pago', 90.00, 90.00, NULL, '', '')
             """
         ),
         {"tenant": TENANT, "outro": OUTRO_TENANT},
+    )
+    db.execute(
+        text(
+            """
+            INSERT INTO movimentacoes_caixa (
+                id, tenant_id, tipo, valor, descricao, categoria, documento, data_movimento
+            )
+            VALUES (
+                400, :tenant, 'despesa', 42.50, 'Despesa rapida caixa', 'Outros', '', '2026-06-07 09:00:00'
+            )
+            """
+        ),
+        {"tenant": TENANT},
     )
     db.execute(
         text(
