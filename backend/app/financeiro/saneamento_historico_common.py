@@ -13,9 +13,7 @@ def _run_saneamento_transacional(
     *,
     actions: list[dict[str, Any]],
     apply_changes: bool,
-    apply_actions: Callable[
-        [Session, list[dict[str, Any]]], list[dict[str, Any]]
-    ],
+    apply_actions: Callable[[Session, list[dict[str, Any]]], list[dict[str, Any]]],
 ) -> list[dict[str, Any]]:
     applied: list[dict[str, Any]] = []
     try:
