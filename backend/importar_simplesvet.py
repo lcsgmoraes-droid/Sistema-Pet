@@ -20,12 +20,10 @@ Fases:
 # ruff: noqa: E402
 
 import sys
-import csv
 import argparse
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import List, Optional
 from pathlib import Path
-import re
 
 # Add backend to path
 backend_path = Path(__file__).parent
@@ -37,51 +35,17 @@ from app.models import Cliente, Pet, Especie, Raca
 from app.produtos_models import Produto, Marca
 from app.vendas_models import Venda, VendaItem
 from app.db import SessionLocal
-
-
-# =====================================================================
-# CONFIGURAÇÕES
-# =====================================================================
-
-# Caminho para os CSVs do SimplesVet
-SIMPLESVET_PATH = Path(
-    r"c:\Users\Lucas\OneDrive\Área de Trabalho\Programa\Sistema Pet\simplesvet\banco"
+from importar_simplesvet_state import ID_MAP, NAO_IMPORTADOS, STATS, TENANT_ID, USER_ID
+from importar_simplesvet_summary import exibir_resumo as _exibir_resumo
+from importar_simplesvet_utils import (
+    carregar_contatos,
+    ler_csv,
+    limpar_cpf,
+    log,
+    parse_bool,
+    parse_date,
+    parse_decimal,
 )
-
-# Mapeamento de IDs antigos → novos (para preservar relacionamentos)
-ID_MAP = {
-    "pessoas": {},  # pes_int_codigo → cliente.id
-    "animais": {},  # ani_int_codigo → pet.id
-    "produtos": {},  # pro_int_codigo → produto.id
-    "vendas": {},  # ven_int_codigo → venda.id
-    "especies": {},  # esp_int_codigo → especie.id
-    "racas": {},  # rac_int_codigo → raca.id
-    "marcas": {},  # mar_int_codigo → marca.id
-}
-
-# Estatísticas da importação
-STATS = {
-    "especies": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
-    "racas": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
-    "clientes": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
-    "marcas": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
-    "produtos": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0, "sem_sku": 0},
-    "pets": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
-    "vendas": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
-    "itens_venda": {"total": 0, "sucesso": 0, "erro": 0, "duplicado": 0},
-}
-
-# Lista de itens não importados (para gerar relatório)
-NAO_IMPORTADOS = {
-    "produtos": [],  # {'linha': idx, 'sku': '', 'nome': '', 'motivo': '', 'erro': ''}
-    "clientes": [],
-    "pets": [],
-    "vendas": [],
-}
-
-# Usuário para importação (será o primeiro admin do sistema)
-USER_ID = 1  # CONFIGURAR: ID do admin
-TENANT_ID = None  # Será buscado automaticamente do banco
 
 
 def obter_tenant_id(db: Session) -> str:
@@ -106,117 +70,6 @@ def obter_tenant_id(db: Session) -> str:
     except Exception as e:
         log(f"Erro ao buscar tenant_id: {e}", "ERRO")
         sys.exit(1)
-
-
-# =====================================================================
-# UTILITÁRIOS
-# =====================================================================
-
-
-def ler_csv(arquivo: str, limite: Optional[int] = None) -> List[Dict]:
-    """Lê arquivo CSV e retorna lista de dicionários"""
-    caminho = SIMPLESVET_PATH / arquivo
-
-    if not caminho.exists():
-        print(f"[ERRO] Arquivo não encontrado: {caminho}")
-        return []
-
-    registros = []
-    with open(caminho, "r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for i, row in enumerate(reader):
-            if limite and i >= limite:
-                break
-            registros.append(row)
-
-    print(f"[INFO] Lidos {len(registros)} registros de {arquivo}")
-    return registros
-
-
-def limpar_cpf(cpf: Optional[str]) -> Optional[str]:
-    """Remove formatação do CPF"""
-    if not cpf or cpf == "NULL" or cpf == "":
-        return None
-    return re.sub(r"[^0-9]", "", cpf)
-
-
-def limpar_telefone(tel: Optional[str]) -> Optional[str]:
-    """Remove formatação do telefone"""
-    if not tel or tel == "NULL" or tel == "":
-        return None
-    return re.sub(r"[^0-9]", "", tel)
-
-
-def carregar_contatos() -> Dict[str, Dict[str, Optional[str]]]:
-    """Carrega contatos (telefone/celular) do SimplesVet"""
-    contatos = {}
-    registros = ler_csv("glo_contato.csv", limite=None)
-
-    for row in registros:
-        pes_id = row.get("pes_int_codigo")
-        if not pes_id:
-            continue
-
-        tipo = (row.get("tco_var_nome") or "").strip().lower()
-        contato = limpar_telefone(row.get("con_var_contato"))
-        if not contato:
-            continue
-
-        if pes_id not in contatos:
-            contatos[pes_id] = {"telefone": None, "celular": None}
-
-        if "cel" in tipo:
-            contatos[pes_id]["celular"] = contatos[pes_id]["celular"] or contato
-        elif "tel" in tipo or "fone" in tipo:
-            contatos[pes_id]["telefone"] = contatos[pes_id]["telefone"] or contato
-
-    return contatos
-
-
-def parse_decimal(valor: Optional[str]) -> float:
-    """Converte string decimal para float"""
-    if not valor or valor == "NULL" or valor == "":
-        return 0.0
-    try:
-        return float(valor.replace(",", "."))
-    except Exception:
-        return 0.0
-
-
-def parse_bool(valor: Optional[str], verdadeiro: str = "Sim") -> bool:
-    """Converte string para boolean"""
-    if not valor or valor == "NULL":
-        return False
-    return valor.strip() == verdadeiro
-
-
-def parse_date(data: Optional[str]) -> Optional[datetime]:
-    """Converte string de data para datetime"""
-    if not data or data == "NULL" or data == "":
-        return None
-
-    # Formatos comuns
-    formatos = ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d", "%d/%m/%Y", "%d/%m/%Y %H:%M:%S"]
-
-    for fmt in formatos:
-        try:
-            return datetime.strptime(data.strip(), fmt)
-        except Exception:
-            continue
-
-    return None
-
-
-def log(msg: str, nivel: str = "INFO"):
-    """Log com timestamp"""
-    timestamp = datetime.now().strftime("%H:%M:%S")
-    icones = {"INFO": "[INFO]", "SUCESSO": "[OK]", "ERRO": "[ERR]", "AVISO": "[WARN]"}
-    icone = icones.get(nivel, "[INFO]")
-    try:
-        print(f"[{timestamp}] {icone} {msg}")
-    except UnicodeEncodeError:
-        # Fallback para sistemas sem suporte a Unicode
-        print(f"[{timestamp}] {nivel} {msg.encode('ascii', 'ignore').decode()}")
 
 
 # =====================================================================
@@ -908,52 +761,8 @@ def importar_itens_venda(db: Session, vendas_ids: List[str]):
 
 
 def exibir_resumo():
-    """Exibe resumo da importação"""
-    print("\n" + "=" * 90)
-    print("RESUMO DA IMPORTACAO".center(90))
-    print("=" * 90)
-    print(
-        f"{'ENTIDADE':<15} | {'TOTAL':>6} | {'NOVOS':>6} | {'DUPLIC':>6} | {'ERROS':>6} | {'SEM_SKU':>7} | {'TAXA':>6}"
-    )
-    print("-" * 90)
-
-    for entidade, stats in STATS.items():
-        if stats["total"] > 0:
-            taxa = (
-                (stats["sucesso"] / stats["total"]) * 100 if stats["total"] > 0 else 0
-            )
-            sem_sku = stats.get("sem_sku", 0)
-            print(
-                f"{entidade.upper():<15} | {stats['total']:>6} | {stats['sucesso']:>6} | "
-                f"{stats['duplicado']:>6} | {stats['erro']:>6} | {sem_sku:>7} | {taxa:>5.1f}%"
-            )
-
-    print("-" * 90)
-
-    # Resumo consolidado
-    total_geral = sum(s["total"] for s in STATS.values())
-    novos_geral = sum(s["sucesso"] for s in STATS.values())
-    duplic_geral = sum(s["duplicado"] for s in STATS.values())
-    erros_geral = sum(s["erro"] for s in STATS.values())
-    sem_sku_geral = sum(s.get("sem_sku", 0) for s in STATS.values())
-
-    print(
-        f"{'TOTAL GERAL':<15} | {total_geral:>6} | {novos_geral:>6} | "
-        f"{duplic_geral:>6} | {erros_geral:>6} | {sem_sku_geral:>7}"
-    )
-    print("=" * 90)
-
-    # Aviso sobre não importados
-    nao_imp_total = sum(len(items) for items in NAO_IMPORTADOS.values())
-    if nao_imp_total > 0:
-        print(f"\n⚠️  ATENÇÃO: {nao_imp_total} itens NÃO foram importados")
-        for entidade, items in NAO_IMPORTADOS.items():
-            if items:
-                print(f"  - {entidade.capitalize()}: {len(items)}")
-        print(
-            "\n📄 Verifique os arquivos CSV em logs_importacao/ para detalhes dos produtos não importados"
-        )
-    print("=" * 90 + "\n")
+    """Exibe resumo da importacao."""
+    _exibir_resumo(STATS, NAO_IMPORTADOS)
 
 
 def main():
