@@ -742,7 +742,9 @@ def aplicar_contagem_estoque_funcionario(
             else contagem.titulo.strip()
         )
     observacao = (
-        observacao_base if not observacao_extra else f"{observacao_base}: {observacao_extra}"
+        observacao_base
+        if not observacao_extra
+        else f"{observacao_base}: {observacao_extra}"
     )
 
     resultados = []
