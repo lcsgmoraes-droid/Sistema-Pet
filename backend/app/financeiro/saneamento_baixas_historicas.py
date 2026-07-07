@@ -9,6 +9,8 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.financeiro.saneamento_historico_common import _run_saneamento_transacional
+
 
 CENT = Decimal("0.01")
 CONFIRM_TOKEN_BAIXAS_HISTORICAS = "SANEAR_BAIXAS_HISTORICAS_CP"
@@ -211,16 +213,12 @@ def sanear_baixas_historicas_contas_pagar(
     }
     actions = _build_actions(_fetch_candidates(db, params), tenant_id=str(tenant_id))
 
-    applied: list[dict[str, Any]] = []
-    try:
-        if apply_changes:
-            applied = _apply_actions(db, actions)
-            db.commit()
-        else:
-            db.rollback()
-    except Exception:
-        db.rollback()
-        raise
+    applied = _run_saneamento_transacional(
+        db,
+        actions=actions,
+        apply_changes=apply_changes,
+        apply_actions=_apply_actions,
+    )
 
     return _build_report(
         tenant_id=str(tenant_id),
