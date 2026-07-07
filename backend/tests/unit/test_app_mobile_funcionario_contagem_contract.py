@@ -78,11 +78,11 @@ def test_employee_count_can_apply_saved_count_to_stock_once():
     assert "Produto.tenant_id == tenant_id" in apply_block
     assert "Produto.ativo.is_(True)" in apply_block
     assert "_produto_permite_balanco_funcionario" in apply_block
-    assert "modo == \"entrada\"" in apply_block
+    assert 'modo == "entrada"' in apply_block
     assert "estoque_novo = estoque_atual + quantidade" in apply_block
     assert "estoque_novo = quantidade" in apply_block
     assert "EstoqueMovimentacao(" in apply_block
-    assert 'motivo=modo' in apply_block
+    assert "motivo=modo" in apply_block
     assert "Produto.estoque_atual" not in apply_block
     assert "produto.estoque_atual = estoque_novo" in apply_block
     assert "sincronizar_bling_background" in apply_block
