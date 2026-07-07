@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from datetime import date
 from decimal import Decimal
@@ -21,9 +20,12 @@ from app.financeiro.saneamento_nf_dre_historico import (
     CONFIRM_TOKEN_NF_DRE_HISTORICO,
     sanear_contas_pagar_nf_dre_historico,
 )
-
-
-PRODUCTION_ENVS = {"prod", "production"}
+from app.scripts.sanear_baixas_historicas_contas_pagar import (
+    PRODUCTION_ENVS,
+    _environment_name,
+    _fail,
+    _parse_date,
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -63,14 +65,6 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _environment_name() -> str:
-    for name in ("APP_ENV", "ENVIRONMENT", "ENV"):
-        value = os.getenv(name)
-        if value:
-            return value.strip().lower()
-    return ""
-
-
 def _json_default(value: Any) -> Any:
     if isinstance(value, Decimal):
         return f"{value:.2f}"
@@ -79,34 +73,14 @@ def _json_default(value: Any) -> Any:
     return str(value)
 
 
-def _fail(message: str, *, dry_run: bool) -> int:
-    print(
-        json.dumps(
-            {"ok": False, "dry_run": dry_run, "error": message},
-            ensure_ascii=False,
-            indent=2,
-            sort_keys=True,
-        ),
-        file=sys.stderr,
-    )
-    return 1
-
-
-def _parse_date(raw: str, name: str) -> date:
-    try:
-        return date.fromisoformat(raw)
-    except ValueError:
-        raise ValueError(f"{name} deve estar no formato YYYY-MM-DD.") from None
-
-
 def _validate_args(args: argparse.Namespace) -> tuple[str, date, date]:
     try:
         tenant_id = str(UUID(str(args.tenant_id)))
     except ValueError:
         raise ValueError("--tenant-id deve ser um UUID valido.") from None
 
-    data_inicio = _parse_date(args.data_inicio, "--data-inicio")
-    data_fim = _parse_date(args.data_fim, "--data-fim")
+    data_inicio = _parse_date(args.data_inicio, field="--data-inicio")
+    data_fim = _parse_date(args.data_fim, field="--data-fim")
     if data_fim <= data_inicio:
         raise ValueError("--data-fim deve ser posterior a --data-inicio.")
 

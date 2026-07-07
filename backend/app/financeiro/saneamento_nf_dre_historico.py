@@ -3,27 +3,16 @@
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.financeiro.saneamento_baixas_historicas import _money, _money_str, _rows
 
-CENT = Decimal("0.01")
+
 CONFIRM_TOKEN_NF_DRE_HISTORICO = "SANEAR_NF_DRE_HISTORICO_CP"
-
-
-def _money(value: Any) -> Decimal:
-    return Decimal(str(value or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
-
-
-def _money_str(value: Any) -> str:
-    return f"{_money(value):.2f}"
-
-
-def _rows(db: Session, sql: str, params: dict[str, Any]) -> list[dict[str, Any]]:
-    return [dict(row) for row in db.execute(text(sql), params).mappings().all()]
 
 
 def _fetch_candidates(db: Session, params: dict[str, Any]) -> list[dict[str, Any]]:
