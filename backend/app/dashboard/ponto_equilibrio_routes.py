@@ -444,6 +444,8 @@ async def obter_ponto_equilibrio(
         "modo_custo_fiscal": modo_custo_fiscal,
         "opcoes_modo_custo_fiscal": MODO_CUSTO_FISCAL_PE_OPCOES,
         "faturamento": faturamento,
+        "faturamento_bruto": margem_periodo.get("faturamento_bruto", faturamento),
+        "deducoes_receita": margem_periodo.get("deducoes_receita", 0),
         "receita_produtos_servicos": margem_periodo.get("receita_produtos_servicos", 0),
         "receita_entrega": margem_periodo.get("receita_entrega", 0),
         "descontos": margem_periodo.get("descontos", 0),

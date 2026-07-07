@@ -253,12 +253,14 @@ def _somar_componentes_margem_vendas_pe(
 
     receita_produtos_servicos = _round_money(campos["receita_produtos_servicos"])
     receita_entrega = _round_money(campos["receita_entrega"])
-    faturamento = _round_money(receita_produtos_servicos + receita_entrega)
+    faturamento_bruto = _round_money(receita_produtos_servicos + receita_entrega)
+    descontos = _round_money(campos["descontos"])
+    beneficios_campanhas = _round_money(campos["beneficios_campanhas"])
+    deducoes_receita = _round_money(descontos + beneficios_campanhas)
+    faturamento = _round_money(faturamento_bruto - deducoes_receita)
     outros_variaveis = _round_money(outros_variaveis)
     despesas_variaveis = _round_money(
-        campos["descontos"]
-        + campos["beneficios_campanhas"]
-        + campos["taxas_cartao"]
+        campos["taxas_cartao"]
         + campos["repasse_entrega"]
         + campos["custo_operacional_entrega"]
         + campos["comissoes"]
@@ -336,10 +338,12 @@ def _somar_componentes_margem_vendas_pe(
 
     return {
         "faturamento": faturamento,
+        "faturamento_bruto": faturamento_bruto,
+        "deducoes_receita": deducoes_receita,
         "receita_produtos_servicos": receita_produtos_servicos,
         "receita_entrega": receita_entrega,
-        "descontos": _round_money(campos["descontos"]),
-        "beneficios_campanhas": _round_money(campos["beneficios_campanhas"]),
+        "descontos": descontos,
+        "beneficios_campanhas": beneficios_campanhas,
         "taxas_cartao": _round_money(campos["taxas_cartao"]),
         "repasse_entrega": _round_money(campos["repasse_entrega"]),
         "custo_operacional_entrega": _round_money(campos["custo_operacional_entrega"]),
