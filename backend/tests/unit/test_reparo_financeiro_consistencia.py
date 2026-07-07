@@ -175,9 +175,11 @@ def _session():
                 eh_parcelado BOOLEAN,
                 numero_parcela INTEGER,
                 total_parcelas INTEGER,
+                dre_subcategoria_id INTEGER,
                 nota_entrada_id INTEGER,
                 nfe_numero TEXT,
                 documento TEXT,
+                afeta_dre BOOLEAN NOT NULL DEFAULT 1,
                 percentual_online NUMERIC(5,2),
                 percentual_loja NUMERIC(5,2),
                 user_id INTEGER NOT NULL
@@ -407,7 +409,9 @@ def test_reparo_financeiro_apply_corrige_apenas_tenant_alvo(monkeypatch):
         db.execute(
             text(
                 """
-            SELECT valor_final, data_vencimento, numero_parcela, total_parcelas
+            SELECT
+                valor_final, data_vencimento, numero_parcela, total_parcelas,
+                dre_subcategoria_id, afeta_dre
             FROM contas_pagar
             WHERE nota_entrada_id = 100 AND tenant_id = :tenant
             ORDER BY numero_parcela
@@ -426,6 +430,8 @@ def test_reparo_financeiro_apply_corrige_apenas_tenant_alvo(monkeypatch):
         "2026-07-10",
         "2026-08-10",
     ]
+    assert [row["dre_subcategoria_id"] for row in cps] == [None, None]
+    assert [bool(row["afeta_dre"]) for row in cps] == [False, False]
 
     assert (
         db.execute(

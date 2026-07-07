@@ -99,12 +99,15 @@ def criar_contas_pagar_da_nota(
                 nota_entrada_id=nota.id,
                 nfe_numero=str(nota.numero_nota),
                 documento=dup.get("numero", ""),
+                afeta_dre=False,
                 percentual_online=nota.percentual_online or 0,
                 percentual_loja=nota.percentual_loja or 100,
                 user_id=user_id,
                 tenant_id=tenant_id,
             )
             aplicar_classificacao_aprendida_conta_pagar(db, tenant_id, conta)
+            conta.afeta_dre = False
+            conta.dre_subcategoria_id = None
 
             db.add(conta)
             db.flush()
