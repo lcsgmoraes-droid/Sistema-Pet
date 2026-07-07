@@ -10,6 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.financeiro.saneamento_baixas_historicas import _money, _money_str, _rows
+from app.financeiro.saneamento_historico_common import _run_saneamento_transacional
 
 
 CONFIRM_TOKEN_NF_DRE_HISTORICO = "SANEAR_NF_DRE_HISTORICO_CP"
@@ -160,16 +161,12 @@ def sanear_contas_pagar_nf_dre_historico(
     }
     actions = _build_actions(_fetch_candidates(db, params), tenant_id=str(tenant_id))
 
-    applied: list[dict[str, Any]] = []
-    try:
-        if apply_changes:
-            applied = _apply_actions(db, actions)
-            db.commit()
-        else:
-            db.rollback()
-    except Exception:
-        db.rollback()
-        raise
+    applied = _run_saneamento_transacional(
+        db,
+        actions=actions,
+        apply_changes=apply_changes,
+        apply_actions=_apply_actions,
+    )
 
     return _build_report(
         tenant_id=str(tenant_id),
