@@ -217,7 +217,7 @@ Inventario atualizado em 2026-07-07 pela contagem operacional de linhas com cont
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Observacao: fora do inventario de aplicacao backend/web/mobile, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
 - Observacao mobile: `app-mobile/src` esta com 0 arquivos acima de 700 linhas; a frente mobile zerou as telas grandes mantendo separacao por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
-- Observacao operacional: no inventario amplo `backend` + `frontend/src` + `app-mobile/src`, ainda ha 9 arquivos acima de 700 linhas: 6 testes backend, 2 migrations geradas e 1 script/importador legado fora de `backend/app`.
+- Observacao operacional: no inventario amplo `backend` + `frontend/src` + `app-mobile/src`, ainda ha 8 arquivos acima de 700 linhas: 6 testes backend e 2 migrations geradas.
 
 Fatia aplicacao 700 batch 56 de 2026-07-07: os ultimos arquivos de aplicacao backend/web/mobile acima de 700 linhas sairam da faixa com contrato automatizado de guarda:
 
@@ -226,6 +226,14 @@ Fatia aplicacao 700 batch 56 de 2026-07-07: os ultimos arquivos de aplicacao bac
 - `frontend/src/components/Layout.jsx`: 714 -> 637 linhas com conteudo, movendo a barra de favoritos arrastavel para `frontend/src/components/layout/LayoutFavoritesBar.jsx` e a comparacao de ordem para `menuFavorites.js`.
 - `frontend/src/components/ContasPagar.jsx`: 705 -> 635 linhas com conteudo, movendo regras puras de filtros, calculo, data, tooltip e selecoes derivadas para `contasPagarHelpers.js`.
 - Contrato dedicado: `backend/tests/unit/test_application_large_files_guard.py`, garantindo 0 arquivos de aplicacao em `backend/app`, `frontend/src` e `app-mobile/src` acima de 700 linhas e inventario atualizado.
+
+Fatia operacional 700 batch 57 de 2026-07-07: `backend/importar_simplesvet.py`, ultimo script/importador legado acima de 700 linhas no inventario amplo, saiu da faixa mantendo a fachada CLI e o fluxo por fases:
+
+- `backend/importar_simplesvet.py`: 824 -> 674 linhas com conteudo, mantendo as fases de especies, racas, clientes, produtos, marcas, pets, vendas e itens.
+- `backend/importar_simplesvet_utils.py`: concentra leitura CSV, limpeza de CPF/telefone, contatos e parsers de decimal, booleano, data e log.
+- `backend/importar_simplesvet_state.py`: concentra mapas de IDs, estatisticas, lista de nao importados e IDs padrao usados pelo importador.
+- `backend/importar_simplesvet_summary.py`: concentra a exibicao do resumo final e dos itens nao importados.
+- Contrato dedicado: `backend/tests/unit/test_importar_simplesvet_refactor_contract.py`, garantindo a fachada abaixo de 700 linhas e os modulos extraidos esperados.
 
 Fatia scripts 700 batch 55 de 2026-07-03: `backend/scripts/enriquecer_produtos_bling_sku.py` saiu da faixa acima de 700 linhas ao virar fachada de CLI/compatibilidade e separar carregamento, classificacao, DB e processamento por modulo:
 
