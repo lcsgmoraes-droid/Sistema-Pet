@@ -95,7 +95,9 @@ def test_ponto_equilibrio_soma_margem_pelo_snapshot_da_venda():
         ],
     )
 
-    assert resultado["faturamento"] == pytest.approx(112.0)
+    assert resultado["faturamento_bruto"] == pytest.approx(112.0)
+    assert resultado["deducoes_receita"] == pytest.approx(8.0)
+    assert resultado["faturamento"] == pytest.approx(104.0)
     assert resultado["receita_produtos_servicos"] == pytest.approx(100.0)
     assert resultado["receita_entrega"] == pytest.approx(12.0)
     assert resultado["descontos"] == pytest.approx(5.0)
@@ -107,9 +109,9 @@ def test_ponto_equilibrio_soma_margem_pelo_snapshot_da_venda():
     assert resultado["custo_fiscal"] == pytest.approx(8.0)
     assert resultado["cmv_estimado"] == pytest.approx(40.0)
     assert resultado["outros_variaveis"] == pytest.approx(9.0)
-    assert resultado["custos_variaveis"] == pytest.approx(84.0)
+    assert resultado["custos_variaveis"] == pytest.approx(76.0)
     assert resultado["margem_contribuicao"] == pytest.approx(28.0)
-    assert resultado["margem_contribuicao_percentual"] == pytest.approx(25.0)
+    assert resultado["margem_contribuicao_percentual"] == pytest.approx(26.92)
     assert (
         resultado["detalhes_margem"]["subtotais"][0]["id"]
         == "receita_produtos_servicos"
