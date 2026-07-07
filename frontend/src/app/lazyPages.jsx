@@ -65,6 +65,7 @@ export const ComprasPendencias = lazy(() => import("../components/ComprasPendenc
 
 export const preloadDashboardFinanceiro = () => import("../pages/DashboardFinanceiro");
 export const DashboardFinanceiro = lazy(preloadDashboardFinanceiro);
+export const BancosFinanceiro = lazy(() => import("../pages/BancosFinanceiro"));
 export const ContasBancarias = lazy(() => import("../components/ContasBancarias"));
 export const ContasPagar = lazy(() => import("../components/ContasPagar"));
 export const ContasReceber = lazy(() => import("../components/ContasReceber"));
