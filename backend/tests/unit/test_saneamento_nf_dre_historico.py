@@ -1,6 +1,5 @@
 import json
 from datetime import date
-from decimal import Decimal
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
