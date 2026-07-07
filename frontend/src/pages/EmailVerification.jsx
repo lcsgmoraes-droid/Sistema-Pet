@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { PawPrint } from "lucide-react";
 import { FiAlertCircle, FiCheckCircle, FiMail } from "react-icons/fi";
 import api from "../api";
+import { buildCorePetLoginUrl } from "./emailVerificationLinks";
 
 const EmailVerification = () => {
   const [searchParams] = useSearchParams();
@@ -27,7 +28,16 @@ const EmailVerification = () => {
         token: manualToken,
       });
       setStatus("success");
-      setMessage(response.data?.message || "Email confirmado com sucesso.");
+      setMessage(
+        isAppFlow
+          ? "Email confirmado com sucesso. Abrindo o app para login..."
+          : response.data?.message || "Email confirmado com sucesso.",
+      );
+      if (isAppFlow) {
+        window.setTimeout(() => {
+          window.location.assign(buildCorePetLoginUrl(email));
+        }, 900);
+      }
     } catch (error) {
       setStatus("error");
       setMessage(error.response?.data?.detail || "Nao foi possivel confirmar este e-mail.");
@@ -143,8 +153,11 @@ const EmailVerification = () => {
 
         <div className="mt-6 text-center">
           {isSuccess && isAppFlow ? (
-            <a href="corepet://" className="text-blue-600 hover:text-blue-700 font-semibold">
-              Abrir app CorePet
+            <a
+              href={buildCorePetLoginUrl(email)}
+              className="text-blue-600 hover:text-blue-700 font-semibold"
+            >
+              Abrir app para login
             </a>
           ) : (
             <Link to="/login" className="text-blue-600 hover:text-blue-700 font-semibold">

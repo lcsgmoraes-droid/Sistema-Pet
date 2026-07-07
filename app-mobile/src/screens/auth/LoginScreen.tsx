@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -15,13 +15,25 @@ import SelectedStoreBanner from '../../components/SelectedStoreBanner';
 import { useAuthStore } from '../../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
 import { AppProfileType } from '../../types';
+import {
+  isEmailVerificationSuccess,
+  normalizeVerifiedEmailParam,
+} from '../../utils/emailVerificationLoginLink';
 
-export default function LoginScreen({ navigation }: any) {
-  const [email, setEmail] = useState('');
+export default function LoginScreen({ navigation, route }: any) {
+  const emailConfirmado = isEmailVerificationSuccess(route?.params);
+  const emailConfirmadoParam = normalizeVerifiedEmailParam(route?.params?.email);
+  const [email, setEmail] = useState(emailConfirmadoParam);
   const [senha, setSenha] = useState('');
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const { login, pendingProfiles, needsProfileSelection, selectProfile } = useAuthStore();
+
+  useEffect(() => {
+    if (emailConfirmadoParam) {
+      setEmail(emailConfirmadoParam);
+    }
+  }, [emailConfirmadoParam]);
 
   async function handleLogin() {
     if (!email.trim() || !senha.trim()) {
@@ -69,6 +81,15 @@ export default function LoginScreen({ navigation }: any) {
         <SelectedStoreBanner />
 
         <View style={styles.form}>
+          {emailConfirmado && (
+            <View style={styles.confirmationBox}>
+              <Ionicons name="checkmark-circle-outline" size={22} color="#15803d" />
+              <Text style={styles.confirmationText}>
+                E-mail confirmado. Agora entre com sua senha para continuar.
+              </Text>
+            </View>
+          )}
+
           <Text style={styles.label}>E-mail</Text>
           <TextInput
             style={styles.input}
@@ -317,5 +338,22 @@ const styles = StyleSheet.create({
     color: CORES.primario,
     fontSize: FONTE.normal,
     fontWeight: '700',
+  },
+  confirmationBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ESPACO.sm,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
+    marginBottom: ESPACO.md,
+    backgroundColor: '#F0FDF4',
+  },
+  confirmationText: {
+    flex: 1,
+    color: '#166534',
+    fontSize: FONTE.normal,
+    fontWeight: '600',
   },
 });
