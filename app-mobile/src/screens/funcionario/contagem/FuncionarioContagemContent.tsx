@@ -6,6 +6,7 @@ import KeyboardSafeScrollView from "../../../components/KeyboardSafeScrollView";
 import { CORES } from "../../../theme";
 import type {
   FuncionarioContagem,
+  FuncionarioContagemAplicarEstoqueModo,
   FuncionarioContagemFornecedor,
   FuncionarioContagemResumo,
   FuncionarioProdutoEstoque,
@@ -63,6 +64,8 @@ export type FuncionarioContagemContentProps = {
   setFeedbackVozErroAtiva: Dispatch<SetStateAction<boolean>>;
   salvando: boolean;
   salvar: () => void | Promise<FuncionarioContagem | null>;
+  aplicandoEstoque: FuncionarioContagemAplicarEstoqueModo | null;
+  confirmarAplicarEstoque: (modo: FuncionarioContagemAplicarEstoqueModo) => void;
   exportando: "pdf" | "xlsx" | null;
   exportar: (formato: "pdf" | "xlsx") => void | Promise<void>;
   contagemSalva: FuncionarioContagem | null;
@@ -112,6 +115,8 @@ export function FuncionarioContagemContent({
   setFeedbackVozErroAtiva,
   salvando,
   salvar,
+  aplicandoEstoque,
+  confirmarAplicarEstoque,
   exportando,
   exportar,
   contagemSalva,
@@ -121,6 +126,10 @@ export function FuncionarioContagemContent({
   confirmarExcluirContagem,
   excluindoContagemId,
 }: FuncionarioContagemContentProps) {
+  const contagemJaAplicada =
+    contagemSalva?.status === "entrada_aplicada" || contagemSalva?.status === "balanco_aplicado";
+  const bloqueiaAcoesEstoque = !itens.length || aplicandoEstoque !== null || salvando || contagemJaAplicada;
+
   return (
     <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
       <View style={styles.headerCard}>
@@ -384,7 +393,53 @@ export function FuncionarioContagemContent({
         {contagemSalva ? (
           <View style={styles.resultado}>
             <Ionicons name="checkmark-circle-outline" size={18} color={CORES.sucesso} />
-            <Text style={styles.resultadoTexto}>Contagem #{contagemSalva.id} salva.</Text>
+            <Text style={styles.resultadoTexto}>
+              Contagem #{contagemSalva.id} {contagemJaAplicada ? "aplicada ao estoque." : "salva."}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.secaoTitulo}>Estoque</Text>
+        <View style={styles.estoqueAcoesLinha}>
+          <TouchableOpacity
+            style={[
+              styles.botaoEstoqueEntrada,
+              bloqueiaAcoesEstoque && styles.botaoDesabilitado,
+            ]}
+            onPress={() => confirmarAplicarEstoque("entrada")}
+            disabled={bloqueiaAcoesEstoque}
+          >
+            {aplicandoEstoque === "entrada" ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Ionicons name="download-outline" size={18} color="#fff" />
+            )}
+            <Text style={styles.botaoEstoqueTexto}>Fazer entrada</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.botaoEstoqueBalanco,
+              bloqueiaAcoesEstoque && styles.botaoDesabilitado,
+            ]}
+            onPress={() => confirmarAplicarEstoque("balanco")}
+            disabled={bloqueiaAcoesEstoque}
+          >
+            {aplicandoEstoque === "balanco" ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Ionicons name="swap-horizontal-outline" size={18} color="#fff" />
+            )}
+            <Text style={styles.botaoEstoqueTexto}>Fazer balanco</Text>
+          </TouchableOpacity>
+        </View>
+        {contagemJaAplicada ? (
+          <View style={styles.avisoEstoqueAplicado}>
+            <Ionicons name="lock-closed-outline" size={16} color="#92400E" />
+            <Text style={styles.avisoEstoqueAplicadoTexto}>
+              Esta contagem ja foi aplicada ao estoque. Salve uma nova versao para aplicar novamente.
+            </Text>
           </View>
         ) : null}
       </View>

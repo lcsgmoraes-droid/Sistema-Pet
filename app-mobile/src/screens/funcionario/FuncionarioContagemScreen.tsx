@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Vibration } from "react-native";
 
 import {
+  aplicarContagemEstoqueFuncionario,
   baixarContagemFuncionario,
   buscarFornecedoresContagemFuncionario,
   excluirContagemFuncionario,
@@ -18,6 +19,7 @@ import {
 } from "../../services/funcionarioEstoque.service";
 import type {
   FuncionarioContagem,
+  FuncionarioContagemAplicarEstoqueModo,
   FuncionarioContagemFornecedor,
   FuncionarioContagemResumo,
   FuncionarioProdutoEstoque,
@@ -65,6 +67,8 @@ export default function FuncionarioContagemScreen() {
   const [feedbackVozErroAtiva, setFeedbackVozErroAtiva] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [exportando, setExportando] = useState<"pdf" | "xlsx" | null>(null);
+  const [aplicandoEstoque, setAplicandoEstoque] =
+    useState<FuncionarioContagemAplicarEstoqueModo | null>(null);
   const [contagemSalva, setContagemSalva] = useState<FuncionarioContagem | null>(null);
   const [contagensRecentes, setContagensRecentes] = useState<FuncionarioContagemResumo[]>([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
@@ -427,6 +431,49 @@ export default function FuncionarioContagemScreen() {
     }
   }
 
+  function confirmarAplicarEstoque(modo: FuncionarioContagemAplicarEstoqueModo) {
+    if (!itens.length) {
+      Alert.alert("Lista vazia", "Adicione ao menos um produto contado.");
+      return;
+    }
+    const tituloAlerta = modo === "entrada" ? "Fazer entrada" : "Fazer balanco";
+    const descricao =
+      modo === "entrada"
+        ? "As quantidades conferidas serao somadas ao estoque atual. Ex: estoque 5 + contagem 3 = 8."
+        : "As quantidades conferidas vao substituir o saldo atual. Ex: estoque 5 e contagem 3 = 3.";
+    Alert.alert(
+      tituloAlerta,
+      `${descricao}\n\nEssa acao movimenta estoque e esta contagem nao podera ser aplicada de novo.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: tituloAlerta,
+          style: "destructive",
+          onPress: () => aplicarEstoque(modo),
+        },
+      ],
+    );
+  }
+
+  async function aplicarEstoque(modo: FuncionarioContagemAplicarEstoqueModo) {
+    const alvo = contagemSalva ?? (await salvar(false));
+    if (!alvo) return;
+    setAplicandoEstoque(modo);
+    try {
+      const resposta = await aplicarContagemEstoqueFuncionario(alvo.id, {
+        modo,
+        observacao: observacao.trim() || null,
+      });
+      setContagemSalva({ ...alvo, status: resposta.status_contagem });
+      await carregarRecentes(false);
+      Alert.alert("Estoque atualizado", resposta.mensagem);
+    } catch (error: any) {
+      Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel atualizar o estoque."));
+    } finally {
+      setAplicandoEstoque(null);
+    }
+  }
+
   async function abrirContagem(contagemId: number) {
     setCarregandoHistorico(true);
     try {
@@ -578,6 +625,8 @@ export default function FuncionarioContagemScreen() {
       setFeedbackVozErroAtiva={setFeedbackVozErroAtiva}
       salvando={salvando}
       salvar={salvar}
+      aplicandoEstoque={aplicandoEstoque}
+      confirmarAplicarEstoque={confirmarAplicarEstoque}
       exportando={exportando}
       exportar={exportar}
       contagemSalva={contagemSalva}
