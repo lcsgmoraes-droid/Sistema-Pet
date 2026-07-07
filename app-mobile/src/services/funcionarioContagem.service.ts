@@ -4,6 +4,8 @@ import api from "./api";
 import { compartilharArquivoGerado } from "./funcionarioContagemArquivo";
 import {
   FuncionarioContagem,
+  FuncionarioContagemAplicarEstoquePayload,
+  FuncionarioContagemAplicarEstoqueResponse,
   FuncionarioContagemArquivo,
   FuncionarioContagemExportOptions,
   FuncionarioContagemFornecedor,
@@ -65,6 +67,35 @@ function normalizarArquivo(data: any): FuncionarioContagemArquivo {
   };
 }
 
+function normalizarAplicacaoEstoque(data: any): FuncionarioContagemAplicarEstoqueResponse {
+  return {
+    status: String(data.status ?? "registrado"),
+    modo: data.modo === "entrada" ? "entrada" : "balanco",
+    status_contagem: String(data.status_contagem ?? ""),
+    contagem_id: Number(data.contagem_id ?? 0),
+    total_itens: Number(data.total_itens ?? 0),
+    quantidade_total: Number(data.quantidade_total ?? 0),
+    total_movimentacoes: Number(data.total_movimentacoes ?? 0),
+    sem_alteracao: Number(data.sem_alteracao ?? 0),
+    mensagem: String(data.mensagem ?? "Estoque atualizado."),
+    itens: Array.isArray(data.itens)
+      ? data.itens.map((item: any) => ({
+          produto_id: Number(item.produto_id ?? 0),
+          nome: String(item.nome ?? ""),
+          quantidade: Number(item.quantidade ?? 0),
+          estoque_anterior: Number(item.estoque_anterior ?? 0),
+          estoque_novo: Number(item.estoque_novo ?? 0),
+          tipo_movimentacao:
+            item.tipo_movimentacao === "entrada" || item.tipo_movimentacao === "saida"
+              ? item.tipo_movimentacao
+              : null,
+          movimentacao_id: item.movimentacao_id == null ? null : Number(item.movimentacao_id),
+          mensagem: String(item.mensagem ?? ""),
+        }))
+      : [],
+  };
+}
+
 export async function buscarFornecedoresContagemFuncionario(
   termo: string,
 ): Promise<FuncionarioContagemFornecedor[]> {
@@ -95,6 +126,14 @@ export async function obterContagemFuncionario(contagemId: number): Promise<Func
 
 export async function excluirContagemFuncionario(contagemId: number): Promise<void> {
   await api.delete(`/app/funcionario/contagens/${contagemId}`);
+}
+
+export async function aplicarContagemEstoqueFuncionario(
+  contagemId: number,
+  payload: FuncionarioContagemAplicarEstoquePayload,
+): Promise<FuncionarioContagemAplicarEstoqueResponse> {
+  const response = await api.post(`/app/funcionario/contagens/${contagemId}/estoque`, payload);
+  return normalizarAplicacaoEstoque(response.data);
 }
 
 export async function baixarContagemFuncionario(

@@ -353,6 +353,37 @@ export interface FuncionarioContagemExportOptions {
   mostrar_venda?: boolean;
 }
 
+export type FuncionarioContagemAplicarEstoqueModo = "entrada" | "balanco";
+
+export interface FuncionarioContagemAplicarEstoquePayload {
+  modo: FuncionarioContagemAplicarEstoqueModo;
+  observacao?: string | null;
+}
+
+export interface FuncionarioContagemAplicarEstoqueItem {
+  produto_id: number;
+  nome: string;
+  quantidade: number;
+  estoque_anterior: number;
+  estoque_novo: number;
+  tipo_movimentacao?: "entrada" | "saida" | null;
+  movimentacao_id?: number | null;
+  mensagem: string;
+}
+
+export interface FuncionarioContagemAplicarEstoqueResponse {
+  status: string;
+  modo: FuncionarioContagemAplicarEstoqueModo;
+  status_contagem: string;
+  contagem_id: number;
+  total_itens: number;
+  quantidade_total: number;
+  total_movimentacoes: number;
+  sem_alteracao: number;
+  mensagem: string;
+  itens: FuncionarioContagemAplicarEstoqueItem[];
+}
+
 export interface FuncionarioPdvProduto {
   id: number;
   nome: string;

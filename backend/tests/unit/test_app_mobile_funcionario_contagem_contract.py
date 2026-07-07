@@ -27,8 +27,8 @@ def test_employee_count_routes_save_without_stock_movement():
     assert "FuncionarioContagemItem" in source
     assert "Produto.tenant_id == tenant_id" in save_block
     assert "Produto.ativo.is_(True)" in save_block
-    assert "EstoqueMovimentacao" not in source
-    assert "sincronizar_bling_background" not in source
+    assert "EstoqueMovimentacao" not in save_block
+    assert "sincronizar_bling_background" not in save_block
     assert "Produto.estoque_atual" not in save_block
     assert "estoque_atual =" not in save_block
 
@@ -59,6 +59,33 @@ def test_employee_count_delete_is_scoped_to_employee_and_tenant():
     assert "db.commit()" in delete_block
     assert "EstoqueMovimentacao" not in delete_block
     assert "Produto.estoque_atual" not in delete_block
+
+
+def test_employee_count_can_apply_saved_count_to_stock_once():
+    source = read_repo("backend/app/routes/app_mobile_funcionario_contagem_routes.py")
+    apply_block = extract_block(source, "def aplicar_contagem_estoque_funcionario")
+
+    assert '"/funcionario/contagens/{contagem_id}/estoque"' in source
+    assert "FuncionarioContagemAplicarEstoqueRequest" in source
+    assert '"entrada"' in source
+    assert '"balanco"' in source
+    assert "_get_contagem_funcionario_or_404(" in apply_block
+    assert "funcionario.id" in apply_block
+    assert "tenant_id" in apply_block
+    assert "contagem.status" in apply_block
+    assert "entrada_aplicada" in apply_block
+    assert "balanco_aplicado" in apply_block
+    assert "Produto.tenant_id == tenant_id" in apply_block
+    assert "Produto.ativo.is_(True)" in apply_block
+    assert "_produto_permite_balanco_funcionario" in apply_block
+    assert 'modo == "entrada"' in apply_block
+    assert "estoque_novo = estoque_atual + quantidade" in apply_block
+    assert "estoque_novo = quantidade" in apply_block
+    assert "EstoqueMovimentacao(" in apply_block
+    assert "motivo=modo" in apply_block
+    assert "Produto.estoque_atual" not in apply_block
+    assert "produto.estoque_atual = estoque_novo" in apply_block
+    assert "sincronizar_bling_background" in apply_block
 
 
 def test_employee_count_allows_optional_supplier_search():
@@ -101,6 +128,13 @@ def test_mobile_employee_count_service_screen_and_navigation_exist():
     screen = read_repo(
         "app-mobile/src/screens/funcionario/FuncionarioContagemScreen.tsx"
     )
+    content = read_repo(
+        "app-mobile/src/screens/funcionario/contagem/FuncionarioContagemContent.tsx"
+    )
+    scanner = read_repo(
+        "app-mobile/src/screens/funcionario/contagem/FuncionarioContagemScanner.tsx"
+    )
+    mobile_screen_source = f"{screen}\n{content}\n{scanner}"
     navigator = read_repo("app-mobile/src/navigation/FuncionarioNavigator.tsx")
     home = read_repo("app-mobile/src/screens/funcionario/FuncionarioHomeScreen.tsx")
     types = read_repo("app-mobile/src/types/index.ts")
@@ -110,20 +144,25 @@ def test_mobile_employee_count_service_screen_and_navigation_exist():
     assert "/app/funcionario/contagens/fornecedores/buscar" in service
     assert "excluirContagemFuncionario" in service
     assert "api.delete(`/app/funcionario/contagens/${contagemId}`)" in service
+    assert "aplicarContagemEstoqueFuncionario" in service
+    assert "api.post(`/app/funcionario/contagens/${contagemId}/estoque`" in service
     assert "expo-file-system" in service
     assert 'Share } from "react-native"' in service
     assert "expo-sharing" not in service
-    assert "CameraView" in screen
+    assert "CameraView" in scanner
     assert "salvarContagemFuncionario" in screen
     assert "baixarContagemFuncionario" in screen
-    assert "mostrarCusto" in screen
-    assert "mostrarVenda" in screen
-    assert "fornecedor" in screen
-    assert "Adicionar item" in screen
-    assert "PDF" in screen
-    assert "Excel" in screen
-    assert "confirmarExcluirContagem" in screen
-    assert "Excluir contagem" in screen
+    assert "mostrarCusto" in mobile_screen_source
+    assert "mostrarVenda" in mobile_screen_source
+    assert "fornecedor" in mobile_screen_source
+    assert "Adicionar item" in mobile_screen_source
+    assert "PDF" in mobile_screen_source
+    assert "Excel" in mobile_screen_source
+    assert "confirmarExcluirContagem" in mobile_screen_source
+    assert "Excluir contagem" in mobile_screen_source
+    assert "confirmarAplicarEstoque" in mobile_screen_source
+    assert "Fazer entrada" in mobile_screen_source
+    assert "Fazer balanco" in mobile_screen_source
     assert "FuncionarioContagem" in navigator
     assert "FuncionarioContagem" in route_types
     assert "Contagem" in home

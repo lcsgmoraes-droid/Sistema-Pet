@@ -4,7 +4,7 @@ import base64
 import html
 from datetime import datetime
 from io import BytesIO
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
@@ -14,7 +14,17 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_session
 from app.models import Cliente, User
-from app.produtos_models import FuncionarioContagem, FuncionarioContagemItem, Produto
+from app.produtos_models import (
+    EstoqueMovimentacao,
+    FuncionarioContagem,
+    FuncionarioContagemItem,
+    Produto,
+)
+from app.bling_estoque_sync import sincronizar_bling_background
+from app.routes.app_mobile_funcionario_estoque_routes import (
+    _consumir_lotes_balanco_funcionario,
+    _produto_permite_balanco_funcionario,
+)
 from app.routes.app_mobile_funcionario_pdv_routes import (
     _get_funcionario_operacional_or_403,
 )
@@ -76,6 +86,35 @@ class FuncionarioContagemArquivoResponse(BaseModel):
     filename: str
     mime_type: str
     base64: str
+
+
+class FuncionarioContagemAplicarEstoqueRequest(BaseModel):
+    modo: Literal["entrada", "balanco"]
+    observacao: Optional[str] = None
+
+
+class FuncionarioContagemAplicarEstoqueItemResponse(BaseModel):
+    produto_id: int
+    nome: str
+    quantidade: float
+    estoque_anterior: float
+    estoque_novo: float
+    tipo_movimentacao: Optional[str] = None
+    movimentacao_id: Optional[int] = None
+    mensagem: str
+
+
+class FuncionarioContagemAplicarEstoqueResponse(BaseModel):
+    status: str
+    modo: Literal["entrada", "balanco"]
+    status_contagem: str
+    contagem_id: int
+    total_itens: int
+    quantidade_total: float
+    total_movimentacoes: int
+    sem_alteracao: int
+    mensagem: str
+    itens: list[FuncionarioContagemAplicarEstoqueItemResponse]
 
 
 def _fornecedor_nome_contagem(fornecedor: Cliente | None) -> Optional[str]:
@@ -637,6 +676,178 @@ def excluir_contagem_funcionario(
     )
     db.delete(contagem)
     db.commit()
+
+
+@router.post(
+    "/funcionario/contagens/{contagem_id}/estoque",
+    response_model=FuncionarioContagemAplicarEstoqueResponse,
+)
+def aplicar_contagem_estoque_funcionario(
+    contagem_id: int,
+    payload: FuncionarioContagemAplicarEstoqueRequest,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    contagem = _get_contagem_funcionario_or_404(
+        db, contagem_id, funcionario.id, tenant_id
+    )
+    if contagem.status in {"entrada_aplicada", "balanco_aplicado"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Esta contagem ja foi aplicada ao estoque. Salve uma nova contagem para aplicar novamente.",
+        )
+    if not contagem.itens:
+        raise HTTPException(status_code=400, detail="Contagem sem itens.")
+
+    modo = payload.modo
+    produto_ids = {item.produto_id for item in contagem.itens}
+    produtos = (
+        db.query(Produto)
+        .filter(
+            Produto.tenant_id == tenant_id,
+            Produto.ativo.is_(True),
+            Produto.situacao.is_not(False),
+            Produto.id.in_(produto_ids),
+        )
+        .all()
+    )
+    produtos_por_id = {produto.id: produto for produto in produtos}
+    faltantes = sorted(produto_ids - set(produtos_por_id))
+    if faltantes:
+        raise HTTPException(
+            status_code=404, detail=f"Produto nao encontrado: {faltantes[0]}"
+        )
+
+    for item in contagem.itens:
+        produto = produtos_por_id[item.produto_id]
+        permite_balanco, aviso = _produto_permite_balanco_funcionario(produto)
+        if not permite_balanco:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{item.nome}: {aviso or 'Produto nao permite ajuste direto.'}",
+            )
+
+    documento = f"APP-CONT-{contagem.id}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    observacao_base = (
+        "App funcionario - entrada por contagem"
+        if modo == "entrada"
+        else "App funcionario - balanco por contagem"
+    )
+    observacao_extra = (payload.observacao or "").strip()
+    if contagem.titulo:
+        observacao_extra = (
+            f"{contagem.titulo.strip()}: {observacao_extra}"
+            if observacao_extra
+            else contagem.titulo.strip()
+        )
+    observacao = (
+        observacao_base
+        if not observacao_extra
+        else f"{observacao_base}: {observacao_extra}"
+    )
+
+    resultados = []
+    produtos_para_sync = []
+    total_movimentacoes = 0
+    sem_alteracao = 0
+    quantidade_total = 0.0
+
+    for item in sorted(contagem.itens, key=lambda atual: atual.ordem or atual.id):
+        produto = produtos_por_id[item.produto_id]
+        quantidade = float(item.quantidade or 0)
+        quantidade_total += quantidade
+        estoque_atual = float(produto.estoque_atual or 0)
+        if modo == "entrada":
+            estoque_novo = estoque_atual + quantidade
+        else:
+            estoque_novo = quantidade
+        estoque_novo = round(estoque_novo, 6)
+        diferenca = round(estoque_novo - estoque_atual, 6)
+
+        if abs(diferenca) < 0.000001:
+            sem_alteracao += 1
+            resultados.append(
+                {
+                    "produto_id": produto.id,
+                    "nome": item.nome,
+                    "quantidade": quantidade,
+                    "estoque_anterior": estoque_atual,
+                    "estoque_novo": estoque_novo,
+                    "tipo_movimentacao": None,
+                    "movimentacao_id": None,
+                    "mensagem": "Saldo sem alteracao.",
+                }
+            )
+            continue
+
+        tipo_movimentacao = "entrada" if diferenca > 0 else "saida"
+        quantidade_movimentada = abs(diferenca)
+        lotes_consumidos = None
+        if tipo_movimentacao == "saida":
+            lotes_consumidos = _consumir_lotes_balanco_funcionario(
+                db, produto, quantidade_movimentada
+            )
+
+        produto.estoque_atual = estoque_novo
+        movimentacao = EstoqueMovimentacao(
+            produto_id=produto.id,
+            tipo=tipo_movimentacao,
+            motivo=modo,
+            quantidade=quantidade_movimentada,
+            quantidade_anterior=estoque_atual,
+            quantidade_nova=estoque_novo,
+            custo_unitario=produto.preco_custo,
+            valor_total=quantidade_movimentada * float(produto.preco_custo or 0),
+            lotes_consumidos=lotes_consumidos,
+            documento=documento,
+            observacao=observacao,
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+        )
+        db.add(movimentacao)
+        db.flush()
+        total_movimentacoes += 1
+        produtos_para_sync.append((produto.id, estoque_novo))
+        resultados.append(
+            {
+                "produto_id": produto.id,
+                "nome": item.nome,
+                "quantidade": quantidade,
+                "estoque_anterior": estoque_atual,
+                "estoque_novo": estoque_novo,
+                "tipo_movimentacao": tipo_movimentacao,
+                "movimentacao_id": movimentacao.id,
+                "mensagem": "Movimentacao registrada.",
+            }
+        )
+
+    contagem.status = "entrada_aplicada" if modo == "entrada" else "balanco_aplicado"
+    db.commit()
+
+    for produto_id, estoque_novo in produtos_para_sync:
+        try:
+            sincronizar_bling_background(
+                produto_id,
+                estoque_novo,
+                f"{modo}_contagem_app_funcionario",
+            )
+        except Exception:
+            pass
+
+    acao = "Entrada" if modo == "entrada" else "Balanco"
+    return {
+        "status": "registrado",
+        "modo": modo,
+        "status_contagem": contagem.status,
+        "contagem_id": contagem.id,
+        "total_itens": len(contagem.itens),
+        "quantidade_total": quantidade_total,
+        "total_movimentacoes": total_movimentacoes,
+        "sem_alteracao": sem_alteracao,
+        "mensagem": f"{acao} aplicado em {total_movimentacoes} produto(s).",
+        "itens": resultados,
+    }
 
 
 @router.get("/funcionario/contagens/{contagem_id}/export/{formato}")

@@ -24,12 +24,14 @@ export function FuncionarioContagemPermissionRequest({
 export function FuncionarioContagemScanner({
   scanAtivo,
   buscandoProduto,
+  feedback,
   onBarcodeScanned,
   onClose,
   onResetScan,
 }: {
   scanAtivo: boolean;
   buscandoProduto: boolean;
+  feedback?: { tipo: "sucesso" | "erro"; mensagem: string } | null;
   onBarcodeScanned: (event: { data: string }) => void | Promise<void>;
   onClose: () => void;
   onResetScan: () => void;
@@ -50,9 +52,26 @@ export function FuncionarioContagemScanner({
           </TouchableOpacity>
           <View style={styles.frameScan} />
           <Text style={styles.scannerTexto}>
-            {buscandoProduto ? "Buscando no ERP..." : "Aponte para o codigo de barras"}
+            {buscandoProduto ? "Buscando no ERP..." : "Pronto para bipar"}
           </Text>
-          {!scanAtivo ? (
+          {feedback ? (
+            <View
+              style={[
+                styles.scannerFeedback,
+                feedback.tipo === "erro" ? styles.scannerFeedbackErro : styles.scannerFeedbackSucesso,
+              ]}
+            >
+              <Ionicons
+                name={feedback.tipo === "erro" ? "alert-circle-outline" : "checkmark-circle-outline"}
+                size={18}
+                color="#fff"
+              />
+              <Text style={styles.scannerFeedbackTexto} numberOfLines={2}>
+                {feedback.mensagem}
+              </Text>
+            </View>
+          ) : null}
+          {!scanAtivo && !buscandoProduto && !feedback ? (
             <TouchableOpacity style={styles.botaoScanner} onPress={onResetScan}>
               <Ionicons name="scan-outline" size={18} color="#fff" />
               <Text style={styles.botaoScannerTexto}>Escanear novamente</Text>
