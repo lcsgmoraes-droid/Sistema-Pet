@@ -202,6 +202,25 @@ def _auditar_contas_pagar_pagamentos(
           AND cp.data_pagamento >= :data_inicio
           AND cp.data_pagamento < :data_fim
           AND cp.valor_pago <> COALESCE(pg.soma_pagamentos, 0)
+          AND NOT (
+              COALESCE(cp.observacoes, '') LIKE 'Gerada automaticamente pelo PDV (Caixa #%'
+              AND EXISTS (
+                  SELECT 1
+                  FROM movimentacoes_caixa mc
+                  WHERE mc.tenant_id = cp.tenant_id
+                    AND COALESCE(mc.tipo, '') = 'despesa'
+                    AND ABS(CAST(COALESCE(mc.valor, 0) AS NUMERIC) - CAST(COALESCE(cp.valor_pago, 0) AS NUMERIC)) < 0.01
+                    AND SUBSTR(CAST(mc.data_movimento AS TEXT), 1, 10) = SUBSTR(CAST(cp.data_pagamento AS TEXT), 1, 10)
+                    AND (
+                        lower(trim(COALESCE(mc.descricao, ''))) = lower(trim(COALESCE(cp.descricao, '')))
+                        OR lower(trim(COALESCE(mc.categoria, ''))) = lower(trim(COALESCE(cp.descricao, '')))
+                        OR (
+                            COALESCE(cp.documento, '') <> ''
+                            AND lower(trim(COALESCE(mc.documento, ''))) = lower(trim(COALESCE(cp.documento, '')))
+                        )
+                    )
+              )
+          )
         ORDER BY cp.data_pagamento ASC, cp.id ASC
         """,
         params,
