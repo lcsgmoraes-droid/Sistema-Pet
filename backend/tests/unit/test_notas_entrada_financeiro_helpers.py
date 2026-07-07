@@ -71,3 +71,56 @@ def test_criar_contas_pagar_da_nota_usa_tipo_tenant_e_classificacao(monkeypatch)
     assert primeira.user_id == 42
     assert primeira.percentual_online == 30
     assert primeira.percentual_loja == 70
+
+
+def test_criar_contas_pagar_da_nota_nao_afeta_dre_mesmo_com_regra_aprendida(
+    monkeypatch,
+):
+    monkeypatch.setattr(financeiro, "ContaPagar", _FakeContaPagar)
+    monkeypatch.setattr(
+        financeiro, "_obter_tipo_produto_revenda_id", lambda db, tenant_id: 123
+    )
+
+    def aplicar_regra_perigosa(_db, _tenant_id, conta):
+        conta.dre_subcategoria_id = 999
+        conta.canal = "loja_fisica"
+        return True
+
+    monkeypatch.setattr(
+        financeiro,
+        "aplicar_classificacao_aprendida_conta_pagar",
+        aplicar_regra_perigosa,
+    )
+
+    nota = SimpleNamespace(
+        id=10,
+        numero_nota="785638",
+        fornecedor_id=88,
+        data_emissao=date(2026, 6, 5),
+        valor_total=Decimal("3708.75"),
+        percentual_online=0,
+        percentual_loja=100,
+    )
+    db = _FakeDb()
+
+    financeiro.criar_contas_pagar_da_nota(
+        nota,
+        {
+            "duplicatas": [
+                {
+                    "numero": "001",
+                    "vencimento": date(2026, 6, 8),
+                    "valor": "3708.75",
+                }
+            ]
+        },
+        db,
+        user_id=42,
+        tenant_id="tenant-1",
+    )
+
+    conta = db.adicionados[0]
+    assert conta.tipo_despesa_id == 123
+    assert conta.nota_entrada_id == 10
+    assert conta.afeta_dre is False
+    assert conta.dre_subcategoria_id is None

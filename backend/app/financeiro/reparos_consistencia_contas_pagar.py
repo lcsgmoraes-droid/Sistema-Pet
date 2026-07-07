@@ -143,8 +143,10 @@ def _build_cp_missing_actions(
                     "eh_parcelado": eh_parcelado,
                     "numero_parcela": idx if eh_parcelado else None,
                     "total_parcelas": len(duplicatas) if eh_parcelado else None,
+                    "dre_subcategoria_id": None,
                     "nfe_numero": str(nota["numero_nota"]),
                     "documento": str(dup.get("numero") or ""),
+                    "afeta_dre": False,
                     "percentual_online": _money_str(nota["percentual_online"]),
                     "percentual_loja": _money_str(nota["percentual_loja"]),
                     "user_id": int(nota["user_id"]),
@@ -164,7 +166,8 @@ def _insert_conta_pagar(db: Session, action: dict[str, Any]) -> int:
                 valor_original, valor_final, valor_pago,
                 data_emissao, data_vencimento, status,
                 eh_parcelado, numero_parcela, total_parcelas,
-                nota_entrada_id, nfe_numero, documento,
+                dre_subcategoria_id, nota_entrada_id, nfe_numero, documento,
+                afeta_dre,
                 percentual_online, percentual_loja, user_id, tenant_id
             )
             VALUES (
@@ -172,7 +175,8 @@ def _insert_conta_pagar(db: Session, action: dict[str, Any]) -> int:
                 :valor_original, :valor_final, 0,
                 :data_emissao, :data_vencimento, :status,
                 :eh_parcelado, :numero_parcela, :total_parcelas,
-                :nota_id, :nfe_numero, :documento,
+                :dre_subcategoria_id, :nota_id, :nfe_numero, :documento,
+                :afeta_dre,
                 :percentual_online, :percentual_loja, :user_id, :tenant_id
             )
             RETURNING id

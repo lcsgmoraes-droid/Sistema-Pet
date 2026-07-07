@@ -182,10 +182,17 @@ class ChatIAMetricasMixin:
                 ContaPagar.data_emissao >= data_inicio.date(),
                 ContaPagar.data_emissao <= data_fim.date(),
                 ContaPagar.status != "cancelado",
+                ContaPagar.afeta_dre.is_(True),
+                ContaPagar.nota_entrada_id.is_(None),
             )
             .all()
         )
-        despesas_operacionais = sum(float(c.valor_original or 0) for c in despesas)
+        despesas_operacionais = sum(
+            float(c.valor_original or 0)
+            for c in despesas
+            if getattr(c, "afeta_dre", True) is True
+            and getattr(c, "nota_entrada_id", None) is None
+        )
 
         lucro_liquido = lucro_bruto - despesas_operacionais
         margem_liquida = (
