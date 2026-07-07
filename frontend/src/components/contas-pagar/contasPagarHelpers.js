@@ -111,3 +111,134 @@ export function extrairMensagemErroPagamento(error) {
 export function getFornecedorNome(fornecedor) {
   return fornecedor?.nome || fornecedor?.razao_social || fornecedor?.nome_fantasia || "";
 }
+
+export function montarParamsFiltrosContasPagar(filtrosParaAplicar = {}) {
+  const params = new URLSearchParams();
+  params.append("_t", Date.now());
+
+  if (filtrosParaAplicar.status !== "todos") params.append("status", filtrosParaAplicar.status);
+  if (filtrosParaAplicar.fornecedor_id)
+    params.append("fornecedor_id", filtrosParaAplicar.fornecedor_id);
+  if (filtrosParaAplicar.data_inicio) params.append("data_inicio", filtrosParaAplicar.data_inicio);
+  if (filtrosParaAplicar.data_fim) params.append("data_fim", filtrosParaAplicar.data_fim);
+  if (filtrosParaAplicar.apenas_vencidas) params.append("apenas_vencidas", "true");
+  if (filtrosParaAplicar.apenas_vencer) params.append("apenas_vencer", "true");
+  if (filtrosParaAplicar.ocultar_taxas_cartao) params.append("ocultar_taxas_cartao", "true");
+  if (filtrosParaAplicar.apenas_taxas_cartao) params.append("apenas_taxas_cartao", "true");
+  if (filtrosParaAplicar.numero_nf) params.append("numero_nf", filtrosParaAplicar.numero_nf);
+  if (filtrosParaAplicar.tipo_custo !== "todos")
+    params.append("tipo_custo", filtrosParaAplicar.tipo_custo);
+  if (filtrosParaAplicar.origem !== "todos") params.append("origem", filtrosParaAplicar.origem);
+  if (filtrosParaAplicar.busca) params.append("busca", filtrosParaAplicar.busca);
+  if (filtrosParaAplicar.fornecedor_busca)
+    params.append("fornecedor_nome", filtrosParaAplicar.fornecedor_busca);
+  if (filtrosParaAplicar.data_campo) params.append("data_campo", filtrosParaAplicar.data_campo);
+  if (filtrosParaAplicar.tipo_despesa_id)
+    params.append("tipo_despesa_id", filtrosParaAplicar.tipo_despesa_id);
+
+  return params;
+}
+
+export function normalizarFormaPagamentoContasPagar(forma) {
+  return {
+    id: forma.id,
+    nome: forma.nome,
+    tipo: forma.tipo || forma.nome?.toLowerCase()?.replace(/\s+/g, "_") || "outro",
+    icone: forma.icone || "ðŸ’³",
+    conta_bancaria_destino_id: forma.conta_bancaria_destino_id || null,
+  };
+}
+
+export async function carregarFormasPagamentoContasPagar(api, safeArray) {
+  const response = await api.get("/financeiro/formas-pagamento?apenas_ativas=true");
+  return safeArray(response.data).map(normalizarFormaPagamentoContasPagar);
+}
+
+export function criarFiltrosDespesasCaixaContasPagar(filtrosPadrao, filtrosAtuais) {
+  return {
+    ...filtrosPadrao,
+    status: "pago",
+    origem: "caixa_pdv",
+    data_campo: filtrosAtuais.data_campo || "pagamento",
+    data_inicio: filtrosAtuais.data_inicio,
+    data_fim: filtrosAtuais.data_fim,
+    periodo_rapido: filtrosAtuais.periodo_rapido || "",
+    ocultar_taxas_cartao: false,
+    apenas_taxas_cartao: false,
+  };
+}
+
+export function criarFiltrosTaxasCartaoContasPagar(filtrosPadrao, filtrosAtuais) {
+  return {
+    ...filtrosPadrao,
+    data_inicio: filtrosAtuais.data_inicio,
+    data_fim: filtrosAtuais.data_fim,
+    data_campo: filtrosAtuais.data_campo || "vencimento",
+    periodo_rapido: filtrosAtuais.periodo_rapido || "",
+    ocultar_taxas_cartao: false,
+    apenas_taxas_cartao: true,
+  };
+}
+
+export function calcularValorFinalPagamentoContasPagar(dados = {}) {
+  return (
+    (Number(dados.valor_pago) || 0) +
+    (Number(dados.valor_juros) || 0) +
+    (Number(dados.valor_multa) || 0) -
+    (Number(dados.valor_desconto) || 0)
+  );
+}
+
+export function formatarDataContasPagar(data) {
+  if (!data) return "-";
+  const partes = data.split("T")[0].split("-");
+  const dataLocal = new Date(parseInt(partes[0]), parseInt(partes[1]) - 1, parseInt(partes[2]));
+  return dataLocal.toLocaleDateString("pt-BR");
+}
+
+export function getOrigemLabelContasPagar(conta) {
+  const origem = conta.origem_lancamento || "manual";
+
+  if (origem === "caixa_pdv") {
+    return conta.caixa_referencia ? `Caixa/PDV (${conta.caixa_referencia})` : "Caixa/PDV";
+  }
+
+  if (origem === "nota_entrada") {
+    return "Nota entrada";
+  }
+
+  return "Manual";
+}
+
+export function getDescricaoPrincipalContasPagar(conta) {
+  const descricao = String(conta.descricao || "-").trim();
+  const nfMatch = descricao.match(/\bNF-e?\s+\d+/i);
+  if (nfMatch) return nfMatch[0].replace(/\s+/g, " ");
+  return descricao;
+}
+
+export function getContaTooltipContasPagar(conta) {
+  const linhas = [
+    `Descricao: ${conta.descricao || "-"}`,
+    conta.documento ? `Documento/NF: ${conta.documento}` : null,
+    `Origem: ${getOrigemLabelContasPagar(conta)}`,
+    conta.tipo_despesa_nome ? `Tipo de despesa: ${conta.tipo_despesa_nome}` : null,
+    conta.eh_parcelado ? `Parcela: ${conta.numero_parcela}/${conta.total_parcelas}` : null,
+    conta.e_custo_fixo === true ? "Tipo de custo: Fixo" : null,
+    conta.e_custo_fixo === false ? "Tipo de custo: Variavel" : null,
+  ].filter(Boolean);
+
+  return linhas.join("\n");
+}
+
+export function ordenarTiposDespesaContasPagar(tiposDespesa, safeArray) {
+  return [...safeArray(tiposDespesa)].sort((a, b) =>
+    String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR", { sensitivity: "base" }),
+  );
+}
+
+export function encontrarFornecedorFiltroContasPagar(fornecedores, fornecedorId, safeArray) {
+  return safeArray(fornecedores).find(
+    (fornecedor) => String(fornecedor.id) === String(fornecedorId),
+  );
+}

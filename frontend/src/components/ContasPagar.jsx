@@ -8,9 +8,18 @@ import { formatMoneyCellValue } from "./ui/MoneyCell";
 import StatusBadge from "./ui/StatusBadge";
 import {
   calcularIntervaloPeriodoRapido,
+  calcularValorFinalPagamentoContasPagar,
   criarFiltrosPadraoContasPagar,
+  criarFiltrosDespesasCaixaContasPagar,
+  criarFiltrosTaxasCartaoContasPagar,
+  encontrarFornecedorFiltroContasPagar,
   extrairMensagemErroPagamento,
+  formatarDataContasPagar,
   formatarDataISO,
+  getContaTooltipContasPagar,
+  getDescricaoPrincipalContasPagar,
+  montarParamsFiltrosContasPagar,
+  ordenarTiposDespesaContasPagar,
 } from "./contas-pagar/contasPagarHelpers";
 
 const ContasPagar = () => {
@@ -82,32 +91,6 @@ const ContasPagar = () => {
     }));
   };
 
-  const montarParamsFiltros = (filtrosParaAplicar = filtros) => {
-    const params = new URLSearchParams();
-    params.append("_t", Date.now());
-    if (filtrosParaAplicar.status !== "todos") params.append("status", filtrosParaAplicar.status);
-    if (filtrosParaAplicar.fornecedor_id)
-      params.append("fornecedor_id", filtrosParaAplicar.fornecedor_id);
-    if (filtrosParaAplicar.data_inicio)
-      params.append("data_inicio", filtrosParaAplicar.data_inicio);
-    if (filtrosParaAplicar.data_fim) params.append("data_fim", filtrosParaAplicar.data_fim);
-    if (filtrosParaAplicar.apenas_vencidas) params.append("apenas_vencidas", "true");
-    if (filtrosParaAplicar.apenas_vencer) params.append("apenas_vencer", "true");
-    if (filtrosParaAplicar.ocultar_taxas_cartao) params.append("ocultar_taxas_cartao", "true");
-    if (filtrosParaAplicar.apenas_taxas_cartao) params.append("apenas_taxas_cartao", "true");
-    if (filtrosParaAplicar.numero_nf) params.append("numero_nf", filtrosParaAplicar.numero_nf);
-    if (filtrosParaAplicar.tipo_custo !== "todos")
-      params.append("tipo_custo", filtrosParaAplicar.tipo_custo);
-    if (filtrosParaAplicar.origem !== "todos") params.append("origem", filtrosParaAplicar.origem);
-    if (filtrosParaAplicar.busca) params.append("busca", filtrosParaAplicar.busca);
-    if (filtrosParaAplicar.fornecedor_busca)
-      params.append("fornecedor_nome", filtrosParaAplicar.fornecedor_busca);
-    if (filtrosParaAplicar.data_campo) params.append("data_campo", filtrosParaAplicar.data_campo);
-    if (filtrosParaAplicar.tipo_despesa_id)
-      params.append("tipo_despesa_id", filtrosParaAplicar.tipo_despesa_id);
-    return params;
-  };
-
   const carregarDados = async () => {
     try {
       const [
@@ -119,7 +102,7 @@ const ContasPagar = () => {
         subcategoriasRes,
         tiposRes,
       ] = await Promise.allSettled([
-        api.get(`/contas-pagar/?${montarParamsFiltros(filtros)}`),
+        api.get(`/contas-pagar/?${montarParamsFiltrosContasPagar(filtros)}`),
         api.get(`/clientes/?tipo_cadastro=fornecedor`),
         carregarFormasPagamento(),
         api.get(`/contas-bancarias?apenas_ativas=true`),
@@ -173,7 +156,9 @@ const ContasPagar = () => {
   const aplicarFiltros = async (filtrosParaAplicar = filtros) => {
     try {
       setLoading(true);
-      const response = await api.get(`/contas-pagar/?${montarParamsFiltros(filtrosParaAplicar)}`);
+      const response = await api.get(
+        `/contas-pagar/?${montarParamsFiltrosContasPagar(filtrosParaAplicar)}`,
+      );
 
       setContas(safeArray(response.data));
     } catch (error) {
@@ -186,31 +171,13 @@ const ContasPagar = () => {
   };
 
   const filtrarDespesasCaixa = () => {
-    const filtrosCaixa = {
-      ...filtrosPadrao,
-      status: "pago",
-      origem: "caixa_pdv",
-      data_campo: filtros.data_campo || "pagamento",
-      data_inicio: filtros.data_inicio,
-      data_fim: filtros.data_fim,
-      periodo_rapido: filtros.periodo_rapido || "",
-      ocultar_taxas_cartao: false,
-      apenas_taxas_cartao: false,
-    };
+    const filtrosCaixa = criarFiltrosDespesasCaixaContasPagar(filtrosPadrao, filtros);
     setFiltros(filtrosCaixa);
     aplicarFiltros(filtrosCaixa);
   };
 
   const filtrarTaxasCartao = () => {
-    const filtrosTaxas = {
-      ...filtrosPadrao,
-      data_inicio: filtros.data_inicio,
-      data_fim: filtros.data_fim,
-      data_campo: filtros.data_campo || "vencimento",
-      periodo_rapido: filtros.periodo_rapido || "",
-      ocultar_taxas_cartao: false,
-      apenas_taxas_cartao: true,
-    };
+    const filtrosTaxas = criarFiltrosTaxasCartaoContasPagar(filtrosPadrao, filtros);
     setFiltros(filtrosTaxas);
     aplicarFiltros(filtrosTaxas);
   };
@@ -563,10 +530,7 @@ const ContasPagar = () => {
   };
 
   const calcularValorFinalPagamento = (dados = dadosPagamento) =>
-    (Number(dados.valor_pago) || 0) +
-    (Number(dados.valor_juros) || 0) +
-    (Number(dados.valor_multa) || 0) -
-    (Number(dados.valor_desconto) || 0);
+    calcularValorFinalPagamentoContasPagar(dados);
 
   const confirmarSaldoNegativoPagamento = () => {
     const contaBancaria = safeArray(contasBancarias).find(
@@ -620,14 +584,6 @@ const ContasPagar = () => {
     }
   };
 
-  const formatarData = (data) => {
-    if (!data) return "-";
-    // Evita problemas de timezone ao criar data diretamente dos componentes
-    const partes = data.split("T")[0].split("-");
-    const dataLocal = new Date(parseInt(partes[0]), parseInt(partes[1]) - 1, parseInt(partes[2]));
-    return dataLocal.toLocaleDateString("pt-BR");
-  };
-
   const formatarMoeda = (valor) => {
     return formatMoneyCellValue(valor);
   };
@@ -642,47 +598,12 @@ const ContasPagar = () => {
     return <StatusBadge status="pendente" />;
   };
 
-  const getOrigemLabel = (conta) => {
-    const origem = conta.origem_lancamento || "manual";
+  const tiposDespesaOrdenados = ordenarTiposDespesaContasPagar(tiposDespesa, safeArray);
 
-    if (origem === "caixa_pdv") {
-      return conta.caixa_referencia ? `Caixa/PDV (${conta.caixa_referencia})` : "Caixa/PDV";
-    }
-
-    if (origem === "nota_entrada") {
-      return "Nota entrada";
-    }
-
-    return "Manual";
-  };
-
-  const getDescricaoPrincipal = (conta) => {
-    const descricao = String(conta.descricao || "-").trim();
-    const nfMatch = descricao.match(/\bNF-e?\s+\d+/i);
-    if (nfMatch) return nfMatch[0].replace(/\s+/g, " ");
-    return descricao;
-  };
-
-  const getContaTooltip = (conta) => {
-    const linhas = [
-      `Descricao: ${conta.descricao || "-"}`,
-      conta.documento ? `Documento/NF: ${conta.documento}` : null,
-      `Origem: ${getOrigemLabel(conta)}`,
-      conta.tipo_despesa_nome ? `Tipo de despesa: ${conta.tipo_despesa_nome}` : null,
-      conta.eh_parcelado ? `Parcela: ${conta.numero_parcela}/${conta.total_parcelas}` : null,
-      conta.e_custo_fixo === true ? "Tipo de custo: Fixo" : null,
-      conta.e_custo_fixo === false ? "Tipo de custo: Variavel" : null,
-    ].filter(Boolean);
-
-    return linhas.join("\n");
-  };
-
-  const tiposDespesaOrdenados = [...safeArray(tiposDespesa)].sort((a, b) =>
-    String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR", { sensitivity: "base" }),
-  );
-
-  const fornecedorFiltroSelecionado = safeArray(fornecedores).find(
-    (fornecedor) => String(fornecedor.id) === String(filtros.fornecedor_id),
+  const fornecedorFiltroSelecionado = encontrarFornecedorFiltroContasPagar(
+    fornecedores,
+    filtros.fornecedor_id,
+    safeArray,
   );
 
   const handleFiltrosSubmit = (event) => {
@@ -713,10 +634,10 @@ const ContasPagar = () => {
       algumasVisiveisSelecionadas={algumasVisiveisSelecionadas}
       selecionarTodasContasVisiveis={selecionarTodasContasVisiveis}
       alternarSelecaoConta={alternarSelecaoConta}
-      getContaTooltip={getContaTooltip}
-      getDescricaoPrincipal={getDescricaoPrincipal}
+      getContaTooltip={getContaTooltipContasPagar}
+      getDescricaoPrincipal={getDescricaoPrincipalContasPagar}
       getStatusBadge={getStatusBadge}
-      formatarData={formatarData}
+      formatarData={formatarDataContasPagar}
       abrirModalEdicao={abrirModalEdicao}
       abrirModalPagamento={abrirModalPagamento}
       precisaClassificacao={precisaClassificacao}

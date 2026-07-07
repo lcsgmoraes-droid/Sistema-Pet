@@ -207,17 +207,25 @@ Regras para refatorar sem quebrar producao:
 - Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
-Inventario atualizado em 2026-07-03 pela contagem operacional de linhas com conteudo do recorte backend/web rastreado, excluindo testes, migrations, CSS e builds locais.
+Inventario atualizado em 2026-07-07 pela contagem operacional de linhas com conteudo do recorte backend/web/mobile rastreado, excluindo testes, migrations, CSS e builds locais.
 
-- 0 arquivos de aplicacao backend/web acima de 700 linhas, em atencao.
-- 0 arquivos de aplicacao backend/web acima de 1000 linhas, prioridade de refatoracao.
-- 0 arquivos de aplicacao backend/web acima de 1500 linhas, criticidade alta.
-- 0 arquivos de aplicacao backend/web acima de 2000 linhas.
+- 0 arquivos de aplicacao backend/web/mobile acima de 700 linhas, em atencao.
+- 0 arquivos de aplicacao backend/web/mobile acima de 1000 linhas, prioridade de refatoracao.
+- 0 arquivos de aplicacao backend/web/mobile acima de 1500 linhas, criticidade alta.
+- 0 arquivos de aplicacao backend/web/mobile acima de 2000 linhas.
 - Recorte backend em `backend/app`: 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
 - Recorte GUI amplo em `frontend/src` (`js`, `jsx`, `ts`, `tsx`, excluindo testes): 0 arquivos acima de 700 linhas e 0 acima de 1000 linhas.
-- Observacao: fora do inventario de aplicacao backend/web, ainda ha 5 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
+- Observacao: fora do inventario de aplicacao backend/web/mobile, ainda ha 6 arquivos de teste em `backend/tests` e 0 em `frontend/src` acima de 700 linhas.
 - Observacao mobile: `app-mobile/src` esta com 0 arquivos acima de 700 linhas; a frente mobile zerou as telas grandes mantendo separacao por `Content`, `Scanner`, `Cards`, `Forms`, `styles` e `utils`.
-- Observacao operacional: no inventario amplo `backend` + `frontend/src` + `app-mobile/src`, ainda ha 8 arquivos acima de 700 linhas: 5 testes backend, 2 migrations geradas e 1 script/importador legado fora de `backend/app`.
+- Observacao operacional: no inventario amplo `backend` + `frontend/src` + `app-mobile/src`, ainda ha 9 arquivos acima de 700 linhas: 6 testes backend, 2 migrations geradas e 1 script/importador legado fora de `backend/app`.
+
+Fatia aplicacao 700 batch 56 de 2026-07-07: os ultimos arquivos de aplicacao backend/web/mobile acima de 700 linhas sairam da faixa com contrato automatizado de guarda:
+
+- `backend/app/financeiro/reparos_consistencia.py`: 776 -> 141 linhas com conteudo, mantendo a fachada publica e separando reparos de contas a receber, contas a pagar, centavos e helpers comuns.
+- `backend/app/financeiro/contas_receber_service.py`: 710 -> 651 linhas com conteudo, movendo consultas auxiliares para `backend/app/financeiro/contas_receber_queries.py` e preservando reexports de compatibilidade.
+- `frontend/src/components/Layout.jsx`: 714 -> 637 linhas com conteudo, movendo a barra de favoritos arrastavel para `frontend/src/components/layout/LayoutFavoritesBar.jsx` e a comparacao de ordem para `menuFavorites.js`.
+- `frontend/src/components/ContasPagar.jsx`: 705 -> 635 linhas com conteudo, movendo regras puras de filtros, calculo, data, tooltip e selecoes derivadas para `contasPagarHelpers.js`.
+- Contrato dedicado: `backend/tests/unit/test_application_large_files_guard.py`, garantindo 0 arquivos de aplicacao em `backend/app`, `frontend/src` e `app-mobile/src` acima de 700 linhas e inventario atualizado.
 
 Fatia scripts 700 batch 55 de 2026-07-03: `backend/scripts/enriquecer_produtos_bling_sku.py` saiu da faixa acima de 700 linhas ao virar fachada de CLI/compatibilidade e separar carregamento, classificacao, DB e processamento por modulo:
 

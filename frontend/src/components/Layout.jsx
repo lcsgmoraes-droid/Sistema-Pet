@@ -1,18 +1,3 @@
-import {
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  horizontalListSortingStrategy,
-  sortableKeyboardCoordinates,
-  useSortable,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { CalendarDays, FlaskConical, Stethoscope, Syringe } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FiFileText, FiMenu } from "react-icons/fi";
@@ -34,58 +19,17 @@ import {
   buildVisibleMenuFavorites,
   normalizeMenuFavorites,
   reorderMenuFavorites,
+  sameFavoritePathOrder,
   shouldBlockFavoriteShortcutClick,
   toggleMenuFavorite,
 } from "./layout/menuFavorites";
+import LayoutFavoritesBar from "./layout/LayoutFavoritesBar";
 import LayoutSidebar from "./layout/LayoutSidebar";
 import { createLayoutMenuItems } from "./layout/menuConfig";
 import ModalCalculadoraUniversal from "./ModalCalculadoraUniversal";
 import ThemeToggle from "./theme/ThemeToggle";
 
 const COREPET_ICON = "/brand/corepet/corepet-icon-64.png";
-
-function sameFavoritePathOrder(left = [], right = []) {
-  if (left.length !== right.length) return false;
-  return left.every((favorite, index) => favorite.path === right[index]?.path);
-}
-
-function FavoriteShortcut({ favorite, active, onClick }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: favorite.path,
-  });
-  const Icon = favorite.icon;
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.72 : 1,
-    zIndex: isDragging ? 20 : undefined,
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="shrink-0 touch-none cursor-grab active:cursor-grabbing"
-      {...attributes}
-      {...listeners}
-    >
-      <Link
-        to={favorite.path}
-        onClick={onClick}
-        className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-semibold shadow-sm transition-colors ${
-          active
-            ? "border-[#0f8b8d] bg-[#d8eee9] text-[#0f5f63]"
-            : "border-gray-200 bg-white text-gray-700 hover:border-[#b9ddd8] hover:bg-[#f4fbfa]"
-        } ${isDragging ? "ring-2 ring-[#b9ddd8]" : ""}`}
-        title="Arraste para reordenar"
-      >
-        {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" /> : null}
-        <span className="whitespace-nowrap">{favorite.label}</span>
-      </Link>
-    </div>
-  );
-}
 
 const Layout = () => {
   useEscapeFallbackForVisibleModals();
@@ -192,14 +136,6 @@ const Layout = () => {
     isDragging: false,
     suppressClickUntil: 0,
   });
-  const favoriteDragSensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 6 },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  );
   const perfilVeterinario = isVeterinarioProfile(user);
   const rotaVeterinaria = location.pathname.startsWith("/veterinario");
   const exibirAtalhosVetMobile = isMobile && perfilVeterinario && rotaVeterinaria;
@@ -721,32 +657,15 @@ const Layout = () => {
           </div>
         </header>
 
-        {visibleMenuFavorites.length > 0 && !isBradescoOrganizerRoute && (
-          <div className="shrink-0 border-b border-gray-200 bg-white/95 px-3 py-2 md:px-6 dark:border-slate-800 dark:bg-slate-950/95">
-            <DndContext
-              sensors={favoriteDragSensors}
-              collisionDetection={closestCenter}
-              onDragStart={markFavoriteDragStarted}
-              onDragEnd={handleFavoriteDragEnd}
-              onDragCancel={markFavoriteDragFinished}
-            >
-              <SortableContext
-                items={visibleMenuFavorites.map((favorite) => favorite.path)}
-                strategy={horizontalListSortingStrategy}
-              >
-                <div className="flex items-center gap-2 overflow-x-auto">
-                  {visibleMenuFavorites.map((favorite) => (
-                    <FavoriteShortcut
-                      key={favorite.path}
-                      favorite={favorite}
-                      active={isActive(favorite.path)}
-                      onClick={handleFavoriteShortcutClick}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          </div>
+        {!isBradescoOrganizerRoute && (
+          <LayoutFavoritesBar
+            favorites={visibleMenuFavorites}
+            isActive={isActive}
+            onShortcutClick={handleFavoriteShortcutClick}
+            onDragStart={markFavoriteDragStarted}
+            onDragEnd={handleFavoriteDragEnd}
+            onDragCancel={markFavoriteDragFinished}
+          />
         )}
 
         {/* Page Content */}

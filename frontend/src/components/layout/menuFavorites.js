@@ -111,6 +111,11 @@ export function reorderMenuFavorites(favorites = [], activePath, overPath) {
   return reordered;
 }
 
+export function sameFavoritePathOrder(left = [], right = []) {
+  if (left.length !== right.length) return false;
+  return left.every((favorite, index) => favorite.path === right[index]?.path);
+}
+
 export function shouldBlockFavoriteShortcutClick({
   isDragging = false,
   suppressClickUntil = 0,
