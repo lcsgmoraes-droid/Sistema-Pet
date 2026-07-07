@@ -14,7 +14,10 @@ def contas_pagar_source() -> str:
         for path in (
             "frontend/src/components/ContasPagar.jsx",
             "frontend/src/components/contas-pagar/contasPagarHelpers.js",
+            "frontend/src/components/contas-pagar/contasPagarFilterHelpers.js",
+            "frontend/src/components/contas-pagar/contasPagarDisplayHelpers.js",
             "frontend/src/components/contas-pagar/ContasPagarFilters.jsx",
+            "frontend/src/components/contas-pagar/ContasPagarAnalise.jsx",
             "frontend/src/components/contas-pagar/ContasPagarTable.jsx",
             "frontend/src/components/contas-pagar/ContasPagarModals.jsx",
             "frontend/src/components/contas-pagar/ContasPagarPagamentoLoteModal.jsx",
@@ -41,11 +44,14 @@ def modal_conta_pagar_source() -> str:
 def test_contas_pagar_foi_dividido_em_componentes_menores():
     arquivos = {
         "frontend/src/components/ContasPagar.jsx": 1000,
+        "frontend/src/components/contas-pagar/ContasPagarAnalise.jsx": 500,
         "frontend/src/components/contas-pagar/ContasPagarFilters.jsx": 400,
         "frontend/src/components/contas-pagar/ContasPagarTable.jsx": 500,
         "frontend/src/components/contas-pagar/ContasPagarModals.jsx": 700,
         "frontend/src/components/contas-pagar/ContasPagarPagamentoLoteModal.jsx": 220,
-        "frontend/src/components/contas-pagar/contasPagarHelpers.js": 150,
+        "frontend/src/components/contas-pagar/contasPagarHelpers.js": 80,
+        "frontend/src/components/contas-pagar/contasPagarFilterHelpers.js": 240,
+        "frontend/src/components/contas-pagar/contasPagarDisplayHelpers.js": 90,
         "frontend/src/components/contas-pagar/useContasPagarSelection.js": 220,
     }
 
@@ -247,6 +253,22 @@ def test_contas_pagar_frontend_tem_modal_de_pagamento_em_lote():
     assert "Pagamento em lote" in source
     assert "Saldo total selecionado" in source
     assert "conta_ids: contasParaPagamentoLote.map" in source
+
+
+def test_contas_pagar_frontend_tem_aba_analise_com_exclusao_de_fornecedor():
+    source = contas_pagar_source()
+
+    assert "ContasPagarAnalise" in source
+    assert "abaAtivaContasPagar" in source
+    assert "Lancamentos" in source
+    assert "Analise" in source
+    assert 'api.get("/contas-pagar/analise-abertos"' in source
+    assert "fornecedor_modo" in source
+    assert "fornecedor_ids" in source
+    assert "Excluir selecionados" in source
+    assert "Tudo menos" in source
+    assert "proximos_12_meses" in source
+    assert "agenda_mensal" in source
 
 
 def test_contas_pagar_frontend_chama_endpoints_de_estorno_cancelamento_e_exclusao_em_lote():

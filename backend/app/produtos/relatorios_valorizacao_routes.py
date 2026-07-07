@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -82,6 +82,8 @@ def relatorio_valorizacao_estoque(
     marca_id: Optional[int] = None,
     departamento_id: Optional[int] = None,
     fornecedor_id: Optional[int] = None,
+    fornecedor_ids: Optional[list[int]] = Query(None),
+    fornecedor_modo: str = "incluir",
     incluir_kits_virtuais: bool = False,
     ativo: Optional[bool] = True,
     apenas_com_estoque: bool = True,
@@ -150,18 +152,39 @@ def relatorio_valorizacao_estoque(
             )
         )
 
-    if fornecedor_id:
-        query = query.filter(
-            or_(
-                Produto.fornecedor_id == fornecedor_id,
-                Produto.fornecedores_alternativos.any(
+    fornecedor_ids = list(
+        dict.fromkeys(int(item) for item in fornecedor_ids or [] if item)
+    )
+    if fornecedor_id and fornecedor_id not in fornecedor_ids:
+        fornecedor_ids.append(fornecedor_id)
+
+    fornecedor_modo_normalizado = (fornecedor_modo or "incluir").strip().lower()
+    fornecedor_vinculo_condition = None
+    if fornecedor_ids:
+        fornecedor_vinculo_condition = or_(
+            Produto.fornecedor_id.in_(fornecedor_ids),
+            Produto.fornecedores_alternativos.any(
+                and_(
+                    ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids),
+                    ProdutoFornecedor.ativo.is_(True),
+                ),
+            ),
+        )
+        if fornecedor_modo_normalizado == "excluir":
+            query = query.filter(
+                or_(
+                    Produto.fornecedor_id.is_(None),
+                    Produto.fornecedor_id.notin_(fornecedor_ids),
+                ),
+                ~Produto.fornecedores_alternativos.any(
                     and_(
-                        ProdutoFornecedor.fornecedor_id == fornecedor_id,
+                        ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids),
                         ProdutoFornecedor.ativo.is_(True),
                     )
                 ),
             )
-        )
+        else:
+            query = query.filter(fornecedor_vinculo_condition)
 
     query = query.options(
         joinedload(Produto.categoria).joinedload(Categoria.departamento),

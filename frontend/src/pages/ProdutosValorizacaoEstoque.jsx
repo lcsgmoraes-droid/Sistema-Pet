@@ -19,7 +19,10 @@ const filtrosIniciais = {
   busca: "",
   categoria_id: "",
   fornecedor_id: "",
+  fornecedor_ids: [],
   fornecedor_busca: "",
+  fornecedor_modo: "incluir",
+  fornecedores_selecionados: [],
   marca_id: "",
   departamento_id: "",
   apenas_com_estoque: true,
@@ -164,18 +167,18 @@ export default function ProdutosValorizacaoEstoque() {
   const carregarRelatorio = async (filtros, pagina) => {
     try {
       setLoading(true);
-      const params = {
-        page: pagina,
-        page_size: Number(filtros.page_size) || ITENS_POR_PAGINA_INICIAL,
-        apenas_com_estoque: filtros.apenas_com_estoque,
-        incluir_kits_virtuais: filtros.incluir_kits_virtuais,
-      };
+      const params = new URLSearchParams();
+      params.append("page", pagina);
+      params.append("page_size", Number(filtros.page_size) || ITENS_POR_PAGINA_INICIAL);
+      params.append("apenas_com_estoque", filtros.apenas_com_estoque ? "true" : "false");
+      params.append("incluir_kits_virtuais", filtros.incluir_kits_virtuais ? "true" : "false");
+      params.append("fornecedor_modo", filtros.fornecedor_modo || "incluir");
 
-      if (filtros.busca.trim()) params.busca = filtros.busca.trim();
-      if (filtros.categoria_id) params.categoria_id = filtros.categoria_id;
-      if (filtros.fornecedor_id) params.fornecedor_id = filtros.fornecedor_id;
-      if (filtros.marca_id) params.marca_id = filtros.marca_id;
-      if (filtros.departamento_id) params.departamento_id = filtros.departamento_id;
+      if (filtros.busca.trim()) params.append("busca", filtros.busca.trim());
+      if (filtros.categoria_id) params.append("categoria_id", filtros.categoria_id);
+      if (filtros.marca_id) params.append("marca_id", filtros.marca_id);
+      if (filtros.departamento_id) params.append("departamento_id", filtros.departamento_id);
+      filtros.fornecedor_ids.forEach((id) => params.append("fornecedor_ids", id));
 
       const response = await getRelatorioValorizacaoEstoque(params);
       setDados(response.data);
@@ -214,16 +217,23 @@ export default function ProdutosValorizacaoEstoque() {
     }));
   };
 
-  const fornecedorFiltroSelecionado =
-    fornecedores.find(
-      (fornecedor) => String(fornecedor.id) === String(filtrosForm.fornecedor_id),
-    ) || null;
+  const fornecedores_selecionados = filtrosForm.fornecedores_selecionados;
 
   const selecionarFornecedorFiltro = (fornecedor) => {
+    if (!fornecedor?.id) return;
+    const fornecedorId = String(fornecedor.id);
     setFiltrosForm((prev) => ({
       ...prev,
-      fornecedor_id: fornecedor?.id ? String(fornecedor.id) : "",
-      fornecedor_busca: getFornecedorNome(fornecedor),
+      fornecedor_id: "",
+      fornecedor_busca: "",
+      fornecedor_ids: prev.fornecedor_ids.includes(fornecedorId)
+        ? prev.fornecedor_ids
+        : [...prev.fornecedor_ids, fornecedorId],
+      fornecedores_selecionados: prev.fornecedores_selecionados.some(
+        (item) => String(item.id) === fornecedorId,
+      )
+        ? prev.fornecedores_selecionados
+        : [...prev.fornecedores_selecionados, fornecedor],
     }));
   };
 
@@ -232,6 +242,16 @@ export default function ProdutosValorizacaoEstoque() {
       ...prev,
       fornecedor_id: "",
       fornecedor_busca: "",
+    }));
+  };
+
+  const removerFornecedorFiltro = (fornecedorId) => {
+    setFiltrosForm((prev) => ({
+      ...prev,
+      fornecedor_ids: prev.fornecedor_ids.filter((id) => String(id) !== String(fornecedorId)),
+      fornecedores_selecionados: prev.fornecedores_selecionados.filter(
+        (fornecedor) => String(fornecedor.id) !== String(fornecedorId),
+      ),
     }));
   };
 
@@ -297,25 +317,40 @@ export default function ProdutosValorizacaoEstoque() {
             />
           </div>
 
-          <div>
-            <FornecedorSelector
-              fornecedores={fornecedores}
-              fornecedorId={filtrosForm.fornecedor_id}
-              fornecedorSelecionado={fornecedorFiltroSelecionado}
-              value={filtrosForm.fornecedor_busca}
-              placeholder="Buscar fornecedor..."
-              inputClassName="rounded-xl border-gray-300 py-2.5"
-              onInputChange={(termo) =>
-                setFiltrosForm((prev) => ({
-                  ...prev,
-                  fornecedor_id: "",
-                  fornecedor_busca: termo,
-                }))
-              }
-              onSelect={selecionarFornecedorFiltro}
-              onClear={limparFornecedorFiltro}
-              onFornecedorCriado={selecionarFornecedorFiltro}
-            />
+          <div className="xl:col-span-2">
+            <div className="grid gap-2 sm:grid-cols-[170px_1fr]">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Filtro fornecedor
+                </label>
+                <select
+                  value={filtrosForm.fornecedor_modo}
+                  onChange={(event) => atualizarFiltro("fornecedor_modo", event.target.value)}
+                  className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="incluir">Incluir fornecedores</option>
+                  <option value="excluir">Excluir fornecedores</option>
+                </select>
+              </div>
+              <FornecedorSelector
+                fornecedores={fornecedores}
+                fornecedorId=""
+                fornecedorSelecionado={null}
+                value={filtrosForm.fornecedor_busca}
+                placeholder="Buscar fornecedor..."
+                inputClassName="rounded-xl border-gray-300 py-2.5"
+                onInputChange={(termo) =>
+                  setFiltrosForm((prev) => ({
+                    ...prev,
+                    fornecedor_id: "",
+                    fornecedor_busca: termo,
+                  }))
+                }
+                onSelect={selecionarFornecedorFiltro}
+                onClear={limparFornecedorFiltro}
+                onFornecedorCriado={selecionarFornecedorFiltro}
+              />
+            </div>
           </div>
 
           <div>
@@ -406,6 +441,36 @@ export default function ProdutosValorizacaoEstoque() {
             {filtrosAplicados.incluir_kits_virtuais
               ? "Os kits virtuais entraram nesta conta. Eles podem duplicar o mesmo estoque dos itens base."
               : "Os kits virtuais estao fora da valorizacao por padrao. Assim o total reflete o estoque fisico real."}
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            {fornecedores_selecionados.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold">
+                  {filtrosForm.fornecedor_modo === "excluir"
+                    ? "Tudo menos"
+                    : "Somente fornecedores"}
+                </span>
+                {fornecedores_selecionados.map((fornecedor) => (
+                  <span
+                    key={fornecedor.id}
+                    className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 font-medium text-blue-800"
+                  >
+                    {getFornecedorNome(fornecedor)}
+                    <button
+                      type="button"
+                      onClick={() => removerFornecedorFiltro(fornecedor.id)}
+                      className="rounded-full px-1 hover:bg-blue-100"
+                      title="Remover fornecedor"
+                    >
+                      x
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              "Nenhum fornecedor selecionado. O relatorio considera todos os fornecedores."
+            )}
           </div>
         </div>
       </form>
