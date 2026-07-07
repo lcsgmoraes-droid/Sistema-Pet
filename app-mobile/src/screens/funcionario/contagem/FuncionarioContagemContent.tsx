@@ -57,6 +57,10 @@ export type FuncionarioContagemContentProps = {
   setMostrarCusto: Dispatch<SetStateAction<boolean>>;
   mostrarVenda: boolean;
   setMostrarVenda: Dispatch<SetStateAction<boolean>>;
+  feedbackVibracaoAtiva: boolean;
+  setFeedbackVibracaoAtiva: Dispatch<SetStateAction<boolean>>;
+  feedbackVozErroAtiva: boolean;
+  setFeedbackVozErroAtiva: Dispatch<SetStateAction<boolean>>;
   salvando: boolean;
   salvar: () => void | Promise<FuncionarioContagem | null>;
   exportando: "pdf" | "xlsx" | null;
@@ -102,6 +106,10 @@ export function FuncionarioContagemContent({
   setMostrarCusto,
   mostrarVenda,
   setMostrarVenda,
+  feedbackVibracaoAtiva,
+  setFeedbackVibracaoAtiva,
+  feedbackVozErroAtiva,
+  setFeedbackVozErroAtiva,
   salvando,
   salvar,
   exportando,
@@ -121,7 +129,7 @@ export function FuncionarioContagemContent({
         </View>
         <View style={styles.headerTexto}>
           <Text style={styles.titulo}>Contagem</Text>
-          <Text style={styles.subtitulo}>Bipe, informe a quantidade e gere PDF ou Excel.</Text>
+          <Text style={styles.subtitulo}>Bipe produtos e gere PDF ou Excel.</Text>
         </View>
       </View>
 
@@ -187,6 +195,21 @@ export function FuncionarioContagemContent({
           <Ionicons name="camera" size={20} color="#fff" />
           <Text style={styles.botaoScanTexto}>Ler codigo de barras</Text>
         </TouchableOpacity>
+
+        <View style={styles.feedbackOpcoes}>
+          <CheckboxLinha
+            ativo={feedbackVibracaoAtiva}
+            titulo="Vibracao"
+            descricao="Feedback curto nas leituras."
+            onPress={() => setFeedbackVibracaoAtiva((atual) => !atual)}
+          />
+          <CheckboxLinha
+            ativo={feedbackVozErroAtiva}
+            titulo="Voz no erro"
+            descricao="Fala quando o codigo nao for encontrado."
+            onPress={() => setFeedbackVozErroAtiva((atual) => !atual)}
+          />
+        </View>
 
         <View style={styles.buscaLinha}>
           <TextInput

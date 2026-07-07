@@ -1,5 +1,6 @@
 import { useIsFocused } from "@react-navigation/native";
 import { useCameraPermissions } from "expo-camera";
+import * as Speech from "expo-speech";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Vibration } from "react-native";
 
@@ -26,7 +27,20 @@ import {
   FuncionarioContagemPermissionRequest,
   FuncionarioContagemScanner,
 } from "./contagem/FuncionarioContagemScanner";
-import { mensagemErroApi, parseNumero, type ContagemItemLocal } from "./contagem/FuncionarioContagemUtils";
+import {
+  incrementarProdutoContagemRapida,
+  mensagemErroApi,
+  parseNumero,
+  type ContagemItemLocal,
+} from "./contagem/FuncionarioContagemUtils";
+
+type ScannerFeedback = {
+  tipo: "sucesso" | "erro";
+  mensagem: string;
+};
+
+const SCANNER_MESMO_CODIGO_COOLDOWN_MS = 1600;
+const SCANNER_REATIVAR_DELAY_MS = 450;
 
 export default function FuncionarioContagemScreen() {
   const isFocused = useIsFocused();
@@ -47,15 +61,22 @@ export default function FuncionarioContagemScreen() {
   const [fornecedor, setFornecedor] = useState<FuncionarioContagemFornecedor | null>(null);
   const [mostrarCusto, setMostrarCusto] = useState(false);
   const [mostrarVenda, setMostrarVenda] = useState(false);
+  const [feedbackVibracaoAtiva, setFeedbackVibracaoAtiva] = useState(true);
+  const [feedbackVozErroAtiva, setFeedbackVozErroAtiva] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [exportando, setExportando] = useState<"pdf" | "xlsx" | null>(null);
   const [contagemSalva, setContagemSalva] = useState<FuncionarioContagem | null>(null);
   const [contagensRecentes, setContagensRecentes] = useState<FuncionarioContagemResumo[]>([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
   const [excluindoContagemId, setExcluindoContagemId] = useState<number | null>(null);
+  const [feedbackScanner, setFeedbackScanner] = useState<ScannerFeedback | null>(null);
   const ultimoScan = useRef("");
+  const ultimoScanEm = useRef(0);
+  const itensRef = useRef<ContagemItemLocal[]>([]);
   const produtoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fornecedorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reativarScannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const feedbackScannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (scannerAberto && !permission?.granted) {
@@ -67,6 +88,18 @@ export default function FuncionarioContagemScreen() {
     if (!isFocused) return;
     carregarRecentes(false);
   }, [isFocused]);
+
+  useEffect(() => {
+    itensRef.current = itens;
+  }, [itens]);
+
+  useEffect(() => {
+    return () => {
+      if (reativarScannerTimer.current) clearTimeout(reativarScannerTimer.current);
+      if (feedbackScannerTimer.current) clearTimeout(feedbackScannerTimer.current);
+      Speech.stop();
+    };
+  }, []);
 
   useEffect(() => {
     if (!isFocused) return;
@@ -201,33 +234,94 @@ export default function FuncionarioContagemScreen() {
     invalidarContagemSalva();
   }
 
+  function mostrarFeedbackScanner(feedback: ScannerFeedback) {
+    setFeedbackScanner(feedback);
+    if (feedbackScannerTimer.current) clearTimeout(feedbackScannerTimer.current);
+    feedbackScannerTimer.current = setTimeout(() => {
+      setFeedbackScanner(null);
+    }, 2200);
+  }
+
+  function emitirFeedbackScanner(tipo: ScannerFeedback["tipo"]) {
+    if (feedbackVibracaoAtiva) {
+      Vibration.vibrate(tipo === "sucesso" ? 55 : [0, 90, 60, 130]);
+    }
+    if (tipo === "erro" && feedbackVozErroAtiva) {
+      try {
+        Speech.stop();
+        Speech.speak("erro", {
+          language: "pt-BR",
+          pitch: 1,
+          rate: 1,
+        });
+      } catch {
+        // Feedback visual e vibracao continuam cobrindo aparelhos sem fala disponivel.
+      }
+    }
+  }
+
+  function registrarProdutoCapturado(produtoCapturado: FuncionarioProdutoEstoque) {
+    const resultado = incrementarProdutoContagemRapida(itensRef.current, produtoCapturado, {
+      retornarQuantidade: true,
+    });
+    itensRef.current = resultado.itens;
+    setItens(resultado.itens);
+    invalidarContagemSalva();
+    setProduto(null);
+    setQuantidade("1");
+    setObservacaoItem("");
+    setSugestoes([]);
+    setBuscaManual("");
+    return resultado.quantidadeAtual;
+  }
+
+  function reativarScannerDepois() {
+    if (reativarScannerTimer.current) clearTimeout(reativarScannerTimer.current);
+    reativarScannerTimer.current = setTimeout(() => {
+      setScanAtivo(true);
+    }, SCANNER_REATIVAR_DELAY_MS);
+  }
+
   async function onBarcodeScanned({ data }: { data: string }) {
-    if (!scanAtivo || buscandoProduto || data === ultimoScan.current) return;
-    ultimoScan.current = data;
+    const codigo = data.trim();
+    if (!codigo || !scanAtivo || buscandoProduto) return;
+    const agora = Date.now();
+    if (
+      codigo === ultimoScan.current &&
+      agora - ultimoScanEm.current < SCANNER_MESMO_CODIGO_COOLDOWN_MS
+    ) {
+      return;
+    }
+    ultimoScan.current = codigo;
+    ultimoScanEm.current = agora;
     setScanAtivo(false);
     setBuscandoProduto(true);
-    Vibration.vibrate(80);
 
     try {
-      const encontrado = await buscarProdutoFuncionarioPorBarcode(data);
+      const encontrado = await buscarProdutoFuncionarioPorBarcode(codigo);
       if (!encontrado) {
-        Alert.alert("Nao encontrado", `Codigo ${data} nao encontrado no ERP.`, [
-          {
-            text: "Escanear outro",
-            onPress: () => {
-              ultimoScan.current = "";
-              setScanAtivo(true);
-            },
-          },
-        ]);
+        emitirFeedbackScanner("erro");
+        mostrarFeedbackScanner({
+          tipo: "erro",
+          mensagem: `Codigo ${codigo} nao encontrado`,
+        });
         return;
       }
-      selecionarProduto(encontrado);
-      setScannerAberto(false);
+      const quantidadeAtual = registrarProdutoCapturado(encontrado);
+      emitirFeedbackScanner("sucesso");
+      mostrarFeedbackScanner({
+        tipo: "sucesso",
+        mensagem: `${encontrado.nome} | Qtd ${quantidadeAtual}`,
+      });
     } catch (error: any) {
-      Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel buscar o produto."));
+      emitirFeedbackScanner("erro");
+      mostrarFeedbackScanner({
+        tipo: "erro",
+        mensagem: mensagemErroApi(error, "Nao foi possivel buscar o produto."),
+      });
     } finally {
       setBuscandoProduto(false);
+      reativarScannerDepois();
     }
   }
 
@@ -409,12 +503,21 @@ export default function FuncionarioContagemScreen() {
 
   function abrirScanner() {
     ultimoScan.current = "";
+    ultimoScanEm.current = 0;
+    setFeedbackScanner(null);
     setScanAtivo(true);
     setScannerAberto(true);
   }
 
+  function fecharScanner() {
+    setScannerAberto(false);
+    if (reativarScannerTimer.current) clearTimeout(reativarScannerTimer.current);
+    Speech.stop();
+  }
+
   function reativarScanner() {
     ultimoScan.current = "";
+    ultimoScanEm.current = 0;
     setScanAtivo(true);
   }
 
@@ -427,8 +530,9 @@ export default function FuncionarioContagemScreen() {
       <FuncionarioContagemScanner
         scanAtivo={scanAtivo}
         buscandoProduto={buscandoProduto}
+        feedback={feedbackScanner}
         onBarcodeScanned={onBarcodeScanned}
-        onClose={() => setScannerAberto(false)}
+        onClose={fecharScanner}
         onResetScan={reativarScanner}
       />
     );
@@ -468,6 +572,10 @@ export default function FuncionarioContagemScreen() {
       setMostrarCusto={setMostrarCusto}
       mostrarVenda={mostrarVenda}
       setMostrarVenda={setMostrarVenda}
+      feedbackVibracaoAtiva={feedbackVibracaoAtiva}
+      setFeedbackVibracaoAtiva={setFeedbackVibracaoAtiva}
+      feedbackVozErroAtiva={feedbackVozErroAtiva}
+      setFeedbackVozErroAtiva={setFeedbackVozErroAtiva}
       salvando={salvando}
       salvar={salvar}
       exportando={exportando}

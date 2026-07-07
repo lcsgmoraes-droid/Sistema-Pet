@@ -103,6 +103,7 @@ export const funcionarioContagemStyles = StyleSheet.create({
     gap: ESPACO.sm,
   },
   botaoScanTexto: { color: "#fff", fontWeight: "800", fontSize: FONTE.media },
+  feedbackOpcoes: { gap: ESPACO.sm },
   produtoImagemWrap: {
     width: 54,
     height: 54,
@@ -278,6 +279,20 @@ export const funcionarioContagemStyles = StyleSheet.create({
     borderRadius: RAIO.md,
   },
   scannerTexto: { color: "#fff", marginTop: ESPACO.lg, fontSize: FONTE.media, fontWeight: "700" },
+  scannerFeedback: {
+    minHeight: 48,
+    maxWidth: "86%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ESPACO.sm,
+    borderRadius: RAIO.md,
+    paddingHorizontal: ESPACO.md,
+    paddingVertical: ESPACO.sm,
+    marginTop: ESPACO.md,
+  },
+  scannerFeedbackSucesso: { backgroundColor: "rgba(22, 163, 74, 0.92)" },
+  scannerFeedbackErro: { backgroundColor: "rgba(220, 38, 38, 0.92)" },
+  scannerFeedbackTexto: { flex: 1, color: "#fff", fontWeight: "800", fontSize: FONTE.normal },
   botaoScanner: {
     flexDirection: "row",
     alignItems: "center",
