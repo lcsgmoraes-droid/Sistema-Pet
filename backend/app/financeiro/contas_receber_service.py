@@ -744,6 +744,7 @@ class ContasReceberService:
             "status": "nenhum",
         }
 
+
 from app.financeiro.contas_receber_queries import (  # noqa: E402
     calcular_total_pendente_venda,
     listar_contas_vencidas,

@@ -238,5 +238,7 @@ export function ordenarTiposDespesaContasPagar(tiposDespesa, safeArray) {
 }
 
 export function encontrarFornecedorFiltroContasPagar(fornecedores, fornecedorId, safeArray) {
-  return safeArray(fornecedores).find((fornecedor) => String(fornecedor.id) === String(fornecedorId));
+  return safeArray(fornecedores).find(
+    (fornecedor) => String(fornecedor.id) === String(fornecedorId),
+  );
 }

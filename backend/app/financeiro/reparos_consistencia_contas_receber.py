@@ -165,7 +165,9 @@ def _build_cr_actions_for_pagamento(
     dre_subcategoria_id: int,
 ) -> list[dict[str, Any]]:
     forma_nome = str(pagamento["forma_pagamento"])
-    forma = _resolve_forma_pagamento(db, tenant_id=tenant_id, forma_pagamento=forma_nome)
+    forma = _resolve_forma_pagamento(
+        db, tenant_id=tenant_id, forma_pagamento=forma_nome
+    )
     numero_parcelas = max(int(pagamento["numero_parcelas"] or 1), 1)
     valores = ContasReceberService._distribuir_valor_parcelas(
         _money(pagamento["valor"]), numero_parcelas
