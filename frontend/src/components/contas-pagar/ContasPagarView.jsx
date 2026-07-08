@@ -4,6 +4,7 @@ import ModalNovaContaPagar from "../ModalNovaContaPagar";
 import ActionButton from "../ui/ActionButton";
 import LoadingState from "../ui/LoadingState";
 import PageHeader from "../ui/PageHeader";
+import ContasPagarAnalise from "./ContasPagarAnalise";
 import ContasPagarFilters from "./ContasPagarFilters";
 import ContasPagarTable from "./ContasPagarTable";
 import ContasPagarModals from "./ContasPagarModals";
@@ -11,6 +12,8 @@ import ContasPagarPagamentoLoteModal from "./ContasPagarPagamentoLoteModal";
 
 export default function ContasPagarView({
   loading,
+  abaAtivaContasPagar,
+  setAbaAtivaContasPagar,
   setContaEdicao,
   setMostrarModalNovaConta,
   filtros,
@@ -25,6 +28,7 @@ export default function ContasPagarView({
   limparFiltros,
   aplicarFiltros,
   handleFiltrosSubmit,
+  abrirListaComFiltrosAnalise,
   contasVisiveis,
   contasSelecionadas,
   contasSelecionadasObjetos,
@@ -118,51 +122,86 @@ export default function ContasPagarView({
         title="Contas a Pagar"
       />
 
-      <ContasPagarFilters
-        filtros={filtros}
-        setFiltros={setFiltros}
-        fornecedores={fornecedores}
-        fornecedorFiltroSelecionado={fornecedorFiltroSelecionado}
-        tiposDespesaOrdenados={tiposDespesaOrdenados}
-        aplicarPeriodoRapido={aplicarPeriodoRapido}
-        filtrarDespesasCaixa={filtrarDespesasCaixa}
-        filtrarTaxasCartao={filtrarTaxasCartao}
-        alternarOcultarTaxasCartao={alternarOcultarTaxasCartao}
-        limparFiltros={limparFiltros}
-        aplicarFiltros={aplicarFiltros}
-        handleFiltrosSubmit={handleFiltrosSubmit}
-      />
+      <div className="mb-5 flex flex-wrap gap-2 border-b border-slate-200">
+        {[
+          { id: "lancamentos", label: "Lancamentos" },
+          { id: "analise", label: "Analise" },
+        ].map((aba) => {
+          const ativa = abaAtivaContasPagar === aba.id;
+          return (
+            <button
+              key={aba.id}
+              type="button"
+              onClick={() => setAbaAtivaContasPagar(aba.id)}
+              className={[
+                "border-b-2 px-4 py-2 text-sm font-semibold transition",
+                ativa
+                  ? "border-blue-600 text-blue-700"
+                  : "border-transparent text-slate-500 hover:text-slate-800",
+              ].join(" ")}
+            >
+              {aba.label}
+            </button>
+          );
+        })}
+      </div>
 
-      <ContasPagarTable
-        contasVisiveis={contasVisiveis}
-        contasSelecionadas={contasSelecionadas}
-        contasSelecionadasObjetos={contasSelecionadasObjetos}
-        todasVisiveisSelecionadas={todasVisiveisSelecionadas}
-        algumasVisiveisSelecionadas={algumasVisiveisSelecionadas}
-        selecionarTodasContasVisiveis={selecionarTodasContasVisiveis}
-        alternarSelecaoConta={alternarSelecaoConta}
-        getContaTooltip={getContaTooltip}
-        getDescricaoPrincipal={getDescricaoPrincipal}
-        getStatusBadge={getStatusBadge}
-        formatarData={formatarData}
-        abrirModalEdicao={abrirModalEdicao}
-        abrirModalPagamento={abrirModalPagamento}
-        precisaClassificacao={precisaClassificacao}
-        abrirModalClassificacao={abrirModalClassificacao}
-        excluirContaPagar={excluirContaPagar}
-        contaTemPagamento={contaTemPagamento}
-        totalSelecionadas={totalSelecionadas}
-        abrirPagamentoEmLote={abrirPagamentoEmLote}
-        editarContaSelecionada={editarContaSelecionada}
-        estornarContasSelecionadas={estornarContasSelecionadas}
-        cancelarContasSelecionadas={cancelarContasSelecionadas}
-        excluirContasSelecionadas={excluirContasSelecionadas}
-        limparSelecaoContas={limparSelecaoContas}
-        haContaPagavelSelecionada={haContaPagavelSelecionada}
-        haContaPagaSelecionada={haContaPagaSelecionada}
-        haContaCancelavelSelecionada={haContaCancelavelSelecionada}
-        haContaExcluivelSelecionada={haContaExcluivelSelecionada}
-      />
+      {abaAtivaContasPagar === "analise" ? (
+        <ContasPagarAnalise
+          fornecedores={fornecedores}
+          formatarMoeda={formatarMoeda}
+          onAbrirListaComFiltros={abrirListaComFiltrosAnalise}
+          tiposDespesaOrdenados={tiposDespesaOrdenados}
+        />
+      ) : (
+        <>
+          <ContasPagarFilters
+            filtros={filtros}
+            setFiltros={setFiltros}
+            fornecedores={fornecedores}
+            fornecedorFiltroSelecionado={fornecedorFiltroSelecionado}
+            tiposDespesaOrdenados={tiposDespesaOrdenados}
+            aplicarPeriodoRapido={aplicarPeriodoRapido}
+            filtrarDespesasCaixa={filtrarDespesasCaixa}
+            filtrarTaxasCartao={filtrarTaxasCartao}
+            alternarOcultarTaxasCartao={alternarOcultarTaxasCartao}
+            limparFiltros={limparFiltros}
+            aplicarFiltros={aplicarFiltros}
+            handleFiltrosSubmit={handleFiltrosSubmit}
+          />
+
+          <ContasPagarTable
+            contasVisiveis={contasVisiveis}
+            contasSelecionadas={contasSelecionadas}
+            contasSelecionadasObjetos={contasSelecionadasObjetos}
+            todasVisiveisSelecionadas={todasVisiveisSelecionadas}
+            algumasVisiveisSelecionadas={algumasVisiveisSelecionadas}
+            selecionarTodasContasVisiveis={selecionarTodasContasVisiveis}
+            alternarSelecaoConta={alternarSelecaoConta}
+            getContaTooltip={getContaTooltip}
+            getDescricaoPrincipal={getDescricaoPrincipal}
+            getStatusBadge={getStatusBadge}
+            formatarData={formatarData}
+            abrirModalEdicao={abrirModalEdicao}
+            abrirModalPagamento={abrirModalPagamento}
+            precisaClassificacao={precisaClassificacao}
+            abrirModalClassificacao={abrirModalClassificacao}
+            excluirContaPagar={excluirContaPagar}
+            contaTemPagamento={contaTemPagamento}
+            totalSelecionadas={totalSelecionadas}
+            abrirPagamentoEmLote={abrirPagamentoEmLote}
+            editarContaSelecionada={editarContaSelecionada}
+            estornarContasSelecionadas={estornarContasSelecionadas}
+            cancelarContasSelecionadas={cancelarContasSelecionadas}
+            excluirContasSelecionadas={excluirContasSelecionadas}
+            limparSelecaoContas={limparSelecaoContas}
+            haContaPagavelSelecionada={haContaPagavelSelecionada}
+            haContaPagaSelecionada={haContaPagaSelecionada}
+            haContaCancelavelSelecionada={haContaCancelavelSelecionada}
+            haContaExcluivelSelecionada={haContaExcluivelSelecionada}
+          />
+        </>
+      )}
 
       <ContasPagarPagamentoLoteModal
         aberto={mostrarModalPagamentoLote}

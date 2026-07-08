@@ -11,6 +11,10 @@ from .financeiro.contas_pagar_common import (
     _resolver_dre_subcategoria_conta_pagar,
     _valor_reais_para_centavos,
 )
+from .financeiro.contas_pagar_analise_routes import (
+    analisar_contas_pagar_abertas,
+    router as analise_router,
+)
 from .financeiro.contas_pagar_consulta_routes import (
     classificar_conta_pagar,
     listar_contas_pagar,
@@ -53,6 +57,7 @@ from .financeiro.contas_pagar_schemas import (
 )
 
 router = APIRouter(prefix="/contas-pagar", tags=["Contas a Pagar"])
+router.include_router(analise_router)
 router.include_router(criacao_router)
 router.include_router(consulta_router)
 router.include_router(manutencao_router)
@@ -69,6 +74,7 @@ __all__ = [
     "ContaPagarUpdate",
     "PagamentoCreate",
     "PagamentoLoteCreate",
+    "analisar_contas_pagar_abertas",
     "atualizar_conta_pagar",
     "buscar_conta_pagar",
     "cancelar_conta_pagar",

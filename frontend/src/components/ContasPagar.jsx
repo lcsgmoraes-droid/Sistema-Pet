@@ -26,6 +26,7 @@ const ContasPagar = () => {
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtros, setFiltros] = useState(criarFiltrosPadraoContasPagar);
+  const [abaAtivaContasPagar, setAbaAtivaContasPagar] = useState("lancamentos");
 
   const [fornecedores, setFornecedores] = useState([]);
   const [categoriasFinanceiras, setCategoriasFinanceiras] = useState([]);
@@ -209,6 +210,48 @@ const ContasPagar = () => {
   const limparFiltros = () => {
     setFiltros(filtrosPadrao);
     aplicarFiltros(filtrosPadrao);
+  };
+
+  const abrirListaComFiltrosAnalise = (filtrosAnalise = {}) => {
+    const novosFiltros = {
+      ...filtrosPadrao,
+      status: "todos",
+      data_campo: "vencimento",
+      origem: filtrosAnalise.origem || "todos",
+      tipo_custo: filtrosAnalise.tipo_custo || "todos",
+      tipo_despesa_id: filtrosAnalise.tipo_despesa_id || "",
+      ocultar_taxas_cartao: Boolean(filtrosAnalise.ocultar_taxas_cartao),
+      apenas_taxas_cartao: Boolean(filtrosAnalise.apenas_taxas_cartao),
+      fornecedor_ids: filtrosAnalise.fornecedor_ids || [],
+      fornecedor_modo: filtrosAnalise.fornecedor_modo || "incluir",
+      fornecedor_id: null,
+      fornecedor_busca: "",
+      periodo_rapido: "",
+      apenas_vencidas: false,
+      apenas_vencer: false,
+    };
+
+    if (filtrosAnalise.periodo_analise === "vencido") {
+      novosFiltros.apenas_vencidas = true;
+      novosFiltros.data_inicio = "";
+      novosFiltros.data_fim = "";
+    } else if (["hoje", "amanha", "mes"].includes(filtrosAnalise.periodo_analise)) {
+      Object.assign(novosFiltros, calcularIntervaloPeriodoRapido(filtrosAnalise.periodo_analise));
+      novosFiltros.periodo_rapido = filtrosAnalise.periodo_analise;
+    } else if (filtrosAnalise.periodo_analise === "proximos_12_meses") {
+      const hoje = new Date();
+      const fim = new Date(hoje);
+      fim.setFullYear(fim.getFullYear() + 1);
+      novosFiltros.data_inicio = formatarDataISO(hoje);
+      novosFiltros.data_fim = formatarDataISO(fim);
+    } else {
+      novosFiltros.data_inicio = "";
+      novosFiltros.data_fim = "";
+    }
+
+    setAbaAtivaContasPagar("lancamentos");
+    setFiltros(novosFiltros);
+    aplicarFiltros(novosFiltros);
   };
 
   const abrirModalPagamento = (conta) => {
@@ -613,6 +656,8 @@ const ContasPagar = () => {
   return (
     <ContasPagarView
       loading={loading}
+      abaAtivaContasPagar={abaAtivaContasPagar}
+      setAbaAtivaContasPagar={setAbaAtivaContasPagar}
       setContaEdicao={setContaEdicao}
       setMostrarModalNovaConta={setMostrarModalNovaConta}
       filtros={filtros}
@@ -627,6 +672,7 @@ const ContasPagar = () => {
       limparFiltros={limparFiltros}
       aplicarFiltros={aplicarFiltros}
       handleFiltrosSubmit={handleFiltrosSubmit}
+      abrirListaComFiltrosAnalise={abrirListaComFiltrosAnalise}
       contasVisiveis={contasVisiveis}
       contasSelecionadas={contasSelecionadas}
       contasSelecionadasObjetos={contasParaPagamentoLote}

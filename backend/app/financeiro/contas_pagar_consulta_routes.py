@@ -40,6 +40,8 @@ router = APIRouter()
 def listar_contas_pagar(
     status: Optional[str] = Query(None),
     fornecedor_id: Optional[int] = Query(None),
+    fornecedor_ids: Optional[List[int]] = Query(None),
+    fornecedor_modo: str = Query("incluir", pattern="^(incluir|excluir)$"),
     categoria_id: Optional[int] = Query(None),
     tipo_despesa_id: Optional[int] = Query(None),
     tipo_custo: Optional[str] = Query(None),  # 'fixo', 'variavel'
@@ -78,7 +80,22 @@ def listar_contas_pagar(
             )
         else:
             query = query.filter(ContaPagar.status == status_normalizado)
-    if fornecedor_id:
+    fornecedor_ids = list(
+        dict.fromkeys(int(item) for item in fornecedor_ids or [] if item)
+    )
+    if fornecedor_id and fornecedor_id not in fornecedor_ids:
+        fornecedor_ids.append(fornecedor_id)
+    fornecedor_modo_normalizado = (fornecedor_modo or "incluir").strip().lower()
+    if fornecedor_ids and fornecedor_modo_normalizado == "excluir":
+        query = query.filter(
+            or_(
+                ContaPagar.fornecedor_id.is_(None),
+                ContaPagar.fornecedor_id.notin_(fornecedor_ids),
+            )
+        )
+    elif fornecedor_ids:
+        query = query.filter(ContaPagar.fornecedor_id.in_(fornecedor_ids))
+    elif fornecedor_id:
         query = query.filter(ContaPagar.fornecedor_id == fornecedor_id)
     termo_fornecedor = (fornecedor_nome or "").strip()
     if termo_fornecedor:
