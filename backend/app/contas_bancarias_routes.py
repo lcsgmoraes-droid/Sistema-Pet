@@ -17,6 +17,10 @@ from app.financeiro.virada_bancaria_historica import (
     CONFIRM_TOKEN_VIRADA_BANCARIA,
     executar_virada_bancaria_historica,
 )
+from app.services.business_audit_service import (
+    build_bank_cutover_metadata,
+    log_business_event,
+)
 
 router = APIRouter(prefix="/contas-bancarias", tags=["Contas Bancárias"])
 
@@ -151,7 +155,7 @@ def aplicar_virada_bancaria_historica(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Aplica a virada historica com token literal e saldo atual esperado."""
-    _current_user, tenant_id = user_and_tenant
+    current_user, tenant_id = user_and_tenant
 
     if not payload.baixar_historico and not payload.ajustar_saldo:
         raise HTTPException(
@@ -185,6 +189,18 @@ def aplicar_virada_bancaria_historica(
             status_code=400,
             detail=resultado.get("error", "Nao foi possivel aplicar a virada."),
         )
+
+    log_business_event(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        event="financeiro.virada_bancaria_historica_aplicada",
+        entity_type="contas_bancarias",
+        entity_id=payload.conta_bancaria_id,
+        metadata=build_bank_cutover_metadata(payload=payload, resultado=resultado),
+        details="Virada bancaria historica aplicada",
+        commit=True,
+    )
 
     return resultado
 

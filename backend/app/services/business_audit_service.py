@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -61,6 +62,13 @@ def _to_serializable_id(value: Any) -> str | int | None:
     if isinstance(value, int):
         return value
     return str(value)
+
+
+def _to_money_string(value: Any) -> str:
+    try:
+        return f"{Decimal(str(value or 0)):.2f}"
+    except (InvalidOperation, TypeError, ValueError):
+        return "0.00"
 
 
 def calculate_manual_discount_amount(venda: Any) -> float:
@@ -148,6 +156,46 @@ def build_plan_activation_metadata(
             "trial_ends_at": getattr(tenant, "trial_ends_at", None).isoformat()
             if getattr(tenant, "trial_ends_at", None)
             else None,
+        },
+    }
+
+
+def build_bank_cutover_metadata(
+    *,
+    payload: Any,
+    resultado: dict[str, Any],
+) -> dict[str, Any]:
+    resumo = resultado.get("resumo") or {}
+    saldo_bancario = resultado.get("saldo_bancario") or {}
+
+    return {
+        "data_corte": str(getattr(payload, "data_corte", "")),
+        "conta_bancaria_id": getattr(payload, "conta_bancaria_id", None),
+        "saldo_real": _to_money_string(getattr(payload, "saldo_real", None)),
+        "expected_saldo_atual": _to_money_string(
+            getattr(payload, "expected_saldo_atual", None)
+        ),
+        "baixar_historico": bool(getattr(payload, "baixar_historico", False)),
+        "ajustar_saldo": bool(getattr(payload, "ajustar_saldo", False)),
+        "resumo": {
+            "contas_receber_baixadas": resumo.get("contas_receber_baixadas", 0),
+            "valor_receber_baixado": _to_money_string(
+                resumo.get("valor_receber_baixado")
+            ),
+            "contas_pagar_baixadas": resumo.get("contas_pagar_baixadas", 0),
+            "valor_pagar_baixado": _to_money_string(resumo.get("valor_pagar_baixado")),
+            "saldo_bancario_alterado": bool(resumo.get("saldo_bancario_alterado")),
+        },
+        "saldo_bancario": {
+            "conta_bancaria_id": saldo_bancario.get("conta_bancaria_id"),
+            "nome": saldo_bancario.get("nome"),
+            "saldo_atual_antes": _to_money_string(
+                saldo_bancario.get("saldo_atual_antes")
+            ),
+            "saldo_atual_depois": _to_money_string(
+                saldo_bancario.get("saldo_atual_depois")
+            ),
+            "diferenca": _to_money_string(saldo_bancario.get("diferenca")),
         },
     }
 
