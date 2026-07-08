@@ -14,6 +14,7 @@ from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.financeiro_models import ContaBancaria, MovimentacaoFinanceira
 from app.financeiro.virada_bancaria_historica import (
+    CONFIRM_TOKEN_VIRADA_BANCARIA,
     executar_virada_bancaria_historica,
 )
 
@@ -49,6 +50,16 @@ class AjusteSaldo(BaseModel):
     descricao: str = Field(
         ..., min_length=1, max_length=500, description="Motivo do ajuste"
     )
+
+
+class ViradaHistoricaApply(BaseModel):
+    data_corte: date
+    conta_bancaria_id: int
+    saldo_real: Decimal
+    expected_saldo_atual: Decimal
+    baixar_historico: bool = True
+    ajustar_saldo: bool = True
+    confirmacao: str = Field(..., min_length=1)
 
 
 class ContaBancariaResponse(BaseModel):
@@ -131,6 +142,51 @@ def prever_virada_bancaria_historica(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/virada-historica/aplicar")
+def aplicar_virada_bancaria_historica(
+    payload: ViradaHistoricaApply,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Aplica a virada historica com token literal e saldo atual esperado."""
+    _current_user, tenant_id = user_and_tenant
+
+    if not payload.baixar_historico and not payload.ajustar_saldo:
+        raise HTTPException(
+            status_code=400,
+            detail="Selecione ao menos uma acao para aplicar na virada historica.",
+        )
+
+    if payload.confirmacao != CONFIRM_TOKEN_VIRADA_BANCARIA:
+        raise HTTPException(
+            status_code=400,
+            detail=f"confirmacao deve ser {CONFIRM_TOKEN_VIRADA_BANCARIA}",
+        )
+
+    try:
+        resultado = executar_virada_bancaria_historica(
+            db,
+            tenant_id=str(tenant_id),
+            data_corte=payload.data_corte,
+            conta_bancaria_id=payload.conta_bancaria_id,
+            saldo_real=payload.saldo_real,
+            expected_saldo_atual=payload.expected_saldo_atual,
+            apply_baixas=payload.baixar_historico,
+            apply_saldo=payload.ajustar_saldo,
+            confirm_token=payload.confirmacao,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not resultado.get("ok", False):
+        raise HTTPException(
+            status_code=400,
+            detail=resultado.get("error", "Nao foi possivel aplicar a virada."),
+        )
+
+    return resultado
 
 
 @router.get("/{conta_id}", response_model=ContaBancariaResponse)

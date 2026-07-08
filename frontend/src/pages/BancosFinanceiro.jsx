@@ -25,6 +25,7 @@ import StatusBadge from "../components/ui/StatusBadge";
 import { safeArray } from "../utils/safeArray";
 
 const MOTIVO_PADRAO = "Ajuste de saldo bancario";
+const CONFIRMACAO_VIRADA_HISTORICA = "VIRADA_BANCARIA_HISTORICA";
 
 const ORIGEM_LABELS = {
   abertura_conta: "Abertura",
@@ -94,6 +95,8 @@ export default function BancosFinanceiro() {
     dataCorte: dataHojeInput(),
     saldoReal: 0,
     previa: null,
+    confirmacao: "",
+    aplicado: false,
   });
 
   const contaSelecionada = useMemo(
@@ -189,6 +192,8 @@ export default function BancosFinanceiro() {
       dataCorte: dataHojeInput(),
       saldoReal: saldoDaConta(conta),
       previa: null,
+      confirmacao: "",
+      aplicado: false,
     });
   };
 
@@ -208,6 +213,8 @@ export default function BancosFinanceiro() {
       dataCorte: dataHojeInput(),
       saldoReal: 0,
       previa: null,
+      confirmacao: "",
+      aplicado: false,
     });
   };
 
@@ -265,7 +272,13 @@ export default function BancosFinanceiro() {
   };
 
   const atualizarModalVirada = (campo, valor) => {
-    setModalVirada((atual) => ({ ...atual, [campo]: valor, previa: null }));
+    setModalVirada((atual) => ({
+      ...atual,
+      [campo]: valor,
+      ...(campo === "dataCorte" || campo === "saldoReal"
+        ? { previa: null, confirmacao: "", aplicado: false }
+        : {}),
+    }));
   };
 
   const preverViradaHistorica = async () => {
@@ -286,11 +299,61 @@ export default function BancosFinanceiro() {
         saldo_real: String(modalVirada.saldoReal || 0),
       });
       const response = await api.get(`/contas-bancarias/virada-historica/previa?${params}`);
-      setModalVirada((atual) => ({ ...atual, previa: response.data }));
+      setModalVirada((atual) => ({
+        ...atual,
+        previa: response.data,
+        confirmacao: "",
+        aplicado: false,
+      }));
       toast.success("Previa calculada.");
     } catch (error) {
       console.error("Erro ao prever virada historica:", error);
       toast.error(mensagemErro(error, "Nao foi possivel calcular a previa."));
+    } finally {
+      setLoadingVirada(false);
+    }
+  };
+
+  const aplicarViradaHistorica = async () => {
+    const conta = modalVirada.conta;
+    const previa = modalVirada.previa;
+    const expectedSaldoAtual = previa?.saldo_bancario?.saldo_atual_antes;
+    if (!conta || !previa) return;
+
+    if (modalVirada.confirmacao.trim() !== CONFIRMACAO_VIRADA_HISTORICA) {
+      toast.error(`Digite ${CONFIRMACAO_VIRADA_HISTORICA} para aplicar.`);
+      return;
+    }
+
+    if (expectedSaldoAtual === null || expectedSaldoAtual === undefined) {
+      toast.error("Refaca a previa antes de aplicar a virada.");
+      return;
+    }
+
+    setLoadingVirada(true);
+
+    try {
+      const response = await api.post("/contas-bancarias/virada-historica/aplicar", {
+        data_corte: modalVirada.dataCorte,
+        conta_bancaria_id: conta.id,
+        saldo_real: String(modalVirada.saldoReal || 0),
+        expected_saldo_atual: String(expectedSaldoAtual),
+        baixar_historico: true,
+        ajustar_saldo: true,
+        confirmacao: modalVirada.confirmacao.trim(),
+      });
+
+      setModalVirada((atual) => ({
+        ...atual,
+        previa: response.data,
+        aplicado: true,
+      }));
+      toast.success("Virada historica aplicada.");
+      await carregarContasBancarias();
+      await carregarMovimentacoes(conta.id);
+    } catch (error) {
+      console.error("Erro ao aplicar virada historica:", error);
+      toast.error(mensagemErro(error, "Nao foi possivel aplicar a virada."));
     } finally {
       setLoadingVirada(false);
     }
@@ -357,6 +420,9 @@ export default function BancosFinanceiro() {
 
   const saldoAtualSistema = saldoDaConta(modalAjuste.conta);
   const diferenca = arredondarMoeda(modalAjuste.novoSaldo - saldoAtualSistema);
+  const viradaProntaParaAplicar = Boolean(
+    modalVirada.previa && modalVirada.confirmacao.trim() === CONFIRMACAO_VIRADA_HISTORICA,
+  );
 
   if (loadingContas && contasBancarias.length === 0) {
     return <LoadingState className="min-h-screen" label="Carregando bancos..." />;
@@ -783,6 +849,43 @@ export default function BancosFinanceiro() {
                       </p>
                     </div>
                   </div>
+
+                  {modalVirada.aplicado ? (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-100">
+                      Virada aplicada. O extrato e os saldos foram atualizados.
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900 dark:border-red-400/30 dark:bg-red-500/10 dark:text-red-100">
+                      <div className="flex gap-2">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <div className="min-w-0 flex-1 space-y-3">
+                          <p>
+                            A aplicacao baixa os historicos ate a data de corte e define o saldo
+                            real desta conta. Se o saldo do sistema mudar depois da previa, o
+                            backend bloqueia a operacao.
+                          </p>
+                          <div>
+                            <label
+                              htmlFor="confirmacao-virada"
+                              className="mb-1 block text-xs font-semibold uppercase text-red-800 dark:text-red-100"
+                            >
+                              Confirmacao
+                            </label>
+                            <input
+                              id="confirmacao-virada"
+                              type="text"
+                              className="h-10 w-full rounded-md border border-red-300 bg-white px-3 text-sm font-semibold text-red-950 shadow-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100 dark:border-red-500/40 dark:bg-slate-950 dark:text-red-50 dark:focus:ring-red-500/20"
+                              placeholder={CONFIRMACAO_VIRADA_HISTORICA}
+                              value={modalVirada.confirmacao}
+                              onChange={(event) =>
+                                atualizarModalVirada("confirmacao", event.target.value)
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : null}
             </div>
@@ -795,6 +898,15 @@ export default function BancosFinanceiro() {
                 onClick={fecharModalVirada}
               >
                 Fechar
+              </ActionButton>
+              <ActionButton
+                icon={AlertTriangle}
+                intent="warning"
+                loading={loadingVirada}
+                disabled={!viradaProntaParaAplicar || modalVirada.aplicado}
+                onClick={aplicarViradaHistorica}
+              >
+                Aplicar virada
               </ActionButton>
             </div>
           </div>

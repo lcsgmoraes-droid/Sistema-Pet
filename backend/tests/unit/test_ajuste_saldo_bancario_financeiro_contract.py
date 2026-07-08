@@ -53,7 +53,7 @@ def test_tela_bancos_expoe_ajuste_por_modal_e_saldo_por_conta():
     assert "allowNegative = false" in currency_input
 
 
-def test_tela_bancos_expoe_previa_da_virada_historica_sem_apply():
+def test_tela_bancos_expoe_previa_da_virada_historica():
     source = _read(FRONTEND_ROOT / "pages" / "BancosFinanceiro.jsx")
 
     assert "modalVirada" in source
@@ -66,9 +66,19 @@ def test_tela_bancos_expoe_previa_da_virada_historica_sem_apply():
     assert "contas_receber_baixadas" in source
     assert "contas_pagar_baixadas" in source
     assert "saldo_bancario" in source
-    assert "Confirmar virada" not in source
-    assert "apply_baixas" not in source
-    assert "apply_saldo" not in source
+
+
+def test_tela_bancos_aplica_virada_historica_com_confirmacao_e_saldo_esperado():
+    source = _read(FRONTEND_ROOT / "pages" / "BancosFinanceiro.jsx")
+
+    assert "aplicarViradaHistorica" in source
+    assert "/virada-historica/aplicar" in source
+    assert "VIRADA_BANCARIA_HISTORICA" in source
+    assert "expected_saldo_atual" in source
+    assert "confirmacao" in source
+    assert "baixar_historico" in source
+    assert "ajustar_saldo" in source
+    assert "Aplicar virada" in source
 
 
 def test_backend_ajuste_saldo_mantem_rastro_sem_dre():
@@ -107,3 +117,25 @@ def test_backend_bancos_tem_previa_segura_da_virada_historica():
     assert "apply_baixas=False" in previa
     assert "apply_saldo=False" in previa
     assert "confirm_token=None" in previa
+
+
+def test_backend_bancos_aplica_virada_historica_com_travas_de_confirmacao():
+    source = _read(BACKEND_ROOT / "app" / "contas_bancarias_routes.py")
+
+    assert '@router.post("/virada-historica/aplicar")' in source
+    assert source.index('@router.post("/virada-historica/aplicar")') < source.index(
+        '@router.get("/{conta_id}"'
+    )
+    assert "CONFIRM_TOKEN_VIRADA_BANCARIA" in source
+
+    apply_route = source.split("def aplicar_virada_bancaria_historica(", 1)[1].split(
+        '@router.get("/{conta_id}"',
+        1,
+    )[0]
+    assert "executar_virada_bancaria_historica" in apply_route
+    assert "tenant_id=str(tenant_id)" in apply_route
+    assert "apply_baixas=payload.baixar_historico" in apply_route
+    assert "apply_saldo=payload.ajustar_saldo" in apply_route
+    assert "expected_saldo_atual=payload.expected_saldo_atual" in apply_route
+    assert "confirm_token=payload.confirmacao" in apply_route
+    assert "HTTPException(status_code=400" in apply_route
