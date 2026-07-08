@@ -53,6 +53,24 @@ def test_tela_bancos_expoe_ajuste_por_modal_e_saldo_por_conta():
     assert "allowNegative = false" in currency_input
 
 
+def test_tela_bancos_expoe_previa_da_virada_historica_sem_apply():
+    source = _read(FRONTEND_ROOT / "pages" / "BancosFinanceiro.jsx")
+
+    assert "modalVirada" in source
+    assert "abrirModalVirada" in source
+    assert "preverViradaHistorica" in source
+    assert "/virada-historica/previa" in source
+    assert "Prever virada" in source
+    assert "Virada historica" in source
+    assert "Baixas historicas" in source
+    assert "contas_receber_baixadas" in source
+    assert "contas_pagar_baixadas" in source
+    assert "saldo_bancario" in source
+    assert "Confirmar virada" not in source
+    assert "apply_baixas" not in source
+    assert "apply_saldo" not in source
+
+
 def test_backend_ajuste_saldo_mantem_rastro_sem_dre():
     source = _read(BACKEND_ROOT / "app" / "contas_bancarias_routes.py")
     ajustar_saldo = source.split("def ajustar_saldo(", 1)[1].split(
@@ -70,3 +88,22 @@ def test_backend_ajuste_saldo_mantem_rastro_sem_dre():
     assert "conta.saldo_atual = novo_saldo" in ajustar_saldo
     assert "atualizar_dre" not in ajustar_saldo
     assert "DRE" not in ajustar_saldo
+
+
+def test_backend_bancos_tem_previa_segura_da_virada_historica():
+    source = _read(BACKEND_ROOT / "app" / "contas_bancarias_routes.py")
+
+    assert '@router.get("/virada-historica/previa")' in source
+    assert source.index('@router.get("/virada-historica/previa")') < source.index(
+        '@router.get("/{conta_id}"'
+    )
+
+    previa = source.split("def prever_virada_bancaria_historica(", 1)[1].split(
+        '@router.get("/{conta_id}"',
+        1,
+    )[0]
+    assert "executar_virada_bancaria_historica" in previa
+    assert "tenant_id=str(tenant_id)" in previa
+    assert "apply_baixas=False" in previa
+    assert "apply_saldo=False" in previa
+    assert "confirm_token=None" in previa

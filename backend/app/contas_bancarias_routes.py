@@ -6,13 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
 from typing import List, Optional
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from pydantic import BaseModel, Field
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.financeiro_models import ContaBancaria, MovimentacaoFinanceira
+from app.financeiro.virada_bancaria_historica import (
+    executar_virada_bancaria_historica,
+)
 
 router = APIRouter(prefix="/contas-bancarias", tags=["Contas Bancárias"])
 
@@ -102,6 +105,32 @@ def listar_contas(
     contas = query.order_by(ContaBancaria.nome).all()
 
     return contas
+
+
+@router.get("/virada-historica/previa")
+def prever_virada_bancaria_historica(
+    data_corte: date,
+    conta_bancaria_id: Optional[int] = None,
+    saldo_real: Optional[Decimal] = None,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Preve baixas historicas e ajuste de saldo sem persistir alteracoes."""
+    _current_user, tenant_id = user_and_tenant
+
+    try:
+        return executar_virada_bancaria_historica(
+            db,
+            tenant_id=str(tenant_id),
+            data_corte=data_corte,
+            conta_bancaria_id=conta_bancaria_id,
+            saldo_real=saldo_real,
+            apply_baixas=False,
+            apply_saldo=False,
+            confirm_token=None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/{conta_id}", response_model=ContaBancariaResponse)

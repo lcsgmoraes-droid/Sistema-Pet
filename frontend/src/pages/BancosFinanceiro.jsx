@@ -39,6 +39,14 @@ function arredondarMoeda(valor) {
   return Math.round(Number(valor || 0) * 100) / 100;
 }
 
+function dataHojeInput() {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = String(hoje.getMonth() + 1).padStart(2, "0");
+  const dia = String(hoje.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
 function saldoDaConta(conta) {
   return Number(conta?.saldo_atual || 0);
 }
@@ -73,11 +81,19 @@ export default function BancosFinanceiro() {
   const [loadingContas, setLoadingContas] = useState(true);
   const [loadingMovimentacoes, setLoadingMovimentacoes] = useState(false);
   const [processando, setProcessando] = useState(false);
+  const [loadingVirada, setLoadingVirada] = useState(false);
   const [modalAjuste, setModalAjuste] = useState({
     aberto: false,
     conta: null,
     novoSaldo: 0,
     descricao: MOTIVO_PADRAO,
+  });
+  const [modalVirada, setModalVirada] = useState({
+    aberto: false,
+    conta: null,
+    dataCorte: dataHojeInput(),
+    saldoReal: 0,
+    previa: null,
   });
 
   const contaSelecionada = useMemo(
@@ -164,6 +180,18 @@ export default function BancosFinanceiro() {
     });
   };
 
+  const abrirModalVirada = (conta) => {
+    if (!conta) return;
+
+    setModalVirada({
+      aberto: true,
+      conta,
+      dataCorte: dataHojeInput(),
+      saldoReal: saldoDaConta(conta),
+      previa: null,
+    });
+  };
+
   const resetarModalAjuste = () => {
     setModalAjuste({
       aberto: false,
@@ -173,10 +201,26 @@ export default function BancosFinanceiro() {
     });
   };
 
+  const resetarModalVirada = () => {
+    setModalVirada({
+      aberto: false,
+      conta: null,
+      dataCorte: dataHojeInput(),
+      saldoReal: 0,
+      previa: null,
+    });
+  };
+
   const fecharModalAjuste = () => {
     if (processando) return;
 
     resetarModalAjuste();
+  };
+
+  const fecharModalVirada = () => {
+    if (loadingVirada) return;
+
+    resetarModalVirada();
   };
 
   const confirmarAjuste = async () => {
@@ -218,6 +262,38 @@ export default function BancosFinanceiro() {
 
   const atualizarModalAjuste = (campo, valor) => {
     setModalAjuste((atual) => ({ ...atual, [campo]: valor }));
+  };
+
+  const atualizarModalVirada = (campo, valor) => {
+    setModalVirada((atual) => ({ ...atual, [campo]: valor, previa: null }));
+  };
+
+  const preverViradaHistorica = async () => {
+    const conta = modalVirada.conta;
+    if (!conta) return;
+
+    if (!modalVirada.dataCorte) {
+      toast.error("Informe a data de corte.");
+      return;
+    }
+
+    setLoadingVirada(true);
+
+    try {
+      const params = new URLSearchParams({
+        data_corte: modalVirada.dataCorte,
+        conta_bancaria_id: String(conta.id),
+        saldo_real: String(modalVirada.saldoReal || 0),
+      });
+      const response = await api.get(`/contas-bancarias/virada-historica/previa?${params}`);
+      setModalVirada((atual) => ({ ...atual, previa: response.data }));
+      toast.success("Previa calculada.");
+    } catch (error) {
+      console.error("Erro ao prever virada historica:", error);
+      toast.error(mensagemErro(error, "Nao foi possivel calcular a previa."));
+    } finally {
+      setLoadingVirada(false);
+    }
   };
 
   const extratoColumns = [
@@ -318,6 +394,15 @@ export default function BancosFinanceiro() {
               onClick={() => abrirModalAjuste(contaSelecionada)}
             >
               Ajustar saldo
+            </ActionButton>
+            <ActionButton
+              icon={AlertTriangle}
+              intent="warning"
+              tone="soft"
+              disabled={!contaSelecionada}
+              onClick={() => abrirModalVirada(contaSelecionada)}
+            >
+              Prever virada
             </ActionButton>
           </>
         }
@@ -428,6 +513,15 @@ export default function BancosFinanceiro() {
               onClick={() => abrirModalAjuste(contaSelecionada)}
             >
               Ajustar saldo
+            </ActionButton>
+            <ActionButton
+              icon={AlertTriangle}
+              intent="warning"
+              tone="soft"
+              disabled={!contaSelecionada}
+              onClick={() => abrirModalVirada(contaSelecionada)}
+            >
+              Prever virada
             </ActionButton>
           </div>
 
@@ -556,6 +650,151 @@ export default function BancosFinanceiro() {
                 onClick={confirmarAjuste}
               >
                 Confirmar ajuste
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {modalVirada.aberto ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+          <div className="w-full max-w-3xl rounded-lg border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-4 dark:border-slate-800">
+              <div>
+                <h2 className="text-base font-semibold text-slate-950 dark:text-slate-100">
+                  Virada historica
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {modalVirada.conta?.nome}
+                </p>
+              </div>
+              <ActionButton
+                icon={X}
+                intent="neutral"
+                tone="ghost"
+                size="xs"
+                disabled={loadingVirada}
+                onClick={fecharModalVirada}
+              >
+                Fechar
+              </ActionButton>
+            </div>
+
+            <div className="space-y-4 p-4">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-500/10 dark:text-amber-100">
+                <div className="flex gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p>
+                    Esta previa nao baixa contas e nao altera saldo. Ela mostra o impacto de marcar
+                    contas antigas como pagas/recebidas sem movimentar banco e de informar o saldo
+                    real para iniciar o uso do extrato.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="data-corte-virada"
+                    className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-200"
+                  >
+                    Data de corte
+                  </label>
+                  <input
+                    id="data-corte-virada"
+                    type="date"
+                    className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-500/20"
+                    value={modalVirada.dataCorte}
+                    onChange={(event) => atualizarModalVirada("dataCorte", event.target.value)}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="saldo-real-virada"
+                    className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-200"
+                  >
+                    Saldo real do banco
+                  </label>
+                  <CurrencyInput
+                    allowNegative
+                    id="saldo-real-virada"
+                    className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-right text-sm font-semibold text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-500/20"
+                    title="Use a tecla - para alternar saldo negativo."
+                    value={modalVirada.saldoReal}
+                    onChange={(valor) => atualizarModalVirada("saldoReal", valor)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <ActionButton
+                  icon={RefreshCw}
+                  intent="warning"
+                  loading={loadingVirada}
+                  onClick={preverViradaHistorica}
+                >
+                  Prever virada
+                </ActionButton>
+              </div>
+
+              {modalVirada.previa ? (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    Baixas historicas
+                  </h3>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+                      <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
+                        Contas a receber
+                      </p>
+                      <p className="mt-1 text-lg font-bold text-slate-950 dark:text-slate-100">
+                        {modalVirada.previa.resumo?.contas_receber_baixadas || 0}
+                      </p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        <MoneyCell value={modalVirada.previa.resumo?.valor_receber_baixado} />
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+                      <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
+                        Contas a pagar
+                      </p>
+                      <p className="mt-1 text-lg font-bold text-slate-950 dark:text-slate-100">
+                        {modalVirada.previa.resumo?.contas_pagar_baixadas || 0}
+                      </p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        <MoneyCell value={modalVirada.previa.resumo?.valor_pagar_baixado} />
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+                      <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
+                        Saldo bancario
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        Sistema:{" "}
+                        <MoneyCell value={modalVirada.previa.saldo_bancario?.saldo_atual_antes} />
+                      </p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Real:{" "}
+                        <MoneyCell value={modalVirada.previa.saldo_bancario?.saldo_atual_depois} />
+                      </p>
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                        Diferenca:{" "}
+                        <MoneyCell value={modalVirada.previa.saldo_bancario?.diferenca} />
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 p-4 dark:border-slate-800">
+              <ActionButton
+                intent="neutral"
+                tone="soft"
+                disabled={loadingVirada}
+                onClick={fecharModalVirada}
+              >
+                Fechar
               </ActionButton>
             </div>
           </div>
