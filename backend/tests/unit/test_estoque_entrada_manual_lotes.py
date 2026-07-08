@@ -141,8 +141,9 @@ def test_entrada_manual_notifica_pendencias_do_pdv_quando_estoque_volta(monkeypa
     )
     monkeypatch.setattr(
         "app.services.pendencia_estoque_service.verificar_e_notificar_pendencias",
-        lambda *args, **kwargs: pendencia_calls.append((args, kwargs))
-        or {"notificacoes_enviadas": 1},
+        lambda *args, **kwargs: (
+            pendencia_calls.append((args, kwargs)) or {"notificacoes_enviadas": 1}
+        ),
     )
     monkeypatch.setattr(
         estoque_entrada_manual_routes,

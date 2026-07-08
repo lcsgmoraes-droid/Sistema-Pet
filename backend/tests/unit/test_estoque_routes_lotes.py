@@ -118,11 +118,11 @@ def test_registrar_lote_entrada_cria_lote_novo_quando_nao_existe(monkeypatch):
 
 
 def test_entrada_produto_por_lote_notifica_pendencias_do_pdv():
-    source = (ROOT / "app" / "produtos" / "lotes_routes.py").read_text(
-        encoding="utf-8"
-    )
+    source = (ROOT / "app" / "produtos" / "lotes_routes.py").read_text(encoding="utf-8")
     entrada_start = source.index("def entrada_estoque(")
-    entrada_source = source[entrada_start : source.index("def saida_estoque_fifo(", entrada_start)]
+    entrada_source = source[
+        entrada_start : source.index("def saida_estoque_fifo(", entrada_start)
+    ]
 
     assert "verificar_e_notificar_pendencias" in entrada_source
     assert "quantidade_entrada=entrada.quantidade" in entrada_source
