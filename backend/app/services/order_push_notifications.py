@@ -94,7 +94,7 @@ def _load_user(db, *, tenant_id: str, user_id: int | None) -> User | None:
     )
 
 
-def _send_expo_push(
+def send_expo_push(
     push_token: str, content: dict[str, Any]
 ) -> tuple[bool, str | None, str | None]:
     payload = {
@@ -168,7 +168,7 @@ def notify_order_event(
             if not token:
                 continue
             try:
-                sent, ticket_id, error = _send_expo_push(token, content)
+                sent, ticket_id, error = send_expo_push(token, content)
             except Exception as exc:
                 sent, ticket_id, error = False, None, str(exc)
             any_sent = any_sent or sent

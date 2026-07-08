@@ -8,14 +8,12 @@ from sqlalchemy import and_
 from datetime import datetime
 from typing import Dict
 import logging
-import requests
 
 from app.pendencia_estoque_models import PendenciaEstoque
 from app.produtos_models import Produto
 from app.tenancy.rls import sync_rls_tenant
 
 logger = logging.getLogger(__name__)
-EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
 
 def verificar_e_notificar_pendencias(
@@ -84,60 +82,12 @@ def verificar_e_notificar_pendencias(
 
     for pendencia in pendencias:
         try:
-            # Buscar cliente
-            cliente = pendencia.cliente
-
-            if not cliente:
-                logger.warning(
-                    f"❌ Cliente não encontrado para pendência {pendencia.id}"
-                )
-                continue
-
-            telefone = cliente.celular or cliente.telefone
-            push_sucesso = enviar_push_pendencia(
-                db=db,
-                tenant_id=tenant_id,
-                cliente=cliente,
-                produto=produto,
-            )
-            whatsapp_sucesso = False
-            if telefone:
-                mensagem = montar_mensagem_whatsapp(
-                    cliente_nome=cliente.nome,
-                    produto_nome=produto.nome,
-                    produto_codigo=produto.codigo,
-                    quantidade=pendencia.quantidade_desejada,
-                    valor=produto.preco_venda,
-                )
-                whatsapp_sucesso = enviar_whatsapp_pendencia(
-                    db=db,
-                    tenant_id=tenant_id,
-                    cliente_id=cliente.id,
-                    telefone=telefone,
-                    mensagem=mensagem,
-                )
-            else:
-                logger.warning(f"Cliente {cliente.nome} nao tem telefone cadastrado")
-
-            if push_sucesso or whatsapp_sucesso:
-                pendencia.status = "notificado"
-                pendencia.data_notificacao = datetime.utcnow()
-                pendencia.whatsapp_enviado = bool(whatsapp_sucesso)
+            if _notificar_pendencia(db, tenant_id, produto, pendencia):
                 notificacoes_enviadas += 1
-                canais = []
-                if push_sucesso:
-                    canais.append("app mobile")
-                if whatsapp_sucesso:
-                    canais.append("WhatsApp")
-                logger.info(
-                    f"Notificacao enviada para {cliente.nome} via {', '.join(canais)}"
-                )
             else:
                 notificacoes_falhas += 1
-                logger.error(f"Falha ao notificar {cliente.nome}")
-
-        except Exception as e:
-            logger.error(f"❌ Erro ao processar pendência {pendencia.id}: {str(e)}")
+        except Exception:
+            logger.exception("Erro ao processar pendencia %s", pendencia.id)
             notificacoes_falhas += 1
             continue
 
@@ -156,6 +106,77 @@ def verificar_e_notificar_pendencias(
         "notificacoes_enviadas": notificacoes_enviadas,
         "notificacoes_falhas": notificacoes_falhas,
     }
+
+
+def _notificar_pendencia(
+    db: Session, tenant_id: str, produto: Produto, pendencia: PendenciaEstoque
+) -> bool:
+    cliente = pendencia.cliente
+    if not cliente:
+        logger.warning("Cliente nao encontrado para pendencia %s", pendencia.id)
+        return False
+
+    push_sucesso = enviar_push_pendencia(
+        db=db,
+        tenant_id=tenant_id,
+        cliente=cliente,
+        produto=produto,
+    )
+    whatsapp_sucesso = _enviar_whatsapp_pendencia_cliente(
+        db=db,
+        tenant_id=tenant_id,
+        produto=produto,
+        pendencia=pendencia,
+        cliente=cliente,
+    )
+
+    if not (push_sucesso or whatsapp_sucesso):
+        logger.error("Falha ao notificar %s", cliente.nome)
+        return False
+
+    pendencia.status = "notificado"
+    pendencia.data_notificacao = datetime.utcnow()
+    pendencia.whatsapp_enviado = bool(whatsapp_sucesso)
+    canais = _nomes_canais_notificacao(push_sucesso, whatsapp_sucesso)
+    logger.info("Notificacao enviada para %s via %s", cliente.nome, canais)
+    return True
+
+
+def _enviar_whatsapp_pendencia_cliente(
+    db: Session,
+    tenant_id: str,
+    produto: Produto,
+    pendencia: PendenciaEstoque,
+    cliente,
+) -> bool:
+    telefone = cliente.celular or cliente.telefone
+    if not telefone:
+        logger.warning("Cliente %s nao tem telefone cadastrado", cliente.nome)
+        return False
+
+    mensagem = montar_mensagem_whatsapp(
+        cliente_nome=cliente.nome,
+        produto_nome=produto.nome,
+        produto_codigo=produto.codigo,
+        quantidade=pendencia.quantidade_desejada,
+        valor=produto.preco_venda,
+    )
+    return enviar_whatsapp_pendencia(
+        db=db,
+        tenant_id=tenant_id,
+        cliente_id=cliente.id,
+        telefone=telefone,
+        mensagem=mensagem,
+    )
+
+
+def _nomes_canais_notificacao(push_sucesso: bool, whatsapp_sucesso: bool) -> str:
+    canais = []
+    if push_sucesso:
+        canais.append("app mobile")
+    if whatsapp_sucesso:
+        canais.append("WhatsApp")
+    return ", ".join(canais)
 
 
 def montar_mensagem_whatsapp(
@@ -198,6 +219,7 @@ def enviar_push_pendencia(
             load_customer_push_targets,
             mark_push_target_result,
         )
+        from app.services.order_push_notifications import send_expo_push
 
         targets = load_customer_push_targets(
             db,
@@ -227,46 +249,15 @@ def enviar_push_pendencia(
         any_sent = False
         for target in targets:
             try:
-                sent, ticket_id, error = _send_expo_push(target.token, content)
+                sent, ticket_id, error = send_expo_push(target.token, content)
             except Exception as exc:
                 sent, ticket_id, error = False, None, str(exc)
             any_sent = any_sent or sent
             mark_push_target_result(target, sent=sent, ticket_id=ticket_id, error=error)
         return any_sent
-    except Exception as e:
-        logger.error(f"Erro ao enviar push de pendencia: {str(e)}")
-        return False
-
-
-def _send_expo_push(
-    push_token: str, content: dict
-) -> tuple[bool, str | None, str | None]:
-    payload = {
-        "to": push_token,
-        "sound": "default",
-        "priority": "high",
-        "channelId": "default",
-        "title": content["title"],
-        "body": content["body"],
-        "data": content["data"],
-    }
-    response = requests.post(
-        EXPO_PUSH_URL,
-        json=payload,
-        headers={"Content-Type": "application/json"},
-        timeout=10,
-    )
-    response.raise_for_status()
-    try:
-        response_body = response.json()
     except Exception:
-        return True, None, None
-    data = response_body.get("data") if isinstance(response_body, dict) else None
-    if isinstance(data, dict) and data.get("status") not in (None, "ok"):
-        logger.warning("[LISTA-ESPERA-PDV] Expo retornou falha: %s", data)
-        return False, None, str(data)
-    ticket_id = data.get("id") if isinstance(data, dict) else None
-    return True, ticket_id, None
+        logger.exception("Erro ao enviar push de pendencia")
+        return False
 
 
 def enviar_whatsapp_pendencia(
@@ -301,8 +292,8 @@ def enviar_whatsapp_pendencia(
 
         return resultado.get("sucesso", False)
 
-    except Exception as e:
-        logger.error(f"❌ Erro ao enviar WhatsApp: {str(e)}")
+    except Exception:
+        logger.exception("Erro ao enviar WhatsApp")
         return False
 
 

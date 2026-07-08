@@ -155,9 +155,7 @@ def test_verificar_e_notificar_pendencias_notifica_cliente_do_pdv_no_app_mobile(
             json=lambda: {"data": {"status": "ok", "id": "ticket-stock-1"}},
         )
 
-    monkeypatch.setattr(
-        "app.services.pendencia_estoque_service.requests.post", fake_post
-    )
+    monkeypatch.setattr("app.services.order_push_notifications.requests.post", fake_post)
 
     cliente = SimpleNamespace(
         id=77,
