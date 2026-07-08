@@ -2,6 +2,7 @@
 
 import logging
 from datetime import datetime as dt, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.clientes.common import _validar_tenant_e_obter_usuario
 from app.db import get_session
+from app.financeiro_models import ContaReceber
 from app.services.venda_rentabilidade_snapshot_service import (
     get_or_build_venda_rentabilidade_snapshot,
 )
@@ -18,6 +20,71 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 __all__ = ["baixar_vendas_lote", "router"]
+
+CENT = Decimal("0.01")
+
+
+def _money(value) -> Decimal:
+    return Decimal(str(value or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
+
+
+def _date_only(value):
+    if hasattr(value, "date"):
+        return value.date()
+    return value
+
+
+def _status_conta_receber(valor_total: Decimal, valor_recebido: Decimal) -> str:
+    if valor_recebido <= Decimal("0.00"):
+        return "pendente"
+    if abs(valor_total - valor_recebido) < CENT:
+        return "recebido"
+    return "parcial"
+
+
+def _criar_conta_receber_faltante_baixa_lote(
+    *,
+    db: Session,
+    venda,
+    current_user,
+    tenant_id,
+    valor_ja_recebido,
+    data_referencia,
+):
+    valor_total = _money(venda.total)
+    valor_recebido = _money(valor_ja_recebido)
+    data_ref = _date_only(data_referencia)
+    data_emissao = _date_only(venda.data_venda) or data_ref
+
+    conta = ContaReceber(
+        descricao=f"Venda {venda.numero_venda} - baixa em lote",
+        cliente_id=venda.cliente_id,
+        forma_pagamento_id=None,
+        dre_subcategoria_id=1,
+        canal=venda.canal or "loja_fisica",
+        valor_original=valor_total,
+        valor_recebido=valor_recebido,
+        valor_desconto=Decimal("0.00"),
+        valor_juros=Decimal("0.00"),
+        valor_multa=Decimal("0.00"),
+        valor_final=valor_total,
+        data_emissao=data_emissao,
+        data_vencimento=data_ref,
+        data_recebimento=data_ref if valor_recebido > Decimal("0.00") else None,
+        status=_status_conta_receber(valor_total, valor_recebido),
+        eh_parcelado=False,
+        venda_id=venda.id,
+        documento=f"VENDA-{venda.id}",
+        observacoes=(
+            "Criada automaticamente pela baixa em lote para manter "
+            "venda, recebimento e financeiro conciliados."
+        ),
+        user_id=current_user.id,
+        tenant_id=tenant_id,
+    )
+    db.add(conta)
+    db.flush()
+    return conta
 
 
 @router.post("/{cliente_id}/baixar-vendas-lote")
@@ -37,7 +104,7 @@ async def baixar_vendas_lote(
 
         from app.vendas_models import Venda, VendaPagamento
         from app.caixa_models import Caixa, MovimentacaoCaixa
-        from app.financeiro_models import ContaReceber, Recebimento
+        from app.financeiro_models import Recebimento
         from app.ia.aba5_models import FluxoCaixa
 
         # Extrair dados do body
@@ -260,6 +327,16 @@ async def baixar_vendas_lote(
                 )
                 .first()
             )
+
+            if not conta_receber:
+                conta_receber = _criar_conta_receber_faltante_baixa_lote(
+                    db=db,
+                    venda=venda,
+                    current_user=current_user,
+                    tenant_id=tenant_id,
+                    valor_ja_recebido=item["valor_ja_pago"],
+                    data_referencia=dt.now(),
+                )
 
             if conta_receber:
                 valor_ja_recebido = float(conta_receber.valor_recebido or 0)

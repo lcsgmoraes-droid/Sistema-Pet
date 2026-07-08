@@ -1,4 +1,11 @@
 import importlib.util
+from datetime import date
+from decimal import Decimal
+from pathlib import Path
+from types import SimpleNamespace
+
+
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 
 EXPECTED_FINANCEIRO_PATHS = {
@@ -37,6 +44,30 @@ EXPECTED_DUPLICIDADES_PATHS = {
 
 def _route_paths(router):
     return {getattr(route, "path", None) for route in router.routes}
+
+
+def _source(relative_path: str) -> str:
+    return (BACKEND_ROOT / relative_path).read_text(encoding="utf-8")
+
+
+class _FakeDb:
+    def __init__(self):
+        self.added = []
+        self.flushed = False
+
+    def add(self, obj):
+        obj.id = len(self.added) + 1
+        self.added.append(obj)
+
+    def flush(self):
+        self.flushed = True
+
+
+class _FakeContaReceber:
+    def __init__(self, **kwargs):
+        self.id = None
+        for chave, valor in kwargs.items():
+            setattr(self, chave, valor)
 
 
 def test_clientes_financeiro_routes_ficam_em_subrouter_dedicado():
@@ -108,3 +139,50 @@ def test_clientes_outros_subrouters_ficam_dedicados_e_reexportados():
     assert (
         clientes_routes.verificar_duplicata is duplicidades_routes.verificar_duplicata
     )
+
+
+def test_baixa_lote_cria_conta_receber_faltante_com_valor_total_da_venda(monkeypatch):
+    from app.clientes import financeiro_baixa_lote_routes as routes
+
+    monkeypatch.setattr(routes, "ContaReceber", _FakeContaReceber, raising=False)
+
+    venda = SimpleNamespace(
+        id=1066052,
+        numero_venda="202606240055",
+        cliente_id=10651,
+        total=Decimal("100.00"),
+        data_venda=date(2026, 6, 24),
+        canal="loja_fisica",
+    )
+    db = _FakeDb()
+
+    conta = routes._criar_conta_receber_faltante_baixa_lote(
+        db=db,
+        venda=venda,
+        current_user=SimpleNamespace(id=2),
+        tenant_id="tenant-1",
+        valor_ja_recebido=Decimal("20.00"),
+        data_referencia=date(2026, 7, 7),
+    )
+
+    assert conta in db.added
+    assert db.flushed is True
+    assert conta.valor_original == Decimal("100.00")
+    assert conta.valor_final == Decimal("100.00")
+    assert conta.valor_recebido == Decimal("20.00")
+    assert conta.status == "parcial"
+    assert conta.venda_id == 1066052
+    assert conta.documento == "VENDA-1066052"
+    assert conta.tenant_id == "tenant-1"
+    assert conta.user_id == 2
+
+
+def test_baixa_lote_garante_conta_receber_antes_de_registrar_recebimento():
+    source = _source("app/clientes/financeiro_baixa_lote_routes.py")
+    bloco = source.split("# Dar baixa no contas a receber (se existir)", 1)[1].split(
+        "valor_restante -= valor_aplicar",
+        1,
+    )[0]
+
+    assert "if not conta_receber:" in bloco
+    assert "_criar_conta_receber_faltante_baixa_lote(" in bloco
