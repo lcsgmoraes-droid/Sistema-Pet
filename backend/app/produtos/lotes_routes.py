@@ -361,6 +361,23 @@ def entrada_estoque(
     except Exception:
         pass
 
+    if estoque_anterior <= 0 and produto.estoque_atual > 0:
+        try:
+            from app.services.pendencia_estoque_service import (
+                verificar_e_notificar_pendencias,
+            )
+
+            verificar_e_notificar_pendencias(
+                db=db,
+                tenant_id=tenant_id,
+                produto_id=produto.id,
+                quantidade_entrada=entrada.quantidade,
+            )
+        except Exception as e_pendencia:
+            logger.warning(
+                "[LISTA-ESPERA-PDV] Erro ao notificar clientes: %s", e_pendencia
+            )
+
     return {
         "sucesso": True,
         "mensagem": "Entrada registrada com sucesso",

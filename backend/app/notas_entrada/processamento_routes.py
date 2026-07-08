@@ -579,9 +579,11 @@ def processar_entrada_estoque(
                 produto_id=produto_id,
                 quantidade_entrada=quantidade,
             )
-            if notificacoes > 0:
+            notificacoes_enviadas = notificacoes.get("notificacoes_enviadas", 0)
+            if notificacoes_enviadas > 0:
+                produto_nome = item_proc["produto_nome"]
                 logger.info(
-                    f"WhatsApp: {notificacoes} clientes notificados sobre {item_proc['produto']}"
+                    f"Lista de espera: {notificacoes_enviadas} clientes notificados sobre {produto_nome}"
                 )
     except Exception as e:
         logger.error(f"Erro ao notificar pendencias: {str(e)}")

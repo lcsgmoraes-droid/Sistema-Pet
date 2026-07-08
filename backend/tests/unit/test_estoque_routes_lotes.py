@@ -1,9 +1,13 @@
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from app import estoque_entrada_manual_routes
 from app.estoque_entrada_manual_routes import _registrar_lote_entrada
+
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class _FakeQuery:
@@ -111,3 +115,14 @@ def test_registrar_lote_entrada_cria_lote_novo_quando_nao_existe(monkeypatch):
     assert lote.quantidade_inicial == pytest.approx(2.0)
     assert lote.quantidade_disponivel == pytest.approx(2.0)
     assert lote.data_validade is not None
+
+
+def test_entrada_produto_por_lote_notifica_pendencias_do_pdv():
+    source = (ROOT / "app" / "produtos" / "lotes_routes.py").read_text(encoding="utf-8")
+    entrada_start = source.index("def entrada_estoque(")
+    entrada_source = source[
+        entrada_start : source.index("def saida_estoque_fifo(", entrada_start)
+    ]
+
+    assert "verificar_e_notificar_pendencias" in entrada_source
+    assert "quantidade_entrada=entrada.quantidade" in entrada_source
