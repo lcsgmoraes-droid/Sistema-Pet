@@ -4,7 +4,7 @@ from pathlib import Path
 from uuid import UUID
 
 from app.financeiro.fluxo_caixa_routes import get_fluxo_caixa
-from app.financeiro_models import ContaPagar, LancamentoManual
+from app.financeiro_models import ContaPagar, ContaReceber, LancamentoManual
 from app.ia.aba5_models import FluxoCaixa
 from app.tenancy.context import set_current_tenant
 from app.vendas_models import Venda
@@ -95,6 +95,40 @@ def _criar_conta_pagar_pendente(
         data_emissao=date(2026, 6, 1),
         data_vencimento=date(2026, 6, 20),
         status="pendente",
+    )
+    db_session.add(conta)
+    db_session.flush()
+    return conta
+
+
+def _criar_conta_receber_pendente(
+    db_session,
+    *,
+    tenant_id,
+    user_id: int,
+    descricao: str,
+    valor_final: str,
+    valor_recebido: str = "0.00",
+    status: str = "pendente",
+) -> ContaReceber:
+    set_current_tenant(UUID(str(tenant_id)))
+    conta = ContaReceber(
+        tenant_id=UUID(str(tenant_id)),
+        user_id=user_id,
+        descricao=descricao,
+        cliente_id=None,
+        categoria_id=None,
+        dre_subcategoria_id=1,
+        canal="loja_fisica",
+        valor_original=Decimal(valor_final),
+        valor_recebido=Decimal(valor_recebido),
+        valor_desconto=Decimal("0.00"),
+        valor_juros=Decimal("0.00"),
+        valor_multa=Decimal("0.00"),
+        valor_final=Decimal(valor_final),
+        data_emissao=date(2026, 6, 1),
+        data_vencimento=date(2026, 6, 18),
+        status=status,
     )
     db_session.add(conta)
     db_session.flush()
@@ -275,4 +309,86 @@ def test_fluxo_caixa_inclui_contas_pagar_do_tenant_mesmo_de_outro_usuario(
 
     assert ("conta_pagar", conta_tenant.id) in movimentos_por_origem
     assert movimentos_por_origem[("conta_pagar", conta_tenant.id)].valor == 321.45
+    assert all(mov.valor != 999.99 for mov in resposta.movimentacoes)
+
+
+def test_fluxo_caixa_inclui_contas_receber_abertas_sem_duplicar_fluxo_previsto(
+    db_session, tenant_factory, user_factory
+):
+    FluxoCaixa.__table__.create(bind=db_session.get_bind(), checkfirst=True)
+
+    tenant = tenant_factory(nome="Atacadao")
+    gestor = user_factory(tenant_id=tenant.id, email="gestor.receber.fluxo@test.com")
+    financeiro = user_factory(
+        tenant_id=tenant.id, email="financeiro.receber.fluxo@test.com"
+    )
+    outro_tenant = tenant_factory(nome="Clinica Sao Jose")
+    usuario_outro = user_factory(
+        tenant_id=outro_tenant.id, email="financeiro.receber.outro@test.com"
+    )
+
+    conta_tenant = _criar_conta_receber_pendente(
+        db_session,
+        tenant_id=tenant.id,
+        user_id=financeiro.id,
+        descricao="Cliente Atacadao parcial",
+        valor_final="210.00",
+        valor_recebido="60.00",
+        status="parcial",
+    )
+    conta_ja_lancada = _criar_conta_receber_pendente(
+        db_session,
+        tenant_id=tenant.id,
+        user_id=financeiro.id,
+        descricao="Cliente Atacadao ja no fluxo",
+        valor_final="50.00",
+    )
+    _criar_conta_receber_pendente(
+        db_session,
+        tenant_id=outro_tenant.id,
+        user_id=usuario_outro.id,
+        descricao="Cliente de outro tenant",
+        valor_final="999.99",
+    )
+
+    set_current_tenant(UUID(str(tenant.id)))
+    db_session.add(
+        FluxoCaixa(
+            tenant_id=UUID(str(tenant.id)),
+            usuario_id=financeiro.id,
+            tipo="entrada",
+            categoria="Recebimentos",
+            descricao="Previsao ja existente",
+            valor=50.0,
+            data_prevista=datetime(2026, 6, 18, 10, 0, 0),
+            status="previsto",
+            origem_tipo="conta_receber",
+            origem_id=conta_ja_lancada.id,
+        )
+    )
+    db_session.flush()
+
+    set_current_tenant(UUID(str(tenant.id)))
+    resposta = get_fluxo_caixa(
+        data_inicio="2026-06-01",
+        data_fim="2026-06-30",
+        db=db_session,
+        current_user_and_tenant=(gestor, UUID(str(tenant.id))),
+    )
+
+    movimentos_por_origem = [
+        mov for mov in resposta.movimentacoes if mov.origem_tipo == "conta_receber"
+    ]
+    movimentos_chave = {
+        (mov.origem_tipo, mov.origem_id): mov for mov in movimentos_por_origem
+    }
+
+    assert ("conta_receber", conta_tenant.id) in movimentos_chave
+    assert movimentos_chave[("conta_receber", conta_tenant.id)].valor == 150.0
+    assert movimentos_chave[("conta_receber", conta_tenant.id)].status == "previsto"
+    assert movimentos_chave[("conta_receber", conta_tenant.id)].tipo == "entrada"
+    assert (
+        sum(1 for mov in movimentos_por_origem if mov.origem_id == conta_ja_lancada.id)
+        == 1
+    )
     assert all(mov.valor != 999.99 for mov in resposta.movimentacoes)

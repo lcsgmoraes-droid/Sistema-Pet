@@ -349,6 +349,78 @@ def get_fluxo_caixa(
     """
 
     # 6. CONTAS A PAGAR PENDENTES (Saídas Previstas)
+    # Recebiveis e pagaveis abaixo usam tenant_id e pulam titulos ja previstos.
+    fluxos_previstos_origens = (
+        db.query(FluxoCaixa.origem_tipo, FluxoCaixa.origem_id)
+        .filter(
+            and_(
+                FluxoCaixa.tenant_id == tenant_id,
+                FluxoCaixa.data_prevista >= dt_inicio_datetime,
+                FluxoCaixa.data_prevista <= dt_fim_datetime,
+                FluxoCaixa.status == "previsto",
+                FluxoCaixa.origem_tipo.in_(["conta_receber", "conta_pagar"]),
+                FluxoCaixa.origem_id.isnot(None),
+            )
+        )
+        .all()
+    )
+    contas_receber_com_fluxo_previsto = {
+        origem_id
+        for origem_tipo, origem_id in fluxos_previstos_origens
+        if origem_tipo == "conta_receber"
+    }
+    contas_pagar_com_fluxo_previsto = {
+        origem_id
+        for origem_tipo, origem_id in fluxos_previstos_origens
+        if origem_tipo == "conta_pagar"
+    }
+
+    contas_receber_pendentes = (
+        db.query(ContaReceber)
+        .filter(
+            and_(
+                ContaReceber.tenant_id == tenant_id,
+                ContaReceber.data_vencimento >= dt_inicio,
+                ContaReceber.data_vencimento <= dt_fim,
+                ContaReceber.status.notin_(
+                    ["recebido", "pago", "cancelado", "cancelada"]
+                ),
+            )
+        )
+        .all()
+    )
+
+    for conta in contas_receber_pendentes:
+        if conta.id in contas_receber_com_fluxo_previsto:
+            continue
+
+        valor_restante = (conta.valor_final or 0) - (conta.valor_recebido or 0)
+        if valor_restante > 0:
+            numero_venda_conta = None
+            if conta.venda_id:
+                venda = (
+                    db.query(Venda)
+                    .filter(Venda.id == conta.venda_id, Venda.tenant_id == tenant_id)
+                    .first()
+                )
+                if venda:
+                    numero_venda_conta = venda.numero_venda
+
+            cliente_nome = conta.cliente.nome if conta.cliente else "Cliente"
+            movimentacoes.append(
+                FluxoCaixaMovimentacao(
+                    data=conta.data_vencimento,
+                    tipo="entrada",
+                    descricao=f"A Receber - {cliente_nome}",
+                    categoria="Recebimentos",
+                    valor=float(valor_restante),
+                    origem_tipo="conta_receber",
+                    origem_id=conta.id,
+                    numero_venda=numero_venda_conta,
+                    status="previsto",
+                )
+            )
+
     contas_pagar_pendentes = (
         db.query(ContaPagar)
         .filter(
@@ -363,7 +435,10 @@ def get_fluxo_caixa(
     )
 
     for conta in contas_pagar_pendentes:
-        valor_restante = (conta.valor_original or 0) - (conta.valor_pago or 0)
+        if conta.id in contas_pagar_com_fluxo_previsto:
+            continue
+
+        valor_restante = (conta.valor_final or 0) - (conta.valor_pago or 0)
         if valor_restante > 0:
             fornecedor_nome = (
                 conta.fornecedor.nome if conta.fornecedor else "Fornecedor"

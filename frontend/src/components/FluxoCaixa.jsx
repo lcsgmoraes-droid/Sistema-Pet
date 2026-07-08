@@ -115,17 +115,17 @@ const FluxoCaixa = () => {
     }
   };
 
-  const carregarFluxoCaixa = async () => {
+  const carregarFluxoCaixa = async (filtrosConsulta = filtros) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
-        data_inicio: filtros.data_inicio,
-        data_fim: filtros.data_fim,
-        agrupamento: filtros.agrupamento,
+        data_inicio: filtrosConsulta.data_inicio,
+        data_fim: filtrosConsulta.data_fim,
+        agrupamento: filtrosConsulta.agrupamento,
       });
 
-      if (filtros.conta_bancaria_id) {
-        params.append("conta_bancaria_id", filtros.conta_bancaria_id);
+      if (filtrosConsulta.conta_bancaria_id) {
+        params.append("conta_bancaria_id", filtrosConsulta.conta_bancaria_id);
       }
 
       // Adicionar filtro de número de venda se preenchido
@@ -152,11 +152,13 @@ const FluxoCaixa = () => {
 
     switch (preset) {
       case "7dias":
-        inicio = new Date(hoje.setDate(hoje.getDate() - 7));
+        inicio = new Date(hoje);
+        inicio.setDate(inicio.getDate() - 7);
         fim = new Date();
         break;
       case "30dias":
-        inicio = new Date(hoje.setDate(hoje.getDate() - 30));
+        inicio = new Date(hoje);
+        inicio.setDate(inicio.getDate() - 30);
         fim = new Date();
         break;
       case "mes_atual":
@@ -167,6 +169,10 @@ const FluxoCaixa = () => {
         inicio = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);
         fim = new Date(hoje.getFullYear(), hoje.getMonth() + 2, 0);
         break;
+      case "proximos_12_meses":
+        inicio = new Date();
+        fim = new Date(hoje.getFullYear(), hoje.getMonth() + 12, hoje.getDate());
+        break;
       default:
         return;
     }
@@ -175,12 +181,13 @@ const FluxoCaixa = () => {
       ...filtros,
       data_inicio: inicio.toISOString().split("T")[0],
       data_fim: fim.toISOString().split("T")[0],
+      agrupamento: preset === "proximos_12_meses" ? "mes" : filtros.agrupamento,
     };
 
     setFiltros(novosFiltros);
 
     // Recarregar dados com novos filtros
-    setTimeout(() => carregarFluxoCaixa(), 100);
+    setTimeout(() => carregarFluxoCaixa(novosFiltros), 100);
   };
 
   const formatarMoeda = (valor) => {
@@ -517,6 +524,15 @@ const FluxoCaixa = () => {
             size="xs"
           >
             Próximo Mês
+          </ActionButton>
+
+          <ActionButton
+            onClick={() => handlePeriodoPreset("proximos_12_meses")}
+            intent="neutral"
+            tone="soft"
+            size="xs"
+          >
+            Proximos 12 meses
           </ActionButton>
 
           <div className="ml-auto flex items-center gap-2 bg-blue-50 px-3 py-2 rounded border border-blue-200">
