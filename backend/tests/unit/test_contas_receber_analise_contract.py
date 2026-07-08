@@ -38,7 +38,10 @@ def test_analise_contas_receber_tem_filtros_de_exclusao_e_totalizadores():
     assert 'cliente_modo: str = Query("incluir"' in source
     assert 'cliente_modo_normalizado == "excluir"' in source
     assert "ContaReceber.cliente_id.notin_(cliente_ids)" in source
-    assert 'ContaReceber.status.notin_(["recebido", "pago", "cancelado", "cancelada"])' in source
+    assert (
+        'ContaReceber.status.notin_(["recebido", "pago", "cancelado", "cancelada"])'
+        in source
+    )
     assert "ContaReceber.valor_final - ContaReceber.valor_recebido" in source
     assert "vencido" in source
     assert "hoje" in source
@@ -48,4 +51,3 @@ def test_analise_contas_receber_tem_filtros_de_exclusao_e_totalizadores():
     assert "por_cliente" in source
     assert "por_forma_pagamento" in source
     assert "por_canal" in source
-
