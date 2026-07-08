@@ -16,6 +16,7 @@ def test_backend_large_files_700_batch_4_contas_receber_router_is_facade():
     source = read("app/contas_receber_routes.py")
 
     assert "router.include_router(criacao_router)" in source
+    assert "router.include_router(analise_router)" in source
     assert "router.include_router(consulta_router)" in source
     assert "router.include_router(recebimentos_router)" in source
     assert "router.include_router(recorrencias_router)" in source
@@ -26,6 +27,7 @@ def test_backend_large_files_700_batch_4_modules_stay_below_limit():
     extracted_files = [
         "app/contas_receber_schemas.py",
         "app/contas_receber_recorrencias.py",
+        "app/contas_receber_analise_routes.py",
         "app/contas_receber_criacao_routes.py",
         "app/contas_receber_consulta_routes.py",
         "app/contas_receber_recebimentos_routes.py",
@@ -54,6 +56,7 @@ def test_backend_large_files_700_batch_4_preserves_public_contas_receber_paths()
     expected_methods = {
         ("/contas-receber/", "POST"),
         ("/contas-receber/", "GET"),
+        ("/contas-receber/analise-abertos", "GET"),
         ("/contas-receber/{conta_id}", "GET"),
         ("/contas-receber/{conta_id}/receber", "POST"),
         ("/contas-receber/dashboard/resumo", "GET"),

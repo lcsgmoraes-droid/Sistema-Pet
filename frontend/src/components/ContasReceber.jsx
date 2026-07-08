@@ -17,11 +17,50 @@ import {
   ContasReceberFilters,
   ContasReceberRecebimentoModal,
 } from "./contasReceber/ContasReceberPanels";
+import ContasReceberAnalise from "./contasReceber/ContasReceberAnalise";
+
+const formatarDataISO = (data) => {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+};
+
+const adicionarMeses = (data, meses) => {
+  const resultado = new Date(data);
+  resultado.setMonth(resultado.getMonth() + meses);
+  return resultado;
+};
+
+const calcularIntervaloAnaliseReceber = (periodo) => {
+  const hoje = new Date();
+  const amanha = new Date(hoje);
+  amanha.setDate(hoje.getDate() + 1);
+  const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+  const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+  const fim12Meses = new Date(adicionarMeses(inicioMes, 12));
+  fim12Meses.setDate(0);
+
+  if (periodo === "hoje") {
+    return { data_inicio: formatarDataISO(hoje), data_fim: formatarDataISO(hoje) };
+  }
+  if (periodo === "amanha") {
+    return { data_inicio: formatarDataISO(amanha), data_fim: formatarDataISO(amanha) };
+  }
+  if (periodo === "mes") {
+    return { data_inicio: formatarDataISO(inicioMes), data_fim: formatarDataISO(fimMes) };
+  }
+  if (periodo === "proximos_12_meses") {
+    return { data_inicio: formatarDataISO(hoje), data_fim: formatarDataISO(fim12Meses) };
+  }
+  return { data_inicio: "", data_fim: "" };
+};
 
 const ContasReceber = () => {
   const navigate = useNavigate();
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [abaAtivaContasReceber, setAbaAtivaContasReceber] = useState("lancamentos");
   const [filtros, setFiltros] = useState({
     status: "todos",
     cliente_id: null,
@@ -58,14 +97,13 @@ const ContasReceber = () => {
   }, []);
 
   const carregarFormasPagamento = async (headers) => {
-    const response = await api.get("/comissoes/formas-pagamento", { headers });
-    const lista = response.data?.formas || [];
-    return safeArray(lista).map((forma) => ({
+    const response = await api.get("/financeiro/formas-pagamento?apenas_ativas=true", { headers });
+    return safeArray(response.data).map((forma) => ({
       id: forma.id,
       nome: forma.nome,
-      tipo: forma.nome?.toLowerCase()?.replace(/\s+/g, "_") || "outro",
-      icone: "💳",
-      conta_bancaria_destino_id: null,
+      tipo: forma.tipo || forma.nome?.toLowerCase()?.replace(/\s+/g, "_") || "outro",
+      icone: forma.icone || "",
+      conta_bancaria_destino_id: forma.conta_bancaria_destino_id || null,
     }));
   };
 
@@ -119,17 +157,28 @@ const ContasReceber = () => {
     }
   };
 
-  const aplicarFiltros = async () => {
+  const carregarContasComFiltros = async (
+    filtrosParaAplicar = filtros,
+    buscaParaAplicar = buscaNumeroVenda,
+  ) => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      if (filtros.status !== "todos") params.append("status", filtros.status);
-      if (filtros.cliente_id) params.append("cliente_id", filtros.cliente_id);
-      if (filtros.data_inicio) params.append("data_inicio", filtros.data_inicio);
-      if (filtros.data_fim) params.append("data_fim", filtros.data_fim);
-      if (filtros.apenas_vencidas) params.append("apenas_vencidas", "true");
-      if (filtros.apenas_vencer) params.append("apenas_vencer", "true");
-      if (buscaNumeroVenda) params.append("numero_venda", buscaNumeroVenda); // Filtro pelo backend
+      if (filtrosParaAplicar.status !== "todos") {
+        params.append("status", filtrosParaAplicar.status);
+      }
+      if (filtrosParaAplicar.cliente_id) {
+        params.append("cliente_id", filtrosParaAplicar.cliente_id);
+      }
+      if (filtrosParaAplicar.data_inicio) {
+        params.append("data_inicio", filtrosParaAplicar.data_inicio);
+      }
+      if (filtrosParaAplicar.data_fim) {
+        params.append("data_fim", filtrosParaAplicar.data_fim);
+      }
+      if (filtrosParaAplicar.apenas_vencidas) params.append("apenas_vencidas", "true");
+      if (filtrosParaAplicar.apenas_vencer) params.append("apenas_vencer", "true");
+      if (buscaParaAplicar) params.append("numero_venda", buscaParaAplicar);
 
       const response = await api.get(`/contas-receber/?${params}`);
 
@@ -140,6 +189,37 @@ const ContasReceber = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const aplicarFiltros = async () => carregarContasComFiltros(filtros, buscaNumeroVenda);
+
+  const abrirListaComFiltrosAnalise = (filtrosAnalise = {}) => {
+    const novosFiltros = {
+      ...filtros,
+      status: "todos",
+      cliente_id: null,
+      data_inicio: "",
+      data_fim: "",
+      apenas_vencidas: false,
+      apenas_vencer: false,
+    };
+
+    if (filtrosAnalise.periodo_analise === "vencido") {
+      novosFiltros.apenas_vencidas = true;
+    } else {
+      Object.assign(novosFiltros, calcularIntervaloAnaliseReceber(filtrosAnalise.periodo_analise));
+    }
+
+    if (
+      filtrosAnalise.cliente_modo === "incluir" &&
+      safeArray(filtrosAnalise.cliente_ids).length === 1
+    ) {
+      novosFiltros.cliente_id = filtrosAnalise.cliente_ids[0];
+    }
+
+    setFiltros(novosFiltros);
+    setAbaAtivaContasReceber("lancamentos");
+    void carregarContasComFiltros(novosFiltros, buscaNumeroVenda);
   };
 
   const abrirVendaNoPDV = (vendaId) => {
@@ -442,41 +522,76 @@ const ContasReceber = () => {
         title="Contas a Receber"
       />
 
-      <ContasReceberFilters
-        aplicarFiltros={aplicarFiltros}
-        buscaNumeroVenda={buscaNumeroVenda}
-        clientes={clientes}
-        filtros={filtros}
-        handleFiltrosSubmit={handleFiltrosSubmit}
-        setBuscaNumeroVenda={setBuscaNumeroVenda}
-        setFiltros={setFiltros}
-      />
-      {/* Tabela de Contas */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <DataTable
-          columns={contasReceberColumns}
-          data={contasReceberExibidas}
-          emptyMessage="Nenhuma conta encontrada"
-          getRowKey={(conta) => conta.id}
-          tableClassName="min-w-[960px]"
-          theadClassName="bg-gray-50"
-          tbodyClassName="divide-y divide-gray-200"
-        />
-
-        {contasReceberExibidas.length > 0 && (
-          <div className="bg-green-50 border-t border-green-200 px-4 py-3">
-            <strong>Total:</strong> {contasReceberExibidas.length} conta(s) |
-            <strong className="ml-3">Saldo a Receber:</strong>{" "}
-            <MoneyCell
-              value={contasReceberExibidas.reduce(
-                (sum, c) => sum + (c.valor_final - c.valor_recebido),
-                0,
-              )}
-              zeroAsDash
-            />
-          </div>
-        )}
+      <div className="mb-5 flex flex-wrap gap-2 border-b border-slate-200">
+        {[
+          { id: "lancamentos", label: "Lancamentos" },
+          { id: "analise", label: "Analise" },
+        ].map((aba) => {
+          const ativa = abaAtivaContasReceber === aba.id;
+          return (
+            <button
+              key={aba.id}
+              type="button"
+              onClick={() => setAbaAtivaContasReceber(aba.id)}
+              className={[
+                "border-b-2 px-4 py-2 text-sm font-semibold transition",
+                ativa
+                  ? "border-blue-600 text-blue-700"
+                  : "border-transparent text-slate-500 hover:text-slate-800",
+              ].join(" ")}
+            >
+              {aba.label}
+            </button>
+          );
+        })}
       </div>
+
+      {abaAtivaContasReceber === "analise" ? (
+        <ContasReceberAnalise
+          clientes={clientes}
+          formasPagamento={formasPagamento}
+          formatarMoeda={formatarMoeda}
+          onAbrirListaComFiltros={abrirListaComFiltrosAnalise}
+        />
+      ) : (
+        <>
+          <ContasReceberFilters
+            aplicarFiltros={aplicarFiltros}
+            buscaNumeroVenda={buscaNumeroVenda}
+            clientes={clientes}
+            filtros={filtros}
+            handleFiltrosSubmit={handleFiltrosSubmit}
+            setBuscaNumeroVenda={setBuscaNumeroVenda}
+            setFiltros={setFiltros}
+          />
+          {/* Tabela de Contas */}
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <DataTable
+              columns={contasReceberColumns}
+              data={contasReceberExibidas}
+              emptyMessage="Nenhuma conta encontrada"
+              getRowKey={(conta) => conta.id}
+              tableClassName="min-w-[960px]"
+              theadClassName="bg-gray-50"
+              tbodyClassName="divide-y divide-gray-200"
+            />
+
+            {contasReceberExibidas.length > 0 && (
+              <div className="bg-green-50 border-t border-green-200 px-4 py-3">
+                <strong>Total:</strong> {contasReceberExibidas.length} conta(s) |
+                <strong className="ml-3">Saldo a Receber:</strong>{" "}
+                <MoneyCell
+                  value={contasReceberExibidas.reduce(
+                    (sum, c) => sum + (c.valor_final - c.valor_recebido),
+                    0,
+                  )}
+                  zeroAsDash
+                />
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       <ContasReceberRecebimentoModal
         contaSelecionada={contaSelecionada}
