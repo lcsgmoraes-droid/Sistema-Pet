@@ -108,7 +108,9 @@ def analisar_contas_receber_abertas(
     saldo_expr = ContaReceber.valor_final - ContaReceber.valor_recebido
     query = (
         db.query(ContaReceber)
-        .options(joinedload(ContaReceber.cliente), joinedload(ContaReceber.forma_pagamento))
+        .options(
+            joinedload(ContaReceber.cliente), joinedload(ContaReceber.forma_pagamento)
+        )
         .filter(
             ContaReceber.tenant_id == tenant_id,
             ContaReceber.status.notin_(["recebido", "pago", "cancelado", "cancelada"]),
@@ -140,7 +142,9 @@ def analisar_contas_receber_abertas(
     if data_fim:
         query = query.filter(ContaReceber.data_vencimento <= data_fim)
 
-    contas = query.order_by(ContaReceber.data_vencimento.asc(), ContaReceber.id.asc()).all()
+    contas = query.order_by(
+        ContaReceber.data_vencimento.asc(), ContaReceber.id.asc()
+    ).all()
 
     resumo = {
         "quantidade": 0,
@@ -214,7 +218,9 @@ def analisar_contas_receber_abertas(
         grupo_cliente["total_aberto"] = _as_money(grupo_cliente["total_aberto"] + saldo)
 
         forma_id = conta.forma_pagamento_id or "sem_forma"
-        forma_nome = conta.forma_pagamento.nome if conta.forma_pagamento else "Sem forma"
+        forma_nome = (
+            conta.forma_pagamento.nome if conta.forma_pagamento else "Sem forma"
+        )
         grupo_forma = por_forma_pagamento.setdefault(
             forma_id,
             _novo_grupo(forma_id, forma_nome),
@@ -245,4 +251,3 @@ def analisar_contas_receber_abertas(
         "por_canal": _ordenar_grupo_por_total(por_canal),
         "agenda_mensal": list(agenda_mensal.values()),
     }
-
