@@ -139,3 +139,22 @@ def test_backend_bancos_aplica_virada_historica_com_travas_de_confirmacao():
     assert "expected_saldo_atual=payload.expected_saldo_atual" in apply_route
     assert "confirm_token=payload.confirmacao" in apply_route
     assert "HTTPException(status_code=400" in apply_route
+
+
+def test_backend_bancos_audita_apply_da_virada_bancaria():
+    source = _read(BACKEND_ROOT / "app" / "contas_bancarias_routes.py")
+    apply_route = source.split("def aplicar_virada_bancaria_historica(", 1)[1].split(
+        '@router.get("/{conta_id}"',
+        1,
+    )[0]
+
+    assert "log_business_event" in source
+    assert "build_bank_cutover_metadata" in source
+    assert "current_user, tenant_id = user_and_tenant" in apply_route
+    assert 'event="financeiro.virada_bancaria_historica_aplicada"' in apply_route
+    assert 'entity_type="contas_bancarias"' in apply_route
+    assert "entity_id=payload.conta_bancaria_id" in apply_route
+    assert "user_id=current_user.id" in apply_route
+    assert "tenant_id=tenant_id" in apply_route
+    assert "metadata=build_bank_cutover_metadata(" in apply_route
+    assert "commit=True" in apply_route

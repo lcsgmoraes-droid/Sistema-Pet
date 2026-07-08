@@ -248,3 +248,59 @@ def test_build_plan_activation_metadata_records_previous_and_current_state():
             "trial_ends_at": None,
         },
     }
+
+
+def test_build_bank_cutover_metadata_records_safe_summary_only():
+    metadata = business_audit_service.build_bank_cutover_metadata(
+        payload=SimpleNamespace(
+            data_corte="2026-07-08",
+            conta_bancaria_id=12,
+            saldo_real=1500.25,
+            expected_saldo_atual=-120.5,
+            baixar_historico=True,
+            ajustar_saldo=True,
+        ),
+        resultado={
+            "resumo": {
+                "contas_receber_baixadas": 4,
+                "valor_receber_baixado": "1000.00",
+                "contas_pagar_baixadas": 2,
+                "valor_pagar_baixado": "350.00",
+                "saldo_bancario_alterado": True,
+            },
+            "saldo_bancario": {
+                "conta_bancaria_id": 12,
+                "nome": "Santander",
+                "saldo_atual_antes": "-120.50",
+                "saldo_atual_depois": "1500.25",
+                "diferenca": "1620.75",
+            },
+            "contas_receber": [{"id": 1}, {"id": 2}],
+            "contas_pagar": [{"id": 3}],
+        },
+    )
+
+    assert metadata == {
+        "data_corte": "2026-07-08",
+        "conta_bancaria_id": 12,
+        "saldo_real": "1500.25",
+        "expected_saldo_atual": "-120.50",
+        "baixar_historico": True,
+        "ajustar_saldo": True,
+        "resumo": {
+            "contas_receber_baixadas": 4,
+            "valor_receber_baixado": "1000.00",
+            "contas_pagar_baixadas": 2,
+            "valor_pagar_baixado": "350.00",
+            "saldo_bancario_alterado": True,
+        },
+        "saldo_bancario": {
+            "conta_bancaria_id": 12,
+            "nome": "Santander",
+            "saldo_atual_antes": "-120.50",
+            "saldo_atual_depois": "1500.25",
+            "diferenca": "1620.75",
+        },
+    }
+    assert "contas_receber" not in metadata
+    assert "contas_pagar" not in metadata
