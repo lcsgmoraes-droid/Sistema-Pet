@@ -113,43 +113,79 @@ def _auditar_vendas_contas_receber(
     }
 
 
-def _auditar_notas_sem_contas_pagar(
-    db: Session, params: dict[str, Any]
-) -> dict[str, Any]:
+def _auditar_notas_contas_pagar(db: Session, params: dict[str, Any]) -> dict[str, Any]:
     rows = _rows(
         db,
         """
+        WITH cp_por_nota AS (
+            SELECT
+                nota_entrada_id,
+                tenant_id,
+                COUNT(*) AS qtd_cp,
+                COALESCE(SUM(valor_final), 0) AS total_cp
+            FROM contas_pagar
+            WHERE tenant_id = :tenant_id
+              AND nota_entrada_id IS NOT NULL
+              AND COALESCE(status, '') NOT IN ('cancelado', 'cancelada')
+            GROUP BY nota_entrada_id, tenant_id
+        )
         SELECT
             ne.id AS nota_id,
             ne.numero_nota AS numero_nota,
             ne.data_entrada AS data_entrada,
             ne.valor_total AS valor_total,
             ne.fornecedor_id AS fornecedor_id,
-            ne.status AS status
+            ne.status AS status,
+            COALESCE(cp.qtd_cp, 0) AS qtd_cp,
+            COALESCE(cp.total_cp, 0) AS total_cp
         FROM notas_entrada ne
-        LEFT JOIN contas_pagar cp
+        LEFT JOIN cp_por_nota cp
           ON cp.nota_entrada_id = ne.id
          AND cp.tenant_id = ne.tenant_id
         WHERE ne.tenant_id = :tenant_id
           AND ne.data_entrada >= :data_inicio
           AND ne.data_entrada < :data_fim
-          AND cp.id IS NULL
         ORDER BY ne.data_entrada ASC, ne.id ASC
         """,
         params,
     )
-    payload = [
-        {
+    sem_cp: list[dict[str, Any]] = []
+    centavos: list[dict[str, Any]] = []
+    maiores: list[dict[str, Any]] = []
+
+    for row in rows:
+        valor_total = _money(row["valor_total"])
+        total_cp = _money(row["total_cp"])
+        diferenca = total_cp - valor_total
+        qtd_cp = int(row["qtd_cp"] or 0)
+
+        payload = {
             "nota_id": int(row["nota_id"]),
             "numero_nota": row["numero_nota"],
             "data_entrada": str(row["data_entrada"]),
-            "valor_total": _money_str(row["valor_total"]),
+            "valor_total": _money_str(valor_total),
             "fornecedor_id": row["fornecedor_id"],
             "status": row["status"],
+            "qtd_contas_pagar": qtd_cp,
+            "total_contas_pagar": _money_str(total_cp),
+            "diferenca": _money_str(diferenca),
+            "diferenca_abs": _money_str(abs(diferenca)),
         }
-        for row in rows
-    ]
-    return {"sem_contas_pagar": _bucket(payload, "valor_total")}
+
+        if qtd_cp == 0:
+            sem_cp.append(payload)
+        elif diferenca == Decimal("0.00"):
+            continue
+        elif abs(diferenca) <= Decimal("0.05"):
+            centavos.append(payload)
+        else:
+            maiores.append(payload)
+
+    return {
+        "sem_contas_pagar": _bucket(sem_cp, "valor_total"),
+        "diferencas_centavos": _bucket(centavos, "diferenca_abs"),
+        "divergencias_valor": _bucket(maiores, "diferenca_abs"),
+    }
 
 
 def _auditar_contas_pagar_pagamentos(
@@ -270,6 +306,6 @@ def auditar_financeiro_tenant(
             "data_fim": data_fim.isoformat(),
         },
         "vendas_contas_receber": _auditar_vendas_contas_receber(db, params),
-        "notas_entrada_contas_pagar": _auditar_notas_sem_contas_pagar(db, params),
+        "notas_entrada_contas_pagar": _auditar_notas_contas_pagar(db, params),
         "contas_pagar_pagamentos": _auditar_contas_pagar_pagamentos(db, params),
     }

@@ -158,6 +158,9 @@ def _session():
             )
             VALUES
               (100, :tenant, 'N1', '2026-06-04', 123.45, 7, 'processada'),
+              (102, :tenant, 'N2', '2026-06-08', 100.00, 7, 'processada'),
+              (103, :tenant, 'N3', '2026-06-09', 200.00, 7, 'processada'),
+              (104, :tenant, 'N4', '2026-06-10', 300.00, 7, 'processada'),
               (101, :outro, 'NX', '2026-06-04', 999.99, 8, 'processada')
             """
         ),
@@ -174,6 +177,10 @@ def _session():
               (200, :tenant, 'legacy paid', '2026-06-05', 'pago', 80.00, 80.00, NULL, '', ''),
               (201, :tenant, 'ok paid', '2026-06-06', 'pago', 20.00, 20.00, NULL, '', ''),
               (203, :tenant, 'Despesa rapida caixa', '2026-06-07', 'pago', 42.50, 42.50, NULL, '', 'Gerada automaticamente pelo PDV (Caixa #12)'),
+              (204, :tenant, 'NF N2 parcial', NULL, 'pendente', 90.00, 0.00, 102, 'N2', ''),
+              (205, :tenant, 'NF N3 parcela 1', NULL, 'pendente', 100.00, 0.00, 103, 'N3-1', ''),
+              (206, :tenant, 'NF N3 parcela 2', NULL, 'pendente', 100.01, 0.00, 103, 'N3-2', ''),
+              (207, :tenant, 'NF N4 ok', NULL, 'pendente', 300.00, 0.00, 104, 'N4', ''),
               (202, :outro, 'outro', '2026-06-05', 'pago', 90.00, 90.00, NULL, '', '')
             """
         ),
@@ -223,6 +230,13 @@ def test_auditoria_financeira_classifica_inconsistencias_por_tenant_e_periodo():
     notas = resultado["notas_entrada_contas_pagar"]
     assert notas["sem_contas_pagar"]["quantidade"] == 1
     assert notas["sem_contas_pagar"]["valor_total"] == "123.45"
+    assert notas["divergencias_valor"]["quantidade"] == 1
+    assert notas["divergencias_valor"]["valor_total"] == "10.00"
+    assert notas["divergencias_valor"]["itens"][0]["numero_nota"] == "N2"
+    assert notas["divergencias_valor"]["itens"][0]["total_contas_pagar"] == "90.00"
+    assert notas["diferencas_centavos"]["quantidade"] == 1
+    assert notas["diferencas_centavos"]["valor_total"] == "0.01"
+    assert notas["diferencas_centavos"]["itens"][0]["numero_nota"] == "N3"
 
     contas_pagar = resultado["contas_pagar_pagamentos"]
     assert contas_pagar["valor_pago_sem_pagamento"]["quantidade"] == 1
