@@ -43,11 +43,7 @@ const resumoVazio = {
 
 export function getClienteNome(cliente) {
   return (
-    cliente?.nome ||
-    cliente?.razao_social ||
-    cliente?.nome_fantasia ||
-    cliente?.fantasia ||
-    ""
+    cliente?.nome || cliente?.razao_social || cliente?.nome_fantasia || cliente?.fantasia || ""
   );
 }
 
@@ -313,9 +309,7 @@ export default function ContasReceberAnalise({
             ) : null}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Forma pagamento
-            </label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Forma pagamento</label>
             <select
               value={filtros.forma_pagamento_id}
               onChange={(event) =>
@@ -458,4 +452,3 @@ export default function ContasReceberAnalise({
     </div>
   );
 }
-
