@@ -337,6 +337,22 @@ def entrada_estoque(
         except Exception as e_avise:
             logger.warning(f"[AVISE-ME] Erro ao notificar clientes: {e_avise}")
 
+        try:
+            from app.services.pendencia_estoque_service import (
+                verificar_e_notificar_pendencias,
+            )
+
+            verificar_e_notificar_pendencias(
+                db=db,
+                tenant_id=tenant_id,
+                produto_id=produto.id,
+                quantidade_entrada=entrada.quantidade,
+            )
+        except Exception as e_pendencia:
+            logger.warning(
+                f"[LISTA-ESPERA-PDV] Erro ao notificar clientes: {e_pendencia}"
+            )
+
     # ========== SENSIBILIZAÇÃO: KIT FÍSICO - ENTRADA diminui componentes ==========
     # LÓGICA: Entrada no kit físico significa que os unitários foram consumidos para montar os kits
     # Exemplo: Entrada de 5 kits = os componentes DIMINUEM (foram usados para montar)

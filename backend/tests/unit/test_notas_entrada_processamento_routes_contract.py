@@ -70,3 +70,14 @@ def test_notas_entrada_routes_nao_reconcentra_processamento():
         len(Path(reversao_routes.__file__).read_text(encoding="utf-8").splitlines())
         < 350
     )
+
+
+def test_processamento_nf_trata_retorno_de_pendencias_como_resumo_dict():
+    source = Path(processamento_routes.__file__).read_text(encoding="utf-8")
+    trecho = source[source.index("# VERIFICAR E NOTIFICAR") :]
+    trecho = trecho[: trecho.index("logger.info", trecho.index("except Exception"))]
+
+    assert 'notificacoes.get("notificacoes_enviadas", 0)' in trecho
+    assert 'item_proc["produto_nome"]' in trecho
+    assert "if notificacoes > 0:" not in trecho
+    assert "item_proc['produto']" not in trecho
