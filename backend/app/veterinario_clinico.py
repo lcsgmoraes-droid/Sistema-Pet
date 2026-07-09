@@ -2,7 +2,7 @@
 
 import json
 import hashlib
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import HTTPException
