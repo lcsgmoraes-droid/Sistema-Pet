@@ -16,15 +16,17 @@ import { useCartStore } from '../../store/cart.store';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../../theme';
 import { Produto } from '../../types';
 import { formatarMoeda } from '../../utils/format';
+import { resolveProductDetailParams } from '../../utils/productDetailRoute';
 
 export default function ProductDetailScreen({ route, navigation }: any) {
-  const produtoParam = route.params?.produto as Produto | undefined;
-  const produtoId = Number(route.params?.produtoId ?? produtoParam?.id ?? 0);
+  const { produtoId, produtoParam } = resolveProductDetailParams<Produto>(route.params);
   const [produto, setProduto] = useState<Produto | undefined>(produtoParam);
   const [carregandoProduto, setCarregandoProduto] = useState(!produtoParam && !!produtoId);
   const [erroProduto, setErroProduto] = useState(false);
   const [imagemAberta, setImagemAberta] = useState(false);
   const { adicionar } = useCartStore();
+  const produtoExibido =
+    produto && (!produtoId || Number(produto.id) === produtoId) ? produto : undefined;
 
   React.useEffect(() => {
     let active = true;
@@ -37,6 +39,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
       };
     }
     if (!produtoId) {
+      setProduto(undefined);
       setCarregandoProduto(false);
       setErroProduto(true);
       return () => {
@@ -44,6 +47,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
       };
     }
 
+    setProduto(undefined);
     setCarregandoProduto(true);
     setErroProduto(false);
     buscarProdutoPorId(produtoId)
@@ -62,7 +66,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
     };
   }, [produtoParam, produtoId]);
 
-  if (carregandoProduto) {
+  if (carregandoProduto || (produtoId && produto && Number(produto.id) !== produtoId)) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={CORES.primario} size="large" />
@@ -70,7 +74,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
     );
   }
 
-  if (!produto) {
+  if (!produtoExibido) {
     return (
       <View style={styles.center}>
         <Text style={styles.emptyText}>
@@ -80,14 +84,14 @@ export default function ProductDetailScreen({ route, navigation }: any) {
     );
   }
 
-  const temOferta = !!produto.promocao_ativa && !!produto.preco_promocional;
-  const precoFinal = temOferta ? Number(produto.preco_promocional) : Number(produto.preco || 0);
-  const precoOriginal = Number(produto.preco_original ?? produto.preco ?? 0);
+  const temOferta = !!produtoExibido.promocao_ativa && !!produtoExibido.preco_promocional;
+  const precoFinal = temOferta ? Number(produtoExibido.preco_promocional) : Number(produtoExibido.preco || 0);
+  const precoOriginal = Number(produtoExibido.preco_original ?? produtoExibido.preco ?? 0);
 
   async function adicionarProduto() {
-    if (!produto) return;
+    if (!produtoExibido) return;
     try {
-      await adicionar(produto, 1);
+      await adicionar(produtoExibido, 1);
       Alert.alert('Adicionado', 'Produto enviado para o carrinho.', [
         { text: 'Continuar comprando' },
         { text: 'Ver carrinho', onPress: () => navigation.navigate('Carrinho') },
@@ -101,17 +105,17 @@ export default function ProductDetailScreen({ route, navigation }: any) {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <TouchableOpacity
         style={styles.imageBox}
-        activeOpacity={produto.foto_url ? 0.9 : 1}
-        onPress={() => produto.foto_url && setImagemAberta(true)}
+        activeOpacity={produtoExibido.foto_url ? 0.9 : 1}
+        onPress={() => produtoExibido.foto_url && setImagemAberta(true)}
       >
-        {produto.foto_url ? (
-          <Image source={{ uri: produto.foto_url }} style={styles.image} resizeMode="contain" />
+        {produtoExibido.foto_url ? (
+          <Image source={{ uri: produtoExibido.foto_url }} style={styles.image} resizeMode="contain" />
         ) : (
           <View style={styles.placeholder}>
             <Ionicons name="image-outline" size={54} color={CORES.textoClaro} />
           </View>
         )}
-        {produto.foto_url ? (
+        {produtoExibido.foto_url ? (
           <View style={styles.expandBadge}>
             <Ionicons name="expand-outline" size={16} color="#fff" />
             <Text style={styles.expandText}>Ampliar</Text>
@@ -126,16 +130,16 @@ export default function ProductDetailScreen({ route, navigation }: any) {
             <Text style={styles.offerText}>Oferta</Text>
           </View>
         ) : null}
-        <Text style={styles.nome}>{produto.nome}</Text>
-        {produto.codigo ? <Text style={styles.meta}>SKU: {produto.codigo}</Text> : null}
-        {produto.codigo_barras ? <Text style={styles.meta}>Codigo de barras: {produto.codigo_barras}</Text> : null}
+        <Text style={styles.nome}>{produtoExibido.nome}</Text>
+        {produtoExibido.codigo ? <Text style={styles.meta}>SKU: {produtoExibido.codigo}</Text> : null}
+        {produtoExibido.codigo_barras ? <Text style={styles.meta}>Codigo de barras: {produtoExibido.codigo_barras}</Text> : null}
 
         <View style={styles.priceRow}>
           {temOferta ? <Text style={styles.priceOld}>{formatarMoeda(precoOriginal)}</Text> : null}
           <Text style={styles.price}>{formatarMoeda(precoFinal)}</Text>
         </View>
 
-        {produto.descricao ? <Text style={styles.description}>{produto.descricao}</Text> : null}
+        {produtoExibido.descricao ? <Text style={styles.description}>{produtoExibido.descricao}</Text> : null}
 
         <TouchableOpacity style={styles.addButton} onPress={adicionarProduto}>
           <Ionicons name="cart" size={18} color="#fff" />
@@ -148,8 +152,8 @@ export default function ProductDetailScreen({ route, navigation }: any) {
           <TouchableOpacity style={styles.modalClose} onPress={() => setImagemAberta(false)}>
             <Ionicons name="close" size={28} color="#fff" />
           </TouchableOpacity>
-          {produto.foto_url ? (
-            <Image source={{ uri: produto.foto_url }} style={styles.modalImage} resizeMode="contain" />
+          {produtoExibido.foto_url ? (
+            <Image source={{ uri: produtoExibido.foto_url }} style={styles.modalImage} resizeMode="contain" />
           ) : null}
         </View>
       </Modal>
