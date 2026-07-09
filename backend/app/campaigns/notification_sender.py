@@ -383,7 +383,9 @@ class NotificationSender:
                 mark_push_target_result(target, sent=False, error=error)
                 errors.append(error)
 
-        from app.services.app_notifications import registrar_resultado_push_notificacao_app
+        from app.services.app_notifications import (
+            registrar_resultado_push_notificacao_app,
+        )
 
         registrar_resultado_push_notificacao_app(
             app_notification,

@@ -31,9 +31,7 @@ class ReminderJob:
 def config_from_model(config) -> AppointmentReminderConfig:
     return AppointmentReminderConfig(
         enabled=bool(getattr(config, "lembretes_agendamento_ativos", True)),
-        day_before_enabled=bool(
-            getattr(config, "lembrete_agendamento_1d_ativo", True)
-        ),
+        day_before_enabled=bool(getattr(config, "lembrete_agendamento_1d_ativo", True)),
         hours_before_enabled=bool(
             getattr(config, "lembrete_agendamento_horas_ativo", True)
         ),
