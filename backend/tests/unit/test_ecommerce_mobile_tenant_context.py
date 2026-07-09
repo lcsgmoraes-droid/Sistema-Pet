@@ -417,6 +417,22 @@ def test_registrar_push_token_sets_tenant_context_before_device_queries():
     assert get_current_tenant() == tenant_id
 
 
+def test_registrar_push_token_keeps_same_device_active_for_other_accounts():
+    source = inspect.getsource(app_mobile_routes.registrar_push_token)
+
+    assert "_disable_same_push_token_for_other_users" not in source
+
+
+def test_app_mobile_exposes_push_token_opt_out_route():
+    route_signatures = {
+        (route.path, tuple(sorted(route.methods)))
+        for route in app_mobile_routes.router.routes
+        if hasattr(route, "methods")
+    }
+
+    assert ("/app/push-token", ("DELETE",)) in route_signatures
+
+
 def test_get_or_create_cliente_for_user_prefers_operational_profile_by_email():
     tenant_id = uuid4()
     user = SimpleNamespace(

@@ -172,6 +172,7 @@ def test_stock_available_push_uses_all_active_user_devices(monkeypatch):
     )
 
     request = SimpleNamespace(
+        id=42,
         email="cliente@example.com",
         product_id=123,
         product_name="Racao",

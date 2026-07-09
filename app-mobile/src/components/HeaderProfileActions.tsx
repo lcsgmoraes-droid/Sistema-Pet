@@ -5,6 +5,7 @@ import * as Notifications from "expo-notifications";
 import * as AuthService from "../services/auth.service";
 import { ensurePushNotificationsRegistered } from "../services/pushNotifications.service";
 import { useAuthStore } from "../store/auth.store";
+import { confirmLogoutWithNotificationChoice } from "../utils/logoutNotifications";
 
 type HeaderProfileActionsProps = {
   logoutContextLabel: string;
@@ -76,18 +77,7 @@ export default function HeaderProfileActions({
   };
 
   const confirmarLogout = () => {
-    Alert.alert("Sair da conta", `Deseja sair da conta de ${logoutContextLabel}?`, [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Sair",
-        style: "destructive",
-        onPress: () => {
-          logout().catch(() => {
-            Alert.alert("Erro", "Nao foi possivel sair agora.");
-          });
-        },
-      },
-    ]);
+    confirmLogoutWithNotificationChoice(logout, logoutContextLabel);
   };
 
   const ativarNotificacoes = async () => {

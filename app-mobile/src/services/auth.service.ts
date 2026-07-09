@@ -113,3 +113,9 @@ export async function registerPushToken(
 ): Promise<void> {
   await api.post('/app/push-token', { token: pushToken, ...metadata });
 }
+
+export async function unregisterPushToken(pushToken?: string | null): Promise<void> {
+  await api.delete('/app/push-token', {
+    data: pushToken ? { token: pushToken } : {},
+  });
+}

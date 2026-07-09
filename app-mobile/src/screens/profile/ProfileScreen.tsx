@@ -7,6 +7,7 @@ import { updateProfile } from "../../services/auth.service";
 import { ensurePushNotificationsRegistered } from "../../services/pushNotifications.service";
 import { useAuthStore } from "../../store/auth.store";
 import type { AppProfileType } from "../../types";
+import { confirmLogoutWithNotificationChoice } from "../../utils/logoutNotifications";
 import { ProfileContent } from "./profile/ProfileContent";
 import {
   buildDefaultAddress,
@@ -263,10 +264,7 @@ export default function ProfileScreen() {
   }
 
   function handleLogout() {
-    Alert.alert("Sair", "Deseja sair da sua conta?", [
-      { text: "Cancelar", style: "cancel" },
-      { text: "Sair", style: "destructive", onPress: logout },
-    ]);
+    confirmLogoutWithNotificationChoice(logout, "sua conta");
   }
 
   async function ativarNotificacoes() {

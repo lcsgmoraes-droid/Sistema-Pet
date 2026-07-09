@@ -61,6 +61,9 @@ def test_mobile_profile_switch_only_appears_for_multiple_profiles():
     actions = read_repo("app-mobile/src/components/HeaderProfileActions.tsx")
     home = read_repo("app-mobile/src/screens/HomeScreen.tsx")
     profile = read_repo("app-mobile/src/screens/profile/ProfileScreen.tsx")
+    profile_sections = read_repo(
+        "app-mobile/src/screens/profile/profile/ProfilePersonalSections.tsx"
+    )
 
     assert "const canSwitch = available_profiles.length > 1" in actions
     assert "alwaysShowSwitch" not in actions
@@ -71,7 +74,8 @@ def test_mobile_profile_switch_only_appears_for_multiple_profiles():
     assert "alwaysShowSwitch" not in home
     assert "getProfile" in profile
     assert "Sem outros acessos" in profile
-    assert "available_profiles.length > 1 &&" in profile
+    assert "availableProfiles" in profile
+    assert "availableProfiles.length <= 1" in profile_sections
 
 
 def test_operational_headers_can_activate_push_notifications():
@@ -80,6 +84,22 @@ def test_operational_headers_can_activate_push_notifications():
     assert "ensurePushNotificationsRegistered" in actions
     assert "notifications-outline" in actions
     assert "Ativar notificacoes" in actions
+
+
+def test_mobile_logout_asks_explicit_push_consent():
+    service = read_repo("app-mobile/src/services/auth.service.ts")
+    helper = read_repo("app-mobile/src/utils/logoutNotifications.ts")
+    actions = read_repo("app-mobile/src/components/HeaderProfileActions.tsx")
+    profile = read_repo("app-mobile/src/screens/profile/ProfileScreen.tsx")
+
+    assert "unregisterPushToken" in service
+    assert "api.delete('/app/push-token'" in service
+    assert "confirmLogoutWithNotificationChoice" in helper
+    assert "continuar recebendo notificacoes" in helper.lower()
+    assert "outras pessoas" in helper.lower()
+    assert "unregisterPushToken" in helper
+    assert "confirmLogoutWithNotificationChoice" in actions
+    assert "confirmLogoutWithNotificationChoice" in profile
 
 
 def test_selected_store_banner_uses_corepet_logo_when_tenant_logo_is_missing():
