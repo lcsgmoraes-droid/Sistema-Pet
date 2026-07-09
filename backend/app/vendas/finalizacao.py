@@ -490,6 +490,29 @@ def finalizar_venda(
             f"✅ ✅ ✅ COMMIT REALIZADO - Venda #{venda.numero_venda} finalizada com sucesso! ✅ ✅ ✅"
         )
 
+        pendencias_estoque_finalizadas = 0
+        if venda.status == "finalizada":
+            try:
+                from app.services.pendencia_estoque_service import (
+                    finalizar_pendencias_por_venda,
+                )
+
+                resultado_pendencias_estoque = finalizar_pendencias_por_venda(
+                    db=db,
+                    tenant_id=tenant_id,
+                    venda=venda,
+                    commit=True,
+                )
+                pendencias_estoque_finalizadas = int(
+                    resultado_pendencias_estoque.get("finalizadas", 0) or 0
+                )
+            except Exception:
+                logger.exception(
+                    "Erro ao finalizar pendencias de estoque da venda %s",
+                    venda.id,
+                )
+                db.rollback()
+
         # ============================================================
         publicar_eventos_finalizacao(
             venda=venda,
@@ -528,6 +551,7 @@ def finalizar_venda(
                 "contas_baixadas": contas_baixadas,
                 "contas_criadas": contas_criadas_ids,
                 "cupom_consumido": cupom_consumido,
+                "pendencias_estoque_finalizadas": pendencias_estoque_finalizadas,
             },
             "pos_commit": {
                 "contas_novas": len(contas_criadas_ids),

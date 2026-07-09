@@ -110,8 +110,6 @@ def criar_notificacao_estoque_app(
         "product_id": produto_id,
         "pendencia_id": pendencia_id,
     }
-    idempotency_key = f"stock_waitlist:{pendencia_id}" if pendencia_id else None
-
     return criar_notificacao_app(
         db,
         tenant_id=tenant_id,
@@ -122,7 +120,7 @@ def criar_notificacao_estoque_app(
         source="stock_waitlist",
         kind="stock_available",
         payload=payload,
-        idempotency_key=idempotency_key,
+        idempotency_key=None,
     )
 
 

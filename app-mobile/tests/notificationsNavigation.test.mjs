@@ -88,3 +88,16 @@ test("central de notificacoes mobile chama endpoints do app", () => {
   assert.match(screenSource, /markNotificationAsRead/);
   assert.match(screenSource, /stockNotificationToProductId/);
 });
+
+test("home mobile mostra badge vermelho com notificacoes nao lidas", () => {
+  const homeSource = readFileSync(
+    path.resolve(__dirname, "../src/screens/HomeScreen.tsx"),
+    "utf8",
+  );
+
+  assert.match(homeSource, /listarNotificacoesApp/);
+  assert.match(homeSource, /useFocusEffect/);
+  assert.match(homeSource, /unreadNotifications/);
+  assert.match(homeSource, /notificacoesBadge/);
+  assert.match(homeSource, /99\+/);
+});

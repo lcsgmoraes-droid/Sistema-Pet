@@ -6,7 +6,7 @@ Verifica e notifica clientes quando produtos entram no estoque
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Iterable
 import logging
 
 from app.pendencia_estoque_models import PendenciaEstoque
@@ -14,6 +14,8 @@ from app.produtos_models import Produto
 from app.tenancy.rls import sync_rls_tenant
 
 logger = logging.getLogger(__name__)
+
+STATUS_ATIVOS_LISTA_ESPERA = ("pendente", "notificado")
 
 
 def verificar_e_notificar_pendencias(
@@ -56,7 +58,7 @@ def verificar_e_notificar_pendencias(
             and_(
                 PendenciaEstoque.tenant_id == tenant_id,
                 PendenciaEstoque.produto_id == produto_id,
-                PendenciaEstoque.status == "pendente",
+                PendenciaEstoque.status.in_(STATUS_ATIVOS_LISTA_ESPERA),
             )
         )
         .order_by(
@@ -392,3 +394,101 @@ def marcar_pendencia_finalizada(
         logger.error(f"❌ Erro ao finalizar pendência: {str(e)}")
         db.rollback()
         return False
+
+
+def finalizar_pendencias_por_compra(
+    db: Session,
+    *,
+    tenant_id: str,
+    cliente_id: int | None,
+    produto_ids: Iterable[int | None],
+    venda_id: int,
+    commit: bool = True,
+) -> dict:
+    """Finaliza inscricoes ativas da lista quando o cliente compra o produto."""
+    if not cliente_id:
+        return {"finalizadas": 0, "pendencia_ids": []}
+
+    produto_ids_unicos = _normalizar_produto_ids(produto_ids)
+    if not produto_ids_unicos:
+        return {"finalizadas": 0, "pendencia_ids": []}
+
+    sync_rls_tenant(db, tenant_id)
+
+    pendencias = (
+        db.query(PendenciaEstoque)
+        .filter(
+            and_(
+                PendenciaEstoque.tenant_id == tenant_id,
+                PendenciaEstoque.cliente_id == cliente_id,
+                PendenciaEstoque.produto_id.in_(produto_ids_unicos),
+                PendenciaEstoque.status.in_(STATUS_ATIVOS_LISTA_ESPERA),
+            )
+        )
+        .all()
+    )
+
+    agora = datetime.utcnow()
+    pendencia_ids = []
+    for pendencia in pendencias:
+        pendencia.status = "finalizado"
+        pendencia.data_finalizacao = agora
+        pendencia.venda_id = venda_id
+        pendencia_ids.append(pendencia.id)
+
+    if pendencias and commit:
+        db.commit()
+
+    if pendencias:
+        logger.info(
+            "Finalizadas %s pendencias de estoque pela venda %s",
+            len(pendencias),
+            venda_id,
+        )
+
+    return {"finalizadas": len(pendencias), "pendencia_ids": pendencia_ids}
+
+
+def finalizar_pendencias_por_venda(
+    db: Session,
+    *,
+    tenant_id: str,
+    venda,
+    commit: bool = True,
+) -> dict:
+    """Finaliza a lista de espera para itens comprados em uma venda finalizada."""
+    return finalizar_pendencias_por_compra(
+        db=db,
+        tenant_id=tenant_id,
+        cliente_id=getattr(venda, "cliente_id", None),
+        produto_ids=_produto_ids_da_venda(venda),
+        venda_id=getattr(venda, "id", None),
+        commit=commit,
+    )
+
+
+def _normalizar_produto_ids(produto_ids: Iterable[int | None]) -> tuple[int, ...]:
+    ids = []
+    vistos = set()
+    for produto_id in produto_ids or []:
+        if produto_id is None:
+            continue
+        try:
+            produto_id_int = int(produto_id)
+        except (TypeError, ValueError):
+            continue
+        if produto_id_int in vistos:
+            continue
+        ids.append(produto_id_int)
+        vistos.add(produto_id_int)
+    return tuple(ids)
+
+
+def _produto_ids_da_venda(venda) -> tuple[int, ...]:
+    ids = []
+    for item in getattr(venda, "itens", []) or []:
+        if getattr(item, "tipo", None) != "produto":
+            continue
+        ids.append(getattr(item, "produto_id", None))
+        ids.append(getattr(item, "product_variation_id", None))
+    return _normalizar_produto_ids(ids)
