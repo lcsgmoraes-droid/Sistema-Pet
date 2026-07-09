@@ -45,6 +45,11 @@ Para release/deploy, use a sequencia completa:
 6. **DEPLOY NO SERVIDOR REMOTO (mlprohub.com.br / 192.241.150.121): preferir o usuario operacional `petdeploy` e rodar `ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-deploy-producao"`. Esse wrapper root-owned executa o script oficial `scripts/deploy_producao_seguro.sh`, que faz pull, build frontend, rebuild backend/worker, migrations e health. `root@192.241.150.121` fica apenas como fallback operacional autorizado.**
 7. `FLUXO_UNICO.bat status` mostra containers locais; para ver estado real da producao, checar via SSH
 
+Para update OTA do app mobile via EAS, depois da autorizacao do Lucas, publicar
+a mesma versao nos canais `production` e `preview`, salvo excecao combinada
+explicitamente. Validar os dois com `update:list` e `channel:view`, porque
+aparelhos de teste podem estar instalados no canal `preview`.
+
 ## Comunicacao com o usuario
 
 - Sempre escrever em portugues simples, sem jargao.
