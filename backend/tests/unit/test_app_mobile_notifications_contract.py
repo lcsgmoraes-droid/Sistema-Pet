@@ -91,3 +91,28 @@ def test_ecommerce_public_exposes_product_detail_endpoint_for_mobile_deeplink():
     assert '@router.get("/products/{produto_id}")' in public_source
     assert "Produto.id == produto_id" in public_source
     assert "resolver_preco_publico_produto" in public_source
+
+
+def test_app_mobile_product_detail_endpoint_includes_unavailable_app_products():
+    routes_source = (BACKEND_ROOT / "app/routes/app_mobile_routes.py").read_text(
+        encoding="utf-8"
+    )
+    service_source = (REPO_ROOT / "app-mobile/src/services/shop.service.ts").read_text(
+        encoding="utf-8"
+    )
+
+    assert '@router.get("/produto/{produto_id}"' in routes_source
+    assert (
+        "Produto.anunciar_app.is_(True)"
+        not in routes_source[
+            routes_source.index("def buscar_produto_app_por_id(") : routes_source.index(
+                '@router.get("/produto-barcode/{barcode}"'
+            )
+        ]
+    )
+    assert '"anunciar_app"' in routes_source
+    assert '"anunciar_ecommerce"' in routes_source
+    assert '"disponivel_app"' in routes_source
+    assert '"disponivel_ecommerce"' in routes_source
+    assert 'float(getattr(produto, "estoque_atual", 0) or 0) > 0' in routes_source
+    assert "api.get<Produto>(`/app/produto/${id}`)" in service_source

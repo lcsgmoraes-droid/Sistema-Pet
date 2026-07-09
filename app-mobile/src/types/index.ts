@@ -253,6 +253,10 @@ export interface Produto {
   categoria_nome?: string | null;
   marca_nome?: string | null;
   peso_embalagem_kg?: number | null;   // para calculadora de ração
+  anunciar_app?: boolean | null;
+  anunciar_ecommerce?: boolean | null;
+  disponivel_app?: boolean | null;
+  disponivel_ecommerce?: boolean | null;
 }
 
 export interface FuncionarioProdutoEstoque {

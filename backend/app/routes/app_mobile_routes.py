@@ -10,9 +10,9 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import case, func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db import get_session
 from app.models import AppNotification, Cliente, User, UserPushDevice
@@ -158,6 +158,36 @@ class ProdutoBarcodeResponse(BaseModel):
     promocao_ativa: Optional[bool] = False
     promocao_origem: Optional[str] = None
     promocao_validade: Optional[dict] = None
+
+
+class ProdutoAppDetalheResponse(BaseModel):
+    id: int
+    nome: str
+    preco: float
+    preco_venda: float
+    preco_original: float
+    preco_promocional: Optional[float] = None
+    foto_url: Optional[str] = None
+    imagem_principal: Optional[str] = None
+    imagens: list[dict] = Field(default_factory=list)
+    codigo: Optional[str] = None
+    codigo_barras: Optional[str] = None
+    unidade: str
+    estoque: float
+    estoque_atual: float
+    estoque_ecommerce: float
+    categoria_nome: Optional[str] = None
+    marca_nome: Optional[str] = None
+    descricao: Optional[str] = None
+    peso_embalagem: Optional[float] = None
+    peso_embalagem_kg: Optional[float] = None
+    promocao_ativa: Optional[bool] = False
+    promocao_origem: Optional[str] = None
+    promocao_validade: Optional[dict] = None
+    anunciar_app: bool = True
+    anunciar_ecommerce: bool = True
+    disponivel_app: bool = True
+    disponivel_ecommerce: bool = True
 
 
 class PushTokenPayload(BaseModel):
@@ -388,6 +418,145 @@ def limpar_notificacoes_app(
     )
     db.commit()
     return {"status": "ok", "cleared": cleared}
+
+
+def _produto_disponivel_canal_app(produto: Produto) -> bool:
+    return (
+        bool(getattr(produto, "ativo", True))
+        and getattr(produto, "situacao", True) is not False
+        and getattr(produto, "is_sellable", True) is not False
+        and bool(getattr(produto, "anunciar_app", True))
+    )
+
+
+def _produto_disponivel_canal_ecommerce(produto: Produto) -> bool:
+    return (
+        bool(getattr(produto, "ativo", True))
+        and getattr(produto, "situacao", True) is not False
+        and getattr(produto, "is_sellable", True) is not False
+        and bool(getattr(produto, "anunciar_ecommerce", True))
+        and float(getattr(produto, "estoque_atual", 0) or 0) > 0
+    )
+
+
+def _serialize_produto_app_detalhe(
+    db: Session,
+    produto: Produto,
+) -> dict:
+    oferta_validade = mapear_ofertas_validade_por_produto(db, [produto], "app").get(
+        produto.id
+    )
+    pricing = resolver_preco_publico_produto(
+        produto,
+        "app",
+        validity_offer=oferta_validade,
+    )
+    preco_regular = float(pricing.regular_price or 0)
+    preco = float(
+        pricing.promotional_price
+        if pricing.promotional_price is not None
+        else preco_regular
+    )
+    imagens = [
+        {
+            "id": imagem.id,
+            "url": imagem.url,
+            "ordem": imagem.ordem,
+            "e_principal": imagem.e_principal,
+        }
+        for imagem in sorted(
+            produto.imagens or [],
+            key=lambda item: (item.ordem or 0, item.id or 0),
+        )
+    ]
+
+    return {
+        "id": produto.id,
+        "nome": produto.nome,
+        "preco": preco,
+        "preco_venda": preco_regular,
+        "preco_original": preco_regular,
+        "preco_promocional": pricing.promotional_price,
+        "foto_url": produto.imagem_principal,
+        "imagem_principal": produto.imagem_principal,
+        "imagens": imagens,
+        "codigo": produto.codigo,
+        "codigo_barras": produto.codigo_barras,
+        "unidade": produto.unidade or "UN",
+        "estoque": float(produto.estoque_atual or 0),
+        "estoque_atual": float(produto.estoque_atual or 0),
+        "estoque_ecommerce": float(produto.estoque_atual or 0),
+        "categoria_nome": getattr(produto.categoria, "nome", None),
+        "marca_nome": getattr(produto.marca, "nome", None),
+        "descricao": produto.descricao_curta or produto.descricao_completa,
+        "peso_embalagem": produto.peso_embalagem,
+        "peso_embalagem_kg": produto.peso_embalagem,
+        "promocao_ativa": pricing.promotion_active,
+        "promocao_origem": pricing.promotion_origin,
+        "promocao_validade": {
+            "ativa": bool(oferta_validade and oferta_validade.active),
+            "lote_id": oferta_validade.lote_id if oferta_validade else None,
+            "nome_lote": oferta_validade.lote_nome if oferta_validade else None,
+            "dias_para_vencer": oferta_validade.dias_para_vencer
+            if oferta_validade
+            else None,
+            "quantidade_promocional": oferta_validade.quantity_available
+            if oferta_validade
+            else None,
+            "percentual_desconto": oferta_validade.percentual_desconto
+            if oferta_validade
+            else None,
+            "preco_promocional": oferta_validade.promotional_price
+            if oferta_validade
+            else None,
+            "faixa": oferta_validade.faixa if oferta_validade else None,
+            "label": oferta_validade.label if oferta_validade else None,
+            "mensagem": oferta_validade.message if oferta_validade else None,
+        },
+        "anunciar_app": bool(getattr(produto, "anunciar_app", True)),
+        "anunciar_ecommerce": bool(getattr(produto, "anunciar_ecommerce", True)),
+        "disponivel_app": _produto_disponivel_canal_app(produto),
+        "disponivel_ecommerce": _produto_disponivel_canal_ecommerce(produto),
+    }
+
+
+@router.get("/produto/{produto_id}", response_model=ProdutoAppDetalheResponse)
+def buscar_produto_app_por_id(
+    produto_id: int,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Busca produto ativo para o app por ID.
+    Usado por notificacoes: retorna produtos ativos mesmo quando ainda nao
+    estao anunciados no app, para orientar compra no e-commerce ou loja fisica.
+    """
+    tenant_id = _activate_user_tenant_context(current_user)
+    produto = (
+        db.query(Produto)
+        .options(
+            joinedload(Produto.categoria),
+            joinedload(Produto.marca),
+            selectinload(Produto.imagens),
+        )
+        .filter(
+            Produto.tenant_id == tenant_id,
+            Produto.id == produto_id,
+            Produto.ativo.is_(True),
+            Produto.situacao.is_not(False),
+            Produto.is_sellable.is_(True),
+            Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+        )
+        .first()
+    )
+
+    if not produto:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Produto nao encontrado.",
+        )
+
+    return _serialize_produto_app_detalhe(db, produto)
 
 
 @router.get("/produto-barcode/{barcode}", response_model=ProdutoBarcodeResponse)
