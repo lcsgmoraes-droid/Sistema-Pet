@@ -590,7 +590,9 @@ def desativar_push_token(
     _activate_user_tenant_context(current_user)
 
     token = (
-        getattr(payload, "token", None) or getattr(current_user, "push_token", None) or ""
+        getattr(payload, "token", None)
+        or getattr(current_user, "push_token", None)
+        or ""
     ).strip()
     query = db.query(UserPushDevice).filter(
         UserPushDevice.tenant_id == current_user.tenant_id,
@@ -600,9 +602,7 @@ def desativar_push_token(
     if token:
         query = query.filter(UserPushDevice.expo_push_token == token)
 
-    disabled = query.update(
-        {UserPushDevice.enabled: False}, synchronize_session=False
-    )
+    disabled = query.update({UserPushDevice.enabled: False}, synchronize_session=False)
     current_user.push_token = None
     db.commit()
     return {"status": "ok", "disabled": disabled}
