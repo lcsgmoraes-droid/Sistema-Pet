@@ -83,6 +83,11 @@ function normalizarProdutoCatalogo(p: any): Produto {
     descricao: p.descricao ?? null,
     peso_embalagem_kg: p.peso_embalagem ?? p.peso_embalagem_kg ?? null,
     unidade: p.unidade ?? 'UN',
+    anunciar_app: p.anunciar_app ?? true,
+    anunciar_ecommerce: p.anunciar_ecommerce ?? true,
+    disponivel_app: p.disponivel_app ?? p.anunciar_app ?? true,
+    disponivel_ecommerce:
+      p.disponivel_ecommerce ?? (p.anunciar_ecommerce !== false && estoqueCatalogo > 0),
   };
 }
 
@@ -221,7 +226,7 @@ export async function buscarProdutoPorBarcode(barcode: string): Promise<Produto 
 }
 
 export async function buscarProdutoPorId(id: number): Promise<Produto> {
-  const { data } = await api.get<Produto>(`/ecommerce/products/${id}`);
+  const { data } = await api.get<Produto>(`/app/produto/${id}`);
   return normalizarProdutoCatalogo(data);
 }
 

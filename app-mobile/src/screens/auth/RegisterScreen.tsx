@@ -150,6 +150,9 @@ export default function RegisterScreen({ navigation }: any) {
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
+            autoComplete="email"
+            textContentType="username"
+            importantForAutofill="yes"
             value={email}
             onChangeText={setEmail}
           />
@@ -161,6 +164,10 @@ export default function RegisterScreen({ navigation }: any) {
               placeholder="Minimo 8 caracteres"
               placeholderTextColor={CORES.textoClaro}
               secureTextEntry={!mostrarSenha}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              importantForAutofill="yes"
+              passwordRules="minlength: 8;"
               value={senha}
               onChangeText={setSenha}
             />
@@ -179,6 +186,10 @@ export default function RegisterScreen({ navigation }: any) {
               placeholder="Repita a senha"
               placeholderTextColor={CORES.textoClaro}
               secureTextEntry={!mostrarConfSenha}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              importantForAutofill="yes"
+              passwordRules="minlength: 8;"
               value={confirmarSenha}
               onChangeText={setConfirmarSenha}
             />

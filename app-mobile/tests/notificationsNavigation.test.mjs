@@ -141,3 +141,84 @@ test("detalhe do produto ignora produto antigo quando notificacao envia outro pr
   assert.equal(resultado.produtoId, 6089);
   assert.equal(resultado.produtoParam, undefined);
 });
+
+test("detalhe de produto indisponivel no app orienta ecommerce e loja fisica", () => {
+  const {
+    buildEcommerceSearchUrl,
+    isProductAvailableInApp,
+    isProductAvailableInEcommerce,
+  } = carregarModuloTs("src/utils/productAvailability.ts");
+
+  assert.equal(
+    isProductAvailableInApp({ anunciar_app: false, disponivel_app: false }),
+    false,
+  );
+  assert.equal(isProductAvailableInApp({ anunciar_app: true }), true);
+  assert.equal(
+    isProductAvailableInEcommerce({
+      anunciar_ecommerce: true,
+      disponivel_ecommerce: true,
+      estoque: 2,
+    }),
+    true,
+  );
+  assert.equal(
+    isProductAvailableInEcommerce({
+      anunciar_ecommerce: true,
+      disponivel_ecommerce: false,
+      estoque: 2,
+    }),
+    false,
+  );
+  assert.equal(
+    isProductAvailableInEcommerce({
+      anunciar_ecommerce: true,
+      disponivel_ecommerce: true,
+      estoque: 0,
+    }),
+    false,
+  );
+  assert.equal(
+    buildEcommerceSearchUrl({
+      apiBaseUrl: "https://corepet.com.br/api",
+      tenantSlug: "atacadaopetpp",
+      query: "SKU 6089",
+    }),
+    "https://corepet.com.br/atacadaopetpp?busca=SKU%206089",
+  );
+
+  const detailSource = readFileSync(
+    path.resolve(__dirname, "../src/screens/shop/ProductDetailScreen.tsx"),
+    "utf8",
+  );
+  assert.match(detailSource, /produtoDisponivelNoApp/);
+  assert.match(detailSource, /produtoDisponivelNoEcommerce/);
+  assert.match(detailSource, /Esse produto chegou na loja/);
+  assert.match(detailSource, /Pesquisar no e-commerce/);
+  assert.match(detailSource, /loja fisica/);
+  assert.match(detailSource, /openEcommerceSearch/);
+  assert.match(detailSource, /produtoDisponivelNoEcommerce && ecommerceSearchUrl/);
+});
+
+test("login e cadastro usam autofill seguro do celular", () => {
+  const loginSource = readFileSync(
+    path.resolve(__dirname, "../src/screens/auth/LoginScreen.tsx"),
+    "utf8",
+  );
+  const registerSource = readFileSync(
+    path.resolve(__dirname, "../src/screens/auth/RegisterScreen.tsx"),
+    "utf8",
+  );
+
+  assert.match(loginSource, /autoComplete="email"/);
+  assert.match(loginSource, /textContentType="username"/);
+  assert.match(loginSource, /autoComplete="current-password"/);
+  assert.match(loginSource, /textContentType="password"/);
+  assert.match(loginSource, /importantForAutofill="yes"/);
+
+  assert.match(registerSource, /autoComplete="email"/);
+  assert.match(registerSource, /textContentType="username"/);
+  assert.match(registerSource, /autoComplete="new-password"/);
+  assert.match(registerSource, /textContentType="newPassword"/);
+  assert.match(registerSource, /passwordRules=/);
+});

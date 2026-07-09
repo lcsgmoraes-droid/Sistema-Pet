@@ -98,6 +98,9 @@ export default function LoginScreen({ navigation, route }: any) {
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
+            autoComplete="email"
+            textContentType="username"
+            importantForAutofill="yes"
             value={email}
             onChangeText={setEmail}
           />
@@ -109,6 +112,9 @@ export default function LoginScreen({ navigation, route }: any) {
               placeholder="Sua senha"
               placeholderTextColor={CORES.textoClaro}
               secureTextEntry={!mostrarSenha}
+              autoComplete="current-password"
+              textContentType="password"
+              importantForAutofill="yes"
               value={senha}
               onChangeText={setSenha}
             />

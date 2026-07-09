@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -11,11 +12,18 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { API_BASE_URL } from '../../config';
 import { buscarProdutoPorId } from '../../services/shop.service';
 import { useCartStore } from '../../store/cart.store';
+import { useTenantStore } from '../../store/tenant.store';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../../theme';
 import { Produto } from '../../types';
 import { formatarMoeda } from '../../utils/format';
+import {
+  buildEcommerceSearchUrl,
+  isProductAvailableInApp,
+  isProductAvailableInEcommerce,
+} from '../../utils/productAvailability';
 import { resolveProductDetailParams } from '../../utils/productDetailRoute';
 
 export default function ProductDetailScreen({ route, navigation }: any) {
@@ -25,6 +33,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
   const [erroProduto, setErroProduto] = useState(false);
   const [imagemAberta, setImagemAberta] = useState(false);
   const { adicionar } = useCartStore();
+  const { tenant } = useTenantStore();
   const produtoExibido =
     produto && (!produtoId || Number(produto.id) === produtoId) ? produto : undefined;
 
@@ -87,9 +96,29 @@ export default function ProductDetailScreen({ route, navigation }: any) {
   const temOferta = !!produtoExibido.promocao_ativa && !!produtoExibido.preco_promocional;
   const precoFinal = temOferta ? Number(produtoExibido.preco_promocional) : Number(produtoExibido.preco || 0);
   const precoOriginal = Number(produtoExibido.preco_original ?? produtoExibido.preco ?? 0);
+  const produtoDisponivelNoApp = isProductAvailableInApp(produtoExibido);
+  const produtoDisponivelNoEcommerce = isProductAvailableInEcommerce(produtoExibido);
+  const enderecoLoja = [
+    tenant?.endereco,
+    tenant?.numero,
+    tenant?.bairro,
+    tenant?.cidade && tenant?.uf ? `${tenant.cidade}/${tenant.uf}` : tenant?.cidade,
+  ].filter(Boolean).join(', ');
+  const ecommerceSearchUrl = buildEcommerceSearchUrl({
+    apiBaseUrl: API_BASE_URL,
+    tenantSlug: tenant?.slug,
+    query: produtoExibido.codigo || produtoExibido.nome,
+  });
 
   async function adicionarProduto() {
     if (!produtoExibido) return;
+    if (!produtoDisponivelNoApp) {
+      Alert.alert(
+        'Disponivel na loja',
+        'Esse produto chegou na loja, mas ainda nao esta disponivel para compra pelo app.',
+      );
+      return;
+    }
     try {
       await adicionar(produtoExibido, 1);
       Alert.alert('Adicionado', 'Produto enviado para o carrinho.', [
@@ -98,6 +127,18 @@ export default function ProductDetailScreen({ route, navigation }: any) {
       ]);
     } catch {
       Alert.alert('Erro', 'Nao foi possivel adicionar ao carrinho.');
+    }
+  }
+
+  async function openEcommerceSearch() {
+    if (!ecommerceSearchUrl) {
+      navigation.navigate('Catalogo');
+      return;
+    }
+    try {
+      await Linking.openURL(ecommerceSearchUrl);
+    } catch {
+      Alert.alert('Erro', 'Nao foi possivel abrir o e-commerce agora.');
     }
   }
 
@@ -141,10 +182,46 @@ export default function ProductDetailScreen({ route, navigation }: any) {
 
         {produtoExibido.descricao ? <Text style={styles.description}>{produtoExibido.descricao}</Text> : null}
 
-        <TouchableOpacity style={styles.addButton} onPress={adicionarProduto}>
-          <Ionicons name="cart" size={18} color="#fff" />
-          <Text style={styles.addButtonText}>Adicionar ao carrinho</Text>
-        </TouchableOpacity>
+        {!produtoDisponivelNoApp ? (
+          <View style={styles.unavailableNotice}>
+            <View style={styles.unavailableHeader}>
+              <Ionicons name="storefront-outline" size={20} color="#92400E" />
+              <Text style={styles.unavailableTitle}>Chegou na loja</Text>
+            </View>
+            <Text style={styles.unavailableText}>
+              Esse produto chegou na loja, mas ainda nao esta disponivel para compra pelo app.
+            </Text>
+            {produtoDisponivelNoEcommerce ? (
+              <Text style={styles.unavailableText}>
+                Pesquise no e-commerce ou fale com a loja fisica para comprar.
+              </Text>
+            ) : (
+              <Text style={styles.unavailableText}>
+                Fale com a loja fisica para comprar ou reservar.
+              </Text>
+            )}
+            {enderecoLoja ? (
+              <Text style={styles.storeAddress}>Loja fisica: {enderecoLoja}</Text>
+            ) : null}
+            <View style={styles.unavailableActions}>
+              {produtoDisponivelNoEcommerce && ecommerceSearchUrl ? (
+                <TouchableOpacity style={styles.ecommerceButton} onPress={openEcommerceSearch}>
+                  <Ionicons name="search" size={17} color="#fff" />
+                  <Text style={styles.ecommerceButtonText}>Pesquisar no e-commerce</Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity style={styles.catalogButton} onPress={() => navigation.navigate('Catalogo')}>
+                <Ionicons name="grid-outline" size={17} color={CORES.primario} />
+                <Text style={styles.catalogButtonText}>Ver catalogo do app</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.addButton} onPress={adicionarProduto}>
+            <Ionicons name="cart" size={18} color="#fff" />
+            <Text style={styles.addButtonText}>Adicionar ao carrinho</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <Modal visible={imagemAberta} transparent animationType="fade" onRequestClose={() => setImagemAberta(false)}>
@@ -207,6 +284,42 @@ const styles = StyleSheet.create({
   priceOld: { color: CORES.textoClaro, textDecorationLine: 'line-through', fontSize: FONTE.normal },
   price: { color: CORES.primario, fontWeight: '900', fontSize: FONTE.titulo },
   description: { color: CORES.textoSecundario, lineHeight: 21, marginTop: ESPACO.md },
+  unavailableNotice: {
+    marginTop: ESPACO.lg,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    backgroundColor: '#FFF7ED',
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
+    gap: 8,
+  },
+  unavailableHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  unavailableTitle: { color: '#92400E', fontWeight: '900', fontSize: FONTE.media },
+  unavailableText: { color: '#7C2D12', lineHeight: 20, fontSize: FONTE.normal },
+  storeAddress: { color: '#7C2D12', fontWeight: '700', fontSize: FONTE.pequena },
+  unavailableActions: { gap: ESPACO.sm, marginTop: ESPACO.sm },
+  ecommerceButton: {
+    backgroundColor: '#92400E',
+    borderRadius: RAIO.md,
+    paddingVertical: ESPACO.sm + 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  ecommerceButtonText: { color: '#fff', fontWeight: '800', fontSize: FONTE.normal },
+  catalogButton: {
+    borderWidth: 1,
+    borderColor: CORES.primario,
+    borderRadius: RAIO.md,
+    paddingVertical: ESPACO.sm + 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: CORES.superficie,
+  },
+  catalogButtonText: { color: CORES.primario, fontWeight: '800', fontSize: FONTE.normal },
   addButton: {
     marginTop: ESPACO.lg,
     backgroundColor: CORES.primario,
