@@ -126,3 +126,18 @@ test("home mobile mostra badge vermelho com notificacoes nao lidas", () => {
   assert.match(homeSource, /notificacoesBadge/);
   assert.match(homeSource, /99\+/);
 });
+
+test("detalhe do produto ignora produto antigo quando notificacao envia outro produtoId", () => {
+  const { resolveProductDetailParams } = carregarModuloTs(
+    "src/utils/productDetailRoute.ts",
+  );
+
+  const produtoAntigo = { id: 5107, nome: "Produto antigo" };
+  const resultado = resolveProductDetailParams({
+    produto: produtoAntigo,
+    produtoId: 6089,
+  });
+
+  assert.equal(resultado.produtoId, 6089);
+  assert.equal(resultado.produtoParam, undefined);
+});
