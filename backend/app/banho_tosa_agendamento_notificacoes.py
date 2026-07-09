@@ -13,13 +13,20 @@ from app.services.appointment_reminders import (
 def sincronizar_lembretes_agendamento_banho_tosa(
     db, *, tenant_id, agendamento: BanhoTosaAgendamento, config
 ) -> None:
-    if not agendamento.id or not agendamento.cliente_id or not agendamento.data_hora_inicio:
+    if (
+        not agendamento.id
+        or not agendamento.cliente_id
+        or not agendamento.data_hora_inicio
+    ):
         return
 
     prefixo = f"banho-tosa-agendamento:{agendamento.id}:"
     replace_pending_reminder_jobs(db, tenant_id=tenant_id, idempotency_prefix=prefixo)
 
-    if agendamento.status in STATUS_AGENDAMENTO_FINAIS or agendamento.status != "agendado":
+    if (
+        agendamento.status in STATUS_AGENDAMENTO_FINAIS
+        or agendamento.status != "agendado"
+    ):
         return
 
     pet_nome = getattr(getattr(agendamento, "pet", None), "nome", None)

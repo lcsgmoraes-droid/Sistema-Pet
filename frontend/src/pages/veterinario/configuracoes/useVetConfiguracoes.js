@@ -20,10 +20,8 @@ export function useVetConfiguracoes() {
   useEffect(() => {
     if (!data.lembretesConfig) return;
     setLembretesForm({
-      lembretes_agendamento_ativos:
-        data.lembretesConfig.lembretes_agendamento_ativos ?? true,
-      lembrete_agendamento_1d_ativo:
-        data.lembretesConfig.lembrete_agendamento_1d_ativo ?? true,
+      lembretes_agendamento_ativos: data.lembretesConfig.lembretes_agendamento_ativos ?? true,
+      lembrete_agendamento_1d_ativo: data.lembretesConfig.lembrete_agendamento_1d_ativo ?? true,
       lembrete_agendamento_horas_ativo:
         data.lembretesConfig.lembrete_agendamento_horas_ativo ?? true,
       lembrete_agendamento_horas_antes: String(

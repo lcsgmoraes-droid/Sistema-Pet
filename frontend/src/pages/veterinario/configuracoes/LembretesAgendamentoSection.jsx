@@ -1,11 +1,6 @@
 import { Bell } from "lucide-react";
 
-export default function LembretesAgendamentoSection({
-  form,
-  onChangeForm,
-  onSave,
-  salvando,
-}) {
+export default function LembretesAgendamentoSection({ form, onChangeForm, onSave, salvando }) {
   if (!form) return null;
 
   return (
