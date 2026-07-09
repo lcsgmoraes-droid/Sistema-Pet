@@ -5,6 +5,7 @@ import * as Notifications from "expo-notifications";
 import { useEffect, useRef } from "react";
 import { navigateWhenReady } from "../navigation/navigationRef";
 import { ensurePushNotificationsRegistered } from "../services/pushNotifications.service";
+import { stockNotificationToProductId } from "../utils/notificationNavigation";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -21,6 +22,7 @@ export function usePushNotifications(isAuthenticated: boolean) {
     null,
   );
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
+  const handledResponses = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -35,25 +37,46 @@ export function usePushNotifications(isAuthenticated: boolean) {
 
     setup();
 
+    function handleNotificationResponse(response: Notifications.NotificationResponse) {
+      const request = response.notification.request;
+      const identifier = request.identifier;
+      if (identifier && handledResponses.current.has(identifier)) return;
+      if (identifier) handledResponses.current.add(identifier);
+
+      const data = request.content.data || {};
+      const produtoId = stockNotificationToProductId(data);
+      if (produtoId) {
+        navigateWhenReady("Loja", {
+          screen: "DetalhesProduto",
+          params: { produtoId },
+        });
+        return;
+      }
+      if (data.source === "order") {
+        navigateWhenReady("Pedidos");
+        return;
+      }
+      if (data.source !== "app-vet") return;
+      if (data.kind === "procedimento") {
+        navigateWhenReady("VetProcedimentos");
+      } else if (data.kind === "agendamento") {
+        navigateWhenReady("VetAgenda");
+      }
+    }
+
     notificationListener.current =
       Notifications.addNotificationReceivedListener((_notification) => {
         // A notificacao ja aparece pela config do setNotificationHandler acima.
       });
 
     responseListener.current =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response.notification.request.content.data || {};
-        if (data.source === "order") {
-          navigateWhenReady("Pedidos");
-          return;
-        }
-        if (data.source !== "app-vet") return;
-        if (data.kind === "procedimento") {
-          navigateWhenReady("VetProcedimentos");
-        } else if (data.kind === "agendamento") {
-          navigateWhenReady("VetAgenda");
-        }
-      });
+      Notifications.addNotificationResponseReceivedListener(handleNotificationResponse);
+
+    Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (response) handleNotificationResponse(response);
+      })
+      .catch(() => {});
 
     return () => {
       notificationListener.current?.remove();

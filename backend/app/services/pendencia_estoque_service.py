@@ -121,6 +121,7 @@ def _notificar_pendencia(
         tenant_id=tenant_id,
         cliente=cliente,
         produto=produto,
+        pendencia=pendencia,
     )
     whatsapp_sucesso = _enviar_whatsapp_pendencia_cliente(
         db=db,
@@ -212,14 +213,36 @@ def enviar_push_pendencia(
     tenant_id: str,
     cliente,
     produto: Produto,
+    pendencia=None,
 ) -> bool:
     """Envia push mobile de produto disponivel para cliente da lista de espera."""
     try:
+        from app.services.app_notifications import (
+            criar_notificacao_estoque_app,
+            registrar_resultado_push_notificacao_app,
+        )
         from app.services.push_devices import (
             load_customer_push_targets,
             mark_push_target_result,
         )
         from app.services.order_push_notifications import send_expo_push
+
+        app_notification = None
+        try:
+            app_notification = criar_notificacao_estoque_app(
+                db=db,
+                tenant_id=tenant_id,
+                cliente=cliente,
+                produto=produto,
+                pendencia=pendencia,
+            )
+        except Exception:
+            logger.exception(
+                "[LISTA-ESPERA-PDV] Falha ao gravar notificacao no app tenant_id=%s cliente_id=%s produto_id=%s",
+                tenant_id,
+                getattr(cliente, "id", None),
+                getattr(produto, "id", None),
+            )
 
         targets = load_customer_push_targets(
             db,
@@ -233,6 +256,11 @@ def enviar_push_pendencia(
                 getattr(cliente, "id", None),
                 getattr(produto, "id", None),
             )
+            registrar_resultado_push_notificacao_app(
+                app_notification,
+                sent=False,
+                error="Cliente sem dispositivo push",
+            )
             return False
 
         content = {
@@ -243,17 +271,30 @@ def enviar_push_pendencia(
                 "kind": "stock_available",
                 "produto_id": getattr(produto, "id", None),
                 "product_id": getattr(produto, "id", None),
+                "pendencia_id": getattr(pendencia, "id", None),
             },
         }
 
         any_sent = False
+        last_ticket_id = None
+        last_error = None
         for target in targets:
             try:
                 sent, ticket_id, error = send_expo_push(target.token, content)
             except Exception as exc:
                 sent, ticket_id, error = False, None, str(exc)
             any_sent = any_sent or sent
+            if sent and ticket_id:
+                last_ticket_id = ticket_id
+            if error:
+                last_error = error
             mark_push_target_result(target, sent=sent, ticket_id=ticket_id, error=error)
+        registrar_resultado_push_notificacao_app(
+            app_notification,
+            sent=any_sent,
+            ticket_id=last_ticket_id,
+            error=last_error,
+        )
         return any_sent
     except Exception:
         logger.exception("Erro ao enviar push de pendencia")

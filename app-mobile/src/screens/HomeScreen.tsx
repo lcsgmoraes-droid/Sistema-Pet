@@ -73,13 +73,22 @@ export default function HomeScreen() {
           <Text style={styles.subSaudacao}>Bem-vindo ao pet shop</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.pontosCard}
-            onPress={() => navigation.navigate('Beneficios')}
-          >
-            <Ionicons name="trophy" size={16} color={CORES.pontos} />
-            <Text style={styles.pontosTexto}>{pontos} pts</Text>
-          </TouchableOpacity>
+          <View style={styles.headerTopActions}>
+            <TouchableOpacity
+              style={styles.pontosCard}
+              onPress={() => navigation.navigate('Beneficios')}
+            >
+              <Ionicons name="trophy" size={16} color={CORES.pontos} />
+              <Text style={styles.pontosTexto}>{pontos} pts</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityLabel="Abrir notificacoes"
+              style={styles.notificacoesButton}
+              onPress={() => navigation.navigate('Notificacoes')}
+            >
+              <Ionicons name="notifications-outline" size={18} color={CORES.primario} />
+            </TouchableOpacity>
+          </View>
           <HeaderProfileActions
             color={CORES.primario}
             logoutContextLabel="cliente"
@@ -415,6 +424,7 @@ const styles = StyleSheet.create({
   },
   headerText: { flex: 1 },
   headerActions: { alignItems: 'flex-end', gap: ESPACO.xs },
+  headerTopActions: { flexDirection: 'row', alignItems: 'center', gap: ESPACO.xs },
   saudacao: { fontSize: FONTE.grande, fontWeight: 'bold', color: CORES.texto },
   subSaudacao: { fontSize: FONTE.normal, color: CORES.textoSecundario, marginTop: 2 },
   pontosCard: {
@@ -427,6 +437,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   pontosTexto: { fontSize: FONTE.normal, fontWeight: 'bold', color: '#92400E' },
+  notificacoesButton: {
+    width: 36,
+    height: 36,
+    borderRadius: RAIO.circulo,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    backgroundColor: CORES.superficie,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   scannerCardCompacto: {
     marginHorizontal: ESPACO.lg,
     marginTop: ESPACO.lg,

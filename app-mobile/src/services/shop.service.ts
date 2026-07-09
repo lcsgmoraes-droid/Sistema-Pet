@@ -61,6 +61,31 @@ export type CatalogoFiltroOpcoes = {
   pesos_embalagem_kg: number[];
 };
 
+function normalizarProdutoCatalogo(p: any): Produto {
+  const estoqueAtual = toNumberOrNull(p.estoque_atual);
+  const estoquePadrao = toNumberOrNull(p.estoque);
+  const estoqueCatalogo = estoqueAtual ?? estoquePadrao ?? 0;
+
+  return {
+    id: p.id,
+    nome: p.nome,
+    preco: p.preco_venda ?? p.preco ?? 0,
+    preco_original: p.preco_original ?? p.preco_venda ?? p.preco ?? null,
+    preco_promocional: p.preco_promocional ?? null,
+    promocao_ativa: p.promocao_ativa ?? false,
+    foto_url: resolveMediaUrl(p.imagem_principal ?? p.foto_url),
+    estoque: estoqueCatalogo,
+    estoque_ecommerce: estoqueAtual,
+    categoria_nome: p.categoria_nome ?? null,
+    marca_nome: p.marca_nome ?? null,
+    codigo: p.codigo ?? p.codigo_barras ?? null,
+    codigo_barras: p.codigo_barras ?? null,
+    descricao: p.descricao ?? null,
+    peso_embalagem_kg: p.peso_embalagem ?? p.peso_embalagem_kg ?? null,
+    unidade: p.unidade ?? 'UN',
+  };
+}
+
 export async function listarProdutos(params?: {
   pagina?: number;
   busca?: string;
@@ -93,29 +118,7 @@ export async function listarProdutos(params?: {
   });
   // Backend retorna { items: [...] } — adaptar para o formato do app
   const items = data.items ?? data.produtos ?? [];
-  const produtos: Produto[] = items.map((p: any) => {
-    const estoqueAtual = toNumberOrNull(p.estoque_atual);
-    const estoquePadrao = toNumberOrNull(p.estoque);
-    const estoqueCatalogo = estoqueAtual ?? estoquePadrao ?? 0;
-
-    return {
-      id: p.id,
-      nome: p.nome,
-      preco: p.preco_venda ?? p.preco ?? 0,
-      preco_original: p.preco_original ?? p.preco_venda ?? p.preco ?? null,
-      preco_promocional: p.preco_promocional ?? null,
-      promocao_ativa: p.promocao_ativa ?? false,
-      foto_url: resolveMediaUrl(p.imagem_principal ?? p.foto_url),
-      estoque: estoqueCatalogo,
-      estoque_ecommerce: estoqueAtual,
-      categoria_nome: p.categoria_nome ?? null,
-      marca_nome: p.marca_nome ?? null,
-      codigo: p.codigo ?? p.codigo_barras ?? null,
-      codigo_barras: p.codigo_barras ?? null,
-      descricao: p.descricao ?? null,
-      peso_embalagem_kg: p.peso_embalagem ?? null,
-    };
-  });
+  const produtos: Produto[] = items.map((p: any) => normalizarProdutoCatalogo(p));
   return { produtos, total: Number(data?.total ?? produtos.length) };
 }
 
@@ -219,7 +222,7 @@ export async function buscarProdutoPorBarcode(barcode: string): Promise<Produto 
 
 export async function buscarProdutoPorId(id: number): Promise<Produto> {
   const { data } = await api.get<Produto>(`/ecommerce/products/${id}`);
-  return data;
+  return normalizarProdutoCatalogo(data);
 }
 
 // ─────────────────────────────────────────────────────────────

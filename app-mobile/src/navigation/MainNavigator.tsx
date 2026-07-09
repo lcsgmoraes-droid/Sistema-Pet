@@ -19,6 +19,7 @@ import PetDetailScreen from "../screens/pets/PetDetailScreen";
 import PetFormScreen from "../screens/pets/PetFormScreen";
 import PetListScreen from "../screens/pets/PetListScreen";
 import ProfileScreen from "../screens/profile/ProfileScreen";
+import NotificationsScreen from "../screens/notifications/NotificationsScreen";
 import BanhoTosaScreen from "../screens/services/BanhoTosaScreen";
 import VeterinarioScreen from "../screens/vet/VeterinarioScreen";
 import BarcodeScannerScreen from "../screens/shop/BarcodeScannerScreen";
@@ -29,10 +30,28 @@ import ProductDetailScreen from "../screens/shop/ProductDetailScreen";
 import WishlistScreen from "../screens/shop/WishlistScreen";
 
 const Tab = createBottomTabNavigator();
+const HomeStack = createNativeStackNavigator();
 const LojaStack = createNativeStackNavigator();
 const PetsStack = createNativeStackNavigator();
 const PedidosStack = createNativeStackNavigator();
 const BeneficiosStack = createNativeStackNavigator();
+
+function HomeNavigator() {
+  return (
+    <HomeStack.Navigator>
+      <HomeStack.Screen
+        name="Inicio"
+        component={HomeScreen}
+        options={{ headerShown: false }}
+      />
+      <HomeStack.Screen
+        name="Notificacoes"
+        component={NotificationsScreen}
+        options={{ title: "Notificacoes" }}
+      />
+    </HomeStack.Navigator>
+  );
+}
 
 function LojaNavigator() {
   return (
@@ -196,7 +215,7 @@ export default function MainNavigator() {
     >
       <Tab.Screen
         name="Home"
-        component={HomeScreen}
+        component={HomeNavigator}
         options={{
           title: "Início",
           tabBarIcon: ({ color, size }) => (

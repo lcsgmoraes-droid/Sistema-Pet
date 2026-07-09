@@ -13,7 +13,7 @@ import EntregadorNavigator from './EntregadorNavigator';
 import FuncionarioNavigator from './FuncionarioNavigator';
 import MainNavigator from './MainNavigator';
 import VeterinarioNavigator from './VeterinarioNavigator';
-import { navigationRef } from './navigationRef';
+import { flushPendingNavigation, navigationRef } from './navigationRef';
 
 // Tela de seleção de loja
 import SelecionarLojaScreen from '../screens/SelecionarLojaScreen';
@@ -31,6 +31,18 @@ const appLinking = {
         screens: {
           ListaPedidos: "pedidos",
           Rastreio: "pedidos/:pedidoId/rastreio",
+        },
+      },
+      Home: {
+        screens: {
+          Inicio: "inicio",
+          Notificacoes: "notificacoes",
+        },
+      },
+      Loja: {
+        screens: {
+          Catalogo: "produtos",
+          DetalhesProduto: "produtos/:produtoId",
         },
       },
     },
@@ -85,7 +97,11 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef} linking={appLinking as any}>
+    <NavigationContainer
+      ref={navigationRef}
+      linking={appLinking as any}
+      onReady={flushPendingNavigation}
+    >
       {activeNav}
     </NavigationContainer>
   );
