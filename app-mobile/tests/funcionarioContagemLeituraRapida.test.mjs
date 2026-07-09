@@ -33,7 +33,7 @@ function carregarModuloTs(relativo) {
   return module.exports;
 }
 
-const { incrementarProdutoContagemRapida, resolverLeituraProdutoContagem } = carregarModuloTs(
+const { emitirVozErroScanner, incrementarProdutoContagemRapida, resolverLeituraProdutoContagem } = carregarModuloTs(
   "src/screens/funcionario/contagem/FuncionarioContagemUtils.ts",
 );
 
@@ -114,4 +114,34 @@ test("bloqueia leitura de outro produto quando produto esta travado", () => {
   assert.equal(resultado.tipo, "bloqueado");
   assert.equal(JSON.stringify(resultado.itens), JSON.stringify(itens));
   assert.match(resultado.mensagem, /Produto A/);
+});
+
+test("fala erro apenas quando voz de erro esta ativa", async () => {
+  const eventos = [];
+  const dependencias = {
+    pararFala: async () => {
+      eventos.push("stop");
+    },
+    falar: (texto, options) => {
+      eventos.push(["speak", texto, options.language, options.pitch, options.rate]);
+    },
+  };
+
+  await emitirVozErroScanner({
+    tipo: "erro",
+    vozErroAtiva: true,
+    ...dependencias,
+  });
+  await emitirVozErroScanner({
+    tipo: "erro",
+    vozErroAtiva: false,
+    ...dependencias,
+  });
+  await emitirVozErroScanner({
+    tipo: "sucesso",
+    vozErroAtiva: true,
+    ...dependencias,
+  });
+
+  assert.deepEqual(eventos, ["stop", ["speak", "erro", "pt-BR", 1, 1]]);
 });
