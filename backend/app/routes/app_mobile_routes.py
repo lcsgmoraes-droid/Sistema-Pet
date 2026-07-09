@@ -219,9 +219,7 @@ def _serialize_app_notification(notification: AppNotification) -> dict:
         "source": notification.source,
         "kind": notification.kind,
         "data": notification.payload or {},
-        "read_at": notification.read_at.isoformat()
-        if notification.read_at
-        else None,
+        "read_at": notification.read_at.isoformat() if notification.read_at else None,
         "created_at": notification.created_at.isoformat()
         if notification.created_at
         else None,
@@ -358,11 +356,7 @@ def listar_notificacoes_app(
         AppNotification.user_id == current_user.id,
         AppNotification.cleared_at.is_(None),
     )
-    items = (
-        base_query.order_by(AppNotification.created_at.desc())
-        .limit(limit)
-        .all()
-    )
+    items = base_query.order_by(AppNotification.created_at.desc()).limit(limit).all()
     unread_count = base_query.filter(AppNotification.read_at.is_(None)).count()
 
     return {
