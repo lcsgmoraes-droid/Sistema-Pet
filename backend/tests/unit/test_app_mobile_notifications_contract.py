@@ -37,6 +37,19 @@ def test_stock_waitlist_push_creates_app_notification_with_product_payload():
     assert '"pendencia_id": getattr(pendencia, "id", None)' in source
 
 
+def test_ecommerce_notify_me_push_uses_product_payload_and_app_notification():
+    source = (BACKEND_ROOT / "app/routes/ecommerce_notify_routes.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "criar_notificacao_app" in source
+    assert '"source": "stock_waitlist"' in source
+    assert '"kind": "stock_available"' in source
+    assert '"produto_id": product_id' in source
+    assert '"product_id": product_id' in source
+    assert '"type": "stock_available"' in source
+
+
 def test_mobile_app_exposes_notifications_center_and_stock_push_navigation():
     navigator_source = (
         REPO_ROOT / "app-mobile/src/navigation/MainNavigator.tsx"
@@ -55,3 +68,13 @@ def test_mobile_app_exposes_notifications_center_and_stock_push_navigation():
     assert "getLastNotificationResponseAsync" in hook_source
     assert "produtoId" in product_detail_source
     assert "buscarProdutoPorId" in product_detail_source
+
+
+def test_ecommerce_public_exposes_product_detail_endpoint_for_mobile_deeplink():
+    public_source = (BACKEND_ROOT / "app/routes/ecommerce_public.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert '@router.get("/products/{produto_id}")' in public_source
+    assert "Produto.id == produto_id" in public_source
+    assert "resolver_preco_publico_produto" in public_source

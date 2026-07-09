@@ -201,6 +201,7 @@ def notificar_clientes_estoque_disponivel(
 
     # Coletar push tokens dos usuários cadastrados para este produto
     from app.models import User
+    from app.services.app_notifications import criar_notificacao_app
     from app.services.push_devices import load_user_push_targets
     import requests as http_requests
 
@@ -242,6 +243,16 @@ def notificar_clientes_estoque_disponivel(
 
     count = 0
     push_tokens = []
+    product_payload = {
+        "source": "stock_waitlist",
+        "kind": "stock_available",
+        "produto_id": product_id,
+        "product_id": product_id,
+        "type": "stock_available",
+        "notify_request_id": None,
+    }
+    notification_title = "Produto disponivel"
+    notification_body = f"{product_name or 'Produto'} voltou ao estoque. Confira no app antes que acabe."
 
     for req in pending:
         # Enviar e-mail
@@ -266,6 +277,19 @@ def notificar_clientes_estoque_disponivel(
             .first()
         )
         if user:
+            payload = {**product_payload, "notify_request_id": req.id}
+            criar_notificacao_app(
+                db,
+                tenant_id=tenant_id,
+                user_id=user.id,
+                customer_id=None,
+                title=notification_title,
+                body=notification_body,
+                source="stock_waitlist",
+                kind="stock_available",
+                payload=payload,
+                idempotency_key=f"ecommerce_notify:{req.id}",
+            )
             push_tokens.extend(
                 target.token
                 for target in load_user_push_targets(
@@ -283,7 +307,7 @@ def notificar_clientes_estoque_disponivel(
         tokens=push_tokens,
         title="📦 Produto disponível!",
         body=f"{product_name or 'Produto'} voltou ao estoque. Corre antes que acabe!",
-        data={"product_id": product_id, "type": "stock_available"},
+        data=product_payload,
     )
     if push_tokens:
         logger.info(

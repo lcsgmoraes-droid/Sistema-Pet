@@ -227,6 +227,12 @@ def enviar_push_pendencia(
         )
         from app.services.order_push_notifications import send_expo_push
 
+        targets = load_customer_push_targets(
+            db,
+            tenant_id=tenant_id,
+            customer_id=getattr(cliente, "id", None),
+        )
+        target_user_id = _primeiro_user_id_targets_push(targets)
         app_notification = None
         try:
             app_notification = criar_notificacao_estoque_app(
@@ -235,6 +241,7 @@ def enviar_push_pendencia(
                 cliente=cliente,
                 produto=produto,
                 pendencia=pendencia,
+                user_id_override=target_user_id,
             )
         except Exception:
             logger.exception(
@@ -244,11 +251,6 @@ def enviar_push_pendencia(
                 getattr(produto, "id", None),
             )
 
-        targets = load_customer_push_targets(
-            db,
-            tenant_id=tenant_id,
-            customer_id=getattr(cliente, "id", None),
-        )
         if not targets:
             logger.warning(
                 "[LISTA-ESPERA-PDV] Cliente sem dispositivo push tenant_id=%s cliente_id=%s produto_id=%s",
@@ -299,6 +301,14 @@ def enviar_push_pendencia(
     except Exception:
         logger.exception("Erro ao enviar push de pendencia")
         return False
+
+
+def _primeiro_user_id_targets_push(targets) -> int | None:
+    for target in targets or []:
+        user_id = getattr(getattr(target, "device", None), "user_id", None)
+        if user_id:
+            return int(user_id)
+    return None
 
 
 def enviar_whatsapp_pendencia(

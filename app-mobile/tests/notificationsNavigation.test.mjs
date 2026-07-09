@@ -53,6 +53,13 @@ test("extrai produto da notificacao de estoque por produto_id ou product_id", ()
     }),
     1715,
   );
+  assert.equal(
+    stockNotificationToProductId({
+      type: "stock_available",
+      product_id: "2291",
+    }),
+    2291,
+  );
   assert.equal(stockNotificationToProductId({ source: "order" }), null);
   assert.equal(
     stockNotificationToProductId({

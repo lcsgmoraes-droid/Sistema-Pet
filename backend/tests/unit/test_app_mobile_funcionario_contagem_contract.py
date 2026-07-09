@@ -86,6 +86,7 @@ def test_employee_count_can_apply_saved_count_to_stock_once():
     assert "Produto.estoque_atual" not in apply_block
     assert "produto.estoque_atual = estoque_novo" in apply_block
     assert "sincronizar_bling_background" in apply_block
+    assert "verificar_e_notificar_pendencias" in apply_block
 
 
 def test_employee_count_allows_optional_supplier_search():

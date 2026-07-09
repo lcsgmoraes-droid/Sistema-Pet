@@ -55,6 +55,7 @@ def test_employee_stock_balance_uses_final_count_difference():
     assert 'motivo="balanco"' in block or "motivo='balanco'" in block
     assert "App funcionario - balanco por camera" in block
     assert "sem_alteracao" in block
+    assert "verificar_e_notificar_pendencias" in block
 
 
 def test_mobile_app_routes_employee_users_to_balance_screen():

@@ -96,10 +96,13 @@ def criar_notificacao_estoque_app(
     cliente,
     produto,
     pendencia=None,
+    user_id_override: int | None = None,
 ) -> AppNotification | None:
     produto_id = getattr(produto, "id", None)
     pendencia_id = getattr(pendencia, "id", None)
-    user_id = resolve_customer_app_user_id(db, tenant_id=tenant_id, cliente=cliente)
+    user_id = user_id_override or resolve_customer_app_user_id(
+        db, tenant_id=tenant_id, cliente=cliente
+    )
     payload = {
         "source": "stock_waitlist",
         "kind": "stock_available",

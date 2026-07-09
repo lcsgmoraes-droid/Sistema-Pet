@@ -229,6 +229,72 @@ def test_verificar_e_notificar_pendencias_notifica_cliente_do_pdv_no_app_mobile(
     assert db.committed is True
 
 
+def test_enviar_push_pendencia_grava_central_para_usuario_do_dispositivo(
+    monkeypatch,
+):
+    created_user_ids = []
+    push_results = []
+    fake_notification = SimpleNamespace(id=101)
+
+    def fake_criar_notificacao_estoque_app(
+        db,
+        *,
+        tenant_id,
+        cliente,
+        produto,
+        pendencia=None,
+        user_id_override=None,
+    ):
+        created_user_ids.append(user_id_override)
+        return fake_notification
+
+    def fake_registrar_resultado_push_notificacao_app(notification, **kwargs):
+        push_results.append((notification, kwargs))
+
+    monkeypatch.setattr(
+        "app.services.app_notifications.criar_notificacao_estoque_app",
+        fake_criar_notificacao_estoque_app,
+    )
+    monkeypatch.setattr(
+        "app.services.app_notifications.registrar_resultado_push_notificacao_app",
+        fake_registrar_resultado_push_notificacao_app,
+    )
+    monkeypatch.setattr(
+        "app.services.push_devices.load_customer_push_targets",
+        lambda *args, **kwargs: [
+            SimpleNamespace(
+                token="ExponentPushToken[phone-a]",
+                device=SimpleNamespace(user_id=999),
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        "app.services.push_devices.mark_push_target_result",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.services.order_push_notifications.send_expo_push",
+        lambda *args, **kwargs: (True, "ticket-stock-2", None),
+    )
+
+    sent = pendencia_estoque_service.enviar_push_pendencia(
+        db=SimpleNamespace(),
+        tenant_id=TENANT_ID,
+        cliente=SimpleNamespace(id=77, user_id=5, email="cliente@app.com"),
+        produto=SimpleNamespace(id=10, nome="Racao Teste"),
+        pendencia=SimpleNamespace(id=51),
+    )
+
+    assert sent is True
+    assert created_user_ids == [999]
+    assert push_results == [
+        (
+            fake_notification,
+            {"sent": True, "ticket_id": "ticket-stock-2", "error": None},
+        )
+    ]
+
+
 def test_marcar_pendencia_finalizada_syncs_and_filters_by_explicit_tenant(monkeypatch):
     events = []
     pendencia = SimpleNamespace(

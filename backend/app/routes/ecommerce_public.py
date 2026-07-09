@@ -93,6 +93,57 @@ def _serialize_catalog_categories(rows) -> list[dict]:
     return categorias
 
 
+def _serialize_catalog_product(
+    produto: Produto,
+    canal_normalizado: str,
+    oferta=None,
+) -> dict:
+    pricing = resolver_preco_publico_produto(
+        produto,
+        canal_normalizado,
+        validity_offer=oferta,
+    )
+    return {
+        "id": produto.id,
+        "nome": produto.nome,
+        "codigo": produto.codigo,
+        "codigo_barras": produto.codigo_barras,
+        "preco_venda": pricing.regular_price,
+        "preco_promocional": pricing.promotional_price,
+        "promocao_ativa": pricing.promotion_active,
+        "promocao_origem": pricing.promotion_origin,
+        "promocao_validade": _serializar_promocao_validade(
+            oferta,
+            pricing.promotion_origin,
+        ),
+        "categoria_id": produto.categoria_id,
+        "categoria_nome": getattr(produto.categoria, "nome", None),
+        "marca_nome": getattr(produto.marca, "nome", None)
+        if hasattr(produto, "marca")
+        else None,
+        "estoque_ecommerce": produto.estoque_atual,
+        "estoque_atual": produto.estoque_atual,
+        "imagem_principal": produto.imagem_principal,
+        "imagens": [
+            {
+                "id": imagem.id,
+                "url": imagem.url,
+                "ordem": imagem.ordem,
+                "e_principal": imagem.e_principal,
+            }
+            for imagem in sorted(
+                produto.imagens or [],
+                key=lambda item: (item.ordem or 0, item.id or 0),
+            )
+        ],
+        "descricao": produto.descricao_curta or produto.descricao_completa,
+        "peso_embalagem": produto.peso_embalagem,
+        "classificacao_racao": produto.classificacao_racao,
+        "categoria_racao": produto.categoria_racao,
+        "unidade": produto.unidade or "UN",
+    }
+
+
 def _normalize_tenant_uuid(raw_tenant_id: str | None) -> str | None:
     if not raw_tenant_id:
         return None
@@ -351,6 +402,51 @@ def listar_filtros_produtos_publicos(
     }
 
 
+@router.get("/products/{produto_id}")
+def obter_produto_publico_por_id(
+    produto_id: int,
+    tenant_ref: tuple[str, str] = Depends(_resolve_tenant_ref),
+    canal: str | None = Query(default=None),
+    x_canal_venda: str | None = Header(default=None, alias="X-Canal-Venda"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_session),
+):
+    tenant = _get_active_tenant(db, tenant_ref)
+    canal_resolvido = canal or x_canal_venda
+    if not canal_resolvido and authorization:
+        canal_resolvido = "app"
+    canal_normalizado = _normalize_sales_channel(canal_resolvido)
+
+    query = (
+        db.query(Produto)
+        .options(
+            joinedload(Produto.categoria),
+            joinedload(Produto.marca),
+            selectinload(Produto.imagens),
+        )
+        .filter(
+            Produto.tenant_id == tenant.id,
+            Produto.id == produto_id,
+            Produto.ativo.is_(True),
+            Produto.situacao.is_not(False),
+            Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+        )
+    )
+    if canal_normalizado == "app":
+        query = query.filter(Produto.anunciar_app.is_(True))
+    else:
+        query = query.filter(Produto.anunciar_ecommerce.is_(True))
+
+    produto = query.first()
+    if not produto:
+        raise HTTPException(status_code=404, detail="Produto nao encontrado.")
+
+    oferta = mapear_ofertas_validade_por_produto(db, [produto], canal_normalizado).get(
+        produto.id
+    )
+    return _serialize_catalog_product(produto, canal_normalizado, oferta)
+
+
 @router.get("/produtos")
 def listar_produtos_publicos(
     tenant_ref: tuple[str, str] = Depends(_resolve_tenant_ref),
@@ -507,52 +603,9 @@ def listar_produtos_publicos(
         "limit": limit,
         "categorias": categorias,
         "items": [
-            (
-                lambda pricing, oferta: {
-                    "id": produto.id,
-                    "nome": produto.nome,
-                    "codigo": produto.codigo,
-                    "codigo_barras": produto.codigo_barras,
-                    "preco_venda": pricing.regular_price,
-                    "preco_promocional": pricing.promotional_price,
-                    "promocao_ativa": pricing.promotion_active,
-                    "promocao_origem": pricing.promotion_origin,
-                    "promocao_validade": _serializar_promocao_validade(
-                        oferta,
-                        pricing.promotion_origin,
-                    ),
-                    "categoria_id": produto.categoria_id,
-                    "categoria_nome": getattr(produto.categoria, "nome", None),
-                    "marca_nome": getattr(produto.marca, "nome", None)
-                    if hasattr(produto, "marca")
-                    else None,
-                    # Mantemos o campo por compatibilidade, mas com o mesmo saldo oficial.
-                    "estoque_ecommerce": produto.estoque_atual,
-                    "estoque_atual": produto.estoque_atual,
-                    "imagem_principal": produto.imagem_principal,
-                    "imagens": [
-                        {
-                            "id": imagem.id,
-                            "url": imagem.url,
-                            "ordem": imagem.ordem,
-                            "e_principal": imagem.e_principal,
-                        }
-                        for imagem in sorted(
-                            produto.imagens or [],
-                            key=lambda item: (item.ordem or 0, item.id or 0),
-                        )
-                    ],
-                    "descricao": produto.descricao_curta or produto.descricao_completa,
-                    "peso_embalagem": produto.peso_embalagem,
-                    "classificacao_racao": produto.classificacao_racao,
-                    "categoria_racao": produto.categoria_racao,
-                }
-            )(
-                resolver_preco_publico_produto(
-                    produto,
-                    canal_normalizado,
-                    validity_offer=ofertas_validade.get(produto.id),
-                ),
+            _serialize_catalog_product(
+                produto,
+                canal_normalizado,
                 ofertas_validade.get(produto.id),
             )
             for produto in itens
