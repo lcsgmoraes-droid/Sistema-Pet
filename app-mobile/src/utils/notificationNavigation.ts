@@ -15,8 +15,11 @@ function toPositiveInteger(value: unknown): number | null {
 
 export function stockNotificationToProductId(data: NotificationData): number | null {
   if (!data) return null;
-  if (data.source !== "stock_waitlist") return null;
-  if (data.kind && data.kind !== "stock_available") return null;
+  const isStockWaitlist =
+    data.source === "stock_waitlist" &&
+    (!data.kind || data.kind === "stock_available");
+  const isLegacyNotifyMe = !data.source && data.type === "stock_available";
+  if (!isStockWaitlist && !isLegacyNotifyMe) return null;
 
   return toPositiveInteger(data.produto_id) ?? toPositiveInteger(data.product_id);
 }

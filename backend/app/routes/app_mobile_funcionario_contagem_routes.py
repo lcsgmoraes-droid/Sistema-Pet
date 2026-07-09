@@ -2,6 +2,7 @@
 
 import base64
 import html
+import logging
 from datetime import datetime
 from io import BytesIO
 from typing import Literal, Optional
@@ -31,6 +32,7 @@ from app.routes.app_mobile_funcionario_pdv_routes import (
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class FuncionarioContagemFornecedorResponse(BaseModel):
@@ -749,6 +751,7 @@ def aplicar_contagem_estoque_funcionario(
 
     resultados = []
     produtos_para_sync = []
+    produtos_para_notificacao = []
     total_movimentacoes = 0
     sem_alteracao = 0
     quantidade_total = 0.0
@@ -809,6 +812,10 @@ def aplicar_contagem_estoque_funcionario(
         db.flush()
         total_movimentacoes += 1
         produtos_para_sync.append((produto.id, estoque_novo))
+        if tipo_movimentacao == "entrada" and estoque_atual <= 0 and estoque_novo > 0:
+            produtos_para_notificacao.append(
+                (produto.id, quantidade_movimentada, item.nome)
+            )
         resultados.append(
             {
                 "produto_id": produto.id,
@@ -824,6 +831,25 @@ def aplicar_contagem_estoque_funcionario(
 
     contagem.status = "entrada_aplicada" if modo == "entrada" else "balanco_aplicado"
     db.commit()
+
+    for produto_id, quantidade_movimentada, produto_nome in produtos_para_notificacao:
+        try:
+            from app.services.pendencia_estoque_service import (
+                verificar_e_notificar_pendencias,
+            )
+
+            verificar_e_notificar_pendencias(
+                db=db,
+                tenant_id=tenant_id,
+                produto_id=produto_id,
+                quantidade_entrada=quantidade_movimentada,
+            )
+        except Exception as exc:
+            logger.warning(
+                "[LISTA-ESPERA-PDV] Erro ao notificar clientes na contagem produto=%s: %s",
+                produto_nome,
+                exc,
+            )
 
     for produto_id, estoque_novo in produtos_para_sync:
         try:

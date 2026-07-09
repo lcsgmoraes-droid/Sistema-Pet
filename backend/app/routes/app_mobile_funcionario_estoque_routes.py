@@ -1,6 +1,7 @@
 """Rotas de estoque operacional do funcionario no app mobile."""
 
 import json
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -22,6 +23,7 @@ from app.routes.app_mobile_funcionario_pdv_routes import (
 from app.routes.ecommerce_auth import _get_current_ecommerce_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class FuncionarioProdutoEstoqueResponse(BaseModel):
@@ -356,6 +358,24 @@ def registrar_balanco_funcionario_estoque(
     db.commit()
     db.refresh(movimentacao)
     db.refresh(produto)
+
+    if tipo_movimentacao == "entrada" and estoque_atual <= 0 and saldo_final > 0:
+        try:
+            from app.services.pendencia_estoque_service import (
+                verificar_e_notificar_pendencias,
+            )
+
+            verificar_e_notificar_pendencias(
+                db=db,
+                tenant_id=tenant_id,
+                produto_id=produto.id,
+                quantidade_entrada=quantidade_movimentada,
+            )
+        except Exception as exc:
+            logger.warning(
+                "[LISTA-ESPERA-PDV] Erro ao notificar clientes no balanco: %s",
+                exc,
+            )
 
     try:
         sincronizar_bling_background(produto.id, saldo_final, "balanco_app_funcionario")
