@@ -1,5 +1,10 @@
 type NotificationData = Record<string, unknown> | null | undefined;
 
+type NavigationTarget = {
+  route: string;
+  params?: Record<string, unknown>;
+};
+
 function toPositiveInteger(value: unknown): number | null {
   if (typeof value === "number") {
     return Number.isInteger(value) && value > 0 ? value : null;
@@ -22,4 +27,18 @@ export function stockNotificationToProductId(data: NotificationData): number | n
   if (!isStockWaitlist && !isLegacyNotifyMe) return null;
 
   return toPositiveInteger(data.produto_id) ?? toPositiveInteger(data.product_id);
+}
+
+export function appointmentNotificationTarget(data: NotificationData): NavigationTarget | null {
+  if (!data || data.source !== "appointment_reminder") return null;
+
+  const module = String(data.module || "");
+  const kind = String(data.kind || "");
+  if (module === "banho_tosa" || kind === "banho_tosa_agendamento") {
+    return { route: "Pets", params: { screen: "BanhoTosa" } };
+  }
+  if (module === "veterinario" || kind === "veterinario_agendamento") {
+    return { route: "Pets", params: { screen: "Veterinario" } };
+  }
+  return null;
 }

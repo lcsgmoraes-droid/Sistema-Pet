@@ -5,7 +5,10 @@ import * as Notifications from "expo-notifications";
 import { useEffect, useRef } from "react";
 import { navigateWhenReady } from "../navigation/navigationRef";
 import { ensurePushNotificationsRegistered } from "../services/pushNotifications.service";
-import { stockNotificationToProductId } from "../utils/notificationNavigation";
+import {
+  appointmentNotificationTarget,
+  stockNotificationToProductId,
+} from "../utils/notificationNavigation";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -54,6 +57,11 @@ export function usePushNotifications(isAuthenticated: boolean) {
       }
       if (data.source === "order") {
         navigateWhenReady("Pedidos");
+        return;
+      }
+      const appointmentTarget = appointmentNotificationTarget(data);
+      if (appointmentTarget) {
+        navigateWhenReady(appointmentTarget.route, appointmentTarget.params);
         return;
       }
       if (data.source !== "app-vet") return;

@@ -17,6 +17,7 @@ from sqlalchemy import (
     DECIMAL,
     Numeric,
     Index,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
@@ -24,6 +25,22 @@ from sqlalchemy.orm import relationship
 
 from app.base_models import BaseTenantModel
 from app.db import Base
+
+
+class VeterinarioLembreteConfiguracao(BaseTenantModel):
+    """Configuracao de lembretes de agendamento veterinario para o app do cliente."""
+
+    __tablename__ = "vet_lembrete_configuracoes"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", name="uq_vet_lembrete_config_tenant"),
+        Index("ix_vet_lembrete_config_tenant_ativo", "tenant_id", "ativo"),
+    )
+
+    lembretes_agendamento_ativos = Column(Boolean, nullable=False, default=True)
+    lembrete_agendamento_1d_ativo = Column(Boolean, nullable=False, default=True)
+    lembrete_agendamento_horas_ativo = Column(Boolean, nullable=False, default=True)
+    lembrete_agendamento_horas_antes = Column(Integer, nullable=False, default=1)
+    ativo = Column(Boolean, nullable=False, default=True)
 
 
 # ==============================================================

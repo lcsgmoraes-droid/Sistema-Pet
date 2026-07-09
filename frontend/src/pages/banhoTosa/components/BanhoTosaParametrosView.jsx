@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { CalendarDays, Clock3, Plus, Settings, Smartphone, X } from "lucide-react";
+import { Bell, CalendarDays, Clock3, Plus, Settings, Smartphone, X } from "lucide-react";
 import ActionButton from "../../../components/ui/ActionButton";
 import { CheckboxField, TextField } from "../../../components/ui/FormField";
 import LoadingState from "../../../components/ui/LoadingState";
@@ -44,6 +44,10 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
       horas_produtivas_mes_padrao: String(config.horas_produtivas_mes_padrao ?? "176"),
       mostrar_calendario_cliente: Boolean(config.mostrar_calendario_cliente),
       whatsapp_agendamento: config.whatsapp_agendamento || "",
+      lembretes_agendamento_ativos: config.lembretes_agendamento_ativos ?? true,
+      lembrete_agendamento_1d_ativo: config.lembrete_agendamento_1d_ativo ?? true,
+      lembrete_agendamento_horas_ativo: config.lembrete_agendamento_horas_ativo ?? true,
+      lembrete_agendamento_horas_antes: String(config.lembrete_agendamento_horas_antes ?? 1),
     });
   }, [config?.id]);
 
@@ -73,6 +77,12 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
         label: "App do cliente",
         value: configForm.mostrar_calendario_cliente ? "Visivel" : "Oculto",
         detail: configForm.whatsapp_agendamento || "WhatsApp nao informado",
+      },
+      {
+        icon: Bell,
+        label: "Lembretes",
+        value: configForm.lembretes_agendamento_ativos ? "Ativos" : "Pausados",
+        detail: resumoLembretes(configForm),
       },
     ];
   }, [configForm]);
@@ -128,6 +138,10 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
         horas_produtivas_mes_padrao: toApiDecimal(configForm.horas_produtivas_mes_padrao, "176"),
         mostrar_calendario_cliente: Boolean(configForm.mostrar_calendario_cliente),
         whatsapp_agendamento: configForm.whatsapp_agendamento || null,
+        lembretes_agendamento_ativos: Boolean(configForm.lembretes_agendamento_ativos),
+        lembrete_agendamento_1d_ativo: Boolean(configForm.lembrete_agendamento_1d_ativo),
+        lembrete_agendamento_horas_ativo: Boolean(configForm.lembrete_agendamento_horas_ativo),
+        lembrete_agendamento_horas_antes: Number(configForm.lembrete_agendamento_horas_antes || 1),
       });
       toast.success("Parametros salvos.");
       setConfigOpen(false);
@@ -278,6 +292,42 @@ export default function BanhoTosaParametrosView({ config, parametros, onChanged 
                   )}
                   onChange={(value) => updateConfig("whatsapp_agendamento", value)}
                   value={configForm.whatsapp_agendamento}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Lembretes no app</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Disparos automaticos para agendamentos marcados.
+                  </p>
+                </div>
+                <CheckboxField
+                  checked={Boolean(configForm.lembretes_agendamento_ativos)}
+                  label="Enviar lembretes"
+                  onChange={(value) => updateConfig("lembretes_agendamento_ativos", value)}
+                />
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-[auto_auto_140px]">
+                <CheckboxField
+                  checked={Boolean(configForm.lembrete_agendamento_1d_ativo)}
+                  label="1 dia antes"
+                  onChange={(value) => updateConfig("lembrete_agendamento_1d_ativo", value)}
+                />
+                <CheckboxField
+                  checked={Boolean(configForm.lembrete_agendamento_horas_ativo)}
+                  label="No dia"
+                  onChange={(value) => updateConfig("lembrete_agendamento_horas_ativo", value)}
+                />
+                <TextField
+                  label="Horas antes"
+                  min="1"
+                  max="168"
+                  onChange={(value) => updateConfig("lembrete_agendamento_horas_antes", value)}
+                  type="number"
+                  value={configForm.lembrete_agendamento_horas_antes}
                 />
               </div>
             </div>
@@ -436,4 +486,14 @@ function ResumoItem({ detail, icon: Icon, label, value }) {
 
 function tooltip(text) {
   return <BanhoTosaHelpTooltip text={text} />;
+}
+
+function resumoLembretes(configForm) {
+  if (!configForm.lembretes_agendamento_ativos) return "Envio pausado";
+  const partes = [];
+  if (configForm.lembrete_agendamento_1d_ativo) partes.push("1 dia antes");
+  if (configForm.lembrete_agendamento_horas_ativo) {
+    partes.push(`${configForm.lembrete_agendamento_horas_antes || 1}h antes`);
+  }
+  return partes.join(" + ") || "Sem disparos";
 }

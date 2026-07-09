@@ -1,6 +1,7 @@
 import ConfiguracoesAlertas from "./configuracoes/ConfiguracoesAlertas";
 import ConfiguracoesHeader from "./configuracoes/ConfiguracoesHeader";
 import ConsultoriosSection from "./configuracoes/ConsultoriosSection";
+import LembretesAgendamentoSection from "./configuracoes/LembretesAgendamentoSection";
 import ParceiroInfoBox from "./configuracoes/ParceiroInfoBox";
 import ParceirosSection from "./configuracoes/ParceirosSection";
 import { useVetConfiguracoes } from "./configuracoes/useVetConfiguracoes";
@@ -16,6 +17,7 @@ export default function VetConfiguracoes() {
     consultorioForm,
     consultorios,
     erro,
+    lembretesForm,
     mostrarForm,
     mostrarFormConsultorio,
     parceiroForm,
@@ -28,10 +30,12 @@ export default function VetConfiguracoes() {
     setErro,
     setMostrarForm,
     setMostrarFormConsultorio,
+    salvarLembretes,
     sucesso,
     tenantsVet,
     toggleAtivoConsultorio,
     toggleAtivoParceiro,
+    atualizarLembretesForm,
   } = useVetConfiguracoes();
 
   if (carregando) {
@@ -47,6 +51,13 @@ export default function VetConfiguracoes() {
       <ConfiguracoesHeader onReload={carregar} />
 
       <ConfiguracoesAlertas erro={erro} sucesso={sucesso} onLimparErro={() => setErro(null)} />
+
+      <LembretesAgendamentoSection
+        form={lembretesForm}
+        onChangeForm={atualizarLembretesForm}
+        onSave={salvarLembretes}
+        salvando={salvando}
+      />
 
       <ParceirosSection
         form={parceiroForm}

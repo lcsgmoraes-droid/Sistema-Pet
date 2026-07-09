@@ -8,9 +8,7 @@ from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 
-from app.services.push_devices import load_user_push_targets
-
-from .models import AuditLog, Cliente, Pet, User
+from .models import AuditLog, Cliente, Pet
 from .veterinario_core import _all_accessible_tenant_ids, _vet_now
 from .veterinario_exames_ia import _meses_desde
 from .veterinario_models import (
@@ -384,95 +382,58 @@ def _upsert_lembretes_push_agendamento(
     if not ag.data_hora or not ag.cliente_id:
         return
 
-    if ag.status in {"cancelado", "faltou"}:
-        return
-
-    from app.campaigns.models import (
-        NotificationChannelEnum,
-        NotificationQueue,
-        NotificationStatusEnum,
+    from app.services.appointment_reminders import (
+        build_reminder_jobs,
+        config_from_model,
+        enqueue_reminder_jobs,
+        replace_pending_reminder_jobs,
+    )
+    from app.veterinario_lembrete_configuracoes import (
+        obter_ou_criar_configuracao_lembretes_vet,
     )
 
     cliente = (
         db.query(Cliente)
         .filter(
             Cliente.id == ag.cliente_id,
-            Cliente.tenant_id == str(tenant_id),
+            Cliente.tenant_id == tenant_id,
         )
         .first()
     )
-    if not cliente or not cliente.user_id:
-        return
-
-    user_tutor = (
-        db.query(User)
-        .filter(
-            User.id == cliente.user_id,
-            User.tenant_id == str(tenant_id),
-        )
-        .first()
-    )
-    if not user_tutor:
-        return
-
-    push_targets = load_user_push_targets(
-        db,
-        tenant_id=str(tenant_id),
-        user_id=user_tutor.id,
-        legacy_push_token=getattr(user_tutor, "push_token", None),
-    )
-    if not push_targets:
+    if not cliente:
         return
 
     prefixo = f"vet-agendamento:{ag.id}:"
+    replace_pending_reminder_jobs(db, tenant_id=tenant_id, idempotency_prefix=prefixo)
 
-    db.query(NotificationQueue).filter(
-        NotificationQueue.idempotency_key.like(f"{prefixo}%"),
-        NotificationQueue.status == NotificationStatusEnum.pending,
-    ).delete(synchronize_session=False)
+    if ag.status in {"cancelado", "faltou", "finalizado"}:
+        return
 
-    agora = (
-        datetime.now(ag.data_hora.tzinfo)
-        if getattr(ag.data_hora, "tzinfo", None)
-        else datetime.now()
+    pet_nome = getattr(getattr(ag, "pet", None), "nome", None)
+    config = obter_ou_criar_configuracao_lembretes_vet(db, tenant_id)
+    jobs = build_reminder_jobs(
+        config=config_from_model(config),
+        tenant_id=tenant_id,
+        customer_id=cliente.id,
+        appointment_id=ag.id,
+        starts_at=ag.data_hora,
+        module="veterinario",
+        kind="veterinario_agendamento",
+        pet_id=ag.pet_id,
+        pet_name=pet_nome,
+        title="Lembrete de consulta veterinaria",
+        body_for_hours=lambda horas: _mensagem_lembrete_vet(ag, pet_nome, horas),
+        idempotency_prefix=prefixo,
     )
-    lembretes = [
-        (
-            24,
-            "Lembrete de consulta veterinária",
-            f"Olá! A consulta do pet está marcada para amanhã às {ag.data_hora.strftime('%H:%M')}.",
-        ),
-        (
-            1,
-            "Lembrete de consulta veterinária",
-            f"A consulta do pet começa em 1 hora ({ag.data_hora.strftime('%H:%M')}).",
-        ),
-    ]
+    enqueue_reminder_jobs(db, jobs)
+    return
 
-    for horas, assunto, mensagem in lembretes:
-        envio_em = ag.data_hora - timedelta(hours=horas)
-        if envio_em <= agora:
-            continue
 
-        idempotencia = f"{prefixo}{horas}h:{ag.data_hora.isoformat()}"
-        existe = (
-            db.query(NotificationQueue.id)
-            .filter(NotificationQueue.idempotency_key == idempotencia)
-            .first()
-        )
-        if existe:
-            continue
-
-        db.add(
-            NotificationQueue(
-                tenant_id=tenant_id,
-                idempotency_key=idempotencia,
-                customer_id=cliente.id,
-                channel=NotificationChannelEnum.push,
-                subject=assunto,
-                body=mensagem,
-                push_token=getattr(user_tutor, "push_token", None)
-                or push_targets[0].token,
-                scheduled_at=envio_em,
-            )
-        )
+def _mensagem_lembrete_vet(ag: AgendamentoVet, pet_nome: str | None, horas: int) -> str:
+    pet_label = pet_nome or "Seu pet"
+    horario = ag.data_hora.strftime("%H:%M")
+    if horas >= 24:
+        return f"{pet_label} tem consulta veterinaria amanha as {horario}."
+    if horas == 1:
+        return f"{pet_label} tem consulta veterinaria em 1 hora ({horario})."
+    return f"{pet_label} tem consulta veterinaria em {horas} horas ({horario})."
