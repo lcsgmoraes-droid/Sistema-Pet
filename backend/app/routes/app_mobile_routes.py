@@ -437,6 +437,8 @@ def registrar_push_token(
             "motivo": "Migration pendente: coluna push_token não existe.",
         }
 
+    _activate_user_tenant_context(current_user)
+
     token = payload.token.strip()
     if not token:
         raise HTTPException(status_code=400, detail="Token de push obrigatorio.")

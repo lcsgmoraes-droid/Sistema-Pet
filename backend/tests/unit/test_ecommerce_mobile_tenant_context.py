@@ -46,6 +46,42 @@ from app.security.module_access import require_active_module
 from app.tenancy.context import clear_current_tenant, get_current_tenant
 
 
+class _TenantGuardedQuery:
+    def filter(self, *_args, **_kwargs):
+        if get_current_tenant() is None:
+            raise RuntimeError("missing tenant context")
+        return self
+
+    def order_by(self, *_args, **_kwargs):
+        return self
+
+    def first(self):
+        return None
+
+    def all(self):
+        return []
+
+
+class _TenantGuardedDb:
+    def __init__(self):
+        self.added = []
+        self.committed = False
+
+    def query(self, *_args, **_kwargs):
+        if get_current_tenant() is None:
+            raise RuntimeError("missing tenant context")
+        return _TenantGuardedQuery()
+
+    def add(self, item):
+        self.added.append(item)
+
+    def commit(self):
+        self.committed = True
+
+    def refresh(self, item):
+        item.id = 123
+
+
 class _Query:
     def __init__(self, result):
         self.result = result
@@ -346,6 +382,38 @@ def test_get_or_create_cliente_for_user_sets_tenant_context_before_query():
     result = _get_or_create_cliente_for_user(_Db([cliente], []), user)
 
     assert result is cliente
+    assert get_current_tenant() == tenant_id
+
+
+def test_registrar_push_token_sets_tenant_context_before_device_queries():
+    tenant_id = uuid4()
+    user = SimpleNamespace(
+        id=123,
+        tenant_id=tenant_id,
+        push_token=None,
+    )
+    payload = app_mobile_routes.PushTokenPayload(
+        token="ExponentPushToken[cliente-app]",
+        platform="android",
+        device_name="Lucas Phone",
+    )
+    db = _TenantGuardedDb()
+    clear_current_tenant()
+
+    result = app_mobile_routes.registrar_push_token(
+        payload=payload,
+        current_user=user,
+        db=db,
+    )
+
+    assert result == {
+        "status": "ok",
+        "device_id": 123,
+        "token_preview": "ExponentPushToken[...",
+    }
+    assert user.push_token == "ExponentPushToken[cliente-app]"
+    assert db.added
+    assert db.committed is True
     assert get_current_tenant() == tenant_id
 
 
