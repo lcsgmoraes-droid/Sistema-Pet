@@ -15,6 +15,7 @@ from app.auth import get_current_user_and_tenant
 from app.pendencia_estoque_models import PendenciaEstoque
 from app.models import Cliente
 from app.produtos_models import Produto
+from app.services.pendencia_estoque_service import STATUS_ATIVOS_LISTA_ESPERA
 
 router = APIRouter(prefix="/pendencias-estoque", tags=["Pendências de Estoque"])
 
@@ -75,7 +76,7 @@ def criar_pendencia(
                 PendenciaEstoque.tenant_id == tenant,
                 PendenciaEstoque.cliente_id == pendencia.cliente_id,
                 PendenciaEstoque.produto_id == pendencia.produto_id,
-                PendenciaEstoque.status == "pendente",
+                PendenciaEstoque.status.in_(STATUS_ATIVOS_LISTA_ESPERA),
             )
         )
         .first()
@@ -186,7 +187,7 @@ def listar_pendencias_cliente(
     )
 
     if apenas_ativas:
-        query = query.filter(PendenciaEstoque.status.in_(["pendente", "notificado"]))
+        query = query.filter(PendenciaEstoque.status.in_(STATUS_ATIVOS_LISTA_ESPERA))
 
     pendencias = query.order_by(desc(PendenciaEstoque.data_registro)).all()
 
@@ -215,7 +216,7 @@ def listar_pendencias_produto(
             and_(
                 PendenciaEstoque.tenant_id == tenant,
                 PendenciaEstoque.produto_id == produto_id,
-                PendenciaEstoque.status == "pendente",
+                PendenciaEstoque.status.in_(STATUS_ATIVOS_LISTA_ESPERA),
             )
         )
         .order_by(desc(PendenciaEstoque.prioridade), PendenciaEstoque.data_registro)
@@ -373,7 +374,7 @@ def dashboard_pendencias(
         .filter(
             and_(
                 PendenciaEstoque.tenant_id == tenant,
-                PendenciaEstoque.status == "pendente",
+                PendenciaEstoque.status.in_(STATUS_ATIVOS_LISTA_ESPERA),
             )
         )
         .group_by(PendenciaEstoque.produto_id)

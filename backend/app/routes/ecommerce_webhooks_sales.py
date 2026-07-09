@@ -588,6 +588,31 @@ def _integrar_venda_ao_motor(
                 webhook_payload=webhook_payload or {},
             )
 
+            try:
+                from app.services.pendencia_estoque_service import (
+                    finalizar_pendencias_por_venda,
+                )
+
+                resultado_pendencias_estoque = finalizar_pendencias_por_venda(
+                    db=db,
+                    tenant_id=str(pedido.tenant_id),
+                    venda=venda_row,
+                    commit=False,
+                )
+                if resultado_pendencias_estoque.get("finalizadas"):
+                    log.info(
+                        "Lista de espera finalizada por venda online %s: %s pendencia(s)",
+                        venda_row.id,
+                        resultado_pendencias_estoque.get("finalizadas"),
+                    )
+            except Exception as exc:
+                log.error(
+                    "Erro ao finalizar lista de espera da venda online %s: %s",
+                    getattr(venda_row, "id", None),
+                    exc,
+                    exc_info=True,
+                )
+
         _publicar_evento_campanha(
             db, pedido, venda_row, venda_id, cliente_id, canal_origem
         )

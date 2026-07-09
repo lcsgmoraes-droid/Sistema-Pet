@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import React, { useEffect, useState } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Image,
   RefreshControl,
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import HeaderProfileActions from '../components/HeaderProfileActions';
+import { listarNotificacoesApp } from '../services/appNotifications.service';
 import { listarProdutos } from '../services/shop.service';
 import { useAuthStore } from '../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../theme';
@@ -29,6 +30,7 @@ export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   async function carregar() {
     try {
@@ -43,9 +45,24 @@ export default function HomeScreen() {
     carregar();
   }, []);
 
+  const carregarNotificacoesNaoLidas = useCallback(async () => {
+    try {
+      const response = await listarNotificacoesApp();
+      setUnreadNotifications(Math.max(0, Number(response.unread_count ?? 0)));
+    } catch {
+      setUnreadNotifications(0);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void carregarNotificacoesNaoLidas();
+    }, [carregarNotificacoesNaoLidas]),
+  );
+
   async function onRefresh() {
     setRefreshing(true);
-    await carregar();
+    await Promise.all([carregar(), carregarNotificacoesNaoLidas()]);
     setRefreshing(false);
   }
 
@@ -87,6 +104,13 @@ export default function HomeScreen() {
               onPress={() => navigation.navigate('Notificacoes')}
             >
               <Ionicons name="notifications-outline" size={18} color={CORES.primario} />
+              {unreadNotifications > 0 ? (
+                <View style={styles.notificacoesBadge}>
+                  <Text style={styles.notificacoesBadgeText}>
+                    {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                  </Text>
+                </View>
+              ) : null}
             </TouchableOpacity>
           </View>
           <HeaderProfileActions
@@ -446,6 +470,26 @@ const styles = StyleSheet.create({
     backgroundColor: CORES.superficie,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
+  },
+  notificacoesBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: CORES.superficie,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  notificacoesBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '900',
   },
   scannerCardCompacto: {
     marginHorizontal: ESPACO.lg,

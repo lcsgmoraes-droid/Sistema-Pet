@@ -37,6 +37,19 @@ def test_stock_waitlist_push_creates_app_notification_with_product_payload():
     assert '"pendencia_id": getattr(pendencia, "id", None)' in source
 
 
+def test_stock_waitlist_app_notification_allows_new_record_each_stock_cycle():
+    source = (BACKEND_ROOT / "app/services/app_notifications.py").read_text(
+        encoding="utf-8"
+    )
+    stock_function = source[source.index("def criar_notificacao_estoque_app(") :]
+    stock_function = stock_function[
+        : stock_function.index("def registrar_resultado_push_notificacao_app(")
+    ]
+
+    assert "stock_waitlist:{pendencia_id}" not in stock_function
+    assert "idempotency_key=None" in stock_function
+
+
 def test_ecommerce_notify_me_push_uses_product_payload_and_app_notification():
     source = (BACKEND_ROOT / "app/routes/ecommerce_notify_routes.py").read_text(
         encoding="utf-8"

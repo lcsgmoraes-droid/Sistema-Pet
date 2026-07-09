@@ -93,6 +93,38 @@ class _WaitlistDB:
         self.committed = True
 
 
+class _FinalizarCompraQuery:
+    def __init__(self, events, all_result):
+        self._events = events
+        self._all_result = all_result
+
+    def filter(self, *conditions):
+        self._events.append(("filter", conditions))
+        return self
+
+    def all(self):
+        self._events.append("all")
+        return self._all_result
+
+
+class _FinalizarCompraDB:
+    def __init__(self, pendencias):
+        self.events = []
+        self.pendencias = pendencias
+        self.committed = False
+        self.rolled_back = False
+
+    def query(self, model):
+        self.events.append(("query", model.__name__))
+        return _FinalizarCompraQuery(self.events, self.pendencias)
+
+    def commit(self):
+        self.committed = True
+
+    def rollback(self):
+        self.rolled_back = True
+
+
 def _capture_rls_sync(monkeypatch, events):
     def fake_sync_rls_tenant(db, tenant_id):
         events.append(("sync", db, tenant_id))
@@ -229,6 +261,20 @@ def test_verificar_e_notificar_pendencias_notifica_cliente_do_pdv_no_app_mobile(
     assert db.committed is True
 
 
+def test_lista_espera_notificada_continua_ativa_para_novo_ciclo_de_estoque():
+    source = (ROOT / "app" / "services" / "pendencia_estoque_service.py").read_text(
+        encoding="utf-8"
+    )
+    routes_source = (ROOT / "app" / "pendencia_estoque_routes.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "STATUS_ATIVOS_LISTA_ESPERA" in source
+    assert "PendenciaEstoque.status.in_(STATUS_ATIVOS_LISTA_ESPERA)" in source
+    assert "STATUS_ATIVOS_LISTA_ESPERA" in routes_source
+    assert "PendenciaEstoque.status.in_(STATUS_ATIVOS_LISTA_ESPERA)" in routes_source
+
+
 def test_enviar_push_pendencia_grava_central_para_usuario_do_dispositivo(
     monkeypatch,
 ):
@@ -322,6 +368,65 @@ def test_marcar_pendencia_finalizada_syncs_and_filters_by_explicit_tenant(monkey
     assert pendencia.venda_id == 22
     assert pendencia.data_finalizacao is not None
     assert db.committed is True
+
+
+def test_finalizar_pendencias_por_compra_finaliza_pendentes_e_notificadas(
+    monkeypatch,
+):
+    events = []
+    _capture_rls_sync(monkeypatch, events)
+    pendente = SimpleNamespace(
+        id=101,
+        status="pendente",
+        data_finalizacao=None,
+        venda_id=None,
+    )
+    notificada = SimpleNamespace(
+        id=102,
+        status="notificado",
+        data_finalizacao=None,
+        venda_id=None,
+    )
+    db = _FinalizarCompraDB([pendente, notificada])
+
+    result = pendencia_estoque_service.finalizar_pendencias_por_compra(
+        db=db,
+        tenant_id=TENANT_ID,
+        cliente_id=77,
+        produto_ids=[10, 10, None],
+        venda_id=500,
+    )
+
+    filter_event = next(
+        event
+        for event in db.events
+        if isinstance(event, tuple) and event[0] == "filter"
+    )
+    assert result == {"finalizadas": 2, "pendencia_ids": [101, 102]}
+    assert events == [("sync", db, TENANT_ID)]
+    assert _has_tenant_condition(filter_event[1])
+    assert pendente.status == "finalizado"
+    assert notificada.status == "finalizado"
+    assert pendente.venda_id == 500
+    assert notificada.venda_id == 500
+    assert pendente.data_finalizacao is not None
+    assert notificada.data_finalizacao is not None
+    assert db.committed is True
+
+
+def test_vendas_finalizadas_disparam_baixa_da_lista_espera_em_todos_canais():
+    pdv_source = (ROOT / "app" / "vendas" / "finalizacao.py").read_text(
+        encoding="utf-8"
+    )
+    ecommerce_source = (
+        ROOT / "app" / "routes" / "ecommerce_webhooks_sales.py"
+    ).read_text(encoding="utf-8")
+
+    assert "finalizar_pendencias_por_venda" in pdv_source
+    assert 'venda.status == "finalizada"' in pdv_source
+    assert '"pendencias_estoque_finalizadas"' in pdv_source
+    assert "finalizar_pendencias_por_venda" in ecommerce_source
+    assert "commit=False" in ecommerce_source
 
 
 def test_dashboard_product_detail_lookup_uses_explicit_tenant_filter():
