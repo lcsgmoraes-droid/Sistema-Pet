@@ -96,7 +96,39 @@ def load_customer_push_targets(
         logger.warning("[PushDevices] Falha ao consultar cliente do push: %s", exc)
         cliente = None
 
+    if not cliente:
+        return _legacy_target(legacy_push_token)
+
     user_id = getattr(cliente, "user_id", None)
+    cliente_email = _clean_token(getattr(cliente, "email", None)).lower()
+    email_user = None
+    if cliente_email:
+        try:
+            email_user = (
+                db.query(User)
+                .filter(
+                    User.email == cliente_email,
+                    User.tenant_id == tenant_id,
+                )
+                .first()
+            )
+        except Exception as exc:
+            logger.warning(
+                "[PushDevices] Falha ao consultar usuario do push por email: %s",
+                exc,
+            )
+
+    if email_user:
+        targets = load_user_push_targets(
+            db,
+            tenant_id=tenant_id,
+            user_id=getattr(email_user, "id", None),
+            legacy_push_token=legacy_push_token
+            or getattr(email_user, "push_token", None),
+        )
+        if targets:
+            return targets
+
     if not user_id:
         return _legacy_target(legacy_push_token)
 
