@@ -39,6 +39,20 @@ type ResolverLeituraProdutoContagemResultado =
       mensagem: string;
     };
 
+type EmitirVozErroScannerOptions = {
+  tipo: "sucesso" | "erro";
+  vozErroAtiva: boolean;
+  pararFala: () => Promise<unknown> | unknown;
+  falar: (
+    texto: string,
+    options: {
+      language: string;
+      pitch: number;
+      rate: number;
+    },
+  ) => unknown;
+};
+
 export function mensagemErroApi(error: any, fallback: string) {
   const detail = error?.response?.data?.detail;
   if (typeof detail === "string" && detail.trim()) return detail;
@@ -99,6 +113,31 @@ export function incrementarProdutoContagemRapida(
   }
 
   return proximos;
+}
+
+export async function emitirVozErroScanner({
+  tipo,
+  vozErroAtiva,
+  pararFala,
+  falar,
+}: EmitirVozErroScannerOptions) {
+  if (tipo !== "erro" || !vozErroAtiva) return;
+
+  try {
+    await pararFala();
+  } catch {
+    // A tentativa de fala abaixo ainda pode funcionar mesmo se parar a fila falhar.
+  }
+
+  try {
+    falar("erro", {
+      language: "pt-BR",
+      pitch: 1,
+      rate: 1,
+    });
+  } catch {
+    // Feedback visual e vibracao continuam cobrindo aparelhos sem fala disponivel.
+  }
 }
 
 export function resolverLeituraProdutoContagem(

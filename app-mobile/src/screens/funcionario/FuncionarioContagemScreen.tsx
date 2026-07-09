@@ -30,6 +30,7 @@ import {
   FuncionarioContagemScanner,
 } from "./contagem/FuncionarioContagemScanner";
 import {
+  emitirVozErroScanner,
   mensagemErroApi,
   parseNumero,
   resolverLeituraProdutoContagem,
@@ -268,22 +269,16 @@ export default function FuncionarioContagemScreen() {
     }, 2200);
   }
 
-  function emitirFeedbackScanner(tipo: ScannerFeedback["tipo"]) {
+  async function emitirFeedbackScanner(tipo: ScannerFeedback["tipo"]) {
     if (feedbackVibracaoAtiva) {
       Vibration.vibrate(tipo === "sucesso" ? 55 : [0, 90, 60, 130]);
     }
-    if (tipo === "erro" && feedbackVozErroAtiva) {
-      try {
-        Speech.stop();
-        Speech.speak("erro", {
-          language: "pt-BR",
-          pitch: 1,
-          rate: 1,
-        });
-      } catch {
-        // Feedback visual e vibracao continuam cobrindo aparelhos sem fala disponivel.
-      }
-    }
+    await emitirVozErroScanner({
+      tipo,
+      vozErroAtiva: feedbackVozErroAtiva,
+      pararFala: Speech.stop,
+      falar: Speech.speak,
+    });
   }
 
   function reativarScannerDepois() {
@@ -311,7 +306,7 @@ export default function FuncionarioContagemScreen() {
     try {
       const encontrado = await buscarProdutoFuncionarioPorBarcode(codigo);
       if (!encontrado) {
-        emitirFeedbackScanner("erro");
+        await emitirFeedbackScanner("erro");
         mostrarFeedbackScanner({
           tipo: "erro",
           mensagem: `Codigo ${codigo} nao encontrado`,
@@ -323,7 +318,7 @@ export default function FuncionarioContagemScreen() {
         produtoTravado,
       });
       if (leitura.tipo === "bloqueado") {
-        emitirFeedbackScanner("erro");
+        await emitirFeedbackScanner("erro");
         mostrarFeedbackScanner({
           tipo: "erro",
           mensagem: leitura.mensagem,
@@ -332,7 +327,7 @@ export default function FuncionarioContagemScreen() {
       }
       if (leitura.tipo === "manual") {
         selecionarProdutoParaLancamento(leitura.produto);
-        emitirFeedbackScanner("sucesso");
+        await emitirFeedbackScanner("sucesso");
         setScannerAberto(false);
         return;
       }
@@ -344,13 +339,13 @@ export default function FuncionarioContagemScreen() {
       setObservacaoItem("");
       setSugestoes([]);
       setBuscaManual("");
-      emitirFeedbackScanner("sucesso");
+      await emitirFeedbackScanner("sucesso");
       mostrarFeedbackScanner({
         tipo: "sucesso",
         mensagem: `${encontrado.nome} | Qtd ${leitura.quantidadeAtual}`,
       });
     } catch (error: any) {
-      emitirFeedbackScanner("erro");
+      await emitirFeedbackScanner("erro");
       mostrarFeedbackScanner({
         tipo: "erro",
         mensagem: mensagemErroApi(error, "Nao foi possivel buscar o produto."),
