@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -10,20 +11,71 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { buscarProdutoPorId } from '../../services/shop.service';
 import { useCartStore } from '../../store/cart.store';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../../theme';
 import { Produto } from '../../types';
 import { formatarMoeda } from '../../utils/format';
 
 export default function ProductDetailScreen({ route, navigation }: any) {
-  const produto = route.params?.produto as Produto;
+  const produtoParam = route.params?.produto as Produto | undefined;
+  const produtoId = Number(route.params?.produtoId ?? produtoParam?.id ?? 0);
+  const [produto, setProduto] = useState<Produto | undefined>(produtoParam);
+  const [carregandoProduto, setCarregandoProduto] = useState(!produtoParam && !!produtoId);
+  const [erroProduto, setErroProduto] = useState(false);
   const [imagemAberta, setImagemAberta] = useState(false);
   const { adicionar } = useCartStore();
+
+  React.useEffect(() => {
+    let active = true;
+    if (produtoParam) {
+      setProduto(produtoParam);
+      setCarregandoProduto(false);
+      setErroProduto(false);
+      return () => {
+        active = false;
+      };
+    }
+    if (!produtoId) {
+      setCarregandoProduto(false);
+      setErroProduto(true);
+      return () => {
+        active = false;
+      };
+    }
+
+    setCarregandoProduto(true);
+    setErroProduto(false);
+    buscarProdutoPorId(produtoId)
+      .then((produtoEncontrado) => {
+        if (active) setProduto(produtoEncontrado);
+      })
+      .catch(() => {
+        if (active) setErroProduto(true);
+      })
+      .finally(() => {
+        if (active) setCarregandoProduto(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [produtoParam, produtoId]);
+
+  if (carregandoProduto) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color={CORES.primario} size="large" />
+      </View>
+    );
+  }
 
   if (!produto) {
     return (
       <View style={styles.center}>
-        <Text style={styles.emptyText}>Produto nao encontrado.</Text>
+        <Text style={styles.emptyText}>
+          {erroProduto ? 'Produto nao encontrado.' : 'Produto indisponivel.'}
+        </Text>
       </View>
     );
   }
@@ -33,6 +85,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
   const precoOriginal = Number(produto.preco_original ?? produto.preco ?? 0);
 
   async function adicionarProduto() {
+    if (!produto) return;
     try {
       await adicionar(produto, 1);
       Alert.alert('Adicionado', 'Produto enviado para o carrinho.', [

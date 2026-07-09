@@ -222,6 +222,7 @@ def test_verificar_e_notificar_pendencias_notifica_cliente_do_pdv_no_app_mobile(
         "kind": "stock_available",
         "produto_id": 10,
         "product_id": 10,
+        "pendencia_id": 51,
     }
     assert device.last_ticket_id == "ticket-stock-1"
     assert device.last_error is None

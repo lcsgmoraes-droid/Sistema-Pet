@@ -15,7 +15,7 @@ from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from app.db import get_session
-from app.models import Cliente, User, UserPushDevice
+from app.models import AppNotification, Cliente, User, UserPushDevice
 from app.produtos_models import Produto
 from app.routes.ecommerce_auth import (
     _activate_user_tenant_context,
@@ -211,6 +211,25 @@ def _serialize_push_device(device: UserPushDevice) -> dict:
     }
 
 
+def _serialize_app_notification(notification: AppNotification) -> dict:
+    return {
+        "id": notification.id,
+        "title": notification.title,
+        "body": notification.body,
+        "source": notification.source,
+        "kind": notification.kind,
+        "data": notification.payload or {},
+        "read_at": notification.read_at.isoformat() if notification.read_at else None,
+        "created_at": notification.created_at.isoformat()
+        if notification.created_at
+        else None,
+        "delivered_at": notification.delivered_at.isoformat()
+        if notification.delivered_at
+        else None,
+        "is_read": bool(notification.read_at),
+    }
+
+
 def _disable_same_push_token_for_other_users(
     db: Session, current_user: User, token: str
 ) -> None:
@@ -321,6 +340,83 @@ def obter_status_push(
 # ─────────────────────────────────────────
 # PRODUTO POR CÓDIGO DE BARRAS
 # ─────────────────────────────────────────
+
+
+@router.get("/notificacoes")
+def listar_notificacoes_app(
+    limit: int = 50,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    tenant_id = _activate_user_tenant_context(current_user)
+    limit = min(100, max(1, int(limit or 50)))
+
+    base_query = db.query(AppNotification).filter(
+        AppNotification.tenant_id == tenant_id,
+        AppNotification.user_id == current_user.id,
+        AppNotification.cleared_at.is_(None),
+    )
+    items = base_query.order_by(AppNotification.created_at.desc()).limit(limit).all()
+    unread_count = base_query.filter(AppNotification.read_at.is_(None)).count()
+
+    return {
+        "items": [_serialize_app_notification(item) for item in items],
+        "unread_count": unread_count,
+    }
+
+
+@router.post("/notificacoes/{notificacao_id}/lida")
+def marcar_notificacao_app_lida(
+    notificacao_id: int,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    tenant_id = _activate_user_tenant_context(current_user)
+    notification = (
+        db.query(AppNotification)
+        .filter(
+            AppNotification.tenant_id == tenant_id,
+            AppNotification.user_id == current_user.id,
+            AppNotification.id == notificacao_id,
+            AppNotification.cleared_at.is_(None),
+        )
+        .first()
+    )
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notificacao nao encontrada.")
+
+    if notification.read_at is None:
+        notification.read_at = datetime.utcnow()
+        db.commit()
+        db.refresh(notification)
+
+    return _serialize_app_notification(notification)
+
+
+@router.delete("/notificacoes")
+def limpar_notificacoes_app(
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    tenant_id = _activate_user_tenant_context(current_user)
+    now = datetime.utcnow()
+    cleared = (
+        db.query(AppNotification)
+        .filter(
+            AppNotification.tenant_id == tenant_id,
+            AppNotification.user_id == current_user.id,
+            AppNotification.cleared_at.is_(None),
+        )
+        .update(
+            {
+                AppNotification.cleared_at: now,
+                AppNotification.updated_at: now,
+            },
+            synchronize_session=False,
+        )
+    )
+    db.commit()
+    return {"status": "ok", "cleared": cleared}
 
 
 @router.get("/produto-barcode/{barcode}", response_model=ProdutoBarcodeResponse)

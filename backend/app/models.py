@@ -221,6 +221,49 @@ class UserPushDevice(BaseTenantModel):
     user = relationship("User")
 
 
+class AppNotification(BaseTenantModel):
+    """Notificacao persistida para a central do app mobile."""
+
+    __tablename__ = "app_notifications"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "user_id",
+            "idempotency_key",
+            name="uq_app_notifications_tenant_user_idem",
+        ),
+        Index(
+            "ix_app_notifications_tenant_user_visible",
+            "tenant_id",
+            "user_id",
+            "cleared_at",
+            "created_at",
+        ),
+        Index(
+            "ix_app_notifications_tenant_customer",
+            "tenant_id",
+            "customer_id",
+            "created_at",
+        ),
+    )
+
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    customer_id = Column(Integer, nullable=True, index=True)
+    title = Column(String(200), nullable=False)
+    body = Column(Text, nullable=False)
+    source = Column(String(80), nullable=False, index=True)
+    kind = Column(String(80), nullable=False, index=True)
+    payload = Column(JSON, nullable=False, default=dict)
+    idempotency_key = Column(String(300), nullable=True)
+    read_at = Column(DateTime(timezone=True), nullable=True)
+    cleared_at = Column(DateTime(timezone=True), nullable=True)
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+    push_ticket_id = Column(String(120), nullable=True)
+    push_error = Column(Text, nullable=True)
+
+    user = relationship("User")
+
+
 class AuditLog(BaseTenantModel):
     """Log de auditoria (LGPD - rastreabilidade)"""
 

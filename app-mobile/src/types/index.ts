@@ -615,9 +615,14 @@ export type MainTabParamList = {
   Perfil: undefined;
 };
 
+export type HomeStackParamList = {
+  Inicio: undefined;
+  Notificacoes: undefined;
+};
+
 export type LojaStackParamList = {
   Catalogo: undefined;
-  DetalhesProduto: { produto: Produto };
+  DetalhesProduto: { produto?: Produto; produtoId?: number };
   Carrinho: undefined;
   BarcodeScanner: undefined;
   CheckoutSucesso: { pedido: Pedido };
