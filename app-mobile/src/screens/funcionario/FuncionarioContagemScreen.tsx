@@ -30,9 +30,9 @@ import {
   FuncionarioContagemScanner,
 } from "./contagem/FuncionarioContagemScanner";
 import {
-  incrementarProdutoContagemRapida,
   mensagemErroApi,
   parseNumero,
+  resolverLeituraProdutoContagem,
   type ContagemItemLocal,
 } from "./contagem/FuncionarioContagemUtils";
 
@@ -63,6 +63,8 @@ export default function FuncionarioContagemScreen() {
   const [fornecedor, setFornecedor] = useState<FuncionarioContagemFornecedor | null>(null);
   const [mostrarCusto, setMostrarCusto] = useState(false);
   const [mostrarVenda, setMostrarVenda] = useState(false);
+  const [bipagemRapidaAtiva, setBipagemRapidaAtiva] = useState(true);
+  const [produtoTravado, setProdutoTravado] = useState<FuncionarioProdutoEstoque | null>(null);
   const [feedbackVibracaoAtiva, setFeedbackVibracaoAtiva] = useState(true);
   const [feedbackVozErroAtiva, setFeedbackVozErroAtiva] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -167,15 +169,35 @@ export default function FuncionarioContagemScreen() {
     setFornecedor(null);
     setBuscaFornecedor("");
     setFornecedores([]);
+    setProdutoTravado(null);
     setContagemSalva(null);
   }
 
-  function selecionarProduto(item: FuncionarioProdutoEstoque) {
+  function selecionarProdutoParaLancamento(item: FuncionarioProdutoEstoque) {
     setProduto(item);
     setQuantidade("1");
     setObservacaoItem("");
     setSugestoes([]);
     setBuscaManual("");
+  }
+
+  function selecionarProduto(item: FuncionarioProdutoEstoque) {
+    if (produtoTravado && produtoTravado.id !== item.id) {
+      Alert.alert(
+        "Produto travado",
+        `A contagem esta travada em ${produtoTravado.nome}. Destrave para selecionar outro produto.`,
+      );
+      return;
+    }
+    selecionarProdutoParaLancamento(item);
+  }
+
+  function alternarTravaProduto(item: FuncionarioProdutoEstoque) {
+    setProdutoTravado((atual) => (atual?.id === item.id ? null : item));
+  }
+
+  function destravarProduto() {
+    setProdutoTravado(null);
   }
 
   async function carregarRecentes(mostrarErro = true) {
@@ -264,21 +286,6 @@ export default function FuncionarioContagemScreen() {
     }
   }
 
-  function registrarProdutoCapturado(produtoCapturado: FuncionarioProdutoEstoque) {
-    const resultado = incrementarProdutoContagemRapida(itensRef.current, produtoCapturado, {
-      retornarQuantidade: true,
-    });
-    itensRef.current = resultado.itens;
-    setItens(resultado.itens);
-    invalidarContagemSalva();
-    setProduto(null);
-    setQuantidade("1");
-    setObservacaoItem("");
-    setSugestoes([]);
-    setBuscaManual("");
-    return resultado.quantidadeAtual;
-  }
-
   function reativarScannerDepois() {
     if (reativarScannerTimer.current) clearTimeout(reativarScannerTimer.current);
     reativarScannerTimer.current = setTimeout(() => {
@@ -311,11 +318,36 @@ export default function FuncionarioContagemScreen() {
         });
         return;
       }
-      const quantidadeAtual = registrarProdutoCapturado(encontrado);
+      const leitura = resolverLeituraProdutoContagem(itensRef.current, encontrado, {
+        bipagemRapidaAtiva,
+        produtoTravado,
+      });
+      if (leitura.tipo === "bloqueado") {
+        emitirFeedbackScanner("erro");
+        mostrarFeedbackScanner({
+          tipo: "erro",
+          mensagem: leitura.mensagem,
+        });
+        return;
+      }
+      if (leitura.tipo === "manual") {
+        selecionarProdutoParaLancamento(leitura.produto);
+        emitirFeedbackScanner("sucesso");
+        setScannerAberto(false);
+        return;
+      }
+      itensRef.current = leitura.itens;
+      setItens(leitura.itens);
+      invalidarContagemSalva();
+      setProduto(null);
+      setQuantidade("1");
+      setObservacaoItem("");
+      setSugestoes([]);
+      setBuscaManual("");
       emitirFeedbackScanner("sucesso");
       mostrarFeedbackScanner({
         tipo: "sucesso",
-        mensagem: `${encontrado.nome} | Qtd ${quantidadeAtual}`,
+        mensagem: `${encontrado.nome} | Qtd ${leitura.quantidadeAtual}`,
       });
     } catch (error: any) {
       emitirFeedbackScanner("erro");
@@ -578,6 +610,13 @@ export default function FuncionarioContagemScreen() {
         scanAtivo={scanAtivo}
         buscandoProduto={buscandoProduto}
         feedback={feedbackScanner}
+        instrucao={
+          produtoTravado
+            ? `Travado em ${produtoTravado.nome}`
+            : bipagemRapidaAtiva
+              ? "Pronto para bipar e somar"
+              : "Bipe para informar a quantidade"
+        }
         onBarcodeScanned={onBarcodeScanned}
         onClose={fecharScanner}
         onResetScan={reativarScanner}
@@ -619,6 +658,11 @@ export default function FuncionarioContagemScreen() {
       setMostrarCusto={setMostrarCusto}
       mostrarVenda={mostrarVenda}
       setMostrarVenda={setMostrarVenda}
+      bipagemRapidaAtiva={bipagemRapidaAtiva}
+      setBipagemRapidaAtiva={setBipagemRapidaAtiva}
+      produtoTravado={produtoTravado}
+      alternarTravaProduto={alternarTravaProduto}
+      destravarProduto={destravarProduto}
       feedbackVibracaoAtiva={feedbackVibracaoAtiva}
       setFeedbackVibracaoAtiva={setFeedbackVibracaoAtiva}
       feedbackVozErroAtiva={feedbackVozErroAtiva}

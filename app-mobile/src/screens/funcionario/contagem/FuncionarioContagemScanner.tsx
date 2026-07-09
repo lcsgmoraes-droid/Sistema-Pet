@@ -25,6 +25,7 @@ export function FuncionarioContagemScanner({
   scanAtivo,
   buscandoProduto,
   feedback,
+  instrucao,
   onBarcodeScanned,
   onClose,
   onResetScan,
@@ -32,6 +33,7 @@ export function FuncionarioContagemScanner({
   scanAtivo: boolean;
   buscandoProduto: boolean;
   feedback?: { tipo: "sucesso" | "erro"; mensagem: string } | null;
+  instrucao: string;
   onBarcodeScanned: (event: { data: string }) => void | Promise<void>;
   onClose: () => void;
   onResetScan: () => void;
@@ -51,8 +53,8 @@ export function FuncionarioContagemScanner({
             <Ionicons name="close" size={28} color="#fff" />
           </TouchableOpacity>
           <View style={styles.frameScan} />
-          <Text style={styles.scannerTexto}>
-            {buscandoProduto ? "Buscando no ERP..." : "Pronto para bipar"}
+          <Text style={styles.scannerTexto} numberOfLines={2}>
+            {buscandoProduto ? "Buscando no ERP..." : instrucao}
           </Text>
           {feedback ? (
             <View

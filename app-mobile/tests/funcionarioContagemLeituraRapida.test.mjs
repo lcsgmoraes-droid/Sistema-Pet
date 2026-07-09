@@ -33,7 +33,7 @@ function carregarModuloTs(relativo) {
   return module.exports;
 }
 
-const { incrementarProdutoContagemRapida } = carregarModuloTs(
+const { incrementarProdutoContagemRapida, resolverLeituraProdutoContagem } = carregarModuloTs(
   "src/screens/funcionario/contagem/FuncionarioContagemUtils.ts",
 );
 
@@ -83,4 +83,35 @@ test("retorna a quantidade atual do produto capturado", () => {
     retornarQuantidade: true,
   });
   assert.equal(segundaLeitura.quantidadeAtual, 2);
+});
+
+test("seleciona produto sem somar quando bipagem rapida esta desativada", () => {
+  const produtoA = produto(101, "Produto A");
+  const produtoB = produto(202, "Produto B");
+  const itens = incrementarProdutoContagemRapida([], produtoA);
+
+  const resultado = resolverLeituraProdutoContagem(itens, produtoB, {
+    bipagemRapidaAtiva: false,
+    produtoTravado: null,
+  });
+
+  assert.equal(resultado.tipo, "manual");
+  assert.equal(resultado.produto.id, 202);
+  assert.equal(resultado.quantidade, "1");
+  assert.equal(JSON.stringify(resultado.itens), JSON.stringify(itens));
+});
+
+test("bloqueia leitura de outro produto quando produto esta travado", () => {
+  const produtoA = produto(101, "Produto A");
+  const produtoB = produto(202, "Produto B");
+  const itens = incrementarProdutoContagemRapida([], produtoA);
+
+  const resultado = resolverLeituraProdutoContagem(itens, produtoB, {
+    bipagemRapidaAtiva: true,
+    produtoTravado: produtoA,
+  });
+
+  assert.equal(resultado.tipo, "bloqueado");
+  assert.equal(JSON.stringify(resultado.itens), JSON.stringify(itens));
+  assert.match(resultado.mensagem, /Produto A/);
 });

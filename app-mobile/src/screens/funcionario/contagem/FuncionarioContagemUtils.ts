@@ -16,6 +16,29 @@ type IncrementarProdutoContagemRapidaResultado = {
   quantidadeAtual: number;
 };
 
+type ResolverLeituraProdutoContagemOptions = {
+  bipagemRapidaAtiva: boolean;
+  produtoTravado?: FuncionarioProdutoEstoque | null;
+};
+
+type ResolverLeituraProdutoContagemResultado =
+  | {
+      tipo: "rapido";
+      itens: ContagemItemLocal[];
+      quantidadeAtual: number;
+    }
+  | {
+      tipo: "manual";
+      itens: ContagemItemLocal[];
+      produto: FuncionarioProdutoEstoque;
+      quantidade: string;
+    }
+  | {
+      tipo: "bloqueado";
+      itens: ContagemItemLocal[];
+      mensagem: string;
+    };
+
 export function mensagemErroApi(error: any, fallback: string) {
   const detail = error?.response?.data?.detail;
   if (typeof detail === "string" && detail.trim()) return detail;
@@ -76,4 +99,37 @@ export function incrementarProdutoContagemRapida(
   }
 
   return proximos;
+}
+
+export function resolverLeituraProdutoContagem(
+  itens: ContagemItemLocal[],
+  produtoCapturado: FuncionarioProdutoEstoque,
+  options: ResolverLeituraProdutoContagemOptions,
+): ResolverLeituraProdutoContagemResultado {
+  const produtoTravado = options.produtoTravado ?? null;
+  if (produtoTravado && produtoTravado.id !== produtoCapturado.id) {
+    return {
+      tipo: "bloqueado",
+      itens,
+      mensagem: `Produto travado: ${produtoTravado.nome}`,
+    };
+  }
+
+  if (!options.bipagemRapidaAtiva) {
+    return {
+      tipo: "manual",
+      itens,
+      produto: produtoCapturado,
+      quantidade: "1",
+    };
+  }
+
+  const resultado = incrementarProdutoContagemRapida(itens, produtoCapturado, {
+    retornarQuantidade: true,
+  });
+  return {
+    tipo: "rapido",
+    itens: resultado.itens,
+    quantidadeAtual: resultado.quantidadeAtual,
+  };
 }

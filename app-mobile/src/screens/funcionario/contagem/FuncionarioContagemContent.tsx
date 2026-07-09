@@ -58,6 +58,11 @@ export type FuncionarioContagemContentProps = {
   setMostrarCusto: Dispatch<SetStateAction<boolean>>;
   mostrarVenda: boolean;
   setMostrarVenda: Dispatch<SetStateAction<boolean>>;
+  bipagemRapidaAtiva: boolean;
+  setBipagemRapidaAtiva: Dispatch<SetStateAction<boolean>>;
+  produtoTravado: FuncionarioProdutoEstoque | null;
+  alternarTravaProduto: (item: FuncionarioProdutoEstoque) => void;
+  destravarProduto: () => void;
   feedbackVibracaoAtiva: boolean;
   setFeedbackVibracaoAtiva: Dispatch<SetStateAction<boolean>>;
   feedbackVozErroAtiva: boolean;
@@ -109,6 +114,11 @@ export function FuncionarioContagemContent({
   setMostrarCusto,
   mostrarVenda,
   setMostrarVenda,
+  bipagemRapidaAtiva,
+  setBipagemRapidaAtiva,
+  produtoTravado,
+  alternarTravaProduto,
+  destravarProduto,
   feedbackVibracaoAtiva,
   setFeedbackVibracaoAtiva,
   feedbackVozErroAtiva,
@@ -129,6 +139,7 @@ export function FuncionarioContagemContent({
   const contagemJaAplicada =
     contagemSalva?.status === "entrada_aplicada" || contagemSalva?.status === "balanco_aplicado";
   const bloqueiaAcoesEstoque = !itens.length || aplicandoEstoque !== null || salvando || contagemJaAplicada;
+  const produtoSelecionadoTravado = !!produto && produtoTravado?.id === produto.id;
 
   return (
     <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
@@ -207,6 +218,12 @@ export function FuncionarioContagemContent({
 
         <View style={styles.feedbackOpcoes}>
           <CheckboxLinha
+            ativo={bipagemRapidaAtiva}
+            titulo="Bipagem rapida"
+            descricao="Liga para somar 1 a cada leitura. Desliga para informar a quantidade manualmente."
+            onPress={() => setBipagemRapidaAtiva((atual) => !atual)}
+          />
+          <CheckboxLinha
             ativo={feedbackVibracaoAtiva}
             titulo="Vibracao"
             descricao="Feedback curto nas leituras."
@@ -219,6 +236,22 @@ export function FuncionarioContagemContent({
             onPress={() => setFeedbackVozErroAtiva((atual) => !atual)}
           />
         </View>
+
+        {produtoTravado ? (
+          <View style={styles.travaBox}>
+            <Ionicons name="lock-closed-outline" size={18} color="#92400E" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.travaTitulo}>Produto travado</Text>
+              <Text style={styles.travaDescricao} numberOfLines={2}>
+                {produtoTravado.nome}
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.travaBotao} onPress={destravarProduto}>
+              <Ionicons name="lock-open-outline" size={17} color="#fff" />
+              <Text style={styles.travaBotaoTexto}>Destravar</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <View style={styles.buscaLinha}>
           <TextInput
@@ -272,6 +305,25 @@ export function FuncionarioContagemContent({
             </View>
           </View>
 
+          <TouchableOpacity
+            style={[styles.travarProdutoBotao, produtoSelecionadoTravado && styles.travarProdutoBotaoAtivo]}
+            onPress={() => alternarTravaProduto(produto)}
+          >
+            <Ionicons
+              name={produtoSelecionadoTravado ? "lock-closed-outline" : "lock-open-outline"}
+              size={18}
+              color={produtoSelecionadoTravado ? "#92400E" : CORES.primario}
+            />
+            <Text
+              style={[
+                styles.travarProdutoTexto,
+                produtoSelecionadoTravado && styles.travarProdutoTextoAtivo,
+              ]}
+            >
+              {produtoSelecionadoTravado ? "Produto travado" : "Travar este produto"}
+            </Text>
+          </TouchableOpacity>
+
           <Text style={styles.label}>Quantidade contada</Text>
           <TextInput
             value={quantidade}
@@ -316,6 +368,19 @@ export function FuncionarioContagemContent({
                 </Text>
                 {item.observacao ? <Text style={styles.itemObs} numberOfLines={2}>{item.observacao}</Text> : null}
               </View>
+              <TouchableOpacity
+                style={[
+                  styles.botaoTravarItem,
+                  produtoTravado?.id === item.produto.id && styles.botaoTravarItemAtivo,
+                ]}
+                onPress={() => alternarTravaProduto(item.produto)}
+              >
+                <Ionicons
+                  name={produtoTravado?.id === item.produto.id ? "lock-closed-outline" : "lock-open-outline"}
+                  size={18}
+                  color={produtoTravado?.id === item.produto.id ? "#92400E" : CORES.primario}
+                />
+              </TouchableOpacity>
               <TouchableOpacity style={styles.botaoRemover} onPress={() => removerItem(item.id)}>
                 <Ionicons name="trash-outline" size={18} color={CORES.erro} />
               </TouchableOpacity>
