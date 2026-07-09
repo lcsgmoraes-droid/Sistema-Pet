@@ -172,6 +172,10 @@ class PushTokenPayload(BaseModel):
     app_version: Optional[str] = None
 
 
+class PushTokenOptOutPayload(BaseModel):
+    token: Optional[str] = None
+
+
 def _get_cliente_or_404(db: Session, user: User) -> Cliente:
     """Retorna o Cliente ligado a este usuário ecommerce ou lança 404."""
     cliente = _get_or_create_cliente_for_user(db, user)
@@ -228,39 +232,6 @@ def _serialize_app_notification(notification: AppNotification) -> dict:
         else None,
         "is_read": bool(notification.read_at),
     }
-
-
-def _disable_same_push_token_for_other_users(
-    db: Session, current_user: User, token: str
-) -> None:
-    other_devices = (
-        db.query(UserPushDevice)
-        .filter(
-            UserPushDevice.tenant_id == current_user.tenant_id,
-            UserPushDevice.expo_push_token == token,
-            UserPushDevice.user_id != current_user.id,
-            UserPushDevice.enabled.is_(True),
-        )
-        .all()
-    )
-    if not other_devices:
-        return
-
-    other_user_ids = {other_device.user_id for other_device in other_devices}
-    for other_device in other_devices:
-        other_device.enabled = False
-
-    other_users = (
-        db.query(User)
-        .filter(
-            User.tenant_id == current_user.tenant_id,
-            User.id.in_(other_user_ids),
-            User.push_token == token,
-        )
-        .all()
-    )
-    for other_user in other_users:
-        other_user.push_token = None
 
 
 @router.get("/push-status")
@@ -512,6 +483,37 @@ def buscar_produto_barcode(
 # ─────────────────────────────────────────
 
 
+def _disable_same_push_token_for_other_users(
+    db: Session, current_user: User, token: str
+) -> None:
+    other_devices = (
+        db.query(UserPushDevice)
+        .filter(
+            UserPushDevice.tenant_id == current_user.tenant_id,
+            UserPushDevice.expo_push_token == token,
+            UserPushDevice.user_id != current_user.id,
+            UserPushDevice.enabled.is_(True),
+        )
+        .all()
+    )
+    other_user_ids = {other_device.user_id for other_device in other_devices}
+    for other_device in other_devices:
+        other_device.enabled = False
+
+    if other_user_ids:
+        other_users = (
+            db.query(User)
+            .filter(
+                User.tenant_id == current_user.tenant_id,
+                User.id.in_(other_user_ids),
+                User.push_token == token,
+            )
+            .all()
+        )
+        for other_user in other_users:
+            other_user.push_token = None
+
+
 @router.post("/push-token")
 def registrar_push_token(
     payload: PushTokenPayload,
@@ -538,8 +540,8 @@ def registrar_push_token(
     token = payload.token.strip()
     if not token:
         raise HTTPException(status_code=400, detail="Token de push obrigatorio.")
-    current_user.push_token = token
     _disable_same_push_token_for_other_users(db, current_user, token)
+    current_user.push_token = token
 
     device = (
         db.query(UserPushDevice)
@@ -576,6 +578,34 @@ def registrar_push_token(
         "device_id": device.id,
         "token_preview": f"{token[:18]}...",
     }
+
+
+@router.delete("/push-token")
+def desativar_push_token(
+    payload: PushTokenOptOutPayload | None = None,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    """Desativa notificacoes push desta conta quando o usuario recusa apos logout."""
+    _activate_user_tenant_context(current_user)
+
+    token = (
+        getattr(payload, "token", None)
+        or getattr(current_user, "push_token", None)
+        or ""
+    ).strip()
+    query = db.query(UserPushDevice).filter(
+        UserPushDevice.tenant_id == current_user.tenant_id,
+        UserPushDevice.user_id == current_user.id,
+        UserPushDevice.enabled.is_(True),
+    )
+    if token:
+        query = query.filter(UserPushDevice.expo_push_token == token)
+
+    disabled = query.update({UserPushDevice.enabled: False}, synchronize_session=False)
+    current_user.push_token = None
+    db.commit()
+    return {"status": "ok", "disabled": disabled}
 
 
 # ─────────────────────────────────────────

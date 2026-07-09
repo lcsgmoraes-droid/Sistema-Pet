@@ -26,6 +26,10 @@ class BanhoTosaConfiguracaoUpdate(BaseModel):
     fluxo_etapas: Optional[list[str]] = None
     mostrar_calendario_cliente: Optional[bool] = None
     whatsapp_agendamento: Optional[str] = Field(default=None, max_length=30)
+    lembretes_agendamento_ativos: Optional[bool] = None
+    lembrete_agendamento_1d_ativo: Optional[bool] = None
+    lembrete_agendamento_horas_ativo: Optional[bool] = None
+    lembrete_agendamento_horas_antes: Optional[int] = Field(default=None, ge=1, le=168)
     ativo: Optional[bool] = None
 
 
@@ -50,6 +54,10 @@ class BanhoTosaConfiguracaoResponse(BaseModel):
     fluxo_etapas: Optional[list[str]] = None
     mostrar_calendario_cliente: bool = False
     whatsapp_agendamento: Optional[str] = None
+    lembretes_agendamento_ativos: bool = True
+    lembrete_agendamento_1d_ativo: bool = True
+    lembrete_agendamento_horas_ativo: bool = True
+    lembrete_agendamento_horas_antes: int = 1
     ativo: bool
 
     class Config:

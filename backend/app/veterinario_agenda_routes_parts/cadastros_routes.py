@@ -11,14 +11,54 @@ from ..db import get_session
 from ..models import Cliente
 from ..veterinario_core import _get_tenant
 from ..veterinario_models import AgendamentoVet, ConsultorioVet
+from ..veterinario_lembrete_configuracoes import (
+    obter_ou_criar_configuracao_lembretes_vet,
+)
 from ..veterinario_schemas import (
     ConsultorioCreate,
     ConsultorioResponse,
     ConsultorioUpdate,
+    VeterinarioLembreteConfiguracaoResponse,
+    VeterinarioLembreteConfiguracaoUpdate,
     VeterinarioSimples,
 )
 
 router = APIRouter()
+
+
+@router.get(
+    "/configuracoes/lembretes",
+    response_model=VeterinarioLembreteConfiguracaoResponse,
+)
+def obter_configuracao_lembretes_vet(
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    config = obter_ou_criar_configuracao_lembretes_vet(db, tenant_id)
+    db.commit()
+    db.refresh(config)
+    return config
+
+
+@router.patch(
+    "/configuracoes/lembretes",
+    response_model=VeterinarioLembreteConfiguracaoResponse,
+)
+def atualizar_configuracao_lembretes_vet(
+    body: VeterinarioLembreteConfiguracaoUpdate,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    config = obter_ou_criar_configuracao_lembretes_vet(db, tenant_id)
+
+    for campo, valor in body.model_dump(exclude_unset=True).items():
+        setattr(config, campo, valor)
+
+    db.commit()
+    db.refresh(config)
+    return config
 
 
 @router.get("/veterinarios", response_model=List[VeterinarioSimples])

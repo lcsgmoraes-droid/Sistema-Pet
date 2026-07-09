@@ -71,6 +71,31 @@ test("extrai produto da notificacao de estoque por produto_id ou product_id", ()
   );
 });
 
+test("direciona lembretes de agendamento para a area certa do app", () => {
+  const { appointmentNotificationTarget } = carregarModuloTs(
+    "src/utils/notificationNavigation.ts",
+  );
+
+  const banhoTosaTarget = appointmentNotificationTarget({
+    source: "appointment_reminder",
+    kind: "banho_tosa_agendamento",
+    module: "banho_tosa",
+    agendamento_id: "33",
+  });
+  assert.equal(banhoTosaTarget.route, "Pets");
+  assert.equal(banhoTosaTarget.params.screen, "BanhoTosa");
+
+  const vetTarget = appointmentNotificationTarget({
+    source: "appointment_reminder",
+    kind: "veterinario_agendamento",
+    module: "veterinario",
+    appointment_id: 44,
+  });
+  assert.equal(vetTarget.route, "Pets");
+  assert.equal(vetTarget.params.screen, "Veterinario");
+  assert.equal(appointmentNotificationTarget({ source: "order" }), null);
+});
+
 test("central de notificacoes mobile chama endpoints do app", () => {
   const serviceSource = readFileSync(
     path.resolve(__dirname, "../src/services/appNotifications.service.ts"),

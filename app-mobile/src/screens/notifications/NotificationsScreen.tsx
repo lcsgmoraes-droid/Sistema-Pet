@@ -18,7 +18,10 @@ import {
   markNotificationAsRead,
 } from '../../services/appNotifications.service';
 import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
-import { stockNotificationToProductId } from '../../utils/notificationNavigation';
+import {
+  appointmentNotificationTarget,
+  stockNotificationToProductId,
+} from '../../utils/notificationNavigation';
 
 export default function NotificationsScreen({ navigation }: any) {
   const [items, setItems] = useState<AppNotification[]>([]);
@@ -80,6 +83,12 @@ export default function NotificationsScreen({ navigation }: any) {
         screen: 'DetalhesProduto',
         params: { produtoId },
       });
+      return;
+    }
+
+    const appointmentTarget = appointmentNotificationTarget(item.data);
+    if (appointmentTarget) {
+      navigation.navigate(appointmentTarget.route, appointmentTarget.params);
     }
   }
 
@@ -173,7 +182,13 @@ export default function NotificationsScreen({ navigation }: any) {
           >
             <View style={styles.iconBox}>
               <Ionicons
-                name={item.source === 'stock_waitlist' ? 'cube-outline' : 'notifications-outline'}
+                name={
+                  item.source === 'stock_waitlist'
+                    ? 'cube-outline'
+                    : item.source === 'appointment_reminder'
+                      ? 'calendar-outline'
+                      : 'notifications-outline'
+                }
                 size={20}
                 color={CORES.primario}
               />

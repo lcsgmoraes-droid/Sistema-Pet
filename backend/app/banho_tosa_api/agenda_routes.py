@@ -18,6 +18,9 @@ from app.banho_tosa_api.utils import (
     validar_cliente_pet,
 )
 from app.banho_tosa_agenda_capacity import validar_capacidade_agenda
+from app.banho_tosa_agendamento_notificacoes import (
+    sincronizar_lembretes_agendamento_banho_tosa,
+)
 from app.banho_tosa_custos import validar_transicao_status
 from app.banho_tosa_models import (
     BanhoTosaAgendamento,
@@ -185,6 +188,12 @@ def criar_agendamento(
     agendamento.servicos = servicos_snapshot
 
     db.add(agendamento)
+    db.flush()
+    agendamento.pet = pet
+    config = obter_ou_criar_configuracao(db, tenant_id)
+    sincronizar_lembretes_agendamento_banho_tosa(
+        db, tenant_id=tenant_id, agendamento=agendamento, config=config
+    )
     db.commit()
     db.refresh(agendamento)
     agendamento = buscar_agendamento_completo(db, tenant_id, agendamento.id)
@@ -213,6 +222,10 @@ def atualizar_status_agendamento(
     if body.observacoes is not None:
         agendamento.observacoes = body.observacoes
 
+    config = obter_ou_criar_configuracao(db, tenant_id)
+    sincronizar_lembretes_agendamento_banho_tosa(
+        db, tenant_id=tenant_id, agendamento=agendamento, config=config
+    )
     db.commit()
     db.refresh(agendamento)
     return serializar_agendamento(agendamento)

@@ -620,6 +620,9 @@ class NotificationQueue(Base):
     body = Column(Text, nullable=False)
     push_token = Column(String(500), nullable=True)
     email_address = Column(String(300), nullable=True)
+    source = Column(String(80), nullable=True)
+    kind = Column(String(80), nullable=True)
+    payload = Column(JSONB, nullable=True)
     status = Column(
         Enum(NotificationStatusEnum, name="notification_status_enum"),
         nullable=False,

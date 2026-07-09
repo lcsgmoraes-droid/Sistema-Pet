@@ -20,6 +20,7 @@ import ssl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
+from typing import Any
 
 import requests
 
@@ -171,6 +172,60 @@ def _send_push(
     return data_obj.get("id")
 
 
+def _push_data_for_notification(notif) -> dict[str, Any]:
+    payload = getattr(notif, "payload", None)
+    data = dict(payload) if isinstance(payload, dict) else {}
+    data["idempotency_key"] = getattr(notif, "idempotency_key", None)
+    source = getattr(notif, "source", None)
+    kind = getattr(notif, "kind", None)
+    if source:
+        data["source"] = source
+    if kind:
+        data["kind"] = kind
+    return {key: value for key, value in data.items() if value is not None}
+
+
+def _create_app_notification_for_queue(
+    db: Session, notif, *, subject: str, push_data: dict[str, Any]
+):
+    source = getattr(notif, "source", None)
+    kind = getattr(notif, "kind", None)
+    if not source or not kind:
+        return None
+
+    from app.models import Cliente
+    from app.services.app_notifications import (
+        criar_notificacao_app,
+        resolve_customer_app_user_id,
+    )
+
+    cliente = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == notif.customer_id,
+            Cliente.tenant_id == notif.tenant_id,
+        )
+        .first()
+    )
+    user_id = (
+        resolve_customer_app_user_id(db, tenant_id=notif.tenant_id, cliente=cliente)
+        if cliente
+        else None
+    )
+    return criar_notificacao_app(
+        db,
+        tenant_id=notif.tenant_id,
+        user_id=user_id,
+        customer_id=notif.customer_id,
+        title=subject,
+        body=notif.body,
+        source=source,
+        kind=kind,
+        payload=push_data,
+        idempotency_key=notif.idempotency_key,
+    )
+
+
 class NotificationSender:
     """Processa lotes de notificações pendentes da fila."""
 
@@ -288,6 +343,11 @@ class NotificationSender:
         _send_email(notif.email_address, subject, notif.body, campaign_type)
 
     def _dispatch_push(self, db: Session, notif) -> None:
+        subject = notif.subject or "CorePet"
+        push_data = _push_data_for_notification(notif)
+        app_notification = _create_app_notification_for_queue(
+            db, notif, subject=subject, push_data=push_data
+        )
         targets = load_customer_push_targets(
             db,
             tenant_id=notif.tenant_id,
@@ -295,25 +355,44 @@ class NotificationSender:
             legacy_push_token=notif.push_token,
         )
         if not targets:
+            from app.services.app_notifications import (
+                registrar_resultado_push_notificacao_app,
+            )
+
+            registrar_resultado_push_notificacao_app(
+                app_notification, sent=False, error="Notificacao sem push_token"
+            )
             raise ValueError("Notificação sem push_token")
 
-        subject = notif.subject or "CorePet"
         errors: list[str] = []
         sent_count = 0
+        last_ticket_id = None
         for target in targets:
             try:
                 ticket_id = _send_push(
                     push_token=target.token,
                     title=subject,
                     body_text=notif.body,
-                    data={"idempotency_key": notif.idempotency_key},
+                    data=push_data,
                 )
                 mark_push_target_result(target, sent=True, ticket_id=ticket_id)
                 sent_count += 1
+                last_ticket_id = ticket_id or last_ticket_id
             except Exception as exc:
                 error = str(exc)
                 mark_push_target_result(target, sent=False, error=error)
                 errors.append(error)
+
+        from app.services.app_notifications import (
+            registrar_resultado_push_notificacao_app,
+        )
+
+        registrar_resultado_push_notificacao_app(
+            app_notification,
+            sent=sent_count > 0,
+            ticket_id=last_ticket_id,
+            error="; ".join(errors) if errors else None,
+        )
 
         if sent_count == 0:
             raise RuntimeError("; ".join(errors) or "Falha ao enviar push")

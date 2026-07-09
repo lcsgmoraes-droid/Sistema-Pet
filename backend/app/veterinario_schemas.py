@@ -97,6 +97,25 @@ class ConsultorioResponse(BaseModel):
         from_attributes = True
 
 
+class VeterinarioLembreteConfiguracaoUpdate(BaseModel):
+    lembretes_agendamento_ativos: Optional[bool] = None
+    lembrete_agendamento_1d_ativo: Optional[bool] = None
+    lembrete_agendamento_horas_ativo: Optional[bool] = None
+    lembrete_agendamento_horas_antes: Optional[int] = Field(default=None, ge=1, le=168)
+
+
+class VeterinarioLembreteConfiguracaoResponse(BaseModel):
+    id: int
+    lembretes_agendamento_ativos: bool = True
+    lembrete_agendamento_1d_ativo: bool = True
+    lembrete_agendamento_horas_ativo: bool = True
+    lembrete_agendamento_horas_antes: int = 1
+    ativo: bool = True
+
+    class Config:
+        from_attributes = True
+
+
 class ConsultaCreate(BaseModel):
     pet_id: int
     cliente_id: int

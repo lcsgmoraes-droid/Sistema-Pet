@@ -40,6 +40,10 @@ class BanhoTosaConfiguracao(BaseTenantModel):
     fluxo_etapas = Column(JSON, nullable=True)
     mostrar_calendario_cliente = Column(Boolean, nullable=False, default=False)
     whatsapp_agendamento = Column(String(30), nullable=True)
+    lembretes_agendamento_ativos = Column(Boolean, nullable=False, default=True)
+    lembrete_agendamento_1d_ativo = Column(Boolean, nullable=False, default=True)
+    lembrete_agendamento_horas_ativo = Column(Boolean, nullable=False, default=True)
+    lembrete_agendamento_horas_antes = Column(Integer, nullable=False, default=1)
     ativo = Column(Boolean, nullable=False, default=True)
 
 

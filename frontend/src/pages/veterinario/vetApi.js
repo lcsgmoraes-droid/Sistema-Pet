@@ -46,6 +46,8 @@ export const vetApi = {
 
   // Veterinários
   listarVeterinarios: () => api.get(`${BASE}/veterinarios`),
+  obterConfigLembretes: () => api.get(`${BASE}/configuracoes/lembretes`),
+  atualizarConfigLembretes: (data) => api.patch(`${BASE}/configuracoes/lembretes`, data),
   listarConsultorios: (params) => api.get(`${BASE}/consultorios`, { params }),
   criarConsultorio: (data) => api.post(`${BASE}/consultorios`, data),
   atualizarConsultorio: (id, data) => api.patch(`${BASE}/consultorios/${id}`, data),
