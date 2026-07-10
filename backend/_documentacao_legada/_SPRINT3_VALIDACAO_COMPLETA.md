@@ -110,12 +110,12 @@ temperature: 0.7
 auto_response_enabled: true
 working_hours_start: "00:00:00"
 working_hours_end: "23:59:59"
-openai_api_key: "sk-proj-5GJng_..."
+openai_api_key: "coloque_sua_chave_aqui"
 ```
 
 ### .env
 ```bash
-OPENAI_API_KEY=sk-proj-5GJng_ATBFqJFQzwMKQoW-...
+OPENAI_API_KEY=coloque_sua_chave_aqui
 ```
 
 ---

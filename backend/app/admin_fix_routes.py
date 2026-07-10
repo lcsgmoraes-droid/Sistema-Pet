@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.db import get_session
-from app.auth import get_current_user_and_tenant
+from app.auth.dependencies import require_admin_with_tenant_context
 
 router = APIRouter(prefix="/admin/fix", tags=["Admin - Correções"])
 
@@ -14,13 +14,11 @@ router = APIRouter(prefix="/admin/fix", tags=["Admin - Correções"])
 @router.post("/sequences")
 def fix_sequences(
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    _current_user=Depends(require_admin_with_tenant_context),
 ):
     """
     Corrige sequências desincronizadas no PostgreSQL
     """
-    current_user, tenant_id = user_and_tenant
-
     results = {}
     tables_to_fix = ["pets", "clientes", "produtos", "vendas"]
 

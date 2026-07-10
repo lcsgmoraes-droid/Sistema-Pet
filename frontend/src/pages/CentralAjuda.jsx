@@ -89,15 +89,31 @@ const Paragrafo = ({ texto }) => {
 };
 
 /* Card de artigo expansível */
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const renderTextoDestacado = (texto, destaqueTexto) => {
+  const termo = String(destaqueTexto || "").trim();
+  if (!termo) return texto;
+
+  const regex = new RegExp(`(${escapeRegExp(termo)})`, "gi");
+  const termoNormalizado = termo.toLowerCase();
+  return String(texto)
+    .split(regex)
+    .map((parte, i) =>
+      parte.toLowerCase() === termoNormalizado ? (
+        <mark key={`${parte}-${i}`} className="bg-yellow-200 rounded px-0.5">
+          {parte}
+        </mark>
+      ) : (
+        parte
+      ),
+    );
+};
+
 const CardArtigo = ({ artigo, corClasses, destaqueTexto }) => {
   const [aberto, setAberto] = useState(!!destaqueTexto);
 
-  const tituloDestacado = destaqueTexto
-    ? artigo.titulo.replace(
-        new RegExp(`(${destaqueTexto})`, "gi"),
-        '<mark class="bg-yellow-200 rounded px-0.5">$1</mark>',
-      )
-    : artigo.titulo;
+  const tituloDestacado = renderTextoDestacado(artigo.titulo, destaqueTexto);
 
   return (
     <div
@@ -107,10 +123,7 @@ const CardArtigo = ({ artigo, corClasses, destaqueTexto }) => {
         onClick={() => setAberto(!aberto)}
         className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-gray-50 transition-colors"
       >
-        <span
-          className="text-sm font-semibold text-gray-800"
-          dangerouslySetInnerHTML={{ __html: tituloDestacado }}
-        />
+        <span className="text-sm font-semibold text-gray-800">{tituloDestacado}</span>
         <span className="flex-shrink-0">
           {aberto ? (
             <FiChevronUp className="w-4 h-4 text-gray-400" />

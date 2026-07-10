@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { TrendingUp, BarChart3, Package, RefreshCw, Target, ShoppingCart } from "lucide-react";
 import { toast } from "react-hot-toast";
 import api from "../api";
-import { getAccessToken } from "../auth/tokenStorage";
 import DashboardRacoesAnaliseSegmento from "./racoes/DashboardRacoesAnaliseSegmento";
 import DashboardRacoesComparacaoDetalhada from "./racoes/DashboardRacoesComparacaoDetalhada";
 import DashboardRacoesComparacaoMarcas from "./racoes/DashboardRacoesComparacaoMarcas";
@@ -96,10 +95,7 @@ const DashboardAnaliseRacoes = () => {
       setLoading(true);
 
       // 🔍 DEBUG: Verificar token antes da requisição
-      const token = getAccessToken();
       console.log("🔐 [DashboardAnaliseRacoes] Iniciando carregamento de dados", {
-        hasToken: !!token,
-        tokenPreview: token ? `${token.substring(0, 20)}...` : "NO TOKEN",
       });
 
       // Carregar opções de filtros
@@ -116,8 +112,6 @@ const DashboardAnaliseRacoes = () => {
       console.error("❌ [DashboardAnaliseRacoes] Erro ao carregar dados:", {
         message: error.message,
         status: error.response?.status,
-        data: error.response?.data,
-        config: error.config,
       });
 
       if (error.response?.status === 403) {

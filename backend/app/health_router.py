@@ -5,8 +5,9 @@ Fornece endpoints para verificação de saúde da aplicação e métricas
 
 import logging
 import os
+import hmac
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -24,6 +25,32 @@ logger = logging.getLogger(__name__)
 WHATSAPP_ACTIVE_SESSIONS_COUNT_SQL = (
     "SELECT count(*) FROM whatsapp_ia_sessions WHERE status = :status"
 )
+PROTECTED_HEALTH_ENVIRONMENTS = {"production", "prod", "staging"}
+
+
+def _is_protected_health_environment() -> bool:
+    values = {
+        os.getenv("APP_ENV"),
+        os.getenv("ENVIRONMENT"),
+        os.getenv("ENV"),
+    }
+    return any(
+        str(value or "").strip().lower() in PROTECTED_HEALTH_ENVIRONMENTS
+        for value in values
+    )
+
+
+def require_operational_health_access(
+    x_ops_token: str | None = Header(default=None, alias="X-Ops-Token"),
+) -> None:
+    expected_token = os.getenv("OPS_HEALTH_TOKEN", "").strip()
+    provided_token = str(x_ops_token or "").strip()
+
+    if expected_token and hmac.compare_digest(provided_token, expected_token):
+        return
+
+    if expected_token or _is_protected_health_environment():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
 
 
 def _scalar_count(db: Session, sql: str, params: dict | None = None) -> int:
@@ -104,7 +131,7 @@ async def watchdog_health():
         )
 
 
-@router.get("/detailed")
+@router.get("/detailed", dependencies=[Depends(require_operational_health_access)])
 async def detailed_health(db: Session = Depends(get_session)) -> Dict[str, Any]:
     """
     🔍 **Health Check Detalhado**
@@ -256,7 +283,7 @@ async def liveness_check() -> Dict[str, Any]:
     return {"alive": True, "timestamp": datetime.utcnow().isoformat()}
 
 
-@router.get("/metrics")
+@router.get("/metrics", dependencies=[Depends(require_operational_health_access)])
 async def application_metrics(db: Session = Depends(get_session)) -> Dict[str, Any]:
     """
     📊 **Application Metrics**
@@ -313,7 +340,7 @@ async def application_metrics(db: Session = Depends(get_session)) -> Dict[str, A
         )
 
 
-@router.get("/prometheus")
+@router.get("/prometheus", dependencies=[Depends(require_operational_health_access)])
 async def prometheus_metrics(db: Session = Depends(get_session)) -> str:
     """
     🔥 **Prometheus Metrics**
@@ -365,7 +392,7 @@ system_disk_usage_percent {psutil.disk_usage("/").percent}
         )
 
 
-@router.get("/bling-flow")
+@router.get("/bling-flow", dependencies=[Depends(require_operational_health_access)])
 async def bling_flow_health(db: Session = Depends(get_session)) -> Dict[str, Any]:
     resumo = obter_resumo_monitoramento(db)
     return {

@@ -5,12 +5,26 @@ Requer autorização manual via navegador
 
 import requests
 import base64
+import os
 from pathlib import Path
 
-# Suas credenciais (do .env)
-CLIENT_ID = "3e0a1e84306203b3119c9410f73ca4fe4aa9fbea"
-CLIENT_SECRET = "ad8a54353648c3402bd4a069bcc90dade61d9b4db7e9337dde7421bcf3a1"
+# Credenciais devem vir do ambiente/.env, nunca do codigo versionado.
+CLIENT_ID = os.getenv("BLING_CLIENT_ID", "").strip()
+CLIENT_SECRET = os.getenv("BLING_CLIENT_SECRET", "").strip()
 REDIRECT_URI = "http://localhost:8000/auth/bling/callback"
+
+
+def mask_secret(value: str) -> str:
+    if not value:
+        return ""
+    if len(value) <= 10:
+        return "***"
+    return f"{value[:6]}...{value[-4:]}"
+
+
+if not CLIENT_ID or not CLIENT_SECRET:
+    print("BLING_CLIENT_ID e BLING_CLIENT_SECRET precisam estar configurados no ambiente.")
+    exit(1)
 
 print("=" * 60)
 print(" 🔄 RENOVAÇÃO DE TOKENS DO BLING")
@@ -66,8 +80,8 @@ try:
         print()
         print("📦 NOVOS TOKENS:")
         print("-" * 60)
-        print(f"ACCESS_TOKEN: {tokens['access_token']}")
-        print(f"REFRESH_TOKEN: {tokens['refresh_token']}")
+        print(f"ACCESS_TOKEN: {mask_secret(tokens['access_token'])}")
+        print(f"REFRESH_TOKEN: {mask_secret(tokens['refresh_token'])}")
         print(
             f"EXPIRA EM: {tokens['expires_in']} segundos ({tokens['expires_in'] / 3600:.1f} horas)"
         )
