@@ -95,8 +95,7 @@ const DashboardAnaliseRacoes = () => {
       setLoading(true);
 
       // 🔍 DEBUG: Verificar token antes da requisição
-      console.log("🔐 [DashboardAnaliseRacoes] Iniciando carregamento de dados", {
-      });
+      console.log("🔐 [DashboardAnaliseRacoes] Iniciando carregamento de dados", {});
 
       // Carregar opções de filtros
       console.log("📡 [DashboardAnaliseRacoes] Chamando: /racoes/analises/opcoes-filtros");

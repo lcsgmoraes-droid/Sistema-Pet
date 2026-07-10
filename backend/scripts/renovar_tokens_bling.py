@@ -23,7 +23,9 @@ def mask_secret(value: str) -> str:
 
 
 if not CLIENT_ID or not CLIENT_SECRET:
-    print("BLING_CLIENT_ID e BLING_CLIENT_SECRET precisam estar configurados no ambiente.")
+    print(
+        "BLING_CLIENT_ID e BLING_CLIENT_SECRET precisam estar configurados no ambiente."
+    )
     exit(1)
 
 print("=" * 60)
