@@ -17,6 +17,7 @@ def run_auto_execute_drawings(*, db_factory: DbFactory, logger) -> None:
     """Executa automaticamente sorteios com auto_execute=True cuja draw_date já passou."""
     from datetime import datetime, timezone as _tz
     from app.campaigns.models import Drawing, DrawingEntry, DrawingStatusEnum
+    from app.campaigns.app_push import enqueue_campaign_push
     from app.campaigns.notification_service import enqueue_email
     from app.models import Tenant
     import uuid as _uuid
@@ -86,6 +87,29 @@ def run_auto_execute_drawings(*, db_factory: DbFactory, logger) -> None:
                     )
                     .first()
                 )
+                prize_text_push = drawing.prize_description or "o premio"
+                if cliente:
+                    enqueue_campaign_push(
+                        db,
+                        tenant_id=drawing.tenant_id,
+                        customer_id=cliente.id,
+                        title=f"Voce ganhou o sorteio: {drawing.name}",
+                        body=(
+                            f"Parabens, {cliente.nome}! Voce foi sorteado(a) no sorteio "
+                            f"{drawing.name}. Premio: {prize_text_push}."
+                        ),
+                        idempotency_key=f"sorteio:{drawing.id}:ganhador:{cliente.id}:push",
+                        kind="drawing_winner",
+                        payload={
+                            "target": "benefits",
+                            "campaign_type": "drawing",
+                            "drawing_id": drawing.id,
+                            "drawing_name": drawing.name,
+                            "customer_id": cliente.id,
+                            "prize": prize_text_push,
+                        },
+                    )
+
                 if cliente and cliente.email:
                     prize_text = drawing.prize_description or "o prêmio"
                     enqueue_email(

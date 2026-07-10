@@ -111,6 +111,12 @@ def test_campaign_push_notifications_create_app_center_payloads():
     engajamento_source = (
         BACKEND_ROOT / "app/campaigns/engajamento_routes.py"
     ).read_text(encoding="utf-8")
+    sorteios_source = (BACKEND_ROOT / "app/campaigns/sorteios_routes.py").read_text(
+        encoding="utf-8"
+    )
+    scheduler_jobs_source = (
+        BACKEND_ROOT / "app/campaigns/scheduler_jobs.py"
+    ).read_text(encoding="utf-8")
     retorno_source = (
         BACKEND_ROOT / "app/banho_tosa_retornos_notificacoes.py"
     ).read_text(encoding="utf-8")
@@ -138,6 +144,10 @@ def test_campaign_push_notifications_create_app_center_payloads():
     assert '"monthly_highlight"' in engajamento_source
     assert '"ranking_message"' in engajamento_source
     assert '"inactivity"' in engajamento_source
+    assert "enqueue_campaign_push" in sorteios_source
+    assert '"drawing_winner"' in sorteios_source
+    assert "enqueue_campaign_push" in scheduler_jobs_source
+    assert '"drawing_winner"' in scheduler_jobs_source
     assert 'source="campaign" if canal == "app" else None' in retorno_source
     assert '"kind": "banho_tosa_retorno"' in retorno_source
 

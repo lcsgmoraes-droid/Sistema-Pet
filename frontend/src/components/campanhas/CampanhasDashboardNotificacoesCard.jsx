@@ -35,7 +35,7 @@ const NOTIFICACOES_APP = [
   },
   {
     title: "Ranking e premios",
-    detail: "Nivel, lote e cliente destaque",
+    detail: "Nivel, lote, destaque e sorteios",
     icon: Trophy,
     tone: "amber",
   },
