@@ -154,10 +154,17 @@ def _send_push(
         "title": title,
         "body": body_text,
         "sound": "default",
+        "priority": "high",
+        "channelId": "default",
         "data": data or {},
     }
 
-    response = requests.post(EXPO_PUSH_URL, json=payload, timeout=10)
+    response = requests.post(
+        EXPO_PUSH_URL,
+        json=payload,
+        headers={"Content-Type": "application/json"},
+        timeout=10,
+    )
     response.raise_for_status()
     body_json = response.json()
 
