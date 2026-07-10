@@ -441,7 +441,14 @@ export default function EcommerceMVP() {
     return loadCatalogProducts(tenantId);
   }
 
-  function logoutCustomer() {
+  async function logoutCustomer() {
+    try {
+      if (customerToken) {
+        await ecommerceApi.post("/api/ecommerce/auth/logout", null, { headers: authHeaders });
+      }
+    } catch {
+      // Mesmo se o token ja expirou, o logout local deve limpar a sessao do navegador.
+    }
     clearCustomerSession();
     clearCart();
     resetCheckoutStatus();

@@ -2,6 +2,18 @@ import * as SecureStore from 'expo-secure-store';
 import api from './api';
 import { AppProfileType, AuthResponse, EcommerceUser } from '../types';
 
+const ACCESS_TOKEN_KEY = 'auth_token';
+const REFRESH_TOKEN_KEY = 'auth_refresh_token';
+
+async function persistAuthTokens(data: AuthResponse): Promise<void> {
+  if (data.access_token) {
+    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, data.access_token);
+  }
+  if (data.refresh_token) {
+    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, data.refresh_token);
+  }
+}
+
 type EcommerceProfileUpdate = Partial<EcommerceUser> & {
   entrega_nome?: string | null;
   entrega_cep?: string | null;
@@ -15,9 +27,7 @@ type EcommerceProfileUpdate = Partial<EcommerceUser> & {
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
   const { data } = await api.post<AuthResponse>('/ecommerce/auth/login', { email, password });
-  if (data.access_token) {
-    await SecureStore.setItemAsync('auth_token', data.access_token);
-  }
+  await persistAuthTokens(data);
   return data;
 }
 
@@ -42,9 +52,7 @@ export async function register(
   }, {
     headers: { 'X-Client-Channel': 'app' },
   });
-  if (data.access_token) {
-    await SecureStore.setItemAsync('auth_token', data.access_token);
-  }
+  await persistAuthTokens(data);
   return data;
 }
 
@@ -52,14 +60,18 @@ export async function selectProfile(profileType: AppProfileType): Promise<AuthRe
   const { data } = await api.post<AuthResponse>('/ecommerce/auth/select-profile', {
     profile_type: profileType,
   });
-  if (data.access_token) {
-    await SecureStore.setItemAsync('auth_token', data.access_token);
-  }
+  await persistAuthTokens(data);
   return data;
 }
 
 export async function logout(): Promise<void> {
-  await SecureStore.deleteItemAsync('auth_token');
+  try {
+    await api.post('/ecommerce/auth/logout');
+  } catch {
+    // Logout local deve acontecer mesmo se a sessao remota ja expirou.
+  }
+  await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+  await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
 }
 
 export async function getProfile(): Promise<EcommerceUser> {
@@ -94,7 +106,7 @@ export async function resetPassword(
 }
 
 export async function getStoredToken(): Promise<string | null> {
-  return SecureStore.getItemAsync('auth_token');
+  return SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
 }
 
 export interface PushDeviceMetadata {

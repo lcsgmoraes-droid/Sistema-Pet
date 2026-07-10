@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import ecommerceApi from "../../services/ecommerceApi";
 import {
   STORAGE_TOKEN_KEY,
+  STORAGE_REFRESH_TOKEN_KEY,
   buildCustomerProfileForm,
   extractApiErrorMessage,
   fetchAddressByCep,
@@ -275,6 +276,7 @@ export default function useEcommerceCustomer({
     setCustomer(null);
     setCustomerToken("");
     localStorage.removeItem(STORAGE_TOKEN_KEY);
+    localStorage.removeItem(STORAGE_REFRESH_TOKEN_KEY);
   }
 
   function clearRegisterFieldError(field) {
@@ -321,11 +323,15 @@ export default function useEcommerceCustomer({
     }
 
     const token = response?.data?.access_token;
+    const refreshToken = response?.data?.refresh_token;
     if (!token) throw new Error("Token n\u00e3o retornado");
     if (response?.data?.user) {
       setCustomer(response.data.user);
     }
     localStorage.setItem(STORAGE_TOKEN_KEY, token);
+    if (refreshToken) {
+      localStorage.setItem(STORAGE_REFRESH_TOKEN_KEY, refreshToken);
+    }
     setCustomerToken(token);
     await syncGuestCartToServer(token);
     clearRegisterUiState();
@@ -642,11 +648,15 @@ export default function useEcommerceCustomer({
         headers: tenantHeaders,
       });
       const token = response?.data?.access_token;
+      const refreshToken = response?.data?.refresh_token;
       if (!token) throw new Error("Token n\u00e3o retornado");
       if (response?.data?.user) {
         setCustomer(response.data.user);
       }
       localStorage.setItem(STORAGE_TOKEN_KEY, token);
+      if (refreshToken) {
+        localStorage.setItem(STORAGE_REFRESH_TOKEN_KEY, refreshToken);
+      }
       setCustomerToken(token);
       await syncGuestCartToServer(token);
       setLoginForm(EMPTY_LOGIN_FORM);

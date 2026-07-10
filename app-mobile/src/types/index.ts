@@ -4,7 +4,9 @@
 
 export interface AuthTokens {
   access_token?: string | null;
+  refresh_token?: string | null;
   token_type: string;
+  expires_in?: number | null;
 }
 
 export interface AuthResponse extends AuthTokens {

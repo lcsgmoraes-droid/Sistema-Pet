@@ -1,6 +1,7 @@
 import { formatMoneyBRL } from "../../utils/formatters.js";
 
 export const STORAGE_TOKEN_KEY = "ecommerce_customer_token";
+export const STORAGE_REFRESH_TOKEN_KEY = "ecommerce_customer_refresh_token";
 export const STORAGE_ORDERS_KEY = "ecommerce_customer_orders";
 export const STORAGE_ADDRESS_KEY = "ecommerce_customer_address";
 export const STORAGE_GUEST_CART_KEY = "ecommerce_guest_cart";

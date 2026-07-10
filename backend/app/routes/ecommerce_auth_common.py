@@ -3,6 +3,11 @@ from uuid import UUID
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from app.auth import create_access_token, create_refresh_token
+from app.auth.core import (
+    ACCESS_TOKEN_EXPIRE_DAYS,
+    ACCESS_TOKEN_EXPIRE_SECONDS,
+)
 from app.security.jwt_compat import JWTError, jwt
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -11,12 +16,19 @@ from app.auth.core import ALGORITHM
 from app.config import JWT_SECRET_KEY
 from app.db import get_session
 from app.models import Role, Tenant, User, UserTenant
+from app.services.auth_security import get_request_ip
 from app.services.app_access_profile_service import normalize_profile_type
+from app.session_manager import (
+    create_session,
+    get_session_by_jti,
+    validate_session,
+)
 from app.tenancy.context import set_current_tenant
 from app.tenancy.rls import sync_rls_auth_user
 
 
 security = HTTPBearer()
+ECOMMERCE_TOKEN_TYPE = "ecommerce_customer"
 
 
 def _normalize_tenant_uuid(raw_tenant_id: str | None) -> UUID | None:
@@ -94,6 +106,79 @@ def _tenant_status_is_active(status_value: object) -> bool:
     return str(status_value or "").strip().lower() in {"active", "ativo"}
 
 
+def _session_expiry_utc(db_session) -> datetime:
+    expires_at = db_session.expires_at
+    if expires_at.tzinfo is None:
+        return expires_at.replace(tzinfo=timezone.utc)
+    return expires_at
+
+
+def _create_ecommerce_token_pair(
+    *,
+    user: User,
+    token_jti: str,
+    expires_at: datetime,
+    tenant_id: str,
+    active_profile: str | None = None,
+) -> tuple[str, str]:
+    token_data = {
+        "sub": str(user.id),
+        "email": user.email,
+        "jti": token_jti,
+        "token_type": ECOMMERCE_TOKEN_TYPE,
+    }
+    if active_profile:
+        token_data["active_profile"] = active_profile
+
+    access_token = create_access_token(
+        data=token_data,
+        tenant_id=str(tenant_id),
+        role="customer",
+    )
+    refresh_token = create_refresh_token(
+        data=token_data,
+        expires_at=expires_at,
+        tenant_id=str(tenant_id),
+        role="customer",
+    )
+    return access_token, refresh_token
+
+
+def _ecommerce_auth_payload(access_token: str, refresh_token: str) -> dict:
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_SECONDS,
+    }
+
+
+def _create_ecommerce_session_tokens(
+    *,
+    db: Session,
+    user: User,
+    request: Request,
+    tenant_id: str,
+    active_profile: str | None = None,
+) -> dict:
+    db_session = create_session(
+        db=db,
+        user_id=user.id,
+        ip_address=get_request_ip(request),
+        user_agent=request.headers.get("user-agent"),
+        expires_in_days=ACCESS_TOKEN_EXPIRE_DAYS,
+        tenant_id=str(tenant_id),
+    )
+    access_token, refresh_token = _create_ecommerce_token_pair(
+        user=user,
+        token_jti=db_session.token_jti,
+        expires_at=_session_expiry_utc(db_session),
+        tenant_id=str(tenant_id),
+        active_profile=active_profile,
+    )
+    return _ecommerce_auth_payload(access_token, refresh_token)
+
+
 def _get_current_ecommerce_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_session),
@@ -110,13 +195,21 @@ def _get_current_ecommerce_user(
         )
         user_id = int(payload.get("sub"))
         token_type = payload.get("token_type")
+        token_jti = payload.get("jti")
         tenant_id = _normalize_tenant_uuid(payload.get("tenant_id"))
-        if token_type != "ecommerce_customer":
+        if token_type != ECOMMERCE_TOKEN_TYPE:
             raise credentials_exception
-        if not tenant_id:
+        if not tenant_id or not token_jti:
             raise credentials_exception
     except (JWTError, TypeError, ValueError):
         raise credentials_exception
+
+    if not validate_session(db, token_jti):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sessao expirada ou revogada",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     set_current_tenant(tenant_id)
     sync_rls_auth_user(db, user_id)
@@ -125,6 +218,14 @@ def _get_current_ecommerce_user(
         db.query(User).filter(User.id == user_id, User.tenant_id == tenant_id).first()
     )
     if not user or not user.is_active:
+        raise credentials_exception
+
+    db_session = get_session_by_jti(db, token_jti)
+    if (
+        not db_session
+        or db_session.user_id != user.id
+        or (db_session.tenant_id and str(db_session.tenant_id) != str(tenant_id))
+    ):
         raise credentials_exception
 
     user_tenant = (

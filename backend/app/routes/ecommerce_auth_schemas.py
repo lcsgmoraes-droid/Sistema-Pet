@@ -25,6 +25,10 @@ class EcommerceLoginRequest(BaseModel):
     password: str
 
 
+class EcommerceRefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
 class EcommerceForgotPasswordRequest(BaseModel):
     email: EmailStr
     canal: str | None = None

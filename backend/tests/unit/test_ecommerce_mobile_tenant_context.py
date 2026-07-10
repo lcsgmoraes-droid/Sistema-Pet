@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -175,15 +176,26 @@ class _UnorderedFirstDb:
         return _UnorderedFirstQuery(self.unordered_first, self.ordered_results)
 
 
-def _token(user_id: int, tenant_id) -> str:
+def _token(user_id: int, tenant_id, jti: str = "test-ecommerce-jti") -> str:
     return jwt.encode(
         {
             "sub": str(user_id),
             "tenant_id": str(tenant_id),
             "token_type": "ecommerce_customer",
+            "jti": jti,
         },
         JWT_SECRET_KEY,
         algorithm=ALGORITHM,
+    )
+
+
+def _session(user_id: int, tenant_id, jti: str = "test-ecommerce-jti"):
+    return SimpleNamespace(
+        user_id=user_id,
+        tenant_id=tenant_id,
+        token_jti=jti,
+        revoked=False,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=1),
     )
 
 
@@ -206,7 +218,14 @@ def test_get_current_ecommerce_user_sets_tenant_context_from_token():
     clear_current_tenant()
 
     current_user = _get_current_ecommerce_user(
-        credentials=credentials, db=_Db(user, user_tenant, tenant)
+        credentials=credentials,
+        db=_Db(
+            _session(user.id, tenant_id),
+            user,
+            _session(user.id, tenant_id),
+            user_tenant,
+            tenant,
+        ),
     )
 
     assert current_user is user
@@ -801,7 +820,14 @@ def test_delivery_actor_ecommerce_token_sets_tenant_context():
 
     actor = _validate_ecommerce_entregador_actor(
         credentials=credentials,
-        db=_Db(user, user_tenant, tenant, cliente),
+        db=_Db(
+            _session(user.id, tenant_id),
+            user,
+            _session(user.id, tenant_id),
+            user_tenant,
+            tenant,
+            cliente,
+        ),
     )
 
     assert actor.user is user

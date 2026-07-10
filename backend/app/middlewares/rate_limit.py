@@ -45,6 +45,9 @@ AUTH_ROUTES = [
     "/ecommerce/auth/login",
     "/ecommerce/auth/esqueci-senha",
     "/ecommerce/auth/resetar-senha",
+    "/ecommerce/auth/refresh",
+    "/ecommerce/auth/logout",
+    "/ecommerce/auth/select-profile",
 ]
 
 # Rotas de API (limite menos restritivo)
@@ -143,6 +146,17 @@ class RateLimitStore:
 rate_limit_store = RateLimitStore()
 
 
+def _extract_client_ip(request: Request) -> str:
+    for header_name in ("cf-connecting-ip", "x-real-ip", "x-forwarded-for"):
+        value = request.headers.get(header_name)
+        if not value:
+            continue
+        candidate = value.split(",", 1)[0].strip()
+        if candidate:
+            return candidate
+    return request.client.host if request.client else "unknown"
+
+
 # ============================================================================
 # MIDDLEWARE DE RATE LIMIT
 # ============================================================================
@@ -185,7 +199,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Extrair IP do cliente
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = _extract_client_ip(request)
 
         # Verificar limite
         is_allowed, remaining = rate_limit_store.check_limit(

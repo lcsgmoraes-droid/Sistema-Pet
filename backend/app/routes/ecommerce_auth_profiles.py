@@ -1,9 +1,11 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from app.auth import create_access_token
+from app.auth.core import ALGORITHM
+from app.config import JWT_SECRET_KEY
 from app.db import get_session
 from app.models import Cliente, User
 from app.routes.ecommerce_auth_cliente import (
@@ -18,7 +20,11 @@ from app.routes.ecommerce_auth_cliente import (
 )
 from app.routes.ecommerce_auth_common import (
     _activate_user_tenant_context,
+    _create_ecommerce_token_pair,
+    _ecommerce_auth_payload,
     _get_current_ecommerce_user,
+    _session_expiry_utc,
+    security,
 )
 from app.routes.ecommerce_auth_schemas import (
     EcommerceProfileUpdateRequest,
@@ -30,6 +36,8 @@ from app.services.app_access_profile_service import (
     normalize_profile_type,
     resolve_user_app_profiles,
 )
+from app.security.jwt_compat import JWTError, jwt
+from app.session_manager import get_session_by_jti
 
 
 router = APIRouter()
@@ -154,6 +162,7 @@ def obter_perfil(
 @router.post("/select-profile")
 def selecionar_perfil_app(
     payload: EcommerceSelectProfileRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     current_user: User = Depends(_get_current_ecommerce_user),
     db: Session = Depends(get_session),
 ):
@@ -175,20 +184,36 @@ def selecionar_perfil_app(
             status_code=status.HTTP_403_FORBIDDEN, detail="Perfil de app nao liberado"
         )
 
-    access_token = create_access_token(
-        data={
-            "sub": str(current_user.id),
-            "email": current_user.email,
-            "token_type": "ecommerce_customer",
-            "active_profile": profile_type,
-        },
+    try:
+        token_payload = jwt.decode(
+            credentials.credentials, JWT_SECRET_KEY, algorithms=[ALGORITHM]
+        )
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalido",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token_jti = token_payload.get("jti")
+    db_session = get_session_by_jti(db, token_jti) if token_jti else None
+    if not db_session or db_session.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sessao invalida. Faca login novamente.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    access_token, refresh_token = _create_ecommerce_token_pair(
+        user=current_user,
+        token_jti=token_jti,
+        expires_at=_session_expiry_utc(db_session),
         tenant_id=str(current_user.tenant_id),
-        role="customer",
+        active_profile=profile_type,
     )
 
     return {
-        "access_token": access_token,
-        "token_type": "bearer",
+        **_ecommerce_auth_payload(access_token, refresh_token),
         "user": _serialize_profile(
             current_user, cliente, db, selected_profile=profile_type
         ),
