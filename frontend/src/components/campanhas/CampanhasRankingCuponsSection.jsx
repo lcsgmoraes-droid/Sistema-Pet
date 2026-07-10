@@ -50,7 +50,7 @@ export default function CampanhasRankingCuponsSection({
 
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b bg-gray-50 flex items-center justify-between flex-wrap gap-2">
-          <h2 className="font-semibold text-gray-800">Cupons gerados</h2>
+          <h2 className="font-semibold text-gray-800">Cupons e brindes gerados</h2>
           <div className="flex gap-2 flex-wrap">
             {CUPOM_STATUS_OPTIONS.map((statusFiltro) => (
               <button

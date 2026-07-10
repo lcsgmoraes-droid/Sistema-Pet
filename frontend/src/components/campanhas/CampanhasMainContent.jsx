@@ -6,6 +6,7 @@ import CampanhasRetencaoTab from "./CampanhasRetencaoTab";
 import CampanhasDestaqueTab from "./CampanhasDestaqueTab";
 import CampanhasSorteiosTab from "./CampanhasSorteiosTab";
 import CampanhasRankingTab from "./CampanhasRankingTab";
+import CampanhasCuponsTab from "./CampanhasCuponsTab";
 import CampanhasRelatoriosTab from "./CampanhasRelatoriosTab";
 import CampanhasUnificacaoTab from "./CampanhasUnificacaoTab";
 import CampanhasGestorTab from "./CampanhasGestorTab";
@@ -198,6 +199,31 @@ export default function CampanhasMainContent({
           rankingConfigLoading={rankingConfigLoading}
           salvarRankingConfig={configuracoes.salvarRankingConfig}
           rankingConfigSalvando={configuracoes.rankingConfigSalvando}
+          campanhas={campanhas}
+          filtroCupomBusca={filtroCupomBusca}
+          setFiltroCupomBusca={setFiltroCupomBusca}
+          filtroCupomDataInicio={filtroCupomDataInicio}
+          setFiltroCupomDataInicio={setFiltroCupomDataInicio}
+          filtroCupomDataFim={filtroCupomDataFim}
+          setFiltroCupomDataFim={setFiltroCupomDataFim}
+          filtroCupomCampanha={filtroCupomCampanha}
+          setFiltroCupomCampanha={setFiltroCupomCampanha}
+          carregarCupons={carregarCupons}
+          filtroCupomStatus={filtroCupomStatus}
+          setFiltroCupomStatus={setFiltroCupomStatus}
+          loadingCupons={loadingCupons}
+          cupons={listaCupons}
+          cupomStatus={CUPOM_STATUS}
+          cupomDetalhes={cupomDetalhes}
+          setCupomDetalhes={setCupomDetalhes}
+          anularCupom={cupons.anularCupom}
+          anulando={cupons.anulando}
+          formatarValorCupom={cupons.formatarValorCupom}
+        />
+      )}
+
+      {aba === "cupons" && (
+        <CampanhasCuponsTab
           campanhas={campanhas}
           filtroCupomBusca={filtroCupomBusca}
           setFiltroCupomBusca={setFiltroCupomBusca}
