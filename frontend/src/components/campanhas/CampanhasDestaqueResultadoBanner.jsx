@@ -17,6 +17,10 @@ export default function CampanhasDestaqueResultadoBanner({ destaqueResultado, on
           Enviar novamente
         </button>
       </div>
+      <p className="mb-3 text-sm text-green-700">
+        {destaqueResultado.push_enfileirados || 0} push/app enfileirado(s) para os clientes com app
+        ativo.
+      </p>
       <ul className="space-y-1.5">
         {(destaqueResultado.resultados || []).map((resultado, index) => (
           <li key={index} className="flex items-center gap-2 text-sm text-gray-700">
@@ -32,6 +36,11 @@ export default function CampanhasDestaqueResultadoBanner({ destaqueResultado, on
               </>
             ) : (
               <span className="text-amber-700">Brinde registrado</span>
+            )}
+            {resultado.push_enfileirado && (
+              <span className="rounded-full bg-cyan-50 px-2 py-0.5 text-xs font-medium text-cyan-700">
+                app
+              </span>
             )}
           </li>
         ))}

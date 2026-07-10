@@ -108,7 +108,10 @@ export default function CampanhasRankingCuponsTable({
   if (cupons.length === 0) {
     return (
       <div className="p-8 text-center text-gray-400">
-        <p>Nenhum cupom encontrado.</p>
+        <p className="font-medium text-gray-500">Nenhum cupom ou brinde encontrado.</p>
+        <p className="mt-1 text-sm">
+          Ajuste os filtros ou gere uma campanha com beneficio para acompanhar por aqui.
+        </p>
       </div>
     );
   }

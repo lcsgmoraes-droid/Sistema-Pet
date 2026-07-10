@@ -17,6 +17,7 @@ def run_auto_execute_drawings(*, db_factory: DbFactory, logger) -> None:
     """Executa automaticamente sorteios com auto_execute=True cuja draw_date já passou."""
     from datetime import datetime, timezone as _tz
     from app.campaigns.models import Drawing, DrawingEntry, DrawingStatusEnum
+    from app.campaigns.drawing_notifications import enqueue_drawing_winner_push
     from app.campaigns.notification_service import enqueue_email
     from app.models import Tenant
     import uuid as _uuid
@@ -86,6 +87,13 @@ def run_auto_execute_drawings(*, db_factory: DbFactory, logger) -> None:
                     )
                     .first()
                 )
+                enqueue_drawing_winner_push(
+                    db,
+                    tenant_id=drawing.tenant_id,
+                    drawing=drawing,
+                    cliente=cliente,
+                )
+
                 if cliente and cliente.email:
                     prize_text = drawing.prize_description or "o prêmio"
                     enqueue_email(

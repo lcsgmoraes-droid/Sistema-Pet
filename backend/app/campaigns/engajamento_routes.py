@@ -4,6 +4,7 @@ Rotas de engajamento das campanhas.
 Sub-router incluido por ``app.campaigns.routes`` sob o prefixo ``/campanhas``.
 """
 
+import hashlib
 from datetime import datetime, date, timezone, timedelta
 from typing import Optional
 
@@ -24,6 +25,7 @@ from app.campaigns.models import (
     CustomerRankHistory,
     RankLevelEnum,
 )
+from app.campaigns.app_push import enqueue_campaign_push
 from app.db import SessionLocal
 from app.utils.logger import logger
 
@@ -287,6 +289,78 @@ class EnviarDestaqueBody(BaseModel):
     mensagem_personalizada: Optional[str] = None
 
 
+def _categoria_destaque_label(categoria: str) -> str:
+    return {
+        "maior_gasto": "maior gasto",
+        "mais_compras": "mais compras",
+    }.get(categoria, categoria.replace("_", " "))
+
+
+def _stable_text_key(value: str) -> str:
+    return hashlib.sha256((value or "").encode("utf-8")).hexdigest()[:16]
+
+
+def _enfileirar_push_destaque(
+    db: Session,
+    *,
+    tenant_id,
+    customer_id: int,
+    categoria: str,
+    period: str,
+    tipo_premio: str,
+    mensagem: str | None = None,
+    coupon=None,
+    retirar_de: str | None = None,
+    retirar_ate: str | None = None,
+) -> bool:
+    from app.models import Cliente
+
+    cliente = (
+        db.query(Cliente)
+        .filter(Cliente.id == customer_id, Cliente.tenant_id == tenant_id)
+        .first()
+    )
+    nome_cliente = getattr(cliente, "nome", None) or "cliente"
+    categoria_label = _categoria_destaque_label(categoria)
+    coupon_code = getattr(coupon, "code", None)
+    title = "Voce ganhou um premio"
+    if tipo_premio == "cupom" and coupon_code:
+        body = (
+            f"Ola, {nome_cliente}! Voce foi destaque em {categoria_label} "
+            f"e ganhou o cupom {coupon_code}."
+        )
+        target = "coupons"
+    else:
+        body = (
+            mensagem
+            or f"Ola, {nome_cliente}! Voce foi destaque em {categoria_label}. "
+            "Passe na loja para retirar seu premio."
+        )
+        target = "benefits"
+
+    return enqueue_campaign_push(
+        db,
+        tenant_id=tenant_id,
+        customer_id=customer_id,
+        title=title,
+        body=body,
+        idempotency_key=f"destaque:{tenant_id}:{period}:{categoria}:{customer_id}:push",
+        kind="monthly_highlight",
+        payload={
+            "target": target,
+            "campaign_type": "monthly_highlight",
+            "customer_id": customer_id,
+            "category": categoria,
+            "period": period,
+            "reward_type": tipo_premio,
+            "coupon_id": getattr(coupon, "id", None),
+            "coupon_code": coupon_code,
+            "retirar_de": retirar_de,
+            "retirar_ate": retirar_ate,
+        },
+    )
+
+
 @router.post("/destaque-mensal/enviar")
 def enviar_destaque_mensal(
     body: EnviarDestaqueBody,
@@ -311,6 +385,7 @@ def enviar_destaque_mensal(
     period = last_month.strftime("%Y-%m")
 
     resultados = []
+    push_enfileirados = 0
 
     for categoria, info in body.vencedores.items():
         customer_id = info.get("customer_id")
@@ -369,6 +444,22 @@ def enviar_destaque_mensal(
                 ja_existia_brinde = False
             else:
                 ja_existia_brinde = True
+                novo_brinde = brinde_existente
+
+            push_ok = _enfileirar_push_destaque(
+                db,
+                tenant_id=tenant_id,
+                customer_id=customer_id,
+                categoria=categoria,
+                period=period,
+                tipo_premio="mensagem",
+                mensagem=mensagem,
+                coupon=novo_brinde,
+                retirar_de=retirar_de,
+                retirar_ate=retirar_ate,
+            )
+            if push_ok:
+                push_enfileirados += 1
 
             resultados.append(
                 {
@@ -379,6 +470,7 @@ def enviar_destaque_mensal(
                     "retirar_de": retirar_de,
                     "retirar_ate": retirar_ate,
                     "ja_existia": ja_existia_brinde,
+                    "push_enfileirado": push_ok,
                 }
             )
             logger.info(
@@ -401,6 +493,18 @@ def enviar_destaque_mensal(
             .first()
         )
         if already:
+            push_ok = _enfileirar_push_destaque(
+                db,
+                tenant_id=tenant_id,
+                customer_id=customer_id,
+                categoria=categoria,
+                period=period,
+                tipo_premio="cupom",
+                mensagem=mensagem,
+                coupon=already,
+            )
+            if push_ok:
+                push_enfileirados += 1
             resultados.append(
                 {
                     "categoria": categoria,
@@ -409,6 +513,7 @@ def enviar_destaque_mensal(
                     "coupon_code": already.code,
                     "coupon_value": float(already.discount_value or 0),
                     "ja_existia": True,
+                    "push_enfileirado": push_ok,
                 }
             )
             continue
@@ -432,6 +537,18 @@ def enviar_destaque_mensal(
                     "mensagem": mensagem,
                 },
             )
+            push_ok = _enfileirar_push_destaque(
+                db,
+                tenant_id=tenant_id,
+                customer_id=customer_id,
+                categoria=categoria,
+                period=period,
+                tipo_premio="cupom",
+                mensagem=mensagem,
+                coupon=coupon,
+            )
+            if push_ok:
+                push_enfileirados += 1
             resultados.append(
                 {
                     "categoria": categoria,
@@ -440,13 +557,19 @@ def enviar_destaque_mensal(
                     "coupon_code": coupon.code,
                     "coupon_value": val_cupom,
                     "ja_existia": False,
+                    "push_enfileirado": push_ok,
                 }
             )
         except Exception as exc:
             logger.warning("[DestaqueEnviar] Erro cliente %s: %s", customer_id, exc)
 
     db.commit()
-    return {"ok": True, "enviados": len(resultados), "resultados": resultados}
+    return {
+        "ok": True,
+        "enviados": len(resultados),
+        "push_enfileirados": push_enfileirados,
+        "resultados": resultados,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -539,7 +662,13 @@ def envio_em_lote(
     registros = q.all()
 
     if not registros:
-        return {"ok": True, "enfileirados": 0, "sem_email": 0, "periodo": periodo}
+        return {
+            "ok": True,
+            "enfileirados": 0,
+            "push_enfileirados": 0,
+            "sem_email": 0,
+            "periodo": periodo,
+        }
 
     customer_ids = [r.customer_id for r in registros]
     clientes = (
@@ -547,38 +676,66 @@ def envio_em_lote(
         .filter(
             Cliente.id.in_(customer_ids),
             Cliente.tenant_id == tenant_id,
-            Cliente.email.isnot(None),
         )
         .all()
     )
     clientes_map = {c.id: c for c in clientes}
 
     enfileirados = 0
+    push_enfileirados = 0
     sem_email = 0
+    assunto_key = _stable_text_key(body.assunto)
     for r in registros:
         cliente = clientes_map.get(r.customer_id)
-        if not cliente or not cliente.email:
+        if not cliente:
             sem_email += 1
             continue
 
         from app.campaigns.notification_service import enqueue_email
 
-        idempotency_key = f"lote:{tenant_id}:{periodo}:{body.nivel}:{r.customer_id}:{hash(body.assunto)}"
-        if enqueue_email(
+        if cliente.email:
+            idempotency_key = (
+                f"lote:{tenant_id}:{periodo}:{body.nivel}:{r.customer_id}:{assunto_key}"
+            )
+            if enqueue_email(
+                db,
+                tenant_id=tenant_id,
+                customer_id=r.customer_id,
+                subject=body.assunto,
+                body=body.mensagem,
+                email_address=cliente.email,
+                idempotency_key=idempotency_key,
+            ):
+                enfileirados += 1
+        else:
+            sem_email += 1
+
+        if enqueue_campaign_push(
             db,
             tenant_id=tenant_id,
             customer_id=r.customer_id,
-            subject=body.assunto,
+            title=body.assunto,
             body=body.mensagem,
-            email_address=cliente.email,
-            idempotency_key=idempotency_key,
+            idempotency_key=(
+                f"ranking_lote:{tenant_id}:{periodo}:{body.nivel}:"
+                f"{r.customer_id}:{assunto_key}:push"
+            ),
+            kind="ranking_message",
+            payload={
+                "target": "benefits",
+                "campaign_type": "ranking_monthly",
+                "customer_id": r.customer_id,
+                "rank": r.rank_level.value,
+                "period": periodo,
+            },
         ):
-            enfileirados += 1
+            push_enfileirados += 1
 
     db.commit()
     return {
         "ok": True,
         "enfileirados": enfileirados,
+        "push_enfileirados": push_enfileirados,
         "sem_email": sem_email,
         "total_clientes": len(registros),
         "periodo": periodo,
@@ -649,40 +806,67 @@ def envio_escalonado_inativos(
 
     inativos_ids = list(todos_ids - ativos_ids)
     if not inativos_ids:
-        return {"ok": True, "enfileirados": 0, "sem_email": 0, "total_inativos": 0}
+        return {
+            "ok": True,
+            "enfileirados": 0,
+            "push_enfileirados": 0,
+            "sem_email": 0,
+            "total_inativos": 0,
+        }
 
     clientes = (
         db.query(Cliente)
         .filter(
             Cliente.id.in_(inativos_ids),
             Cliente.tenant_id == tenant_id,
-            Cliente.email.isnot(None),
         )
         .all()
     )
 
     enfileirados = 0
-    sem_email = len(inativos_ids) - len(clientes)
+    push_enfileirados = 0
+    sem_email = 0
 
     for cliente in clientes:
-        idempotency_key = f"inativos:{tenant_id}:{body.dias_sem_compra}:{cliente.id}:{date.today().isoformat()}"
-        from app.campaigns.notification_service import enqueue_email
+        if cliente.email:
+            idempotency_key = f"inativos:{tenant_id}:{body.dias_sem_compra}:{cliente.id}:{date.today().isoformat()}"
+            from app.campaigns.notification_service import enqueue_email
 
-        if enqueue_email(
+            if enqueue_email(
+                db,
+                tenant_id=tenant_id,
+                customer_id=cliente.id,
+                subject=body.assunto,
+                body=body.mensagem,
+                email_address=cliente.email,
+                idempotency_key=idempotency_key,
+            ):
+                enfileirados += 1
+        else:
+            sem_email += 1
+
+        if enqueue_campaign_push(
             db,
             tenant_id=tenant_id,
             customer_id=cliente.id,
-            subject=body.assunto,
+            title=body.assunto,
             body=body.mensagem,
-            email_address=cliente.email,
-            idempotency_key=idempotency_key,
+            idempotency_key=f"inativos:{tenant_id}:{body.dias_sem_compra}:{cliente.id}:{date.today().isoformat()}:push",
+            kind="inactivity",
+            payload={
+                "target": "benefits",
+                "campaign_type": "inactivity",
+                "customer_id": cliente.id,
+                "inactivity_days": body.dias_sem_compra,
+            },
         ):
-            enfileirados += 1
+            push_enfileirados += 1
 
     db.commit()
     return {
         "ok": True,
         "enfileirados": enfileirados,
+        "push_enfileirados": push_enfileirados,
         "sem_email": sem_email,
         "total_inativos": len(inativos_ids),
         "dias_sem_compra": body.dias_sem_compra,

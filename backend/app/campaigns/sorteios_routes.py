@@ -22,6 +22,7 @@ from app.campaigns.models import (
     DrawingStatusEnum,
     RankLevelEnum,
 )
+from app.campaigns.drawing_notifications import enqueue_drawing_winner_push
 from app.db import SessionLocal
 
 
@@ -367,6 +368,15 @@ def executar_sorteio(
     )
 
     # Enfileirar notificação de parabéns para o ganhador
+    push_enfileirado = enqueue_drawing_winner_push(
+        db,
+        tenant_id=tenant_id,
+        drawing=drawing,
+        cliente=cliente,
+    )
+    if push_enfileirado and not cliente.email:
+        db.commit()
+
     if cliente and cliente.email:
         from app.campaigns.notification_service import enqueue_email
 

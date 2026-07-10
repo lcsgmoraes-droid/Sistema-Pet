@@ -1,6 +1,7 @@
 import CampanhasDashboardAlertasSection from "./CampanhasDashboardAlertasSection";
 import CampanhasDashboardAniversariosCard from "./CampanhasDashboardAniversariosCard";
 import CampanhasDashboardMetricasGrid from "./CampanhasDashboardMetricasGrid";
+import CampanhasDashboardNotificacoesCard from "./CampanhasDashboardNotificacoesCard";
 import CampanhasDashboardProximosEventosSection from "./CampanhasDashboardProximosEventosSection";
 
 export default function CampanhasDashboardTab({
@@ -20,6 +21,7 @@ export default function CampanhasDashboardTab({
   return (
     <div className="space-y-6">
       <CampanhasDashboardMetricasGrid dashboard={dashboard} />
+      <CampanhasDashboardNotificacoesCard />
       <CampanhasDashboardAniversariosCard dashboard={dashboard} />
       <CampanhasDashboardAlertasSection
         dashboard={dashboard}

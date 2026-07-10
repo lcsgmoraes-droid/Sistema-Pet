@@ -11,7 +11,6 @@ import {
   Edit,
 } from "lucide-react";
 import api from "../api";
-import { getAccessToken } from "../auth/tokenStorage";
 import toast from "react-hot-toast";
 import DashboardAnaliseRacoes from "./DashboardAnaliseRacoes";
 import SugestoesInteligentesRacoes from "./SugestoesInteligentesRacoes";
@@ -60,10 +59,7 @@ function AlertasRacao() {
     setLoading(true);
     try {
       // 🔍 DEBUG: Verificar token antes da requisição
-      const token = getAccessToken();
       console.log("🔐 [AlertasRacao] Iniciando carregamento de alertas", {
-        hasToken: !!token,
-        tokenPreview: token ? `${token.substring(0, 20)}...` : "NO TOKEN",
         especieFiltro,
       });
 
@@ -89,8 +85,6 @@ function AlertasRacao() {
       console.error("❌ [AlertasRacao] Erro ao carregar alertas:", {
         message: error.message,
         status: error.response?.status,
-        data: error.response?.data,
-        config: error.config,
       });
 
       if (error.response?.status === 403) {

@@ -15,7 +15,6 @@ export type PushRegistrationStatus =
 export interface PushRegistrationResult {
   status: PushRegistrationStatus;
   message: string;
-  tokenPreview?: string;
   permissionStatus?: Notifications.PermissionStatus | string;
   canAskAgain?: boolean;
 }
@@ -134,13 +133,11 @@ export async function ensurePushNotificationsRegistered(): Promise<PushRegistrat
     return {
       status: "backend_error",
       message: errorMessage(error),
-      tokenPreview: `${tokenData.data.slice(0, 18)}...`,
     };
   }
 
   return {
     status: "registered",
     message: "Notificacoes ativadas.",
-    tokenPreview: `${tokenData.data.slice(0, 18)}...`,
   };
 }

@@ -79,6 +79,39 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+STRICT_RUNTIME_ENVIRONMENTS = {"production", "prod", "staging"}
+
+
+def _runtime_environments() -> set[str]:
+    values = {
+        os.getenv("APP_ENV"),
+        os.getenv("ENVIRONMENT"),
+        os.getenv("ENV"),
+        settings.ENVIRONMENT,
+    }
+    return {value.strip().lower() for value in values if value and value.strip()}
+
+
+def _is_strict_runtime_environment() -> bool:
+    return bool(_runtime_environments() & STRICT_RUNTIME_ENVIRONMENTS)
+
+
+def _validate_security_settings() -> None:
+    if not _is_strict_runtime_environment():
+        return
+
+    jwt_secret = str(settings.JWT_SECRET_KEY or "").strip()
+    if jwt_secret in {"", "CHANGE_ME_IN_ENV"} or len(jwt_secret) < 32:
+        raise RuntimeError(
+            "JWT_SECRET_KEY must be configured with at least 32 characters in production/staging."
+        )
+
+    if settings.DEBUG:
+        raise RuntimeError("DEBUG must be false in production/staging.")
+
+
+_validate_security_settings()
+
 # ====== EXPORTS LEGACY (COMPATIBILIDADE) ======
 
 DATABASE_URL = settings.DATABASE_URL
@@ -128,7 +161,7 @@ ALLOWED_ORIGINS: List[str] = [
 
 # ====== HELPERS ======
 
-STRICT_DATABASE_ENVIRONMENTS = {"production", "prod", "staging"}
+STRICT_DATABASE_ENVIRONMENTS = STRICT_RUNTIME_ENVIRONMENTS
 LOCAL_DATABASE_ENVIRONMENTS = {"test", "testing", "dev", "development", "local"}
 
 

@@ -6,12 +6,13 @@ FastAPI + SQLAlchemy + SQLite/PostgreSQL
 import app.database.orm_guards  # ORM Guards: forca IDs=None antes do flush
 
 import logging
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from starlette.responses import Response
 
 from app.config import SYSTEM_NAME, SYSTEM_VERSION, settings
 from app.main_basic_routes import register_basic_routes
@@ -81,9 +82,26 @@ register_exception_handlers(app)
 # ARQUIVOS ESTATICOS - ANTES DOS ROUTERS!
 # ============================================================================
 
+PUBLIC_UPLOAD_PREFIXES = {"produtos", "ecommerce", "pets", "banho_tosa"}
+
+
+class PublicUploadsStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):
+        normalized_path = path.replace("\\", "/").lstrip("/")
+        parts = PurePosixPath(normalized_path).parts
+        if (
+            not parts
+            or parts[0] not in PUBLIC_UPLOAD_PREFIXES
+            or any(part in {"", ".", ".."} for part in parts)
+        ):
+            return Response(status_code=404)
+
+        return await super().get_response(path, scope)
+
+
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/uploads", PublicUploadsStaticFiles(directory="uploads"), name="uploads")
 
 # ============================================================================
 # REGISTRAR ROUTERS
