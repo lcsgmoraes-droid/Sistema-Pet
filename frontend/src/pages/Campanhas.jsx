@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useCampanhasConsultas } from "../hooks/useCampanhasConsultas";
+import CampanhasPageHeader from "../components/campanhas/CampanhasPageHeader";
 import CampanhasTabsBar from "../components/campanhas/CampanhasTabsBar";
 import CampanhasMainContent from "../components/campanhas/CampanhasMainContent";
 import CampanhasModalsLayer from "../components/campanhas/CampanhasModalsLayer";
@@ -261,15 +262,12 @@ export default function Campanhas() {
   });
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Campanhas de Fidelidade</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Gerencie campanhas automaticas, ranking de clientes e cupons.
-          </p>
-        </div>
-      </div>
+    <div className="mx-auto max-w-7xl space-y-5 p-4 sm:p-6">
+      <CampanhasPageHeader
+        aba={aba}
+        dashboard={campanhasConsultas.dashboard}
+        loadingDashboard={campanhasConsultas.loadingDashboard}
+      />
 
       <CampanhasTabsBar aba={aba} onChange={setAba} />
 
