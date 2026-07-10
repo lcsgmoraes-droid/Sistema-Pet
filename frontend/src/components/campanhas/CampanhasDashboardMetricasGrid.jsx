@@ -88,9 +88,9 @@ export default function CampanhasDashboardMetricasGrid({ dashboard }) {
         >
           {nomesCampanhas.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {nomesCampanhas.slice(0, 3).map((nome) => (
+              {nomesCampanhas.slice(0, 3).map((nome, index) => (
                 <span
-                  key={nome}
+                  key={`${nome}-${index}`}
                   className="max-w-full truncate rounded-md bg-slate-100 px-2 py-1 text-xs text-gray-600"
                 >
                   {nome}

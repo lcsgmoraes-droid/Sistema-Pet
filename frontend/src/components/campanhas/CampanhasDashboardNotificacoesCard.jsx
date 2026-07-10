@@ -1,4 +1,12 @@
-import { BellRing, CalendarClock, Gift, PackageCheck, Smartphone, Sparkles } from "lucide-react";
+import {
+  BellRing,
+  CalendarClock,
+  Gift,
+  PackageCheck,
+  Smartphone,
+  Sparkles,
+  Trophy,
+} from "lucide-react";
 
 const NOTIFICACOES_APP = [
   {
@@ -21,8 +29,14 @@ const NOTIFICACOES_APP = [
   },
   {
     title: "Campanhas automaticas",
-    detail: "Boas-vindas, inatividade, cashback e ranking",
+    detail: "Boas-vindas, inatividade, cashback e recompra",
     icon: Sparkles,
+    tone: "amber",
+  },
+  {
+    title: "Ranking e premios",
+    detail: "Nivel, lote e cliente destaque",
+    icon: Trophy,
     tone: "amber",
   },
 ];

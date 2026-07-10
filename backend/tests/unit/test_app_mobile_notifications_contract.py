@@ -108,6 +108,9 @@ def test_campaign_push_notifications_create_app_center_payloads():
     loyalty_source = (BACKEND_ROOT / "app/campaigns/loyalty_rewards.py").read_text(
         encoding="utf-8"
     )
+    engajamento_source = (
+        BACKEND_ROOT / "app/campaigns/engajamento_routes.py"
+    ).read_text(encoding="utf-8")
     retorno_source = (
         BACKEND_ROOT / "app/banho_tosa_retornos_notificacoes.py"
     ).read_text(encoding="utf-8")
@@ -131,6 +134,10 @@ def test_campaign_push_notifications_create_app_center_payloads():
     assert '"quick_repurchase"' in quick_repurchase_source
     assert "enqueue_campaign_push" in loyalty_source
     assert '"loyalty_reward"' in loyalty_source
+    assert "enqueue_campaign_push" in engajamento_source
+    assert '"monthly_highlight"' in engajamento_source
+    assert '"ranking_message"' in engajamento_source
+    assert '"inactivity"' in engajamento_source
     assert 'source="campaign" if canal == "app" else None' in retorno_source
     assert '"kind": "banho_tosa_retorno"' in retorno_source
 

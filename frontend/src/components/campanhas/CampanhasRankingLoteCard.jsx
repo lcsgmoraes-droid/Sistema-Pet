@@ -1,10 +1,10 @@
 export default function CampanhasRankingLoteCard({ setResultadoLote, setModalLote }) {
   return (
-    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between">
+    <div className="flex items-center justify-between rounded-lg border border-cyan-200 bg-cyan-50 p-4">
       <div>
-        <p className="font-semibold text-blue-800">Envio em lote</p>
-        <p className="text-sm text-blue-600">
-          Envie um e-mail personalizado para todos os clientes de um nivel.
+        <p className="font-semibold text-cyan-900">Mensagem por ranking</p>
+        <p className="text-sm text-cyan-700">
+          Envie e-mail e notificacao no app para todos os clientes de um nivel.
         </p>
       </div>
       <button
@@ -12,7 +12,7 @@ export default function CampanhasRankingLoteCard({ setResultadoLote, setModalLot
           setResultadoLote(null);
           setModalLote(true);
         }}
-        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+        className="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-cyan-800"
       >
         Enviar para nivel
       </button>

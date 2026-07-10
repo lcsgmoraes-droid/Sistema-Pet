@@ -15,10 +15,10 @@ export default function CampanhasEnvioInativosModal({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
         <div className="px-6 py-4 border-b flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-gray-900">Enviar email de reativacao</h3>
+            <h3 className="font-semibold text-gray-900">Enviar reativacao</h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              Clientes sem compra ha mais de {modalEnvioInativos} dias. Os emails sao enfileirados e
-              enviados em lotes.
+              Clientes sem compra ha mais de {modalEnvioInativos} dias. Emails e push/app sao
+              enfileirados e enviados em lotes.
             </p>
           </div>
           <button
@@ -34,9 +34,10 @@ export default function CampanhasEnvioInativosModal({
         <div className="p-6 space-y-4">
           {resultadoEnvioInativos ? (
             <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-1">
-              <p className="font-semibold text-green-800">Emails enfileirados com sucesso.</p>
+              <p className="font-semibold text-green-800">Mensagens enfileiradas com sucesso.</p>
               <p className="text-sm text-green-700">
-                {resultadoEnvioInativos.enfileirados} email(s) adicionados a fila.
+                {resultadoEnvioInativos.enfileirados} email(s) e{" "}
+                {resultadoEnvioInativos.push_enfileirados || 0} push/app adicionados a fila.
               </p>
               {resultadoEnvioInativos.sem_email > 0 && (
                 <p className="text-xs text-gray-500">
@@ -58,7 +59,7 @@ export default function CampanhasEnvioInativosModal({
             <>
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">
-                  Assunto do email
+                  Titulo da mensagem
                 </label>
                 <input
                   type="text"
@@ -106,7 +107,7 @@ export default function CampanhasEnvioInativosModal({
                   }
                   className="flex-1 py-2.5 bg-orange-500 text-white rounded-lg text-sm font-semibold hover:bg-orange-600 disabled:opacity-50 transition-colors"
                 >
-                  {enviandoInativos ? "Enfileirando..." : "Enfileirar emails"}
+                  {enviandoInativos ? "Enfileirando..." : "Enfileirar mensagens"}
                 </button>
               </div>
             </>
