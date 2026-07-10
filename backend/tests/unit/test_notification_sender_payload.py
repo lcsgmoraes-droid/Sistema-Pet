@@ -23,3 +23,27 @@ def test_push_data_for_notification_includes_navigation_payload():
         "agendamento_id": 42,
         "appointment_id": 42,
     }
+
+
+def test_push_data_for_campaign_notification_includes_campaign_payload():
+    notif = SimpleNamespace(
+        idempotency_key="bday:10:55:2026-07-10:push",
+        source="campaign",
+        kind="birthday_customer",
+        payload={
+            "target": "coupons",
+            "campaign_id": 10,
+            "campaign_type": "birthday_customer",
+            "coupon_code": "ANIV-123",
+        },
+    )
+
+    assert _push_data_for_notification(notif) == {
+        "idempotency_key": "bday:10:55:2026-07-10:push",
+        "source": "campaign",
+        "kind": "birthday_customer",
+        "target": "coupons",
+        "campaign_id": 10,
+        "campaign_type": "birthday_customer",
+        "coupon_code": "ANIV-123",
+    }

@@ -39,6 +39,7 @@ from app.campaigns.models import (
     CustomerRankHistory,
     RankLevelEnum,
 )
+from app.campaigns.app_push import enqueue_campaign_push
 from app.campaigns.notification_service import enqueue_email
 
 logger = logging.getLogger(__name__)
@@ -168,6 +169,29 @@ class RankingHandler:
                     cliente = (
                         db.query(Cliente).filter(Cliente.id == row.cliente_id).first()
                     )
+                    if cliente:
+                        enqueue_campaign_push(
+                            db,
+                            tenant_id=campaign.tenant_id,
+                            customer_id=row.cliente_id,
+                            title="Voce subiu de nivel",
+                            body=(
+                                f"Ola, {cliente.nome}! Voce subiu para o nivel "
+                                f"{new_rank.value.upper()}."
+                            ),
+                            idempotency_key=(
+                                f"rank_upgrade:{campaign.id}:{row.cliente_id}:{period}:push"
+                            ),
+                            kind="ranking_upgrade",
+                            campaign=campaign,
+                            payload={
+                                "target": "benefits",
+                                "customer_id": row.cliente_id,
+                                "rank": new_rank.value,
+                                "previous_rank": prev_rank.value,
+                                "period": period,
+                            },
+                        )
                     if cliente and cliente.email:
                         enqueue_email(
                             db,

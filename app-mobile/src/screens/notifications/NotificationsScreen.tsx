@@ -20,6 +20,7 @@ import {
 import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
 import {
   appointmentNotificationTarget,
+  campaignNotificationTarget,
   stockNotificationToProductId,
 } from '../../utils/notificationNavigation';
 
@@ -89,6 +90,12 @@ export default function NotificationsScreen({ navigation }: any) {
     const appointmentTarget = appointmentNotificationTarget(item.data);
     if (appointmentTarget) {
       navigation.navigate(appointmentTarget.route, appointmentTarget.params);
+      return;
+    }
+
+    const campaignTarget = campaignNotificationTarget(item.data);
+    if (campaignTarget) {
+      navigation.navigate(campaignTarget.route, campaignTarget.params);
     }
   }
 
@@ -187,6 +194,8 @@ export default function NotificationsScreen({ navigation }: any) {
                     ? 'cube-outline'
                     : item.source === 'appointment_reminder'
                       ? 'calendar-outline'
+                      : item.source === 'campaign'
+                        ? 'gift-outline'
                       : 'notifications-outline'
                 }
                 size={20}

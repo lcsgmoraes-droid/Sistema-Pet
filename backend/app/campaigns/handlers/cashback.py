@@ -43,6 +43,7 @@ from app.campaigns.models import (
     CustomerRankHistory,
     RankLevelEnum,
 )
+from app.campaigns.app_push import enqueue_campaign_push
 from app.campaigns.notification_service import enqueue_email
 from app.campaigns.channel_scope import normalize_benefit_channel
 
@@ -229,11 +230,37 @@ class CashbackHandler:
         from app.models import Cliente
 
         cliente = db.query(Cliente).filter(Cliente.id == customer_id).first()
+        if cliente:
+            amount_label = f"{amount:.2f}".replace(".", ",")
+            push_body = (
+                f"Ola, {cliente.nome}! Voce ganhou R$ {amount_label} de cashback "
+                "na sua ultima compra. Veja seus beneficios no app."
+            )
+            enqueue_campaign_push(
+                db,
+                tenant_id=campaign.tenant_id,
+                customer_id=customer_id,
+                title="Voce ganhou cashback",
+                body=push_body,
+                idempotency_key=f"cashback:{campaign.id}:{customer_id}:{ref_period}:push",
+                kind="cashback",
+                campaign=campaign,
+                payload={
+                    "target": "benefits",
+                    "customer_id": customer_id,
+                    "venda_id": venda_id,
+                    "cashback_amount": float(amount),
+                    "rank": rank.value,
+                    "canal": canal,
+                    "reward_type": "cashback",
+                },
+            )
         if cliente and cliente.email:
+            amount_label = f"{amount:.2f}".replace(".", ",")
             body = (
-                f"Olá, {cliente.nome}! Você ganhou R$ {amount:.2f} de cashback "
+                f"Olá, {cliente.nome}! Você ganhou R$ {amount_label} de cashback "
                 f"na sua última compra. Seu saldo será aplicado na próxima compra."
-            ).replace(".", ",")
+            )
             enqueue_email(
                 db,
                 tenant_id=campaign.tenant_id,

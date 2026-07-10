@@ -7,6 +7,7 @@ import { navigateWhenReady } from "../navigation/navigationRef";
 import { ensurePushNotificationsRegistered } from "../services/pushNotifications.service";
 import {
   appointmentNotificationTarget,
+  campaignNotificationTarget,
   stockNotificationToProductId,
 } from "../utils/notificationNavigation";
 
@@ -62,6 +63,11 @@ export function usePushNotifications(isAuthenticated: boolean) {
       const appointmentTarget = appointmentNotificationTarget(data);
       if (appointmentTarget) {
         navigateWhenReady(appointmentTarget.route, appointmentTarget.params);
+        return;
+      }
+      const campaignTarget = campaignNotificationTarget(data);
+      if (campaignTarget) {
+        navigateWhenReady(campaignTarget.route, campaignTarget.params);
         return;
       }
       if (data.source !== "app-vet") return;

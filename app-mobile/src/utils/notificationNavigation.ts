@@ -42,3 +42,34 @@ export function appointmentNotificationTarget(data: NotificationData): Navigatio
   }
   return null;
 }
+
+export function campaignNotificationTarget(data: NotificationData): NavigationTarget | null {
+  if (!data || data.source !== "campaign") return null;
+
+  const kind = String(data.kind || "");
+  const target = String(data.target || "");
+  if (target === "banho_tosa" || kind === "banho_tosa_retorno") {
+    return { route: "Pets", params: { screen: "BanhoTosa" } };
+  }
+
+  if (target === "coupons") {
+    return { route: "Beneficios", params: { screen: "MeusCupons" } };
+  }
+  if (target === "benefits") {
+    return { route: "Beneficios", params: { screen: "MeusBeneficios" } };
+  }
+
+  if ([
+    "birthday_customer",
+    "birthday_pet",
+    "welcome_app",
+    "welcome_ecommerce",
+    "inactivity",
+    "quick_repurchase",
+    "monthly_highlight",
+  ].includes(kind)) {
+    return { route: "Beneficios", params: { screen: "MeusCupons" } };
+  }
+
+  return { route: "Beneficios", params: { screen: "MeusBeneficios" } };
+}

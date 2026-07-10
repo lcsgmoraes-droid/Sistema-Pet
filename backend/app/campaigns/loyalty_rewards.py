@@ -17,6 +17,7 @@ from app.campaigns.models import (
     Coupon,
     CouponStatusEnum,
 )
+from app.campaigns.app_push import enqueue_campaign_push
 from app.campaigns.notification_service import enqueue_email
 from app.models import Cliente
 
@@ -126,7 +127,7 @@ def _give_loyalty_reward(
         if cashback_tx is not None:
             cashback_tx.source_id = execution.id
 
-    if cliente and cliente.email:
+    if cliente:
         if reward_tp == "credit":
             body = f"Ola, {cliente.nome}! Voce ganhou {code} de cashback no programa de fidelidade."
         else:
@@ -138,6 +139,26 @@ def _give_loyalty_reward(
                     value=f"{reward_value:.2f}",
                 )
             )
+        enqueue_campaign_push(
+            db,
+            tenant_id=campaign.tenant_id,
+            customer_id=customer_id,
+            title="Sua recompensa chegou",
+            body=body,
+            idempotency_key=f"loyalty:{campaign.id}:{customer_id}:{ref_period}:push",
+            kind="loyalty_reward",
+            campaign=campaign,
+            payload={
+                "target": "coupons" if reward_meta.get("coupon_code") else "benefits",
+                "customer_id": customer_id,
+                "coupon_code": reward_meta.get("coupon_code"),
+                "coupon_id": reward_meta.get("coupon_id"),
+                "cashback_tx_id": reward_meta.get("cashback_tx_id"),
+                "reward_type": reward_type,
+                "reference_period": ref_period,
+            },
+        )
+    if cliente and cliente.email:
         enqueue_email(
             db,
             tenant_id=campaign.tenant_id,
