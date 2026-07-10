@@ -306,6 +306,29 @@ def _create_monthly_highlight_coupon(
             "periodo": period,
         },
     )
+    from app.campaigns.app_push import enqueue_campaign_push
+
+    enqueue_campaign_push(
+        db,
+        tenant_id=tenant.id,
+        customer_id=customer_id,
+        title="Voce ganhou destaque",
+        body=(
+            f"Ola, {cliente.nome}! Voce ganhou destaque em {period}. "
+            f"Seu cupom: {coupon.code}."
+        ),
+        idempotency_key=f"destaque:{tenant.id}:{period}:{category}:push",
+        kind="monthly_highlight",
+        campaign=campaign,
+        payload={
+            "target": "coupons",
+            "customer_id": customer_id,
+            "coupon_code": coupon.code,
+            "coupon_id": coupon.id,
+            "category": category,
+            "period": period,
+        },
+    )
     if cliente.email:
         cat_label = (
             "Maior Destaque do Mês"
@@ -550,6 +573,28 @@ def _expire_cashback_credit_if_needed(db, tenant, tx) -> None:
         )
     )
     cliente = db.query(Cliente).filter(Cliente.id == tx.customer_id).first()
+    if cliente:
+        from app.campaigns.app_push import enqueue_campaign_push
+
+        enqueue_campaign_push(
+            db,
+            tenant_id=tenant.id,
+            customer_id=tx.customer_id,
+            title="Seu cashback expirou",
+            body=(
+                f"Ola, {cliente.nome}! R$ {float(tx.amount):.2f} de cashback "
+                "venceu hoje."
+            ),
+            idempotency_key=f"cashback_expired:{tenant.id}:{tx.id}:push",
+            kind="cashback_expired",
+            campaign=None,
+            payload={
+                "target": "benefits",
+                "customer_id": tx.customer_id,
+                "cashback_amount": float(tx.amount),
+                "cashback_tx_id": tx.id,
+            },
+        )
     if cliente and cliente.email:
         enqueue_email(
             db,
@@ -623,6 +668,28 @@ def _send_cashback_expiration_alert(
         return False
 
     remaining_days = max(0, (tx.expires_at - now_utc).days)
+    from app.campaigns.app_push import enqueue_campaign_push
+
+    enqueue_campaign_push(
+        db,
+        tenant_id=tenant.id,
+        customer_id=tx.customer_id,
+        title="Cashback perto de vencer",
+        body=(
+            f"Ola, {cliente.nome}! Voce tem R$ {float(tx.amount):.2f} "
+            f"de cashback que vence em {remaining_days} dia(s)."
+        ),
+        idempotency_key=f"{idem_key}:push",
+        kind="cashback_expiring",
+        campaign=None,
+        payload={
+            "target": "benefits",
+            "customer_id": tx.customer_id,
+            "cashback_amount": float(tx.amount),
+            "cashback_tx_id": tx.id,
+            "remaining_days": remaining_days,
+        },
+    )
     if cliente.email:
         enqueue_email(
             db,

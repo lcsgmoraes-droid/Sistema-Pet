@@ -37,6 +37,7 @@ from app.campaigns.models import (
     Coupon,
     CouponStatusEnum,
 )
+from app.campaigns.app_push import enqueue_campaign_push
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +142,37 @@ class QuickRepurchaseHandler:
                 valid_days=coupon_valid_days,
                 channel=params.get("coupon_channel", "pdv"),
             )
+            from app.models import Cliente
+
+            cliente = db.query(Cliente).filter(Cliente.id == customer_id).first()
+            if cliente:
+                from collections import defaultdict
+
+                body = (params.get("notification_message") or "").format_map(
+                    defaultdict(str, code=coupon.code, nome=cliente.nome)
+                )
+                if not body:
+                    body = f"Obrigado pela compra! Use o cupom {coupon.code} na proxima visita."
+                enqueue_campaign_push(
+                    db,
+                    tenant_id=campaign.tenant_id,
+                    customer_id=customer_id,
+                    title="Cupom para a proxima compra",
+                    body=body,
+                    idempotency_key=(
+                        f"quick_repurchase:{campaign.id}:{customer_id}:{coupon.id}:push"
+                    ),
+                    kind="quick_repurchase",
+                    campaign=campaign,
+                    payload={
+                        "target": "coupons",
+                        "customer_id": customer_id,
+                        "coupon_code": coupon.code,
+                        "coupon_id": coupon.id,
+                        "venda_total": float(venda_total),
+                        "reward_type": f"coupon:{coupon_type}",
+                    },
+                )
 
             logger.info(
                 "[QuickRepurchaseHandler] Cupom %s gerado para cliente_id=%s (campanha=%d)",

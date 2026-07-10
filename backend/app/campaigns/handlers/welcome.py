@@ -32,8 +32,8 @@ from app.campaigns.models import (
     CampaignExecution,
     CampaignTypeEnum,
 )
-from app.campaigns.notification_service import enqueue_email, enqueue_push
-from app.services.push_devices import load_customer_push_targets
+from app.campaigns.app_push import enqueue_campaign_push
+from app.campaigns.notification_service import enqueue_email
 
 logger = logging.getLogger(__name__)
 
@@ -217,17 +217,27 @@ class WelcomeHandler:
                 idempotency_key=f"{notif_key}:email",
             )
 
-        if load_customer_push_targets(
+        kind = (
+            "welcome_app"
+            if campaign.campaign_type == CampaignTypeEnum.welcome_app
+            else "welcome_ecommerce"
+        )
+        enqueue_campaign_push(
             db,
             tenant_id=campaign.tenant_id,
             customer_id=customer_id,
-        ):
-            enqueue_push(
-                db,
-                tenant_id=campaign.tenant_id,
-                customer_id=customer_id,
-                body=body,
-                idempotency_key=f"{notif_key}:push",
-            )
+            title="Bem-vindo ao CorePet",
+            body=body,
+            idempotency_key=f"{notif_key}:push",
+            kind=kind,
+            campaign=campaign,
+            payload={
+                "target": "coupons",
+                "customer_id": customer_id,
+                "coupon_code": coupon.code,
+                "coupon_id": coupon.id,
+                "reward_type": f"coupon:{coupon_type}",
+            },
+        )
 
         return 1

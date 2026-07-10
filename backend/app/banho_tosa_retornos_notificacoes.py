@@ -66,6 +66,9 @@ def enfileirar_notificacoes_retorno(
                 body=mensagem,
                 email_address=email,
                 scheduled_at=agora,
+                source="campaign" if canal == "app" else None,
+                kind="banho_tosa_retorno" if canal == "app" else None,
+                payload=_payload_retorno(item) if canal == "app" else None,
             )
         )
         resultado["enfileirados"] += 1
@@ -95,6 +98,22 @@ def _canal_fila(canal: str):
         if canal == "email"
         else NotificationChannelEnum.push
     )
+
+
+def _payload_retorno(item: dict) -> dict:
+    data_referencia = item.get("data_referencia")
+    return {
+        "source": "campaign",
+        "kind": "banho_tosa_retorno",
+        "target": "banho_tosa",
+        "customer_id": item.get("cliente_id"),
+        "pet_id": item.get("pet_id"),
+        "tipo_retorno": item.get("tipo"),
+        "referencia_id": item.get("referencia_id") or item.get("id"),
+        "data_referencia": data_referencia.isoformat()
+        if hasattr(data_referencia, "isoformat")
+        else data_referencia,
+    }
 
 
 def _emails_clientes(db: Session, tenant_id, sugestoes: list[dict]) -> dict[int, str]:

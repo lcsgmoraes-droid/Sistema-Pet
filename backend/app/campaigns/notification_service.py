@@ -21,6 +21,7 @@ Uso:
 """
 
 import logging
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -123,8 +124,12 @@ def enqueue_push(
     customer_id: int,
     body: str,
     idempotency_key: str,
+    subject: str | None = None,
     push_token: str | None = None,
     privacy_customer_id: int | None = None,
+    source: str | None = None,
+    kind: str | None = None,
+    payload: dict[str, Any] | None = None,
 ) -> bool:
     """
     Enfileira notificação push.
@@ -164,8 +169,12 @@ def enqueue_push(
         idempotency_key=idempotency_key,
         customer_id=customer_id,
         channel=NotificationChannelEnum.push,
+        subject=subject,
         body=body,
         push_token=push_token,
+        source=source,
+        kind=kind,
+        payload=payload,
     )
     db.add(notif)
     logger.debug(

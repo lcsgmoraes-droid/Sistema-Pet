@@ -39,8 +39,8 @@ from app.campaigns.models import (
     CampaignExecution,
     CampaignTypeEnum,
 )
-from app.campaigns.notification_service import enqueue_email, enqueue_push
-from app.services.push_devices import load_customer_push_targets
+from app.campaigns.app_push import enqueue_campaign_push
+from app.campaigns.notification_service import enqueue_email
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +197,7 @@ class BirthdayHandler:
                     prefix="PETANIV",
                     notification_extra=f" (aniversário do {pet.nome})",
                     nome_pet=pet.nome,
+                    notification_customer_id=dono.id,
                     privacy_customer_id=dono.id,
                 )
             except Exception as exc:
@@ -234,6 +235,7 @@ class BirthdayHandler:
         prefix: str,
         notification_extra: str = "",
         nome_pet: str = "",
+        notification_customer_id: int | None = None,
         privacy_customer_id: int | None = None,
     ) -> int:
         """
@@ -257,6 +259,7 @@ class BirthdayHandler:
             return 0  # Já recompensado — skip silencioso
 
         # Parâmetros da campanha (com defaults seguros)
+        notification_customer_id = notification_customer_id or customer_id
         tipo_presente = params.get("tipo_presente", "cupom")
         coupon_type = params.get("coupon_type", "fixed")
         coupon_value = params.get("coupon_value", 10.0)
@@ -281,7 +284,7 @@ class BirthdayHandler:
                 db,
                 tenant_id=campaign.tenant_id,
                 campaign=campaign,
-                customer_id=customer_id,
+                customer_id=notification_customer_id,
                 coupon_type=coupon_type,
                 discount_value=discount_value,
                 discount_percent=discount_percent,
@@ -326,28 +329,43 @@ class BirthdayHandler:
         )
         body = notification_msg.format_map(fmt_vars)
         notif_key = f"bday:{campaign.id}:{customer_id}:{reference_period}"
+        kind = (
+            "birthday_pet"
+            if campaign.campaign_type == CampaignTypeEnum.birthday_pet
+            else "birthday_customer"
+        )
+        title = (
+            "Aniversario do seu pet" if kind == "birthday_pet" else "Feliz aniversario"
+        )
+        notification_payload = {
+            "target": "coupons" if coupon_code else "benefits",
+            "customer_id": notification_customer_id,
+            "campaign_customer_id": customer_id,
+            "coupon_code": coupon_code or None,
+            "coupon_id": reward_meta.get("coupon_id"),
+            "reward_type": reward_type_str,
+            "pet_name": nome_pet or None,
+        }
 
-        if load_customer_push_targets(
+        enqueue_campaign_push(
             db,
             tenant_id=campaign.tenant_id,
-            customer_id=customer_id,
+            customer_id=notification_customer_id,
+            title=title,
+            body=body,
+            idempotency_key=f"{notif_key}:push",
+            kind=kind,
+            campaign=campaign,
+            payload=notification_payload,
             legacy_push_token=customer_push_token,
-        ):
-            enqueue_push(
-                db,
-                tenant_id=campaign.tenant_id,
-                customer_id=customer_id,
-                body=body,
-                idempotency_key=f"{notif_key}:push",
-                push_token=customer_push_token,
-                privacy_customer_id=privacy_customer_id,
-            )
+            privacy_customer_id=privacy_customer_id,
+        )
 
         if customer_email:
             enqueue_email(
                 db,
                 tenant_id=campaign.tenant_id,
-                customer_id=customer_id,
+                customer_id=notification_customer_id,
                 subject=f"Feliz aniversário{notification_extra}, {customer_name}! 🎂",
                 body=body,
                 email_address=customer_email,

@@ -83,6 +83,58 @@ def test_mobile_app_exposes_notifications_center_and_stock_push_navigation():
     assert "buscarProdutoPorId" in product_detail_source
 
 
+def test_campaign_push_notifications_create_app_center_payloads():
+    helper_source = (BACKEND_ROOT / "app/campaigns/app_push.py").read_text(
+        encoding="utf-8"
+    )
+    birthday_source = (BACKEND_ROOT / "app/campaigns/handlers/birthday.py").read_text(
+        encoding="utf-8"
+    )
+    welcome_source = (BACKEND_ROOT / "app/campaigns/handlers/welcome.py").read_text(
+        encoding="utf-8"
+    )
+    inactivity_source = (
+        BACKEND_ROOT / "app/campaigns/handlers/inactivity.py"
+    ).read_text(encoding="utf-8")
+    cashback_source = (BACKEND_ROOT / "app/campaigns/handlers/cashback.py").read_text(
+        encoding="utf-8"
+    )
+    ranking_source = (BACKEND_ROOT / "app/campaigns/handlers/ranking.py").read_text(
+        encoding="utf-8"
+    )
+    quick_repurchase_source = (
+        BACKEND_ROOT / "app/campaigns/handlers/quick_repurchase.py"
+    ).read_text(encoding="utf-8")
+    loyalty_source = (BACKEND_ROOT / "app/campaigns/loyalty_rewards.py").read_text(
+        encoding="utf-8"
+    )
+    retorno_source = (
+        BACKEND_ROOT / "app/banho_tosa_retornos_notificacoes.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'source="campaign"' in helper_source
+    assert '"target": "benefits"' in helper_source
+    assert "enqueue_campaign_push" in birthday_source
+    assert '"birthday_customer"' in birthday_source
+    assert '"birthday_pet"' in birthday_source
+    assert "notification_customer_id=dono.id" in birthday_source
+    assert "customer_id=notification_customer_id" in birthday_source
+    assert "enqueue_campaign_push" in welcome_source
+    assert '"welcome_app"' in welcome_source
+    assert "enqueue_campaign_push" in inactivity_source
+    assert '"inactivity"' in inactivity_source
+    assert "enqueue_campaign_push" in cashback_source
+    assert '"cashback"' in cashback_source
+    assert "enqueue_campaign_push" in ranking_source
+    assert '"ranking_upgrade"' in ranking_source
+    assert "enqueue_campaign_push" in quick_repurchase_source
+    assert '"quick_repurchase"' in quick_repurchase_source
+    assert "enqueue_campaign_push" in loyalty_source
+    assert '"loyalty_reward"' in loyalty_source
+    assert 'source="campaign" if canal == "app" else None' in retorno_source
+    assert '"kind": "banho_tosa_retorno"' in retorno_source
+
+
 def test_ecommerce_public_exposes_product_detail_endpoint_for_mobile_deeplink():
     public_source = (BACKEND_ROOT / "app/routes/ecommerce_public.py").read_text(
         encoding="utf-8"

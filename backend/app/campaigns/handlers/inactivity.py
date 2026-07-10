@@ -38,6 +38,7 @@ from app.campaigns.models import (
     CampaignExecution,
     CampaignTypeEnum,
 )
+from app.campaigns.app_push import enqueue_campaign_push
 from app.campaigns.notification_service import enqueue_email
 
 logger = logging.getLogger(__name__)
@@ -208,6 +209,24 @@ class InactivityHandler:
 
         body = notification_msg.format(code=coupon.code, nome=customer_name)
         notif_key = f"inactivity:{campaign.id}:{customer_id}:{reference_period}"
+        enqueue_campaign_push(
+            db,
+            tenant_id=campaign.tenant_id,
+            customer_id=customer_id,
+            title="Sentimos sua falta",
+            body=body,
+            idempotency_key=f"{notif_key}:push",
+            kind="inactivity",
+            campaign=campaign,
+            payload={
+                "target": "coupons",
+                "customer_id": customer_id,
+                "coupon_code": coupon.code,
+                "coupon_id": coupon.id,
+                "inactivity_days": inactivity_days,
+                "reward_type": f"coupon:{coupon_type}",
+            },
+        )
         if customer_email:
             enqueue_email(
                 db,

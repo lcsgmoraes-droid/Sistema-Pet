@@ -96,6 +96,38 @@ test("direciona lembretes de agendamento para a area certa do app", () => {
   assert.equal(appointmentNotificationTarget({ source: "order" }), null);
 });
 
+test("direciona campanhas para beneficios, cupons ou banho e tosa", () => {
+  const { campaignNotificationTarget } = carregarModuloTs(
+    "src/utils/notificationNavigation.ts",
+  );
+
+  const birthdayTarget = campaignNotificationTarget({
+    source: "campaign",
+    kind: "birthday_customer",
+    target: "coupons",
+    coupon_code: "ANIV-123",
+  });
+  assert.equal(birthdayTarget.route, "Beneficios");
+  assert.equal(birthdayTarget.params.screen, "MeusCupons");
+
+  const cashbackTarget = campaignNotificationTarget({
+    source: "campaign",
+    kind: "cashback",
+    target: "benefits",
+  });
+  assert.equal(cashbackTarget.route, "Beneficios");
+  assert.equal(cashbackTarget.params.screen, "MeusBeneficios");
+
+  const retornoTarget = campaignNotificationTarget({
+    source: "campaign",
+    kind: "banho_tosa_retorno",
+    target: "banho_tosa",
+  });
+  assert.equal(retornoTarget.route, "Pets");
+  assert.equal(retornoTarget.params.screen, "BanhoTosa");
+  assert.equal(campaignNotificationTarget({ source: "order" }), null);
+});
+
 test("central de notificacoes mobile chama endpoints do app", () => {
   const serviceSource = readFileSync(
     path.resolve(__dirname, "../src/services/appNotifications.service.ts"),
@@ -112,6 +144,8 @@ test("central de notificacoes mobile chama endpoints do app", () => {
   assert.match(screenSource, /limparNotificacoesApp/);
   assert.match(screenSource, /markNotificationAsRead/);
   assert.match(screenSource, /stockNotificationToProductId/);
+  assert.match(screenSource, /campaignNotificationTarget/);
+  assert.match(screenSource, /gift-outline/);
 });
 
 test("home mobile mostra badge vermelho com notificacoes nao lidas", () => {
