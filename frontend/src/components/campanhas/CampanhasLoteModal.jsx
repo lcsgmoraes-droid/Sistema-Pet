@@ -69,8 +69,8 @@ export default function CampanhasLoteModal({
           {resultadoLote && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
               <p className="font-semibold text-green-800">
-                {resultadoLote.enfileirados} email(s) e{" "}
-                {resultadoLote.push_enfileirados || 0} push/app enfileirado(s).
+                {resultadoLote.enfileirados} email(s) e {resultadoLote.push_enfileirados || 0}{" "}
+                push/app enfileirado(s).
               </p>
               {resultadoLote.sem_email > 0 && (
                 <p className="text-green-600">

@@ -22,7 +22,7 @@ from app.campaigns.models import (
     DrawingStatusEnum,
     RankLevelEnum,
 )
-from app.campaigns.app_push import enqueue_campaign_push
+from app.campaigns.drawing_notifications import enqueue_drawing_winner_push
 from app.db import SessionLocal
 
 
@@ -368,31 +368,14 @@ def executar_sorteio(
     )
 
     # Enfileirar notificação de parabéns para o ganhador
-    prize_text_push = drawing.prize_description or "o premio"
-    push_enfileirado = False
-    if cliente:
-        push_enfileirado = enqueue_campaign_push(
-            db,
-            tenant_id=tenant_id,
-            customer_id=cliente.id,
-            title=f"Voce ganhou o sorteio: {drawing.name}",
-            body=(
-                f"Parabens, {cliente.nome}! Voce foi sorteado(a) no sorteio "
-                f"{drawing.name}. Premio: {prize_text_push}."
-            ),
-            idempotency_key=f"sorteio:{drawing.id}:ganhador:{cliente.id}:push",
-            kind="drawing_winner",
-            payload={
-                "target": "benefits",
-                "campaign_type": "drawing",
-                "drawing_id": drawing.id,
-                "drawing_name": drawing.name,
-                "customer_id": cliente.id,
-                "prize": prize_text_push,
-            },
-        )
-        if push_enfileirado and not cliente.email:
-            db.commit()
+    push_enfileirado = enqueue_drawing_winner_push(
+        db,
+        tenant_id=tenant_id,
+        drawing=drawing,
+        cliente=cliente,
+    )
+    if push_enfileirado and not cliente.email:
+        db.commit()
 
     if cliente and cliente.email:
         from app.campaigns.notification_service import enqueue_email

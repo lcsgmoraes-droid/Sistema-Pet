@@ -18,9 +18,7 @@ import {
 export const CAMPANHAS_TABS = [
   {
     group: "Visao geral",
-    items: [
-      { id: "dashboard", label: "Dashboard", labelText: "Dashboard", icon: LayoutDashboard },
-    ],
+    items: [{ id: "dashboard", label: "Dashboard", labelText: "Dashboard", icon: LayoutDashboard }],
   },
   {
     group: "Campanhas",

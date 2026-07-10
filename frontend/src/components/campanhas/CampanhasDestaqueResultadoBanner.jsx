@@ -18,8 +18,8 @@ export default function CampanhasDestaqueResultadoBanner({ destaqueResultado, on
         </button>
       </div>
       <p className="mb-3 text-sm text-green-700">
-        {destaqueResultado.push_enfileirados || 0} push/app enfileirado(s) para os
-        clientes com app ativo.
+        {destaqueResultado.push_enfileirados || 0} push/app enfileirado(s) para os clientes com app
+        ativo.
       </p>
       <ul className="space-y-1.5">
         {(destaqueResultado.resultados || []).map((resultado, index) => (
