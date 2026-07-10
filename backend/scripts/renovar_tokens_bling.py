@@ -14,14 +14,6 @@ CLIENT_SECRET = os.getenv("BLING_CLIENT_SECRET", "").strip()
 REDIRECT_URI = "http://localhost:8000/auth/bling/callback"
 
 
-def mask_secret(value: str) -> str:
-    if not value:
-        return ""
-    if len(value) <= 10:
-        return "***"
-    return f"{value[:6]}...{value[-4:]}"
-
-
 if not CLIENT_ID or not CLIENT_SECRET:
     print(
         "BLING_CLIENT_ID e BLING_CLIENT_SECRET precisam estar configurados no ambiente."
@@ -82,8 +74,8 @@ try:
         print()
         print("📦 NOVOS TOKENS:")
         print("-" * 60)
-        print(f"ACCESS_TOKEN: {mask_secret(tokens['access_token'])}")
-        print(f"REFRESH_TOKEN: {mask_secret(tokens['refresh_token'])}")
+        print("ACCESS_TOKEN: gerado (oculto por seguranca)")
+        print("REFRESH_TOKEN: gerado (oculto por seguranca)")
         print(
             f"EXPIRA EM: {tokens['expires_in']} segundos ({tokens['expires_in'] / 3600:.1f} horas)"
         )
