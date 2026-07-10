@@ -450,6 +450,11 @@ class ProdutoResponse(ProdutoBase):
     promocao_pdv_ativa: bool = False
     promocao_origem_pdv: Optional[str] = None
     desconto_promocional_pdv: Optional[float] = 0
+    bling_produto_id: Optional[str] = None
+    bling_sync_status: Optional[str] = None
+    bling_sincronizar: bool = False
+    bling_ultima_sincronizacao: Optional[datetime] = None
+    bling_ultimo_erro: Optional[str] = None
 
     @field_validator("categoria_nome", mode="before")
     @classmethod

@@ -11,6 +11,7 @@
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import { exportarProdutoBling, exportarProdutosBlingLote } from "../api/produtos";
 import ProdutosMainContent from "../components/produtos/ProdutosMainContent";
 import ProdutosModalsLayer from "../components/produtos/ProdutosModalsLayer";
 import { createProdutosColunas } from "../components/produtos/produtosColumns";
@@ -36,6 +37,8 @@ export default function Produtos() {
   const { iniciarTour } = useTour("produtos", tourProdutos);
   const [modalImportacao, setModalImportacao] = useState(false);
   const [modalFusao, setModalFusao] = useState(false);
+  const [blingActionKey, setBlingActionKey] = useState(null);
+  const [blingBatchLoading, setBlingBatchLoading] = useState(false);
   const [paisExpandidos, setPaisExpandidos] = useState([]);
   const produtosColunas = useMemo(() => createProdutosColunas(), []);
   const {
@@ -108,6 +111,103 @@ export default function Produtos() {
     navigator.clipboard.writeText(texto);
     toast.success(`${tipo} copiado!`);
   };
+
+  const getProdutoBlingId = (produto) => String(produto?.bling_produto_id || "").trim();
+  const getProdutoBlingActionKey = (produtoId) => `produto-bling-${produtoId}`;
+  const getMensagemErroBling = (error, fallback) => {
+    const detail = error?.response?.data?.detail ?? error?.response?.data?.message;
+    if (Array.isArray(detail)) {
+      return detail.map((item) => item?.msg || item?.message || String(item)).join("; ");
+    }
+    if (detail && typeof detail === "object") {
+      return detail.message || JSON.stringify(detail);
+    }
+    return detail || error?.message || fallback;
+  };
+
+  const handleExportarProdutoBling = async (produto) => {
+    if (!produto?.id) return;
+    if (produto.tipo_produto === "PAI") {
+      toast.error("Produto agrupador nao deve ser cadastrado diretamente no Bling.");
+      return;
+    }
+    if (getProdutoBlingId(produto)) {
+      toast.success("Produto ja esta vinculado ao Bling.");
+      return;
+    }
+
+    setBlingActionKey(getProdutoBlingActionKey(produto.id));
+    try {
+      const response = await exportarProdutoBling(produto.id, true);
+      const status = response.data?.status;
+      const mensagem =
+        status === "criado"
+          ? "Produto cadastrado no Bling."
+          : status === "vinculado_existente"
+            ? "Produto ja existia no Bling e foi vinculado."
+            : "Produto vinculado ao Bling.";
+      toast.success(mensagem);
+      await carregarDados();
+    } catch (error) {
+      console.error("Erro ao cadastrar produto no Bling:", error);
+      toast.error(getMensagemErroBling(error, "Nao foi possivel cadastrar no Bling."));
+    } finally {
+      setBlingActionKey(null);
+    }
+  };
+
+  const handleEnviarSelecionadosBling = async () => {
+    const selecionadosSet = new Set(selecionados.map(Number));
+    const produtosSelecionados = produtosBrutos.filter((produto) =>
+      selecionadosSet.has(Number(produto.id)),
+    );
+    const candidatos = produtosSelecionados.filter(
+      (produto) => produto.tipo_produto !== "PAI" && !getProdutoBlingId(produto),
+    );
+    const ignorados = Math.max(selecionados.length - candidatos.length, 0);
+
+    if (candidatos.length === 0) {
+      toast.error("Selecione produtos sem cadastro no Bling.");
+      return;
+    }
+
+    const avisoIgnorados =
+      ignorados > 0
+        ? `\n\n${ignorados} selecionado(s) ja tem Bling ou sao agrupadores e serao ignorados.`
+        : "";
+    const confirmado = window.confirm(
+      `Cadastrar ${candidatos.length} produto(s) no Bling?${avisoIgnorados}`,
+    );
+    if (!confirmado) return;
+
+    const produtoIds = candidatos.map((produto) => Number(produto.id));
+    setBlingBatchLoading(true);
+    try {
+      const response = await exportarProdutosBlingLote(produtoIds, true);
+      const data = response.data || {};
+      const partes = [
+        data.criados ? `${data.criados} criado(s)` : "",
+        data.vinculados_existentes ? `${data.vinculados_existentes} vinculado(s)` : "",
+        data.ja_vinculados ? `${data.ja_vinculados} ja vinculado(s)` : "",
+      ].filter(Boolean);
+      const resumo = partes.length ? ` ${partes.join(", ")}.` : "";
+
+      if (data.erros) {
+        toast.error(`Lote concluido com ${data.erros} erro(s).${resumo}`);
+      } else {
+        toast.success(`Lote enviado ao Bling.${resumo}`);
+      }
+
+      setSelecionados((prev) => prev.filter((id) => !produtoIds.includes(Number(id))));
+      await carregarDados();
+    } catch (error) {
+      console.error("Erro ao cadastrar produtos no Bling:", error);
+      toast.error(getMensagemErroBling(error, "Nao foi possivel enviar o lote ao Bling."));
+    } finally {
+      setBlingBatchLoading(false);
+    }
+  };
+
   const produtosFusao = useMemo(
     () => produtosBrutos.filter((produto) => selecionados.includes(produto.id)).slice(0, 2),
     [produtosBrutos, selecionados],
@@ -205,10 +305,12 @@ export default function Produtos() {
       setPersistirBusca,
     },
     headerState: {
+      blingBatchLoading,
       iniciarTour,
       menuRelatoriosAberto,
       menuRelatoriosRef,
       navigate,
+      onEnviarSelecionadosBling: handleEnviarSelecionadosBling,
       onExcluirSelecionados: () => handleExcluirSelecionados(selecionados),
       onGerarRelatorioFiltrado,
       onGerarRelatorioGeral,
@@ -245,6 +347,7 @@ export default function Produtos() {
       colunasRelatorioProdutos,
     },
     tableState: {
+      blingActionKey,
       editandoMargem,
       editandoPreco,
       getCorEstoque,
@@ -262,6 +365,7 @@ export default function Produtos() {
       linhaProdutoRefs,
       loading,
       novoPreco,
+      onExportarProdutoBling: handleExportarProdutoBling,
       onChangeItensPorPagina: (value) => {
         setItensPorPagina(Number(value));
         setPaginaAtual(1);

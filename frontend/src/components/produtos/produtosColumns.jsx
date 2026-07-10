@@ -1,4 +1,5 @@
 ﻿import { actionButtonClasses } from "../ui/actionStyles";
+import { AlertTriangle, CheckCircle2, UploadCloud } from "lucide-react";
 import { markdownToPlainText } from "../../utils/safeMarkdown";
 import ChannelBadges from "../ui/ChannelBadges";
 import {
@@ -11,6 +12,44 @@ import {
 import { createProdutosPricingColumns } from "./produtosPricingColumns";
 
 const normalizeExpandId = (value) => String(value ?? "");
+const getProdutoBlingId = (produto) => String(produto?.bling_produto_id || "").trim();
+const getProdutoBlingActionKey = (produtoId) => `produto-bling-${produtoId}`;
+
+function renderBlingStatusBadge(produto) {
+  const blingId = getProdutoBlingId(produto);
+  const status = String(produto?.bling_sync_status || "").toLowerCase();
+  const temErro = status === "erro" || Boolean(produto?.bling_ultimo_erro);
+
+  if (produto?.tipo_produto === "PAI") {
+    return (
+      <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600">
+        Agrupador
+      </span>
+    );
+  }
+
+  if (!blingId) {
+    return (
+      <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
+        Sem Bling
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium ${
+        temErro
+          ? "border-amber-200 bg-amber-50 text-amber-700"
+          : "border-emerald-200 bg-emerald-50 text-emerald-700"
+      }`}
+      title={temErro ? produto?.bling_ultimo_erro || "Produto vinculado com erro de sync" : ""}
+    >
+      {temErro ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />}
+      Bling #{blingId}
+    </span>
+  );
+}
 
 // ====================================================
 // DEFINICAO DE COLUNAS DA LISTAGEM
@@ -290,6 +329,50 @@ export function createProdutosColunas() {
           <span className="text-sm text-gray-700">{produto.unidade || "UN"}</span>
         </td>
       ),
+    },
+    {
+      key: "bling",
+      label: "Bling",
+      visible: true,
+      renderHeader: () => (
+        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+          Bling
+        </th>
+      ),
+      renderCell: (produto, props) => {
+        const blingId = getProdutoBlingId(produto);
+        const isPai = produto.tipo_produto === "PAI";
+        const loading = props.blingActionKey === getProdutoBlingActionKey(produto.id);
+        const podeCriar = !blingId && !isPai && props.onExportarProdutoBling;
+
+        return (
+          <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col items-center gap-1.5">
+              {renderBlingStatusBadge(produto)}
+              {podeCriar && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    props.onExportarProdutoBling(produto);
+                  }}
+                  disabled={loading}
+                  className={actionButtonClasses({
+                    intent: "create",
+                    tone: "soft",
+                    size: "xs",
+                    className: "min-w-20",
+                  })}
+                  title="Cadastrar este produto no Bling"
+                >
+                  <UploadCloud size={14} aria-hidden="true" />
+                  {loading ? "Criando..." : "Criar"}
+                </button>
+              )}
+            </div>
+          </td>
+        );
+      },
     },
     ...createProdutosPricingColumns(),
     {

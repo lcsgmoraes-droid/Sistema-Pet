@@ -141,6 +141,7 @@ export function EstoqueBlingToolbar({
   faltantesMeta,
   localLoading,
   onCreateBatch,
+  onExportLocalSelected,
   onMassLinkBySku,
   onReconnectBling,
   onRefreshLocal,
@@ -151,6 +152,7 @@ export function EstoqueBlingToolbar({
   runningAction,
   search,
   searchPlaceholder,
+  selectedLocalCount,
   shouldShowReconnectWarning,
   skuLinkSuggestions,
   syncLoading,
@@ -206,13 +208,24 @@ export function EstoqueBlingToolbar({
           ) : null}
 
           {activeTab === "local" ? (
-            <button
-              onClick={onRefreshLocal}
-              disabled={localLoading || runningAction !== ""}
-              className="rounded-xl bg-slate-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
-            >
-              {localLoading ? "Atualizando..." : "Atualizar lista local"}
-            </button>
+            <>
+              <button
+                onClick={onExportLocalSelected}
+                disabled={runningAction !== "" || Number(selectedLocalCount || 0) <= 0}
+                className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {runningAction === "exportar-local-lote"
+                  ? "Enviando lote..."
+                  : `Enviar selecionados (${selectedLocalCount || 0})`}
+              </button>
+              <button
+                onClick={onRefreshLocal}
+                disabled={localLoading || runningAction !== ""}
+                className="rounded-xl bg-slate-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {localLoading ? "Atualizando..." : "Atualizar lista local"}
+              </button>
+            </>
           ) : null}
 
           {activeTab === "corrigir" ? (

@@ -13,10 +13,12 @@ import PageHeader from "../ui/PageHeader";
 
 export default function ProdutosHeaderActions({
   abrirModalColunas,
+  blingBatchLoading,
   iniciarTour,
   menuRelatoriosAberto,
   menuRelatoriosRef,
   navigate,
+  onEnviarSelecionadosBling,
   onExcluirSelecionados,
   onGerarRelatorioFiltrado,
   onGerarRelatorioGeral,
@@ -43,6 +45,20 @@ export default function ProdutosHeaderActions({
             className={actionClassName}
           >
             Editar em Lote ({selecionadosCount})
+          </ActionButton>
+          <ActionButton
+            onClick={onEnviarSelecionadosBling}
+            disabled={!onEnviarSelecionadosBling}
+            loading={blingBatchLoading}
+            intent="create"
+            tone="solid"
+            size="md"
+            icon={UploadCloud}
+            className={actionClassName}
+          >
+            {blingBatchLoading
+              ? "Enviando ao Bling..."
+              : `Enviar ao Bling (${selecionadosCount})`}
           </ActionButton>
           {selecionadosCount === 2 && (
             <ActionButton

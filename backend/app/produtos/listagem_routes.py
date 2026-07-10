@@ -150,6 +150,7 @@ def listar_produtos(
     busca_completa: bool = False,
     incluir_imagens: bool = False,
     incluir_lotes: bool = False,
+    incluir_bling_sync: bool = False,
     incluir_detalhes_composto: bool = False,
     incluir_inativos: bool = False,
     db: Session = Depends(get_session),
@@ -218,6 +219,7 @@ def listar_produtos(
         page_size=page_size,
         incluir_imagens=incluir_imagens,
         incluir_lotes=incluir_lotes,
+        incluir_bling_sync=incluir_bling_sync,
     )
 
     logger.info("GET /produtos/ - total encontrado: %s", total)
@@ -238,6 +240,7 @@ def listar_produtos(
         termo_busca=termo_busca,
         load_options=load_options,
         validade_por_produto=validade_por_produto,
+        incluir_bling_sync=incluir_bling_sync,
     )
     return _montar_resposta_produtos_paginados(
         produtos_expandidos,

@@ -65,6 +65,7 @@ function EstoqueBling() {
   const [manualSearchTerms, setManualSearchTerms] = useState({});
   const [syncItems, setSyncItems] = useState([]);
   const [blingConnection, setBlingConnection] = useState(EMPTY_BLING_CONNECTION);
+  const [selectedLocalIds, setSelectedLocalIds] = useState(() => new Set());
 
   const applyResumo = (data = {}) => {
     setCobertura(normalizarResumoBling(data));
@@ -292,6 +293,22 @@ function EstoqueBling() {
     }
   }, [activeTab, localMeta.loaded, localLoading]);
 
+  useEffect(() => {
+    setSelectedLocalIds((current) => {
+      if (!current.size) return current;
+
+      const visibleIds = new Set(produtosLocaisSemBling.map((item) => Number(item.id)));
+      const next = new Set();
+      current.forEach((id) => {
+        if (visibleIds.has(Number(id))) {
+          next.add(Number(id));
+        }
+      });
+
+      return next.size === current.size ? current : next;
+    });
+  }, [produtosLocaisSemBling]);
+
   const syncProblems = useMemo(() => {
     return (syncItems || [])
       .map((item) => ({
@@ -370,6 +387,7 @@ function EstoqueBling() {
     local: localMeta.loaded ? Number(localMeta.total || 0) : "-",
     corrigir: syncLoaded || cobertura.snapshot_disponivel ? syncProblemCount : "-",
   };
+  const selectedLocalCount = selectedLocalIds.size;
   const { healthPercent, healthTone, healthDetail } = montarResumoSaudeBling({
     hasAnySnapshot,
     faltantesMeta,
@@ -382,6 +400,8 @@ function EstoqueBling() {
   const {
     buscarBlingParaProdutoLocal,
     criarPrimeirosFaltantes,
+    exportarProdutoLocalParaBling,
+    exportarSelecionadosParaBling,
     handleFixItem,
     handleImportImagesFromBling,
     handleReconnectBling,
@@ -397,6 +417,7 @@ function EstoqueBling() {
     loadDashboard,
     loadSyncProblems,
     manualSearchTerms,
+    selectedLocalIds,
     setLocalMeta,
     setManualBlingLookup,
     setManualSearchKey,
@@ -406,10 +427,24 @@ function EstoqueBling() {
     setProdutosSemVinculo,
     setRowActionKey,
     setRunningAction,
+    setSelectedLocalIds,
     setVinculosMeta,
     skuLinkSuggestions,
     syncProblems,
   });
+
+  const toggleLocalSelection = (produtoId) => {
+    setSelectedLocalIds((current) => {
+      const id = Number(produtoId);
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const searchPlaceholder = {
     criar: "Buscar por nome, SKU ou codigo de barras",
@@ -450,6 +485,7 @@ function EstoqueBling() {
         faltantesMeta={faltantesMeta}
         localLoading={localLoading}
         onCreateBatch={criarPrimeirosFaltantes}
+        onExportLocalSelected={exportarSelecionadosParaBling}
         onMassLinkBySku={runMassLinkBySku}
         onReconnectBling={handleReconnectBling}
         onRefreshLocal={() => loadLocalProductsWithoutBling({ silent: false })}
@@ -460,6 +496,7 @@ function EstoqueBling() {
         runningAction={runningAction}
         search={search}
         searchPlaceholder={searchPlaceholder}
+        selectedLocalCount={selectedLocalCount}
         shouldShowReconnectWarning={shouldShowReconnectWarning}
         skuLinkSuggestions={skuLinkSuggestions}
         syncLoading={syncLoading}
@@ -507,12 +544,15 @@ function EstoqueBling() {
           localMeta={localMeta}
           localError={localError}
           filteredLocal={filteredLocal}
+          selectedLocalIds={selectedLocalIds}
           manualBlingLookup={manualBlingLookup}
           manualSearchTerms={manualSearchTerms}
           manualSearchKey={manualSearchKey}
           rowActionKey={rowActionKey}
+          toggleLocalSelection={toggleLocalSelection}
           updateManualSearchTerm={updateManualSearchTerm}
           buscarBlingParaProdutoLocal={buscarBlingParaProdutoLocal}
+          exportarProdutoLocalParaBling={exportarProdutoLocalParaBling}
           vincularProdutoLocalAoBling={vincularProdutoLocalAoBling}
         />
       ) : null}

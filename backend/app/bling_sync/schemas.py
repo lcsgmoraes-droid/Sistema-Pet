@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -44,6 +44,16 @@ class VincularProdutoRequest(BaseModel):
 
 class CriarProdutoBlingFaltanteRequest(BaseModel):
     bling_id: str
+
+
+class ExportarProdutoLocalBlingRequest(BaseModel):
+    produto_id: int = Field(..., gt=0)
+    enviar_estoque: bool = True
+
+
+class ExportarProdutosLocaisBlingLoteRequest(BaseModel):
+    produto_ids: List[int] = Field(..., min_length=1, max_length=50)
+    enviar_estoque: bool = True
 
 
 class ReconciliarBatchRequest(BaseModel):

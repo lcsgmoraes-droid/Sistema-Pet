@@ -46,10 +46,12 @@ export default function useProdutosPageComposition({
   } = conflictState;
   const { filtros, handleFiltroChange, persistirBusca, setPersistirBusca } = filtersState;
   const {
+    blingBatchLoading,
     iniciarTour,
     menuRelatoriosAberto,
     menuRelatoriosRef,
     navigate,
+    onEnviarSelecionadosBling,
     onExcluirSelecionados,
     onGerarRelatorioFiltrado,
     onGerarRelatorioGeral,
@@ -73,6 +75,7 @@ export default function useProdutosPageComposition({
   } = modalsState;
   const { colunasRelatorioProdutos } = reportState;
   const {
+    blingActionKey,
     editandoMargem,
     editandoPreco,
     getCorEstoque,
@@ -91,6 +94,7 @@ export default function useProdutosPageComposition({
     loading,
     novoPreco,
     onChangeItensPorPagina,
+    onExportarProdutoBling,
     onIrParaPagina,
     onIrParaPrimeiraPagina,
     onIrParaUltimaPagina,
@@ -112,6 +116,8 @@ export default function useProdutosPageComposition({
   return {
     mainContentProps: {
       abrirModalColunas,
+      blingActionKey,
+      blingBatchLoading,
       categorias,
       copiarTexto,
       editandoMargem,
@@ -142,7 +148,9 @@ export default function useProdutosPageComposition({
       navigate,
       novoPreco,
       onChangeItensPorPagina,
+      onEnviarSelecionadosBling,
       onExcluirSelecionados,
+      onExportarProdutoBling,
       onGerarRelatorioFiltrado,
       onGerarRelatorioGeral,
       onIrParaPagina,

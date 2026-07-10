@@ -1,3 +1,4 @@
+import { UploadCloud } from "lucide-react";
 import { formatarData } from "../../api/produtos";
 import ActionButton from "../ui/ActionButton";
 import ChannelBadges from "../ui/ChannelBadges";
@@ -82,7 +83,11 @@ function obterImagemProduto(produto) {
     : `${window.location.origin}${produto.imagem_principal}`;
 }
 
+const getProdutoBlingId = (produto) => String(produto?.bling_produto_id || "").trim();
+const getProdutoBlingActionKey = (produtoId) => `produto-bling-${produtoId}`;
+
 export default function ProdutosTabelaSection({
+  blingActionKey,
   colunasVisiveis,
   copiarTexto,
   editandoMargem,
@@ -104,6 +109,7 @@ export default function ProdutosTabelaSection({
   loading,
   navigate,
   novoPreco,
+  onExportarProdutoBling,
   onChangeItensPorPagina,
   onIrParaPagina,
   paginaAtual,
@@ -155,6 +161,8 @@ export default function ProdutosTabelaSection({
     navigate,
     handleExcluir,
     handleToggleAtivo,
+    onExportarProdutoBling,
+    blingActionKey,
   });
 
   const isProdutoExpandido = (produto) =>
@@ -244,6 +252,11 @@ export default function ProdutosTabelaSection({
                 const imagem = obterImagemProduto(produto);
                 const codigo = produto.codigo || produto.sku || produto.codigo_barras;
                 const canaisAtivos = obterCanaisAtivosProduto(produto);
+                const blingId = getProdutoBlingId(produto);
+                const isPai = produto.tipo_produto === "PAI";
+                const blingLoading =
+                  blingActionKey === getProdutoBlingActionKey(produto.id);
+                const podeCriarBling = !blingId && !isPai && onExportarProdutoBling;
 
                 return (
                   <article
@@ -302,6 +315,17 @@ export default function ProdutosTabelaSection({
                                   Inativo
                                 </span>
                               )}
+                              <span
+                                className={`rounded-full px-2 py-0.5 ${
+                                  blingId
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : isPai
+                                      ? "bg-slate-100 text-slate-600"
+                                      : "bg-amber-50 text-amber-700"
+                                }`}
+                              >
+                                {blingId ? `Bling #${blingId}` : isPai ? "Agrupador" : "Sem Bling"}
+                              </span>
                               <ChannelBadges channels={canaisAtivos} layout="row" empty="" />
                             </div>
                           </div>
@@ -380,6 +404,23 @@ export default function ProdutosTabelaSection({
                           size="sm"
                         >
                           Copiar
+                        </ActionButton>
+                      )}
+                      {podeCriarBling && (
+                        <ActionButton
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onExportarProdutoBling(produto);
+                          }}
+                          intent="create"
+                          tone="soft"
+                          size="sm"
+                          icon={UploadCloud}
+                          loading={blingLoading}
+                          className="flex-1"
+                        >
+                          {blingLoading ? "Criando..." : "Cadastrar Bling"}
                         </ActionButton>
                       )}
                       <ActionButton
