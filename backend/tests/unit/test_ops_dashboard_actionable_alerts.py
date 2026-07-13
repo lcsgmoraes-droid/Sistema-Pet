@@ -156,3 +156,51 @@ def test_period_alerts_flag_missing_backup_evidence():
             "source": "continuity",
         }
     ]
+
+
+def test_period_alerts_flag_tls_expiry_warning():
+    alerts = _build_alerts(
+        db=_FakeDb(),
+        watchdog={"status": "healthy"},
+        error_summary={"errors_5xx": 0, "slow_requests": 0},
+        deploy_events=[],
+        watchdog_summary={"recoveries": 0},
+        tenant_incidents=[],
+        route_incidents=[],
+        tls={
+            "status": "warning",
+            "certificates": [
+                {"domain": "corepet.com.br", "status": "warning"},
+                {"domain": "img.corepet.com.br", "status": "healthy"},
+            ],
+        },
+    )
+
+    assert alerts[0] == {
+        "severity": "warning",
+        "tone": "amber",
+        "title": "Validade TLS exige atencao",
+        "detail": "Status: warning; dominios: corepet.com.br.",
+        "action": "Validar renovacao e cadeia do certificado antes do vencimento.",
+        "source": "tls",
+    }
+
+
+def test_actionable_alerts_notify_tls_expiry_warning():
+    alerts = _build_actionable_alerts(
+        _FakeDb(),
+        [],
+        {"status": "healthy"},
+        {"recoveries": 0},
+        [],
+        tls={
+            "status": "warning",
+            "certificates": [
+                {"domain": "corepet.com.br", "status": "warning"},
+            ],
+        },
+    )
+
+    assert alerts[0]["id"] == "system:tls:certificate_status"
+    assert alerts[0]["severity"] == "warning"
+    assert alerts[0]["score"] == 780

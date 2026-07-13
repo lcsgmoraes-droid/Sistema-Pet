@@ -8,7 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_continuity_scripts_are_versioned_as_executable():
     scripts = [
         "scripts/install_prod_restore_smoke_wrapper.sh",
+        "scripts/install_ops_tls_monitor_cron.sh",
         "scripts/ops_continuity_event.sh",
+        "scripts/ops_tls_probe.sh",
         "scripts/prod_db_backup.sh",
         "scripts/prod_db_restore_smoke.sh",
     ]
@@ -105,3 +107,29 @@ def test_ops_dashboard_exposes_continuity_summary():
     assert "function ContinuityPanel" in dashboard
     assert "RPO alvo" in dashboard
     assert "RTO alvo" in dashboard
+
+
+def test_ops_dashboard_exposes_automated_tls_expiry_status():
+    probe = (ROOT / "scripts" / "ops_tls_probe.sh").read_text(encoding="utf-8")
+    installer = (ROOT / "scripts" / "install_ops_tls_monitor_cron.sh").read_text(
+        encoding="utf-8"
+    )
+    deploy = (ROOT / "scripts" / "deploy_producao_seguro.sh").read_text(
+        encoding="utf-8"
+    )
+    service = (
+        ROOT / "backend" / "app" / "services" / "ops_dashboard_service.py"
+    ).read_text(encoding="utf-8")
+    dashboard = (ROOT / "frontend" / "src" / "pages" / "OpsDashboard.jsx").read_text(
+        encoding="utf-8"
+    )
+
+    assert "ssl.create_default_context()" in probe
+    assert "server_hostname=domain" in probe
+    assert "tls_status.json" in probe
+    assert "20 * * * *" in installer
+    assert "flock -n /tmp/petshop-ops-tls-monitor.lock" in installer
+    assert "timeout 45" in installer
+    assert "install_ops_tls_monitor_cron.sh" in deploy
+    assert '"tls": tls' in service
+    assert "Certificado TLS" in dashboard

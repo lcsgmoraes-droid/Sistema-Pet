@@ -54,7 +54,7 @@ function toneClasses(tone) {
 }
 
 function statusTone(status) {
-  if (["critical", "failed", "missing", "unhealthy"].includes(status)) return "red";
+  if (["critical", "failed", "missing", "unavailable", "unhealthy"].includes(status)) return "red";
   if (["degraded", "stale", "warning"].includes(status)) return "amber";
   if (status === "healthy" || status === "ok") return "green";
   return "slate";
@@ -68,6 +68,7 @@ function statusLabel(status) {
     healthy: "saudavel",
     missing: "sem evidencia",
     stale: "atrasado",
+    unavailable: "sem leitura",
     unhealthy: "indisponivel",
     warning: "atencao",
     ok: "ok",
@@ -562,6 +563,11 @@ export default function OpsDashboard() {
   const periodStatus = dashboard?.period_status || dashboard?.status;
   const blingQueue = dashboard?.queues?.bling_pedido_webhooks;
   const continuity = dashboard?.continuity;
+  const tls = dashboard?.tls;
+  const tlsDays = (tls?.certificates || [])
+    .map((item) => Number(item.days_remaining))
+    .filter(Number.isFinite);
+  const tlsMinDays = tlsDays.length ? Math.min(...tlsDays) : null;
 
   return (
     <div className="p-6">
@@ -610,7 +616,7 @@ export default function OpsDashboard() {
 
         <CurrentStatusPanel currentStatus={currentStatus} watchdog={watchdog} />
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-9">
           <MetricCard
             icon={FiCheckCircle}
             label="Estado atual"
@@ -682,6 +688,13 @@ export default function OpsDashboard() {
                 : "Sem evidencia registrada"
             }
             tone={statusTone(continuity?.restore?.status)}
+          />
+          <MetricCard
+            icon={FiShield}
+            label="Certificado TLS"
+            value={statusLabel(tls?.status)}
+            detail={tlsMinDays != null ? `${tlsMinDays} dias restantes` : "Sem leitura recente"}
+            tone={statusTone(tls?.status)}
           />
         </div>
 
