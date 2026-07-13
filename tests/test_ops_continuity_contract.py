@@ -1,7 +1,24 @@
+import subprocess
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_continuity_scripts_are_versioned_as_executable():
+    scripts = [
+        "scripts/ops_continuity_event.sh",
+        "scripts/prod_db_backup.sh",
+        "scripts/prod_db_restore_smoke.sh",
+    ]
+    index_entries = subprocess.check_output(
+        ["git", "ls-files", "--stage", *scripts],
+        cwd=ROOT,
+        text=True,
+    ).splitlines()
+
+    assert len(index_entries) == len(scripts)
+    assert all(entry.startswith("100755 ") for entry in index_entries)
 
 
 def test_backup_and_restore_publish_safe_continuity_events():
