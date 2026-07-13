@@ -103,3 +103,20 @@ test("mantem compartilhamento por url no iOS", async () => {
   assert.equal(conteudo.title, "contagem-1.pdf");
   assert.equal(conteudo.url, "file:///cache/contagem-1.pdf");
 });
+
+test("mantem modulo nativo de compartilhamento registrado apos prebuild", () => {
+  const androidRoot = path.resolve(
+    __dirname,
+    "..",
+    "android/app/src/main/java/br/com/corepet/app",
+  );
+  const application = readFileSync(path.join(androidRoot, "MainApplication.kt"), "utf8");
+  const nativeModule = readFileSync(
+    path.join(androidRoot, "FuncionarioFileShareModule.kt"),
+    "utf8",
+  );
+
+  assert.match(application, /add\(FuncionarioFileSharePackage\(\)\)/);
+  assert.match(nativeModule, /override fun getName\(\): String = "FuncionarioFileShare"/);
+  assert.match(nativeModule, /Intent\.FLAG_GRANT_READ_URI_PERMISSION/);
+});

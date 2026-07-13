@@ -336,7 +336,7 @@ export default function SelecionarLojaScreen() {
       >
         <View style={styles.scannerContainer}>
           <CameraView
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
             facing="back"
             barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
             onBarcodeScanned={onBarcodeScanned}
@@ -599,7 +599,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
   },
   scannerOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
   },

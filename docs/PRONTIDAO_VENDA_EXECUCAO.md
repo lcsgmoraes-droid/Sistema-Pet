@@ -100,6 +100,25 @@ Este ciclo ainda nao encerra o G3. O dump permanece no mesmo servidor ate a esco
 e configuracao de um armazenamento externo. Depois disso, uma execucao real em
 producao deve comprovar backup, copia externa, restore e exibicao correta no `/ops`.
 
+## Evidencias do quarto ciclo
+
+Executado em 2026-07-13:
+
+- aplicativo mobile migrado incrementalmente do Expo 54 para o Expo 57;
+- React Native atualizado de 0.81 para 0.86 e React atualizado para 19.2;
+- dependencias nativas alinhadas pelo `expo install --fix` em cada marco;
+- configuracao legada de splash migrada para o plugin `expo-splash-screen`;
+- projeto Android regenerado para o SDK 57;
+- modulo nativo de compartilhamento restaurado e protegido por teste de contrato;
+- auditoria npm mobile passou de 15 alertas moderados para zero;
+- typecheck e 25 testes mobile aprovados;
+- bundle Android Hermes aprovado com 1.943 modulos.
+
+A compilacao nativa Android ainda precisa ser comprovada por EAS Build, pois o
+computador local nao possui JDK. O alerta do `expo-doctor` sobre projeto hibrido e
+esperado: Android e versionado por conter modulo nativo proprio, enquanto iOS usa a
+configuracao gerada pelo Expo.
+
 ## G1 - Release reproduzivel
 
 O primeiro pacote adiciona `scripts/validar_release.ps1` ao `release-check` oficial.

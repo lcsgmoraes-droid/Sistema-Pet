@@ -13,11 +13,6 @@
     },
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0F5F66"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "br.com.corepet.app",
@@ -58,6 +53,14 @@
     },
     "plugins": [
       [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0F5F66"
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Permite escanear codigos de barras dos produtos.",
@@ -91,7 +94,8 @@
         }
       ],
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {
