@@ -41,6 +41,9 @@ jobs:
       - name: Test smoke helpers
         run: python -m pytest tests -q
 
+      - name: Validate Basic Plan commercial contract
+        run: python -m pytest scripts/test_pacote_comercial_basico.py -q
+
       - name: Backend and auth smoke
         run: python scripts/ci_smoke.py
 

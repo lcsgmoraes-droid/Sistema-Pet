@@ -1,6 +1,6 @@
 # Indice operacional do Sistema Pet
 
-Atualizado em: 2026-06-28
+Atualizado em: 2026-07-13
 
 Este e o ponto de entrada oficial da documentacao. Se houver conflito entre este
 indice e um documento historico, use este indice e o guia mestre de maturidade.
@@ -24,6 +24,8 @@ Guia mestre:
 | Observabilidade e auditoria | `docs/RETENCAO_LOGS_AUDITORIA.md` | Painel Ops e logs JSONL |
 | Estrutura/refatoracao | `docs/auditorias/estrutura-geral-definition-of-done.md` | Testes focados da fatia |
 | Vender Plano Basico | `docs/GUIA_VENDA_PLANO_BASICO.md` | Checklist de onboarding e clientes piloto |
+| Proposta e suporte do piloto | `docs/comercial/PACOTE_PILOTO_PLANO_BASICO.md` | Checklist exclusivo do Plano Basico |
+| Implantar Plano Basico piloto | `docs/implantacao/CHECKLIST_PLANO_BASICO_PILOTO.md` | Pacote comercial aceito pelo cliente |
 | Implantacao inicial | `docs/implantacao/GUIA_IMPLANTACAO_INICIAL.md` | Introducao Guiada em `/ajuda` |
 | Criativos e videos do sistema | `docs/marketing/MATRIZ_CRIATIVOS_SISTEMA.md` | Guia de implantacao e telas reais |
 | Produzir videos com IA | `docs/marketing/GUIA_PRODUCAO_VIDEO_IA.md` | Roteiros de venda e demos por funcionalidade |

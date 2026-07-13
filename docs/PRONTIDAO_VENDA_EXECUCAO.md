@@ -39,7 +39,7 @@ restante da aplicacao.
 | G1 - Release reproduzivel | Atendido | `FLUXO_UNICO.bat release-check` executa qualidade, testes, builds e auditorias sem falso positivo |
 | G2 - Seguranca critica | Atendido para piloto | Sem vulnerabilidade bloqueadora, segredo em log ou erro interno exposto |
 | G3 - Recuperacao e operacao | Em execucao | Backup externo monitorado e restore recorrente comprovado |
-| G4 - Oferta comercial | Pendente | Escopo, contrato, suporte, onboarding e resposta a incidente definidos |
+| G4 - Oferta comercial | Atendido para piloto | Escopo, modelo de aceite, suporte, onboarding e resposta a incidente definidos; contrato definitivo requer revisao juridica |
 | G5 - Piloto pago | Pendente | 2 a 5 clientes acompanhados, sem incidente critico e com indicadores registrados |
 | G6 - Escala enterprise | Futuro | Staging, PITR, testes de carga, monitoramento externo, pentest e governanca formal |
 
@@ -231,6 +231,23 @@ Evolucoes planejadas para o mesmo cockpit:
 6. Expor os indicadores de continuidade no cockpit `/ops`.
 7. Formalizar oferta do Plano Basico, suporte e onboarding.
 8. Iniciar pilotos controlados e medir a operacao.
+
+## Progresso das oito etapas
+
+Situacao em 2026-07-13: **6 de 8 concluidas (75%)**.
+
+- etapas 1, 2, 3, 4, 6 e 7 concluidas;
+- etapa 5 parcial: backup e restore locais validados; copia externa em standby por
+  decisao do responsavel;
+- etapa 8 e a proxima: iniciar 2 a 5 pilotos controlados e registrar os indicadores.
+
+Evidencias da etapa 7:
+
+- `docs/comercial/PACOTE_PILOTO_PLANO_BASICO.md` concentra escopo, exclusoes,
+  condicao comercial, suporte, incidente, privacidade e aceite;
+- `docs/implantacao/CHECKLIST_PLANO_BASICO_PILOTO.md` limita a implantacao ao que
+  esta efetivamente prometido no Plano Basico;
+- `scripts/test_pacote_comercial_basico.py` protege o contrato documental minimo.
 
 ## Regra de decisao
 
