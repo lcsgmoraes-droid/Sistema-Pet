@@ -10,7 +10,10 @@ NEXT_RUNTIME_DIST="${NEXT_RUNTIME_DIST:-${RUNTIME_DIST}.next}"
 PREV_RUNTIME_DIST="${PREV_RUNTIME_DIST:-${RUNTIME_DIST}.prev}"
 PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://mlprohub.com.br/api/health}"
 DEPLOY_EVENTS_PATH="${DEPLOY_EVENTS_PATH:-backend/logs/deploy_events.jsonl}"
-DEPLOY_STARTED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+DEPLOY_STARTED_AT="${DEPLOY_STARTED_AT:-$(date -u '+%Y-%m-%dT%H:%M:%SZ')}"
+DEPLOY_REEXECUTED="${DEPLOY_REEXECUTED:-0}"
+DEPLOY_ORIGINAL_HEAD="${DEPLOY_ORIGINAL_HEAD:-}"
+DEPLOY_ORIGINAL_BACKUP_DIR="${DEPLOY_ORIGINAL_BACKUP_DIR:-}"
 CURRENT_STEP="inicio"
 DEPLOY_EVENT_RECORDED=0
 HEAD_BEFORE=""
@@ -237,24 +240,52 @@ if [[ "$tracked_dist_count" != "0" ]]; then
   fail "Artefatos gerados nao podem estar versionados."
 fi
 
-backup_dir="$APP_DIR/backups/deploy_$(date '+%Y%m%d_%H%M%S')"
-mkdir -p "$backup_dir"
+if [[ "$DEPLOY_REEXECUTED" == "1" ]]; then
+  [[ -n "$DEPLOY_ORIGINAL_HEAD" ]] || fail "Reexecucao sem commit original"
+  git cat-file -e "$DEPLOY_ORIGINAL_HEAD^{commit}" 2>/dev/null || fail "Commit original invalido na reexecucao"
+  case "$DEPLOY_ORIGINAL_BACKUP_DIR" in
+    "$APP_DIR"/backups/deploy_*) ;;
+    *) fail "Diretorio de backup original invalido na reexecucao" ;;
+  esac
+  [[ -d "$DEPLOY_ORIGINAL_BACKUP_DIR" ]] || fail "Backup original ausente na reexecucao"
+  HEAD_BEFORE="$DEPLOY_ORIGINAL_HEAD"
+  backup_dir="$DEPLOY_ORIGINAL_BACKUP_DIR"
+else
+  backup_dir="$APP_DIR/backups/deploy_$(date '+%Y%m%d_%H%M%S')"
+  mkdir -p "$backup_dir"
+  HEAD_BEFORE="$(git rev-parse HEAD)"
+  printf '%s\n' "$HEAD_BEFORE" >"$backup_dir/head_before.txt"
+  docker compose -f "$COMPOSE_FILE" ps >"$backup_dir/docker_ps_before.txt" || true
+fi
+
 db_backup_dir="$APP_DIR/backups/db"
 mkdir -p "$db_backup_dir"
 if getent group docker >/dev/null 2>&1; then
   chgrp docker "$APP_DIR/backups" "$db_backup_dir" || true
   chmod 770 "$APP_DIR/backups" "$db_backup_dir" || true
 fi
-HEAD_BEFORE="$(git rev-parse HEAD)"
-printf '%s\n' "$HEAD_BEFORE" >"$backup_dir/head_before.txt"
-docker compose -f "$COMPOSE_FILE" ps >"$backup_dir/docker_ps_before.txt" || true
-
 mark_step "atualizar_codigo"
 audit_step "Atualizando codigo em producao"
 log "Atualizando codigo para $REMOTE/$BRANCH"
 git fetch "$REMOTE" "$BRANCH"
 git reset --hard "$REMOTE/$BRANCH"
 HEAD_AFTER="$(git rev-parse HEAD)"
+
+if [[ "$HEAD_BEFORE" != "$HEAD_AFTER" && "$DEPLOY_REEXECUTED" != "1" ]]; then
+  log "Codigo atualizado; recarregando o script de deploy na nova versao"
+  exec env \
+    DEPLOY_REEXECUTED=1 \
+    DEPLOY_ORIGINAL_HEAD="$HEAD_BEFORE" \
+    DEPLOY_ORIGINAL_BACKUP_DIR="$backup_dir" \
+    DEPLOY_STARTED_AT="$DEPLOY_STARTED_AT" \
+    APP_DIR="$APP_DIR" REMOTE="$REMOTE" BRANCH="$BRANCH" \
+    COMPOSE_FILE="$COMPOSE_FILE" RUNTIME_DIST="$RUNTIME_DIST" \
+    NEXT_RUNTIME_DIST="$NEXT_RUNTIME_DIST" PREV_RUNTIME_DIST="$PREV_RUNTIME_DIST" \
+    PUBLIC_HEALTH_URL="$PUBLIC_HEALTH_URL" DEPLOY_EVENTS_PATH="$DEPLOY_EVENTS_PATH" \
+    DEPLOY_LOCK_FILE="$DEPLOY_LOCK_FILE" \
+    bash "$APP_DIR/scripts/deploy_producao_seguro.sh"
+fi
+
 changed_files="$(git diff --name-only "$HEAD_BEFORE" "$HEAD_AFTER" || true)"
 
 if [[ -n "$(git status --porcelain)" ]]; then
