@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 
@@ -39,4 +40,7 @@ def test_android_push_build_has_firebase_configuration_contract():
     root_gradle = read("app-mobile/android/build.gradle")
     app_gradle = read("app-mobile/android/app/build.gradle")
     assert "com.google.gms:google-services" in root_gradle
-    assert 'apply plugin: "com.google.gms.google-services"' in app_gradle
+    assert re.search(
+        r'''apply plugin:\s*["']com\.google\.gms\.google-services["']''',
+        app_gradle,
+    )
