@@ -31,6 +31,7 @@ root-owned:
 
 - `/usr/local/sbin/petshop-deploy-producao`
 - `/usr/local/sbin/petshop-status-producao`
+- `/usr/local/sbin/petshop-restore-smoke-producao`
 
 Usar `root@192.241.150.121` somente como fallback operacional autorizado.
 

@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_continuity_scripts_are_versioned_as_executable():
     scripts = [
+        "scripts/install_prod_restore_smoke_wrapper.sh",
         "scripts/ops_continuity_event.sh",
         "scripts/prod_db_backup.sh",
         "scripts/prod_db_restore_smoke.sh",
@@ -19,6 +20,29 @@ def test_continuity_scripts_are_versioned_as_executable():
 
     assert len(index_entries) == len(scripts)
     assert all(entry.startswith("100755 ") for entry in index_entries)
+
+
+def test_restore_smoke_uses_restricted_root_owned_wrapper():
+    installer = (ROOT / "scripts" / "install_prod_restore_smoke_wrapper.sh").read_text(
+        encoding="utf-8"
+    )
+    deploy = (ROOT / "scripts" / "deploy_producao_seguro.sh").read_text(
+        encoding="utf-8"
+    )
+    guide = (ROOT / "docs" / "PRODUCAO_BACKUP_RESTORE_TESTE.md").read_text(
+        encoding="utf-8"
+    )
+
+    wrapper_path = "/usr/local/sbin/petshop-restore-smoke-producao"
+    assert "Este wrapper nao aceita argumentos." in installer
+    assert "database.restore_smoke" in installer
+    assert "auditar_comando_producao.sh" in installer
+    assert "exec env -i" in installer
+    assert "-- bash scripts/prod_db_restore_smoke.sh" in installer
+    assert "NOPASSWD" in installer
+    assert "visudo -cf" in installer
+    assert "install_prod_restore_smoke_wrapper.sh" in deploy
+    assert f"sudo -n {wrapper_path}" in guide
 
 
 def test_backup_and_restore_publish_safe_continuity_events():

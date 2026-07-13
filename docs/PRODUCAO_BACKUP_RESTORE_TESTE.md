@@ -26,8 +26,11 @@ nao altera o banco de producao.
 Rodar em producao pelo usuario operacional:
 
 ```bash
-ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "cd /opt/petshop && bash scripts/prod_db_restore_smoke.sh"
+ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-restore-smoke-producao"
 ```
+
+O wrapper e root-owned, nao aceita argumentos e registra a operacao no log de
+auditoria antes de criar um backup novo e restaura-lo em container descartavel.
 
 Saida esperada, sem dados sensiveis:
 
@@ -44,10 +47,16 @@ restore_container_removed=true
 
 ## Restaurar backup ja existente no smoke
 
-Para testar um dump especifico:
+O wrapper operacional nao aceita caminhos de arquivo. Testar um dump especifico
+exige acesso root de fallback, autorizacao explicita e o wrapper de auditoria:
 
 ```bash
-ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "cd /opt/petshop && bash scripts/prod_db_restore_smoke.sh /opt/petshop/backups/db/ARQUIVO.dump.gz"
+cd /opt/petshop
+bash scripts/auditar_comando_producao.sh \
+  --action database.restore_smoke_existing \
+  --reason "validar dump especifico autorizado" \
+  --label "restore smoke de dump existente" \
+  -- bash scripts/prod_db_restore_smoke.sh /opt/petshop/backups/db/ARQUIVO.dump.gz
 ```
 
 ## Politica de retencao
