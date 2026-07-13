@@ -21,12 +21,29 @@ def _build_alerts(
     tenant_incidents: list[dict[str, Any]],
     route_incidents: list[dict[str, Any]],
     queue_snapshot: dict[str, Any] | None = None,
+    continuity: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     alerts: list[dict[str, Any]] = []
     errors_5xx = int(error_summary.get("errors_5xx") or 0)
     slow_requests = int(error_summary.get("slow_requests") or 0)
     last_failed = _last_failed_deploy_after_success(deploy_events)
     recoveries = int(watchdog_summary.get("recoveries") or 0)
+
+    if continuity and continuity.get("status") != "healthy":
+        backup_status = (continuity.get("backup") or {}).get("status")
+        external_status = (continuity.get("external_copy") or {}).get("status")
+        restore_status = (continuity.get("restore") or {}).get("status")
+        critical = continuity.get("status") == "critical"
+        alerts.append(
+            {
+                "severity": "critical" if critical else "warning",
+                "tone": "red" if critical else "amber",
+                "title": "Continuidade operacional exige atencao",
+                "detail": f"Backup: {backup_status or '-'}; copia externa: {external_status or '-'}; restore: {restore_status or '-'}.",
+                "action": "Validar a rotina de backup e executar restore controlado antes do proximo deploy.",
+                "source": "continuity",
+            }
+        )
 
     if watchdog.get("status") != "healthy":
         alerts.append(

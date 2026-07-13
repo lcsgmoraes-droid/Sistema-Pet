@@ -38,7 +38,7 @@ restante da aplicacao.
 | --- | --- | --- |
 | G1 - Release reproduzivel | Em execucao | `FLUXO_UNICO.bat release-check` executa qualidade, testes, builds e auditorias sem falso positivo |
 | G2 - Seguranca critica | Em execucao | Sem vulnerabilidade bloqueadora, segredo em log ou erro interno exposto |
-| G3 - Recuperacao e operacao | Pendente | Backup externo monitorado e restore recorrente comprovado |
+| G3 - Recuperacao e operacao | Em execucao | Backup externo monitorado e restore recorrente comprovado |
 | G4 - Oferta comercial | Pendente | Escopo, contrato, suporte, onboarding e resposta a incidente definidos |
 | G5 - Piloto pago | Pendente | 2 a 5 clientes acompanhados, sem incidente critico e com indicadores registrados |
 | G6 - Escala enterprise | Futuro | Staging, PITR, testes de carga, monitoramento externo, pentest e governanca formal |
@@ -81,6 +81,25 @@ Executado em 2026-07-13:
 Este ciclo reduz um risco critico, mas nao encerra o G2. Ainda faltam as revisoes de
 autenticacao, rate limit, confiabilidade do IP de origem e headers HTTP.
 
+## Evidencias do terceiro ciclo
+
+Executado em 2026-07-13:
+
+- backup local diario configurado para 03:15;
+- restore controlado semanal configurado para domingo as 04:30;
+- exclusao mutua adicionada para impedir backup e restore simultaneos;
+- eventos append-only registram apenas horario, status, tamanho, checksum e contagens;
+- permissoes ajustadas para o backend nao-root ler a evidencia criada pelo cron;
+- cockpit `/ops` passou a classificar backup, restore, RPO e evidencia de RTO;
+- ausencia de copia externa permanece visivel como alerta, sem falso estado saudavel;
+- 18 testes da area Ops e 2 testes de contrato aprovados;
+- sintaxe Bash, lint, formatacao, auditoria frontend e build de producao aprovados;
+- gate rapido de release aprovado.
+
+Este ciclo ainda nao encerra o G3. O dump permanece no mesmo servidor ate a escolha
+e configuracao de um armazenamento externo. Depois disso, uma execucao real em
+producao deve comprovar backup, copia externa, restore e exibicao correta no `/ops`.
+
 ## G1 - Release reproduzivel
 
 O primeiro pacote adiciona `scripts/validar_release.ps1` ao `release-check` oficial.
@@ -117,8 +136,7 @@ Ja existem no cockpit:
 
 Evolucoes planejadas para o mesmo cockpit:
 
-- idade e resultado do ultimo backup;
-- data e resultado do ultimo restore controlado;
+- copia externa do backup e sua idade;
 - validade do certificado TLS;
 - resultado de monitoramento externo;
 - versao implantada e estado do gate que autorizou a versao;

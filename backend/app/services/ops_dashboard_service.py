@@ -14,6 +14,7 @@ from app.services.error_event_reporter import (
     summarize_error_events,
 )
 from app.services.ops_alert_notifier import notify_ops_alerts
+from app.services.ops_continuity_service import summarize_continuity
 from app.services.ops_dashboard_actionable_alerts import _build_actionable_alerts
 from app.services.ops_dashboard_health import (
     _current_health_status,
@@ -70,6 +71,7 @@ def build_ops_dashboard(
         since=period_since, until=period_until, db=db
     )
     watchdog = _watchdog_now(db)
+    continuity = summarize_continuity(now=now)
     queue_snapshot: dict[str, Any] = {}
     if get_bling_pedido_webhook_queue_snapshot is not None:
         try:
@@ -142,6 +144,7 @@ def build_ops_dashboard(
         tenant_incidents=tenant_incidents,
         route_incidents=route_incidents,
         queue_snapshot=queue_snapshot,
+        continuity=continuity,
     )
     period_status = _overall_status(alerts)
 
@@ -163,6 +166,7 @@ def build_ops_dashboard(
         "queues": {
             "bling_pedido_webhooks": queue_snapshot,
         },
+        "continuity": continuity,
         "actionable_alerts": persisted_actionable_alerts or actionable_alerts,
         "ops_notifications": {
             **ops_notifications,
