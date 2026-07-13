@@ -41,6 +41,11 @@ Backup e restore smoke do banco: `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md`.
 
 O script `scripts/deploy_producao_seguro.sh` e o caminho oficial. Ele faz pull de `origin/main`, gera frontend, reconstrui a imagem `petshop-backend:prod`, sobe `postgres`, `backend`, `worker-bling` e `nginx`, aplica Alembic e valida health.
 
+Quando o `git reset` troca o commit, o processo recarrega uma unica vez o script
+recem-baixado antes de continuar. O commit anterior, o horario inicial e o mesmo
+diretorio de evidencias sao preservados, garantindo que etapas novas entrem ja no
+primeiro deploy sem perder o contexto de rollback.
+
 Quando o deploy detecta que o diff entre o commit anterior e o novo commit tem
 somente arquivos sem impacto de runtime (`docs/`, `.github/`, arquivos
 Markdown e metadados equivalentes), ele atualiza o repositorio, valida o health
