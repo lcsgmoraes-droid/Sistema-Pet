@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 APP_DIR="${APP_DIR:-/opt/petshop}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
-PUBLIC_WATCHDOG_URL="${HOST_WATCHDOG_URL:-https://mlprohub.com.br/api/health/watchdog}"
+PUBLIC_WATCHDOG_URL="${HOST_WATCHDOG_URL:-https://mlprohub.com.br/api/health}"
 INTERNAL_WATCHDOG_URL="${HOST_WATCHDOG_INTERNAL_URL:-http://127.0.0.1:8000/health/watchdog}"
 STATE_DIR="${HOST_WATCHDOG_STATE_DIR:-/var/lib/petshop-ops}"
 STATE_FILE="${HOST_WATCHDOG_STATE_FILE:-$STATE_DIR/host_watchdog.state}"
