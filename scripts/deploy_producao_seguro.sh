@@ -10,6 +10,9 @@ NEXT_RUNTIME_DIST="${NEXT_RUNTIME_DIST:-${RUNTIME_DIST}.next}"
 PREV_RUNTIME_DIST="${PREV_RUNTIME_DIST:-${RUNTIME_DIST}.prev}"
 PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://mlprohub.com.br/api/health}"
 DEPLOY_EVENTS_PATH="${DEPLOY_EVENTS_PATH:-backend/logs/deploy_events.jsonl}"
+RELEASE_GATE_GITHUB_REPOSITORY="${RELEASE_GATE_GITHUB_REPOSITORY:-lcsgmoraes-droid/Sistema-Pet}"
+RELEASE_STATUS_PATH="${RELEASE_STATUS_PATH:-backend/logs/release_status.json}"
+RELEASE_STATUS_NEXT_PATH="${RELEASE_STATUS_NEXT_PATH:-${RELEASE_STATUS_PATH}.next}"
 DEPLOY_STARTED_AT="${DEPLOY_STARTED_AT:-$(date -u '+%Y-%m-%dT%H:%M:%SZ')}"
 DEPLOY_REEXECUTED="${DEPLOY_REEXECUTED:-0}"
 DEPLOY_ORIGINAL_HEAD="${DEPLOY_ORIGINAL_HEAD:-}"
@@ -170,6 +173,7 @@ trap 'on_error $LINENO' ERR
 
 cleanup_deploy_lock() {
   rm -f "$DEPLOY_LOCK_FILE" 2>/dev/null || true
+  rm -f "$APP_DIR/$RELEASE_STATUS_NEXT_PATH" 2>/dev/null || true
 }
 
 trap cleanup_deploy_lock EXIT
@@ -282,9 +286,21 @@ if [[ "$HEAD_BEFORE" != "$HEAD_AFTER" && "$DEPLOY_REEXECUTED" != "1" ]]; then
     COMPOSE_FILE="$COMPOSE_FILE" RUNTIME_DIST="$RUNTIME_DIST" \
     NEXT_RUNTIME_DIST="$NEXT_RUNTIME_DIST" PREV_RUNTIME_DIST="$PREV_RUNTIME_DIST" \
     PUBLIC_HEALTH_URL="$PUBLIC_HEALTH_URL" DEPLOY_EVENTS_PATH="$DEPLOY_EVENTS_PATH" \
+    RELEASE_GATE_GITHUB_REPOSITORY="$RELEASE_GATE_GITHUB_REPOSITORY" \
+    RELEASE_STATUS_PATH="$RELEASE_STATUS_PATH" \
+    RELEASE_STATUS_NEXT_PATH="$RELEASE_STATUS_NEXT_PATH" \
     DEPLOY_LOCK_FILE="$DEPLOY_LOCK_FILE" \
     bash "$APP_DIR/scripts/deploy_producao_seguro.sh"
 fi
+
+mark_step "validar_release_gate"
+audit_step "Validando checks obrigatorios do commit de producao"
+log "Validando gate do commit ${HEAD_AFTER:0:8} no GitHub"
+python3 "$APP_DIR/scripts/validate_release_gate.py" \
+  --repository "$RELEASE_GATE_GITHUB_REPOSITORY" \
+  --commit "$HEAD_AFTER" \
+  --output "$APP_DIR/$RELEASE_STATUS_NEXT_PATH" \
+  || fail "O commit de producao nao possui todos os checks obrigatorios aprovados."
 
 changed_files="$(git diff --name-only "$HEAD_BEFORE" "$HEAD_AFTER" || true)"
 
@@ -317,6 +333,8 @@ if ! requires_runtime_deploy "$changed_files"; then
 
   git rev-parse HEAD >"$backup_dir/head_after.txt"
   docker compose -f "$COMPOSE_FILE" ps >"$backup_dir/docker_ps_after.txt" || true
+  mv -f "$APP_DIR/$RELEASE_STATUS_NEXT_PATH" "$APP_DIR/$RELEASE_STATUS_PATH"
+  chmod 0644 "$APP_DIR/$RELEASE_STATUS_PATH"
   write_deploy_event "success" "$CURRENT_STEP" "Deploy sem rebuild; sem mudanca de runtime"
   cleanup_deploy_lock
   log "Deploy sem rebuild concluido"
@@ -532,6 +550,8 @@ fi
 
 git rev-parse HEAD >"$backup_dir/head_after.txt"
 docker compose -f "$COMPOSE_FILE" ps >"$backup_dir/docker_ps_after.txt" || true
+mv -f "$APP_DIR/$RELEASE_STATUS_NEXT_PATH" "$APP_DIR/$RELEASE_STATUS_PATH"
+chmod 0644 "$APP_DIR/$RELEASE_STATUS_PATH"
 
 mark_step "concluido"
 write_deploy_event "success" "$CURRENT_STEP" "Deploy concluido com repositorio limpo"

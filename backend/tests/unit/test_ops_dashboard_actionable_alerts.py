@@ -204,3 +204,30 @@ def test_actionable_alerts_notify_tls_expiry_warning():
     assert alerts[0]["id"] == "system:tls:certificate_status"
     assert alerts[0]["severity"] == "warning"
     assert alerts[0]["score"] == 780
+
+
+def test_release_gate_without_evidence_creates_critical_alerts():
+    release = {"status": "unavailable"}
+    period_alerts = _build_alerts(
+        db=_FakeDb(),
+        watchdog={"status": "healthy"},
+        error_summary={"errors_5xx": 0, "slow_requests": 0},
+        deploy_events=[],
+        watchdog_summary={"recoveries": 0},
+        tenant_incidents=[],
+        route_incidents=[],
+        release=release,
+    )
+    actionable = _build_actionable_alerts(
+        _FakeDb(),
+        [],
+        {"status": "healthy"},
+        {"recoveries": 0},
+        [],
+        release=release,
+    )
+
+    assert period_alerts[0]["source"] == "release_gate"
+    assert period_alerts[0]["severity"] == "critical"
+    assert actionable[0]["id"] == "system:release:gate_status"
+    assert actionable[0]["score"] == 990

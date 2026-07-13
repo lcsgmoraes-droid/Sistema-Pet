@@ -133,3 +133,23 @@ def test_ops_dashboard_exposes_automated_tls_expiry_status():
     assert "install_ops_tls_monitor_cron.sh" in deploy
     assert '"tls": tls' in service
     assert "Certificado TLS" in dashboard
+
+
+def test_deploy_validates_and_ops_exposes_release_gate_evidence():
+    deploy = (ROOT / "scripts" / "deploy_producao_seguro.sh").read_text(
+        encoding="utf-8"
+    )
+    service = (
+        ROOT / "backend" / "app" / "services" / "ops_dashboard_service.py"
+    ).read_text(encoding="utf-8")
+    dashboard = (ROOT / "frontend" / "src" / "pages" / "OpsDashboard.jsx").read_text(
+        encoding="utf-8"
+    )
+
+    assert "validate_release_gate.py" in deploy
+    assert 'mark_step "validar_release_gate"' in deploy
+    assert "RELEASE_STATUS_NEXT_PATH" in deploy
+    assert 'mv -f "$APP_DIR/$RELEASE_STATUS_NEXT_PATH"' in deploy
+    assert '"release": release' in service
+    assert "Versao e gate" in dashboard
+    assert "Abrir evidencia no GitHub" in dashboard

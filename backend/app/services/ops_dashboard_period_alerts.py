@@ -23,12 +23,26 @@ def _build_alerts(
     queue_snapshot: dict[str, Any] | None = None,
     continuity: dict[str, Any] | None = None,
     tls: dict[str, Any] | None = None,
+    release: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     alerts: list[dict[str, Any]] = []
     errors_5xx = int(error_summary.get("errors_5xx") or 0)
     slow_requests = int(error_summary.get("slow_requests") or 0)
     last_failed = _last_failed_deploy_after_success(deploy_events)
     recoveries = int(watchdog_summary.get("recoveries") or 0)
+
+    if release and release.get("status") != "healthy":
+        release_status = str(release.get("status") or "unavailable")
+        alerts.append(
+            {
+                "severity": "critical",
+                "tone": "red",
+                "title": "Versao sem gate de release comprovado",
+                "detail": f"Status da evidencia: {release_status}.",
+                "action": "Nao executar novo deploy ate validar o commit e os checks obrigatorios.",
+                "source": "release_gate",
+            }
+        )
 
     if tls and tls.get("status") != "healthy":
         tls_status = str(tls.get("status") or "unavailable")

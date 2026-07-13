@@ -34,6 +34,7 @@ from app.services.ops_persistence_service import (
     summarize_ops_alerts,
     upsert_ops_alerts,
 )
+from app.services.ops_release_status_service import summarize_release_status
 from app.services.ops_tls_status_service import summarize_tls_status
 from app.services.watchdog_event_reporter import (
     get_watchdog_events,
@@ -74,6 +75,7 @@ def build_ops_dashboard(
     watchdog = _watchdog_now(db)
     continuity = summarize_continuity(now=now)
     tls = summarize_tls_status(now=now)
+    release = summarize_release_status()
     queue_snapshot: dict[str, Any] = {}
     if get_bling_pedido_webhook_queue_snapshot is not None:
         try:
@@ -117,6 +119,7 @@ def build_ops_dashboard(
         watchdog_summary,
         deploy_events,
         tls=tls,
+        release=release,
     )
     persisted_actionable_alerts = upsert_ops_alerts(db, actionable_alerts)
     try:
@@ -149,6 +152,7 @@ def build_ops_dashboard(
         queue_snapshot=queue_snapshot,
         continuity=continuity,
         tls=tls,
+        release=release,
     )
     period_status = _overall_status(alerts)
 
@@ -172,6 +176,7 @@ def build_ops_dashboard(
         },
         "continuity": continuity,
         "tls": tls,
+        "release": release,
         "actionable_alerts": persisted_actionable_alerts or actionable_alerts,
         "ops_notifications": {
             **ops_notifications,
