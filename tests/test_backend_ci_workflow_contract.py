@@ -27,6 +27,14 @@ def test_backend_ci_keeps_required_pr_guardrails():
     assert "ruff format --check ." in source
 
 
+def test_backend_ci_runs_required_gate_for_every_main_commit():
+    source = _workflow_source()
+
+    assert "push:" in source
+    assert "branches: [main, develop]" in source
+    assert "paths:" not in source
+
+
 def test_backend_ci_keeps_multitenant_runtime_safety_suite():
     source = _workflow_source()
 
