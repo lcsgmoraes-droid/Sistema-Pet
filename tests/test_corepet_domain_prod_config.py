@@ -6,6 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 NGINX_CONF = ROOT / "nginx" / "nginx.conf"
+SECURITY_HEADERS = ROOT / "nginx" / "includes" / "security-headers.conf"
 COMPOSE_PROD = ROOT / "docker-compose.prod.yml"
 GITIGNORE = ROOT / ".gitignore"
 APP_MOBILE_CONFIG = ROOT / "app-mobile" / "src" / "config.ts"
@@ -75,6 +76,37 @@ def test_prod_nginx_rate_limits_each_final_client_ip():
     assert "limit_req_zone $client_ip zone=api_limit:10m rate=10r/s;" in nginx_conf
     assert "limit_req_zone $client_ip zone=login_limit:10m rate=5r/m;" in nginx_conf
     assert "limit_req_zone $binary_remote_addr" not in nginx_conf
+
+
+def test_prod_nginx_applies_one_consistent_security_header_policy():
+    nginx_conf = NGINX_CONF.read_text(encoding="utf-8")
+    app_locations = (
+        ROOT / "nginx" / "includes" / "app-server-locations.conf"
+    ).read_text(encoding="utf-8")
+    image_locations = (
+        ROOT / "nginx" / "includes" / "product-image-server-locations.conf"
+    ).read_text(encoding="utf-8")
+    headers = SECURITY_HEADERS.read_text(encoding="utf-8")
+
+    assert "server_tokens off;" in nginx_conf
+    assert 'add_header X-Frame-Options "DENY" always;' in headers
+    assert 'add_header X-XSS-Protection "0" always;' in headers
+    assert (
+        'add_header Referrer-Policy "strict-origin-when-cross-origin" always;'
+        in headers
+    )
+    assert "frame-ancestors 'none'" in headers
+    assert "object-src 'none'" in headers
+    assert "proxy_hide_header X-Frame-Options;" in headers
+    assert "proxy_hide_header Referrer-Policy;" in headers
+    assert "SAMEORIGIN" not in app_locations
+    assert "no-referrer-when-downgrade" not in app_locations
+    assert (
+        app_locations.count("include /etc/nginx/includes/security-headers.conf;") == 9
+    )
+    assert (
+        image_locations.count("include /etc/nginx/includes/security-headers.conf;") == 2
+    )
 
 
 def test_prod_nginx_preserves_frontend_redirects_from_api_routes():

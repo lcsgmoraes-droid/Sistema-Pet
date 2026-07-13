@@ -16,6 +16,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("X-XSS-Protection", "0")
         response.headers.setdefault(
             "Referrer-Policy", "strict-origin-when-cross-origin"
         )
@@ -23,11 +24,13 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "Permissions-Policy",
             "camera=(), microphone=(), geolocation=(self), payment=(self)",
         )
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "base-uri 'self'; object-src 'none'; frame-ancestors 'none'; "
+            "form-action 'self'; upgrade-insecure-requests",
+        )
 
-        if (
-            request.url.scheme == "https"
-            or request.headers.get("x-forwarded-proto") == "https"
-        ):
+        if request.url.scheme == "https":
             response.headers.setdefault(
                 "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
             )
