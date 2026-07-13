@@ -80,8 +80,14 @@ def test_prod_nginx_rate_limits_each_final_client_ip():
     assert "limit_req_zone $client_ip zone=login_limit:10m rate=5r/m;" in nginx_conf
     assert "limit_req_zone $binary_remote_addr" not in nginx_conf
     assert "location /api/auth/login" not in app_locations
-    assert "auth/(?:register|login(?:-multitenant)?|forgot-password|reset-password|verify-email|resend-verification)" in app_locations
-    assert "ecommerce/auth/(?:registrar|login|esqueci-senha|resetar-senha)" in app_locations
+    assert (
+        "auth/(?:register|login(?:-multitenant)?|forgot-password|reset-password|verify-email|resend-verification)"
+        in app_locations
+    )
+    assert (
+        "ecommerce/auth/(?:registrar|login|esqueci-senha|resetar-senha)"
+        in app_locations
+    )
     assert "limit_req zone=login_limit burst=5 nodelay;" in app_locations
 
 
