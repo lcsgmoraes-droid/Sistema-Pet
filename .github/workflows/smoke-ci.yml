@@ -3,13 +3,6 @@ name: Smoke CI
 on:
   push:
     branches: [main]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - "scripts/ci_smoke.py"
-      - "scripts/smoke_golive.py"
-      - "tests/**"
-      - ".github/workflows/smoke-ci.yml"
   pull_request:
     branches: [main]
 

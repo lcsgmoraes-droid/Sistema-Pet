@@ -3,13 +3,6 @@ name: Deploy Safety
 on:
   push:
     branches: [main]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - "scripts/**"
-      - "docs/FLUXO_UNICO_DEV_PROD.md"
-      - "docker-compose*.yml"
-      - ".github/workflows/deploy-safety.yml"
   pull_request:
     branches: [main]
 
