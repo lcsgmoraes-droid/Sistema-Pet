@@ -158,12 +158,15 @@ export function EstoqueBlingLocalTab({
   localMeta,
   localError,
   filteredLocal,
+  selectedLocalIds,
   manualBlingLookup,
   manualSearchTerms,
   manualSearchKey,
   rowActionKey,
+  toggleLocalSelection,
   updateManualSearchTerm,
   buscarBlingParaProdutoLocal,
+  exportarProdutoLocalParaBling,
   vincularProdutoLocalAoBling,
 }) {
   if (localLoading && !localMeta.loaded) {
@@ -194,6 +197,7 @@ export function EstoqueBlingLocalTab({
         const key = String(item.id);
         const lookup = manualBlingLookup[key] || {};
         const searchTerm = manualSearchTerms[key] ?? item.codigo ?? "";
+        const selected = selectedLocalIds?.has(Number(item.id));
 
         return (
           <PendingCard
@@ -206,9 +210,9 @@ export function EstoqueBlingLocalTab({
               { label: "ID local", value: item.id, mono: true },
             ]}
             reason={{
-              title: "Opcional para loja fisica",
+              title: "Cadastro ainda nao enviado ao Bling",
               description:
-                "Este produto ainda nao tem vinculo com o Bling. Busque no Bling somente se ele tambem for vendido online ou por marketplace.",
+                "Cadastre no Bling quando o produto tambem precisar vender online ou em marketplace. Se ele ja existir la, use a busca para vincular.",
             }}
             details={[
               { label: "Estoque local", value: formatNumber(item.estoque_atual) },
@@ -220,6 +224,13 @@ export function EstoqueBlingLocalTab({
             ]}
             actions={[
               {
+                label:
+                  rowActionKey === `export-bling-${item.id}` ? "Enviando..." : "Cadastrar no Bling",
+                onClick: () => exportarProdutoLocalParaBling(item),
+                disabled: manualSearchKey !== "" || rowActionKey !== "",
+                className: ISSUE_TONES.emerald.button,
+              },
+              {
                 label: manualSearchKey === key ? "Buscando..." : "Buscar no Bling",
                 onClick: () => buscarBlingParaProdutoLocal(item),
                 disabled: manualSearchKey !== "" || rowActionKey !== "",
@@ -227,6 +238,17 @@ export function EstoqueBlingLocalTab({
               },
             ]}
           >
+            <label className="inline-flex w-fit items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+              <input
+                type="checkbox"
+                checked={Boolean(selected)}
+                onChange={() => toggleLocalSelection(item.id)}
+                disabled={rowActionKey !== ""}
+                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              Selecionar para lote
+            </label>
+
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 value={searchTerm}

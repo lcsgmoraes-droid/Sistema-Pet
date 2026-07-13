@@ -10,8 +10,8 @@ import {
 const normalizeExpandId = (value) => String(value ?? "");
 const PRODUTOS_COLUNAS_STORAGE_KEY = "produtos_colunas_visiveis";
 const PRODUTOS_COLUNAS_VERSION_KEY = "produtos_colunas_visiveis_version";
-const PRODUTOS_COLUNAS_VERSION = 2;
-const COLUNAS_PADRAO_MIGRACAO = ["margem", "canais"];
+const PRODUTOS_COLUNAS_VERSION = 3;
+const COLUNAS_PADRAO_MIGRACAO = ["margem", "canais", "bling"];
 
 function carregarColunasVisiveisSalvas(colunasTabela) {
   const salvo = localStorage.getItem(PRODUTOS_COLUNAS_STORAGE_KEY);

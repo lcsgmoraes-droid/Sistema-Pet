@@ -26,6 +26,7 @@ from contextvars import ContextVar
 import logging
 
 from app.services.error_event_reporter import record_request_event
+from app.security.error_sanitization import is_strict_runtime_environment
 from app.utils.logger import clear_context as clear_log_context
 from app.utils.logger import set_endpoint, set_trace_id
 
@@ -266,6 +267,9 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             # Em caso de exceção, ainda logar com contexto
             duration_ms = round((time.time() - start_time) * 1000, 2)
 
+            strict_runtime = is_strict_runtime_environment()
+            exception_message = None if strict_runtime else str(e)[:200]
+
             logger.error(
                 f"Request failed with exception: {type(e).__name__}",
                 extra={
@@ -274,9 +278,9 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                     "path": path,
                     "duration_ms": duration_ms,
                     "exception_type": type(e).__name__,
-                    "exception_message": str(e)[:200],  # Truncado por segurança
+                    "exception_message": exception_message,
                 },
-                exc_info=True,  # Inclui stack trace nos logs
+                exc_info=not strict_runtime,
             )
 
             record_request_event(
@@ -286,7 +290,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 path=path,
                 duration_ms=duration_ms,
                 exception_type=type(e).__name__,
-                exception_message=str(e),
+                exception_message=exception_message,
             )
 
             raise  # Re-raise para FastAPI lidar

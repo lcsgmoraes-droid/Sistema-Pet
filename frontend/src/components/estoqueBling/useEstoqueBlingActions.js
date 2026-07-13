@@ -14,6 +14,7 @@ export function useEstoqueBlingActions({
   loadDashboard,
   loadSyncProblems,
   manualSearchTerms,
+  selectedLocalIds,
   setLocalMeta,
   setManualBlingLookup,
   setManualSearchKey,
@@ -23,6 +24,7 @@ export function useEstoqueBlingActions({
   setProdutosSemVinculo,
   setRowActionKey,
   setRunningAction,
+  setSelectedLocalIds,
   setVinculosMeta,
   skuLinkSuggestions,
   syncProblems,
@@ -201,6 +203,33 @@ export function useEstoqueBlingActions({
     } finally {
       setRunningAction("");
     }
+  };
+
+  const removeLocalProducts = (produtoIds) => {
+    const ids = new Set(
+      (produtoIds || []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0),
+    );
+
+    if (!ids.size) return;
+
+    setProdutosLocaisSemBling((current) => current.filter((item) => !ids.has(Number(item.id))));
+    setLocalMeta((current) => ({
+      ...current,
+      total: Math.max(Number(current.total || 0) - ids.size, 0),
+      atualizadoEm: new Date().toISOString(),
+    }));
+    setManualBlingLookup((current) => {
+      const next = { ...current };
+      ids.forEach((id) => {
+        delete next[String(id)];
+      });
+      return next;
+    });
+    setSelectedLocalIds((current) => {
+      const next = new Set(current);
+      ids.forEach((id) => next.delete(id));
+      return next;
+    });
   };
 
   const handleImportImagesFromBling = async () => {
@@ -458,6 +487,83 @@ export function useEstoqueBlingActions({
     }
   };
 
+  const exportarProdutoLocalParaBling = async (produto) => {
+    const key = `export-bling-${produto.id}`;
+    setRowActionKey(key);
+
+    try {
+      const response = await api.post(
+        "/estoque/sync/produtos-bling/exportar",
+        {
+          produto_id: Number(produto.id),
+          enviar_estoque: true,
+        },
+        { timeout: HEAVY_REQUEST_TIMEOUT_MS },
+      );
+      const data = response?.data || {};
+      removeLocalProducts([data.produto_id || produto.id]);
+      toast.success(data.message || "Produto enviado ao Bling.");
+      await loadDashboard();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Nao foi possivel cadastrar esse produto no Bling."));
+    } finally {
+      setRowActionKey("");
+    }
+  };
+
+  const exportarSelecionadosParaBling = async () => {
+    const produtoIds = Array.from(selectedLocalIds || [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id) && id > 0);
+
+    if (!produtoIds.length) {
+      toast("Selecione ao menos um produto local para enviar ao Bling.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Cadastrar ${produtoIds.length} produto(s) selecionado(s) no Bling? Se algum SKU ja existir la, o sistema apenas cria o vinculo.`,
+    );
+    if (!confirmed) return;
+
+    setRunningAction("exportar-local-lote");
+    try {
+      const response = await api.post(
+        "/estoque/sync/produtos-bling/exportar-lote",
+        {
+          produto_ids: produtoIds,
+          enviar_estoque: true,
+        },
+        { timeout: 0 },
+      );
+      const data = response?.data || {};
+      const items = data.items || [];
+      const resolvidos = items.filter((item) => item.ok).map((item) => item.produto_id);
+      const criados = Number(data.criados || 0);
+      const vinculados = Number(data.vinculados_existentes || 0);
+      const jaVinculados = Number(data.ja_vinculados || 0);
+      const erros = Number(data.erros || 0);
+
+      removeLocalProducts(resolvidos);
+
+      if (erros > 0) {
+        toast(
+          `Lote concluido: ${criados} criado(s), ${vinculados + jaVinculados} vinculado(s) e ${erros} com pendencia.`,
+        );
+      } else {
+        toast.success(
+          `Lote enviado: ${criados} criado(s) e ${vinculados + jaVinculados} vinculado(s).`,
+        );
+      }
+
+      await loadDashboard();
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Nao foi possivel enviar o lote ao Bling."));
+    } finally {
+      setRunningAction("");
+    }
+  };
+
   const criarPrimeirosFaltantes = async () => {
     const candidatos = filteredCreate
       .filter((item) => item.pronto_para_autocorrecao && item.id)
@@ -524,6 +630,8 @@ export function useEstoqueBlingActions({
   return {
     buscarBlingParaProdutoLocal,
     criarPrimeirosFaltantes,
+    exportarProdutoLocalParaBling,
+    exportarSelecionadosParaBling,
     handleFixItem,
     handleImportImagesFromBling,
     handleReconnectBling,

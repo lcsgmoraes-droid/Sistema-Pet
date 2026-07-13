@@ -4,6 +4,8 @@ import ProdutosTabelaSection from "./ProdutosTabelaSection";
 
 export default function ProdutosMainContent({
   abrirModalColunas,
+  blingActionKey,
+  blingBatchLoading,
   categorias,
   copiarTexto,
   editandoMargem,
@@ -34,7 +36,9 @@ export default function ProdutosMainContent({
   navigate,
   novoPreco,
   onChangeItensPorPagina,
+  onEnviarSelecionadosBling,
   onExcluirSelecionados,
+  onExportarProdutoBling,
   onGerarRelatorioFiltrado,
   onGerarRelatorioGeral,
   onOpenFusao,
@@ -72,6 +76,8 @@ export default function ProdutosMainContent({
         menuRelatoriosAberto={menuRelatoriosAberto}
         menuRelatoriosRef={menuRelatoriosRef}
         navigate={navigate}
+        blingBatchLoading={blingBatchLoading}
+        onEnviarSelecionadosBling={onEnviarSelecionadosBling}
         onExcluirSelecionados={onExcluirSelecionados}
         onGerarRelatorioFiltrado={onGerarRelatorioFiltrado}
         onGerarRelatorioGeral={onGerarRelatorioGeral}
@@ -113,7 +119,9 @@ export default function ProdutosMainContent({
         loading={loading}
         navigate={navigate}
         novoPreco={novoPreco}
+        blingActionKey={blingActionKey}
         onChangeItensPorPagina={onChangeItensPorPagina}
+        onExportarProdutoBling={onExportarProdutoBling}
         onIrParaPagina={onIrParaPagina}
         onIrParaPrimeiraPagina={onIrParaPrimeiraPagina}
         onIrParaUltimaPagina={onIrParaUltimaPagina}

@@ -155,6 +155,17 @@ def test_campaign_push_notifications_create_app_center_payloads():
     assert '"kind": "banho_tosa_retorno"' in retorno_source
 
 
+def test_campaign_notification_sender_uses_visible_push_options():
+    sender_source = (BACKEND_ROOT / "app/campaigns/notification_sender.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert '"sound": "default"' in sender_source
+    assert '"priority": "high"' in sender_source
+    assert '"channelId": "default"' in sender_source
+    assert 'headers={"Content-Type": "application/json"}' in sender_source
+
+
 def test_ecommerce_public_exposes_product_detail_endpoint_for_mobile_deeplink():
     public_source = (BACKEND_ROOT / "app/routes/ecommerce_public.py").read_text(
         encoding="utf-8"

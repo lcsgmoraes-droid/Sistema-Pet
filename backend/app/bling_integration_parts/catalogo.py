@@ -46,6 +46,10 @@ class BlingCatalogoMixin:
         resultado = self._request("GET", f"/produtos/{produto_id}")
         return resultado.get("data", resultado)
 
+    def criar_produto(self, payload: Dict) -> Dict:
+        """Cria um produto no Bling API v3."""
+        return self._request("POST", "/produtos", data=payload)
+
     def atualizar_estoque_produto(
         self,
         produto_id: str,

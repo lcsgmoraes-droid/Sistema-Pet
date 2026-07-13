@@ -127,12 +127,16 @@ def _load_options_listagem_produtos(
     *,
     incluir_imagens: bool,
     incluir_lotes: bool,
+    incluir_bling_sync: bool = False,
 ) -> list[Any]:
     return [
         joinedload(Produto.categoria),
         joinedload(Produto.marca),
         joinedload(Produto.imagens) if incluir_imagens else noload(Produto.imagens),
         joinedload(Produto.lotes) if incluir_lotes else noload(Produto.lotes),
+        joinedload(Produto.bling_sync)
+        if incluir_bling_sync
+        else noload(Produto.bling_sync),
     ]
 
 
@@ -144,6 +148,7 @@ def _buscar_pagina_produtos_listagem(
     page_size: int,
     incluir_imagens: bool,
     incluir_lotes: bool,
+    incluir_bling_sync: bool = False,
     contar_total: bool = True,
 ) -> tuple[list[Produto], Optional[int], list[Any]]:
     total = query.count() if contar_total else None
@@ -151,6 +156,7 @@ def _buscar_pagina_produtos_listagem(
     load_options = _load_options_listagem_produtos(
         incluir_imagens=incluir_imagens,
         incluir_lotes=incluir_lotes,
+        incluir_bling_sync=incluir_bling_sync,
     )
 
     produtos = (
@@ -162,6 +168,62 @@ def _buscar_pagina_produtos_listagem(
     )
 
     return [produto for produto in produtos if produto is not None], total, load_options
+
+
+def _mapa_total_variacoes_por_pai(
+    db: Session, produtos: list[Produto]
+) -> dict[int, int]:
+    pai_ids = [
+        int(produto.id)
+        for produto in produtos
+        if produto and produto.id and produto.tipo_produto == "PAI"
+    ]
+    if not pai_ids:
+        return {}
+
+    rows = (
+        db.query(Produto.produto_pai_id, func.count(Produto.id))
+        .filter(
+            Produto.produto_pai_id.in_(pai_ids),
+            Produto.tipo_produto == "VARIACAO",
+            Produto.ativo.is_(True),
+        )
+        .group_by(Produto.produto_pai_id)
+        .all()
+    )
+    return {int(produto_pai_id): int(total or 0) for produto_pai_id, total in rows}
+
+
+def _mapa_variacoes_por_pai(
+    db: Session,
+    produtos: list[Produto],
+    load_options: list[Any],
+) -> dict[int, list[Produto]]:
+    pai_ids = [
+        int(produto.id)
+        for produto in produtos
+        if produto and produto.id and produto.tipo_produto == "PAI"
+    ]
+    if not pai_ids:
+        return {}
+
+    variacoes = (
+        db.query(Produto)
+        .filter(
+            Produto.produto_pai_id.in_(pai_ids),
+            Produto.tipo_produto == "VARIACAO",
+            Produto.ativo.is_(True),
+        )
+        .options(*load_options)
+        .order_by(Produto.produto_pai_id, Produto.nome)
+        .all()
+    )
+    variacoes_por_pai: dict[int, list[Produto]] = {}
+    for variacao in variacoes:
+        if not variacao.produto_pai_id:
+            continue
+        variacoes_por_pai.setdefault(int(variacao.produto_pai_id), []).append(variacao)
+    return variacoes_por_pai
 
 
 def _montar_resposta_produtos_paginados(
@@ -195,21 +257,27 @@ def _expandir_produtos_listagem(
     termo_busca: Optional[str],
     load_options: list[Any],
     validade_por_produto: dict[int, dict[str, Any]],
+    incluir_bling_sync: bool = False,
 ) -> list[Produto]:
     produtos_expandidos = []
+    total_variacoes_por_pai = _mapa_total_variacoes_por_pai(db, produtos)
+    variacoes_por_pai = (
+        _mapa_variacoes_por_pai(db, produtos, load_options)
+        if include_variations and not termo_busca
+        else {}
+    )
+    todas_variacoes = [
+        variacao for variacoes in variacoes_por_pai.values() for variacao in variacoes
+    ]
+    validade_por_variacao = (
+        _mapa_validade_proxima_produtos(db, todas_variacoes, access_ids)
+        if todas_variacoes
+        else {}
+    )
 
     for produto in produtos:
         if produto.tipo_produto == "PAI":
-            total_variacoes = (
-                db.query(func.count(Produto.id))
-                .filter(
-                    Produto.produto_pai_id == produto.id,
-                    Produto.tipo_produto == "VARIACAO",
-                    Produto.ativo.is_(True),
-                )
-                .scalar()
-            )
-            produto.total_variacoes = total_variacoes or 0
+            produto.total_variacoes = total_variacoes_por_pai.get(int(produto.id), 0)
 
         _enriquecer_produto_listagem(
             db,
@@ -218,26 +286,12 @@ def _expandir_produtos_listagem(
             reservas_por_produto,
             incluir_detalhes_composto=incluir_detalhes_composto,
             validade_por_produto=validade_por_produto,
+            incluir_bling_sync=incluir_bling_sync,
         )
         produtos_expandidos.append(produto)
 
         if include_variations and not termo_busca and produto.tipo_produto == "PAI":
-            variacoes = (
-                db.query(Produto)
-                .filter(
-                    Produto.produto_pai_id == produto.id,
-                    Produto.tipo_produto == "VARIACAO",
-                    Produto.ativo.is_(True),
-                )
-                .options(*load_options)
-                .order_by(Produto.nome)
-                .all()
-            )
-            validade_por_variacao = _mapa_validade_proxima_produtos(
-                db,
-                variacoes,
-                access_ids,
-            )
+            variacoes = variacoes_por_pai.get(int(produto.id), [])
 
             for variacao in variacoes:
                 _enriquecer_produto_listagem(
@@ -247,6 +301,7 @@ def _expandir_produtos_listagem(
                     reservas_por_produto,
                     incluir_detalhes_composto=incluir_detalhes_composto,
                     validade_por_produto=validade_por_variacao,
+                    incluir_bling_sync=incluir_bling_sync,
                 )
                 produtos_expandidos.append(variacao)
 
@@ -472,6 +527,7 @@ def _enriquecer_produto_listagem(
     reservas_por_produto: dict[int, float] | None = None,
     incluir_detalhes_composto: bool = True,
     validade_por_produto: dict[int, dict[str, Any]] | None = None,
+    incluir_bling_sync: bool = False,
 ):
     """Padroniza dados de listagem para produtos simples, kits e variacoes-kit."""
     reservas_por_produto = reservas_por_produto or {}
@@ -577,6 +633,21 @@ def _enriquecer_produto_listagem(
             0.0,
         )
     produto.de_parceiro = is_partner_owned(tenant_id, produto.tenant_id)
+    if incluir_bling_sync:
+        sync = getattr(produto, "bling_sync", None)
+        produto.bling_produto_id = (
+            getattr(sync, "bling_produto_id", None) if sync else None
+        )
+        produto.bling_sync_status = getattr(sync, "status", None) if sync else None
+        produto.bling_sincronizar = (
+            bool(getattr(sync, "sincronizar", False)) if sync else False
+        )
+        produto.bling_ultima_sincronizacao = (
+            getattr(sync, "ultima_sincronizacao", None) if sync else None
+        )
+        produto.bling_ultimo_erro = (
+            getattr(sync, "erro_mensagem", None) if sync else None
+        )
     _enriquecer_preco_pdv(produto)
     return produto
 

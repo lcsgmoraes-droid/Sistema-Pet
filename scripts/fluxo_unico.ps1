@@ -8,6 +8,7 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $root
 
 $validatorScript = Join-Path $PSScriptRoot 'validar_fluxo.ps1'
+$releaseValidatorScript = Join-Path $PSScriptRoot 'validar_release.ps1'
 $devComposeFile = Join-Path $root 'docker-compose.local-dev.yml'
 $prodComposeFile = Join-Path $root 'docker-compose.prod.yml'
 
@@ -54,6 +55,10 @@ switch ($Acao) {
 
     'release-check' {
         Run-Validator -allowLocalChanges $false
+        & $releaseValidatorScript -Nivel completo
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Gate tecnico de release falhou.'
+        }
         Write-Host 'Release-check passou. Pode seguir para producao.' -ForegroundColor Green
     }
 

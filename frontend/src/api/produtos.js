@@ -139,6 +139,24 @@ export const getProdutos = (params = {}) => {
   return api.get("/produtos/", { params });
 };
 
+export const exportarProdutoBling = (produtoId, enviarEstoque = true) => {
+  return api.post("/estoque/sync/produtos-bling/exportar", {
+    produto_id: Number(produtoId),
+    enviar_estoque: enviarEstoque,
+  });
+};
+
+export const exportarProdutosBlingLote = (produtoIds, enviarEstoque = true) => {
+  return api.post(
+    "/estoque/sync/produtos-bling/exportar-lote",
+    {
+      produto_ids: produtoIds.map((produtoId) => Number(produtoId)),
+      enviar_estoque: enviarEstoque,
+    },
+    { timeout: 0 },
+  );
+};
+
 /**
  * Listar produtos VENDÁVEIS (SIMPLES e VARIACAO)
  * Usado no PDV e carrinho de vendas
@@ -505,6 +523,8 @@ export default {
   deleteDepartamento,
   // Produtos
   getProdutos,
+  exportarProdutoBling,
+  exportarProdutosBlingLote,
   getProduto,
   createProduto,
   updateProduto,
