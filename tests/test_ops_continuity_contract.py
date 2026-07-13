@@ -76,6 +76,23 @@ def test_backup_and_restore_publish_safe_continuity_events():
     assert "install_ops_continuity_cron.sh" in deploy
 
 
+def test_restore_smoke_owns_and_removes_its_temporary_volume():
+    restore = (ROOT / "scripts" / "prod_db_restore_smoke.sh").read_text(
+        encoding="utf-8"
+    )
+    disk_guard = (ROOT / "scripts" / "ops_disk_guard.sh").read_text(encoding="utf-8")
+
+    assert "RESTORE_VOLUME_NAME" in restore
+    assert "--label com.corepet.purpose=restore-smoke" in restore
+    assert "type=volume,source=$RESTORE_VOLUME_NAME" in restore
+    assert 'docker rm -f -v "$RESTORE_CONTAINER_NAME"' in restore
+    assert 'docker volume rm -f "$RESTORE_VOLUME_NAME"' in restore
+    assert 'docker volume inspect "$RESTORE_VOLUME_NAME"' in restore
+    assert "restore_volume_removed=true" in restore
+    assert "label=com.corepet.purpose=restore-smoke" in disk_guard
+    assert 'docker volume rm "$volume_name"' in disk_guard
+
+
 def test_ops_dashboard_exposes_continuity_summary():
     service = (
         ROOT / "backend" / "app" / "services" / "ops_dashboard_service.py"

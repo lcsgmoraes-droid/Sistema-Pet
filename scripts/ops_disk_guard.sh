@@ -85,6 +85,17 @@ fi
 
 log "Disco em risco: ${before}%. Limpando cache Docker seguro."
 
+# Remove somente volumes temporarios identificados pelo restore smoke. Volumes
+# ativos sao recusados pelo Docker e nunca entram nesta limpeza.
+restore_volumes="$(docker volume ls -q --filter label=com.corepet.purpose=restore-smoke)"
+if [[ -n "$restore_volumes" ]]; then
+  while IFS= read -r volume_name; do
+    [[ -n "$volume_name" ]] || continue
+    docker volume rm "$volume_name" >/dev/null 2>&1 || true
+  done <<<"$restore_volumes"
+  actions+=("docker_restore_volume_prune")
+fi
+
 docker builder prune -af || true
 actions+=("docker_builder_prune")
 

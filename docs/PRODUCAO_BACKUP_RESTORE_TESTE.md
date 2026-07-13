@@ -13,10 +13,12 @@ O script `scripts/prod_db_restore_smoke.sh`:
 1. Cria um dump real do Postgres de producao com `scripts/prod_db_backup.sh`,
    quando nenhum arquivo de backup e informado.
 2. Salva o dump em `/opt/petshop/backups/db`.
-3. Sobe um container Postgres temporario, sem porta publicada.
+3. Cria um volume identificado e sobe um container Postgres temporario, sem
+   porta publicada.
 4. Restaura o dump nesse container descartavel.
 5. Valida que tabelas publicas e `alembic_version` existem.
-6. Remove o container temporario ao final.
+6. Remove o container e o volume temporarios ao final, inclusive quando o teste
+   falha.
 
 O teste nao baixa dados para o computador local, nao imprime linhas de tabelas e
 nao altera o banco de producao.
@@ -43,6 +45,7 @@ restore_smoke_status=ok
 public_tables=...
 alembic_rows=1
 restore_container_removed=true
+restore_volume_removed=true
 ```
 
 ## Restaurar backup ja existente no smoke
@@ -78,6 +81,7 @@ So marcar o item do guia mestre como feito quando houver evidencia de:
 - `restore_smoke_status=ok`.
 - `alembic_rows` maior ou igual a 1.
 - Container temporario removido.
+- Volume temporario removido.
 - Health publico e watchdog saudaveis depois do teste.
 
 Registrar apenas caminho do backup, tamanho, checksum e resultado. Nunca
