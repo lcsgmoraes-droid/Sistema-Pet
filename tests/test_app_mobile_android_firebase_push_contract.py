@@ -41,6 +41,6 @@ def test_android_push_build_has_firebase_configuration_contract():
     app_gradle = read("app-mobile/android/app/build.gradle")
     assert "com.google.gms:google-services" in root_gradle
     assert re.search(
-        r'''apply plugin:\s*["']com\.google\.gms\.google-services["']''',
+        r"""apply plugin:\s*["']com\.google\.gms\.google-services["']""",
         app_gradle,
     )
