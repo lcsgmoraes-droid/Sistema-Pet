@@ -13,8 +13,29 @@ RESTORE_USER="${RESTORE_USER:-restore_smoke}"
 RESTORE_PASSWORD="${RESTORE_PASSWORD:-restore_smoke_password}"
 TIMESTAMP="$(date '+%Y%m%d_%H%M%S')"
 RESTORE_CONTAINER_NAME="${RESTORE_CONTAINER_NAME:-petshop-restore-smoke-$TIMESTAMP}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=ops_continuity_event.sh
+source "$SCRIPT_DIR/ops_continuity_event.sh"
+
+continuity_event_recorded="false"
+
+record_restore_event() {
+  continuity_event_recorded="true"
+  record_ops_continuity_event \
+    "restore" "$1" "${2:-}" "" "" "${3:-}" "${4:-}"
+}
+
+record_unexpected_restore_failure() {
+  if [[ "$continuity_event_recorded" != "true" ]]; then
+    record_restore_event "failed" "${backup_file:-}" || true
+  fi
+}
+
+trap record_unexpected_restore_failure ERR
 
 fail() {
+  record_restore_event "failed" "${backup_file:-}" || true
   printf 'restore_smoke_status=failed\n' >&2
   printf 'restore_smoke_error=%s\n' "$*" >&2
   exit 1
@@ -124,6 +145,8 @@ fi
 if [[ -z "$alembic_rows" || "$alembic_rows" -lt 1 ]]; then
   fail "restore completed but alembic_version was not found"
 fi
+
+record_restore_event "ok" "$backup_file" "$public_tables" "$alembic_rows"
 
 printf 'restore_smoke_status=ok\n'
 printf 'backup_file=%s\n' "$backup_file"

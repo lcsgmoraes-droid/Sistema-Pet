@@ -311,6 +311,13 @@ if [[ -f "$APP_DIR/scripts/install_ops_host_watchdog_cron.sh" ]]; then
   bash "$APP_DIR/scripts/install_ops_host_watchdog_cron.sh" || log "Aviso: nao foi possivel instalar o cron do host watchdog"
 fi
 
+mark_step "instalar_continuidade_ops"
+audit_step "Instalando rotina de backup e restore controlado"
+log "Instalando rotina de continuidade operacional"
+if [[ -f "$APP_DIR/scripts/install_ops_continuity_cron.sh" ]]; then
+  bash "$APP_DIR/scripts/install_ops_continuity_cron.sh" || fail "Nao foi possivel instalar o cron de continuidade operacional"
+fi
+
 mark_step "preparar_diretorios_persistentes"
 audit_step "Preparando diretorios persistentes do backend"
 log "Preparando diretorios persistentes do backend"

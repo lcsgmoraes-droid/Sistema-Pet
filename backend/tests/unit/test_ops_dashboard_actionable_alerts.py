@@ -1,4 +1,5 @@
 from app.services.ops_dashboard_service import _build_actionable_alerts
+from app.services.ops_dashboard_period_alerts import _build_alerts
 
 
 class _FakeDb:
@@ -126,3 +127,32 @@ def test_build_actionable_alerts_flags_recurrent_5xx_and_slow_routes():
     assert route_slow["slow_requests"] == 4
     assert route_slow["request_id"] == "req-slow-d"
     assert tenant_5xx["tenant_filter"] == "sem_tenant"
+
+
+def test_period_alerts_flag_missing_backup_evidence():
+    alerts = _build_alerts(
+        db=_FakeDb(),
+        watchdog={"status": "healthy"},
+        error_summary={"errors_5xx": 0, "slow_requests": 0},
+        deploy_events=[],
+        watchdog_summary={"recoveries": 0},
+        tenant_incidents=[],
+        route_incidents=[],
+        continuity={
+            "status": "critical",
+            "backup": {"status": "missing"},
+            "external_copy": {"status": "missing"},
+            "restore": {"status": "missing"},
+        },
+    )
+
+    assert alerts == [
+        {
+            "severity": "critical",
+            "tone": "red",
+            "title": "Continuidade operacional exige atencao",
+            "detail": "Backup: missing; copia externa: missing; restore: missing.",
+            "action": "Validar a rotina de backup e executar restore controlado antes do proximo deploy.",
+            "source": "continuity",
+        }
+    ]

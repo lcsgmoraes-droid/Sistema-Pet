@@ -10,8 +10,28 @@ BACKUP_DIR="${BACKUP_DIR:-$APP_DIR/backups/db}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-14}"
 TIMESTAMP="$(date '+%Y%m%d_%H%M%S')"
 BACKUP_NAME="${BACKUP_NAME:-petshop_prod_$TIMESTAMP}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=ops_continuity_event.sh
+source "$SCRIPT_DIR/ops_continuity_event.sh"
+
+continuity_event_recorded="false"
+
+record_backup_event() {
+  continuity_event_recorded="true"
+  record_ops_continuity_event "backup" "$1" "${2:-}" "${3:-}" "${4:-}"
+}
+
+record_unexpected_backup_failure() {
+  if [[ "$continuity_event_recorded" != "true" ]]; then
+    record_backup_event "failed" || true
+  fi
+}
+
+trap record_unexpected_backup_failure ERR
 
 fail() {
+  record_backup_event "failed" || true
   printf 'backup_status=failed\n' >&2
   printf 'backup_error=%s\n' "$*" >&2
   exit 1
@@ -71,6 +91,8 @@ fi
 
 backup_bytes="$(wc -c <"$backup_file" | tr -d '[:space:]')"
 backup_sha256="$(cat "$checksum_file")"
+
+record_backup_event "ok" "$backup_file" "$backup_bytes" "$backup_sha256"
 
 printf 'backup_status=ok\n'
 printf 'backup_file=%s\n' "$backup_file"
