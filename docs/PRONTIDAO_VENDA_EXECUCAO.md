@@ -36,8 +36,8 @@ restante da aplicacao.
 
 | Gate | Situacao inicial | Criterio de saida |
 | --- | --- | --- |
-| G1 - Release reproduzivel | Em execucao | `FLUXO_UNICO.bat release-check` executa qualidade, testes, builds e auditorias sem falso positivo |
-| G2 - Seguranca critica | Em execucao | Sem vulnerabilidade bloqueadora, segredo em log ou erro interno exposto |
+| G1 - Release reproduzivel | Atendido | `FLUXO_UNICO.bat release-check` executa qualidade, testes, builds e auditorias sem falso positivo |
+| G2 - Seguranca critica | Atendido para piloto | Sem vulnerabilidade bloqueadora, segredo em log ou erro interno exposto |
 | G3 - Recuperacao e operacao | Em execucao | Backup externo monitorado e restore recorrente comprovado |
 | G4 - Oferta comercial | Pendente | Escopo, contrato, suporte, onboarding e resposta a incidente definidos |
 | G5 - Piloto pago | Pendente | 2 a 5 clientes acompanhados, sem incidente critico e com indicadores registrados |
@@ -160,6 +160,24 @@ Com estas evidencias, o G2 atende a linha de base para pilotos controlados. Isso
 substitui pentest independente nem os controles adicionais previstos no G6 para uma
 declaracao enterprise formal.
 
+## Evidencias do setimo ciclo
+
+Executado em 2026-07-13:
+
+- o deploy seguro passou a consultar os checks do commit exato que sera implantado;
+- oito checks obrigatorios cobrem qualidade, migrations, smoke, fluxo DEV/PROD,
+  CodeQL para Python e JavaScript e varredura Trivy;
+- check ausente, em andamento ou reprovado bloqueia o deploy antes de migrations e
+  da troca dos servicos;
+- a evidencia fica temporaria durante o deploy e so e promovida depois dos health
+  checks finais, evitando apresentar tentativa falha como versao implantada;
+- o `/ops` passou a exibir commit completo, horario, total aprovado, checks
+  individuais e link para a evidencia no GitHub;
+- evidencia ausente ou reprovada gera alerta critico operacional;
+- o validador foi comprovado no Linux contra o commit que estava em producao, com
+  oito de oito checks aprovados;
+- 20 testes focados, lint, formatacao, sintaxe Bash e build do frontend aprovados.
+
 ## G1 - Release reproduzivel
 
 O primeiro pacote adiciona `scripts/validar_release.ps1` ao `release-check` oficial.
@@ -193,15 +211,15 @@ Ja existem no cockpit:
 - eventos de deploy e watchdog;
 - alertas acionaveis, notificacoes e acoes de recuperacao;
 - visao operacional dos tenants.
+- backup, restore e indicadores de RPO e RTO;
+- validade dos certificados TLS dos dominios publicos;
+- versao implantada e evidencia do gate que autorizou a versao.
 
 Evolucoes planejadas para o mesmo cockpit:
 
 - copia externa do backup e sua idade (standby por decisao do responsavel em
   2026-07-13; manter o alerta visivel ate a retomada);
-- validade do certificado TLS;
 - resultado de monitoramento externo;
-- versao implantada e estado do gate que autorizou a versao;
-- indicadores de RPO e RTO.
 
 ## Ordem de execucao
 

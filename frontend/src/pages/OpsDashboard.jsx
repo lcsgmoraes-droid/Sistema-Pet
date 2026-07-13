@@ -264,8 +264,9 @@ function BlingQueuePanel({ queue }) {
   );
 }
 
-function DeployPanel({ deploys }) {
+function DeployPanel({ deploys, release }) {
   const items = deploys?.latest || [];
+  const releaseHealthy = release?.status === "healthy";
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -275,6 +276,50 @@ function DeployPanel({ deploys }) {
           <p className="text-sm text-slate-500">Registrados pelo deploy seguro.</p>
         </div>
         <FiGitBranch className="h-5 w-5 text-slate-500" />
+      </div>
+      <div className={`mt-4 rounded-lg border p-3 ${toneClasses(statusTone(release?.status))}`}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide">Versao implantada</div>
+            <div className="mt-1 font-mono text-sm font-bold">
+              {release?.commit_sha || "Sem evidencia"}
+            </div>
+          </div>
+          <span className="rounded-full bg-white/70 px-2 py-1 text-xs font-bold">
+            {statusLabel(release?.status)} • {release?.passed_checks || 0}/
+            {release?.total_checks || 0}
+          </span>
+        </div>
+        {release?.generated_at ? (
+          <div className="mt-2 text-xs opacity-75">
+            Gate conferido em {formatDate(release.generated_at)}
+          </div>
+        ) : null}
+        {(release?.required_checks || []).length ? (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {release.required_checks.map((check) => {
+              const passed = check.status === "completed" && check.conclusion === "success";
+              return (
+                <span
+                  key={check.name}
+                  className={`rounded-full px-2 py-1 text-[11px] font-semibold ${passed ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}
+                >
+                  {check.name}
+                </span>
+              );
+            })}
+          </div>
+        ) : null}
+        {releaseHealthy && release?.checks_url ? (
+          <a
+            href={release.checks_url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-flex text-xs font-semibold text-blue-700 hover:underline"
+          >
+            Abrir evidencia no GitHub
+          </a>
+        ) : null}
       </div>
       <div className="mt-4 space-y-2">
         {items.length === 0 ? (
@@ -564,6 +609,7 @@ export default function OpsDashboard() {
   const blingQueue = dashboard?.queues?.bling_pedido_webhooks;
   const continuity = dashboard?.continuity;
   const tls = dashboard?.tls;
+  const release = dashboard?.release;
   const tlsDays = (tls?.certificates || [])
     .map((item) => Number(item.days_remaining))
     .filter(Number.isFinite);
@@ -616,7 +662,7 @@ export default function OpsDashboard() {
 
         <CurrentStatusPanel currentStatus={currentStatus} watchdog={watchdog} />
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-9">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5 2xl:grid-cols-10">
           <MetricCard
             icon={FiCheckCircle}
             label="Estado atual"
@@ -668,6 +714,17 @@ export default function OpsDashboard() {
             tone={lastDeploy?.status === "failed" ? "red" : "slate"}
           />
           <MetricCard
+            icon={FiGitBranch}
+            label="Versao e gate"
+            value={shortHash(release?.commit_sha)}
+            detail={
+              release?.generated_at
+                ? `${statusLabel(release.status)} • ${release.passed_checks}/${release.total_checks} checks • ${formatDate(release.generated_at)}`
+                : "Sem evidencia implantada"
+            }
+            tone={statusTone(release?.status)}
+          />
+          <MetricCard
             icon={FiDatabase}
             label="Backup"
             value={statusLabel(continuity?.backup?.status)}
@@ -700,7 +757,7 @@ export default function OpsDashboard() {
 
         <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
           <AlertPanel alerts={dashboard?.alerts || []} />
-          <DeployPanel deploys={deploys} />
+          <DeployPanel deploys={deploys} release={release} />
         </div>
 
         <SelfHealingPanel selfHealing={selfHealing} watchdogEvents={watchdogEvents} />

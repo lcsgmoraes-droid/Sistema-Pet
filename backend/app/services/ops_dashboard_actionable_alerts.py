@@ -83,6 +83,7 @@ def _build_actionable_alerts(
     watchdog_summary: dict[str, Any],
     deploy_events: list[dict[str, Any]],
     tls: dict[str, Any] | None = None,
+    release: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     alerts: list[dict[str, Any]] = []
     tenant_error_threshold = _env_int("OPS_ALERT_TENANT_5XX_CRITICAL", 2)
@@ -112,6 +113,22 @@ def _build_actionable_alerts(
     worker_health = str(
         _event_payload_value(latest_watchdog_event, "worker_health") or ""
     ).lower()
+
+    if release and release.get("status") != "healthy":
+        release_status = str(release.get("status") or "unavailable")
+        alerts.append(
+            {
+                "id": "system:release:gate_status",
+                "scope": "system",
+                "kind": "release_gate_status",
+                "severity": "critical",
+                "tone": "red",
+                "title": "Versao sem gate de release comprovado",
+                "detail": f"Status da evidencia: {release_status}.",
+                "action": "Bloquear novos deploys e validar os checks do commit em producao.",
+                "score": 990,
+            }
+        )
 
     if tls and tls.get("status") != "healthy":
         tls_status = str(tls.get("status") or "unavailable")
