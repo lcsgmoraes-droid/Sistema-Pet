@@ -1,6 +1,6 @@
 # Guia de Venda e Implantacao do Plano Basico
 
-Atualizado em: 2026-05-17
+Atualizado em: 2026-07-13
 
 Este e o guia central para organizar a venda controlada do Plano Basico do
 Sistema Pet. Use este arquivo para decidir a proxima acao, registrar progresso e
@@ -21,9 +21,17 @@ proximo.
 | Produto Plano Basico | Pronto para venda controlada | Escopo basico validado para cadastro, estoque e PDV/vendas. |
 | Producao | Pronta para uso acompanhado | Health, deploy seguro, CI e alertas operacionais estao em 10/10. |
 | E-mail transacional | Parcial para escala | Yahoo e alerta Ops validados; Outlook ainda precisa reteste real de cadastro. |
-| Material comercial | Pendente | Falta proposta simples, roteiro de demo, FAQ e mensagem de venda. |
-| Onboarding de cliente | Pendente como rotina | Falta executar e registrar o primeiro onboarding real usando este guia. |
-| Suporte inicial | Pendente como rotina | Definir canal, horario e regra de resposta para clientes piloto. |
+| Material comercial | Formalizado para piloto | Oferta, exclusoes, campos comerciais, demo e mensagem base estao documentados. |
+| Onboarding de cliente | Pronto para executar | Checklist exclusivo do Plano Basico criado; falta usa-lo com cliente real. |
+| Suporte inicial | Formalizado para piloto | Horario, severidade, metas de resposta e processo de incidente definidos. |
+
+Fontes oficiais desta etapa:
+
+- `docs/comercial/PACOTE_PILOTO_PLANO_BASICO.md`;
+- `docs/implantacao/CHECKLIST_PLANO_BASICO_PILOTO.md`.
+
+Valor, meio de cobranca manual e canal oficial continuam sendo preenchidos por
+cliente na proposta. Isso evita prometer uma condicao que ainda nao foi decidida.
 
 ## Regra de ouro
 
@@ -71,12 +79,12 @@ sem improviso.
 
 - [ ] Definir preco mensal do Plano Basico.
 - [ ] Definir se havera 30 dias gratis, implantacao paga ou ambos.
-- [ ] Definir canal de suporte inicial: WhatsApp, e-mail ou ambos.
-- [ ] Criar proposta comercial curta.
-- [ ] Criar mensagem pronta para WhatsApp/e-mail.
-- [ ] Criar roteiro de demo de 15 minutos.
-- [ ] Criar FAQ de objecoes comuns.
-- [ ] Confirmar que o cliente entendeu o que nao esta incluido.
+- [x] Definir politica de suporte; o canal oficial e preenchido por cliente.
+- [x] Criar modelo de proposta comercial curta.
+- [x] Criar mensagem pronta para prospect (o canal efetivo e definido por cliente).
+- [x] Criar roteiro de demo de 15 minutos.
+- [x] Criar FAQ de objecoes comuns no pacote comercial e neste guia.
+- [x] Definir aceite explicito do que nao esta incluido.
 
 Resultado esperado: Lucas consegue apresentar e vender o Plano Basico sem
 prometer modulos beta.
@@ -112,7 +120,9 @@ Resultado esperado: primeiros clientes entram com expectativa correta.
 
 Objetivo: colocar o cliente usando o sistema com uma primeira venda validada.
 
-Checklist de implantacao:
+Checklist oficial: `docs/implantacao/CHECKLIST_PLANO_BASICO_PILOTO.md`.
+
+Resumo da implantacao:
 
 - [ ] Criar empresa/tenant.
 - [ ] Confirmar e-mail do usuario principal.

@@ -2,6 +2,11 @@
 
 Uso: checklist interno para Lucas/suporte configurar ou revisar uma conta nova.
 
+Atencao: este guia cobre modulos amplos do sistema. Para cliente do Plano Basico
+piloto, use `docs/implantacao/CHECKLIST_PLANO_BASICO_PILOTO.md`; itens de
+financeiro completo, Stone, WhatsApp e demais adicionais nao entram na promessa
+do Basico.
+
 ## Sequencia logica de configuracao
 
 Esta ordem evita que o usuario tente vender, receber ou analisar resultado sem
