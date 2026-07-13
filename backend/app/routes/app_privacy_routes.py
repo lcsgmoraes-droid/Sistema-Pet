@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.models import Cliente, User
+from app.security.client_ip import get_client_ip
 from app.routes.ecommerce_auth import (
     _activate_user_tenant_context,
     _get_current_ecommerce_user,
@@ -40,10 +41,7 @@ class AppPrivacyRequestCreate(BaseModel):
 
 
 def _request_ip(request: Request) -> str | None:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else None
+    return get_client_ip(request)
 
 
 def _get_cliente_or_404(db: Session, user: User) -> Cliente:

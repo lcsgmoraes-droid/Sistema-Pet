@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.audit_log import log_action
 from app.middlewares.request_context import get_request_id
 from app.models import User
+from app.security.client_ip import get_client_ip
 from app.tenancy.context import (
     clear_current_tenant,
     get_current_tenant,
@@ -40,18 +41,7 @@ def normalize_datetime(value: datetime | None) -> datetime | None:
 
 
 def get_request_ip(request: Request | None) -> str | None:
-    if not request:
-        return None
-
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",", 1)[0].strip() or None
-
-    real_ip = request.headers.get("x-real-ip")
-    if real_ip:
-        return real_ip.strip() or None
-
-    return request.client.host if request.client else None
+    return get_client_ip(request)
 
 
 def get_user_agent(request: Request | None) -> str | None:

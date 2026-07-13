@@ -119,6 +119,26 @@ computador local nao possui JDK. O alerta do `expo-doctor` sobre projeto hibrido
 esperado: Android e versionado por conter modulo nativo proprio, enquanto iOS usa a
 configuracao gerada pelo Expo.
 
+## Evidencias do quinto ciclo
+
+Executado em 2026-07-13:
+
+- o Nginx deixou de aceitar `CF-Connecting-IP` de conexoes fora das redes oficiais
+  da Cloudflare;
+- conexoes diretas passaram a usar obrigatoriamente o IP observado pelo servidor;
+- o rate limit do Nginx passou a separar clientes finais, em vez de agrupar todos
+  que chegavam pela mesma borda da Cloudflare;
+- o backend passou a confiar em `X-Forwarded-For`, `X-Real-IP` e
+  `X-Forwarded-Proto` somente quando o par direto pertence a uma rede de proxy
+  configurada;
+- login, auditoria de autenticacao e solicitacoes LGPD passaram a compartilhar a
+  mesma resolucao segura de IP;
+- testes focados de IP, autenticacao, erros HTTP, analytics e configuracao de
+  producao foram aprovados.
+
+Este ciclo fecha a divida conhecida de confiabilidade do IP de origem. O G2 segue em
+execucao ate concluir a revisao final dos fluxos de autenticacao e dos headers HTTP.
+
 ## G1 - Release reproduzivel
 
 O primeiro pacote adiciona `scripts/validar_release.ps1` ao `release-check` oficial.

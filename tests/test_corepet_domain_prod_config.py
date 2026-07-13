@@ -60,6 +60,23 @@ def test_prod_nginx_allows_direct_corepet_without_exposing_legacy_origin():
     assert "deny all;" in cloudflare_allowlist
 
 
+def test_prod_nginx_only_trusts_cloudflare_client_ip_from_cloudflare_networks():
+    nginx_conf = NGINX_CONF.read_text(encoding="utf-8")
+
+    assert 'map "$from_cloudflare:$http_cf_connecting_ip" $client_ip {' in nginx_conf
+    assert "~^1:(.+)$ $1;" in nginx_conf
+    assert "default $remote_addr;" in nginx_conf
+    assert "map $http_cf_connecting_ip $client_ip" not in nginx_conf
+
+
+def test_prod_nginx_rate_limits_each_final_client_ip():
+    nginx_conf = NGINX_CONF.read_text(encoding="utf-8")
+
+    assert "limit_req_zone $client_ip zone=api_limit:10m rate=10r/s;" in nginx_conf
+    assert "limit_req_zone $client_ip zone=login_limit:10m rate=5r/m;" in nginx_conf
+    assert "limit_req_zone $binary_remote_addr" not in nginx_conf
+
+
 def test_prod_nginx_preserves_frontend_redirects_from_api_routes():
     app_locations = (
         ROOT / "nginx" / "includes" / "app-server-locations.conf"
@@ -108,6 +125,8 @@ def test_prod_cors_allows_corepet_and_legacy_domains():
     ) in compose_text
     assert 'APP_NAME: "CorePet ERP"' in compose_text
     assert 'APP_NAME: "Pet Shop Pro"' not in compose_text
+    assert "TRUSTED_PROXY_CIDRS:" in compose_text
+    assert "172.16.0.0/12" in compose_text
 
 
 def test_prod_generates_public_links_with_corepet_domain():
