@@ -173,10 +173,18 @@ trap 'on_error $LINENO' ERR
 
 cleanup_deploy_lock() {
   rm -f "$DEPLOY_LOCK_FILE" 2>/dev/null || true
+}
+
+cleanup_release_candidate() {
   rm -f "$APP_DIR/$RELEASE_STATUS_NEXT_PATH" 2>/dev/null || true
 }
 
-trap cleanup_deploy_lock EXIT
+cleanup_on_exit() {
+  cleanup_deploy_lock
+  cleanup_release_candidate
+}
+
+trap cleanup_on_exit EXIT
 
 wait_for() {
   local label="$1"
