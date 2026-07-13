@@ -51,6 +51,7 @@ Referencias externas:
 | `backend/logs/host_watchdog_events.jsonl` | Watchdog externo do host | Servidor/producao | 90 dias | 24 meses agregado | Rotacionar e apagar bruto antigo |
 | `backend/logs/disk_guard_events.jsonl` | Guardiao preventivo de disco | Servidor/producao | 90 dias | 24 meses agregado | Rotacionar e apagar bruto antigo |
 | Logs de container/nginx | Acesso HTTP, erros de proxy e runtime | Docker/nginx/host | 30 dias | 90 dias se houver incidente | Rotacionar no host |
+| Journal do sistema | Eventos do kernel e servicos do host | `systemd-journald` | 30 dias, limitado a 768 MB | Exportar somente quando houver incidente | Expirar por tempo e espaco, preservando 3 GB livres |
 
 ## Campos minimos por evento
 
