@@ -10,13 +10,18 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from app.config import ALLOWED_ORIGINS, ENVIRONMENT
+from app.config import ALLOWED_ORIGINS
 from app.middlewares.rate_limit import RateLimitMiddleware
-from app.middlewares.request_context import RequestContextMiddleware
+from app.middlewares.request_context import RequestContextMiddleware, get_request_id
 from app.middlewares.request_logging import RequestLoggingMiddleware
 from app.middlewares.security_audit import SecurityAuditMiddleware
 from app.middlewares.security_headers import SecurityHeadersMiddleware
 from app.middlewares.tenant_middleware import TenantSecurityMiddleware
+from app.security.error_sanitization import (
+    internal_error_payload,
+    is_strict_runtime_environment,
+    sanitize_validation_errors,
+)
 from app.tenancy.context import TenantContextMiddleware
 from app.tenancy.middleware import TenancyMiddleware
 
@@ -78,22 +83,44 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def validation_exception_handler(
         request: Request, exc: RequestValidationError
     ):
-        logger.error(f"[VALIDATION] VALIDATION ERROR: {request.url}")
-        logger.error(f"   Errors: {exc.errors()}")
-        logger.error(f"   Body: {exc.body if hasattr(exc, 'body') else 'N/A'}")
+        safe_errors = sanitize_validation_errors(exc.errors())
+        logger.warning(
+            "[VALIDATION] Request rejeitada: method=%s path=%s fields=%s",
+            request.method,
+            request.url.path,
+            [{"loc": error["loc"], "type": error["type"]} for error in safe_errors],
+        )
         return JSONResponse(
             status_code=422,
             content={
                 "error": "validation_error",
                 "message": "Dados inválidos",
-                "details": exc.errors(),
+                "details": safe_errors,
             },
         )
 
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
-        if exc.status_code != 404 or "Segmento não encontrado" not in str(exc.detail):
-            logger.warning(f"[HTTP] HTTP {exc.status_code}: {exc.detail}")
+        if exc.status_code >= 500:
+            logger.error(
+                "[HTTP] HTTP %s retornado pela aplicacao: method=%s path=%s",
+                exc.status_code,
+                request.method,
+                request.url.path,
+            )
+            if is_strict_runtime_environment():
+                return JSONResponse(
+                    status_code=exc.status_code,
+                    content=internal_error_payload(get_request_id()),
+                    headers=exc.headers,
+                )
+        elif exc.status_code != 404 or "Segmento não encontrado" not in str(exc.detail):
+            logger.warning(
+                "[HTTP] HTTP %s: method=%s path=%s",
+                exc.status_code,
+                request.method,
+                request.url.path,
+            )
 
         return JSONResponse(
             status_code=exc.status_code,
@@ -103,28 +130,36 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
-        from app import config as app_config
         from app.utils.logger import logger as structured_logger
 
+        strict_runtime = is_strict_runtime_environment()
+        request_id = get_request_id()
+        structured_message = (
+            "Erro interno nao tratado" if strict_runtime else f"Erro 500: {str(exc)}"
+        )
         structured_logger.error(
             event="unhandled_exception",
-            message=f"Erro 500: {str(exc)}",
+            message=structured_message,
             path=request.url.path,
             method=request.method,
             exception_type=type(exc).__name__,
+            request_id=request_id,
         )
-        logger.error(f"[ERROR] Erro 500: {str(exc)}", exc_info=True)
+        if strict_runtime:
+            logger.error(
+                "[ERROR] Erro 500 sem detalhes: type=%s method=%s path=%s request_id=%s",
+                type(exc).__name__,
+                request.method,
+                request.url.path,
+                request_id,
+            )
+        else:
+            logger.error("[ERROR] Erro 500: %s", str(exc), exc_info=True)
 
-        environment = getattr(app_config, "ENVIRONMENT", ENVIRONMENT)
-        is_production = environment.lower() in ["production", "prod"]
-
-        if is_production:
+        if strict_runtime:
             return JSONResponse(
                 status_code=500,
-                content={
-                    "error": "internal_server_error",
-                    "message": "Erro interno no servidor. Nossa equipe foi notificada.",
-                },
+                content=internal_error_payload(request_id),
             )
 
         return JSONResponse(

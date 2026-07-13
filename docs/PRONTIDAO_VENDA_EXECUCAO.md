@@ -7,7 +7,9 @@ Atualizado em: 2026-07-13
 Preparar o Sistema Pet para os primeiros clientes pagantes sem prometer maturidade
 enterprise antes das evidencias tecnicas, operacionais e comerciais necessarias.
 
-Este plano nao autoriza deploy de producao.
+Este plano nao executa deploy de producao automaticamente. Em 2026-07-13, o
+responsavel autorizou a preparacao da subida, condicionada ao aviso previo quando
+existir uma fatia tecnicamente segura.
 
 ## Escopo atual
 
@@ -35,7 +37,7 @@ restante da aplicacao.
 | Gate | Situacao inicial | Criterio de saida |
 | --- | --- | --- |
 | G1 - Release reproduzivel | Em execucao | `FLUXO_UNICO.bat release-check` executa qualidade, testes, builds e auditorias sem falso positivo |
-| G2 - Seguranca critica | Pendente | Sem vulnerabilidade bloqueadora, segredo em log ou erro interno exposto |
+| G2 - Seguranca critica | Em execucao | Sem vulnerabilidade bloqueadora, segredo em log ou erro interno exposto |
 | G3 - Recuperacao e operacao | Pendente | Backup externo monitorado e restore recorrente comprovado |
 | G4 - Oferta comercial | Pendente | Escopo, contrato, suporte, onboarding e resposta a incidente definidos |
 | G5 - Piloto pago | Pendente | 2 a 5 clientes acompanhados, sem incidente critico e com indicadores registrados |
@@ -60,6 +62,24 @@ Executado em 2026-07-13:
 A correcao sugerida para os alertas mobile exige migracao do Expo 54 para o Expo 57.
 Essa migracao deve ser executada em pacote proprio, com build Android/iOS e regressao
 funcional. Nao deve ser aplicada automaticamente por `npm audit fix --force`.
+
+## Evidencias do segundo ciclo
+
+Executado em 2026-07-13:
+
+- respostas HTTP 5xx de producao e staging deixaram de expor detalhes internos;
+- respostas 5xx passaram a preservar o `request_id` para correlacao operacional;
+- erros 422 deixaram de registrar corpo, valores submetidos e contexto inseguro;
+- eventos do middleware deixaram de persistir a mensagem da excecao em ambientes
+  restritos;
+- logs do middleware de tenant deixaram de incluir mensagem e stack trace em
+  producao e staging;
+- 6 testes especificos de sanitizacao aprovados;
+- 15 testes de regressao dos middlewares e rotas de analytics aprovados;
+- gate rapido, 68 smoke tests e 736 testes multiempresa aprovados apos as mudancas.
+
+Este ciclo reduz um risco critico, mas nao encerra o G2. Ainda faltam as revisoes de
+autenticacao, rate limit, confiabilidade do IP de origem e headers HTTP.
 
 ## G1 - Release reproduzivel
 

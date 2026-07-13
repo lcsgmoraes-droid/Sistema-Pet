@@ -7,6 +7,7 @@ from uuid import UUID
 
 from app.auth.core import ALGORITHM
 from app.config import JWT_SECRET_KEY
+from app.security.error_sanitization import is_strict_runtime_environment
 
 logger = logging.getLogger(__name__)
 
@@ -80,13 +81,17 @@ class TenantSecurityMiddleware(BaseHTTPMiddleware):
             if str(e) == "No response returned." and await request.is_disconnected():
                 return Response(status_code=status.HTTP_204_NO_CONTENT)
             logger.error(
-                f"[TenantSecurityMiddleware] ❌ Erro inesperado: {str(e)}",
-                exc_info=True,
+                "[TenantSecurityMiddleware] Erro inesperado: type=%s path=%s",
+                type(e).__name__,
+                request.url.path,
+                exc_info=not is_strict_runtime_environment(),
             )
             raise
         except Exception as e:
             logger.error(
-                f"[TenantSecurityMiddleware] ❌ Erro inesperado: {str(e)}",
-                exc_info=True,
+                "[TenantSecurityMiddleware] Erro inesperado: type=%s path=%s",
+                type(e).__name__,
+                request.url.path,
+                exc_info=not is_strict_runtime_environment(),
             )
             raise
