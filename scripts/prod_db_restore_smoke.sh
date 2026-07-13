@@ -13,6 +13,7 @@ RESTORE_USER="${RESTORE_USER:-restore_smoke}"
 RESTORE_PASSWORD="${RESTORE_PASSWORD:-restore_smoke_password}"
 TIMESTAMP="$(date '+%Y%m%d_%H%M%S')"
 RESTORE_CONTAINER_NAME="${RESTORE_CONTAINER_NAME:-petshop-restore-smoke-$TIMESTAMP}"
+RESTORE_VOLUME_NAME="${RESTORE_VOLUME_NAME:-petshop-restore-smoke-data-$TIMESTAMP}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # shellcheck source=ops_continuity_event.sh
@@ -95,16 +96,23 @@ if [[ ! -s "$backup_file" ]]; then
   fail "backup file not found or empty: $backup_file"
 fi
 
-cleanup_container() {
-  docker rm -f "$RESTORE_CONTAINER_NAME" >/dev/null 2>&1 || true
+cleanup_resources() {
+  docker rm -f -v "$RESTORE_CONTAINER_NAME" >/dev/null 2>&1 || true
+  docker volume rm -f "$RESTORE_VOLUME_NAME" >/dev/null 2>&1 || true
 }
 
-trap cleanup_container EXIT
+trap cleanup_resources EXIT
 
-docker rm -f "$RESTORE_CONTAINER_NAME" >/dev/null 2>&1 || true
+docker rm -f -v "$RESTORE_CONTAINER_NAME" >/dev/null 2>&1 || true
+docker volume rm -f "$RESTORE_VOLUME_NAME" >/dev/null 2>&1 || true
+docker volume create \
+  --label com.corepet.purpose=restore-smoke \
+  --label com.corepet.temporary=true \
+  "$RESTORE_VOLUME_NAME" >/dev/null
 
 docker run -d --rm \
   --name "$RESTORE_CONTAINER_NAME" \
+  --mount "type=volume,source=$RESTORE_VOLUME_NAME,target=/var/lib/postgresql/data" \
   -e POSTGRES_DB="$RESTORE_DB" \
   -e POSTGRES_USER="$RESTORE_USER" \
   -e POSTGRES_PASSWORD="$RESTORE_PASSWORD" \
@@ -146,6 +154,14 @@ if [[ -z "$alembic_rows" || "$alembic_rows" -lt 1 ]]; then
   fail "restore completed but alembic_version was not found"
 fi
 
+cleanup_resources
+if docker inspect "$RESTORE_CONTAINER_NAME" >/dev/null 2>&1; then
+  fail "temporary restore container was not removed"
+fi
+if docker volume inspect "$RESTORE_VOLUME_NAME" >/dev/null 2>&1; then
+  fail "temporary restore volume was not removed"
+fi
+
 record_restore_event "ok" "$backup_file" "$public_tables" "$alembic_rows"
 
 printf 'restore_smoke_status=ok\n'
@@ -154,3 +170,4 @@ printf 'created_backup=%s\n' "$created_backup"
 printf 'public_tables=%s\n' "$public_tables"
 printf 'alembic_rows=%s\n' "$alembic_rows"
 printf 'restore_container_removed=true\n'
+printf 'restore_volume_removed=true\n'
