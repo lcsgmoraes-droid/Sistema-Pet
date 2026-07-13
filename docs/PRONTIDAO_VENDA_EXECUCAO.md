@@ -196,7 +196,8 @@ Ja existem no cockpit:
 
 Evolucoes planejadas para o mesmo cockpit:
 
-- copia externa do backup e sua idade;
+- copia externa do backup e sua idade (standby por decisao do responsavel em
+  2026-07-13; manter o alerta visivel ate a retomada);
 - validade do certificado TLS;
 - resultado de monitoramento externo;
 - versao implantada e estado do gate que autorizou a versao;

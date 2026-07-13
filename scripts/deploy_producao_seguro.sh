@@ -349,6 +349,16 @@ if [[ -f "$APP_DIR/scripts/install_ops_host_watchdog_cron.sh" ]]; then
   bash "$APP_DIR/scripts/install_ops_host_watchdog_cron.sh" || log "Aviso: nao foi possivel instalar o cron do host watchdog"
 fi
 
+mark_step "instalar_monitor_tls"
+audit_step "Instalando monitor de validade TLS"
+log "Instalando monitor de validade TLS"
+if [[ -f "$APP_DIR/scripts/install_ops_tls_monitor_cron.sh" ]]; then
+  bash "$APP_DIR/scripts/install_ops_tls_monitor_cron.sh" || log "Aviso: nao foi possivel instalar o monitor TLS"
+fi
+if [[ -f "$APP_DIR/scripts/ops_tls_probe.sh" ]]; then
+  timeout 45 bash "$APP_DIR/scripts/ops_tls_probe.sh" || log "Aviso: verificacao TLS inicial falhou"
+fi
+
 mark_step "instalar_continuidade_ops"
 audit_step "Instalando rotina de backup e restore controlado"
 log "Instalando rotina de continuidade operacional"

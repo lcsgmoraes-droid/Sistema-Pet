@@ -22,12 +22,33 @@ def _build_alerts(
     route_incidents: list[dict[str, Any]],
     queue_snapshot: dict[str, Any] | None = None,
     continuity: dict[str, Any] | None = None,
+    tls: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     alerts: list[dict[str, Any]] = []
     errors_5xx = int(error_summary.get("errors_5xx") or 0)
     slow_requests = int(error_summary.get("slow_requests") or 0)
     last_failed = _last_failed_deploy_after_success(deploy_events)
     recoveries = int(watchdog_summary.get("recoveries") or 0)
+
+    if tls and tls.get("status") != "healthy":
+        tls_status = str(tls.get("status") or "unavailable")
+        critical = tls_status in {"critical", "unavailable"}
+        certificates = tls.get("certificates") or []
+        affected = [
+            str(item.get("domain") or "-")
+            for item in certificates
+            if item.get("status") != "healthy"
+        ]
+        alerts.append(
+            {
+                "severity": "critical" if critical else "warning",
+                "tone": "red" if critical else "amber",
+                "title": "Validade TLS exige atencao",
+                "detail": f"Status: {tls_status}; dominios: {', '.join(affected) or 'sem leitura'}.",
+                "action": "Validar renovacao e cadeia do certificado antes do vencimento.",
+                "source": "tls",
+            }
+        )
 
     if continuity and continuity.get("status") != "healthy":
         backup_status = (continuity.get("backup") or {}).get("status")

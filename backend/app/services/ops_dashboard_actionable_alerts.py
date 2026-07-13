@@ -82,6 +82,7 @@ def _build_actionable_alerts(
     watchdog: dict[str, Any],
     watchdog_summary: dict[str, Any],
     deploy_events: list[dict[str, Any]],
+    tls: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     alerts: list[dict[str, Any]] = []
     tenant_error_threshold = _env_int("OPS_ALERT_TENANT_5XX_CRITICAL", 2)
@@ -111,6 +112,29 @@ def _build_actionable_alerts(
     worker_health = str(
         _event_payload_value(latest_watchdog_event, "worker_health") or ""
     ).lower()
+
+    if tls and tls.get("status") != "healthy":
+        tls_status = str(tls.get("status") or "unavailable")
+        certificates = tls.get("certificates") or []
+        affected = [
+            str(item.get("domain") or "-")
+            for item in certificates
+            if item.get("status") != "healthy"
+        ]
+        critical = tls_status in {"critical", "unavailable"}
+        alerts.append(
+            {
+                "id": "system:tls:certificate_status",
+                "scope": "system",
+                "kind": "tls_certificate_status",
+                "severity": "critical" if critical else "warning",
+                "tone": "red" if critical else "amber",
+                "title": "Validade TLS exige atencao",
+                "detail": f"Status: {tls_status}; dominios: {', '.join(affected) or 'sem leitura'}.",
+                "action": "Validar renovacao e cadeia do certificado antes do vencimento.",
+                "score": 980 if critical else 780,
+            }
+        )
 
     if watchdog.get("status") != "healthy":
         alerts.append(
