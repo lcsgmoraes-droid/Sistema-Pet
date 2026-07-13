@@ -293,6 +293,13 @@ if ! requires_runtime_deploy "$changed_files"; then
   exit 0
 fi
 
+mark_step "instalar_retencao_journal"
+audit_step "Instalando ou validando retencao do journal do host"
+log "Instalando politica de retencao do journal"
+if [[ -f "$APP_DIR/scripts/install_ops_journal_retention.sh" ]]; then
+  bash "$APP_DIR/scripts/install_ops_journal_retention.sh" || log "Aviso: nao foi possivel instalar a retencao do journal"
+fi
+
 mark_step "instalar_disk_guard"
 audit_step "Instalando ou validando guardiao preventivo de disco"
 log "Instalando monitor preventivo de disco"
