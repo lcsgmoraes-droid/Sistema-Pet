@@ -56,9 +56,7 @@ export default function ProdutosHeaderActions({
             icon={UploadCloud}
             className={actionClassName}
           >
-            {blingBatchLoading
-              ? "Enviando ao Bling..."
-              : `Enviar ao Bling (${selecionadosCount})`}
+            {blingBatchLoading ? "Enviando ao Bling..." : `Enviar ao Bling (${selecionadosCount})`}
           </ActionButton>
           {selecionadosCount === 2 && (
             <ActionButton

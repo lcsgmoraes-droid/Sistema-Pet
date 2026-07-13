@@ -311,7 +311,9 @@ def _exportar_produto_local_para_bling(
     except Exception as error:
         db.rollback()
         mensagem = str(error)
-        status_code = 429 if "429" in mensagem or "TOO_MANY_REQUESTS" in mensagem else 400
+        status_code = (
+            429 if "429" in mensagem or "TOO_MANY_REQUESTS" in mensagem else 400
+        )
         raise HTTPException(
             status_code=status_code,
             detail=f"Erro ao consultar produto no Bling antes de criar: {mensagem}",
@@ -336,7 +338,9 @@ def _exportar_produto_local_para_bling(
     except Exception as error:
         db.rollback()
         mensagem = str(error)
-        status_code = 429 if "429" in mensagem or "TOO_MANY_REQUESTS" in mensagem else 400
+        status_code = (
+            429 if "429" in mensagem or "TOO_MANY_REQUESTS" in mensagem else 400
+        )
         raise HTTPException(
             status_code=status_code,
             detail=f"Erro ao criar produto no Bling: {mensagem}",
@@ -390,7 +394,9 @@ def exportar_produtos_locais_para_bling_lote(
 ):
     """Cadastra no Bling os produtos locais selecionados na central."""
     _current_user, tenant_id = user_and_tenant
-    produto_ids = list(dict.fromkeys(int(produto_id) for produto_id in body.produto_ids))
+    produto_ids = list(
+        dict.fromkeys(int(produto_id) for produto_id in body.produto_ids)
+    )
 
     try:
         bling = BlingAPI()

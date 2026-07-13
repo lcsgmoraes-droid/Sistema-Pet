@@ -13,32 +13,42 @@ function read(relativePath) {
 
 test("perfil mobile edita e salva complemento do endereco padrao", () => {
   const source = read("src/screens/profile/ProfileScreen.tsx");
+  const addressSections = read(
+    "src/screens/profile/profile/ProfileAddressSections.tsx",
+  );
 
   assert.match(source, /useState\(user\?\.complemento \?\? ""\)/);
   assert.match(source, /setComplemento\(user\?\.complemento \?\? ""\)/);
   assert.match(source, /complemento:\s*complemento\.trim\(\) \|\| undefined/);
-  assert.match(source, /<Campo label="Complemento">/);
+  assert.match(addressSections, /<Campo label="Complemento">/);
   assert.match(source, /user\?\.complemento/);
 });
 
 test("checkout mobile usa complemento do endereco salvo", () => {
   const source = read("src/screens/shop/CartScreen.tsx");
+  const utils = read("src/screens/shop/cart/CartUtils.ts");
 
-  assert.match(source, /complemento: user\?\.complemento \?\? ''/);
+  assert.match(utils, /complemento: user\?\.complemento \?\? ""/);
   assert.match(source, /useState\(enderecoInicial\.complemento\)/);
 });
 
 test("perfil mobile edita e salva complemento do endereco de entrega", () => {
   const source = read("src/screens/profile/ProfileScreen.tsx");
+  const addressSections = read(
+    "src/screens/profile/profile/ProfileAddressSections.tsx",
+  );
 
   assert.match(source, /user\?\.endereco_entrega_detalhado \?\? \{\}/);
-  assert.match(source, /useState\(Boolean\(user\?\.usar_endereco_entrega_diferente\)\)/);
+  assert.match(
+    source,
+    /useState\(\s*Boolean\(user\?\.usar_endereco_entrega_diferente\),?\s*\)/,
+  );
   assert.match(source, /entrega_complemento:\s*entregaComplemento\.trim\(\) \|\| undefined/);
-  assert.match(source, /<Campo label="Complemento da entrega">/);
+  assert.match(addressSections, /<Campo label="Complemento da entrega">/);
 });
 
 test("checkout mobile prefere complemento do endereco de entrega detalhado", () => {
-  const source = read("src/screens/shop/CartScreen.tsx");
+  const source = read("src/screens/shop/cart/CartUtils.ts");
 
   assert.match(source, /user\?\.endereco_entrega_detalhado/);
   assert.match(source, /user\?\.usar_endereco_entrega_diferente/);

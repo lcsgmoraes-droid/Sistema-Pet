@@ -254,8 +254,7 @@ export default function ProdutosTabelaSection({
                 const canaisAtivos = obterCanaisAtivosProduto(produto);
                 const blingId = getProdutoBlingId(produto);
                 const isPai = produto.tipo_produto === "PAI";
-                const blingLoading =
-                  blingActionKey === getProdutoBlingActionKey(produto.id);
+                const blingLoading = blingActionKey === getProdutoBlingActionKey(produto.id);
                 const podeCriarBling = !blingId && !isPai && onExportarProdutoBling;
 
                 return (

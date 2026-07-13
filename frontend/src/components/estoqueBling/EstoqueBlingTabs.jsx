@@ -225,9 +225,7 @@ export function EstoqueBlingLocalTab({
             actions={[
               {
                 label:
-                  rowActionKey === `export-bling-${item.id}`
-                    ? "Enviando..."
-                    : "Cadastrar no Bling",
+                  rowActionKey === `export-bling-${item.id}` ? "Enviando..." : "Cadastrar no Bling",
                 onClick: () => exportarProdutoLocalParaBling(item),
                 disabled: manualSearchKey !== "" || rowActionKey !== "",
                 className: ISSUE_TONES.emerald.button,

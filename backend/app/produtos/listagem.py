@@ -267,9 +267,7 @@ def _expandir_produtos_listagem(
         else {}
     )
     todas_variacoes = [
-        variacao
-        for variacoes in variacoes_por_pai.values()
-        for variacao in variacoes
+        variacao for variacoes in variacoes_por_pai.values() for variacao in variacoes
     ]
     validade_por_variacao = (
         _mapa_validade_proxima_produtos(db, todas_variacoes, access_ids)
@@ -647,7 +645,9 @@ def _enriquecer_produto_listagem(
         produto.bling_ultima_sincronizacao = (
             getattr(sync, "ultima_sincronizacao", None) if sync else None
         )
-        produto.bling_ultimo_erro = getattr(sync, "erro_mensagem", None) if sync else None
+        produto.bling_ultimo_erro = (
+            getattr(sync, "erro_mensagem", None) if sync else None
+        )
     _enriquecer_preco_pdv(produto)
     return produto
 

@@ -207,16 +207,12 @@ export function useEstoqueBlingActions({
 
   const removeLocalProducts = (produtoIds) => {
     const ids = new Set(
-      (produtoIds || [])
-        .map((id) => Number(id))
-        .filter((id) => Number.isFinite(id) && id > 0),
+      (produtoIds || []).map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0),
     );
 
     if (!ids.size) return;
 
-    setProdutosLocaisSemBling((current) =>
-      current.filter((item) => !ids.has(Number(item.id))),
-    );
+    setProdutosLocaisSemBling((current) => current.filter((item) => !ids.has(Number(item.id))));
     setLocalMeta((current) => ({
       ...current,
       total: Math.max(Number(current.total || 0) - ids.size, 0),
