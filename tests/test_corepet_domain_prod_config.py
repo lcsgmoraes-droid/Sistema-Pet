@@ -72,10 +72,17 @@ def test_prod_nginx_only_trusts_cloudflare_client_ip_from_cloudflare_networks():
 
 def test_prod_nginx_rate_limits_each_final_client_ip():
     nginx_conf = NGINX_CONF.read_text(encoding="utf-8")
+    app_locations = (
+        ROOT / "nginx" / "includes" / "app-server-locations.conf"
+    ).read_text(encoding="utf-8")
 
     assert "limit_req_zone $client_ip zone=api_limit:10m rate=10r/s;" in nginx_conf
     assert "limit_req_zone $client_ip zone=login_limit:10m rate=5r/m;" in nginx_conf
     assert "limit_req_zone $binary_remote_addr" not in nginx_conf
+    assert "location /api/auth/login" not in app_locations
+    assert "auth/(?:register|login(?:-multitenant)?|forgot-password|reset-password|verify-email|resend-verification)" in app_locations
+    assert "ecommerce/auth/(?:registrar|login|esqueci-senha|resetar-senha)" in app_locations
+    assert "limit_req zone=login_limit burst=5 nodelay;" in app_locations
 
 
 def test_prod_nginx_applies_one_consistent_security_header_policy():
