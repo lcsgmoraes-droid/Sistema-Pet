@@ -139,6 +139,27 @@ Executado em 2026-07-13:
 Este ciclo fecha a divida conhecida de confiabilidade do IP de origem. O G2 segue em
 execucao ate concluir a revisao final dos fluxos de autenticacao e dos headers HTTP.
 
+## Evidencias do sexto ciclo
+
+Executado em 2026-07-13:
+
+- HTML, API e arquivos publicos passaram a compartilhar uma politica unica de
+  headers HTTP de seguranca;
+- headers duplicados ou conflitantes foram removidos e a versao do Nginx deixou
+  de ser divulgada publicamente;
+- CSP, HSTS, protecao contra enquadramento, MIME sniffing e politica de referencia
+  foram validados no dominio publico;
+- a revisao final confirmou tokens de acesso curtos, refresh token vinculado a
+  sessao, revogacao no logout e na troca de senha, bloqueio por falhas de login,
+  respostas genericas de recuperacao e tokens de recuperacao armazenados como hash;
+- o limite duravel de cinco requisicoes por minuto passou a cobrir tambem cadastro,
+  recuperacao de senha, confirmacao de e-mail e os fluxos publicos equivalentes do
+  e-commerce, sem depender dos contadores em memoria dos workers do backend.
+
+Com estas evidencias, o G2 atende a linha de base para pilotos controlados. Isso nao
+substitui pentest independente nem os controles adicionais previstos no G6 para uma
+declaracao enterprise formal.
+
 ## G1 - Release reproduzivel
 
 O primeiro pacote adiciona `scripts/validar_release.ps1` ao `release-check` oficial.
