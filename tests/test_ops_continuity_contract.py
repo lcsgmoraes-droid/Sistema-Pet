@@ -153,3 +153,17 @@ def test_deploy_validates_and_ops_exposes_release_gate_evidence():
     assert '"release": release' in service
     assert "Versao e gate" in dashboard
     assert "Abrir evidencia no GitHub" in dashboard
+
+
+def test_unlock_before_final_watchdog_preserves_release_candidate():
+    deploy = (ROOT / "scripts" / "deploy_producao_seguro.sh").read_text(
+        encoding="utf-8"
+    )
+    lock_cleanup = deploy.split("cleanup_deploy_lock() {", 1)[1].split("}", 1)[0]
+
+    assert "RELEASE_STATUS_NEXT_PATH" not in lock_cleanup
+    assert "cleanup_release_candidate()" in deploy
+    assert "trap cleanup_on_exit EXIT" in deploy
+    assert deploy.index(
+        'cleanup_deploy_lock\nif [[ -f "$APP_DIR/scripts/ops_host_watchdog.sh"'
+    ) < deploy.rindex('mv -f "$APP_DIR/$RELEASE_STATUS_NEXT_PATH"')
