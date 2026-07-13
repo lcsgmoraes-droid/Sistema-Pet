@@ -17,6 +17,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from app.security.client_ip import get_client_ip
+
 
 # ============================================================================
 # CONFIGURAÇÃO DE RATE LIMIT
@@ -185,7 +187,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Extrair IP do cliente
-        client_ip = request.client.host if request.client else "unknown"
+        client_ip = get_client_ip(request) or "unknown"
 
         # Verificar limite
         is_allowed, remaining = rate_limit_store.check_limit(

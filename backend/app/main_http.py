@@ -22,6 +22,7 @@ from app.security.error_sanitization import (
     is_strict_runtime_environment,
     sanitize_validation_errors,
 )
+from app.security.client_ip import is_trusted_proxy
 from app.tenancy.context import TenantContextMiddleware
 from app.tenancy.middleware import TenancyMiddleware
 
@@ -33,7 +34,11 @@ def register_proxy_headers_middleware(app: FastAPI) -> None:
 
     @app.middleware("http")
     async def proxy_headers_middleware(request: Request, call_next):
-        if request.headers.get("X-Forwarded-Proto") == "https":
+        peer_ip = request.client.host if request.client else None
+        if (
+            is_trusted_proxy(peer_ip)
+            and request.headers.get("X-Forwarded-Proto") == "https"
+        ):
             request.scope["scheme"] = "https"
         response = await call_next(request)
         return response

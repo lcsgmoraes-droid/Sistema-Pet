@@ -57,6 +57,7 @@ services:
       
       # CORS
       ALLOWED_ORIGINS: https://corepet.com.br,https://www.corepet.com.br,https://mlprohub.com.br,https://www.mlprohub.com.br
+      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
       
       # App
       APP_NAME: "CorePet ERP"

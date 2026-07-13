@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import Cliente
+from app.security.client_ip import get_client_ip
 from app.security.permissions_service import check_permission
 from app.services.lgpd_service import PREFERENCE_TYPES, PrivacyOpsService
 
@@ -74,10 +75,7 @@ class SubjectRequestAnonymize(BaseModel):
 
 
 def _request_ip(request: Request) -> str | None:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else None
+    return get_client_ip(request)
 
 
 def _service(db: Session, tenant_id) -> PrivacyOpsService:
