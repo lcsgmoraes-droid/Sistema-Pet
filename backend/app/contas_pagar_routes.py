@@ -13,6 +13,7 @@ from .financeiro.contas_pagar_common import (
 )
 from .financeiro.contas_pagar_analise_routes import (
     analisar_contas_pagar_abertas,
+    detalhar_contas_pagar_abertas,
     router as analise_router,
 )
 from .financeiro.contas_pagar_consulta_routes import (
@@ -81,6 +82,7 @@ __all__ = [
     "classificar_conta_pagar",
     "criar_conta_pagar",
     "dashboard_contas_pagar",
+    "detalhar_contas_pagar_abertas",
     "estornar_pagamento_conta_pagar",
     "excluir_conta_pagar",
     "excluir_recorrencias_contas_pagar",

@@ -18,6 +18,9 @@ def contas_pagar_source() -> str:
             "frontend/src/components/contas-pagar/contasPagarDisplayHelpers.js",
             "frontend/src/components/contas-pagar/ContasPagarFilters.jsx",
             "frontend/src/components/contas-pagar/ContasPagarAnalise.jsx",
+            "frontend/src/components/contas-pagar/ContasPagarAnaliseDetalhesDrawer.jsx",
+            "frontend/src/components/contas-pagar/ContasPagarAnaliseResumo.jsx",
+            "frontend/src/components/contas-pagar/contasPagarAnaliseParams.js",
             "frontend/src/components/contas-pagar/ContasPagarTable.jsx",
             "frontend/src/components/contas-pagar/ContasPagarModals.jsx",
             "frontend/src/components/contas-pagar/ContasPagarPagamentoLoteModal.jsx",
@@ -97,13 +100,20 @@ def test_modal_conta_pagar_suporta_modo_edicao():
 
 def test_contas_pagar_lista_edita_e_exclui_sem_botao_ver():
     source = contas_pagar_source()
+    lista_source = "\n".join(
+        read_repo(path)
+        for path in (
+            "frontend/src/components/ContasPagar.jsx",
+            "frontend/src/components/contas-pagar/ContasPagarTable.jsx",
+        )
+    )
 
     assert "excluirContaPagar" in source
     assert "api.delete(`/contas-pagar/${conta.id}`)" in source
     assert "Excluir" in source
-    assert "abrirDetalhes" not in source
-    assert "mostrarDetalhes" not in source
-    assert 'title="Ver Detalhes"' not in source
+    assert "abrirDetalhes" not in lista_source
+    assert "mostrarDetalhes" not in lista_source
+    assert 'title="Ver Detalhes"' not in lista_source
 
 
 def test_edicao_de_conta_pagar_expoe_recorrencia_no_modal():
@@ -269,6 +279,23 @@ def test_contas_pagar_frontend_tem_aba_analise_com_exclusao_de_fornecedor():
     assert "Tudo menos" in source
     assert "proximos_12_meses" in source
     assert "agenda_mensal" in source
+
+
+def test_contas_pagar_analise_abre_detalhes_dos_valores_sem_perder_filtros():
+    source = contas_pagar_source()
+
+    assert 'api.get("/contas-pagar/analise-abertos/detalhes"' in source
+    assert "montarParamsDetalhes(filtros, detalhe, page)" in source
+    assert "filtrosAplicados" in source
+    assert "copiarFiltrosAnalise" in source
+    assert "ContasPagarAnaliseDetalhesDrawer" in source
+    assert "Origem dos valores" in source
+    assert "origem_lancamento_label" in source
+    assert "origem_referencia" in source
+    assert 'grupo="tipo_despesa"' in source
+    assert 'grupo="fornecedor"' in source
+    assert 'grupo="origem"' in source
+    assert 'grupo="tipo_custo"' in source
 
 
 def test_contas_pagar_frontend_chama_endpoints_de_estorno_cancelamento_e_exclusao_em_lote():
