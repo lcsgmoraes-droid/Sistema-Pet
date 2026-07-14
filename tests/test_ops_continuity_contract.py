@@ -10,6 +10,7 @@ def test_continuity_scripts_are_versioned_as_executable():
         "scripts/install_prod_restore_smoke_wrapper.sh",
         "scripts/install_ops_tls_monitor_cron.sh",
         "scripts/ops_continuity_event.sh",
+        "scripts/prod_db_external_copy.sh",
         "scripts/ops_tls_probe.sh",
         "scripts/prod_db_backup.sh",
         "scripts/prod_db_restore_smoke.sh",
@@ -52,6 +53,9 @@ def test_backup_and_restore_publish_safe_continuity_events():
     restore = (ROOT / "scripts" / "prod_db_restore_smoke.sh").read_text(
         encoding="utf-8"
     )
+    external_copy = (ROOT / "scripts" / "prod_db_external_copy.sh").read_text(
+        encoding="utf-8"
+    )
     event_writer = (ROOT / "scripts" / "ops_continuity_event.sh").read_text(
         encoding="utf-8"
     )
@@ -66,6 +70,12 @@ def test_backup_and_restore_publish_safe_continuity_events():
     assert 'record_restore_event "ok"' in restore
     assert 'record_backup_event "failed"' in backup
     assert 'record_restore_event "failed"' in restore
+    assert 'record_external_copy_event "ok"' in external_copy
+    assert 'record_external_copy_event "failed"' in external_copy
+    assert "head-object" in external_copy
+    assert "Metadata.sha256" in external_copy
+    assert "configuration file must belong to root" in external_copy
+    assert "AWS_SECRET_ACCESS_KEY" not in event_writer
     assert "continuity_events.jsonl" in event_writer
     assert "backup_sha256" in event_writer
     assert "public_tables" in event_writer
@@ -74,6 +84,9 @@ def test_backup_and_restore_publish_safe_continuity_events():
     assert "OPS_RUNTIME_UID:-1000" in event_writer
     assert "prod_db_backup.sh" in installer
     assert "prod_db_restore_smoke.sh" in installer
+    assert "prod_db_external_copy.sh" in installer
+    assert "backup-external.env" in installer
+    assert 'if [[ -f "$EXTERNAL_COPY_CONFIG_FILE"' in installer
     assert "flock -n /tmp/petshop-ops-continuity.lock" in installer
     assert "install_ops_continuity_cron.sh" in deploy
 

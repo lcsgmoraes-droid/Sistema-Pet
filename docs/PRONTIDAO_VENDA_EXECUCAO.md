@@ -217,8 +217,8 @@ Ja existem no cockpit:
 
 Evolucoes planejadas para o mesmo cockpit:
 
-- copia externa do backup e sua idade (standby por decisao do responsavel em
-  2026-07-13; manter o alerta visivel ate a retomada);
+- copia externa do backup e sua idade (automacao S3 compativel preparada; manter
+  o alerta visivel ate criar o bucket e ativar as credenciais em producao);
 - resultado de monitoramento externo;
 
 ## Ordem de execucao
@@ -237,8 +237,8 @@ Evolucoes planejadas para o mesmo cockpit:
 Situacao em 2026-07-13: **6 de 8 concluidas (75%)**.
 
 - etapas 1, 2, 3, 4, 6 e 7 concluidas;
-- etapa 5 parcial: backup e restore locais validados; copia externa em standby por
-  decisao do responsavel;
+- etapa 5 parcial: backup e restore locais validados; automacao externa preparada,
+  faltando criar o bucket privado e ativar suas credenciais em producao;
 - etapa 8 em execucao: Maiara e o primeiro piloto veterinario acompanhado; o
   cockpit registra indicadores automaticamente, mas ainda falta um piloto real
   aderente ao Plano Basico.
