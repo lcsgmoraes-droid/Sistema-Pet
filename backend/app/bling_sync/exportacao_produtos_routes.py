@@ -32,6 +32,29 @@ router = APIRouter()
 PERMISSOES_EXPORTACAO_BLING = ("compras.sincronizacao_bling", "produtos.editar")
 
 
+def _detalhe_publico_erro_bling(error: Exception, *, operacao: str) -> tuple[int, str]:
+    mensagem = str(error).upper()
+    if "429" in mensagem or "TOO_MANY_REQUESTS" in mensagem:
+        return (
+            429,
+            "O Bling atingiu o limite temporario de requisicoes. Aguarde alguns segundos e tente novamente.",
+        )
+
+    if any(
+        marcador in mensagem
+        for marcador in ("400", "422", "BAD REQUEST", "UNPROCESSABLE")
+    ):
+        return (
+            422,
+            "O Bling recusou os dados do produto. Revise SKU, EAN, unidade e dados fiscais.",
+        )
+
+    return (
+        502,
+        f"Nao foi possivel {operacao} no Bling agora. Tente novamente em alguns instantes.",
+    )
+
+
 def _texto(valor: Any, max_length: Optional[int] = None) -> str:
     texto = str(valor or "").strip()
     if max_length and len(texto) > max_length:
@@ -310,13 +333,17 @@ def _exportar_produto_local_para_bling(
         )
     except Exception as error:
         db.rollback()
-        mensagem = str(error)
-        status_code = (
-            429 if "429" in mensagem or "TOO_MANY_REQUESTS" in mensagem else 400
+        logger.warning(
+            "Falha ao consultar produto no Bling antes da exportacao; produto_id=%s error_type=%s",
+            produto.id,
+            type(error).__name__,
+        )
+        status_code, detail = _detalhe_publico_erro_bling(
+            error, operacao="consultar o produto"
         )
         raise HTTPException(
             status_code=status_code,
-            detail=f"Erro ao consultar produto no Bling antes de criar: {mensagem}",
+            detail=detail,
         ) from error
 
     if item_existente and _texto(item_existente.get("id")):
@@ -337,13 +364,17 @@ def _exportar_produto_local_para_bling(
         resposta = bling.criar_produto(payload)
     except Exception as error:
         db.rollback()
-        mensagem = str(error)
-        status_code = (
-            429 if "429" in mensagem or "TOO_MANY_REQUESTS" in mensagem else 400
+        logger.warning(
+            "Falha ao criar produto no Bling; produto_id=%s error_type=%s",
+            produto.id,
+            type(error).__name__,
+        )
+        status_code, detail = _detalhe_publico_erro_bling(
+            error, operacao="criar o produto"
         )
         raise HTTPException(
             status_code=status_code,
-            detail=f"Erro ao criar produto no Bling: {mensagem}",
+            detail=detail,
         ) from error
 
     bling_produto_id = _extrair_bling_produto_id(resposta)
@@ -378,10 +409,13 @@ def exportar_produto_local_para_bling(
         raise
     except Exception as error:
         db.rollback()
-        logger.exception("Erro ao exportar produto local para o Bling")
+        logger.error(
+            "Erro inesperado ao exportar produto local para o Bling; error_type=%s",
+            type(error).__name__,
+        )
         raise HTTPException(
             status_code=500,
-            detail=f"Nao foi possivel enviar o produto ao Bling: {error}",
+            detail="Nao foi possivel concluir o cadastro no Bling.",
         ) from error
 
 
@@ -401,9 +435,13 @@ def exportar_produtos_locais_para_bling_lote(
     try:
         bling = BlingAPI()
     except Exception as error:
+        logger.error(
+            "Erro ao iniciar integracao Bling para exportacao em lote; error_type=%s",
+            type(error).__name__,
+        )
         raise HTTPException(
-            status_code=500,
-            detail=f"Nao foi possivel iniciar a integracao com o Bling: {error}",
+            status_code=503,
+            detail="A integracao com o Bling esta indisponivel no momento.",
         ) from error
 
     items: list[dict[str, Any]] = []
@@ -430,15 +468,17 @@ def exportar_produtos_locais_para_bling_lote(
             )
         except Exception as error:
             db.rollback()
-            logger.exception(
-                "Erro ao exportar produto %s para o Bling em lote", produto_id
+            logger.error(
+                "Erro inesperado ao exportar produto em lote; produto_id=%s error_type=%s",
+                produto_id,
+                type(error).__name__,
             )
             items.append(
                 {
                     "ok": False,
                     "status": "erro",
                     "produto_id": produto_id,
-                    "detail": str(error),
+                    "detail": "Nao foi possivel concluir este cadastro no Bling.",
                 }
             )
 

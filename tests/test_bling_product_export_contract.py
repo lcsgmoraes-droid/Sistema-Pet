@@ -66,3 +66,19 @@ def test_product_list_counts_parent_variations_in_batch():
     assert ".group_by(Produto.produto_pai_id)" in listagem
     assert "total_variacoes_por_pai = _mapa_total_variacoes_por_pai" in listagem
     assert "variacoes_por_pai = (" in listagem
+
+
+def test_bling_product_export_does_not_expose_provider_errors():
+    export_source = read_text("backend/app/bling_sync/exportacao_produtos_routes.py")
+
+    assert "def _detalhe_publico_erro_bling" in export_source
+    assert 'detail=f"Erro ao consultar produto no Bling' not in export_source
+    assert 'detail=f"Erro ao criar produto no Bling' not in export_source
+    assert 'detail=f"Nao foi possivel enviar o produto ao Bling' not in export_source
+    assert (
+        'detail=f"Nao foi possivel iniciar a integracao com o Bling'
+        not in export_source
+    )
+    assert '"detail": str(error)' not in export_source
+    assert "O Bling atingiu o limite temporario de requisicoes" in export_source
+    assert "O Bling recusou os dados do produto" in export_source
