@@ -1,6 +1,6 @@
 # Cronograma - Maiara, Veterinario e Admin SaaS
 
-Atualizado em: 2026-05-17
+Atualizado em: 2026-07-13
 
 Este documento organiza tres frentes que nao devem se misturar:
 
@@ -8,6 +8,27 @@ Este documento organiza tres frentes que nao devem se misturar:
 2. padronizar a experiencia visual das telas do modulo veterinario;
 3. construir uma area global de administracao SaaS para usuarios, clientes,
    planos, modulos e pagamentos.
+
+## Revisao operacional em 2026-07-13
+
+O tenant real da Maiara ja existe como `Clinica Veterinaria Sao Jose`, esta no
+plano `premium` e possui o modulo veterinario ativo. As notas antigas deste
+documento sobre criar acesso ou tenant devem ser lidas como historico, nao como
+pendencia atual.
+
+O cockpit `/ops/tenants`, aba `Pilotos`, passa a acompanhar este piloto somente
+por leitura, usando evidencias ja existentes:
+
+- acesso e e-mail confirmado;
+- ultima atividade registrada;
+- cadastros de produtos, clientes e pets;
+- vendas, agendamentos e consultas veterinarias;
+- erros 5xx dos ultimos sete dias e alertas criticos abertos;
+- marcos operacionais de D1, D3 e D7.
+
+A Maiara conta como primeiro piloto veterinario acompanhado. Ela nao valida
+sozinha a oferta do Plano Basico, que exige uso real de cadastro, estoque e PDV
+por um pet shop aderente a esse escopo.
 
 ## Estado confirmado em 2026-05-17
 

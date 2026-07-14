@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import inspect, text
@@ -19,6 +20,8 @@ COUNT_TABLES = {
     "pets": "pets",
     "vendas": "vendas",
     "produto_imagens": "produto_imagens",
+    "agendamentos_vet": "vet_agendamentos",
+    "consultas_vet": "vet_consultas",
 }
 
 COMMERCIAL_STATE_OPTIONS = {
@@ -66,6 +69,37 @@ def _table_exists(db: Session, table_name: str) -> bool:
     return inspect(db.connection()).has_table(table_name)
 
 
+def _column_exists(db: Session, table_name: str, column_name: str) -> bool:
+    if not _table_exists(db, table_name):
+        return False
+    return column_name in {
+        column["name"] for column in inspect(db.connection()).get_columns(table_name)
+    }
+
+
+def _iso(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return str(value)
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def _count_by_tenant(db: Session, table_name: str, tenant_id: str) -> int:
     if not _table_exists(db, table_name):
         return 0
@@ -109,7 +143,7 @@ def _principal_user(db: Session, tenant_id: str) -> dict[str, Any] | None:
         db.execute(
             text(
                 """
-            SELECT id, email, nome, is_active, is_admin
+            SELECT id, email, nome, is_active, is_admin, email_verified, last_login_at
             FROM users
             WHERE CAST(tenant_id AS TEXT) = :tenant_id
             ORDER BY is_admin DESC, id ASC
@@ -127,7 +161,8 @@ def _principal_user(db: Session, tenant_id: str) -> dict[str, Any] | None:
             db.execute(
                 text(
                     """
-                SELECT u.id, u.email, u.nome, u.is_active, u.is_admin
+                SELECT u.id, u.email, u.nome, u.is_active, u.is_admin,
+                       u.email_verified, u.last_login_at
                 FROM user_tenants ut
                 JOIN users u ON u.id = ut.user_id
                 WHERE CAST(ut.tenant_id AS TEXT) = :tenant_id
@@ -149,6 +184,8 @@ def _principal_user(db: Session, tenant_id: str) -> dict[str, Any] | None:
         "nome": row.get("nome"),
         "is_active": bool(row.get("is_active")),
         "is_admin": bool(row.get("is_admin")),
+        "email_verified": bool(row.get("email_verified")),
+        "last_login_at": _iso(row.get("last_login_at")),
     }
 
 
@@ -237,6 +274,186 @@ def _tenant_usage(
     }
 
 
+def _latest_tenant_timestamp(
+    db: Session, tenant_id: str, table_name: str, column_name: str
+) -> str | None:
+    if not _column_exists(db, table_name, column_name):
+        return None
+    value = db.execute(
+        text(
+            f"""
+            SELECT MAX({column_name})
+            FROM {table_name}
+            WHERE CAST(tenant_id AS TEXT) = :tenant_id
+            """
+        ),
+        {"tenant_id": tenant_id},
+    ).scalar()
+    return _iso(value)
+
+
+def _latest_user_login(db: Session, tenant_id: str) -> str | None:
+    if not _column_exists(db, "users", "last_login_at"):
+        return None
+    candidates = [
+        db.execute(
+            text(
+                """
+                SELECT MAX(last_login_at)
+                FROM users
+                WHERE CAST(tenant_id AS TEXT) = :tenant_id
+                """
+            ),
+            {"tenant_id": tenant_id},
+        ).scalar()
+    ]
+    if _table_exists(db, "user_tenants"):
+        candidates.append(
+            db.execute(
+                text(
+                    """
+                    SELECT MAX(u.last_login_at)
+                    FROM user_tenants ut
+                    JOIN users u ON u.id = ut.user_id
+                    WHERE CAST(ut.tenant_id AS TEXT) = :tenant_id
+                    """
+                ),
+                {"tenant_id": tenant_id},
+            ).scalar()
+        )
+    parsed = []
+    for value in candidates:
+        parsed_value = _parse_datetime(value)
+        if parsed_value is not None:
+            parsed.append((parsed_value, value))
+    return _iso(max(parsed, key=lambda item: item[0])[1]) if parsed else None
+
+
+def _pilot_errors_7d(db: Session, tenant_id: str) -> int:
+    if not _table_exists(db, "ops_error_events"):
+        return 0
+    since = datetime.now(timezone.utc) - timedelta(days=7)
+    return int(
+        db.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM ops_error_events
+                WHERE CAST(tenant_id AS TEXT) = :tenant_id
+                  AND status_code >= 500
+                  AND created_at >= :since
+                """
+            ),
+            {"tenant_id": tenant_id, "since": since},
+        ).scalar()
+        or 0
+    )
+
+
+def _pilot_critical_alerts(db: Session, tenant_id: str) -> int:
+    if not _table_exists(db, "ops_alerts"):
+        return 0
+    return int(
+        db.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM ops_alerts
+                WHERE CAST(tenant_id AS TEXT) = :tenant_id
+                  AND lower(severity) = 'critical'
+                  AND lower(status) = 'open'
+                """
+            ),
+            {"tenant_id": tenant_id},
+        ).scalar()
+        or 0
+    )
+
+
+def _tenant_pilot_status(
+    db: Session,
+    *,
+    tenant_id: str,
+    row: dict[str, Any],
+    principal_user: dict[str, Any] | None,
+    counts: dict[str, int],
+) -> dict[str, Any]:
+    kind = (
+        "veterinario"
+        if str(row.get("organization_type") or "").lower() == "veterinary_clinic"
+        or int(counts.get("agendamentos_vet") or 0) > 0
+        or int(counts.get("consultas_vet") or 0) > 0
+        else "plano_basico"
+    )
+    operational_events = int(counts.get("vendas") or 0)
+    if kind == "veterinario":
+        operational_events += int(counts.get("agendamentos_vet") or 0)
+        operational_events += int(counts.get("consultas_vet") or 0)
+
+    activity_candidates = [
+        _latest_user_login(db, tenant_id),
+        _latest_tenant_timestamp(db, tenant_id, "vendas", "data_venda"),
+        _latest_tenant_timestamp(db, tenant_id, "vet_agendamentos", "created_at"),
+        _latest_tenant_timestamp(db, tenant_id, "vet_consultas", "created_at"),
+    ]
+    parsed_activity = []
+    for value in activity_candidates:
+        parsed = _parse_datetime(value)
+        if parsed is not None:
+            parsed_activity.append((parsed, value))
+    last_activity_at = (
+        max(parsed_activity, key=lambda item: item[0])[1] if parsed_activity else None
+    )
+
+    errors_7d = _pilot_errors_7d(db, tenant_id)
+    critical_alerts_open = _pilot_critical_alerts(db, tenant_id)
+    access_confirmed = bool(
+        principal_user
+        and principal_user.get("is_active")
+        and principal_user.get("email_verified")
+        and principal_user.get("last_login_at")
+    )
+    setup_records = sum(
+        int(counts.get(field) or 0) for field in ("produtos", "clientes", "pets")
+    )
+
+    if critical_alerts_open:
+        status = "blocked"
+    elif access_confirmed and operational_events:
+        status = "active"
+    elif access_confirmed and setup_records:
+        status = "ready"
+    else:
+        status = "pending"
+
+    started_at = row.get("subscription_activated_at") or row.get("created_at")
+    parsed_start = _parse_datetime(started_at)
+    days_since_start = (
+        max((datetime.now(timezone.utc) - parsed_start).days, 0)
+        if parsed_start
+        else None
+    )
+    return {
+        "kind": kind,
+        "status": status,
+        "started_at": _iso(started_at),
+        "days_since_start": days_since_start,
+        "access_confirmed": access_confirmed,
+        "setup_records": setup_records,
+        "operational_events": operational_events,
+        "last_activity_at": _iso(last_activity_at),
+        "errors_7d": errors_7d,
+        "critical_alerts_open": critical_alerts_open,
+        "milestones": {
+            "day_1_access": access_confirmed,
+            "day_3_setup": setup_records > 0,
+            "day_7_operation": operational_events > 0
+            and errors_7d == 0
+            and critical_alerts_open == 0,
+        },
+    }
+
+
 def _is_billing_attention(status: str | None) -> bool:
     return str(status or "").strip().lower() in {
         "past_due",
@@ -252,6 +469,7 @@ def _is_billing_attention(status: str | None) -> bool:
 def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
     tenant_id = str(row["id"])
     counts = _tenant_counts(db, tenant_id)
+    principal_user = _principal_user(db, tenant_id)
     return {
         "id": tenant_id,
         "name": row["name"],
@@ -263,10 +481,17 @@ def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
         "organization_type": row.get("organization_type") or "petshop",
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
-        "principal_user": _principal_user(db, tenant_id),
+        "principal_user": principal_user,
         "counts": counts,
         "usage": _tenant_usage(db, tenant_id, counts),
         "base_catalog": _base_catalog_status(db, tenant_id),
+        "pilot": _tenant_pilot_status(
+            db,
+            tenant_id=tenant_id,
+            row=row,
+            principal_user=principal_user,
+            counts=counts,
+        ),
     }
 
 
@@ -349,6 +574,12 @@ def list_ops_tenants(
         ),
         "image_bytes": sum(
             int(item.get("usage", {}).get("image_bytes") or 0) for item in items
+        ),
+        "pilots_active": sum(
+            1 for item in items if item.get("pilot", {}).get("status") == "active"
+        ),
+        "pilots_blocked": sum(
+            1 for item in items if item.get("pilot", {}).get("status") == "blocked"
         ),
     }
     return {"items": items, "summary": summary}

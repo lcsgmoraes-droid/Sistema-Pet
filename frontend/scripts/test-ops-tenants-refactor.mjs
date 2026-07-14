@@ -35,6 +35,7 @@ const expectedFiles = [
   "src/pages/ops-tenants/OpsTenantsCommercialEditPanel.jsx",
   "src/pages/ops-tenants/OpsTenantsBillingTab.jsx",
   "src/pages/ops-tenants/OpsTenantsUsageTab.jsx",
+  "src/pages/ops-tenants/OpsTenantsPilotTab.jsx",
 ];
 
 for (const relativePath of expectedFiles) {
@@ -65,6 +66,7 @@ for (const literal of [
   "Importacao de catalogo base",
   "Planos e pagamentos",
   "Uso e cadastros",
+  "Acompanhamento dos pilotos",
   "Guardrails do MVP",
   "Rode uma simulacao valida antes de aplicar a importacao.",
   "Manutencao salva.",

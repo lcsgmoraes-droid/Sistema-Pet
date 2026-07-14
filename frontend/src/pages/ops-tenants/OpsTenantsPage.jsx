@@ -6,6 +6,7 @@ import OpsTenantsGuardrailsPanel from "./OpsTenantsGuardrailsPanel";
 import OpsTenantsHeader from "./OpsTenantsHeader";
 import OpsTenantsImportPanel from "./OpsTenantsImportPanel";
 import OpsTenantsMetricCard from "./OpsTenantsMetricCard";
+import OpsTenantsPilotTab from "./OpsTenantsPilotTab";
 import OpsTenantsTable from "./OpsTenantsTable";
 import OpsTenantsTabs from "./OpsTenantsTabs";
 import OpsTenantsUsageTab from "./OpsTenantsUsageTab";
@@ -145,6 +146,10 @@ export default function OpsTenantsPage() {
 
         {activeTab === "usage" ? (
           <OpsTenantsUsageTab items={items} summaries={tabSummaries} loading={loading} />
+        ) : null}
+
+        {activeTab === "pilot" ? (
+          <OpsTenantsPilotTab items={items} summaries={tabSummaries} loading={loading} />
         ) : null}
       </div>
     </div>
