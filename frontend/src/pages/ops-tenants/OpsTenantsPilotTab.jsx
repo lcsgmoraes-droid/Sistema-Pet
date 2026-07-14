@@ -26,9 +26,7 @@ const STATUS = {
 function Milestone({ checked, children }) {
   return (
     <div className="flex items-center gap-2 text-xs text-slate-600">
-      <FiCheckCircle
-        className={checked ? "h-4 w-4 text-emerald-600" : "h-4 w-4 text-slate-300"}
-      />
+      <FiCheckCircle className={checked ? "h-4 w-4 text-emerald-600" : "h-4 w-4 text-slate-300"} />
       <span>{children}</span>
     </div>
   );
@@ -117,7 +115,9 @@ export default function OpsTenantsPilotTab({ items, summaries, loading }) {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <OpsTenantsBadge className={status.className}>{status.label}</OpsTenantsBadge>
+                        <OpsTenantsBadge className={status.className}>
+                          {status.label}
+                        </OpsTenantsBadge>
                         <div className="mt-2 text-xs text-slate-500">
                           Acesso {pilot.access_confirmed ? "confirmado" : "pendente"}
                         </div>
@@ -140,7 +140,9 @@ export default function OpsTenantsPilotTab({ items, summaries, loading }) {
                       <td className="space-y-1.5 px-4 py-3">
                         <Milestone checked={milestones.day_1_access}>D1 acesso</Milestone>
                         <Milestone checked={milestones.day_3_setup}>D3 configuracao</Milestone>
-                        <Milestone checked={milestones.day_7_operation}>D7 operacao saudavel</Milestone>
+                        <Milestone checked={milestones.day_7_operation}>
+                          D7 operacao saudavel
+                        </Milestone>
                       </td>
                     </tr>
                   );

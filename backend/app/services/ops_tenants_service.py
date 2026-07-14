@@ -429,7 +429,9 @@ def _tenant_pilot_status(
     started_at = row.get("subscription_activated_at") or row.get("created_at")
     parsed_start = _parse_datetime(started_at)
     days_since_start = (
-        max((datetime.now(timezone.utc) - parsed_start).days, 0) if parsed_start else None
+        max((datetime.now(timezone.utc) - parsed_start).days, 0)
+        if parsed_start
+        else None
     )
     return {
         "kind": kind,
