@@ -73,6 +73,34 @@ Para alterar temporariamente:
 BACKUP_RETENTION_DAYS=30 bash scripts/prod_db_restore_smoke.sh
 ```
 
+## Copia externa (R2, B2 ou outro S3 compativel)
+
+O script `scripts/prod_db_external_copy.sh` envia o backup local mais recente e
+seu checksum para um bucket privado. Depois do envio, ele consulta o objeto no
+provedor e so registra `external_copy:ok` no `/ops` quando tamanho e SHA-256
+conferem.
+
+As credenciais nao ficam no Git. Elas devem existir apenas em producao, no
+arquivo root-owned `/etc/petshop/backup-external.env`, com permissao `0600`:
+
+```bash
+OPS_BACKUP_S3_BUCKET=nome-do-bucket-privado
+OPS_BACKUP_S3_ENDPOINT_URL=https://ID_DA_CONTA.r2.cloudflarestorage.com
+OPS_BACKUP_S3_REGION=auto
+OPS_BACKUP_S3_PREFIX=corepet/database
+AWS_ACCESS_KEY_ID=preencher-direto-no-servidor
+AWS_SECRET_ACCESS_KEY=preencher-direto-no-servidor
+```
+
+O token deve permitir somente leitura e gravacao nesse bucket. O bucket deve
+permanecer privado e ter uma regra de ciclo de vida para remover copias antigas
+no prazo escolhido. Quando o arquivo seguro nao existe, o instalador mantem a
+copia externa em standby e nao cria o agendamento. Quando existe, o envio roda
+diariamente as 03:45, depois do backup local das 03:15.
+
+Nunca enviar as chaves por chat, salvar em `.env` do repositorio ou imprimir no
+log. A ativacao no servidor exige autorizacao explicita de producao.
+
 ## Criterio para marcar como validado
 
 So marcar o item do guia mestre como feito quando houver evidencia de:
