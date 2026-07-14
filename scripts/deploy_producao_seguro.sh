@@ -159,6 +159,13 @@ audit_step() {
   write_deploy_event "running" "$CURRENT_STEP" "$message" || log "Aviso: nao foi possivel auditar etapa $CURRENT_STEP"
 }
 
+prune_deploy_backup_history() {
+  if [[ -f "$APP_DIR/scripts/ops_deploy_backup_retention.sh" ]]; then
+    bash "$APP_DIR/scripts/ops_deploy_backup_retention.sh" \
+      || log "Aviso: nao foi possivel aplicar a retencao do historico de deploy"
+  fi
+}
+
 on_error() {
   local exit_code=$?
   local line="${1:-unknown}"
@@ -343,6 +350,7 @@ if ! requires_runtime_deploy "$changed_files"; then
   docker compose -f "$COMPOSE_FILE" ps >"$backup_dir/docker_ps_after.txt" || true
   mv -f "$APP_DIR/$RELEASE_STATUS_NEXT_PATH" "$APP_DIR/$RELEASE_STATUS_PATH"
   chmod 0644 "$APP_DIR/$RELEASE_STATUS_PATH"
+  prune_deploy_backup_history
   write_deploy_event "success" "$CURRENT_STEP" "Deploy sem rebuild; sem mudanca de runtime"
   cleanup_deploy_lock
   log "Deploy sem rebuild concluido"
@@ -560,6 +568,7 @@ git rev-parse HEAD >"$backup_dir/head_after.txt"
 docker compose -f "$COMPOSE_FILE" ps >"$backup_dir/docker_ps_after.txt" || true
 mv -f "$APP_DIR/$RELEASE_STATUS_NEXT_PATH" "$APP_DIR/$RELEASE_STATUS_PATH"
 chmod 0644 "$APP_DIR/$RELEASE_STATUS_PATH"
+prune_deploy_backup_history
 
 mark_step "concluido"
 write_deploy_event "success" "$CURRENT_STEP" "Deploy concluido com repositorio limpo"
