@@ -22,6 +22,7 @@ Guia mestre:
 | Rollback | `docs/PRODUCAO_ROLLBACK_CHECKLIST.md` | Backup operacional do deploy |
 | Backup/restore de banco | `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md` | Restore smoke controlado |
 | Observabilidade e auditoria | `docs/RETENCAO_LOGS_AUDITORIA.md` | Painel Ops e logs JSONL |
+| Teste seguro de capacidade | `docs/TESTE_CAPACIDADE_SEGURO.md` | `scripts/capacity_smoke.py` em ambiente local |
 | Estrutura/refatoracao | `docs/auditorias/estrutura-geral-definition-of-done.md` | Testes focados da fatia |
 | Vender Plano Basico | `docs/GUIA_VENDA_PLANO_BASICO.md` | Checklist de onboarding e clientes piloto |
 | Proposta e suporte do piloto | `docs/comercial/PACOTE_PILOTO_PLANO_BASICO.md` | Checklist exclusivo do Plano Basico |
