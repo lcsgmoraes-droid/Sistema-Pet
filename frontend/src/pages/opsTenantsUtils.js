@@ -2,6 +2,7 @@ export const OPS_TENANT_TABS = [
   { id: "tenants", label: "Tenants" },
   { id: "catalog", label: "Importacao" },
   { id: "billing", label: "Planos" },
+  { id: "pilot", label: "Pilotos" },
   { id: "usage", label: "Uso" },
 ];
 
@@ -57,6 +58,17 @@ export function buildOpsTenantTabSummaries(items = [], summary = {}) {
     summary?.image_bytes ??
       items.reduce((totalBytes, item) => totalBytes + Number(item?.usage?.image_bytes || 0), 0),
   );
+  const pilotActive = Number(
+    summary?.pilots_active ??
+      items.filter((item) => String(item?.pilot?.status || "") === "active").length,
+  );
+  const pilotBlocked = Number(
+    summary?.pilots_blocked ??
+      items.filter((item) => String(item?.pilot?.status || "") === "blocked").length,
+  );
+  const pilotPending = items.filter((item) =>
+    ["pending", "ready"].includes(String(item?.pilot?.status || "")),
+  ).length;
 
   return {
     tenants: {
@@ -70,6 +82,11 @@ export function buildOpsTenantTabSummaries(items = [], summary = {}) {
     },
     billing: {
       attention,
+    },
+    pilot: {
+      active: pilotActive,
+      blocked: pilotBlocked,
+      pending: pilotPending,
     },
     usage: {
       recordsTotal,

@@ -40,7 +40,7 @@ restante da aplicacao.
 | G2 - Seguranca critica | Atendido para piloto | Sem vulnerabilidade bloqueadora, segredo em log ou erro interno exposto |
 | G3 - Recuperacao e operacao | Em execucao | Backup externo monitorado e restore recorrente comprovado |
 | G4 - Oferta comercial | Atendido para piloto | Escopo, modelo de aceite, suporte, onboarding e resposta a incidente definidos; contrato definitivo requer revisao juridica |
-| G5 - Piloto pago | Pendente | 2 a 5 clientes acompanhados, sem incidente critico e com indicadores registrados |
+| G5 - Piloto pago | Em execucao | Maiara identificada como primeiro piloto veterinario; Plano Basico ainda requer uso real de pet shop com estoque e PDV |
 | G6 - Escala enterprise | Futuro | Staging, PITR, testes de carga, monitoramento externo, pentest e governanca formal |
 
 ## Evidencias do primeiro ciclo
@@ -239,7 +239,9 @@ Situacao em 2026-07-13: **6 de 8 concluidas (75%)**.
 - etapas 1, 2, 3, 4, 6 e 7 concluidas;
 - etapa 5 parcial: backup e restore locais validados; copia externa em standby por
   decisao do responsavel;
-- etapa 8 e a proxima: iniciar 2 a 5 pilotos controlados e registrar os indicadores.
+- etapa 8 em execucao: Maiara e o primeiro piloto veterinario acompanhado; o
+  cockpit registra indicadores automaticamente, mas ainda falta um piloto real
+  aderente ao Plano Basico.
 
 Evidencias da etapa 7:
 
@@ -248,6 +250,15 @@ Evidencias da etapa 7:
 - `docs/implantacao/CHECKLIST_PLANO_BASICO_PILOTO.md` limita a implantacao ao que
   esta efetivamente prometido no Plano Basico;
 - `scripts/test_pacote_comercial_basico.py` protege o contrato documental minimo.
+
+Evidencias iniciais da etapa 8:
+
+- o tenant `Clinica Veterinaria Sao Jose` ja existe com acesso e modulo
+  veterinario validados;
+- `/ops/tenants`, aba `Pilotos`, consolida acesso, atividade, operacao, erros 5xx,
+  alertas criticos e marcos D1/D3/D7 sem escrever dados no tenant;
+- alerta critico aberto classifica o piloto como bloqueado e impede leitura
+  otimista da operacao.
 
 ## Regra de decisao
 

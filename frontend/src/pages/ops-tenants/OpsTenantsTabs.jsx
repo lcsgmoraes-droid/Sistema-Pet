@@ -37,6 +37,9 @@ export default function OpsTenantsTabs({ activeTab, summaries, onChange }) {
     billing: summaries.billing.attention
       ? `${formatNumber(summaries.billing.attention)} atencao`
       : "ok",
+    pilot: summaries.pilot.blocked
+      ? `${formatNumber(summaries.pilot.blocked)} bloqueado(s)`
+      : `${formatNumber(summaries.pilot.active)} ativo(s)`,
     usage: summaries.usage.imageStorage,
   };
 

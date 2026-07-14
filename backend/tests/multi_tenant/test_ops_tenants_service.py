@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -41,6 +43,8 @@ def ops_tenants_session():
             nome TEXT,
             is_active BOOLEAN,
             is_admin BOOLEAN,
+            email_verified BOOLEAN,
+            last_login_at TEXT,
             created_at TEXT
         )
         """,
@@ -57,7 +61,19 @@ def ops_tenants_session():
         "CREATE TABLE clientes (id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL)",
         "CREATE TABLE pets (id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL)",
         "CREATE TABLE vendas (id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL, total REAL)",
+        "CREATE TABLE vet_agendamentos (id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL, created_at TEXT)",
+        "CREATE TABLE vet_consultas (id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL, created_at TEXT)",
         "CREATE TABLE produto_imagens (id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL, tamanho INTEGER)",
+        """
+        CREATE TABLE ops_error_events (
+            id INTEGER PRIMARY KEY, tenant_id TEXT, status_code INTEGER, created_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE ops_alerts (
+            id INTEGER PRIMARY KEY, tenant_id TEXT, severity TEXT, status TEXT
+        )
+        """,
         """
         CREATE TABLE tenant_template_installs (
             id INTEGER PRIMARY KEY,
@@ -92,11 +108,14 @@ def ops_tenants_session():
     session.execute(
         text(
             """
-            INSERT INTO users (id, email, tenant_id, nome, is_active, is_admin, created_at)
+            INSERT INTO users (
+                id, email, tenant_id, nome, is_active, is_admin,
+                email_verified, last_login_at, created_at
+            )
             VALUES
-            (1, 'atacadaopetpp@gmail.com', :source, 'Lucas Admin', 1, 1, '2026-05-01'),
-            (10, 'maiaraalmeidaa42@hotmail.com', :target, 'Maiara Almeida', 1, 1, '2026-05-17'),
-            (11, 'vet@clinica.test', :target, 'Veterinario', 1, 0, '2026-05-18')
+            (1, 'atacadaopetpp@gmail.com', :source, 'Lucas Admin', 1, 1, 1, '2026-07-12 10:00:00', '2026-05-01'),
+            (10, 'maiaraalmeidaa42@hotmail.com', :target, 'Maiara Almeida', 1, 1, 1, '2026-07-13 09:00:00', '2026-05-17'),
+            (11, 'vet@clinica.test', :target, 'Veterinario', 1, 0, 1, '2026-07-13 08:00:00', '2026-05-18')
             """
         ),
         {"source": SOURCE_TENANT, "target": TARGET_TENANT},
@@ -144,6 +163,24 @@ def ops_tenants_session():
         ),
         {"target": TARGET_TENANT, "summary": '{"created":{"produtos":3}}'},
     )
+    session.execute(
+        text(
+            """
+            INSERT INTO vet_agendamentos (id, tenant_id, created_at)
+            VALUES (1, :target, '2026-07-12 14:00:00'), (2, :target, '2026-07-13 10:00:00')
+            """
+        ),
+        {"target": TARGET_TENANT},
+    )
+    session.execute(
+        text(
+            """
+            INSERT INTO vet_consultas (id, tenant_id, created_at)
+            VALUES (1, :target, '2026-07-13 11:00:00')
+            """
+        ),
+        {"target": TARGET_TENANT},
+    )
     session.commit()
 
     try:
@@ -171,19 +208,30 @@ def test_list_ops_tenants_returns_counts_and_catalog_status(ops_tenants_session)
         "pets": 4,
         "vendas": 5,
         "produto_imagens": 2,
+        "agendamentos_vet": 2,
+        "consultas_vet": 1,
         "usuarios": 2,
     }
     assert tenant["usage"] == {
-        "records_total": 18,
+        "records_total": 21,
         "image_count": 2,
         "image_bytes": 1572864,
         "image_mb": 1.5,
     }
     assert result["summary"]["billing_attention"] == 1
-    assert result["summary"]["records_total"] == 18
+    assert result["summary"]["records_total"] == 21
     assert result["summary"]["image_bytes"] == 1572864
     assert tenant["base_catalog"]["installed"] is True
     assert tenant["base_catalog"]["status"] == "completed"
+    assert tenant["pilot"]["kind"] == "veterinario"
+    assert tenant["pilot"]["status"] == "active"
+    assert tenant["pilot"]["access_confirmed"] is True
+    assert tenant["pilot"]["operational_events"] == 8
+    assert tenant["pilot"]["last_activity_at"] == "2026-07-13 11:00:00"
+    assert tenant["pilot"]["errors_7d"] == 0
+    assert tenant["pilot"]["critical_alerts_open"] == 0
+    assert result["summary"]["pilots_active"] == 1
+    assert result["summary"]["pilots_blocked"] == 0
 
 
 def test_apply_base_catalog_import_requires_explicit_confirmation(ops_tenants_session):
@@ -199,6 +247,38 @@ def test_apply_base_catalog_import_requires_explicit_confirmation(ops_tenants_se
             actor_user_id=99,
             confirm=False,
         )
+
+
+def test_list_ops_tenants_blocks_pilot_with_critical_alert(ops_tenants_session):
+    from app.services.ops_tenants_service import list_ops_tenants
+
+    ops_tenants_session.execute(
+        text(
+            """
+            INSERT INTO ops_alerts (id, tenant_id, severity, status)
+            VALUES (1, :target, 'critical', 'open')
+            """
+        ),
+        {"target": TARGET_TENANT},
+    )
+    ops_tenants_session.execute(
+        text(
+            """
+            INSERT INTO ops_error_events (id, tenant_id, status_code, created_at)
+            VALUES (1, :target, 500, :created_at)
+            """
+        ),
+        {"target": TARGET_TENANT, "created_at": datetime.now(timezone.utc)},
+    )
+    ops_tenants_session.commit()
+
+    result = list_ops_tenants(ops_tenants_session, search="clinica")
+
+    assert result["items"][0]["pilot"]["status"] == "blocked"
+    assert result["items"][0]["pilot"]["critical_alerts_open"] == 1
+    assert result["items"][0]["pilot"]["errors_7d"] == 1
+    assert result["summary"]["pilots_active"] == 0
+    assert result["summary"]["pilots_blocked"] == 1
 
 
 def test_update_ops_tenant_commercial_state_changes_safe_fields(ops_tenants_session):
