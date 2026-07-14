@@ -57,6 +57,13 @@ e watchdog publico `healthy`.
 
 O deploy tambem instala o guardiao preventivo de disco (`scripts/ops_disk_guard.sh`) em `/etc/cron.d/petshop-ops-disk-guard`. Ele roda a cada 30 minutos e tambem ao fim do deploy, registra eventos em `backend/logs/disk_guard_events.jsonl` e, quando o uso do disco chega ao limite de risco, limpa cache/imagens Docker nao usados e volumes descartaveis identificados do restore smoke. Ele nao remove volumes persistentes, banco, uploads nem dados operacionais.
 
+Depois dos health checks aprovados, o deploy aplica tambem
+`scripts/ops_deploy_backup_retention.sh`. Por padrao, ficam os 20 historicos
+operacionais `backups/deploy_YYYYMMDD_HHMMSS` mais recentes. Essa rotina nao
+entra em `backups/db`, `backups/manual`, uploads ou volumes Docker e recusa
+configuracao menor que dois historicos. O limite pode ser alterado por
+`DEPLOY_BACKUP_KEEP`.
+
 Antes do guardiao de disco, o deploy instala a politica versionada do journal do
 host (`scripts/install_ops_journal_retention.sh`): retencao maxima de 30 dias,
 teto de 768 MB e preservacao de pelo menos 3 GB livres. A rotina atua somente no
