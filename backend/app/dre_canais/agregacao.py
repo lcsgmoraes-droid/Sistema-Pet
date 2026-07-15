@@ -28,6 +28,7 @@ from app.dre_canais.base import (
     _snapshot_pronto,
     _texto_conta,
 )
+from app.dre_canais.folha import calcular_resumo_folha_gerencial
 
 
 def _obter_vendas_por_canal_legacy(
@@ -378,6 +379,7 @@ def agregar_contas_pagar_por_canal(
                 extract("month", ContaPagar.data_emissao) == mes,
                 extract("year", ContaPagar.data_emissao) == ano,
                 ContaPagar.status != "cancelado",
+                ContaPagar.afeta_dre.is_(True),
                 ContaPagar.nota_entrada_id.is_(None),
             )
         )
@@ -413,6 +415,13 @@ def agregar_contas_pagar_por_canal(
         canal = _normalizar_canal(getattr(conta, "canal", None))
         dados = dados_canais.setdefault(canal, _novo_canal())
         dados[campo] += _conta_valor(conta)
+
+    resumo_folha = calcular_resumo_folha_gerencial(
+        db, mes, ano, tenant_id, contas, subcategorias
+    )
+    for canal, valor in resumo_folha["ajustes_por_canal"].items():
+        if valor:
+            dados_canais.setdefault(canal, _novo_canal())["despesas_pessoal"] += valor
 
 
 def agregar_fretes_sobre_compras(

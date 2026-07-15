@@ -26,6 +26,10 @@ from app.dre_canais.base import (
     _periodo_mes,
     _texto_conta,
 )
+from app.dre_canais.folha import (
+    calcular_resumo_folha_gerencial,
+    canal_provisao_folha,
+)
 from app.dre_canais.schemas import DREDetalheItem, DREDetalheResponse
 from app.dre_plano_contas_models import DRESubcategoria
 from app.financeiro_models import ContaPagar
@@ -196,6 +200,7 @@ def _detalhes_contas_campo(
                     extract("month", ContaPagar.data_emissao) == mes,
                     extract("year", ContaPagar.data_emissao) == ano,
                     ContaPagar.status != "cancelado",
+                    ContaPagar.afeta_dre.is_(True),
                     ContaPagar.nota_entrada_id.is_(None),
                 )
             )
@@ -253,6 +258,60 @@ def _detalhes_contas_campo(
                 },
             )
         )
+
+    if campo == "despesas_pessoal":
+        resumo_folha = calcular_resumo_folha_gerencial(
+            db, mes, ano, tenant_id, contas_base, subcategorias
+        )
+        for provisao in resumo_folha["provisoes"]:
+            if canal_provisao_folha(provisao) != canal:
+                continue
+            valor_provisao = _decimal(getattr(provisao, "despesas_pessoal", 0))
+            if abs(valor_provisao) <= Decimal("0.004"):
+                continue
+            detalhes.append(
+                DREDetalheItem(
+                    id=f"provisao-folha-{provisao.id}",
+                    origem_tipo="provisao_dre",
+                    origem_label="Provisao da folha",
+                    data=_data_iso(getattr(provisao, "data_fim", None)),
+                    descricao=getattr(provisao, "observacao", None)
+                    or "Provisao trabalhista registrada",
+                    contraparte="DRE / provisoes trabalhistas",
+                    valor=float(valor_provisao),
+                    meta={"canal": canal},
+                )
+            )
+
+        complemento = resumo_folha["complemento_loja_fisica"]
+        if canal == "loja_fisica" and complemento > Decimal("0.004"):
+            quantidade = resumo_folha["quantidade_funcionarios"]
+            lancado = resumo_folha["folha_lancada_por_canal"].get(
+                "loja_fisica", Decimal("0")
+            )
+            provisoes = resumo_folha["provisoes_por_canal"].get(
+                "loja_fisica", Decimal("0")
+            )
+            detalhes.append(
+                DREDetalheItem(
+                    id="folha-gerencial-estimada",
+                    origem_tipo="folha_gerencial",
+                    origem_label="Cadastro de remuneracao",
+                    data=f"{ano:04d}-{mes:02d}-01",
+                    descricao=(
+                        f"Complemento gerencial de {quantidade} funcionario(s) ativo(s)"
+                    ),
+                    contraparte="Funcionarios e cargos",
+                    valor=float(complemento),
+                    link="/configuracoes/rh/funcionarios",
+                    meta={
+                        "estimado": float(resumo_folha["estimado"]),
+                        "contas_lancadas": float(lancado),
+                        "provisoes": float(provisoes),
+                        "canal": canal,
+                    },
+                )
+            )
 
     detalhes.sort(key=lambda item: item.data or "", reverse=True)
     return detalhes

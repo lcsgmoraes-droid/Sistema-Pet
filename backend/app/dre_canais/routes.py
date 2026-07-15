@@ -45,7 +45,7 @@ def gerar_dre_por_canais(
         _normalizar_canal(c.strip()) for c in canais.split(",") if c.strip()
     ]
     if not canais_selecionados:
-        canais_selecionados = list(CANAIS_CONFIG.keys())
+        canais_selecionados = ["loja_fisica"]
 
     meses = [
         "",

@@ -216,7 +216,7 @@ export default function DREView({
                       tone="ghost"
                       size="xs"
                     >
-                      Limpar Seleção
+                      Somente Loja Física
                     </ActionButton>
                   )}
                 </div>
