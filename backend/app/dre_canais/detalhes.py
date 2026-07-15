@@ -87,9 +87,7 @@ def _detalhes_cmv_estimado(
     canal: str,
 ) -> List[DREDetalheItem]:
     dados_canais = obter_vendas_por_canal(db, mes, ano, tenant_id)
-    itens = list(
-        dados_canais.get(canal, {}).get("itens_cmv_estimado", []) or []
-    )
+    itens = list(dados_canais.get(canal, {}).get("itens_cmv_estimado", []) or [])
     detalhes = []
     for indice, item in enumerate(itens):
         codigo = item.get("produto_codigo")

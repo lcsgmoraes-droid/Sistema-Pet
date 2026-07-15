@@ -325,7 +325,8 @@ def _complementar_snapshot_com_custos_reais(
         return snapshot
 
     itens_snapshot = [
-        dict(item) if isinstance(item, dict) else {} for item in itens_snapshot_originais
+        dict(item) if isinstance(item, dict) else {}
+        for item in itens_snapshot_originais
     ]
     custo_adicional = Decimal("0")
 
@@ -572,9 +573,7 @@ def obter_vendas_por_canal(db: Session, mes: int, ano: int, tenant_id: str) -> D
         dados["campanhas"] += _decimal(snapshot.get("custo_campanha", 0))
         dados["vendas"].append(venda)
 
-    _aplicar_estimativas_cmv(
-        dados_por_canal, bases_estimativa, pendencias_estimativa
-    )
+    _aplicar_estimativas_cmv(dados_por_canal, bases_estimativa, pendencias_estimativa)
     return dados_por_canal
 
 
