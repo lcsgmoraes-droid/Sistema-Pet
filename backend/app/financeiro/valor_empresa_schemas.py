@@ -5,10 +5,18 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, field_validator
 
 
+class FornecedorExclusaoPayload(BaseModel):
+    fornecedor_id: int = Field(..., gt=0)
+    excluir_estoque: bool = False
+    excluir_contas_pagar: bool = False
+
+
 class ValorEmpresaConfiguracaoPayload(BaseModel):
     periodo_dias: int = Field(60, ge=30, le=730)
     canais: str = Field("loja_fisica", max_length=300)
-    fornecedor_ids_excluidos: list[int] = Field(default_factory=list)
+    fornecedores_exclusoes: list[FornecedorExclusaoPayload] = Field(
+        default_factory=list
+    )
     folha_mensal_override: Decimal | None = Field(None, ge=0)
     despesas_fixas_mensais_override: Decimal | None = Field(None, ge=0)
     margem_contribuicao_override: Decimal | None = Field(None, ge=0, le=100)
@@ -25,10 +33,15 @@ class ValorEmpresaConfiguracaoPayload(BaseModel):
     dias_estoque_lento: int = Field(365, ge=30, le=3650)
     observacoes: str | None = Field(None, max_length=4000)
 
-    @field_validator("fornecedor_ids_excluidos")
+    @field_validator("fornecedores_exclusoes")
     @classmethod
-    def normalizar_fornecedores(cls, valor: list[int]) -> list[int]:
-        return list(dict.fromkeys(item for item in valor if item > 0))
+    def normalizar_fornecedores(
+        cls, valor: list[FornecedorExclusaoPayload]
+    ) -> list[FornecedorExclusaoPayload]:
+        unicos = {}
+        for item in valor:
+            unicos[item.fornecedor_id] = item
+        return list(unicos.values())
 
 
 class SimulacaoValorEmpresaPayload(BaseModel):

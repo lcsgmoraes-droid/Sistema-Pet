@@ -21,7 +21,7 @@ def upgrade():
         "valor_empresa_configuracoes",
         sa.Column("periodo_dias", sa.Integer(), nullable=False),
         sa.Column("canais", sa.String(length=300), nullable=False),
-        sa.Column("fornecedor_ids_excluidos", sa.JSON(), nullable=False),
+        sa.Column("fornecedores_exclusoes", sa.JSON(), nullable=False),
         sa.Column("folha_mensal_override", sa.Numeric(14, 2), nullable=True),
         sa.Column("despesas_fixas_mensais_override", sa.Numeric(14, 2), nullable=True),
         sa.Column("margem_contribuicao_override", sa.Numeric(7, 4), nullable=True),

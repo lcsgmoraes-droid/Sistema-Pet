@@ -129,13 +129,27 @@ export default function ValorEmpresa() {
 
   const atualizar = (campo, valor) => setForm((atual) => ({ ...atual, [campo]: valor }));
 
-  const alternarFornecedor = (id) => {
-    const atuais = form.fornecedor_ids_excluidos || [];
-    atualizar(
-      "fornecedor_ids_excluidos",
-      atuais.includes(id) ? atuais.filter((item) => item !== id) : [...atuais, id],
-    );
+  const alternarExclusaoFornecedor = (fornecedorId, campo) => {
+    const atuais = form.fornecedores_exclusoes || [];
+    const existente = atuais.find((item) => item.fornecedor_id === fornecedorId) || {
+      fornecedor_id: fornecedorId,
+      excluir_estoque: false,
+      excluir_contas_pagar: false,
+    };
+    const atualizado = { ...existente, [campo]: !existente[campo] };
+    const proximos = atuais.filter((item) => item.fornecedor_id !== fornecedorId);
+    if (atualizado.excluir_estoque || atualizado.excluir_contas_pagar) {
+      proximos.push(atualizado);
+    }
+    atualizar("fornecedores_exclusoes", proximos);
   };
+
+  const fornecedorTemExclusao = (fornecedorId, campo) =>
+    Boolean(
+      (form.fornecedores_exclusoes || []).find((item) => item.fornecedor_id === fornecedorId)?.[
+        campo
+      ],
+    );
 
   const payloadConfiguracao = () => {
     const { id: _id, fornecedores_excluidos: _fornecedores, ...payload } = form;
@@ -448,27 +462,51 @@ export default function ValorEmpresa() {
 
             <div className="mt-6 grid gap-5 xl:grid-cols-2">
               <div className="rounded-xl border border-slate-200 p-4">
-                <p className="text-sm font-semibold text-slate-800">
-                  Fornecedores fora da avaliação
-                </p>
+                <p className="text-sm font-semibold text-slate-800">Exclusões por fornecedor</p>
                 <p className="mt-1 text-xs text-slate-500">
-                  Exclui tanto o estoque quanto as contas a pagar desses fornecedores.
+                  Marque separadamente o que não deve entrar na avaliação.
                 </p>
-                <div className="mt-3 max-h-44 space-y-2 overflow-y-auto pr-1">
+                <div className="mt-3 max-h-56 overflow-y-auto pr-1">
+                  <div className="sticky top-0 grid grid-cols-[1fr_80px_105px] gap-2 border-b border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-slate-500">
+                    <span>Fornecedor</span>
+                    <span className="text-center">Estoque</span>
+                    <span className="text-center">Contas a pagar</span>
+                  </div>
                   {fornecedores.map((fornecedor) => (
-                    <label
+                    <div
                       key={fornecedor.id}
-                      className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50"
+                      className="grid grid-cols-[1fr_80px_105px] items-center gap-2 rounded-lg px-2 py-2 text-sm hover:bg-slate-50"
                     >
-                      <input
-                        type="checkbox"
-                        checked={(form.fornecedor_ids_excluidos || []).includes(fornecedor.id)}
-                        onChange={() => alternarFornecedor(fornecedor.id)}
-                        className="h-4 w-4 accent-blue-600"
-                      />
-                      <span>{fornecedor.nome}</span>
-                      <span className="text-xs text-slate-400">#{fornecedor.id}</span>
-                    </label>
+                      <span>
+                        {fornecedor.nome}{" "}
+                        <span className="text-xs text-slate-400">#{fornecedor.id}</span>
+                      </span>
+                      <label className="flex cursor-pointer justify-center" title="Tirar estoque">
+                        <input
+                          type="checkbox"
+                          aria-label={`Tirar estoque de ${fornecedor.nome}`}
+                          checked={fornecedorTemExclusao(fornecedor.id, "excluir_estoque")}
+                          onChange={() =>
+                            alternarExclusaoFornecedor(fornecedor.id, "excluir_estoque")
+                          }
+                          className="h-4 w-4 accent-blue-600"
+                        />
+                      </label>
+                      <label
+                        className="flex cursor-pointer justify-center"
+                        title="Tirar contas a pagar"
+                      >
+                        <input
+                          type="checkbox"
+                          aria-label={`Tirar contas a pagar de ${fornecedor.nome}`}
+                          checked={fornecedorTemExclusao(fornecedor.id, "excluir_contas_pagar")}
+                          onChange={() =>
+                            alternarExclusaoFornecedor(fornecedor.id, "excluir_contas_pagar")
+                          }
+                          className="h-4 w-4 accent-blue-600"
+                        />
+                      </label>
+                    </div>
                   ))}
                   {!fornecedores.length ? (
                     <p className="text-sm text-slate-500">Nenhum fornecedor encontrado.</p>

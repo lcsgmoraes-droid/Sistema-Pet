@@ -1,6 +1,10 @@
 from decimal import Decimal
 
-from app.financeiro.valor_empresa_service import calcular_cenarios, configuracao_padrao
+from app.financeiro.valor_empresa_service import (
+    calcular_cenarios,
+    configuracao_padrao,
+    separar_exclusoes_fornecedores,
+)
 
 
 def test_cenario_provavel_abre_composicao_do_valor():
@@ -53,3 +57,28 @@ def test_desconto_incide_somente_sobre_estoque_lento():
 
     assert conservador["estoque_negociavel"] == 40000
     assert conservador["valor_sugerido"] == 40000
+
+
+def test_fornecedor_pode_ser_excluido_de_cada_fonte_independentemente():
+    estoque, contas_pagar = separar_exclusoes_fornecedores(
+        [
+            {
+                "fornecedor_id": 10007,
+                "excluir_estoque": True,
+                "excluir_contas_pagar": False,
+            },
+            {
+                "fornecedor_id": 10080,
+                "excluir_estoque": False,
+                "excluir_contas_pagar": True,
+            },
+            {
+                "fornecedor_id": 42,
+                "excluir_estoque": True,
+                "excluir_contas_pagar": True,
+            },
+        ]
+    )
+
+    assert estoque == [10007, 42]
+    assert contas_pagar == [10080, 42]

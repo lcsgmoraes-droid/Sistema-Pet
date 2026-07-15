@@ -36,7 +36,7 @@ def configuracao_padrao() -> dict:
     return {
         "periodo_dias": 60,
         "canais": "loja_fisica",
-        "fornecedor_ids_excluidos": [],
+        "fornecedores_exclusoes": [],
         "folha_mensal_override": None,
         "despesas_fixas_mensais_override": None,
         "margem_contribuicao_override": None,
@@ -63,8 +63,23 @@ def dados_configuracao(config: ValorEmpresaConfiguracao | None) -> dict:
         valor = getattr(config, campo, None)
         if valor is not None:
             dados[campo] = valor
-    dados["fornecedor_ids_excluidos"] = list(config.fornecedor_ids_excluidos or [])
+    dados["fornecedores_exclusoes"] = list(config.fornecedores_exclusoes or [])
     return dados
+
+
+def separar_exclusoes_fornecedores(
+    exclusoes: list[dict],
+) -> tuple[list[int], list[int]]:
+    """Separa as exclusoes de estoque e contas sem misturar as duas decisoes."""
+    estoque = []
+    contas_pagar = []
+    for item in exclusoes:
+        fornecedor_id = int(item["fornecedor_id"])
+        if item.get("excluir_estoque"):
+            estoque.append(fornecedor_id)
+        if item.get("excluir_contas_pagar"):
+            contas_pagar.append(fornecedor_id)
+    return list(dict.fromkeys(estoque)), list(dict.fromkeys(contas_pagar))
 
 
 def calcular_cenarios(
@@ -241,7 +256,9 @@ async def montar_avaliacao(
     canais = [
         item.strip() for item in str(config["canais"] or "").split(",") if item.strip()
     ]
-    fornecedores = [int(item) for item in config["fornecedor_ids_excluidos"]]
+    fornecedores_estoque, fornecedores_contas_pagar = separar_exclusoes_fornecedores(
+        config["fornecedores_exclusoes"]
+    )
     pe = await obter_ponto_equilibrio(
         data_inicio=inicio,
         data_fim=fim,
@@ -249,7 +266,7 @@ async def montar_avaliacao(
         fonte_margem="periodo_atual",
         modo_custo_fiscal="gerencial_completo",
         incluir_detalhes=False,
-        fornecedor_ids_excluidos=",".join(map(str, fornecedores)),
+        fornecedor_ids_excluidos=",".join(map(str, fornecedores_contas_pagar)),
         db=db,
         user_and_tenant=(current_user, tenant_id),
     )
@@ -295,7 +312,7 @@ async def montar_avaliacao(
     ).quantize(CENTAVOS)
 
     estoque = _calcular_estoque(
-        db, tenant_id, fornecedores, int(config["dias_estoque_lento"])
+        db, tenant_id, fornecedores_estoque, int(config["dias_estoque_lento"])
     )
     imobilizado_dados = _calcular_imobilizado(db, tenant_id)
     imobilizado = moeda(
@@ -303,7 +320,7 @@ async def montar_avaliacao(
         if config["imobilizado_override"] is not None
         else imobilizado_dados["valor"]
     )
-    dividas_dados = _calcular_dividas(db, tenant_id, fornecedores)
+    dividas_dados = _calcular_dividas(db, tenant_id, fornecedores_contas_pagar)
     dividas = Decimal("0")
     if config["incluir_dividas"]:
         dividas = (
@@ -364,11 +381,17 @@ async def montar_avaliacao(
     pontos = max(pontos, 0)
     nivel = "alta" if pontos >= 80 else "média" if pontos >= 55 else "baixa"
     nomes_fornecedores = []
-    if fornecedores:
+    fornecedores_ids = sorted(set(fornecedores_estoque + fornecedores_contas_pagar))
+    if fornecedores_ids:
         nomes_fornecedores = [
-            {"id": item.id, "nome": item.nome}
+            {
+                "id": item.id,
+                "nome": item.nome,
+                "excluir_estoque": item.id in fornecedores_estoque,
+                "excluir_contas_pagar": item.id in fornecedores_contas_pagar,
+            }
             for item in db.query(Cliente)
-            .filter(Cliente.tenant_id == tenant_id, Cliente.id.in_(fornecedores))
+            .filter(Cliente.tenant_id == tenant_id, Cliente.id.in_(fornecedores_ids))
             .all()
         ]
     config_response = {

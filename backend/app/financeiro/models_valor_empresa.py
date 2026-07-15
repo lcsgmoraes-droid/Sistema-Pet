@@ -24,7 +24,7 @@ class ValorEmpresaConfiguracao(BaseTenantModel):
 
     periodo_dias = Column(Integer, nullable=False, default=60)
     canais = Column(String(300), nullable=False, default="loja_fisica")
-    fornecedor_ids_excluidos = Column(JSON, nullable=False, default=list)
+    fornecedores_exclusoes = Column(JSON, nullable=False, default=list)
 
     folha_mensal_override = Column(Numeric(14, 2), nullable=True)
     despesas_fixas_mensais_override = Column(Numeric(14, 2), nullable=True)
