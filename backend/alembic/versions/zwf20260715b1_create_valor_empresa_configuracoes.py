@@ -9,11 +9,16 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from app.tenant_rls_migration import TENANT_RLS_GUARD, apply_tenant_rls
+
 
 revision = "zwf20260715b1"
 down_revision = "zwf20260715a1"
 branch_labels = None
 depends_on = None
+
+TABELAS_RLS = ("valor_empresa_configuracoes",)
+TENANT_GUARD = TENANT_RLS_GUARD
 
 
 def upgrade():
@@ -39,8 +44,18 @@ def upgrade():
         sa.Column("observacoes", sa.Text(), nullable=True),
         sa.Column("id", sa.Integer(), sa.Identity(always=True), nullable=False),
         sa.Column("tenant_id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("tenant_id", name="uq_valor_empresa_configuracoes_tenant"),
     )
@@ -50,8 +65,23 @@ def upgrade():
         ["tenant_id"],
         unique=False,
     )
+    apply_tenant_rls(
+        op_module=op,
+        sa_module=sa,
+        table_names=TABELAS_RLS,
+        enable=True,
+    )
 
 
 def downgrade():
-    op.drop_index(op.f("ix_valor_empresa_configuracoes_tenant_id"), table_name="valor_empresa_configuracoes")
+    apply_tenant_rls(
+        op_module=op,
+        sa_module=sa,
+        table_names=TABELAS_RLS,
+        enable=False,
+    )
+    op.drop_index(
+        op.f("ix_valor_empresa_configuracoes_tenant_id"),
+        table_name="valor_empresa_configuracoes",
+    )
     op.drop_table("valor_empresa_configuracoes")
