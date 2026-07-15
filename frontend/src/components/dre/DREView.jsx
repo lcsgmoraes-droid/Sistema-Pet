@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   Brain,
   CheckCircle,
   DollarSign,
@@ -196,6 +197,59 @@ export default function DREView({
                   subtitle="Rentabilidade"
                 />
               </MetricGrid>
+
+              {(dados.alertas || []).map((alerta) => {
+                const linhaEstimativa = (dados.linhas || []).find(
+                  (linha) => linha.campo === "cmv_estimado" && linha.canal === alerta.canal,
+                );
+                const semBase = Boolean(alerta.sem_base_estimativa);
+                return (
+                  <div
+                    key={`${alerta.codigo}-${alerta.canal}`}
+                    className={`rounded-lg border p-4 ${
+                      semBase
+                        ? "border-red-300 bg-red-50 text-red-900"
+                        : "border-amber-300 bg-amber-50 text-amber-950"
+                    }`}
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle
+                          className={`mt-0.5 h-5 w-5 flex-shrink-0 ${
+                            semBase ? "text-red-600" : "text-amber-600"
+                          }`}
+                        />
+                        <div>
+                          <h3 className="font-semibold">{alerta.titulo}</h3>
+                          <p className="mt-1 text-sm leading-5">{alerta.mensagem}</p>
+                          <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                            <span>
+                              <strong>{alerta.quantidade_produtos}</strong> produto(s) sem custo
+                            </span>
+                            <span>
+                              Vendas afetadas: <MoneyCell value={alerta.valor_vendas || 0} />
+                            </span>
+                            <span>
+                              CMV provisório: <MoneyCell value={alerta.valor_estimado || 0} />
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      {linhaEstimativa && (
+                        <ActionButton
+                          onClick={() => abrirDetalhesLinha(linhaEstimativa)}
+                          intent="warning"
+                          tone="soft"
+                          size="sm"
+                          className="flex-shrink-0"
+                        >
+                          Ver produtos e vendas
+                        </ActionButton>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
 
               {/* Seletor de Canais - ABA 7 */}
               <div className="bg-white rounded-lg shadow p-4 md:p-6">

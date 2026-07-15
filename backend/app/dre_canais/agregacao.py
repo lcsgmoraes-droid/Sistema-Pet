@@ -284,6 +284,202 @@ def _bulk_estoque_custos_por_venda(
     return resultado
 
 
+def _moeda(valor: Any) -> Decimal:
+    return _decimal(valor).quantize(Decimal("0.01"))
+
+
+def _custo_confirmado_atual_item(
+    item: VendaItem,
+    estoque_custos_por_produto: Dict[int, Dict[str, float]],
+) -> tuple[Decimal, str | None]:
+    """Busca um custo real atual sem alterar a fotografia persistida da venda."""
+    quantidade_item = _decimal(getattr(item, "quantidade", 0))
+    if quantidade_item <= 0:
+        return Decimal("0"), None
+
+    produto_id = getattr(item, "produto_id", None)
+    movimento = estoque_custos_por_produto.get(int(produto_id or 0), {})
+    quantidade_movimento = _decimal(movimento.get("quantidade", 0))
+    valor_movimento = _decimal(movimento.get("valor_total", 0))
+    if quantidade_movimento > 0 and valor_movimento > 0:
+        custo_unitario = valor_movimento / quantidade_movimento
+        return _moeda(custo_unitario * quantidade_item), "movimentacao_estoque"
+
+    produto = getattr(item, "produto", None)
+    custo_unitario = _decimal(getattr(produto, "preco_custo", 0))
+    if custo_unitario > 0:
+        return _moeda(custo_unitario * quantidade_item), "cadastro_produto"
+
+    return Decimal("0"), None
+
+
+def _complementar_snapshot_com_custos_reais(
+    venda: Venda,
+    snapshot: Dict[str, Any],
+    estoque_custos_por_produto: Dict[int, Dict[str, float]],
+) -> Dict[str, Any]:
+    """Preenche apenas custos zerados que passaram a ter uma origem real confiável."""
+    itens_venda = list(getattr(venda, "itens", []) or [])
+    itens_snapshot_originais = snapshot.get("itens")
+    if not isinstance(itens_snapshot_originais, list) or not itens_venda:
+        return snapshot
+
+    itens_snapshot = [
+        dict(item) if isinstance(item, dict) else {} for item in itens_snapshot_originais
+    ]
+    custo_adicional = Decimal("0")
+
+    for indice, item in enumerate(itens_venda):
+        if indice >= len(itens_snapshot):
+            break
+        item_snapshot = itens_snapshot[indice]
+        if _decimal(item_snapshot.get("custo_total", 0)) > Decimal("0.004"):
+            continue
+
+        custo_real, origem = _custo_confirmado_atual_item(
+            item, estoque_custos_por_produto
+        )
+        if custo_real <= Decimal("0.004"):
+            continue
+
+        quantidade = _decimal(getattr(item, "quantidade", 0))
+        item_snapshot["custo_total"] = float(custo_real)
+        item_snapshot["custo_unitario"] = (
+            float(_moeda(custo_real / quantidade)) if quantidade > 0 else 0.0
+        )
+        item_snapshot["custo_origem_complemento_dre"] = origem
+        custo_adicional += custo_real
+
+    if custo_adicional <= 0:
+        return snapshot
+
+    snapshot_ajustado = dict(snapshot)
+    snapshot_ajustado["itens"] = itens_snapshot
+    snapshot_ajustado["custo_produtos"] = float(
+        _moeda(_decimal(snapshot.get("custo_produtos", 0)) + custo_adicional)
+    )
+    snapshot_ajustado["custo_complementado_dre"] = float(_moeda(custo_adicional))
+    return snapshot_ajustado
+
+
+def _registrar_base_estimativa_cmv(
+    venda: Venda,
+    canal: str,
+    snapshot: Dict[str, Any],
+    bases_por_canal: Dict[str, Dict[str, Decimal]],
+    pendencias_por_canal: Dict[str, List[Dict[str, Any]]],
+) -> None:
+    """Separa itens com custo confirmado dos produtos que ainda precisam de estimativa."""
+    itens_venda = list(getattr(venda, "itens", []) or [])
+    itens_snapshot = snapshot.get("itens")
+    if not isinstance(itens_snapshot, list) or len(itens_snapshot) < len(itens_venda):
+        return
+
+    base = bases_por_canal.setdefault(
+        canal,
+        {"receita_confirmada": Decimal("0"), "custo_confirmado": Decimal("0")},
+    )
+    pendencias = pendencias_por_canal.setdefault(canal, [])
+
+    for indice, item in enumerate(itens_venda):
+        if str(getattr(item, "tipo", "") or "").lower() == "servico":
+            continue
+
+        item_snapshot = itens_snapshot[indice]
+        if not isinstance(item_snapshot, dict):
+            continue
+
+        valor_venda = _moeda(
+            item_snapshot.get("venda_bruta", getattr(item, "subtotal", 0))
+        )
+        custo_confirmado = _moeda(item_snapshot.get("custo_total", 0))
+        if custo_confirmado > Decimal("0.004"):
+            if valor_venda > 0:
+                base["receita_confirmada"] += valor_venda
+                base["custo_confirmado"] += custo_confirmado
+            continue
+
+        produto = getattr(item, "produto", None)
+        data_venda = getattr(venda, "data_venda", None)
+        data_iso = None
+        if data_venda:
+            data_iso = (
+                data_venda.date().isoformat()
+                if hasattr(data_venda, "date")
+                else data_venda.isoformat()
+            )
+        pendencias.append(
+            {
+                "venda_id": getattr(venda, "id", None),
+                "numero_venda": getattr(venda, "numero_venda", None),
+                "data": data_iso,
+                "produto_id": getattr(item, "produto_id", None),
+                "produto_codigo": getattr(produto, "codigo", None),
+                "produto_nome": getattr(produto, "nome", None) or "Produto removido",
+                "quantidade": float(_decimal(getattr(item, "quantidade", 0))),
+                "valor_venda": float(valor_venda),
+                "valor_estimado": 0.0,
+                "canal": canal,
+            }
+        )
+
+
+def _aplicar_estimativas_cmv(
+    dados_por_canal: Dict[str, Dict],
+    bases_por_canal: Dict[str, Dict[str, Decimal]],
+    pendencias_por_canal: Dict[str, List[Dict[str, Any]]],
+) -> None:
+    """Estima somente na DRE usando a proporção ponderada de custos confirmados."""
+    receita_global = sum(
+        (base["receita_confirmada"] for base in bases_por_canal.values()),
+        Decimal("0"),
+    )
+    custo_global = sum(
+        (base["custo_confirmado"] for base in bases_por_canal.values()),
+        Decimal("0"),
+    )
+
+    for canal, pendencias in pendencias_por_canal.items():
+        if not pendencias:
+            continue
+        dados = dados_por_canal.setdefault(canal, _novo_canal())
+        base = bases_por_canal.get(canal, {})
+        receita_base = _decimal(base.get("receita_confirmada", 0))
+        custo_base = _decimal(base.get("custo_confirmado", 0))
+        origem_percentual = "mesmo_canal"
+
+        if receita_base <= 0 or custo_base <= 0:
+            receita_base = receita_global
+            custo_base = custo_global
+            origem_percentual = "todos_canais_periodo"
+
+        percentual = (
+            custo_base / receita_base
+            if receita_base > 0 and custo_base > 0
+            else Decimal("0")
+        )
+        if percentual <= 0:
+            origem_percentual = "sem_base"
+
+        total_estimado = Decimal("0")
+        itens_estimados: List[Dict[str, Any]] = []
+        for pendencia in pendencias:
+            item_estimado = dict(pendencia)
+            valor_estimado = _moeda(
+                _decimal(pendencia.get("valor_venda", 0)) * percentual
+            )
+            item_estimado["valor_estimado"] = float(valor_estimado)
+            item_estimado["percentual_custo"] = float(percentual * Decimal("100"))
+            item_estimado["origem_percentual"] = origem_percentual
+            itens_estimados.append(item_estimado)
+            total_estimado += valor_estimado
+
+        dados["cmv_estimado"] = _moeda(total_estimado)
+        dados["itens_cmv_estimado"] = itens_estimados
+        dados["percentual_cmv_estimado"] = percentual * Decimal("100")
+        dados["origem_percentual_cmv_estimado"] = origem_percentual
+
+
 def obter_vendas_por_canal(db: Session, mes: int, ano: int, tenant_id: str) -> Dict:
     """Retorna vendas agrupadas por canal usando a fotografia de rentabilidade da venda."""
     inicio, fim = _periodo_mes(mes, ano)
@@ -315,6 +511,9 @@ def obter_vendas_por_canal(db: Session, mes: int, ano: int, tenant_id: str) -> D
     taxa_operacional_por_venda = _bulk_taxa_operacional_por_venda(db, tenant_id, vendas)
     estoque_custos_por_venda = _bulk_estoque_custos_por_venda(db, tenant_id, venda_ids)
 
+    bases_estimativa: Dict[str, Dict[str, Decimal]] = {}
+    pendencias_estimativa: Dict[str, List[Dict[str, Any]]] = {}
+
     for venda in vendas:
         canal = _normalizar_canal(getattr(venda, "canal", None))
         dados = dados_por_canal.setdefault(canal, _novo_canal())
@@ -340,6 +539,18 @@ def obter_vendas_por_canal(db: Session, mes: int, ano: int, tenant_id: str) -> D
                 taxa_operacional_entrega=taxa_operacional_por_venda.get(venda.id, 0.0),
                 estoque_custos_por_produto=estoque_custos_por_venda.get(venda.id, {}),
             )
+        snapshot = _complementar_snapshot_com_custos_reais(
+            venda,
+            snapshot,
+            estoque_custos_por_venda.get(venda.id, {}),
+        )
+        _registrar_base_estimativa_cmv(
+            venda,
+            canal,
+            snapshot,
+            bases_estimativa,
+            pendencias_estimativa,
+        )
 
         receita_bruta = _decimal(snapshot.get("venda_bruta", 0))
         receita_produtos, receita_servicos = _separar_receita_produto_servico(
@@ -361,6 +572,9 @@ def obter_vendas_por_canal(db: Session, mes: int, ano: int, tenant_id: str) -> D
         dados["campanhas"] += _decimal(snapshot.get("custo_campanha", 0))
         dados["vendas"].append(venda)
 
+    _aplicar_estimativas_cmv(
+        dados_por_canal, bases_estimativa, pendencias_estimativa
+    )
     return dados_por_canal
 
 
@@ -548,6 +762,11 @@ def _preparar_snapshots_vendas(
                 taxa_operacional_entrega=taxa_operacional_por_venda.get(venda.id, 0.0),
                 estoque_custos_por_produto=estoque_custos_por_venda.get(venda.id, {}),
             )
+        snapshot = _complementar_snapshot_com_custos_reais(
+            venda,
+            snapshot,
+            estoque_custos_por_venda.get(venda.id, {}),
+        )
         snapshots[int(venda.id)] = snapshot
     return snapshots
 

@@ -113,7 +113,11 @@ def montar_linhas_dre_competencia(
     deducoes_total = descontos_total + impostos_total
     receita_liquida_total = receita_bruta_total - deducoes_total
 
-    cmv_total = _somar(dados_canais, "cmv") + _somar(dados_canais, "fretes_compras")
+    cmv_total = (
+        _somar(dados_canais, "cmv")
+        + _somar(dados_canais, "cmv_estimado")
+        + _somar(dados_canais, "fretes_compras")
+    )
     lucro_bruto_total = receita_liquida_total - cmv_total
 
     despesas_variaveis_total = (
@@ -226,6 +230,14 @@ def montar_linhas_dre_competencia(
     )
     _adicionar_linhas_campo(
         linhas, dados_canais, receita_bruta_total, "cmv", "CMV", "custo"
+    )
+    _adicionar_linhas_campo(
+        linhas,
+        dados_canais,
+        receita_bruta_total,
+        "cmv_estimado",
+        "CMV Provisório (Produtos sem Custo)",
+        "custo",
     )
     _adicionar_linhas_campo(
         linhas,

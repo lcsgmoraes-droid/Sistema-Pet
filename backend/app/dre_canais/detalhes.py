@@ -11,6 +11,7 @@ from app.dre_canais.agregacao import (
     _preparar_snapshots_vendas,
     _subcategorias_contas_map,
     _valor_snapshot_campo,
+    obter_vendas_por_canal,
 )
 from app.dre_canais.base import (
     CANAIS_CONFIG,
@@ -45,6 +46,7 @@ CAMPOS_DETALHE_VENDAS = {
     "descontos",
     "impostos",
     "cmv",
+    "cmv_estimado",
     "taxas_cartao",
     "repasse_entrega",
     "taxa_operacional_entrega",
@@ -77,6 +79,53 @@ def _paginar_detalhes(
     return items[inicio : inicio + page_size], page_size, pages
 
 
+def _detalhes_cmv_estimado(
+    db: Session,
+    mes: int,
+    ano: int,
+    tenant_id: str,
+    canal: str,
+) -> List[DREDetalheItem]:
+    dados_canais = obter_vendas_por_canal(db, mes, ano, tenant_id)
+    itens = list(
+        dados_canais.get(canal, {}).get("itens_cmv_estimado", []) or []
+    )
+    detalhes = []
+    for indice, item in enumerate(itens):
+        codigo = item.get("produto_codigo")
+        nome = item.get("produto_nome") or "Produto removido"
+        numero_venda = item.get("numero_venda") or f"#{item.get('venda_id')}"
+        percentual = _decimal(item.get("percentual_custo", 0))
+        detalhes.append(
+            DREDetalheItem(
+                id=(
+                    f"cmv-estimado-{item.get('venda_id')}-"
+                    f"{item.get('produto_id')}-{indice}"
+                ),
+                origem_tipo="estimativa_cmv",
+                origem_label="Custo provisório",
+                data=item.get("data"),
+                descricao=f"{codigo} - {nome}" if codigo else nome,
+                contraparte=f"Venda {numero_venda} • custo aplicado {float(percentual):.2f}%",
+                documento=str(numero_venda),
+                valor=float(_decimal(item.get("valor_estimado", 0))),
+                valor_auxiliar=float(_decimal(item.get("valor_venda", 0))),
+                link="/produtos",
+                meta={
+                    "produto_id": item.get("produto_id"),
+                    "quantidade": item.get("quantidade"),
+                    "valor_venda": item.get("valor_venda"),
+                    "percentual_custo": float(percentual),
+                    "origem_percentual": item.get("origem_percentual"),
+                    "provisorio": True,
+                },
+            )
+        )
+
+    detalhes.sort(key=lambda detalhe: detalhe.data or "", reverse=True)
+    return detalhes
+
+
 def _detalhes_vendas_campo(
     db: Session,
     mes: int,
@@ -85,6 +134,9 @@ def _detalhes_vendas_campo(
     canal: str,
     campo: str,
 ) -> List[DREDetalheItem]:
+    if campo == "cmv_estimado":
+        return _detalhes_cmv_estimado(db, mes, ano, tenant_id, canal)
+
     inicio, fim = _periodo_mes(mes, ano)
     vendas = (
         db.query(Venda)
