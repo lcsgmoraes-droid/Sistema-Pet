@@ -10,10 +10,7 @@ from app.dre_canais.folha import _calcular_complemento_folha
 
 def test_classifica_pro_labore_e_beneficios_como_despesa_de_pessoal():
     assert _classificar_conta_dre("Pro Labore Sócios") == "despesas_pessoal"
-    assert (
-        _classificar_conta_dre("Plano Odontológico Unimed")
-        == "despesas_pessoal"
-    )
+    assert _classificar_conta_dre("Plano Odontológico Unimed") == "despesas_pessoal"
     assert _classificar_conta_dre("Despesas com Pessoal") == "despesas_pessoal"
 
 

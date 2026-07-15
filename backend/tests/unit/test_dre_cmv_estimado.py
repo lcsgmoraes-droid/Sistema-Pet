@@ -33,8 +33,7 @@ def test_estima_cmv_pela_proporcao_ponderada_do_mesmo_canal():
     assert dados["loja_fisica"]["percentual_cmv_estimado"] == Decimal("60.0")
     assert dados["loja_fisica"]["origem_percentual_cmv_estimado"] == "mesmo_canal"
     assert [
-        item["valor_estimado"]
-        for item in dados["loja_fisica"]["itens_cmv_estimado"]
+        item["valor_estimado"] for item in dados["loja_fisica"]["itens_cmv_estimado"]
     ] == [60.0, 30.0]
 
 
@@ -55,10 +54,7 @@ def test_estima_com_base_global_quando_canal_nao_tem_amostra_confiavel():
     _aplicar_estimativas_cmv(dados, bases, pendencias)
 
     assert dados["shopee"]["cmv_estimado"] == Decimal("40.00")
-    assert (
-        dados["shopee"]["origem_percentual_cmv_estimado"]
-        == "todos_canais_periodo"
-    )
+    assert dados["shopee"]["origem_percentual_cmv_estimado"] == "todos_canais_periodo"
 
 
 def test_custo_real_cadastrado_depois_substitui_estimativa_sem_mudar_snapshot():
