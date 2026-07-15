@@ -1,4 +1,6 @@
 import json
+import re
+import unicodedata
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict, Optional
@@ -128,6 +130,10 @@ def _novo_canal() -> Dict:
         "descontos": _campo_zero(),
         "impostos": _campo_zero(),
         "cmv": _campo_zero(),
+        "cmv_estimado": _campo_zero(),
+        "itens_cmv_estimado": [],
+        "percentual_cmv_estimado": _campo_zero(),
+        "origem_percentual_cmv_estimado": None,
         "fretes_compras": _campo_zero(),
         "taxas_cartao": _campo_zero(),
         "taxas_marketplace": _campo_zero(),
@@ -179,6 +185,13 @@ def _conta_valor(conta: ContaPagar) -> Decimal:
     return valor_final if valor_final else _decimal(getattr(conta, "valor_original", 0))
 
 
+def _normalizar_texto_dre(valor: Any) -> str:
+    texto = unicodedata.normalize("NFKD", str(valor or "").lower())
+    texto = "".join(ch for ch in texto if not unicodedata.combining(ch))
+    texto = re.sub(r"[-_/]+", " ", texto)
+    return re.sub(r"\s+", " ", texto).strip()
+
+
 def _texto_conta(conta: ContaPagar, subcategoria: Optional[DRESubcategoria]) -> str:
     categoria_nome = (
         getattr(getattr(subcategoria, "categoria", None), "nome", "")
@@ -190,29 +203,48 @@ def _texto_conta(conta: ContaPagar, subcategoria: Optional[DRESubcategoria]) -> 
         getattr(subcategoria, "nome", "") if subcategoria else "",
         categoria_nome or "",
     ]
-    return " ".join(partes).lower()
+    return _normalizar_texto_dre(" ".join(partes))
 
 
 def _eh_custo_de_venda_ja_vindo_da_venda(texto: str) -> bool:
+    texto = _normalizar_texto_dre(texto)
     termos = [
         "taxa de cart",
         "taxas de cart",
         "taxa pix",
         "taxas pix",
-        "pix/boleto",
+        "pix boleto",
         "frete operacional",
         "fretes sobre vendas",
         "taxa de entrega",
         "custo fixo entrega",
         "comissao entregador",
-        "comissão entregador",
         "comissoes de vendas",
-        "comissões de vendas",
     ]
     return any(termo in texto for termo in termos)
 
 
+def _eh_folha_funcionarios_dre(texto: str) -> bool:
+    """Identifica folha de empregados sem confundir pro-labore de socios."""
+    texto = _normalizar_texto_dre(texto)
+    termos = (
+        "salario",
+        "folha",
+        "funcionario",
+        "encargo",
+        "fgts",
+        "inss",
+        "ferias",
+        "decimo terceiro",
+        "13o salario",
+        "13º salario",
+        "complemento salarial",
+    )
+    return any(termo in texto for termo in termos) and "pro labore" not in texto
+
+
 def _classificar_conta_dre(texto: str) -> str:
+    texto = _normalizar_texto_dre(texto)
     if (
         "marketplace" in texto
         or "mercado livre" in texto
@@ -224,15 +256,25 @@ def _classificar_conta_dre(texto: str) -> str:
         t in texto
         for t in [
             "salario",
-            "salário",
             "folha",
+            "pessoal",
+            "funcionario",
+            "encargo",
             "fgts",
             "inss",
-            "vale ",
+            "vale transporte",
+            "vale alimentacao",
+            "vale refeicao",
             "ferias",
-            "férias",
-            "13",
+            "decimo terceiro",
+            "13o salario",
+            "13º salario",
             "rescis",
+            "pro labore",
+            "plano odontologico",
+            "plano de saude",
+            "beneficios trabalhistas",
+            "beneficios funcionarios",
         ]
     ):
         return "despesas_pessoal"
@@ -241,21 +283,25 @@ def _classificar_conta_dre(texto: str) -> str:
         for t in [
             "aluguel",
             "condominio",
-            "condomínio",
             "iptu",
             "energia",
             "eletrica",
-            "elétrica",
             "agua",
-            "água",
             "internet",
             "telefonia",
             "telefone",
             "seguranca",
-            "segurança",
             "limpeza",
             "manutencao",
-            "manutenção",
+            "ocupacao",
+            "administrativ",
+            "software",
+            "sistema",
+            "erp",
+            "escritorio",
+            "contabil",
+            "honorario",
+            "licenca",
         ]
     ):
         return "despesas_administrativas"
@@ -266,7 +312,6 @@ def _classificar_conta_dre(texto: str) -> str:
             "ads",
             "propaganda",
             "anuncio",
-            "anúncio",
             "brinde",
             "fidelidade",
             "campanha",
@@ -280,7 +325,6 @@ def _classificar_conta_dre(texto: str) -> str:
         for t in [
             "juros",
             "tarifa bancaria",
-            "tarifa bancária",
             "iof",
             "financeir",
             "banco",
@@ -299,8 +343,9 @@ ORIGENS_DRE = {
     "descontos": "Descontos concedidos na venda. Cupons/cashback identificados como campanha sao reclassificados na linha de campanhas.",
     "impostos": "Imposto por competencia, calculado pela aliquota fiscal configurada sobre venda bruta e frete.",
     "receita_liquida_total": "Receita bruta menos deducoes da receita.",
-    "cmv_total": "Soma do CMV e dos fretes sobre compras classificados no periodo.",
+    "cmv_total": "Soma do CMV confirmado, do custo provisoriamente estimado para produtos sem custo e dos fretes sobre compras classificados no periodo.",
     "cmv": "Custo dos produtos vendidos. Prioriza movimentacao de estoque/FIFO e usa custo do cadastro do produto quando nao houver movimento.",
+    "cmv_estimado": "Custo provisório de produtos vendidos sem custo confiável. Usa a proporção ponderada entre custo confirmado e venda bruta dos demais produtos do mesmo canal e período; não altera o cadastro do produto.",
     "fretes_compras": "Contas a pagar classificadas como Fretes sobre Compras pela data de emissao.",
     "lucro_bruto_total": "Receita liquida menos CMV e fretes sobre compras.",
     "despesas_variaveis_total": "Soma dos custos variaveis ligados a venda: cartao, marketplace, entrega, operacional, comissoes e campanhas.",
@@ -311,7 +356,7 @@ ORIGENS_DRE = {
     "comissoes": "Comissoes apuradas no modulo de comissoes para as vendas do periodo.",
     "campanhas": "Cupons, cashback e beneficios de campanha aplicados nas vendas do periodo.",
     "despesas_fixas_total": "Soma das contas a pagar administrativas, pessoal, comerciais, financeiras e outras no regime de competencia.",
-    "despesas_pessoal": "Contas a pagar de folha, salarios, encargos e beneficios pela data de emissao. Sem canal informado entra em Loja Fisica.",
+    "despesas_pessoal": "Contas a pagar, provisoes trabalhistas e complemento da remuneracao cadastrada para funcionarios ativos, sem duplicar valores ja lancados. Sem canal informado entra em Loja Fisica.",
     "despesas_administrativas": "Contas a pagar de aluguel, ocupacao, energia, agua, internet, manutencao e administrativo pela data de emissao.",
     "despesas_comerciais": "Contas a pagar de marketing, anuncios, brindes, eventos e acoes comerciais pela data de emissao.",
     "despesas_financeiras": "Contas a pagar de tarifas, juros, banco, IOF e despesas financeiras pela data de emissao.",

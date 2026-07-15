@@ -11,6 +11,7 @@ from app.dre_canais.agregacao import (
     _preparar_snapshots_vendas,
     _subcategorias_contas_map,
     _valor_snapshot_campo,
+    obter_vendas_por_canal,
 )
 from app.dre_canais.base import (
     CANAIS_CONFIG,
@@ -25,6 +26,10 @@ from app.dre_canais.base import (
     _periodo_label,
     _periodo_mes,
     _texto_conta,
+)
+from app.dre_canais.folha import (
+    calcular_resumo_folha_gerencial,
+    canal_provisao_folha,
 )
 from app.dre_canais.schemas import DREDetalheItem, DREDetalheResponse
 from app.dre_plano_contas_models import DRESubcategoria
@@ -41,6 +46,7 @@ CAMPOS_DETALHE_VENDAS = {
     "descontos",
     "impostos",
     "cmv",
+    "cmv_estimado",
     "taxas_cartao",
     "repasse_entrega",
     "taxa_operacional_entrega",
@@ -73,6 +79,51 @@ def _paginar_detalhes(
     return items[inicio : inicio + page_size], page_size, pages
 
 
+def _detalhes_cmv_estimado(
+    db: Session,
+    mes: int,
+    ano: int,
+    tenant_id: str,
+    canal: str,
+) -> List[DREDetalheItem]:
+    dados_canais = obter_vendas_por_canal(db, mes, ano, tenant_id)
+    itens = list(dados_canais.get(canal, {}).get("itens_cmv_estimado", []) or [])
+    detalhes = []
+    for indice, item in enumerate(itens):
+        codigo = item.get("produto_codigo")
+        nome = item.get("produto_nome") or "Produto removido"
+        numero_venda = item.get("numero_venda") or f"#{item.get('venda_id')}"
+        percentual = _decimal(item.get("percentual_custo", 0))
+        detalhes.append(
+            DREDetalheItem(
+                id=(
+                    f"cmv-estimado-{item.get('venda_id')}-"
+                    f"{item.get('produto_id')}-{indice}"
+                ),
+                origem_tipo="estimativa_cmv",
+                origem_label="Custo provisório",
+                data=item.get("data"),
+                descricao=f"{codigo} - {nome}" if codigo else nome,
+                contraparte=f"Venda {numero_venda} • custo aplicado {float(percentual):.2f}%",
+                documento=str(numero_venda),
+                valor=float(_decimal(item.get("valor_estimado", 0))),
+                valor_auxiliar=float(_decimal(item.get("valor_venda", 0))),
+                link="/produtos",
+                meta={
+                    "produto_id": item.get("produto_id"),
+                    "quantidade": item.get("quantidade"),
+                    "valor_venda": item.get("valor_venda"),
+                    "percentual_custo": float(percentual),
+                    "origem_percentual": item.get("origem_percentual"),
+                    "provisorio": True,
+                },
+            )
+        )
+
+    detalhes.sort(key=lambda detalhe: detalhe.data or "", reverse=True)
+    return detalhes
+
+
 def _detalhes_vendas_campo(
     db: Session,
     mes: int,
@@ -81,6 +132,9 @@ def _detalhes_vendas_campo(
     canal: str,
     campo: str,
 ) -> List[DREDetalheItem]:
+    if campo == "cmv_estimado":
+        return _detalhes_cmv_estimado(db, mes, ano, tenant_id, canal)
+
     inicio, fim = _periodo_mes(mes, ano)
     vendas = (
         db.query(Venda)
@@ -196,6 +250,7 @@ def _detalhes_contas_campo(
                     extract("month", ContaPagar.data_emissao) == mes,
                     extract("year", ContaPagar.data_emissao) == ano,
                     ContaPagar.status != "cancelado",
+                    ContaPagar.afeta_dre.is_(True),
                     ContaPagar.nota_entrada_id.is_(None),
                 )
             )
@@ -253,6 +308,60 @@ def _detalhes_contas_campo(
                 },
             )
         )
+
+    if campo == "despesas_pessoal":
+        resumo_folha = calcular_resumo_folha_gerencial(
+            db, mes, ano, tenant_id, contas_base, subcategorias
+        )
+        for provisao in resumo_folha["provisoes"]:
+            if canal_provisao_folha(provisao) != canal:
+                continue
+            valor_provisao = _decimal(getattr(provisao, "despesas_pessoal", 0))
+            if abs(valor_provisao) <= Decimal("0.004"):
+                continue
+            detalhes.append(
+                DREDetalheItem(
+                    id=f"provisao-folha-{provisao.id}",
+                    origem_tipo="provisao_dre",
+                    origem_label="Provisao da folha",
+                    data=_data_iso(getattr(provisao, "data_fim", None)),
+                    descricao=getattr(provisao, "observacao", None)
+                    or "Provisao trabalhista registrada",
+                    contraparte="DRE / provisoes trabalhistas",
+                    valor=float(valor_provisao),
+                    meta={"canal": canal},
+                )
+            )
+
+        complemento = resumo_folha["complemento_loja_fisica"]
+        if canal == "loja_fisica" and complemento > Decimal("0.004"):
+            quantidade = resumo_folha["quantidade_funcionarios"]
+            lancado = resumo_folha["folha_lancada_por_canal"].get(
+                "loja_fisica", Decimal("0")
+            )
+            provisoes = resumo_folha["provisoes_por_canal"].get(
+                "loja_fisica", Decimal("0")
+            )
+            detalhes.append(
+                DREDetalheItem(
+                    id="folha-gerencial-estimada",
+                    origem_tipo="folha_gerencial",
+                    origem_label="Cadastro de remuneracao",
+                    data=f"{ano:04d}-{mes:02d}-01",
+                    descricao=(
+                        f"Complemento gerencial de {quantidade} funcionario(s) ativo(s)"
+                    ),
+                    contraparte="Funcionarios e cargos",
+                    valor=float(complemento),
+                    link="/configuracoes/rh/funcionarios",
+                    meta={
+                        "estimado": float(resumo_folha["estimado"]),
+                        "contas_lancadas": float(lancado),
+                        "provisoes": float(provisoes),
+                        "canal": canal,
+                    },
+                )
+            )
 
     detalhes.sort(key=lambda item: item.data or "", reverse=True)
     return detalhes

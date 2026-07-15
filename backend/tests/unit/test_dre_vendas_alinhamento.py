@@ -16,10 +16,12 @@ def test_dre_usa_mesmo_criterio_de_status_da_tela_de_vendas():
     assert "Venda.status.in_" not in source
 
 
-def test_dre_abre_com_todos_os_canais_por_padrao():
+def test_dre_abre_somente_com_loja_fisica_por_padrao():
     backend = _source("backend/app/dre_canais/routes.py")
     frontend = _source("frontend/src/components/DRE.jsx")
 
     assert "canais: str = Query(" in backend
     assert '        "",' in backend
-    assert "CANAIS_DRE_PADRAO.map((canal) => canal.id)" in frontend
+    assert 'canais_selecionados = ["loja_fisica"]' in backend
+    assert 'useState(["loja_fisica"])' in frontend
+    assert "CANAIS_DRE_PADRAO.map((canal) => canal.id)" not in frontend

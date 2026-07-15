@@ -133,9 +133,7 @@ const DRE = () => {
 
   // Canais de venda (ABA 7)
   const [canaisDisponiveis] = useState(CANAIS_DRE_PADRAO);
-  const [canaisSelecionados, setCanaisSelecionados] = useState(
-    CANAIS_DRE_PADRAO.map((canal) => canal.id),
-  );
+  const [canaisSelecionados, setCanaisSelecionados] = useState(["loja_fisica"]);
 
   // Filtros
   const obterDataLocal = () => {
@@ -252,7 +250,7 @@ const DRE = () => {
   };
 
   const limparSelecaoCanais = () => {
-    setCanaisSelecionados([]);
+    setCanaisSelecionados(["loja_fisica"]);
   };
 
   useEffect(() => {

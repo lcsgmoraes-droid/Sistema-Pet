@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class LinhaCanal(BaseModel):
@@ -20,6 +20,20 @@ class LinhaCanal(BaseModel):
     detalhavel: bool = False
 
 
+class DREAlerta(BaseModel):
+    codigo: str
+    nivel: str
+    canal: str
+    titulo: str
+    mensagem: str
+    quantidade_produtos: int = 0
+    quantidade_itens: int = 0
+    valor_vendas: float = 0
+    valor_estimado: float = 0
+    percentual_custo_aplicado: float = 0
+    sem_base_estimativa: bool = False
+
+
 class DREPorCanalResponse(BaseModel):
     """DRE completa com linhas separadas por canal"""
 
@@ -29,6 +43,7 @@ class DREPorCanalResponse(BaseModel):
     linhas: List[LinhaCanal]
     totais: Dict
     canais_encontrados: List[str]
+    alertas: List[DREAlerta] = Field(default_factory=list)
 
 
 class DREDetalheItem(BaseModel):
@@ -43,7 +58,7 @@ class DREDetalheItem(BaseModel):
     valor: float
     valor_auxiliar: Optional[float] = None
     link: Optional[str] = None
-    meta: Dict[str, Any] = {}
+    meta: Dict[str, Any] = Field(default_factory=dict)
 
 
 class DREDetalheResponse(BaseModel):
