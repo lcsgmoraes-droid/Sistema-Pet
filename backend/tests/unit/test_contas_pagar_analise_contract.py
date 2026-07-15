@@ -42,7 +42,10 @@ def test_analise_contas_pagar_expoe_origem_dos_lancamentos_por_grupo():
     source = read_repo("backend/app/financeiro/contas_pagar_analise_routes.py")
 
     assert 'router.get("/analise-abertos/detalhes")' in source
-    assert 'pattern="^(todos|periodo|mes|fornecedor|tipo_despesa|origem|tipo_custo)$"' in source
+    assert (
+        'pattern="^(todos|periodo|mes|fornecedor|tipo_despesa|origem|tipo_custo)$"'
+        in source
+    )
     assert "_aplicar_filtros_analise" in source
     assert "_aplicar_grupo_detalhe" in source
     assert '"saldo_aberto": saldo_aberto' in source
@@ -50,7 +53,7 @@ def test_analise_contas_pagar_expoe_origem_dos_lancamentos_por_grupo():
     assert '"origem_lancamento_label"' in read_repo(
         "backend/app/financeiro/contas_pagar_origem.py"
     )
-    assert 'page_size: int = Query(30, ge=1, le=100)' in source
+    assert "page_size: int = Query(30, ge=1, le=100)" in source
 
 
 @pytest.mark.parametrize(
