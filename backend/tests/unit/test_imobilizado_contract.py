@@ -41,9 +41,7 @@ def test_tela_e_menu_publicam_imobilizado_em_financeiro():
     routes = (ROOT / "frontend/src/app/routes/FinanceRoutes.jsx").read_text(
         encoding="utf-8"
     )
-    agregador = (ROOT / "backend/app/financeiro_routes.py").read_text(
-        encoding="utf-8"
-    )
+    agregador = (ROOT / "backend/app/financeiro_routes.py").read_text(encoding="utf-8")
 
     assert 'path: "/financeiro/imobilizado"' in menu
     assert 'path="financeiro/imobilizado"' in routes

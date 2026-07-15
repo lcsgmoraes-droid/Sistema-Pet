@@ -75,9 +75,7 @@ def listar_imobilizado(
     resumo = ResumoImobilizado(
         total_registros=len(items),
         total_itens=sum(item.quantidade for item in items),
-        valor_aquisicao=sum(
-            (item.valor_aquisicao for item in items), Decimal("0")
-        ),
+        valor_aquisicao=sum((item.valor_aquisicao for item in items), Decimal("0")),
         depreciacao_acumulada=sum(
             (item.depreciacao_acumulada for item in items), Decimal("0")
         ),
@@ -103,7 +101,9 @@ def obter_bem(
     return _serializar_bem(_bem_do_tenant(db, tenant_id, bem_id))
 
 
-@router.post("", response_model=BemImobilizadoResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=BemImobilizadoResponse, status_code=status.HTTP_201_CREATED
+)
 @require_permission("relatorios.financeiro")
 def criar_bem(
     payload: BemImobilizadoCreate,

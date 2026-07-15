@@ -59,4 +59,3 @@ def calcular_valores_bem(bem, data_referencia: date | None = None) -> dict:
         "depreciacao_acumulada": depreciacao,
         "valor_contabil": valor_contabil,
     }
-

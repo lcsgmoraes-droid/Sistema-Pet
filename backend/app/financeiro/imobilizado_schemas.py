@@ -83,4 +83,3 @@ class ResumoImobilizado(BaseModel):
 class ListaImobilizadoResponse(BaseModel):
     items: list[BemImobilizadoResponse]
     resumo: ResumoImobilizado
-
