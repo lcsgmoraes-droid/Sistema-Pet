@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, CalendarDays, Filter, RefreshCw, X } from "lucide-react";
+import { BarChart3, CalendarDays, FileSearch, Filter, RefreshCw, X } from "lucide-react";
 import toast from "react-hot-toast";
 
 import api from "../../api";
 import ActionButton from "../ui/ActionButton";
 import FornecedorSelector, { getFornecedorNome } from "../fornecedores/FornecedorSelector";
+import ContasPagarAnaliseDetalhesDrawer from "./ContasPagarAnaliseDetalhesDrawer";
+import { PainelResumo, TabelaResumo } from "./ContasPagarAnaliseResumo";
+import {
+  copiarFiltrosAnalise,
+  montarParamsAnalise,
+  montarParamsDetalhes,
+} from "./contasPagarAnaliseParams";
 
 const filtrosIniciais = {
   fornecedor_busca: "",
@@ -35,88 +42,15 @@ const resumoVazio = {
   agenda_mensal: [],
 };
 
-function montarParamsAnalise(filtros) {
-  const params = new URLSearchParams();
-  params.append("_t", Date.now());
-  params.append("fornecedor_modo", filtros.fornecedor_modo);
-  params.append("ocultar_taxas_cartao", filtros.ocultar_taxas_cartao ? "true" : "false");
-  params.append("apenas_taxas_cartao", filtros.apenas_taxas_cartao ? "true" : "false");
-
-  filtros.fornecedor_ids.forEach((id) => params.append("fornecedor_ids", id));
-  if (filtros.origem !== "todos") params.append("origem", filtros.origem);
-  if (filtros.tipo_despesa_id) params.append("tipo_despesa_id", filtros.tipo_despesa_id);
-  if (filtros.tipo_custo !== "todos") params.append("tipo_custo", filtros.tipo_custo);
-
-  return params;
-}
-
-function PainelResumo({ titulo, valor, detalhe, destaque = "slate", onClick }) {
-  const estilos = {
-    slate: "border-slate-200 bg-white text-slate-900",
-    amber: "border-amber-200 bg-amber-50 text-amber-950",
-    blue: "border-blue-200 bg-blue-50 text-blue-950",
-    emerald: "border-emerald-200 bg-emerald-50 text-emerald-950",
-    red: "border-red-200 bg-red-50 text-red-950",
-    violet: "border-violet-200 bg-violet-50 text-violet-950",
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`min-h-[96px] rounded-lg border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
-        estilos[destaque] || estilos.slate
-      }`}
-    >
-      <div className="text-xs font-semibold uppercase">{titulo}</div>
-      <div className="mt-2 text-xl font-bold leading-tight">{valor}</div>
-      <div className="mt-1 text-xs opacity-80">{detalhe}</div>
-    </button>
-  );
-}
-
-function TabelaResumo({ titulo, subtitulo, itens, formatarMoeda }) {
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-200 px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-900">{titulo}</h3>
-        <p className="text-xs text-slate-500">{subtitulo}</p>
-      </div>
-      <div className="max-h-[340px] overflow-auto">
-        {itens.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-slate-500">Sem dados no filtro.</div>
-        ) : (
-          <table className="min-w-full divide-y divide-slate-100">
-            <tbody className="divide-y divide-slate-100">
-              {itens.map((item) => (
-                <tr key={`${item.id}-${item.nome}`} className="hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{item.nome}</div>
-                    <div className="text-xs text-slate-500">{item.quantidade} conta(s)</div>
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold text-slate-900">
-                    {formatarMoeda(item.total_aberto)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </section>
-  );
-}
-
-export default function ContasPagarAnalise({
-  fornecedores,
-  formatarMoeda,
-  onAbrirListaComFiltros,
-  tiposDespesaOrdenados,
-}) {
+export default function ContasPagarAnalise({ fornecedores, formatarMoeda, tiposDespesaOrdenados }) {
   const [dados, setDados] = useState(resumoVazio);
   const [filtros, setFiltros] = useState(filtrosIniciais);
+  const [filtrosAplicados, setFiltrosAplicados] = useState(filtrosIniciais);
   const [fornecedoresSelecionados, setFornecedoresSelecionados] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [detalheSelecionado, setDetalheSelecionado] = useState(null);
+  const [dadosDetalhes, setDadosDetalhes] = useState(null);
+  const [loadingDetalhes, setLoadingDetalhes] = useState(false);
 
   const fornecedoresSelecionadosResolvidos = useMemo(() => {
     const porId = new Map();
@@ -132,12 +66,14 @@ export default function ContasPagarAnalise({
   }, [filtros.fornecedor_ids, fornecedores, fornecedoresSelecionados]);
 
   const carregarAnalise = async (filtrosParaAplicar = filtros) => {
+    const filtrosSolicitados = copiarFiltrosAnalise(filtrosParaAplicar);
     try {
       setLoading(true);
       const response = await api.get("/contas-pagar/analise-abertos", {
-        params: montarParamsAnalise(filtrosParaAplicar),
+        params: montarParamsAnalise(filtrosSolicitados),
       });
       setDados({ ...resumoVazio, ...response.data });
+      setFiltrosAplicados(filtrosSolicitados);
     } catch (error) {
       console.error("Erro ao carregar analise de contas a pagar:", error);
       toast.error(error?.response?.data?.detail || "Erro ao carregar analise");
@@ -150,6 +86,30 @@ export default function ContasPagarAnalise({
   useEffect(() => {
     void carregarAnalise(filtros);
   }, []);
+
+  const fecharDetalhes = () => {
+    setDetalheSelecionado(null);
+    setDadosDetalhes(null);
+    setLoadingDetalhes(false);
+  };
+
+  const abrirDetalhes = async (detalhe, page = 1) => {
+    setDetalheSelecionado(detalhe);
+    setLoadingDetalhes(true);
+    if (page === 1) setDadosDetalhes(null);
+    try {
+      const response = await api.get("/contas-pagar/analise-abertos/detalhes", {
+        params: montarParamsDetalhes(filtrosAplicados, detalhe, page),
+      });
+      setDadosDetalhes(response.data);
+    } catch (error) {
+      console.error("Erro ao carregar detalhes da analise de contas a pagar:", error);
+      toast.error(error?.response?.data?.detail || "Erro ao carregar detalhes");
+      setDadosDetalhes(null);
+    } finally {
+      setLoadingDetalhes(false);
+    }
+  };
 
   const selecionarFornecedor = (fornecedor) => {
     if (!fornecedor?.id) return;
@@ -179,26 +139,15 @@ export default function ContasPagarAnalise({
 
   const aplicarFiltros = (event) => {
     event.preventDefault();
+    fecharDetalhes();
     void carregarAnalise(filtros);
   };
 
   const limparFiltros = () => {
+    fecharDetalhes();
     setFornecedoresSelecionados([]);
     setFiltros(filtrosIniciais);
     void carregarAnalise(filtrosIniciais);
-  };
-
-  const abrirListaPeriodo = (periodo) => {
-    onAbrirListaComFiltros?.({
-      fornecedor_ids: filtros.fornecedor_ids,
-      fornecedor_modo: filtros.fornecedor_modo,
-      ocultar_taxas_cartao: filtros.ocultar_taxas_cartao,
-      apenas_taxas_cartao: filtros.apenas_taxas_cartao,
-      origem: filtros.origem,
-      tipo_despesa_id: filtros.tipo_despesa_id,
-      tipo_custo: filtros.tipo_custo,
-      periodo_analise: periodo,
-    });
   };
 
   const resumo = dados.resumo || resumoVazio.resumo;
@@ -217,7 +166,7 @@ export default function ContasPagarAnalise({
               Analise de contas em aberto
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Totalize vencimentos por fornecedor, tipo, origem e agenda mensal.
+              Combine filtros e clique em Detalhes para conferir a origem de cada valor.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -349,42 +298,89 @@ export default function ContasPagarAnalise({
           valor={formatarMoeda(resumo.total_aberto)}
           detalhe={`${resumo.quantidade} conta(s)`}
           destaque="slate"
-          onClick={() => abrirListaPeriodo("todos")}
+          onClick={() =>
+            abrirDetalhes({
+              grupo: "todos",
+              nome: "Total em aberto",
+              quantidade: resumo.quantidade,
+              total_aberto: resumo.total_aberto,
+            })
+          }
         />
         <PainelResumo
           titulo="Vencido"
           valor={formatarMoeda(resumo.vencido?.total_aberto)}
           detalhe={`${resumo.vencido?.quantidade || 0} conta(s)`}
           destaque="red"
-          onClick={() => abrirListaPeriodo("vencido")}
+          onClick={() =>
+            abrirDetalhes({
+              grupo: "periodo",
+              grupo_id: "vencido",
+              nome: "Contas vencidas",
+              quantidade: resumo.vencido?.quantidade,
+              total_aberto: resumo.vencido?.total_aberto,
+            })
+          }
         />
         <PainelResumo
           titulo="Hoje"
           valor={formatarMoeda(resumo.hoje?.total_aberto)}
           detalhe={`${resumo.hoje?.quantidade || 0} conta(s)`}
           destaque="blue"
-          onClick={() => abrirListaPeriodo("hoje")}
+          onClick={() =>
+            abrirDetalhes({
+              grupo: "periodo",
+              grupo_id: "hoje",
+              nome: "Vencimentos de hoje",
+              quantidade: resumo.hoje?.quantidade,
+              total_aberto: resumo.hoje?.total_aberto,
+            })
+          }
         />
         <PainelResumo
           titulo="Amanha"
           valor={formatarMoeda(resumo.amanha?.total_aberto)}
           detalhe={`${resumo.amanha?.quantidade || 0} conta(s)`}
           destaque="emerald"
-          onClick={() => abrirListaPeriodo("amanha")}
+          onClick={() =>
+            abrirDetalhes({
+              grupo: "periodo",
+              grupo_id: "amanha",
+              nome: "Vencimentos de amanha",
+              quantidade: resumo.amanha?.quantidade,
+              total_aberto: resumo.amanha?.total_aberto,
+            })
+          }
         />
         <PainelResumo
           titulo="Mes atual"
           valor={formatarMoeda(resumo.mes_atual?.total_aberto)}
           detalhe={`${resumo.mes_atual?.quantidade || 0} conta(s)`}
           destaque="amber"
-          onClick={() => abrirListaPeriodo("mes")}
+          onClick={() =>
+            abrirDetalhes({
+              grupo: "periodo",
+              grupo_id: "mes_atual",
+              nome: "Vencimentos do mes atual",
+              quantidade: resumo.mes_atual?.quantidade,
+              total_aberto: resumo.mes_atual?.total_aberto,
+            })
+          }
         />
         <PainelResumo
           titulo="Proximos 12 meses"
           valor={formatarMoeda(resumo.proximos_12_meses?.total_aberto)}
           detalhe={`${resumo.proximos_12_meses?.quantidade || 0} conta(s)`}
           destaque="violet"
-          onClick={() => abrirListaPeriodo("proximos_12_meses")}
+          onClick={() =>
+            abrirDetalhes({
+              grupo: "periodo",
+              grupo_id: "proximos_12_meses",
+              nome: "Proximos 12 meses",
+              quantidade: resumo.proximos_12_meses?.quantidade,
+              total_aberto: resumo.proximos_12_meses?.total_aberto,
+            })
+          }
         />
       </div>
 
@@ -395,41 +391,75 @@ export default function ContasPagarAnalise({
         </div>
         <div className="grid grid-cols-1 gap-2 p-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
           {dados.agenda_mensal.map((mes) => (
-            <div key={mes.mes} className="rounded-lg border border-slate-200 p-3">
+            <button
+              key={mes.mes}
+              type="button"
+              className="rounded-lg border border-slate-200 p-3 text-left transition hover:border-blue-300 hover:bg-blue-50"
+              onClick={() =>
+                abrirDetalhes({
+                  grupo: "mes",
+                  grupo_id: mes.mes,
+                  nome: mes.label,
+                  quantidade: mes.quantidade,
+                  total_aberto: mes.total_aberto,
+                })
+              }
+            >
               <div className="text-xs font-semibold uppercase text-slate-500">{mes.label}</div>
               <div className="mt-1 font-bold text-slate-900">{formatarMoeda(mes.total_aberto)}</div>
               <div className="text-xs text-slate-500">{mes.quantidade} conta(s)</div>
-            </div>
+              <div className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-blue-700">
+                <FileSearch className="h-3.5 w-3.5" />
+                Detalhes
+              </div>
+            </button>
           ))}
         </div>
       </section>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <TabelaResumo
+          grupo="fornecedor"
           titulo="Por fornecedor"
           subtitulo="Quem concentra o contas a pagar em aberto."
           itens={dados.por_fornecedor || []}
           formatarMoeda={formatarMoeda}
+          onDetalhes={abrirDetalhes}
         />
         <TabelaResumo
+          grupo="tipo_despesa"
           titulo="Por tipo de despesa"
           subtitulo="Separacao gerencial dos compromissos."
           itens={dados.por_tipo_despesa || []}
           formatarMoeda={formatarMoeda}
+          onDetalhes={abrirDetalhes}
         />
         <TabelaResumo
+          grupo="origem"
           titulo="Por origem"
           subtitulo="Nota de entrada, caixa/PDV ou lancamento manual."
           itens={dados.por_origem || []}
           formatarMoeda={formatarMoeda}
+          onDetalhes={abrirDetalhes}
         />
         <TabelaResumo
+          grupo="tipo_custo"
           titulo="Por tipo de custo"
           subtitulo="Fixo, variavel ou sem classificacao."
           itens={dados.por_tipo_custo || []}
           formatarMoeda={formatarMoeda}
+          onDetalhes={abrirDetalhes}
         />
       </div>
+
+      <ContasPagarAnaliseDetalhesDrawer
+        detalhe={detalheSelecionado}
+        dados={dadosDetalhes}
+        formatarMoeda={formatarMoeda}
+        loading={loadingDetalhes}
+        onClose={fecharDetalhes}
+        onPageChange={(page) => abrirDetalhes(detalheSelecionado, page)}
+      />
     </div>
   );
 }

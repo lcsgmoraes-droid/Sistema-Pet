@@ -28,7 +28,6 @@ export default function ContasPagarView({
   limparFiltros,
   aplicarFiltros,
   handleFiltrosSubmit,
-  abrirListaComFiltrosAnalise,
   contasVisiveis,
   contasSelecionadas,
   contasSelecionadasObjetos,
@@ -150,7 +149,6 @@ export default function ContasPagarView({
         <ContasPagarAnalise
           fornecedores={fornecedores}
           formatarMoeda={formatarMoeda}
-          onAbrirListaComFiltros={abrirListaComFiltrosAnalise}
           tiposDespesaOrdenados={tiposDespesaOrdenados}
         />
       ) : (
