@@ -30,6 +30,7 @@ from app.financeiro.models_contas import (
     Recebimento,
 )
 from app.financeiro.models_imobilizado import BemImobilizado
+from app.financeiro.models_valor_empresa import ValorEmpresaConfiguracao
 
 __all__ = [
     "CategoriaFinanceira",
@@ -49,4 +50,5 @@ __all__ = [
     "ProvisaoAutomatica",
     "TemplateAdquirente",
     "BemImobilizado",
+    "ValorEmpresaConfiguracao",
 ]

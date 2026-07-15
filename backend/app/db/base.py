@@ -35,6 +35,7 @@ from app.caixa_models import Caixa  # noqa
 from app import conciliacao_models  # noqa
 from app import financeiro_models  # noqa
 from app.financeiro import models_imobilizado  # noqa
+from app.financeiro import models_valor_empresa  # noqa
 from app import funcionario_contagem_models  # noqa
 from app import rotas_entrega_models  # noqa
 from app import opportunities_models  # noqa
