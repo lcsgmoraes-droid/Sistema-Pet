@@ -395,6 +395,12 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
           permission: "relatorios.financeiro",
         },
         {
+          path: "/financeiro/imobilizado",
+          label: "Imobilizado",
+          modulo: "financeiro_erp",
+          permission: "relatorios.financeiro",
+        },
+        {
           path: "/financeiro/contas-pagar",
           label: "Contas a Pagar",
           modulo: "financeiro_erp",

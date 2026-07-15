@@ -10,6 +10,7 @@ import {
   DashboardFinanceiro,
   FluxoCaixa,
   HistoricoConciliacoes,
+  Imobilizado,
   PontoEquilibrio,
   RelatorioVendas,
   VendasFinanceiro,
@@ -69,6 +70,7 @@ export function createFinanceRoutes() {
       />
       <Route path="financeiro/fluxo-caixa" element={financeiroPage(<FluxoCaixa />)} />
       <Route path="financeiro/dre" element={financeiroPage(<DRE />)} />
+      <Route path="financeiro/imobilizado" element={financeiroPage(<Imobilizado />)} />
     </>
   );
 }

@@ -44,6 +44,7 @@ import app.produtos_models
 import app.vendas_models
 import app.caixa_models
 import app.financeiro_models
+import app.financeiro.models_imobilizado
 import app.comissoes_models
 import app.comissoes_avancadas_models
 import app.formas_pagamento_models

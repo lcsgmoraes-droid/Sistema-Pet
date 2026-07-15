@@ -29,6 +29,7 @@ from app.financeiro.models_contas import (
     Pagamento,
     Recebimento,
 )
+from app.financeiro.models_imobilizado import BemImobilizado
 
 __all__ = [
     "CategoriaFinanceira",
@@ -47,4 +48,5 @@ __all__ = [
     "RegraConciliacao",
     "ProvisaoAutomatica",
     "TemplateAdquirente",
+    "BemImobilizado",
 ]

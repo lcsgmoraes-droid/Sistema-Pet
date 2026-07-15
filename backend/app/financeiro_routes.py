@@ -40,11 +40,13 @@ from .financeiro.cliente_routes import (
     get_resumo_financeiro_cliente,
     router as cliente_router,
 )
+from .financeiro.imobilizado_routes import router as imobilizado_router
 
 router = APIRouter(prefix="/financeiro", tags=["Financeiro - Configura??es"])
 router.include_router(config_router)
 router.include_router(fluxo_caixa_router)
 router.include_router(cliente_router)
+router.include_router(imobilizado_router)
 
 __all__ = [
     "CategoriaCreate",
