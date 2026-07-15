@@ -6,7 +6,7 @@ from datetime import date, datetime, time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func, inspect, or_
 from sqlalchemy.orm import Session
 
 from ..db import get_session
@@ -51,6 +51,7 @@ async def obter_ponto_equilibrio(
     fonte_margem: Optional[str] = MARGEM_PONTO_EQUILIBRIO_PADRAO,
     modo_custo_fiscal: Optional[str] = MODO_CUSTO_FISCAL_PE_PADRAO,
     incluir_detalhes: bool = False,
+    fornecedor_ids_excluidos: Optional[str] = None,
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -70,6 +71,11 @@ async def obter_ponto_equilibrio(
     fim_dt = datetime.combine(fim, time.max)
     canais_lista = [
         canal.strip() for canal in (canais or "").split(",") if canal.strip()
+    ]
+    fornecedores_excluidos = [
+        int(item.strip())
+        for item in (fornecedor_ids_excluidos or "").split(",")
+        if item.strip().isdigit() and int(item.strip()) > 0
     ]
     fonte_margem = (fonte_margem or MARGEM_PONTO_EQUILIBRIO_PADRAO).strip()
     if fonte_margem not in MARGEM_PONTO_EQUILIBRIO_OPCOES:
@@ -148,6 +154,13 @@ async def obter_ponto_equilibrio(
     if canais_lista:
         contas_query = contas_query.filter(
             or_(ContaPagar.canal.in_(canais_lista), ContaPagar.canal.is_(None))
+        )
+    if fornecedores_excluidos:
+        contas_query = contas_query.filter(
+            or_(
+                ContaPagar.fornecedor_id.is_(None),
+                ContaPagar.fornecedor_id.notin_(fornecedores_excluidos),
+            )
         )
 
     despesas_fixas = 0.0
@@ -287,24 +300,27 @@ async def obter_ponto_equilibrio(
                 ),
             )
 
-    provisoes_dre_query = db.query(DREDetalheCanal).filter(
-        DREDetalheCanal.tenant_id == tenant_id,
-        DREDetalheCanal.data_inicio <= fim,
-        DREDetalheCanal.data_fim >= inicio,
-        or_(
-            DREDetalheCanal.origem == "PROVISAO",
-            DREDetalheCanal.canal == "provisao",
-        ),
-    )
-    if canais_lista:
-        provisoes_dre_query = provisoes_dre_query.filter(
+    provisoes_dre = []
+    if inspect(db.get_bind()).has_table(DREDetalheCanal.__tablename__):
+        provisoes_dre_query = db.query(DREDetalheCanal).filter(
+            DREDetalheCanal.tenant_id == tenant_id,
+            DREDetalheCanal.data_inicio <= fim,
+            DREDetalheCanal.data_fim >= inicio,
             or_(
-                DREDetalheCanal.canal.in_(canais_lista),
+                DREDetalheCanal.origem == "PROVISAO",
                 DREDetalheCanal.canal == "provisao",
-            )
+            ),
         )
+        if canais_lista:
+            provisoes_dre_query = provisoes_dre_query.filter(
+                or_(
+                    DREDetalheCanal.canal.in_(canais_lista),
+                    DREDetalheCanal.canal == "provisao",
+                )
+            )
+        provisoes_dre = provisoes_dre_query.all()
 
-    for provisao in provisoes_dre_query.all():
+    for provisao in provisoes_dre:
         despesas_pessoal = float(provisao.despesas_pessoal or 0)
         despesas_fixas_dre = (
             despesas_pessoal
@@ -437,6 +453,7 @@ async def obter_ponto_equilibrio(
             "inicio": inicio,
             "fim": fim,
             "canais": canais_lista,
+            "fornecedor_ids_excluidos": fornecedores_excluidos,
         },
         "formula": "ponto_equilibrio = custos fixos / margem de contribuicao escolhida",
         "fonte_margem": fonte_margem,
