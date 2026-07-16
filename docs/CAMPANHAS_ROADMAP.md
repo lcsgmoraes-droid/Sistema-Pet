@@ -8,7 +8,7 @@
 
 ---
 
-## Situação Atual (Resumo Rápido) — atualizado em 05/03/2026
+## Situação Atual (Resumo Rápido) — atualizado em 16/07/2026
 
 | Camada                   | O que está pronto                                                                                                                                                                                                                                                 |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -22,7 +22,10 @@
 | **Ecommerce**            | CPF obrigatório no cadastro                                                                                                                                                                                                                                       |
 | **Lembretes**            | Alertas de campanhas integrados em Lembretes.jsx (Sprint 9)                                                                                                                                                                                                       |
 
-**O que ainda falta (06/03/2026):** Push FCM real (bloqueado — app não publicado na Play Store). Todos os demais itens do roadmap estão concluídos.
+**Estado do push (16/07/2026):** envio real pelo app está operacional e foi
+revalidado em produção. A publicação nas lojas está submetida e aguarda apenas
+a aprovação da Apple e do Google; isso não bloqueia os testes nem os envios dos
+dispositivos já registrados.
 
 ---
 
@@ -253,7 +256,7 @@
 | E-mail: infraestrutura configurada                                         | ✅ Feito    | Provedor cadastrado, funciona                                                  |
 | Push FCM: configurado                                                      | ✅ Feito    | —                                                                              |
 | Worker real de despacho de e-mails (consome NotificationQueue e envia)     | ✅ Feito    | `NotificationSender.process_batch()` SMTP real, a cada 5 min                   |
-| Worker real de despacho de push FCM                                        | ❌ Pendente | App ainda não publicado na Play Store (testar com EAS Preview APK)             |
+| Worker real de despacho de push pelo app                                   | ✅ Feito    | `NotificationSender` envia pela Expo Push API; produção revalidada em 16/07/2026 |
 | Template de e-mail por tipo de campanha (aniversário, boas-vindas, cupom…) | ✅ Feito    | `_render_email_html()` com cores distintas por tipo de campanha                |
 | Envio escalonado em lotes (ex: 50 e-mails a cada 30 min) para evitar spam  | ✅ Feito    | BATCH_SIZE=50 em `notification_sender.py`                                      |
 | **UI — Configurar horário de envio** preferencial por tipo de campanha     | ✅ Feito    | Aba Configurações — tabela de horários por tipo de campanha (scheduler config) |

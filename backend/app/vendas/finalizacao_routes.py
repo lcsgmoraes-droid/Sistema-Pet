@@ -1,8 +1,6 @@
 """Rota de finalizacao de vendas e pos-processamentos imediatos."""
 
-import json
 import logging
-from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -13,7 +11,6 @@ from app.db import get_session
 from app.idempotency import idempotent
 from app.services.opportunity_background_processor import get_opportunity_processor
 from app.utils.logger import logger as struct_logger, set_user_id
-from app.utils.security_helpers import safe_get_produto
 from app.vendas.comissoes import _gerar_comissoes_pendentes_venda
 from app.vendas.routes_common import _validar_tenant_e_obter_usuario
 from app.vendas.schemas import FinalizarVendaRequest
@@ -152,174 +149,6 @@ async def finalizar_venda(
     else:
         logger.info("Venda sem funcionario - comissoes nao geradas")
 
-    # 🔔 SISTEMA DE RECORRÊNCIA - Criar/Atualizar lembretes automaticamente
-    from app.produtos_models import Lembrete
-    from app.models import Pet
-
-    lembretes_criados = []
-    lembretes_atualizados = []
-
-    try:
-        for item in venda.itens:
-            # Apenas produtos com pet_id vinculado e que tenham recorrência
-            if item.tipo == "produto" and item.produto_id and item.pet_id:
-                # 🔒 SEGURANÇA: Validar que produto pertence ao usuário
-                produto = safe_get_produto(db, item.produto_id, current_user.id)
-
-                # 🔒 SEGURANÇA: Validar que pet pertence ao cliente do usuário
-                pet = (
-                    db.query(Pet)
-                    .filter(Pet.id == item.pet_id, Pet.cliente_id == venda.cliente_id)
-                    .first()
-                )
-
-                if not produto or not pet:
-                    continue  # Ignorar se não encontrado (segurança)
-
-                if (
-                    produto
-                    and pet
-                    and produto.tem_recorrencia
-                    and produto.intervalo_dias
-                ):
-                    # Verificar se já existe lembrete PENDENTE para este produto+pet
-                    lembrete_existente = (
-                        db.query(Lembrete)
-                        .filter(
-                            Lembrete.tenant_id == tenant_id,
-                            Lembrete.cliente_id == venda.cliente_id,
-                            Lembrete.pet_id == item.pet_id,
-                            Lembrete.produto_id == item.produto_id,
-                            Lembrete.status.in_(["pendente", "notificado"]),
-                        )
-                        .first()
-                    )
-
-                    if lembrete_existente:
-                        # ✅ CLIENTE JÁ TINHA LEMBRETE - DAR CHECK AUTOMÁTICO
-                        historico = (
-                            json.loads(lembrete_existente.historico_doses)
-                            if lembrete_existente.historico_doses
-                            else []
-                        )
-                        historico.append(
-                            {
-                                "dose": lembrete_existente.dose_atual,
-                                "data": datetime.utcnow().isoformat(),
-                                "comprou": True,
-                                "status": "completado",
-                                "venda_id": venda.id,
-                            }
-                        )
-
-                        # Marcar como completado
-                        lembrete_existente.status = "completado"
-                        lembrete_existente.data_completado = datetime.utcnow()
-                        lembrete_existente.historico_doses = json.dumps(historico)
-
-                        # Verificar se é a última dose
-                        if (
-                            lembrete_existente.dose_total
-                            and lembrete_existente.dose_atual
-                            >= lembrete_existente.dose_total
-                        ):
-                            # Última dose - NÃO criar novo lembrete
-                            lembretes_atualizados.append(
-                                {
-                                    "acao": "finalizado",
-                                    "produto": produto.nome,
-                                    "pet": pet.nome,
-                                    "dose": f"{lembrete_existente.dose_atual}/{lembrete_existente.dose_total}",
-                                }
-                            )
-                        else:
-                            # Criar novo lembrete para próxima dose
-                            data_proxima = datetime.utcnow() + timedelta(
-                                days=produto.intervalo_dias
-                            )
-                            data_notificacao = data_proxima - timedelta(days=7)
-
-                            novo_lembrete = Lembrete(
-                                tenant_id=tenant_id,
-                                user_id=current_user.id,
-                                cliente_id=venda.cliente_id,
-                                pet_id=item.pet_id,
-                                produto_id=item.produto_id,
-                                venda_id=venda.id,
-                                data_compra=datetime.utcnow(),
-                                data_proxima_dose=data_proxima,
-                                data_notificacao_7_dias=data_notificacao,
-                                status="pendente",
-                                quantidade_recomendada=float(item.quantidade),
-                                preco_estimado=produto.preco_venda,
-                                dose_atual=lembrete_existente.dose_atual + 1,
-                                dose_total=lembrete_existente.dose_total,
-                                historico_doses=json.dumps(historico),
-                            )
-                            db.add(novo_lembrete)
-
-                            lembretes_atualizados.append(
-                                {
-                                    "acao": "renovado",
-                                    "produto": produto.nome,
-                                    "pet": pet.nome,
-                                    "dose": f"{novo_lembrete.dose_atual}/{novo_lembrete.dose_total or '∞'}",
-                                }
-                            )
-                    else:
-                        # ✨ PRIMEIRA VENDA COM RECORRÊNCIA - CRIAR LEMBRETE
-                        data_proxima = datetime.utcnow() + timedelta(
-                            days=produto.intervalo_dias
-                        )
-                        data_notificacao = data_proxima - timedelta(days=7)
-
-                        historico_inicial = [
-                            {
-                                "dose": 1,
-                                "data": datetime.utcnow().isoformat(),
-                                "comprou": True,
-                                "status": "criado",
-                                "venda_id": venda.id,
-                            }
-                        ]
-
-                        novo_lembrete = Lembrete(
-                            tenant_id=tenant_id,
-                            user_id=current_user.id,
-                            cliente_id=venda.cliente_id,
-                            pet_id=item.pet_id,
-                            produto_id=item.produto_id,
-                            venda_id=venda.id,
-                            data_compra=datetime.utcnow(),
-                            data_proxima_dose=data_proxima,
-                            data_notificacao_7_dias=data_notificacao,
-                            status="pendente",
-                            quantidade_recomendada=float(item.quantidade),
-                            preco_estimado=produto.preco_venda,
-                            dose_atual=1,
-                            dose_total=produto.numero_doses,
-                            historico_doses=json.dumps(historico_inicial),
-                        )
-                        db.add(novo_lembrete)
-
-                        lembretes_criados.append(
-                            {
-                                "produto": produto.nome,
-                                "pet": pet.nome,
-                                "proxima_dose": data_proxima.strftime("%d/%m/%Y"),
-                                "dose_total": produto.numero_doses or "∞",
-                            }
-                        )
-
-        if lembretes_criados or lembretes_atualizados:
-            logger.info(
-                f"🔔 Lembretes: {len(lembretes_criados)} criados, {len(lembretes_atualizados)} atualizados"
-            )
-
-    except Exception as e:
-        logger.error(f"⚠️ Erro ao processar lembretes: {str(e)}")
-        # Não abortar a venda por erro nos lembretes
-
     db.commit()
 
     log_action(
@@ -350,6 +179,9 @@ async def finalizar_venda(
     total_pago = (
         sum(float(p.valor) for p in venda.pagamentos) if venda.pagamentos else 0
     )
+    recurrence_result = (resultado.get("pos_commit") or {}).get("lembretes") or {}
+    lembretes_criados = recurrence_result.get("created") or []
+    lembretes_atualizados = recurrence_result.get("completed") or []
     struct_logger.info(
         event="FINALIZE_COMPLETE",
         message="Venda finalizada completamente (com comissões e lembretes)",

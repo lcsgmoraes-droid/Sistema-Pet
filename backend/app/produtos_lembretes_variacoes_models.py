@@ -34,7 +34,9 @@ class Lembrete(BaseTenantModel):
     # Relacionamentos
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
-    pet_id = Column(Integer, ForeignKey("pets.id"), nullable=False, index=True)
+    # Reposicoes aprendidas (ex.: racao) podem nao estar vinculadas a um pet.
+    # Protocolos continuam usando pet_id quando a venda informa o animal.
+    pet_id = Column(Integer, ForeignKey("pets.id"), nullable=True, index=True)
     produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False, index=True)
     venda_id = Column(
         Integer, ForeignKey("vendas.id"), nullable=True, index=True
@@ -59,10 +61,15 @@ class Lembrete(BaseTenantModel):
     status = Column(
         String(20), default="pendente"
     )  # pendente, notificado, completado, cancelado
-    metodo_notificacao = Column(
-        String(50), default="whatsapp"
-    )  # whatsapp, email, sms, app
+    metodo_notificacao = Column(String(50), default="app")
     notificacao_enviada = Column(Boolean, default=False)
+
+    # Como o intervalo foi definido. Estes campos deixam a previsao auditavel
+    # para a loja e evitam tratar uma estimativa como se fosse um protocolo.
+    origem_intervalo = Column(String(30), nullable=True)  # configurado, aprendido
+    intervalo_estimado_dias = Column(Integer, nullable=True)
+    confianca_recorrencia = Column(Float, nullable=True)
+    amostras_recorrencia = Column(Integer, nullable=False, default=0)
 
     # Informa��es adicionais
     observacoes = Column(Text, nullable=True)

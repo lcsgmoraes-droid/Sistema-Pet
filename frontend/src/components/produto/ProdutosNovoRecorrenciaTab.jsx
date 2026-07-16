@@ -17,14 +17,15 @@ export default function ProdutosNovoRecorrenciaTab({
             </svg>
           </div>
           <div className="ml-3">
-            <h3 className="text-sm font-medium text-purple-800">Sistema de Recorrência (Fase 1)</h3>
+            <h3 className="text-sm font-medium text-purple-800">Recorrência Inteligente</h3>
             <div className="mt-2 text-sm text-purple-700">
               <p>
-                Configure produtos que precisam ser recomprados periodicamente (vacinas, antipulgas,
-                rações).
+                Configure protocolos com intervalo fixo, como vacinas e antipulgas. Para produtos de
+                reposição, o CorePet aprende o ciclo real de cada cliente pelo histórico de compras.
               </p>
               <p className="mt-1">
-                O sistema criará lembretes automáticos para notificar clientes 7 dias antes.
+                Quando a recompra se aproxima, o cliente recebe o lembrete no app e pode abrir o
+                produto diretamente.
               </p>
             </div>
           </div>
@@ -41,7 +42,9 @@ export default function ProdutosNovoRecorrenciaTab({
         />
         <label htmlFor="tem_recorrencia" className="ml-3">
           <span className="text-base font-medium text-gray-900">Produto com Recorrência</span>
-          <p className="text-sm text-gray-500">Ativar lembretes automáticos para este produto</p>
+          <p className="text-sm text-gray-500">
+            Define um intervalo inicial ou um protocolo obrigatório para este produto
+          </p>
         </label>
       </div>
 
@@ -159,12 +162,18 @@ export default function ProdutosNovoRecorrenciaTab({
               <h4 className="text-sm font-semibold text-purple-900 mb-2">📌 Preview do Lembrete</h4>
               <div className="text-sm text-purple-700 space-y-1">
                 <p>
-                  ✓ Cliente será notificado <strong>7 dias antes</strong> da próxima dose
+                  ✓ Cliente será avisado no app com antecedência proporcional ao intervalo (até 7
+                  dias)
                 </p>
                 <p>
                   ✓ Intervalo configurado: <strong>{formData.intervalo_dias} dias</strong>
                 </p>
                 <p>✓ Após a compra, um novo lembrete será criado automaticamente</p>
+                {!formData.numero_doses && (
+                  <p>
+                    ✓ Com histórico suficiente, o ciclo será ajustado ao consumo real do cliente
+                  </p>
+                )}
                 {formData.especie_compativel !== "both" && (
                   <p className="mt-2 text-purple-800">
                     ⚠️ Sistema validará se o pet é compatível na hora da venda

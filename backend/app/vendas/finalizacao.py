@@ -491,6 +491,7 @@ def finalizar_venda(
         )
 
         pendencias_estoque_finalizadas = 0
+        recurrence_result = {"created": [], "completed": [], "skipped": []}
         if venda.status == "finalizada":
             try:
                 from app.services.pendencia_estoque_service import (
@@ -509,6 +510,26 @@ def finalizar_venda(
             except Exception:
                 logger.exception(
                     "Erro ao finalizar pendencias de estoque da venda %s",
+                    venda.id,
+                )
+                db.rollback()
+
+            try:
+                from app.services.product_recurrence import (
+                    process_finalized_sale_recurrence,
+                )
+
+                with db.begin_nested():
+                    recurrence_result = process_finalized_sale_recurrence(
+                        db,
+                        venda=venda,
+                        tenant_id=tenant_id,
+                        user_id=user_id,
+                    )
+                db.commit()
+            except Exception:
+                logger.exception(
+                    "Erro ao processar recorrencia da venda %s",
                     venda.id,
                 )
                 db.rollback()
@@ -556,7 +577,9 @@ def finalizar_venda(
             "pos_commit": {
                 "contas_novas": len(contas_criadas_ids),
                 "comissoes_geradas": False,  # Será processado na rota
-                "lembretes_criados": 0,  # Será processado na rota
+                "lembretes_criados": len(recurrence_result["created"]),
+                "lembretes_concluidos": len(recurrence_result["completed"]),
+                "lembretes": recurrence_result,
             },
         }
 
