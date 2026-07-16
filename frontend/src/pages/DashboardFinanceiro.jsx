@@ -1,15 +1,20 @@
 import {
   AlertCircle,
-  BarChart2,
-  DollarSign,
-  FileText,
+  ArrowRight,
+  BarChart3,
+  Building2,
+  CheckCircle2,
+  HelpCircle,
+  Clock3,
   MessageCircle,
+  RefreshCw,
   ShoppingBag,
   TrendingDown,
   TrendingUp,
+  Users,
+  WalletCards,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { FiHelpCircle } from "react-icons/fi";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Area,
@@ -22,645 +27,643 @@ import {
   YAxis,
 } from "recharts";
 import api from "../api";
-import AlertasIA from "../components/AlertasIA";
 import { useTour } from "../hooks/useTour";
 import { tourDashboard } from "../tours/tourDefinitions";
 import { formatMoneyBRL } from "../utils/formatters";
+import { DashboardLoading, MetricCard, PriorityCard } from "./dashboard/DashboardCards";
+import {
+  calculateDashboardIndicators,
+  createEmptyDashboardSummary,
+  createEmptyManagementMetrics,
+  getExecutiveStatus,
+  getPeriodLabel,
+} from "./dashboard/dashboardOverview";
 
-const DashboardFinanceiro = () => {
+const PERIOD_OPTIONS = [
+  { value: 1, label: "Hoje" },
+  { value: 7, label: "7 dias" },
+  { value: 15, label: "15 dias" },
+  { value: 30, label: "30 dias" },
+  { value: 60, label: "60 dias" },
+  { value: 90, label: "90 dias" },
+];
+
+const STATUS_STYLES = {
+  neutral:
+    "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200",
+  positive:
+    "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200",
+  warning:
+    "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200",
+  critical:
+    "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200",
+};
+
+function formatDate(dateValue) {
+  if (!dateValue) return "-";
+  return new Date(dateValue).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
+export default function DashboardFinanceiro() {
   const navigate = useNavigate();
-  const { iniciarTour } = useTour("dashboard", tourDashboard);
+  const { iniciarTour } = useTour("dashboard", tourDashboard, { delay: 2000 });
+  const requestIdRef = useRef(0);
+  const hasLoadedRef = useRef(false);
+  const [periodDays, setPeriodDays] = useState(30);
   const [loading, setLoading] = useState(true);
-  const [periodoDias, setPeriodoDias] = useState(30);
-  const [resumo, setResumo] = useState({
-    saldo_atual: 0,
-    contas_receber: { total: 0, vencidas: 0 },
-    contas_pagar: { total: 0, vencidas: 0 },
-    vendas_periodo: {
-      quantidade: 0,
-      valor_total: 0,
-      faturamento_bruto: 0,
-      finalizadas: 0,
-      ticket_medio: 0,
-    },
-    fluxo_periodo: { entradas: 0, saidas: 0, lucro: 0 },
-  });
-  const [entradasSaidas, setEntradasSaidas] = useState([]);
-  const [contasVencidas, setContasVencidas] = useState({
-    contas_receber: [],
-    contas_pagar: [],
-  });
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [failedBlocks, setFailedBlocks] = useState([]);
+  const [summary, setSummary] = useState(createEmptyDashboardSummary);
+  const [management, setManagement] = useState(createEmptyManagementMetrics);
+  const [cashFlow, setCashFlow] = useState([]);
+  const [overdueAccounts, setOverdueAccounts] = useState({ contas_receber: [], contas_pagar: [] });
+  const [topProducts, setTopProducts] = useState([]);
+  const [bankBalance, setBankBalance] = useState(null);
 
-  const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(valor || 0);
-  };
+  const loadDashboard = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    if (hasLoadedRef.current) setRefreshing(true);
+    else setLoading(true);
 
-  const formatarData = (dataStr) => {
-    const data = new Date(dataStr);
-    return data.toLocaleDateString("pt-BR", {
-      day: "2-digit",
-      month: "2-digit",
+    const requests = [
+      {
+        key: "resumo financeiro",
+        promise: api.get("/dashboard/resumo", { params: { periodo_dias: periodDays } }),
+      },
+      {
+        key: "fluxo diário",
+        promise: api.get("/dashboard/entradas-saidas", { params: { periodo_dias: periodDays } }),
+      },
+      {
+        key: "contas vencidas",
+        promise: api.get("/dashboard/contas-vencidas", { params: { limite: 5 } }),
+      },
+      { key: "clientes", promise: api.get("/dashboard/gerencial") },
+      {
+        key: "produtos",
+        promise: api.get("/dashboard/top-produtos", {
+          params: { periodo_dias: periodDays, limite: 5 },
+        }),
+      },
+      { key: "saldo bancário", promise: api.get("/contas-bancarias/resumo/saldos") },
+    ];
+
+    const results = await Promise.allSettled(requests.map((request) => request.promise));
+    if (requestId !== requestIdRef.current) return;
+
+    const failed = [];
+    results.forEach((result, index) => {
+      if (result.status === "rejected") failed.push(requests[index].key);
     });
-  };
 
-  const carregarDados = async () => {
-    setLoading(true);
-
-    // Carregar resumo
-    try {
-      const resumoRes = await api.get(`/dashboard/resumo?periodo_dias=${periodoDias}`);
-      setResumo(resumoRes.data);
-    } catch (err) {
-      console.error("Erro ao carregar resumo:", err);
+    if (results[0].status === "fulfilled") setSummary(results[0].value.data);
+    if (results[1].status === "fulfilled") setCashFlow(results[1].value.data || []);
+    if (results[2].status === "fulfilled") setOverdueAccounts(results[2].value.data);
+    if (results[3].status === "fulfilled") setManagement(results[3].value.data);
+    if (results[4].status === "fulfilled") setTopProducts(results[4].value.data || []);
+    if (results[5].status === "fulfilled") {
+      setBankBalance(Number(results[5].value.data?.total_geral || 0));
+    } else {
+      setBankBalance(null);
     }
 
-    // Carregar entradas/saídas
-    try {
-      const entradasSaidasRes = await api.get(
-        `/dashboard/entradas-saidas?periodo_dias=${periodoDias}`,
-      );
-      setEntradasSaidas(entradasSaidasRes.data);
-    } catch (err) {
-      console.error("Erro ao carregar entradas/saídas:", err);
-    }
-
-    // Carregar contas vencidas
-    try {
-      const contasVencidasRes = await api.get(`/dashboard/contas-vencidas?limite=5`);
-      setContasVencidas(contasVencidasRes.data);
-    } catch (err) {
-      console.error("Erro ao carregar contas vencidas:", err);
-    }
-
+    hasLoadedRef.current = true;
+    setFailedBlocks(failed);
+    setLastUpdate(new Date());
     setLoading(false);
-  };
+    setRefreshing(false);
+  }, [periodDays]);
 
   useEffect(() => {
-    carregarDados();
-  }, [periodoDias]);
+    loadDashboard();
+  }, [loadDashboard]);
 
-  const coberturaPE =
-    resumo.fluxo_periodo.saidas > 0
-      ? (resumo.fluxo_periodo.entradas / resumo.fluxo_periodo.saidas) * 100
-      : 100;
+  const indicators = useMemo(() => calculateDashboardIndicators(summary), [summary]);
+  const executiveStatus = useMemo(() => getExecutiveStatus(summary), [summary]);
+  const statusIcon = executiveStatus.tone === "positive" ? CheckCircle2 : AlertCircle;
+  const StatusIcon = statusIcon;
+  const periodLabel = getPeriodLabel(periodDays);
+  const salesTotal = Number(summary?.vendas_periodo?.valor_total || 0);
+  const grossSales = Number(summary?.vendas_periodo?.faturamento_bruto || 0);
+  const cashResult = Number(summary?.fluxo_periodo?.lucro || 0);
+  const displayedBalance = bankBalance ?? Number(summary?.saldo_atual || 0);
+  const hasChartMovement = cashFlow.some(
+    (item) => Number(item?.entradas || 0) !== 0 || Number(item?.saidas || 0) !== 0,
+  );
 
-  const montarInsights = () => {
-    const lucro = Number(resumo.fluxo_periodo.lucro || 0);
-    const faturamento = Number(
-      resumo.vendas_periodo.faturamento_bruto ?? resumo.vendas_periodo.valor_total ?? 0,
-    );
-    const ticketMedio = Number(resumo.vendas_periodo.ticket_medio || 0);
-    const vencidoLiquido =
-      Number(resumo.contas_receber.vencidas || 0) - Number(resumo.contas_pagar.vencidas || 0);
-
-    return [
-      {
-        titulo: "Resultado do período",
-        valor: lucro >= 0 ? formatMoneyBRL(lucro) : `- ${formatMoneyBRL(Math.abs(lucro))}`,
-        descricao:
-          lucro >= 0
-            ? "O período está fechando no azul."
-            : "O período está consumindo caixa e merece atenção.",
-        cor:
-          lucro >= 0
-            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-            : "border-red-200 bg-red-50 text-red-900",
-        pergunta: `Analise o resultado dos últimos ${periodoDias} dias e me diga o que mais impactou o lucro.`,
-      },
-      {
-        titulo: "Cobertura das despesas",
-        valor: `${coberturaPE.toFixed(1)}%`,
-        descricao:
-          coberturaPE >= 100
-            ? "As entradas do período cobriram as saídas."
-            : "As entradas ainda não cobriram todas as saídas.",
-        cor:
-          coberturaPE >= 100
-            ? "border-blue-200 bg-blue-50 text-blue-900"
-            : "border-orange-200 bg-orange-50 text-orange-900",
-        pergunta: `Explique minha cobertura de despesas nos últimos ${periodoDias} dias e como melhorar.`,
-      },
-      {
-        titulo: "Ritmo comercial",
-        valor: `${resumo.vendas_periodo.quantidade || 0} vendas`,
-        descricao:
-          faturamento > 0
-            ? `Faturamento bruto de ${formatMoneyBRL(faturamento)} no período.`
-            : "Ainda não houve faturamento no período selecionado.",
-        cor: "border-violet-200 bg-violet-50 text-violet-900",
-        pergunta: `Analise meu ritmo comercial nos últimos ${periodoDias} dias, com vendas, ticket e produtos líderes.`,
-      },
-      {
-        titulo: "Pressão de vencidos",
-        valor: ticketMedio > 0 ? `Ticket médio ${formatMoneyBRL(ticketMedio)}` : "Sem ticket médio",
-        descricao:
-          vencidoLiquido >= 0
-            ? "Os recebimentos vencidos superam ou empatam com os pagamentos vencidos."
-            : "Os pagamentos vencidos estão acima dos recebimentos vencidos.",
-        cor:
-          vencidoLiquido >= 0
-            ? "border-cyan-200 bg-cyan-50 text-cyan-900"
-            : "border-amber-200 bg-amber-50 text-amber-900",
-        pergunta: "Analise minhas contas vencidas e diga a prioridade de cobrança e pagamento.",
-      },
-    ];
-  };
-
-  const insightsPeriodo = montarInsights();
-
-  const abrirPerguntaIA = (perguntaInicial) => {
+  const openManagementAssistant = () => {
     navigate("/ia/chat", {
       state: {
-        perguntaInicial,
+        perguntaInicial: `Analise meu negócio nos últimos ${periodDays} dias: vendas, resultado de caixa, contas vencidas e riscos de clientes.`,
       },
     });
   };
 
-  const abrirAssistenteGestao = () => {
-    const perguntaBase =
-      periodoDias === 1
-        ? "Quero um resumo de vendas do dia, produtos mais vendidos e alertas de caixa."
-        : `Quero um resumo de vendas dos últimos ${periodoDias} dias, margem e DRE simplificada.`;
-
-    abrirPerguntaIA(perguntaBase);
-  };
-
-  let saudeExecutiva = {
-    titulo: "Risco elevado",
-    descricao: "O caixa do período está pressionado e pede ação rápida.",
-    cor: "bg-rose-600 text-white",
-  };
-
-  if (coberturaPE >= 100) {
-    saudeExecutiva = {
-      titulo: "Operação saudável",
-      descricao: "As entradas cobriram as saídas do período.",
-      cor: "bg-emerald-600 text-white",
-    };
-  } else if (coberturaPE >= 70) {
-    saudeExecutiva = {
-      titulo: "Atenção no período",
-      descricao: "Há pressão no caixa, mas ainda com reação possível.",
-      cor: "bg-amber-500 text-white",
-    };
-  }
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
+  if (loading) return <DashboardLoading />;
 
   return (
-    <div className="p-4 bg-gray-50 min-h-screen">
-      <div className={`mb-4 rounded-2xl p-4 shadow-sm ${saudeExecutiva.cor}`}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="min-h-full space-y-5 bg-slate-50 p-4 dark:bg-slate-950 sm:p-6">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] opacity-80 mb-1">Painel Executivo</p>
-            <h2 className="text-xl font-bold">{saudeExecutiva.titulo}</h2>
-            <p className="text-sm opacity-90">{saudeExecutiva.descricao}</p>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[executiveStatus.tone]}`}
+              >
+                <StatusIcon className="h-3.5 w-3.5" />
+                {executiveStatus.title}
+              </span>
+              {lastUpdate && (
+                <span className="text-xs text-slate-400">
+                  Atualizado às{" "}
+                  {lastUpdate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
+            </div>
+            <h1 className="text-2xl font-bold text-slate-950 dark:text-white sm:text-3xl">
+              Visão geral do negócio
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+              {executiveStatus.description} Os valores abaixo separam a posição atual do desempenho
+              do período.
+            </p>
           </div>
+
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() =>
-                abrirPerguntaIA(
-                  "Compare este mês com o mês anterior e me diga onde melhorei ou piorei.",
-                )
-              }
-              className="px-3 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-sm font-medium transition-colors"
-            >
-              Comparar meses
-            </button>
-            <button
-              onClick={() =>
-                abrirPerguntaIA(
-                  "Me dê um raio-x executivo do negócio com vendas, margem, canal e alertas.",
-                )
-              }
-              className="px-3 py-2 rounded-lg bg-white text-slate-900 hover:bg-slate-100 text-sm font-medium transition-colors"
-            >
-              Raio-x executivo
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Cabeçalho */}
-      <div className="mb-4 flex flex-wrap justify-between items-center gap-2">
-        <div className="flex items-center gap-2">
-          <div>
-            <h1 className="text-xl font-bold text-gray-800">Dashboard Financeiro</h1>
-            <p className="text-xs text-gray-500">Visão consolidada do seu negócio</p>
-          </div>
-          <button
-            onClick={iniciarTour}
-            title="Ver tour guiado desta página"
-            className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-          >
-            <FiHelpCircle className="text-sm" />
-          </button>
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          <button
-            onClick={abrirAssistenteGestao}
-            className="mb-1 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
-          >
-            <MessageCircle className="w-4 h-4" />
-            Perguntar para IA de Gestão
-          </button>
-          <div className="flex gap-1">
-            {[
-              { v: 1, label: "Hoje" },
-              { v: 7, label: "7d" },
-              { v: 15, label: "15d" },
-              { v: 30, label: "30d" },
-              { v: 60, label: "60d" },
-              { v: 90, label: "90d" },
-            ].map(({ v, label }) => (
-              <button
-                key={v}
-                onClick={() => setPeriodoDias(v)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  periodoDias === v
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-gray-400">
-            Período afeta: Lucro · Vendas · Fluxo · Ticket Médio
-          </p>
-        </div>
-      </div>
-
-      {/* KPIs — linha 1: valores fixos (não afetados pelo período) */}
-      <div className="mb-1">
-        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5">
-          📌 Posição atual — não muda com o período
-        </p>
-        <div id="tour-stats" className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Saldo */}
-          <button
-            type="button"
-            onClick={() => navigate("/financeiro/fluxo-caixa")}
-            className="bg-blue-600 rounded-xl p-3 text-white text-left hover:bg-blue-700 transition-colors"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <DollarSign className="w-4 h-4 opacity-80" />
-              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">Hoje</span>
-            </div>
-            <p className="text-xs opacity-75 mb-0.5">Saldo Estimado</p>
-            <p className="text-base font-bold leading-tight">{formatarMoeda(resumo.saldo_atual)}</p>
-          </button>
-
-          {/* A Receber */}
-          <button
-            type="button"
-            onClick={() => navigate("/financeiro/contas-receber")}
-            className="bg-emerald-600 rounded-xl p-3 text-white text-left hover:bg-emerald-700 transition-colors"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <TrendingUp className="w-4 h-4 opacity-80" />
-              {resumo.contas_receber.vencidas > 0 && (
-                <AlertCircle className="w-3.5 h-3.5 text-yellow-300" />
-              )}
-            </div>
-            <p className="text-xs opacity-75 mb-0.5">A Receber</p>
-            <p className="text-base font-bold leading-tight">
-              {formatarMoeda(resumo.contas_receber.total)}
-            </p>
-            {resumo.contas_receber.vencidas > 0 && (
-              <p className="text-xs mt-1 text-yellow-200">
-                ⚠ {formatarMoeda(resumo.contas_receber.vencidas)} venc.
-              </p>
-            )}
-          </button>
-
-          {/* A Pagar */}
-          <button
-            type="button"
-            onClick={() => navigate("/financeiro/contas-pagar")}
-            className="bg-red-500 rounded-xl p-3 text-white text-left hover:bg-red-600 transition-colors"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <TrendingDown className="w-4 h-4 opacity-80" />
-              {resumo.contas_pagar.vencidas > 0 && (
-                <AlertCircle className="w-3.5 h-3.5 text-yellow-300" />
-              )}
-            </div>
-            <p className="text-xs opacity-75 mb-0.5">A Pagar</p>
-            <p className="text-base font-bold leading-tight">
-              {formatarMoeda(resumo.contas_pagar.total)}
-            </p>
-            {resumo.contas_pagar.vencidas > 0 && (
-              <p className="text-xs mt-1 text-yellow-200">
-                ⚠ {formatarMoeda(resumo.contas_pagar.vencidas)} venc.
-              </p>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* KPIs — linha 2: valores do período selecionado */}
-      <div className="mb-4">
-        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-1.5 mt-3">
-          📅 Período selecionado: {periodoDias === 1 ? "Hoje" : `últimos ${periodoDias} dias`}
-        </p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {/* Faturamento Bruto */}
-          <button
-            type="button"
-            onClick={() => navigate("/financeiro/relatorio-vendas")}
-            className="bg-purple-600 hover:bg-purple-700 rounded-xl p-3 text-white text-left transition-colors"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <FileText className="w-4 h-4 opacity-80" />
-              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">
-                {periodoDias === 1 ? "Hoje" : `${periodoDias}d`}
-              </span>
-            </div>
-            <p className="text-xs opacity-75 mb-0.5">Faturamento Bruto</p>
-            <p className="text-base font-bold leading-tight">
-              {formatarMoeda(
-                resumo.vendas_periodo.faturamento_bruto ?? resumo.vendas_periodo.valor_total,
-              )}
-            </p>
-          </button>
-
-          {/* Lucro do Período */}
-          <button
-            type="button"
-            onClick={() => navigate("/financeiro/dre")}
-            className={`rounded-xl p-3 text-white cursor-pointer transition-colors ${
-              resumo.fluxo_periodo.lucro >= 0
-                ? "bg-green-600 hover:bg-green-700"
-                : "bg-orange-500 hover:bg-orange-600"
-            }`}
-          >
-            <div className="flex justify-between items-start mb-2">
-              <TrendingUp className="w-4 h-4 opacity-80" />
-              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">
-                {periodoDias === 1 ? "Hoje" : `${periodoDias}d`}
-              </span>
-            </div>
-            <p className="text-xs opacity-75 mb-0.5">
-              {resumo.fluxo_periodo.lucro >= 0 ? "Lucro do Período" : "Prejuízo"}
-            </p>
-            <p className="text-base font-bold leading-tight">
-              {formatarMoeda(Math.abs(resumo.fluxo_periodo.lucro))}
-            </p>
-          </button>
-
-          {/* Vendas (qtd) */}
-          <button
-            type="button"
-            onClick={() => navigate("/financeiro/relatorio-vendas")}
-            className="bg-cyan-600 rounded-xl p-3 text-white text-left hover:bg-cyan-700 transition-colors"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <ShoppingBag className="w-4 h-4 opacity-80" />
-              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">
-                {periodoDias === 1 ? "Hoje" : `${periodoDias}d`}
-              </span>
-            </div>
-            <p className="text-xs opacity-75 mb-0.5">Vendas</p>
-            <p className="text-base font-bold leading-tight">
-              {resumo.vendas_periodo.quantidade || 0}
-            </p>
-            <p className="text-xs opacity-75 mt-0.5">
-              {formatarMoeda(resumo.vendas_periodo.valor_total)}
-            </p>
-          </button>
-
-          {/* Ticket Médio */}
-          <button
-            type="button"
-            onClick={() => navigate("/financeiro/relatorio-vendas")}
-            className="bg-indigo-500 rounded-xl p-3 text-white text-left hover:bg-indigo-600 transition-colors"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <BarChart2 className="w-4 h-4 opacity-80" />
-              <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">
-                {periodoDias === 1 ? "Hoje" : `${periodoDias}d`}
-              </span>
-            </div>
-            <p className="text-xs opacity-75 mb-0.5">Ticket Médio</p>
-            <p className="text-base font-bold leading-tight">
-              {formatarMoeda(resumo.vendas_periodo.ticket_medio || 0)}
-            </p>
-            <p className="text-xs opacity-75 mt-0.5">por venda</p>
-          </button>
-        </div>
-
-        {/* Sub-row: Entradas, Saídas, Margem, Finalizadas */}
-        <div id="tour-financeiro" className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
-          <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
-            <p className="text-xs text-gray-500 mb-1">Entradas</p>
-            <p className="text-lg font-bold text-emerald-600">
-              {formatarMoeda(resumo.fluxo_periodo.entradas)}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
-            <p className="text-xs text-gray-500 mb-1">Saídas</p>
-            <p className="text-lg font-bold text-red-500">
-              {formatarMoeda(resumo.fluxo_periodo.saidas)}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
-            <p className="text-xs text-gray-500 mb-1">Margem</p>
-            <p className="text-lg font-bold text-gray-800">
-              {resumo.fluxo_periodo.entradas > 0
-                ? ((resumo.fluxo_periodo.lucro / resumo.fluxo_periodo.entradas) * 100).toFixed(1) +
-                  "%"
-                : "—"}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
-            <p className="text-xs text-gray-500 mb-1">Finalizadas</p>
-            <p className="text-lg font-bold text-gray-800">
-              {resumo.vendas_periodo.finalizadas || 0}
-            </p>
-            <p className="text-xs text-gray-400">
-              de {resumo.vendas_periodo.quantidade || 0} vendas
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-4 bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-700">Leitura automática do período</h2>
-            <p className="text-xs text-gray-500">
-              Resumo pronto dos últimos sinais financeiros sem precisar abrir o chat.
-            </p>
-          </div>
-          <button
-            onClick={abrirAssistenteGestao}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-900 text-white hover:bg-slate-800 transition-colors"
-          >
-            <MessageCircle className="w-4 h-4" />
-            Aprofundar com IA
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-          {insightsPeriodo.map((insight) => (
-            <button
-              key={insight.titulo}
               type="button"
-              onClick={() => abrirPerguntaIA(insight.pergunta)}
-              className={`rounded-xl border p-3 text-left transition-transform hover:-translate-y-0.5 ${insight.cor}`}
+              onClick={iniciarTour}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              title="Conhecer o dashboard"
             >
-              <p className="text-xs uppercase tracking-wide opacity-70 mb-1">{insight.titulo}</p>
-              <p className="text-lg font-bold mb-1">{insight.valor}</p>
-              <p className="text-sm opacity-80 leading-snug">{insight.descricao}</p>
+              <HelpCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Entender painel</span>
+            </button>
+            <button
+              type="button"
+              onClick={openManagementAssistant}
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Analisar com IA
+            </button>
+            <button
+              type="button"
+              onClick={loadDashboard}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              Atualizar
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+          <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Período
+          </span>
+          {PERIOD_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setPeriodDays(option.value)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                periodDays === option.value
+                  ? "bg-[#0f8b8d] text-white shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              }`}
+            >
+              {option.label}
             </button>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* Gráfico + Alertas IA lado a lado */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
-        {/* Gráfico de fluxo */}
-        <div
-          id="tour-composicao"
-          className="lg:col-span-3 bg-white rounded-xl p-4 shadow-sm border border-gray-100"
-        >
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">
-            📈 Fluxo Financeiro — últimos {periodoDias} dias
-          </h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={entradasSaidas} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="gradEntradas" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="gradSaidas" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#EF4444" stopOpacity={0.25} />
-                  <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis
-                dataKey="data"
-                tickFormatter={formatarData}
-                style={{ fontSize: "10px" }}
-                tick={{ fill: "#9ca3af" }}
-              />
-              <YAxis
-                tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                style={{ fontSize: "10px" }}
-                tick={{ fill: "#9ca3af" }}
-                width={36}
-              />
-              <Tooltip
-                formatter={(value) => formatarMoeda(value)}
-                labelFormatter={formatarData}
-                contentStyle={{ fontSize: "12px" }}
-              />
-              <Legend wrapperStyle={{ fontSize: "11px" }} />
-              <Area
-                type="monotone"
-                dataKey="entradas"
-                stroke="#10B981"
-                strokeWidth={2}
-                fill="url(#gradEntradas)"
-                name="Entradas"
-              />
-              <Area
-                type="monotone"
-                dataKey="saidas"
-                stroke="#EF4444"
-                strokeWidth={2}
-                fill="url(#gradSaidas)"
-                name="Saídas"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Alertas IA */}
-        <div
-          id="tour-acoes-rapidas"
-          className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
-        >
-          <AlertasIA compacto />
-        </div>
-      </div>
-
-      {/* Contas Vencidas */}
-      {(contasVencidas.contas_receber.length > 0 || contasVencidas.contas_pagar.length > 0) && (
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-red-100">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-red-500" />
-            Contas Vencidas com Atenção
-          </h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {contasVencidas.contas_receber.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 mb-2">
-                  A Receber ({contasVencidas.contas_receber.length})
-                </p>
-                <div className="space-y-1.5">
-                  {contasVencidas.contas_receber.slice(0, 3).map((conta) => (
-                    <div
-                      key={conta.id}
-                      className="flex justify-between items-center p-2 bg-red-50 border border-red-100 rounded-lg"
-                    >
-                      <div>
-                        <p className="text-xs font-medium text-gray-700">
-                          {conta.cliente || "Sem cliente"}
-                        </p>
-                        <p className="text-xs text-red-500">Venceu há {conta.dias_vencido} dias</p>
-                      </div>
-                      <p className="text-sm font-bold text-red-600">{formatarMoeda(conta.saldo)}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {contasVencidas.contas_pagar.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-gray-500 mb-2">
-                  A Pagar ({contasVencidas.contas_pagar.length})
-                </p>
-                <div className="space-y-1.5">
-                  {contasVencidas.contas_pagar.slice(0, 3).map((conta) => (
-                    <div
-                      key={conta.id}
-                      className="flex justify-between items-center p-2 bg-orange-50 border border-orange-100 rounded-lg"
-                    >
-                      <div>
-                        <p className="text-xs font-medium text-gray-700">
-                          {conta.fornecedor || "Sem fornecedor"}
-                        </p>
-                        <p className="text-xs text-orange-500">
-                          Venceu há {conta.dias_vencido} dias
-                        </p>
-                      </div>
-                      <p className="text-sm font-bold text-orange-600">
-                        {formatarMoeda(conta.saldo)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+      {failedBlocks.length > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            Parte do painel não pôde ser atualizada ({failedBlocks.join(", ")}). Os demais números
+            continuam disponíveis.
+          </p>
         </div>
       )}
+
+      <section id="tour-stats">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Desempenho</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{periodLabel}</p>
+          </div>
+          <div className="flex gap-4 text-xs text-slate-500 dark:text-slate-400">
+            <span>
+              Entradas:{" "}
+              <strong className="text-emerald-700 dark:text-emerald-300">
+                {formatMoneyBRL(indicators.inflows)}
+              </strong>
+            </span>
+            <span>
+              Saídas:{" "}
+              <strong className="text-rose-700 dark:text-rose-300">
+                {formatMoneyBRL(indicators.outflows)}
+              </strong>
+            </span>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            icon={TrendingUp}
+            label="Faturamento"
+            value={formatMoneyBRL(salesTotal)}
+            detail={
+              grossSales > salesTotal
+                ? `Bruto antes de descontos: ${formatMoneyBRL(grossSales)}`
+                : "Total das vendas finalizadas"
+            }
+            tone="violet"
+            onClick={() => navigate("/financeiro/vendas")}
+          />
+          <MetricCard
+            icon={cashResult >= 0 ? TrendingUp : TrendingDown}
+            label="Resultado de caixa"
+            value={formatMoneyBRL(cashResult)}
+            detail={`${formatMoneyBRL(indicators.inflows)} em entradas − ${formatMoneyBRL(indicators.outflows)} em saídas`}
+            tone={cashResult >= 0 ? "emerald" : "rose"}
+            onClick={() => navigate("/financeiro/fluxo-caixa")}
+          />
+          <MetricCard
+            icon={ShoppingBag}
+            label="Vendas finalizadas"
+            value={String(summary?.vendas_periodo?.quantidade || 0)}
+            detail="Quantidade concluída no período"
+            tone="cyan"
+            onClick={() => navigate("/financeiro/vendas")}
+          />
+          <MetricCard
+            icon={BarChart3}
+            label="Ticket médio"
+            value={formatMoneyBRL(summary?.vendas_periodo?.ticket_medio || 0)}
+            detail="Valor médio por venda finalizada"
+            tone="blue"
+            onClick={() => navigate("/financeiro/vendas")}
+          />
+        </div>
+      </section>
+
+      <section id="tour-financeiro" className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:col-span-1">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Posição atual</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Valores acumulados, sem filtro de período
+            </p>
+          </div>
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => navigate("/financeiro/bancos")}
+              className="flex w-full items-center justify-between rounded-xl bg-slate-900 p-4 text-left text-white transition hover:bg-slate-800 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
+            >
+              <span>
+                <span className="block text-xs opacity-70">
+                  {bankBalance === null ? "Saldo estimado" : "Saldo em bancos"}
+                </span>
+                <strong className="mt-1 block text-xl">{formatMoneyBRL(displayedBalance)}</strong>
+              </span>
+              <Building2 className="h-5 w-5 opacity-70" />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/financeiro/contas-receber")}
+              className="flex w-full items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-left transition hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15"
+            >
+              <span>
+                <span className="block text-xs text-emerald-700 dark:text-emerald-300">
+                  Total a receber
+                </span>
+                <strong className="mt-1 block text-lg text-emerald-950 dark:text-emerald-100">
+                  {formatMoneyBRL(summary?.contas_receber?.total || 0)}
+                </strong>
+              </span>
+              <TrendingUp className="h-5 w-5 text-emerald-600" />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/financeiro/contas-pagar")}
+              className="flex w-full items-center justify-between rounded-xl border border-rose-200 bg-rose-50 p-4 text-left transition hover:bg-rose-100 dark:border-rose-500/30 dark:bg-rose-500/10 dark:hover:bg-rose-500/15"
+            >
+              <span>
+                <span className="block text-xs text-rose-700 dark:text-rose-300">
+                  Total a pagar
+                </span>
+                <strong className="mt-1 block text-lg text-rose-950 dark:text-rose-100">
+                  {formatMoneyBRL(summary?.contas_pagar?.total || 0)}
+                </strong>
+              </span>
+              <TrendingDown className="h-5 w-5 text-rose-600" />
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:col-span-2">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Atenção agora</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Pendências que podem virar ação, sem misturar com indicadores
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <PriorityCard
+              icon={WalletCards}
+              label="Recebimentos vencidos"
+              value={formatMoneyBRL(indicators.overdueReceivable)}
+              detail={
+                indicators.overdueReceivable > 0
+                  ? "Priorize as cobranças mais antigas"
+                  : "Nenhum valor vencido"
+              }
+              hasIssue={indicators.overdueReceivable > 0}
+              onClick={() => navigate("/financeiro/contas-receber")}
+            />
+            <PriorityCard
+              icon={Clock3}
+              label="Pagamentos vencidos"
+              value={formatMoneyBRL(indicators.overduePayable)}
+              detail={
+                indicators.overduePayable > 0
+                  ? "Revise juros e fornecedores prioritários"
+                  : "Nenhum valor vencido"
+              }
+              hasIssue={indicators.overduePayable > 0}
+              onClick={() => navigate("/financeiro/contas-pagar")}
+            />
+            <PriorityCard
+              icon={Users}
+              label="VIPs em risco"
+              value={String(management?.vips_inativos?.quantidade || 0)}
+              detail={
+                management?.vips_inativos?.quantidade > 0
+                  ? `${management.vips_inativos.impacto} em impacto estimado`
+                  : "Nenhum VIP inativo há mais de 20 dias"
+              }
+              hasIssue={Number(management?.vips_inativos?.quantidade || 0) > 0}
+              onClick={() => navigate("/clientes")}
+            />
+            <PriorityCard
+              icon={Users}
+              label="Clientes inativos"
+              value={String(management?.clientes_inativos?.quantidade || 0)}
+              detail={
+                management?.clientes_inativos?.quantidade > 0
+                  ? "Sem compra há mais de 90 dias"
+                  : "Nenhum cliente nessa condição"
+              }
+              hasIssue={Number(management?.clientes_inativos?.quantidade || 0) > 0}
+              onClick={() => navigate("/clientes")}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section id="tour-composicao" className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:col-span-3">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                Entradas e saídas
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Movimento diário · {periodLabel.toLowerCase()}
+              </p>
+            </div>
+          </div>
+          {hasChartMovement ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <AreaChart data={cashFlow} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="dashboardEntradas" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0f8b8d" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#0f8b8d" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="dashboardSaidas" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#e11d48" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#e11d48" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis
+                  dataKey="data"
+                  tickFormatter={formatDate}
+                  tick={{ fill: "#64748b", fontSize: 11 }}
+                />
+                <YAxis
+                  width={54}
+                  tickFormatter={(value) =>
+                    Number(value).toLocaleString("pt-BR", { notation: "compact" })
+                  }
+                  tick={{ fill: "#64748b", fontSize: 11 }}
+                />
+                <Tooltip formatter={(value) => formatMoneyBRL(value)} labelFormatter={formatDate} />
+                <Legend wrapperStyle={{ fontSize: "12px" }} />
+                <Area
+                  type="monotone"
+                  dataKey="entradas"
+                  stroke="#0f8b8d"
+                  strokeWidth={2}
+                  fill="url(#dashboardEntradas)"
+                  name="Entradas"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="saidas"
+                  stroke="#e11d48"
+                  strokeWidth={2}
+                  fill="url(#dashboardSaidas)"
+                  name="Saídas"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex h-[260px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center dark:border-slate-700 dark:bg-slate-950/40">
+              <div>
+                <BarChart3 className="mx-auto h-7 w-7 text-slate-300 dark:text-slate-600" />
+                <p className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+                  Sem movimento neste período
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Escolha outro período ou registre novas movimentações.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:col-span-2">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                Produtos que puxam as vendas
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Ranking por quantidade no período
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate("/produtos")}
+              className="text-xs font-semibold text-[#0f8b8d] hover:underline dark:text-cyan-300"
+            >
+              Ver produtos
+            </button>
+          </div>
+          {topProducts.length > 0 ? (
+            <ol className="space-y-2">
+              {topProducts.map((product, index) => (
+                <li
+                  key={`${product.nome}-${index}`}
+                  className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 dark:border-slate-800"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#d8eee9] text-sm font-bold text-[#0f5f63] dark:bg-cyan-500/10 dark:text-cyan-300">
+                    {index + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">
+                      {product.nome}
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {product.quantidade_vendida} unidades
+                    </p>
+                  </div>
+                  <strong className="text-sm text-slate-700 dark:text-slate-200">
+                    {formatMoneyBRL(product.receita_total)}
+                  </strong>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <div className="flex min-h-56 items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 text-center dark:border-slate-700 dark:bg-slate-950/40">
+              <div>
+                <ShoppingBag className="mx-auto h-7 w-7 text-slate-300 dark:text-slate-600" />
+                <p className="mt-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+                  Sem produtos vendidos no período
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section id="tour-acoes-rapidas" className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <h2 className="text-lg font-bold text-slate-900 dark:text-white">Base de clientes</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Qualidade e oportunidade de relacionamento
+          </p>
+          <div className="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
+            {[
+              ["Clientes ativos", management?.total_clientes || 0],
+              ["Novos promissores", management?.oportunidades_novos?.quantidade || 0],
+              ["Sem WhatsApp", management?.whatsapp_inativo?.quantidade || 0],
+            ].map(([label, value]) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => navigate("/clientes")}
+                className="flex w-full items-center justify-between py-3 text-left"
+              >
+                <span className="text-sm text-slate-600 dark:text-slate-400">{label}</span>
+                <strong className="text-base text-slate-900 dark:text-white">{value}</strong>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:col-span-2">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                Contas vencidas mais antigas
+              </h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Detalhes para começar a agir sem procurar em outra tela
+              </p>
+            </div>
+          </div>
+          {overdueAccounts.contas_receber?.length || overdueAccounts.contas_pagar?.length ? (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {[
+                {
+                  key: "contas_receber",
+                  label: "A receber",
+                  personKey: "cliente",
+                  path: "/financeiro/contas-receber",
+                  tone: "text-emerald-700 dark:text-emerald-300",
+                },
+                {
+                  key: "contas_pagar",
+                  label: "A pagar",
+                  personKey: "fornecedor",
+                  path: "/financeiro/contas-pagar",
+                  tone: "text-rose-700 dark:text-rose-300",
+                },
+              ].map((group) => (
+                <div
+                  key={group.key}
+                  className="rounded-xl border border-slate-100 p-3 dark:border-slate-800"
+                >
+                  <button
+                    type="button"
+                    onClick={() => navigate(group.path)}
+                    className={`mb-2 flex w-full items-center justify-between text-xs font-bold uppercase tracking-wide ${group.tone}`}
+                  >
+                    {group.label}
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                  <div className="space-y-2">
+                    {(overdueAccounts[group.key] || []).slice(0, 3).map((account) => (
+                      <div
+                        key={account.id}
+                        className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 p-2.5 dark:bg-slate-950/50"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+                            {account[group.personKey] || account.descricao || "Sem identificação"}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            Vencida há {account.dias_vencido || 0} dias
+                          </p>
+                        </div>
+                        <strong className="shrink-0 text-sm text-slate-700 dark:text-slate-200">
+                          {formatMoneyBRL(account.saldo)}
+                        </strong>
+                      </div>
+                    ))}
+                    {(overdueAccounts[group.key] || []).length === 0 && (
+                      <p className="py-6 text-center text-xs text-slate-400">
+                        Nenhuma conta vencida
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex min-h-36 items-center justify-center rounded-xl border border-dashed border-emerald-200 bg-emerald-50/60 text-center dark:border-emerald-500/30 dark:bg-emerald-500/10">
+              <div>
+                <CheckCircle2 className="mx-auto h-7 w-7 text-emerald-600" />
+                <p className="mt-2 text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+                  Nenhuma conta vencida
+                </p>
+                <p className="mt-1 text-xs text-emerald-700/70 dark:text-emerald-300/70">
+                  Recebimentos e pagamentos estão em dia.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
-};
-
-export default DashboardFinanceiro;
+}

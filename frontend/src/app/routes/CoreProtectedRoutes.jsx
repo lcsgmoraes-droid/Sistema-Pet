@@ -1,10 +1,9 @@
-import { Route } from "react-router-dom";
+import { Navigate, Route } from "react-router-dom";
 import ProtectedRoute from "../../components/ProtectedRoute";
 import {
   ClienteFinanceiro,
   ClienteTimelinePage,
   DashboardFinanceiro,
-  DashboardGerencial,
   GerenciamentoPets,
   MeuPlano,
   Pessoas,
@@ -26,14 +25,7 @@ export function createCoreProtectedRoutes() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="dashboard-gerencial"
-        element={
-          <ProtectedRoute permission="relatorios.gerencial">
-            <DashboardGerencial />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="dashboard-gerencial" element={<Navigate to="/dashboard" replace />} />
       <Route
         path="clientes"
         element={
