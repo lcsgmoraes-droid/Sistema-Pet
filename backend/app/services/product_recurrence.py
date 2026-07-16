@@ -164,9 +164,7 @@ def process_finalized_sale_recurrence(
             .all()
         )
         purchase_dates = [
-            finalized or sold
-            for finalized, sold in purchase_rows
-            if finalized or sold
+            finalized or sold for finalized, sold in purchase_rows if finalized or sold
         ]
 
         configured_interval = _valid_interval(
@@ -305,9 +303,11 @@ def run_due_recurrence_notifications(*, db_factory, logger_override=None) -> dic
                     stats["tenants"] += 1
                     stats["due"] += len(due)
                     for reminder in due:
-                        customer_email = str(
-                            getattr(reminder.cliente, "email", "") or ""
-                        ).strip().lower()
+                        customer_email = (
+                            str(getattr(reminder.cliente, "email", "") or "")
+                            .strip()
+                            .lower()
+                        )
                         app_user = None
                         if customer_email:
                             app_user = (
@@ -349,9 +349,13 @@ def run_due_recurrence_notifications(*, db_factory, logger_override=None) -> dic
                                 "product_id": reminder.produto_id,
                             },
                         )
-                        exists = queued or db.query(NotificationQueue.id).filter(
-                            NotificationQueue.idempotency_key == key
-                        ).first() is not None
+                        exists = (
+                            queued
+                            or db.query(NotificationQueue.id)
+                            .filter(NotificationQueue.idempotency_key == key)
+                            .first()
+                            is not None
+                        )
                         if exists:
                             reminder.notificacao_enviada = True
                             reminder.data_notificacao_enviada = datetime.utcnow()

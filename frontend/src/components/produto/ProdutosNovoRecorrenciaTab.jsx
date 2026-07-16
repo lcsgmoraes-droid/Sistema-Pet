@@ -170,7 +170,9 @@ export default function ProdutosNovoRecorrenciaTab({
                 </p>
                 <p>✓ Após a compra, um novo lembrete será criado automaticamente</p>
                 {!formData.numero_doses && (
-                  <p>✓ Com histórico suficiente, o ciclo será ajustado ao consumo real do cliente</p>
+                  <p>
+                    ✓ Com histórico suficiente, o ciclo será ajustado ao consumo real do cliente
+                  </p>
                 )}
                 {formData.especie_compativel !== "both" && (
                   <p className="mt-2 text-purple-800">

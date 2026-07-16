@@ -66,9 +66,7 @@ def upgrade():
 
 
 def downgrade():
-    op.drop_index(
-        "ix_lembretes_tenant_cliente_produto_status", table_name="lembretes"
-    )
+    op.drop_index("ix_lembretes_tenant_cliente_produto_status", table_name="lembretes")
     op.drop_index("ix_lembretes_tenant_status_notificacao", table_name="lembretes")
     op.alter_column(
         "lembretes",

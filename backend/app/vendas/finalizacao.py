@@ -579,6 +579,7 @@ def finalizar_venda(
                 "comissoes_geradas": False,  # Será processado na rota
                 "lembretes_criados": len(recurrence_result["created"]),
                 "lembretes_concluidos": len(recurrence_result["completed"]),
+                "lembretes": recurrence_result,
             },
         }
 

@@ -1,7 +1,6 @@
 """Rota de finalizacao de vendas e pos-processamentos imediatos."""
 
 import logging
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -180,6 +179,9 @@ async def finalizar_venda(
     total_pago = (
         sum(float(p.valor) for p in venda.pagamentos) if venda.pagamentos else 0
     )
+    recurrence_result = (resultado.get("pos_commit") or {}).get("lembretes") or {}
+    lembretes_criados = recurrence_result.get("created") or []
+    lembretes_atualizados = recurrence_result.get("completed") or []
     struct_logger.info(
         event="FINALIZE_COMPLETE",
         message="Venda finalizada completamente (com comissões e lembretes)",

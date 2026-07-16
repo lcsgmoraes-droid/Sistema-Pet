@@ -27,7 +27,7 @@ def test_venda_recurrence_creates_reminder_with_explicit_tenant():
     constructor = source.split("reminder = Lembrete(", 1)[1].split("\n        )", 1)[0]
 
     assert "tenant_id=tenant_id" in constructor
-    assert "metodo_notificacao=\"app\"" in constructor
+    assert 'metodo_notificacao="app"' in constructor
 
 
 def test_all_sale_finalization_paths_delegate_to_recurrence_service_with_tenant():
