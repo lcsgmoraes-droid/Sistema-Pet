@@ -6,8 +6,8 @@ Endpoints para dados consolidados do sistema
 # ruff: noqa: F401
 
 from fastapi import APIRouter, HTTPException, Depends, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import func, and_, or_
 from datetime import datetime, timedelta
 from typing import Optional
 import logging
@@ -18,6 +18,8 @@ from .models import Cliente
 from .vendas_models import Venda, VendaItem
 from .financeiro_models import ContaReceber, ContaPagar
 from .produtos_models import Produto
+from .relatorio_vendas_common import _total_recebido_venda
+from .utils.timezone import now_brasilia
 from .utils.tenant_safe_sql import execute_tenant_safe
 from .dashboard.ponto_equilibrio_routes import (
     router as ponto_equilibrio_router,
@@ -72,6 +74,16 @@ def _dashboard_fetchone(db: Session, sql: str, tenant_id, params=None):
     return execute_tenant_safe(db, sql, params or {}, tenant_id=tenant_id).fetchone()
 
 
+def _intervalo_dias_calendario(periodo_dias: int, agora: datetime | None = None):
+    """Retorna dias civis completos de Brasilia, incluindo o dia atual."""
+    referencia = agora or now_brasilia()
+    inicio_hoje = referencia.replace(hour=0, minute=0, second=0, microsecond=0)
+    quantidade_dias = max(int(periodo_dias or 0), 1)
+    inicio_periodo = inicio_hoje - timedelta(days=quantidade_dias - 1)
+    fim_periodo = inicio_hoje + timedelta(days=1)
+    return inicio_periodo, fim_periodo
+
+
 @router.get("/dashboard/resumo")
 async def obter_resumo_dashboard(
     periodo_dias: int = Query(30, ge=1, le=366),
@@ -83,8 +95,8 @@ async def obter_resumo_dashboard(
     """
     current_user, tenant_id = user_and_tenant
     try:
-        hoje = datetime.now()
-        inicio_periodo = hoje - timedelta(days=periodo_dias)
+        hoje = now_brasilia()
+        inicio_periodo, fim_periodo = _intervalo_dias_calendario(periodo_dias, hoje)
 
         # ========================================
         # 1. SALDO ATUAL (Baseado em vendas pagas)
@@ -167,61 +179,46 @@ async def obter_resumo_dashboard(
         # 4. VENDAS DO PERÍODO
         # ========================================
         vendas_periodo = (
-            db.query(
-                func.count(Venda.id).label("quantidade"),
-                func.sum(Venda.total).label("valor_total"),
-                func.sum(Venda.subtotal).label("faturamento_bruto"),
-            )
+            db.query(Venda)
+            .options(selectinload(Venda.pagamentos))
             .filter(
                 and_(
                     Venda.tenant_id == tenant_id,
                     Venda.data_venda >= inicio_periodo,
-                    Venda.status == "finalizada",
+                    Venda.data_venda < fim_periodo,
+                    or_(Venda.status.is_(None), Venda.status != "cancelada"),
                 )
             )
-            .first()
+            .all()
         )
 
-        total_vendas_periodo = vendas_periodo.valor_total or 0
-        quantidade_vendas_periodo = vendas_periodo.quantidade or 0
-        faturamento_bruto_periodo = vendas_periodo.faturamento_bruto or 0
+        total_vendas_periodo = sum(float(venda.total or 0) for venda in vendas_periodo)
+        quantidade_vendas_periodo = len(vendas_periodo)
+        faturamento_bruto_periodo = sum(
+            float(venda.subtotal or 0) + float(venda.desconto_valor or 0)
+            for venda in vendas_periodo
+        )
+        valor_recebido_periodo = sum(
+            _total_recebido_venda(venda) for venda in vendas_periodo
+        )
 
         # Vendas finalizadas
-        vendas_finalizadas = (
-            db.query(func.count(Venda.id))
-            .filter(
-                and_(
-                    Venda.tenant_id == tenant_id,
-                    Venda.data_venda >= inicio_periodo,
-                    Venda.status == "finalizada",
-                )
-            )
-            .scalar()
-            or 0
+        vendas_finalizadas = sum(
+            1 for venda in vendas_periodo if venda.status == "finalizada"
         )
 
         # ========================================
         # 5. ENTRADAS E SAÍDAS DO PERÍODO (baseado em vendas e contas)
         # ========================================
-        entradas_periodo = (
-            db.query(func.sum(Venda.total))
-            .filter(
-                and_(
-                    Venda.tenant_id == tenant_id,
-                    Venda.data_venda >= inicio_periodo,
-                    Venda.status == "finalizada",
-                )
-            )
-            .scalar()
-            or 0
-        )
+        entradas_periodo = valor_recebido_periodo
 
         saidas_periodo = (
             db.query(func.sum(ContaPagar.valor_pago))
             .filter(
                 and_(
                     ContaPagar.tenant_id == tenant_id,
-                    ContaPagar.data_pagamento >= inicio_periodo,
+                    ContaPagar.data_pagamento >= inicio_periodo.date(),
+                    ContaPagar.data_pagamento < fim_periodo.date(),
                 )
             )
             .scalar()
@@ -237,7 +234,7 @@ async def obter_resumo_dashboard(
         # 7. TICKET MÉDIO
         # ========================================
         ticket_medio = (
-            (total_vendas_periodo / quantidade_vendas_periodo)
+            (faturamento_bruto_periodo / quantidade_vendas_periodo)
             if quantidade_vendas_periodo > 0
             else 0
         )
@@ -259,6 +256,7 @@ async def obter_resumo_dashboard(
                 "quantidade": quantidade_vendas_periodo,
                 "valor_total": round(total_vendas_periodo, 2),
                 "faturamento_bruto": round(float(faturamento_bruto_periodo), 2),
+                "valor_recebido": round(valor_recebido_periodo, 2),
                 "finalizadas": int(vendas_finalizadas),
                 "ticket_medio": round(ticket_medio, 2),
             },
@@ -286,23 +284,20 @@ async def obter_entradas_saidas_por_dia(
     """
     current_user, tenant_id = user_and_tenant
     try:
-        hoje = datetime.now()
-        inicio_periodo = hoje - timedelta(days=periodo_dias)
+        inicio_periodo, fim_periodo = _intervalo_dias_calendario(periodo_dias)
 
         # Buscar vendas por dia
         vendas = (
-            db.query(
-                func.date(Venda.data_venda).label("data"),
-                func.sum(Venda.total).label("total"),
-            )
+            db.query(Venda)
+            .options(selectinload(Venda.pagamentos))
             .filter(
                 and_(
                     Venda.tenant_id == tenant_id,
                     Venda.data_venda >= inicio_periodo,
-                    Venda.status == "finalizada",
+                    Venda.data_venda < fim_periodo,
+                    or_(Venda.status.is_(None), Venda.status != "cancelada"),
                 )
             )
-            .group_by(func.date(Venda.data_venda))
             .all()
         )
 
@@ -315,7 +310,8 @@ async def obter_entradas_saidas_por_dia(
             .filter(
                 and_(
                     ContaPagar.tenant_id == tenant_id,
-                    ContaPagar.data_pagamento >= inicio_periodo,
+                    ContaPagar.data_pagamento >= inicio_periodo.date(),
+                    ContaPagar.data_pagamento < fim_periodo.date(),
                 )
             )
             .group_by(func.date(ContaPagar.data_pagamento))
@@ -326,20 +322,15 @@ async def obter_entradas_saidas_por_dia(
         dados_por_dia = {}
 
         # Inicializar todos os dias com zero
-        for i in range(periodo_dias + 1):
+        for i in range(max(periodo_dias, 1)):
             data = (inicio_periodo + timedelta(days=i)).strftime("%Y-%m-%d")
             dados_por_dia[data] = {"data": data, "entradas": 0, "saidas": 0}
 
         # Preencher com vendas
         for venda in vendas:
-            data_obj = venda[0] if isinstance(venda, tuple) else venda.data
-            data_str = (
-                data_obj.strftime("%Y-%m-%d")
-                if hasattr(data_obj, "strftime")
-                else str(data_obj)
-            )
+            data_str = venda.data_venda.strftime("%Y-%m-%d")
             if data_str in dados_por_dia:
-                dados_por_dia[data_str]["entradas"] = float(venda.total or 0)
+                dados_por_dia[data_str]["entradas"] += _total_recebido_venda(venda)
 
         # Preencher com pagamentos
         for pagamento in pagamentos:
@@ -373,8 +364,7 @@ async def obter_vendas_por_dia(
     """
     current_user, tenant_id = user_and_tenant
     try:
-        hoje = datetime.now()
-        inicio_periodo = hoje - timedelta(days=periodo_dias)
+        inicio_periodo, fim_periodo = _intervalo_dias_calendario(periodo_dias)
 
         # Buscar vendas do período
         vendas = (
@@ -384,7 +374,12 @@ async def obter_vendas_por_dia(
                 func.sum(Venda.total).label("valor_total"),
             )
             .filter(
-                and_(Venda.tenant_id == tenant_id, Venda.data_venda >= inicio_periodo)
+                and_(
+                    Venda.tenant_id == tenant_id,
+                    Venda.data_venda >= inicio_periodo,
+                    Venda.data_venda < fim_periodo,
+                    or_(Venda.status.is_(None), Venda.status != "cancelada"),
+                )
             )
             .group_by(func.date(Venda.data_venda))
             .all()
@@ -394,7 +389,7 @@ async def obter_vendas_por_dia(
         dados_por_dia = {}
 
         # Inicializar todos os dias com zero
-        for i in range(periodo_dias + 1):
+        for i in range(max(periodo_dias, 1)):
             data = (inicio_periodo + timedelta(days=i)).strftime("%Y-%m-%d")
             dados_por_dia[data] = {"data": data, "quantidade": 0, "valor_total": 0}
 
@@ -728,8 +723,7 @@ async def obter_top_produtos(
         from .vendas_models import VendaItem
         from .produtos_models import Produto
 
-        hoje = datetime.now()
-        inicio_periodo = hoje - timedelta(days=periodo_dias)
+        inicio_periodo, fim_periodo = _intervalo_dias_calendario(periodo_dias)
 
         # Buscar produtos mais vendidos
         top_produtos = (
@@ -745,7 +739,8 @@ async def obter_top_produtos(
                     Venda.tenant_id == tenant_id,
                     Produto.tenant_id == tenant_id,
                     Venda.data_venda >= inicio_periodo,
-                    Venda.status == "finalizada",
+                    Venda.data_venda < fim_periodo,
+                    or_(Venda.status.is_(None), Venda.status != "cancelada"),
                 )
             )
             .group_by(Produto.id, Produto.nome)

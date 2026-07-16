@@ -7,6 +7,7 @@ export function createEmptyDashboardSummary() {
       quantidade: 0,
       valor_total: 0,
       faturamento_bruto: 0,
+      valor_recebido: 0,
       finalizadas: 0,
       ticket_medio: 0,
     },

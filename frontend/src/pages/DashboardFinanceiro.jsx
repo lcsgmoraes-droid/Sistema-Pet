@@ -144,7 +144,6 @@ export default function DashboardFinanceiro() {
   const statusIcon = executiveStatus.tone === "positive" ? CheckCircle2 : AlertCircle;
   const StatusIcon = statusIcon;
   const periodLabel = getPeriodLabel(periodDays);
-  const salesTotal = Number(summary?.vendas_periodo?.valor_total || 0);
   const grossSales = Number(summary?.vendas_periodo?.faturamento_bruto || 0);
   const cashResult = Number(summary?.fluxo_periodo?.lucro || 0);
   const displayedBalance = bankBalance ?? Number(summary?.saldo_atual || 0);
@@ -275,13 +274,9 @@ export default function DashboardFinanceiro() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             icon={TrendingUp}
-            label="Faturamento"
-            value={formatMoneyBRL(salesTotal)}
-            detail={
-              grossSales > salesTotal
-                ? `Bruto antes de descontos: ${formatMoneyBRL(grossSales)}`
-                : "Total das vendas finalizadas"
-            }
+            label="Venda bruta"
+            value={formatMoneyBRL(grossSales)}
+            detail="Produtos e serviços antes das deduções"
             tone="violet"
             onClick={() => navigate("/financeiro/vendas")}
           />
@@ -289,15 +284,15 @@ export default function DashboardFinanceiro() {
             icon={cashResult >= 0 ? TrendingUp : TrendingDown}
             label="Resultado de caixa"
             value={formatMoneyBRL(cashResult)}
-            detail={`${formatMoneyBRL(indicators.inflows)} em entradas − ${formatMoneyBRL(indicators.outflows)} em saídas`}
+            detail={`${formatMoneyBRL(indicators.inflows)} recebido − ${formatMoneyBRL(indicators.outflows)} pago`}
             tone={cashResult >= 0 ? "emerald" : "rose"}
             onClick={() => navigate("/financeiro/fluxo-caixa")}
           />
           <MetricCard
             icon={ShoppingBag}
-            label="Vendas finalizadas"
+            label="Vendas no período"
             value={String(summary?.vendas_periodo?.quantidade || 0)}
-            detail="Quantidade concluída no período"
+            detail="Quantidade de vendas não canceladas"
             tone="cyan"
             onClick={() => navigate("/financeiro/vendas")}
           />
@@ -305,7 +300,7 @@ export default function DashboardFinanceiro() {
             icon={BarChart3}
             label="Ticket médio"
             value={formatMoneyBRL(summary?.vendas_periodo?.ticket_medio || 0)}
-            detail="Valor médio por venda finalizada"
+            detail="Venda bruta média por venda"
             tone="blue"
             onClick={() => navigate("/financeiro/vendas")}
           />
