@@ -26,6 +26,8 @@ test("createLayoutMenuItems organiza a rotina e agrupa as telas do Bling", () =>
   const items = createLayoutMenuItems();
   const visiblePaths = items.map((item) => item.path);
   const bling = findMenuItem(items, "/vendas/bling");
+  const pathsBySection = (section) =>
+    items.filter((item) => item.section === section).map((item) => item.path);
 
   assert.deepEqual(visiblePaths.slice(0, 3), ["/dashboard", "/lembretes", "/clientes"]);
   assert.equal(findMenuItem(items, "/dashboard")?.section, "Visão geral");
@@ -34,6 +36,20 @@ test("createLayoutMenuItems organiza a rotina e agrupa as telas do Bling", () =>
     bling?.submenu?.map((item) => item.path),
     ["/vendas/bling-pedidos", "/vendas/bling-monitor"],
   );
+  assert.deepEqual(pathsBySection("Vendas e relacionamento"), [
+    "/pdv",
+    "/ecommerce",
+    "/campanhas",
+    "/vendas/bling",
+    "/entregas",
+  ]);
+  assert.deepEqual(pathsBySection("Gestão"), [
+    "/cadastros",
+    "/rh",
+    "/ia",
+    "/admin",
+    "/configuracoes",
+  ]);
   assert.equal(findMenuItem(items, "/configuracoes")?.section, "Gestão");
 });
 
