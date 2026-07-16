@@ -1,12 +1,20 @@
 # Publicacao do App Mobile - Play Store e App Store
 
-Atualizado em: 2026-06-21
+Atualizado em: 2026-07-16
 
 Este guia organiza o que falta para publicar o app CorePet nas lojas. Ele separa
 o que ja esta pronto no codigo, o que pode ser feito pelo time tecnico e o que
 precisa ser feito pelo titular das contas Apple/Google.
 
 ## Estado atual do app
+
+- Builds enviados para Google Play e App Store; publicação aguardando a revisão
+  e aprovação das lojas.
+- Compras pelo app e pelo ecommerce validadas em produção.
+- Compra real pelo app confirmada no tenant Atacadão Pet: venda `202607010031`,
+  cliente Josiane Moreno, finalizada em 01/07/2026.
+- Push real operacional em produção; campanhas e lembretes de agendamento já
+  possuem envios concluídos.
 
 - Nome publico configurado: `CorePet`.
 - Android package: `br.com.corepet.app`.
@@ -228,11 +236,11 @@ atribuição, esta resposta precisa ser revisada antes de publicar update.
 - [ ] Android instalado via teste interno/fechado e validado em aparelho real.
 - [ ] iOS instalado via TestFlight e validado em iPhone real.
 - [ ] Login de cliente validado.
-- [ ] Compra pelo app validada.
+- [x] Compra pelo app validada.
 - [ ] Pagamento Mercado Pago validado.
 - [ ] Webhook atualizando pedido validado.
 - [ ] Notificacao de compra recebida.
-- [ ] Notificacao de status recebida.
+- [x] Notificacoes push reais validadas em producao.
 - [ ] Historico de pedidos exibindo canal e itens.
 - [ ] Politica de privacidade abre publicamente.
 - [ ] Termos de uso abrem publicamente.
@@ -240,6 +248,9 @@ atribuição, esta resposta precisa ser revisada antes de publicar update.
 - [ ] Descricao, categoria, suporte e classificacao indicativa preenchidos.
 
 ## Pendencias que dependem de acesso externo
+
+Estado em 16/07/2026: submissões realizadas e aguardando aprovação da Apple e
+do Google. Os itens abaixo ficam como referência para renovações ou ajustes.
 
 - Conta Google Play Developer ativa.
 - Conta Apple Developer Program ativa.

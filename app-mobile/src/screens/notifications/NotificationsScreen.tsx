@@ -21,6 +21,7 @@ import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
 import {
   appointmentNotificationTarget,
   campaignNotificationTarget,
+  recurrenceNotificationToProductId,
   stockNotificationToProductId,
 } from '../../utils/notificationNavigation';
 
@@ -78,7 +79,9 @@ export default function NotificationsScreen({ navigation }: any) {
       // A navegacao ainda pode seguir; a leitura sincroniza na proxima abertura.
     }
 
-    const produtoId = stockNotificationToProductId(item.data);
+    const produtoId =
+      recurrenceNotificationToProductId(item.data) ??
+      stockNotificationToProductId(item.data);
     if (produtoId) {
       navigation.navigate('Loja', {
         screen: 'DetalhesProduto',

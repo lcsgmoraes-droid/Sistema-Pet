@@ -589,6 +589,26 @@ def _integrar_venda_ao_motor(
             )
 
             try:
+                from app.services.product_recurrence import (
+                    process_finalized_sale_recurrence,
+                )
+
+                with db.begin_nested():
+                    process_finalized_sale_recurrence(
+                        db,
+                        venda=venda_row,
+                        tenant_id=pedido.tenant_id,
+                        user_id=vendedor.id,
+                    )
+            except Exception as exc:
+                log.error(
+                    "Erro ao processar recorrencia da venda online %s: %s",
+                    venda_row.id,
+                    exc,
+                    exc_info=True,
+                )
+
+            try:
                 from app.services.pendencia_estoque_service import (
                     finalizar_pendencias_por_venda,
                 )

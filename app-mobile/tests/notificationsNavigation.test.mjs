@@ -71,6 +71,30 @@ test("extrai produto da notificacao de estoque por produto_id ou product_id", ()
   );
 });
 
+test("abre o produto certo ao tocar no lembrete de recompra", () => {
+  const { recurrenceNotificationToProductId } = carregarModuloTs(
+    "src/utils/notificationNavigation.ts",
+  );
+
+  assert.equal(
+    recurrenceNotificationToProductId({
+      source: "product_recurrence",
+      kind: "repurchase_due",
+      produto_id: "6089",
+    }),
+    6089,
+  );
+  assert.equal(
+    recurrenceNotificationToProductId({
+      source: "product_recurrence",
+      kind: "repurchase_due",
+      product_id: 1715,
+    }),
+    1715,
+  );
+  assert.equal(recurrenceNotificationToProductId({ source: "campaign" }), null);
+});
+
 test("direciona lembretes de agendamento para a area certa do app", () => {
   const { appointmentNotificationTarget } = carregarModuloTs(
     "src/utils/notificationNavigation.ts",

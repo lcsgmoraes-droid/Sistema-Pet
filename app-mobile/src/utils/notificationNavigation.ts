@@ -29,6 +29,19 @@ export function stockNotificationToProductId(data: NotificationData): number | n
   return toPositiveInteger(data.produto_id) ?? toPositiveInteger(data.product_id);
 }
 
+export function recurrenceNotificationToProductId(
+  data: NotificationData,
+): number | null {
+  if (
+    !data ||
+    data.source !== "product_recurrence" ||
+    data.kind !== "repurchase_due"
+  ) {
+    return null;
+  }
+  return toPositiveInteger(data.produto_id) ?? toPositiveInteger(data.product_id);
+}
+
 export function appointmentNotificationTarget(data: NotificationData): NavigationTarget | null {
   if (!data || data.source !== "appointment_reminder") return null;
 

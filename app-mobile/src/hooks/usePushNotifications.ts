@@ -8,6 +8,7 @@ import { ensurePushNotificationsRegistered } from "../services/pushNotifications
 import {
   appointmentNotificationTarget,
   campaignNotificationTarget,
+  recurrenceNotificationToProductId,
   stockNotificationToProductId,
 } from "../utils/notificationNavigation";
 
@@ -48,7 +49,9 @@ export function usePushNotifications(isAuthenticated: boolean) {
       if (identifier) handledResponses.current.add(identifier);
 
       const data = request.content.data || {};
-      const produtoId = stockNotificationToProductId(data);
+      const produtoId =
+        recurrenceNotificationToProductId(data) ??
+        stockNotificationToProductId(data);
       if (produtoId) {
         navigateWhenReady("Loja", {
           screen: "DetalhesProduto",

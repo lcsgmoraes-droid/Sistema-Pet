@@ -100,6 +100,15 @@ class CampaignScheduler:
             replace_existing=True,
         )
 
+        # Oportunidades de recompra vencidas viram notificacoes no app.
+        self.scheduler.add_job(
+            func=self._tick_product_recurrence,
+            trigger=IntervalTrigger(minutes=15),
+            id="product_recurrence_notification_tick",
+            name="Recorrencia: Lembretes de Recompra no App",
+            replace_existing=True,
+        )
+
         # Job 6: Execução automática de sorteios (diário às 10:00)
         self.scheduler.add_job(
             func=self._auto_execute_drawings,
@@ -133,6 +142,7 @@ class CampaignScheduler:
         logger.info("   - monthly_ranking_recalc: dia 1 às 06:00")
         logger.info("   - campaign_worker_tick: a cada 10s")
         logger.info("   - campaign_notification_tick: a cada 5 min")
+        logger.info("   - product_recurrence_notification_tick: a cada 15 min")
         logger.info("   - auto_drawings: 10:00 diário")
         logger.info("   - destaque_mensal: dia 1 às 08:00")
         logger.info("   - cashback_expiration: 07:00 diário")
@@ -184,6 +194,22 @@ class CampaignScheduler:
                 logger.info("[CampaignScheduler] Notificações: %s", stats)
         except Exception as exc:
             logger.exception("[CampaignScheduler] Erro no notification tick: %s", exc)
+
+    def _tick_product_recurrence(self) -> None:
+        """Transforma lembretes de recompra vencidos em push do app."""
+        try:
+            from app.services.product_recurrence import (
+                run_due_recurrence_notifications,
+            )
+
+            stats = run_due_recurrence_notifications(
+                db_factory=SessionLocal,
+                logger_override=logger,
+            )
+            if stats["due"] > 0:
+                logger.info("[CampaignScheduler] Recorrencia de produtos: %s", stats)
+        except Exception as exc:
+            logger.exception("[CampaignScheduler] Erro no tick de recorrencia: %s", exc)
 
     def _auto_execute_drawings(self) -> None:
         run_auto_execute_drawings(db_factory=SessionLocal, logger=logger)

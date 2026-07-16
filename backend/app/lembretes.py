@@ -37,9 +37,9 @@ class LembreteResponse:
 @router.post("/criar", summary="Criar novo lembrete")
 async def criar_lembrete(
     cliente_id: int,
-    pet_id: int,
     produto_id: int,
     intervalo_dias: int,
+    pet_id: int = None,
     quantidade: float = 1.0,
     observacoes: str = None,
     venda_id: int = None,
@@ -60,11 +60,19 @@ async def criar_lembrete(
         if not cliente:
             raise HTTPException(status_code=404, detail="Cliente não encontrado")
 
-        pet = (
-            db.query(Pet).filter(Pet.id == pet_id, Pet.cliente_id == cliente_id).first()
-        )
-        if not pet:
-            raise HTTPException(status_code=404, detail="Pet não encontrado")
+        pet = None
+        if pet_id is not None:
+            pet = (
+                db.query(Pet)
+                .filter(
+                    Pet.id == pet_id,
+                    Pet.cliente_id == cliente_id,
+                    Pet.tenant_id == tenant_id,
+                )
+                .first()
+            )
+            if not pet:
+                raise HTTPException(status_code=404, detail="Pet não encontrado")
 
         produto = (
             db.query(Produto)
@@ -73,9 +81,18 @@ async def criar_lembrete(
         )
         if not produto:
             raise HTTPException(status_code=404, detail="Produto não encontrado")
+        if intervalo_dias < 1 or intervalo_dias > 365:
+            raise HTTPException(
+                status_code=400,
+                detail="O intervalo deve ficar entre 1 e 365 dias",
+            )
 
         # Validar compatibilidade com espécie
-        if produto.especie_compativel and produto.especie_compativel.lower() != "both":
+        if (
+            pet
+            and produto.especie_compativel
+            and produto.especie_compativel.lower() != "both"
+        ):
             if pet.especie.lower() != produto.especie_compativel.lower():
                 raise HTTPException(
                     status_code=400,
@@ -84,7 +101,11 @@ async def criar_lembrete(
 
         # Calcular data da próxima dose
         data_proxima_dose = datetime.utcnow() + timedelta(days=intervalo_dias)
-        data_notificacao_7_dias = data_proxima_dose - timedelta(days=7)
+        from app.services.product_recurrence import notification_lead_days
+
+        data_notificacao_7_dias = data_proxima_dose - timedelta(
+            days=notification_lead_days(intervalo_dias)
+        )
 
         # Criar histórico inicial
         historico_inicial = [
@@ -99,6 +120,7 @@ async def criar_lembrete(
         # Criar lembrete
         lembrete = Lembrete(
             tenant_id=tenant_id,
+            user_id=current_user.id,
             cliente_id=cliente_id,
             pet_id=pet_id,
             produto_id=produto_id,
@@ -107,6 +129,11 @@ async def criar_lembrete(
             data_proxima_dose=data_proxima_dose,
             data_notificacao_7_dias=data_notificacao_7_dias,
             status="pendente",
+            metodo_notificacao="app",
+            origem_intervalo="configurado",
+            intervalo_estimado_dias=intervalo_dias,
+            confianca_recorrencia=1.0,
+            amostras_recorrencia=0,
             quantidade_recomendada=quantidade,
             preco_estimado=produto.preco_venda,
             observacoes=observacoes,
@@ -164,7 +191,7 @@ async def listar_lembretes_pendentes(
             "lembretes": [
                 {
                     "id": lembrete.id,
-                    "pet_nome": lembrete.pet.nome,
+                    "pet_nome": lembrete.pet.nome if lembrete.pet else None,
                     "produto_nome": lembrete.produto.nome,
                     "data_proxima_dose": lembrete.data_proxima_dose.isoformat(),
                     "dias_restantes": (
@@ -175,6 +202,10 @@ async def listar_lembretes_pendentes(
                     "preco_estimado": lembrete.preco_estimado,
                     "dose_atual": lembrete.dose_atual,
                     "dose_total": lembrete.dose_total,
+                    "origem_intervalo": lembrete.origem_intervalo,
+                    "intervalo_estimado_dias": lembrete.intervalo_estimado_dias,
+                    "confianca_recorrencia": lembrete.confianca_recorrencia,
+                    "amostras_recorrencia": lembrete.amostras_recorrencia,
                 }
                 for lembrete in lembretes
             ],
@@ -217,9 +248,7 @@ async def listar_lembretes_para_notificar(
                     "id": lembrete.id,
                     "cliente_id": lembrete.cliente_id,
                     "cliente_nome": lembrete.cliente.nome,
-                    "telefone": lembrete.cliente.telefone,
-                    "email": lembrete.cliente.email,
-                    "pet_nome": lembrete.pet.nome,
+                    "pet_nome": lembrete.pet.nome if lembrete.pet else None,
                     "produto_nome": lembrete.produto.nome,
                     "data_proxima_dose": lembrete.data_proxima_dose.isoformat(),
                     "metodo_notificacao": lembrete.metodo_notificacao,
@@ -254,6 +283,7 @@ async def marcar_notificacao_enviada(
         lembrete.notificacao_enviada = True
         lembrete.data_notificacao_enviada = datetime.utcnow()
         lembrete.status = "notificado"
+        lembrete.metodo_notificacao = "app"
 
         db.commit()
         db.refresh(lembrete)
@@ -333,10 +363,13 @@ async def renovar_lembrete(
 
         produto = lembrete_anterior.produto
 
-        if not produto.tem_recorrencia or not produto.intervalo_dias:
+        intervalo_dias = (
+            lembrete_anterior.intervalo_estimado_dias or produto.intervalo_dias
+        )
+        if not intervalo_dias:
             raise HTTPException(
                 status_code=400,
-                detail=f"Produto {produto.nome} não tem recorrência configurada",
+                detail=f"Produto {produto.nome} não tem intervalo de recorrência",
             )
 
         # Atualizar histórico de doses
@@ -375,11 +408,16 @@ async def renovar_lembrete(
             }
 
         # Criar novo lembrete para próxima dose
-        data_proxima_dose = datetime.utcnow() + timedelta(days=produto.intervalo_dias)
-        data_notificacao_7_dias = data_proxima_dose - timedelta(days=7)
+        from app.services.product_recurrence import notification_lead_days
+
+        data_proxima_dose = datetime.utcnow() + timedelta(days=intervalo_dias)
+        data_notificacao_7_dias = data_proxima_dose - timedelta(
+            days=notification_lead_days(intervalo_dias)
+        )
 
         novo_lembrete = Lembrete(
             tenant_id=tenant_id,
+            user_id=current_user.id,
             cliente_id=lembrete_anterior.cliente_id,
             pet_id=lembrete_anterior.pet_id,
             produto_id=lembrete_anterior.produto_id,
@@ -387,12 +425,17 @@ async def renovar_lembrete(
             data_proxima_dose=data_proxima_dose,
             data_notificacao_7_dias=data_notificacao_7_dias,
             status="pendente",
+            metodo_notificacao="app",
             quantidade_recomendada=lembrete_anterior.quantidade_recomendada,
             preco_estimado=produto.preco_venda,
             observacoes=lembrete_anterior.observacoes,
             dose_atual=lembrete_anterior.dose_atual + 1,  # Incrementar dose
             dose_total=lembrete_anterior.dose_total,
             historico_doses=json.dumps(historico),
+            origem_intervalo=lembrete_anterior.origem_intervalo or "configurado",
+            intervalo_estimado_dias=intervalo_dias,
+            confianca_recorrencia=lembrete_anterior.confianca_recorrencia,
+            amostras_recorrencia=lembrete_anterior.amostras_recorrencia or 0,
         )
 
         db.add(novo_lembrete)

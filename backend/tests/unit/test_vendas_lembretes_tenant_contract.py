@@ -1,35 +1,41 @@
-import re
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-VENDAS_FINALIZACAO_ROUTES = REPO_ROOT / "app" / "vendas" / "finalizacao_routes.py"
+RECURRENCE_SERVICE = REPO_ROOT / "app" / "services" / "product_recurrence.py"
+VENDAS_FINALIZACAO = REPO_ROOT / "app" / "vendas" / "finalizacao.py"
+ECOMMERCE_WEBHOOK_SALES = REPO_ROOT / "app" / "routes" / "ecommerce_webhooks_sales.py"
 
 
-def _recurrence_block() -> str:
-    source = VENDAS_FINALIZACAO_ROUTES.read_text(encoding="utf-8")
-    start = source.index("SISTEMA DE RECORR")
-    end = source.index("db.commit()", start)
-    return source[start:end]
+def _source(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
 
 
-def test_venda_recurrence_query_scopes_existing_reminder_by_tenant():
-    block = _recurrence_block()
-    query_match = re.search(
-        r"lembrete_existente = \(\s*db\.query\(Lembrete\)\s*\.filter\((.*?)\)\s*\.first\(\)",
-        block,
-        flags=re.DOTALL,
-    )
+def test_venda_recurrence_scopes_reminders_and_history_by_tenant():
+    source = _source(RECURRENCE_SERVICE)
 
-    assert query_match is not None
-    assert "Lembrete.tenant_id == tenant_id" in query_match.group(1)
+    assert "Lembrete.tenant_id == tenant_id" in source
+    assert "Venda.tenant_id == tenant_id" in source
+    assert "Produto.tenant_id == tenant_id" in source
+    assert "Pet.tenant_id == tenant_id" in source
+    assert "Lembrete.venda_id == venda.id" in source
+    assert '"venda_ja_processada"' in source
 
 
-def test_venda_recurrence_creates_new_reminders_with_explicit_tenant():
-    block = _recurrence_block()
-    creation_blocks = block.split("novo_lembrete = Lembrete(")[1:]
+def test_venda_recurrence_creates_reminder_with_explicit_tenant():
+    source = _source(RECURRENCE_SERVICE)
+    constructor = source.split("reminder = Lembrete(", 1)[1].split("\n        )", 1)[0]
 
-    assert len(creation_blocks) == 2
-    for creation_block in creation_blocks:
-        constructor_body = creation_block.split(")", 1)[0]
-        assert "tenant_id=tenant_id" in constructor_body
+    assert "tenant_id=tenant_id" in constructor
+    assert "metodo_notificacao=\"app\"" in constructor
+
+
+def test_all_sale_finalization_paths_delegate_to_recurrence_service_with_tenant():
+    source = _source(VENDAS_FINALIZACAO)
+    ecommerce_source = _source(ECOMMERCE_WEBHOOK_SALES)
+
+    assert "process_finalized_sale_recurrence(" in source
+    assert "tenant_id=tenant_id" in source
+    assert "with db.begin_nested():" in source
+    assert "process_finalized_sale_recurrence(" in ecommerce_source
+    assert "tenant_id=pedido.tenant_id" in ecommerce_source

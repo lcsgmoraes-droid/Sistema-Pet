@@ -164,7 +164,7 @@ export const MODULOS_INFO = {
       "Campanhas de desconto personalizadas",
       "Segmentação de clientes",
       "Relatórios de engajamento",
-      "Envio automático por WhatsApp",
+      "Notificações automáticas pelo app",
     ],
   },
   whatsapp: {
