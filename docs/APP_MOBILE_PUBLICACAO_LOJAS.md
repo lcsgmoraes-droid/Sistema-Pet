@@ -1,6 +1,6 @@
 # Publicacao do App Mobile - Play Store e App Store
 
-Atualizado em: 2026-06-21
+Atualizado em: 2026-07-08
 
 Este guia organiza o que falta para publicar o app CorePet nas lojas. Ele separa
 o que ja esta pronto no codigo, o que pode ser feito pelo time tecnico e o que
@@ -52,12 +52,25 @@ estiver criada e o primeiro app existir.
 5. Subir build iOS para TestFlight depois que a conta Apple Developer,
 App Store Connect e credenciais iOS estiverem liberadas.
 
-6. Publicar updates OTA pelo canal correto quando a mudanca for apenas
-JavaScript/assets e o runtime for compativel:
+6. Publicar updates OTA quando a mudanca for apenas JavaScript/assets e o
+runtime for compativel. Regra operacional: publicar a mesma versao nos canais
+`production` e `preview`, salvo excecao combinada explicitamente com Lucas.
+Isso evita testar um aparelho no canal `preview` enquanto so `production` foi
+atualizado.
 
 ```powershell
 cd app-mobile
-eas update --channel production --platform all --message "ajuste app mobile"
+npx eas-cli@latest update --branch production --message "ajuste app mobile"
+npx eas-cli@latest update --branch preview --message "ajuste app mobile"
+```
+
+Depois, validar que os dois canais apontam para o update esperado:
+
+```powershell
+npx eas-cli@latest update:list --branch production --limit 1 --json --non-interactive
+npx eas-cli@latest update:list --branch preview --limit 1 --json --non-interactive
+npx eas-cli@latest channel:view production --json --non-interactive
+npx eas-cli@latest channel:view preview --json --non-interactive
 ```
 
 ## O que Lucas precisa fazer nas contas

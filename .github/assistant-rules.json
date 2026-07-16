@@ -110,6 +110,17 @@
     "reason": "O codigo do backend fica DENTRO da imagem Docker (nao em volume montado). Um simples docker restart nao aplica mudancas de codigo. So o frontend usa artefato gerado no deploy em runtime/frontend/dist. Sempre reconstruir imagem ao alterar qualquer arquivo em backend/.",
     "never_do": "docker restart petshop-prod-backend como unico comando apos mudancas no codigo backend"
   },
+  "mobile_eas_update_rules": {
+    "production_channel_requires_lucas_authorization": true,
+    "when_publishing_ota": "Quando Lucas autorizar subir uma mudanca do app mobile via EAS OTA, publicar a mesma versao nos canais production e preview, salvo excecao explicitamente combinada com ele.",
+    "required_validation": [
+      "confirmar npx eas-cli@latest update:list --branch production --limit 1",
+      "confirmar npx eas-cli@latest update:list --branch preview --limit 1",
+      "confirmar npx eas-cli@latest channel:view production",
+      "confirmar npx eas-cli@latest channel:view preview"
+    ],
+    "reason": "Alguns aparelhos de teste usam preview. Publicar em apenas um canal faz parecer que a correcao nao subiu no app."
+  },
   "REGRA_ABSOLUTA_DEPLOY_PRODUCAO": {
     "obrigatorio": true,
     "regra": "NUNCA fazer deploy em producao (git push + SSH no servidor) sem PERGUNTAR E RECEBER autorizacao explicita do Lucas ANTES",

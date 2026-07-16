@@ -25,6 +25,9 @@ feita nos momentos certos, sem virar repeticao a cada micro-etapa.
 
 - Estas regras nao autorizam deploy de producao.
 - Antes de qualquer `git push origin main` ou comando no servidor de producao, pedir autorizacao explicita ao Lucas em portugues simples.
+- Em deploy/update do app mobile via EAS, quando Lucas autorizar subir a
+  mudanca mobile, publicar e validar a mesma versao nos canais `production` e
+  `preview`, salvo excecao combinada explicitamente com Lucas.
 - Seguir tambem `.github/assistant-rules.json`, `.github/copilot-instructions.md` e `docs/FLUXO_UNICO_DEV_PROD.md`.
 
 ## Padrao de trabalho
