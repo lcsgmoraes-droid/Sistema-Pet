@@ -9,7 +9,7 @@ export const LAYOUT_MENU_GROUPS = [
   },
   {
     label: "Vendas e relacionamento",
-    paths: ["/pdv", "/campanhas", "/ecommerce", "/vendas/bling", "/entregas"],
+    paths: ["/pdv", "/ecommerce", "/campanhas", "/vendas/bling", "/entregas"],
   },
   {
     label: "Estoque e suprimentos",
@@ -21,7 +21,7 @@ export const LAYOUT_MENU_GROUPS = [
   },
   {
     label: "Gestão",
-    paths: ["/ia", "/rh", "/cadastros", "/admin", "/configuracoes"],
+    paths: ["/cadastros", "/rh", "/ia", "/admin", "/configuracoes"],
   },
 ];
 
