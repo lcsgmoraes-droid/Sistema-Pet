@@ -311,11 +311,17 @@ fi
 mark_step "validar_release_gate"
 audit_step "Validando checks obrigatorios do commit de producao"
 log "Validando gate do commit ${HEAD_AFTER:0:8} no GitHub"
-python3 "$APP_DIR/scripts/validate_release_gate.py" \
+if ! python3 "$APP_DIR/scripts/validate_release_gate.py" \
   --repository "$RELEASE_GATE_GITHUB_REPOSITORY" \
   --commit "$HEAD_AFTER" \
-  --output "$APP_DIR/$RELEASE_STATUS_NEXT_PATH" \
-  || fail "O commit de producao nao possui todos os checks obrigatorios aprovados."
+  --output "$APP_DIR/$RELEASE_STATUS_NEXT_PATH"; then
+  mark_step "restaurar_codigo_apos_gate"
+  audit_step "Restaurando commit anterior apos bloqueio do gate"
+  log "Gate bloqueou o deploy; restaurando codigo para ${HEAD_BEFORE:0:8}"
+  git reset --hard "$HEAD_BEFORE" \
+    || fail "Gate falhou e o commit anterior nao pode ser restaurado."
+  fail "O commit de producao nao possui todos os checks obrigatorios aprovados."
+fi
 
 changed_files="$(git diff --name-only "$HEAD_BEFORE" "$HEAD_AFTER" || true)"
 
