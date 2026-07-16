@@ -17,6 +17,18 @@ def test_deploy_reexecutes_new_script_after_git_update_once():
     )
 
 
+def test_deploy_restores_previous_commit_when_release_gate_blocks():
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+
+    gate = 'if ! python3 "$APP_DIR/scripts/validate_release_gate.py"'
+    restore = 'git reset --hard "$HEAD_BEFORE"'
+    runtime_diff = 'changed_files="$(git diff --name-only "$HEAD_BEFORE" "$HEAD_AFTER"'
+
+    assert gate in script
+    assert restore in script
+    assert script.index(gate) < script.index(restore) < script.index(runtime_diff)
+
+
 def test_deploy_reexec_preserves_original_release_context():
     script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
 
