@@ -8,6 +8,7 @@ test("createLayoutMenuItems preserva itens principais do menu", () => {
   const items = createLayoutMenuItems();
 
   assert.equal(findMenuItem(items, "/dashboard")?.permission, "relatorios.gerencial");
+  assert.equal(findMenuItem(items, "/dashboard-gerencial"), undefined);
   assert.equal(findMenuItem(items, "/pdv")?.permission, "vendas.criar");
   assert.equal(
     findMenuItem(items, "/financeiro")?.submenu?.some((item) => item.path === "/financeiro/vendas"),
@@ -19,6 +20,21 @@ test("createLayoutMenuItems preserva itens principais do menu", () => {
     ),
     true,
   );
+});
+
+test("createLayoutMenuItems organiza a rotina e agrupa as telas do Bling", () => {
+  const items = createLayoutMenuItems();
+  const visiblePaths = items.map((item) => item.path);
+  const bling = findMenuItem(items, "/vendas/bling");
+
+  assert.deepEqual(visiblePaths.slice(0, 3), ["/dashboard", "/lembretes", "/clientes"]);
+  assert.equal(findMenuItem(items, "/dashboard")?.section, "Visão geral");
+  assert.equal(findMenuItem(items, "/pdv")?.section, "Vendas e relacionamento");
+  assert.deepEqual(
+    bling?.submenu?.map((item) => item.path),
+    ["/vendas/bling-pedidos", "/vendas/bling-monitor"],
+  );
+  assert.equal(findMenuItem(items, "/configuracoes")?.section, "Gestão");
 });
 
 test("createLayoutMenuItems aplica badge de lembretes conforme contador", () => {

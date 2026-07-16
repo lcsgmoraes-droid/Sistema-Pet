@@ -102,8 +102,24 @@ export default function SidebarMenu({
   return (
     <nav className="flex-1 py-2 md:py-4 overflow-y-auto overflow-x-hidden">
       {Array.isArray(menuItems) &&
-        menuItems.map((item) => (
+        menuItems.map((item, index) => (
           <div key={item.path}>
+            {item.section !== menuItems[index - 1]?.section && (
+              <div
+                className={
+                  sidebarOpen
+                    ? "px-4 pb-1 pt-4"
+                    : "mx-4 my-3 border-t border-[#d8eee9] dark:border-slate-800"
+                }
+                aria-label={sidebarOpen ? item.section : undefined}
+              >
+                {sidebarOpen && (
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#4b7f7b] dark:text-slate-500">
+                    {item.section}
+                  </p>
+                )}
+              </div>
+            )}
             {item.submenu ? (
               <>
                 <button

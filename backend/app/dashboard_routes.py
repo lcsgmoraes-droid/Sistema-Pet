@@ -74,7 +74,7 @@ def _dashboard_fetchone(db: Session, sql: str, tenant_id, params=None):
 
 @router.get("/dashboard/resumo")
 async def obter_resumo_dashboard(
-    periodo_dias: int = 30,
+    periodo_dias: int = Query(30, ge=1, le=366),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -173,7 +173,11 @@ async def obter_resumo_dashboard(
                 func.sum(Venda.subtotal).label("faturamento_bruto"),
             )
             .filter(
-                and_(Venda.tenant_id == tenant_id, Venda.data_venda >= inicio_periodo)
+                and_(
+                    Venda.tenant_id == tenant_id,
+                    Venda.data_venda >= inicio_periodo,
+                    Venda.status == "finalizada",
+                )
             )
             .first()
         )
@@ -184,7 +188,7 @@ async def obter_resumo_dashboard(
 
         # Vendas finalizadas
         vendas_finalizadas = (
-            db.query(func.sum(Venda.total))
+            db.query(func.count(Venda.id))
             .filter(
                 and_(
                     Venda.tenant_id == tenant_id,
@@ -255,7 +259,7 @@ async def obter_resumo_dashboard(
                 "quantidade": quantidade_vendas_periodo,
                 "valor_total": round(total_vendas_periodo, 2),
                 "faturamento_bruto": round(float(faturamento_bruto_periodo), 2),
-                "finalizadas": round(vendas_finalizadas, 2),
+                "finalizadas": int(vendas_finalizadas),
                 "ticket_medio": round(ticket_medio, 2),
             },
             "fluxo_periodo": {
@@ -741,6 +745,7 @@ async def obter_top_produtos(
                     Venda.tenant_id == tenant_id,
                     Produto.tenant_id == tenant_id,
                     Venda.data_venda >= inicio_periodo,
+                    Venda.status == "finalizada",
                 )
             )
             .group_by(Produto.id, Produto.nome)

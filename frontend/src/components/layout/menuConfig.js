@@ -1,7 +1,5 @@
 import { PawPrint, Scissors, Stethoscope } from "lucide-react";
 import {
-  FiActivity,
-  FiBarChart2,
   FiBell,
   FiBox,
   FiBriefcase,
@@ -21,9 +19,10 @@ import {
   FiTruck,
   FiUsers,
 } from "react-icons/fi";
+import { applyLayoutMenuStructure } from "./menuStructure.js";
 
 export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
-  return [
+  const items = [
     {
       path: "/dashboard",
       icon: FiHome,
@@ -31,14 +30,6 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
       label: "Dashboard",
       permission: "relatorios.gerencial",
     }, // Precisa de permissão
-    {
-      path: "/dashboard-gerencial",
-      icon: FiBarChart2,
-      iconKey: "bar-chart",
-      label: "Dashboard Gerencial",
-      highlight: true,
-      permission: "relatorios.gerencial",
-    },
     {
       path: "/clientes",
       icon: FiUsers,
@@ -292,20 +283,24 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
       ],
     },
     {
-      path: "/vendas/bling-pedidos",
+      path: "/vendas/bling",
       icon: FiShoppingBag,
       iconKey: "shopping-bag",
-      label: "Pedidos Bling",
+      label: "Bling",
       modulo: "bling",
       permission: "compras.sincronizacao_bling",
-    },
-    {
-      path: "/vendas/bling-monitor",
-      icon: FiActivity,
-      iconKey: "activity",
-      label: "Monitor Bling",
-      modulo: "bling",
-      permission: "compras.sincronizacao_bling",
+      submenu: [
+        {
+          path: "/vendas/bling-pedidos",
+          label: "Pedidos Bling",
+          permission: "compras.sincronizacao_bling",
+        },
+        {
+          path: "/vendas/bling-monitor",
+          label: "Monitor da Integração",
+          permission: "compras.sincronizacao_bling",
+        },
+      ],
     },
     {
       path: "/notas-fiscais/saida",
@@ -665,4 +660,6 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
       ],
     },
   ];
+
+  return applyLayoutMenuStructure(items);
 }

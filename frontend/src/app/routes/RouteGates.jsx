@@ -6,7 +6,7 @@ import { isMobileViewport, isVeterinarioProfile } from "../../utils/veterinarioP
 export function DefaultProtectedHomeRedirect() {
   const { user } = useAuth();
   const destino =
-    isMobileViewport() && isVeterinarioProfile(user) ? "/veterinario/agenda" : "/lembretes";
+    isMobileViewport() && isVeterinarioProfile(user) ? "/veterinario/agenda" : "/dashboard";
   return <Navigate to={destino} replace />;
 }
 

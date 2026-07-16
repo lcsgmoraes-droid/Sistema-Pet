@@ -20,7 +20,7 @@ export const tourDashboard = [
     popover: {
       title: "📊 Resumo do Negócio",
       description:
-        "Aqui ficam os números mais importantes: total de vendas, clientes ativos, produtos cadastrados e faturamento do período.",
+        "Aqui ficam faturamento, resultado de caixa, vendas finalizadas e ticket médio do período escolhido.",
       side: "bottom",
     },
   },
@@ -29,25 +29,25 @@ export const tourDashboard = [
     popover: {
       title: "💰 Resumo Financeiro",
       description:
-        "Veja o faturamento bruto, as despesas e o lucro líquido. Os valores são atualizados conforme você registra vendas e lançamentos.",
+        "A posição atual mostra saldo, valores a receber e a pagar. Ao lado ficam as pendências que exigem ação.",
       side: "top",
     },
   },
   {
     element: "#tour-composicao",
     popover: {
-      title: "📈 Composição do Faturamento",
+      title: "📈 Movimento e produtos",
       description:
-        "Esta barra mostra visualmente quanto do faturamento bruto virou lucro, quanto foi gasto em despesas e quanto foi para impostos.",
+        "Compare entradas e saídas ao longo dos dias e veja quais produtos mais contribuíram para as vendas.",
       side: "top",
     },
   },
   {
     element: "#tour-acoes-rapidas",
     popover: {
-      title: "⚡ Ações Rápidas",
+      title: "👥 Clientes e contas vencidas",
       description:
-        "Atalhos para as tarefas mais comuns: iniciar uma venda, cadastrar um cliente ou adicionar um produto.",
+        "Acompanhe a qualidade da base de clientes e comece pelas contas vencidas mais antigas.",
       side: "left",
     },
   },
