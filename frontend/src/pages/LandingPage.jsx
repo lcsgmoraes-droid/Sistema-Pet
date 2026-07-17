@@ -147,30 +147,6 @@ const screenHighlights = [
   },
 ];
 
-const featureVideos = [
-  {
-    eyebrow: "Recorrência inteligente",
-    title: "A próxima compra antes de o cliente esquecer",
-    text: "O sistema identifica a oportunidade e prepara a comunicação automática pelo app.",
-    source: "/marketing/corepet-feature-recorrencia.mp4",
-    poster: "/marketing/product-shots/erp-recorrencia.png",
-  },
-  {
-    eyebrow: "Lista de espera",
-    title: "O estoque voltou. O cliente fica sabendo.",
-    text: "O interesse registrado no PDV se transforma em uma nova oportunidade de venda.",
-    source: "/marketing/corepet-feature-lista-espera.mp4",
-    poster: "/marketing/product-shots/pdv-lista-espera.png",
-  },
-  {
-    eyebrow: "Resultado venda por venda",
-    title: "Lucro, custos e margem no instante da venda",
-    text: "Uma visão objetiva para decidir com números reais, não apenas com faturamento.",
-    source: "/marketing/corepet-feature-resultado.mp4",
-    poster: "/marketing/product-shots/erp-resultado.png",
-  },
-];
-
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -233,9 +209,6 @@ export default function LandingPage() {
             </a>
             <a href="#sistema-por-dentro" className="transition hover:text-white">
               Por dentro
-            </a>
-            <a href="#videos-funcionalidades" className="transition hover:text-white">
-              Vídeos
             </a>
             <a href="#integracao" className="transition hover:text-white">
               Integração
@@ -432,7 +405,41 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="mt-12 grid gap-6 lg:grid-cols-3">
+            <article className="mt-12 grid overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-2xl shadow-slate-900/20 lg:grid-cols-[0.72fr_1.28fr]">
+              <div className="flex flex-col justify-center p-7 sm:p-10 lg:p-12">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-300">
+                  Demonstração narrada · 21 segundos
+                </p>
+                <h3 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">
+                  Cada venda mostra o que entrou, o que custou e o que virou lucro.
+                </h3>
+                <p className="mt-5 text-lg leading-8 text-slate-300">
+                  Veja uma tela real do CorePet explicada de forma direta, com os números que o
+                  gestor precisa para decidir em tempo real.
+                </p>
+                <div className="mt-7 flex items-center gap-3 text-sm font-bold text-emerald-200">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400 text-slate-950">
+                    <Play className="h-4 w-4 fill-current" />
+                  </span>
+                  Aperte o play e ouça com som
+                </div>
+              </div>
+
+              <div className="flex items-center bg-black p-3 sm:p-5">
+                <video
+                  className="aspect-video w-full rounded-2xl bg-black object-contain shadow-2xl"
+                  controls
+                  playsInline
+                  preload="metadata"
+                  poster="/marketing/corepet-resultado-venda-por-venda-poster.jpg"
+                >
+                  <source src="/marketing/corepet-resultado-venda-por-venda.mp4" type="video/mp4" />
+                  Seu navegador não suporta vídeo HTML5.
+                </video>
+              </div>
+            </article>
+
+            <div className="mt-8 grid gap-6 lg:grid-cols-3">
               {screenHighlights.map((screen) => (
                 <article
                   key={screen.title}
@@ -455,56 +462,6 @@ export default function LandingPage() {
                     </p>
                     <h3 className="mt-2 text-2xl font-black tracking-tight">{screen.title}</h3>
                     <p className="mt-3 leading-7 text-slate-600">{screen.text}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="videos-funcionalidades" className="scroll-mt-16 bg-slate-950 py-20 text-white">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-3xl">
-                <p className="text-sm font-black uppercase tracking-[0.16em] text-emerald-300">
-                  CorePet em poucos segundos
-                </p>
-                <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">
-                  Vídeos curtos para entender os diferenciais rapidamente.
-                </h2>
-              </div>
-              <p className="max-w-md text-lg leading-8 text-slate-300">
-                Demonstrações objetivas, com foco nas automações e nas telas que mudam a rotina da
-                loja.
-              </p>
-            </div>
-
-            <div className="mt-12 grid gap-6 lg:grid-cols-3">
-              {featureVideos.map((video) => (
-                <article
-                  key={video.title}
-                  className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl shadow-black/20"
-                >
-                  <div className="aspect-video overflow-hidden bg-slate-900">
-                    <video
-                      className="h-full w-full object-cover"
-                      autoPlay
-                      muted
-                      loop
-                      controls
-                      playsInline
-                      preload="metadata"
-                      poster={video.poster}
-                    >
-                      <source src={video.source} type="video/mp4" />
-                    </video>
-                  </div>
-                  <div className="p-6">
-                    <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-300">
-                      {video.eyebrow}
-                    </p>
-                    <h3 className="mt-2 text-xl font-extrabold">{video.title}</h3>
-                    <p className="mt-3 leading-7 text-slate-300">{video.text}</p>
                   </div>
                 </article>
               ))}

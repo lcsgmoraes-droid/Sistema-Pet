@@ -34,20 +34,6 @@ const horizontalOutput = join(
 );
 const posterOutput = join(outputDir, "corepet-vende-de-novo-poster.jpg");
 const voiceoverPath = join(outputDir, "corepet-vende-de-novo-narracao.mp3");
-const featureOutputs = [
-  {
-    sceneIndex: 2,
-    output: join(outputDir, "corepet-feature-recorrencia.mp4"),
-  },
-  {
-    sceneIndex: 3,
-    output: join(outputDir, "corepet-feature-lista-espera.mp4"),
-  },
-  {
-    sceneIndex: 5,
-    output: join(outputDir, "corepet-feature-resultado.mp4"),
-  },
-];
 const demoCaptureDir = join(root, "runtime", "marketing-captures");
 const productShotDir = join(
   root,
@@ -398,32 +384,6 @@ function renderVideo(images, outputPath, width, height) {
   }
 }
 
-function renderFeatureVideo(imagePath, outputPath) {
-  run(
-    ffmpeg,
-    [
-      "-y",
-      "-i",
-      imagePath,
-      "-vf",
-      "scale=1920:1080,zoompan=z='min(zoom+0.00045,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=180:s=1280x720:fps=30,format=yuv420p",
-      "-frames:v",
-      "180",
-      "-an",
-      "-c:v",
-      "libx264",
-      "-preset",
-      "medium",
-      "-crf",
-      "20",
-      "-movflags",
-      "+faststart",
-      outputPath,
-    ],
-    `Renderização do vídeo curto ${outputPath}`,
-  );
-}
-
 if (!existsSync(chrome)) throw new Error(`Chrome não encontrado: ${chrome}`);
 if (!existsSync(logoPath)) throw new Error(`Logo não encontrado: ${logoPath}`);
 
@@ -441,10 +401,6 @@ const horizontalScenes = scenes.map((scene, index) =>
 renderVideo(verticalScenes, verticalOutput, 1080, 1920);
 renderVideo(horizontalScenes, horizontalOutput, 1920, 1080);
 
-featureOutputs.forEach(({ sceneIndex, output }) => {
-  renderFeatureVideo(horizontalScenes[sceneIndex], output);
-});
-
 run(
   ffmpeg,
   ["-y", "-i", verticalScenes[1], "-q:v", "2", posterOutput],
@@ -460,7 +416,6 @@ console.log(
       vertical: verticalOutput,
       horizontal: horizontalOutput,
       poster: posterOutput,
-      featureVideos: featureOutputs.map(({ output }) => output),
       durationSeconds:
         durations.reduce((sum, value) => sum + value, 0) -
         transitionDuration * (durations.length - 1),
