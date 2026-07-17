@@ -180,13 +180,13 @@ const systemDemoVideos = [
   },
   {
     id: "resultado",
-    eyebrow: "Gestão em tempo real · 26 segundos",
+    eyebrow: "Gestão em tempo real · 27 segundos",
     title: "Cada venda mostra o que entrou, o que custou e o que virou lucro.",
     text: "Abra a venda, veja os produtos e acompanhe custos, lucro e margem de cada item em tempo real.",
     source: "/marketing/corepet-resultado-venda-por-venda.mp4",
     poster: "/marketing/corepet-resultado-venda-por-venda-poster.jpg",
     shortTitle: "Resultado da venda",
-    duration: "0:26",
+    duration: "0:27",
   },
   {
     id: "campanhas",
@@ -200,13 +200,13 @@ const systemDemoVideos = [
   },
   {
     id: "entregas",
-    eyebrow: "Rotas e custos · 29 segundos",
+    eyebrow: "Rotas e custos · 30 segundos",
     title: "Controle a entrega sem perder margem no caminho.",
     text: "Rotas, entregadores, rastreio, custos e repasses ficam reunidos na mesma operação.",
     source: "/marketing/corepet-demo-entregas-rotas-custos.mp4",
     poster: "/marketing/corepet-demo-entregas-rotas-custos-poster.jpg",
     shortTitle: "Entregas e custos",
-    duration: "0:29",
+    duration: "0:30",
   },
 ];
 

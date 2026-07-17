@@ -187,13 +187,15 @@ const videos = [
         title: "Abra a venda e veja os produtos.",
         body: "O resultado também aparece por item, com custo, lucro e margem.",
         accent: "#34d399",
+        fit: "contain",
+        maskSourceLogo: true,
         copyStyle: "top:90px;bottom:auto;width:690px",
         focus: {
-          left: 4,
-          top: 64.5,
-          width: 92,
-          height: 14,
-          label: "Produtos e resultado por item",
+          left: 2,
+          top: 56.5,
+          width: 96,
+          height: 20,
+          label: "Venda aberta: produtos e resultado por item",
         },
       },
     ],
@@ -265,13 +267,15 @@ const videos = [
         title: "Saiba quem está na rua e qual é a próxima entrega.",
         body: "Distância, tempo previsto, endereço e status ficam na mesma visão.",
         accent: "#3b82f6",
-        copyStyle: "bottom:55px;width:760px",
+        fit: "contain",
+        maskSourceLogo: true,
+        copyStyle: "top:90px;bottom:auto;width:760px",
         focus: {
           left: 1,
-          top: 23,
+          top: 54.8,
           width: 98,
-          height: 30,
-          label: "Entrega em andamento",
+          height: 30.5,
+          label: "Detalhes da rota em andamento",
         },
       },
       {
@@ -336,7 +340,8 @@ function focusBlock(focus, accent) {
 
 function screenScene(scene) {
   return `<div class="screen-wrap">
-    <img class="screen-image" src="${assetUrl(scene.image)}" alt="" style="transform:scale(${scene.zoom || 1});transform-origin:${scene.origin || "center"}">
+    <img class="screen-image" src="${assetUrl(scene.image)}" alt="" style="object-fit:${scene.fit || "cover"};transform:scale(${scene.zoom || 1});transform-origin:${scene.origin || "center"}">
+    ${scene.maskSourceLogo ? '<div class="source-corner-mask"></div>' : ""}
     ${focusBlock(scene.focus, scene.accent)}
   </div>${copyBlock(scene)}`;
 }
@@ -390,6 +395,7 @@ function sceneHtml(scene) {
     .brand{position:absolute;z-index:20;top:30px;left:42px;height:54px;display:flex;align-items:center;gap:14px;padding:8px 18px 8px 9px;border:1px solid rgba(255,255,255,.16);border-radius:17px;background:rgba(2,6,23,.78);box-shadow:0 14px 40px rgba(0,0,0,.25)}
     .brand img{width:38px;height:38px;border-radius:10px}.brand strong{font-size:24px;letter-spacing:-.4px}
     .screen-wrap{position:absolute;inset:0;background:#f8fafc;overflow:hidden}.screen-image{width:100%;height:100%;object-fit:cover;transition:none}
+    .source-corner-mask{position:absolute;z-index:3;left:0;top:0;width:64px;height:92px;background:#f8fafc}
     .screen-wrap:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(2,6,23,.05) 50%,rgba(2,6,23,.78) 100%)}
     .copy-card{position:absolute;z-index:10;left:54px;bottom:48px;width:min(860px,72vw);padding:25px 30px 26px;border:1px solid rgba(255,255,255,.18);border-left:7px solid var(--accent);border-radius:22px;background:rgba(2,6,23,.88);box-shadow:0 22px 70px rgba(0,0,0,.34);backdrop-filter:blur(12px)}
     .eyebrow{font-size:18px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
@@ -488,7 +494,7 @@ function generateVoice(text, outputPath) {
   );
 }
 
-function renderVideo(video, images, audioPath) {
+function renderVideo(video, images, audioPath, paddingSeconds = 1.1) {
   const outputPath = join(
     publicDir,
     video.outputName || `corepet-demo-${video.slug}.mp4`,
@@ -498,7 +504,7 @@ function renderVideo(video, images, audioPath) {
     video.posterName || `corepet-demo-${video.slug}-poster.jpg`,
   );
   const transition = 0.45;
-  const targetDuration = audioDuration(audioPath) + 1.1;
+  const targetDuration = audioDuration(audioPath) + paddingSeconds;
   const sceneDuration =
     (targetDuration + transition * (images.length - 1)) / images.length;
   const inputs = images.flatMap((image) => [
@@ -587,14 +593,47 @@ rmSync(workDir, { recursive: true, force: true });
 mkdirSync(workDir, { recursive: true });
 mkdirSync(publicDir, { recursive: true });
 
+const requestedSlugs = new Set(process.argv.slice(2));
+const selectedVideos = requestedSlugs.size
+  ? videos.filter((video) => requestedSlugs.has(video.slug))
+  : videos;
+
+if (requestedSlugs.size && selectedVideos.length !== requestedSlugs.size) {
+  const foundSlugs = new Set(selectedVideos.map((video) => video.slug));
+  const missingSlugs = [...requestedSlugs].filter((slug) => !foundSlugs.has(slug));
+  throw new Error(`Vídeo(s) não encontrado(s): ${missingSlugs.join(", ")}`);
+}
+
 const results = [];
-for (const video of videos) {
-  const audioPath = join(workDir, `${video.slug}-narracao.mp3`);
-  generateVoice(video.voice, audioPath);
+for (const video of selectedVideos) {
+  const reuseAudio = process.env.COREPET_REUSE_AUDIO === "1";
+  const audioPath = join(
+    workDir,
+    `${video.slug}-narracao.${reuseAudio ? "m4a" : "mp3"}`,
+  );
+  if (reuseAudio) {
+    const currentVideoPath = join(
+      publicDir,
+      video.outputName || `corepet-demo-${video.slug}.mp4`,
+    );
+    if (!existsSync(currentVideoPath)) {
+      throw new Error(`Vídeo atual não encontrado para reutilizar áudio: ${currentVideoPath}`);
+    }
+    run(
+      ffmpeg,
+      ["-y", "-i", currentVideoPath, "-vn", "-c:a", "copy", audioPath],
+      `Extração do áudio atual de ${video.slug}`,
+    );
+  } else {
+    generateVoice(video.voice, audioPath);
+  }
   const images = video.scenes.map((scene, index) =>
     captureScene(scene, video.slug, index),
   );
-  results.push({ slug: video.slug, ...renderVideo(video, images, audioPath) });
+  results.push({
+    slug: video.slug,
+    ...renderVideo(video, images, audioPath, reuseAudio ? 0 : 1.1),
+  });
 }
 
 console.log(JSON.stringify({ ok: true, videos: results }, null, 2));
