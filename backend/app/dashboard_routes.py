@@ -19,6 +19,7 @@ from .vendas_models import Venda, VendaItem
 from .financeiro_models import ContaReceber, ContaPagar
 from .produtos_models import Produto
 from .relatorio_vendas_common import _total_recebido_venda
+from .utils.serialization import safe_decimal_to_float_zero
 from .utils.timezone import now_brasilia
 from .utils.tenant_safe_sql import execute_tenant_safe
 from .dashboard.ponto_equilibrio_routes import (
@@ -101,18 +102,16 @@ async def obter_resumo_dashboard(
         # ========================================
         # 1. SALDO ATUAL (Baseado em vendas pagas)
         # ========================================
-        vendas_pagas = (
+        vendas_pagas = safe_decimal_to_float_zero(
             db.query(func.sum(Venda.total))
             .filter(and_(Venda.tenant_id == tenant_id, Venda.status == "finalizada"))
             .scalar()
-            or 0
         )
 
-        contas_pagas_total = (
+        contas_pagas_total = safe_decimal_to_float_zero(
             db.query(func.sum(ContaPagar.valor_pago))
             .filter(ContaPagar.tenant_id == tenant_id)
             .scalar()
-            or 0
         )
 
         saldo_atual = vendas_pagas - contas_pagas_total
@@ -120,7 +119,7 @@ async def obter_resumo_dashboard(
         # ========================================
         # 2. CONTAS A RECEBER
         # ========================================
-        contas_receber_total = (
+        contas_receber_total = safe_decimal_to_float_zero(
             db.query(func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido))
             .filter(
                 and_(
@@ -129,11 +128,10 @@ async def obter_resumo_dashboard(
                 )
             )
             .scalar()
-            or 0
         )
 
         # Contas vencidas a receber
-        contas_receber_vencidas = (
+        contas_receber_vencidas = safe_decimal_to_float_zero(
             db.query(func.sum(ContaReceber.valor_final - ContaReceber.valor_recebido))
             .filter(
                 and_(
@@ -143,13 +141,12 @@ async def obter_resumo_dashboard(
                 )
             )
             .scalar()
-            or 0
         )
 
         # ========================================
         # 3. CONTAS A PAGAR
         # ========================================
-        contas_pagar_total = (
+        contas_pagar_total = safe_decimal_to_float_zero(
             db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
             .filter(
                 and_(
@@ -158,11 +155,10 @@ async def obter_resumo_dashboard(
                 )
             )
             .scalar()
-            or 0
         )
 
         # Contas vencidas a pagar
-        contas_pagar_vencidas = (
+        contas_pagar_vencidas = safe_decimal_to_float_zero(
             db.query(func.sum(ContaPagar.valor_final - ContaPagar.valor_pago))
             .filter(
                 and_(
@@ -172,7 +168,6 @@ async def obter_resumo_dashboard(
                 )
             )
             .scalar()
-            or 0
         )
 
         # ========================================
@@ -212,7 +207,7 @@ async def obter_resumo_dashboard(
         # ========================================
         entradas_periodo = valor_recebido_periodo
 
-        saidas_periodo = (
+        saidas_periodo = safe_decimal_to_float_zero(
             db.query(func.sum(ContaPagar.valor_pago))
             .filter(
                 and_(
@@ -222,7 +217,6 @@ async def obter_resumo_dashboard(
                 )
             )
             .scalar()
-            or 0
         )
 
         # ========================================
