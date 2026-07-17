@@ -10,6 +10,7 @@ export default function ContasPagarFilters({
   fornecedorFiltroSelecionado,
   tiposDespesaOrdenados,
   aplicarPeriodoRapido,
+  filtrarVenceHoje,
   filtrarDespesasCaixa,
   filtrarTaxasCartao,
   alternarOcultarTaxasCartao,
@@ -40,7 +41,9 @@ export default function ContasPagarFilters({
             <select
               className="w-full border border-gray-300 rounded px-3 py-2"
               value={filtros.status}
-              onChange={(e) => setFiltros({ ...filtros, status: e.target.value })}
+              onChange={(e) =>
+                setFiltros({ ...filtros, status: e.target.value, vence_hoje: false })
+              }
             >
               <option value="todos">Todos</option>
               <option value="pendente">Pendente</option>
@@ -149,7 +152,13 @@ export default function ContasPagarFilters({
             <select
               className="w-full border border-gray-300 rounded px-3 py-2"
               value={filtros.data_campo}
-              onChange={(e) => setFiltros({ ...filtros, data_campo: e.target.value })}
+              onChange={(e) =>
+                setFiltros({
+                  ...filtros,
+                  data_campo: e.target.value,
+                  vence_hoje: false,
+                })
+              }
             >
               <option value="vencimento">Vencimento</option>
               <option value="pagamento">Pagamento</option>
@@ -164,7 +173,12 @@ export default function ContasPagarFilters({
               className="w-full border border-gray-300 rounded px-3 py-2"
               value={filtros.data_inicio}
               onChange={(e) =>
-                setFiltros({ ...filtros, data_inicio: e.target.value, periodo_rapido: "" })
+                setFiltros({
+                  ...filtros,
+                  data_inicio: e.target.value,
+                  periodo_rapido: "",
+                  vence_hoje: false,
+                })
               }
             />
           </div>
@@ -176,7 +190,12 @@ export default function ContasPagarFilters({
               className="w-full border border-gray-300 rounded px-3 py-2"
               value={filtros.data_fim}
               onChange={(e) =>
-                setFiltros({ ...filtros, data_fim: e.target.value, periodo_rapido: "" })
+                setFiltros({
+                  ...filtros,
+                  data_fim: e.target.value,
+                  periodo_rapido: "",
+                  vence_hoje: false,
+                })
               }
             />
           </div>
@@ -202,6 +221,19 @@ export default function ContasPagarFilters({
                   </button>
                 );
               })}
+              <button
+                type="button"
+                aria-pressed={filtros.vence_hoje}
+                onClick={filtrarVenceHoje}
+                title="Mostrar somente contas em aberto com vencimento hoje"
+                className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${
+                  filtros.vence_hoje
+                    ? "border-amber-600 bg-amber-500 text-white shadow-sm"
+                    : "border-amber-300 bg-amber-50 text-amber-800 hover:border-amber-500 hover:bg-amber-100"
+                }`}
+              >
+                Vence hoje
+              </button>
             </div>
           </div>
 
@@ -225,6 +257,7 @@ export default function ContasPagarFilters({
                     ...filtros,
                     apenas_vencidas: e.target.checked,
                     apenas_vencer: false,
+                    vence_hoje: false,
                   })
                 }
               />
@@ -240,6 +273,7 @@ export default function ContasPagarFilters({
                     ...filtros,
                     apenas_vencer: e.target.checked,
                     apenas_vencidas: false,
+                    vence_hoje: false,
                   })
                 }
               />

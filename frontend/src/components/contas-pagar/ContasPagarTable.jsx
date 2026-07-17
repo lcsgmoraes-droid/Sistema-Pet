@@ -3,6 +3,7 @@ import ActionButton from "../ui/ActionButton";
 import DataTable from "../ui/DataTable";
 import MoneyCell from "../ui/MoneyCell";
 import FornecedorIdentity, { getFornecedorIdentityName } from "../ui/FornecedorIdentity";
+import { ehVencimentoHojeContasPagar } from "./contasPagarHelpers";
 
 export default function ContasPagarTable({
   contasVisiveis,
@@ -140,7 +141,16 @@ export default function ContasPagarTable({
       header: "Vencimento",
       headerClassName: "w-[110px] whitespace-nowrap",
       className: "w-[110px] whitespace-nowrap",
-      render: (conta) => formatarData(conta.data_vencimento),
+      render: (conta) => (
+        <div className="flex flex-col items-start gap-1">
+          <span>{formatarData(conta.data_vencimento)}</span>
+          {ehVencimentoHojeContasPagar(conta.data_vencimento) && (
+            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-amber-800">
+              Hoje
+            </span>
+          )}
+        </div>
+      ),
     },
     {
       key: "valor_original",

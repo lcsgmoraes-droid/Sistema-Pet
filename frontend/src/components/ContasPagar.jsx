@@ -18,6 +18,7 @@ import {
   formatarDataISO,
   getContaTooltipContasPagar,
   getDescricaoPrincipalContasPagar,
+  getStatusVisualContasPagar,
   montarParamsFiltrosContasPagar,
   ordenarTiposDespesaContasPagar,
 } from "./contas-pagar/contasPagarHelpers";
@@ -201,6 +202,24 @@ const ContasPagar = () => {
       periodo_rapido: periodo,
       apenas_vencidas: false,
       apenas_vencer: false,
+      vence_hoje: false,
+    };
+
+    setFiltros(novosFiltros);
+    aplicarFiltros(novosFiltros);
+  };
+
+  const filtrarVenceHoje = () => {
+    const hoje = calcularIntervaloPeriodoRapido("hoje");
+    const novosFiltros = {
+      ...filtros,
+      ...hoje,
+      status: "todos",
+      data_campo: "vencimento",
+      periodo_rapido: "",
+      apenas_vencidas: false,
+      apenas_vencer: false,
+      vence_hoje: true,
     };
 
     setFiltros(novosFiltros);
@@ -590,13 +609,7 @@ const ContasPagar = () => {
   };
 
   const getStatusBadge = (conta) => {
-    const hoje = new Date();
-    const vencimento = new Date(conta.data_vencimento);
-    if (conta.status === "cancelado") return <StatusBadge status="cancelado" />;
-    if (conta.status === "pago") return <StatusBadge status="pago" />;
-    if (vencimento < hoje) return <StatusBadge status="vencida" />;
-    if (conta.status === "parcial") return <StatusBadge status="parcial" />;
-    return <StatusBadge status="pendente" />;
+    return <StatusBadge status={getStatusVisualContasPagar(conta)} />;
   };
 
   const tiposDespesaOrdenados = ordenarTiposDespesaContasPagar(tiposDespesa, safeArray);
@@ -624,6 +637,7 @@ const ContasPagar = () => {
       fornecedorFiltroSelecionado={fornecedorFiltroSelecionado}
       tiposDespesaOrdenados={tiposDespesaOrdenados}
       aplicarPeriodoRapido={aplicarPeriodoRapido}
+      filtrarVenceHoje={filtrarVenceHoje}
       filtrarDespesasCaixa={filtrarDespesasCaixa}
       filtrarTaxasCartao={filtrarTaxasCartao}
       alternarOcultarTaxasCartao={alternarOcultarTaxasCartao}

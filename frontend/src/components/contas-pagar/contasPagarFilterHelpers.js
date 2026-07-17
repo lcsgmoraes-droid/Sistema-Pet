@@ -51,6 +51,7 @@ export function criarFiltrosPadraoContasPagar() {
     data_fim: hoje.data_fim,
     apenas_vencidas: false,
     apenas_vencer: false,
+    vence_hoje: false,
     numero_nf: "",
     tipo_custo: "todos",
     origem: "todos",
@@ -130,6 +131,7 @@ export function montarParamsFiltrosContasPagar(filtrosParaAplicar = {}) {
   if (filtrosParaAplicar.data_fim) params.append("data_fim", filtrosParaAplicar.data_fim);
   if (filtrosParaAplicar.apenas_vencidas) params.append("apenas_vencidas", "true");
   if (filtrosParaAplicar.apenas_vencer) params.append("apenas_vencer", "true");
+  if (filtrosParaAplicar.vence_hoje) params.append("vence_hoje", "true");
   if (filtrosParaAplicar.ocultar_taxas_cartao) params.append("ocultar_taxas_cartao", "true");
   if (filtrosParaAplicar.apenas_taxas_cartao) params.append("apenas_taxas_cartao", "true");
   if (filtrosParaAplicar.numero_nf) params.append("numero_nf", filtrosParaAplicar.numero_nf);

@@ -22,6 +22,7 @@ export default function ContasPagarView({
   fornecedorFiltroSelecionado,
   tiposDespesaOrdenados,
   aplicarPeriodoRapido,
+  filtrarVenceHoje,
   filtrarDespesasCaixa,
   filtrarTaxasCartao,
   alternarOcultarTaxasCartao,
@@ -160,6 +161,7 @@ export default function ContasPagarView({
             fornecedorFiltroSelecionado={fornecedorFiltroSelecionado}
             tiposDespesaOrdenados={tiposDespesaOrdenados}
             aplicarPeriodoRapido={aplicarPeriodoRapido}
+            filtrarVenceHoje={filtrarVenceHoje}
             filtrarDespesasCaixa={filtrarDespesasCaixa}
             filtrarTaxasCartao={filtrarTaxasCartao}
             alternarOcultarTaxasCartao={alternarOcultarTaxasCartao}

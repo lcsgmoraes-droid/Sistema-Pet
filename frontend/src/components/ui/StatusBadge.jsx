@@ -25,6 +25,7 @@ const STATUS_MAP = {
   pendente: ["Pendente", "warning"],
   recebida: ["Recebida", "success"],
   recebido: ["Recebido", "success"],
+  vence_hoje: ["Vence hoje", "warning"],
   vencida: ["Vencida", "danger"],
   vencido: ["Vencido", "danger"],
 };
