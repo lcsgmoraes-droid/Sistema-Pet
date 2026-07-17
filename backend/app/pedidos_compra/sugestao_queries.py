@@ -27,6 +27,11 @@ from .sugestao import (
 logger = logging.getLogger(__name__)
 
 
+def _filtro_ativo_ou_legado_sugestao(coluna_ativo):
+    """Inclui registros ativos e cadastros legados sem flag de atividade."""
+    return or_(coluna_ativo.is_(True), coluna_ativo.is_(None))
+
+
 def _resolver_fornecedores_compra(
     db: Session,
     tenant_id,

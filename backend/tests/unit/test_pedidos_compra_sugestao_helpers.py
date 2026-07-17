@@ -5,6 +5,8 @@ import importlib.util
 from math import inf, nan
 from types import SimpleNamespace
 
+from sqlalchemy import Boolean, Column, Integer, MetaData, Table, create_engine, select
+
 from app.pedidos_compra import sugestao as sugestao_helpers
 from app.pedidos_compra.sugestao import (
     JANELAS_GIRO_SUGESTAO,
@@ -768,6 +770,42 @@ def test_sugestao_queries_basicas_sem_consulta_ao_banco():
             "tipo_kit": None,
         },
     )
+
+
+def test_filtro_ativo_sugestao_inclui_cadastro_legado_sem_flag():
+    sugestao_queries = importlib.import_module("app.pedidos_compra.sugestao_queries")
+    metadata = MetaData()
+    produtos = Table(
+        "produtos_teste_sugestao",
+        metadata,
+        Column("id", Integer, primary_key=True),
+        Column("ativo", Boolean, nullable=True),
+    )
+    engine = create_engine("sqlite:///:memory:")
+    metadata.create_all(engine)
+
+    with engine.begin() as conn:
+        conn.execute(
+            produtos.insert(),
+            [
+                {"id": 1, "ativo": True},
+                {"id": 2, "ativo": None},
+                {"id": 3, "ativo": False},
+            ],
+        )
+        ids = (
+            conn.execute(
+                select(produtos.c.id)
+                .where(
+                    sugestao_queries._filtro_ativo_ou_legado_sugestao(produtos.c.ativo)
+                )
+                .order_by(produtos.c.id)
+            )
+            .scalars()
+            .all()
+        )
+
+    assert ids == [1, 2]
 
 
 def test_calcular_tendencia_vendas_sugestao_respeita_periodo_e_limiares():
