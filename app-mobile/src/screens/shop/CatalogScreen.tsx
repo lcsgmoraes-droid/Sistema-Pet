@@ -12,6 +12,7 @@ import {
 import { useCartStore } from "../../store/cart.store";
 import { useWishlistStore } from "../../store/wishlist.store";
 import { useAuthStore } from "../../store/auth.store";
+import { useRequireAuth } from "../../hooks/useRequireAuth";
 import { Produto } from "../../types";
 import { CatalogContent } from "./catalog/CatalogContent";
 import {
@@ -31,7 +32,8 @@ export default function CatalogScreen() {
     carregar: carregarWishlist,
     toggle: toggleWishlist,
   } = useWishlistStore();
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
+  const requireAuth = useRequireAuth(navigation);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [busca, setBusca] = useState("");
   const [buscaMarca, setBuscaMarca] = useState("");
@@ -121,8 +123,8 @@ export default function CatalogScreen() {
   );
 
   useEffect(() => {
-    carregarWishlist();
-  }, []);
+    if (isAuthenticated) carregarWishlist();
+  }, [carregarWishlist, isAuthenticated]);
 
   useEffect(() => {
     carregar(1, busca);
@@ -164,6 +166,7 @@ export default function CatalogScreen() {
   }
 
   async function adicionarAoCarrinho(produto: Produto) {
+    if (!requireAuth(undefined, "Faca login para adicionar produtos ao carrinho.")) return;
     try {
       await adicionar(produto, 1);
     } catch {
@@ -172,14 +175,8 @@ export default function CatalogScreen() {
   }
 
   async function registrarAvisoProduto(produto: Produto) {
-    if (!user?.email) {
-      Alert.alert(
-        "Entre na sua conta",
-        "Para receber o aviso quando o produto voltar ao estoque, faca login primeiro.",
-        [{ text: "OK" }],
-      );
-      return;
-    }
+    if (!requireAuth(undefined, "Faca login para receber avisos de estoque.")) return;
+    if (!user?.email) return;
 
     try {
       const res = await registrarAviseme(user.email, produto.id, produto.nome);
@@ -200,7 +197,7 @@ export default function CatalogScreen() {
       busca={busca}
       onBusca={onBusca}
       filtrosAtivos={filtrosAtivos}
-      totalCarrinho={totalItens()}
+      totalCarrinho={isAuthenticated ? totalItens() : 0}
       ordenacaoLabel={ordenacaoLabel}
       produtos={produtos}
       produtosFiltrados={produtosFiltrados}
@@ -208,7 +205,7 @@ export default function CatalogScreen() {
       pagina={pagina}
       carregando={carregando}
       refreshing={refreshing}
-      wishlistIds={wishlistIds}
+      wishlistIds={isAuthenticated ? wishlistIds : []}
       userEmail={user?.email}
       modalFiltrosVisivel={modalFiltrosVisivel}
       insetsBottom={insets.bottom}
@@ -217,12 +214,27 @@ export default function CatalogScreen() {
       buscaMarca={buscaMarca}
       marcasFiltradas={marcasFiltradas}
       pesosEmbalagemDisponiveis={pesosEmbalagemDisponiveis}
-      onNavigateScanner={() => navigation.navigate("BarcodeScanner")}
-      onNavigateCart={() => navigation.navigate("Carrinho")}
+      onNavigateScanner={() =>
+        requireAuth(
+          () => navigation.navigate("BarcodeScanner"),
+          "Faca login para usar o leitor e comprar sem fila.",
+        )
+      }
+      onNavigateCart={() =>
+        requireAuth(
+          () => navigation.navigate("Carrinho"),
+          "Faca login para acessar seu carrinho.",
+        )
+      }
       onOpenProduct={(produto) =>
         navigation.navigate("DetalhesProduto", { produto })
       }
-      onToggleWishlist={toggleWishlist}
+      onToggleWishlist={(produtoId) =>
+        requireAuth(
+          () => toggleWishlist(produtoId),
+          "Faca login para salvar produtos nos favoritos.",
+        )
+      }
       onAddToCart={adicionarAoCarrinho}
       onRegisterAviseme={registrarAvisoProduto}
       onRefresh={onRefresh}

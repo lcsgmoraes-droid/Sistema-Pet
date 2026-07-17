@@ -2,8 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { navigateToLogin } from "../hooks/useRequireAuth";
+import { useAuthStore } from "../store/auth.store";
 import { useCartStore } from "../store/cart.store";
 import { useWishlistStore } from "../store/wishlist.store";
 import { CORES } from "../theme";
@@ -28,6 +30,9 @@ import CatalogScreen from "../screens/shop/CatalogScreen";
 import CheckoutSucessoScreen from "../screens/shop/CheckoutSucessoScreen";
 import ProductDetailScreen from "../screens/shop/ProductDetailScreen";
 import WishlistScreen from "../screens/shop/WishlistScreen";
+import ForgotPasswordScreen from "../screens/auth/ForgotPasswordScreen";
+import LoginScreen from "../screens/auth/LoginScreen";
+import RegisterScreen from "../screens/auth/RegisterScreen";
 
 const Tab = createBottomTabNavigator();
 const HomeStack = createNativeStackNavigator();
@@ -35,6 +40,7 @@ const LojaStack = createNativeStackNavigator();
 const PetsStack = createNativeStackNavigator();
 const PedidosStack = createNativeStackNavigator();
 const BeneficiosStack = createNativeStackNavigator();
+const CustomerStack = createNativeStackNavigator();
 
 function HomeNavigator() {
   return (
@@ -197,8 +203,23 @@ function HeartIcon({ color, size }: { color: string; size: number }) {
   );
 }
 
-export default function MainNavigator() {
+function CustomerTabs() {
   const insets = useSafeAreaInsets();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  function protectTab(event: any, navigation: any) {
+    if (isAuthenticated) return;
+    event.preventDefault();
+    Alert.alert(
+      "Entre na sua conta",
+      "Esta area guarda dados pessoais e precisa de login.",
+      [
+        { text: "Agora nao", style: "cancel" },
+        { text: "Entrar", onPress: () => navigateToLogin(navigation) },
+      ],
+    );
+  }
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -242,6 +263,9 @@ export default function MainNavigator() {
       <Tab.Screen
         name="Favoritos"
         component={WishlistScreen}
+        listeners={({ navigation }) => ({
+          tabPress: (event) => protectTab(event, navigation),
+        })}
         options={{
           title: "Favoritos",
           tabBarIcon: ({ color, size }) => (
@@ -256,6 +280,10 @@ export default function MainNavigator() {
         component={PetsNavigator}
         listeners={({ navigation }) => ({
           tabPress: (event) => {
+            if (!isAuthenticated) {
+              protectTab(event, navigation);
+              return;
+            }
             event.preventDefault();
             navigation.navigate("Pets", { screen: "ListaPets" });
           },
@@ -270,6 +298,9 @@ export default function MainNavigator() {
       <Tab.Screen
         name="Pedidos"
         component={PedidosNavigator}
+        listeners={({ navigation }) => ({
+          tabPress: (event) => protectTab(event, navigation),
+        })}
         options={{
           title: "Pedidos",
           tabBarIcon: ({ color, size }) => (
@@ -281,6 +312,9 @@ export default function MainNavigator() {
       <Tab.Screen
         name="Beneficios"
         component={BeneficiosNavigator}
+        listeners={({ navigation }) => ({
+          tabPress: (event) => protectTab(event, navigation),
+        })}
         options={{
           title: "Benefícios",
           tabBarIcon: ({ color, size }) => (
@@ -292,6 +326,9 @@ export default function MainNavigator() {
       <Tab.Screen
         name="Perfil"
         component={ProfileScreen}
+        listeners={({ navigation }) => ({
+          tabPress: (event) => protectTab(event, navigation),
+        })}
         options={{
           title: "Perfil",
           tabBarIcon: ({ color, size }) => (
@@ -302,6 +339,17 @@ export default function MainNavigator() {
         }}
       />
     </Tab.Navigator>
+  );
+}
+
+export default function MainNavigator() {
+  return (
+    <CustomerStack.Navigator screenOptions={{ headerShown: false }}>
+      <CustomerStack.Screen name="AppTabs" component={CustomerTabs} />
+      <CustomerStack.Screen name="Login" component={LoginScreen} />
+      <CustomerStack.Screen name="Register" component={RegisterScreen} />
+      <CustomerStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+    </CustomerStack.Navigator>
   );
 }
 

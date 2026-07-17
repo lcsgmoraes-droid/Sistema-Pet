@@ -8,7 +8,6 @@ import { useTenantStore } from '../store/tenant.store';
 import { CORES } from '../theme';
 
 // Navegadores
-import AuthNavigator from './AuthNavigator';
 import EntregadorNavigator from './EntregadorNavigator';
 import FuncionarioNavigator from './FuncionarioNavigator';
 import MainNavigator from './MainNavigator';
@@ -24,27 +23,31 @@ const appLinking = {
   prefixes: ["corepet://app", "corepet://", "https://corepet.com.br/app"],
   config: {
     screens: {
+      AppTabs: {
+        screens: {
+          Pedidos: {
+            screens: {
+              ListaPedidos: "pedidos",
+              Rastreio: "pedidos/:pedidoId/rastreio",
+            },
+          },
+          Home: {
+            screens: {
+              Inicio: "inicio",
+              Notificacoes: "notificacoes",
+            },
+          },
+          Loja: {
+            screens: {
+              Catalogo: "produtos",
+              DetalhesProduto: "produtos/:produtoId",
+            },
+          },
+        },
+      },
       Login: "login",
       Register: "cadastro",
       ForgotPassword: "recuperar-senha",
-      Pedidos: {
-        screens: {
-          ListaPedidos: "pedidos",
-          Rastreio: "pedidos/:pedidoId/rastreio",
-        },
-      },
-      Home: {
-        screens: {
-          Inicio: "inicio",
-          Notificacoes: "notificacoes",
-        },
-      },
-      Loja: {
-        screens: {
-          Catalogo: "produtos",
-          DetalhesProduto: "produtos/:produtoId",
-        },
-      },
     },
   },
 };
@@ -84,13 +87,11 @@ export default function AppNavigator() {
 
   // Loja escolhida → fluxo normal (login ou app)
   let activeNav: React.ReactNode;
-  if (!isAuthenticated) {
-    activeNav = <AuthNavigator />;
-  } else if (user?.is_veterinario || user?.perfil_operacional === "veterinario") {
+  if (isAuthenticated && (user?.is_veterinario || user?.perfil_operacional === "veterinario")) {
     activeNav = <VeterinarioNavigator />;
-  } else if (user?.is_entregador) {
+  } else if (isAuthenticated && user?.is_entregador) {
     activeNav = <EntregadorNavigator />;
-  } else if (user?.is_funcionario || user?.perfil_operacional === "funcionario") {
+  } else if (isAuthenticated && (user?.is_funcionario || user?.perfil_operacional === "funcionario")) {
     activeNav = <FuncionarioNavigator />;
   } else {
     activeNav = <MainNavigator />;

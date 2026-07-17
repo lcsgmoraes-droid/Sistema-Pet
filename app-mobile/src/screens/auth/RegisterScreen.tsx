@@ -74,6 +74,8 @@ export default function RegisterScreen({ navigation }: any) {
           'Enviamos um link de confirmacao para o seu e-mail. Depois de confirmar, entre pelo login.',
           [{ text: 'Ir para login', onPress: () => navigation.navigate('Login') }],
         );
+      } else {
+        navigation.reset({ index: 0, routes: [{ name: 'AppTabs' }] });
       }
       // Login automático após registro — AppNavigator redireciona sozinho
     } catch (err: any) {

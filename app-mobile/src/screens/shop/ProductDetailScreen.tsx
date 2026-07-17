@@ -25,6 +25,7 @@ import {
   isProductAvailableInEcommerce,
 } from '../../utils/productAvailability';
 import { resolveProductDetailParams } from '../../utils/productDetailRoute';
+import { useRequireAuth } from '../../hooks/useRequireAuth';
 
 export default function ProductDetailScreen({ route, navigation }: any) {
   const { produtoId, produtoParam } = resolveProductDetailParams<Produto>(route.params);
@@ -34,6 +35,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
   const [imagemAberta, setImagemAberta] = useState(false);
   const { adicionar } = useCartStore();
   const { tenant } = useTenantStore();
+  const requireAuth = useRequireAuth(navigation);
   const produtoExibido =
     produto && (!produtoId || Number(produto.id) === produtoId) ? produto : undefined;
 
@@ -112,6 +114,7 @@ export default function ProductDetailScreen({ route, navigation }: any) {
 
   async function adicionarProduto() {
     if (!produtoExibido) return;
+    if (!requireAuth(undefined, 'Faca login para adicionar produtos ao carrinho.')) return;
     if (!produtoDisponivelNoApp) {
       Alert.alert(
         'Disponivel na loja',

@@ -18,6 +18,7 @@ import { useAuthStore } from '../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../theme';
 import { Produto } from '../types';
 import { formatarMoeda } from '../utils/format';
+import { navigateToLogin, useRequireAuth } from '../hooks/useRequireAuth';
 
 type HomeIconFamily = 'ionicons' | 'material-community' | 'food-bag-bone';
 type HomeIconName =
@@ -26,8 +27,9 @@ type HomeIconName =
   | 'food-bag-bone';
 
 export default function HomeScreen() {
-  const { user } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const navigation = useNavigation<any>();
+  const requireAuth = useRequireAuth(navigation);
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
@@ -46,13 +48,17 @@ export default function HomeScreen() {
   }, []);
 
   const carregarNotificacoesNaoLidas = useCallback(async () => {
+    if (!isAuthenticated) {
+      setUnreadNotifications(0);
+      return;
+    }
     try {
       const response = await listarNotificacoesApp();
       setUnreadNotifications(Math.max(0, Number(response.unread_count ?? 0)));
     } catch {
       setUnreadNotifications(0);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useFocusEffect(
     useCallback(() => {
@@ -62,15 +68,21 @@ export default function HomeScreen() {
 
   async function onRefresh() {
     setRefreshing(true);
-    await Promise.all([carregar(), carregarNotificacoesNaoLidas()]);
+    await Promise.all([
+      carregar(),
+      isAuthenticated ? carregarNotificacoesNaoLidas() : Promise.resolve(),
+    ]);
     setRefreshing(false);
   }
 
   function abrirVeterinario() {
-    navigation.navigate('Pets', { screen: 'Veterinario' });
+    requireAuth(
+      () => navigation.navigate('Pets', { screen: 'Veterinario' }),
+      'Faca login para acessar os servicos do seu pet.',
+    );
   }
 
-  const primeiroNome = user?.nome?.split(' ')[0] || 'Cliente';
+  const primeiroNome = user?.nome?.split(' ')[0];
   const pontos = user?.pontos ?? 0;
 
   return (
@@ -86,11 +98,14 @@ export default function HomeScreen() {
     >
       <View style={styles.header}>
         <View style={styles.headerText}>
-          <Text style={styles.saudacao}>Ola, {primeiroNome}!</Text>
-          <Text style={styles.subSaudacao}>Bem-vindo ao pet shop</Text>
+          <Text style={styles.saudacao}>{primeiroNome ? `Ola, ${primeiroNome}!` : 'Ola!'}</Text>
+          <Text style={styles.subSaudacao}>
+            {isAuthenticated ? 'Bem-vindo ao pet shop' : 'Explore os produtos da loja'}
+          </Text>
         </View>
         <View style={styles.headerActions}>
-          <View style={styles.headerTopActions}>
+          {isAuthenticated ? <>
+            <View style={styles.headerTopActions}>
             <TouchableOpacity
               style={styles.pontosCard}
               onPress={() => navigation.navigate('Beneficios')}
@@ -112,18 +127,32 @@ export default function HomeScreen() {
                 </View>
               ) : null}
             </TouchableOpacity>
-          </View>
-          <HeaderProfileActions
-            color={CORES.primario}
-            logoutContextLabel="cliente"
-            showLogout={false}
-          />
+            </View>
+            <HeaderProfileActions
+              color={CORES.primario}
+              logoutContextLabel="cliente"
+              showLogout={false}
+            />
+          </> : (
+            <TouchableOpacity
+              style={styles.loginButton}
+              onPress={() => navigateToLogin(navigation)}
+            >
+              <Ionicons name="log-in-outline" size={18} color="#fff" />
+              <Text style={styles.loginButtonText}>Entrar</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
       <TouchableOpacity
         style={styles.scannerCardCompacto}
-        onPress={() => navigation.navigate('Loja', { screen: 'BarcodeScanner' })}
+        onPress={() =>
+          requireAuth(
+            () => navigation.navigate('Loja', { screen: 'BarcodeScanner' }),
+            'Faca login para usar o leitor e comprar sem fila.',
+          )
+        }
         activeOpacity={0.85}
       >
         <View style={styles.scannerIconBox}>
@@ -203,28 +232,48 @@ export default function HomeScreen() {
             titulo="Calculadora"
             cor="#F0FDF4"
             corTexto={CORES.sucesso}
-            onPress={() => navigation.navigate('Pets', { screen: 'CalculadoraRacao' })}
+            onPress={() =>
+              requireAuth(
+                () => navigation.navigate('Pets', { screen: 'CalculadoraRacao' }),
+                'Faca login para calcular a racao dos seus pets.',
+              )
+            }
           />
           <Atalho
             iconName="cut-outline"
             titulo="Banho & Tosa"
             cor="#ECFEFF"
             corTexto="#0E7490"
-            onPress={() => navigation.navigate('Pets', { screen: 'BanhoTosa' })}
+            onPress={() =>
+              requireAuth(
+                () => navigation.navigate('Pets', { screen: 'BanhoTosa' }),
+                'Faca login para acessar os servicos do seu pet.',
+              )
+            }
           />
           <Atalho
             iconName="receipt-outline"
             titulo="Pedidos"
             cor="#FDF4FF"
             corTexto="#9333EA"
-            onPress={() => navigation.navigate('Pedidos')}
+            onPress={() =>
+              requireAuth(
+                () => navigation.navigate('Pedidos'),
+                'Faca login para consultar seus pedidos.',
+              )
+            }
           />
           <Atalho
             iconName="gift-outline"
             titulo="Benefícios"
             cor="#FEF3C7"
             corTexto="#92400E"
-            onPress={() => navigation.navigate('Beneficios')}
+            onPress={() =>
+              requireAuth(
+                () => navigation.navigate('Beneficios'),
+                'Faca login para consultar seus beneficios.',
+              )
+            }
           />
         </View>
       </View>
@@ -461,6 +510,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   pontosTexto: { fontSize: FONTE.normal, fontWeight: 'bold', color: '#92400E' },
+  loginButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ESPACO.xs,
+    backgroundColor: CORES.primario,
+    borderRadius: RAIO.circulo,
+    paddingHorizontal: ESPACO.md,
+    paddingVertical: ESPACO.sm,
+  },
+  loginButtonText: { color: '#fff', fontSize: FONTE.normal, fontWeight: '700' },
   notificacoesButton: {
     width: 36,
     height: 36,
