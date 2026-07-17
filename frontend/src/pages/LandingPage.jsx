@@ -15,7 +15,7 @@ import {
   Sparkles,
   TrendingUp,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -147,9 +147,55 @@ const screenHighlights = [
   },
 ];
 
+const systemDemoVideos = [
+  {
+    id: "recorrencia",
+    eyebrow: "Recorrência inteligente · 28 segundos",
+    title: "A próxima venda antes de o cliente esquecer.",
+    text: "O CorePet aprende o intervalo de consumo, identifica a recompra e notifica o cliente automaticamente pelo app.",
+    source: "/marketing/corepet-demo-recorrencia-inteligente.mp4",
+    poster: "/marketing/corepet-demo-recorrencia-inteligente-poster.jpg",
+    shortTitle: "Recorrência automática",
+    duration: "0:28",
+  },
+  {
+    id: "lista-espera",
+    eyebrow: "Lista de espera automática · 26 segundos",
+    title: "O estoque voltou. O cliente fica sabendo.",
+    text: "O interesse é registrado no PDV e vira uma nova oportunidade quando o produto entra novamente no estoque.",
+    source: "/marketing/corepet-demo-lista-espera-automatica.mp4",
+    poster: "/marketing/corepet-demo-lista-espera-automatica-poster.jpg",
+    shortTitle: "Lista de espera",
+    duration: "0:26",
+  },
+  {
+    id: "integracao",
+    eyebrow: "Um único ecossistema · 26 segundos",
+    title: "ERP, App e E-commerce trabalhando juntos.",
+    text: "Cadastre uma vez, venda em todos os canais e mantenha pedidos e estoque em uma única operação.",
+    source: "/marketing/corepet-demo-ecossistema-integrado.mp4",
+    poster: "/marketing/corepet-demo-ecossistema-integrado-poster.jpg",
+    shortTitle: "Tudo integrado",
+    duration: "0:26",
+  },
+  {
+    id: "resultado",
+    eyebrow: "Gestão em tempo real · 21 segundos",
+    title: "Cada venda mostra o que entrou, o que custou e o que virou lucro.",
+    text: "Uma tela real do CorePet com os números que o gestor precisa para decidir em tempo real.",
+    source: "/marketing/corepet-resultado-venda-por-venda.mp4",
+    poster: "/marketing/corepet-resultado-venda-por-venda-poster.jpg",
+    shortTitle: "Resultado da venda",
+    duration: "0:21",
+  },
+];
+
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [activeDemoId, setActiveDemoId] = useState(systemDemoVideos[0].id);
+  const activeDemo =
+    systemDemoVideos.find((video) => video.id === activeDemoId) || systemDemoVideos[0];
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -406,17 +452,14 @@ export default function LandingPage() {
             </div>
 
             <article className="mt-12 grid overflow-hidden rounded-[2rem] bg-slate-950 text-white shadow-2xl shadow-slate-900/20 lg:grid-cols-[0.72fr_1.28fr]">
-              <div className="flex flex-col justify-center p-7 sm:p-10 lg:p-12">
+              <div className="order-2 flex flex-col justify-center p-7 sm:p-10 lg:order-1 lg:p-12">
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-300">
-                  Demonstração narrada · 21 segundos
+                  {activeDemo.eyebrow}
                 </p>
                 <h3 className="mt-4 text-3xl font-black tracking-tight sm:text-4xl">
-                  Cada venda mostra o que entrou, o que custou e o que virou lucro.
+                  {activeDemo.title}
                 </h3>
-                <p className="mt-5 text-lg leading-8 text-slate-300">
-                  Veja uma tela real do CorePet explicada de forma direta, com os números que o
-                  gestor precisa para decidir em tempo real.
-                </p>
+                <p className="mt-5 text-lg leading-8 text-slate-300">{activeDemo.text}</p>
                 <div className="mt-7 flex items-center gap-3 text-sm font-bold text-emerald-200">
                   <span className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400 text-slate-950">
                     <Play className="h-4 w-4 fill-current" />
@@ -425,19 +468,58 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <div className="flex items-center bg-black p-3 sm:p-5">
+              <div className="order-1 flex items-center bg-black p-3 sm:p-5 lg:order-2">
                 <video
+                  key={activeDemo.source}
                   className="aspect-video w-full rounded-2xl bg-black object-contain shadow-2xl"
                   controls
                   playsInline
                   preload="metadata"
-                  poster="/marketing/corepet-resultado-venda-por-venda-poster.jpg"
+                  poster={activeDemo.poster}
                 >
-                  <source src="/marketing/corepet-resultado-venda-por-venda.mp4" type="video/mp4" />
+                  <source src={activeDemo.source} type="video/mp4" />
                   Seu navegador não suporta vídeo HTML5.
                 </video>
               </div>
             </article>
+
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {systemDemoVideos.map((video, index) => {
+                const isActive = video.id === activeDemo.id;
+                return (
+                  <button
+                    key={video.id}
+                    type="button"
+                    aria-pressed={isActive}
+                    onClick={() => setActiveDemoId(video.id)}
+                    className={`flex items-center gap-4 rounded-2xl border p-4 text-left transition ${
+                      isActive
+                        ? "border-slate-950 bg-slate-950 text-white shadow-xl"
+                        : "border-slate-200 bg-white text-slate-900 hover:-translate-y-0.5 hover:border-emerald-400 hover:shadow-lg"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-10 w-10 flex-none items-center justify-center rounded-xl text-sm font-black ${
+                        isActive ? "bg-emerald-400 text-slate-950" : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      0{index + 1}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-extrabold">{video.shortTitle}</span>
+                      <span
+                        className={`mt-1 block text-xs ${isActive ? "text-slate-300" : "text-slate-500"}`}
+                      >
+                        Narrado · {video.duration}
+                      </span>
+                    </span>
+                    <Play
+                      className={`h-4 w-4 flex-none ${isActive ? "text-emerald-300" : "text-slate-400"}`}
+                    />
+                  </button>
+                );
+              })}
+            </div>
 
             <div className="mt-8 grid gap-6 lg:grid-cols-3">
               {screenHighlights.map((screen) => (
