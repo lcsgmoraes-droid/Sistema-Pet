@@ -31,6 +31,7 @@ from .sugestao import (
 from .sugestao_queries import (
     _agrupar_movimentacoes_estoque_periodo,
     _carregar_vendas_sugestao,
+    _filtro_ativo_ou_legado_sugestao,
     _obter_estoque_atual_sugestao,
     _resolver_fornecedores_compra,
 )
@@ -176,7 +177,7 @@ def sugerir_pedido_inteligente(
         .outerjoin(Marca, Produto.marca_id == Marca.id)
         .filter(
             Produto.tenant_id == tenant_id,
-            Produto.ativo,
+            _filtro_ativo_ou_legado_sugestao(Produto.ativo),
             or_(
                 Produto.participa_sugestao_compra,
                 Produto.participa_sugestao_compra.is_(None),
