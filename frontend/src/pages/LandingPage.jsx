@@ -88,6 +88,89 @@ const unifiedChannels = [
   "Estoque atualizado independentemente do canal",
 ];
 
+const screenHighlights = [
+  {
+    eyebrow: "E-commerce 24 horas",
+    title: "Uma loja completa, bonita e conectada ao estoque",
+    text: "Catálogo, busca, categorias, carrinho e pedidos usam os mesmos produtos e o mesmo estoque do ERP.",
+    image: "/marketing/product-shots/ecommerce-catalogo.png",
+    alt: "Catálogo real do e-commerce integrado ao CorePet",
+    wide: true,
+  },
+  {
+    eyebrow: "App do cliente",
+    title: "A loja acompanha o cliente no celular",
+    text: "Compra sem fila, loja, veterinário, calculadora de ração, pedidos e benefícios em um único app.",
+    image: "/marketing/product-shots/app-inicio.png",
+    alt: "Tela inicial real do aplicativo CorePet",
+    portrait: true,
+  },
+  {
+    eyebrow: "Catálogo no app",
+    title: "Produtos disponíveis para comprar de qualquer lugar",
+    text: "Busca, filtros, favoritos, preço e disponibilidade atualizados diretamente pela operação da loja.",
+    image: "/marketing/product-shots/app-produtos.png",
+    alt: "Catálogo de produtos real no aplicativo CorePet",
+    portrait: true,
+  },
+  {
+    eyebrow: "Recompra simplificada",
+    title: "O cliente repete um pedido em poucos toques",
+    text: "O histórico reúne compras do app, e-commerce e loja física e oferece a ação de comprar novamente.",
+    image: "/marketing/product-shots/app-pedidos.png",
+    alt: "Histórico de pedidos e botão repetir no aplicativo CorePet",
+    portrait: true,
+  },
+  {
+    eyebrow: "Fidelização integrada",
+    title: "Cashback, cupons e cartão fidelidade visíveis",
+    text: "O cliente entende seus benefícios e encontra motivos concretos para continuar comprando na mesma loja.",
+    image: "/marketing/product-shots/app-beneficios.png",
+    alt: "Benefícios, cashback e fidelidade no aplicativo CorePet",
+    portrait: true,
+  },
+  {
+    eyebrow: "Gestão em tempo real",
+    title: "O gestor enxerga o resultado, não apenas o faturamento",
+    text: "Taxas, impostos, descontos, custos, valor recebido, lucro e margem aparecem juntos e de forma clara.",
+    image: "/marketing/product-shots/erp-resultado.png",
+    alt: "Composição real do resultado de vendas no ERP CorePet",
+    wide: true,
+  },
+  {
+    eyebrow: "Automação no PDV",
+    title: "Produto em falta entra na lista de espera",
+    text: "Quando o estoque é reposto, o CorePet notifica o cliente automaticamente pelo app.",
+    image: "/marketing/product-shots/pdv-lista-espera.png",
+    alt: "Lista de espera automática para produtos sem estoque no PDV CorePet",
+    wide: true,
+  },
+];
+
+const featureVideos = [
+  {
+    eyebrow: "Recorrência inteligente",
+    title: "A próxima compra antes de o cliente esquecer",
+    text: "O sistema identifica a oportunidade e prepara a comunicação automática pelo app.",
+    source: "/marketing/corepet-feature-recorrencia.mp4",
+    poster: "/marketing/product-shots/erp-recorrencia.png",
+  },
+  {
+    eyebrow: "Lista de espera",
+    title: "O estoque voltou. O cliente fica sabendo.",
+    text: "O interesse registrado no PDV se transforma em uma nova oportunidade de venda.",
+    source: "/marketing/corepet-feature-lista-espera.mp4",
+    poster: "/marketing/product-shots/pdv-lista-espera.png",
+  },
+  {
+    eyebrow: "Resultado venda por venda",
+    title: "Lucro, custos e margem no instante da venda",
+    text: "Uma visão objetiva para decidir com números reais, não apenas com faturamento.",
+    source: "/marketing/corepet-feature-resultado.mp4",
+    poster: "/marketing/product-shots/erp-resultado.png",
+  },
+];
+
 export default function LandingPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -147,6 +230,12 @@ export default function LandingPage() {
             </a>
             <a href="#plataforma" className="transition hover:text-white">
               Plataforma
+            </a>
+            <a href="#sistema-por-dentro" className="transition hover:text-white">
+              Por dentro
+            </a>
+            <a href="#videos-funcionalidades" className="transition hover:text-white">
+              Vídeos
             </a>
             <a href="#integracao" className="transition hover:text-white">
               Integração
@@ -232,7 +321,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div id="video-corepet" className="relative mx-auto w-full max-w-lg scroll-mt-24">
+            <div id="video-corepet" className="relative mx-auto w-full max-w-xl scroll-mt-24">
               <div className="absolute -inset-5 rounded-[2rem] bg-emerald-400/15 blur-3xl" />
               <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-slate-900/85 p-3 shadow-2xl shadow-black/50 backdrop-blur">
                 <div className="aspect-[9/16] overflow-hidden rounded-[1.45rem] bg-gradient-to-br from-violet-950 via-slate-950 to-emerald-950">
@@ -319,6 +408,104 @@ export default function LandingPage() {
                   </div>
                   <h3 className="mt-5 text-xl font-extrabold">{title}</h3>
                   <p className="mt-3 leading-7 text-slate-600">{text}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="sistema-por-dentro"
+          className="scroll-mt-16 overflow-hidden border-y border-slate-200 bg-slate-100 py-20"
+        >
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <div className="mx-auto max-w-4xl text-center">
+              <p className="text-sm font-black uppercase tracking-[0.16em] text-violet-700">
+                Veja o sistema por dentro
+              </p>
+              <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">
+                Não é promessa. São telas reais trabalhando juntas.
+              </h2>
+              <p className="mt-5 text-lg leading-8 text-slate-600">
+                Do pedido do cliente à análise do lucro, o CorePet conecta a experiência de compra
+                com a operação e a gestão da empresa.
+              </p>
+            </div>
+
+            <div className="mt-12 grid gap-6 lg:grid-cols-3">
+              {screenHighlights.map((screen) => (
+                <article
+                  key={screen.title}
+                  className={`group overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-2xl ${screen.wide ? "lg:col-span-2" : ""}`}
+                >
+                  <div
+                    className={`relative overflow-hidden border-b border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-violet-950 p-4 ${screen.portrait ? "h-[34rem]" : "h-[22rem]"}`}
+                  >
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_15%,rgba(52,211,153,0.18),transparent_30%)]" />
+                    <img
+                      src={screen.image}
+                      alt={screen.alt}
+                      loading="lazy"
+                      className={`relative mx-auto h-full rounded-2xl object-contain shadow-2xl transition duration-500 group-hover:scale-[1.025] ${screen.portrait ? "w-auto" : "w-full"}`}
+                    />
+                  </div>
+                  <div className="p-6 sm:p-7">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">
+                      {screen.eyebrow}
+                    </p>
+                    <h3 className="mt-2 text-2xl font-black tracking-tight">{screen.title}</h3>
+                    <p className="mt-3 leading-7 text-slate-600">{screen.text}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="videos-funcionalidades" className="scroll-mt-16 bg-slate-950 py-20 text-white">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-3xl">
+                <p className="text-sm font-black uppercase tracking-[0.16em] text-emerald-300">
+                  CorePet em poucos segundos
+                </p>
+                <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">
+                  Vídeos curtos para entender os diferenciais rapidamente.
+                </h2>
+              </div>
+              <p className="max-w-md text-lg leading-8 text-slate-300">
+                Demonstrações objetivas, com foco nas automações e nas telas que mudam a rotina da
+                loja.
+              </p>
+            </div>
+
+            <div className="mt-12 grid gap-6 lg:grid-cols-3">
+              {featureVideos.map((video) => (
+                <article
+                  key={video.title}
+                  className="overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-2xl shadow-black/20"
+                >
+                  <div className="aspect-video overflow-hidden bg-slate-900">
+                    <video
+                      className="h-full w-full object-cover"
+                      autoPlay
+                      muted
+                      loop
+                      controls
+                      playsInline
+                      preload="metadata"
+                      poster={video.poster}
+                    >
+                      <source src={video.source} type="video/mp4" />
+                    </video>
+                  </div>
+                  <div className="p-6">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-300">
+                      {video.eyebrow}
+                    </p>
+                    <h3 className="mt-2 text-xl font-extrabold">{video.title}</h3>
+                    <p className="mt-3 leading-7 text-slate-300">{video.text}</p>
+                  </div>
                 </article>
               ))}
             </div>

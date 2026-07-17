@@ -34,7 +34,28 @@ const horizontalOutput = join(
 );
 const posterOutput = join(outputDir, "corepet-vende-de-novo-poster.jpg");
 const voiceoverPath = join(outputDir, "corepet-vende-de-novo-narracao.mp3");
+const featureOutputs = [
+  {
+    sceneIndex: 2,
+    output: join(outputDir, "corepet-feature-recorrencia.mp4"),
+  },
+  {
+    sceneIndex: 3,
+    output: join(outputDir, "corepet-feature-lista-espera.mp4"),
+  },
+  {
+    sceneIndex: 5,
+    output: join(outputDir, "corepet-feature-resultado.mp4"),
+  },
+];
 const demoCaptureDir = join(root, "runtime", "marketing-captures");
+const productShotDir = join(
+  root,
+  "frontend",
+  "public",
+  "marketing",
+  "product-shots",
+);
 
 const scenes = [
   {
@@ -58,6 +79,7 @@ const scenes = [
     accent: "#2dd4bf",
     demoCapture: join(demoCaptureDir, "03-recorrencia-criada.png"),
     demoObjectPosition: "left top",
+    demoZoom: true,
   },
   {
     eyebrow: "Lista de espera automática",
@@ -66,6 +88,7 @@ const scenes = [
     accent: "#fb923c",
     demoCapture: join(demoCaptureDir, "06-pdv-lista-espera.png"),
     demoObjectPosition: "center",
+    demoZoom: true,
   },
   {
     eyebrow: "Um único ecossistema",
@@ -74,8 +97,9 @@ const scenes = [
     accent: "#60a5fa",
     channelShowcase: true,
     erpCapture: join(demoCaptureDir, "02-produtos-canais-estoque.png"),
-    appCapture: join(demoCaptureDir, "04-ecommerce-real.jpg"),
-    ecommerceCapture: join(demoCaptureDir, "04-ecommerce-real.jpg"),
+    appHomeCapture: join(productShotDir, "app-inicio.png"),
+    appProductsCapture: join(productShotDir, "app-produtos.png"),
+    ecommerceCapture: join(productShotDir, "ecommerce-catalogo.png"),
   },
   {
     eyebrow: "Gestão em tempo real",
@@ -126,33 +150,30 @@ function sceneHtml(scene, width, height) {
     : "";
   const demoCapture =
     scene.demoCapture && existsSync(scene.demoCapture)
-      ? `<figure class="demo"><img src="${pathToFileURL(scene.demoCapture).href}" alt="Tela real do CorePet"><figcaption>TELA REAL DO SISTEMA</figcaption></figure>`
+      ? `<figure class="demo${scene.demoZoom ? " demo-zoom" : ""}"><img src="${pathToFileURL(scene.demoCapture).href}" alt="Tela real do CorePet"><figcaption>TELA REAL DO SISTEMA</figcaption></figure>`
       : "";
   const channelShowcase =
     scene.channelShowcase &&
     existsSync(scene.erpCapture) &&
-    existsSync(scene.appCapture) &&
+    existsSync(scene.appHomeCapture) &&
+    existsSync(scene.appProductsCapture) &&
     existsSync(scene.ecommerceCapture)
       ? `<div class="channels-showcase">
           <figure class="channel-window channel-erp">
             <figcaption><span></span>ERP</figcaption>
             <img src="${pathToFileURL(scene.erpCapture).href}" alt="Tela real do ERP CorePet">
           </figure>
-          <figure class="channel-window channel-app">
-            <figcaption><span></span>APP</figcaption>
-            <div class="channel-app-body">
-              <img src="${pathToFileURL(scene.appCapture).href}" alt="Catálogo do app CorePet">
-              <div class="app-proof">
-                <b>CorePet</b>
-                <span>Sua ração está acabando?</span>
-                <small>Peça novamente pelo app.</small>
-                <button>PEDIR AGORA</button>
-              </div>
-            </div>
-          </figure>
           <figure class="channel-window channel-ecommerce">
             <figcaption><span></span>E-COMMERCE</figcaption>
             <img src="${pathToFileURL(scene.ecommerceCapture).href}" alt="Tela real do e-commerce CorePet">
+          </figure>
+          <figure class="channel-phone channel-app-home">
+            <figcaption>APP • INÍCIO</figcaption>
+            <img src="${pathToFileURL(scene.appHomeCapture).href}" alt="Tela inicial do app CorePet">
+          </figure>
+          <figure class="channel-phone channel-app-products">
+            <figcaption>APP • PRODUTOS</figcaption>
+            <img src="${pathToFileURL(scene.appProductsCapture).href}" alt="Produtos no app CorePet">
           </figure>
         </div>`
       : "";
@@ -221,27 +242,23 @@ function sceneHtml(scene, width, height) {
   .chips span, .metrics span { padding: 22px 25px; border: 1px solid #ffffff22; border-radius: 18px; background: #ffffff0d; color: #f8fafc; text-align: center; font-size: ${vertical ? 27 : 24}px; font-weight: 900; letter-spacing: .06em; }
   .demo { position: relative; margin: 0; padding: ${vertical ? "13px" : "16px"}; border: 1px solid #ffffff2b; border-radius: ${vertical ? "24px" : "28px"}; background: #020617cc; box-shadow: 0 34px 100px #000b, 0 0 60px ${scene.accent}22; transform: rotate(${vertical ? "0" : "-1.2deg"}); overflow: hidden; }
   .demo img { display: block; width: 100%; height: ${vertical ? "650px" : "610px"}; object-fit: contain; object-position: ${scene.demoObjectPosition || "top center"}; border-radius: ${vertical ? "15px" : "18px"}; background: #f8fafc; }
+  .demo-zoom img { object-fit: ${vertical ? "cover" : "contain"}; object-position: ${scene.demoObjectPosition || "center"}; }
   .demo figcaption { position: absolute; right: 28px; bottom: 25px; padding: 10px 15px; border-radius: 999px; color: #020617; background: ${scene.accent}; font-size: ${vertical ? 17 : 16}px; font-weight: 950; letter-spacing: .08em; box-shadow: 0 10px 30px #0008; }
   .cta { display: inline-flex; align-items: center; justify-content: center; margin-top: 52px; width: fit-content; padding: 24px 34px; border-radius: 18px; background: ${scene.accent}; color: #052e2b; font-size: ${vertical ? 26 : 24}px; font-weight: 950; letter-spacing: .08em; box-shadow: 0 20px 60px ${scene.accent}33; }
-  .channels-showcase { width: 100%; display: grid; grid-template-columns: ${vertical ? "1fr" : "repeat(2, minmax(0, 1fr))"}; grid-template-rows: ${vertical ? "repeat(3, 270px)" : "repeat(2, 260px)"}; gap: ${vertical ? "18px" : "20px"}; }
-  .channel-window { min-width: 0; margin: 0; overflow: hidden; border: 1px solid #ffffff30; border-radius: 22px; background: #020617; box-shadow: 0 24px 70px #000a; }
-  .channel-window figcaption { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 18px; color: #e2e8f0; background: #0f172a; font-size: 18px; font-weight: 950; letter-spacing: .08em; }
-  .channel-window figcaption span { width: 11px; height: 11px; border-radius: 50%; background: ${scene.accent}; box-shadow: 18px 0 #34d399, 36px 0 #fbbf24; margin-right: 38px; }
-  .channel-window img { width: 100%; height: calc(100% - 46px); object-fit: cover; object-position: top center; }
-  .channel-erp { ${vertical ? "" : "grid-row: 1; grid-column: 1;"} }
-  .channel-app { ${vertical ? "" : "grid-row: 2; grid-column: 1 / -1;"} }
-  .channel-ecommerce { ${vertical ? "" : "grid-row: 1; grid-column: 2;"} }
-  .channel-app-body { height: calc(100% - 46px); display: grid; grid-template-columns: ${vertical ? "1.05fr .95fr" : "1.35fr .65fr"}; background: #f8fafc; }
-  .channel-app-body > img { height: 100%; object-position: center top; }
-  .app-proof { align-self: center; margin: 14px; padding: ${vertical ? "18px" : "15px"}; border-radius: 18px; color: #e2e8f0; background: linear-gradient(145deg, #0f172a, #172554); box-shadow: 0 16px 35px #02061755; }
-  .app-proof b { display: block; color: ${scene.accent}; font-size: ${vertical ? "17px" : "16px"}; }
-  .app-proof span { display: block; margin-top: 9px; color: #fff; font-size: ${vertical ? "19px" : "18px"}; font-weight: 900; line-height: 1.08; }
-  .app-proof small { display: block; margin-top: 7px; color: #cbd5e1; font-size: ${vertical ? "14px" : "13px"}; line-height: 1.2; }
-  .app-proof button { width: 100%; margin-top: 12px; padding: 10px 6px; border: 0; border-radius: 10px; color: #020617; background: ${scene.accent}; font-size: 12px; font-weight: 950; letter-spacing: .07em; }
+  .channels-showcase { width: 100%; display: grid; grid-template-columns: ${vertical ? "repeat(2, minmax(0, 1fr))" : "1.35fr .58fr .58fr"}; grid-template-rows: ${vertical ? "250px 250px 520px" : "repeat(2, 255px)"}; gap: ${vertical ? "16px" : "18px"}; }
+  .channel-window, .channel-phone { min-width: 0; margin: 0; overflow: hidden; border: 1px solid #ffffff30; border-radius: 22px; background: #020617; box-shadow: 0 24px 70px #000a; }
+  .channel-window figcaption, .channel-phone figcaption { display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 16px; color: #e2e8f0; background: #0f172a; font-size: ${vertical ? "16px" : "15px"}; font-weight: 950; letter-spacing: .08em; }
+  .channel-window figcaption span { width: 10px; height: 10px; border-radius: 50%; background: ${scene.accent}; box-shadow: 17px 0 #34d399, 34px 0 #fbbf24; margin-right: 36px; }
+  .channel-window img, .channel-phone img { display: block; width: 100%; height: calc(100% - 42px); object-fit: cover; object-position: top center; }
+  .channel-ecommerce { ${vertical ? "grid-row: 1; grid-column: 1 / -1;" : "grid-row: 1; grid-column: 1;"} }
+  .channel-erp { ${vertical ? "grid-row: 2; grid-column: 1 / -1;" : "grid-row: 2; grid-column: 1;"} }
+  .channel-app-home { ${vertical ? "grid-row: 3; grid-column: 1;" : "grid-row: 1 / -1; grid-column: 2;"} }
+  .channel-app-products { ${vertical ? "grid-row: 3; grid-column: 2;" : "grid-row: 1 / -1; grid-column: 3;"} }
+  .channel-phone img { object-position: top center; }
   .results-showcase { width: 100%; display: grid; grid-template-columns: ${vertical ? "1fr" : "repeat(2, minmax(0, 1fr))"}; gap: 18px; }
   .result-window { min-width: 0; margin: 0; overflow: hidden; border: 1px solid #ffffff30; border-radius: 22px; background: #f8fafc; box-shadow: 0 24px 70px #000a; }
   .result-window figcaption { height: 46px; padding: 13px 18px; color: #020617; background: ${scene.accent}; font-size: 16px; font-weight: 950; letter-spacing: .09em; }
-  .result-window img { display: block; width: 100%; height: ${vertical ? "330px" : "430px"}; object-fit: cover; object-position: top center; }
+  .result-window img { display: block; width: 100%; height: ${vertical ? "390px" : "430px"}; object-fit: cover; object-position: top center; }
   .result-sales img { object-position: center; }
   .footer { position: absolute; z-index: 10; left: ${vertical ? "54px" : "70px"}; right: ${vertical ? "54px" : "70px"}; bottom: ${vertical ? "122px" : "48px"}; display: flex; align-items: center; justify-content: space-between; color: #94a3b8; font-size: ${vertical ? 23 : 20}px; font-weight: 700; }
   .dot { display: inline-block; width: 11px; height: 11px; margin-right: 10px; border-radius: 50%; background: ${scene.accent}; box-shadow: 0 0 22px ${scene.accent}; }
@@ -381,6 +398,32 @@ function renderVideo(images, outputPath, width, height) {
   }
 }
 
+function renderFeatureVideo(imagePath, outputPath) {
+  run(
+    ffmpeg,
+    [
+      "-y",
+      "-i",
+      imagePath,
+      "-vf",
+      "scale=1920:1080,zoompan=z='min(zoom+0.00045,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=180:s=1280x720:fps=30,format=yuv420p",
+      "-frames:v",
+      "180",
+      "-an",
+      "-c:v",
+      "libx264",
+      "-preset",
+      "medium",
+      "-crf",
+      "20",
+      "-movflags",
+      "+faststart",
+      outputPath,
+    ],
+    `Renderização do vídeo curto ${outputPath}`,
+  );
+}
+
 if (!existsSync(chrome)) throw new Error(`Chrome não encontrado: ${chrome}`);
 if (!existsSync(logoPath)) throw new Error(`Logo não encontrado: ${logoPath}`);
 
@@ -398,6 +441,10 @@ const horizontalScenes = scenes.map((scene, index) =>
 renderVideo(verticalScenes, verticalOutput, 1080, 1920);
 renderVideo(horizontalScenes, horizontalOutput, 1920, 1080);
 
+featureOutputs.forEach(({ sceneIndex, output }) => {
+  renderFeatureVideo(horizontalScenes[sceneIndex], output);
+});
+
 run(
   ffmpeg,
   ["-y", "-i", verticalScenes[1], "-q:v", "2", posterOutput],
@@ -413,6 +460,7 @@ console.log(
       vertical: verticalOutput,
       horizontal: horizontalOutput,
       poster: posterOutput,
+      featureVideos: featureOutputs.map(({ output }) => output),
       durationSeconds:
         durations.reduce((sum, value) => sum + value, 0) -
         transitionDuration * (durations.length - 1),
