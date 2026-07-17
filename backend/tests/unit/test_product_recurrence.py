@@ -1,8 +1,11 @@
+import inspect
 from datetime import date, timedelta
 
 from app.services.product_recurrence import (
     estimate_recurrence,
     notification_lead_days,
+    process_finalized_sale_recurrence,
+    run_due_recurrence_notifications,
 )
 
 
@@ -57,3 +60,20 @@ def test_notification_lead_is_proportional_to_cycle():
     assert notification_lead_days(7) == 1
     assert notification_lead_days(30) == 7
     assert notification_lead_days(90) == 7
+
+
+def test_finalized_sale_reloads_persisted_items_instead_of_cached_relationship():
+    source = inspect.getsource(process_finalized_sale_recurrence)
+
+    assert "db.query(VendaItem)" in source
+    assert "VendaItem.venda_id == venda.id" in source
+    assert 'getattr(venda, "itens", [])' not in source
+
+
+def test_due_scheduler_registers_sale_model_and_counts_only_after_commit():
+    source = inspect.getsource(run_due_recurrence_notifications)
+
+    assert "from app.vendas_models import Venda" in source
+    assert source.index("db.commit()") < source.index(
+        'stats["queued"] += tenant_queued'
+    )

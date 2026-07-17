@@ -1,78 +1,91 @@
 import {
   ArrowRight,
   BarChart3,
-  CreditCard,
-  Database,
-  MessageCircle,
-  Package,
-  ShieldCheck,
-  ShoppingCart,
+  BellRing,
+  Boxes,
+  Calculator,
+  CheckCircle2,
+  Clock3,
+  Megaphone,
+  PackageCheck,
+  Play,
+  Route,
+  ShoppingBag,
+  Smartphone,
   Sparkles,
-  Users,
+  TrendingUp,
 } from "lucide-react";
 import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
-const whatsappUrl =
-  "https://wa.me/5518997401641?text=Ol%C3%A1!%20Quero%20come%C3%A7ar%20no%20Plano%20B%C3%A1sico%20do%20CorePet.";
+const salesContactUrl =
+  "https://wa.me/5518997401641?text=Ol%C3%A1!%20Quero%20conhecer%20o%20CorePet%20e%20ver%20uma%20demonstra%C3%A7%C3%A3o.";
 
 const heroImage =
-  "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&w=2200&q=85";
+  "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&w=2200&q=88";
 
-const includedItems = [
+const activeSalesSteps = [
   {
-    icon: Users,
-    title: "Clientes e pets",
-    text: "Cadastro, histórico essencial e organização da base.",
+    icon: ShoppingBag,
+    label: "O cliente compra",
+    text: "No balcão, no app ou no e-commerce.",
   },
   {
-    icon: Package,
-    title: "Produtos e estoque",
-    text: "SKU, validade, lotes, movimentações e saldo operacional.",
+    icon: Sparkles,
+    label: "O CorePet aprende",
+    text: "Identifica consumo recorrente e protocolos configurados.",
   },
   {
-    icon: ShoppingCart,
-    title: "PDV e caixa",
-    text: "Venda no balcão, pagamentos, sangria, suprimento e fechamento.",
+    icon: BellRing,
+    label: "O CorePet oferece",
+    text: "Lembra o cliente pelo app no momento certo da recompra.",
+  },
+  {
+    icon: TrendingUp,
+    label: "Sua loja vende de novo",
+    text: "Sem depender apenas de o cliente lembrar de voltar.",
+  },
+];
+
+const platformPillars = [
+  {
+    icon: Smartphone,
+    title: "ERP, app e e-commerce",
+    text: "Cadastre uma vez. Produtos, preços, pedidos e estoque permanecem conectados em todos os canais.",
+  },
+  {
+    icon: Calculator,
+    title: "Lucro real em cada venda",
+    text: "Taxas de cartão, impostos, custos, comissão e margem aparecem para o gestor acompanhar o resultado.",
+  },
+  {
+    icon: Megaphone,
+    title: "Campanhas dentro do sistema",
+    text: "Crie públicos, ofertas e notificações no app usando os dados da própria operação.",
+  },
+  {
+    icon: Route,
+    title: "Entregas sob controle",
+    text: "Organize rotas, entregadores, andamento e custos para entender o resultado além do caixa.",
   },
   {
     icon: BarChart3,
-    title: "Vendas e gestão",
-    text: "Lista de vendas, visão por cliente e indicadores básicos.",
+    title: "Gestão clara e automática",
+    text: "DRE, fluxo de caixa, ponto de equilíbrio e indicadores transformam a operação em decisão.",
   },
   {
-    icon: CreditCard,
-    title: "Formas de pagamento",
-    text: "Cadastro de meios, operadoras e taxas para venda diária.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Usuários e permissões",
-    text: "Perfis de acesso, LGPD operacional e isolamento por empresa.",
+    icon: PackageCheck,
+    title: "Compras mais inteligentes",
+    text: "Sugestões de pedido ajudam a ganhar tempo, repor melhor e evitar excesso ou falta de produtos.",
   },
 ];
 
-const processSteps = [
-  {
-    title: "Teste o Básico",
-    text: "30 dias grátis com o plano essencial completo.",
-  },
-  {
-    title: "Crie sua empresa",
-    text: "Cadastro online já cria o tenant no Plano Básico.",
-  },
-  {
-    title: "Conheça os Betas",
-    text: "Módulos avançados aparecem como vitrine e piloto acompanhado.",
-  },
-];
-
-const nextModules = [
-  "Financeiro ERP completo",
-  "Campanhas e fidelidade avançadas",
-  "E-commerce e canais de venda",
-  "Veterinário, banho e tosa e app mobile",
+const unifiedChannels = [
+  "Produto cadastrado uma única vez",
+  "Publicação integrada no app e e-commerce",
+  "Compra disponível 24 horas por dia",
+  "Estoque atualizado independentemente do canal",
 ];
 
 export default function LandingPage() {
@@ -96,10 +109,10 @@ export default function LandingPage() {
       document.head.appendChild(metaDescription);
     }
 
-    document.title = "CorePet | 30 dias grátis do Plano Básico";
+    document.title = "CorePet | O sistema que trabalha para vender de novo";
     metaDescription.setAttribute(
       "content",
-      "Teste o Plano Básico do CorePet por 30 dias: clientes, pets, produtos, estoque, PDV, caixa, vendas, usuários e permissões.",
+      "ERP, app e e-commerce para pet shops: recorrência inteligente, campanhas, estoque integrado, entregas e gestão do lucro em tempo real.",
     );
 
     return () => {
@@ -113,30 +126,30 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
+    <div className="min-h-screen bg-white text-slate-950">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-violet-700 focus:shadow-lg"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-violet-700 focus:shadow-xl"
       >
         Pular para o conteúdo principal
       </a>
 
-      <nav className="fixed left-0 right-0 top-0 z-50 border-b border-white/15 bg-slate-950/70 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-          <Link to="/landing" className="flex items-center gap-2 font-bold text-white">
-            <img src="/brand/corepet/corepet-icon-64.png" alt="" className="h-7 w-7 rounded-md" />
+      <nav className="fixed left-0 right-0 top-0 z-50 border-b border-white/10 bg-slate-950/85 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
+          <Link to="/landing" className="flex items-center gap-2.5 font-extrabold text-white">
+            <img src="/brand/corepet/corepet-icon-64.png" alt="" className="h-8 w-8 rounded-lg" />
             CorePet
           </Link>
 
-          <div className="hidden items-center gap-7 text-sm font-semibold text-slate-200 md:flex">
-            <a href="#plano-basico" className="hover:text-white">
-              Plano Básico
+          <div className="hidden items-center gap-7 text-sm font-semibold text-slate-300 lg:flex">
+            <a href="#venda-ativa" className="transition hover:text-white">
+              Venda ativa
             </a>
-            <a href="#incluido" className="hover:text-white">
-              Incluído
+            <a href="#plataforma" className="transition hover:text-white">
+              Plataforma
             </a>
-            <a href="#proximos-modulos" className="hover:text-white">
-              Módulos futuros
+            <a href="#integracao" className="transition hover:text-white">
+              Integração
             </a>
           </div>
 
@@ -147,182 +160,244 @@ export default function LandingPage() {
             >
               Entrar
             </Link>
-            <Link
-              to="/register?plan=basico"
-              className="inline-flex items-center gap-2 rounded-md bg-emerald-400 px-4 py-2 text-sm font-bold text-slate-950 transition hover:bg-emerald-300"
+            <a
+              href={salesContactUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-400 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-emerald-300"
             >
-              Começar
+              Quero uma demonstração
               <ArrowRight className="h-4 w-4" />
-            </Link>
+            </a>
           </div>
         </div>
       </nav>
 
       <main id="main-content">
         <section
-          className="relative flex min-h-[86vh] items-center bg-cover bg-center pt-16"
+          className="relative isolate overflow-hidden bg-slate-950 pt-16 text-white"
           style={{
-            backgroundImage: `linear-gradient(90deg, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.78) 46%, rgba(15,23,42,0.30) 100%), url(${heroImage})`,
+            backgroundImage: `linear-gradient(92deg, rgba(2,6,23,0.98) 0%, rgba(2,6,23,0.92) 48%, rgba(2,6,23,0.58) 100%), url(${heroImage})`,
+            backgroundPosition: "center",
+            backgroundSize: "cover",
           }}
         >
-          <div className="mx-auto w-full max-w-6xl px-4 py-20 text-white">
+          <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_72%_30%,rgba(52,211,153,0.18),transparent_34%)]" />
+          <div className="mx-auto grid min-h-[820px] max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1.08fr_0.92fr]">
             <div className="max-w-3xl">
-              <span className="inline-flex items-center gap-2 rounded-md border border-emerald-300/40 bg-emerald-300/15 px-3 py-1 text-sm font-bold text-emerald-100">
+              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-sm font-bold text-emerald-200">
                 <Sparkles className="h-4 w-4" />
-                30 dias grátis do Plano Básico
+                Tecnologia para o mercado pet vender todos os dias
               </span>
-              <h1 className="mt-6 text-4xl font-extrabold leading-tight md:text-6xl">CorePet</h1>
-              <p className="mt-5 max-w-2xl text-xl leading-8 text-slate-100">
-                Use clientes, pets, estoque, PDV, caixa, vendas e permissões sem pagar no primeiro
-                mês. Os módulos avançados aparecem como próximos passos ou pilotos.
+              <h1 className="mt-7 text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
+                Sua loja ainda espera o cliente voltar?
+              </h1>
+              <p className="mt-7 max-w-2xl text-xl leading-8 text-slate-200 sm:text-2xl">
+                O CorePet aprende o consumo, identifica a hora da recompra e trabalha para oferecer
+                o produto certo pelo app.
+              </p>
+              <p className="mt-5 max-w-2xl text-lg font-bold leading-8 text-emerald-300">
+                Seu ERP registra o que você vendeu. O CorePet trabalha para vender de novo.
               </p>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link
-                  to="/register?plan=basico"
-                  className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-400 px-6 py-3 font-bold text-slate-950 shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-300"
-                >
-                  Começar 30 dias grátis
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
+              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                 <a
-                  href={whatsappUrl}
+                  href={salesContactUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-md border border-white/30 bg-white/10 px-6 py-3 font-semibold text-white backdrop-blur transition hover:bg-white/20"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-400 px-6 py-3.5 font-extrabold text-slate-950 shadow-xl shadow-emerald-950/30 transition hover:-translate-y-0.5 hover:bg-emerald-300"
                 >
-                  <MessageCircle className="h-4 w-4" />
-                  Falar com vendas
+                  Ver uma demonstração
+                  <ArrowRight className="h-5 w-5" />
+                </a>
+                <a
+                  href="#video-corepet"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/10 px-6 py-3.5 font-bold text-white backdrop-blur transition hover:bg-white/15"
+                >
+                  <Play className="h-5 w-5 fill-current" />
+                  Assistir em 30 segundos
                 </a>
               </div>
+
+              <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3 text-sm font-semibold text-slate-300">
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> ERP completo
+                </span>
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> App + e-commerce
+                </span>
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Tudo integrado
+                </span>
+              </div>
+            </div>
+
+            <div id="video-corepet" className="relative mx-auto w-full max-w-lg scroll-mt-24">
+              <div className="absolute -inset-5 rounded-[2rem] bg-emerald-400/15 blur-3xl" />
+              <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-slate-900/85 p-3 shadow-2xl shadow-black/50 backdrop-blur">
+                <div className="aspect-[9/16] overflow-hidden rounded-[1.45rem] bg-gradient-to-br from-violet-950 via-slate-950 to-emerald-950">
+                  <video
+                    className="h-full w-full object-cover"
+                    controls
+                    playsInline
+                    preload="metadata"
+                    poster="/marketing/corepet-vende-de-novo-poster.jpg"
+                  >
+                    <source src="/marketing/corepet-vende-de-novo-vertical.mp4" type="video/mp4" />
+                    Seu navegador não suporta vídeo HTML5.
+                  </video>
+                </div>
+              </div>
+              <div className="relative mx-3 mt-4 rounded-2xl border border-white/10 bg-slate-950/95 p-4 shadow-xl">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-300">
+                  Venda ativa
+                </p>
+                <p className="mt-1 font-bold text-white">A recompra acontece no momento certo.</p>
+              </div>
             </div>
           </div>
         </section>
 
-        <section id="plano-basico" className="border-b border-slate-200 bg-slate-50">
-          <div className="mx-auto grid max-w-6xl gap-8 px-4 py-12 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-wide text-violet-700">
-                Contratação guiada
+        <section
+          id="venda-ativa"
+          className="scroll-mt-16 border-b border-slate-200 bg-slate-50 py-20"
+        >
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="text-sm font-black uppercase tracking-[0.16em] text-violet-700">
+                Da venda passada à próxima venda
               </p>
-              <h2 className="mt-2 text-3xl font-extrabold text-slate-950 md:text-4xl">
-                O Básico é o ponto de entrada.
+              <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">
+                Recorrência não é uma lista de lembretes. É uma estratégia de venda.
               </h2>
-              <p className="mt-4 text-lg leading-8 text-slate-600">
-                O primeiro acesso libera 30 dias do Básico completo. Quando o cliente decidir
-                contratar, ele segue no mesmo plano, sem troca de promessa no meio do caminho.
+              <p className="mt-5 text-lg leading-8 text-slate-600">
+                Ração, antipulgas, medicamentos com protocolo e outros produtos recorrentes deixam
+                sinais. O CorePet usa esses sinais para ajudar a loja a agir antes de perder a
+                recompra.
               </p>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              {processSteps.map((step, index) => (
+            <div className="mt-12 grid gap-4 lg:grid-cols-4">
+              {activeSalesSteps.map(({ icon: Icon, label, text }, index) => (
                 <article
-                  key={step.title}
-                  className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+                  key={label}
+                  className="relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
                 >
-                  <span className="text-sm font-extrabold text-emerald-600">0{index + 1}</span>
-                  <h3 className="mt-3 font-bold text-slate-950">{step.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{step.text}</p>
+                  <span className="absolute right-5 top-5 text-sm font-black text-slate-300">
+                    0{index + 1}
+                  </span>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <h3 className="mt-5 text-lg font-extrabold">{label}</h3>
+                  <p className="mt-2 leading-7 text-slate-600">{text}</p>
                 </article>
               ))}
             </div>
           </div>
         </section>
 
-        <section id="incluido" className="bg-white py-16">
-          <div className="mx-auto max-w-6xl px-4">
-            <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-              <div>
-                <p className="text-sm font-bold uppercase tracking-wide text-emerald-700">
-                  Incluso no Plano Básico
-                </p>
-                <h2 className="mt-2 text-3xl font-extrabold text-slate-950">
-                  O essencial para operar sem planilha.
-                </h2>
-              </div>
-              <Link
-                to="/planos"
-                className="inline-flex w-fit items-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-              >
-                Ver detalhes do plano
-                <ArrowRight className="h-4 w-4" />
-              </Link>
+        <section id="plataforma" className="scroll-mt-16 bg-white py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <div className="max-w-3xl">
+              <p className="text-sm font-black uppercase tracking-[0.16em] text-emerald-700">
+                Uma plataforma, a operação inteira
+              </p>
+              <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">
+                Mais do que organizar. Enxergar, decidir e vender.
+              </h2>
             </div>
 
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {includedItems.map(({ icon: Icon, title, text }) => (
+            <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              {platformPillars.map(({ icon: Icon, title, text }) => (
                 <article
                   key={title}
-                  className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+                  className="group rounded-2xl border border-slate-200 p-6 transition hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl"
                 >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
-                    <Icon className="h-5 w-5" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950 text-emerald-300 transition group-hover:bg-emerald-400 group-hover:text-slate-950">
+                    <Icon className="h-6 w-6" />
                   </div>
-                  <h3 className="mt-4 font-bold text-slate-950">{title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{text}</p>
+                  <h3 className="mt-5 text-xl font-extrabold">{title}</h3>
+                  <p className="mt-3 leading-7 text-slate-600">{text}</p>
                 </article>
               ))}
             </div>
           </div>
         </section>
 
-        <section id="proximos-modulos" className="bg-slate-950 py-16 text-white">
-          <div className="mx-auto grid max-w-6xl gap-10 px-4 lg:grid-cols-[1fr_1fr] lg:items-center">
+        <section
+          id="integracao"
+          className="scroll-mt-16 overflow-hidden bg-slate-950 py-20 text-white"
+        >
+          <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 sm:px-6 lg:grid-cols-2">
             <div>
-              <span className="inline-flex items-center gap-2 rounded-md bg-amber-300/15 px-3 py-1 text-sm font-bold text-amber-200">
-                <Sparkles className="h-4 w-4" />O que vem por aí
+              <span className="inline-flex items-center gap-2 rounded-full bg-violet-400/15 px-4 py-2 text-sm font-bold text-violet-200">
+                <Boxes className="h-4 w-4" />
+                Integração de verdade
               </span>
-              <h2 className="mt-5 text-3xl font-extrabold md:text-4xl">
-                Mais recursos para conhecer e pedir acesso.
+              <h2 className="mt-6 text-3xl font-black tracking-tight sm:text-5xl">
+                O cliente compra 24 horas. A gestão continua no controle.
               </h2>
-              <p className="mt-4 text-lg leading-8 text-slate-300">
-                A vitrine mostra módulos em validação com selo Beta. Eles não são liberados
-                automaticamente: entram como piloto acompanhado quando fizer sentido para o cliente.
+              <p className="mt-5 text-lg leading-8 text-slate-300">
+                ERP, app e e-commerce compartilham produtos, pedidos e estoque. Uma venda feita em
+                qualquer canal entra na mesma operação e atualiza as informações do gestor.
+              </p>
+              <p className="mt-4 text-sm font-semibold text-amber-200">
+                Aplicativos em fase final de aprovação para publicação na App Store e Google Play.
               </p>
             </div>
 
-            <div className="grid gap-3">
-              {nextModules.map((module) => (
-                <div
-                  key={module}
-                  className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3"
-                >
-                  <Database className="h-5 w-5 flex-none text-amber-200" />
-                  <span className="font-semibold text-slate-100">{module}</span>
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-7 backdrop-blur">
+              <div className="flex items-center justify-between border-b border-white/10 pb-5">
+                <div>
+                  <p className="text-sm font-bold uppercase tracking-wider text-emerald-300">
+                    Ecossistema CorePet
+                  </p>
+                  <p className="mt-1 text-xl font-extrabold">Tudo conversa com tudo</p>
                 </div>
-              ))}
+                <Clock3 className="h-9 w-9 text-emerald-300" />
+              </div>
+              <div className="mt-6 space-y-4">
+                {unifiedChannels.map((item) => (
+                  <div key={item} className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 flex-none text-emerald-400" />
+                    <span className="font-semibold text-slate-200">{item}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="bg-emerald-50 py-16">
-          <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 px-4 md:flex-row md:items-center">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-wide text-emerald-700">
-                Próximo passo
+        <section className="bg-emerald-50 py-20">
+          <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 px-4 sm:px-6 lg:flex-row lg:items-center">
+            <div className="max-w-3xl">
+              <p className="text-sm font-black uppercase tracking-[0.16em] text-emerald-700">
+                A próxima venda pode começar agora
               </p>
-              <h2 className="mt-2 text-3xl font-extrabold text-slate-950">
-                Comece com 30 dias grátis no Básico.
+              <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">
+                Pare de apenas esperar. Coloque o CorePet para trabalhar.
               </h2>
-              <p className="mt-3 max-w-2xl text-slate-600">
-                O cadastro cria a empresa no Plano Básico e mantém módulos avançados como Beta sob
-                liberação acompanhada. Integrações externas específicas não fazem parte desta
-                oferta.
+              <p className="mt-5 text-lg leading-8 text-slate-600">
+                Veja, em uma demonstração, como venda ativa, operação e gestão funcionam juntas no
+                dia a dia de uma empresa do mercado pet.
               </p>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row lg:flex-col">
+              <a
+                href={salesContactUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-7 py-4 font-extrabold text-white transition hover:bg-slate-800"
+              >
+                Solicitar demonstração
+                <ArrowRight className="h-5 w-5" />
+              </a>
               <Link
                 to="/register?plan=basico"
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-6 py-3 font-bold text-white transition hover:bg-slate-800"
+                className="inline-flex items-center justify-center rounded-xl border border-emerald-300 bg-white px-7 py-4 font-extrabold text-slate-800 transition hover:bg-emerald-100"
               >
                 Começar 30 dias grátis
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                to="/login"
-                className="inline-flex items-center justify-center rounded-md border border-emerald-200 bg-white px-6 py-3 font-bold text-slate-700 transition hover:bg-emerald-100"
-              >
-                Já sou cliente
               </Link>
             </div>
           </div>
@@ -330,19 +405,19 @@ export default function LandingPage() {
       </main>
 
       <footer className="bg-white py-8 text-slate-500">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 text-sm md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-2 font-bold text-slate-900">
-            <img src="/brand/corepet/corepet-icon-64.png" alt="" className="h-5 w-5 rounded" />
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 text-sm sm:px-6 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-2 font-extrabold text-slate-950">
+            <img src="/brand/corepet/corepet-icon-64.png" alt="" className="h-6 w-6 rounded" />
             CorePet
           </div>
           <div className="flex flex-wrap gap-5">
-            <Link to="/termos" className="hover:text-slate-900">
+            <Link to="/termos" className="hover:text-slate-950">
               Termos
             </Link>
-            <Link to="/privacidade" className="hover:text-slate-900">
+            <Link to="/privacidade" className="hover:text-slate-950">
               Privacidade
             </Link>
-            <Link to="/planos" className="hover:text-slate-900">
+            <Link to="/planos" className="hover:text-slate-950">
               Planos
             </Link>
           </div>
