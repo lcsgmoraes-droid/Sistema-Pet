@@ -54,10 +54,18 @@ const scenes = [
   {
     eyebrow: "Recorrência inteligente",
     title: "O produto certo. No momento certo.",
-    text: "Rações, antipulgas e protocolos configurados viram oportunidades de nova venda.",
+    text: "O CorePet identifica a recompra e notifica o cliente automaticamente pelo app.",
     accent: "#2dd4bf",
     demoCapture: join(demoCaptureDir, "03-recorrencia-criada.png"),
     demoObjectPosition: "left top",
+  },
+  {
+    eyebrow: "Lista de espera automática",
+    title: "Sem estoque não precisa ser venda perdida.",
+    text: "O PDV registra o interesse. Quando o produto entra, o cliente é avisado automaticamente pelo app.",
+    accent: "#fb923c",
+    demoCapture: join(demoCaptureDir, "06-pdv-lista-espera.png"),
+    demoObjectPosition: "center",
   },
   {
     eyebrow: "Um único ecossistema",
@@ -72,10 +80,11 @@ const scenes = [
   {
     eyebrow: "Gestão em tempo real",
     title: "Venda não é faturamento. É resultado.",
-    text: "Taxas, impostos, custos, comissão, margem e lucro visíveis para decidir melhor.",
+    text: "Cada venda mostra taxas, impostos, custos, margem e lucro no instante em que acontece.",
     accent: "#fbbf24",
-    metrics: ["TAXAS", "IMPOSTOS", "MARGEM", "LUCRO"],
-    demoCapture: join(demoCaptureDir, "01-vendas-rentabilidade.png"),
+    resultsShowcase: true,
+    summaryCapture: join(demoCaptureDir, "01-vendas-rentabilidade.png"),
+    salesCapture: join(demoCaptureDir, "05-vendas-lista.png"),
   },
   {
     eyebrow: "CorePet",
@@ -86,7 +95,7 @@ const scenes = [
   },
 ];
 
-const durations = [3.4, 4.2, 3.8, 4.1, 4.2, 5.1];
+const durations = [3.1, 4.1, 4.0, 4.6, 4.2, 5.1, 4.8];
 const transitionDuration = 0.45;
 
 function escapeHtml(value) {
@@ -129,25 +138,40 @@ function sceneHtml(scene, width, height) {
             <figcaption><span></span>ERP</figcaption>
             <img src="${pathToFileURL(scene.erpCapture).href}" alt="Tela real do ERP CorePet">
           </figure>
+          <figure class="channel-window channel-app">
+            <figcaption><span></span>APP</figcaption>
+            <div class="channel-app-body">
+              <img src="${pathToFileURL(scene.appCapture).href}" alt="Catálogo do app CorePet">
+              <div class="app-proof">
+                <b>CorePet</b>
+                <span>Sua ração está acabando?</span>
+                <small>Peça novamente pelo app.</small>
+                <button>PEDIR AGORA</button>
+              </div>
+            </div>
+          </figure>
           <figure class="channel-window channel-ecommerce">
             <figcaption><span></span>E-COMMERCE</figcaption>
             <img src="${pathToFileURL(scene.ecommerceCapture).href}" alt="Tela real do e-commerce CorePet">
           </figure>
-          <figure class="channel-phone">
-            <figcaption>APP</figcaption>
-            <div class="phone-speaker"></div>
-            <img src="${pathToFileURL(scene.appCapture).href}" alt="Catálogo do app CorePet">
-            <div class="phone-proof">
-              <b>CorePet</b>
-              <span>Sua ração está acabando?</span>
-              <small>Peça novamente pelo app.</small>
-              <button>PEDIR AGORA</button>
-            </div>
-            <div class="phone-home"></div>
+        </div>`
+      : "";
+  const resultsShowcase =
+    scene.resultsShowcase &&
+    existsSync(scene.summaryCapture) &&
+    existsSync(scene.salesCapture)
+      ? `<div class="results-showcase">
+          <figure class="result-window">
+            <figcaption>RESUMO EM TEMPO REAL</figcaption>
+            <img src="${pathToFileURL(scene.summaryCapture).href}" alt="Resumo do resultado em tempo real">
+          </figure>
+          <figure class="result-window result-sales">
+            <figcaption>VENDA POR VENDA</figcaption>
+            <img src="${pathToFileURL(scene.salesCapture).href}" alt="Lista de vendas e rentabilidade">
           </figure>
         </div>`
       : "";
-  const hasDemo = Boolean(demoCapture || channelShowcase);
+  const hasDemo = Boolean(demoCapture || channelShowcase || resultsShowcase);
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -196,28 +220,29 @@ function sceneHtml(scene, width, height) {
   .metrics { grid-template-columns: repeat(${vertical ? 2 : 4}, minmax(0, 1fr)); }
   .chips span, .metrics span { padding: 22px 25px; border: 1px solid #ffffff22; border-radius: 18px; background: #ffffff0d; color: #f8fafc; text-align: center; font-size: ${vertical ? 27 : 24}px; font-weight: 900; letter-spacing: .06em; }
   .demo { position: relative; margin: 0; padding: ${vertical ? "13px" : "16px"}; border: 1px solid #ffffff2b; border-radius: ${vertical ? "24px" : "28px"}; background: #020617cc; box-shadow: 0 34px 100px #000b, 0 0 60px ${scene.accent}22; transform: rotate(${vertical ? "0" : "-1.2deg"}); overflow: hidden; }
-  .demo img { display: block; width: 100%; height: ${vertical ? "720px" : "650px"}; object-fit: cover; object-position: ${scene.demoObjectPosition || "top center"}; border-radius: ${vertical ? "15px" : "18px"}; }
+  .demo img { display: block; width: 100%; height: ${vertical ? "650px" : "610px"}; object-fit: contain; object-position: ${scene.demoObjectPosition || "top center"}; border-radius: ${vertical ? "15px" : "18px"}; background: #f8fafc; }
   .demo figcaption { position: absolute; right: 28px; bottom: 25px; padding: 10px 15px; border-radius: 999px; color: #020617; background: ${scene.accent}; font-size: ${vertical ? 17 : 16}px; font-weight: 950; letter-spacing: .08em; box-shadow: 0 10px 30px #0008; }
   .cta { display: inline-flex; align-items: center; justify-content: center; margin-top: 52px; width: fit-content; padding: 24px 34px; border-radius: 18px; background: ${scene.accent}; color: #052e2b; font-size: ${vertical ? 26 : 24}px; font-weight: 950; letter-spacing: .08em; box-shadow: 0 20px 60px ${scene.accent}33; }
-  .channels-showcase { position: relative; width: 100%; height: ${vertical ? "910px" : "720px"}; }
-  .channel-window, .channel-phone { margin: 0; overflow: hidden; border: 1px solid #ffffff30; background: #020617; box-shadow: 0 28px 90px #000c; }
-  .channel-window { position: absolute; width: ${vertical ? "82%" : "82%"}; height: ${vertical ? "390px" : "330px"}; border-radius: 25px; }
+  .channels-showcase { width: 100%; display: grid; grid-template-columns: ${vertical ? "1fr" : "repeat(2, minmax(0, 1fr))"}; grid-template-rows: ${vertical ? "repeat(3, 270px)" : "repeat(2, 260px)"}; gap: ${vertical ? "18px" : "20px"}; }
+  .channel-window { min-width: 0; margin: 0; overflow: hidden; border: 1px solid #ffffff30; border-radius: 22px; background: #020617; box-shadow: 0 24px 70px #000a; }
   .channel-window figcaption { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 18px; color: #e2e8f0; background: #0f172a; font-size: 18px; font-weight: 950; letter-spacing: .08em; }
   .channel-window figcaption span { width: 11px; height: 11px; border-radius: 50%; background: ${scene.accent}; box-shadow: 18px 0 #34d399, 36px 0 #fbbf24; margin-right: 38px; }
   .channel-window img { width: 100%; height: calc(100% - 46px); object-fit: cover; object-position: top center; }
-  .channel-erp { left: 0; top: 0; transform: rotate(-1.2deg); }
-  .channel-ecommerce { right: 0; bottom: 0; transform: rotate(1.2deg); }
-  .channel-ecommerce img { object-position: center bottom; }
-  .channel-phone { position: absolute; z-index: 3; left: ${vertical ? "55%" : "53%"}; top: ${vertical ? "210px" : "145px"}; width: ${vertical ? "310px" : "270px"}; height: ${vertical ? "610px" : "540px"}; border: 12px solid #020617; border-radius: 48px; background: #f8fafc; transform: translateX(-50%) rotate(2deg); }
-  .channel-phone figcaption { position: absolute; z-index: 3; left: 50%; top: 24px; transform: translateX(-50%); padding: 9px 18px; border-radius: 999px; color: #020617; background: ${scene.accent}; font-size: 18px; font-weight: 950; letter-spacing: .1em; }
-  .channel-phone img { position: absolute; width: ${vertical ? "900px" : "820px"}; height: auto; left: ${vertical ? "-100px" : "-105px"}; top: ${vertical ? "-230px" : "-210px"}; }
-  .phone-proof { position: absolute; z-index: 3; left: 15px; right: 15px; top: ${vertical ? "270px" : "235px"}; padding: ${vertical ? "23px 19px" : "19px 16px"}; border-radius: 23px; color: #e2e8f0; background: linear-gradient(145deg, #0f172a, #172554); box-shadow: 0 20px 45px #02061755; }
-  .phone-proof b { display: block; color: ${scene.accent}; font-size: ${vertical ? "20px" : "18px"}; }
-  .phone-proof span { display: block; margin-top: 13px; color: #fff; font-size: ${vertical ? "23px" : "20px"}; font-weight: 900; line-height: 1.08; }
-  .phone-proof small { display: block; margin-top: 9px; color: #cbd5e1; font-size: ${vertical ? "16px" : "14px"}; line-height: 1.25; }
-  .phone-proof button { width: 100%; margin-top: 17px; padding: 13px 8px; border: 0; border-radius: 13px; color: #020617; background: ${scene.accent}; font-size: 14px; font-weight: 950; letter-spacing: .08em; }
-  .phone-speaker { position: absolute; z-index: 4; left: 50%; top: 7px; width: 82px; height: 7px; transform: translateX(-50%); border-radius: 99px; background: #334155; }
-  .phone-home { position: absolute; z-index: 4; left: 50%; bottom: 8px; width: 82px; height: 6px; transform: translateX(-50%); border-radius: 99px; background: #64748b; }
+  .channel-erp { ${vertical ? "" : "grid-row: 1; grid-column: 1;"} }
+  .channel-app { ${vertical ? "" : "grid-row: 2; grid-column: 1 / -1;"} }
+  .channel-ecommerce { ${vertical ? "" : "grid-row: 1; grid-column: 2;"} }
+  .channel-app-body { height: calc(100% - 46px); display: grid; grid-template-columns: ${vertical ? "1.05fr .95fr" : "1.35fr .65fr"}; background: #f8fafc; }
+  .channel-app-body > img { height: 100%; object-position: center top; }
+  .app-proof { align-self: center; margin: 14px; padding: ${vertical ? "18px" : "15px"}; border-radius: 18px; color: #e2e8f0; background: linear-gradient(145deg, #0f172a, #172554); box-shadow: 0 16px 35px #02061755; }
+  .app-proof b { display: block; color: ${scene.accent}; font-size: ${vertical ? "17px" : "16px"}; }
+  .app-proof span { display: block; margin-top: 9px; color: #fff; font-size: ${vertical ? "19px" : "18px"}; font-weight: 900; line-height: 1.08; }
+  .app-proof small { display: block; margin-top: 7px; color: #cbd5e1; font-size: ${vertical ? "14px" : "13px"}; line-height: 1.2; }
+  .app-proof button { width: 100%; margin-top: 12px; padding: 10px 6px; border: 0; border-radius: 10px; color: #020617; background: ${scene.accent}; font-size: 12px; font-weight: 950; letter-spacing: .07em; }
+  .results-showcase { width: 100%; display: grid; grid-template-columns: ${vertical ? "1fr" : "repeat(2, minmax(0, 1fr))"}; gap: 18px; }
+  .result-window { min-width: 0; margin: 0; overflow: hidden; border: 1px solid #ffffff30; border-radius: 22px; background: #f8fafc; box-shadow: 0 24px 70px #000a; }
+  .result-window figcaption { height: 46px; padding: 13px 18px; color: #020617; background: ${scene.accent}; font-size: 16px; font-weight: 950; letter-spacing: .09em; }
+  .result-window img { display: block; width: 100%; height: ${vertical ? "330px" : "430px"}; object-fit: cover; object-position: top center; }
+  .result-sales img { object-position: center; }
   .footer { position: absolute; z-index: 10; left: ${vertical ? "54px" : "70px"}; right: ${vertical ? "54px" : "70px"}; bottom: ${vertical ? "122px" : "48px"}; display: flex; align-items: center; justify-content: space-between; color: #94a3b8; font-size: ${vertical ? 23 : 20}px; font-weight: 700; }
   .dot { display: inline-block; width: 11px; height: 11px; margin-right: 10px; border-radius: 50%; background: ${scene.accent}; box-shadow: 0 0 22px ${scene.accent}; }
 </style>
@@ -233,7 +258,7 @@ function sceneHtml(scene, width, height) {
         <div class="line"></div>
         ${notification}${chips}${metrics}${cta}
       </div>
-      ${channelShowcase || demoCapture}
+      ${channelShowcase || resultsShowcase || demoCapture}
     </section>
     <footer class="footer"><span><i class="dot"></i>ERP • APP • E-COMMERCE</span><span>corepet.com.br</span></footer>
   </main>
