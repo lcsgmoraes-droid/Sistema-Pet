@@ -44,13 +44,11 @@ const videos = [
         title: "O CorePet identifica a data provável da recompra.",
         body: "Rações, antipulgas e protocolos deixam de depender da memória da equipe.",
         accent: "#8b5cf6",
-        zoom: 1.13,
-        origin: "54% 62%",
         focus: {
-          left: 10,
-          top: 44,
-          width: 80,
-          height: 20,
+          left: 5,
+          top: 59,
+          width: 90,
+          height: 13,
           label: "Próxima oportunidade",
         },
       },
@@ -87,13 +85,12 @@ const videos = [
         title: "Quando o produto entra, o sistema reconhece.",
         body: "A reposição ativa o aviso sem criar mais uma tarefa para a equipe.",
         accent: "#f59e0b",
-        zoom: 1.12,
-        origin: "54% 68%",
+        copyStyle: "top:90px;bottom:auto;width:650px",
         focus: {
-          left: 33,
-          top: 57,
-          width: 38,
-          height: 12,
+          left: 32.5,
+          top: 70.5,
+          width: 35,
+          height: 9,
           label: "Aviso automático pelo app",
         },
       },
@@ -123,10 +120,10 @@ const videos = [
         body: "Produtos, preços e disponibilidade partem de uma única operação.",
         accent: "#3b82f6",
         focus: {
-          left: 77,
-          top: 47,
-          width: 12,
-          height: 42,
+          left: 83.5,
+          top: 62,
+          width: 7.5,
+          height: 34,
           label: "App + E-commerce",
         },
       },
@@ -148,6 +145,150 @@ const videos = [
         title: "ERP + App + E-commerce. Tudo integrado.",
         body: "Cada pedido atualiza a operação e o estoque, independentemente do canal.",
         accent: "#34d399",
+      },
+    ],
+  },
+  {
+    slug: "resultado-venda-por-venda",
+    outputName: "corepet-resultado-venda-por-venda.mp4",
+    posterName: "corepet-resultado-venda-por-venda-poster.jpg",
+    posterScene: 2,
+    voice:
+      "Faturamento sozinho não mostra se a venda deu resultado. No CorePet, cada venda apresenta o valor líquido, os impostos, as comissões, o custo dos produtos, o lucro e a margem. Ao expandir uma venda, o gestor também vê os produtos e o resultado de cada item. Assim, ele entende exatamente onde ganhou dinheiro e onde precisa agir.",
+    scenes: [
+      {
+        mode: "screen",
+        image: join(shotsDir, "erp-resultado.png"),
+        eyebrow: "Gestão em tempo real",
+        title: "Venda não é faturamento. É resultado.",
+        body: "Taxas, impostos, custos, lucro e margem aparecem sem esperar o fechamento do mês.",
+        accent: "#f59e0b",
+      },
+      {
+        mode: "screen",
+        image: join(capturesDir, "05-vendas-lista.png"),
+        eyebrow: "Resultado venda por venda",
+        title: "Cada venda mostra o que realmente aconteceu.",
+        body: "O gestor acompanha valor líquido, custos, lucro e margem em tempo real.",
+        accent: "#f59e0b",
+        copyStyle: "top:90px;bottom:auto;width:720px",
+        focus: {
+          left: 3,
+          top: 49,
+          width: 94,
+          height: 10,
+          label: "Resultado individual da venda",
+        },
+      },
+      {
+        mode: "screen",
+        image: join(shotsDir, "erp-venda-expandida.png"),
+        eyebrow: "Detalhe completo",
+        title: "Abra a venda e veja os produtos.",
+        body: "O resultado também aparece por item, com custo, lucro e margem.",
+        accent: "#34d399",
+        copyStyle: "top:90px;bottom:auto;width:690px",
+        focus: {
+          left: 4,
+          top: 64.5,
+          width: 92,
+          height: 14,
+          label: "Produtos e resultado por item",
+        },
+      },
+    ],
+  },
+  {
+    slug: "motor-campanhas",
+    voice:
+      "Campanha não precisa ser uma ação solta. No CorePet, fidelidade, cupons, retenção e notificações do app ficam no mesmo motor. A loja pode criar regras automáticas para clientes inativos e também ofertas por validade. Quando a regra identifica a oportunidade, o sistema prepara a ação e publica nos canais definidos. Menos operação manual e mais clientes voltando a comprar.",
+    scenes: [
+      {
+        mode: "screen",
+        image: join(shotsDir, "erp-campanhas.png"),
+        eyebrow: "Motor de campanhas",
+        title: "Relacionamento e venda em uma única central.",
+        body: "Fidelidade, cupons, ranking, retenção e notificações do app trabalham juntos.",
+        accent: "#14b8a6",
+      },
+      {
+        mode: "screen",
+        image: join(shotsDir, "erp-campanhas-retencao.png"),
+        eyebrow: "Retenção automática",
+        title: "O sistema identifica quem parou de comprar.",
+        body: "Cada regra pode disparar uma ação diferente conforme os dias de inatividade.",
+        accent: "#f97316",
+        copyStyle: "top:90px;bottom:auto;width:700px",
+        focus: {
+          left: 11,
+          top: 70,
+          width: 78,
+          height: 12,
+          label: "Regra automática de retenção",
+        },
+      },
+      {
+        mode: "screen",
+        image: join(shotsDir, "erp-campanhas-validade.png"),
+        eyebrow: "Oferta por validade",
+        title: "A oportunidade entra sozinha na campanha.",
+        body: "O lote elegível é publicado no app e no site com o desconto configurado.",
+        accent: "#34d399",
+        copyStyle: "top:90px;bottom:auto;width:700px",
+        focus: {
+          left: 11,
+          top: 70,
+          width: 78,
+          height: 15,
+          label: "Campanha automática por validade",
+        },
+      },
+    ],
+  },
+  {
+    slug: "entregas-rotas-custos",
+    voice:
+      "A entrega também precisa dar resultado. No CorePet, o gestor acompanha as rotas, o entregador, as paradas e o andamento da operação. Depois, o painel financeiro mostra o custo total, o custo da moto, o repasse e o custo médio por entrega. O sistema ainda alerta quando uma despesa foge do esperado. Assim, a loja entrega melhor sem perder margem no caminho.",
+    scenes: [
+      {
+        mode: "screen",
+        image: join(shotsDir, "erp-rotas.png"),
+        eyebrow: "Operação de entregas",
+        title: "Rotas, entregadores e paradas sob controle.",
+        body: "Acompanhe o que está em rota e abra o rastreio da entrega em tempo real.",
+        accent: "#3b82f6",
+      },
+      {
+        mode: "screen",
+        image: join(shotsDir, "erp-rotas.png"),
+        eyebrow: "Acompanhamento operacional",
+        title: "Saiba quem está na rua e qual é a próxima entrega.",
+        body: "Distância, tempo previsto, endereço e status ficam na mesma visão.",
+        accent: "#3b82f6",
+        copyStyle: "bottom:55px;width:760px",
+        focus: {
+          left: 1,
+          top: 23,
+          width: 98,
+          height: 30,
+          label: "Entrega em andamento",
+        },
+      },
+      {
+        mode: "screen",
+        image: join(shotsDir, "erp-entregas-financeiro.png"),
+        eyebrow: "Custo real da entrega",
+        title: "Entregar também precisa preservar a margem.",
+        body: "Custos, repasses, alertas e custo médio aparecem em tempo real.",
+        accent: "#8b5cf6",
+        copyStyle: "top:90px;bottom:auto;width:720px",
+        focus: {
+          left: 11,
+          top: 59,
+          width: 78,
+          height: 36,
+          label: "Custos e repasses da operação",
+        },
       },
     ],
   },
@@ -179,7 +320,7 @@ function brand() {
 }
 
 function copyBlock(scene) {
-  return `<div class="copy-card" style="--accent:${scene.accent}">
+  return `<div class="copy-card" style="--accent:${scene.accent};${scene.copyStyle || ""}">
     <div class="eyebrow">${escapeHtml(scene.eyebrow)}</div>
     <h1>${escapeHtml(scene.title)}</h1>
     <p>${escapeHtml(scene.body)}</p>
@@ -348,8 +489,14 @@ function generateVoice(text, outputPath) {
 }
 
 function renderVideo(video, images, audioPath) {
-  const outputPath = join(publicDir, `corepet-demo-${video.slug}.mp4`);
-  const posterPath = join(publicDir, `corepet-demo-${video.slug}-poster.jpg`);
+  const outputPath = join(
+    publicDir,
+    video.outputName || `corepet-demo-${video.slug}.mp4`,
+  );
+  const posterPath = join(
+    publicDir,
+    video.posterName || `corepet-demo-${video.slug}-poster.jpg`,
+  );
   const transition = 0.45;
   const targetDuration = audioDuration(audioPath) + 1.1;
   const sceneDuration =
@@ -418,7 +565,7 @@ function renderVideo(video, images, audioPath) {
     [
       "-y",
       "-i",
-      images[1],
+      images[video.posterScene ?? 1],
       "-vf",
       "scale=1280:-2",
       "-q:v",
