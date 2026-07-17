@@ -79,9 +79,7 @@ def test_contas_pagar_tem_atalhos_de_periodo():
 
 def test_contas_pagar_indica_e_filtra_vencimentos_de_hoje():
     source = contas_pagar_source()
-    backend_source = read_repo(
-        "backend/app/financeiro/contas_pagar_consulta_routes.py"
-    )
+    backend_source = read_repo("backend/app/financeiro/contas_pagar_consulta_routes.py")
 
     assert "Vence hoje" in source
     assert "filtrarVenceHoje" in source
