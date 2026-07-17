@@ -11,7 +11,11 @@
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import { exportarProdutoBling, exportarProdutosBlingLote } from "../api/produtos";
+import {
+  exportarProdutoBling,
+  exportarProdutosBlingLote,
+  validarVinculoProdutoBling,
+} from "../api/produtos";
 import ProdutosMainContent from "../components/produtos/ProdutosMainContent";
 import ProdutosModalsLayer from "../components/produtos/ProdutosModalsLayer";
 import { createProdutosColunas } from "../components/produtos/produtosColumns";
@@ -139,18 +143,53 @@ export default function Produtos() {
     setBlingActionKey(getProdutoBlingActionKey(produto.id));
     try {
       const response = await exportarProdutoBling(produto.id, true);
-      const status = response.data?.status;
+      const data = response.data || {};
+      const status = data.status;
       const mensagem =
         status === "criado"
           ? "Produto cadastrado no Bling."
           : status === "vinculado_existente"
             ? "Produto ja existia no Bling e foi vinculado."
             : "Produto vinculado ao Bling.";
-      toast.success(mensagem);
+      const enriquecimentos = [
+        data.imagens_enviadas ? `${data.imagens_enviadas} foto(s)` : "",
+        data.fornecedores_enviados ? `${data.fornecedores_enviados} fornecedor(es)` : "",
+      ].filter(Boolean);
+      toast.success(
+        enriquecimentos.length
+          ? `${mensagem} Enviado tambem: ${enriquecimentos.join(" e ")}.`
+          : mensagem,
+      );
+      if (data.fornecedores_detail) {
+        toast(data.fornecedores_detail, { icon: "⚠️" });
+      }
       await carregarDados();
     } catch (error) {
       console.error("Erro ao cadastrar produto no Bling:", error);
       toast.error(getMensagemErroBling(error, "Nao foi possivel cadastrar no Bling."));
+    } finally {
+      setBlingActionKey(null);
+    }
+  };
+
+  const handleValidarVinculoProdutoBling = async (produto) => {
+    if (!produto?.id || !getProdutoBlingId(produto)) return;
+
+    setBlingActionKey(getProdutoBlingActionKey(produto.id));
+    try {
+      const response = await validarVinculoProdutoBling(produto.id);
+      const data = response.data || {};
+      if (data.existe) {
+        toast.success(data.message || "Cadastro confirmado no Bling.");
+      } else {
+        toast(data.message || "O vinculo antigo foi removido. Agora voce pode criar novamente.", {
+          icon: "🔄",
+        });
+        await carregarDados();
+      }
+    } catch (error) {
+      console.error("Erro ao conferir produto no Bling:", error);
+      toast.error(getMensagemErroBling(error, "Nao foi possivel conferir o cadastro no Bling."));
     } finally {
       setBlingActionKey(null);
     }
@@ -366,6 +405,7 @@ export default function Produtos() {
       loading,
       novoPreco,
       onExportarProdutoBling: handleExportarProdutoBling,
+      onValidarVinculoProdutoBling: handleValidarVinculoProdutoBling,
       onChangeItensPorPagina: (value) => {
         setItensPorPagina(Number(value));
         setPaginaAtual(1);

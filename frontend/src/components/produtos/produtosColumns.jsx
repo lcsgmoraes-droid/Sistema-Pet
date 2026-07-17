@@ -15,10 +15,11 @@ const normalizeExpandId = (value) => String(value ?? "");
 const getProdutoBlingId = (produto) => String(produto?.bling_produto_id || "").trim();
 const getProdutoBlingActionKey = (produtoId) => `produto-bling-${produtoId}`;
 
-function renderBlingStatusBadge(produto) {
+function renderBlingStatusBadge(produto, props) {
   const blingId = getProdutoBlingId(produto);
   const status = String(produto?.bling_sync_status || "").toLowerCase();
   const temErro = status === "erro" || Boolean(produto?.bling_ultimo_erro);
+  const loading = props.blingActionKey === getProdutoBlingActionKey(produto.id);
 
   if (produto?.tipo_produto === "PAI") {
     return (
@@ -37,17 +38,27 @@ function renderBlingStatusBadge(produto) {
   }
 
   return (
-    <span
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        props.onValidarVinculoProdutoBling?.(produto);
+      }}
+      disabled={loading || !props.onValidarVinculoProdutoBling}
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium ${
         temErro
           ? "border-amber-200 bg-amber-50 text-amber-700"
           : "border-emerald-200 bg-emerald-50 text-emerald-700"
-      }`}
-      title={temErro ? produto?.bling_ultimo_erro || "Produto vinculado com erro de sync" : ""}
+      } hover:brightness-95 disabled:cursor-wait`}
+      title={
+        temErro
+          ? `${produto?.bling_ultimo_erro || "Produto vinculado com erro de sync"}. Clique para conferir no Bling.`
+          : "Clique para conferir se este cadastro ainda existe no Bling"
+      }
     >
       {temErro ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />}
-      Bling #{blingId}
-    </span>
+      {loading ? "Conferindo..." : `Bling #${blingId}`}
+    </button>
   );
 }
 
@@ -348,7 +359,7 @@ export function createProdutosColunas() {
         return (
           <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
             <div className="flex flex-col items-center gap-1.5">
-              {renderBlingStatusBadge(produto)}
+              {renderBlingStatusBadge(produto, props)}
               {podeCriar && (
                 <button
                   type="button"

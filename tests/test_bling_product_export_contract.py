@@ -13,6 +13,9 @@ def test_bling_catalog_client_can_create_product():
 
     assert "def criar_produto" in source
     assert 'self._request("POST", "/produtos", data=payload)' in source
+    assert "def listar_contatos" in source
+    assert "def criar_produto_fornecedor" in source
+    assert 'self._request("POST", "/produtos/fornecedores", data=payload)' in source
 
 
 def test_bling_product_export_routes_are_registered():
@@ -23,6 +26,9 @@ def test_bling_product_export_routes_are_registered():
     assert "router.include_router(exportacao_produtos_bling_router)" in source
     assert '@router.post("/produtos-bling/exportar")' in export_source
     assert '@router.post("/produtos-bling/exportar-lote")' in export_source
+    assert (
+        '@router.post("/produtos-bling/validar-vinculo/{produto_id}")' in export_source
+    )
 
 
 def test_frontend_exposes_single_and_batch_product_export():
@@ -53,9 +59,27 @@ def test_product_list_exposes_bling_export_status_and_actions():
     assert "filtrosLimpos.incluir_bling_sync = true" in hook
     assert "exportarProdutoBling" in page
     assert "exportarProdutosBlingLote" in page
+    assert "validarVinculoProdutoBling" in page
     assert 'key: "bling"' in columns
     assert "Sem Bling" in columns
+    assert "Clique para conferir" in columns
     assert "Enviar ao Bling" in header
+
+
+def test_bling_product_export_sends_supported_enrichment_fields():
+    export_source = read_text("backend/app/bling_sync/product_export_enrichment.py")
+
+    for field in (
+        '"dataValidade"',
+        '"itensPorCaixa"',
+        '"tipoProducao"',
+        '"freteGratis"',
+        '"percentualTributos"',
+        '"imagensURL"',
+        '"precoCusto"',
+        '"precoCompra"',
+    ):
+        assert field in export_source
 
 
 def test_product_list_counts_parent_variations_in_batch():

@@ -110,6 +110,7 @@ export default function ProdutosTabelaSection({
   navigate,
   novoPreco,
   onExportarProdutoBling,
+  onValidarVinculoProdutoBling,
   onChangeItensPorPagina,
   onIrParaPagina,
   paginaAtual,
@@ -162,6 +163,7 @@ export default function ProdutosTabelaSection({
     handleExcluir,
     handleToggleAtivo,
     onExportarProdutoBling,
+    onValidarVinculoProdutoBling,
     blingActionKey,
   });
 
@@ -314,17 +316,34 @@ export default function ProdutosTabelaSection({
                                   Inativo
                                 </span>
                               )}
-                              <span
+                              <button
+                                type="button"
+                                disabled={blingLoading || !blingId}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  if (blingId && onValidarVinculoProdutoBling) {
+                                    onValidarVinculoProdutoBling(produto);
+                                  }
+                                }}
                                 className={`rounded-full px-2 py-0.5 ${
                                   blingId
-                                    ? "bg-emerald-50 text-emerald-700"
+                                    ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait"
                                     : isPai
                                       ? "bg-slate-100 text-slate-600"
                                       : "bg-amber-50 text-amber-700"
                                 }`}
+                                title={
+                                  blingId ? "Clique para conferir se ainda existe no Bling" : ""
+                                }
                               >
-                                {blingId ? `Bling #${blingId}` : isPai ? "Agrupador" : "Sem Bling"}
-                              </span>
+                                {blingLoading && blingId
+                                  ? "Conferindo..."
+                                  : blingId
+                                    ? `Bling #${blingId}`
+                                    : isPai
+                                      ? "Agrupador"
+                                      : "Sem Bling"}
+                              </button>
                               <ChannelBadges channels={canaisAtivos} layout="row" empty="" />
                             </div>
                           </div>

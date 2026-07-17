@@ -146,6 +146,10 @@ export const exportarProdutoBling = (produtoId, enviarEstoque = true) => {
   });
 };
 
+export const validarVinculoProdutoBling = (produtoId) => {
+  return api.post(`/estoque/sync/produtos-bling/validar-vinculo/${Number(produtoId)}`);
+};
+
 export const exportarProdutosBlingLote = (produtoIds, enviarEstoque = true) => {
   return api.post(
     "/estoque/sync/produtos-bling/exportar-lote",
@@ -525,6 +529,7 @@ export default {
   getProdutos,
   exportarProdutoBling,
   exportarProdutosBlingLote,
+  validarVinculoProdutoBling,
   getProduto,
   createProduto,
   updateProduto,
