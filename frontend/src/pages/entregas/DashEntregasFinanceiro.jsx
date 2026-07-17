@@ -11,6 +11,7 @@
  */
 import { useEffect, useState } from "react";
 import api from "../../api";
+import { formatMoneyBRL } from "../../utils/formatters";
 import {
   FiCalendar,
   FiRefreshCw,
@@ -116,12 +117,12 @@ export default function DashEntregasFinanceiro() {
           {margem >= 0 ? (
             <>
               A taxa de entrega está <strong>cobrindo os custos</strong> com uma margem média de{" "}
-              <strong>{formatarMoeda(margem)}</strong> por entrega.
+              <strong>{formatMoneyBRL(margem)}</strong> por entrega.
             </>
           ) : (
             <>
               ⚠️ A taxa de entrega está <strong>abaixo dos custos</strong>. Déficit médio de{" "}
-              <strong>{formatarMoeda(Math.abs(margem))}</strong> por entrega.
+              <strong>{formatMoneyBRL(Math.abs(margem))}</strong> por entrega.
             </>
           )}
         </p>
@@ -258,33 +259,40 @@ export default function DashEntregasFinanceiro() {
               colorClasse="border-blue-200 bg-blue-50"
             />
             <Card
+              titulo="Rotas Concluídas"
+              valor={dados.total_rotas || 0}
+              icon={<FiCalendar className="text-indigo-600" />}
+              colorClasse="border-indigo-200 bg-indigo-50"
+              subtitulo="Uma rota pode ter várias entregas"
+            />
+            <Card
               titulo="Custo Total"
-              valor={formatarMoeda(dados.custo_total_entregas)}
+              valor={formatMoneyBRL(dados.custo_total_entregas)}
               icon={<FiDollarSign className="text-red-600" />}
               colorClasse="border-red-200 bg-red-50"
               subtitulo="Entregadores + Moto"
             />
             <Card
               titulo="Custo Entregadores"
-              valor={formatarMoeda(dados.custo_total_entregadores)}
+              valor={formatMoneyBRL(dados.custo_total_entregadores)}
               icon={<FiUser className="text-purple-600" />}
               colorClasse="border-purple-200 bg-purple-50"
             />
             <Card
               titulo="Custo da Moto"
-              valor={formatarMoeda(dados.custo_total_moto)}
+              valor={formatMoneyBRL(dados.custo_total_moto)}
               icon={<FiTool className="text-orange-600" />}
               colorClasse="border-orange-200 bg-orange-50"
             />
             <Card
               titulo="Repasse aos Entregadores"
-              valor={formatarMoeda(dados.total_repasse_taxa)}
+              valor={formatMoneyBRL(dados.total_repasse_taxa)}
               icon={<FiCreditCard className="text-green-600" />}
               colorClasse="border-green-200 bg-green-50"
             />
             <Card
               titulo="Custo Médio por Entrega"
-              valor={formatarMoeda(dados.custo_medio_por_entrega)}
+              valor={formatMoneyBRL(dados.custo_medio_por_entrega)}
               icon={<FiTrendingDown className="text-indigo-600" />}
               colorClasse="border-indigo-200 bg-indigo-50"
             />
@@ -316,7 +324,7 @@ export default function DashEntregasFinanceiro() {
                       />
                       <YAxis tick={{ fontSize: 12 }} />
                       <Tooltip
-                        formatter={(value) => `R$ ${Number(value).toFixed(2)}`}
+                        formatter={(value) => formatMoneyBRL(value)}
                         labelFormatter={(label) => {
                           const [ano, mes, dia] = label.split("-");
                           return `${dia}/${mes}/${ano}`;
@@ -357,7 +365,7 @@ export default function DashEntregasFinanceiro() {
                       />
                       <YAxis tick={{ fontSize: 12 }} />
                       <Tooltip
-                        formatter={(value) => `R$ ${Number(value).toFixed(2)}`}
+                        formatter={(value) => formatMoneyBRL(value)}
                         labelFormatter={(label) => {
                           const [ano, mes, dia] = label.split("-");
                           return `${dia}/${mes}/${ano}`;
@@ -396,7 +404,7 @@ export default function DashEntregasFinanceiro() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" />
                       <YAxis />
-                      <Tooltip formatter={(value) => `R$ ${Number(value).toFixed(2)}`} />
+                      <Tooltip formatter={(value) => formatMoneyBRL(value)} />
                       <Legend />
                       <Bar dataKey="Taxa Cobrada" fill="#10b981" />
                       <Bar dataKey="Custo Real" fill="#ef4444" />
@@ -405,13 +413,13 @@ export default function DashEntregasFinanceiro() {
                   <div className="mt-4 text-center">
                     {graficos.taxa_vs_custo.taxa_media >= graficos.taxa_vs_custo.custo_medio ? (
                       <p className="text-green-600 font-medium">
-                        ✅ Taxa média (R$ {graficos.taxa_vs_custo.taxa_media.toFixed(2)}) cobre o
-                        custo médio (R$ {graficos.taxa_vs_custo.custo_medio.toFixed(2)})
+                        ✅ Taxa média ({formatMoneyBRL(graficos.taxa_vs_custo.taxa_media)}) cobre o
+                        custo médio ({formatMoneyBRL(graficos.taxa_vs_custo.custo_medio)})
                       </p>
                     ) : (
                       <p className="text-red-600 font-medium">
-                        ⚠️ Taxa média (R$ {graficos.taxa_vs_custo.taxa_media.toFixed(2)}) está
-                        abaixo do custo médio (R$ {graficos.taxa_vs_custo.custo_medio.toFixed(2)})
+                        ⚠️ Taxa média ({formatMoneyBRL(graficos.taxa_vs_custo.taxa_media)}) está
+                        abaixo do custo médio ({formatMoneyBRL(graficos.taxa_vs_custo.custo_medio)})
                       </p>
                     )}
                   </div>
@@ -507,14 +515,6 @@ function AnalyseSkeleton() {
       }}
     />
   );
-}
-
-function formatarMoeda(valor) {
-  if (valor === null || valor === undefined) return "R$ 0,00";
-  return valor.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
 }
 
 function formatarData(dataISO) {

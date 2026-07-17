@@ -121,9 +121,12 @@ def criar_rota(
 
         # Somar taxas de entrega de todas as vendas
         taxa_total = sum(v.taxa_entrega for v in vendas if v.taxa_entrega)
+        repasse_total = sum(
+            v.valor_taxa_entregador for v in vendas if v.valor_taxa_entregador
+        )
 
         rota.taxa_entrega_cliente = taxa_total if taxa_total > 0 else None
-        # valor_repasse_entregador será calculado posteriormente (não existe na venda)
+        rota.valor_repasse_entregador = repasse_total if repasse_total > 0 else None
 
         # Definir pontos inicial e final
         # Montar endereço completo do ponto inicial a partir da configuração
@@ -281,8 +284,16 @@ def criar_rota(
         status="pendente",
         created_by=user.id,
         # ETAPA 7.1: Snapshot dos valores de repasse (se fornecidos)
-        taxa_entrega_cliente=payload.taxa_entrega_cliente,
-        valor_repasse_entregador=payload.valor_repasse_entregador,
+        taxa_entrega_cliente=(
+            payload.taxa_entrega_cliente
+            if payload.taxa_entrega_cliente is not None
+            else venda.taxa_entrega
+        ),
+        valor_repasse_entregador=(
+            payload.valor_repasse_entregador
+            if payload.valor_repasse_entregador is not None
+            else venda.valor_taxa_entregador
+        ),
     )
 
     # Número da rota (simples por enquanto)

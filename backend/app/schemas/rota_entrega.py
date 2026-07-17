@@ -5,7 +5,7 @@ Schemas Pydantic para Rotas de Entrega - ETAPA 9.3
 from typing import Optional, List
 from decimal import Decimal
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ClienteEntregadorResponse(BaseModel):
@@ -84,6 +84,15 @@ class RotaEntregaParadaResponse(BaseModel):
     cliente_nome: Optional[str] = None
     cliente_telefone: Optional[str] = None
     cliente_celular: Optional[str] = None
+    numero_venda: Optional[str] = None
+    valor_venda: Optional[Decimal] = None
+    taxa_entrega: Optional[Decimal] = None
+    data_venda: Optional[datetime] = None
+    forma_pagamento: Optional[str] = None
+    status_pagamento: Optional[str] = None
+    valor_pago: Optional[Decimal] = None
+    observacoes_entrega: Optional[str] = None
+    canal_venda: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -97,7 +106,16 @@ class RotaEntregaResponse(RotaEntregaBase):
 
     distancia_real: Optional[Decimal] = None
     custo_real: Optional[Decimal] = None
+    custo_moto: Optional[Decimal] = None
+    custo_entregador: Optional[Decimal] = None
+    custo_por_entrega: Optional[Decimal] = None
     tentativas: int
+
+    total_entregas: int = 0
+    entregas_concluidas: int = 0
+    valor_total_vendas: Decimal = Decimal("0")
+    taxa_total_entregas: Decimal = Decimal("0")
+    duracao_minutos: Optional[int] = None
 
     # Controle de KM da moto (opcional)
     km_inicial: Optional[Decimal] = None
@@ -120,7 +138,7 @@ class RotaEntregaResponse(RotaEntregaBase):
     distancia_ate_ultima_entrega_km_real: Optional[Decimal] = None
 
     # ETAPA 9.3: Incluir paradas ordenadas
-    paradas: Optional[List[RotaEntregaParadaResponse]] = []
+    paradas: List[RotaEntregaParadaResponse] = Field(default_factory=list)
 
     # Incluir dados do entregador
     entregador: Optional[ClienteEntregadorResponse] = None

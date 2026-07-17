@@ -83,6 +83,13 @@ def fechar_rota(
             ),
         )
 
+    quantidade_entregas = len(paradas) if paradas else (1 if rota.venda_id else 0)
+    if quantidade_entregas == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="A rota nao possui entregas para finalizar.",
+        )
+
     # Atualizar campos
     if payload.km_final is not None:
         rota.km_final = payload.km_final
@@ -141,7 +148,7 @@ def fechar_rota(
             venda.status_entrega = "entregue"
             venda.data_entrega = venda.data_entrega or conclusao_em
 
-    rota.tentativas = payload.tentativas or 1
+    rota.tentativas = max(int(rota.tentativas or 1), int(payload.tentativas or 1))
     rota.observacoes = payload.observacoes
     rota.status = "concluida"
     rota.data_conclusao = conclusao_em
@@ -153,6 +160,7 @@ def fechar_rota(
         km=km_para_custo,
         tentativas=rota.tentativas,
         moto_da_loja=rota.moto_da_loja,
+        quantidade_entregas=quantidade_entregas,
     )
 
     # ETAPA 8 + 11.1: Se moto da loja, calcular e armazenar custo da moto separadamente
