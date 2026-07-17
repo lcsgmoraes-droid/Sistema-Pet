@@ -77,8 +77,6 @@ export default function PedidosCompraModalsLayer({
   grupoFornecedorAtual,
   incluirGrupoFornecedor,
   setIncluirGrupoFornecedor,
-  apenasFornecedorPrincipal,
-  setApenasFornecedorPrincipal,
   limparEstadosSugestao,
   sugestoes,
   produtosSelecionados,
@@ -247,8 +245,6 @@ export default function PedidosCompraModalsLayer({
         grupoFornecedorAtual={grupoFornecedorAtual}
         incluirGrupoFornecedor={incluirGrupoFornecedor}
         setIncluirGrupoFornecedor={setIncluirGrupoFornecedor}
-        apenasFornecedorPrincipal={apenasFornecedorPrincipal}
-        setApenasFornecedorPrincipal={setApenasFornecedorPrincipal}
         limparEstadosSugestao={limparEstadosSugestao}
         sugestoes={sugestoes}
         produtosSelecionados={produtosSelecionados}

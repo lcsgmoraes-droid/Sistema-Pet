@@ -1,4 +1,4 @@
-import { RefreshCw, Search, X } from "lucide-react";
+import { Info, RefreshCw, Search, X } from "lucide-react";
 
 export default function PedidosCompraSugestaoHeader({
   fecharModalSugestao,
@@ -25,8 +25,6 @@ export default function PedidosCompraSugestaoHeader({
   grupoFornecedorAtual,
   incluirGrupoFornecedor,
   setIncluirGrupoFornecedor,
-  apenasFornecedorPrincipal,
-  setApenasFornecedorPrincipal,
   limparEstadosSugestao,
   sugestoes,
   produtosSelecionados,
@@ -206,22 +204,21 @@ export default function PedidosCompraSugestaoHeader({
                     />
                     <span>Incluir Alertas</span>
                   </label>
-                  <label className="flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1">
-                    <input
-                      type="checkbox"
-                      checked={apenasFornecedorPrincipal}
-                      onChange={(e) => {
-                        setApenasFornecedorPrincipal(e.target.checked);
-                        limparEstadosSugestao();
-                      }}
-                      className="h-4 w-4 rounded"
-                    />
+                  <div
+                    className="flex items-center gap-2 rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-teal-800"
+                    title={
+                      incluirGrupoFornecedor
+                        ? "Mostra todos os produtos habilitados para sugestao vinculados a qualquer CNPJ do grupo, seja o fornecedor principal ou alternativo do produto."
+                        : "Mostra todos os produtos habilitados para sugestao vinculados ao fornecedor, seja ele principal ou alternativo do produto."
+                    }
+                  >
+                    <Info className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span>
                       {incluirGrupoFornecedor
-                        ? "Somente principais do grupo"
-                        : "Somente fornecedor principal"}
+                        ? "Produtos habilitados de qualquer CNPJ do grupo"
+                        : "Produtos habilitados deste fornecedor"}
                     </span>
-                  </label>
+                  </div>
                   {grupoFornecedorAtual && (
                     <label className="flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1">
                       <input

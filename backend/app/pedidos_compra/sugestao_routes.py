@@ -185,7 +185,7 @@ def sugerir_pedido_inteligente(
             or_(Produto.e_granel.is_(False), Produto.e_granel.is_(None)),
             ~Produto.nome.ilike("%granel%"),
             ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids),
-            ProdutoFornecedor.ativo,
+            _filtro_ativo_ou_legado_sugestao(ProdutoFornecedor.ativo),
         )
     )
 

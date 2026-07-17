@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import List, Optional
@@ -30,6 +32,59 @@ logger = logging.getLogger(__name__)
 def _filtro_ativo_ou_legado_sugestao(coluna_ativo):
     """Inclui registros ativos e cadastros legados sem flag de atividade."""
     return or_(coluna_ativo.is_(True), coluna_ativo.is_(None))
+
+
+def _normalizar_cnpj_fornecedor(valor) -> str:
+    return re.sub(r"\D", "", str(valor or ""))
+
+
+def _normalizar_nome_fornecedor(valor) -> str:
+    texto = unicodedata.normalize("NFKD", str(valor or "").strip().casefold())
+    texto_sem_acentos = "".join(
+        caractere for caractere in texto if not unicodedata.combining(caractere)
+    )
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", texto_sem_acentos).split())
+
+
+def _expandir_ids_fornecedores_equivalentes(
+    fornecedores_grupo,
+    fornecedores_tenant,
+) -> set[int]:
+    """Inclui aliases legados do mesmo fornecedor sem misturar CNPJs distintos."""
+    ids_grupo = {int(fornecedor.id) for fornecedor in fornecedores_grupo}
+    cnpjs_grupo = {
+        cnpj
+        for fornecedor in fornecedores_grupo
+        if (cnpj := _normalizar_cnpj_fornecedor(fornecedor.cnpj))
+    }
+    nomes_grupo = {
+        nome
+        for fornecedor in fornecedores_grupo
+        for valor in (fornecedor.nome, fornecedor.razao_social)
+        if (nome := _normalizar_nome_fornecedor(valor))
+    }
+
+    ids_expandidos = set(ids_grupo)
+    for fornecedor in fornecedores_tenant:
+        fornecedor_id = int(fornecedor.id)
+        if fornecedor_id in ids_grupo:
+            continue
+
+        cnpj = _normalizar_cnpj_fornecedor(fornecedor.cnpj)
+        if cnpj:
+            if cnpj in cnpjs_grupo:
+                ids_expandidos.add(fornecedor_id)
+            continue
+
+        nomes = {
+            nome
+            for valor in (fornecedor.nome, fornecedor.razao_social)
+            if (nome := _normalizar_nome_fornecedor(valor))
+        }
+        if nomes & nomes_grupo:
+            ids_expandidos.add(fornecedor_id)
+
+    return ids_expandidos
 
 
 def _resolver_fornecedores_compra(
@@ -71,7 +126,7 @@ def _resolver_fornecedores_compra(
         return [fornecedor.id], None
 
     fornecedores_grupo = (
-        db.query(Cliente.id)
+        db.query(Cliente.id, Cliente.nome, Cliente.razao_social, Cliente.cnpj)
         .filter(
             Cliente.tenant_id == tenant_id,
             Cliente.tipo_cadastro == "fornecedor",
@@ -80,8 +135,20 @@ def _resolver_fornecedores_compra(
         )
         .all()
     )
+    fornecedores_tenant = (
+        db.query(Cliente.id, Cliente.nome, Cliente.razao_social, Cliente.cnpj)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "fornecedor",
+        )
+        .all()
+    )
     fornecedor_ids = sorted(
-        {linha[0] for linha in fornecedores_grupo} | {fornecedor.id}
+        _expandir_ids_fornecedores_equivalentes(
+            fornecedores_grupo,
+            fornecedores_tenant,
+        )
+        | {fornecedor.id}
     )
 
     return fornecedor_ids, grupo

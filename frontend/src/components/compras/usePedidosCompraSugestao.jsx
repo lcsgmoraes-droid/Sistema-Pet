@@ -39,7 +39,6 @@ export default function usePedidosCompraSugestao({
   const [contextoRascunhoSugestao, setContextoRascunhoSugestao] = useState(null);
   const [modoAplicacaoSugestao, setModoAplicacaoSugestao] = useState("merge");
   const [estrategiaMesclaItens, setEstrategiaMesclaItens] = useState("somar");
-  const [apenasFornecedorPrincipal, setApenasFornecedorPrincipal] = useState(true);
 
   const cabecalhoTabelaSugestaoRef = useRef(null);
   const corpoTabelaSugestaoRef = useRef(null);
@@ -74,7 +73,6 @@ export default function usePedidosCompraSugestao({
           dias_cobertura: diasCobertura,
           apenas_criticos: apenasCriticos,
           incluir_alerta: incluirAlerta,
-          apenas_fornecedor_principal: apenasFornecedorPrincipal,
           marca_ids: marcasSelecionadas,
           ...obterParametrosGrupoFornecedor(fornecedorId),
         },
@@ -641,8 +639,6 @@ export default function usePedidosCompraSugestao({
     setModoAplicacaoSugestao,
     estrategiaMesclaItens,
     setEstrategiaMesclaItens,
-    apenasFornecedorPrincipal,
-    setApenasFornecedorPrincipal,
     cabecalhoTabelaSugestaoRef,
     corpoTabelaSugestaoRef,
     filtroMarcasRef,
