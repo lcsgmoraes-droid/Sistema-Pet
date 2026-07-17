@@ -1,8 +1,32 @@
+import { formatarDataISO } from "./contasPagarFilterHelpers.js";
+
 export function formatarDataContasPagar(data) {
   if (!data) return "-";
   const partes = data.split("T")[0].split("-");
   const dataLocal = new Date(parseInt(partes[0]), parseInt(partes[1]) - 1, parseInt(partes[2]));
   return dataLocal.toLocaleDateString("pt-BR");
+}
+
+export function ehVencimentoHojeContasPagar(dataVencimento, dataReferencia = new Date()) {
+  if (!dataVencimento) return false;
+
+  const vencimentoISO = String(dataVencimento).split("T")[0];
+  return vencimentoISO === formatarDataISO(dataReferencia);
+}
+
+export function getStatusVisualContasPagar(conta, dataReferencia = new Date()) {
+  const status = String(conta?.status || "pendente").toLowerCase();
+
+  if (status === "cancelado") return "cancelado";
+  if (status === "pago") return "pago";
+
+  const vencimentoISO = conta?.data_vencimento ? String(conta.data_vencimento).split("T")[0] : "";
+  const hojeISO = formatarDataISO(dataReferencia);
+
+  if (vencimentoISO && vencimentoISO < hojeISO) return "vencida";
+  if (vencimentoISO === hojeISO) return "vence_hoje";
+  if (status === "parcial") return "parcial";
+  return "pendente";
 }
 
 export function getOrigemLabelContasPagar(conta) {

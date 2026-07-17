@@ -37,6 +37,7 @@
     "test:calculadora-racao-refactor": "node scripts/test-calculadora-racao-refactor.mjs",
     "test:lembretes-refactor": "node scripts/test-lembretes-refactor.mjs",
     "test:modal-nova-conta-pagar-refactor": "node scripts/test-modal-nova-conta-pagar-refactor.mjs",
+    "test:contas-pagar-vence-hoje": "node scripts/test-contas-pagar-vence-hoje.mjs",
     "test:final-gui-large-files-refactor": "node scripts/test-final-gui-large-files-refactor.mjs",
     "test:frontend-zero-large-files-refactor": "node scripts/test-frontend-zero-large-files-refactor.mjs",
     "test:large-files-700-batch-refactor": "node scripts/test-large-files-700-batch-refactor.mjs",

@@ -77,6 +77,22 @@ def test_contas_pagar_tem_atalhos_de_periodo():
     assert "filtros.periodo_rapido === periodo.value" in source
 
 
+def test_contas_pagar_indica_e_filtra_vencimentos_de_hoje():
+    source = contas_pagar_source()
+    backend_source = read_repo(
+        "backend/app/financeiro/contas_pagar_consulta_routes.py"
+    )
+
+    assert "Vence hoje" in source
+    assert "filtrarVenceHoje" in source
+    assert "ehVencimentoHojeContasPagar" in source
+    assert "getStatusVisualContasPagar" in source
+    assert 'params.append("vence_hoje", "true")' in source
+    assert "vence_hoje: bool = Query(False)" in backend_source
+    assert 'ContaPagar.status.notin_(["pago", "cancelado"])' in backend_source
+    assert "ContaPagar.data_vencimento == date.today()" in backend_source
+
+
 def test_contas_pagar_lista_abre_edicao_de_lancamento():
     source = contas_pagar_source()
 

@@ -15,10 +15,12 @@ export {
 } from "./contasPagarFilterHelpers";
 
 export {
+  ehVencimentoHojeContasPagar,
   encontrarFornecedorFiltroContasPagar,
   formatarDataContasPagar,
   getContaTooltipContasPagar,
   getDescricaoPrincipalContasPagar,
   getOrigemLabelContasPagar,
+  getStatusVisualContasPagar,
   ordenarTiposDespesaContasPagar,
 } from "./contasPagarDisplayHelpers";

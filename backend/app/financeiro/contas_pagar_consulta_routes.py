@@ -53,6 +53,7 @@ def listar_contas_pagar(
     data_fim: Optional[date] = Query(None),
     apenas_vencidas: bool = Query(False),
     apenas_vencer: bool = Query(False),
+    vence_hoje: bool = Query(False),
     ocultar_taxas_cartao: bool = Query(False),
     apenas_taxas_cartao: bool = Query(False),
     numero_nf: Optional[str] = Query(None),
@@ -196,6 +197,13 @@ def listar_contas_pagar(
         query = query.filter(
             and_(
                 ContaPagar.status != "pago", ContaPagar.data_vencimento >= date.today()
+            )
+        )
+    if vence_hoje:
+        query = query.filter(
+            and_(
+                ContaPagar.status.notin_(["pago", "cancelado"]),
+                ContaPagar.data_vencimento == date.today(),
             )
         )
 
