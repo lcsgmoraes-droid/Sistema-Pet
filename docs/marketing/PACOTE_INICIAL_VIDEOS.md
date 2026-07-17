@@ -18,21 +18,41 @@ Criar um conjunto pequeno, coerente e reutilizavel:
 - 1 video de onboarding para novos usuarios.
 - 1 video horizontal maior para apresentacao consultiva.
 
+## Campanha prioritaria — venda ativa e recorrencia
+
+A mensagem principal desta fase esta detalhada em
+`CAMPANHA_VENDA_ATIVA_RECORRENCIA.md`.
+
+Primeira entrega produzida:
+
+- video vertical narrado de aproximadamente 23 segundos para WhatsApp e redes sociais;
+- video horizontal para apresentacoes e landing page;
+- poster vertical;
+- telas reais do demo mostrando recorrencia, produtos integrados e rentabilidade;
+- landing reposicionada para venda ativa, recorrencia, integracao e gestao do lucro.
+
+Frase central:
+
+```text
+Seu ERP registra o que voce vendeu. O CorePet trabalha para vender de novo.
+```
+
 ## Ordem recomendada
 
 | Ordem | Video | Tipo | Duracao | Formato principal | Documento base |
 |---|---|---|---:|---|---|
-| 1 | Estoque que some | Venda | 20s | 9:16 | `ROTEIROS_CRIATIVOS_VENDA.md` |
-| 2 | Recebimentos baguncados | Venda | 30s | 9:16 | `ROTEIROS_CRIATIVOS_VENDA.md` |
-| 3 | Lucro real | Venda | 25s | 9:16 | `ROTEIROS_CRIATIVOS_VENDA.md` |
-| 4 | Comparador de racao | Venda/demo | 25s a 45s | 9:16 e 16:9 | `ROTEIROS_CRIATIVOS_VENDA.md` |
-| 5 | Vendas com rentabilidade | Demo | 60s | 16:9 | `ROTEIROS_DEMO_FUNCIONALIDADES.md` |
-| 6 | Produto, PDV e estoque | Demo | 60s | 16:9 e 9:16 | `ROTEIROS_DEMO_FUNCIONALIDADES.md` |
-| 7 | Financeiro antes da primeira venda | Demo | 75s | 16:9 | `ROTEIROS_DEMO_FUNCIONALIDADES.md` |
-| 8 | Entregas e comissoes | Demo | 60s | 16:9 | `ROTEIROS_DEMO_FUNCIONALIDADES.md` |
-| 9 | Configuracao inicial | Demo/onboarding | 60s | 16:9 e 9:16 | `ROTEIROS_DEMO_FUNCIONALIDADES.md` |
-| 10 | Como configurar do zero | Onboarding | 3 a 5 min | 16:9 | `GUIA_IMPLANTACAO_INICIAL.md` |
-| 11 | Visao geral Sistema Pet | Apresentacao | 5 a 8 min | 16:9 | `APRESENTACAO_COMERCIAL_DEMO_5_8_MIN.md` |
+| 1 | Venda ativa e recorrencia | Venda | 23s | 9:16 e 16:9 | `CAMPANHA_VENDA_ATIVA_RECORRENCIA.md` |
+| 2 | Estoque que some | Venda | 20s | 9:16 | `ROTEIROS_CRIATIVOS_VENDA.md` |
+| 3 | Recebimentos baguncados | Venda | 30s | 9:16 | `ROTEIROS_CRIATIVOS_VENDA.md` |
+| 4 | Lucro real | Venda | 25s | 9:16 | `ROTEIROS_CRIATIVOS_VENDA.md` |
+| 5 | Comparador de racao | Venda/demo | 25s a 45s | 9:16 e 16:9 | `ROTEIROS_CRIATIVOS_VENDA.md` |
+| 6 | Vendas com rentabilidade | Demo | 60s | 16:9 | `ROTEIROS_DEMO_FUNCIONALIDADES.md` |
+| 7 | Produto, PDV e estoque | Demo | 60s | 16:9 e 9:16 | `ROTEIROS_DEMO_FUNCIONALIDADES.md` |
+| 8 | Financeiro antes da primeira venda | Demo | 75s | 16:9 | `ROTEIROS_DEMO_FUNCIONALIDADES.md` |
+| 9 | Entregas e comissoes | Demo | 60s | 16:9 | `ROTEIROS_DEMO_FUNCIONALIDADES.md` |
+| 10 | Configuracao inicial | Demo/onboarding | 60s | 16:9 e 9:16 | `ROTEIROS_DEMO_FUNCIONALIDADES.md` |
+| 11 | Como configurar do zero | Onboarding | 3 a 5 min | 16:9 | `GUIA_IMPLANTACAO_INICIAL.md` |
+| 12 | Visao geral Sistema Pet | Apresentacao | 5 a 8 min | 16:9 | `APRESENTACAO_COMERCIAL_DEMO_5_8_MIN.md` |
 
 ## Lote 1 - Criativos de venda
 
@@ -307,6 +327,7 @@ Para cada video:
 
 | Video | Roteiro | Base demo | Gravado | Editado | Publicado |
 |---|---|---|---|---|---|
+| Venda ativa e recorrencia | Pronto | Capturas reais validadas | Gravado | Pronto, com narracao | Pendente |
 | Estoque que some | Pronto | Dados validados | Pendente | Pendente | Pendente |
 | Recebimentos baguncados | Pronto | Dados validados | Pendente | Pendente | Pendente |
 | Lucro real | Pronto | Dados validados | Pendente | Pendente | Pendente |

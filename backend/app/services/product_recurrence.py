@@ -98,7 +98,16 @@ def process_finalized_sale_recurrence(
     purchase_at = getattr(venda, "data_finalizacao", None) or datetime.utcnow()
     processed: set[tuple[int, int | None]] = set()
 
-    for item in getattr(venda, "itens", []):
+    sale_items = (
+        db.query(VendaItem)
+        .filter(
+            VendaItem.tenant_id == tenant_id,
+            VendaItem.venda_id == venda.id,
+        )
+        .all()
+    )
+
+    for item in sale_items:
         if getattr(item, "tipo", None) != "produto" or not getattr(
             item, "produto_id", None
         ):
@@ -279,6 +288,7 @@ def run_due_recurrence_notifications(*, db_factory, logger_override=None) -> dic
     from app.models import Tenant, User
     from app.produtos_models import Lembrete
     from app.tenancy.context import tenant_context
+    from app.vendas_models import Venda  # noqa: F401 - registra a FK de lembretes
 
     log = logger_override or logger
     db = db_factory()
@@ -300,8 +310,7 @@ def run_due_recurrence_notifications(*, db_factory, logger_override=None) -> dic
                         .limit(200)
                         .all()
                     )
-                    stats["tenants"] += 1
-                    stats["due"] += len(due)
+                    tenant_queued = 0
                     for reminder in due:
                         customer_email = (
                             str(getattr(reminder.cliente, "email", "") or "")
@@ -361,8 +370,11 @@ def run_due_recurrence_notifications(*, db_factory, logger_override=None) -> dic
                             reminder.data_notificacao_enviada = datetime.utcnow()
                             reminder.status = "notificado"
                             reminder.metodo_notificacao = "app"
-                            stats["queued"] += int(queued)
+                            tenant_queued += int(queued)
                     db.commit()
+                    stats["tenants"] += 1
+                    stats["due"] += len(due)
+                    stats["queued"] += tenant_queued
                 except Exception:
                     db.rollback()
                     log.exception("[ProductRecurrence] Falha no tenant %s", tenant_id)

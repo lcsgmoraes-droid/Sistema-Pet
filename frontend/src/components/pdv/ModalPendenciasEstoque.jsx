@@ -492,8 +492,8 @@ export default function ModalPendenciasEstoque({
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
-                  <strong>📲 O cliente será notificado automaticamente via WhatsApp</strong> quando
-                  o produto entrar no estoque.
+                  <strong>📲 O cliente será notificado automaticamente pelo app</strong> quando o
+                  produto entrar no estoque.
                 </p>
               </div>
 

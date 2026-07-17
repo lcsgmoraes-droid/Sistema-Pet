@@ -29,6 +29,10 @@ export default function LoginScreen({ navigation, route }: any) {
   const [carregando, setCarregando] = useState(false);
   const { login, pendingProfiles, needsProfileSelection, selectProfile } = useAuthStore();
 
+  function voltarAoConteudo() {
+    navigation.reset({ index: 0, routes: [{ name: 'AppTabs' }] });
+  }
+
   useEffect(() => {
     if (emailConfirmadoParam) {
       setEmail(emailConfirmadoParam);
@@ -43,6 +47,7 @@ export default function LoginScreen({ navigation, route }: any) {
     setCarregando(true);
     try {
       await login(email.trim().toLowerCase(), senha);
+      if (useAuthStore.getState().isAuthenticated) voltarAoConteudo();
     } catch (err: any) {
       const msg =
         err?.response?.data?.detail === 'Incorrect username or password'
@@ -58,6 +63,7 @@ export default function LoginScreen({ navigation, route }: any) {
     setCarregando(true);
     try {
       await selectProfile(profileType);
+      if (useAuthStore.getState().isAuthenticated) voltarAoConteudo();
     } catch (err: any) {
       const msg = err?.response?.data?.detail || 'Erro ao selecionar acesso. Tente novamente.';
       Alert.alert('Erro', msg);
@@ -165,6 +171,10 @@ export default function LoginScreen({ navigation, route }: any) {
             <Text style={styles.linkTexto}>
               Não tem conta? <Text style={styles.linkDestaque}>Cadastre-se grátis</Text>
             </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.continueGuestButton} onPress={voltarAoConteudo}>
+            <Text style={styles.continueGuestText}>Continuar explorando sem login</Text>
           </TouchableOpacity>
         </View>
 
@@ -362,4 +372,6 @@ const styles = StyleSheet.create({
     fontSize: FONTE.normal,
     fontWeight: '600',
   },
+  continueGuestButton: { alignItems: 'center', marginTop: ESPACO.md },
+  continueGuestText: { color: CORES.primario, fontSize: FONTE.normal, fontWeight: '600' },
 });
