@@ -39,6 +39,7 @@ export default function ProdutosMainContent({
   onEnviarSelecionadosBling,
   onExcluirSelecionados,
   onExportarProdutoBling,
+  onValidarVinculoProdutoBling,
   onGerarRelatorioFiltrado,
   onGerarRelatorioGeral,
   onOpenFusao,
@@ -122,6 +123,7 @@ export default function ProdutosMainContent({
         blingActionKey={blingActionKey}
         onChangeItensPorPagina={onChangeItensPorPagina}
         onExportarProdutoBling={onExportarProdutoBling}
+        onValidarVinculoProdutoBling={onValidarVinculoProdutoBling}
         onIrParaPagina={onIrParaPagina}
         onIrParaPrimeiraPagina={onIrParaPrimeiraPagina}
         onIrParaUltimaPagina={onIrParaUltimaPagina}

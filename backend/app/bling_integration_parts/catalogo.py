@@ -50,6 +50,29 @@ class BlingCatalogoMixin:
         """Cria um produto no Bling API v3."""
         return self._request("POST", "/produtos", data=payload)
 
+    def listar_contatos(
+        self,
+        pesquisa: str = None,
+        numero_documento: str = None,
+        pagina: int = 1,
+        limite: int = 20,
+    ) -> Dict:
+        """Lista contatos do Bling para localizar fornecedores com seguranca."""
+        params: Dict = {
+            "pagina": pagina,
+            "limite": min(limite, 100),
+            "criterio": 1,
+        }
+        if pesquisa:
+            params["pesquisa"] = pesquisa
+        if numero_documento:
+            params["numeroDocumento"] = numero_documento
+        return self._request("GET", "/contatos", data=params)
+
+    def criar_produto_fornecedor(self, payload: Dict) -> Dict:
+        """Vincula um fornecedor e os custos a um produto do Bling."""
+        return self._request("POST", "/produtos/fornecedores", data=payload)
+
     def atualizar_estoque_produto(
         self,
         produto_id: str,

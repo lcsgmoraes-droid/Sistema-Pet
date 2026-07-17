@@ -12,17 +12,26 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.bling_integration import BlingAPI
 from app.bling_sync.catalog_snapshots import _invalidate_bling_snapshots
 from app.bling_sync.product_matching import _produto_eh_pai, _produto_sincroniza_estoque
+from app.bling_sync.product_export_enrichment import (
+    _detalhe_bling_confirma_produto,
+    _enviar_fornecedores_produto_bling,
+    _erro_bling_nao_encontrado,
+    _limpar_vinculo_bling_inexistente,
+    _montar_payload_produto_bling,
+    _texto,
+)
 from app.bling_sync.routes_common import (
     PRODUTO_NAO_ENCONTRADO,
     _buscar_item_bling_por_codigos_com_retry,
     _upsert_sync_vinculo,
+    utc_now,
 )
 from app.bling_sync.schemas import (
     ExportarProdutoLocalBlingRequest,
     ExportarProdutosLocaisBlingLoteRequest,
 )
 from app.db import get_session
-from app.produtos_models import Produto, ProdutoBlingSync
+from app.produtos_models import Produto, ProdutoBlingSync, ProdutoFornecedor
 from app.security.permissions_decorator import require_any_permission
 from app.services.bling_sync_service import BlingSyncService
 
@@ -55,132 +64,6 @@ def _detalhe_publico_erro_bling(error: Exception, *, operacao: str) -> tuple[int
     )
 
 
-def _texto(valor: Any, max_length: Optional[int] = None) -> str:
-    texto = str(valor or "").strip()
-    if max_length and len(texto) > max_length:
-        return texto[:max_length].rstrip()
-    return texto
-
-
-def _float_or_none(valor: Any) -> Optional[float]:
-    if valor is None or valor == "":
-        return None
-    try:
-        return float(valor)
-    except (TypeError, ValueError):
-        return None
-
-
-def _float_or_zero(valor: Any) -> float:
-    return _float_or_none(valor) or 0.0
-
-
-def _digits(valor: Any, allowed_lengths: Optional[set[int]] = None) -> str:
-    texto = "".join(ch for ch in str(valor or "") if ch.isdigit())
-    if allowed_lengths and len(texto) not in allowed_lengths:
-        return ""
-    return texto
-
-
-def _origem_fiscal(valor: Any) -> Optional[int]:
-    texto = _texto(valor)
-    if texto.isdigit():
-        origem = int(texto)
-        if 0 <= origem <= 8:
-            return origem
-    return None
-
-
-def _tipo_bling(produto: Produto) -> str:
-    tipo = _texto(getattr(produto, "tipo", "")).lower()
-    return "S" if tipo in {"servico", "servico_produto"} else "P"
-
-
-def _montar_payload_produto_bling(produto: Produto) -> dict[str, Any]:
-    nome = _texto(produto.nome, 120) or _texto(produto.codigo, 120)
-    payload: dict[str, Any] = {
-        "nome": nome,
-        "codigo": _texto(produto.codigo, 80),
-        "preco": _float_or_zero(produto.preco_venda),
-        "tipo": _tipo_bling(produto),
-        "situacao": "A" if bool(produto.situacao) else "I",
-        "formato": "S",
-        "unidade": _texto(produto.unidade, 10) or "UN",
-    }
-
-    descricao_curta = _texto(produto.descricao_curta, 500)
-    descricao_completa = _texto(produto.descricao_completa, 4000)
-    if descricao_curta:
-        payload["descricaoCurta"] = descricao_curta
-    if descricao_completa:
-        payload["descricaoComplementar"] = descricao_completa
-
-    gtin = _digits(produto.gtin_ean or produto.codigo_barras, {8, 12, 13, 14})
-    gtin_embalagem = _digits(produto.gtin_ean_tributario, {8, 12, 13})
-    if gtin:
-        payload["gtin"] = gtin
-    if gtin_embalagem:
-        payload["gtinEmbalagem"] = gtin_embalagem
-
-    marca_nome = _texto(getattr(getattr(produto, "marca", None), "nome", ""), 120)
-    if marca_nome:
-        payload["marca"] = marca_nome
-
-    peso_liquido = _float_or_none(produto.peso_liquido)
-    peso_bruto = _float_or_none(produto.peso_bruto)
-    if peso_liquido and peso_liquido > 0:
-        payload["pesoLiquido"] = peso_liquido
-    if peso_bruto and peso_bruto > 0:
-        payload["pesoBruto"] = peso_bruto
-
-    estoque: dict[str, Any] = {}
-    estoque_minimo = _float_or_none(produto.estoque_minimo)
-    estoque_maximo = _float_or_none(produto.estoque_maximo)
-    localizacao = _texto(getattr(produto, "localizacao", ""), 80)
-    crossdocking = getattr(produto, "crossdocking_dias", None)
-    if estoque_minimo is not None:
-        estoque["minimo"] = estoque_minimo
-    if estoque_maximo is not None and estoque_maximo > 0:
-        estoque["maximo"] = estoque_maximo
-    if localizacao:
-        estoque["localizacao"] = localizacao
-    if isinstance(crossdocking, int) and crossdocking > 0:
-        estoque["crossdocking"] = crossdocking
-    if estoque:
-        payload["estoque"] = estoque
-
-    tributacao: dict[str, Any] = {}
-    ncm = _digits(produto.ncm, {8})
-    cest = _digits(produto.cest, {7})
-    origem = _origem_fiscal(produto.origem)
-    dados_adicionais = _texto(getattr(produto, "informacoes_adicionais_nf", ""), 500)
-    if ncm:
-        tributacao["ncm"] = ncm
-    if cest:
-        tributacao["cest"] = cest
-    if origem is not None:
-        tributacao["origem"] = origem
-    if dados_adicionais:
-        tributacao["dadosAdicionais"] = dados_adicionais
-    if tributacao:
-        payload["tributacao"] = tributacao
-
-    dimensoes: dict[str, Any] = {}
-    for origem_attr, destino_attr in [
-        ("largura", "largura"),
-        ("altura", "altura"),
-        ("profundidade", "profundidade"),
-    ]:
-        valor = _float_or_none(getattr(produto, origem_attr, None))
-        if valor and valor > 0:
-            dimensoes[destino_attr] = valor
-    if dimensoes:
-        dimensoes["unidadeMedida"] = 1
-        payload["dimensoes"] = dimensoes
-
-    return payload
-
-
 def _extrair_bling_produto_id(resposta: dict[str, Any]) -> str:
     data = resposta.get("data") if isinstance(resposta, dict) else {}
     candidatos = [
@@ -200,7 +83,14 @@ def _extrair_bling_produto_id(resposta: dict[str, Any]) -> str:
 def _buscar_produto(db: Session, tenant_id, produto_id: int) -> Produto:
     produto = (
         db.query(Produto)
-        .options(joinedload(Produto.marca))
+        .options(
+            joinedload(Produto.marca),
+            joinedload(Produto.imagens),
+            joinedload(Produto.fornecedor),
+            joinedload(Produto.fornecedores_alternativos).joinedload(
+                ProdutoFornecedor.fornecedor
+            ),
+        )
         .filter(Produto.id == produto_id, Produto.tenant_id == tenant_id)
         .first()
     )
@@ -258,6 +148,7 @@ def _montar_resultado(
     bling_produto_id: str,
     status: str,
     estoque_resultado: Optional[dict[str, Any]] = None,
+    enriquecimento: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     mensagens = {
         "criado": "Produto cadastrado no Bling e vinculado ao CorePet.",
@@ -265,7 +156,8 @@ def _montar_resultado(
         "ja_vinculado": "Produto ja estava vinculado ao Bling.",
     }
     estoque_resultado = estoque_resultado or {}
-    return {
+    enriquecimento = enriquecimento or {}
+    resultado = {
         "ok": True,
         "status": status,
         "message": mensagens.get(status, "Exportacao concluida."),
@@ -278,7 +170,15 @@ def _montar_resultado(
         "queue_id": estoque_resultado.get("queue_id"),
         "estoque_enviado": estoque_resultado.get("estoque_enviado"),
         "estoque_detail": estoque_resultado.get("detail"),
+        "imagens_enviadas": int(enriquecimento.get("imagens_enviadas") or 0),
+        "fornecedores_enviados": int(enriquecimento.get("fornecedores_enviados") or 0),
+        "fornecedores_nao_localizados": int(
+            enriquecimento.get("fornecedores_nao_localizados") or 0
+        ),
+        "fornecedores_erros": int(enriquecimento.get("fornecedores_erros") or 0),
+        "fornecedores_detail": enriquecimento.get("fornecedores_detail"),
     }
+    return resultado
 
 
 def _exportar_produto_local_para_bling(
@@ -305,20 +205,44 @@ def _exportar_produto_local_para_bling(
 
     sync_vinculado = _obter_sync_vinculado(db, tenant_id, produto.id)
     if sync_vinculado:
-        estoque_resultado = _registrar_vinculo_e_enfileirar_estoque(
-            db,
-            tenant_id,
-            produto,
-            _texto(sync_vinculado.bling_produto_id),
-            enviar_estoque,
-        )
-        db.commit()
-        return _montar_resultado(
-            produto,
-            _texto(sync_vinculado.bling_produto_id),
-            "ja_vinculado",
-            estoque_resultado,
-        )
+        bling_produto_id_atual = _texto(sync_vinculado.bling_produto_id)
+        vinculo_inexistente = False
+        try:
+            detalhe_bling = bling.consultar_produto(bling_produto_id_atual)
+        except Exception as error:
+            if _erro_bling_nao_encontrado(error):
+                vinculo_inexistente = True
+            else:
+                db.rollback()
+                status_code, detail = _detalhe_publico_erro_bling(
+                    error, operacao="conferir o vinculo do produto"
+                )
+                raise HTTPException(status_code=status_code, detail=detail) from error
+        else:
+            vinculo_inexistente = not _detalhe_bling_confirma_produto(
+                detalhe_bling, bling_produto_id_atual
+            )
+
+        if vinculo_inexistente:
+            _limpar_vinculo_bling_inexistente(sync_vinculado)
+            db.commit()
+            _invalidate_bling_snapshots(tenant_id)
+        else:
+            sync_vinculado.ultima_conferencia_bling = utc_now()
+            estoque_resultado = _registrar_vinculo_e_enfileirar_estoque(
+                db,
+                tenant_id,
+                produto,
+                bling_produto_id_atual,
+                enviar_estoque,
+            )
+            db.commit()
+            return _montar_resultado(
+                produto,
+                bling_produto_id_atual,
+                "ja_vinculado",
+                estoque_resultado,
+            )
 
     codigos_extras = [
         _texto(produto.codigo_barras),
@@ -346,18 +270,37 @@ def _exportar_produto_local_para_bling(
             detail=detail,
         ) from error
 
-    if item_existente and _texto(item_existente.get("id")):
-        bling_produto_id = _texto(item_existente.get("id"))
-        estoque_resultado = _registrar_vinculo_e_enfileirar_estoque(
-            db, tenant_id, produto, bling_produto_id, enviar_estoque
-        )
-        db.commit()
-        return _montar_resultado(
-            produto,
-            bling_produto_id,
-            "vinculado_existente",
-            estoque_resultado,
-        )
+    bling_produto_id_existente = (
+        _texto(item_existente.get("id")) if item_existente else ""
+    )
+    if bling_produto_id_existente:
+        try:
+            detalhe_existente = bling.consultar_produto(bling_produto_id_existente)
+        except Exception as error:
+            if not _erro_bling_nao_encontrado(error):
+                db.rollback()
+                status_code, detail = _detalhe_publico_erro_bling(
+                    error, operacao="confirmar o produto encontrado"
+                )
+                raise HTTPException(status_code=status_code, detail=detail) from error
+        else:
+            if _detalhe_bling_confirma_produto(
+                detalhe_existente, bling_produto_id_existente
+            ):
+                estoque_resultado = _registrar_vinculo_e_enfileirar_estoque(
+                    db,
+                    tenant_id,
+                    produto,
+                    bling_produto_id_existente,
+                    enviar_estoque,
+                )
+                db.commit()
+                return _montar_resultado(
+                    produto,
+                    bling_produto_id_existente,
+                    "vinculado_existente",
+                    estoque_resultado,
+                )
 
     payload = _montar_payload_produto_bling(produto)
     try:
@@ -378,11 +321,107 @@ def _exportar_produto_local_para_bling(
         ) from error
 
     bling_produto_id = _extrair_bling_produto_id(resposta)
+    enriquecimento = {
+        "imagens_enviadas": len(
+            payload.get("midia", {}).get("imagens", {}).get("imagensURL", [])
+        )
+    }
+    enriquecimento.update(
+        _enviar_fornecedores_produto_bling(bling, produto, bling_produto_id)
+    )
     estoque_resultado = _registrar_vinculo_e_enfileirar_estoque(
         db, tenant_id, produto, bling_produto_id, enviar_estoque
     )
     db.commit()
-    return _montar_resultado(produto, bling_produto_id, "criado", estoque_resultado)
+    return _montar_resultado(
+        produto,
+        bling_produto_id,
+        "criado",
+        estoque_resultado,
+        enriquecimento,
+    )
+
+
+@router.post("/produtos-bling/validar-vinculo/{produto_id}")
+@require_any_permission(PERMISSOES_EXPORTACAO_BLING)
+def validar_vinculo_produto_bling(
+    produto_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Confere se o ID salvo ainda existe no Bling e limpa vinculos obsoletos."""
+    _current_user, tenant_id = user_and_tenant
+    produto = _buscar_produto(db, tenant_id, produto_id)
+    sync = _obter_sync_vinculado(db, tenant_id, produto_id)
+    if not sync:
+        return {
+            "ok": True,
+            "status": "sem_vinculo",
+            "existe": False,
+            "produto_id": produto.id,
+            "bling_produto_id": None,
+            "message": "Este produto nao possui vinculo ativo com o Bling.",
+        }
+
+    bling_produto_id = _texto(sync.bling_produto_id)
+    try:
+        detalhe_bling = BlingAPI().consultar_produto(bling_produto_id)
+    except Exception as error:
+        if not _erro_bling_nao_encontrado(error):
+            db.rollback()
+            status_code, detail = _detalhe_publico_erro_bling(
+                error, operacao="conferir o produto"
+            )
+            raise HTTPException(status_code=status_code, detail=detail) from error
+
+        _limpar_vinculo_bling_inexistente(sync)
+        db.commit()
+        _invalidate_bling_snapshots(tenant_id)
+        return {
+            "ok": True,
+            "status": "removido_no_bling",
+            "existe": False,
+            "produto_id": produto.id,
+            "bling_produto_id": None,
+            "message": (
+                "O produto nao existe mais no Bling. O vinculo antigo foi removido "
+                "e o cadastro pode ser criado novamente."
+            ),
+        }
+
+    if not _detalhe_bling_confirma_produto(detalhe_bling, bling_produto_id):
+        _limpar_vinculo_bling_inexistente(sync)
+        db.commit()
+        _invalidate_bling_snapshots(tenant_id)
+        return {
+            "ok": True,
+            "status": "removido_no_bling",
+            "existe": False,
+            "produto_id": produto.id,
+            "bling_produto_id": None,
+            "message": (
+                "O produto nao existe mais no Bling. O vinculo antigo foi removido "
+                "e o cadastro pode ser criado novamente."
+            ),
+        }
+
+    sync.ultima_conferencia_bling = utc_now()
+    sync.updated_at = utc_now()
+    db.commit()
+    return {
+        "ok": True,
+        "status": "confirmado",
+        "existe": True,
+        "produto_id": produto.id,
+        "bling_produto_id": bling_produto_id,
+        "bling_nome": _texto(detalhe_bling.get("nome"))
+        if isinstance(detalhe_bling, dict)
+        else None,
+        "bling_situacao": _texto(detalhe_bling.get("situacao"))
+        if isinstance(detalhe_bling, dict)
+        else None,
+        "message": "Cadastro confirmado no Bling.",
+    }
 
 
 @router.post("/produtos-bling/exportar")
