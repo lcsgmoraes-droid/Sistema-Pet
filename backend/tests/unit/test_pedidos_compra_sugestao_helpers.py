@@ -808,6 +808,41 @@ def test_filtro_ativo_sugestao_inclui_cadastro_legado_sem_flag():
     assert ids == [1, 2]
 
 
+def test_expandir_fornecedores_do_grupo_inclui_alias_legado_sem_cnpj():
+    sugestao_queries = importlib.import_module("app.pedidos_compra.sugestao_queries")
+    special_dog = SimpleNamespace(
+        id=10149,
+        nome="SPECIAL DOG PET FOOD LTDA",
+        razao_social="SPECIAL DOG PET FOOD LTDA",
+        cnpj="63.287.129/0004-95",
+    )
+    manfrim = SimpleNamespace(
+        id=10013,
+        nome="MANFRIM INDUSTRIAL E COMERCIAL LTDA",
+        razao_social="MANFRIM INDUSTRIAL E COMERCIAL LTDA",
+        cnpj="56.813.280/0002-92",
+    )
+    alias_legado = SimpleNamespace(
+        id=10091,
+        nome="Special Dog Pet Food Ltda.",
+        razao_social="SPECIAL DOG PET FOOD LTDA",
+        cnpj=None,
+    )
+    homonimo_outro_cnpj = SimpleNamespace(
+        id=10200,
+        nome="SPECIAL DOG PET FOOD LTDA",
+        razao_social="SPECIAL DOG PET FOOD LTDA",
+        cnpj="11.111.111/0001-11",
+    )
+
+    ids = sugestao_queries._expandir_ids_fornecedores_equivalentes(
+        [special_dog, manfrim],
+        [special_dog, manfrim, alias_legado, homonimo_outro_cnpj],
+    )
+
+    assert ids == {10013, 10091, 10149}
+
+
 def test_calcular_tendencia_vendas_sugestao_respeita_periodo_e_limiares():
     assert hasattr(sugestao_helpers, "_calcular_tendencia_vendas_sugestao")
 

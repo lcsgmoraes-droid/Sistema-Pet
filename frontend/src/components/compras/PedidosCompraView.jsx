@@ -12,7 +12,6 @@ export default function PedidosCompraView({ controller }) {
     alternarFornecedorNoGrupoForm,
     alternarMarcaSelecionada,
     apenasCriticos,
-    apenasFornecedorPrincipal,
     aplicarFiltrosPedidos,
     abrirConfronto,
     abrirEdicao,
@@ -137,7 +136,6 @@ export default function PedidosCompraView({ controller }) {
     selecionarTodosCriticos,
     selecionadosComQuantidade,
     setApenasCriticos,
-    setApenasFornecedorPrincipal,
     setDadosEnvio,
     setDiasCobertura,
     setEstrategiaMesclaItens,
@@ -339,8 +337,6 @@ export default function PedidosCompraView({ controller }) {
         grupoFornecedorAtual={grupoFornecedorAtual}
         incluirGrupoFornecedor={incluirGrupoFornecedor}
         setIncluirGrupoFornecedor={setIncluirGrupoFornecedor}
-        apenasFornecedorPrincipal={apenasFornecedorPrincipal}
-        setApenasFornecedorPrincipal={setApenasFornecedorPrincipal}
         limparEstadosSugestao={limparEstadosSugestao}
         sugestoes={sugestoes}
         produtosSelecionados={produtosSelecionados}

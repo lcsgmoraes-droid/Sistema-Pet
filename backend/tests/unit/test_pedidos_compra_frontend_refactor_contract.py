@@ -92,3 +92,13 @@ def test_pedidos_compra_frontend_preserva_endpoints_criticos():
         "`/pedidos-compra/${pedidoSelecionado.id}/receber`",
     ]:
         assert endpoint in operacoes_controller
+
+
+def test_sugestao_compra_considera_todos_os_produtos_habilitados_do_escopo():
+    hook = _source("compras/usePedidosCompraSugestao.jsx")
+    header = _source("compras/PedidosCompraSugestaoHeader.jsx")
+
+    assert "apenas_fornecedor_principal" not in hook
+    assert "Somente principais do grupo" not in header
+    assert "Produtos habilitados de qualquer CNPJ do grupo" in header
+    assert "seja o fornecedor principal ou alternativo do produto" in header
