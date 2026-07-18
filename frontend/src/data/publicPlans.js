@@ -76,7 +76,7 @@ export const publicPlans = {
       features: [
         "PDV, clientes, pets e produtos",
         "Estoque e histórico essenciais",
-        "Até 500 vendas por mês",
+        "Até 300 vendas por mês",
         "Um acesso simultâneo",
       ],
     },
@@ -204,7 +204,7 @@ export const publicPlanComparisons = {
     { label: "PDV, clientes, pets, produtos e estoque", values: [true, true, true, true] },
     {
       label: "Volume de vendas",
-      values: ["Até 500/mês", "Ilimitadas", "Ilimitadas", "Ilimitadas"],
+      values: ["Até 300/mês", "Ilimitadas", "Ilimitadas", "Ilimitadas"],
     },
     { label: "Acessos simultâneos", values: ["1 acesso", "Até 3", "Até 3", "Até 3"] },
     { label: "Entrada de nota por XML", values: [false, true, true, true] },
