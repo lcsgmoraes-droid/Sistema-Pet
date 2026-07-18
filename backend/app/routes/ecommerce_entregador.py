@@ -1,6 +1,6 @@
 """Rotas da API para o perfil de entregador no app mobile."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import List, Optional
@@ -18,7 +18,12 @@ from fastapi import (
 )
 from pydantic import BaseModel
 from sqlalchemy import or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
+
+from app.api.endpoints.rotas_entrega_core_routes import (
+    _hidratar_paradas_rota,
+    aplicar_filtros_ordenacao_rotas,
+)
 
 from app.db import get_session
 from app.models import Cliente, ConfiguracaoEntrega, User
@@ -172,6 +177,12 @@ def _montar_endereco_origem(config: Optional[ConfiguracaoEntrega]) -> Optional[s
 @router.get("/minhas-rotas", response_model=List[RotaEntregaResponse])
 def minhas_rotas(
     filtro_status: Optional[str] = Query(None, alias="status"),
+    data_inicio: Optional[date] = Query(None),
+    data_fim: Optional[date] = Query(None),
+    busca: Optional[str] = Query(None),
+    ordenar_por: str = Query("data"),
+    direcao: str = Query("asc", pattern="^(asc|desc)$"),
+    limite: int = Query(100, ge=1, le=200),
     cliente: Cliente = Depends(_get_entregador_cliente),
     db: Session = Depends(get_session),
 ):
@@ -187,6 +198,9 @@ def minhas_rotas(
             joinedload(RotaEntrega.paradas)
             .joinedload(RotaEntregaParada.venda)
             .joinedload(Venda.cliente),
+            joinedload(RotaEntrega.paradas)
+            .joinedload(RotaEntregaParada.venda)
+            .selectinload(Venda.pagamentos),
         )
         .filter(
             RotaEntrega.tenant_id == tenant_id,
@@ -201,16 +215,19 @@ def minhas_rotas(
             RotaEntrega.status.in_(["pendente", "em_rota", "em_andamento"])
         )
 
-    rotas = query.order_by(RotaEntrega.created_at.asc()).all()
+    query = aplicar_filtros_ordenacao_rotas(
+        query,
+        tenant_id=tenant_id,
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        busca=busca,
+        ordenar_por=ordenar_por,
+        direcao=direcao,
+    )
+    rotas = query.limit(limite).all()
 
     for rota in rotas:
-        if rota.paradas:
-            rota.paradas = sorted(rota.paradas, key=lambda p: p.ordem)
-            for parada in rota.paradas:
-                if parada.venda and parada.venda.cliente:
-                    parada.cliente_nome = parada.venda.cliente.nome
-                    parada.cliente_telefone = parada.venda.cliente.telefone
-                    parada.cliente_celular = parada.venda.cliente.celular
+        _hidratar_paradas_rota(db, rota, tenant_id)
 
     return rotas
 
@@ -223,7 +240,7 @@ def listar_entregas_abertas(
     tenant_id = _activate_cliente_tenant_context(cliente)
     vendas = (
         db.query(Venda)
-        .options(joinedload(Venda.cliente))
+        .options(joinedload(Venda.cliente), selectinload(Venda.pagamentos))
         .filter(
             Venda.tenant_id == tenant_id,
             Venda.tem_entrega.is_(True),
@@ -245,11 +262,26 @@ def listar_entregas_abertas(
             "id": v.id,
             "numero_venda": v.numero_venda,
             "cliente_nome": v.cliente.nome if v.cliente else "Cliente não cadastrado",
+            "cliente_telefone": v.cliente.telefone if v.cliente else None,
+            "cliente_celular": v.cliente.celular if v.cliente else None,
             "endereco_entrega": v.endereco_entrega,
             "ordem_otimizada": v.ordem_entrega_otimizada,
             "data_venda": v.data_venda.isoformat() if v.data_venda else None,
             "total": float(v.total or 0),
             "taxa_entrega": float(v.taxa_entrega or 0),
+            "forma_pagamento": (
+                v.pagamentos[0].forma_pagamento if v.pagamentos else None
+            ),
+            "valor_pago": float(sum((p.valor or 0) for p in v.pagamentos)),
+            "status_pagamento": (
+                "pago"
+                if sum((p.valor or 0) for p in v.pagamentos) >= (v.total or 0)
+                else "parcial"
+                if sum((p.valor or 0) for p in v.pagamentos) > 0
+                else "pendente"
+            ),
+            "observacoes_entrega": v.observacoes_entrega,
+            "canal_venda": v.canal,
         }
         for v in vendas
     ]
