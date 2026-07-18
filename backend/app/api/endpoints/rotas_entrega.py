@@ -11,9 +11,9 @@ from app.api.endpoints.rotas_entrega_core_routes import (
     listar_rotas,
     listar_vendas_pendentes_entrega,
     obter_rota,
-    rastreio_publico,
     router as core_router,
 )
+from app.api.endpoints.rotas_entrega_public_routes import rastreio_publico
 from app.api.endpoints.rotas_entrega_criacao_routes import (
     criar_rota,
     router as criacao_router,

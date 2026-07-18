@@ -59,3 +59,42 @@ export function montarParametrosHistorico(filtros = {}) {
   if (filtros.busca?.trim()) params.busca = filtros.busca.trim();
   return params;
 }
+
+function dataLocalInput(data) {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+export function calcularPeriodoRapidoHistorico(periodo, dataBase = new Date()) {
+  const base = new Date(dataBase.getFullYear(), dataBase.getMonth(), dataBase.getDate());
+  const hoje = dataLocalInput(base);
+
+  if (periodo === "todos") return { dataInicio: "", dataFim: "" };
+  if (periodo === "hoje") return { dataInicio: hoje, dataFim: hoje };
+
+  if (periodo === "ontem") {
+    const ontem = new Date(base);
+    ontem.setDate(base.getDate() - 1);
+    const dataOntem = dataLocalInput(ontem);
+    return { dataInicio: dataOntem, dataFim: dataOntem };
+  }
+
+  if (periodo === "esta_semana") {
+    const inicio = new Date(base);
+    const diaSemana = base.getDay();
+    inicio.setDate(base.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1));
+    return { dataInicio: dataLocalInput(inicio), dataFim: hoje };
+  }
+
+  if (periodo === "este_mes") {
+    const inicio = new Date(base.getFullYear(), base.getMonth(), 1);
+    return { dataInicio: dataLocalInput(inicio), dataFim: hoje };
+  }
+
+  const dias = periodo === "ultimos_7_dias" ? 7 : 30;
+  const inicio = new Date(base);
+  inicio.setDate(base.getDate() - (dias - 1));
+  return { dataInicio: dataLocalInput(inicio), dataFim: hoje };
+}

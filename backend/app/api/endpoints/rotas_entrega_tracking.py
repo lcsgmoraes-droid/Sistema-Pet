@@ -10,30 +10,53 @@ from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
 from app.models import Cliente
-from app.rotas_entrega_models import RotaEntregaParada
+from app.rotas_entrega_models import RotaEntregaParada, RotaEntregaRastreioToken
 from app.services.notificacao_entrega_service import notificar_proximo_cliente
-from app.tenancy.context import clear_current_tenant, set_current_tenant
+from app.tenancy.context import clear_current_tenant, set_current_tenant, tenant_context
+from app.utils.tenant_safe_sql import execute_tenant_safe
 from app.utils.logger import logger
 from app.vendas_models import Venda
 
 
-_RASTREIO_ROTA_SQL = text(
-    """
+_RASTREIO_ROTA_SQL = """
     SELECT id, numero, status, entregador_id, lat_atual, lon_atual, localizacao_atualizada_em,
         distancia_total_km_real, distancia_retorno_km_real
     FROM rotas_entrega
-    WHERE token_rastreio = :token
+    WHERE {tenant_filter} AND id = :rid
     LIMIT 1
     """
-)
 
-_RASTREIO_DISTANCIAS_SQL = text(
-    """
+_RASTREIO_DISTANCIAS_SQL = """
     SELECT id, distancia_trecho_real_km, distancia_acumulada_real_km
     FROM rotas_entrega_paradas
-    WHERE rota_id = :rid
+    WHERE {tenant_filter} AND rota_id = :rid
     """
-)
+
+
+def registrar_token_rastreio(
+    db: Session, *, token: str, rota_id: int, tenant_id
+) -> RotaEntregaRastreioToken:
+    """Mantem o indice publico sincronizado sem expor dados da rota."""
+    token_normalizado = str(token or "").strip()
+    if not token_normalizado:
+        raise ValueError("Token de rastreio obrigatorio")
+
+    registro = (
+        db.query(RotaEntregaRastreioToken)
+        .filter(RotaEntregaRastreioToken.rota_id == rota_id)
+        .first()
+    )
+    if registro is None:
+        registro = RotaEntregaRastreioToken(
+            token=token_normalizado,
+            rota_id=rota_id,
+            tenant_id=tenant_id,
+        )
+        db.add(registro)
+    else:
+        registro.token = token_normalizado
+        registro.tenant_id = tenant_id
+    return registro
 
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -220,8 +243,31 @@ def atualizar_localizacao_real_rota(
     return delta_km
 
 
-def _buscar_rota_rastreio(db: Session, token: str):
-    rota_row = db.execute(_RASTREIO_ROTA_SQL, {"token": token}).fetchone()
+def _buscar_indice_rastreio(db: Session, token: str) -> RotaEntregaRastreioToken:
+    token_normalizado = str(token or "").strip()
+    if not token_normalizado or len(token_normalizado) > 64:
+        raise HTTPException(
+            status_code=404, detail="Rastreio nao encontrado ou link invalido"
+        )
+    registro = (
+        db.query(RotaEntregaRastreioToken)
+        .filter(RotaEntregaRastreioToken.token == token_normalizado)
+        .first()
+    )
+    if registro:
+        return registro
+    raise HTTPException(
+        status_code=404, detail="Rastreio nao encontrado ou link invalido"
+    )
+
+
+def _buscar_rota_rastreio(db: Session, *, rota_id: int, tenant_id):
+    rota_row = execute_tenant_safe(
+        db,
+        _RASTREIO_ROTA_SQL,
+        {"rid": rota_id},
+        tenant_id=tenant_id,
+    ).fetchone()
     if rota_row:
         return rota_row
     raise HTTPException(
@@ -229,23 +275,37 @@ def _buscar_rota_rastreio(db: Session, token: str):
     )
 
 
-def _buscar_entregador(db: Session, entregador_id):
+def _buscar_entregador(db: Session, entregador_id, tenant_id):
     if not entregador_id:
         return None
-    return db.query(Cliente).filter(Cliente.id == entregador_id).first()
+    return (
+        db.query(Cliente)
+        .filter(Cliente.id == entregador_id, Cliente.tenant_id == tenant_id)
+        .first()
+    )
 
 
-def _listar_paradas_rastreio(db: Session, rota_id: int) -> list[RotaEntregaParada]:
+def _listar_paradas_rastreio(
+    db: Session, rota_id: int, tenant_id
+) -> list[RotaEntregaParada]:
     return (
         db.query(RotaEntregaParada)
-        .filter(RotaEntregaParada.rota_id == rota_id)
+        .filter(
+            RotaEntregaParada.rota_id == rota_id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
         .order_by(RotaEntregaParada.ordem)
         .all()
     )
 
 
-def _distancias_por_parada(db: Session, rota_id: int) -> dict[int, tuple]:
-    rows = db.execute(_RASTREIO_DISTANCIAS_SQL, {"rid": rota_id}).fetchall()
+def _distancias_por_parada(db: Session, rota_id: int, tenant_id) -> dict[int, tuple]:
+    rows = execute_tenant_safe(
+        db,
+        _RASTREIO_DISTANCIAS_SQL,
+        {"rid": rota_id},
+        tenant_id=tenant_id,
+    ).fetchall()
     return {row[0]: row for row in rows}
 
 
@@ -268,23 +328,27 @@ def _montar_posicao(lat, lon, atualizada_em, fonte: str) -> dict | None:
     }
 
 
-def _coordenadas_entrega_parada(db: Session, parada_id: int):
+def _coordenadas_entrega_parada(db: Session, parada_id: int, tenant_id):
     try:
-        return db.execute(
-            text(
-                "SELECT lat_entrega, lon_entrega FROM rotas_entrega_paradas WHERE id = :pid"
-            ),
+        return execute_tenant_safe(
+            db,
+            """
+            SELECT lat_entrega, lon_entrega
+            FROM rotas_entrega_paradas
+            WHERE {tenant_filter} AND id = :pid
+            """,
             {"pid": parada_id},
+            tenant_id=tenant_id,
         ).fetchone()
     except Exception:
         return None
 
 
 def _ultima_posicao_por_paradas(
-    db: Session, paradas: list[RotaEntregaParada]
+    db: Session, paradas: list[RotaEntregaParada], tenant_id
 ) -> dict | None:
     for parada in reversed(paradas):
-        coordenadas = _coordenadas_entrega_parada(db, parada.id)
+        coordenadas = _coordenadas_entrega_parada(db, parada.id, tenant_id)
         if not coordenadas:
             continue
         posicao = _montar_posicao(
@@ -301,13 +365,14 @@ def _montar_ultima_posicao(
     lat_atual,
     lon_atual,
     localizacao_atualizada_em,
+    tenant_id,
 ) -> dict | None:
     posicao_atual = _montar_posicao(
         lat_atual, lon_atual, localizacao_atualizada_em, "rota_atual"
     )
     if posicao_atual:
         return posicao_atual
-    return _ultima_posicao_por_paradas(db, paradas)
+    return _ultima_posicao_por_paradas(db, paradas, tenant_id)
 
 
 def _distancia_ate_ultima_entrega(distancia_total_real, distancia_retorno_real):
@@ -330,7 +395,9 @@ def _montar_parada_publica(
 ) -> dict:
     return {
         "ordem": parada.ordem,
-        "endereco": parada.endereco,
+        # O token e uma capacidade publica. Enderecos de outros clientes nao
+        # podem aparecer para quem recebeu o link.
+        "endereco": f"Entrega {parada.ordem}",
         "status": parada.status,
         "data_entrega": _isoformat_or_none(parada.data_entrega),
         "distancia_trecho_real_km": _valor_distancia_parada(
@@ -343,6 +410,18 @@ def _montar_parada_publica(
 
 
 def montar_rastreio_publico(db: Session, token: str) -> dict:
+    indice = _buscar_indice_rastreio(db, token)
+    with tenant_context(indice.tenant_id) as tenant_id:
+        return _montar_rastreio_publico_tenant(
+            db,
+            rota_id_indice=indice.rota_id,
+            tenant_id=tenant_id,
+        )
+
+
+def _montar_rastreio_publico_tenant(
+    db: Session, *, rota_id_indice: int, tenant_id
+) -> dict:
     (
         rota_id,
         rota_numero,
@@ -353,13 +432,22 @@ def montar_rastreio_publico(db: Session, token: str) -> dict:
         localizacao_atualizada_em,
         distancia_total_real,
         distancia_retorno_real,
-    ) = _buscar_rota_rastreio(db, token)
+    ) = _buscar_rota_rastreio(
+        db,
+        rota_id=rota_id_indice,
+        tenant_id=tenant_id,
+    )
 
-    entregador = _buscar_entregador(db, entregador_id)
-    paradas = _listar_paradas_rastreio(db, rota_id)
-    dist_por_parada = _distancias_por_parada(db, rota_id)
+    entregador = _buscar_entregador(db, entregador_id, tenant_id)
+    paradas = _listar_paradas_rastreio(db, rota_id, tenant_id)
+    dist_por_parada = _distancias_por_parada(db, rota_id, tenant_id)
     ultima_posicao = _montar_ultima_posicao(
-        db, paradas, lat_atual, lon_atual, localizacao_atualizada_em
+        db,
+        paradas,
+        lat_atual,
+        lon_atual,
+        localizacao_atualizada_em,
+        tenant_id,
     )
     entregues = sum(1 for parada in paradas if parada.status == "entregue")
     total = len(paradas)

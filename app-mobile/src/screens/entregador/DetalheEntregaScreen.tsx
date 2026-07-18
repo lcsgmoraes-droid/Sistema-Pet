@@ -16,6 +16,10 @@ import {
   type VendaDetalhes,
 } from "./detalhe/DetalheEntregaUtils";
 import api from "../../services/api";
+import {
+  iniciarRastreamentoEntregaEmSegundoPlano,
+  pararRastreamentoEntregaEmSegundoPlano,
+} from "../../services/deliveryLocationTracking";
 import { EntregadorStackParamList } from "../../types/entregadorNavigation";
 
 type RouteProps = RouteProp<EntregadorStackParamList, "DetalheEntrega">;
@@ -90,6 +94,7 @@ export default function DetalheEntregaScreen() {
     if (!rota || !["em_rota", "em_andamento"].includes(rota.status)) {
       localizacaoSubscriptionRef.current?.remove();
       localizacaoSubscriptionRef.current = null;
+      void pararRastreamentoEntregaEmSegundoPlano(rotaId);
       return;
     }
 
@@ -119,6 +124,10 @@ export default function DetalheEntregaScreen() {
     };
 
     const iniciar = async () => {
+      const rastreioEmSegundoPlano =
+        await iniciarRastreamentoEntregaEmSegundoPlano(rotaId);
+      if (rastreioEmSegundoPlano || !ativo) return;
+
       try {
         const permissao = await Location.getForegroundPermissionsAsync();
         if (!permissao.granted) {
@@ -197,6 +206,14 @@ export default function DetalheEntregaScreen() {
           },
         },
       );
+      const rastreioEmSegundoPlano =
+        await iniciarRastreamentoEntregaEmSegundoPlano(rotaId);
+      if (!rastreioEmSegundoPlano) {
+        Alert.alert(
+          "Rastreamento em segundo plano",
+          "A rota foi iniciada, mas o acompanhamento continua somente enquanto esta tela estiver aberta. Para acompanhar ao abrir o mapa, permita a localizacao sempre.",
+        );
+      }
       await carregar();
     } catch (error) {
       const rotaAtualizada = await carregar(false);
@@ -381,6 +398,7 @@ export default function DetalheEntregaScreen() {
         await api.post(`/ecommerce/entregador/rotas/${rotaId}/fechar`, {
           tentativas: 1,
         });
+        await pararRastreamentoEntregaEmSegundoPlano(rotaId);
         await carregar(false);
         Alert.alert('Sucesso', 'Rota finalizada com sucesso.', [
           { text: 'OK', onPress: voltarParaListaComRotaFinalizada },
@@ -388,6 +406,7 @@ export default function DetalheEntregaScreen() {
       } catch (error) {
         const rotaAtualizada = await carregar(false);
         if (rotaAtualizada?.status === "concluida") {
+          await pararRastreamentoEntregaEmSegundoPlano(rotaId);
           Alert.alert('Sucesso', 'Rota finalizada com sucesso.', [
             { text: 'OK', onPress: voltarParaListaComRotaFinalizada },
           ]);

@@ -3,9 +3,14 @@ import "leaflet/dist/leaflet.css";
 import axios from "axios";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import { formatBRL } from "../../utils/formatters";
 
 const apiPublica = axios.create({ baseURL: "/api" });
 const TRAIL_LIMIT = 50;
+
+function formatarKm(valor) {
+  return `${formatBRL(Number(valor || 0))} km`;
+}
 
 function easeInOut(progress) {
   if (progress < 0.5) {
@@ -253,6 +258,11 @@ export default function RastreioPublico() {
       })
     : null;
   const gpsEhTempoReal = gpsFonte === "rota_atual";
+  const gpsDesatualizado = Boolean(
+    gpsEhTempoReal &&
+    dados.ultima_posicao_gps?.atualizada_em &&
+    Date.now() - new Date(dados.ultima_posicao_gps.atualizada_em).getTime() > 30_000,
+  );
   const distanciaTotalReal = Number(dados.distancia_total_km_real || 0);
   const distanciaRetornoReal = Number(dados.distancia_retorno_km_real || 0);
   const distanciaAteUltima = Number(dados.distancia_ate_ultima_entrega_km_real || 0);
@@ -296,7 +306,11 @@ export default function RastreioPublico() {
         {linkMaps && (
           <div style={styles.gpsBox}>
             <p style={styles.gpsTexto}>
-              {gpsEhTempoReal ? "GPS ao vivo do entregador" : "Ultimo ponto confirmado"}
+              {gpsDesatualizado
+                ? "GPS sem atualizacao recente"
+                : gpsEhTempoReal
+                  ? "GPS ao vivo do entregador"
+                  : "Ultimo ponto confirmado"}
             </p>
             {gpsAtualizadoEm && <p style={styles.gpsSubtexto}>Atualizado em {gpsAtualizadoEm}</p>}
             <a href={linkMaps} target="_blank" rel="noopener noreferrer" style={styles.btnMaps}>
@@ -304,7 +318,11 @@ export default function RastreioPublico() {
             </a>
             <div style={styles.mapaEmbedWrap}>
               <div style={styles.mapaBadgeMoto}>
-                {gpsEhTempoReal ? "Rota em movimento" : "Ultimo ponto salvo"}
+                {gpsDesatualizado
+                  ? "Aguardando novo sinal"
+                  : gpsEhTempoReal
+                    ? "Rota em movimento"
+                    : "Ultimo ponto salvo"}
               </div>
               <div ref={mapaRef} style={styles.mapaLeaflet} />
             </div>
@@ -316,15 +334,15 @@ export default function RastreioPublico() {
             <div style={styles.distTitulo}>Distancia percorrida na rota</div>
             <div style={styles.distLinha}>
               <span>Total rodado</span>
-              <strong>{distanciaTotalReal.toFixed(2)} km</strong>
+              <strong>{formatarKm(distanciaTotalReal)}</strong>
             </div>
             <div style={styles.distLinha}>
               <span>Ate ultima entrega</span>
-              <strong>{distanciaAteUltima.toFixed(2)} km</strong>
+              <strong>{formatarKm(distanciaAteUltima)}</strong>
             </div>
             <div style={styles.distLinha}>
               <span>Retorno vazio</span>
-              <strong>{distanciaRetornoReal.toFixed(2)} km</strong>
+              <strong>{formatarKm(distanciaRetornoReal)}</strong>
             </div>
           </div>
         )}
@@ -338,9 +356,9 @@ export default function RastreioPublico() {
                 <div style={styles.paradaEndereco}>{parada.endereco}</div>
                 {parada.status === "entregue" && Number(parada.distancia_trecho_real_km) > 0 && (
                   <div style={styles.paradaDistanciaReal}>
-                    {`Trecho: ${Number(parada.distancia_trecho_real_km).toFixed(2)} km`}
+                    {`Trecho: ${formatarKm(parada.distancia_trecho_real_km)}`}
                     {parada.distancia_acumulada_real_km > 0
-                      ? ` • Acumulado: ${Number(parada.distancia_acumulada_real_km).toFixed(2)} km`
+                      ? ` • Acumulado: ${formatarKm(parada.distancia_acumulada_real_km)}`
                       : ""}
                   </div>
                 )}
@@ -372,7 +390,7 @@ export default function RastreioPublico() {
               <div style={styles.paradaInfo}>
                 <div style={styles.paradaEndereco}>Retorno ao estabelecimento</div>
                 <div style={styles.paradaDistanciaReal}>
-                  {`Trecho: ${distanciaRetornoReal.toFixed(2)} km`}
+                  {`Trecho: ${formatarKm(distanciaRetornoReal)}`}
                 </div>
                 <div style={styles.paradaStatusRow}>
                   <span style={{ fontSize: 12, fontWeight: "600", color: "#6b7280" }}>

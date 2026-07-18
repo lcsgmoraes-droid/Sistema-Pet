@@ -325,6 +325,7 @@ def marcar_parada_entregue(
     if tentativa:
         parada.status = "tentativa"
         rota.tentativas += 1
+        parada.tentativas = max(int(parada.tentativas or 1), 1) + 1
         mensagem = "Tentativa registrada. Cliente ausente."
     else:
         parada.status = "entregue"

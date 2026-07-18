@@ -24,6 +24,7 @@ from app.api.endpoints.rotas_entrega_core_routes import (
     _hidratar_paradas_rota,
     aplicar_filtros_ordenacao_rotas,
 )
+from app.api.endpoints.rotas_entrega_tracking import registrar_token_rastreio
 
 from app.db import get_session
 from app.models import Cliente, ConfiguracaoEntrega, User
@@ -413,6 +414,12 @@ def criar_rota_por_entregador(
 
     db.add(rota)
     db.flush()
+    registrar_token_rastreio(
+        db,
+        token=rota.token_rastreio,
+        rota_id=rota.id,
+        tenant_id=tenant_uuid,
+    )
 
     for idx, venda in enumerate(vendas, start=1):
         parada = RotaEntregaParada(

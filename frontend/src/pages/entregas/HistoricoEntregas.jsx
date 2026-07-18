@@ -5,12 +5,23 @@ import SaleReference from "../../components/ui/SaleReference";
 import { formatMoneyBRL } from "../../utils/formatters";
 import "./Entregas.css";
 import {
+  calcularPeriodoRapidoHistorico,
   calcularResumoHistorico,
   formatarDuracao,
   montarParametrosHistorico,
   obterDistanciaRota,
   obterQuantidadeEntregas,
 } from "./historicoEntregasUtils";
+
+const PERIODOS_RAPIDOS = [
+  ["hoje", "Hoje"],
+  ["ontem", "Ontem"],
+  ["esta_semana", "Esta semana"],
+  ["ultimos_7_dias", "7 dias"],
+  ["ultimos_30_dias", "30 dias"],
+  ["este_mes", "Este mês"],
+  ["todos", "Tudo"],
+];
 
 function dataLocal(diasAtras = 0) {
   const data = new Date();
@@ -20,7 +31,8 @@ function dataLocal(diasAtras = 0) {
 }
 
 const FILTROS_INICIAIS = {
-  dataInicio: dataLocal(30),
+  // Intervalo inclusivo: hoje + 29 dias anteriores = 30 dias.
+  dataInicio: dataLocal(29),
   dataFim: dataLocal(),
   entregadorId: "",
   busca: "",
@@ -39,6 +51,18 @@ function formatarKm(valor) {
     minimumFractionDigits: 1,
     maximumFractionDigits: 2,
   })} km`;
+}
+
+function rotuloModeloCusto(modelo) {
+  return (
+    {
+      taxa_fixa: "Taxa fixa por entrega",
+      por_km: "Custo por km",
+      rateio_rh: "Rateio de RH por entrega",
+      legado_rateado: "Histórico rateado",
+      sem_configuracao: "Sem custo configurado",
+    }[modelo] || "Não informado"
+  );
 }
 
 function ResumoCard({ label, valor, detalhe, cor = "#1d4ed8" }) {
@@ -66,6 +90,7 @@ export default function HistoricoEntregas() {
   const [rotaExpandida, setRotaExpandida] = useState(null);
   const [filtros, setFiltros] = useState(FILTROS_INICIAIS);
   const [filtrosAplicados, setFiltrosAplicados] = useState(FILTROS_INICIAIS);
+  const [periodoRapido, setPeriodoRapido] = useState("ultimos_30_dias");
 
   const carregarHistorico = useCallback(async () => {
     try {
@@ -114,6 +139,16 @@ export default function HistoricoEntregas() {
     setFiltros(FILTROS_INICIAIS);
     setFiltrosAplicados(FILTROS_INICIAIS);
     setRotaExpandida(null);
+    setPeriodoRapido("ultimos_30_dias");
+  }
+
+  function aplicarPeriodoRapido(periodo) {
+    const datas = calcularPeriodoRapidoHistorico(periodo);
+    const proximosFiltros = { ...filtros, ...datas };
+    setFiltros(proximosFiltros);
+    setFiltrosAplicados(proximosFiltros);
+    setPeriodoRapido(periodo);
+    setRotaExpandida(null);
   }
 
   return (
@@ -143,6 +178,32 @@ export default function HistoricoEntregas() {
           borderRadius: 10,
         }}
       >
+        <div style={{ gridColumn: "1 / -1" }}>
+          <span style={{ display: "block", fontSize: 12, color: "#475569", marginBottom: 7 }}>
+            Período rápido
+          </span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+            {PERIODOS_RAPIDOS.map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => aplicarPeriodoRapido(id)}
+                aria-pressed={periodoRapido === id}
+                style={{
+                  border: periodoRapido === id ? "1px solid #2563eb" : "1px solid #cbd5e1",
+                  background: periodoRapido === id ? "#dbeafe" : "#fff",
+                  color: periodoRapido === id ? "#1d4ed8" : "#475569",
+                  borderRadius: 999,
+                  padding: "6px 11px",
+                  cursor: "pointer",
+                  fontWeight: periodoRapido === id ? 700 : 500,
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <label>
           <span style={{ display: "block", fontSize: 12, color: "#475569", marginBottom: 4 }}>
             Data inicial
@@ -150,7 +211,10 @@ export default function HistoricoEntregas() {
           <input
             type="date"
             value={filtros.dataInicio}
-            onChange={(event) => atualizarFiltro("dataInicio", event.target.value)}
+            onChange={(event) => {
+              atualizarFiltro("dataInicio", event.target.value);
+              setPeriodoRapido(null);
+            }}
             style={{ width: "100%", padding: 8, border: "1px solid #cbd5e1", borderRadius: 6 }}
           />
         </label>
@@ -161,7 +225,10 @@ export default function HistoricoEntregas() {
           <input
             type="date"
             value={filtros.dataFim}
-            onChange={(event) => atualizarFiltro("dataFim", event.target.value)}
+            onChange={(event) => {
+              atualizarFiltro("dataFim", event.target.value);
+              setPeriodoRapido(null);
+            }}
             style={{ width: "100%", padding: 8, border: "1px solid #cbd5e1", borderRadius: 6 }}
           />
         </label>
@@ -462,6 +529,49 @@ export default function HistoricoEntregas() {
                               >
                                 <span>Venda: {formatMoneyBRL(parada.valor_venda)}</span>
                                 <span>Taxa: {formatMoneyBRL(parada.taxa_entrega)}</span>
+                                {parada.custo_operacional != null && (
+                                  <span>
+                                    Custo operacional: {formatMoneyBRL(parada.custo_operacional)}
+                                  </span>
+                                )}
+                                {Number(parada.custo_moto_rateado) > 0 && (
+                                  <span>
+                                    Moto rateada: {formatMoneyBRL(parada.custo_moto_rateado)}
+                                  </span>
+                                )}
+                                {parada.custo_operacional != null && (
+                                  <span>
+                                    Custo total da entrega:{" "}
+                                    {formatMoneyBRL(
+                                      Number(parada.custo_operacional || 0) +
+                                        Number(parada.custo_moto_rateado || 0),
+                                    )}
+                                  </span>
+                                )}
+                                {parada.modelo_custo_operacional && (
+                                  <span>
+                                    Critério: {rotuloModeloCusto(parada.modelo_custo_operacional)}
+                                  </span>
+                                )}
+                                {parada.modelo_custo_operacional === "por_km" && (
+                                  <span>
+                                    Base registrada:{" "}
+                                    {formatMoneyBRL(parada.valor_base_custo_operacional)}/km ×{" "}
+                                    {formatarKm(parada.distancia_custo_km)}
+                                  </span>
+                                )}
+                                {["taxa_fixa", "rateio_rh"].includes(
+                                  parada.modelo_custo_operacional,
+                                ) && (
+                                  <span>
+                                    Base registrada:{" "}
+                                    {formatMoneyBRL(parada.valor_base_custo_operacional)} por
+                                    entrega
+                                  </span>
+                                )}
+                                {Number(parada.tentativas) > 1 && (
+                                  <span>Tentativas desta entrega: {parada.tentativas}</span>
+                                )}
                                 <span>Pagamento: {parada.status_pagamento || "Não informado"}</span>
                                 {parada.forma_pagamento && (
                                   <span>Forma: {parada.forma_pagamento}</span>

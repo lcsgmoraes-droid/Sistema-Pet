@@ -23,8 +23,11 @@ from app.models import Cliente
 from app.models_configuracao_custo_moto import ConfiguracaoCustoMoto
 from app.rotas_entrega_models import RotaEntrega, RotaEntregaParada
 from app.schemas.rota_entrega import RotaEntregaResponse, RotaEntregaUpdate
-from app.services.custo_entrega_service import calcular_custo_entrega
 from app.services.custo_moto_service import calcular_custo_moto
+from app.services.custo_operacional_entrega_service import (
+    consolidar_custos_por_entrega,
+    registrar_snapshot_custo_paradas,
+)
 from app.services.notificacao_entrega_service import notificar_inicio_rota
 from app.utils.logger import logger
 from app.vendas_models import Venda
@@ -72,6 +75,29 @@ def fechar_rota(
         .order_by(RotaEntregaParada.ordem)
         .all()
     )
+
+    # Compatibilidade com rotas simples antigas, criadas sem uma parada propria.
+    if not paradas and rota.venda_id:
+        venda_legada = (
+            db.query(Venda)
+            .filter(Venda.id == rota.venda_id, Venda.tenant_id == tenant_id)
+            .first()
+        )
+        if venda_legada:
+            parada_legada = RotaEntregaParada(
+                tenant_id=tenant_id,
+                rota_id=rota.id,
+                venda_id=venda_legada.id,
+                ordem=1,
+                endereco=venda_legada.endereco_entrega
+                or rota.endereco_destino
+                or "Entrega",
+                status="entregue",
+                data_entrega=venda_legada.data_entrega or datetime.now(),
+            )
+            db.add(parada_legada)
+            db.flush()
+            paradas = [parada_legada]
 
     paradas_abertas = [p for p in paradas if p.status != "entregue"]
     if paradas_abertas:
@@ -153,18 +179,8 @@ def fechar_rota(
     rota.status = "concluida"
     rota.data_conclusao = conclusao_em
 
-    # Calcular custo de entrega (entregador)
     km_para_custo = rota.distancia_real or payload.distancia_real or Decimal("0")
-    rota.custo_real = calcular_custo_entrega(
-        entregador=entregador,
-        km=km_para_custo,
-        tentativas=rota.tentativas,
-        moto_da_loja=rota.moto_da_loja,
-        quantidade_entregas=quantidade_entregas,
-    )
-
-    # ETAPA 8 + 11.1: Se moto da loja, calcular e armazenar custo da moto separadamente
-    rota.custo_moto = Decimal("0")
+    custo_moto_total = Decimal("0")
     if rota.moto_da_loja and km_para_custo:
         config_moto = (
             db.query(ConfiguracaoCustoMoto)
@@ -172,9 +188,17 @@ def fechar_rota(
             .first()
         )
         if config_moto:
-            custo_moto = calcular_custo_moto(config=config_moto, km=km_para_custo)
-            rota.custo_moto = custo_moto
-            rota.custo_real += custo_moto
+            custo_moto_total = calcular_custo_moto(config=config_moto, km=km_para_custo)
+
+    custos = consolidar_custos_por_entrega(
+        paradas,
+        entregador,
+        distancia_total_km=km_para_custo,
+        custo_moto_total=custo_moto_total,
+        calculado_em=conclusao_em,
+    )
+    rota.custo_moto = custos.custo_moto
+    rota.custo_real = custos.custo_total
 
     db.commit()
     db.refresh(rota)
@@ -222,14 +246,54 @@ def iniciar_rota(
         )
 
     # Verificar se tem paradas
-    paradas_count = (
-        db.query(RotaEntregaParada).filter(RotaEntregaParada.rota_id == rota.id).count()
+    paradas_rota = (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.rota_id == rota.id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
+        .order_by(RotaEntregaParada.ordem)
+        .all()
     )
 
-    if paradas_count == 0:
+    # Compatibilidade com rotas simples antigas, criadas antes de toda venda
+    # possuir uma parada propria para custo e rastreabilidade.
+    if not paradas_rota and rota.venda_id:
+        venda_legada = (
+            db.query(Venda)
+            .filter(Venda.id == rota.venda_id, Venda.tenant_id == tenant_id)
+            .first()
+        )
+        if venda_legada:
+            parada_legada = RotaEntregaParada(
+                tenant_id=tenant_id,
+                rota_id=rota.id,
+                venda_id=venda_legada.id,
+                ordem=1,
+                endereco=venda_legada.endereco_entrega
+                or rota.endereco_destino
+                or "Entrega",
+                status="pendente",
+            )
+            db.add(parada_legada)
+            db.flush()
+            paradas_rota = [parada_legada]
+
+    if not paradas_rota:
         raise HTTPException(
             status_code=400, detail="Rota não possui paradas cadastradas"
         )
+
+    entregador = (
+        db.query(Cliente)
+        .filter(Cliente.id == rota.entregador_id, Cliente.tenant_id == tenant_id)
+        .first()
+    )
+    registrar_snapshot_custo_paradas(
+        paradas_rota,
+        entregador,
+        registrado_em=datetime.now(),
+    )
 
     # Iniciar rota
     rota.status = "em_rota"
