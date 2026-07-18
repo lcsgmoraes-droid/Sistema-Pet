@@ -11,6 +11,7 @@ import {
   FiUser,
 } from "react-icons/fi";
 import { useAuth } from "../contexts/AuthContext";
+import { findPublicPlan, planOrganizationTypes } from "../data/publicPlans";
 
 const Register = () => {
   const [nome, setNome] = useState("");
@@ -18,7 +19,6 @@ const Register = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [organizationType, setOrganizationType] = useState("petshop");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const [error, setError] = useState("");
@@ -28,8 +28,22 @@ const Register = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const requestedPlan = (searchParams.get("plan") || "basico").trim().toLowerCase();
-  const selectedPlan = requestedPlan === "basico" ? "basico" : "basico";
+  const requestedPlan = (searchParams.get("plan") || "pet-start").trim().toLowerCase();
+  const selectedPlanData = findPublicPlan(requestedPlan) || findPublicPlan("pet-start");
+  const selectedPlan = selectedPlanData.id;
+  const requestedOrganization = (searchParams.get("organization_type") || "").trim().toLowerCase();
+  const defaultOrganization =
+    requestedOrganization || planOrganizationTypes[selectedPlanData.segment] || "petshop";
+  const [organizationType, setOrganizationType] = useState(defaultOrganization);
+  const organizationOptions =
+    selectedPlanData.segment === "vet"
+      ? [
+          { value: "veterinary_clinic", label: "Clinica Veterinaria" },
+          { value: "hospital", label: "Hospital Veterinario" },
+        ]
+      : selectedPlanData.segment === "grooming"
+        ? [{ value: "grooming", label: "Banho e Tosa" }]
+        : [{ value: "petshop", label: "Pet Shop" }];
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -92,6 +106,9 @@ const Register = () => {
         )}
 
         <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <p className="mb-2 font-black">
+            Plano escolhido: {selectedPlanData.name} — R$ {selectedPlanData.price}/mes
+          </p>
           <p className="font-semibold">Experiência CorePet Completa por 30 dias</p>
           <p className="mt-1">
             Durante o período gratuito, sua empresa poderá conhecer todos os módulos do CorePet.
@@ -167,10 +184,11 @@ const Register = () => {
                 onChange={(event) => setOrganizationType(event.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition bg-white"
               >
-                <option value="petshop">Pet Shop</option>
-                <option value="veterinary_clinic">Clinica Veterinaria</option>
-                <option value="grooming">Banho e Tosa</option>
-                <option value="hospital">Hospital Veterinario</option>
+                {organizationOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

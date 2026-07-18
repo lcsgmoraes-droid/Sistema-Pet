@@ -199,6 +199,22 @@ export const publicPlans = {
   ],
 };
 
+export const planOrganizationTypes = {
+  pet: "petshop",
+  vet: "veterinary_clinic",
+  grooming: "grooming",
+};
+
+export function findPublicPlan(planId) {
+  const normalizedId = ["basico", "basic", "base"].includes(planId) ? "pet-basico" : planId;
+
+  for (const [segment, plans] of Object.entries(publicPlans)) {
+    const plan = plans.find((item) => item.id === normalizedId);
+    if (plan) return { ...plan, segment };
+  }
+  return null;
+}
+
 export const publicPlanComparisons = {
   pet: [
     { label: "PDV, clientes, pets, produtos e estoque", values: [true, true, true, true] },

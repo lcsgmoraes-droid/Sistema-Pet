@@ -294,7 +294,7 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(
 
     assert user.tenant_id == tenant_id
     assert user.is_admin is False
-    assert tenant.plan == "basico"
+    assert tenant.plan == "pet-start"
     assert role.tenant_id == tenant_id
     assert user_tenant.tenant_id == tenant_id
     assert (

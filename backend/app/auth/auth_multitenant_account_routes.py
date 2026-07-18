@@ -14,7 +14,6 @@ from app.auth.auth_multitenant_schemas import (
     RegisterRequest,
 )
 from app.auth.auth_multitenant_support import (
-    ALLOWED_SIGNUP_PLANS,
     DEFAULT_TRIAL_DAYS,
     _auth_payload,
     _create_token_pair,
@@ -38,6 +37,7 @@ from app.services.auth_security import (
     remaining_lock_seconds,
 )
 from app.services.tenant_onboarding_service import onboard_tenant_defaults
+from app.services.plan_catalog import resolve_signup_selection
 from app.session_manager import create_session
 from app.tenancy.context import clear_tenant_context, set_tenant_context
 from app.tenancy.rls import sync_rls_auth_email, sync_rls_auth_user
@@ -80,12 +80,15 @@ def register(
             detail="Senha deve ter no minimo 8 caracteres",
         )
 
-    selected_plan = (payload.plan or "basico").strip().lower()
-    if selected_plan not in ALLOWED_SIGNUP_PLANS:
+    try:
+        selected_plan, organization_type = resolve_signup_selection(
+            payload.plan, payload.organization_type
+        )
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Plano selecionado indisponivel. Escolha o Plano Basico ou fale com vendas.",
-        )
+            detail=str(exc),
+        ) from exc
 
     email_verification_required = _email_verification_required_for_request(request)
 
@@ -96,12 +99,12 @@ def register(
         id=str(tenant_id),
         name=tenant_name,
         status="active",
-        plan=selected_plan,
+        plan=selected_plan.code,
         billing_status="trial",
         trial_started_at=trial_started_at,
         trial_ends_at=trial_started_at + timedelta(days=DEFAULT_TRIAL_DAYS),
         subscription_source="manual",
-        organization_type=payload.organization_type or "petshop",
+        organization_type=organization_type,
     )
     db.add(tenant)
     db.flush()

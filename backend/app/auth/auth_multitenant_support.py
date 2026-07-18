@@ -14,6 +14,7 @@ from app.auth import create_access_token, create_refresh_token
 from app.auth.core import ACCESS_TOKEN_EXPIRE_SECONDS
 from app.models import Permission, RolePermission, Tenant, User, UserTenant
 from app.services.email_service import send_email
+from app.services.plan_catalog import PUBLIC_SIGNUP_PLANS
 
 
 RESET_TOKEN_MINUTES = 30
@@ -25,7 +26,7 @@ TERMS_VERSION = os.getenv("TERMS_VERSION", "termos-2026-05-08")
 PRIVACY_VERSION = os.getenv("PRIVACY_VERSION", "privacidade-2026-05-08")
 STRICT_EMAIL_ENVS = {"production", "prod", "staging"}
 LOCAL_REQUEST_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
-ALLOWED_SIGNUP_PLANS = {"basico"}
+ALLOWED_SIGNUP_PLANS = PUBLIC_SIGNUP_PLANS
 DEFAULT_TRIAL_DAYS = 30
 
 

@@ -12,6 +12,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import LaunchOfferBanner from "../components/marketing/LaunchOfferBanner";
 import {
   buildSalesContactUrl,
+  planOrganizationTypes,
   publicPlans,
   segmentOptions,
   segmentSummaries,
@@ -63,10 +64,8 @@ function PlanCard({ plan, segment }) {
           </li>
         ))}
       </ul>
-      <a
-        href={contactUrl}
-        target="_blank"
-        rel="noopener noreferrer"
+      <Link
+        to={`/register?plan=${encodeURIComponent(plan.id)}&organization_type=${encodeURIComponent(planOrganizationTypes[segment])}`}
         className={`mt-7 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-extrabold transition ${
           plan.featured
             ? "bg-emerald-400 text-slate-950 hover:bg-emerald-300"
@@ -75,6 +74,14 @@ function PlanCard({ plan, segment }) {
       >
         Quero este plano
         <ArrowRight className="h-4 w-4" />
+      </Link>
+      <a
+        href={contactUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-3 text-center text-sm font-bold text-slate-600 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
+      >
+        Falar com um especialista
       </a>
     </article>
   );
