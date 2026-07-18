@@ -9,11 +9,20 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { MODULOS_INFO, useModulos } from "../contexts/ModulosContext";
-import { buildSalesContactUrl, serviceInvoiceAddon } from "../data/publicPlans";
+import { buildSalesContactUrl, publicPlans, serviceInvoiceAddon } from "../data/publicPlans";
+import { api } from "../services/api";
 
 const WHATSAPP_NUMERO = "5518997401641";
+const PLAN_OPTIONS = Object.entries(publicPlans).flatMap(([segment, plans]) =>
+  plans.map((plan) => ({ ...plan, segment })),
+);
+
+function normalizedPlanCode(value) {
+  return PLAN_OPTIONS.some((plan) => plan.id === value) ? value : "pet-start";
+}
 
 function formatDate(value) {
   if (!value) return "-";
@@ -28,6 +37,15 @@ function formatDate(value) {
 
 function getStatusInfo(assinatura) {
   const status = assinatura?.status_efetivo || assinatura?.status || "trial";
+
+  if (assinatura?.acesso_completo_durante_trial) {
+    return {
+      label: "Experiencia completa em andamento",
+      tone: "blue",
+      icon: Clock3,
+      text: "Todos os modulos do CorePet permanecem liberados durante os primeiros 30 dias.",
+    };
+  }
 
   if (status === "active") {
     return {
@@ -56,12 +74,42 @@ function getStatusInfo(assinatura) {
     };
   }
 
+  if (status === "pending") {
+    return {
+      label: "Pagamento pendente",
+      tone: "amber",
+      icon: Clock3,
+      text: "A assinatura foi criada e aguarda a confirmacao do pagamento.",
+    };
+  }
+
+  if (["past_due", "refunded", "canceled"].includes(status)) {
+    return {
+      label: "Pagamento precisa de atencao",
+      tone: "rose",
+      icon: AlertTriangle,
+      text: "Regularize a assinatura para manter os recursos do plano liberados.",
+    };
+  }
+
   return {
     label: "Trial em andamento",
     tone: "blue",
     icon: Clock3,
     text: "Todos os módulos do CorePet ficam liberados durante os primeiros 30 dias.",
   };
+}
+
+function trustedAsaasUrl(value) {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      (url.hostname === "asaas.com" || url.hostname.endsWith(".asaas.com"))
+    );
+  } catch {
+    return false;
+  }
 }
 
 function toneClasses(tone) {
@@ -84,6 +132,29 @@ export default function MeuPlano() {
     planoAtual,
     trialPadrao,
   } = useModulos();
+  const [billing, setBilling] = useState(null);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingError, setBillingError] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState(() => normalizedPlanCode(planoAtual));
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get("/billing/asaas/status")
+      .then((response) => {
+        if (active) setBilling(response.data);
+      })
+      .catch(() => {
+        if (active) setBilling(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    setSelectedPlan(normalizedPlanCode(planoAtual));
+  }, [planoAtual]);
 
   const statusInfo = getStatusInfo(assinaturaAtual);
   const StatusIcon = statusInfo.icon;
@@ -95,13 +166,44 @@ export default function MeuPlano() {
     "Olá! Quero escolher meu plano do CorePet após o período de acesso completo.",
   );
   const msgBeta = encodeURIComponent("Olá! Quero ajuda para escolher meu plano do CorePet.");
-  const emTrial = (assinaturaAtual?.status_efetivo || assinaturaAtual?.status) === "trial";
+  const emTrial = Boolean(assinaturaAtual?.acesso_completo_durante_trial);
   const podeContratarNfse = ["veterinario", "banho_tosa"].some((modulo) =>
     (modulosAtivos || []).includes(modulo),
   );
   const nfseContactUrl = buildSalesContactUrl(
     "Olá! Quero ativar a emissão de NFS-e integrada ao CorePet por R$ 59,90 mensais.",
   );
+
+  async function handleSubscribe() {
+    if (billing?.checkout_url && trustedAsaasUrl(billing.checkout_url)) {
+      window.location.assign(billing.checkout_url);
+      return;
+    }
+
+    setBillingLoading(true);
+    setBillingError("");
+    try {
+      const response = await api.post("/billing/asaas/subscriptions", {
+        plan_code: selectedPlan,
+        billing_type: "UNDEFINED",
+      });
+      setBilling(response.data);
+      if (trustedAsaasUrl(response.data?.checkout_url)) {
+        window.location.assign(response.data.checkout_url);
+      } else {
+        setBillingError(
+          "A assinatura foi criada, mas o link de pagamento ainda esta sendo preparado.",
+        );
+      }
+      await carregarModulos();
+    } catch (error) {
+      setBillingError(
+        error.response?.data?.detail || "Nao foi possivel iniciar a assinatura agora.",
+      );
+    } finally {
+      setBillingLoading(false);
+    }
+  }
 
   return (
     <main className="min-h-full bg-slate-50 p-4 md:p-6">
@@ -167,7 +269,61 @@ export default function MeuPlano() {
               </div>
             </div>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-6 max-w-md">
+              <label htmlFor="billing-plan" className="text-sm font-bold text-slate-800">
+                Plano que deseja contratar
+              </label>
+              <select
+                id="billing-plan"
+                value={selectedPlan}
+                onChange={(event) => {
+                  setSelectedPlan(event.target.value);
+                  setBilling(null);
+                  setBillingError("");
+                }}
+                className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              >
+                <optgroup label="Loja Pet">
+                  {PLAN_OPTIONS.filter((plan) => plan.segment === "pet").map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.name} - R$ {plan.price}/mes
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Veterinario">
+                  {PLAN_OPTIONS.filter((plan) => plan.segment === "vet").map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.name} - R$ {plan.price}/mes
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Banho e Tosa">
+                  {PLAN_OPTIONS.filter((plan) => plan.segment === "grooming").map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.name} - R$ {plan.price}/mes
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                O primeiro vencimento respeita o fim dos seus 30 dias de experiencia completa.
+              </p>
+            </div>
+
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleSubscribe}
+                disabled={billingLoading || !selectedPlan}
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <CreditCard className="h-4 w-4" />
+                {billingLoading
+                  ? "Preparando pagamento..."
+                  : billing?.checkout_url
+                    ? "Abrir pagamento"
+                    : "Assinar pelo Asaas"}
+              </button>
               <a
                 href={`https://wa.me/${WHATSAPP_NUMERO}?text=${msgContratar}`}
                 target="_blank"
@@ -184,6 +340,11 @@ export default function MeuPlano() {
                 Ver plano publico
               </Link>
             </div>
+            {billingError && (
+              <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-800">
+                {billingError}
+              </p>
+            )}
           </article>
 
           <aside className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
@@ -192,10 +353,11 @@ export default function MeuPlano() {
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="font-bold text-slate-950">Sem pagamento integrado</h2>
+                <h2 className="font-bold text-slate-950">Pagamento seguro pelo Asaas</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Por enquanto, a cobranca e feita fora do sistema. Depois da confirmacao, o acesso
-                  e ativado manualmente pelo administrativo.
+                  O pagamento acontece na pagina protegida do Asaas. Boleto, Pix e as opcoes
+                  disponiveis ficam fora do CorePet, e a liberacao ocorre automaticamente apos a
+                  confirmacao.
                 </p>
               </div>
             </div>
@@ -205,7 +367,7 @@ export default function MeuPlano() {
                 <li>1. Criar a empresa e receber 30 dias completos.</li>
                 <li>2. Conhecer os módulos com acompanhamento humano.</li>
                 <li>3. Escolher o plano ideal com nossa equipe.</li>
-                <li>4. Continuar apenas com os recursos contratados.</li>
+                <li>4. Pagar com seguranca e ter a liberacao automatica.</li>
               </ol>
             </div>
           </aside>

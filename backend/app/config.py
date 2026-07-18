@@ -18,6 +18,10 @@ class Settings(BaseSettings):
 
     # Integracoes externas
     GOOGLE_MAPS_API_KEY: str = ""
+    ASAAS_ENVIRONMENT: str = "sandbox"
+    ASAAS_API_KEY: str = ""
+    ASAAS_WEBHOOK_TOKEN: str = ""
+    ASAAS_WEBHOOK_URL: str = ""
 
     # Imagens de produtos
     PRODUCT_IMAGE_STORAGE_BACKEND: str = "local"  # local | s3

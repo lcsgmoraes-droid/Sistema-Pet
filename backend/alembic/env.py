@@ -63,6 +63,7 @@ import app.bling_pedido_webhook_queue_models
 import app.template_models
 import app.veterinario_models
 import app.ecommerce_payment_models
+import app.billing_models
 
 # Stone (pagamentos)
 import app.stone_models  # noqa: F401
