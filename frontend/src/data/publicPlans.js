@@ -199,6 +199,43 @@ export const publicPlans = {
   ],
 };
 
+export const publicPlanComparisons = {
+  pet: [
+    { label: "PDV, clientes, pets, produtos e estoque", values: [true, true, true, true] },
+    {
+      label: "Volume de vendas",
+      values: ["Até 500/mês", "Ilimitadas", "Ilimitadas", "Ilimitadas"],
+    },
+    { label: "Acessos simultâneos", values: ["1 acesso", "Até 3", "Até 3", "Até 3"] },
+    { label: "Entrada de nota por XML", values: [false, true, true, true] },
+    { label: "Sugestão inteligente de compras", values: [false, false, true, true] },
+    { label: "Financeiro, DRE e ponto de equilíbrio", values: [false, false, true, true] },
+    { label: "App e e-commerce integrados", values: [false, false, false, true] },
+    { label: "Campanhas, recorrência e recompra", values: [false, false, false, true] },
+    { label: "Entregas, rotas e emissão fiscal integrada", values: [false, false, false, true] },
+  ],
+  vet: [
+    { label: "Agenda, tutores, pets, serviços e preços", values: [true, true, true] },
+    { label: "PDV e recebimentos", values: [true, true, true] },
+    { label: "Lembretes e próximos agendamentos pelo app", values: [true, true, true] },
+    { label: "Consultas, prontuário e prescrições", values: [false, true, true] },
+    { label: "Exames, vacinas e carteirinha digital", values: [false, true, true] },
+    { label: "Financeiro, documentos e relatórios", values: [false, true, true] },
+    { label: "Internações, leitos e medicações", values: [false, false, true] },
+    { label: "Protocolos, calculadora de doses e IA", values: [false, false, true] },
+  ],
+  grooming: [
+    { label: "Agenda, clientes, pets, serviços e preços", values: [true, true, true] },
+    { label: "PDV e recebimentos", values: [true, true, true] },
+    { label: "Lembretes e status pelo app", values: [true, true, true] },
+    { label: "Vários profissionais e fila do dia", values: [false, true, true] },
+    { label: "Pacotes, créditos e recorrência", values: [false, true, true] },
+    { label: "Comissões, financeiro e relatórios", values: [false, true, true] },
+    { label: "Custos e margem por serviço", values: [false, false, true] },
+    { label: "Campanhas, fidelidade, taxi dog e rotas", values: [false, false, true] },
+  ],
+};
+
 export const serviceInvoiceAddon = {
   name: "Emissão de NFS-e integrada",
   price: "59,90",

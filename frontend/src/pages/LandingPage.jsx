@@ -10,9 +10,11 @@ import {
   PackageCheck,
   Play,
   Route,
+  Scissors,
   ShoppingBag,
   Smartphone,
   Sparkles,
+  Stethoscope,
   TrendingUp,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -25,6 +27,27 @@ const salesContactUrl =
 
 const heroImage =
   "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&w=2200&q=88";
+
+const heroProfiles = [
+  {
+    id: "pet",
+    icon: ShoppingBag,
+    title: "Quero CorePet para meu Pet Shop",
+    detail: "PDV, estoque, gestão, app e vendas",
+  },
+  {
+    id: "vet",
+    icon: Stethoscope,
+    title: "Quero CorePet para Veterinário",
+    detail: "Agenda, prontuário e gestão clínica",
+  },
+  {
+    id: "grooming",
+    icon: Scissors,
+    title: "Quero CorePet para Banho & Tosa",
+    detail: "Agenda, equipe, pacotes e recorrência",
+  },
+];
 
 const activeSalesSteps = [
   {
@@ -217,6 +240,13 @@ export default function LandingPage() {
   const activeDemo =
     systemDemoVideos.find((video) => video.id === activeDemoId) || systemDemoVideos[0];
 
+  const selectProfileFromHero = (profileId) => {
+    setActiveProfileId(profileId);
+    globalThis.requestAnimationFrame?.(() => {
+      document.getElementById("solucoes")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
   useEffect(() => {
     const previousTitle = document.title;
     const existingMetaDescription = document.querySelector('meta[name="description"]');
@@ -291,7 +321,8 @@ export default function LandingPage() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-lg bg-emerald-400 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-emerald-300"
             >
-              Quero uma demonstração
+              <span className="hidden sm:inline">Quero uma demonstração</span>
+              <span className="sm:hidden">Quero uma demo</span>
               <ArrowRight className="h-4 w-4" />
             </a>
           </div>
@@ -308,44 +339,72 @@ export default function LandingPage() {
           }}
         >
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_72%_30%,rgba(52,211,153,0.18),transparent_34%)]" />
-          <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6">
-            <LaunchOfferBanner dark />
+          <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
+            <LaunchOfferBanner dark compact />
           </div>
-          <div className="mx-auto grid min-h-[740px] max-w-7xl items-center gap-12 px-4 py-14 sm:px-6 lg:grid-cols-[1.08fr_0.92fr]">
+          <div className="mx-auto grid max-w-7xl items-start gap-8 px-4 pb-12 pt-8 sm:px-6 lg:grid-cols-[1.12fr_0.88fr] lg:gap-10">
             <div className="max-w-3xl">
               <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-sm font-bold text-emerald-200">
                 <Sparkles className="h-4 w-4" />
                 Uma plataforma para todo o mercado pet
               </span>
-              <h1 className="mt-7 text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
-                Gestão que começa simples e cresce com o seu negócio.
+              <h1 className="mt-5 text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+                Escolha seu negócio. Veja o CorePet feito para ele.
               </h1>
-              <p className="mt-7 max-w-2xl text-xl leading-8 text-slate-200 sm:text-2xl">
-                Loja Pet, Veterinário ou Banho & Tosa: escolha seu perfil e conheça uma solução
-                feita para a sua operação.
-              </p>
-              <p className="mt-5 max-w-2xl text-lg font-bold leading-8 text-emerald-300">
-                Agenda, vendas, atendimento, gestão e app trabalhando juntos.
+              <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-200 sm:text-xl">
+                Clique em uma opção e vá direto às funcionalidades e aos planos que fazem sentido
+                para você.
               </p>
 
-              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-                <a
-                  href="#solucoes"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-400 px-6 py-3.5 font-extrabold text-slate-950 shadow-xl shadow-emerald-950/30 transition hover:-translate-y-0.5 hover:bg-emerald-300"
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                {heroProfiles.map((profile) => {
+                  const Icon = profile.icon;
+                  return (
+                    <button
+                      key={profile.id}
+                      type="button"
+                      onClick={() => selectProfileFromHero(profile.id)}
+                      className="group flex items-center gap-3 rounded-2xl border-2 border-white/20 bg-white/10 p-3 text-left backdrop-blur transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-white/15 hover:shadow-xl sm:block sm:p-4"
+                    >
+                      <span className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-emerald-400 text-slate-950">
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0 flex-1 sm:mt-3 sm:block">
+                        <span className="block text-sm font-black leading-5 text-white">
+                          {profile.title}
+                        </span>
+                        <span className="mt-1 hidden text-xs font-semibold leading-5 text-slate-300 sm:block">
+                          {profile.detail}
+                        </span>
+                        <span className="mt-3 hidden items-center gap-1 text-xs font-black text-emerald-300 sm:inline-flex">
+                          Ver minha solução <ArrowRight className="h-3.5 w-3.5" />
+                        </span>
+                      </span>
+                      <ArrowRight className="h-4 w-4 flex-none text-emerald-300 sm:hidden" />
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  onClick={() => selectProfileFromHero("all")}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-3 font-extrabold text-slate-950 transition hover:bg-emerald-300"
                 >
-                  Escolher meu perfil
-                  <ArrowRight className="h-5 w-5" />
-                </a>
+                  Tenho mais de uma área
+                  <ArrowRight className="h-4 w-4" />
+                </button>
                 <a
                   href="#video-corepet"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/10 px-6 py-3.5 font-bold text-white backdrop-blur transition hover:bg-white/15"
+                  className="inline-flex items-center justify-center gap-2 px-3 py-3 text-sm font-bold text-white transition hover:text-emerald-300"
                 >
-                  <Play className="h-5 w-5 fill-current" />
-                  Assistir em 30 segundos
+                  <Play className="h-4 w-4 fill-current" />
+                  Ver o CorePet em 30 segundos
                 </a>
               </div>
 
-              <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3 text-sm font-semibold text-slate-300">
+              <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-xs font-semibold text-slate-300 sm:text-sm">
                 <span className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Comece pelo essencial
                 </span>
@@ -358,7 +417,10 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div id="video-corepet" className="relative mx-auto w-full max-w-xl scroll-mt-24">
+            <div
+              id="video-corepet"
+              className="relative mx-auto w-full max-w-sm scroll-mt-24 lg:mt-1"
+            >
               <div className="absolute -inset-5 rounded-[2rem] bg-emerald-400/15 blur-3xl" />
               <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-slate-900/85 p-3 shadow-2xl shadow-black/50 backdrop-blur">
                 <div className="aspect-[9/16] overflow-hidden rounded-[1.45rem] bg-gradient-to-br from-violet-950 via-slate-950 to-emerald-950">
