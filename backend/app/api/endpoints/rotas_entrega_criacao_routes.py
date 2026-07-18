@@ -12,6 +12,7 @@ from app.api.endpoints.rotas_entrega_auth import (
     get_delivery_actor_and_tenant,
 )
 from app.api.endpoints.rotas_entrega_core_routes import obter_rota
+from app.api.endpoints.rotas_entrega_tracking import registrar_token_rastreio
 from app.db import get_session
 from app.models import Cliente, ConfiguracaoEntrega
 from app.rotas_entrega_models import RotaEntrega, RotaEntregaParada
@@ -161,6 +162,12 @@ def criar_rota(
 
         db.add(rota)
         db.flush()  # Obter ID da rota
+        registrar_token_rastreio(
+            db,
+            token=rota.token_rastreio,
+            rota_id=rota.id,
+            tenant_id=tenant_id,
+        )
 
         # Calcular rota otimizada com Google Directions API
         if config_entrega and ponto_inicial:
@@ -301,6 +308,23 @@ def criar_rota(
     rota.token_rastreio = secrets.token_urlsafe(32)
 
     db.add(rota)
+    db.flush()
+    registrar_token_rastreio(
+        db,
+        token=rota.token_rastreio,
+        rota_id=rota.id,
+        tenant_id=tenant_id,
+    )
+    db.add(
+        RotaEntregaParada(
+            tenant_id=tenant_id,
+            rota_id=rota.id,
+            venda_id=venda.id,
+            ordem=1,
+            endereco=venda.endereco_entrega or payload.endereco_destino,
+            status="pendente",
+        )
+    )
 
     # Marcar venda como "em_rota"
     venda.entregador_id = entregador_id

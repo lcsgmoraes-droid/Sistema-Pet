@@ -15,7 +15,7 @@ from app.api.endpoints.rotas_entrega_auth import (
     get_delivery_actor_and_tenant,
 )
 from app.api.endpoints.rotas_entrega_schema import ensure_rotas_entrega_schema
-from app.api.endpoints.rotas_entrega_tracking import montar_rastreio_publico
+from app.api.endpoints.rotas_entrega_tracking import registrar_token_rastreio
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import Cliente
@@ -64,6 +64,12 @@ def _hidratar_localizacao_rota(db: Session, rota: RotaEntrega, tenant_id: int) -
             {"token": token_rastreio, "rid": rota.id, "tenant": tenant_id},
         )
         rota.token_rastreio = token_rastreio
+        registrar_token_rastreio(
+            db,
+            token=token_rastreio,
+            rota_id=rota.id,
+            tenant_id=tenant_id,
+        )
         return True
 
     rota.token_rastreio = token_rastreio
@@ -465,16 +471,3 @@ def atualizar_rota(
     rota.entregador = db.query(Cliente).filter(Cliente.id == rota.entregador_id).first()
 
     return rota
-
-
-@router.get("/rastreio/{token}")
-def rastreio_publico(
-    token: str,
-    db: Session = Depends(get_session),
-):
-    """
-    Endpoint público para rastreamento de rota por token.
-    Retorna última posição GPS e status das paradas (sem dados sensíveis).
-    """
-    ensure_rotas_entrega_schema(db)
-    return montar_rastreio_publico(db, token)

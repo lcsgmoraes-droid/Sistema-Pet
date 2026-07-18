@@ -47,6 +47,8 @@ TENANT_WHITELIST_TABLES = {
     # por evento ao processar (engine.py). Alinhado com INTENTIONALLY_GLOBAL_TENANT_TABLES.
     "campaign_event_queue",  # fila de eventos: worker.process_batch claim cross-tenant
     "notification_queue",  # fila de notificações: notification_sender claim cross-tenant
+    # Indice minimo de capacidade publica: token aleatorio -> tenant/rota.
+    "rotas_entrega_rastreio_tokens",
 }
 
 

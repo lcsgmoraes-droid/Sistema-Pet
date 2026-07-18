@@ -2,12 +2,34 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  calcularPeriodoRapidoHistorico,
   calcularResumoHistorico,
   formatarDuracao,
   montarParametrosHistorico,
   obterDistanciaRota,
   obterQuantidadeEntregas,
 } from "./historicoEntregasUtils.js";
+
+test("calcula atalhos de periodo usando datas locais e intervalos inclusivos", () => {
+  const base = new Date(2026, 6, 17, 18, 30);
+
+  assert.deepEqual(calcularPeriodoRapidoHistorico("hoje", base), {
+    dataInicio: "2026-07-17",
+    dataFim: "2026-07-17",
+  });
+  assert.deepEqual(calcularPeriodoRapidoHistorico("ontem", base), {
+    dataInicio: "2026-07-16",
+    dataFim: "2026-07-16",
+  });
+  assert.deepEqual(calcularPeriodoRapidoHistorico("ultimos_7_dias", base), {
+    dataInicio: "2026-07-11",
+    dataFim: "2026-07-17",
+  });
+  assert.deepEqual(calcularPeriodoRapidoHistorico("este_mes", base), {
+    dataInicio: "2026-07-01",
+    dataFim: "2026-07-17",
+  });
+});
 
 test("resume rotas usando entregas reais e custo medio por entrega", () => {
   const resumo = calcularResumoHistorico([

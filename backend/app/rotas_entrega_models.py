@@ -12,8 +12,12 @@ from sqlalchemy import (
     Text,
     ForeignKey,
 )
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from app.base_models import BaseTenantModel
+from app.db import Base
 
 # Import necessário para resolver relacionamento com Venda
 # Colocado depois dos imports base para evitar circular dependency
@@ -99,6 +103,22 @@ class RotaEntrega(BaseTenantModel):
     entregador = relationship("Cliente", foreign_keys=[entregador_id], lazy="joined")
 
 
+class RotaEntregaRastreioToken(Base):
+    """Indice global minimo para resolver um token publico antes do tenant."""
+
+    __tablename__ = "rotas_entrega_rastreio_tokens"
+
+    token = Column(String(64), primary_key=True)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    rota_id = Column(
+        Integer,
+        ForeignKey("rotas_entrega.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class RotaEntregaParada(BaseTenantModel):
     """
     ETAPA 9.3 - Paradas de uma rota com sequência otimizada
@@ -129,6 +149,16 @@ class RotaEntregaParada(BaseTenantModel):
     km_entrega = Column(
         Numeric(10, 2), nullable=True
     )  # KM da moto ao entregar (opcional)
+
+    # Snapshot do custo operacional da entrega. O valor-base/modelo ficam
+    # congelados ao iniciar a rota; o valor final por KM e fechado ao concluir.
+    tentativas = Column(Integer, nullable=False, default=1)
+    modelo_custo_operacional = Column(String(24), nullable=True)
+    valor_base_custo_operacional = Column(Numeric(12, 4), nullable=True)
+    distancia_custo_km = Column(Numeric(10, 3), nullable=True)
+    custo_operacional = Column(Numeric(12, 2), nullable=True)
+    custo_moto_rateado = Column(Numeric(12, 2), nullable=True, default=0)
+    custo_calculado_em = Column(DateTime, nullable=True)
 
     # Relacionamentos
     rota = relationship("RotaEntrega", back_populates="paradas")

@@ -78,6 +78,13 @@ class RotaEntregaParadaResponse(BaseModel):
     km_entrega: Optional[Decimal] = None  # KM da moto ao entregar
     distancia_trecho_real_km: Optional[Decimal] = None
     distancia_acumulada_real_km: Optional[Decimal] = None
+    tentativas: int = 1
+    modelo_custo_operacional: Optional[str] = None
+    valor_base_custo_operacional: Optional[Decimal] = None
+    distancia_custo_km: Optional[Decimal] = None
+    custo_operacional: Optional[Decimal] = None
+    custo_moto_rateado: Optional[Decimal] = None
+    custo_calculado_em: Optional[datetime] = None
     created_at: datetime
 
     # Informações do cliente para facilitar visualização

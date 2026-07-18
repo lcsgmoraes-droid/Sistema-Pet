@@ -126,6 +126,9 @@ from app.api.endpoints.configuracoes_entrega import (
     router as configuracoes_entrega_router,
 )
 from app.api.endpoints.rotas_entrega import router as rotas_entrega_router
+from app.api.endpoints.rotas_entrega_public_routes import (
+    router as rotas_entrega_public_router,
+)
 from app.api.endpoints.acertos_entrega import router as acertos_entrega_router
 from app.api.endpoints.configuracao_custo_moto import (
     router as configuracao_custo_moto_router,
@@ -529,6 +532,9 @@ def register_routers(app: FastAPI) -> None:
         tags=["Configurações - Entregas"],
         dependencies=_module_dependencies("entregas"),
     )
+    # O token opaco resolve o tenant antes de acessar as tabelas protegidas.
+    # Por isso o link publico fica fora da dependencia de login do modulo.
+    app.include_router(rotas_entrega_public_router)
     app.include_router(
         rotas_entrega_router,
         tags=["Entregas - Rotas"],

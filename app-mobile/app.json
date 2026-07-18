@@ -20,7 +20,9 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Usado para escanear codigo de barras dos produtos.",
         "NSPhotoLibraryUsageDescription": "Usado para adicionar foto do seu pet.",
-        "NSLocationWhenInUseUsageDescription": "Usado para sugerir a loja mais proxima e enviar a posicao do entregador durante rotas ativas."
+        "NSLocationWhenInUseUsageDescription": "Usado para sugerir a loja mais proxima e enviar a posicao do entregador durante rotas ativas.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Durante uma rota ativa, permite que a loja e o cliente acompanhem a entrega mesmo quando o entregador abre o mapa ou deixa o CorePet em segundo plano.",
+        "NSLocationAlwaysUsageDescription": "Durante uma rota ativa, permite o rastreamento da entrega em segundo plano."
       },
       "runtimeVersion": {
         "policy": "appVersion"
@@ -84,7 +86,11 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Usado para sugerir a loja mais proxima e enviar a posicao do entregador durante rotas ativas."
+          "locationWhenInUsePermission": "Usado para sugerir a loja mais proxima e enviar a posicao do entregador durante rotas ativas.",
+          "locationAlwaysAndWhenInUsePermission": "Durante uma rota ativa, permite que a loja e o cliente acompanhem a entrega mesmo com o CorePet em segundo plano.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [

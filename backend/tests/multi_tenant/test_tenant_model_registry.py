@@ -84,6 +84,8 @@ INTENTIONALLY_GLOBAL_TENANT_TABLES = frozenset(
         # Espelhado em TENANT_WHITELIST_TABLES (app/tenancy/filters.py).
         "campaign_event_queue",
         "notification_queue",
+        # Resolve token publico antes de entrar nas tabelas protegidas por RLS.
+        "rotas_entrega_rastreio_tokens",
     }
 )
 
