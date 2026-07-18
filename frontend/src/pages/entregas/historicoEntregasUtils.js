@@ -68,11 +68,7 @@ function dataLocalInput(data) {
 }
 
 export function calcularPeriodoRapidoHistorico(periodo, dataBase = new Date()) {
-  const base = new Date(
-    dataBase.getFullYear(),
-    dataBase.getMonth(),
-    dataBase.getDate(),
-  );
+  const base = new Date(dataBase.getFullYear(), dataBase.getMonth(), dataBase.getDate());
   const hoje = dataLocalInput(base);
 
   if (periodo === "todos") return { dataInicio: "", dataFim: "" };

@@ -259,9 +259,9 @@ export default function RastreioPublico() {
     : null;
   const gpsEhTempoReal = gpsFonte === "rota_atual";
   const gpsDesatualizado = Boolean(
-    gpsEhTempoReal
-      && dados.ultima_posicao_gps?.atualizada_em
-      && Date.now() - new Date(dados.ultima_posicao_gps.atualizada_em).getTime() > 30_000,
+    gpsEhTempoReal &&
+    dados.ultima_posicao_gps?.atualizada_em &&
+    Date.now() - new Date(dados.ultima_posicao_gps.atualizada_em).getTime() > 30_000,
   );
   const distanciaTotalReal = Number(dados.distancia_total_km_real || 0);
   const distanciaRetornoReal = Number(dados.distancia_retorno_km_real || 0);

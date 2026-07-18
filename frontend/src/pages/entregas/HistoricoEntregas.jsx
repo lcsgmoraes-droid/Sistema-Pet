@@ -54,13 +54,15 @@ function formatarKm(valor) {
 }
 
 function rotuloModeloCusto(modelo) {
-  return {
-    taxa_fixa: "Taxa fixa por entrega",
-    por_km: "Custo por km",
-    rateio_rh: "Rateio de RH por entrega",
-    legado_rateado: "Histórico rateado",
-    sem_configuracao: "Sem custo configurado",
-  }[modelo] || "Não informado";
+  return (
+    {
+      taxa_fixa: "Taxa fixa por entrega",
+      por_km: "Custo por km",
+      rateio_rh: "Rateio de RH por entrega",
+      legado_rateado: "Histórico rateado",
+      sem_configuracao: "Sem custo configurado",
+    }[modelo] || "Não informado"
+  );
 }
 
 function ResumoCard({ label, valor, detalhe, cor = "#1d4ed8" }) {
@@ -539,9 +541,10 @@ export default function HistoricoEntregas() {
                                 )}
                                 {parada.custo_operacional != null && (
                                   <span>
-                                    Custo total da entrega: {formatMoneyBRL(
-                                      Number(parada.custo_operacional || 0)
-                                        + Number(parada.custo_moto_rateado || 0),
+                                    Custo total da entrega:{" "}
+                                    {formatMoneyBRL(
+                                      Number(parada.custo_operacional || 0) +
+                                        Number(parada.custo_moto_rateado || 0),
                                     )}
                                   </span>
                                 )}
@@ -552,18 +555,18 @@ export default function HistoricoEntregas() {
                                 )}
                                 {parada.modelo_custo_operacional === "por_km" && (
                                   <span>
-                                    Base registrada: {formatMoneyBRL(
-                                      parada.valor_base_custo_operacional,
-                                    )}/km × {formatarKm(parada.distancia_custo_km)}
+                                    Base registrada:{" "}
+                                    {formatMoneyBRL(parada.valor_base_custo_operacional)}/km ×{" "}
+                                    {formatarKm(parada.distancia_custo_km)}
                                   </span>
                                 )}
                                 {["taxa_fixa", "rateio_rh"].includes(
                                   parada.modelo_custo_operacional,
                                 ) && (
                                   <span>
-                                    Base registrada: {formatMoneyBRL(
-                                      parada.valor_base_custo_operacional,
-                                    )} por entrega
+                                    Base registrada:{" "}
+                                    {formatMoneyBRL(parada.valor_base_custo_operacional)} por
+                                    entrega
                                   </span>
                                 )}
                                 {Number(parada.tentativas) > 1 && (
