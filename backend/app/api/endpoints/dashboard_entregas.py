@@ -15,6 +15,12 @@ from app.services.ia_entregas_service import (
     gerar_insights_entregas,
     calcular_custo_moto_percentual,
 )
+from app.services.dashboard_entregas_metrics import (
+    calcular_medias_por_entrega,
+    construir_contagem_entregas,
+    filtrar_periodo_conclusao,
+    juntar_contagem_entregas,
+)
 
 router = APIRouter(
     prefix="/dashboard/entregas",
@@ -50,11 +56,13 @@ def dashboard_financeiro(
     - data_fim: Data de fim do período
     """
     user, tenant_id = user_and_tenant
+    paradas_por_rota, quantidade_entregas = construir_contagem_entregas(tenant_id)
 
     # Query agregada para buscar todos os KPIs de uma vez
     q = (
         db.query(
-            func.count(RotaEntrega.id).label("total_entregas"),
+            func.count(RotaEntrega.id).label("total_rotas"),
+            func.coalesce(func.sum(quantidade_entregas), 0).label("total_entregas"),
             func.coalesce(func.sum(RotaEntrega.custo_real), 0).label("custo_total"),
             func.coalesce(func.sum(RotaEntrega.custo_moto), 0).label("custo_moto"),
             func.coalesce(
@@ -66,24 +74,26 @@ def dashboard_financeiro(
             func.coalesce(func.sum(RotaEntrega.valor_repasse_entregador), 0).label(
                 "total_repasse"
             ),
-            func.coalesce(func.avg(RotaEntrega.custo_real), 0).label("custo_medio"),
-            func.coalesce(func.avg(RotaEntrega.taxa_entrega_cliente), 0).label(
-                "taxa_media"
+            func.coalesce(func.sum(RotaEntrega.taxa_entrega_cliente), 0).label(
+                "taxa_total"
             ),
         )
         .filter(RotaEntrega.tenant_id == tenant_id)
         .filter(RotaEntrega.status == "concluida")
-        .filter(RotaEntrega.data_conclusao.between(data_inicio, data_fim))
     )
+    q = juntar_contagem_entregas(q, paradas_por_rota)
+    q = filtrar_periodo_conclusao(q, data_inicio, data_fim)
 
     r = q.one()
 
     # Calcular margem média (taxa - custo)
-    taxa_media = float(r.taxa_media) if r.taxa_media else 0.0
-    custo_medio = float(r.custo_medio) if r.custo_medio else 0.0
+    custo_medio, taxa_media = calcular_medias_por_entrega(
+        r.total_entregas, r.custo_total, r.taxa_total
+    )
     margem_media = taxa_media - custo_medio
 
     return {
+        "total_rotas": r.total_rotas or 0,
         "total_entregas": r.total_entregas or 0,
         "custo_total_entregas": float(r.custo_total),
         "custo_total_entregadores": float(r.custo_entregadores),
@@ -132,20 +142,25 @@ def dashboard_graficos(
     ```
     """
     user, tenant_id = user_and_tenant
+    paradas_por_rota, quantidade_entregas = construir_contagem_entregas(tenant_id)
 
     # 1. Custo total e médio por dia
     por_dia_query = (
         db.query(
             func.date(RotaEntrega.data_conclusao).label("data"),
             func.coalesce(func.sum(RotaEntrega.custo_real), 0).label("custo_total"),
-            func.coalesce(func.avg(RotaEntrega.custo_real), 0).label("custo_medio"),
+            func.coalesce(func.sum(RotaEntrega.taxa_entrega_cliente), 0).label(
+                "taxa_total"
+            ),
+            func.coalesce(func.sum(quantidade_entregas), 0).label("total_entregas"),
         )
         .filter(RotaEntrega.tenant_id == tenant_id)
         .filter(RotaEntrega.status == "concluida")
-        .filter(RotaEntrega.data_conclusao.between(data_inicio, data_fim))
         .group_by(func.date(RotaEntrega.data_conclusao))
         .order_by(func.date(RotaEntrega.data_conclusao))
     )
+    por_dia_query = juntar_contagem_entregas(por_dia_query, paradas_por_rota)
+    por_dia_query = filtrar_periodo_conclusao(por_dia_query, data_inicio, data_fim)
 
     resultados_dia = por_dia_query.all()
 
@@ -154,6 +169,9 @@ def dashboard_graficos(
     custo_medio_dia = []
 
     for r in resultados_dia:
+        custo_medio, _ = calcular_medias_por_entrega(
+            r.total_entregas, r.custo_total, r.taxa_total
+        )
         data_str = r.data.isoformat() if hasattr(r.data, "isoformat") else str(r.data)
         por_dia.append(
             {
@@ -164,26 +182,34 @@ def dashboard_graficos(
         custo_medio_dia.append(
             {
                 "data": data_str,
-                "valor": float(r.custo_medio),
+                "valor": custo_medio,
             }
         )
 
     # 2. Taxa vs Custo (médias gerais do período)
     media_geral = (
         db.query(
-            func.coalesce(func.avg(RotaEntrega.taxa_entrega_cliente), 0).label(
-                "taxa_media"
+            func.coalesce(func.sum(RotaEntrega.taxa_entrega_cliente), 0).label(
+                "taxa_total"
             ),
-            func.coalesce(func.avg(RotaEntrega.custo_real), 0).label("custo_medio"),
+            func.coalesce(func.sum(RotaEntrega.custo_real), 0).label("custo_total"),
+            func.coalesce(func.sum(quantidade_entregas), 0).label("total_entregas"),
         )
         .filter(RotaEntrega.tenant_id == tenant_id)
         .filter(RotaEntrega.status == "concluida")
-        .filter(RotaEntrega.data_conclusao.between(data_inicio, data_fim))
-    ).one()
+    )
+    media_geral = juntar_contagem_entregas(media_geral, paradas_por_rota)
+    media_geral = filtrar_periodo_conclusao(media_geral, data_inicio, data_fim).one()
+
+    custo_medio_geral, taxa_media_geral = calcular_medias_por_entrega(
+        media_geral.total_entregas,
+        media_geral.custo_total,
+        media_geral.taxa_total,
+    )
 
     taxa_vs_custo = {
-        "taxa_media": float(media_geral.taxa_media),
-        "custo_medio": float(media_geral.custo_medio),
+        "taxa_media": taxa_media_geral,
+        "custo_medio": custo_medio_geral,
     }
 
     return {
@@ -226,33 +252,37 @@ def dashboard_ia(
     ```
     """
     user, tenant_id = user_and_tenant
+    paradas_por_rota, quantidade_entregas = construir_contagem_entregas(tenant_id)
 
     # Buscar dados agregados (reutiliza a mesma query do dashboard)
     q = (
         db.query(
-            func.count(RotaEntrega.id).label("total_entregas"),
+            func.coalesce(func.sum(quantidade_entregas), 0).label("total_entregas"),
             func.coalesce(func.sum(RotaEntrega.custo_real), 0).label("custo_total"),
             func.coalesce(func.sum(RotaEntrega.custo_moto), 0).label("custo_moto"),
-            func.coalesce(func.avg(RotaEntrega.custo_real), 0).label("custo_medio"),
-            func.coalesce(func.avg(RotaEntrega.taxa_entrega_cliente), 0).label(
-                "taxa_media"
+            func.coalesce(func.sum(RotaEntrega.taxa_entrega_cliente), 0).label(
+                "taxa_total"
             ),
         )
         .filter(RotaEntrega.tenant_id == tenant_id)
         .filter(RotaEntrega.status == "concluida")
-        .filter(RotaEntrega.data_conclusao.between(data_inicio, data_fim))
     )
+    q = juntar_contagem_entregas(q, paradas_por_rota)
+    q = filtrar_periodo_conclusao(q, data_inicio, data_fim)
 
     r = q.one()
 
     # Preparar dados para a IA
     custo_total = float(r.custo_total)
     custo_moto = float(r.custo_moto)
+    custo_medio, taxa_media = calcular_medias_por_entrega(
+        r.total_entregas, r.custo_total, r.taxa_total
+    )
 
     dados = {
         "total_entregas": r.total_entregas or 0,
-        "custo_medio": float(r.custo_medio),
-        "taxa_media": float(r.taxa_media),
+        "custo_medio": custo_medio,
+        "taxa_media": taxa_media,
         "custo_moto_percentual": calcular_custo_moto_percentual(
             custo_moto, custo_total
         ),
@@ -282,25 +312,30 @@ def analises_ia(
     **Nota:** A IA apenas lê e analisa dados. Não modifica nada.
     """
     user, tenant_id = user_and_tenant
+    paradas_por_rota, quantidade_entregas = construir_contagem_entregas(tenant_id)
 
     analises = []
 
     # 1. Análise: Taxa vs Custo (últimos 7 dias ou período informado)
     dados_gerais = (
         db.query(
-            func.avg(RotaEntrega.taxa_entrega_cliente).label("taxa_media"),
-            func.avg(RotaEntrega.custo_real).label("custo_medio"),
-            func.count(RotaEntrega.id).label("total"),
+            func.coalesce(func.sum(RotaEntrega.taxa_entrega_cliente), 0).label(
+                "taxa_total"
+            ),
+            func.coalesce(func.sum(RotaEntrega.custo_real), 0).label("custo_total"),
+            func.coalesce(func.sum(quantidade_entregas), 0).label("total"),
         )
         .filter(RotaEntrega.tenant_id == tenant_id)
         .filter(RotaEntrega.status == "concluida")
-        .filter(RotaEntrega.data_conclusao.between(data_inicio, data_fim))
-    ).one()
+    )
+    dados_gerais = juntar_contagem_entregas(dados_gerais, paradas_por_rota)
+    dados_gerais = filtrar_periodo_conclusao(dados_gerais, data_inicio, data_fim).one()
+
+    custo_medio, taxa_media = calcular_medias_por_entrega(
+        dados_gerais.total, dados_gerais.custo_total, dados_gerais.taxa_total
+    )
 
     if dados_gerais.total > 0:
-        taxa_media = float(dados_gerais.taxa_media or 0)
-        custo_medio = float(dados_gerais.custo_medio or 0)
-
         if custo_medio > taxa_media:
             deficit = custo_medio - taxa_media
             analises.append(
@@ -319,23 +354,26 @@ def analises_ia(
     por_entregador = (
         db.query(
             Cliente.nome.label("entregador_nome"),
-            func.avg(RotaEntrega.custo_real).label("custo_medio"),
-            func.count(RotaEntrega.id).label("entregas"),
+            func.coalesce(func.sum(RotaEntrega.custo_real), 0).label("custo_total"),
+            func.coalesce(func.sum(quantidade_entregas), 0).label("entregas"),
         )
         .join(Cliente, RotaEntrega.entregador_id == Cliente.id)
         .filter(RotaEntrega.tenant_id == tenant_id)
         .filter(RotaEntrega.status == "concluida")
-        .filter(RotaEntrega.data_conclusao.between(data_inicio, data_fim))
         .filter(RotaEntrega.moto_da_loja == false())  # Excluir moto da loja
         .group_by(Cliente.nome)
-        .having(func.count(RotaEntrega.id) >= 3)  # Mínimo 3 entregas
+        .having(func.sum(quantidade_entregas) >= 3)  # Mínimo 3 entregas
+    )
+    por_entregador = juntar_contagem_entregas(por_entregador, paradas_por_rota)
+    por_entregador = filtrar_periodo_conclusao(
+        por_entregador, data_inicio, data_fim
     ).all()
 
     if por_entregador and dados_gerais.total > 0:
-        custo_medio_geral = float(dados_gerais.custo_medio or 0)
+        custo_medio_geral = custo_medio
 
         for ent in por_entregador:
-            custo_ent = float(ent.custo_medio or 0)
+            custo_ent, _ = calcular_medias_por_entrega(ent.entregas, ent.custo_total, 0)
             if custo_ent > custo_medio_geral * 1.3:  # 30% acima da média
                 diferenca = custo_ent - custo_medio_geral
                 analises.append(
@@ -354,13 +392,14 @@ def analises_ia(
         db.query(
             func.sum(RotaEntrega.custo_moto).label("custo_total_moto"),
             func.sum(RotaEntrega.custo_real).label("custo_total_geral"),
-            func.count(RotaEntrega.id).label("entregas_moto"),
+            func.coalesce(func.sum(quantidade_entregas), 0).label("entregas_moto"),
         )
         .filter(RotaEntrega.tenant_id == tenant_id)
         .filter(RotaEntrega.status == "concluida")
-        .filter(RotaEntrega.data_conclusao.between(data_inicio, data_fim))
         .filter(RotaEntrega.custo_moto > 0)
-    ).one()
+    )
+    dados_moto = juntar_contagem_entregas(dados_moto, paradas_por_rota)
+    dados_moto = filtrar_periodo_conclusao(dados_moto, data_inicio, data_fim).one()
 
     if dados_moto.entregas_moto and dados_moto.entregas_moto > 0:
         custo_moto = float(dados_moto.custo_total_moto or 0)
@@ -418,25 +457,30 @@ def sugestoes_ia(
     **Nota:** A IA sugere ações, mas NUNCA executa nada automaticamente.
     """
     user, tenant_id = user_and_tenant
+    paradas_por_rota, quantidade_entregas = construir_contagem_entregas(tenant_id)
 
     sugestoes = []
 
     # 1. Sugestão: Ajuste de taxa
     dados_gerais = (
         db.query(
-            func.avg(RotaEntrega.taxa_entrega_cliente).label("taxa_media"),
-            func.avg(RotaEntrega.custo_real).label("custo_medio"),
-            func.count(RotaEntrega.id).label("total"),
+            func.coalesce(func.sum(RotaEntrega.taxa_entrega_cliente), 0).label(
+                "taxa_total"
+            ),
+            func.coalesce(func.sum(RotaEntrega.custo_real), 0).label("custo_total"),
+            func.coalesce(func.sum(quantidade_entregas), 0).label("total"),
         )
         .filter(RotaEntrega.tenant_id == tenant_id)
         .filter(RotaEntrega.status == "concluida")
-        .filter(RotaEntrega.data_conclusao.between(data_inicio, data_fim))
-    ).one()
+    )
+    dados_gerais = juntar_contagem_entregas(dados_gerais, paradas_por_rota)
+    dados_gerais = filtrar_periodo_conclusao(dados_gerais, data_inicio, data_fim).one()
+
+    custo_medio, taxa_media = calcular_medias_por_entrega(
+        dados_gerais.total, dados_gerais.custo_total, dados_gerais.taxa_total
+    )
 
     if dados_gerais.total > 0:
-        taxa_media = float(dados_gerais.taxa_media or 0)
-        custo_medio = float(dados_gerais.custo_medio or 0)
-
         # Sugerir taxa que cubra custo + margem de 10%
         taxa_sugerida_min = custo_medio * 1.05  # 5% de margem
         taxa_sugerida_ideal = custo_medio * 1.15  # 15% de margem
@@ -464,13 +508,14 @@ def sugestoes_ia(
         db.query(
             func.sum(RotaEntrega.custo_moto).label("custo_total_moto"),
             func.sum(RotaEntrega.custo_real).label("custo_total_geral"),
-            func.count(RotaEntrega.id).label("entregas_moto"),
+            func.coalesce(func.sum(quantidade_entregas), 0).label("entregas_moto"),
         )
         .filter(RotaEntrega.tenant_id == tenant_id)
         .filter(RotaEntrega.status == "concluida")
-        .filter(RotaEntrega.data_conclusao.between(data_inicio, data_fim))
         .filter(RotaEntrega.custo_moto > 0)
-    ).one()
+    )
+    dados_moto = juntar_contagem_entregas(dados_moto, paradas_por_rota)
+    dados_moto = filtrar_periodo_conclusao(dados_moto, data_inicio, data_fim).one()
 
     if dados_moto.entregas_moto and dados_moto.entregas_moto > 0:
         custo_moto = float(dados_moto.custo_total_moto or 0)
@@ -498,22 +543,34 @@ def sugestoes_ia(
     por_entregador = (
         db.query(
             Cliente.nome.label("entregador_nome"),
-            func.avg(RotaEntrega.custo_real).label("custo_medio"),
-            func.count(RotaEntrega.id).label("entregas"),
+            func.coalesce(func.sum(RotaEntrega.custo_real), 0).label("custo_total"),
+            func.coalesce(func.sum(quantidade_entregas), 0).label("entregas"),
         )
         .join(Cliente, RotaEntrega.entregador_id == Cliente.id)
         .filter(RotaEntrega.tenant_id == tenant_id)
         .filter(RotaEntrega.status == "concluida")
-        .filter(RotaEntrega.data_conclusao.between(data_inicio, data_fim))
         .filter(RotaEntrega.moto_da_loja.is_(False))  # Excluir moto da loja
         .group_by(Cliente.nome)
-        .having(func.count(RotaEntrega.id) >= 3)
-        .order_by(func.avg(RotaEntrega.custo_real).asc())
+        .having(func.sum(quantidade_entregas) >= 3)
+    )
+    por_entregador = juntar_contagem_entregas(por_entregador, paradas_por_rota)
+    por_entregador = filtrar_periodo_conclusao(
+        por_entregador, data_inicio, data_fim
     ).all()
 
-    if por_entregador and len(por_entregador) >= 2:
-        melhor = por_entregador[0]
-        custo_melhor = float(melhor.custo_medio)
+    entregadores_com_media = sorted(
+        (
+            (
+                ent,
+                calcular_medias_por_entrega(ent.entregas, ent.custo_total, 0)[0],
+            )
+            for ent in por_entregador
+        ),
+        key=lambda item: item[1],
+    )
+
+    if len(entregadores_com_media) >= 2:
+        melhor, custo_melhor = entregadores_com_media[0]
 
         sugestoes.append(
             {

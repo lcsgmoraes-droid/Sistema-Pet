@@ -1,18 +1,28 @@
-import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
-import api from '../../services/api';
-import { EntregadorStackParamList } from '../../types/entregadorNavigation';
+  RouteProp,
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+} from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import api from "../../services/api";
+import { EntregadorStackParamList } from "../../types/entregadorNavigation";
+import { formatarDataHora, formatarMoeda } from "../../utils/format";
+import {
+  HistoricoRotasEntregador,
+  type RotaHistorico,
+} from "./HistoricoRotasEntregador";
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -22,6 +32,11 @@ interface ParadaResumo {
   endereco: string;
   status: string; // pendente | entregue | nao_entregue
   cliente_nome?: string;
+  venda_id: number;
+  numero_venda?: string;
+  valor_venda?: number;
+  taxa_entrega?: number;
+  data_entrega?: string;
 }
 
 interface Rota {
@@ -29,6 +44,16 @@ interface Rota {
   numero: string;
   status: string; // pendente | em_rota | em_andamento | concluida
   created_at: string;
+  data_inicio?: string;
+  data_conclusao?: string;
+  duracao_minutos?: number;
+  total_entregas?: number;
+  entregas_concluidas?: number;
+  distancia_real?: number;
+  distancia_total_km_real?: number;
+  distancia_prevista?: number;
+  valor_total_vendas?: number;
+  taxa_total_entregas?: number;
   paradas: ParadaResumo[];
 }
 
@@ -40,22 +65,28 @@ interface EntregaAberta {
   ordem_otimizada?: number | null;
   total: number;
   taxa_entrega: number;
+  data_venda?: string;
+  cliente_telefone?: string;
+  cliente_celular?: string;
+  forma_pagamento?: string;
+  status_pagamento?: string;
+  observacoes_entrega?: string;
 }
 
-type Nav = NativeStackNavigationProp<EntregadorStackParamList, 'MinhasRotas'>;
-type RouteProps = RouteProp<EntregadorStackParamList, 'MinhasRotas'>;
+type Nav = NativeStackNavigationProp<EntregadorStackParamList, "MinhasRotas">;
+type RouteProps = RouteProp<EntregadorStackParamList, "MinhasRotas">;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const BADGE: Record<string, { label: string; color: string }> = {
-  pendente:     { label: 'Pendente',     color: '#f59e0b' },
-  em_rota:      { label: 'Em rota',      color: '#3b82f6' },
-  em_andamento: { label: 'Em andamento', color: '#3b82f6' },
-  concluida:    { label: 'Concluída',    color: '#10b981' },
+  pendente: { label: "Pendente", color: "#f59e0b" },
+  em_rota: { label: "Em rota", color: "#3b82f6" },
+  em_andamento: { label: "Em andamento", color: "#3b82f6" },
+  concluida: { label: "Concluída", color: "#10b981" },
 };
 
 function badgeFor(status: string) {
-  return BADGE[status] ?? { label: status, color: '#6b7280' };
+  return BADGE[status] ?? { label: status, color: "#6b7280" };
 }
 
 // ─── Componente ──────────────────────────────────────────────────────────────
@@ -63,7 +94,7 @@ function badgeFor(status: string) {
 export default function RotasDoEntregadorScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<RouteProps>();
-  const [aba, setAba] = useState<'abertas' | 'rotas'>('abertas');
+  const [aba, setAba] = useState<"abertas" | "rotas" | "historico">("abertas");
 
   const [entregasAbertas, setEntregasAbertas] = useState<EntregaAberta[]>([]);
   const [selecionadas, setSelecionadas] = useState<number[]>([]);
@@ -71,33 +102,53 @@ export default function RotasDoEntregadorScreen() {
   const [criandoRota, setCriandoRota] = useState(false);
 
   const [rotas, setRotas] = useState<Rota[]>([]);
+  const [historico, setHistorico] = useState<RotaHistorico[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const carregar = useCallback(async (mostrarErro = true) => {
     try {
-      const [rotasRes, abertasRes] = await Promise.allSettled([
-        api.get<Rota[]>('/ecommerce/entregador/minhas-rotas'),
-        api.get<EntregaAberta[]>('/ecommerce/entregador/entregas-abertas'),
+      const [rotasRes, abertasRes, historicoRes] = await Promise.allSettled([
+        api.get<Rota[]>("/ecommerce/entregador/minhas-rotas"),
+        api.get<EntregaAberta[]>("/ecommerce/entregador/entregas-abertas"),
+        api.get<RotaHistorico[]>("/ecommerce/entregador/minhas-rotas", {
+          params: {
+            status: "concluida",
+            ordenar_por: "data_conclusao",
+            direcao: "desc",
+            limite: 100,
+          },
+        }),
       ]);
       let carregouAlgumaLista = false;
 
-      if (rotasRes.status === 'fulfilled') {
+      if (rotasRes.status === "fulfilled") {
         setRotas(rotasRes.value.data || []);
         carregouAlgumaLista = true;
       }
 
-      if (abertasRes.status === 'fulfilled') {
+      if (abertasRes.status === "fulfilled") {
         setEntregasAbertas(abertasRes.value.data || []);
         carregouAlgumaLista = true;
       }
 
+      if (historicoRes.status === "fulfilled") {
+        setHistorico(historicoRes.value.data || []);
+        carregouAlgumaLista = true;
+      }
+
       if (!carregouAlgumaLista && mostrarErro) {
-        Alert.alert('Erro', 'Nao foi possivel carregar as entregas. Tente novamente.');
+        Alert.alert(
+          "Erro",
+          "Nao foi possivel carregar as entregas. Tente novamente.",
+        );
       }
     } catch {
       if (mostrarErro) {
-        Alert.alert('Erro', 'Nao foi possivel carregar as entregas. Tente novamente.');
+        Alert.alert(
+          "Erro",
+          "Nao foi possivel carregar as entregas. Tente novamente.",
+        );
       }
     } finally {
       setLoading(false);
@@ -110,8 +161,11 @@ export default function RotasDoEntregadorScreen() {
     if (!rotaFinalizadaId) return;
 
     setRotas((prev) => prev.filter((rota) => rota.id !== rotaFinalizadaId));
-    setAba('rotas');
-    navigation.setParams({ rotaFinalizadaId: undefined, refreshKey: undefined });
+    setAba("rotas");
+    navigation.setParams({
+      rotaFinalizadaId: undefined,
+      refreshKey: undefined,
+    });
   }, [navigation, route.params?.refreshKey, route.params?.rotaFinalizadaId]);
 
   useFocusEffect(
@@ -127,24 +181,32 @@ export default function RotasDoEntregadorScreen() {
 
   function toggleEntrega(vendaId: number) {
     setSelecionadas((prev) =>
-      prev.includes(vendaId) ? prev.filter((id) => id !== vendaId) : [...prev, vendaId],
+      prev.includes(vendaId)
+        ? prev.filter((id) => id !== vendaId)
+        : [...prev, vendaId],
     );
   }
 
   async function otimizarSelecionadas() {
     if (selecionadas.length === 0) {
-      Alert.alert('Atenção', 'Selecione ao menos uma entrega para otimizar.');
+      Alert.alert("Atenção", "Selecione ao menos uma entrega para otimizar.");
       return;
     }
     setOtimizando(true);
     try {
-      await api.post('/ecommerce/entregador/entregas-abertas/otimizar-selecionadas', {
-        venda_ids: selecionadas,
-      });
-      Alert.alert('Sucesso', 'Ordem das entregas otimizada com sucesso.');
+      await api.post(
+        "/ecommerce/entregador/entregas-abertas/otimizar-selecionadas",
+        {
+          venda_ids: selecionadas,
+        },
+      );
+      Alert.alert("Sucesso", "Ordem das entregas otimizada com sucesso.");
       await carregar();
     } catch {
-      Alert.alert('Erro', 'Não foi possível otimizar as entregas selecionadas.');
+      Alert.alert(
+        "Erro",
+        "Não foi possível otimizar as entregas selecionadas.",
+      );
     } finally {
       setOtimizando(false);
     }
@@ -152,52 +214,60 @@ export default function RotasDoEntregadorScreen() {
 
   async function criarRotaSelecionadas() {
     if (selecionadas.length === 0) {
-      Alert.alert('Atenção', 'Selecione ao menos uma entrega para criar a rota.');
+      Alert.alert(
+        "Atenção",
+        "Selecione ao menos uma entrega para criar a rota.",
+      );
       return;
     }
 
     const confirmarCriacao = async () => {
       setCriandoRota(true);
       try {
-        const response = await api.post<Rota>('/ecommerce/entregador/rotas', { venda_ids: selecionadas });
+        const response = await api.post<Rota>("/ecommerce/entregador/rotas", {
+          venda_ids: selecionadas,
+        });
         const novaRota = response.data;
         setSelecionadas([]);
-        setAba('rotas');
+        setAba("rotas");
         await carregar();
         if (novaRota?.id && novaRota?.numero) {
           Alert.alert(
-            'Rota criada',
-            'Agora inicie a rota na próxima tela para começar as entregas.',
+            "Rota criada",
+            "Agora inicie a rota na próxima tela para começar as entregas.",
             [
               {
-                text: 'Abrir rota',
+                text: "Abrir rota",
                 onPress: () => {
-                  navigation.navigate('DetalheEntrega', {
+                  navigation.navigate("DetalheEntrega", {
                     rotaId: novaRota.id,
                     numero: novaRota.numero,
                   });
                 },
               },
-              { text: 'Depois', style: 'cancel' },
+              { text: "Depois", style: "cancel" },
             ],
           );
         } else {
-          Alert.alert('Sucesso', 'Rota criada com sucesso. Abra a rota e toque em "Iniciar Rota".');
+          Alert.alert(
+            "Sucesso",
+            'Rota criada com sucesso. Abra a rota e toque em "Iniciar Rota".',
+          );
         }
       } catch {
-        Alert.alert('Erro', 'Não foi possível criar a rota agora.');
+        Alert.alert("Erro", "Não foi possível criar a rota agora.");
       } finally {
         setCriandoRota(false);
       }
     };
 
     Alert.alert(
-      'Criar rota',
+      "Criar rota",
       `Criar rota com ${selecionadas.length} entrega(s) selecionada(s)?`,
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: "Cancelar", style: "cancel" },
         {
-          text: 'Criar rota',
+          text: "Criar rota",
           onPress: () => {
             void confirmarCriacao();
           },
@@ -210,15 +280,22 @@ export default function RotasDoEntregadorScreen() {
 
   const renderRota = ({ item }: { item: Rota }) => {
     const badge = badgeFor(item.status);
-    const total = item.paradas.length;
-    const entregues = item.paradas.filter(p => p.status === 'entregue').length;
-    const data = new Date(item.created_at).toLocaleDateString('pt-BR');
+    const total = Number(item.total_entregas) || item.paradas.length;
+    const entregues = item.paradas.filter(
+      (p) => p.status === "entregue",
+    ).length;
+    const data = new Date(item.created_at).toLocaleDateString("pt-BR");
 
     return (
       <TouchableOpacity
         style={styles.card}
         activeOpacity={0.75}
-        onPress={() => navigation.navigate('DetalheEntrega', { rotaId: item.id, numero: item.numero })}
+        onPress={() =>
+          navigation.navigate("DetalheEntrega", {
+            rotaId: item.id,
+            numero: item.numero,
+          })
+        }
       >
         <View style={styles.cardHeader}>
           <Text style={styles.cardNumero}>Rota #{item.numero}</Text>
@@ -231,7 +308,7 @@ export default function RotasDoEntregadorScreen() {
 
         <View style={styles.cardFooter}>
           <Text style={styles.cardParadas}>
-            {total} {total === 1 ? 'parada' : 'paradas'}
+            {total} {total === 1 ? "parada" : "paradas"}
           </Text>
           {total > 0 && (
             <Text style={styles.cardProgresso}>
@@ -240,14 +317,12 @@ export default function RotasDoEntregadorScreen() {
           )}
         </View>
 
-        {item.paradas.slice(0, 3).map(p => (
+        {item.paradas.slice(0, 3).map((p) => (
           <Text key={p.id} style={styles.cardParadaItem} numberOfLines={1}>
-            {p.ordem}. {p.cliente_nome ?? 'Cliente'} — {p.endereco}
+            {p.ordem}. {p.cliente_nome ?? "Cliente"} — {p.endereco}
           </Text>
         ))}
-        {total > 3 && (
-          <Text style={styles.cardMais}>+{total - 3} mais…</Text>
-        )}
+        {total > 3 && <Text style={styles.cardMais}>+{total - 3} mais…</Text>}
       </TouchableOpacity>
     );
   };
@@ -263,17 +338,39 @@ export default function RotasDoEntregadorScreen() {
         <View style={styles.cardHeader}>
           <Text style={styles.cardNumero}>Venda #{item.numero_venda}</Text>
           <View style={[styles.checkbox, selecionada && styles.checkboxAtivo]}>
-            <Text style={styles.checkboxTexto}>{selecionada ? '✓' : ''}</Text>
+            <Text style={styles.checkboxTexto}>{selecionada ? "✓" : ""}</Text>
           </View>
         </View>
         <Text style={styles.cardCliente}>{item.cliente_nome}</Text>
         <Text style={styles.cardParadaItem} numberOfLines={2}>
           📍 {item.endereco_entrega}
         </Text>
+        <View style={styles.entregaMetricas}>
+          <Text style={styles.entregaMetrica}>
+            Venda: {formatarMoeda(item.total)}
+          </Text>
+          <Text style={styles.entregaMetrica}>
+            Taxa: {formatarMoeda(item.taxa_entrega)}
+          </Text>
+          <Text style={styles.entregaMetrica}>
+            Pagamento: {item.status_pagamento || "não informado"}
+          </Text>
+        </View>
         <Text style={styles.cardData}>
-          Total: R$ {Number(item.total || 0).toFixed(2)}
-          {item.ordem_otimizada ? ` • Ordem otimizada: ${item.ordem_otimizada}` : ''}
+          Pedido em {formatarDataHora(item.data_venda)}
+          {item.forma_pagamento ? ` • ${item.forma_pagamento}` : ""}
+          {item.ordem_otimizada ? ` • Ordem ${item.ordem_otimizada}` : ""}
         </Text>
+        {(item.cliente_celular || item.cliente_telefone) && (
+          <Text style={styles.cardContato}>
+            📞 {item.cliente_celular || item.cliente_telefone}
+          </Text>
+        )}
+        {item.observacoes_entrega && (
+          <Text style={styles.cardObservacao}>
+            📝 {item.observacoes_entrega}
+          </Text>
+        )}
       </TouchableOpacity>
     );
   };
@@ -293,42 +390,64 @@ export default function RotasDoEntregadorScreen() {
     <View style={{ flex: 1 }}>
       <View style={styles.tabsWrap}>
         <TouchableOpacity
-          style={[styles.tabBtn, aba === 'abertas' && styles.tabBtnAtivo]}
-          onPress={() => setAba('abertas')}
+          style={[styles.tabBtn, aba === "abertas" && styles.tabBtnAtivo]}
+          onPress={() => setAba("abertas")}
         >
-          <Text style={[styles.tabText, aba === 'abertas' && styles.tabTextAtivo]}>
+          <Text
+            style={[styles.tabText, aba === "abertas" && styles.tabTextAtivo]}
+          >
             📦 Entregas em Aberto
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tabBtn, aba === 'rotas' && styles.tabBtnAtivo]}
-          onPress={() => setAba('rotas')}
+          style={[styles.tabBtn, aba === "rotas" && styles.tabBtnAtivo]}
+          onPress={() => setAba("rotas")}
         >
-          <Text style={[styles.tabText, aba === 'rotas' && styles.tabTextAtivo]}>
-            🚚 Rotas de Entrega
+          <Text
+            style={[styles.tabText, aba === "rotas" && styles.tabTextAtivo]}
+          >
+            🚚 Rotas Ativas
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, aba === "historico" && styles.tabBtnAtivo]}
+          onPress={() => setAba("historico")}
+        >
+          <Text
+            style={[styles.tabText, aba === "historico" && styles.tabTextAtivo]}
+          >
+            📜 Histórico
           </Text>
         </TouchableOpacity>
       </View>
 
-      {aba === 'abertas' && (
+      {aba === "abertas" && (
         <>
           <View style={styles.actionsBar}>
             <TouchableOpacity
-              style={[styles.actionBtn, (otimizando || criandoRota) && styles.actionBtnDisabled]}
+              style={[
+                styles.actionBtn,
+                (otimizando || criandoRota) && styles.actionBtnDisabled,
+              ]}
               disabled={otimizando || criandoRota}
               onPress={otimizarSelecionadas}
             >
               <Text style={styles.actionBtnText}>
-                {otimizando ? 'Otimizando...' : '🗺️ Otimizar Selecionadas'}
+                {otimizando ? "Otimizando..." : "🗺️ Otimizar Selecionadas"}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.actionBtnPrimary, (otimizando || criandoRota) && styles.actionBtnDisabled]}
+              style={[
+                styles.actionBtnPrimary,
+                (otimizando || criandoRota) && styles.actionBtnDisabled,
+              ]}
               disabled={otimizando || criandoRota}
               onPress={criarRotaSelecionadas}
             >
               <Text style={styles.actionBtnPrimaryText}>
-                {criandoRota ? 'Criando...' : `✅ Criar Rota (${selecionadas.length})`}
+                {criandoRota
+                  ? "Criando..."
+                  : `✅ Criar Rota (${selecionadas.length})`}
               </Text>
             </TouchableOpacity>
           </View>
@@ -337,32 +456,58 @@ export default function RotasDoEntregadorScreen() {
             data={entregasAbertas}
             keyExtractor={(item) => String(item.id)}
             renderItem={renderEntregaAberta}
-            contentContainerStyle={entregasAbertas.length === 0 ? styles.emptyContainer : styles.list}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            contentContainerStyle={
+              entregasAbertas.length === 0 ? styles.emptyContainer : styles.list
+            }
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
             ListEmptyComponent={
               <View style={styles.center}>
                 <Text style={styles.emptyIcon}>📦</Text>
                 <Text style={styles.emptyTitle}>Nenhuma entrega em aberto</Text>
-                <Text style={styles.emptySubtitle}>Puxe para baixo para atualizar</Text>
+                <Text style={styles.emptySubtitle}>
+                  Puxe para baixo para atualizar
+                </Text>
               </View>
             }
           />
         </>
       )}
 
-      {aba === 'rotas' && (
+      {aba === "rotas" && (
         <FlatList
           data={rotas}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderRota}
-          contentContainerStyle={rotas.length === 0 ? styles.emptyContainer : styles.list}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          contentContainerStyle={
+            rotas.length === 0 ? styles.emptyContainer : styles.list
+          }
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
           ListEmptyComponent={
             <View style={styles.center}>
               <Text style={styles.emptyIcon}>🚚</Text>
-              <Text style={styles.emptyTitle}>Nenhuma rota para hoje</Text>
-              <Text style={styles.emptySubtitle}>Puxe para baixo para atualizar</Text>
+              <Text style={styles.emptyTitle}>Nenhuma rota ativa</Text>
+              <Text style={styles.emptySubtitle}>
+                Puxe para baixo para atualizar
+              </Text>
             </View>
+          }
+        />
+      )}
+
+      {aba === "historico" && (
+        <HistoricoRotasEntregador
+          rotas={historico}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          onOpen={(item) =>
+            navigation.navigate("DetalheEntrega", {
+              rotaId: item.id,
+              numero: item.numero,
+            })
           }
         />
       )}
@@ -378,80 +523,80 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   tabsWrap: {
-    flexDirection: 'row',
+    flexDirection: "row",
     padding: 10,
     gap: 8,
-    backgroundColor: '#eef2ff',
+    backgroundColor: "#eef2ff",
   },
   tabBtn: {
     flex: 1,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#c7d2fe',
+    borderColor: "#c7d2fe",
     paddingVertical: 10,
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    alignItems: "center",
+    backgroundColor: "#fff",
   },
   tabBtnAtivo: {
-    backgroundColor: '#1d4ed8',
-    borderColor: '#1d4ed8',
+    backgroundColor: "#1d4ed8",
+    borderColor: "#1d4ed8",
   },
   tabText: {
-    color: '#1e3a8a',
+    color: "#1e3a8a",
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   tabTextAtivo: {
-    color: '#fff',
+    color: "#fff",
   },
   actionsBar: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 8,
     paddingHorizontal: 12,
     paddingTop: 8,
   },
   actionBtn: {
     flex: 1,
-    backgroundColor: '#0f766e',
+    backgroundColor: "#0f766e",
     borderRadius: 8,
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   actionBtnPrimary: {
     flex: 1,
-    backgroundColor: '#2563eb',
+    backgroundColor: "#2563eb",
     borderRadius: 8,
     paddingVertical: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   actionBtnDisabled: {
     opacity: 0.6,
   },
   actionBtnText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   actionBtnPrimaryText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
   },
   emptyContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 32,
   },
   center: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     gap: 8,
   },
   loadingText: {
     marginTop: 12,
-    color: '#6b7280',
+    color: "#6b7280",
     fontSize: 14,
   },
   emptyIcon: {
@@ -460,20 +605,20 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
+    fontWeight: "600",
+    color: "#111827",
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: "#6b7280",
     marginTop: 4,
   },
   // Card
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 12,
     padding: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
@@ -482,43 +627,70 @@ const styles = StyleSheet.create({
   },
   cardSelecionado: {
     borderWidth: 2,
-    borderColor: '#2563eb',
-    backgroundColor: '#eff6ff',
+    borderColor: "#2563eb",
+    backgroundColor: "#eff6ff",
   },
   cardCliente: {
     fontSize: 14,
-    color: '#111827',
-    fontWeight: '600',
+    color: "#111827",
+    fontWeight: "600",
     marginBottom: 4,
+  },
+  entregaMetricas: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  entregaMetrica: {
+    color: "#334155",
+    backgroundColor: "#f1f5f9",
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    fontSize: 11,
+  },
+  cardContato: {
+    color: "#1d4ed8",
+    fontSize: 12,
+    marginTop: 3,
+  },
+  cardObservacao: {
+    color: "#854d0e",
+    backgroundColor: "#fffbeb",
+    borderRadius: 6,
+    padding: 7,
+    fontSize: 12,
+    marginTop: 6,
   },
   checkbox: {
     width: 22,
     height: 22,
     borderWidth: 1,
-    borderColor: '#9ca3af',
+    borderColor: "#9ca3af",
     borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
   },
   checkboxAtivo: {
-    backgroundColor: '#2563eb',
-    borderColor: '#2563eb',
+    backgroundColor: "#2563eb",
+    borderColor: "#2563eb",
   },
   checkboxTexto: {
-    color: '#fff',
-    fontWeight: '700',
+    color: "#fff",
+    fontWeight: "700",
   },
   cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 4,
   },
   cardNumero: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: "700",
+    color: "#111827",
   },
   badge: {
     paddingHorizontal: 10,
@@ -526,38 +698,38 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   badgeText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   cardData: {
     fontSize: 13,
-    color: '#6b7280',
+    color: "#6b7280",
     marginBottom: 8,
   },
   cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 8,
   },
   cardParadas: {
     fontSize: 14,
-    color: '#374151',
-    fontWeight: '500',
+    color: "#374151",
+    fontWeight: "500",
   },
   cardProgresso: {
     fontSize: 14,
-    color: '#2563eb',
-    fontWeight: '500',
+    color: "#2563eb",
+    fontWeight: "500",
   },
   cardParadaItem: {
     fontSize: 13,
-    color: '#6b7280',
+    color: "#6b7280",
     marginTop: 2,
   },
   cardMais: {
     fontSize: 13,
-    color: '#9ca3af',
+    color: "#9ca3af",
     marginTop: 4,
   },
 });
