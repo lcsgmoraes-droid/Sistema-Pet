@@ -9,7 +9,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models import Tenant, UserSession
-from app.services.plan_catalog import get_plan
+from app.services.plan_catalog import PLAN_CATALOG, get_plan
 from app.utils.timezone import now_brasilia
 from app.vendas_models import Venda
 
@@ -64,8 +64,14 @@ def enforce_monthly_sales_limit(
     if tenant is None or _trial_is_active(tenant):
         return
 
+    raw_plan = str(getattr(tenant, "plan", "") or "").strip().lower()
     billing_status = str(getattr(tenant, "billing_status", "active") or "active")
-    if billing_status.strip().lower() in {"trial", "expired", "blocked", "canceled"}:
+    if raw_plan in PLAN_CATALOG and billing_status.strip().lower() in {
+        "trial",
+        "expired",
+        "blocked",
+        "canceled",
+    }:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail={

@@ -151,6 +151,25 @@ def test_expired_trial_blocks_new_sales_until_activation():
     assert exc.value.detail["code"] == "subscription_inactive"
 
 
+def test_legacy_basic_tenant_is_not_blocked_by_the_new_billing_rule():
+    now = datetime(2026, 7, 18, tzinfo=timezone.utc)
+    tenant_query = MagicMock()
+    tenant_query.filter.return_value.with_for_update.return_value.first.return_value = (
+        _tenant(
+            "basico",
+            billing_status="trial",
+            trial_started_at=now - timedelta(days=60),
+            trial_ends_at=now - timedelta(days=30),
+        )
+    )
+    db = MagicMock()
+    db.query.return_value = tenant_query
+
+    enforce_monthly_sales_limit(db, "tenant-legacy")
+
+    assert db.query.call_count == 1
+
+
 def test_new_start_login_revokes_previous_tenant_sessions():
     now = datetime(2026, 7, 18, tzinfo=timezone.utc)
     old_sessions = [
