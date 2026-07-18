@@ -16,10 +16,9 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import LandingProfileSelector from "../components/landing/LandingProfileSelector";
 import LaunchOfferBanner from "../components/marketing/LaunchOfferBanner";
-import { useAuth } from "../contexts/AuthContext";
 
 const salesContactUrl =
   "https://wa.me/5518997401641?text=Ol%C3%A1!%20Quero%20conhecer%20o%20CorePet%20e%20ver%20uma%20demonstra%C3%A7%C3%A3o.";
@@ -213,18 +212,10 @@ const systemDemoVideos = [
 ];
 
 export default function LandingPage() {
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
   const [activeDemoId, setActiveDemoId] = useState(systemDemoVideos[0].id);
   const [activeProfileId, setActiveProfileId] = useState("all");
   const activeDemo =
     systemDemoVideos.find((video) => video.id === activeDemoId) || systemDemoVideos[0];
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/lembretes", { replace: true });
-    }
-  }, [isAuthenticated, navigate]);
 
   useEffect(() => {
     const previousTitle = document.title;
