@@ -21,6 +21,8 @@ from app.services.business_audit_service import (
     build_plan_activation_metadata,
     log_business_event,
 )
+from app.services.plan_catalog import PLAN_CATALOG, get_plan
+from app.services.plan_limits import active_session_usage, monthly_sales_usage
 from app.tenancy.context import set_current_tenant
 
 logger = logging.getLogger(__name__)
@@ -166,6 +168,7 @@ def _resolver_modulos_ativos(
     agora: datetime,
     plano: str | None = None,
     liberar_trial_completo: bool = False,
+    liberar_modulos_do_plano: bool = True,
 ) -> list[str]:
     modulos_do_tenant = set(_normalizar_modulos_ativos(raw_modulos))
     plano_normalizado = (plano or "").strip().lower()
@@ -181,6 +184,10 @@ def _resolver_modulos_ativos(
         or plano_normalizado in PLANOS_TODOS_MODULOS
     ):
         modulos_do_tenant.update(MODULOS_PREMIUM)
+
+    plano_catalogo = get_plan(plano)
+    if liberar_modulos_do_plano and plano_catalogo:
+        modulos_do_tenant.update(plano_catalogo.modules)
 
     if liberar_trial_completo:
         modulos_do_tenant.update(MODULOS_TRIAL_COMPLETO)
@@ -231,6 +238,41 @@ def get_modulos_status(
         agora,
         tenant.plan,
         liberar_trial_completo=_trial_completo_ativo(tenant, agora),
+        liberar_modulos_do_plano=_assinatura_resumo_tenant(tenant, agora)[
+            "status_efetivo"
+        ]
+        in {"active", "trial"},
+    )
+
+    assinatura_resumo = _assinatura_resumo_tenant(tenant, agora)
+    plano_catalogo = get_plan(tenant.plan)
+    trial_completo = assinatura_resumo["acesso_completo_durante_trial"]
+    plano_ativo = assinatura_resumo["status_efetivo"] in {"active", "trial"}
+    recursos_trial = sorted(
+        {recurso for plano in PLAN_CATALOG.values() for recurso in plano.entitlements}
+    )
+    recursos_ativos = (
+        recursos_trial
+        if trial_completo
+        else sorted(plano_catalogo.entitlements)
+        if plano_catalogo and plano_ativo
+        else []
+    )
+
+    uso_vendas = monthly_sales_usage(db, tenant_id)
+    uso_sessoes = active_session_usage(db, tenant_id)
+    limites_apos_trial = {
+        "vendas_mensais": (
+            plano_catalogo.monthly_sales_limit if plano_catalogo else None
+        ),
+        "acessos_simultaneos": (
+            plano_catalogo.simultaneous_sessions_limit if plano_catalogo else None
+        ),
+    }
+    limites_aplicados = (
+        {"vendas_mensais": None, "acessos_simultaneos": None}
+        if trial_completo
+        else limites_apos_trial
     )
 
     return {
@@ -247,7 +289,17 @@ def get_modulos_status(
             "libera_premium_automaticamente": True,
             "integracoes_terceiras_exigem_configuracao": True,
         },
-        "assinatura": _assinatura_resumo_tenant(tenant, agora),
+        "assinatura": assinatura_resumo,
+        "plano_catalogo": plano_catalogo.to_public_dict() if plano_catalogo else None,
+        "recursos_ativos": recursos_ativos,
+        "limites": {
+            "aplicados": limites_aplicados,
+            "apos_trial": limites_apos_trial,
+        },
+        "uso": {
+            "vendas_no_mes": uso_vendas,
+            "acessos_simultaneos": uso_sessoes,
+        },
         "plano_legado_liberado": (tenant.plan or "").strip().lower()
         in PLANOS_LEGADO_LIBERADOS,
     }
@@ -346,14 +398,15 @@ def ativar_modulo(
     return {"ok": True, "modulo": modulo, "tenant_id": tenant_id_alvo}
 
 
-@router.post("/admin/plano-basico/ativar")
-def ativar_plano_basico_manual(
+@router.post("/admin/plano/ativar")
+def ativar_plano_manual(
     tenant_id_alvo: str,
+    plano: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
     """
-    Marca manualmente o Plano Basico como ativo apos confirmacao externa de pagamento.
+    Ativa manualmente qualquer plano publico apos confirmacao externa de pagamento.
     Este endpoint nao processa pagamento; ele apenas registra a ativacao operacional.
     """
     if not (
@@ -361,6 +414,13 @@ def ativar_plano_basico_manual(
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado"
+        )
+
+    plano_catalogo = get_plan(plano)
+    if plano_catalogo is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Plano publico invalido",
         )
 
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id_alvo).first()
@@ -384,7 +444,7 @@ def ativar_plano_basico_manual(
         if tenant.trial_ends_at
         else None,
     }
-    tenant.plan = "basico"
+    tenant.plan = plano_catalogo.code
     tenant.billing_status = "active"
     tenant.subscription_source = "manual"
     tenant.subscription_activated_at = agora
@@ -405,7 +465,10 @@ def ativar_plano_basico_manual(
             tenant=tenant,
             previous_state=previous_state,
         ),
-        details=f"Plano basico ativado manualmente para tenant {tenant_id_alvo}",
+        details=(
+            f"Plano {plano_catalogo.code} ativado manualmente para tenant "
+            f"{tenant_id_alvo}"
+        ),
         commit=False,
     )
     db.commit()
@@ -417,3 +480,18 @@ def ativar_plano_basico_manual(
         "plano": tenant.plan,
         "assinatura": _assinatura_resumo_tenant(tenant, agora),
     }
+
+
+@router.post("/admin/plano-basico/ativar")
+def ativar_plano_basico_manual(
+    tenant_id_alvo: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    """Compatibilidade para a antiga ativacao manual do Plano Basico."""
+    return ativar_plano_manual(
+        tenant_id_alvo=tenant_id_alvo,
+        plano="pet-basico",
+        current_user=current_user,
+        db=db,
+    )

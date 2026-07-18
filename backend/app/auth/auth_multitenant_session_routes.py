@@ -27,6 +27,7 @@ from app.db import get_session
 from app.models import Permission, Role, RolePermission, Tenant, User, UserTenant
 from app.security.jwt_compat import JWTError, jwt
 from app.services.auth_security import register_logout
+from app.services.plan_limits import enforce_simultaneous_session_limit
 from app.session_manager import (
     get_active_sessions,
     get_session_by_jti,
@@ -183,6 +184,11 @@ def select_tenant(
             detail="Sessao invalida. Faca login novamente.",
         )
 
+    enforce_simultaneous_session_limit(
+        db=db,
+        tenant=tenant,
+        current_session=db_session,
+    )
     db_session.tenant_id = tenant_uuid
     db.commit()
 

@@ -27,6 +27,7 @@ from app.vendas.pos_processamento import (
     processar_contas_pagar_taxas,
     processar_lembretes_venda,
 )
+from app.services.plan_limits import enforce_monthly_sales_limit
 
 __all__ = [
     "VendaService",
@@ -50,6 +51,7 @@ class VendaService:
     def criar_venda(
         payload: Dict[str, Any], user_id: int, db: Session
     ) -> Dict[str, Any]:
+        enforce_monthly_sales_limit(db, payload.get("tenant_id"))
         return criar_venda_impl(
             payload=payload,
             user_id=user_id,

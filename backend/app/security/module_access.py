@@ -15,9 +15,13 @@ from app.db import get_session
 from app.models import AssinaturaModulo, Tenant
 from app.routes.modulos_routes import (
     MODULOS_PREMIUM,
+    PLANOS_LEGADO_LIBERADOS,
+    PLANOS_TODOS_MODULOS,
+    _assinatura_resumo_tenant,
     _resolver_modulos_ativos,
     _trial_completo_ativo,
 )
+from app.services.plan_catalog import ALL_PUBLIC_ENTITLEMENTS, get_plan
 
 optional_security = HTTPBearer(auto_error=False)
 
@@ -67,7 +71,32 @@ def _load_active_modules(
         agora,
         tenant.plan,
         liberar_trial_completo=_trial_completo_ativo(tenant, agora),
+        liberar_modulos_do_plano=_assinatura_resumo_tenant(tenant, agora)[
+            "status_efetivo"
+        ]
+        in {"active", "trial"},
     )
+
+
+def _load_active_entitlements(
+    db: Session, tenant_id: str, agora: datetime | None = None
+) -> list[str]:
+    agora = agora or datetime.now(tz=timezone.utc)
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    if not tenant:
+        return []
+
+    plano_normalizado = str(tenant.plan or "").strip().lower()
+    assinatura = _assinatura_resumo_tenant(tenant, agora)
+    if assinatura["acesso_completo_durante_trial"]:
+        return sorted(ALL_PUBLIC_ENTITLEMENTS)
+    if plano_normalizado in PLANOS_LEGADO_LIBERADOS | PLANOS_TODOS_MODULOS:
+        return sorted(ALL_PUBLIC_ENTITLEMENTS)
+    if assinatura["status_efetivo"] != "active":
+        return []
+
+    plano = get_plan(tenant.plan)
+    return sorted(plano.entitlements) if plano else []
 
 
 def _is_public_bling_webhook(modulo: str, request: Request | None) -> bool:
@@ -131,5 +160,49 @@ def require_active_module(
                 "message": "Modulo nao contratado para este tenant",
             },
         )
+
+    return dependency
+
+
+def require_active_entitlement(entitlement: str) -> Callable:
+    """Bloqueia uma funcionalidade especifica sem confundi-la com um modulo inteiro."""
+    if entitlement not in ALL_PUBLIC_ENTITLEMENTS:
+        raise ValueError(f"Recurso comercial desconhecido: {entitlement}")
+
+    async def dependency(
+        credentials: HTTPAuthorizationCredentials | None = Depends(optional_security),
+        db: Session = Depends(get_session),
+    ) -> None:
+        if not credentials:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Not authenticated"
+            )
+
+        current_user = get_current_user(credentials=credentials, session=db)
+        current_user, tenant_id = await get_current_user_and_tenant(
+            credentials=credentials,
+            user=current_user,
+            db=db,
+        )
+        if getattr(current_user, "is_superadmin", False) or getattr(
+            current_user, "is_system_admin", False
+        ):
+            return
+        if not tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tenant obrigatorio para acessar este recurso",
+            )
+
+        active = _load_active_entitlements(db, str(tenant_id))
+        if entitlement not in active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "entitlement_not_enabled",
+                    "recurso": entitlement,
+                    "message": "Este recurso nao esta incluido no plano atual.",
+                },
+            )
 
     return dependency

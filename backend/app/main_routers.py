@@ -199,7 +199,7 @@ from app.routes.ecommerce_drive_routes import router as ecommerce_drive_router
 from app.routes.product_images_public import router as product_images_public_router
 from app.routes.sefaz_routes import router as sefaz_router
 from app.routes.modulos_routes import router as modulos_router
-from app.security.module_access import require_active_module
+from app.security.module_access import require_active_entitlement, require_active_module
 from app.veterinario_routes import router as veterinario_router  # Módulo Veterinário
 from app.banho_tosa_routes import router as banho_tosa_router  # Modulo Banho & Tosa
 
@@ -218,6 +218,10 @@ def _module_dependencies(modulo: str, *, allow_ecommerce_customer: bool = False)
             )
         )
     ]
+
+
+def _entitlement_dependencies(entitlement: str):
+    return [Depends(require_active_entitlement(entitlement))]
 
 
 def register_routers(app: FastAPI) -> None:
@@ -314,7 +318,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(
         notas_entrada_router,
         tags=["Notas de Entrada (XML)"],
-        dependencies=_module_dependencies("compras"),
+        dependencies=_entitlement_dependencies("purchases.invoice_xml"),
     )
     app.include_router(
         compras_pendencias_router,
