@@ -94,6 +94,7 @@ def test_load_active_modules_libera_experiencia_completa_durante_trial():
     assert "banho_tosa" in ativos
     assert "bling" not in ativos
 
+
 @pytest.mark.asyncio
 async def test_require_active_module_blocks_tenant_without_module(monkeypatch):
     user = _user()
