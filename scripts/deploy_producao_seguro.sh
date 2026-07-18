@@ -8,6 +8,8 @@ COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 RUNTIME_DIST="${RUNTIME_DIST:-runtime/frontend/dist}"
 NEXT_RUNTIME_DIST="${NEXT_RUNTIME_DIST:-${RUNTIME_DIST}.next}"
 PREV_RUNTIME_DIST="${PREV_RUNTIME_DIST:-${RUNTIME_DIST}.prev}"
+RUNTIME_RELEASE_MARKER="${RUNTIME_RELEASE_MARKER:-${RUNTIME_DIST}/.release-commit}"
+NEXT_RUNTIME_RELEASE_MARKER="${NEXT_RUNTIME_RELEASE_MARKER:-${NEXT_RUNTIME_DIST}/.release-commit}"
 PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://mlprohub.com.br/api/health}"
 DEPLOY_EVENTS_PATH="${DEPLOY_EVENTS_PATH:-backend/logs/deploy_events.jsonl}"
 RELEASE_GATE_GITHUB_REPOSITORY="${RELEASE_GATE_GITHUB_REPOSITORY:-lcsgmoraes-droid/Sistema-Pet}"
@@ -300,6 +302,8 @@ if [[ "$HEAD_BEFORE" != "$HEAD_AFTER" && "$DEPLOY_REEXECUTED" != "1" ]]; then
     APP_DIR="$APP_DIR" REMOTE="$REMOTE" BRANCH="$BRANCH" \
     COMPOSE_FILE="$COMPOSE_FILE" RUNTIME_DIST="$RUNTIME_DIST" \
     NEXT_RUNTIME_DIST="$NEXT_RUNTIME_DIST" PREV_RUNTIME_DIST="$PREV_RUNTIME_DIST" \
+    RUNTIME_RELEASE_MARKER="$RUNTIME_RELEASE_MARKER" \
+    NEXT_RUNTIME_RELEASE_MARKER="$NEXT_RUNTIME_RELEASE_MARKER" \
     PUBLIC_HEALTH_URL="$PUBLIC_HEALTH_URL" DEPLOY_EVENTS_PATH="$DEPLOY_EVENTS_PATH" \
     RELEASE_GATE_GITHUB_REPOSITORY="$RELEASE_GATE_GITHUB_REPOSITORY" \
     RELEASE_STATUS_PATH="$RELEASE_STATUS_PATH" \
@@ -325,6 +329,20 @@ fi
 
 changed_files="$(git diff --name-only "$HEAD_BEFORE" "$HEAD_AFTER" || true)"
 
+runtime_release_commit=""
+if [[ -f "$RUNTIME_RELEASE_MARKER" ]]; then
+  runtime_release_commit="$(tr -d '[:space:]' <"$RUNTIME_RELEASE_MARKER")"
+fi
+
+runtime_release_mismatch=0
+if [[ -z "$runtime_release_commit" ]]; then
+  runtime_release_mismatch=1
+elif [[ "$runtime_release_commit" != "$HEAD_AFTER" ]]; then
+  if [[ "$HEAD_BEFORE" == "$HEAD_AFTER" || "$runtime_release_commit" != "$HEAD_BEFORE" ]]; then
+    runtime_release_mismatch=1
+  fi
+fi
+
 if [[ -n "$(git status --porcelain)" ]]; then
   git status --short
   fail "Repositorio ficou sujo apos atualizar codigo."
@@ -336,7 +354,7 @@ if [[ "$tracked_dist_count" != "0" ]]; then
   fail "Artefatos gerados voltaram a aparecer no Git."
 fi
 
-if ! requires_runtime_deploy "$changed_files"; then
+if ! requires_runtime_deploy "$changed_files" && [[ "$runtime_release_mismatch" == "0" ]]; then
   mark_step "sem_mudanca_runtime"
   if [[ "$HEAD_BEFORE" == "$HEAD_AFTER" ]]; then
     audit_step "Repositorio ja estava atualizado; rebuild nao necessario"
@@ -352,6 +370,9 @@ if ! requires_runtime_deploy "$changed_files"; then
     6 \
     5
 
+  mkdir -p "$(dirname "$RUNTIME_RELEASE_MARKER")"
+  printf '%s\n' "$HEAD_AFTER" >"$RUNTIME_RELEASE_MARKER"
+
   git rev-parse HEAD >"$backup_dir/head_after.txt"
   docker compose -f "$COMPOSE_FILE" ps >"$backup_dir/docker_ps_after.txt" || true
   mv -f "$APP_DIR/$RELEASE_STATUS_NEXT_PATH" "$APP_DIR/$RELEASE_STATUS_PATH"
@@ -362,6 +383,10 @@ if ! requires_runtime_deploy "$changed_files"; then
   log "Deploy sem rebuild concluido"
   printf 'Backup operacional: %s\n' "$backup_dir"
   exit 0
+fi
+
+if [[ "$runtime_release_mismatch" == "1" ]]; then
+  log "Artefato publicado nao corresponde ao commit atual; rebuild obrigatorio"
 fi
 
 mark_step "instalar_retencao_journal"
@@ -451,6 +476,7 @@ mkdir -p "$NEXT_RUNTIME_DIST"
 )
 
 [[ -s "$NEXT_RUNTIME_DIST/index.html" ]] || fail "Build do frontend nao gerou index.html em $NEXT_RUNTIME_DIST"
+printf '%s\n' "$HEAD_AFTER" >"$NEXT_RUNTIME_RELEASE_MARKER"
 
 mark_step "validar_compose"
 audit_step "Validando docker compose de producao"
