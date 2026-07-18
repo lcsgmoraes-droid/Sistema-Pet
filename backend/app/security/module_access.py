@@ -13,7 +13,11 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.config import JWT_SECRET_KEY
 from app.db import get_session
 from app.models import AssinaturaModulo, Tenant
-from app.routes.modulos_routes import MODULOS_PREMIUM, _resolver_modulos_ativos
+from app.routes.modulos_routes import (
+    MODULOS_PREMIUM,
+    _resolver_modulos_ativos,
+    _trial_completo_ativo,
+)
 
 optional_security = HTTPBearer(auto_error=False)
 
@@ -42,6 +46,7 @@ def _is_ecommerce_customer_token(
 def _load_active_modules(
     db: Session, tenant_id: str, agora: datetime | None = None
 ) -> list[str]:
+    agora = agora or datetime.now(tz=timezone.utc)
     tenant_id_str = str(tenant_id)
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id_str).first()
     if not tenant:
@@ -59,8 +64,9 @@ def _load_active_modules(
     return _resolver_modulos_ativos(
         tenant.modulos_ativos,
         assinaturas,
-        agora or datetime.now(tz=timezone.utc),
+        agora,
         tenant.plan,
+        liberar_trial_completo=_trial_completo_ativo(tenant, agora),
     )
 
 

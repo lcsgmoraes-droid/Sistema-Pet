@@ -3,6 +3,7 @@ import {
   CheckCircle2,
   Clock3,
   CreditCard,
+  FileText,
   Lock,
   MessageCircle,
   ShieldCheck,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { MODULOS_INFO, useModulos } from "../contexts/ModulosContext";
+import { buildSalesContactUrl, serviceInvoiceAddon } from "../data/publicPlans";
 
 const WHATSAPP_NUMERO = "5518997401641";
 
@@ -32,7 +34,7 @@ function getStatusInfo(assinatura) {
       label: "Plano ativo",
       tone: "emerald",
       icon: CheckCircle2,
-      text: "A empresa esta ativa no Plano Basico.",
+      text: "A empresa está ativa no plano contratado.",
     };
   }
 
@@ -41,7 +43,7 @@ function getStatusInfo(assinatura) {
       label: "Trial encerrado",
       tone: "amber",
       icon: AlertTriangle,
-      text: "Fale com atendimento para ativar o Plano Basico e manter a operacao regular.",
+      text: "O período de acesso completo terminou. Escolha um plano com nosso atendimento.",
     };
   }
 
@@ -58,7 +60,7 @@ function getStatusInfo(assinatura) {
     label: "Trial em andamento",
     tone: "blue",
     icon: Clock3,
-    text: "Use o Plano Basico por 30 dias e contrate com atendimento assistido.",
+    text: "Todos os módulos do CorePet ficam liberados durante os primeiros 30 dias.",
   };
 }
 
@@ -76,6 +78,7 @@ export default function MeuPlano() {
   const {
     assinaturaAtual,
     carregarModulos,
+    modulosAtivos,
     modulosBetaPublicos,
     modulosForaOfertaPublica,
     planoAtual,
@@ -89,9 +92,16 @@ export default function MeuPlano() {
     .filter((modulo) => !(modulosForaOfertaPublica || []).includes(modulo))
     .slice(0, 8);
   const msgContratar = encodeURIComponent(
-    "Ola! Quero ativar meu Plano Basico do CorePet apos o periodo gratuito.",
+    "Olá! Quero escolher meu plano do CorePet após o período de acesso completo.",
   );
-  const msgBeta = encodeURIComponent("Ola! Quero solicitar acesso Beta a um modulo do CorePet.");
+  const msgBeta = encodeURIComponent("Olá! Quero ajuda para escolher meu plano do CorePet.");
+  const emTrial = (assinaturaAtual?.status_efetivo || assinaturaAtual?.status) === "trial";
+  const podeContratarNfse = ["veterinario", "banho_tosa"].some((modulo) =>
+    (modulosAtivos || []).includes(modulo),
+  );
+  const nfseContactUrl = buildSalesContactUrl(
+    "Olá! Quero ativar a emissão de NFS-e integrada ao CorePet por R$ 59,90 mensais.",
+  );
 
   return (
     <main className="min-h-full bg-slate-50 p-4 md:p-6">
@@ -101,8 +111,8 @@ export default function MeuPlano() {
             <p className="text-sm font-bold uppercase text-emerald-700">Assinatura</p>
             <h1 className="mt-1 text-2xl font-extrabold text-slate-950 md:text-3xl">Meu Plano</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              A contratacao inicial e assistida: voce usa o Plano Basico no trial, fala com
-              atendimento e a ativacao e registrada manualmente.
+              A contratação inicial é assistida: você conhece todo o CorePet por 30 dias e nossa
+              equipe ajuda a escolher o melhor plano para continuar.
             </p>
           </div>
           <button
@@ -126,7 +136,9 @@ export default function MeuPlano() {
                   <StatusIcon className="h-4 w-4" />
                   {statusInfo.label}
                 </span>
-                <h2 className="mt-4 text-xl font-extrabold text-slate-950">Plano Basico</h2>
+                <h2 className="mt-4 text-xl font-extrabold text-slate-950">
+                  {emTrial ? "Experiência CorePet Completa" : planoAtual || "Plano contratado"}
+                </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{statusInfo.text}</p>
               </div>
               <div className="rounded-md bg-slate-950 p-3 text-white">
@@ -188,27 +200,69 @@ export default function MeuPlano() {
               </div>
             </div>
             <div className="mt-5 rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              <p className="font-semibold text-slate-800">Fluxo atual</p>
+              <p className="font-semibold text-slate-800">Como funciona</p>
               <ol className="mt-3 space-y-2">
-                <li>1. Criar empresa com 30 dias gratis.</li>
-                <li>2. Usar o Plano Basico no trial.</li>
-                <li>3. Confirmar pagamento com atendimento.</li>
-                <li>4. Administrativo ativa o plano manualmente.</li>
+                <li>1. Criar a empresa e receber 30 dias completos.</li>
+                <li>2. Conhecer os módulos com acompanhamento humano.</li>
+                <li>3. Escolher o plano ideal com nossa equipe.</li>
+                <li>4. Continuar apenas com os recursos contratados.</li>
               </ol>
             </div>
           </aside>
         </section>
 
+        {podeContratarNfse && (
+          <section className="overflow-hidden rounded-lg border border-amber-200 bg-white shadow-sm">
+            <div className="grid gap-6 p-6 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+              <div className="flex items-start gap-3">
+                <div className="rounded-md bg-amber-100 p-3 text-amber-800">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold uppercase text-amber-700">Adicional opcional</p>
+                  <h2 className="mt-1 text-xl font-extrabold text-slate-950">
+                    {serviceInvoiceAddon.name}
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Emissor fiscal parceiro conectado ao fluxo do CorePet.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-4 rounded-lg bg-slate-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-2xl font-extrabold text-slate-950">
+                    R$ {serviceInvoiceAddon.price}
+                    <span className="text-sm font-semibold text-slate-500">/mês</span>
+                  </p>
+                  <p className="mt-1 max-w-xl text-xs leading-5 text-slate-500">
+                    A liberação passa pela validação dos dados fiscais e da compatibilidade do seu
+                    município.
+                  </p>
+                </div>
+                <a
+                  href={nfseContactUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex flex-none items-center justify-center gap-2 rounded-md bg-amber-300 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-amber-200"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Ativar NFS-e
+                </a>
+              </div>
+            </div>
+          </section>
+        )}
+
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm font-bold uppercase text-violet-700">Beta acompanhado</p>
+              <p className="text-sm font-bold uppercase text-violet-700">Experiência completa</p>
               <h2 className="mt-1 text-xl font-extrabold text-slate-950">
-                Modulos que podem entrar depois
+                Conheça os módulos antes de escolher
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                Eles aparecem como pilotos controlados. O trial padrao continua focado no Plano
-                Basico para reduzir risco na primeira venda.
+                Durante os primeiros 30 dias, os módulos do CorePet ficam liberados para você
+                descobrir quais realmente geram valor para sua operação.
               </p>
             </div>
             <a
@@ -218,7 +272,7 @@ export default function MeuPlano() {
               className="inline-flex w-fit items-center justify-center gap-2 rounded-md border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-bold text-violet-800 transition hover:bg-violet-100"
             >
               <Sparkles className="h-4 w-4" />
-              Solicitar Beta
+              Escolher meu plano
             </a>
           </div>
 
@@ -235,8 +289,8 @@ export default function MeuPlano() {
                     {info.descricao}
                   </p>
                   <p className="mt-3 inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
-                    <Lock className="h-3 w-3" />
-                    Beta
+                    <Sparkles className="h-3 w-3" />
+                    Incluído nos 30 dias
                   </p>
                 </article>
               );

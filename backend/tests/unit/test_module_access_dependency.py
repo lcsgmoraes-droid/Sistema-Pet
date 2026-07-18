@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -5,6 +6,32 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 from app.security import module_access
+
+
+class _TrialQuery:
+    def __init__(self, model, tenant):
+        self.model = model
+        self.tenant = tenant
+
+    def filter(self, *criteria):
+        self.criteria = criteria
+        return self
+
+    def first(self):
+        if self.model is module_access.Tenant:
+            return self.tenant
+        return None
+
+    def all(self):
+        return []
+
+
+class _TrialDb:
+    def __init__(self, tenant):
+        self.tenant = tenant
+
+    def query(self, model):
+        return _TrialQuery(model, self.tenant)
 
 
 def _user(**overrides):
@@ -46,6 +73,26 @@ def _patch_auth(monkeypatch, user, tenant_id):
         "get_current_user_and_tenant",
         fake_get_current_user_and_tenant,
     )
+
+
+def test_load_active_modules_libera_experiencia_completa_durante_trial():
+    agora = datetime(2026, 7, 18, tzinfo=timezone.utc)
+    tenant = SimpleNamespace(
+        plan="pet-start",
+        modulos_ativos="[]",
+        billing_status="trial",
+        trial_started_at=agora,
+        trial_ends_at=agora + timedelta(days=30),
+        subscription_source="manual",
+        subscription_activated_at=None,
+    )
+
+    ativos = module_access._load_active_modules(_TrialDb(tenant), "tenant-1", agora)
+
+    assert "compras" in ativos
+    assert "veterinario" in ativos
+    assert "banho_tosa" in ativos
+    assert "bling" not in ativos
 
 
 @pytest.mark.asyncio

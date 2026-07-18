@@ -10,20 +10,44 @@ import {
   PackageCheck,
   Play,
   Route,
+  Scissors,
   ShoppingBag,
   Smartphone,
   Sparkles,
+  Stethoscope,
   TrendingUp,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { Link } from "react-router-dom";
+import LandingProfileSelector from "../components/landing/LandingProfileSelector";
+import LaunchOfferBanner from "../components/marketing/LaunchOfferBanner";
 
 const salesContactUrl =
   "https://wa.me/5518997401641?text=Ol%C3%A1!%20Quero%20conhecer%20o%20CorePet%20e%20ver%20uma%20demonstra%C3%A7%C3%A3o.";
 
 const heroImage =
   "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&w=2200&q=88";
+
+const heroProfiles = [
+  {
+    id: "pet",
+    icon: ShoppingBag,
+    title: "Quero CorePet para meu Pet Shop",
+    detail: "PDV, estoque, gestão, app e vendas",
+  },
+  {
+    id: "vet",
+    icon: Stethoscope,
+    title: "Quero CorePet para Veterinário",
+    detail: "Agenda, prontuário e gestão clínica",
+  },
+  {
+    id: "grooming",
+    icon: Scissors,
+    title: "Quero CorePet para Banho & Tosa",
+    detail: "Agenda, equipe, pacotes e recorrência",
+  },
+];
 
 const activeSalesSteps = [
   {
@@ -211,17 +235,17 @@ const systemDemoVideos = [
 ];
 
 export default function LandingPage() {
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
   const [activeDemoId, setActiveDemoId] = useState(systemDemoVideos[0].id);
+  const [activeProfileId, setActiveProfileId] = useState("all");
   const activeDemo =
     systemDemoVideos.find((video) => video.id === activeDemoId) || systemDemoVideos[0];
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/lembretes", { replace: true });
-    }
-  }, [isAuthenticated, navigate]);
+  const selectProfileFromHero = (profileId) => {
+    setActiveProfileId(profileId);
+    globalThis.requestAnimationFrame?.(() => {
+      document.getElementById("solucoes")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   useEffect(() => {
     const previousTitle = document.title;
@@ -234,10 +258,10 @@ export default function LandingPage() {
       document.head.appendChild(metaDescription);
     }
 
-    document.title = "CorePet | O sistema que trabalha para vender de novo";
+    document.title = "CorePet | Gestão para Loja Pet, Veterinário e Banho & Tosa";
     metaDescription.setAttribute(
       "content",
-      "ERP, app e e-commerce para pet shops: recorrência inteligente, campanhas, estoque integrado, entregas e gestão do lucro em tempo real.",
+      "Gestão, app e automações para Loja Pet, Veterinário e Banho & Tosa, com planos adequados para cada fase do negócio.",
     );
 
     return () => {
@@ -267,8 +291,8 @@ export default function LandingPage() {
           </Link>
 
           <div className="hidden items-center gap-7 text-sm font-semibold text-slate-300 lg:flex">
-            <a href="#venda-ativa" className="transition hover:text-white">
-              Venda ativa
+            <a href="#solucoes" className="transition hover:text-white">
+              Soluções
             </a>
             <a href="#plataforma" className="transition hover:text-white">
               Plataforma
@@ -279,6 +303,9 @@ export default function LandingPage() {
             <a href="#integracao" className="transition hover:text-white">
               Integração
             </a>
+            <Link to="/planos" className="transition hover:text-white">
+              Planos
+            </Link>
           </div>
 
           <div className="flex items-center gap-3">
@@ -294,7 +321,8 @@ export default function LandingPage() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-lg bg-emerald-400 px-4 py-2 text-sm font-extrabold text-slate-950 transition hover:bg-emerald-300"
             >
-              Quero uma demonstração
+              <span className="hidden sm:inline">Quero uma demonstração</span>
+              <span className="sm:hidden">Quero uma demo</span>
               <ArrowRight className="h-4 w-4" />
             </a>
           </div>
@@ -311,56 +339,88 @@ export default function LandingPage() {
           }}
         >
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_72%_30%,rgba(52,211,153,0.18),transparent_34%)]" />
-          <div className="mx-auto grid min-h-[820px] max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1.08fr_0.92fr]">
+          <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
+            <LaunchOfferBanner dark compact />
+          </div>
+          <div className="mx-auto grid max-w-7xl items-start gap-8 px-4 pb-12 pt-8 sm:px-6 lg:grid-cols-[1.12fr_0.88fr] lg:gap-10">
             <div className="max-w-3xl">
               <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-sm font-bold text-emerald-200">
                 <Sparkles className="h-4 w-4" />
-                Tecnologia para o mercado pet vender todos os dias
+                Uma plataforma para todo o mercado pet
               </span>
-              <h1 className="mt-7 text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
-                Sua loja ainda espera o cliente voltar?
+              <h1 className="mt-5 text-4xl font-black leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+                Escolha seu negócio. Veja o CorePet feito para ele.
               </h1>
-              <p className="mt-7 max-w-2xl text-xl leading-8 text-slate-200 sm:text-2xl">
-                O CorePet aprende o consumo, identifica a hora da recompra e trabalha para oferecer
-                o produto certo pelo app.
-              </p>
-              <p className="mt-5 max-w-2xl text-lg font-bold leading-8 text-emerald-300">
-                Seu ERP registra o que você vendeu. O CorePet trabalha para vender de novo.
+              <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-200 sm:text-xl">
+                Clique em uma opção e vá direto às funcionalidades e aos planos que fazem sentido
+                para você.
               </p>
 
-              <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-                <a
-                  href={salesContactUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-400 px-6 py-3.5 font-extrabold text-slate-950 shadow-xl shadow-emerald-950/30 transition hover:-translate-y-0.5 hover:bg-emerald-300"
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                {heroProfiles.map((profile) => {
+                  const Icon = profile.icon;
+                  return (
+                    <button
+                      key={profile.id}
+                      type="button"
+                      onClick={() => selectProfileFromHero(profile.id)}
+                      className="group flex items-center gap-3 rounded-2xl border-2 border-white/20 bg-white/10 p-3 text-left backdrop-blur transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-white/15 hover:shadow-xl sm:block sm:p-4"
+                    >
+                      <span className="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-emerald-400 text-slate-950">
+                        <Icon className="h-5 w-5" />
+                      </span>
+                      <span className="min-w-0 flex-1 sm:mt-3 sm:block">
+                        <span className="block text-sm font-black leading-5 text-white">
+                          {profile.title}
+                        </span>
+                        <span className="mt-1 hidden text-xs font-semibold leading-5 text-slate-300 sm:block">
+                          {profile.detail}
+                        </span>
+                        <span className="mt-3 hidden items-center gap-1 text-xs font-black text-emerald-300 sm:inline-flex">
+                          Ver minha solução <ArrowRight className="h-3.5 w-3.5" />
+                        </span>
+                      </span>
+                      <ArrowRight className="h-4 w-4 flex-none text-emerald-300 sm:hidden" />
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  onClick={() => selectProfileFromHero("all")}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-400 px-5 py-3 font-extrabold text-slate-950 transition hover:bg-emerald-300"
                 >
-                  Ver uma demonstração
-                  <ArrowRight className="h-5 w-5" />
-                </a>
+                  Tenho mais de uma área
+                  <ArrowRight className="h-4 w-4" />
+                </button>
                 <a
                   href="#video-corepet"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/10 px-6 py-3.5 font-bold text-white backdrop-blur transition hover:bg-white/15"
+                  className="inline-flex items-center justify-center gap-2 px-3 py-3 text-sm font-bold text-white transition hover:text-emerald-300"
                 >
-                  <Play className="h-5 w-5 fill-current" />
-                  Assistir em 30 segundos
+                  <Play className="h-4 w-4 fill-current" />
+                  Ver o CorePet em 30 segundos
                 </a>
               </div>
 
-              <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3 text-sm font-semibold text-slate-300">
+              <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-xs font-semibold text-slate-300 sm:text-sm">
                 <span className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> ERP completo
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Comece pelo essencial
                 </span>
                 <span className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> App + e-commerce
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> App para os clientes
                 </span>
                 <span className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Tudo integrado
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Evolução por módulos
                 </span>
               </div>
             </div>
 
-            <div id="video-corepet" className="relative mx-auto w-full max-w-xl scroll-mt-24">
+            <div
+              id="video-corepet"
+              className="relative mx-auto w-full max-w-sm scroll-mt-24 lg:mt-1"
+            >
               <div className="absolute -inset-5 rounded-[2rem] bg-emerald-400/15 blur-3xl" />
               <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-slate-900/85 p-3 shadow-2xl shadow-black/50 backdrop-blur">
                 <div className="aspect-[9/16] overflow-hidden rounded-[1.45rem] bg-gradient-to-br from-violet-950 via-slate-950 to-emerald-950">
@@ -386,6 +446,12 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <LandingProfileSelector
+          activeProfileId={activeProfileId}
+          onProfileChange={setActiveProfileId}
+          salesContactUrl={salesContactUrl}
+        />
+
         <section
           id="venda-ativa"
           className="scroll-mt-16 border-b border-slate-200 bg-slate-50 py-20"
@@ -393,7 +459,7 @@ export default function LandingPage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6">
             <div className="mx-auto max-w-3xl text-center">
               <p className="text-sm font-black uppercase tracking-[0.16em] text-violet-700">
-                Da venda passada à próxima venda
+                Loja Pet · Da venda passada à próxima venda
               </p>
               <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">
                 Recorrência não é uma lista de lembretes. É uma estratégia de venda.
@@ -640,10 +706,10 @@ export default function LandingPage() {
                 <ArrowRight className="h-5 w-5" />
               </a>
               <Link
-                to="/register?plan=basico"
+                to="/planos"
                 className="inline-flex items-center justify-center rounded-xl border border-emerald-300 bg-white px-7 py-4 font-extrabold text-slate-800 transition hover:bg-emerald-100"
               >
-                Começar 30 dias grátis
+                Conhecer os planos
               </Link>
             </div>
           </div>

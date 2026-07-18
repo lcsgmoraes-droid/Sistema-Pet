@@ -54,6 +54,7 @@ MODULOS_PREMIUM = frozenset(
 # configurados. Nao entram na vitrine publica nem no piloto Beta.
 MODULOS_FORA_DA_OFERTA_PUBLICA = frozenset(["bling"])
 MODULOS_BETA_PUBLICOS = frozenset(MODULOS_PREMIUM - MODULOS_FORA_DA_OFERTA_PUBLICA)
+MODULOS_TRIAL_COMPLETO = frozenset(MODULOS_PREMIUM - MODULOS_FORA_DA_OFERTA_PUBLICA)
 
 # Tenants criados antes da politica comercial ficavam com plan=free. Mantemos
 # esse plano legado liberado para nao cortar fluxo real em uso.
@@ -118,6 +119,8 @@ def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
         "trial_fim": _iso_datetime(trial_ends_at),
         "dias_restantes_trial": _dias_restantes_trial(trial_ends_at, agora),
         "trial_expirado": status_efetivo == "expired",
+        "acesso_completo_durante_trial": status_efetivo == "trial"
+        and trial_ends_at is not None,
         "ativada_em": _iso_datetime(getattr(tenant, "subscription_activated_at", None)),
         "pagamento_integrado": False,
         "contratacao": {
@@ -126,6 +129,10 @@ def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
             "acao_cliente": "falar_com_atendimento",
         },
     }
+
+
+def _trial_completo_ativo(tenant: Tenant, agora: datetime) -> bool:
+    return _assinatura_resumo_tenant(tenant, agora)["acesso_completo_durante_trial"]
 
 
 def _normalizar_modulos_ativos(raw_modulos: str | None) -> list[str]:
@@ -158,6 +165,7 @@ def _resolver_modulos_ativos(
     assinaturas_ativas: list[AssinaturaModulo],
     agora: datetime,
     plano: str | None = None,
+    liberar_trial_completo: bool = False,
 ) -> list[str]:
     modulos_do_tenant = set(_normalizar_modulos_ativos(raw_modulos))
     plano_normalizado = (plano or "").strip().lower()
@@ -173,6 +181,9 @@ def _resolver_modulos_ativos(
         or plano_normalizado in PLANOS_TODOS_MODULOS
     ):
         modulos_do_tenant.update(MODULOS_PREMIUM)
+
+    if liberar_trial_completo:
+        modulos_do_tenant.update(MODULOS_TRIAL_COMPLETO)
 
     return sorted(modulo for modulo in modulos_do_tenant if modulo in MODULOS_PREMIUM)
 
@@ -219,6 +230,7 @@ def get_modulos_status(
         assinaturas_ativas,
         agora,
         tenant.plan,
+        liberar_trial_completo=_trial_completo_ativo(tenant, agora),
     )
 
     return {
@@ -229,10 +241,11 @@ def get_modulos_status(
         "modulos_beta": sorted(MODULOS_BETA_PUBLICOS),
         "modulos_fora_oferta_publica": sorted(MODULOS_FORA_DA_OFERTA_PUBLICA),
         "trial_padrao": {
-            "plano": "basico",
+            "plano": "experiencia_completa",
             "dias": TRIAL_DIAS_PADRAO,
-            "escopo": "basico_completo",
-            "libera_premium_automaticamente": False,
+            "escopo": "todos_modulos_corepet",
+            "libera_premium_automaticamente": True,
+            "integracoes_terceiras_exigem_configuracao": True,
         },
         "assinatura": _assinatura_resumo_tenant(tenant, agora),
         "plano_legado_liberado": (tenant.plan or "").strip().lower()
