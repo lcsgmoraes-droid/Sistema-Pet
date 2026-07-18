@@ -261,9 +261,7 @@ def _buscar_indice_rastreio(db: Session, token: str) -> RotaEntregaRastreioToken
     )
 
 
-def _buscar_rota_rastreio(
-    db: Session, *, rota_id: int, tenant_id
-):
+def _buscar_rota_rastreio(db: Session, *, rota_id: int, tenant_id):
     rota_row = execute_tenant_safe(
         db,
         _RASTREIO_ROTA_SQL,

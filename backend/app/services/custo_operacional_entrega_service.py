@@ -74,9 +74,7 @@ def registrar_snapshot_custo_paradas(
 
         if modelo in {"taxa_fixa", "rateio_rh"}:
             parada.distancia_custo_km = Decimal("0")
-            parada.custo_operacional = _moeda(
-                valor_base * Decimal(parada.tentativas)
-            )
+            parada.custo_operacional = _moeda(valor_base * Decimal(parada.tentativas))
             parada.custo_calculado_em = momento
         elif modelo == "sem_configuracao":
             parada.distancia_custo_km = Decimal("0")
@@ -98,9 +96,7 @@ def _ratear(
     if not pesos:
         return []
 
-    total = max(_decimal(total), Decimal("0")).quantize(
-        quantum, rounding=ROUND_HALF_UP
-    )
+    total = max(_decimal(total), Decimal("0")).quantize(quantum, rounding=ROUND_HALF_UP)
     pesos_positivos = [max(_decimal(peso), Decimal("0")) for peso in pesos]
     soma_pesos = sum(pesos_positivos, Decimal("0"))
     if soma_pesos <= 0:
@@ -113,9 +109,7 @@ def _ratear(
         if indice == len(pesos_positivos) - 1:
             parcela = total - acumulado
         else:
-            parcela = (total * peso / soma_pesos).quantize(
-                quantum, rounding=ROUND_DOWN
-            )
+            parcela = (total * peso / soma_pesos).quantize(quantum, rounding=ROUND_DOWN)
             acumulado += parcela
         rateio.append(parcela.quantize(quantum, rounding=ROUND_HALF_UP))
     return rateio
@@ -135,9 +129,7 @@ def consolidar_custos_por_entrega(
 
     distancia_total = max(_decimal(distancia_total_km), Decimal("0"))
     paradas_por_km = [
-        parada
-        for parada in paradas
-        if parada.modelo_custo_operacional == "por_km"
+        parada for parada in paradas if parada.modelo_custo_operacional == "por_km"
     ]
     if paradas_por_km:
         pesos = [
@@ -149,9 +141,7 @@ def consolidar_custos_por_entrega(
             pesos,
             quantum=MILESIMO_KM,
         )
-        taxa_padrao = _decimal(
-            paradas_por_km[0].valor_base_custo_operacional
-        )
+        taxa_padrao = _decimal(paradas_por_km[0].valor_base_custo_operacional)
         custo_km_total = _moeda(distancia_total * taxa_padrao)
         custos_rateados = _ratear(custo_km_total, pesos, quantum=CENTAVO)
 

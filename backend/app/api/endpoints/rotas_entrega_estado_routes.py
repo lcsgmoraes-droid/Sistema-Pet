@@ -89,7 +89,9 @@ def fechar_rota(
                 rota_id=rota.id,
                 venda_id=venda_legada.id,
                 ordem=1,
-                endereco=venda_legada.endereco_entrega or rota.endereco_destino or "Entrega",
+                endereco=venda_legada.endereco_entrega
+                or rota.endereco_destino
+                or "Entrega",
                 status="entregue",
                 data_entrega=venda_legada.data_entrega or datetime.now(),
             )
@@ -186,9 +188,7 @@ def fechar_rota(
             .first()
         )
         if config_moto:
-            custo_moto_total = calcular_custo_moto(
-                config=config_moto, km=km_para_custo
-            )
+            custo_moto_total = calcular_custo_moto(config=config_moto, km=km_para_custo)
 
     custos = consolidar_custos_por_entrega(
         paradas,
@@ -270,7 +270,9 @@ def iniciar_rota(
                 rota_id=rota.id,
                 venda_id=venda_legada.id,
                 ordem=1,
-                endereco=venda_legada.endereco_entrega or rota.endereco_destino or "Entrega",
+                endereco=venda_legada.endereco_entrega
+                or rota.endereco_destino
+                or "Entrega",
                 status="pendente",
             )
             db.add(parada_legada)

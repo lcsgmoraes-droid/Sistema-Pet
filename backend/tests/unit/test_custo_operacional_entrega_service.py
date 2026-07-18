@@ -90,7 +90,10 @@ def test_custo_por_km_rateia_distancia_real_e_fecha_no_total_exato():
         custo_moto_total=Decimal("1"),
     )
 
-    assert [p.distancia_custo_km for p in paradas] == [Decimal("3.000"), Decimal("9.000")]
+    assert [p.distancia_custo_km for p in paradas] == [
+        Decimal("3.000"),
+        Decimal("9.000"),
+    ]
     assert [p.custo_operacional for p in paradas] == [Decimal("7.50"), Decimal("22.50")]
     assert [p.custo_moto_rateado for p in paradas] == [Decimal("0.50"), Decimal("0.50")]
     assert custos.custo_entregador == Decimal("30.00")
