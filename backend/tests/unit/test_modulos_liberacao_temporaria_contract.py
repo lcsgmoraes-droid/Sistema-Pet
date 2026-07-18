@@ -5,10 +5,12 @@ from app.routes.modulos_routes import (
     MODULOS_BETA_PUBLICOS,
     MODULOS_FORA_DA_OFERTA_PUBLICA,
     MODULOS_PREMIUM,
+    MODULOS_TRIAL_COMPLETO,
     _assinatura_resumo_tenant,
     _normalizar_modulos_ativos,
     _raw_modulos_ativos_valido,
     _resolver_modulos_ativos,
+    _trial_completo_ativo,
 )
 
 
@@ -32,6 +34,19 @@ def test_plano_basico_nao_libera_extras_sem_assinatura_ou_modulo_expresso():
     )
 
     assert ativos == []
+
+
+def test_trial_ativo_libera_todos_modulos_corepet_sem_integracao_externa():
+    ativos = _resolver_modulos_ativos(
+        raw_modulos=None,
+        assinaturas_ativas=[],
+        agora=datetime(2026, 7, 18, tzinfo=timezone.utc),
+        plano="pet-start",
+        liberar_trial_completo=True,
+    )
+
+    assert set(ativos) == set(MODULOS_TRIAL_COMPLETO)
+    assert "bling" not in ativos
 
 
 def test_bling_nao_entra_na_vitrine_beta_publica():
@@ -95,6 +110,8 @@ def test_assinatura_trial_informa_dias_restantes_e_pagamento_manual():
     assert resumo["dias_restantes_trial"] == 28
     assert resumo["pagamento_integrado"] is False
     assert resumo["contratacao"]["modelo"] == "manual_assistida"
+    assert resumo["acesso_completo_durante_trial"] is True
+    assert _trial_completo_ativo(tenant, agora) is True
 
 
 def test_assinatura_trial_expirada_nao_precisa_mudar_banco_para_sinalizar():
@@ -113,3 +130,5 @@ def test_assinatura_trial_expirada_nao_precisa_mudar_banco_para_sinalizar():
     assert resumo["status_efetivo"] == "expired"
     assert resumo["trial_expirado"] is True
     assert resumo["dias_restantes_trial"] == 0
+    assert resumo["acesso_completo_durante_trial"] is False
+    assert _trial_completo_ativo(tenant, agora) is False

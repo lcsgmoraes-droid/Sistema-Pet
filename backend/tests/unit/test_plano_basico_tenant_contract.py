@@ -202,8 +202,8 @@ def test_modulos_status_uses_selected_tenant_not_user_home_tenant():
     assert response["modulos_ativos"] == ["campanhas"]
     assert "bling" in response["modulos_fora_oferta_publica"]
     assert "bling" not in response["modulos_beta"]
-    assert response["trial_padrao"]["escopo"] == "basico_completo"
-    assert response["trial_padrao"]["libera_premium_automaticamente"] is False
+    assert response["trial_padrao"]["escopo"] == "todos_modulos_corepet"
+    assert response["trial_padrao"]["libera_premium_automaticamente"] is True
     assert response["assinatura"]["pagamento_integrado"] is False
     assert response["assinatura"]["contratacao"]["modelo"] == "manual_assistida"
 

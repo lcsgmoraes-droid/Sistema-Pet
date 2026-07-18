@@ -30,7 +30,6 @@ const Register = () => {
   const [searchParams] = useSearchParams();
   const requestedPlan = (searchParams.get("plan") || "basico").trim().toLowerCase();
   const selectedPlan = requestedPlan === "basico" ? "basico" : "basico";
-  const selectedPlanLabel = selectedPlan === "basico" ? "Plano Básico" : "Plano Básico";
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -82,7 +81,7 @@ const Register = () => {
             <PawPrint className="w-8 h-8 text-purple-600" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Criar empresa</h1>
-          <p className="text-gray-600 mt-2">Comece com 30 dias grátis do Plano Básico</p>
+          <p className="text-gray-600 mt-2">Comece com 30 dias de acesso completo ao CorePet</p>
         </div>
 
         {error && (
@@ -93,10 +92,14 @@ const Register = () => {
         )}
 
         <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-          <p className="font-semibold">Plano Básico grátis por 30 dias</p>
+          <p className="font-semibold">Experiência CorePet Completa por 30 dias</p>
           <p className="mt-1">
-            Sua empresa será criada no {selectedPlanLabel}. Módulos avançados ficam como Beta ou
-            piloto acompanhado, sem liberação automática no cadastro.
+            Durante o período gratuito, sua empresa poderá conhecer todos os módulos do CorePet.
+            Depois, nossa equipe ajuda você a escolher e configurar o plano que faz sentido para a
+            sua operação.
+          </p>
+          <p className="mt-2 text-xs font-semibold">
+            Condição de lançamento com acompanhamento humano para as 20 primeiras empresas.
           </p>
           <Link
             to="/planos"

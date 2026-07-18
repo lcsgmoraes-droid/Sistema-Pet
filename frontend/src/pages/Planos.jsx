@@ -9,6 +9,7 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
+import LaunchOfferBanner from "../components/marketing/LaunchOfferBanner";
 import {
   buildSalesContactUrl,
   publicPlans,
@@ -51,6 +52,9 @@ function PlanCard({ plan, segment }) {
         <span className="pb-1 text-sm font-semibold text-slate-500">/mês</span>
       </div>
       <p className="mt-4 min-h-20 leading-7 text-slate-600">{plan.description}</p>
+      <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold leading-5 text-amber-900">
+        Primeiro mês: acesso completo ao CorePet com implantação assistida.
+      </p>
       <ul className="mt-6 flex-1 space-y-3 border-t border-slate-100 pt-6">
         {plan.features.map((feature) => (
           <li key={feature} className="flex items-start gap-3 text-sm leading-6 text-slate-700">
@@ -217,6 +221,10 @@ export default function Planos() {
             Comece com o necessário para a sua realidade e avance quando precisar de mais gestão,
             automação ou estrutura.
           </p>
+
+          <div className="mx-auto mt-8 max-w-5xl text-left">
+            <LaunchOfferBanner />
+          </div>
 
           <div
             className="mx-auto mt-9 grid max-w-4xl gap-2 rounded-2xl bg-slate-100 p-2 sm:grid-cols-4"

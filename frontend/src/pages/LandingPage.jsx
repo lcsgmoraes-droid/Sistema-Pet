@@ -18,6 +18,7 @@ import {
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import LandingProfileSelector from "../components/landing/LandingProfileSelector";
+import LaunchOfferBanner from "../components/marketing/LaunchOfferBanner";
 import { useAuth } from "../contexts/AuthContext";
 
 const salesContactUrl =
@@ -316,7 +317,10 @@ export default function LandingPage() {
           }}
         >
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_72%_30%,rgba(52,211,153,0.18),transparent_34%)]" />
-          <div className="mx-auto grid min-h-[820px] max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1.08fr_0.92fr]">
+          <div className="mx-auto max-w-7xl px-4 pt-8 sm:px-6">
+            <LaunchOfferBanner dark />
+          </div>
+          <div className="mx-auto grid min-h-[740px] max-w-7xl items-center gap-12 px-4 py-14 sm:px-6 lg:grid-cols-[1.08fr_0.92fr]">
             <div className="max-w-3xl">
               <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-sm font-bold text-emerald-200">
                 <Sparkles className="h-4 w-4" />
