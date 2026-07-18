@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import LandingProfileSelector from "../components/landing/LandingProfileSelector";
 import { useAuth } from "../contexts/AuthContext";
 
 const salesContactUrl =
@@ -214,6 +215,7 @@ export default function LandingPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [activeDemoId, setActiveDemoId] = useState(systemDemoVideos[0].id);
+  const [activeProfileId, setActiveProfileId] = useState("all");
   const activeDemo =
     systemDemoVideos.find((video) => video.id === activeDemoId) || systemDemoVideos[0];
 
@@ -234,10 +236,10 @@ export default function LandingPage() {
       document.head.appendChild(metaDescription);
     }
 
-    document.title = "CorePet | O sistema que trabalha para vender de novo";
+    document.title = "CorePet | Gestão para Loja Pet, Veterinário e Banho & Tosa";
     metaDescription.setAttribute(
       "content",
-      "ERP, app e e-commerce para pet shops: recorrência inteligente, campanhas, estoque integrado, entregas e gestão do lucro em tempo real.",
+      "Gestão, app e automações para Loja Pet, Veterinário e Banho & Tosa, com planos adequados para cada fase do negócio.",
     );
 
     return () => {
@@ -267,8 +269,8 @@ export default function LandingPage() {
           </Link>
 
           <div className="hidden items-center gap-7 text-sm font-semibold text-slate-300 lg:flex">
-            <a href="#venda-ativa" className="transition hover:text-white">
-              Venda ativa
+            <a href="#solucoes" className="transition hover:text-white">
+              Soluções
             </a>
             <a href="#plataforma" className="transition hover:text-white">
               Plataforma
@@ -279,6 +281,9 @@ export default function LandingPage() {
             <a href="#integracao" className="transition hover:text-white">
               Integração
             </a>
+            <Link to="/planos" className="transition hover:text-white">
+              Planos
+            </Link>
           </div>
 
           <div className="flex items-center gap-3">
@@ -315,27 +320,25 @@ export default function LandingPage() {
             <div className="max-w-3xl">
               <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-sm font-bold text-emerald-200">
                 <Sparkles className="h-4 w-4" />
-                Tecnologia para o mercado pet vender todos os dias
+                Uma plataforma para todo o mercado pet
               </span>
               <h1 className="mt-7 text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl lg:text-7xl">
-                Sua loja ainda espera o cliente voltar?
+                Gestão que começa simples e cresce com o seu negócio.
               </h1>
               <p className="mt-7 max-w-2xl text-xl leading-8 text-slate-200 sm:text-2xl">
-                O CorePet aprende o consumo, identifica a hora da recompra e trabalha para oferecer
-                o produto certo pelo app.
+                Loja Pet, Veterinário ou Banho & Tosa: escolha seu perfil e conheça uma solução
+                feita para a sua operação.
               </p>
               <p className="mt-5 max-w-2xl text-lg font-bold leading-8 text-emerald-300">
-                Seu ERP registra o que você vendeu. O CorePet trabalha para vender de novo.
+                Agenda, vendas, atendimento, gestão e app trabalhando juntos.
               </p>
 
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                 <a
-                  href={salesContactUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="#solucoes"
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-400 px-6 py-3.5 font-extrabold text-slate-950 shadow-xl shadow-emerald-950/30 transition hover:-translate-y-0.5 hover:bg-emerald-300"
                 >
-                  Ver uma demonstração
+                  Escolher meu perfil
                   <ArrowRight className="h-5 w-5" />
                 </a>
                 <a
@@ -349,13 +352,13 @@ export default function LandingPage() {
 
               <div className="mt-10 flex flex-wrap gap-x-7 gap-y-3 text-sm font-semibold text-slate-300">
                 <span className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> ERP completo
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Comece pelo essencial
                 </span>
                 <span className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> App + e-commerce
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> App para os clientes
                 </span>
                 <span className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Tudo integrado
+                  <CheckCircle2 className="h-4 w-4 text-emerald-400" /> Evolução por módulos
                 </span>
               </div>
             </div>
@@ -386,6 +389,12 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <LandingProfileSelector
+          activeProfileId={activeProfileId}
+          onProfileChange={setActiveProfileId}
+          salesContactUrl={salesContactUrl}
+        />
+
         <section
           id="venda-ativa"
           className="scroll-mt-16 border-b border-slate-200 bg-slate-50 py-20"
@@ -393,7 +402,7 @@ export default function LandingPage() {
           <div className="mx-auto max-w-7xl px-4 sm:px-6">
             <div className="mx-auto max-w-3xl text-center">
               <p className="text-sm font-black uppercase tracking-[0.16em] text-violet-700">
-                Da venda passada à próxima venda
+                Loja Pet · Da venda passada à próxima venda
               </p>
               <h2 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">
                 Recorrência não é uma lista de lembretes. É uma estratégia de venda.
@@ -640,10 +649,10 @@ export default function LandingPage() {
                 <ArrowRight className="h-5 w-5" />
               </a>
               <Link
-                to="/register?plan=basico"
+                to="/planos"
                 className="inline-flex items-center justify-center rounded-xl border border-emerald-300 bg-white px-7 py-4 font-extrabold text-slate-800 transition hover:bg-emerald-100"
               >
-                Começar 30 dias grátis
+                Conhecer os planos
               </Link>
             </div>
           </div>
