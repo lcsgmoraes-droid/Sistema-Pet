@@ -27,7 +27,7 @@
       "runtimeVersion": {
         "policy": "appVersion"
       },
-      "buildNumber": "5"
+      "buildNumber": "6"
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
@@ -48,7 +48,7 @@
         "android.permission.SYSTEM_ALERT_WINDOW"
       ],
       "runtimeVersion": "1.0.1",
-      "versionCode": 6
+      "versionCode": 7
     },
     "web": {
       "favicon": "./assets/favicon.png"
