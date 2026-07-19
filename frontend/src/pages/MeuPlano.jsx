@@ -157,6 +157,7 @@ export default function MeuPlano() {
   }, [planoAtual]);
 
   const statusInfo = getStatusInfo(assinaturaAtual);
+  const billingConfigured = billing?.configured === true;
   const StatusIcon = statusInfo.icon;
   const diasRestantes = assinaturaAtual?.dias_restantes_trial;
   const betaModules = (modulosBetaPublicos || [])
@@ -314,12 +315,14 @@ export default function MeuPlano() {
               <button
                 type="button"
                 onClick={handleSubscribe}
-                disabled={billingLoading || !selectedPlan}
+                disabled={billingLoading || !selectedPlan || !billingConfigured}
                 className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <CreditCard className="h-4 w-4" />
                 {billingLoading
                   ? "Preparando pagamento..."
+                  : !billingConfigured
+                    ? "Pagamento online em configuracao"
                   : billing?.checkout_url
                     ? "Abrir pagamento"
                     : "Assinar pelo Asaas"}
