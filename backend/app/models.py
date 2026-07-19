@@ -575,6 +575,14 @@ class Tenant(Base):
     trial_ends_at = Column(DateTime(timezone=True), nullable=True)
     subscription_activated_at = Column(DateTime(timezone=True), nullable=True)
     subscription_source = Column(String(50), nullable=False, server_default="manual")
+    billing_provider_environment = Column(String(20), nullable=True)
+    billing_provider_customer_id = Column(String(80), nullable=True, index=True)
+    billing_provider_subscription_id = Column(String(80), nullable=True, index=True)
+    billing_provider_payment_id = Column(String(80), nullable=True, index=True)
+    billing_payment_status = Column(String(40), nullable=True)
+    billing_type = Column(String(30), nullable=True)
+    billing_next_due_date = Column(Date, nullable=True)
+    billing_checkout_url = Column(String(500), nullable=True)
 
     # Configurações operacionais
     permite_estoque_negativo = Column(Boolean, nullable=False, server_default="false")

@@ -65,7 +65,16 @@ PLANOS_TODOS_MODULOS = frozenset(["premium", "enterprise", "full", "completo"])
 PLANOS_BASICOS = frozenset(["basico", "básico", "base", "basic"])
 TRIAL_DIAS_PADRAO = 30
 ASSINATURA_STATUS_VALIDOS = frozenset(
-    ["trial", "active", "expired", "blocked", "canceled"]
+    [
+        "trial",
+        "pending",
+        "active",
+        "past_due",
+        "expired",
+        "blocked",
+        "refunded",
+        "canceled",
+    ]
 )
 
 
@@ -109,26 +118,50 @@ def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
         status_raw = "active"
 
     trial_ends_at = _datetime_utc(getattr(tenant, "trial_ends_at", None))
+    trial_completo_ativo = trial_ends_at is not None and trial_ends_at > agora
     status_efetivo = status_raw
     if status_raw == "trial" and trial_ends_at and trial_ends_at < agora:
         status_efetivo = "expired"
 
+    origem = getattr(tenant, "subscription_source", None) or "manual"
+    pagamento_integrado = bool(
+        getattr(tenant, "billing_provider_subscription_id", None)
+        or getattr(tenant, "billing_provider_payment_id", None)
+    )
+
     return {
         "status": status_raw,
         "status_efetivo": status_efetivo,
-        "origem": getattr(tenant, "subscription_source", None) or "manual",
+        "origem": origem,
         "trial_inicio": _iso_datetime(getattr(tenant, "trial_started_at", None)),
         "trial_fim": _iso_datetime(trial_ends_at),
         "dias_restantes_trial": _dias_restantes_trial(trial_ends_at, agora),
         "trial_expirado": status_efetivo == "expired",
-        "acesso_completo_durante_trial": status_efetivo == "trial"
-        and trial_ends_at is not None,
+        # Os 30 dias completos continuam mesmo se o cliente pagar antes do fim.
+        "acesso_completo_durante_trial": trial_completo_ativo,
         "ativada_em": _iso_datetime(getattr(tenant, "subscription_activated_at", None)),
-        "pagamento_integrado": False,
+        "pagamento_integrado": pagamento_integrado,
+        "pagamento": {
+            "provedor": "asaas"
+            if getattr(tenant, "subscription_source", None) == "asaas"
+            else None,
+            "status": getattr(tenant, "billing_payment_status", None),
+            "tipo": getattr(tenant, "billing_type", None),
+            "proximo_vencimento": (
+                tenant.billing_next_due_date.isoformat()
+                if getattr(tenant, "billing_next_due_date", None)
+                else None
+            ),
+            "checkout_url": getattr(tenant, "billing_checkout_url", None),
+        },
         "contratacao": {
-            "modelo": "manual_assistida",
-            "canal": "whatsapp",
-            "acao_cliente": "falar_com_atendimento",
+            "modelo": "pagamento_integrado"
+            if pagamento_integrado
+            else "manual_assistida",
+            "canal": "asaas" if origem == "asaas" else "equipe_corepet",
+            "acao_cliente": "abrir_checkout"
+            if pagamento_integrado
+            else "solicitar_ativacao",
         },
     }
 
@@ -259,8 +292,10 @@ def get_modulos_status(
         else []
     )
 
-    uso_vendas = monthly_sales_usage(db, tenant_id)
-    uso_sessoes = active_session_usage(db, tenant_id)
+    # Planos legados nao possuem limites comerciais no catalogo publico.
+    plano_publico_canonico = str(tenant.plan or "").strip().lower() in PLAN_CATALOG
+    uso_vendas = monthly_sales_usage(db, tenant_id) if plano_publico_canonico else 0
+    uso_sessoes = active_session_usage(db, tenant_id) if plano_publico_canonico else 0
     limites_apos_trial = {
         "vendas_mensais": (
             plano_catalogo.monthly_sales_limit if plano_catalogo else None

@@ -199,6 +199,7 @@ from app.routes.ecommerce_drive_routes import router as ecommerce_drive_router
 from app.routes.product_images_public import router as product_images_public_router
 from app.routes.sefaz_routes import router as sefaz_router
 from app.routes.modulos_routes import router as modulos_router
+from app.routes.asaas_billing_routes import router as asaas_billing_router
 from app.security.module_access import require_active_entitlement, require_active_module
 from app.veterinario_routes import router as veterinario_router  # Módulo Veterinário
 from app.banho_tosa_routes import router as banho_tosa_router  # Modulo Banho & Tosa
@@ -625,4 +626,5 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(
         canal_descontos_router, dependencies=_module_dependencies("campanhas")
     )  # Descontos Globais por Canal (Ecommerce / App)
+    app.include_router(asaas_billing_router)
     app.include_router(modulos_router)  # Módulos Premium

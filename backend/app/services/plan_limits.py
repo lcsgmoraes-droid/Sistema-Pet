@@ -15,9 +15,6 @@ from app.vendas_models import Venda
 
 
 def _trial_is_active(tenant: Tenant, now_utc: datetime | None = None) -> bool:
-    if str(getattr(tenant, "billing_status", "") or "").strip().lower() != "trial":
-        return False
-
     ends_at = getattr(tenant, "trial_ends_at", None)
     if ends_at is None:
         return False
@@ -68,8 +65,11 @@ def enforce_monthly_sales_limit(
     billing_status = str(getattr(tenant, "billing_status", "active") or "active")
     if raw_plan in PLAN_CATALOG and billing_status.strip().lower() in {
         "trial",
+        "pending",
+        "past_due",
         "expired",
         "blocked",
+        "refunded",
         "canceled",
     }:
         raise HTTPException(
