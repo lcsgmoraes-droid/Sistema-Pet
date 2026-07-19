@@ -159,7 +159,9 @@ def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
             if pagamento_integrado
             else "manual_assistida",
             "canal": "asaas" if origem == "asaas" else "equipe_corepet",
-            "acao_cliente": "abrir_checkout" if pagamento_integrado else "solicitar_ativacao",
+            "acao_cliente": "abrir_checkout"
+            if pagamento_integrado
+            else "solicitar_ativacao",
         },
     }
 

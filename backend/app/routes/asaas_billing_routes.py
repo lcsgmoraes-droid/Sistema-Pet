@@ -102,9 +102,7 @@ def _validate_webhook_token(received_token: str | None) -> None:
 @router.post("/webhook")
 async def asaas_webhook(
     request: Request,
-    asaas_access_token: str | None = Header(
-        default=None, alias="asaas-access-token"
-    ),
+    asaas_access_token: str | None = Header(default=None, alias="asaas-access-token"),
     db: Session = Depends(get_session),
 ):
     _validate_webhook_token(asaas_access_token)
@@ -184,6 +182,8 @@ async def asaas_webhook(
             failed_event.error_message = str(exc)[:500]
             failed_event.processed_at = datetime.now(timezone.utc)
             db.commit()
-        raise HTTPException(status_code=500, detail="Falha ao processar webhook") from exc
+        raise HTTPException(
+            status_code=500, detail="Falha ao processar webhook"
+        ) from exc
 
     return {"received": True, "duplicate": False}
