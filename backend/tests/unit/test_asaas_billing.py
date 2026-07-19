@@ -70,9 +70,7 @@ def test_pagamento_confirmado_ativa_assinatura():
         "invoiceUrl": "https://sandbox.asaas.com/i/test",
     }
 
-    result = apply_payment_event(
-        _FakeSession(tenant), "PAYMENT_CONFIRMED", payment
-    )
+    result = apply_payment_event(_FakeSession(tenant), "PAYMENT_CONFIRMED", payment)
 
     assert result is tenant
     assert tenant.billing_status == "active"

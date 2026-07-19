@@ -45,9 +45,7 @@ def upgrade() -> None:
     tenant_columns = _columns("tenants")
     for column_name, column_type in TENANT_COLUMNS:
         if column_name not in tenant_columns:
-            op.add_column(
-                "tenants", sa.Column(column_name, column_type, nullable=True)
-            )
+            op.add_column("tenants", sa.Column(column_name, column_type, nullable=True))
 
     tenant_indexes = _indexes("tenants")
     for column_name in (

@@ -43,8 +43,10 @@ class AsaasBillingError(RuntimeError):
 
 def asaas_environment() -> str:
     raw = (
-        os.getenv("ASAAS_ENVIRONMENT") or settings.ASAAS_ENVIRONMENT or "sandbox"
-    ).strip().lower()
+        (os.getenv("ASAAS_ENVIRONMENT") or settings.ASAAS_ENVIRONMENT or "sandbox")
+        .strip()
+        .lower()
+    )
     aliases = {"prod": "production", "producao": "production", "test": "sandbox"}
     environment = aliases.get(raw, raw)
     if environment not in ASAAS_BASE_URLS:
@@ -151,9 +153,7 @@ def _reset_provider_references(tenant: Tenant, environment: str) -> None:
     tenant.billing_next_due_date = None
 
 
-def _ensure_customer(
-    client: AsaasClient, tenant: Tenant, current_user: User
-) -> str:
+def _ensure_customer(client: AsaasClient, tenant: Tenant, current_user: User) -> str:
     _reset_provider_references(tenant, client.environment)
     if tenant.billing_provider_customer_id:
         return tenant.billing_provider_customer_id
@@ -180,7 +180,9 @@ def _ensure_customer(
 
     email = (tenant.email or current_user.email or "").strip()
     payload: dict[str, Any] = {
-        "name": (tenant.razao_social or tenant.name or current_user.nome or email).strip(),
+        "name": (
+            tenant.razao_social or tenant.name or current_user.nome or email
+        ).strip(),
         "cpfCnpj": cpf_cnpj,
         "email": email,
         "externalReference": tenant.id,
@@ -320,9 +322,7 @@ def subscription_status(
     return {
         "configured": asaas_is_configured(),
         "environment": (
-            os.getenv("ASAAS_ENVIRONMENT")
-            or settings.ASAAS_ENVIRONMENT
-            or "sandbox"
+            os.getenv("ASAAS_ENVIRONMENT") or settings.ASAAS_ENVIRONMENT or "sandbox"
         )
         .strip()
         .lower(),
@@ -340,7 +340,9 @@ def subscription_status(
     }
 
 
-def apply_payment_event(db: Session, event_type: str, payment: dict[str, Any]) -> Tenant | None:
+def apply_payment_event(
+    db: Session, event_type: str, payment: dict[str, Any]
+) -> Tenant | None:
     external_reference = str(payment.get("externalReference") or "").strip()
     payment_id = str(payment.get("id") or "").strip()
     subscription_id = str(payment.get("subscription") or "").strip()
