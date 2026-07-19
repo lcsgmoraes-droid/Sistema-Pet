@@ -323,9 +323,9 @@ export default function MeuPlano() {
                   ? "Preparando pagamento..."
                   : !billingConfigured
                     ? "Pagamento online em configuracao"
-                  : billing?.checkout_url
-                    ? "Abrir pagamento"
-                    : "Assinar pelo Asaas"}
+                    : billing?.checkout_url
+                      ? "Abrir pagamento"
+                      : "Assinar pelo Asaas"}
               </button>
               <a
                 href={`https://wa.me/${WHATSAPP_NUMERO}?text=${msgContratar}`}
