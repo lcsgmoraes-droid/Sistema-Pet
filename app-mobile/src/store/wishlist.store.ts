@@ -11,6 +11,7 @@ interface WishlistState {
   carregar: () => Promise<void>;
   toggle: (produtoId: number) => Promise<void>;
   temNaLista: (produtoId: number) => boolean;
+  limpar: () => Promise<void>;
 }
 
 export const useWishlistStore = create<WishlistState>()((set, get) => ({
@@ -42,4 +43,9 @@ export const useWishlistStore = create<WishlistState>()((set, get) => ({
   },
 
   temNaLista: (produtoId) => get().ids.includes(produtoId),
+
+  limpar: async () => {
+    set({ ids: [], carregado: true });
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  },
 }));

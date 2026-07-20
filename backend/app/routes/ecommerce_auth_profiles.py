@@ -1,11 +1,21 @@
 from datetime import datetime
+import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.auth import create_access_token
+from app.auth import create_access_token, hash_password, verify_password
 from app.db import get_session
-from app.models import Cliente, User
+from app.models import (
+    AppAccessProfile,
+    AppNotification,
+    Cliente,
+    User,
+    UserPushDevice,
+    UserSession,
+    UserTenant,
+)
+from app.pedido_models import Pedido, PedidoItem
 from app.routes.ecommerce_auth_cliente import (
     _copy_missing_cliente_fields,
     _digits_only,
@@ -21,6 +31,7 @@ from app.routes.ecommerce_auth_common import (
     _get_current_ecommerce_user,
 )
 from app.routes.ecommerce_auth_schemas import (
+    EcommerceAccountDeletionRequest,
     EcommerceProfileUpdateRequest,
     EcommerceSelectProfileRequest,
 )
@@ -30,9 +41,49 @@ from app.services.app_access_profile_service import (
     normalize_profile_type,
     resolve_user_app_profiles,
 )
-
+from app.services.lgpd_service import PrivacyOpsService, utcnow
 
 router = APIRouter()
+
+
+def _anonymize_ecommerce_user(user: User, *, now: datetime) -> None:
+    user.email = (
+        f"conta-excluida-{user.id}-{secrets.token_hex(8)}@deleted.corepet.invalid"
+    )
+    user.hashed_password = hash_password(secrets.token_urlsafe(48))
+    user.is_active = False
+    user.is_admin = False
+    user.nome = None
+    user.telefone = None
+    user.cpf_cnpj = None
+    user.foto_url = None
+    user.push_token = None
+    user.vet_calendar_token = None
+    user.consent_date = None
+    user.consent_version = None
+    user.privacy_version = None
+    user.consent_ip = None
+    user.consent_user_agent = None
+    user.email_verified = False
+    user.email_verified_at = None
+    user.email_verification_token_hash = None
+    user.email_verification_token_expires = None
+    user.email_verification_sent_at = None
+    user.two_factor_enabled = False
+    user.two_factor_secret = None
+    user.backup_codes = None
+    user.reset_token = None
+    user.reset_token_expires = None
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    user.last_login_at = None
+    user.last_login_ip = None
+    user.password_changed_at = now
+    user.oauth_provider = None
+    user.oauth_id = None
+    user.nome_loja = None
+    user.endereco_loja = None
+    user.telefone_loja = None
 
 
 def _serialize_profile(
@@ -101,9 +152,9 @@ def _serialize_profile(
         # Perfil entregador — usado pelo app mobile para mostrar interface correta
         "is_entregador": is_entregador,
         "is_funcionario": is_funcionario,
-        "funcionario_id": cliente.id
-        if (cliente and (is_entregador or is_funcionario))
-        else None,
+        "funcionario_id": (
+            cliente.id if (cliente and (is_entregador or is_funcionario)) else None
+        ),
         "is_veterinario": is_veterinario,
         "veterinario_id": cliente.id if (cliente and is_veterinario) else None,
         "perfil_operacional": perfil_operacional,
@@ -363,3 +414,108 @@ def atualizar_perfil(
         db,
         selected_profile=getattr(current_user, "_active_app_profile", None),
     )
+
+
+@router.delete("/conta")
+def excluir_conta(
+    payload: EcommerceAccountDeletionRequest,
+    request: Request,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    tenant_id = _activate_user_tenant_context(current_user)
+    if not verify_password(payload.password, current_user.hashed_password or ""):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Senha incorreta",
+        )
+
+    clientes = (
+        db.query(Cliente)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.user_id == current_user.id,
+        )
+        .order_by(Cliente.id.asc())
+        .all()
+    )
+    cliente_ids = [cliente.id for cliente in clientes]
+    client = getattr(request, "client", None)
+    ip_address = getattr(client, "host", None)
+    user_agent = request.headers.get("user-agent")
+    privacy = PrivacyOpsService(db, tenant_id)
+    request_ids: list[int] = []
+
+    for cliente in clientes:
+        deletion_request = privacy.create_subject_request(
+            subject_type="customer",
+            subject_id=str(cliente.id),
+            request_type="deletion",
+            details="Exclusao definitiva solicitada pelo titular no app CorePet.",
+            requester_name=current_user.nome,
+            requester_email=current_user.email,
+            requester_phone=current_user.telefone,
+            channel="app_self_service",
+            payload={"immediate": True, "account_user_id": current_user.id},
+            created_by_user_id=current_user.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        privacy.anonymize_customer_from_request(
+            request_id=deletion_request.id,
+            processed_by_user_id=current_user.id,
+            resolution_notes="Exclusao imediata confirmada com a senha da conta.",
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        request_ids.append(deletion_request.id)
+
+    db.query(AppAccessProfile).filter(
+        AppAccessProfile.tenant_id == tenant_id,
+        AppAccessProfile.user_id == current_user.id,
+    ).update({"is_active": False}, synchronize_session=False)
+    if cliente_ids:
+        db.query(AppAccessProfile).filter(
+            AppAccessProfile.tenant_id == tenant_id,
+            AppAccessProfile.cliente_id.in_(cliente_ids),
+        ).update({"is_active": False}, synchronize_session=False)
+
+    db.query(UserTenant).filter(
+        UserTenant.tenant_id == tenant_id,
+        UserTenant.user_id == current_user.id,
+    ).update({"is_active": False}, synchronize_session=False)
+    db.query(UserPushDevice).filter(
+        UserPushDevice.tenant_id == tenant_id,
+        UserPushDevice.user_id == current_user.id,
+    ).delete(synchronize_session=False)
+    db.query(AppNotification).filter(
+        AppNotification.tenant_id == tenant_id,
+        AppNotification.user_id == current_user.id,
+    ).delete(synchronize_session=False)
+    db.query(UserSession).filter(UserSession.user_id == current_user.id).delete(
+        synchronize_session=False
+    )
+
+    carrinhos = (
+        db.query(Pedido)
+        .filter(
+            Pedido.tenant_id == tenant_id,
+            Pedido.cliente_id == current_user.id,
+            Pedido.status == "carrinho",
+        )
+        .all()
+    )
+    for carrinho in carrinhos:
+        db.query(PedidoItem).filter(
+            PedidoItem.tenant_id == tenant_id,
+            PedidoItem.pedido_id == carrinho.pedido_id,
+        ).delete(synchronize_session=False)
+        db.delete(carrinho)
+
+    _anonymize_ecommerce_user(current_user, now=utcnow())
+    db.commit()
+    return {
+        "account_deleted": True,
+        "message": "Conta excluida definitivamente.",
+        "privacy_request_ids": request_ids,
+    }

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -63,3 +65,8 @@ class EcommerceSelectProfileRequest(BaseModel):
     profile_type: str = Field(
         description="cliente | funcionario | entregador | veterinario"
     )
+
+
+class EcommerceAccountDeletionRequest(BaseModel):
+    password: str = Field(min_length=1)
+    confirmation: Literal["EXCLUIR"]

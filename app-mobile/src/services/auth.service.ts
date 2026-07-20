@@ -72,6 +72,18 @@ export async function updateProfile(updates: EcommerceProfileUpdate): Promise<Ec
   return data;
 }
 
+export async function deleteAccount(
+  password: string,
+): Promise<{ account_deleted: boolean; message: string }> {
+  const { data } = await api.delete<{ account_deleted: boolean; message: string }>(
+    '/ecommerce/auth/conta',
+    {
+      data: { password, confirmation: 'EXCLUIR' },
+    },
+  );
+  return data;
+}
+
 export async function requestPasswordReset(email: string): Promise<{ message: string; expires_in_minutes?: number }> {
   const { data } = await api.post<{ message: string; expires_in_minutes?: number }>(
     '/ecommerce/auth/esqueci-senha',
