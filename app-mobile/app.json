@@ -27,7 +27,7 @@
       "runtimeVersion": {
         "policy": "appVersion"
       },
-      "buildNumber": "7"
+      "buildNumber": "8"
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
