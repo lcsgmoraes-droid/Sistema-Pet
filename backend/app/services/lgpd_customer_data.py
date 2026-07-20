@@ -1,3 +1,5 @@
+import logging
+from pathlib import Path
 from typing import Any
 
 from app.lgpd_models import DataSubjectRequest
@@ -10,6 +12,27 @@ from app.services.lgpd_utils import (
     utcnow,
 )
 from app.whatsapp.security import DataPrivacyConsent
+
+logger = logging.getLogger(__name__)
+PET_UPLOAD_DIR = Path("uploads/pets")
+
+
+def _delete_local_pet_photo(url: str | None) -> bool:
+    normalized = str(url or "").strip()
+    if not normalized.startswith("/uploads/pets/"):
+        return False
+
+    path = Path(normalized.lstrip("/"))
+    try:
+        resolved_path = path.resolve()
+        resolved_base = PET_UPLOAD_DIR.resolve()
+        if resolved_base not in resolved_path.parents:
+            return False
+        path.unlink(missing_ok=True)
+        return True
+    except OSError:
+        logger.warning("Nao foi possivel remover foto local do pet: %s", normalized)
+        return False
 
 
 class PrivacyCustomerDataMixin:
@@ -96,7 +119,10 @@ class PrivacyCustomerDataMixin:
             if hasattr(cliente, field):
                 setattr(cliente, field, None)
 
+        deleted_pet_photos = 0
         for pet in pets:
+            if _delete_local_pet_photo(getattr(pet, "foto_url", None)):
+                deleted_pet_photos += 1
             pet.nome = f"Pet anonimizado #{pet.id}"
             pet.ativo = False
             pet.updated_at = now
@@ -146,6 +172,7 @@ class PrivacyCustomerDataMixin:
             "cliente_id": cliente.id,
             "cliente_codigo": cliente.codigo,
             "pets_anonymized": len(pets),
+            "pet_photos_deleted": deleted_pet_photos,
             "consents_revoked": revoked_consents,
             "completed_at": now.isoformat(),
         }

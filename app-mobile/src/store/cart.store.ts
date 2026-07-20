@@ -13,6 +13,7 @@ interface CartState {
   atualizar: (produto_id: number, quantidade: number) => Promise<void>;
   remover: (produto_id: number) => Promise<void>;
   limpar: () => Promise<void>;
+  limparLocal: () => void;
 
   // Computed
   totalItens: () => number;
@@ -107,6 +108,8 @@ export const useCartStore = create<CartState>()((set, get) => ({
     await ShopService.limparCarrinho();
     set({ itens: [], subtotal: 0 });
   },
+
+  limparLocal: () => set({ itens: [], subtotal: 0, isLoading: false }),
 
   totalItens: () => {
     return get().itens.reduce((acc, i) => acc + i.quantidade, 0);

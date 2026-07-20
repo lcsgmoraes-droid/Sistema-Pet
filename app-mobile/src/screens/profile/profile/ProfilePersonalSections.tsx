@@ -1,6 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
-import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 import { PONTOS } from "../../../config";
 import { CORES } from "../../../theme";
@@ -220,5 +229,118 @@ export function LogoutButton({ onLogout }: { onLogout: () => void }) {
       <Ionicons name="log-out-outline" size={20} color={CORES.erro} />
       <Text style={styles.botaoSairTexto}>Sair da conta</Text>
     </TouchableOpacity>
+  );
+}
+
+export function AccountDeletionSection({
+  excluindo,
+  onExcluirConta,
+}: {
+  excluindo: boolean;
+  onExcluirConta: (password: string) => Promise<void>;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const [senha, setSenha] = useState("");
+  const [confirmacao, setConfirmacao] = useState("");
+  const confirmado = confirmacao.trim().toUpperCase() === "EXCLUIR";
+  const podeExcluir = senha.length > 0 && confirmado && !excluindo;
+
+  function fechar() {
+    if (excluindo) return;
+    setAberto(false);
+    setSenha("");
+    setConfirmacao("");
+  }
+
+  async function confirmarExclusao() {
+    if (!podeExcluir) return;
+    try {
+      await onExcluirConta(senha);
+      fechar();
+    } catch {
+      // A tela principal apresenta a mensagem retornada pelo servidor.
+    }
+  }
+
+  return (
+    <>
+      <View style={styles.exclusaoSecao}>
+        <Text style={styles.exclusaoTitulo}>Excluir conta</Text>
+        <Text style={styles.exclusaoTexto}>
+          Exclui definitivamente sua conta, dados pessoais e pets. Registros que a loja
+          precise manter por obrigacao legal permanecem anonimizados.
+        </Text>
+        <TouchableOpacity style={styles.botaoExcluirConta} onPress={() => setAberto(true)}>
+          <Ionicons name="trash-outline" size={20} color={CORES.erro} />
+          <Text style={styles.botaoExcluirContaTexto}>Excluir minha conta</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Modal
+        visible={aberto}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={fechar}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <View style={styles.modalExclusao}>
+            <View style={styles.modalExclusaoIcone}>
+              <Ionicons name="warning-outline" size={28} color={CORES.erro} />
+            </View>
+            <Text style={styles.modalExclusaoTitulo}>Excluir conta definitivamente?</Text>
+            <Text style={styles.modalExclusaoTexto}>
+              Esta acao nao pode ser desfeita. Confirme sua senha e digite EXCLUIR.
+            </Text>
+
+            <Text style={styles.modalCampoLabel}>Senha atual</Text>
+            <TextInput
+              style={styles.input}
+              value={senha}
+              onChangeText={setSenha}
+              placeholder="Digite sua senha"
+              placeholderTextColor={CORES.textoClaro}
+              secureTextEntry
+              editable={!excluindo}
+            />
+
+            <Text style={styles.modalCampoLabel}>Confirmacao</Text>
+            <TextInput
+              style={styles.input}
+              value={confirmacao}
+              onChangeText={setConfirmacao}
+              placeholder="Digite EXCLUIR"
+              placeholderTextColor={CORES.textoClaro}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              editable={!excluindo}
+            />
+
+            <TouchableOpacity
+              style={[
+                styles.botaoExcluirDefinitivo,
+                !podeExcluir && styles.botaoExcluirDefinitivoDesativado,
+              ]}
+              onPress={confirmarExclusao}
+              disabled={!podeExcluir}
+            >
+              {excluindo ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.botaoExcluirDefinitivoTexto}>
+                  Excluir conta definitivamente
+                </Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.botaoCancelarExclusao} onPress={fechar} disabled={excluindo}>
+              <Text style={styles.botaoCancelarExclusaoTexto}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </>
   );
 }

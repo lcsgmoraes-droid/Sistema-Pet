@@ -182,6 +182,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   logout: async () => {
+    await clearOperationalRoleCache(get().user);
     await AuthService.logout();
     set({ isAuthenticated: false, user: null, pendingProfiles: [], needsProfileSelection: false });
   },

@@ -6,6 +6,7 @@ import { ESPACO } from "../../../theme";
 import type { AppAccessProfile, AppProfileType, EcommerceDeliveryAddress, EcommerceUser } from "../../../types";
 import { DefaultAddressSection, DeliveryAddressSection } from "./ProfileAddressSections";
 import {
+  AccountDeletionSection,
   LogoutButton,
   NotificationsSection,
   PersonalDataSection,
@@ -81,6 +82,8 @@ interface ProfileContentProps {
   ativandoNotificacoes: boolean;
   onAtivarNotificacoes: () => void;
   onLogout: () => void;
+  excluindoConta: boolean;
+  onExcluirConta: (password: string) => Promise<void>;
 }
 
 export function ProfileContent(props: ProfileContentProps) {
@@ -164,7 +167,11 @@ export function ProfileContent(props: ProfileContentProps) {
         onAtivarNotificacoes={props.onAtivarNotificacoes}
       />
       <LogoutButton onLogout={props.onLogout} />
-      <Text style={styles.versao}>CorePet v1.0.0</Text>
+      <AccountDeletionSection
+        excluindo={props.excluindoConta}
+        onExcluirConta={props.onExcluirConta}
+      />
+      <Text style={styles.versao}>CorePet v1.0.1</Text>
       <View style={{ height: ESPACO.xxl }} />
     </KeyboardSafeScrollView>
   );

@@ -6,6 +6,8 @@ import { PONTOS } from "../../config";
 import { updateProfile } from "../../services/auth.service";
 import { ensurePushNotificationsRegistered } from "../../services/pushNotifications.service";
 import { useAuthStore } from "../../store/auth.store";
+import { useCartStore } from "../../store/cart.store";
+import { useWishlistStore } from "../../store/wishlist.store";
 import type { AppProfileType } from "../../types";
 import { confirmLogoutWithNotificationChoice } from "../../utils/logoutNotifications";
 import { ProfileContent } from "./profile/ProfileContent";
@@ -50,6 +52,7 @@ export default function ProfileScreen() {
   const [trocandoPerfil, setTrocandoPerfil] = useState(false);
   const [ativandoNotificacoes, setAtivandoNotificacoes] = useState(false);
   const [statusNotificacoes, setStatusNotificacoes] = useState<string | null>(null);
+  const [excluindoConta, setExcluindoConta] = useState(false);
 
   useEffect(() => {
     setNome(user?.nome ?? "");
@@ -267,6 +270,29 @@ export default function ProfileScreen() {
     confirmLogoutWithNotificationChoice(logout, "sua conta");
   }
 
+  async function excluirConta(password: string) {
+    setExcluindoConta(true);
+    try {
+      await AuthService.deleteAccount(password);
+      useCartStore.getState().limparLocal();
+      await useWishlistStore.getState().limpar().catch(() => undefined);
+      await logout();
+      Alert.alert(
+        "Conta excluida",
+        "Sua conta e seus dados pessoais foram excluidos definitivamente.",
+      );
+    } catch (err: any) {
+      const mensagem =
+        err?.response?.data?.detail ||
+        err?.message ||
+        "Nao foi possivel excluir sua conta agora.";
+      Alert.alert("Nao foi possivel excluir", String(mensagem));
+      throw err;
+    } finally {
+      setExcluindoConta(false);
+    }
+  }
+
   async function ativarNotificacoes() {
     setAtivandoNotificacoes(true);
     try {
@@ -349,6 +375,8 @@ export default function ProfileScreen() {
       ativandoNotificacoes={ativandoNotificacoes}
       onAtivarNotificacoes={ativarNotificacoes}
       onLogout={handleLogout}
+      excluindoConta={excluindoConta}
+      onExcluirConta={excluirConta}
     />
   );
 }
