@@ -187,7 +187,7 @@ def send_email(
     """Envia um e-mail. Retorna True se enviado com sucesso, False caso contrario."""
     recipients = _recipient_addresses(to)
     if not recipients:
-        logger.warning("[EMAIL-SEM-DESTINATARIO] Envio ignorado | Assunto: %s", subject)
+        logger.warning("[EMAIL-SEM-DESTINATARIO] Envio ignorado")
         return False
 
     to_header = ", ".join(recipients)
@@ -197,16 +197,14 @@ def send_email(
     if not _smtp_configured():
         if simulate_if_unconfigured:
             logger.info(
-                "[EMAIL-SIMULADO] Para: %s | Assunto: %s | correlation_id=%s",
-                to_header,
-                subject,
+                "[EMAIL-SIMULADO] Destinatarios: %s | correlation_id=%s",
+                len(recipients),
                 correlation_id,
             )
             return True
         logger.warning(
-            "[EMAIL-NAO-CONFIGURADO] Para: %s | Assunto: %s | correlation_id=%s",
-            to_header,
-            subject,
+            "[EMAIL-NAO-CONFIGURADO] Destinatarios: %s | correlation_id=%s",
+            len(recipients),
             correlation_id,
         )
         return False
@@ -239,16 +237,15 @@ def send_email(
             server.login(user, password)
             server.sendmail(envelope_from, recipients, msg.as_bytes(policy=policy.SMTP))
         logger.info(
-            "[EMAIL-ENVIADO] Para: %s | Assunto: %s | correlation_id=%s",
-            to_header,
-            subject,
+            "[EMAIL-ENVIADO] Destinatarios: %s | correlation_id=%s",
+            len(recipients),
             correlation_id,
         )
         return True
     except Exception as exc:
         logger.error(
-            "[EMAIL-ERRO] Para: %s | Erro: %s | correlation_id=%s",
-            to_header,
+            "[EMAIL-ERRO] Destinatarios: %s | Erro: %s | correlation_id=%s",
+            len(recipients),
             exc,
             correlation_id,
         )

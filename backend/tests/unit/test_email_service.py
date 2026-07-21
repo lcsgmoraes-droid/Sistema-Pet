@@ -1,4 +1,5 @@
 from email import policy
+import logging
 
 from app.middlewares.request_context import clear_request_context, set_request_id
 from app.services import email_service
@@ -84,7 +85,7 @@ def test_send_email_uses_smtp_policy_and_clean_envelope_sender(monkeypatch):
     assert policy.SMTP.linesep.encode() == b"\r\n"
 
 
-def test_send_email_accepts_multiple_recipients(monkeypatch):
+def test_send_email_accepts_multiple_recipients(monkeypatch, caplog):
     sent = {}
 
     class FakeSMTP:
@@ -121,12 +122,27 @@ def test_send_email_accepts_multiple_recipients(monkeypatch):
     fake_settings["pass" + "word"] = "unit-test-only"
     monkeypatch.setattr(email_service, "_smtp_settings", lambda: fake_settings)
 
-    assert email_service.send_email(
-        to=["compras@example.com", "vendedor@example.com"],
-        subject="Pedido de compra",
-        html_body="<p>Pedido</p>",
-        simulate_if_unconfigured=False,
-    )
+    with caplog.at_level(logging.INFO):
+        assert email_service.send_email(
+            to=["compras@example.com", "vendedor@example.com"],
+            subject="Pedido de compra",
+            html_body="<p>Pedido</p>",
+            simulate_if_unconfigured=False,
+        )
 
     assert sent["to_addrs"] == ["compras@example.com", "vendedor@example.com"]
     assert b"To: compras@example.com, vendedor@example.com" in sent["message"]
+    assert "compras@example.com" not in caplog.text
+    assert "vendedor@example.com" not in caplog.text
+    assert "Pedido de compra" not in caplog.text
+
+
+def test_send_email_sem_destinatario_nao_registra_assunto_sensivel(caplog):
+    with caplog.at_level(logging.WARNING):
+        assert not email_service.send_email(
+            to=[],
+            subject="Redefinicao de senha secreta",
+            html_body="<p>Mensagem sensivel</p>",
+        )
+
+    assert "senha secreta" not in caplog.text
