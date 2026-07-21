@@ -43,10 +43,16 @@ const ModalEnvioPedido = ({
               aria-describedby="ajuda-emails-destinatarios"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <p id="ajuda-emails-destinatarios" className="mt-1 text-xs text-gray-500">
-              Para enviar a mais de uma pessoa, separe os e-mails com ponto e vírgula (;) ou vírgula
-              (,).
-            </p>
+            <div
+              id="ajuda-emails-destinatarios"
+              className="mt-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800"
+            >
+              <span className="font-semibold">Mais de um destinatário?</span> Separe os e-mails com
+              ponto e vírgula (;) ou vírgula (,).
+              <span className="mt-1 block text-blue-700">
+                Exemplo: compras@empresa.com; vendedor@empresa.com
+              </span>
+            </div>
           </div>
 
           {/* Campo WhatsApp */}
