@@ -1,7 +1,9 @@
-import { Check, Eye, Package, RotateCcw, Search, Send, Trash2 } from "lucide-react";
+import { Fragment, useState } from "react";
+import { Check, Eye, MoreHorizontal, Package, RotateCcw, Search, Send, Trash2 } from "lucide-react";
 import ActionButton from "../ui/ActionButton";
 import ExportActionButton from "../ui/ExportActionButton";
 import MoneyCell from "../ui/MoneyCell";
+import PaginationControls from "../ui/PaginationControls";
 import StatusBadge from "../ui/StatusBadge";
 
 const STATUS_PEDIDO_META = {
@@ -42,23 +44,105 @@ export default function PedidosCompraTabela({
   enviarPedido,
   exportarExcel,
   exportarPDF,
+  loading = false,
   obterFornecedorPorId,
+  onItemsPerPageChange,
+  onPageChange,
+  paginaAtual = 1,
+  paginasTotal = 0,
   pedidos,
+  pedidosPorPagina = 20,
   reverterStatus,
+  totalPedidos = 0,
   verDetalhes,
 }) {
+  const [pedidoAcoesAberto, setPedidoAcoesAberto] = useState(null);
+
+  const executarAcao = (acao) => {
+    setPedidoAcoesAberto(null);
+    acao();
+  };
+
+  const acaoPrincipal = (pedido) => {
+    if (pedido.status === "rascunho") {
+      return (
+        <ActionButton
+          icon={Send}
+          intent="edit"
+          onClick={() => enviarPedido(pedido)}
+          size="xs"
+          tone="soft"
+          title="Enviar pedido ao fornecedor"
+        >
+          Enviar
+        </ActionButton>
+      );
+    }
+    if (pedido.status === "enviado") {
+      return (
+        <ActionButton
+          icon={Check}
+          intent="create"
+          onClick={() => confirmarPedido(pedido.id)}
+          size="xs"
+          tone="soft"
+          title="Confirmar recebimento do pedido pelo fornecedor"
+        >
+          Confirmar
+        </ActionButton>
+      );
+    }
+    if (pedido.status === "confirmado") {
+      return (
+        <ActionButton
+          icon={Search}
+          intent="info"
+          onClick={() => abrirConfronto(pedido)}
+          size="xs"
+          tone="soft"
+          title="Confrontar pedido com nota fiscal"
+        >
+          Conferir NF
+        </ActionButton>
+      );
+    }
+    if (pedido.status === "recebido_parcial") {
+      return (
+        <ActionButton
+          icon={Package}
+          intent="neutral"
+          onClick={() => abrirRecebimento(pedido)}
+          size="xs"
+          tone="soft"
+          title="Registrar o recebimento restante"
+        >
+          Receber restante
+        </ActionButton>
+      );
+    }
+    return null;
+  };
+
+  const abrirPedido = (pedido) => {
+    if (pedido.status === "rascunho") {
+      abrirEdicao(pedido);
+      return;
+    }
+    verDetalhes(pedido);
+  };
+
   return (
-    <div className="overflow-hidden rounded-lg bg-white shadow-md">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className={`w-full transition-opacity ${loading ? "opacity-50" : "opacity-100"}`}>
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold">Numero</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold">Número</th>
               <th className="px-4 py-3 text-left text-sm font-semibold">Fornecedor</th>
               <th className="px-4 py-3 text-left text-sm font-semibold">Data</th>
               <th className="px-4 py-3 text-right text-sm font-semibold">Valor</th>
               <th className="px-4 py-3 text-center text-sm font-semibold">Status</th>
-              <th className="px-4 py-3 text-center text-sm font-semibold">Acoes</th>
+              <th className="px-4 py-3 text-center text-sm font-semibold">Próxima ação</th>
             </tr>
           </thead>
           <tbody>
@@ -70,152 +154,173 @@ export default function PedidosCompraTabela({
               </tr>
             ) : (
               pedidos.map((pedido) => (
-                <tr
-                  key={pedido.id}
-                  className={`border-t hover:bg-gray-50 ${
-                    pedido.status === "rascunho" ? "cursor-pointer" : ""
-                  }`}
-                  onClick={() => pedido.status === "rascunho" && abrirEdicao(pedido)}
-                  title={pedido.status === "rascunho" ? "Clique para editar" : ""}
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      {pedido.numero_pedido}
-                      {pedido.foi_alterado_apos_envio && (
-                        <span
-                          className="rounded bg-orange-100 px-2 py-1 text-xs font-semibold text-orange-700"
-                          title="Este pedido foi alterado apos o envio"
-                        >
-                          Alterado
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {obterFornecedorPorId(pedido.fornecedor_id)?.nome || pedido.fornecedor_id}
-                  </td>
-                  <td className="px-4 py-3">{formatarDataPedido(pedido.data_pedido)}</td>
-                  <td className="px-4 py-3 text-right font-semibold">
-                    <MoneyCell value={pedido.valor_final} />
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <PedidoStatusBadge status={pedido.status} />
-                  </td>
-                  <td
-                    className="px-4 py-3 text-center"
-                    onClick={(event) => event.stopPropagation()}
+                <Fragment key={pedido.id}>
+                  <tr
+                    className="cursor-pointer border-t hover:bg-slate-50"
+                    onClick={() => abrirPedido(pedido)}
+                    title={pedido.status === "rascunho" ? "Clique para editar" : "Clique para ver"}
                   >
-                    <div className="flex justify-center gap-2">
-                      <ActionButton
-                        icon={Eye}
-                        intent="neutral"
-                        onClick={() => verDetalhes(pedido)}
-                        size="xs"
-                        tone="soft"
-                        title="Ver detalhes completos do pedido"
-                      >
-                        Ver
-                      </ActionButton>
-
-                      <ExportActionButton
-                        type="pdf"
-                        onClick={() => exportarPDF(pedido.id)}
-                        title="Exportar PDF"
-                      >
-                        PDF
-                      </ExportActionButton>
-                      <ExportActionButton
-                        type="excel"
-                        onClick={() => exportarExcel(pedido.id)}
-                        title="Exportar Excel"
-                      >
-                        Excel
-                      </ExportActionButton>
-
-                      {pedido.status === "rascunho" && (
-                        <ActionButton
-                          icon={Send}
-                          intent="edit"
-                          onClick={() => enviarPedido(pedido)}
-                          size="xs"
-                          tone="soft"
-                          title="Enviar pedido ao fornecedor"
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          className="font-semibold text-blue-700 hover:underline"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            abrirPedido(pedido);
+                          }}
                         >
-                          Enviar
-                        </ActionButton>
-                      )}
-                      {pedido.status === "enviado" && (
+                          {pedido.numero_pedido}
+                        </button>
+                        {pedido.foi_alterado_apos_envio && (
+                          <span
+                            className="rounded bg-orange-100 px-2 py-1 text-xs font-semibold text-orange-700"
+                            title="Este pedido foi alterado apos o envio"
+                          >
+                            Alterado
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {obterFornecedorPorId(pedido.fornecedor_id)?.nome || pedido.fornecedor_id}
+                    </td>
+                    <td className="px-4 py-3">{formatarDataPedido(pedido.data_pedido)}</td>
+                    <td className="px-4 py-3 text-right font-semibold">
+                      <MoneyCell value={pedido.valor_final} />
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <PedidoStatusBadge status={pedido.status} />
+                    </td>
+                    <td
+                      className="px-4 py-3 text-center"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <div className="flex justify-center gap-2">
+                        {acaoPrincipal(pedido)}
                         <ActionButton
-                          icon={Check}
-                          intent="create"
-                          onClick={() => confirmarPedido(pedido.id)}
-                          size="xs"
-                          tone="soft"
-                          title="Confirmar recebimento do pedido pelo fornecedor"
-                        >
-                          Confirmar
-                        </ActionButton>
-                      )}
-                      {(pedido.status === "confirmado" || pedido.status === "recebido_parcial") && (
-                        <ActionButton
-                          icon={Search}
-                          intent="info"
-                          onClick={() => abrirConfronto(pedido)}
-                          size="xs"
-                          tone="soft"
-                          title="Confrontar pedido com NF fiscal"
-                        >
-                          Conferir NF
-                        </ActionButton>
-                      )}
-                      {(pedido.status === "confirmado" || pedido.status === "recebido_parcial") && (
-                        <ActionButton
-                          icon={Package}
+                          icon={MoreHorizontal}
                           intent="neutral"
-                          onClick={() => abrirRecebimento(pedido)}
-                          size="xs"
-                          tone="soft"
-                          title="Registrar entrada de produtos no estoque"
-                        >
-                          Receber
-                        </ActionButton>
-                      )}
-                      {pedido.status !== "rascunho" && pedido.status !== "recebido_total" && (
-                        <ActionButton
-                          icon={RotateCcw}
-                          intent="warning"
-                          onClick={() => reverterStatus(pedido.id)}
-                          size="xs"
-                          tone="soft"
-                          title="Reverter para status anterior"
-                        >
-                          Reverter
-                        </ActionButton>
-                      )}
-                      {pedido.status !== "recebido_total" && pedido.status !== "cancelado" && (
-                        <ActionButton
-                          icon={Trash2}
-                          intent="delete"
-                          onClick={() => cancelarPedido(pedido)}
-                          size="xs"
-                          tone="soft"
-                          title={
-                            pedido.status === "rascunho"
-                              ? "Cancelar/Excluir pedido em rascunho"
-                              : "Cancelar pedido"
+                          onClick={() =>
+                            setPedidoAcoesAberto((atual) =>
+                              atual === pedido.id ? null : pedido.id,
+                            )
                           }
+                          size="xs"
+                          tone="soft"
+                          title="Mostrar todas as acoes"
+                          aria-expanded={pedidoAcoesAberto === pedido.id}
                         >
-                          {pedido.status === "rascunho" ? "Excluir" : "Cancelar"}
+                          Mais
                         </ActionButton>
-                      )}
-                    </div>
-                  </td>
-                </tr>
+                      </div>
+                    </td>
+                  </tr>
+
+                  {pedidoAcoesAberto === pedido.id ? (
+                    <tr className="border-t border-blue-100 bg-blue-50/60">
+                      <td colSpan={6} className="px-4 py-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
+                              Acoes do pedido {pedido.numero_pedido}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              Consulta, exportação e mudanças menos frequentes
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            <ActionButton
+                              icon={Eye}
+                              intent="neutral"
+                              onClick={() => executarAcao(() => verDetalhes(pedido))}
+                              size="xs"
+                              tone="soft"
+                            >
+                              Ver detalhes
+                            </ActionButton>
+                            <ExportActionButton
+                              type="pdf"
+                              onClick={() => executarAcao(() => exportarPDF(pedido.id))}
+                              title="Exportar PDF"
+                            >
+                              PDF
+                            </ExportActionButton>
+                            <ExportActionButton
+                              type="excel"
+                              onClick={() => executarAcao(() => exportarExcel(pedido.id))}
+                              title="Exportar Excel"
+                            >
+                              Excel
+                            </ExportActionButton>
+
+                            {pedido.status === "confirmado" ? (
+                              <ActionButton
+                                icon={Package}
+                                intent="neutral"
+                                onClick={() => executarAcao(() => abrirRecebimento(pedido))}
+                                size="xs"
+                                tone="soft"
+                              >
+                                Receber sem confronto
+                              </ActionButton>
+                            ) : null}
+                            {pedido.status === "recebido_parcial" ? (
+                              <ActionButton
+                                icon={Search}
+                                intent="info"
+                                onClick={() => executarAcao(() => abrirConfronto(pedido))}
+                                size="xs"
+                                tone="soft"
+                              >
+                                Conferir NF
+                              </ActionButton>
+                            ) : null}
+                            {pedido.status !== "rascunho" && pedido.status !== "recebido_total" ? (
+                              <ActionButton
+                                icon={RotateCcw}
+                                intent="warning"
+                                onClick={() => executarAcao(() => reverterStatus(pedido.id))}
+                                size="xs"
+                                tone="soft"
+                              >
+                                Reverter
+                              </ActionButton>
+                            ) : null}
+                            {pedido.status !== "recebido_total" && pedido.status !== "cancelado" ? (
+                              <ActionButton
+                                icon={Trash2}
+                                intent="delete"
+                                onClick={() => executarAcao(() => cancelarPedido(pedido))}
+                                size="xs"
+                                tone="soft"
+                              >
+                                {pedido.status === "rascunho" ? "Excluir" : "Cancelar"}
+                              </ActionButton>
+                            ) : null}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))
             )}
           </tbody>
         </table>
       </div>
+      <PaginationControls
+        currentPage={paginaAtual}
+        disabled={loading}
+        itemName="pedidos"
+        itemsPerPage={pedidosPorPagina}
+        onItemsPerPageChange={onItemsPerPageChange}
+        onPageChange={onPageChange}
+        pageSizeOptions={[10, 20, 50]}
+        totalItems={totalPedidos}
+        totalPages={paginasTotal}
+        variant="bottom"
+      />
     </div>
   );
 }

@@ -32,15 +32,27 @@ const ModalEnvioPedido = ({
           {/* Campo E-mail */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              E-mail do Fornecedor
+              E-mails dos destinatários
             </label>
             <input
-              type="email"
+              type="text"
+              inputMode="email"
               value={dadosEnvio.email}
               onChange={(e) => setDadosEnvio({ ...dadosEnvio, email: e.target.value })}
-              placeholder="fornecedor@exemplo.com"
+              placeholder="fornecedor@exemplo.com; vendedor@exemplo.com"
+              aria-describedby="ajuda-emails-destinatarios"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+            <div
+              id="ajuda-emails-destinatarios"
+              className="mt-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-800"
+            >
+              <span className="font-semibold">Mais de um destinatário?</span> Separe os e-mails com
+              ponto e vírgula (;) ou vírgula (,).
+              <span className="mt-1 block text-blue-700">
+                Exemplo: compras@empresa.com; vendedor@empresa.com
+              </span>
+            </div>
           </div>
 
           {/* Campo WhatsApp */}

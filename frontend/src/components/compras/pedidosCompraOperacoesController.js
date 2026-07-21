@@ -19,6 +19,17 @@ function extrairEmailFornecedor(fornecedor) {
   return (emailValido || "").trim();
 }
 
+function separarEmailsDestinatarios(valor) {
+  return String(valor || "")
+    .split(/[;,\n]+/)
+    .map((email) => email.trim())
+    .filter(Boolean);
+}
+
+function emailDestinatarioValido(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 function serializarQuantidadePorEmbalagem(item) {
   const unidadeCompra = item.unidade_compra || "UN";
   if (unidadeCompra === "UN") {
@@ -134,8 +145,16 @@ export function createPedidosCompraOperacoesController({
   };
 
   const confirmarEnvioPedido = async () => {
-    if (!dadosEnvio.email && !dadosEnvio.whatsapp) {
+    const emailsDestinatarios = separarEmailsDestinatarios(dadosEnvio.email);
+
+    if (emailsDestinatarios.length === 0 && !dadosEnvio.whatsapp) {
       toast.error("Informe um e-mail ou WhatsApp");
+      return;
+    }
+
+    const emailsInvalidos = emailsDestinatarios.filter((email) => !emailDestinatarioValido(email));
+    if (emailsInvalidos.length > 0) {
+      toast.error(`Revise os e-mails inválidos: ${emailsInvalidos.join(", ")}`);
       return;
     }
 
@@ -158,7 +177,7 @@ export function createPedidosCompraOperacoesController({
       // Aqui você pode implementar o envio real por e-mail/WhatsApp no futuro
       // Por enquanto, apenas marca como enviado
       const response = await api.post(`/pedidos-compra/${pedidoParaEnviar}/enviar`, {
-        email: dadosEnvio.email,
+        email: emailsDestinatarios.join("; "),
         whatsapp: dadosEnvio.whatsapp,
         formatos: dadosEnvio.formatos,
         colunas_exportacao: normalizarColunasDocumentoPedido(colunasDocumentoPedido),

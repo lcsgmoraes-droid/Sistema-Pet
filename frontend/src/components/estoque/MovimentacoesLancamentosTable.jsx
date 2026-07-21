@@ -1,5 +1,7 @@
 import { Trash2 } from "lucide-react";
+import { formatMoneyBRL } from "../../utils/formatters";
 import ActionButton from "../ui/ActionButton";
+import PaginationControls from "../ui/PaginationControls";
 import StatusBadge from "../ui/StatusBadge";
 
 const CANAL_CLASSES = {
@@ -12,13 +14,8 @@ const CANAL_CLASSES = {
   whatsapp: "bg-green-100 text-green-700",
 };
 
-function formatMoney(valor) {
-  if (valor === null || valor === undefined) {
-    return "-";
-  }
-
-  return `R$ ${Number(valor || 0).toFixed(2)}`;
-}
+const formatMoney = (valor) =>
+  valor === null || valor === undefined ? "-" : formatMoneyBRL(valor);
 
 function CustoCell({ movimentacao }) {
   const custo = movimentacao.custo_unitario;
@@ -115,17 +112,29 @@ export default function MovimentacoesLancamentosTable({
   handleSelectAll,
   handleSelectOne,
   labelsCanais = {},
+  loading = false,
   movimentacoes = [],
+  movimentacoesPorPagina = 50,
   navigate,
+  onItemsPerPageChange,
+  onPageChange,
+  paginaAtual = 1,
+  paginasTotal = 0,
   produto,
   selectedIds = [],
+  totalMovimentacoes = 0,
 }) {
   const unidadeProduto = produto?.unidade || produto?.unidade_medida || "UN";
 
   return (
     <div className="overflow-hidden rounded-lg bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-        <h2 className="text-lg font-semibold text-slate-900">Lancamentos</h2>
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">Lancamentos</h2>
+          <p className="text-xs text-slate-500">
+            {loading ? "Atualizando pagina..." : `${totalMovimentacoes} registro(s) no historico`}
+          </p>
+        </div>
 
         {selectedIds.length > 0 ? (
           <ActionButton icon={Trash2} intent="delete" onClick={handleDelete}>
@@ -135,7 +144,11 @@ export default function MovimentacoesLancamentosTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200">
+        <table
+          className={`min-w-full divide-y divide-slate-200 transition-opacity ${
+            loading ? "opacity-50" : "opacity-100"
+          }`}
+        >
           <thead className="bg-slate-50">
             <tr>
               <th className="w-12 px-4 py-3">
@@ -307,6 +320,18 @@ export default function MovimentacoesLancamentosTable({
           </tbody>
         </table>
       </div>
+      <PaginationControls
+        currentPage={paginaAtual}
+        disabled={loading}
+        itemName="lancamentos"
+        itemsPerPage={movimentacoesPorPagina}
+        onItemsPerPageChange={onItemsPerPageChange}
+        onPageChange={onPageChange}
+        pageSizeOptions={[25, 50, 100]}
+        totalItems={totalMovimentacoes}
+        totalPages={paginasTotal}
+        variant="bottom"
+      />
     </div>
   );
 }

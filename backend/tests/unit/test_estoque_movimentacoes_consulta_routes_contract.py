@@ -3,6 +3,8 @@ import importlib
 import importlib.util
 import os
 
+import pytest
+
 os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test.db"
 os.environ["DEBUG"] = "false"
 
@@ -25,7 +27,29 @@ def test_consulta_movimentacoes_fica_em_router_dedicado():
     }
 
     assert ("/estoque/movimentacoes/produto/{produto_id}", "GET") in routes
+    assert (
+        "/estoque/movimentacoes/produto/{produto_id}/vendas-por-canal",
+        "GET",
+    ) in routes
     assert ("/estoque/produto/{produto_id}/reservas-ativas", "GET") in routes
+
+
+def test_resumo_de_vendas_por_canal_preserva_destaques_e_totais():
+    module = importlib.import_module("app.estoque_movimentacoes_consulta_routes")
+
+    resultado = module._agrupar_vendas_por_canal(
+        [
+            {"canal": "shopee", "quantidade": 2, "preco_venda_unitario": 10},
+            {"canal": "amazon", "quantidade": 4, "preco_venda_unitario": 5},
+        ]
+    )
+
+    assert [item["canal"] for item in resultado[:2]] == ["amazon", "shopee"]
+    assert resultado[0]["valor"] == 20
+    assert resultado[0]["pct"] == pytest.approx(100 * 4 / 6)
+    assert {"loja_fisica", "mercado_livre"}.issubset(
+        {item["canal"] for item in resultado}
+    )
 
 
 def test_estoque_routes_nao_expoe_mais_consulta_movimentacoes():

@@ -93,6 +93,21 @@ def _email_address(value: str) -> str:
     return address or str(value or "").strip()
 
 
+def _recipient_addresses(to: str | Iterable[str]) -> list[str]:
+    values = [to] if isinstance(to, str) else list(to)
+    addresses = []
+    seen = set()
+
+    for value in values:
+        address = _email_address(str(value))
+        key = address.casefold()
+        if address and key not in seen:
+            addresses.append(address)
+            seen.add(key)
+
+    return addresses
+
+
 def _sender_domain(from_addr: str) -> str | None:
     address = _email_address(from_addr)
     if "@" not in address:
@@ -162,7 +177,7 @@ def _build_email_message(
 
 
 def send_email(
-    to: str,
+    to: str | Iterable[str],
     subject: str,
     html_body: str,
     text_body: str | None = None,
@@ -170,22 +185,26 @@ def send_email(
     simulate_if_unconfigured: bool = True,
 ) -> bool:
     """Envia um e-mail. Retorna True se enviado com sucesso, False caso contrario."""
+    recipients = _recipient_addresses(to)
+    if not recipients:
+        logger.warning("[EMAIL-SEM-DESTINATARIO] Envio ignorado")
+        return False
+
+    to_header = ", ".join(recipients)
     correlation_id = current_correlation_id(
-        "integration.email.smtp", reference=f"{to}:{subject}"
+        "integration.email.smtp", reference=f"{to_header}:{subject}"
     )
     if not _smtp_configured():
         if simulate_if_unconfigured:
             logger.info(
-                "[EMAIL-SIMULADO] Para: %s | Assunto: %s | correlation_id=%s",
-                to,
-                subject,
+                "[EMAIL-SIMULADO] Destinatarios: %s | correlation_id=%s",
+                len(recipients),
                 correlation_id,
             )
             return True
         logger.warning(
-            "[EMAIL-NAO-CONFIGURADO] Para: %s | Assunto: %s | correlation_id=%s",
-            to,
-            subject,
+            "[EMAIL-NAO-CONFIGURADO] Destinatarios: %s | correlation_id=%s",
+            len(recipients),
             correlation_id,
         )
         return False
@@ -201,7 +220,7 @@ def send_email(
 
     msg = _build_email_message(
         from_addr=from_addr,
-        to=to,
+        to=to_header,
         subject=subject,
         html_body=html_body,
         text_body=text_body,
@@ -216,18 +235,17 @@ def send_email(
                 server.starttls(context=_smtp_tls_context())
                 server.ehlo()
             server.login(user, password)
-            server.sendmail(envelope_from, [to], msg.as_bytes(policy=policy.SMTP))
+            server.sendmail(envelope_from, recipients, msg.as_bytes(policy=policy.SMTP))
         logger.info(
-            "[EMAIL-ENVIADO] Para: %s | Assunto: %s | correlation_id=%s",
-            to,
-            subject,
+            "[EMAIL-ENVIADO] Destinatarios: %s | correlation_id=%s",
+            len(recipients),
             correlation_id,
         )
         return True
     except Exception as exc:
         logger.error(
-            "[EMAIL-ERRO] Para: %s | Erro: %s | correlation_id=%s",
-            to,
+            "[EMAIL-ERRO] Destinatarios: %s | Erro: %s | correlation_id=%s",
+            len(recipients),
             exc,
             correlation_id,
         )
