@@ -1,8 +1,10 @@
 """Rotas de envio e transicoes de status de pedidos de compra."""
 
 import logging
+import re
 from datetime import datetime
 
+from email_validator import EmailNotValidError, validate_email
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -22,6 +24,30 @@ from .schemas import PedidoCompraEnviarRequest, PedidoCompraEnvioFormatos
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _normalizar_emails_destino(valor: str) -> list[str]:
+    partes = [
+        parte.strip() for parte in re.split(r"[;,\n]+", valor or "") if parte.strip()
+    ]
+    emails = []
+    vistos = set()
+
+    for parte in partes:
+        try:
+            email = validate_email(parte, check_deliverability=False).normalized
+        except EmailNotValidError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"E-mail inválido: {parte}",
+            ) from exc
+
+        chave = email.casefold()
+        if chave not in vistos:
+            emails.append(email)
+            vistos.add(chave)
+
+    return emails
 
 
 @router.get("/envio/status")
@@ -81,8 +107,8 @@ def enviar_pedido(
             "tipo_envio": "manual",
         }
 
-    email_destino = (request.email or "").strip()
-    if not email_destino:
+    emails_destino = _normalizar_emails_destino(request.email or "")
+    if not emails_destino:
         raise HTTPException(status_code=400, detail="Informe o e-mail do fornecedor")
 
     formatos = request.formatos or PedidoCompraEnvioFormatos()
@@ -132,7 +158,7 @@ def enviar_pedido(
         pedido, fornecedor_nome, colunas_exportacao
     )
     enviado = send_email(
-        to=email_destino,
+        to=emails_destino,
         subject=assunto,
         html_body=html_body,
         text_body=text_body,
@@ -151,16 +177,16 @@ def enviar_pedido(
     pedido.updated_at = datetime.utcnow()
 
     db.commit()
-    logger.info(
-        f"Pedido {pedido.numero_pedido} enviado por e-mail para {email_destino}"
-    )
+    emails_log = ", ".join(emails_destino)
+    logger.info(f"Pedido {pedido.numero_pedido} enviado por e-mail para {emails_log}")
     return {
         "message": "Pedido enviado por e-mail com sucesso",
         "pedido_id": pedido.id,
         "numero_pedido": pedido.numero_pedido,
         "status": pedido.status,
         "tipo_envio": "email",
-        "email": email_destino,
+        "email": emails_log,
+        "emails": emails_destino,
     }
 
 

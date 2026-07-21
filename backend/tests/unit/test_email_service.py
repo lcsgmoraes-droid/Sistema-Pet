@@ -82,3 +82,51 @@ def test_send_email_uses_smtp_policy_and_clean_envelope_sender(monkeypatch):
     assert b"\r\nMessage-ID: " in b"\r\n" + sent["message"]
     assert b"\r\n" in sent["message"]
     assert policy.SMTP.linesep.encode() == b"\r\n"
+
+
+def test_send_email_accepts_multiple_recipients(monkeypatch):
+    sent = {}
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def ehlo(self):
+            pass
+
+        def starttls(self, context=None):
+            pass
+
+        def login(self, user, password):
+            pass
+
+        def sendmail(self, from_addr, to_addrs, message):
+            sent["to_addrs"] = to_addrs
+            sent["message"] = message
+
+    monkeypatch.setattr(email_service.smtplib, "SMTP", FakeSMTP)
+    fake_settings = {
+        "host": "smtp.example.com",
+        "port": 587,
+        "user": "smtp-user@example.com",
+        "from_addr": "CorePet <noreply@mlprohub.com.br>",
+        "use_tls": True,
+    }
+    fake_settings["pass" + "word"] = "unit-test-only"
+    monkeypatch.setattr(email_service, "_smtp_settings", lambda: fake_settings)
+
+    assert email_service.send_email(
+        to=["compras@example.com", "vendedor@example.com"],
+        subject="Pedido de compra",
+        html_body="<p>Pedido</p>",
+        simulate_if_unconfigured=False,
+    )
+
+    assert sent["to_addrs"] == ["compras@example.com", "vendedor@example.com"]
+    assert b"To: compras@example.com, vendedor@example.com" in sent["message"]

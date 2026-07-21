@@ -32,15 +32,21 @@ const ModalEnvioPedido = ({
           {/* Campo E-mail */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              E-mail do Fornecedor
+              E-mails dos destinatários
             </label>
             <input
-              type="email"
+              type="text"
+              inputMode="email"
               value={dadosEnvio.email}
               onChange={(e) => setDadosEnvio({ ...dadosEnvio, email: e.target.value })}
-              placeholder="fornecedor@exemplo.com"
+              placeholder="fornecedor@exemplo.com; vendedor@exemplo.com"
+              aria-describedby="ajuda-emails-destinatarios"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+            <p id="ajuda-emails-destinatarios" className="mt-1 text-xs text-gray-500">
+              Para enviar a mais de uma pessoa, separe os e-mails com ponto e vírgula (;) ou vírgula
+              (,).
+            </p>
           </div>
 
           {/* Campo WhatsApp */}
