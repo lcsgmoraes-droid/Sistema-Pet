@@ -27,6 +27,7 @@ const ITEM_FORM_INICIAL = {
 };
 
 const FILTROS_PEDIDOS_INICIAL = {
+  visao: "em_andamento",
   status: "",
   fornecedor_id: "",
   busca: "",
@@ -38,6 +39,14 @@ export default function usePedidosCompraController() {
   const [pedidos, setPedidos] = useState([]);
   const [filtrosPedidos, setFiltrosPedidos] = useState(FILTROS_PEDIDOS_INICIAL);
   const [loadingListaPedidos, setLoadingListaPedidos] = useState(false);
+  const [paginaPedidos, setPaginaPedidos] = useState(1);
+  const [pedidosPorPagina, setPedidosPorPagina] = useState(20);
+  const [paginacaoPedidos, setPaginacaoPedidos] = useState({
+    total: 0,
+    page: 1,
+    page_size: 20,
+    pages: 0,
+  });
   const [fornecedores, setFornecedores] = useState([]);
   const [gruposFornecedores, setGruposFornecedores] = useState([]);
   const [produtos, setProdutos] = useState([]);
@@ -117,25 +126,36 @@ export default function usePedidosCompraController() {
   };
 
   const filtrosPedidosAtivos = useMemo(
-    () => Object.values(filtrosPedidos).filter((valor) => String(valor || "").trim()).length,
+    () =>
+      Object.entries(filtrosPedidos).filter(([campo, valor]) => {
+        if (campo === "visao" && valor === FILTROS_PEDIDOS_INICIAL.visao) return false;
+        return String(valor || "").trim();
+      }).length,
     [filtrosPedidos],
   );
 
   const {
+    alterarPaginaPedidos,
+    alterarPedidosPorPagina,
     atualizarFiltroPedidos,
     aplicarFiltrosPedidos,
     limparFiltrosPedidos,
-    selecionarFiltroStatus,
+    selecionarVisaoPedidos,
     carregarDados,
   } = createPedidosCompraDataController({
     filtrosPedidos,
     filtrosPedidosInicial: FILTROS_PEDIDOS_INICIAL,
+    paginaPedidos,
+    pedidosPorPagina,
     setEmailEnvioDisponivel,
     setFiltrosPedidos,
     setFornecedores,
     setGruposFornecedores,
     setLoadingListaPedidos,
+    setPaginaPedidos,
+    setPaginacaoPedidos,
     setPedidos,
+    setPedidosPorPagina,
   });
 
   const selecionarFornecedor = (fornecedor) => {
@@ -436,6 +456,8 @@ export default function usePedidosCompraController() {
     ITEM_FORM_INICIAL,
     adicionarItem,
     adicionarSugestoesAoPedido,
+    alterarPaginaPedidos,
+    alterarPedidosPorPagina,
     alternarFornecedorNoGrupoForm,
     alternarMarcaSelecionada,
     apenasCriticos,
@@ -541,7 +563,10 @@ export default function usePedidosCompraController() {
     pedidoParaEnviar,
     pedidoParaExportar,
     pedidoSelecionado,
+    paginaPedidos,
+    paginacaoPedidos,
     pedidos,
+    pedidosPorPagina,
     periodoSugestao,
     produtoTexto,
     produtos,
@@ -555,7 +580,7 @@ export default function usePedidosCompraController() {
     reverterStatus,
     salvarGrupoFornecedor,
     salvandoGrupoFornecedor,
-    selecionarFiltroStatus,
+    selecionarVisaoPedidos,
     selecionarFornecedor,
     selecionarGrupoFornecedor,
     selecionarPreenchidosVisiveis,

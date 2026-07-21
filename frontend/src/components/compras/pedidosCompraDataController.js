@@ -4,15 +4,23 @@ import api from "../../api";
 export function createPedidosCompraDataController({
   filtrosPedidos,
   filtrosPedidosInicial,
+  paginaPedidos,
+  pedidosPorPagina,
   setEmailEnvioDisponivel,
   setFiltrosPedidos,
   setFornecedores,
   setGruposFornecedores,
   setLoadingListaPedidos,
+  setPaginaPedidos,
+  setPaginacaoPedidos,
   setPedidos,
+  setPedidosPorPagina,
 }) {
-  const montarParametrosPedidos = (filtros = filtrosPedidosInicial) => {
-    const params = { limit: 100 };
+  const montarParametrosPedidos = (filtros = filtrosPedidosInicial, opcoes = {}) => {
+    const params = {
+      page: Number(opcoes.page || paginaPedidos || 1),
+      page_size: Number(opcoes.pageSize || pedidosPorPagina || 20),
+    };
     Object.entries(filtros).forEach(([chave, valor]) => {
       const texto = String(valor || "").trim();
       if (texto) {
@@ -32,33 +40,61 @@ export function createPedidosCompraDataController({
     return data?.items || [];
   };
 
+  const aplicarRespostaPedidos = (data, opcoes = {}) => {
+    const lista = extrairListaResposta(data, ["pedidos"]);
+    const total = Number(data?.total ?? lista.length);
+    const pageSize = Number(data?.page_size || opcoes.pageSize || pedidosPorPagina || 20);
+    const page = Number(data?.page || opcoes.page || paginaPedidos || 1);
+    const pages = Number(data?.pages ?? (total > 0 ? Math.ceil(total / pageSize) : 0));
+
+    setPedidos(lista);
+    setPaginaPedidos(page);
+    setPedidosPorPagina(pageSize);
+    setPaginacaoPedidos({ total, page, page_size: pageSize, pages });
+    return lista;
+  };
+
   const atualizarFiltroPedidos = (campo, valor) => {
     setFiltrosPedidos((prev) => ({ ...prev, [campo]: valor }));
   };
 
   const aplicarFiltrosPedidos = (event) => {
     event?.preventDefault();
-    carregarDados(filtrosPedidos, { apenasPedidos: true });
+    setPaginaPedidos(1);
+    carregarDados(filtrosPedidos, { apenasPedidos: true, page: 1 });
   };
 
   const limparFiltrosPedidos = () => {
     setFiltrosPedidos(filtrosPedidosInicial);
-    carregarDados(filtrosPedidosInicial, { apenasPedidos: true });
+    setPaginaPedidos(1);
+    carregarDados(filtrosPedidosInicial, { apenasPedidos: true, page: 1 });
   };
 
-  const selecionarFiltroStatus = (statusPedido) => {
-    const proximosFiltros = { ...filtrosPedidos, status: statusPedido };
+  const selecionarVisaoPedidos = (visao) => {
+    const proximosFiltros = { ...filtrosPedidos, visao, status: "" };
     setFiltrosPedidos(proximosFiltros);
-    carregarDados(proximosFiltros, { apenasPedidos: true });
+    setPaginaPedidos(1);
+    carregarDados(proximosFiltros, { apenasPedidos: true, page: 1 });
+  };
+
+  const alterarPaginaPedidos = (page) => {
+    setPaginaPedidos(page);
+    carregarDados(filtrosPedidos, { apenasPedidos: true, page });
+  };
+
+  const alterarPedidosPorPagina = (pageSize) => {
+    setPedidosPorPagina(pageSize);
+    setPaginaPedidos(1);
+    carregarDados(filtrosPedidos, { apenasPedidos: true, page: 1, pageSize });
   };
 
   const carregarDados = async (filtrosParaAplicar = filtrosPedidos, opcoes = {}) => {
-    const params = montarParametrosPedidos(filtrosParaAplicar);
+    const params = montarParametrosPedidos(filtrosParaAplicar, opcoes);
     setLoadingListaPedidos(true);
     try {
       if (opcoes.apenasPedidos) {
         const pedidosRes = await api.get("/pedidos-compra/", { params });
-        setPedidos(extrairListaResposta(pedidosRes.data, ["pedidos"]));
+        aplicarRespostaPedidos(pedidosRes.data, opcoes);
         return;
       }
 
@@ -72,13 +108,12 @@ export function createPedidosCompraDataController({
       ]);
 
       // Tratar resposta dos pedidos (pode ser array direto ou objeto paginado)
-      const pedidosData = extrairListaResposta(pedidosRes.data, ["pedidos"]);
+      aplicarRespostaPedidos(pedidosRes.data, opcoes);
 
       // Tratar resposta dos fornecedores
       const fornecedoresData = extrairListaResposta(fornecedoresRes.data, ["clientes"]);
       const gruposData = extrairListaResposta(gruposRes.data, ["grupos"]);
 
-      setPedidos(pedidosData);
       setFornecedores(fornecedoresData);
       setGruposFornecedores(gruposData);
       setEmailEnvioDisponivel(Boolean(envioStatusRes?.data?.email_configurado));
@@ -92,10 +127,12 @@ export function createPedidosCompraDataController({
   };
 
   return {
+    alterarPaginaPedidos,
+    alterarPedidosPorPagina,
     atualizarFiltroPedidos,
     aplicarFiltrosPedidos,
     limparFiltrosPedidos,
-    selecionarFiltroStatus,
+    selecionarVisaoPedidos,
     carregarDados,
   };
 }

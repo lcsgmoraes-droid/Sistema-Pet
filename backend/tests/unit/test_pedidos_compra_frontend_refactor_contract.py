@@ -102,3 +102,17 @@ def test_sugestao_compra_considera_todos_os_produtos_habilitados_do_escopo():
     assert "Somente principais do grupo" not in header
     assert "Produtos habilitados de qualquer CNPJ do grupo" in header
     assert "seja o fornecedor principal ou alternativo do produto" in header
+
+
+def test_listagem_de_pedidos_reduz_acoes_visiveis_e_controla_paginacao():
+    filtros = _source("compras/PedidosCompraFiltros.jsx")
+    tabela = _source("compras/PedidosCompraTabela.jsx")
+    data_controller = _source("compras/pedidosCompraDataController.js")
+
+    assert 'label: "Em andamento"' in filtros
+    assert "Mais filtros" in filtros
+    assert "PaginationControls" in tabela
+    assert "pedidoAcoesAberto" in tabela
+    assert "Mais" in tabela
+    assert "page_size" in data_controller
+    assert "alterarPaginaPedidos" in data_controller

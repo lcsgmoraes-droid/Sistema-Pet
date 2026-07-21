@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import desc, or_
@@ -30,17 +30,18 @@ router = APIRouter()
 # ============================================================================
 
 
-@router.get("/", response_model=List[PedidoCompraResponse])
+@router.get("/")
 def listar_pedidos(
     status: Optional[str] = Query(None, description="Filtrar por status"),
+    visao: Optional[str] = Query(None, description="Visao resumida da fila"),
     fornecedor_id: Optional[int] = Query(None, description="Filtrar por fornecedor"),
     data_inicio: Optional[str] = Query(None, description="Data inicial (YYYY-MM-DD)"),
     data_fim: Optional[str] = Query(None, description="Data final (YYYY-MM-DD)"),
     busca: Optional[str] = Query(
         None, description="Buscar por numero, fornecedor ou observacao"
     ),
-    limit: int = Query(50, le=100),
-    offset: int = Query(0, ge=0),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_session),
     current_user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -57,6 +58,16 @@ def listar_pedidos(
     # Filtros
     if status:
         query = query.filter(PedidoCompra.status == status)
+    elif visao == "em_andamento":
+        query = query.filter(
+            PedidoCompra.status.in_(
+                ("rascunho", "enviado", "confirmado", "recebido_parcial")
+            )
+        )
+    elif visao == "concluidos":
+        query = query.filter(PedidoCompra.status == "recebido_total")
+    elif visao == "cancelados":
+        query = query.filter(PedidoCompra.status == "cancelado")
     if fornecedor_id:
         query = query.filter(PedidoCompra.fornecedor_id == fornecedor_id)
     if data_inicio:
@@ -97,11 +108,13 @@ def listar_pedidos(
         )
 
     # Ordenar por data decrescente
-    query = query.order_by(desc(PedidoCompra.data_pedido))
+    query = query.order_by(desc(PedidoCompra.data_pedido), desc(PedidoCompra.id))
 
     # Paginação
     total = query.count()
-    pedidos = query.offset(offset).limit(limit).all()
+    pages = (total + page_size - 1) // page_size if total else 0
+    page = min(page, max(pages, 1))
+    pedidos = query.offset((page - 1) * page_size).limit(page_size).all()
 
     # Formatar resposta
     resultado = []
@@ -124,7 +137,13 @@ def listar_pedidos(
         )
 
     logger.info(f"✅ {len(resultado)} pedidos encontrados (total: {total})")
-    return resultado
+    return {
+        "pedidos": resultado,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": pages,
+    }
 
 
 @router.get("/rascunho/fornecedor/{fornecedor_id}")

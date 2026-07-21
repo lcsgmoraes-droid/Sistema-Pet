@@ -2,7 +2,7 @@
  * Página de Movimentações de Estoque por Produto
  * Modelo inspirado no Bling
  */
-import { useState, useEffect, useMemo } from "react";
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api";
 import toast from "react-hot-toast";
@@ -13,8 +13,6 @@ import MovimentacoesProdutoModals from "./estoque/MovimentacoesProdutoModals";
 import {
   ESTILOS_CANAIS,
   LABELS_CANAIS,
-  calcularTotaisMovimentacoes,
-  calcularVendasPorCanalMovimentacoes,
   dataAtualIsoLocalMovimentacao as dataAtualIsoLocal,
   extrairMensagemErroApiMovimentacao as extrairMensagemErroApi,
   formatarQuantidadeMovimentacao as formatarQuantidade,
@@ -28,6 +26,7 @@ import {
 import { montarMovimentoBalanco } from "./produtoBalanco/produtosBalancoUtils";
 import VendasPorCanalPanel from "./estoque/VendasPorCanalPanel";
 import { useMovimentacoesProdutoGranel } from "./estoque/useMovimentacoesProdutoGranel";
+import useMovimentacoesProdutoListagem from "./estoque/useMovimentacoesProdutoListagem";
 import { useModulos } from "../contexts/ModulosContext";
 
 export default function MovimentacoesProduto() {
@@ -36,13 +35,29 @@ export default function MovimentacoesProduto() {
   const { moduloAtivo } = useModulos();
   const moduloBlingAtivo = moduloAtivo("bling");
 
-  const [produto, setProduto] = useState(null);
-  const [movimentacoes, setMovimentacoes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    carregarDados,
+    carregarPaginaMovimentacoes,
+    loading,
+    loadingMovimentacoes,
+    loadingVendasPorCanal,
+    movimentacoes,
+    movimentacoesPorPagina,
+    paginaMovimentacoes,
+    produto,
+    selectedIds,
+    setMovimentacoesPorPagina,
+    setPaginaMovimentacoes,
+    setSelectedIds,
+    syncProduto,
+    totalEntradas,
+    totalMovimentacoes,
+    totalPaginasMovimentacoes,
+    totalSaidas,
+    vendasPorCanal,
+  } = useMovimentacoesProdutoListagem({ id, moduloBlingAtivo });
   const [showModal, setShowModal] = useState(false);
-  const [selectedIds, setSelectedIds] = useState([]);
   const [editingMovimentacao, setEditingMovimentacao] = useState(null);
-  const [syncProduto, setSyncProduto] = useState(null);
   const [forcandoSync, setForcandoSync] = useState(false);
   const [forcandoVinculoBling, setForcandoVinculoBling] = useState(false);
   const [showReservasModal, setShowReservasModal] = useState(false);
@@ -62,53 +77,6 @@ export default function MovimentacoesProduto() {
     descricao_despesa: "",
     data_competencia: dataAtualIsoLocal(),
   });
-  useEffect(() => {
-    carregarDados();
-  }, [id, moduloBlingAtivo]);
-
-  const carregarDados = async () => {
-    try {
-      setLoading(true);
-
-      const [produtoRes, movRes] = await Promise.all([
-        api.get(`/produtos/${id}`),
-        api.get(`/estoque/movimentacoes/produto/${id}`),
-      ]);
-
-      const produtoData = produtoRes.data;
-      setProduto(produtoData);
-      setMovimentacoes(movRes.data);
-
-      const termoBuscaSync = produtoData?.codigo || produtoData?.sku;
-      if (!moduloBlingAtivo) {
-        setSyncProduto(null);
-        return;
-      }
-
-      if (termoBuscaSync) {
-        try {
-          const syncRes = await api.get("/estoque/sync/status", {
-            params: { busca: termoBuscaSync },
-          });
-          const itemSync = (syncRes.data || []).find((item) => item.produto_id === Number(id));
-          setSyncProduto(itemSync || null);
-        } catch (syncError) {
-          if (syncError?.response?.status !== 403) {
-            console.warn("Nao foi possivel carregar status de sincronizacao:", syncError);
-          }
-          setSyncProduto(null);
-        }
-      } else {
-        setSyncProduto(null);
-      }
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error);
-      console.error("Detalhes do erro:", error.response?.data);
-      toast.error(extrairMensagemErroApi(error, "Erro ao carregar dados do produto"));
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const {
     abrirModalGranel,
@@ -489,14 +457,16 @@ export default function MovimentacoesProduto() {
 
   const getMotivoLabel = getMotivoLabelMovimentacao;
   const getOrigem = getOrigemMovimentacao;
-  const { totalEntradas, totalSaidas } = useMemo(
-    () => calcularTotaisMovimentacoes(movimentacoes),
-    [movimentacoes],
-  );
-  const vendasPorCanal = useMemo(
-    () => calcularVendasPorCanalMovimentacoes(movimentacoes),
-    [movimentacoes],
-  );
+
+  const handlePaginaMovimentacoes = (pagina) => {
+    void carregarPaginaMovimentacoes(pagina, movimentacoesPorPagina);
+  };
+
+  const handleMovimentacoesPorPagina = (pageSize) => {
+    setMovimentacoesPorPagina(pageSize);
+    setPaginaMovimentacoes(1);
+    void carregarPaginaMovimentacoes(1, pageSize);
+  };
 
   if (loading) {
     return (
@@ -575,6 +545,7 @@ export default function MovimentacoesProduto() {
         formatMoney={formatMoneyBRL}
         formatQuantidade={formatBRL}
         labelsCanais={LABELS_CANAIS}
+        loading={loadingVendasPorCanal}
         vendasPorCanal={vendasPorCanal}
       />
 
@@ -589,10 +560,17 @@ export default function MovimentacoesProduto() {
         handleSelectAll={handleSelectAll}
         handleSelectOne={handleSelectOne}
         labelsCanais={LABELS_CANAIS}
+        loading={loadingMovimentacoes}
         movimentacoes={movimentacoes}
         navigate={navigate}
+        onItemsPerPageChange={handleMovimentacoesPorPagina}
+        onPageChange={handlePaginaMovimentacoes}
+        paginaAtual={paginaMovimentacoes}
+        paginasTotal={totalPaginasMovimentacoes}
         produto={produto}
         selectedIds={selectedIds}
+        totalMovimentacoes={totalMovimentacoes}
+        movimentacoesPorPagina={movimentacoesPorPagina}
       />
 
       <MovimentacoesProdutoModals

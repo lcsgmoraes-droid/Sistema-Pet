@@ -74,3 +74,20 @@ def test_pedidos_compra_routes_split_mantem_arquivos_focados():
 
     for relative_path, max_lines in limits.items():
         assert _line_count(relative_path) < max_lines, relative_path
+
+
+def test_listagem_de_pedidos_tem_visoes_e_paginacao_no_servidor():
+    source = (BACKEND_ROOT / "app/pedidos_compra/core_routes.py").read_text(
+        encoding="utf-8"
+    )
+
+    for trecho in [
+        'visao == "em_andamento"',
+        'visao == "concluidos"',
+        'visao == "cancelados"',
+        "page: int = Query(1, ge=1)",
+        "page_size: int = Query(20, ge=1, le=100)",
+        '"pedidos": resultado',
+        '"pages": pages',
+    ]:
+        assert trecho in source

@@ -9,6 +9,8 @@ export default function PedidosCompraView({ controller }) {
     ITEM_FORM_INICIAL,
     adicionarItem,
     adicionarSugestoesAoPedido,
+    alterarPaginaPedidos,
+    alterarPedidosPorPagina,
     alternarFornecedorNoGrupoForm,
     alternarMarcaSelecionada,
     apenasCriticos,
@@ -114,7 +116,10 @@ export default function PedidosCompraView({ controller }) {
     pedidoParaEnviar,
     pedidoParaExportar,
     pedidoSelecionado,
+    paginaPedidos,
+    paginacaoPedidos,
     pedidos,
+    pedidosPorPagina,
     periodoSugestao,
     produtoTexto,
     produtos,
@@ -128,7 +133,7 @@ export default function PedidosCompraView({ controller }) {
     reverterStatus,
     salvarGrupoFornecedor,
     salvandoGrupoFornecedor,
-    selecionarFiltroStatus,
+    selecionarVisaoPedidos,
     selecionarFornecedor,
     selecionarGrupoFornecedor,
     selecionarPreenchidosVisiveis,
@@ -248,8 +253,8 @@ export default function PedidosCompraView({ controller }) {
         onAplicar={aplicarFiltrosPedidos}
         onAtualizarFiltro={atualizarFiltroPedidos}
         onLimpar={limparFiltrosPedidos}
-        onSelecionarStatus={selecionarFiltroStatus}
-        pedidosCount={pedidos.length}
+        onSelecionarVisao={selecionarVisaoPedidos}
+        pedidosCount={paginacaoPedidos.total}
       />
 
       {/* Lista de Pedidos */}
@@ -262,9 +267,16 @@ export default function PedidosCompraView({ controller }) {
         enviarPedido={enviarPedido}
         exportarExcel={exportarExcel}
         exportarPDF={exportarPDF}
+        loading={loadingListaPedidos}
         obterFornecedorPorId={obterFornecedorPorId}
+        onItemsPerPageChange={alterarPedidosPorPagina}
+        onPageChange={alterarPaginaPedidos}
+        paginaAtual={paginaPedidos}
+        paginasTotal={paginacaoPedidos.pages}
         pedidos={pedidos}
+        pedidosPorPagina={pedidosPorPagina}
         reverterStatus={reverterStatus}
+        totalPedidos={paginacaoPedidos.total}
         verDetalhes={verDetalhes}
       />
       <PedidosCompraModalsLayer
