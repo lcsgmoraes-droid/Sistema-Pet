@@ -4,6 +4,12 @@ Este plano prepara a aquisição de demonstrações do CorePet sem iniciar gasto
 Qualquer campanha, orçamento ou forma de pagamento deve ser confirmada pelo Lucas
 antes da publicação.
 
+O primeiro teste foi detalhado em
+[`CAMPANHA_META_LOJISTAS.md`](./CAMPANHA_META_LOJISTAS.md). A decisão atual é
+começar somente com lojistas pet e separar clínica veterinária e banho e tosa em
+campanhas posteriores, evitando dividir um orçamento pequeno entre compradores com
+dores diferentes.
+
 ## Objetivo de negócio
 
 Gerar contatos qualificados de donos e gestores de:
