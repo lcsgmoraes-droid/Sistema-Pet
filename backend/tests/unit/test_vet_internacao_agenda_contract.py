@@ -10,6 +10,7 @@ os.environ["DEBUG"] = "false"
 from app.veterinario_clinico import _bloquear_lancamento_em_consulta_finalizada
 from app.veterinario_internacao import (
     _build_payload_procedimento_agenda_internacao,
+    _garantir_internacao_ativa,
     _serializar_procedimento_agenda_internacao,
 )
 
@@ -77,3 +78,14 @@ def test_consulta_finalizada_bloqueia_novos_lancamentos_satelites():
 
     assert exc.value.status_code == 409
     assert "Consulta finalizada" in exc.value.detail
+
+
+def test_internacao_encerrada_bloqueia_novos_registros():
+    with pytest.raises(HTTPException) as exc:
+        _garantir_internacao_ativa(
+            SimpleNamespace(status="alta"),
+            "registrar evolução",
+        )
+
+    assert exc.value.status_code == 409
+    assert "Internação encerrada" in exc.value.detail

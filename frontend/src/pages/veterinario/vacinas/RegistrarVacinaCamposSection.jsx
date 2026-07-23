@@ -85,13 +85,13 @@ export default function RegistrarVacinaCamposSection({ form, onSetCampo, veterin
         </label>
         <select
           id="vacinas-veterinario"
-          value={form.veterinario_responsavel}
-          onChange={(event) => onSetCampo("veterinario_responsavel", event.target.value)}
+          value={form.veterinario_id}
+          onChange={(event) => onSetCampo("veterinario_id", event.target.value)}
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
         >
           <option value="">Selecione...</option>
           {veterinarios.map((veterinario) => (
-            <option key={veterinario.id} value={veterinario.nome}>
+            <option key={veterinario.id} value={veterinario.id}>
               {veterinario.nome}
               {veterinario.crmv ? ` - CRMV ${veterinario.crmv}` : ""}
             </option>

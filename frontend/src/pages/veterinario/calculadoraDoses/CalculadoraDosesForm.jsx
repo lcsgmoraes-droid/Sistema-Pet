@@ -126,7 +126,9 @@ function FaixaMedicamento({ medicamento }) {
         {medicamento.dose_min_mgkg ?? "-"} a {medicamento.dose_max_mgkg ?? "-"} mg/kg
       </p>
       {medicamento.posologia_referencia && (
-        <p className="mt-2 text-cyan-800">{medicamento.posologia_referencia}</p>
+        <p className="mt-2 text-cyan-800">
+          Referência textual cadastrada (não convertida): {medicamento.posologia_referencia}
+        </p>
       )}
     </div>
   );

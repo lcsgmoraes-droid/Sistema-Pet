@@ -346,3 +346,42 @@ def baixar_repasse(
         "data_recebimento": conta.data_recebimento.isoformat(),
         "valor_recebido": float(conta.valor_recebido),
     }
+
+
+@router.post(
+    "/relatorios/repasse/{conta_id}/estornar-baixa",
+    summary="Estorna a baixa de um lançamento de repasse",
+)
+def estornar_baixa_repasse(
+    conta_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    """Reabre uma baixa feita por esta tela, sem afetar outros lançamentos."""
+    _, tenant_id = _get_tenant(current)
+    conta = (
+        db.query(ContaReceber)
+        .filter(
+            ContaReceber.id == conta_id,
+            ContaReceber.tenant_id == str(tenant_id),
+            ContaReceber.documento.like("VET-PROC-%"),
+        )
+        .first()
+    )
+    if not conta:
+        raise HTTPException(404, "Lançamento de repasse não encontrado.")
+    if conta.status != "recebido":
+        raise HTTPException(400, "Este lançamento não está baixado.")
+
+    conta.status = "pendente"
+    conta.valor_recebido = 0
+    conta.data_recebimento = None
+    db.commit()
+
+    return {
+        "ok": True,
+        "id": conta.id,
+        "status": conta.status,
+        "data_recebimento": None,
+        "valor_recebido": 0,
+    }

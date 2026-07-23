@@ -15,8 +15,8 @@ from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# Ensure backend is in path
-backend_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+# Ensure the backend package root (backend/) is in path.
+backend_dir = os.path.abspath(os.path.dirname(__file__) + os.sep + "..")
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 

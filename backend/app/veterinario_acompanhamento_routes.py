@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
-from .models import Pet
+from .models import Cliente, Pet
 from .veterinario_agendamentos import _atualizar_status_agendamento
 from .veterinario_clinico import _bloquear_lancamento_em_consulta_finalizada
 from .veterinario_core import _get_tenant
@@ -78,6 +78,23 @@ def registrar_vacina(
     )
     if not pet_ok:
         raise HTTPException(status_code=404, detail="Pet não encontrado neste tenant")
+
+    if body.veterinario_id:
+        veterinario_ok = (
+            db.query(Cliente.id)
+            .filter(
+                Cliente.id == body.veterinario_id,
+                Cliente.tenant_id == tenant_id,
+                Cliente.tipo_cadastro == "veterinario",
+                Cliente.ativo.is_(True),
+            )
+            .first()
+        )
+        if not veterinario_ok:
+            raise HTTPException(
+                status_code=422,
+                detail="Veterinário responsável não encontrado ou inativo",
+            )
 
     if body.consulta_id:
         consulta_ok = (

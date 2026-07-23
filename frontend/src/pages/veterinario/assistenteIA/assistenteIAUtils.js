@@ -57,10 +57,11 @@ export function formatarLabelConsulta(consulta) {
 }
 
 export function getMemoriaAssistenteIABadge(memoriaAtiva) {
-  if (memoriaAtiva === true) {
+  if (memoriaAtiva === true || memoriaAtiva?.ok === true) {
+    const feedbacks = Number(memoriaAtiva?.memorias_consideradas || 0);
     return {
       className: "bg-emerald-100 text-emerald-700",
-      label: "Memória ativa",
+      label: feedbacks ? `Memória ativa • ${feedbacks} aprendizado(s)` : "Memória ativa",
     };
   }
   if (memoriaAtiva === false) {

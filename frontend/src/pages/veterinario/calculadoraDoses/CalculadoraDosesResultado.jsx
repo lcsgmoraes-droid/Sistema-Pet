@@ -62,6 +62,10 @@ export default function CalculadoraDosesResultado({
         <p>Peso considerado: {form.peso_kg || "--"} kg</p>
         <p>Dose usada: {form.dose_mg_kg || "--"} mg/kg</p>
       </div>
+      <p className="text-xs text-amber-200">
+        Resultado em mg. Só converta para comprimidos ou mL após conferir a concentração exata da
+        apresentação e a compatibilidade da unidade.
+      </p>
     </div>
   );
 }

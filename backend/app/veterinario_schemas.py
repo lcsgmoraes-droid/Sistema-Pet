@@ -275,6 +275,8 @@ class VacinaResponse(BaseModel):
     id: int
     pet_id: int
     consulta_id: Optional[int]
+    veterinario_id: Optional[int]
+    veterinario_responsavel: Optional[str] = None
     nome_vacina: str
     fabricante: Optional[str]
     lote: Optional[str]
@@ -666,3 +668,8 @@ class VetMensagemFeedbackPayload(BaseModel):
     util: bool
     nota: Optional[int] = Field(default=None, ge=1, le=5)
     comentario: Optional[str] = None
+
+
+class VetConhecimentoRevisaoPayload(BaseModel):
+    status: str
+    motivo: Optional[str] = None

@@ -13,6 +13,7 @@ export function useVetRepasse() {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState(null);
   const [baixando, setBaixando] = useState(null);
+  const [estornando, setEstornando] = useState(null);
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -37,6 +38,10 @@ export function useVetRepasse() {
 
   const darBaixa = useCallback(
     async (contaId) => {
+      const confirmado = window.confirm(
+        "Confirmar o recebimento integral deste lançamento na data de hoje?",
+      );
+      if (!confirmado) return;
       setBaixando(contaId);
       try {
         await vetApi.baixarRepasse(contaId);
@@ -45,6 +50,26 @@ export function useVetRepasse() {
         setErro(e?.response?.data?.detail ?? "Erro ao dar baixa no lancamento.");
       } finally {
         setBaixando(null);
+      }
+    },
+    [carregar],
+  );
+
+  const estornarBaixa = useCallback(
+    async (contaId) => {
+      const confirmado = window.confirm(
+        "Estornar esta baixa? O lançamento voltará para o status pendente.",
+      );
+      if (!confirmado) return;
+      setEstornando(contaId);
+      setErro(null);
+      try {
+        await vetApi.estornarBaixaRepasse(contaId);
+        await carregar();
+      } catch (e) {
+        setErro(e?.response?.data?.detail ?? "Erro ao estornar a baixa.");
+      } finally {
+        setEstornando(null);
       }
     },
     [carregar],
@@ -63,6 +88,8 @@ export function useVetRepasse() {
     carregando,
     dados,
     darBaixa,
+    estornarBaixa,
+    estornando,
     dataFim,
     dataInicio,
     erro,

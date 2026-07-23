@@ -26,7 +26,7 @@ def test_frontend_visual_stack_stays_on_migrated_versions_only():
 
     assert _dependency_major_version(package, "react") == 18
     assert _dependency_major_version(package, "react-dom") == 18
-    assert _dependency_major_version(package, "react-router-dom") == 6
+    assert _dependency_major_version(package, "react-router-dom") == 7
     assert _dependency_major_version(package, "tailwindcss") == 3
     assert "@tailwindcss/postcss" not in package.get("devDependencies", {})
 

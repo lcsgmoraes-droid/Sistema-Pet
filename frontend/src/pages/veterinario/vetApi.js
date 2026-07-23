@@ -122,6 +122,10 @@ export const vetApi = {
 
   // Catálogos
   listarCatalogoProcedimentos: () => api.get(`${BASE}/catalogo/procedimentos`),
+  statusModeloProcedimentosCorePet: () =>
+    api.get(`${BASE}/catalogo/procedimentos/modelo-corepet/status`),
+  importarModeloProcedimentosCorePet: () =>
+    api.post(`${BASE}/catalogo/procedimentos/modelo-corepet/importar`),
   criarCatalogoProcedimento: (data) => api.post(`${BASE}/catalogo/procedimentos`, data),
   atualizarCatalogoProcedimento: (id, data) =>
     api.patch(`${BASE}/catalogo/procedimentos/${id}`, data),
@@ -129,6 +133,9 @@ export const vetApi = {
   listarProdutosEstoque: (busca) =>
     api.get(`${BASE}/catalogo/produtos-estoque`, { params: { busca } }),
   listarMedicamentos: (busca) => api.get(`${BASE}/catalogo/medicamentos`, { params: { busca } }),
+  listarBularioRegulatorio: (params) => api.get(`${BASE}/catalogo/bulario-regulatorio`, { params }),
+  adicionarBularioAoCatalogo: (id) =>
+    api.post(`${BASE}/catalogo/bulario-regulatorio/${id}/adicionar`),
   criarMedicamento: (data) => api.post(`${BASE}/catalogo/medicamentos`, data),
   atualizarMedicamento: (id, data) => api.patch(`${BASE}/catalogo/medicamentos/${id}`, data),
   removerMedicamento: (id) => api.delete(`${BASE}/catalogo/medicamentos/${id}`),
@@ -157,6 +164,8 @@ export const vetApi = {
     api.post(`${BASE}/relatorios/repasse/${contaId}/baixar`, null, {
       params: dataRecebimento ? { data_recebimento: dataRecebimento } : {},
     }),
+  estornarBaixaRepasse: (contaId) =>
+    api.post(`${BASE}/relatorios/repasse/${contaId}/estornar-baixa`),
 
   // Chat IA de exames
   chatExameIA: (exameId, pergunta) => api.post(`${BASE}/exames/${exameId}/chat`, { pergunta }),
@@ -164,6 +173,7 @@ export const vetApi = {
   // Assistente IA clínico (livre ou vinculado ao atendimento)
   assistenteIA: (payload) => api.post(`${BASE}/ia/assistente`, payload),
   memoriaStatusAssistenteIA: () => api.get(`${BASE}/ia/memoria-status`),
+  statusConhecimentoAssistenteIA: () => api.get(`${BASE}/ia/conhecimento/status`),
   listarConversasAssistenteIA: (params) => api.get(`${BASE}/ia/conversas`, { params }),
   listarMensagensConversaAssistenteIA: (conversaId) =>
     api.get(`${BASE}/ia/conversas/${conversaId}/mensagens`),

@@ -1,4 +1,9 @@
 import importlib
+from io import BytesIO
+
+import openpyxl
+
+from tests.route_contract_helpers import method_routes
 
 
 def _extratos():
@@ -45,7 +50,9 @@ def test_extrato_contabiliza_procedimento_e_detalha_insumos_sem_duplicar():
     assert extrato["totais"]["margem_valor"] == 95
     assert len(extrato["linhas"]) == 2
     assert extrato["linhas"][0]["contabilizar_total"] is True
+    assert extrato["linhas"][0]["contabilizar_label"] == "Cobrança"
     assert extrato["linhas"][1]["contabilizar_total"] is False
+    assert extrato["linhas"][1]["contabilizar_label"] == "Detalhe"
     assert extrato["linhas"][1]["preco_unitario"] == 40
     assert extrato["linhas"][1]["preco_total"] == 40
 
@@ -118,15 +125,16 @@ def test_exportacoes_pdf_e_excel_usam_o_payload_do_extrato():
     assert excel.startswith(b"PK")
     assert pdf.startswith(b"%PDF")
 
+    workbook = openpyxl.load_workbook(BytesIO(excel))
+    sheet = workbook["Extrato Vet"]
+    assert sheet["B4"].number_format == "R$ #,##0.00"
+    assert sheet["B8"].number_format == "R$ #,##0.00"
+
 
 def test_rotas_de_extrato_veterinario_estao_registradas():
     from app.veterinario_routes import router
 
-    routes = {
-        (route.path, method)
-        for route in router.routes
-        for method in getattr(route, "methods", set())
-    }
+    routes = set(method_routes(router))
     assert ("/vet/extratos/atendimento", "GET") in routes
     assert ("/vet/extratos/atendimento/export.pdf", "GET") in routes
     assert ("/vet/extratos/atendimento/export.xlsx", "GET") in routes

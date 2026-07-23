@@ -2,15 +2,40 @@
 
 from datetime import datetime
 from io import BytesIO
+from pathlib import Path
 from xml.sax.saxutils import escape
 
+import reportlab
 from reportlab.graphics.barcode import qr
 from reportlab.graphics.shapes import Drawing
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import (
+    KeepTogether,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+    Table,
+    TableStyle,
+)
+
+
+def _registrar_fontes_pdf() -> tuple[str, str]:
+    """Usa a fonte Unicode distribuída com o ReportLab."""
+    try:
+        fontes_dir = Path(reportlab.__file__).resolve().parent / "fonts"
+        pdfmetrics.registerFont(TTFont("VetSans", str(fontes_dir / "Vera.ttf")))
+        pdfmetrics.registerFont(TTFont("VetSans-Bold", str(fontes_dir / "VeraBd.ttf")))
+        return "VetSans", "VetSans-Bold"
+    except Exception:
+        return "Helvetica", "Helvetica-Bold"
+
+
+VET_FONT, VET_FONT_BOLD = _registrar_fontes_pdf()
 
 
 def _fmt_data(valor):
@@ -49,9 +74,9 @@ def _bloco_info(titulo, linhas):
             [
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1d4ed8")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
-                ("FONTNAME", (1, 1), (1, -1), "Helvetica"),
+                ("FONTNAME", (0, 0), (-1, 0), VET_FONT_BOLD),
+                ("FONTNAME", (0, 1), (0, -1), VET_FONT_BOLD),
+                ("FONTNAME", (1, 1), (1, -1), VET_FONT),
                 ("FONTSIZE", (0, 0), (-1, -1), 9),
                 ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#d1d5db")),
                 (
@@ -79,7 +104,7 @@ def _style_title():
     return ParagraphStyle(
         "VetTitle",
         parent=getSampleStyleSheet()["Heading1"],
-        fontName="Helvetica-Bold",
+        fontName=VET_FONT_BOLD,
         fontSize=16,
         textColor=colors.HexColor("#0f172a"),
         spaceAfter=10,
@@ -90,7 +115,7 @@ def _style_subtitle():
     return ParagraphStyle(
         "VetSubtitle",
         parent=getSampleStyleSheet()["Heading3"],
-        fontName="Helvetica-Bold",
+        fontName=VET_FONT_BOLD,
         fontSize=11,
         textColor=colors.HexColor("#1e3a8a"),
         spaceBefore=6,
@@ -102,7 +127,7 @@ def _style_normal():
     return ParagraphStyle(
         "VetNormal",
         parent=getSampleStyleSheet()["Normal"],
-        fontName="Helvetica",
+        fontName=VET_FONT,
         fontSize=9,
         leading=12,
     )
@@ -112,10 +137,9 @@ def _style_cell(bold=False):
     return ParagraphStyle(
         "VetCellBold" if bold else "VetCell",
         parent=_style_normal(),
-        fontName="Helvetica-Bold" if bold else "Helvetica",
+        fontName=VET_FONT_BOLD if bold else VET_FONT,
         fontSize=8,
         leading=10,
-        wordWrap="CJK",
     )
 
 
@@ -132,6 +156,40 @@ def _qr_drawing(conteudo, size=2.8 * cm):
     desenho = Drawing(size, size, transform=[size / largura, 0, 0, size / altura, 0, 0])
     desenho.add(qr_widget)
     return desenho
+
+
+def _veterinario_rotulo(veterinario) -> str:
+    nome = _texto(getattr(veterinario, "nome", None))
+    crmv = str(getattr(veterinario, "crmv", None) or "").strip()
+    return f"{nome} — CRMV {crmv}" if crmv else nome
+
+
+def _bloco_assinatura_qr(veterinario, url_validacao, *, legenda_qr: str):
+    assinatura = [
+        Spacer(1, 0.7 * cm),
+        Paragraph("________________________________________", _style_normal()),
+        Paragraph(_veterinario_rotulo(veterinario), _style_normal()),
+        Paragraph("Assinatura do médico-veterinário", _style_normal()),
+    ]
+    validacao = [
+        Paragraph(escape(legenda_qr), _style_cell(bold=True)),
+        Spacer(1, 0.1 * cm),
+        _qr_drawing(url_validacao, size=2.35 * cm),
+    ]
+    tabela = Table([[assinatura, validacao]], colWidths=[12.5 * cm, 3.5 * cm])
+    tabela.setStyle(
+        TableStyle(
+            [
+                ("BOX", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
+    return KeepTogether([tabela])
 
 
 def gerar_pdf_prontuario(consulta, validacao_assinatura, prescricoes, url_validacao):
@@ -155,7 +213,7 @@ def gerar_pdf_prontuario(consulta, validacao_assinatura, prescricoes, url_valida
         [
             ["Pet", _texto(getattr(consulta.pet, "nome", None))],
             ["Tutor", _texto(getattr(consulta.cliente, "nome", None))],
-            ["Veterinario", _texto(getattr(consulta.veterinario, "nome", None))],
+            ["Veterinario", _veterinario_rotulo(consulta.veterinario)],
             ["Status", _texto(consulta.status)],
             ["Inicio atendimento", _fmt_datahora(consulta.inicio_atendimento)],
             ["Fim atendimento", _fmt_datahora(consulta.fim_atendimento)],
@@ -180,15 +238,18 @@ def gerar_pdf_prontuario(consulta, validacao_assinatura, prescricoes, url_valida
 
     elementos.append(Spacer(1, 0.35 * cm))
     elementos += _bloco_info(
-        "Assinatura digital",
+        "Validação do documento",
         [
-            ["Assinada", "Sim" if validacao_assinatura.get("assinada") else "Nao"],
             [
-                "Hash valido",
-                "Sim" if validacao_assinatura.get("hash_valido") else "Nao",
+                "Assinatura / integridade",
+                (
+                    "Assinada e hash válido"
+                    if validacao_assinatura.get("assinada")
+                    and validacao_assinatura.get("hash_valido")
+                    else "Verificação pendente ou inválida"
+                ),
             ],
             ["Hash prontuario", _texto(validacao_assinatura.get("hash_prontuario"))],
-            ["URL verificacao", _texto(url_validacao)],
         ],
     )
 
@@ -212,7 +273,7 @@ def gerar_pdf_prontuario(consulta, validacao_assinatura, prescricoes, url_valida
                 [
                     ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1d4ed8")),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTNAME", (0, 0), (-1, 0), VET_FONT_BOLD),
                     ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#d1d5db")),
                     ("FONTSIZE", (0, 0), (-1, -1), 8),
                     ("ALIGN", (0, 0), (-1, -1), "LEFT"),
@@ -222,10 +283,14 @@ def gerar_pdf_prontuario(consulta, validacao_assinatura, prescricoes, url_valida
         elementos.append(Paragraph("<b>Prescricoes vinculadas</b>", _style_subtitle()))
         elementos.append(tabela_prescricoes)
 
-    elementos.append(Spacer(1, 0.45 * cm))
-    elementos.append(Paragraph("Valide este documento pelo QR code:", _style_normal()))
-    elementos.append(Spacer(1, 0.15 * cm))
-    elementos.append(_qr_drawing(url_validacao))
+    elementos.append(Spacer(1, 0.35 * cm))
+    elementos.append(
+        _bloco_assinatura_qr(
+            consulta.veterinario,
+            url_validacao,
+            legenda_qr="Validar prontuário",
+        )
+    )
 
     elementos.append(Spacer(1, 0.3 * cm))
     elementos.append(
@@ -271,11 +336,17 @@ def gerar_pdf_receita(prescricao, url_validacao):
         [
             ["Pet", _texto(getattr(prescricao.pet, "nome", None))],
             [
-                "Veterinario",
+                "Tutor",
                 _texto(
-                    getattr(prescricao.consulta.veterinario, "nome", None)
+                    getattr(prescricao.consulta.cliente, "nome", None)
                     if prescricao.consulta
                     else None
+                ),
+            ],
+            [
+                "Veterinario",
+                _veterinario_rotulo(
+                    prescricao.consulta.veterinario if prescricao.consulta else None
                 ),
             ],
             ["Consulta", _texto(prescricao.consulta_id)],
@@ -305,7 +376,7 @@ def gerar_pdf_receita(prescricao, url_validacao):
             [
                 ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1d4ed8")),
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTNAME", (0, 0), (-1, 0), VET_FONT_BOLD),
                 ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#d1d5db")),
                 ("FONTSIZE", (0, 0), (-1, -1), 8),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -314,10 +385,14 @@ def gerar_pdf_receita(prescricao, url_validacao):
     )
     elementos.append(tabela_itens)
 
-    elementos.append(Spacer(1, 0.45 * cm))
-    elementos.append(Paragraph("Valide esta receita pelo QR code:", _style_normal()))
-    elementos.append(Spacer(1, 0.15 * cm))
-    elementos.append(_qr_drawing(url_validacao))
+    elementos.append(Spacer(1, 0.35 * cm))
+    elementos.append(
+        _bloco_assinatura_qr(
+            prescricao.consulta.veterinario if prescricao.consulta else None,
+            url_validacao,
+            legenda_qr="Validar receita",
+        )
+    )
 
     elementos.append(Spacer(1, 0.3 * cm))
     elementos.append(

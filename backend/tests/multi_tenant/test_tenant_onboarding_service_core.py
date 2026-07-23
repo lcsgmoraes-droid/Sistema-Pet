@@ -65,6 +65,7 @@ def test_onboarding_apply_creates_default_copy_for_tenant(onboarding_session):
     assert _count(onboarding_session, "tipos_tratamento", TENANT_A) == 9
     assert _count(onboarding_session, "sabores_proteina", TENANT_A) == 10
     assert _count(onboarding_session, "apresentacoes_peso", TENANT_A) == 11
+    assert _count(onboarding_session, "vet_catalogo_procedimentos", TENANT_A) == 70
     assert _count(onboarding_session, "produtos", TENANT_A) == 0
     enum_values = onboarding_session.execute(
         text(
@@ -94,6 +95,7 @@ def test_onboarding_is_idempotent_for_same_tenant(onboarding_session):
     assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 4
     assert _count(onboarding_session, "contas_bancarias", TENANT_A) == 2
     assert _count(onboarding_session, "linhas_racao", TENANT_A) == 4
+    assert _count(onboarding_session, "vet_catalogo_procedimentos", TENANT_A) == 70
     assert _count(onboarding_session, "dre_categorias", TENANT_A) == 3
     assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 2
     assert _count(onboarding_session, "tenant_template_installs") == 1
@@ -244,6 +246,8 @@ def test_onboarding_creates_isolated_copies_for_each_tenant(onboarding_session):
     assert _count(onboarding_session, "dre_categorias", TENANT_B) == 3
     assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 2
     assert _count(onboarding_session, "tipo_despesas", TENANT_B) == 2
+    assert _count(onboarding_session, "vet_catalogo_procedimentos", TENANT_A) == 70
+    assert _count(onboarding_session, "vet_catalogo_procedimentos", TENANT_B) == 70
 
     names_a = {
         row[0]

@@ -15,13 +15,16 @@ test("obterPesoParaCalculoDose usa peso do cadastro do pet quando a consulta ain
   assert.equal(obterPesoParaCalculoDose({ peso_kg: "" }, { peso: "8,2" }), 8.2);
 });
 
-test("calcularDosePrescricaoPorPeso calcula dose média usando campos do catálogo", () => {
+test("calcularDosePrescricaoPorPeso exige a dose escolhida pelo veterinario", () => {
+  assert.equal(calcularDosePrescricaoPorPeso({ dose_min_mgkg: 10, dose_max_mgkg: 20 }, 5), null);
+
   const dose = calcularDosePrescricaoPorPeso(
     {
       dose_min_mgkg: 10,
       dose_max_mgkg: 20,
     },
     5,
+    15,
   );
 
   assert.deepEqual(dose, {
@@ -30,7 +33,7 @@ test("calcularDosePrescricaoPorPeso calcula dose média usando campos do catálo
   });
 });
 
-test("buildCalculadoraDoseFormParaPrescricao preenche modal com medicamento, peso e dose de referencia", () => {
+test("buildCalculadoraDoseFormParaPrescricao não escolhe o meio da faixa automaticamente", () => {
   const formCalculadora = buildCalculadoraDoseFormParaPrescricao({
     calculadoraFormAtual: {
       medicamento_id: "",
@@ -52,7 +55,7 @@ test("buildCalculadoraDoseFormParaPrescricao preenche modal com medicamento, pes
   assert.deepEqual(formCalculadora, {
     medicamento_id: "42",
     peso_kg: "15",
-    dose_mg_kg: "25",
+    dose_mg_kg: "",
     frequencia_horas: "12",
     dias: "5",
   });

@@ -9,12 +9,17 @@ export default function ProdutoEstoqueAutocomplete({
   onSelect,
   helperText = "",
   searchProducts,
+  disabled = false,
 }) {
   const [busca, setBusca] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [sugestoes, setSugestoes] = useState([]);
 
   useEffect(() => {
+    if (disabled) {
+      setSugestoes([]);
+      return;
+    }
     if (selectedProduct?.id) return;
     const termo = busca.trim();
     if (termo.length < 2) {
@@ -38,7 +43,7 @@ export default function ProdutoEstoqueAutocomplete({
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [busca, selectedProduct, searchProducts]);
+  }, [busca, disabled, selectedProduct, searchProducts]);
 
   const estoqueLabel = useMemo(() => {
     if (!selectedProduct) return "";
@@ -73,7 +78,8 @@ export default function ProdutoEstoqueAutocomplete({
                 setBusca("");
                 setSugestoes([]);
               }}
-              className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-100"
+              disabled={disabled}
+              className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
             >
               <X size={12} />
               Trocar
@@ -91,6 +97,7 @@ export default function ProdutoEstoqueAutocomplete({
               type="text"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
+              disabled={disabled}
               placeholder={placeholder}
               className="w-full rounded-lg border border-gray-200 px-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
             />
@@ -111,7 +118,8 @@ export default function ProdutoEstoqueAutocomplete({
                     setBusca(produto.nome || "");
                     setSugestoes([]);
                   }}
-                  className="w-full rounded-lg border border-gray-100 px-3 py-2 text-left hover:bg-emerald-50"
+                  disabled={disabled}
+                  className="w-full rounded-lg border border-gray-100 px-3 py-2 text-left hover:bg-emerald-50 disabled:opacity-50"
                 >
                   <p className="text-sm font-medium text-gray-800">{produto.nome}</p>
                   <p className="text-xs text-gray-500">
