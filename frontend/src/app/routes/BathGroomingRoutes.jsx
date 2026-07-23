@@ -1,4 +1,4 @@
-import { Navigate, Route } from "react-router-dom";
+import { Route } from "react-router-dom";
 import { BanhoTosaPage } from "../lazyPages";
 import { ModuleGate } from "./RouteGates";
 
@@ -19,7 +19,7 @@ export function createBathGroomingRoutes() {
       <Route path="banho-tosa/recursos" element={banhoTosaView("recursos")} />
       <Route path="banho-tosa/agenda" element={banhoTosaView("agenda")} />
       <Route path="banho-tosa/fila" element={banhoTosaView("fila")} />
-      <Route path="banho-tosa/fechamentos" element={<Navigate to="/banho-tosa/fila" replace />} />
+      <Route path="banho-tosa/fechamentos" element={banhoTosaView("fechamentos")} />
       <Route path="banho-tosa/pacotes" element={banhoTosaView("pacotes")} />
       <Route path="banho-tosa/retornos" element={banhoTosaView("retornos")} />
       <Route path="banho-tosa/taxi-dog" element={banhoTosaView("taxi-dog")} />
