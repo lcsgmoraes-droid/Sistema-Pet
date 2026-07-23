@@ -65,6 +65,27 @@ def _garantir_tabelas_memoria_ia(db: Session) -> dict:
     return {"ok": True, "criadas": criadas}
 
 
+def _encerrar_transacao_antes_do_provedor(db: Session) -> bool:
+    """
+    Fecha a transacao de leitura/preparacao antes de chamar um provedor externo.
+
+    A chamada ao LLM pode levar dezenas de segundos. Manter a conexao PostgreSQL
+    ociosa dentro de uma transacao nesse intervalo faz o servidor encerrar a
+    sessao por ``idle_in_transaction_session_timeout`` e impede que o historico
+    seja salvo quando a resposta chega.
+    """
+    try:
+        db.commit()
+        return True
+    except Exception as exc:
+        db.rollback()
+        logger.warning(
+            "Nao foi possivel finalizar a preparacao da IA veterinaria: %s",
+            exc.__class__.__name__,
+        )
+        return False
+
+
 def _carregar_memoria_conversa(
     db: Session, tenant_id, conversa_id: int, limite: int = 8
 ) -> list[MensagemChat]:
