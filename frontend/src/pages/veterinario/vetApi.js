@@ -133,8 +133,7 @@ export const vetApi = {
   listarProdutosEstoque: (busca) =>
     api.get(`${BASE}/catalogo/produtos-estoque`, { params: { busca } }),
   listarMedicamentos: (busca) => api.get(`${BASE}/catalogo/medicamentos`, { params: { busca } }),
-  listarBularioRegulatorio: (params) =>
-    api.get(`${BASE}/catalogo/bulario-regulatorio`, { params }),
+  listarBularioRegulatorio: (params) => api.get(`${BASE}/catalogo/bulario-regulatorio`, { params }),
   adicionarBularioAoCatalogo: (id) =>
     api.post(`${BASE}/catalogo/bulario-regulatorio/${id}/adicionar`),
   criarMedicamento: (data) => api.post(`${BASE}/catalogo/medicamentos`, data),

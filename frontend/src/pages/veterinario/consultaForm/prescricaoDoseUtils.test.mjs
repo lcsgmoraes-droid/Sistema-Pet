@@ -16,10 +16,7 @@ test("obterPesoParaCalculoDose usa peso do cadastro do pet quando a consulta ain
 });
 
 test("calcularDosePrescricaoPorPeso exige a dose escolhida pelo veterinario", () => {
-  assert.equal(
-    calcularDosePrescricaoPorPeso({ dose_min_mgkg: 10, dose_max_mgkg: 20 }, 5),
-    null,
-  );
+  assert.equal(calcularDosePrescricaoPorPeso({ dose_min_mgkg: 10, dose_max_mgkg: 20 }, 5), null);
 
   const dose = calcularDosePrescricaoPorPeso(
     {
