@@ -11,6 +11,7 @@ export default function BanhoTosaDashboardView({ dashboard, config, parametros, 
   const [mostrarBase, setMostrarBase] = useState(false);
   const [mostrarSimulador, setMostrarSimulador] = useState(false);
   const parametrosAtivos = parametros.filter((item) => item.ativo).length;
+  const fluxoVisual = montarFluxoVisual(config?.fluxo_etapas);
 
   return (
     <div className="space-y-4">
@@ -97,16 +98,17 @@ export default function BanhoTosaDashboardView({ dashboard, config, parametros, 
           subtitle="Cada etapa alimenta tempo, consumo, mao de obra e margem."
           title="Fluxo operacional"
         >
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {["Agendado", "Check-in", "Banho / Tosa", "Pronto / Entregue"].map((etapa, index) => (
-              <div key={etapa} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {fluxoVisual.map((etapa, index) => (
+              <div
+                key={etapa.codigo}
+                className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+              >
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
                   {index + 1}
                 </span>
-                <p className="mt-3 font-semibold text-slate-900">{etapa}</p>
-                <p className="mt-1 text-sm text-slate-500">
-                  Atualiza agenda, fila e custos do atendimento.
-                </p>
+                <p className="mt-3 font-semibold text-slate-900">{etapa.label}</p>
+                <p className="mt-1 text-sm text-slate-500">{etapa.descricao}</p>
               </div>
             ))}
           </div>
@@ -140,4 +142,45 @@ export default function BanhoTosaDashboardView({ dashboard, config, parametros, 
 function formatNps(value) {
   const numero = Number(value || 0);
   return Number.isFinite(numero) ? numero.toFixed(0) : "0";
+}
+
+function montarFluxoVisual(fluxoConfigurado) {
+  const descricoes = {
+    chegou: "Check-in registra o pet na fila e preserva as atenções do cadastro.",
+    preparo: "Organiza materiais, responsável e box antes do serviço.",
+    banho: "Inicia o timer e acompanha responsável, recurso e consumo.",
+    secagem: "Continua a cronometragem e evidencia atrasos da operação.",
+    higiene: "Registra os cuidados complementares executados.",
+    tosa: "Controla tempo, profissional e observações da finalização.",
+    pronto: "Revisa ficha, fotos, ocorrências, custos e cobrança.",
+  };
+  const labels = {
+    chegou: "Chegou",
+    preparo: "Preparo",
+    banho: "Banho",
+    secagem: "Secagem",
+    higiene: "Higiene",
+    tosa: "Tosa",
+    pronto: "Pronto",
+  };
+  const fluxo =
+    Array.isArray(fluxoConfigurado) && fluxoConfigurado.length
+      ? fluxoConfigurado
+      : ["chegou", "banho", "secagem", "tosa", "pronto"];
+  const etapas = fluxo
+    .filter((codigo, index, lista) => labels[codigo] && lista.indexOf(codigo) === index)
+    .map((codigo) => ({ codigo, label: labels[codigo], descricao: descricoes[codigo] }));
+  return [
+    {
+      codigo: "agendamento",
+      label: "Agendamento",
+      descricao: "Reserva horário, profissional, serviço, valor e recurso.",
+    },
+    ...etapas,
+    {
+      codigo: "entregue",
+      label: "Fechamento e entrega",
+      descricao: "Gera a venda no PDV, sincroniza o financeiro e encerra o atendimento.",
+    },
+  ];
 }

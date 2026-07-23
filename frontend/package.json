@@ -53,6 +53,7 @@
     "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",
     "test:vendas-reprocessamento-feedback": "node scripts/test-vendas-reprocessamento-feedback.mjs",
     "test:onboarding-inicial": "node scripts/test-onboarding-inicial-contract.mjs",
+    "test:banho-tosa-fluxo": "node scripts/test-banho-tosa-fluxo.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

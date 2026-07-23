@@ -1,9 +1,7 @@
+import { formatMoneyBRL } from "../../utils/formatters";
+
 export function formatCurrency(value) {
-  const numericValue = Number(value || 0);
-  return numericValue.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
+  return formatMoneyBRL(value);
 }
 
 export function formatNumber(value, fractionDigits = 2) {
