@@ -1,5 +1,6 @@
 import CatalogoErro from "./CatalogoErro";
 import ProcedimentoModal from "./ProcedimentoModal";
+import ProcedimentosModeloCorePetBanner from "./ProcedimentosModeloCorePetBanner";
 import ProcedimentosTabela from "./ProcedimentosTabela";
 import ProcedimentosToolbar from "./ProcedimentosToolbar";
 import { useCatProcedimentos } from "./useCatProcedimentos";
@@ -9,6 +10,12 @@ export default function CatProcedimentos() {
 
   return (
     <div className="space-y-3">
+      <ProcedimentosModeloCorePetBanner
+        importando={catalogo.importandoModelo}
+        onImportar={catalogo.importarModeloCorePet}
+        status={catalogo.statusModelo}
+      />
+
       <ProcedimentosToolbar onNovo={catalogo.abrirNovo} />
 
       <CatalogoErro erro={catalogo.erro} />

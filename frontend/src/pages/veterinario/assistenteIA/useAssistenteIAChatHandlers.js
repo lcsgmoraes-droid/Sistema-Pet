@@ -50,7 +50,16 @@ export default function useAssistenteIAChatHandlers({
       const novaConversaId = res.data?.conversa_id;
       setHistorico((h) => [
         ...h,
-        { localId: mensagemIaLocalId, role: "ia", text: res.data?.resposta || "Sem resposta." },
+        {
+          localId: mensagemIaLocalId,
+          role: "ia",
+          text: res.data?.resposta || "Sem resposta.",
+          modeloUsado: res.data?.modelo_usado || null,
+          origemResposta: res.data?.origem_resposta || null,
+          statusProvedor: res.data?.status_provedor || null,
+          fontesContexto: res.data?.fontes_contexto || [],
+          fontesEvidencia: res.data?.fontes_evidencia || [],
+        },
       ]);
 
       if (novaConversaId) {
@@ -98,6 +107,11 @@ export default function useAssistenteIAChatHandlers({
           role: item.tipo === "usuario" ? "user" : "ia",
           text: item.conteudo || "",
           feedback: item.feedback || null,
+          modeloUsado: item.modelo_usado || null,
+          origemResposta: item.origem_resposta || null,
+          statusProvedor: item.status_provedor || null,
+          fontesContexto: item.fontes_contexto || [],
+          fontesEvidencia: item.fontes_evidencia || [],
         })),
       );
     } catch {

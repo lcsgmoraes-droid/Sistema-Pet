@@ -13,7 +13,7 @@ export const EXTRATO_COLUNAS = [
   { chave: "preco_total", titulo: "Venda" },
   { chave: "margem_valor", titulo: "Margem" },
   { chave: "margem_percentual", titulo: "Margem %" },
-  { chave: "contabilizar_label", titulo: "Total" },
+  { chave: "contabilizar_label", titulo: "Tipo da linha" },
   { chave: "estoque_baixado_label", titulo: "Estoque" },
 ];
 

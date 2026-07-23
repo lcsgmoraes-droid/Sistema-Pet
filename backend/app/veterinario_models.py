@@ -27,6 +27,123 @@ from app.base_models import BaseTenantModel
 from app.db import Base
 
 
+class ProdutoRegulatorioVet(Base):
+    """Produto/rotulo oficial compartilhado, sem duplicacao por tenant."""
+
+    __tablename__ = "vet_produtos_regulatorios"
+    __table_args__ = (
+        UniqueConstraint(
+            "fonte", "fonte_id", name="uq_vet_produtos_regulatorios_fonte_id"
+        ),
+        Index(
+            "ix_vet_produtos_regulatorios_busca",
+            "nome",
+            "principio_ativo",
+            "fabricante",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fonte = Column(String(50), nullable=False, index=True)
+    fonte_id = Column(String(120), nullable=False)
+    jurisdicao = Column(String(10), nullable=False, index=True)
+    status_regulatorio = Column(String(80), nullable=True, index=True)
+    tipo_documento = Column(String(80), nullable=True, index=True)
+    nome = Column(String(500), nullable=False, index=True)
+    nome_comercial = Column(String(255), nullable=True, index=True)
+    principio_ativo = Column(Text, nullable=True)
+    fabricante = Column(String(255), nullable=True, index=True)
+    forma_farmaceutica = Column(String(150), nullable=True)
+    especies_indicadas = Column(JSON, nullable=True)
+    bula_url = Column(String(1000), nullable=False)
+    pagina_fonte_url = Column(String(1000), nullable=True)
+    publicado_em = Column(Date, nullable=True, index=True)
+    atualizado_na_fonte_em = Column(DateTime(timezone=True), nullable=True)
+    metadados_fonte = Column(JSON, nullable=True)
+    conteudo_bula = Column(JSON, nullable=True)
+    conteudo_hidratado_em = Column(DateTime(timezone=True), nullable=True)
+    ativo = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class FonteConhecimentoVet(Base):
+    """Fonte publica de conhecimento clinico, compartilhada e auditavel."""
+
+    __tablename__ = "vet_conhecimento_fontes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    codigo = Column(String(50), nullable=False, unique=True, index=True)
+    nome = Column(String(255), nullable=False)
+    tipo = Column(String(50), nullable=False)
+    url_base = Column(String(1000), nullable=False)
+    jurisdicao = Column(String(20), nullable=True)
+    descricao = Column(Text, nullable=True)
+    termos_url = Column(String(1000), nullable=True)
+    requer_revisao = Column(Boolean, nullable=False, default=True)
+    ativo = Column(Boolean, nullable=False, default=True, index=True)
+    ultima_sincronizacao_em = Column(DateTime(timezone=True), nullable=True)
+    ultimo_status = Column(String(30), nullable=True)
+    ultimo_erro = Column(String(500), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class DocumentoConhecimentoVet(Base):
+    """Artigo ou diretriz recuperável com nível de curadoria rastreável."""
+
+    __tablename__ = "vet_conhecimento_documentos"
+    __table_args__ = (
+        UniqueConstraint(
+            "fonte_id",
+            "fonte_documento_id",
+            name="uq_vet_conhecimento_documentos_fonte_documento",
+        ),
+        Index(
+            "ix_vet_conhecimento_documentos_retrieval",
+            "status_revisao",
+            "ativo",
+            "publicado_em",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fonte_id = Column(
+        Integer,
+        ForeignKey("vet_conhecimento_fontes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    fonte_documento_id = Column(String(120), nullable=False)
+    titulo = Column(Text, nullable=False)
+    resumo = Column(Text, nullable=True)
+    autores = Column(JSON, nullable=True)
+    periodico = Column(String(500), nullable=True)
+    doi = Column(String(255), nullable=True, index=True)
+    url = Column(String(1000), nullable=False)
+    idioma = Column(String(30), nullable=True)
+    publicado_em = Column(Date, nullable=True, index=True)
+    especies = Column(JSON, nullable=True)
+    temas = Column(JSON, nullable=True)
+    status_revisao = Column(String(30), nullable=False, default="pendente", index=True)
+    motivo_revisao = Column(Text, nullable=True)
+    revisado_por_id = Column(Integer, nullable=True)
+    revisado_em = Column(DateTime(timezone=True), nullable=True)
+    hash_conteudo = Column(String(64), nullable=False)
+    metadados_fonte = Column(JSON, nullable=True)
+    ativo = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    fonte = relationship("FonteConhecimentoVet")
+
+
 class VeterinarioLembreteConfiguracao(BaseTenantModel):
     """Configuracao de lembretes de agendamento veterinario para o app do cliente."""
 
@@ -76,6 +193,16 @@ class MedicamentoCatalogo(BaseTenantModel):
         Boolean, default=False, nullable=False
     )  # receituário especial
     observacoes = Column(Text, nullable=True)
+    fonte = Column(String(50), nullable=True, index=True)
+    fonte_id = Column(String(120), nullable=True, index=True)
+    jurisdicao = Column(String(10), nullable=True)
+    status_regulatorio = Column(String(80), nullable=True)
+    bula_url = Column(String(1000), nullable=True)
+    pagina_fonte_url = Column(String(1000), nullable=True)
+    publicado_em = Column(Date, nullable=True)
+    verificacao_status = Column(
+        String(30), nullable=False, default="nao_revisado", index=True
+    )
     ativo = Column(Boolean, default=True, nullable=False)
 
 
@@ -375,6 +502,11 @@ class VacinaRegistro(BaseTenantModel):
     pet = relationship("Pet", foreign_keys=[pet_id])
     consulta = relationship("ConsultaVet", foreign_keys=[consulta_id])
     protocolo = relationship("ProtocoloVacina", foreign_keys=[protocolo_id])
+    veterinario = relationship("Cliente", foreign_keys=[veterinario_id])
+
+    @property
+    def veterinario_responsavel(self):
+        return self.veterinario.nome if self.veterinario else None
 
 
 # ==============================================================

@@ -83,7 +83,7 @@ export default function useConsultaRascunhoActions({
         const mensagem = buildMensagemRascunhoSalvo({ etapa, totalEtapas: ETAPAS.length });
         setSucesso(mensagem);
         setRascunhoSalvoMensagem(mensagem);
-        setModalRascunhoSalvoAberto(true);
+        setModalRascunhoSalvoAberto(false);
       }
 
       if (avancarEtapa && etapa < ETAPAS.length - 1) setEtapa((etapaAtual) => etapaAtual + 1);

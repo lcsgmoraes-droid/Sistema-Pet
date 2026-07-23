@@ -125,9 +125,13 @@ def escape_ics(value: Optional[str]) -> str:
 
 
 def formatar_datetime_ics(data_hora: datetime) -> str:
-    if data_hora.tzinfo:
-        return data_hora.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    return data_hora.strftime("%Y%m%dT%H%M%S")
+    """Preserva o horário de parede escolhido na agenda.
+
+    A agenda veterinária mantém o valor digitado como horário local de Brasília,
+    mesmo quando o PostgreSQL devolve um ``datetime`` com informação de UTC.
+    Converter esse valor novamente deslocava o compromisso em três horas.
+    """
+    return data_hora.replace(tzinfo=None).strftime("%Y%m%dT%H%M%S")
 
 
 def gerar_calendario_ics(
@@ -177,8 +181,8 @@ def gerar_calendario_ics(
                 "BEGIN:VEVENT",
                 f"UID:vet-agendamento-{ag.id}@corepet",
                 f"DTSTAMP:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
-                f"DTSTART:{formatar_datetime_ics(data_inicio)}",
-                f"DTEND:{formatar_datetime_ics(data_fim)}",
+                "DTSTART;TZID=America/Sao_Paulo:" + formatar_datetime_ics(data_inicio),
+                "DTEND;TZID=America/Sao_Paulo:" + formatar_datetime_ics(data_fim),
                 "SUMMARY:" + escape_ics(f"{tipo_label} - {pet_nome}"),
                 "DESCRIPTION:" + escape_ics("\n".join(detalhes)),
                 "STATUS:CONFIRMED",

@@ -96,7 +96,7 @@ export default function PrescricaoMedicamentosSection({
             />
             <input
               type="text"
-              placeholder="Dose (ex: 10 mg/kg)"
+              placeholder="Quantidade por administração (ex: 67,5 mg)"
               value={item.dose_mg}
               onChange={(e) => setItem(idx, "dose_mg", e.target.value)}
               className={css.input}

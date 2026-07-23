@@ -1,9 +1,16 @@
-import { CheckCircle, Download } from "lucide-react";
+import { CheckCircle, Download, Undo2 } from "lucide-react";
 
 import { formatMoneyBRL } from "../../../utils/formatters";
 import { badgeStatus, badgeTipo, formatData } from "./repasseUtils";
 
-export default function RepasseTabela({ baixando, carregando, darBaixa, itensFiltrados }) {
+export default function RepasseTabela({
+  baixando,
+  carregando,
+  darBaixa,
+  estornarBaixa,
+  estornando,
+  itensFiltrados,
+}) {
   if (carregando) {
     return (
       <div className="flex justify-center py-12">
@@ -32,7 +39,14 @@ export default function RepasseTabela({ baixando, carregando, darBaixa, itensFil
         </thead>
         <tbody className="divide-y divide-gray-50">
           {itensFiltrados.map((item) => (
-            <RepasseLinha key={item.id} baixando={baixando} item={item} onDarBaixa={darBaixa} />
+            <RepasseLinha
+              key={item.id}
+              baixando={baixando}
+              estornando={estornando}
+              item={item}
+              onDarBaixa={darBaixa}
+              onEstornar={estornarBaixa}
+            />
           ))}
         </tbody>
       </table>
@@ -40,7 +54,7 @@ export default function RepasseTabela({ baixando, carregando, darBaixa, itensFil
   );
 }
 
-function RepasseLinha({ baixando, item, onDarBaixa }) {
+function RepasseLinha({ baixando, estornando, item, onDarBaixa, onEstornar }) {
   const badge = badgeStatus(item.status);
   const tipoBadge = badgeTipo(item.tipo);
 
@@ -74,10 +88,14 @@ function RepasseLinha({ baixando, item, onDarBaixa }) {
             {baixando === item.id ? "Baixando..." : "Dar baixa"}
           </button>
         ) : (
-          <span className="flex items-center gap-1 text-xs text-green-600">
-            <CheckCircle size={12} />
-            Baixado
-          </span>
+          <button
+            onClick={() => onEstornar(item.id)}
+            disabled={estornando === item.id}
+            className="flex items-center gap-1.5 rounded-lg border border-amber-200 px-3 py-1.5 text-xs text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-60"
+          >
+            <Undo2 size={12} />
+            {estornando === item.id ? "Estornando..." : "Estornar baixa"}
+          </button>
         )}
       </td>
     </tr>

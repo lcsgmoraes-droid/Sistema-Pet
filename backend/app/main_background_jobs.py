@@ -27,6 +27,11 @@ _estoque_validade_stop_event = threading.Event()
 _estoque_validade_thread: Optional[threading.Thread] = None
 ESTOQUE_VALIDADE_INTERVALO_SEGUNDOS = 6 * 60 * 60  # 6 horas
 
+_vet_evidence_stop_event = threading.Event()
+_vet_evidence_thread: Optional[threading.Thread] = None
+_vet_regulatory_stop_event = threading.Event()
+_vet_regulatory_thread: Optional[threading.Thread] = None
+
 # SEFAZ — sincronização automática de NF-e por NSU
 _sefaz_sync_stop_event = threading.Event()
 _sefaz_sync_thread: Optional[threading.Thread] = None
@@ -507,6 +512,171 @@ def _loop_estoque_validade():
     logger.info("[VALIDADE] Job de protecao de estoque finalizado (PID %s)", worker_pid)
 
 
+def _vet_evidence_sync_config() -> tuple[int, int, int]:
+    """Return safe startup delay, interval and import limit for evidence sync."""
+
+    def _positive_int(name: str, default: int, maximum: int) -> int:
+        try:
+            value = int(os.getenv(name) or default)
+        except (TypeError, ValueError):
+            return default
+        return min(max(value, 1), maximum)
+
+    startup_delay = _positive_int(
+        "VET_EVIDENCE_SYNC_STARTUP_DELAY_SECONDS",
+        300,
+        24 * 60 * 60,
+    )
+    interval_hours = _positive_int(
+        "VET_EVIDENCE_SYNC_INTERVAL_HOURS",
+        168,
+        24 * 365,
+    )
+    limit = _positive_int("VET_EVIDENCE_SYNC_LIMIT", 100, 500)
+    return startup_delay, interval_hours * 60 * 60, limit
+
+
+def _run_vet_evidence_sync_once(limit: int) -> dict:
+    """Import PubMed metadata with automatic eligibility and traceability."""
+    from app.db import SessionLocal
+    from app.services.vet_clinical_evidence import (
+        PUBMED_DEFAULT_QUERY,
+        sync_pubmed_veterinary_evidence,
+    )
+
+    db = SessionLocal()
+    try:
+        result = sync_pubmed_veterinary_evidence(
+            db,
+            dry_run=False,
+            query=os.getenv("VET_EVIDENCE_PUBMED_QUERY") or PUBMED_DEFAULT_QUERY,
+            limit=limit,
+            api_key=os.getenv("NCBI_API_KEY"),
+            email=os.getenv("NCBI_EMAIL"),
+        )
+        db.commit()
+        return result
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def _loop_vet_evidence_sync() -> None:
+    """Periodically refresh automatically eligible veterinary literature."""
+    startup_delay, interval_seconds, limit = _vet_evidence_sync_config()
+    logger.info(
+        "[VET-EVIDENCE] Atualizacao automatica iniciada "
+        "(intervalo: %sh, limite: %s, triagem rastreavel).",
+        interval_seconds // 3600,
+        limit,
+    )
+
+    if _vet_evidence_stop_event.wait(startup_delay):
+        return
+
+    while not _vet_evidence_stop_event.is_set():
+        try:
+            result = _run_vet_evidence_sync_once(limit)
+            logger.info(
+                "[VET-EVIDENCE] Sincronizacao concluida: "
+                "%s novo(s), %s atualizado(s), %s inalterado(s).",
+                result.get("created", 0),
+                result.get("updated", 0),
+                result.get("unchanged", 0),
+            )
+        except Exception:
+            logger.exception(
+                "[VET-EVIDENCE] Falha ao atualizar a literatura; "
+                "a base existente permanece disponivel."
+            )
+
+        if _vet_evidence_stop_event.wait(interval_seconds):
+            break
+
+    logger.info("[VET-EVIDENCE] Atualizacao automatica finalizada.")
+
+
+def _vet_regulatory_sync_config() -> tuple[int, int]:
+    def _positive_int(name: str, default: int, maximum: int) -> int:
+        try:
+            value = int(os.getenv(name) or default)
+        except (TypeError, ValueError):
+            return default
+        return min(max(value, 1), maximum)
+
+    startup_delay = _positive_int(
+        "VET_REGULATORY_SYNC_STARTUP_DELAY_SECONDS",
+        600,
+        24 * 60 * 60,
+    )
+    interval_hours = _positive_int(
+        "VET_REGULATORY_SYNC_INTERVAL_HOURS",
+        168,
+        24 * 365,
+    )
+    return startup_delay, interval_hours * 60 * 60
+
+
+def _run_vet_regulatory_sync_once() -> list[dict]:
+    from app.db import SessionLocal
+    from app.services.vet_regulatory_catalog_import import (
+        import_dailymed_animal_labels,
+        import_vmd_authorised_products,
+    )
+
+    db = SessionLocal()
+    try:
+        results = [
+            import_dailymed_animal_labels(db, dry_run=False),
+            import_vmd_authorised_products(db, dry_run=False),
+        ]
+        db.commit()
+        return results
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def _loop_vet_regulatory_sync() -> None:
+    """Refresh official regulatory catalogues without blocking the API startup."""
+    startup_delay, interval_seconds = _vet_regulatory_sync_config()
+    logger.info(
+        "[VET-CATALOG] Atualizacao automatica iniciada (intervalo: %sh).",
+        interval_seconds // 3600,
+    )
+    if _vet_regulatory_stop_event.wait(startup_delay):
+        return
+
+    while not _vet_regulatory_stop_event.is_set():
+        try:
+            results = _run_vet_regulatory_sync_once()
+            logger.info(
+                "[VET-CATALOG] Sincronizacao concluida: %s.",
+                ", ".join(
+                    (
+                        f"{item.get('source')}: "
+                        f"{item.get('created', 0)} novo(s), "
+                        f"{item.get('updated', 0)} atualizado(s)"
+                    )
+                    for item in results
+                ),
+            )
+        except Exception:
+            logger.exception(
+                "[VET-CATALOG] Falha ao atualizar fontes oficiais; "
+                "o catalogo existente permanece disponivel."
+            )
+
+        if _vet_regulatory_stop_event.wait(interval_seconds):
+            break
+
+    logger.info("[VET-CATALOG] Atualizacao automatica finalizada.")
+
+
 def start_background_jobs() -> None:
     """Start schedulers and background threads only on the elected leader worker."""
     became_leader = _try_become_background_jobs_leader()
@@ -568,6 +738,34 @@ def start_background_jobs() -> None:
                 "[JOBS] Protecao de estoque por validade desativada neste processo."
             )
 
+        if _env_bool("VET_EVIDENCE_SYNC_ENABLED", False):
+            global _vet_evidence_thread
+            _vet_evidence_stop_event.clear()
+            _vet_evidence_thread = threading.Thread(
+                target=_loop_vet_evidence_sync,
+                name="vet-evidence-sync",
+                daemon=True,
+            )
+            _vet_evidence_thread.start()
+        else:
+            logger.info(
+                "[JOBS] Atualizacao de evidencia veterinaria desativada neste processo."
+            )
+
+        if _env_bool("VET_REGULATORY_SYNC_ENABLED", False):
+            global _vet_regulatory_thread
+            _vet_regulatory_stop_event.clear()
+            _vet_regulatory_thread = threading.Thread(
+                target=_loop_vet_regulatory_sync,
+                name="vet-regulatory-sync",
+                daemon=True,
+            )
+            _vet_regulatory_thread.start()
+        else:
+            logger.info(
+                "[JOBS] Atualizacao do bulario regulatorio desativada neste processo."
+            )
+
         global _sefaz_sync_thread
         _sefaz_sync_stop_event.clear()
         _sefaz_sync_thread = threading.Thread(
@@ -623,5 +821,17 @@ def stop_background_jobs() -> None:
     if _estoque_validade_thread and _estoque_validade_thread.is_alive():
         _estoque_validade_thread.join(timeout=2)
     _estoque_validade_thread = None
+
+    global _vet_evidence_thread
+    _vet_evidence_stop_event.set()
+    if _vet_evidence_thread and _vet_evidence_thread.is_alive():
+        _vet_evidence_thread.join(timeout=2)
+    _vet_evidence_thread = None
+
+    global _vet_regulatory_thread
+    _vet_regulatory_stop_event.set()
+    if _vet_regulatory_thread and _vet_regulatory_thread.is_alive():
+        _vet_regulatory_thread.join(timeout=2)
+    _vet_regulatory_thread = None
 
     _release_background_jobs_leader()

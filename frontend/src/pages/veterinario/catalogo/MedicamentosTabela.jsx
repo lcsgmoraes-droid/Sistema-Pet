@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import { formatLista, LinhaAcoes } from "./shared";
 
 export default function MedicamentosTabela({ buscando, lista, onEditar, onExcluir, removendoId }) {
@@ -46,6 +46,23 @@ function LinhaMedicamento({ item, onEditar, onExcluir, removendo }) {
         <p className="text-xs text-gray-500">
           {item.nome_comercial || item.principio_ativo || item.fabricante || "-"}
         </p>
+        {item.fonte ? (
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-gray-500">
+            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700">
+              {item.fonte} • {item.jurisdicao || "origem não informada"}
+            </span>
+            {item.bula_url ? (
+              <a
+                href={item.bula_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-blue-700 hover:underline"
+              >
+                <ExternalLink size={10} /> Bula da fonte
+              </a>
+            ) : null}
+          </div>
+        ) : null}
       </td>
       <td className="px-4 py-3 text-gray-600">{formatLista(item.especies_indicadas)}</td>
       <td className="px-4 py-3 text-gray-600">{item.posologia_referencia || "-"}</td>

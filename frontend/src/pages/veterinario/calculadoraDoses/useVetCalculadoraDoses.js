@@ -4,7 +4,7 @@ import { useLocation, useSearchParams } from "react-router-dom";
 import { api } from "../../../services/api";
 import { buildReturnTo } from "../../../utils/petReturnFlow";
 import { vetApi } from "../vetApi";
-import { calcularDose, obterDoseMedia } from "./calculadoraDosesUtils";
+import { calcularDose } from "./calculadoraDosesUtils";
 
 export function useVetCalculadoraDoses() {
   const location = useLocation();
@@ -84,14 +84,6 @@ export function useVetCalculadoraDoses() {
     () => medicamentos.find((item) => String(item.id) === String(form.medicamento_id)) ?? null,
     [medicamentos, form.medicamento_id],
   );
-
-  useEffect(() => {
-    if (!medicamentoSelecionado) return;
-    setForm((prev) => ({
-      ...prev,
-      dose_mg_kg: prev.dose_mg_kg || String(obterDoseMedia(medicamentoSelecionado) || ""),
-    }));
-  }, [medicamentoSelecionado]);
 
   const calculo = useMemo(() => calcularDose(form), [form]);
 

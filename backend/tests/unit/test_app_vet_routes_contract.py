@@ -1,4 +1,7 @@
 import os
+from inspect import signature
+
+from tests.route_contract_helpers import method_routes
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 os.environ.setdefault("ENV", "test")
@@ -7,14 +10,7 @@ from app.routes.app_vet_routes import router
 
 
 def _method_routes() -> set[tuple[str, str]]:
-    routes: set[tuple[str, str]] = set()
-    for route in router.routes:
-        methods = getattr(route, "methods", None)
-        if not methods:
-            continue
-        for method in methods:
-            routes.add((route.path, method))
-    return routes
+    return set(method_routes(router))
 
 
 def test_app_vet_router_exposes_mobile_veterinary_mvp_routes():
@@ -57,7 +53,8 @@ def test_app_vet_agendamento_post_accepts_consulta_payload():
     )
     dependant = getattr(route, "dependant", None)
     body_param = dependant.body_params[0]
-    fields = set(body_param.type_.model_fields)
+    body_type = signature(route.endpoint).parameters[body_param.name].annotation
+    fields = set(body_type.model_fields)
 
     assert {
         "pet_id",
@@ -71,12 +68,6 @@ def test_app_vet_agendamento_post_accepts_consulta_payload():
 def test_app_vet_router_is_registered_in_main_app():
     from app.main import app
 
-    routes = set()
-    for route in app.router.routes:
-        methods = getattr(route, "methods", None)
-        if not methods:
-            continue
-        for method in methods:
-            routes.add((route.path, method))
+    routes = set(method_routes(app.router))
 
     assert ("/app/vet/resumo", "GET") in routes

@@ -47,20 +47,6 @@ export default function useCalculadoraDoseConsulta({
     }));
   }, [formPesoKg, petSelecionado]);
 
-  useEffect(() => {
-    if (!medicamentoCalculadoraSelecionado) return;
-    const doseMin = parseNumero(medicamentoCalculadoraSelecionado.dose_minima_mg_kg);
-    const doseMax = parseNumero(medicamentoCalculadoraSelecionado.dose_maxima_mg_kg);
-    const doseMedia =
-      Number.isFinite(doseMin) && Number.isFinite(doseMax)
-        ? ((doseMin + doseMax) / 2).toFixed(2)
-        : doseMin || doseMax || "";
-    setCalculadoraForm((prev) => ({
-      ...prev,
-      dose_mg_kg: prev.dose_mg_kg || String(doseMedia || ""),
-    }));
-  }, [medicamentoCalculadoraSelecionado]);
-
   return {
     calculadoraForm,
     setCalculadoraForm,

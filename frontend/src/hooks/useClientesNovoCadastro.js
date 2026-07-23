@@ -7,12 +7,19 @@ import { useClientesNovoEnderecos } from "./useClientesNovoEnderecos";
 import { normalizeClienteAlertasPdv } from "../utils/clienteAlertasPdv";
 
 const STEPS = [
-  { number: 1, title: "Informacoes do cliente" },
+  { number: 1, title: "Dados da pessoa" },
   { number: 2, title: "Contatos" },
   { number: 3, title: "Endereco" },
   { number: 4, title: "Informacoes complementares" },
   { number: 5, title: "Animais" },
   { number: 6, title: "Financeiro" },
+];
+
+const VETERINARIO_STEPS = [
+  { number: 1, title: "Dados profissionais" },
+  { number: 2, title: "Contatos" },
+  { number: 3, title: "Endereco" },
+  { number: 4, title: "Complementares" },
 ];
 
 function buildNovoClienteFormData(tipoCadastro, tipoPessoa) {
@@ -151,6 +158,10 @@ export function useClientesNovoCadastro({
   const [saldoCampanhas, setSaldoCampanhas] = useState(null);
   const [loadingCadastro, setLoadingCadastro] = useState(false);
   const [formData, setFormData] = useState(buildNovoClienteFormData("cliente", "PF"));
+  const steps = useMemo(
+    () => (formData.tipo_cadastro === "veterinario" ? VETERINARIO_STEPS : STEPS),
+    [formData.tipo_cadastro],
+  );
 
   const {
     enderecosAdicionais,
@@ -307,7 +318,8 @@ export function useClientesNovoCadastro({
   };
 
   const nextStep = async () => {
-    if (currentStep >= 6) return;
+    const ultimoStep = steps.at(-1)?.number || 1;
+    if (currentStep >= ultimoStep) return;
 
     setError("");
     setCepError("");
@@ -424,6 +436,12 @@ export function useClientesNovoCadastro({
         if (telefoneDigits.length < 10) {
           errosValidacao.push("Telefone ou celular");
         }
+      }
+      if (
+        formData.tipo_cadastro === "veterinario" &&
+        (!formData.crmv || formData.crmv.trim() === "")
+      ) {
+        errosValidacao.push("CRMV");
       }
 
       if (errosValidacao.length > 0) {
@@ -595,7 +613,8 @@ export function useClientesNovoCadastro({
         }
       }
 
-      const errorMessage = mensagemErro || err.response?.data?.message || "Erro ao salvar cliente";
+      const errorMessage =
+        mensagemErro || err.response?.data?.message || "Erro ao salvar o cadastro";
       setError(errorMessage);
 
       if (mensagemErro) {
@@ -610,7 +629,7 @@ export function useClientesNovoCadastro({
       editingCliente,
       formData,
       closeModal,
-      steps: STEPS,
+      steps,
       currentStep,
       setCurrentStep,
       error,
@@ -705,6 +724,7 @@ export function useClientesNovoCadastro({
       showModal,
       showModalImportacao,
       onClienteCriado,
+      steps,
     ],
   );
 

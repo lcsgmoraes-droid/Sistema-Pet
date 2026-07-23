@@ -22,7 +22,11 @@ EXTRATO_COLUNAS_META = {
     "preco_total": {"titulo": "Venda", "excel_width": 14, "pdf_width_mm": 18},
     "margem_valor": {"titulo": "Margem", "excel_width": 14, "pdf_width_mm": 18},
     "margem_percentual": {"titulo": "Margem %", "excel_width": 12, "pdf_width_mm": 16},
-    "contabilizar_label": {"titulo": "Total", "excel_width": 12, "pdf_width_mm": 14},
+    "contabilizar_label": {
+        "titulo": "Tipo da linha",
+        "excel_width": 18,
+        "pdf_width_mm": 22,
+    },
     "estoque_baixado_label": {
         "titulo": "Estoque",
         "excel_width": 14,
@@ -234,7 +238,7 @@ def _linha_extrato(
         "margem_valor": margem_valor,
         "margem_percentual": margem_percentual,
         "contabilizar_total": bool(contabilizar_total),
-        "contabilizar_label": "Sim" if contabilizar_total else "Detalhe",
+        "contabilizar_label": "Cobrança" if contabilizar_total else "Detalhe",
         "estoque_baixado": bool(estoque_baixado),
         "estoque_baixado_label": "Baixado" if estoque_baixado else "Nao",
         "estoque_movimentacao_ids": estoque_movimentacao_ids or [],

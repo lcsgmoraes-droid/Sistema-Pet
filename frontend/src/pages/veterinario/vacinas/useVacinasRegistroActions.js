@@ -122,7 +122,7 @@ export function useVacinasRegistroActions({
         lote: form.lote || undefined,
         data_aplicacao: form.data_aplicacao,
         data_proxima_dose: form.proxima_dose || sugestaoDose?.proximaDose || undefined,
-        veterinario_responsavel: form.veterinario_responsavel || undefined,
+        veterinario_id: form.veterinario_id ? Number(form.veterinario_id) : undefined,
         observacoes: form.observacoes || undefined,
       });
 

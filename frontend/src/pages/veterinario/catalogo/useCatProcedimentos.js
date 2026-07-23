@@ -16,15 +16,18 @@ export function useCatProcedimentos() {
   const [form, setForm] = useState(FORM_PROCEDIMENTO_INICIAL);
   const [salvando, setSalvando] = useState(false);
   const [removendoId, setRemovendoId] = useState(null);
+  const [statusModelo, setStatusModelo] = useState(null);
+  const [importandoModelo, setImportandoModelo] = useState(false);
   const [erro, setErro] = useState("");
 
   async function carregar() {
     setCarregando(true);
     setErro("");
     try {
-      const [procedimentosResponse, produtosResponse] = await Promise.all([
+      const [procedimentosResponse, produtosResponse, statusModeloResponse] = await Promise.all([
         vetApi.listarCatalogoProcedimentos(),
         vetApi.listarProdutosEstoque(),
+        vetApi.statusModeloProcedimentosCorePet(),
       ]);
       setLista(
         Array.isArray(procedimentosResponse.data)
@@ -36,6 +39,7 @@ export function useCatProcedimentos() {
           ? produtosResponse.data
           : (produtosResponse.data?.items ?? []),
       );
+      setStatusModelo(statusModeloResponse.data || null);
     } catch (err) {
       setErro(err?.response?.data?.detail || "Erro ao carregar procedimentos.");
     } finally {
@@ -148,6 +152,26 @@ export function useCatProcedimentos() {
     }
   }
 
+  async function importarModeloCorePet() {
+    const quantidade = statusModelo?.disponiveis_para_importar || 0;
+    if (!quantidade) return;
+    const confirmado = window.confirm(
+      `Importar ${quantidade} procedimento(s) do modelo CorePet? Preços e insumos continuarão em branco.`,
+    );
+    if (!confirmado) return;
+
+    setImportandoModelo(true);
+    setErro("");
+    try {
+      await vetApi.importarModeloProcedimentosCorePet();
+      await carregar();
+    } catch (err) {
+      setErro(err?.response?.data?.detail || "Erro ao importar o modelo de procedimentos.");
+    } finally {
+      setImportandoModelo(false);
+    }
+  }
+
   return {
     adicionarInsumo,
     abrirEdicao,
@@ -159,6 +183,8 @@ export function useCatProcedimentos() {
     excluir,
     fecharModal,
     form,
+    importandoModelo,
+    importarModeloCorePet,
     lista,
     modalAberto,
     produtos,
@@ -168,5 +194,6 @@ export function useCatProcedimentos() {
     salvando,
     salvar,
     setCampo,
+    statusModelo,
   };
 }

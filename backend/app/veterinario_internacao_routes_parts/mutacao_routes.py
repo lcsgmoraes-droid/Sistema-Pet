@@ -21,6 +21,7 @@ from ..veterinario_financeiro import (
 )
 from ..veterinario_internacao import (
     _build_procedimento_observacao,
+    _garantir_internacao_ativa,
     _normalizar_baia,
     _pack_motivo_baia,
     _split_motivo_baia,
@@ -144,6 +145,7 @@ def registrar_evolucao(
     # Se o tenant veio no contexto, valida acesso. Se não veio, usa o tenant da internação.
     if tenant_id is not None and i.tenant_id is not None and i.tenant_id != tenant_id:
         raise HTTPException(404, "Internação não encontrada")
+    _garantir_internacao_ativa(i, "registrar evolução")
 
     tenant_id_evolucao = i.tenant_id or tenant_id
     if tenant_id_evolucao is None:
@@ -198,6 +200,7 @@ def registrar_procedimento_internacao(
 
     if tenant_id is not None and i.tenant_id is not None and i.tenant_id != tenant_id:
         raise HTTPException(404, "Internação não encontrada")
+    _garantir_internacao_ativa(i, "registrar procedimento")
 
     tenant_id_registro = i.tenant_id or tenant_id
     if tenant_id_registro is None:
