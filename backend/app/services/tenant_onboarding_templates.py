@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 from typing import Any
 
 DEFAULT_BUNDLE_CODE = "petshop-br"
@@ -26,6 +28,7 @@ ITEM_INSTALL_TARGET_TABLES = {
     "departamentos",
     "categorias",
     "produtos",
+    "vet_catalogo_procedimentos",
 }
 REQUIRED_ONBOARDING_SECTIONS = {
     "payment_methods",
@@ -665,5 +668,29 @@ for index, weight in enumerate((0.5, 1, 2, 3, 5, 7, 10, 10.1, 15, 20, 25), start
             label,
             {"peso_kg": weight, "descricao": label, "ordem": index, "ativo": True},
             700 + index,
+        )
+    )
+
+
+_VET_PROCEDURES_PATH = (
+    Path(__file__).resolve().parents[1] / "catalogos" / "vet_procedimentos_v1.json"
+)
+with _VET_PROCEDURES_PATH.open("r", encoding="utf-8") as _vet_procedures_file:
+    _VET_PROCEDURES = json.load(_vet_procedures_file)
+
+for index, procedure in enumerate(_VET_PROCEDURES, start=1):
+    BUILTIN_TEMPLATE_ITEMS.append(
+        _template_item(
+            "vet_procedure",
+            procedure["code"],
+            procedure["name"],
+            {
+                "nome": procedure["name"],
+                "descricao": procedure.get("descricao"),
+                "categoria": procedure.get("categoria"),
+                "duracao_minutos": procedure.get("duracao_minutos"),
+                "requer_anestesia": bool(procedure.get("requer_anestesia", False)),
+            },
+            1000 + index,
         )
     )

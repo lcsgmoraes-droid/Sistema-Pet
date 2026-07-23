@@ -10,6 +10,7 @@ from .db import get_session
 from .models import Cliente, Pet
 from .produtos_models import Produto
 from .veterinario_core import _get_tenant
+from .veterinario_internacao import _garantir_internacao_ativa
 from .veterinario_models import (
     CatalogoProcedimento,
     ConsultaVet,
@@ -80,6 +81,7 @@ def _internacao_or_none(
         raise HTTPException(
             status_code=404, detail="Internacao nao encontrada para o orcamento"
         )
+    _garantir_internacao_ativa(internacao, "alterar orçamento")
     return internacao
 
 
@@ -376,6 +378,7 @@ def atualizar_orcamento(
 ):
     _, tenant_id = _get_tenant(current)
     orcamento = _orcamento_or_404(db, tenant_id, orcamento_id)
+    _internacao_or_none(db, tenant_id, orcamento.internacao_id)
     payload = body.model_dump(exclude_unset=True)
 
     if any(

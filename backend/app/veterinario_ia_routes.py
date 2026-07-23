@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from .auth.dependencies import get_current_user_and_tenant
@@ -14,6 +15,7 @@ from .veterinario_core import _get_tenant
 from .veterinario_exames_arquivos import _process_exam_file_with_ai
 from .veterinario_ia import (
     _carregar_memoria_conversa,
+    _carregar_memoria_feedback_usuario,
     _garantir_tabelas_memoria_ia,
     _montar_resposta_dose,
     _montar_resposta_interacao,
@@ -22,12 +24,25 @@ from .veterinario_ia import (
     _normalizar_modo_ia,
     _obter_ou_criar_conversa_vet,
     _responder_chat_exame,
+    _safety_identifier_vet,
     _tentar_resposta_llm_veterinaria,
 )
-from .veterinario_models import ConsultaVet, ExameVet, MedicamentoCatalogo
+from .veterinario_ia_contexto import montar_contexto_clinico_vet
+from .services.vet_clinical_evidence import (
+    buscar_evidencias_clinicas_disponiveis,
+    revisar_documento_clinico,
+)
+from .veterinario_models import (
+    ConsultaVet,
+    DocumentoConhecimentoVet,
+    ExameVet,
+    FonteConhecimentoVet,
+    MedicamentoCatalogo,
+)
 from .veterinario_schemas import (
     ExameChatPayload,
     VetAssistenteIAPayload,
+    VetConhecimentoRevisaoPayload,
     VetMensagemFeedbackPayload,
 )
 
@@ -123,12 +138,39 @@ def assistente_ia_veterinario(
         .limit(200)
         .all()
     )
+    contexto_clinico, fontes_contexto = montar_contexto_clinico_vet(
+        db,
+        tenant_id=tenant_id,
+        pet=pet,
+        consulta=consulta,
+        exame=exame,
+    )
+    fontes_evidencia = buscar_evidencias_clinicas_disponiveis(
+        db,
+        pergunta=mensagem,
+        limite=4,
+    )
+    if fontes_evidencia:
+        contexto_clinico["evidencias_clinicas_disponiveis"] = fontes_evidencia
+        fontes_contexto.append("literatura_cientifica_rastreavel")
+
+    _garantir_tabelas_memoria_ia(db)
+    memoria_adaptativa = _carregar_memoria_feedback_usuario(
+        db,
+        tenant_id,
+        user.id,
+    )
+    if memoria_adaptativa["memorias_consideradas"]:
+        contexto_clinico["memoria_adaptativa_usuario"] = memoria_adaptativa
+        fontes_contexto.append("feedback_explicito_usuario_tenant")
 
     conversa = None
     memoria = []
     contexto_memoria = ""
     historico_salvo = False
     modelo_usado = "vet-regra"
+    origem_resposta = "regra_local"
+    status_provedor = "nao_tentado"
     if payload.salvar_historico:
         try:
             _garantir_tabelas_memoria_ia(db)
@@ -154,7 +196,7 @@ def assistente_ia_veterinario(
     if contexto_memoria:
         mensagem_analise = f"{mensagem} {contexto_memoria}"
 
-    resposta_llm, modelo_llm = _tentar_resposta_llm_veterinaria(
+    resposta_llm, modelo_llm, status_provedor = _tentar_resposta_llm_veterinaria(
         mensagem=mensagem,
         memoria=memoria,
         pet=pet,
@@ -164,11 +206,14 @@ def assistente_ia_veterinario(
         peso_kg=peso_kg,
         meds=meds,
         modo=payload.modo,
+        contexto_estruturado=contexto_clinico,
+        safety_identifier=_safety_identifier_vet(tenant_id, user.id),
     )
 
     if resposta_llm:
         resposta_final = resposta_llm
         modelo_usado = modelo_llm or "vet-llm"
+        origem_resposta = "modelo_ia"
     else:
         respostas = []
 
@@ -234,10 +279,11 @@ def assistente_ia_veterinario(
 
         resposta_final = "\n\n".join(respostas)
 
-    resposta_final += (
-        "\n\nAviso clínico: resposta de apoio à decisão. "
-        "Sempre confirmar conduta final com exame físico, histórico completo e protocolos da clínica."
-    )
+    if "aviso clínico:" not in resposta_final.lower():
+        resposta_final += (
+            "\n\nAviso clínico: resposta de apoio à decisão. "
+            "A conduta final é do médico-veterinário responsável."
+        )
 
     contexto_msg = {
         "modulo": "vet",
@@ -247,6 +293,11 @@ def assistente_ia_veterinario(
         "exame_id": exame.id if exame else None,
         "peso_kg": peso_kg,
         "especie": especie,
+        "modelo_usado": modelo_usado,
+        "origem_resposta": origem_resposta,
+        "status_provedor": status_provedor,
+        "fontes_contexto": fontes_contexto,
+        "fontes_evidencia": fontes_evidencia,
     }
 
     if payload.salvar_historico and conversa:
@@ -282,6 +333,11 @@ def assistente_ia_veterinario(
         "resposta": resposta_final,
         "conversa_id": conversa.id if conversa else payload.conversa_id,
         "historico_salvo": historico_salvo,
+        "modelo_usado": modelo_usado,
+        "origem_resposta": origem_resposta,
+        "status_provedor": status_provedor,
+        "fontes_contexto": fontes_contexto,
+        "fontes_evidencia": fontes_evidencia,
         "contexto": {
             "modo": payload.modo,
             "pet_id": pet.id if pet else None,
@@ -367,9 +423,11 @@ def listar_conversas_assistente_vet(
             {
                 "id": conversa.id,
                 "titulo": conversa.titulo,
-                "atualizado_em": conversa.atualizado_em.isoformat()
-                if conversa.atualizado_em
-                else None,
+                "atualizado_em": (
+                    conversa.atualizado_em.isoformat()
+                    if conversa.atualizado_em
+                    else None
+                ),
                 "ultima_mensagem": (ultima.conteudo or "")[:180],
                 "contexto": {
                     "modo": contexto_base.get("modo"),
@@ -429,6 +487,11 @@ def listar_mensagens_conversa_assistente_vet(
                 "conteudo": msg.conteudo,
                 "criado_em": msg.criado_em.isoformat() if msg.criado_em else None,
                 "feedback": contexto.get("feedback"),
+                "modelo_usado": msg.modelo_usado,
+                "origem_resposta": contexto.get("origem_resposta"),
+                "status_provedor": contexto.get("status_provedor"),
+                "fontes_contexto": contexto.get("fontes_contexto") or [],
+                "fontes_evidencia": contexto.get("fontes_evidencia") or [],
             }
         )
 
@@ -436,9 +499,9 @@ def listar_mensagens_conversa_assistente_vet(
         "conversa": {
             "id": conversa.id,
             "titulo": conversa.titulo,
-            "atualizado_em": conversa.atualizado_em.isoformat()
-            if conversa.atualizado_em
-            else None,
+            "atualizado_em": (
+                conversa.atualizado_em.isoformat() if conversa.atualizado_em else None
+            ),
         },
         "items": itens,
     }
@@ -499,9 +562,147 @@ def memoria_status_assistente_vet(
     db: Session = Depends(get_session),
     current=Depends(get_current_user_and_tenant),
 ):
-    _user, _tenant_id = _get_tenant(current)
+    user, tenant_id = _get_tenant(current)
     status_memoria = _garantir_tabelas_memoria_ia(db)
-    return status_memoria
+    memoria = _carregar_memoria_feedback_usuario(db, tenant_id, user.id)
+    return {**status_memoria, **memoria}
+
+
+@router.get(
+    "/ia/conhecimento/status",
+    summary="Mostra a cobertura e a governanca da base clinica da IA",
+)
+def status_conhecimento_assistente_vet(
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _user, _tenant_id = _get_tenant(current)
+    fontes = db.query(FonteConhecimentoVet).order_by(FonteConhecimentoVet.nome).all()
+    counts = dict(
+        db.query(
+            DocumentoConhecimentoVet.status_revisao,
+            func.count(DocumentoConhecimentoVet.id),
+        )
+        .group_by(DocumentoConhecimentoVet.status_revisao)
+        .all()
+    )
+    return {
+        "documentos": {
+            "aprovados": int(counts.get("aprovado", 0)),
+            "automaticos_disponiveis": int(counts.get("auto_disponivel", 0)),
+            "referencias_sem_resumo": int(counts.get("referencia", 0)),
+            "pendentes": int(counts.get("pendente", 0)),
+            "rejeitados": int(counts.get("rejeitado", 0)),
+        },
+        "politica": {
+            "ingestao_automatica": True,
+            "uso_na_resposta_exige_revisao": False,
+            "triagem_automatica_rastreavel": True,
+            "casos_clinicos_entram_em_treinamento_global": False,
+            "feedback_personaliza_usuario_no_tenant": True,
+        },
+        "fontes": [
+            {
+                "codigo": item.codigo,
+                "nome": item.nome,
+                "url": item.url_base,
+                "termos_url": item.termos_url,
+                "ultima_sincronizacao_em": (
+                    item.ultima_sincronizacao_em.isoformat()
+                    if item.ultima_sincronizacao_em
+                    else None
+                ),
+                "ultimo_status": item.ultimo_status,
+            }
+            for item in fontes
+        ],
+    }
+
+
+@router.get(
+    "/ia/conhecimento/documentos",
+    summary="Lista documentos revisados da base clinica",
+)
+def listar_documentos_conhecimento_vet(
+    status: str = Query("aprovado"),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    user, _tenant_id = _get_tenant(current)
+    status_normalizado = (status or "aprovado").strip().lower()
+    if status_normalizado != "aprovado" and not getattr(user, "is_admin", False):
+        raise HTTPException(403, "A fila de revisão é restrita a administradores.")
+    documentos = (
+        db.query(DocumentoConhecimentoVet)
+        .filter(DocumentoConhecimentoVet.status_revisao == status_normalizado)
+        .order_by(
+            DocumentoConhecimentoVet.publicado_em.desc().nullslast(),
+            DocumentoConhecimentoVet.id.desc(),
+        )
+        .limit(limit)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": item.id,
+                "fonte": item.fonte.codigo if item.fonte else None,
+                "fonte_documento_id": item.fonte_documento_id,
+                "titulo": item.titulo,
+                "resumo": item.resumo,
+                "autores": item.autores or [],
+                "periodico": item.periodico,
+                "doi": item.doi,
+                "url": item.url,
+                "publicado_em": (
+                    item.publicado_em.isoformat() if item.publicado_em else None
+                ),
+                "especies": item.especies or [],
+                "temas": item.temas or [],
+                "status_revisao": item.status_revisao,
+                "motivo_revisao": item.motivo_revisao,
+            }
+            for item in documentos
+        ]
+    }
+
+
+@router.post(
+    "/ia/conhecimento/documentos/{documento_id}/revisar",
+    summary="Aprova, rejeita ou devolve um estudo para revisão",
+)
+def revisar_documento_conhecimento_vet(
+    documento_id: int,
+    payload: VetConhecimentoRevisaoPayload,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    user, _tenant_id = _get_tenant(current)
+    if not getattr(user, "is_admin", False):
+        raise HTTPException(403, "A revisão global é restrita a administradores.")
+    documento = (
+        db.query(DocumentoConhecimentoVet)
+        .filter(DocumentoConhecimentoVet.id == documento_id)
+        .first()
+    )
+    if not documento:
+        raise HTTPException(404, "Documento não encontrado.")
+    try:
+        revisar_documento_clinico(
+            documento,
+            status=payload.status,
+            reviewer_id=user.id,
+            motivo=payload.motivo,
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    db.commit()
+    return {
+        "ok": True,
+        "documento_id": documento.id,
+        "status_revisao": documento.status_revisao,
+    }
 
 
 @router.post(

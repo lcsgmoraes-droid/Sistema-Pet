@@ -19,6 +19,17 @@ _BAIA_MOTIVO_RE = re.compile(r"\s*\[BAIA:(?P<baia>[^\]]+)\]\s*$")
 _PROC_PREFIX = "[PROC_INT]"
 
 
+def _garantir_internacao_ativa(internacao: InternacaoVet, acao: str) -> None:
+    if (getattr(internacao, "status", None) or "").lower() not in {
+        "internado",
+        "ativa",
+    }:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Internação encerrada não permite {acao}.",
+        )
+
+
 def _resolver_data_entrada_exibicao_internacao(
     internacao: InternacaoVet,
     registros: Optional[list[EvolucaoInternacao]] = None,

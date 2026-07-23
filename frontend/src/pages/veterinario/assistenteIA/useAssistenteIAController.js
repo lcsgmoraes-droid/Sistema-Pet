@@ -19,6 +19,7 @@ export default function useAssistenteIAController() {
   const [conversaId, setConversaId] = useState("");
   const [filtrarConversasContexto, setFiltrarConversasContexto] = useState(false);
   const [memoriaAtiva, setMemoriaAtiva] = useState(null);
+  const [conhecimentoStatus, setConhecimentoStatus] = useState(null);
   const [conversas, setConversas] = useState([]);
   const [pets, setPets] = useState([]);
   const [consultas, setConsultas] = useState([]);
@@ -105,6 +106,7 @@ export default function useAssistenteIAController() {
     setExameId,
     setExames,
     setHistorico,
+    setConhecimentoStatus,
     setMemoriaAtiva,
     setPets,
     setPesoKg,
@@ -140,6 +142,7 @@ export default function useAssistenteIAController() {
     consultaId,
     consultaSelecionada,
     consultas,
+    conhecimentoStatus,
     conversaId,
     conversas,
     erro,

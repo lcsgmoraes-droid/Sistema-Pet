@@ -33,6 +33,7 @@ from app.services.tenant_onboarding_financial_copies import (
 )
 from app.services.tenant_onboarding_item_installs import _record_install
 from app.services.tenant_onboarding_sql import _items_by_type
+from app.services.tenant_onboarding_vet_copies import _copy_vet_procedures
 
 
 def _run_onboarding_steps(
@@ -187,6 +188,19 @@ def _run_onboarding_steps(
         _copy_package_weights(
             db,
             _items_by_type(items, "package_weight"),
+            tenant_id_str,
+            result,
+        )
+
+    if _tables_ready_or_warn(
+        db,
+        result,
+        "procedimentos veterinarios",
+        ("vet_catalogo_procedimentos",),
+    ):
+        _copy_vet_procedures(
+            db,
+            _items_by_type(items, "vet_procedure"),
             tenant_id_str,
             result,
         )

@@ -231,6 +231,7 @@ export default function OrcamentoMvpPanel({
           selectedProduct={produtoSelecionado}
           onSelect={setProdutoSelecionado}
           helperText=""
+          disabled={modoSomenteLeitura}
         />
         <input
           type="number"

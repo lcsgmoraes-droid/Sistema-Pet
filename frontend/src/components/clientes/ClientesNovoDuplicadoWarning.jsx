@@ -24,9 +24,9 @@ function ClientesNovoDuplicadoWarning({
       <div className="flex items-start gap-3">
         <FiAlertCircle className="text-yellow-600 mt-1" size={24} />
         <div className="flex-1">
-          <h4 className="font-semibold text-yellow-900 mb-2">Cliente ja cadastrado!</h4>
+          <h4 className="font-semibold text-yellow-900 mb-2">Pessoa ja cadastrada!</h4>
           <p className="text-sm text-yellow-800 mb-3">
-            Ja existe um cliente com o mesmo <strong>{clienteDuplicado.campo}</strong> cadastrado:
+            Ja existe uma pessoa com o mesmo <strong>{clienteDuplicado.campo}</strong> cadastrado:
           </p>
 
           <div className="bg-white rounded-lg p-3 border border-yellow-300 mb-3">

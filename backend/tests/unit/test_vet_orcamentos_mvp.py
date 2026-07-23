@@ -1,6 +1,8 @@
 import importlib
 from types import SimpleNamespace
 
+from tests.route_contract_helpers import method_routes
+
 
 def _orcamentos():
     return importlib.import_module("app.veterinario_orcamentos")
@@ -9,14 +11,7 @@ def _orcamentos():
 def _router_routes() -> set[tuple[str, str]]:
     from app.veterinario_routes import router
 
-    routes: set[tuple[str, str]] = set()
-    for route in router.routes:
-        methods = getattr(route, "methods", None)
-        if not methods:
-            continue
-        for method in methods:
-            routes.add((route.path, method))
-    return routes
+    return set(method_routes(router))
 
 
 def test_monta_item_de_catalogo_com_custo_preco_e_margem_estimados():

@@ -17,6 +17,7 @@ except (
     pdfplumber = None
 
 from fastapi import HTTPException, UploadFile
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from .veterinario_exames_ia import (
@@ -39,20 +40,32 @@ UPLOADS_DIR = Path(__file__).resolve().parents[1] / "uploads" / "veterinario" / 
 
 
 def _resolve_vet_openai_config(db: Session, tenant_id) -> tuple[str, str]:
-    with whatsapp_tenant_context(tenant_id):
-        config = (
-            db.query(TenantWhatsAppConfig)
-            .filter(TenantWhatsAppConfig.tenant_id == str(tenant_id))
-            .first()
-        )
-    api_key = ""
-    model = "gpt-4o-mini"
+    api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
+    model = (
+        os.getenv("VET_OPENAI_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-5.6-terra"
+    ).strip()
+
+    # Configuracao do WhatsApp e opcional. O modulo veterinario nao pode falhar
+    # quando esse recurso nao foi instalado no tenant/ambiente.
+    bind = db.get_bind()
+    if not inspect(bind).has_table(TenantWhatsAppConfig.__tablename__):
+        return api_key, model
+
+    config = None
+    try:
+        with db.begin_nested():
+            with whatsapp_tenant_context(tenant_id):
+                config = (
+                    db.query(TenantWhatsAppConfig)
+                    .filter(TenantWhatsAppConfig.tenant_id == str(tenant_id))
+                    .first()
+                )
+    except Exception:
+        config = None
+
     if config and config.openai_api_key:
         api_key = config.openai_api_key.strip()
         model = (config.model_preference or model).strip() or model
-    else:
-        api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
-        model = (os.getenv("OPENAI_MODEL") or model).strip() or model
     return api_key, model
 
 

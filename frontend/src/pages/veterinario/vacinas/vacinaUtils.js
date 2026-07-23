@@ -6,7 +6,7 @@ export const FORM_VACINA_INICIAL = {
   lote: "",
   data_aplicacao: "",
   proxima_dose: "",
-  veterinario_responsavel: "",
+  veterinario_id: "",
   observacoes: "",
 };
 
@@ -28,9 +28,14 @@ export function normalizarVacinas(data) {
 
 export function adicionarDias(dataIso, dias) {
   if (!dataIso || !dias) return "";
-  const data = new Date(`${dataIso}T12:00:00`);
+  const data = dataLocal(dataIso);
+  if (!data) return "";
   data.setDate(data.getDate() + Number(dias));
-  return data.toISOString().slice(0, 10);
+  return [
+    data.getFullYear(),
+    String(data.getMonth() + 1).padStart(2, "0"),
+    String(data.getDate()).padStart(2, "0"),
+  ].join("-");
 }
 
 export function sugerirProximaDose(protocolos, pets, form) {
@@ -61,7 +66,9 @@ export function sugerirProximaDose(protocolos, pets, form) {
 
 export function formatData(iso) {
   if (!iso) return "-";
-  return new Date(iso).toLocaleDateString("pt-BR", {
+  const data = dataLocal(iso);
+  if (!data) return "-";
+  return data.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -70,7 +77,11 @@ export function formatData(iso) {
 
 export function diasRestantes(iso) {
   if (!iso) return null;
-  return Math.ceil((new Date(iso) - Date.now()) / 86400000);
+  const data = dataLocal(iso);
+  if (!data) return null;
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  return Math.round((data - hoje) / 86400000);
 }
 
 export function badgeProxDose(iso) {
@@ -96,4 +107,12 @@ export function classeFaseCalendario(fase) {
   if (fase === "filhote") return "bg-blue-100 text-blue-700";
   if (fase === "adulto") return "bg-green-100 text-green-700";
   return "bg-gray-100 text-gray-600";
+}
+
+function dataLocal(iso) {
+  const dataIso = String(iso).slice(0, 10);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dataIso);
+  if (!match) return null;
+  const data = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return Number.isNaN(data.getTime()) ? null : data;
 }

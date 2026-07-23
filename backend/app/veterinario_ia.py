@@ -1,8 +1,11 @@
 """Helpers de IA do modulo veterinario."""
 
+import hashlib
+import json
+import logging
 import os
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
@@ -10,6 +13,8 @@ from sqlalchemy.orm import Session
 from .ia.aba6_models import Conversa, MensagemChat
 from .models import Pet
 from .veterinario_models import ConsultaVet, ExameVet, MedicamentoCatalogo
+
+logger = logging.getLogger(__name__)
 
 
 def _normalizar_texto(v: Optional[str]) -> str:
@@ -75,6 +80,96 @@ def _carregar_memoria_conversa(
     )
 
 
+def _resumir_feedbacks_memoria(
+    mensagens: list[MensagemChat],
+    limite_comentarios: int = 8,
+) -> dict[str, Any]:
+    """Turn explicit user feedback into scoped preferences, not clinical truth."""
+    comments = []
+    useful = 0
+    not_useful = 0
+    debate_notes = 0
+    preference_markers = (
+        "prefiro ",
+        "na nossa clínica",
+        "na minha clínica",
+        "sempre responda",
+        "quero que você ",
+        "corrigindo sua resposta",
+        "minha conduta ",
+    )
+    for message in mensagens:
+        if getattr(message, "tipo", "assistente") == "usuario":
+            user_text = str(getattr(message, "conteudo", "") or "").strip()
+            normalized_user_text = user_text.casefold()
+            if (
+                user_text
+                and any(marker in normalized_user_text for marker in preference_markers)
+                and len(comments) < limite_comentarios
+            ):
+                comments.append(
+                    {
+                        "resposta_util": None,
+                        "comentario_do_veterinario": user_text[:800],
+                        "origem": "debate_na_conversa",
+                    }
+                )
+                debate_notes += 1
+            continue
+        context = (
+            message.contexto_usado if isinstance(message.contexto_usado, dict) else {}
+        )
+        feedback = context.get("feedback")
+        if not isinstance(feedback, dict):
+            continue
+        if feedback.get("util") is True:
+            useful += 1
+        elif feedback.get("util") is False:
+            not_useful += 1
+        comment = str(feedback.get("comentario") or "").strip()
+        if comment and len(comments) < limite_comentarios:
+            comments.append(
+                {
+                    "resposta_util": bool(feedback.get("util")),
+                    "comentario_do_veterinario": comment[:800],
+                    "origem": "feedback_explicito",
+                }
+            )
+    return {
+        "feedbacks_considerados": useful + not_useful,
+        "debates_considerados": debate_notes,
+        "memorias_consideradas": useful + not_useful + debate_notes,
+        "respostas_uteis": useful,
+        "respostas_nao_uteis": not_useful,
+        "preferencias_e_correcoes_explicitas": comments,
+        "escopo": "usuario_atual_no_tenant_atual",
+    }
+
+
+def _carregar_memoria_feedback_usuario(
+    db: Session,
+    tenant_id,
+    user_id: int,
+) -> dict[str, Any]:
+    mensagens = (
+        db.query(MensagemChat)
+        .join(Conversa, Conversa.id == MensagemChat.conversa_id)
+        .filter(
+            MensagemChat.tenant_id == str(tenant_id),
+            Conversa.usuario_id == user_id,
+        )
+        .order_by(MensagemChat.id.desc())
+        .limit(250)
+        .all()
+    )
+    return _resumir_feedbacks_memoria(mensagens)
+
+
+def _safety_identifier_vet(tenant_id, user_id: int) -> str:
+    raw = f"corepet-vet:{tenant_id}:{user_id}".encode()
+    return f"vet_{hashlib.sha256(raw).hexdigest()[:32]}"
+
+
 def _obter_ou_criar_conversa_vet(
     db: Session,
     tenant_id,
@@ -127,6 +222,21 @@ def _resumo_contexto_clinico(
     if pet:
         blocos.append(
             f"Paciente: {pet.nome} | espécie: {pet.especie or 'não informada'} | raça: {pet.raca or 'n/i'}"
+        )
+        alergias = getattr(pet, "alergias_lista", None) or getattr(
+            pet, "alergias", None
+        )
+        condicoes = getattr(pet, "condicoes_cronicas_lista", None) or getattr(
+            pet, "doencas_cronicas", None
+        )
+        medicamentos = getattr(pet, "medicamentos_continuos_lista", None) or getattr(
+            pet, "medicamentos_continuos", None
+        )
+        blocos.append(
+            "Segurança do paciente: "
+            f"alergias={alergias or 'não revisadas'}; "
+            f"condições crônicas={condicoes or 'não informadas'}; "
+            f"medicamentos contínuos={medicamentos or 'não informados'}"
         )
     if consulta:
         blocos.append(
@@ -403,6 +513,7 @@ def _montar_prompt_vet_llm(
     peso_kg: Optional[float],
     meds: list[MedicamentoCatalogo],
     modo: Optional[str],
+    contexto_estruturado: Optional[dict[str, Any]] = None,
 ) -> tuple[str, str]:
     especie_txt = (especie or "não informada").strip()
     peso_txt = (
@@ -428,27 +539,45 @@ def _montar_prompt_vet_llm(
             partes.append(f"dose mg/kg: {dmin} a {dmax}")
         meds_preview.append(" | ".join(partes))
 
-    contexto_clinico = (
-        _resumo_contexto_clinico(pet, consulta, exame)
-        or "Sem contexto clínico detalhado."
-    )
+    if contexto_estruturado:
+        contexto_clinico = json.dumps(
+            contexto_estruturado,
+            ensure_ascii=False,
+            default=str,
+            separators=(",", ":"),
+        )[:18000]
+    else:
+        contexto_clinico = (
+            _resumo_contexto_clinico(pet, consulta, exame)
+            or "Sem contexto clínico detalhado."
+        )
 
     prompt_system = (
-        "Você é um assistente clínico veterinário para apoio à decisão. "
+        "Você é o copiloto clínico veterinário do CorePet, para apoio à decisão de médicos-veterinários. "
         "Responda em português do Brasil, direto e claro. "
-        "Não invente dados. Não substitua consulta veterinária. "
-        "Sempre inclua orientação de segurança quando houver dose, interação medicamentosa ou risco clínico.\n\n"
+        "Não invente dados, referências, doses nem interações. "
+        "Diferencie claramente fato do prontuário, hipótese clínica e recomendação. "
+        "Não repita avisos genéricos se já houver um aviso clínico na interface.\n\n"
         "REGRAS:\n"
         "1) Se faltar dado crítico (peso, espécie, medicamento), peça esse dado antes de concluir.\n"
-        "2) Em dose, informe faixa e recomende confirmar bula/protocolo.\n"
-        "3) Em interação, sinalize incerteza quando não houver dado explícito.\n"
-        "4) Evite diagnóstico definitivo; forneça hipóteses e próximos passos.\n"
-        "5) Seja objetivo (preferir até 8 linhas, exceto quando pedirem plano detalhado).\n\n"
+        "2) Nunca converta mg em comprimidos ou mL sem concentração e apresentação compatíveis.\n"
+        "3) Em dose, use somente dados do catálogo/contexto e mande confirmar a fonte oficial.\n"
+        "4) Em interação, diga 'não há dado suficiente' quando a fonte explícita não estiver no contexto.\n"
+        "5) Em urgência, priorize estabilização e sinais de alarme; evite diagnóstico definitivo.\n"
+        "6) Considere alergias, medicamentos em uso, condições crônicas, exames e prescrições já registradas.\n"
+        "7) Seja objetivo, mas mostre o raciocínio clínico em tópicos quando pedirem discussão de caso.\n\n"
+        "8) Use somente as evidências clínicas disponíveis presentes no contexto. "
+        "Ao usá-las, cite a referência [E1], [E2] correspondente; não invente estudos.\n"
+        "9) Informe limitações do desenho do estudo. Triagem automática de fonte não "
+        "equivale a consenso nem substitui a leitura do artigo completo.\n"
+        "10) Memórias de feedback representam preferências ou correções do usuário. "
+        "Use-as para adaptar comunicação e fluxo, mas nunca como evidência científica "
+        "universal ou substituto de fonte clínica.\n\n"
         f"MODO: {_normalizar_modo_ia(modo)}\n"
         f"ESPÉCIE: {especie_txt}\n"
         f"PESO: {peso_txt}\n"
-        f"CONTEXTO CLÍNICO:\n{contexto_clinico}\n\n"
-        "CATÁLOGO RESUMIDO DE MEDICAMENTOS (amostra):\n"
+        f"CONTEXTO CLÍNICO ESTRUTURADO:\n{contexto_clinico}\n\n"
+        "CATÁLOGO LOCAL DE MEDICAMENTOS (pode estar incompleto; não trate ausência como prova de segurança):\n"
         f"{chr(10).join(meds_preview) if meds_preview else 'Sem medicamentos ativos no catálogo.'}"
     )
 
@@ -466,13 +595,15 @@ def _tentar_resposta_llm_veterinaria(
     peso_kg: Optional[float],
     meds: list[MedicamentoCatalogo],
     modo: Optional[str],
-) -> tuple[Optional[str], Optional[str]]:
+    contexto_estruturado: Optional[dict[str, Any]] = None,
+    safety_identifier: Optional[str] = None,
+) -> tuple[Optional[str], Optional[str], str]:
     groq_key = os.getenv("GROQ_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY")
     gemini_key = os.getenv("GEMINI_API_KEY")
 
     if not (groq_key or openai_key or gemini_key):
-        return None, None
+        return None, None, "sem_provedor_configurado"
 
     prompt_system, prompt_user = _montar_prompt_vet_llm(
         mensagem=mensagem,
@@ -483,6 +614,7 @@ def _tentar_resposta_llm_veterinaria(
         peso_kg=peso_kg,
         meds=meds,
         modo=modo,
+        contexto_estruturado=contexto_estruturado,
     )
 
     mensagens = [{"role": "system", "content": prompt_system}]
@@ -493,6 +625,57 @@ def _tentar_resposta_llm_veterinaria(
         role = "assistant" if m.tipo == "assistente" else "user"
         mensagens.append({"role": role, "content": conteudo[:3000]})
     mensagens.append({"role": "user", "content": prompt_user})
+
+    falha_provedor = False
+
+    if openai_key:
+        from openai import AuthenticationError, OpenAI, RateLimitError
+
+        client_ia = OpenAI(api_key=openai_key, timeout=45.0)
+        modelo_principal = (
+            os.getenv("VET_OPENAI_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-5.6"
+        ).strip()
+        modelo_fallback = (
+            os.getenv("VET_OPENAI_FALLBACK_MODEL") or "gpt-4o-mini"
+        ).strip()
+        modelos = [modelo_principal]
+        if modelo_fallback and modelo_fallback != modelo_principal:
+            modelos.append(modelo_fallback)
+
+        for indice, modelo in enumerate(modelos):
+            try:
+                kwargs = {
+                    "model": modelo,
+                    "input": mensagens,
+                    "max_output_tokens": 1200,
+                    "store": False,
+                }
+                if safety_identifier:
+                    kwargs["safety_identifier"] = safety_identifier
+                if modelo.startswith("gpt-5"):
+                    kwargs["reasoning"] = {
+                        "effort": (
+                            os.getenv("VET_OPENAI_REASONING_EFFORT") or "medium"
+                        ).strip()
+                    }
+                response = client_ia.responses.create(**kwargs)
+                resposta = (response.output_text or "").strip()
+                if resposta:
+                    status = "llm" if indice == 0 else "llm_fallback_modelo"
+                    return resposta, f"openai:{modelo}", status
+            except (AuthenticationError, RateLimitError):
+                logger.warning(
+                    "OpenAI veterinaria indisponivel por autenticacao ou limite."
+                )
+                falha_provedor = True
+                break
+            except Exception as exc:
+                logger.warning(
+                    "Falha no modelo veterinario OpenAI %s: %s",
+                    modelo,
+                    exc.__class__.__name__,
+                )
+                falha_provedor = True
 
     try:
         if groq_key:
@@ -506,20 +689,7 @@ def _tentar_resposta_llm_veterinaria(
                 max_tokens=600,
             )
             resposta = (completion.choices[0].message.content or "").strip()
-            return (resposta or None), "groq:llama-3.3-70b-versatile"
-
-        if openai_key:
-            from openai import OpenAI
-
-            client_ia = OpenAI(api_key=openai_key, timeout=25.0)
-            completion = client_ia.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=mensagens,
-                temperature=0.2,
-                max_tokens=600,
-            )
-            resposta = (completion.choices[0].message.content or "").strip()
-            return (resposta or None), "openai:gpt-4o-mini"
+            return (resposta or None), "groq:llama-3.3-70b-versatile", "llm"
 
         if gemini_key:
             import google.generativeai as genai
@@ -536,12 +706,16 @@ def _tentar_resposta_llm_veterinaria(
             prompt_completo = f"{prompt_system}\n\n{historico_txt}"
             response = model_ia.generate_content(prompt_completo)
             resposta = (getattr(response, "text", "") or "").strip()
-            return (resposta or None), "gemini:gemini-1.5-flash"
+            return (resposta or None), "gemini:gemini-1.5-flash", "llm"
 
-    except Exception:
-        return None, None
+    except Exception as exc:
+        logger.warning(
+            "Provedor alternativo da IA veterinaria falhou: %s",
+            exc.__class__.__name__,
+        )
+        falha_provedor = True
 
-    return None, None
+    return None, None, "erro_provedor" if falha_provedor else "sem_resposta"
 
 
 def _responder_chat_exame(

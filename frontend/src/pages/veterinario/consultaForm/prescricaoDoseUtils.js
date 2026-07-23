@@ -40,9 +40,9 @@ export function obterDoseMgKgReferencia(item = {}) {
   return NaN;
 }
 
-export function calcularDosePrescricaoPorPeso(item = {}, pesoKg) {
+export function calcularDosePrescricaoPorPeso(item = {}, pesoKg, doseMgKgEscolhida) {
   const peso = parseNumero(pesoKg);
-  const doseMgKg = obterDoseMgKgReferencia(item);
+  const doseMgKg = parseNumero(doseMgKgEscolhida ?? item.dose_mg_kg_escolhida);
 
   if (!Number.isFinite(peso) || peso <= 0 || !Number.isFinite(doseMgKg) || doseMgKg <= 0) {
     return null;
@@ -61,7 +61,7 @@ export function buildCalculadoraDoseFormParaPrescricao({
   petSelecionado = {},
 } = {}) {
   const peso = obterPesoParaCalculoDose(formConsulta, petSelecionado);
-  const doseMgKg = obterDoseMgKgReferencia(itemPrescricao);
+  const doseMgKg = parseNumero(itemPrescricao.dose_mg_kg_escolhida);
 
   return {
     ...calculadoraFormAtual,
@@ -69,9 +69,7 @@ export function buildCalculadoraDoseFormParaPrescricao({
       ? String(itemPrescricao.medicamento_id)
       : calculadoraFormAtual.medicamento_id || "",
     peso_kg: Number.isFinite(peso) ? formatarNumeroCampo(peso) : calculadoraFormAtual.peso_kg || "",
-    dose_mg_kg: Number.isFinite(doseMgKg)
-      ? formatarNumeroCampo(doseMgKg)
-      : calculadoraFormAtual.dose_mg_kg || "",
+    dose_mg_kg: Number.isFinite(doseMgKg) ? formatarNumeroCampo(doseMgKg) : "",
     frequencia_horas: calculadoraFormAtual.frequencia_horas || "12",
     dias: itemPrescricao.duracao_dias
       ? String(itemPrescricao.duracao_dias)

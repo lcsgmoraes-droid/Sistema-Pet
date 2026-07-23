@@ -1,13 +1,8 @@
 import { criarPrescricaoItemInicial, criarProcedimentoRealizadoInicial } from "./consultaFormState";
-import { calcularDosePrescricaoPorPeso, obterPesoParaCalculoDose } from "./prescricaoDoseUtils";
-
 export default function usePrescricaoProcedimentosConsulta({
-  form,
   setForm,
   medicamentosCatalogo,
-  petSelecionado,
   procedimentosCatalogo,
-  setErro,
 }) {
   function adicionarItem() {
     setForm((prev) => ({
@@ -74,22 +69,6 @@ export default function usePrescricaoProcedimentosConsulta({
     });
   }
 
-  function calcularDosePorPeso(item) {
-    const peso = obterPesoParaCalculoDose(form, petSelecionado);
-    if (!Number.isFinite(peso) || peso <= 0) {
-      setErro("Informe o peso do pet para calcular a dose automaticamente.");
-      return null;
-    }
-
-    const doseCalculada = calcularDosePrescricaoPorPeso(item, peso);
-    if (!doseCalculada) {
-      setErro("Esse medicamento não tem dose mg/kg cadastrada no catálogo.");
-      return null;
-    }
-
-    return doseCalculada;
-  }
-
   function selecionarMedicamentoNoItem(idx, medicamentoId) {
     const medicamento = medicamentosCatalogo.find((m) => String(m.id) === String(medicamentoId));
     if (!medicamento) return;
@@ -107,34 +86,11 @@ export default function usePrescricaoProcedimentosConsulta({
         via: medicamento.via_administracao ?? itemAtual.via ?? "oral",
         dose_minima_mg_kg: doseMinima,
         dose_maxima_mg_kg: doseMaxima,
+        dose_mg: "",
         frequencia: itemAtual.frequencia || medicamento.posologia_referencia || "",
       };
 
-      const doseCalculada = calcularDosePorPeso(itemAtualizado);
-      if (doseCalculada) {
-        itemAtualizado.dose_mg = doseCalculada.dose_mg;
-        itemAtualizado.unidade = doseCalculada.unidade;
-      }
-
       itens[idx] = itemAtualizado;
-      return { ...prev, prescricao_itens: itens };
-    });
-  }
-
-  function recalcularDoseItem(idx) {
-    const item = form.prescricao_itens[idx];
-    if (!item) return;
-
-    const doseCalculada = calcularDosePorPeso(item);
-    if (!doseCalculada) return;
-
-    setForm((prev) => {
-      const itens = [...prev.prescricao_itens];
-      itens[idx] = {
-        ...itens[idx],
-        dose_mg: doseCalculada.dose_mg,
-        unidade: doseCalculada.unidade,
-      };
       return { ...prev, prescricao_itens: itens };
     });
   }
@@ -144,7 +100,6 @@ export default function usePrescricaoProcedimentosConsulta({
     removerItem,
     setItem,
     selecionarMedicamentoNoItem,
-    recalcularDoseItem,
     adicionarProcedimento,
     removerProcedimento,
     setProcedimentoItem,

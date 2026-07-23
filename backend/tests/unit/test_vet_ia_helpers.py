@@ -8,6 +8,8 @@ from app.veterinario_ia import (
     _montar_resposta_interacao,
     _normalizar_modo_ia,
     _responder_chat_exame,
+    _resumir_feedbacks_memoria,
+    _safety_identifier_vet,
 )
 from app.veterinario_exames_ia import (
     _basic_lab_values_from_text,
@@ -116,6 +118,56 @@ def test_resposta_interacao_detecta_principio_duplicado():
 
     assert "mesmo princípio ativo" in resposta
     assert "duplicidade terapêutica" in resposta
+
+
+def test_feedback_memory_is_scoped_and_keeps_explicit_vet_comment():
+    messages = [
+        SimpleNamespace(
+            tipo="assistente",
+            conteudo="Resposta anterior",
+            contexto_usado={
+                "modulo": "vet",
+                "feedback": {
+                    "util": False,
+                    "comentario": "Prefiro respostas com hipóteses em ordem de prioridade.",
+                },
+            },
+        ),
+        SimpleNamespace(
+            tipo="assistente",
+            conteudo="Outra resposta",
+            contexto_usado={
+                "modulo": "vet",
+                "feedback": {"util": True, "comentario": None},
+            },
+        ),
+        SimpleNamespace(
+            tipo="usuario",
+            conteudo="Na minha clínica prefiro hipóteses em ordem de gravidade.",
+            contexto_usado=None,
+        ),
+    ]
+
+    result = _resumir_feedbacks_memoria(messages)
+
+    assert result["feedbacks_considerados"] == 2
+    assert result["respostas_uteis"] == 1
+    assert result["respostas_nao_uteis"] == 1
+    assert result["debates_considerados"] == 1
+    assert result["memorias_consideradas"] == 3
+    assert (
+        "ordem de prioridade"
+        in result["preferencias_e_correcoes_explicitas"][0]["comentario_do_veterinario"]
+    )
+    assert result["escopo"] == "usuario_atual_no_tenant_atual"
+
+
+def test_safety_identifier_is_stable_and_does_not_expose_tenant():
+    first = _safety_identifier_vet("tenant-secret", 42)
+    second = _safety_identifier_vet("tenant-secret", 42)
+
+    assert first == second
+    assert "tenant-secret" not in first
 
 
 def test_exame_ia_extrai_valores_laboratoriais_do_texto():

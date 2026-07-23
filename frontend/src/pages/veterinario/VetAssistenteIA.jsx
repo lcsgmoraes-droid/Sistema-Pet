@@ -10,7 +10,10 @@ export default function VetAssistenteIA() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-5">
-      <AssistenteIAHeader memoriaAtiva={assistente.memoriaAtiva} />
+      <AssistenteIAHeader
+        conhecimentoStatus={assistente.conhecimentoStatus}
+        memoriaAtiva={assistente.memoriaAtiva}
+      />
 
       <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-4">
         <AssistenteIAConversaSelector

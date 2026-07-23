@@ -1,15 +1,9 @@
 from app.veterinario_routes import router
+from tests.route_contract_helpers import method_routes, route_paths
 
 
 def _method_routes() -> list[tuple[str, str]]:
-    routes: list[tuple[str, str]] = []
-    for route in router.routes:
-        methods = getattr(route, "methods", None)
-        if not methods:
-            continue
-        for method in methods:
-            routes.append((route.path, method))
-    return routes
+    return method_routes(router)
 
 
 def test_vet_router_preserva_endpoints_movidos():
@@ -46,6 +40,7 @@ def test_vet_router_preserva_endpoints_movidos():
     assert ("/vet/consultas/{consulta_id}/prontuario.pdf", "GET") in routes
     assert ("/vet/parceiros", "GET") in routes
     assert ("/vet/relatorios/repasse", "GET") in routes
+    assert ("/vet/relatorios/repasse/{conta_id}/estornar-baixa", "POST") in routes
     assert ("/vet/ia/assistente", "POST") in routes
     assert ("/vet/ia/conversas", "GET") in routes
     assert ("/vet/exames/{exame_id}/chat", "POST") in routes
@@ -58,7 +53,7 @@ def test_vet_router_nao_duplica_metodo_e_path():
 
 
 def test_rotas_estaticas_de_internacao_vem_antes_da_dinamica():
-    paths = [route.path for route in router.routes if hasattr(route, "path")]
+    paths = route_paths(router)
 
     assert paths.index("/vet/internacoes/config") < paths.index(
         "/vet/internacoes/{internacao_id}"

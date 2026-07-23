@@ -25,6 +25,7 @@ BASE_EXPECTED_COUNTS = {
     "treatment_types": 9,
     "protein_flavors": 10,
     "package_weights": 11,
+    "vet_procedures": 70,
 }
 
 
@@ -343,6 +344,23 @@ def onboarding_session():
             descricao TEXT,
             ordem INTEGER,
             ativo BOOLEAN,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE vet_catalogo_procedimentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
+            nome TEXT NOT NULL,
+            descricao TEXT,
+            categoria TEXT,
+            valor_padrao NUMERIC,
+            duracao_minutos INTEGER,
+            requer_anestesia BOOLEAN,
+            observacoes TEXT,
+            insumos JSON,
+            ativo BOOLEAN NOT NULL,
             created_at TEXT,
             updated_at TEXT
         )

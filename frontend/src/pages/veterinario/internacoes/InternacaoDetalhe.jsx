@@ -10,6 +10,9 @@ export default function InternacaoDetalhe({
   procedimentos,
   procedimentosCatalogo,
 }) {
+  const internacaoAtiva =
+    internacao.status === "ativa" || internacao.status === "internado";
+
   return (
     <div className="border-t border-gray-100 bg-gray-50 px-5 py-4">
       <CurvaEvolucaoInternacao evolucoes={evolucoes} />
@@ -26,6 +29,12 @@ export default function InternacaoDetalhe({
       <EvolucoesResumoInternacao evolucoes={evolucoes} />
       <ProcedimentosResumoInternacao procedimentos={procedimentos} />
       <div className="mt-4">
+        {!internacaoAtiva && (
+          <p className="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Internação encerrada: orçamento e registros clínicos estão disponíveis somente para
+            consulta.
+          </p>
+        )}
         <OrcamentoMvpPanel
           contexto={{
             internacaoId: internacao.id,
@@ -36,10 +45,15 @@ export default function InternacaoDetalhe({
             previsaoDias: 1,
           }}
           procedimentosCatalogo={procedimentosCatalogo}
+          modoSomenteLeitura={!internacaoAtiva}
           titulo="Orçamento da internação"
         />
       </div>
       <div className="mt-4">
+        <p className="mb-2 text-xs text-gray-500">
+          O orçamento é apenas estimativo. O extrato considera procedimentos concluídos e insumos
+          efetivamente registrados.
+        </p>
         <ExtratoAtendimentoPanel
           contexto={{ internacaoId: internacao.id }}
           titulo="Extrato da internação"

@@ -12,6 +12,7 @@ from ..veterinario_financeiro import _as_float
 from ..veterinario_internacao import (
     _build_payload_procedimento_agenda_internacao,
     _build_procedimento_observacao,
+    _garantir_internacao_ativa,
     _resolver_tenant_id_vet,
     _resolver_user_id_vet,
     _serializar_procedimento_agenda_internacao,
@@ -172,6 +173,10 @@ def concluir_procedimento_agenda_internacao(
     )
     if not item:
         raise HTTPException(404, "Procedimento agendado nao encontrado")
+    _garantir_internacao_ativa(
+        item.internacao,
+        "concluir procedimento da agenda",
+    )
     if item.status == "cancelado":
         raise HTTPException(
             status_code=409, detail="Procedimento cancelado nao pode ser concluido"
@@ -270,6 +275,7 @@ def remover_procedimento_agenda_internacao(
 
     item = (
         db.query(InternacaoProcedimentoAgenda)
+        .options(joinedload(InternacaoProcedimentoAgenda.internacao))
         .filter(
             InternacaoProcedimentoAgenda.id == agenda_id,
             InternacaoProcedimentoAgenda.tenant_id == tenant_id,
@@ -278,6 +284,10 @@ def remover_procedimento_agenda_internacao(
     )
     if not item:
         raise HTTPException(404, "Procedimento agendado nao encontrado")
+    _garantir_internacao_ativa(
+        item.internacao,
+        "cancelar procedimento da agenda",
+    )
     if item.status == "concluido":
         raise HTTPException(
             status_code=409,

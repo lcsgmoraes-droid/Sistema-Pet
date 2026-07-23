@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { BookOpen, ClipboardList, Pill, Syringe } from "lucide-react";
+import { BookOpen, ClipboardList, LibraryBig, Pill, Syringe } from "lucide-react";
+import CatBularioRegulatorio from "./catalogo/CatBularioRegulatorio";
 import CatMedicamentos from "./catalogo/CatMedicamentos";
 import CatProcedimentos from "./catalogo/CatProcedimentos";
 import CatProtocolosVacinas from "./catalogo/CatProtocolosVacinas";
 
 const ABAS = [
   { id: "medicamentos", label: "Medicamentos", icon: Pill },
+  { id: "bulario", label: "Bulário oficial", icon: LibraryBig },
   { id: "procedimentos", label: "Procedimentos", icon: ClipboardList },
   { id: "vacinas", label: "Protocolos de vacinas", icon: Syringe },
 ];
@@ -49,6 +51,7 @@ export default function VetCatalogo() {
       </div>
 
       {aba === "medicamentos" && <CatMedicamentos />}
+      {aba === "bulario" && <CatBularioRegulatorio />}
       {aba === "procedimentos" && <CatProcedimentos />}
       {aba === "vacinas" && <CatProtocolosVacinas />}
     </div>

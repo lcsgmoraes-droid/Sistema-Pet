@@ -50,19 +50,15 @@ const ClientesNovoWizardModal = ({
 }) => {
   if (!showModal) return null;
 
-  const tipoTituloEdicao =
-    editingCliente?.tipo_cadastro === "cliente"
-      ? "Cliente"
-      : editingCliente?.tipo_cadastro === "fornecedor"
-        ? "Fornecedor"
-        : "Veterinario";
-
-  const tipoTituloNovo =
-    formData?.tipo_cadastro === "cliente"
-      ? "Cliente"
-      : formData?.tipo_cadastro === "fornecedor"
-        ? "Fornecedor"
-        : "Veterinario";
+  const titulosTipo = {
+    cliente: "Cliente",
+    fornecedor: "Fornecedor",
+    veterinario: "Veterinário",
+    funcionario: "Funcionário",
+  };
+  const tipoTituloEdicao = titulosTipo[editingCliente?.tipo_cadastro] || "Pessoa";
+  const tipoTituloNovo = titulosTipo[formData?.tipo_cadastro] || "Pessoa";
+  const ultimoStep = steps.at(-1)?.number || 1;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -107,7 +103,9 @@ const ClientesNovoWizardModal = ({
               </div>
             ))}
           </div>
-          <div className="text-center text-sm text-gray-600">{currentStep}/6</div>
+          <div className="text-center text-sm text-gray-600">
+            {currentStep}/{ultimoStep}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
@@ -200,7 +198,7 @@ const ClientesNovoWizardModal = ({
             <FiArrowLeft /> Voltar
           </button>
 
-          {currentStep < 6 ? (
+          {currentStep < ultimoStep ? (
             <button
               onClick={nextStep}
               className="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -212,7 +210,7 @@ const ClientesNovoWizardModal = ({
               onClick={handleSubmitFinal}
               className="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
             >
-              <FiSave /> Salvar Cliente
+              <FiSave /> Salvar {tipoTituloNovo}
             </button>
           )}
         </div>

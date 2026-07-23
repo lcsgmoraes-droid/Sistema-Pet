@@ -24,6 +24,7 @@ export default function useAssistenteIADataEffects({
   setExameId,
   setExames,
   setHistorico,
+  setConhecimentoStatus,
   setMemoriaAtiva,
   setPets,
   setPesoKg,
@@ -37,8 +38,12 @@ export default function useAssistenteIADataEffects({
     carregarConversas();
     vetApi
       .memoriaStatusAssistenteIA()
-      .then((res) => setMemoriaAtiva(Boolean(res.data?.ok)))
+      .then((res) => setMemoriaAtiva(res.data || { ok: false }))
       .catch(() => setMemoriaAtiva(false));
+    vetApi
+      .statusConhecimentoAssistenteIA()
+      .then((res) => setConhecimentoStatus(res.data || null))
+      .catch(() => setConhecimentoStatus(null));
     api
       .get("/vet/pets", { params: { limit: 500 } })
       .then((res) => {
