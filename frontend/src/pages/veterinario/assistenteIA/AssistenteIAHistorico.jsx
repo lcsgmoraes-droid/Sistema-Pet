@@ -69,7 +69,7 @@ export default function AssistenteIAHistorico({
                     {msg.fontesEvidencia?.length ? (
                       <div className="mt-2 space-y-1 border-t border-gray-200 pt-2 text-[10px]">
                         <div className="font-semibold text-gray-600">
-                          Evidências rastreáveis usadas como contexto
+                          Evidências rastreáveis citadas na resposta
                         </div>
                         {msg.fontesEvidencia.map((fonte) => (
                           <a

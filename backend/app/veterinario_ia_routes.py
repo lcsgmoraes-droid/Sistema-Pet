@@ -18,6 +18,7 @@ from .veterinario_ia import (
     _carregar_memoria_conversa,
     _carregar_memoria_feedback_usuario,
     _encerrar_transacao_antes_do_provedor,
+    _filtrar_evidencias_citadas,
     _garantir_tabelas_memoria_ia,
     _montar_resposta_dose,
     _montar_resposta_interacao,
@@ -293,6 +294,10 @@ def assistente_ia_veterinario(
             "A conduta final é do médico-veterinário responsável."
         )
 
+    fontes_evidencia_citadas = _filtrar_evidencias_citadas(
+        resposta_final,
+        fontes_evidencia,
+    )
     contexto_msg = {
         "modulo": "vet",
         "modo": _normalizar_modo_ia(payload.modo),
@@ -305,7 +310,7 @@ def assistente_ia_veterinario(
         "origem_resposta": origem_resposta,
         "status_provedor": status_provedor,
         "fontes_contexto": fontes_contexto,
-        "fontes_evidencia": fontes_evidencia,
+        "fontes_evidencia": fontes_evidencia_citadas,
     }
 
     if payload.salvar_historico and conversa:
@@ -351,7 +356,7 @@ def assistente_ia_veterinario(
         "origem_resposta": origem_resposta,
         "status_provedor": status_provedor,
         "fontes_contexto": fontes_contexto,
-        "fontes_evidencia": fontes_evidencia,
+        "fontes_evidencia": fontes_evidencia_citadas,
         "contexto": {
             "modo": payload.modo,
             "pet_id": pet.id if pet else None,
