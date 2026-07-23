@@ -1,5 +1,6 @@
 """Rotas do assistente IA veterinario."""
 
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -16,6 +17,7 @@ from .veterinario_exames_arquivos import _process_exam_file_with_ai
 from .veterinario_ia import (
     _carregar_memoria_conversa,
     _carregar_memoria_feedback_usuario,
+    _encerrar_transacao_antes_do_provedor,
     _garantir_tabelas_memoria_ia,
     _montar_resposta_dose,
     _montar_resposta_interacao,
@@ -47,6 +49,7 @@ from .veterinario_schemas import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════
 # CHAT IA — interpretação clínica conversacional de exames
@@ -196,6 +199,11 @@ def assistente_ia_veterinario(
     if contexto_memoria:
         mensagem_analise = f"{mensagem} {contexto_memoria}"
 
+    preparacao_persistida = _encerrar_transacao_antes_do_provedor(db)
+    if not preparacao_persistida:
+        conversa = None
+        memoria = []
+
     resposta_llm, modelo_llm, status_provedor = _tentar_resposta_llm_veterinaria(
         mensagem=mensagem,
         memoria=memoria,
@@ -325,13 +333,19 @@ def assistente_ia_veterinario(
             conversa.atualizado_em = datetime.utcnow()
             db.commit()
             historico_salvo = True
-        except Exception:
+        except Exception as exc:
             db.rollback()
             historico_salvo = False
+            logger.warning(
+                "Falha ao salvar historico da IA veterinaria: %s",
+                exc.__class__.__name__,
+            )
 
     return {
         "resposta": resposta_final,
-        "conversa_id": conversa.id if conversa else payload.conversa_id,
+        "conversa_id": (
+            conversa.id if conversa and historico_salvo else payload.conversa_id
+        ),
         "historico_salvo": historico_salvo,
         "modelo_usado": modelo_usado,
         "origem_resposta": origem_resposta,
