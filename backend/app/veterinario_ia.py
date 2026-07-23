@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 from datetime import datetime
 from typing import Any, Optional
 
@@ -15,6 +16,7 @@ from .models import Pet
 from .veterinario_models import ConsultaVet, ExameVet, MedicamentoCatalogo
 
 logger = logging.getLogger(__name__)
+_EVIDENCE_CITATION_RE = re.compile(r"\[(E\d+)\]", flags=re.IGNORECASE)
 
 
 def _normalizar_texto(v: Optional[str]) -> str:
@@ -189,6 +191,24 @@ def _carregar_memoria_feedback_usuario(
 def _safety_identifier_vet(tenant_id, user_id: int) -> str:
     raw = f"corepet-vet:{tenant_id}:{user_id}".encode()
     return f"vet_{hashlib.sha256(raw).hexdigest()[:32]}"
+
+
+def _filtrar_evidencias_citadas(
+    resposta: str,
+    fontes_evidencia: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Exibe apenas as fontes que a resposta efetivamente citou."""
+    referencias = {
+        referencia.upper()
+        for referencia in _EVIDENCE_CITATION_RE.findall(str(resposta or ""))
+    }
+    if not referencias:
+        return []
+    return [
+        fonte
+        for fonte in fontes_evidencia
+        if str(fonte.get("ref") or "").upper() in referencias
+    ]
 
 
 def _obter_ou_criar_conversa_vet(
@@ -668,7 +688,7 @@ def _tentar_resposta_llm_veterinaria(
                 kwargs = {
                     "model": modelo,
                     "input": mensagens,
-                    "max_output_tokens": 1200,
+                    "max_output_tokens": 1800,
                     "store": False,
                 }
                 if safety_identifier:
