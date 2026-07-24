@@ -549,7 +549,11 @@ export default function ModalDevolucaoSections({
           {passo === 2 && (
             <button
               onClick={handleConfirmar}
-              disabled={loading || Object.values(itensSelecionados).filter(Boolean).length === 0}
+              disabled={
+                loading ||
+                Object.values(itensSelecionados).filter(Boolean).length === 0 ||
+                (gerarCredito && !vendaSelecionada?.cliente_id && !vendaSelecionada?.cliente?.id)
+              }
               className="flex items-center gap-2 px-8 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (

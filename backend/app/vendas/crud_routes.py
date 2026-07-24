@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session, joinedload
 from app.audit_log import log_action
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
-from app.estoque.service import EstoqueService
 from app.idempotency import idempotent
 from app.models import Cliente
 from app.produtos_models import Produto
@@ -23,6 +22,7 @@ from app.services.venda_rentabilidade_snapshot_service import (
 )
 from app.utils.logger import logger as struct_logger
 from app.vendas.comissoes import _gerar_comissoes_pendentes_venda, _total_pago_venda
+from app.vendas.edicao_estoque import ajustar_estoque_edicao_venda
 from app.vendas.regras import (
     _resolver_status_entrega_atualizacao,
     calcular_totais_venda,
@@ -418,44 +418,17 @@ def atualizar_venda(
         venda.data_entrega = None
     venda.updated_at = datetime.now()
 
-    # 🔄 DEVOLVER ESTOQUE dos produtos REMOVIDOS
-    # Compara itens antigos com novos e devolve o que foi removido
+    # Ajustar o estoque pela diferença entre os itens antigos e os novos.
+    # A finalização não baixa novamente vendas que já estavam abertas.
     itens_antigos = db.query(VendaItem).filter_by(venda_id=venda.id).all()
-    produtos_antigos_ids = {
-        item.produto_id for item in itens_antigos if item.produto_id
-    }
-    produtos_novos_ids = {item.produto_id for item in dados.itens if item.produto_id}
-    produtos_removidos_ids = produtos_antigos_ids - produtos_novos_ids
-
-    # Estornar estoque dos produtos removidos
-    for item_antigo in itens_antigos:
-        if item_antigo.produto_id in produtos_removidos_ids:
-            try:
-                logger.info(
-                    f"📦 Devolvendo estoque (produto removido): Produto {item_antigo.produto_id} +{item_antigo.quantidade}"
-                )
-                EstoqueService.estornar_estoque(
-                    produto_id=item_antigo.produto_id,
-                    quantidade=float(item_antigo.quantidade),
-                    motivo="ajuste",
-                    referencia_id=venda.id,
-                    referencia_tipo="venda_editada",
-                    user_id=current_user.id,
-                    tenant_id=tenant_id,
-                    db=db,
-                    documento=None,
-                    observacao=f"Produto removido da venda #{venda.id}",
-                )
-                log_action(
-                    db=db,
-                    user_id=current_user.id,
-                    action="update",
-                    entity_type="produtos",
-                    entity_id=item_antigo.produto_id,
-                    details=f"Estorno (+{item_antigo.quantidade}) - Produto removido da venda #{venda.id}",
-                )
-            except ValueError as e:
-                logger.error(f"❌ Erro ao estornar estoque: {e}")
+    ajustar_estoque_edicao_venda(
+        venda=venda,
+        itens_antigos=itens_antigos,
+        itens_novos=dados.itens,
+        current_user=current_user,
+        tenant_id=tenant_id,
+        db=db,
+    )
 
     # Excluir itens antigos
     db.query(VendaItem).filter_by(venda_id=venda.id).delete()
