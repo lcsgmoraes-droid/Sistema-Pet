@@ -1,0 +1,39 @@
+# Perfis de acesso padrao
+
+Novos tenants recebem cinco perfis:
+
+- `Administrador`: acesso total e gestao de usuarios/permissoes.
+- `Gerente`: operacao e relatorios, sem administrar usuarios ou dados centrais da empresa.
+- `Financeiro`: bancos, contas, conciliacoes, DRE, fluxo de caixa e relatorios financeiros.
+- `Estoque e Compras`: produtos, entrada de XML e pedidos de compra, sem excluir produtos.
+- `Caixa`: PDV, consulta de produtos e cadastro/edicao de clientes, sem excluir vendas,
+  clientes ou produtos.
+
+## Regras de seguranca
+
+- Os perfis operacionais usam listas explicitas de permissoes.
+- Uma permissao nova do sistema nao entra automaticamente nesses perfis.
+- Apenas `Administrador` recebe automaticamente todas as permissoes disponiveis.
+- A sincronizacao de tenant existente e simulada por padrao.
+- Em producao, a aplicacao exige as opcoes `--apply` e
+  `--allow-production-apply`.
+
+## Tenant existente
+
+Simulacao:
+
+```powershell
+python -m app.scripts.sync_default_roles --tenant-id UUID_DO_TENANT
+```
+
+Aplicacao em DEV:
+
+```powershell
+python -m app.scripts.sync_default_roles --tenant-id UUID_DO_TENANT --apply
+```
+
+Aplicacao em producao, somente depois de autorizacao explicita:
+
+```powershell
+python -m app.scripts.sync_default_roles --tenant-id UUID_DO_TENANT --apply --allow-production-apply
+```
