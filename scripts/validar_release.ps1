@@ -119,7 +119,7 @@ Invoke-GateStep 'Backend format' $ruff @(
 ) $backend
 
 Invoke-GateStep 'Frontend dependency audit' $npm @(
-    'audit', '--audit-level=moderate'
+    'run', 'audit:dependencies'
 ) $frontend
 Invoke-GateStep 'Frontend lint' $npm @('run', 'lint:core') $frontend
 Invoke-GateStep 'Frontend format' $npm @('run', 'format:core:check') $frontend

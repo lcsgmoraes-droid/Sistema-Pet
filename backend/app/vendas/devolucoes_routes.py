@@ -1,10 +1,12 @@
 """Rotas de devolução de vendas."""
 
 import logging
+from collections import defaultdict
 from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.audit_log import log_action
@@ -12,12 +14,30 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.caixa.service import CaixaService
 from app.db import get_session
 from app.estoque.service import EstoqueService
+from app.produtos_models import EstoqueMovimentacao
 from app.utils.security_helpers import safe_get_cliente
 from app.vendas.routes_common import _validar_tenant_e_obter_usuario
 from app.vendas_models import Venda, VendaItem
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _validar_saldo_devolucao(
+    quantidade_vendida: float,
+    quantidade_ja_devolvida: float,
+    quantidade_solicitada: float,
+) -> float:
+    quantidade_disponivel = max(quantidade_vendida - quantidade_ja_devolvida, 0)
+    if quantidade_solicitada > quantidade_disponivel + 1e-9:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Quantidade de devolução excede o saldo vendido. "
+                f"Disponível para devolver: {quantidade_disponivel:g}"
+            ),
+        )
+    return quantidade_disponivel
 
 
 @router.post("/{venda_id}/devolucao")
@@ -39,7 +59,12 @@ def registrar_devolucao(
         logger.info("Tenant validado para devolucao")
 
         # Buscar a venda
-        venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+        venda = (
+            db.query(Venda)
+            .filter_by(id=venda_id, tenant_id=tenant_id)
+            .with_for_update()
+            .first()
+        )
 
         if not venda:
             logger.info(f"❌ Venda #{venda_id} não encontrada")
@@ -77,6 +102,12 @@ def registrar_devolucao(
                 status_code=400, detail="Motivo da devolução é obrigatório"
             )
 
+        if gerar_credito and not venda.cliente_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Não é possível gerar crédito para venda sem cliente cadastrado",
+            )
+
         # Verificar se o caixa existe e está aberto (apenas se for devolução em dinheiro)
         from app.caixa_models import Caixa
 
@@ -88,6 +119,76 @@ def registrar_devolucao(
                 raise HTTPException(
                     status_code=400, detail="Caixa não encontrado ou não está aberto"
                 )
+
+        itens_normais = [
+            item
+            for item in itens_devolucao
+            if not item.get("is_componente_kit", False)
+            and float(item.get("quantidade", 0) or 0) > 0
+        ]
+        itens_ids = {item.get("item_id") for item in itens_normais}
+        itens_venda = (
+            db.query(VendaItem)
+            .filter(
+                VendaItem.venda_id == venda_id,
+                VendaItem.tenant_id == tenant_id,
+                VendaItem.id.in_(itens_ids),
+            )
+            .all()
+            if itens_ids
+            else []
+        )
+        itens_normais_por_id = {item.id: item for item in itens_venda}
+
+        ids_ausentes = itens_ids - set(itens_normais_por_id)
+        if ids_ausentes:
+            item_id = sorted(ids_ausentes, key=lambda valor: str(valor))[0]
+            raise HTTPException(
+                status_code=404,
+                detail=f"Item {item_id} não encontrado na venda",
+            )
+
+        vendido_por_produto = defaultdict(float)
+        for item_venda in db.query(VendaItem).filter_by(venda_id=venda_id).all():
+            if item_venda.produto_id:
+                vendido_por_produto[item_venda.produto_id] += float(
+                    item_venda.quantidade or 0
+                )
+
+        solicitado_por_produto = defaultdict(float)
+        for item_dev in itens_normais:
+            item_venda = itens_normais_por_id[item_dev.get("item_id")]
+            quantidade_devolvida = float(item_dev.get("quantidade", 0) or 0)
+            if quantidade_devolvida > float(item_venda.quantidade or 0):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Quantidade devolvida ({quantidade_devolvida}) maior que "
+                        f"quantidade vendida ({item_venda.quantidade})"
+                    ),
+                )
+            if item_venda.produto_id:
+                solicitado_por_produto[item_venda.produto_id] += quantidade_devolvida
+
+        for produto_id, quantidade_solicitada in solicitado_por_produto.items():
+            quantidade_ja_devolvida = float(
+                db.query(func.coalesce(func.sum(EstoqueMovimentacao.quantidade), 0))
+                .filter(
+                    EstoqueMovimentacao.tenant_id == tenant_id,
+                    EstoqueMovimentacao.produto_id == produto_id,
+                    EstoqueMovimentacao.referencia_tipo == "venda",
+                    EstoqueMovimentacao.referencia_id == venda_id,
+                    EstoqueMovimentacao.motivo == "devolucao",
+                    EstoqueMovimentacao.status != "cancelado",
+                )
+                .scalar()
+                or 0
+            )
+            _validar_saldo_devolucao(
+                vendido_por_produto[produto_id],
+                quantidade_ja_devolvida,
+                quantidade_solicitada,
+            )
 
         valor_total_devolucao = 0
         itens_devolvidos = []
@@ -144,9 +245,11 @@ def registrar_devolucao(
                         entity_type="produtos",
                         entity_id=produto_id,
                         details=f"Devolução de componente de KIT (+{quantidade_devolvida}) - Venda #{venda_id} - Motivo: {motivo}",
+                        commit=False,
                     )
                 except ValueError as e:
                     logger.error(f"Erro ao devolver componente de KIT: {e}")
+                    raise HTTPException(status_code=400, detail=str(e)) from e
 
                 # Calcular valor devolvido do componente
                 valor_componente = Decimal(str(preco_unitario_componente)) * Decimal(
@@ -173,22 +276,7 @@ def registrar_devolucao(
                 if quantidade_devolvida <= 0:
                     continue
 
-                # Buscar o item da venda
-                item_venda = (
-                    db.query(VendaItem).filter_by(id=item_id, venda_id=venda_id).first()
-                )
-
-                if not item_venda:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"Item {item_id} não encontrado na venda",
-                    )
-
-                if quantidade_devolvida > item_venda.quantidade:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Quantidade devolvida ({quantidade_devolvida}) maior que quantidade vendida ({item_venda.quantidade})",
-                    )
+                item_venda = itens_normais_por_id[item_id]
 
                 # Devolver ao estoque
                 if item_venda.produto_id:
@@ -213,9 +301,11 @@ def registrar_devolucao(
                             entity_type="produtos",
                             entity_id=item_venda.produto_id,
                             details=f"Devolução de estoque (+{quantidade_devolvida}) - Venda #{venda_id} - Motivo: {motivo}",
+                            commit=False,
                         )
                     except ValueError as e:
                         logger.error(f"Erro ao devolver estoque: {e}")
+                        raise HTTPException(status_code=400, detail=str(e)) from e
 
                 # Calcular valor devolvido
                 valor_item = item_venda.preco_unitario * Decimal(
@@ -450,6 +540,7 @@ def registrar_devolucao(
             entity_type="vendas",
             entity_id=venda_id,
             details=f"Devolução registrada ({tipo_devolucao}) - Venda #{venda_id} - R$ {valor_total_devolucao:.2f} - Motivo: {motivo}",
+            commit=False,
         )
 
         db.commit()
@@ -476,6 +567,7 @@ def registrar_devolucao(
         return resultado
 
     except HTTPException:
+        db.rollback()
         raise
     except Exception as e:
         logger.info(f"\n{'=' * 80}")

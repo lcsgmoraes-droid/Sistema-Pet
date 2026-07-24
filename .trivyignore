@@ -1,0 +1,4 @@
+# React Router 7.18.1 is used only as a client-side SPA router. The affected
+# React Server Components/Server Actions APIs are not present in frontend/src.
+# Remove this exception when a stable 8.3.0+ release is available.
+GHSA-qwww-vcr4-c8h2
