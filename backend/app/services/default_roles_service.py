@@ -129,19 +129,16 @@ def _normalize_tenant_id(tenant_id: Any) -> UUID:
     return UUID(str(tenant_id))
 
 
-def sync_default_roles(
+def create_default_roles_for_new_tenant(
     db: Session,
     tenant_id: Any,
-    *,
-    update_existing: bool = False,
-    dry_run: bool = False,
 ) -> dict[str, Any]:
     """
-    Cria os perfis padrao e, quando solicitado, sincroniza perfis existentes.
+    Cria os perfis operacionais durante o cadastro de um tenant novo.
 
     Novas permissoes do sistema nunca entram automaticamente nos perfis
     operacionais. Cada perfil usa uma lista explicita para manter o principio
-    do menor privilegio.
+    do menor privilegio. Um perfil que ja exista nunca e alterado.
     """
     tenant_uuid = _normalize_tenant_id(tenant_id)
     required_codes = set().union(*DEFAULT_TENANT_ROLES.values())
@@ -151,8 +148,6 @@ def sync_default_roles(
 
     result: dict[str, Any] = {
         "tenant_id": str(tenant_uuid),
-        "dry_run": dry_run,
-        "update_existing": update_existing,
         "missing_permissions": missing_permissions,
         "roles": {},
     }
@@ -169,49 +164,11 @@ def sync_default_roles(
         role_created = role is None
         available_codes = set(configured_codes) & permission_by_code.keys()
 
-        if role_created and not dry_run:
+        if role_created:
             role = Role(name=role_name, tenant_id=tenant_uuid)
             db.add(role)
             db.flush()
-
-        current_rows: list[RolePermission] = []
-        current_codes: set[str] = set()
-        if role is not None:
-            current_rows = (
-                db.query(RolePermission)
-                .filter(
-                    RolePermission.tenant_id == tenant_uuid,
-                    RolePermission.role_id == role.id,
-                )
-                .all()
-            )
-            permission_code_by_id = {
-                permission.id: permission.code
-                for permission in db.query(Permission)
-                .filter(
-                    Permission.id.in_(
-                        [row.permission_id for row in current_rows] or [-1]
-                    )
-                )
-                .all()
-            }
-            current_codes = {
-                permission_code_by_id[row.permission_id]
-                for row in current_rows
-                if row.permission_id in permission_code_by_id
-            }
-
-        should_sync_permissions = role_created or update_existing
-        added_codes = (
-            sorted(available_codes - current_codes) if should_sync_permissions else []
-        )
-        removed_codes = (
-            sorted(current_codes - available_codes)
-            if update_existing and not role_created
-            else []
-        )
-
-        if not dry_run and role is not None and should_sync_permissions:
+            added_codes = sorted(available_codes)
             for code in added_codes:
                 db.add(
                     RolePermission(
@@ -220,20 +177,14 @@ def sync_default_roles(
                         permission_id=permission_by_code[code].id,
                     )
                 )
-
-            if removed_codes:
-                removed_set = set(removed_codes)
-                for row in current_rows:
-                    code = permission_code_by_id.get(row.permission_id)
-                    if code in removed_set:
-                        db.delete(row)
+        else:
+            added_codes = []
 
         result["roles"][role_name] = {
             "role_id": role.id if role is not None else None,
             "created": role_created,
             "permission_count": len(available_codes),
             "added_permissions": added_codes,
-            "removed_permissions": removed_codes,
         }
 
     return result

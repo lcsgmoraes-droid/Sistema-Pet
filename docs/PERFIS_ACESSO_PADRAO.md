@@ -15,26 +15,5 @@ Novos tenants recebem seis perfis:
 - Os perfis operacionais usam listas explicitas de permissoes.
 - Uma permissao nova do sistema nao entra automaticamente nesses perfis.
 - Apenas `Administrador` recebe automaticamente todas as permissoes disponiveis.
-- A sincronizacao de tenant existente e simulada por padrao.
-- Em producao, a aplicacao exige as opcoes `--apply` e
-  `--allow-production-apply`.
-
-## Tenant existente
-
-Simulacao:
-
-```powershell
-python -m app.scripts.sync_default_roles --tenant-id UUID_DO_TENANT
-```
-
-Aplicacao em DEV:
-
-```powershell
-python -m app.scripts.sync_default_roles --tenant-id UUID_DO_TENANT --apply
-```
-
-Aplicacao em producao, somente depois de autorizacao explicita:
-
-```powershell
-python -m app.scripts.sync_default_roles --tenant-id UUID_DO_TENANT --apply --allow-production-apply
-```
+- O padrao roda somente no cadastro de um tenant novo.
+- Perfis de tenants existentes nao sao sincronizados nem alterados por esta regra.

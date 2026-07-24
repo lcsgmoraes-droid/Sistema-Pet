@@ -36,7 +36,7 @@ from app.services.auth_security import (
     register_successful_login,
     remaining_lock_seconds,
 )
-from app.services.default_roles_service import sync_default_roles
+from app.services.default_roles_service import create_default_roles_for_new_tenant
 from app.services.tenant_onboarding_service import onboard_tenant_defaults
 from app.services.plan_catalog import resolve_signup_selection
 from app.session_manager import create_session
@@ -146,12 +146,7 @@ def register(
     )
 
     try:
-        default_roles_result = sync_default_roles(
-            db,
-            tenant_id,
-            update_existing=False,
-            dry_run=False,
-        )
+        default_roles_result = create_default_roles_for_new_tenant(db, tenant_id)
         db.flush()
         logger.info(
             "Perfis operacionais padrao criados para tenant %s: %s",

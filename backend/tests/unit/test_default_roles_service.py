@@ -2,9 +2,8 @@ from uuid import UUID
 
 from app.models import Permission, Role, RolePermission
 from app.services.default_roles_service import (
-    CAIXA_PERMISSIONS,
     DEFAULT_TENANT_ROLES,
-    sync_default_roles,
+    create_default_roles_for_new_tenant,
 )
 
 
@@ -30,7 +29,7 @@ def _role_permission_codes(db_session, tenant_id, role_id):
     }
 
 
-def test_sync_default_roles_creates_least_privilege_profiles(
+def test_create_default_roles_for_new_tenant_uses_least_privilege(
     db_session, tenant_factory, tenant_context
 ):
     tenant = tenant_factory(nome="Tenant perfis padrao")
@@ -39,7 +38,7 @@ def test_sync_default_roles_creates_least_privilege_profiles(
     configured_codes = set().union(*DEFAULT_TENANT_ROLES.values())
     _seed_permissions(db_session, configured_codes)
 
-    result = sync_default_roles(db_session, tenant_id)
+    result = create_default_roles_for_new_tenant(db_session, tenant_id)
     db_session.flush()
 
     assert result["missing_permissions"] == []
@@ -58,7 +57,7 @@ def test_sync_default_roles_creates_least_privilege_profiles(
         )
 
 
-def test_sync_existing_caixa_removes_excess_permissions_only_on_apply(
+def test_create_default_roles_never_changes_an_existing_caixa(
     db_session, tenant_factory, tenant_context
 ):
     tenant = tenant_factory(nome="Tenant caixa legado")
@@ -80,31 +79,15 @@ def test_sync_existing_caixa_removes_excess_permissions_only_on_apply(
     )
     db_session.flush()
 
-    preview = sync_default_roles(
-        db_session,
-        tenant_id,
-        update_existing=True,
-        dry_run=True,
-    )
-
-    assert excessive_code in preview["roles"]["Caixa"]["removed_permissions"]
-    assert _role_permission_codes(db_session, tenant_id, caixa.id) == {excessive_code}
-
-    applied = sync_default_roles(
-        db_session,
-        tenant_id,
-        update_existing=True,
-        dry_run=False,
-    )
+    result = create_default_roles_for_new_tenant(db_session, tenant_id)
     db_session.flush()
 
-    assert excessive_code in applied["roles"]["Caixa"]["removed_permissions"]
-    assert _role_permission_codes(db_session, tenant_id, caixa.id) == set(
-        CAIXA_PERMISSIONS
-    )
+    assert result["roles"]["Caixa"]["created"] is False
+    assert result["roles"]["Caixa"]["added_permissions"] == []
+    assert _role_permission_codes(db_session, tenant_id, caixa.id) == {excessive_code}
 
 
-def test_sync_default_roles_reports_unavailable_permissions_without_overgranting(
+def test_create_default_roles_reports_unavailable_permissions_without_overgranting(
     db_session, tenant_factory, tenant_context
 ):
     tenant = tenant_factory(nome="Tenant permissoes parciais")
@@ -112,7 +95,7 @@ def test_sync_default_roles_reports_unavailable_permissions_without_overgranting
     tenant_context(tenant_id)
     _seed_permissions(db_session, {"vendas.criar"})
 
-    result = sync_default_roles(db_session, tenant_id)
+    result = create_default_roles_for_new_tenant(db_session, tenant_id)
     db_session.flush()
 
     assert "clientes.visualizar" in result["missing_permissions"]
