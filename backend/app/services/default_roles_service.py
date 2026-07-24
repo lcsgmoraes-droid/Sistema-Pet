@@ -23,6 +23,8 @@ CAIXA_PERMISSIONS = frozenset(
     }
 )
 
+CLIENTE_PERMISSIONS = frozenset()
+
 ESTOQUE_COMPRAS_PERMISSIONS = frozenset(
     {
         "cadastros.categorias_produtos",
@@ -114,6 +116,7 @@ GERENTE_PERMISSIONS = frozenset(
 
 DEFAULT_TENANT_ROLES: dict[str, frozenset[str]] = {
     "Caixa": CAIXA_PERMISSIONS,
+    "Cliente": CLIENTE_PERMISSIONS,
     "Estoque e Compras": ESTOQUE_COMPRAS_PERMISSIONS,
     "Financeiro": FINANCEIRO_PERMISSIONS,
     "Gerente": GERENTE_PERMISSIONS,
