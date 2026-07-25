@@ -34,6 +34,10 @@ from .bling_sync.dashboard_routes import (
     resumo_cobertura_bling,
     router as dashboard_router,
 )
+from .bling_sync.custos_routes import (
+    router as custos_bling_router,
+    sincronizar_custos_marca_bling,
+)
 from .bling_sync.exportacao_produtos_routes import (
     exportar_produto_local_para_bling,
     exportar_produtos_locais_para_bling_lote,
@@ -95,6 +99,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/estoque/sync", tags=["Sincronizacao Bling"])
 router.include_router(produtos_bling_router)
 router.include_router(exportacao_produtos_bling_router)
+router.include_router(custos_bling_router)
 router.include_router(config_router)
 router.include_router(dashboard_router)
 router.include_router(operational_router)
@@ -125,6 +130,7 @@ __all__ = [
     "criar_produto_local_para_faltante_bling",
     "exportar_produto_local_para_bling",
     "exportar_produtos_locais_para_bling_lote",
+    "sincronizar_custos_marca_bling",
     "enviar_estoque_para_bling",
     "forcar_sincronizacao_produto",
     "status_sincronizacao",

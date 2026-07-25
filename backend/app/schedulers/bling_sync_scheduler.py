@@ -8,6 +8,7 @@ import os
 
 from app.db import SessionLocal
 from app.services.bling_flow_monitor_service import executar_auditoria_background
+from app.services.bling_cost_sync_service import BlingCostSyncService
 from app.services.bling_pedido_webhook_queue_service import (
     process_pending_bling_pedido_webhooks,
 )
@@ -231,9 +232,16 @@ class BlingSyncScheduler:
             logger.info("[BLING SYNC] Scheduler parado")
 
     def processar_fila(self) -> None:
-        result = BlingSyncService.process_pending_queue(limit=10)
-        if result.get("processados"):
-            logger.info("[BLING SYNC] Fila processada: %s", result)
+        stock_result = BlingSyncService.process_pending_queue(limit=10)
+        if stock_result.get("processados"):
+            logger.info("[BLING SYNC] Fila de estoque processada: %s", stock_result)
+
+        if stock_result.get("rate_limited") or stock_result.get("auth_invalid"):
+            return
+
+        cost_result = BlingCostSyncService.process_pending_queue(limit=10)
+        if cost_result.get("processados"):
+            logger.info("[BLING COST SYNC] Fila de custo processada: %s", cost_result)
 
     def processar_webhooks_pedidos(self) -> None:
         db = SessionLocal()
