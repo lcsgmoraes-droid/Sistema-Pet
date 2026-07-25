@@ -104,6 +104,7 @@ from .notas_entrada.processamento_routes import (
 
 from .notas_entrada.upload_routes import router as upload_router
 from .notas_entrada.upload_routes import upload_lote_xml, upload_pdf, upload_xml
+from .notas_entrada.listagem_routes import router as listagem_router
 from .notas_entrada.consulta_routes import router as consulta_router
 from .notas_entrada.consulta_routes import buscar_nota, excluir_nota, listar_notas
 
@@ -116,6 +117,7 @@ router.include_router(conferencia_router)
 router.include_router(processamento_router)
 router.include_router(reversao_router)
 router.include_router(upload_router)
+router.include_router(listagem_router)
 router.include_router(consulta_router)
 
 __all__ = [
