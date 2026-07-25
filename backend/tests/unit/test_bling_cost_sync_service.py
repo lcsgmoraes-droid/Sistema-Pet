@@ -23,9 +23,9 @@ from app.services.bling_cost_sync_service import (
 def test_catalog_client_lists_and_updates_product_supplier():
     calls = []
     client = BlingCatalogoMixin()
-    client._request = lambda method, endpoint, data=None: calls.append(
-        (method, endpoint, data)
-    ) or {"data": []}
+    client._request = lambda method, endpoint, data=None: (
+        calls.append((method, endpoint, data)) or {"data": []}
+    )
 
     client.listar_produtos_fornecedores("123", pagina=2, limite=150)
     client.atualizar_produto_fornecedor("456", {"precoCusto": 19.9})
