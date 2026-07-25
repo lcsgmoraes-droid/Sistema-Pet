@@ -123,9 +123,7 @@ def montar_payload_custo_produto_fornecedor(
     payload["produto"] = {"id": int(bling_produto_id)}
 
     supplier = item.get("fornecedor")
-    supplier_id = (
-        _bling_id(supplier.get("id")) if isinstance(supplier, dict) else None
-    )
+    supplier_id = _bling_id(supplier.get("id")) if isinstance(supplier, dict) else None
     if supplier_id:
         payload["fornecedor"] = {"id": int(supplier_id)}
     return payload
@@ -169,9 +167,7 @@ class BlingCostSyncService:
         if not product:
             return {"ok": False, "detail": "Produto nao encontrado"}
 
-        cost = _custo_valido(
-            product.preco_custo if custo_novo is None else custo_novo
-        )
+        cost = _custo_valido(product.preco_custo if custo_novo is None else custo_novo)
         if cost is None:
             return {
                 "ok": False,
@@ -187,11 +183,7 @@ class BlingCostSyncService:
             )
             .first()
         )
-        if (
-            not sync
-            or not sync.sincronizar
-            or not _bling_id(sync.bling_produto_id)
-        ):
+        if not sync or not sync.sincronizar or not _bling_id(sync.bling_produto_id):
             return {
                 "ok": False,
                 "detail": "Produto nao vinculado para sincronizacao com o Bling",
@@ -352,9 +344,7 @@ class BlingCostSyncService:
     ) -> str:
         bling_product_id = _bling_id(sync.bling_produto_id)
         if not bling_product_id:
-            raise BlingCostSyncConfigurationError(
-                "Produto sem identificador do Bling."
-            )
+            raise BlingCostSyncConfigurationError("Produto sem identificador do Bling.")
 
         bling = BlingAPI()
         _reservar_janela_envio_bling()
@@ -542,12 +532,8 @@ class BlingCostSyncService:
                         db.query(ProdutoBlingCostSyncQueue)
                         .filter(
                             ProdutoBlingCostSyncQueue.tenant_id == tenant_id,
-                            ProdutoBlingCostSyncQueue.status.in_(
-                                ["pendente", "erro"]
-                            ),
-                            ProdutoBlingCostSyncQueue.proxima_tentativa_em.isnot(
-                                None
-                            ),
+                            ProdutoBlingCostSyncQueue.status.in_(["pendente", "erro"]),
+                            ProdutoBlingCostSyncQueue.proxima_tentativa_em.isnot(None),
                             ProdutoBlingCostSyncQueue.proxima_tentativa_em <= now,
                         )
                         .order_by(
@@ -662,9 +648,7 @@ class BlingCostSyncService:
                 item["status"] = "custo_invalido"
                 counters["custos_invalidos"] += 1
             elif (
-                not sync
-                or not sync.sincronizar
-                or not _bling_id(sync.bling_produto_id)
+                not sync or not sync.sincronizar or not _bling_id(sync.bling_produto_id)
             ):
                 item["status"] = "sem_vinculo_bling"
                 counters["sem_vinculo_bling"] += 1
