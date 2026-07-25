@@ -73,6 +73,35 @@ class BlingCatalogoMixin:
         """Vincula um fornecedor e os custos a um produto do Bling."""
         return self._request("POST", "/produtos/fornecedores", data=payload)
 
+    def listar_produtos_fornecedores(
+        self,
+        produto_id: str,
+        pagina: int = 1,
+        limite: int = 100,
+    ) -> Dict:
+        """Lista os vinculos de fornecedores de um produto do Bling."""
+        return self._request(
+            "GET",
+            "/produtos/fornecedores",
+            data={
+                "idProduto": int(produto_id),
+                "pagina": pagina,
+                "limite": min(limite, 100),
+            },
+        )
+
+    def atualizar_produto_fornecedor(
+        self,
+        produto_fornecedor_id: str,
+        payload: Dict,
+    ) -> Dict:
+        """Atualiza um vinculo produto-fornecedor existente no Bling."""
+        return self._request(
+            "PUT",
+            f"/produtos/fornecedores/{int(produto_fornecedor_id)}",
+            data=payload,
+        )
+
     def atualizar_estoque_produto(
         self,
         produto_id: str,
