@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Iterable, Optional
 
 from sqlalchemy import func
@@ -13,6 +13,7 @@ from app.produtos_models import (
     Produto,
     ProdutoLote,
 )
+from app.utils.timezone import as_brasilia_naive, now_brasilia, wall_time_naive
 
 
 CANAIS_VALIDOS = {"app", "ecommerce"}
@@ -68,17 +69,13 @@ def _normalizar_canal(canal: Optional[str]) -> str:
 
 
 def _datetime_compat(value):
-    if not value:
-        return None
-    if getattr(value, "tzinfo", None) is not None:
-        return value.astimezone(timezone.utc).replace(tzinfo=None)
-    return value
+    return wall_time_naive(value)
 
 
 def _janela_ativa(inicio, fim, agora: datetime) -> bool:
     inicio = _datetime_compat(inicio)
     fim = _datetime_compat(fim)
-    agora = _datetime_compat(agora) or datetime.utcnow()
+    agora = as_brasilia_naive(agora) or now_brasilia()
     if inicio and inicio > agora:
         return False
     if fim and fim < agora:
@@ -273,7 +270,7 @@ def resolver_preco_promocional_manual(
     agora: Optional[datetime] = None,
 ) -> Optional[float]:
     canal_normalizado = _normalizar_canal(canal)
-    agora = agora or datetime.now(timezone.utc)
+    agora = agora or now_brasilia()
     candidatos: list[float] = []
 
     if canal_normalizado == "app" and produto.preco_app_promo is not None:
