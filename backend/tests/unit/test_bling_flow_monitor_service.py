@@ -145,6 +145,38 @@ def test_diagnosticar_pedido_aponta_nf_autorizada_sem_confirmacao_e_sem_itens():
     assert "NF_AUTORIZADA_PEDIDO_NAO_CONFIRMADO" in codigos
 
 
+def test_diagnosticar_pedido_cancelado_com_nf_ativa_exige_cancelamento_fiscal():
+    pedido = SimpleNamespace(
+        id=101,
+        pedido_bling_id="BL-101",
+        pedido_bling_numero="18001",
+        status="cancelado",
+    )
+
+    incidentes = diagnosticar_pedido_integrado(
+        pedido,
+        [SimpleNamespace(sku="SKU-1", vendido_em=None, liberado_em="agora")],
+        {
+            "ultima_nf": {
+                "id": "NF-101",
+                "numero": "015900",
+                "situacao": "Autorizada",
+            }
+        },
+        movimentacoes_saida=0,
+    )
+
+    codigos = {incidente["code"] for incidente in incidentes}
+    incidente = next(
+        item for item in incidentes if item["code"] == "PEDIDO_CANCELADO_COM_NF_ATIVA"
+    )
+
+    assert "NF_AUTORIZADA_PEDIDO_NAO_CONFIRMADO" not in codigos
+    assert incidente["auto_fixable"] is False
+    assert incidente["severity"] == "critical"
+    assert incidente["nf_bling_id"] == "NF-101"
+
+
 def test_diagnosticar_pedido_confirmado_sem_baixa_e_item_nao_confirmado():
     pedido = SimpleNamespace(id=2, pedido_bling_id="BL-2", status="confirmado")
     itens = [

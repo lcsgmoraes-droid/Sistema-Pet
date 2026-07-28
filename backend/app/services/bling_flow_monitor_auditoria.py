@@ -225,7 +225,7 @@ def auditar_fluxo_bling(
             numero_pedido_loja = _numero_pedido_loja_pedido(pedido)
             precisa_auditar_nfs_recentes = bool(
                 numero_pedido_loja
-                and (pedido.status in {"aberto", "expirado", "confirmado"})
+                and (pedido.status in {"aberto", "expirado", "confirmado", "cancelado"})
             )
             if precisa_auditar_nfs_recentes:
                 if pedido.tenant_id not in nfs_recentes_por_tenant:

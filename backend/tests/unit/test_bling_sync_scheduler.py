@@ -107,3 +107,32 @@ def test_processar_fila_adia_custo_quando_bling_limita_estoque(monkeypatch):
     scheduler.processar_fila()
 
     assert calls == []
+
+
+def test_reconciliar_importacao_pedidos_usa_janela_configurada(monkeypatch):
+    db = _FakeDB()
+    capturado = {}
+    scheduler = scheduler_module.BlingSyncScheduler.__new__(
+        scheduler_module.BlingSyncScheduler
+    )
+    scheduler._should_defer_secondary_job = lambda job_name: False
+
+    monkeypatch.setattr(scheduler_module, "SessionLocal", lambda: db)
+    monkeypatch.setattr(
+        scheduler_module, "BLING_ORDER_IMPORT_RECONCILE_DAYS", 9, raising=False
+    )
+    monkeypatch.setattr(
+        scheduler_module, "BLING_ORDER_IMPORT_RECONCILE_PAGES", 4, raising=False
+    )
+    monkeypatch.setattr(
+        scheduler_module,
+        "reconciliar_importacao_pedidos_bling_recentes",
+        lambda db_arg, **kwargs: capturado.update({"db": db_arg, **kwargs}) or {},
+    )
+
+    scheduler.reconciliar_importacao_pedidos()
+
+    assert capturado["db"] is db
+    assert capturado["dias"] == 9
+    assert capturado["limite_paginas"] == 4
+    assert db.closed is True

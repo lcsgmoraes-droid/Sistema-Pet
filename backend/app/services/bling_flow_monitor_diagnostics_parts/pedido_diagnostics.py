@@ -170,6 +170,29 @@ def diagnosticar_pedido_integrado(
                     )
                 )
 
+    if pedido.status == "cancelado" and _nf_contexto_autorizado(nf_auditavel):
+        incidentes.append(
+            _make_incident(
+                "PEDIDO_CANCELADO_COM_NF_ATIVA",
+                severity="critical",
+                title="Pedido cancelado com NF ainda ativa",
+                message=(
+                    "O pedido foi cancelado no canal de venda, mas a NF vinculada "
+                    "continua autorizada."
+                ),
+                suggested_action=(
+                    "Cancelar a NF no Bling. O estoque so deve voltar depois da "
+                    "confirmacao fiscal do cancelamento."
+                ),
+                auto_fixable=False,
+                pedido=pedido,
+                nf_bling_id=_text(
+                    _primeiro_preenchido(nf_auditavel.get("id"), nf.get("id"))
+                ),
+                details={"nf_detectada": _json_safe(nf_auditavel)},
+            )
+        )
+
     if pedido.status in {"aberto", "expirado"}:
         for item in itens_vendidos:
             incidentes.append(
@@ -267,7 +290,10 @@ def diagnosticar_pedido_integrado(
                         )
                     )
 
-    if _nf_autorizada(payload) and pedido.status != "confirmado":
+    if _nf_autorizada(payload) and pedido.status not in {
+        "confirmado",
+        "cancelado",
+    }:
         incidentes.append(
             _make_incident(
                 "NF_AUTORIZADA_PEDIDO_NAO_CONFIRMADO",

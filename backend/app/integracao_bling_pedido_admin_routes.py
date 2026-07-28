@@ -1,7 +1,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_
+from sqlalchemy import String, cast, or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -57,6 +57,7 @@ def listar_pedidos_bling(
             or_(
                 PedidoIntegrado.pedido_bling_numero.ilike(termo),
                 PedidoIntegrado.pedido_bling_id.ilike(termo),
+                cast(PedidoIntegrado.payload, String).ilike(termo),
             )
         )
 

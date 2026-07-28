@@ -40,6 +40,7 @@ from app.services.bling_nf.estoque import (
     produto_usa_composicao_virtual as produto_usa_composicao_virtual,
 )
 from app.services.kit_estoque_service import KitEstoqueService
+from app.services import pedido_nf_reconciliation_service as nf_alert
 from app.utils.logger import logger
 
 
@@ -311,6 +312,7 @@ def processar_nf_autorizada(
     nf_id: str,
 ) -> str:
     pedido, itens = _recarregar_pedido_e_itens_para_nf(db, pedido, itens)
+    pedido_ja_cancelado = pedido.status == "cancelado"
     pedido_bling_id = getattr(pedido, "pedido_bling_id", None)
     nf_numero = _numero_nf_pedido(pedido)
     if not nf_numero and _text(nf_id):
@@ -569,6 +571,8 @@ def processar_nf_autorizada(
             )
             houve_erros = True
 
+    nf_alert.preservar_pedido_cancelado_com_nf_ativa(db, pedido, pedido_ja_cancelado)
+
     db.add(pedido)
     db.commit()
     incidentes_resolvidos = resolver_incidentes_relacionados(
@@ -688,6 +692,7 @@ def processar_nf_cancelada(
         item.liberado_em = item.liberado_em or datetime.utcnow()
         db.add(item)
 
+    nf_alert.resolver_alerta_nf_cancelada(db, pedido=pedido, nf_id=nf_id)
     db.add(pedido)
     db.commit()
     return "venda_cancelada_com_estorno" if houve_estorno else "venda_cancelada"

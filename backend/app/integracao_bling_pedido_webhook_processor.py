@@ -2,6 +2,8 @@ import time
 
 from sqlalchemy.orm import Session
 
+from app.integracao_bling_nf_helpers import _primeiro_preenchido
+from app.services import pedido_nf_reconciliation_service as nf_reconciliation
 from app.services.pedido_integrado_consolidation_service import pedido_esta_mesclado
 
 
@@ -31,7 +33,6 @@ def processar_pedido_bling_payload(body: dict, db: Session):
     _dict = routes._dict
     _montar_payload_pedido = routes._montar_payload_pedido
     _payload_principal = routes._payload_principal
-    _primeiro_preenchido = routes._primeiro_preenchido
     _processar_nf_autorizada_vinculada_ao_pedido = (
         routes._processar_nf_autorizada_vinculada_ao_pedido
     )
@@ -265,13 +266,13 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                 tenant_id=_tenant_uuid,
                 pedido_bling_id=pedido_bling_id,
             )
-            if pedido and pedido.status != "cancelado":
+            if pedido:
                 itens = (
                     db.query(PedidoIntegradoItem)
                     .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
                     .all()
                 )
-                _sincronizar_nf_do_pedido(
+                resumo_nf = _sincronizar_nf_do_pedido(
                     db=db,
                     pedido=pedido,
                     pedido_payload=pedido_api or data,
@@ -281,8 +282,12 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     message="NF identificada no pedido atualizado e vinculada localmente.",
                     link_source="pedido.updated",
                 )
-                _cancelar_pedido(
-                    db=db, pedido=pedido, itens=itens, processed_at=event_date
+                nf_reconciliation.reconciliar_pedido_cancelado_atualizado(
+                    db=db,
+                    pedido=pedido,
+                    itens=itens,
+                    resumo_nf=resumo_nf,
+                    processed_at=event_date,
                 )
                 logger.info(
                     f"[BLING WEBHOOK] Pedido {pedido_bling_id} cancelado (situacao_id={situacao_id})"
@@ -345,13 +350,13 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                 tenant_id=_tenant_uuid,
                 pedido_bling_id=pedido_bling_id,
             )
-            if pedido and pedido.status != "cancelado":
+            if pedido:
                 itens = (
                     db.query(PedidoIntegradoItem)
                     .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
                     .all()
                 )
-                _sincronizar_nf_do_pedido(
+                resumo_nf = _sincronizar_nf_do_pedido(
                     db=db,
                     pedido=pedido,
                     pedido_payload=pedido_api,
@@ -361,14 +366,12 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     message="NF identificada via consulta da API do Bling e vinculada localmente.",
                     link_source="pedido.updated.api",
                 )
-                pedido.payload = _montar_payload_pedido(
-                    webhook_data=data,
-                    pedido_completo=pedido_api,
-                    payload_atual=pedido.payload,
-                    ultima_nf=_ultima_nf_payload_efetiva(pedido.payload) or None,
-                )
-                _cancelar_pedido(
-                    db=db, pedido=pedido, itens=itens, processed_at=event_date
+                nf_reconciliation.reconciliar_pedido_cancelado_atualizado(
+                    db=db,
+                    pedido=pedido,
+                    itens=itens,
+                    resumo_nf=resumo_nf,
+                    processed_at=event_date,
                 )
                 logger.info(
                     f"[BLING WEBHOOK] Pedido {pedido_bling_id} cancelado via consulta API (situacao_id={situacao_id_api})"
@@ -512,18 +515,15 @@ def processar_pedido_bling_payload(body: dict, db: Session):
     situacao_id_criacao = _situacao_codigo_bling(
         pedido_completo.get("situacao") if pedido_completo else None
     )
-
-    if situacao_id_criacao and situacao_id_criacao in _SITUACOES_PEDIDO_CANCELADO:
+    if situacao_id_criacao in _SITUACOES_PEDIDO_CANCELADO:
+        status_inicial = "cancelado"
         logger.info(
-            f"[BLING WEBHOOK] Pedido {pedido_bling_id} order.created mas já cancelado (situacao_id={situacao_id_criacao}) — ignorado"
+            f"[BLING WEBHOOK] Pedido {pedido_bling_id} já cancelado será importado para auditoria fiscal (situacao_id={situacao_id_criacao})"
         )
-        return {"status": "ignorado", "motivo": "order_created_ja_cancelado"}
-
-    status_inicial = (
-        "confirmado"
-        if (situacao_id_criacao and situacao_id_criacao in _SITUACOES_PEDIDO_ATENDIDO)
-        else "aberto"
-    )
+    elif situacao_id_criacao in _SITUACOES_PEDIDO_ATENDIDO:
+        status_inicial = "confirmado"
+    else:
+        status_inicial = "aberto"
     resumo_nf_pedido = _resumir_ultima_nf_do_pedido_bling(pedido_completo or data)
     payload_pedido = _montar_payload_pedido(
         webhook_data=data,
@@ -578,6 +578,9 @@ def processar_pedido_bling_payload(body: dict, db: Session):
         canal=canal,
         status=status_inicial,
         expira_em=PedidoIntegrado.calcular_expiracao(),
+        cancelado_em=(
+            routes.datetime.utcnow() if status_inicial == "cancelado" else None
+        ),
         payload=payload_pedido,
     )
 
@@ -603,7 +606,10 @@ def processar_pedido_bling_payload(body: dict, db: Session):
         )
 
         try:
-            EstoqueReservaService.reservar(db, item_pedido)
+            if status_inicial == "cancelado":
+                item_pedido.liberado_em = routes.datetime.utcnow()
+            else:
+                EstoqueReservaService.reservar(db, item_pedido)
         except ValueError as e:
             # Produto não cadastrado no sistema ainda — salva o item sem reserva
             logger.warning(f"[BLING WEBHOOK] Reserva não criada para SKU {sku}: {e}")
@@ -649,6 +655,14 @@ def processar_pedido_bling_payload(body: dict, db: Session):
 
     # Se o pedido já nasceu "confirmado" (NF emitida no Bling antes do webhook order.updated),
     # deduzir estoque imediatamente — sem essa baixa, o estoque nunca seria ajustado.
+    if status_inicial == "cancelado":
+        return nf_reconciliation.resposta_importacao_pedido_cancelado(
+            db,
+            pedido=pedido,
+            resumo_nf=resumo_nf_pedido,
+            processed_at=event_date,
+        )
+
     if status_inicial == "confirmado":
         if resumo_nf_pedido:
             registrar_vinculo_nf_pedido(
