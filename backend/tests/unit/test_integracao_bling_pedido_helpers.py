@@ -436,6 +436,40 @@ def test_serializar_pedido_bling_expoe_contexto_duplicidade_e_acoes():
     assert serializado["acoes_disponiveis"]["pode_reconciliar_fluxo"] is True
 
 
+def test_serializar_pedido_cancelado_expoe_acoes_fiscais_e_de_estoque():
+    pedido = SimpleNamespace(
+        id=22,
+        pedido_bling_id="25439737685",
+        pedido_bling_numero="11682",
+        canal="amazon",
+        status="cancelado",
+        criado_em=None,
+        expira_em=None,
+        confirmado_em=None,
+        cancelado_em=None,
+        payload={
+            "pedido": {"numeroPedidoLoja": "701-0090544-7112242", "itens": []},
+            "ultima_nf": {
+                "id": "25441651449",
+                "numero": "011090",
+                "situacao": "Autorizada",
+                "situacao_codigo": 5,
+            },
+            "cancelamento_nf": {"status": "erro", "erro": "Falha temporaria"},
+            "retorno_estoque": {"status": "pendente"},
+        },
+    )
+
+    serializado = _serializar_pedido_bling(pedido, [])
+
+    assert serializado["cancelamento_nf"]["status"] == "erro"
+    assert serializado["retorno_estoque"]["status"] == "pendente"
+    assert (
+        serializado["acoes_disponiveis"]["pode_solicitar_cancelamento_nf"] is True
+    )
+    assert serializado["acoes_disponiveis"]["retorno_estoque_pendente"] is True
+
+
 def test_pedido_ja_cancelado_reconsulta_nf_e_mantem_alerta_fiscal(monkeypatch):
     class FakeQuery:
         def filter(self, *args, **kwargs):

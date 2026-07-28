@@ -177,6 +177,67 @@ def test_diagnosticar_pedido_cancelado_com_nf_ativa_exige_cancelamento_fiscal():
     assert incidente["nf_bling_id"] == "NF-101"
 
 
+def test_diagnosticar_nf_cancelada_exige_decisao_fisica_do_estoque():
+    pedido = SimpleNamespace(
+        id=102,
+        pedido_bling_id="BL-102",
+        pedido_bling_numero="18002",
+        status="cancelado",
+    )
+
+    incidentes = diagnosticar_pedido_integrado(
+        pedido,
+        [SimpleNamespace(sku="SKU-1", vendido_em="agora", liberado_em=None)],
+        {
+            "ultima_nf": {
+                "id": "NF-102",
+                "numero": "015901",
+                "situacao": "Cancelada",
+                "situacao_codigo": 4,
+            },
+            "retorno_estoque": {"status": "pendente"},
+        },
+        movimentacoes_saida=1,
+    )
+
+    incidente = next(
+        item
+        for item in incidentes
+        if item["code"] == "NF_CANCELADA_RETORNO_ESTOQUE_PENDENTE"
+    )
+
+    assert incidente["auto_fixable"] is False
+    assert incidente["severity"] == "high"
+    assert incidente["nf_bling_id"] == "NF-102"
+
+
+def test_diagnosticar_nf_cancelada_nao_reabre_decisao_ja_encerrada():
+    pedido = SimpleNamespace(
+        id=103,
+        pedido_bling_id="BL-103",
+        status="cancelado",
+    )
+
+    incidentes = diagnosticar_pedido_integrado(
+        pedido,
+        [SimpleNamespace(sku="SKU-1", vendido_em="agora", liberado_em=None)],
+        {
+            "ultima_nf": {
+                "id": "NF-103",
+                "situacao": "Cancelada",
+                "situacao_codigo": 4,
+            },
+            "retorno_estoque": {"status": "nao_retornado"},
+        },
+        movimentacoes_saida=1,
+    )
+
+    assert all(
+        item["code"] != "NF_CANCELADA_RETORNO_ESTOQUE_PENDENTE"
+        for item in incidentes
+    )
+
+
 def test_diagnosticar_pedido_confirmado_sem_baixa_e_item_nao_confirmado():
     pedido = SimpleNamespace(id=2, pedido_bling_id="BL-2", status="confirmado")
     itens = [

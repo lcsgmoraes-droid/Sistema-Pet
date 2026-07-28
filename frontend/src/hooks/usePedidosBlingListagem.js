@@ -79,12 +79,59 @@ export default function usePedidosBlingListagem() {
     }
   }
 
+  async function solicitarCancelamentoNF(pedido) {
+    try {
+      const response = await api.post(
+        `/integracoes/bling/pedidos/${pedido.id}/solicitar-cancelamento-nf`,
+        {},
+      );
+      if (response.data?.motivo === "nf_ja_cancelada") {
+        toast.success("A NF ja consta como cancelada.");
+      } else {
+        toast.success("Cancelamento da NF solicitado ao Bling.");
+      }
+      await carregar();
+      return true;
+    } catch (e) {
+      const detail =
+        typeof e.response?.data?.detail === "string"
+          ? e.response.data.detail
+          : "Erro ao solicitar cancelamento da NF";
+      toast.error(detail, { duration: 8000 });
+      return false;
+    }
+  }
+
+  async function decidirRetornoEstoque(pedido, acao, motivo) {
+    try {
+      const response = await api.post(
+        `/integracoes/bling/pedidos/${pedido.id}/decidir-retorno-estoque`,
+        { acao, motivo },
+      );
+      if (response.data?.status === "retornado") {
+        toast.success("Produtos devolvidos ao estoque.");
+      } else {
+        toast.success("Pendencia encerrada sem alterar o estoque.");
+      }
+      await carregar();
+      return true;
+    } catch (e) {
+      const detail =
+        typeof e.response?.data?.detail === "string"
+          ? e.response.data.detail
+          : "Erro ao registrar a decisao de estoque";
+      toast.error(detail, { duration: 8000 });
+      return false;
+    }
+  }
+
   return {
     abas: PEDIDOS_BLING_ABAS,
     buscaPedido,
     carregando,
     carregar,
     consolidarDuplicidade,
+    decidirRetornoEstoque,
     mudarStatus,
     pagina,
     paginas,
@@ -92,6 +139,7 @@ export default function usePedidosBlingListagem() {
     reconciliarFluxo,
     setPagina,
     statusFiltro,
+    solicitarCancelamentoNF,
     total,
   };
 }

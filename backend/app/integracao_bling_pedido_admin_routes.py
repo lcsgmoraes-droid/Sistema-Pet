@@ -5,12 +5,16 @@ from sqlalchemy import String, cast, or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
+from app.bling_flow_monitor_models import BlingFlowIncident
 from app.db import get_session
 from app.estoque_reserva_service import EstoqueReservaService
 from app.integracao_bling_nf_routes import _dict
 from app.integracao_bling_pedido_payload import (
     _montar_payload_pedido,
     _serializar_pedido_bling,
+)
+from app.integracao_bling_pedido_cancelamento_routes import (
+    router as pedidos_cancelamento_router,
 )
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
@@ -27,7 +31,10 @@ router = APIRouter()
 @router.get("/pedidos")
 def listar_pedidos_bling(
     status: Optional[str] = Query(
-        None, description="aberto|confirmado|expirado|cancelado"
+        None,
+        description=(
+            "aberto|confirmado|expirado|cancelado|retorno_estoque_pendente"
+        ),
     ),
     busca: Optional[str] = Query(
         None, description="Numero interno do pedido Bling ou ID do pedido"
@@ -47,7 +54,23 @@ def listar_pedidos_bling(
         PedidoIntegrado.status != "mesclado",
     )
 
-    if status:
+    if status == "retorno_estoque_pendente":
+        from app.services.pedido_cancelamento_fiscal_estoque_service import (
+            INCIDENTE_RETORNO_ESTOQUE_PENDENTE,
+        )
+
+        pedidos_pendentes = (
+            db.query(BlingFlowIncident.pedido_integrado_id)
+            .filter(
+                BlingFlowIncident.tenant_id == tenant_id,
+                BlingFlowIncident.code == INCIDENTE_RETORNO_ESTOQUE_PENDENTE,
+                BlingFlowIncident.status.in_(["open", "ignored"]),
+                BlingFlowIncident.pedido_integrado_id.isnot(None),
+            )
+            .subquery()
+        )
+        q = q.filter(PedidoIntegrado.id.in_(pedidos_pendentes))
+    elif status:
         q = q.filter(PedidoIntegrado.status == status)
 
     busca_texto = str(busca or pedido or "").strip()
@@ -82,13 +105,27 @@ def listar_pedidos_bling(
             .all()
         )
         try:
-            result.append(
-                _serializar_pedido_bling(
-                    p,
-                    itens,
-                    duplicidade=duplicidade_por_pedido.get(int(p.id)),
-                )
+            pedido_serializado = _serializar_pedido_bling(
+                p,
+                itens,
+                duplicidade=duplicidade_por_pedido.get(int(p.id)),
             )
+            if status == "retorno_estoque_pendente":
+                pedido_serializado["acoes_disponiveis"][
+                    "retorno_estoque_pendente"
+                ] = True
+                if pedido_serializado["retorno_estoque"].get("status") not in {
+                    "retornado",
+                    "nao_retornado",
+                    "sem_movimento",
+                }:
+                    pedido_serializado["retorno_estoque"] = {
+                        **pedido_serializado["retorno_estoque"],
+                        "nf_id": pedido_serializado["nota_fiscal"].get("id"),
+                        "status": "pendente",
+                        "origem": "incidente",
+                    }
+            result.append(pedido_serializado)
         except Exception as exc:
             logger.exception(
                 "[BLING PEDIDOS] Falha ao serializar pedido local id=%s bling_id=%s numero=%s: %s",
@@ -416,3 +453,6 @@ def reprocessar_pedidos_sem_itens(
         "total_sem_itens": len(pedidos_sem_itens),
         "erros": erros,
     }
+
+
+router.include_router(pedidos_cancelamento_router)
