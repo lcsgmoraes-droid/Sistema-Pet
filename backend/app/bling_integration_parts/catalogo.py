@@ -176,6 +176,26 @@ class BlingCatalogoMixin:
         resultado = self._request("GET", f"/pedidos/vendas/{pedido_id}")
         return resultado.get("data", resultado)
 
+    def listar_pedidos_vendas(
+        self,
+        *,
+        data_alteracao_inicial: str,
+        data_alteracao_final: str,
+        pagina: int = 1,
+        limite: int = 100,
+    ) -> Dict:
+        """Lista pedidos de venda alterados no periodo para reconciliacao."""
+        return self._request(
+            "GET",
+            "/pedidos/vendas",
+            data={
+                "dataAlteracaoInicial": data_alteracao_inicial,
+                "dataAlteracaoFinal": data_alteracao_final,
+                "pagina": max(int(pagina or 1), 1),
+                "limite": min(max(int(limite or 1), 1), 100),
+            },
+        )
+
     def listar_naturezas_operacoes(self) -> Dict:
         """
         Lista todas as naturezas de operação cadastradas no Bling

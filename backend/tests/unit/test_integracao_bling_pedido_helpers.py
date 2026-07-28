@@ -6,6 +6,7 @@ from app.integracao_bling_pedido_routes import (
     _confirmar_pedido,
     _montar_payload_pedido,
     _normalizar_canal,
+    _processar_nf_autorizada_vinculada_ao_pedido,
     _resumir_ultima_nf_do_pedido_bling,
     _resumir_ultima_nf_webhook,
     _resolver_canal_pedido,
@@ -106,6 +107,34 @@ def test_resumir_ultima_nf_do_pedido_bling_ignora_id_zero_sem_chamar_api(monkeyp
     assert resumo["numero"] == "010985"
     assert resumo["valor_total"] == 15.5
     bling_factory.assert_not_called()
+
+
+def test_processar_nf_vinculada_cancelada_estorna_estoque(monkeypatch):
+    pedido = SimpleNamespace(id=10)
+    itens = [SimpleNamespace(sku="SKU-1")]
+    chamadas = {}
+
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.processar_nf_cancelada",
+        lambda **kwargs: chamadas.update(kwargs) or "venda_cancelada_com_estorno",
+    )
+
+    resultado = _processar_nf_autorizada_vinculada_ao_pedido(
+        db="db",
+        pedido=pedido,
+        itens=itens,
+        resumo_nf={
+            "id": "NF-10",
+            "numero": "015910",
+            "situacao_codigo": 4,
+            "situacao": "Cancelada",
+        },
+    )
+
+    assert resultado == "venda_cancelada_com_estorno"
+    assert chamadas["pedido"] is pedido
+    assert chamadas["itens"] == itens
+    assert chamadas["nf_id"] == "NF-10"
 
 
 def test_resolver_canal_pedido_prioriza_loja_id_quando_canal_salvo_era_bling():
@@ -405,6 +434,90 @@ def test_serializar_pedido_bling_expoe_contexto_duplicidade_e_acoes():
     assert serializado["duplicidade"]["tem_duplicados"] is True
     assert serializado["acoes_disponiveis"]["pode_consolidar_duplicidade"] is True
     assert serializado["acoes_disponiveis"]["pode_reconciliar_fluxo"] is True
+
+
+def test_pedido_ja_cancelado_reconsulta_nf_e_mantem_alerta_fiscal(monkeypatch):
+    class FakeQuery:
+        def filter(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return [item]
+
+    class FakeDB:
+        def __init__(self):
+            self.commits = 0
+
+        def query(self, model):
+            return FakeQuery()
+
+        def commit(self):
+            self.commits += 1
+
+    pedido = SimpleNamespace(
+        id=81,
+        tenant_id="11111111-1111-1111-1111-111111111111",
+        pedido_bling_id="BL-81",
+        pedido_bling_numero="18081",
+        status="cancelado",
+        payload={"pedido": {"numeroPedidoLoja": "701-0000000-0000001"}},
+    )
+    item = SimpleNamespace(sku="SKU-1")
+    chamadas = {}
+
+    class FakeBling:
+        def consultar_pedido(self, pedido_bling_id):
+            assert pedido_bling_id == "BL-81"
+            return {
+                "id": "BL-81",
+                "situacao": {"id": 12},
+                "notaFiscal": {"id": "NF-81"},
+            }
+
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._set_bling_request_tenant",
+        lambda: pedido.tenant_id,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.localizar_pedido_por_bling_id",
+        lambda *args, **kwargs: pedido,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.registrar_evento",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._sincronizar_nf_do_pedido",
+        lambda **kwargs: {
+            "id": "NF-81",
+            "numero": "015981",
+            "situacao": "Autorizada",
+        },
+    )
+    monkeypatch.setattr(
+        "app.services.pedido_nf_reconciliation_service.processar_nf_vinculada_ao_pedido",
+        lambda *args, **kwargs: chamadas.setdefault("nf", kwargs) or "venda_confirmada",
+    )
+    monkeypatch.setattr("app.bling_integration.BlingAPI", lambda: FakeBling())
+    monkeypatch.setattr(
+        "app.services.pedido_nf_reconciliation_service.registrar_alerta_pedido_cancelado_com_nf_ativa",
+        lambda *args, **kwargs: chamadas.setdefault("alerta", kwargs) or True,
+    )
+
+    db = FakeDB()
+    resultado = processar_pedido_bling_payload(
+        {
+            "event": "order.updated",
+            "data": {"id": "BL-81", "situacao": {"id": 12}},
+        },
+        db,
+    )
+
+    assert resultado["acao"] == "cancelado_por_situacao"
+    assert chamadas["nf"]["pedido"] is pedido
+    assert chamadas["alerta"]["pedido"] is pedido
+    assert pedido.status == "cancelado"
+    assert db.commits == 1
 
 
 def test_confirmar_pedido_so_marca_item_vendido_apos_baixa(monkeypatch):

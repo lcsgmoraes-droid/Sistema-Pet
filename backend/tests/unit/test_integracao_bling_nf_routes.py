@@ -809,6 +809,10 @@ def test_nf_cancelada_estorna_baixa_e_reabre_lote(monkeypatch):
     monkeypatch.setattr(
         "app.estoque.service.EstoqueService.estornar_estoque", fake_estornar
     )
+    monkeypatch.setattr(
+        "app.services.pedido_nf_reconciliation_service.resolver_alerta_nf_cancelada",
+        lambda *args, **kwargs: 1,
+    )
 
     db = FakeDB([movimentacao], lote)
     resposta = processar_nf_cancelada(
