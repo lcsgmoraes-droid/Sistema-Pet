@@ -45,6 +45,23 @@ def _nf_contexto_autorizado(nf: dict | None) -> bool:
     return any(token in situacao for token in ("autoriz", "emitida", "emitido"))
 
 
+def _nf_contexto_cancelado(nf: dict | None) -> bool:
+    nf = _dict(nf)
+    codigo = nf.get("situacao_codigo")
+    if codigo is None:
+        situacao_bruta = nf.get("situacao")
+        if isinstance(situacao_bruta, dict):
+            codigo = situacao_bruta.get("id") or situacao_bruta.get("valor")
+    try:
+        if codigo is not None and int(codigo) == 4:
+            return True
+    except (TypeError, ValueError):
+        pass
+
+    situacao = str(nf.get("situacao") or nf.get("status") or "").strip().lower()
+    return "cancelad" in situacao
+
+
 def _numero_pedido_loja_pedido(pedido: PedidoIntegrado | None) -> str | None:
     payload = _dict(getattr(pedido, "payload", None))
     pedido_payload = _dict(payload.get("pedido"))

@@ -84,7 +84,7 @@ def registrar_alerta_pedido_cancelado_com_nf_ativa(
     source: str = "runtime",
     processed_at=None,
 ) -> bool:
-    """Abre um alerta fiscal sem cancelar a NF automaticamente."""
+    """Abre o alerta fiscal e solicita o cancelamento da NF uma unica vez."""
     from app.services.bling_flow_monitor_diagnostics import (
         _nf_contexto_autorizado,
         _ultima_nf,
@@ -105,7 +105,8 @@ def registrar_alerta_pedido_cancelado_com_nf_ativa(
         "nf_numero": nf_numero,
         "nf": nf,
         "regra_estoque": (
-            "O estoque so volta depois que o cancelamento da NF for confirmado."
+            "Cancelar a NF nao devolve estoque. O retorno depende de conferencia "
+            "fisica e decisao manual no CorePet."
         ),
     }
     abrir_incidente(
@@ -118,8 +119,8 @@ def registrar_alerta_pedido_cancelado_com_nf_ativa(
             f"cancelado, mas a NF {nf_numero or nf_id or 'vinculada'} continua autorizada."
         ),
         suggested_action=(
-            "Cancelar a NF no Bling. O CorePet devolvera o estoque somente depois "
-            "de receber a confirmacao fiscal do cancelamento."
+            "Acompanhar o cancelamento solicitado ao Bling ou reenviar manualmente "
+            "se houver erro."
         ),
         auto_fixable=False,
         pedido_integrado_id=pedido.id,
@@ -144,6 +145,16 @@ def registrar_alerta_pedido_cancelado_com_nf_ativa(
         processed_at=processed_at,
         db=db,
     )
+    from app.services.pedido_cancelamento_fiscal_estoque_service import (
+        solicitar_cancelamento_nf_bling,
+    )
+
+    solicitar_cancelamento_nf_bling(
+        db,
+        pedido=pedido,
+        nf_contexto=nf,
+        automatico=True,
+    )
     return True
 
 
@@ -165,7 +176,7 @@ def resolver_alerta_nf_cancelada(
         pedido_bling_id=getattr(pedido, "pedido_bling_id", None),
         nf_bling_id=nf_id,
         resolution_note=(
-            "Cancelamento da NF confirmado; estoque reconciliado pelo CorePet."
+            "Cancelamento da NF confirmado; decisao fisica do estoque pendente."
         ),
     )
 

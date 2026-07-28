@@ -728,7 +728,7 @@ def test_nf_autorizada_nao_faz_fallback_para_numero_do_pedido_no_documento(monke
     assert chamadas_baixa[0]["documento"] is None
 
 
-def test_nf_cancelada_estorna_baixa_e_reabre_lote(monkeypatch):
+def test_nf_cancelada_abre_pendencia_sem_estornar_estoque(monkeypatch):
     class FakeQuery:
         def __init__(self, resultado):
             self.resultado = resultado
@@ -787,31 +787,17 @@ def test_nf_cancelada_estorna_baixa_e_reabre_lote(monkeypatch):
         pedido_bling_numero="11605",
     )
     item = SimpleNamespace(vendido_em="2026-03-30T12:00:00Z", liberado_em=None)
-    chamadas_estorno = []
-
     monkeypatch.setattr(
-        "app.services.bling_nf_service._obter_usuario_padrao_tenant",
-        lambda **kwargs: SimpleNamespace(id=55),
-    )
-    monkeypatch.setattr(
-        "app.services.bling_nf_service.KitEstoqueService.recalcular_kits_que_usam_produto",
-        lambda db, produto_id: {},
-    )
-    monkeypatch.setattr(
-        "app.services.bling_nf_service._sincronizar_cache_estoque_virtual",
-        lambda db, tenant_id, kit_id: None,
-    )
-
-    def fake_estornar(**kwargs):
-        chamadas_estorno.append(kwargs)
-        return {"sucesso": True}
-
-    monkeypatch.setattr(
-        "app.estoque.service.EstoqueService.estornar_estoque", fake_estornar
-    )
-    monkeypatch.setattr(
-        "app.services.pedido_nf_reconciliation_service.resolver_alerta_nf_cancelada",
+        "app.services.bling_flow_monitor_service.resolver_incidentes_relacionados",
         lambda *args, **kwargs: 1,
+    )
+    monkeypatch.setattr(
+        "app.services.bling_flow_monitor_service.abrir_incidente",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.services.bling_flow_monitor_service.registrar_evento",
+        lambda *args, **kwargs: None,
     )
 
     db = FakeDB([movimentacao], lote)
@@ -819,13 +805,12 @@ def test_nf_cancelada_estorna_baixa_e_reabre_lote(monkeypatch):
         db=db, pedido=pedido, itens=[item], nf_id="25432772133"
     )
 
-    assert resposta == "venda_cancelada_com_estorno"
+    assert resposta == "nf_cancelada_retorno_estoque_pendente"
     assert pedido.status == "cancelado"
-    assert item.vendido_em is None
-    assert item.liberado_em is not None
-    assert movimentacao.status == "cancelado"
-    assert lote.quantidade_disponivel == pytest.approx(1.0)
-    assert lote.status == "ativo"
-    assert len(chamadas_estorno) == 1
-    assert chamadas_estorno[0]["produto_id"] == 6745
+    assert pedido.payload["retorno_estoque"]["status"] == "pendente"
+    assert item.vendido_em == "2026-03-30T12:00:00Z"
+    assert item.liberado_em is None
+    assert movimentacao.status == "confirmado"
+    assert lote.quantidade_disponivel == pytest.approx(0.0)
+    assert lote.status == "esgotado"
     assert db.commit_calls == 1

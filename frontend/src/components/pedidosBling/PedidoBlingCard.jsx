@@ -12,7 +12,9 @@ export default function PedidoBlingCard({
   onConfirmar,
   onCancelar,
   onConsolidarDuplicidade,
+  onDecidirRetornoEstoque,
   onReconciliarFluxo,
+  onSolicitarCancelamentoNF,
 }) {
   const [expandido, setExpandido] = useState(false);
   const [acao, setAcao] = useState(false);
@@ -26,6 +28,8 @@ export default function PedidoBlingCard({
   const situacaoBling = pedido.situacao_bling || {};
   const duplicidade = pedido.duplicidade || {};
   const acoesDisponiveis = pedido.acoes_disponiveis || {};
+  const cancelamentoNF = pedido.cancelamento_nf || {};
+  const retornoEstoque = pedido.retorno_estoque || {};
 
   async function handleConfirmar() {
     const confirmou = window.confirm(
@@ -83,6 +87,51 @@ export default function PedidoBlingCard({
     setAcao(true);
     try {
       await onReconciliarFluxo(pedido);
+    } finally {
+      setAcao(false);
+    }
+  }
+
+  async function handleSolicitarCancelamentoNF() {
+    const reenviar = ["erro", "solicitado"].includes(cancelamentoNF.status);
+    const confirmou = window.confirm(
+      `${reenviar ? "Reenviar" : "Solicitar"} o cancelamento da NF #${
+        notaFiscal.numero || notaFiscal.id
+      } ao Bling?\n\nO estoque nao sera alterado por esta acao.`,
+    );
+    if (!confirmou) return;
+
+    setAcao(true);
+    try {
+      await onSolicitarCancelamentoNF(pedido);
+    } finally {
+      setAcao(false);
+    }
+  }
+
+  async function handleDecidirRetornoEstoque(acaoEstoque) {
+    const vaiRetornar = acaoEstoque === "retornar";
+    const confirmou = window.confirm(
+      vaiRetornar
+        ? "Confirma que os produtos voltaram fisicamente e podem ser somados ao estoque?"
+        : "Confirma que os produtos nao retornaram? O saldo continuara baixado.",
+    );
+    if (!confirmou) return;
+
+    const motivo = window.prompt(
+      vaiRetornar
+        ? "Informe o motivo ou a conferencia realizada:"
+        : "Informe por que o produto nao retornou (danificado, item errado, nao devolvido etc.):",
+    );
+    if (motivo === null) return;
+    if (motivo.trim().length < 5) {
+      toast.error("Informe um motivo com pelo menos 5 caracteres.");
+      return;
+    }
+
+    setAcao(true);
+    try {
+      await onDecidirRetornoEstoque(pedido, acaoEstoque, motivo.trim());
     } finally {
       setAcao(false);
     }
@@ -182,6 +231,44 @@ export default function PedidoBlingCard({
               Consolidar
             </button>
           )}
+          {acoesDisponiveis.pode_solicitar_cancelamento_nf && (
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                handleSolicitarCancelamentoNF();
+              }}
+              disabled={acao}
+              className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50 transition"
+            >
+              {["erro", "solicitado"].includes(cancelamentoNF.status)
+                ? "Reenviar cancelamento NF"
+                : "Cancelar NF no Bling"}
+            </button>
+          )}
+          {acoesDisponiveis.retorno_estoque_pendente && (
+            <>
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleDecidirRetornoEstoque("retornar");
+                }}
+                disabled={acao}
+                className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50 transition"
+              >
+                Voltar ao estoque
+              </button>
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleDecidirRetornoEstoque("nao_retornar");
+                }}
+                disabled={acao}
+                className="text-xs bg-gray-700 hover:bg-gray-800 text-white px-3 py-1.5 rounded-lg font-medium disabled:opacity-50 transition"
+              >
+                Nao retornou
+              </button>
+            </>
+          )}
           {acoesDisponiveis.pode_reconciliar_fluxo && (
             <button
               onClick={(event) => {
@@ -249,6 +336,47 @@ export default function PedidoBlingCard({
                 <PedidoBlingCampoInfo label="Situacao NF" valor={notaFiscal.situacao} />
                 <PedidoBlingCampoInfo label="Chave" valor={notaFiscal.chave} />
               </div>
+            </div>
+          )}
+
+          {(cancelamentoNF.status || retornoEstoque.status) && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
+                Cancelamento e retorno fisico
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
+                <PedidoBlingCampoInfo
+                  label="Cancelamento da NF"
+                  valor={
+                    {
+                      solicitado: "Solicitado ao Bling",
+                      erro: "Erro ao solicitar",
+                      confirmado: "Cancelamento confirmado",
+                    }[cancelamentoNF.status] || cancelamentoNF.status
+                  }
+                />
+                <PedidoBlingCampoInfo
+                  label="Retorno ao estoque"
+                  valor={
+                    {
+                      pendente: "Aguardando conferencia",
+                      retornado: "Produto retornou",
+                      nao_retornado: "Produto nao retornou",
+                      sem_movimento: "Sem baixa para devolver",
+                    }[retornoEstoque.status] || retornoEstoque.status
+                  }
+                />
+                <PedidoBlingCampoInfo label="Motivo da decisao" valor={retornoEstoque.motivo} />
+              </div>
+              {cancelamentoNF.erro && (
+                <p className="mt-2 text-xs text-red-700">Falha no Bling: {cancelamentoNF.erro}</p>
+              )}
+              {retornoEstoque.status === "pendente" && (
+                <p className="mt-2 text-sm text-amber-800">
+                  O saldo continua baixado ate a conferencia fisica. Use Voltar ao estoque somente
+                  se os produtos realmente puderem ser vendidos novamente.
+                </p>
+              )}
             </div>
           )}
 

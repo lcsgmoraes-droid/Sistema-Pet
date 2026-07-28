@@ -621,78 +621,13 @@ def processar_nf_cancelada(
     itens: list[PedidoIntegradoItem],
     nf_id: str | None = None,
 ) -> str:
-    from app.estoque.service import EstoqueService
-
-    pedido.status = "cancelado"
-    pedido.cancelado_em = datetime.now(timezone.utc)
-
-    movimentos_ativos = (
-        db.query(EstoqueMovimentacao)
-        .filter(
-            EstoqueMovimentacao.tenant_id == pedido.tenant_id,
-            EstoqueMovimentacao.referencia_tipo == "pedido_integrado",
-            EstoqueMovimentacao.referencia_id == pedido.id,
-            EstoqueMovimentacao.tipo == "saida",
-            EstoqueMovimentacao.status != "cancelado",
-        )
-        .order_by(EstoqueMovimentacao.id.asc())
-        .all()
+    from app.services.pedido_cancelamento_fiscal_estoque_service import (
+        registrar_nf_cancelada_aguardando_decisao,
     )
 
-    usuario_padrao = _obter_usuario_padrao_tenant(db=db, tenant_id=pedido.tenant_id)
-    user_id_execucao = getattr(usuario_padrao, "id", None)
-    houve_estorno = False
-
-    for movimentacao in movimentos_ativos:
-        _restaurar_lotes_consumidos(db, movimentacao)
-
-        user_id_movimentacao = (
-            getattr(movimentacao, "user_id", None) or user_id_execucao
-        )
-        if not user_id_movimentacao:
-            raise ValueError(
-                f"Nenhum usuario valido disponivel para estornar a movimentacao de estoque do pedido {pedido.id}"
-            )
-
-        EstoqueService.estornar_estoque(
-            produto_id=movimentacao.produto_id,
-            quantidade=float(movimentacao.quantidade or 0),
-            motivo="cancelamento_nf_bling",
-            referencia_id=pedido.id,
-            referencia_tipo="pedido_integrado",
-            user_id=user_id_movimentacao,
-            db=db,
-            tenant_id=pedido.tenant_id,
-            documento=pedido.pedido_bling_numero,
-            observacao=(
-                f"Estorno automatico por cancelamento da NF Bling #{nf_id or _numero_nf_pedido(pedido)}"
-            ),
-        )
-        for (
-            kit_id,
-            _estoque_virtual,
-        ) in KitEstoqueService.recalcular_kits_que_usam_produto(
-            db,
-            movimentacao.produto_id,
-        ).items():
-            _sincronizar_cache_estoque_virtual(db, pedido.tenant_id, kit_id)
-        movimentacao.status = "cancelado"
-        observacao_original = (movimentacao.observacao or "").strip()
-        complemento = f"Cancelada pela NF Bling #{nf_id or _numero_nf_pedido(pedido)}"
-        movimentacao.observacao = (
-            f"{observacao_original} | {complemento}"
-            if observacao_original and complemento not in observacao_original
-            else complemento
-        )
-        db.add(movimentacao)
-        houve_estorno = True
-
-    for item in itens:
-        item.vendido_em = None
-        item.liberado_em = item.liberado_em or datetime.utcnow()
-        db.add(item)
-
-    nf_alert.resolver_alerta_nf_cancelada(db, pedido=pedido, nf_id=nf_id)
-    db.add(pedido)
-    db.commit()
-    return "venda_cancelada_com_estorno" if houve_estorno else "venda_cancelada"
+    return registrar_nf_cancelada_aguardando_decisao(
+        db,
+        pedido=pedido,
+        itens=itens,
+        nf_id=nf_id,
+    )

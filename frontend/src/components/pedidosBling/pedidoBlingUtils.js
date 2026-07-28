@@ -3,6 +3,11 @@ export const STATUS_CONFIG = {
   confirmado: { label: "Confirmado", cor: "bg-green-100 text-green-800", dot: "bg-green-500" },
   expirado: { label: "Expirado", cor: "bg-yellow-100 text-yellow-800", dot: "bg-yellow-500" },
   cancelado: { label: "Cancelado", cor: "bg-red-100 text-red-800", dot: "bg-red-500" },
+  retorno_estoque_pendente: {
+    label: "Retorno ao estoque",
+    cor: "bg-amber-100 text-amber-800",
+    dot: "bg-amber-500",
+  },
 };
 
 export const PEDIDOS_BLING_ABAS = [
@@ -11,6 +16,7 @@ export const PEDIDOS_BLING_ABAS = [
   { valor: "confirmado", label: "Confirmados" },
   { valor: "expirado", label: "Expirados" },
   { valor: "cancelado", label: "Cancelados" },
+  { valor: "retorno_estoque_pendente", label: "Retorno ao estoque" },
 ];
 
 export function formatarDataHora(iso) {
