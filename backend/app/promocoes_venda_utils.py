@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 
+from app.utils.timezone import as_brasilia_naive, now_brasilia, wall_time_naive
+
 
 TOLERANCIA_PRECO_PROMOCAO = 0.01
 
@@ -17,15 +19,11 @@ def _as_float(valor: Any, default: float = 0.0) -> float:
 
 
 def _datetime_sem_timezone(valor: Any) -> Optional[datetime]:
-    if not valor:
-        return None
-    if getattr(valor, "tzinfo", None) is not None:
-        return valor.replace(tzinfo=None)
-    return valor
+    return wall_time_naive(valor) if isinstance(valor, datetime) else None
 
 
 def _janela_ativa(inicio: Any, fim: Any, data_ref: Optional[datetime]) -> bool:
-    data_base = _datetime_sem_timezone(data_ref) or datetime.utcnow()
+    data_base = as_brasilia_naive(data_ref) or now_brasilia()
     inicio = _datetime_sem_timezone(inicio)
     fim = _datetime_sem_timezone(fim)
     if inicio and data_base < inicio:
