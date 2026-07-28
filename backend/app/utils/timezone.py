@@ -33,6 +33,33 @@ def now_brasilia() -> datetime:
     return brasilia_now.replace(tzinfo=None)
 
 
+def as_brasilia_naive(dt: datetime | None) -> datetime | None:
+    """
+    Converte um instante para Brasilia e remove a informacao de timezone.
+
+    Datetimes sem timezone ja sao considerados horario local de Brasilia,
+    seguindo o padrao historico do sistema.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt
+    return dt.astimezone(BRASILIA_TZ).replace(tzinfo=None)
+
+
+def wall_time_naive(dt: datetime | None) -> datetime | None:
+    """
+    Preserva o horario de parede informado pelo operador.
+
+    Campos de agenda/promocao historicamente guardam os mesmos numeros de
+    data e hora digitados no ERP. Por isso removemos o timezone sem deslocar
+    o relogio.
+    """
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=None) if dt.tzinfo is not None else dt
+
+
 def to_brasilia(dt: datetime) -> datetime:
     """
     Converte um datetime para o timezone de Brasília.

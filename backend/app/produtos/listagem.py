@@ -18,6 +18,7 @@ from app.produtos.search import (
 )
 from app.produtos.validade import _mapa_validade_proxima_produtos
 from app.services.kit_estoque_service import KitEstoqueService
+from app.utils.timezone import as_brasilia_naive, now_brasilia, wall_time_naive
 
 
 logger = logging.getLogger(__name__)
@@ -404,7 +405,7 @@ def _aplicar_filtros_basicos_produtos(
         query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
 
     if em_promocao:
-        agora = referencia or datetime.now()
+        agora = as_brasilia_naive(referencia) or now_brasilia()
         query = query.filter(
             Produto.preco_promocional.isnot(None),
             or_(Produto.promocao_inicio.is_(None), Produto.promocao_inicio <= agora),
@@ -424,11 +425,7 @@ def _as_float_optional(valor: Any) -> Optional[float]:
 
 
 def _datetime_naive(valor: Any) -> Optional[datetime]:
-    if not valor:
-        return None
-    if isinstance(valor, datetime):
-        return valor.replace(tzinfo=None) if valor.tzinfo else valor
-    return None
+    return wall_time_naive(valor) if isinstance(valor, datetime) else None
 
 
 def _janela_promocao_ativa(
@@ -436,7 +433,7 @@ def _janela_promocao_ativa(
     fim: Any,
     referencia: Optional[datetime] = None,
 ) -> bool:
-    agora = _datetime_naive(referencia) or datetime.now()
+    agora = as_brasilia_naive(referencia) or now_brasilia()
     inicio_dt = _datetime_naive(inicio)
     fim_dt = _datetime_naive(fim)
 
