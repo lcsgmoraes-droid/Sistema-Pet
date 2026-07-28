@@ -233,8 +233,7 @@ def test_diagnosticar_nf_cancelada_nao_reabre_decisao_ja_encerrada():
     )
 
     assert all(
-        item["code"] != "NF_CANCELADA_RETORNO_ESTOQUE_PENDENTE"
-        for item in incidentes
+        item["code"] != "NF_CANCELADA_RETORNO_ESTOQUE_PENDENTE" for item in incidentes
     )
 
 

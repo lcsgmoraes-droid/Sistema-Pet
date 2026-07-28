@@ -140,7 +140,9 @@ def test_falha_automatica_fica_registrada_sem_interromper_fluxo(monkeypatch):
 
 
 def test_nf_cancelada_mantem_saldo_baixado_e_abre_pendencia(monkeypatch):
-    movimento = SimpleNamespace(id=301, produto_id=6745, quantidade=1, status="confirmado")
+    movimento = SimpleNamespace(
+        id=301, produto_id=6745, quantidade=1, status="confirmado"
+    )
     pedido = _pedido(
         payload={
             "ultima_nf": {

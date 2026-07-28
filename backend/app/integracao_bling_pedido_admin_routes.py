@@ -32,9 +32,7 @@ router = APIRouter()
 def listar_pedidos_bling(
     status: Optional[str] = Query(
         None,
-        description=(
-            "aberto|confirmado|expirado|cancelado|retorno_estoque_pendente"
-        ),
+        description=("aberto|confirmado|expirado|cancelado|retorno_estoque_pendente"),
     ),
     busca: Optional[str] = Query(
         None, description="Numero interno do pedido Bling ou ID do pedido"
@@ -111,9 +109,9 @@ def listar_pedidos_bling(
                 duplicidade=duplicidade_por_pedido.get(int(p.id)),
             )
             if status == "retorno_estoque_pendente":
-                pedido_serializado["acoes_disponiveis"][
-                    "retorno_estoque_pendente"
-                ] = True
+                pedido_serializado["acoes_disponiveis"]["retorno_estoque_pendente"] = (
+                    True
+                )
                 if pedido_serializado["retorno_estoque"].get("status") not in {
                     "retornado",
                     "nao_retornado",

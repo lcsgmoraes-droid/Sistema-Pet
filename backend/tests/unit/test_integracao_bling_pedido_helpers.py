@@ -464,9 +464,7 @@ def test_serializar_pedido_cancelado_expoe_acoes_fiscais_e_de_estoque():
 
     assert serializado["cancelamento_nf"]["status"] == "erro"
     assert serializado["retorno_estoque"]["status"] == "pendente"
-    assert (
-        serializado["acoes_disponiveis"]["pode_solicitar_cancelamento_nf"] is True
-    )
+    assert serializado["acoes_disponiveis"]["pode_solicitar_cancelamento_nf"] is True
     assert serializado["acoes_disponiveis"]["retorno_estoque_pendente"] is True
 
 

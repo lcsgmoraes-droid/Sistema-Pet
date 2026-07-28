@@ -95,8 +95,7 @@ def _restaurar_pendencia_legada_por_incidente(
         **payload,
         "retorno_estoque": {
             **detalhes,
-            "nf_id": detalhes.get("nf_id")
-            or getattr(incidente, "nf_bling_id", None),
+            "nf_id": detalhes.get("nf_id") or getattr(incidente, "nf_bling_id", None),
             "status": "pendente",
             "origem": "incidente",
         },

@@ -64,13 +64,9 @@ def test_pedido_cancelado_so_consulta_bling_enquanto_fiscal_esta_pendente():
     )
 
     assert service._pedido_cancelado_requer_acompanhamento(pedido_ativo) is True
+    assert service._pedido_cancelado_requer_acompanhamento(pedido_solicitado) is True
     assert (
-        service._pedido_cancelado_requer_acompanhamento(pedido_solicitado) is True
-    )
-    assert (
-        service._pedido_cancelado_requer_acompanhamento(
-            pedido_aguardando_estoque
-        )
+        service._pedido_cancelado_requer_acompanhamento(pedido_aguardando_estoque)
         is False
     )
 

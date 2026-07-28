@@ -451,9 +451,7 @@ def decidir_retorno_estoque(
     else:
         for movimentacao in movimentos_ativos:
             observacao_original = (movimentacao.observacao or "").strip()
-            complemento = (
-                f"Saida mantida apos NF cancelada; produto nao retornou. Motivo: {motivo}"
-            )
+            complemento = f"Saida mantida apos NF cancelada; produto nao retornou. Motivo: {motivo}"
             movimentacao.observacao = (
                 f"{observacao_original} | {complemento}"
                 if observacao_original

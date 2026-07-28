@@ -418,9 +418,7 @@ def _acoes_operacionais_pedido(
     pode_consolidar = bool(pedido_atual_eh_canonico and pedidos_seguro_ids)
     payload = _dict(getattr(pedido, "payload", None))
     ultima_nf = _ultima_nf_payload_efetiva(payload)
-    nf_id = _texto(
-        _primeiro_preenchido(ultima_nf.get("id"), ultima_nf.get("nfe_id"))
-    )
+    nf_id = _texto(_primeiro_preenchido(ultima_nf.get("id"), ultima_nf.get("nfe_id")))
     situacao_nf = _primeiro_preenchido(
         ultima_nf.get("situacao_codigo"),
         ultima_nf.get("situacao"),
