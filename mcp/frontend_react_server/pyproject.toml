@@ -9,7 +9,7 @@ description = "MCP Server para operação e validação do frontend React do Sis
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "mcp>=1.12.0",
+  "mcp>=1.12.0,<2.0.0",
   "requests>=2.32.0",
 ]
 
