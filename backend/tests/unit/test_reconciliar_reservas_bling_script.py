@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from uuid import UUID
@@ -8,6 +10,29 @@ from scripts import reconciliar_reservas_bling as script
 
 
 TENANT_ID = UUID("11111111-1111-1111-1111-111111111111")
+
+
+def test_script_inicializa_registry_completo_em_processo_isolado():
+    resultado = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import runpy; "
+                "from sqlalchemy.orm import configure_mappers; "
+                "runpy.run_path('scripts/reconciliar_reservas_bling.py'); "
+                "import app.estoque_models; "
+                "configure_mappers()"
+            ),
+        ],
+        cwd=script.ROOT_DIR,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=False,
+    )
+
+    assert resultado.returncode == 0, resultado.stderr
 
 
 class _FakeDB:

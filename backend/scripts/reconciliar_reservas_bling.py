@@ -18,6 +18,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from sqlalchemy import func
 
+import app.db.base  # noqa: F401
 from app.db import SessionLocal
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
