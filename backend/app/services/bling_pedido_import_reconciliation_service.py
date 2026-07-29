@@ -6,6 +6,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
 from app.services.pedido_integrado_consolidation_service import (
     localizar_pedido_por_bling_id,
@@ -25,6 +26,27 @@ def _tenant_bling_configurado() -> UUID | None:
 def _itens_resposta_bling(resposta: dict | None) -> list[dict]:
     data = (resposta or {}).get("data") if isinstance(resposta, dict) else None
     return [item for item in (data or []) if isinstance(item, dict)]
+
+
+def _pedido_confirmado_possui_itens_pendentes(
+    db: Session,
+    pedido: PedidoIntegrado | None,
+) -> bool:
+    pedido_id = getattr(pedido, "id", None)
+    if not pedido_id:
+        return False
+
+    return (
+        db.query(PedidoIntegradoItem.id)
+        .filter(
+            PedidoIntegradoItem.pedido_integrado_id == pedido_id,
+            PedidoIntegradoItem.tenant_id == getattr(pedido, "tenant_id", None),
+            PedidoIntegradoItem.liberado_em.is_(None),
+            PedidoIntegradoItem.vendido_em.is_(None),
+        )
+        .first()
+        is not None
+    )
 
 
 def reconciliar_importacao_pedidos_bling_recentes(
@@ -101,6 +123,9 @@ def reconciliar_importacao_pedidos_bling_recentes(
                         (
                             situacao_id in _SITUACOES_PEDIDO_ATENDIDO
                             and existente.status == "confirmado"
+                            and not _pedido_confirmado_possui_itens_pendentes(
+                                db, existente
+                            )
                         )
                         or (
                             situacao_id is not None
