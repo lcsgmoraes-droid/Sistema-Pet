@@ -189,9 +189,27 @@ def _sincronizar_itens_pedido_integrado(
         .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
         .all()
     )
-    chaves_existentes: dict[tuple[str | None, int], int] = {}
+    from app.services.produto_sku_service import (
+        buscar_produto_por_sku,
+        normalizar_sku,
+    )
+
+    def chave_item(sku: str | None, quantidade: int) -> tuple[str, str, int]:
+        produto = buscar_produto_por_sku(
+            db,
+            tenant_id=pedido.tenant_id,
+            sku=sku or "",
+        )
+        if produto and getattr(produto, "id", None):
+            return ("produto", str(produto.id), quantidade)
+        return ("sku", normalizar_sku(sku), quantidade)
+
+    chaves_existentes: dict[tuple[str, str, int], int] = {}
     for item in itens_existentes:
-        chave = (_texto(item.sku), int(float(item.quantidade or 0)))
+        chave = chave_item(
+            _texto(item.sku),
+            int(float(item.quantidade or 0)),
+        )
         chaves_existentes[chave] = chaves_existentes.get(chave, 0) + 1
 
     criados = 0
@@ -203,7 +221,7 @@ def _sincronizar_itens_pedido_integrado(
         if not sku or quantidade <= 0:
             continue
 
-        chave = (sku, quantidade)
+        chave = chave_item(sku, quantidade)
         if chaves_existentes.get(chave, 0) > 0:
             chaves_existentes[chave] -= 1
             continue
