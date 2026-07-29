@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import time
 
-from sqlalchemy import func, text
+from sqlalchemy import and_, exists, func, or_, text
 from sqlalchemy.orm import Session
 
 from app.pedido_integrado_item_models import PedidoIntegradoItem
@@ -72,6 +72,24 @@ def _pedido_cancelado_requer_acompanhamento(pedido: PedidoIntegrado) -> bool:
     )
 
 
+def _filtro_pedido_regular_requer_reconciliacao():
+    item_pendente = exists().where(
+        and_(
+            PedidoIntegradoItem.pedido_integrado_id == PedidoIntegrado.id,
+            PedidoIntegradoItem.tenant_id == PedidoIntegrado.tenant_id,
+            PedidoIntegradoItem.liberado_em.is_(None),
+            PedidoIntegradoItem.vendido_em.is_(None),
+        )
+    )
+    return or_(
+        PedidoIntegrado.status == "aberto",
+        and_(
+            PedidoIntegrado.status.in_(("confirmado", "expirado")),
+            item_pendente,
+        ),
+    )
+
+
 def _buscar_pedidos_recentes_reconciliaveis(
     db: Session,
     tenant_id,
@@ -89,7 +107,7 @@ def _buscar_pedidos_recentes_reconciliaveis(
         db.query(PedidoIntegrado)
         .filter(
             *filtros_base,
-            PedidoIntegrado.status.in_(("aberto", "confirmado", "expirado")),
+            _filtro_pedido_regular_requer_reconciliacao(),
         )
         .order_by(PedidoIntegrado.criado_em.desc(), PedidoIntegrado.id.desc())
         .limit(max(int(limite_pedidos or 0), 1))
@@ -133,7 +151,7 @@ def _contar_pedidos_recentes_reconciliaveis(
         db.query(func.count(PedidoIntegrado.id))
         .filter(
             *filtros_base,
-            PedidoIntegrado.status.in_(("aberto", "confirmado", "expirado")),
+            _filtro_pedido_regular_requer_reconciliacao(),
         )
         .scalar()
     )
@@ -330,26 +348,26 @@ def reconciliar_status_pedido_local(
             "nf_numero": _dict(resumo_nf).get("numero"),
         }
 
-    if situacao_id and situacao_id in _SITUACOES_PEDIDO_ATENDIDO:
-        acao_nf = _processar_nf_autorizada_vinculada_ao_pedido(
-            db=db,
-            pedido=pedido,
-            itens=itens,
-            resumo_nf=resumo_nf,
-        )
-        if acao_nf:
-            return {
-                "success": True,
-                "executada": True,
-                "acao": acao_nf,
-                "pedido_integrado_id": pedido.id,
-                "pedido_bling_id": pedido_bling_id,
-                "status_anterior": status_anterior,
-                "status_atual": pedido.status,
-                "nf_numero": _dict(resumo_nf).get("numero"),
-                "erros_estoque": [],
-            }
+    acao_nf = _processar_nf_autorizada_vinculada_ao_pedido(
+        db=db,
+        pedido=pedido,
+        itens=itens,
+        resumo_nf=resumo_nf,
+    )
+    if acao_nf:
+        return {
+            "success": True,
+            "executada": True,
+            "acao": acao_nf,
+            "pedido_integrado_id": pedido.id,
+            "pedido_bling_id": pedido_bling_id,
+            "status_anterior": status_anterior,
+            "status_atual": pedido.status,
+            "nf_numero": _dict(resumo_nf).get("numero"),
+            "erros_estoque": [],
+        }
 
+    if situacao_id and situacao_id in _SITUACOES_PEDIDO_ATENDIDO:
         if pedido.status not in {"confirmado", "cancelado"}:
             erros = _confirmar_pedido(
                 db=db,

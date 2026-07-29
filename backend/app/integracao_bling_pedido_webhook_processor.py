@@ -245,11 +245,7 @@ def processar_pedido_bling_payload(body: dict, db: Session):
         pedido_api = None
         situacao_id_api = None
 
-        if (
-            situacao_id
-            and situacao_id
-            in (_SITUACOES_PEDIDO_CANCELADO | _SITUACOES_PEDIDO_ATENDIDO)
-        ) or not situacao_id:
+        if pedido_bling_id:
             try:
                 from app.bling_integration import BlingAPI
 
@@ -259,6 +255,54 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                 logger.warning(
                     f"[BLING WEBHOOK] Falha ao consultar pedido {pedido_bling_id} na API: {e}"
                 )
+
+        if situacao_id_api is not None:
+            situacao_id = situacao_id_api
+
+        if situacao_id not in (
+            _SITUACOES_PEDIDO_CANCELADO | _SITUACOES_PEDIDO_ATENDIDO
+        ):
+            pedido = localizar_pedido_por_bling_id(
+                db,
+                tenant_id=_tenant_uuid,
+                pedido_bling_id=pedido_bling_id,
+            )
+            if pedido and pedido.status != "cancelado":
+                itens = (
+                    db.query(PedidoIntegradoItem)
+                    .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+                    .all()
+                )
+                resumo_nf = _sincronizar_nf_do_pedido(
+                    db=db,
+                    pedido=pedido,
+                    pedido_payload=pedido_api or data,
+                    webhook_data=data,
+                    processed_at=event_date,
+                    source="webhook",
+                    message=(
+                        "NF identificada no pedido atualizado e vinculada localmente."
+                    ),
+                    link_source="pedido.updated.api",
+                )
+                acao_nf = _processar_nf_autorizada_vinculada_ao_pedido(
+                    db=db,
+                    pedido=pedido,
+                    itens=itens,
+                    resumo_nf=resumo_nf,
+                )
+                if acao_nf:
+                    return {
+                        "status": "ok",
+                        "acao": acao_nf,
+                        "erros_estoque": [],
+                    }
+                db.commit()
+
+            return {
+                "status": "ignorado",
+                "motivo": "order_updated_sem_situacao_relevante",
+            }
 
         if situacao_id and situacao_id in _SITUACOES_PEDIDO_CANCELADO:
             pedido = localizar_pedido_por_bling_id(
@@ -343,100 +387,6 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                 )
 
             return {"status": "ok", "acao": "confirmado_por_situacao"}
-
-        if situacao_id_api and situacao_id_api in _SITUACOES_PEDIDO_CANCELADO:
-            pedido = localizar_pedido_por_bling_id(
-                db,
-                tenant_id=_tenant_uuid,
-                pedido_bling_id=pedido_bling_id,
-            )
-            if pedido:
-                itens = (
-                    db.query(PedidoIntegradoItem)
-                    .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
-                    .all()
-                )
-                resumo_nf = _sincronizar_nf_do_pedido(
-                    db=db,
-                    pedido=pedido,
-                    pedido_payload=pedido_api,
-                    webhook_data=data,
-                    processed_at=event_date,
-                    source="webhook",
-                    message="NF identificada via consulta da API do Bling e vinculada localmente.",
-                    link_source="pedido.updated.api",
-                )
-                nf_reconciliation.reconciliar_pedido_cancelado_atualizado(
-                    db=db,
-                    pedido=pedido,
-                    itens=itens,
-                    resumo_nf=resumo_nf,
-                    processed_at=event_date,
-                )
-                logger.info(
-                    f"[BLING WEBHOOK] Pedido {pedido_bling_id} cancelado via consulta API (situacao_id={situacao_id_api})"
-                )
-
-            return {"status": "ok", "acao": "cancelado_via_consulta_api"}
-
-        if situacao_id_api and situacao_id_api in _SITUACOES_PEDIDO_ATENDIDO:
-            pedido = localizar_pedido_por_bling_id(
-                db,
-                tenant_id=_tenant_uuid,
-                pedido_bling_id=pedido_bling_id,
-            )
-            if pedido and pedido.status != "cancelado":
-                itens = (
-                    db.query(PedidoIntegradoItem)
-                    .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
-                    .all()
-                )
-                resumo_nf = _sincronizar_nf_do_pedido(
-                    db=db,
-                    pedido=pedido,
-                    pedido_payload=pedido_api,
-                    webhook_data=data,
-                    processed_at=event_date,
-                    source="webhook",
-                    message="NF identificada via consulta da API do Bling e vinculada localmente.",
-                    link_source="pedido.updated.api",
-                )
-                acao_nf = _processar_nf_autorizada_vinculada_ao_pedido(
-                    db=db,
-                    pedido=pedido,
-                    itens=itens,
-                    resumo_nf=resumo_nf,
-                )
-                if acao_nf:
-                    logger.info(
-                        f"[BLING WEBHOOK] Pedido {pedido_bling_id} consolidado por NF autorizada vinculada via consulta API (situacao_id={situacao_id_api})"
-                    )
-                    return {"status": "ok", "acao": acao_nf, "erros_estoque": []}
-
-                pedido.payload = _montar_payload_pedido(
-                    webhook_data=data,
-                    pedido_completo=pedido_api,
-                    payload_atual=pedido.payload,
-                    ultima_nf=_ultima_nf_payload_efetiva(pedido.payload) or None,
-                )
-                if pedido.status != "confirmado":
-                    _confirmar_pedido(
-                        db=db,
-                        pedido=pedido,
-                        itens=itens,
-                        motivo="venda_bling_webhook",
-                        observacao="Pedido atendido via API do Bling; venda aguardando NF",
-                        processed_at=event_date,
-                        aplicar_baixa_estoque=False,
-                    )
-                    logger.info(
-                        f"[BLING WEBHOOK] Pedido {pedido_bling_id} confirmado via consulta API sem baixa; aguardando NF (situacao_id={situacao_id_api})"
-                    )
-                else:
-                    db.add(pedido)
-                    db.commit()
-
-            return {"status": "ok", "acao": "confirmado_via_consulta_api"}
 
         return {"status": "ignorado", "motivo": "order_updated_sem_situacao_relevante"}
 
@@ -545,10 +495,7 @@ def processar_pedido_bling_payload(body: dict, db: Session):
         event_date=event_date,
     )
     if pedido_consolidado:
-        if status_inicial == "confirmado" and pedido_consolidado.status not in (
-            "confirmado",
-            "cancelado",
-        ):
+        if pedido_consolidado.status != "cancelado":
             itens_salvos = (
                 db.query(PedidoIntegradoItem)
                 .filter(
@@ -556,15 +503,31 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                 )
                 .all()
             )
-            _confirmar_pedido(
+            acao_nf = _processar_nf_autorizada_vinculada_ao_pedido(
                 db=db,
                 pedido=pedido_consolidado,
                 itens=itens_salvos,
-                motivo="venda_bling_webhook_duplicado",
-                observacao="Pedido duplicado no Bling consolidado no pedido canonico; venda aguardando NF",
-                processed_at=event_date,
-                aplicar_baixa_estoque=False,
+                resumo_nf=resumo_nf_pedido,
             )
+            if acao_nf:
+                return {
+                    "status": "ok",
+                    "pedido_id": pedido_consolidado.id,
+                    "acao": acao_nf,
+                }
+            if (
+                status_inicial == "confirmado"
+                and pedido_consolidado.status != "confirmado"
+            ):
+                _confirmar_pedido(
+                    db=db,
+                    pedido=pedido_consolidado,
+                    itens=itens_salvos,
+                    motivo="venda_bling_webhook_duplicado",
+                    observacao="Pedido duplicado no Bling consolidado no pedido canonico; venda aguardando NF",
+                    processed_at=event_date,
+                    aplicar_baixa_estoque=False,
+                )
         return {
             "status": "ok",
             "pedido_id": pedido_consolidado.id,
@@ -663,7 +626,7 @@ def processar_pedido_bling_payload(body: dict, db: Session):
             processed_at=event_date,
         )
 
-    if status_inicial == "confirmado":
+    if status_inicial != "cancelado":
         if resumo_nf_pedido:
             registrar_vinculo_nf_pedido(
                 pedido=pedido,
@@ -683,6 +646,25 @@ def processar_pedido_bling_payload(body: dict, db: Session):
             .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
             .all()
         )
+        acao_nf = _processar_nf_autorizada_vinculada_ao_pedido(
+            db=db,
+            pedido=pedido,
+            itens=itens_salvos,
+            resumo_nf=resumo_nf_pedido,
+        )
+        if acao_nf:
+            logger.info(
+                "[BLING WEBHOOK] Pedido %s criado/importado ja atendido e "
+                "consolidado pela NF autorizada.",
+                pedido_bling_id,
+            )
+            return {
+                "status": "ok",
+                "pedido_id": pedido.id,
+                "acao": acao_nf,
+            }
+        if status_inicial != "confirmado":
+            return {"status": "ok", "pedido_id": pedido.id}
         _confirmar_pedido(
             db=db,
             pedido=pedido,

@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
+import pytest
+
 from app.services import pedido_status_reconciliation_service as service
 
 
@@ -71,7 +73,11 @@ def test_pedido_cancelado_so_consulta_bling_enquanto_fiscal_esta_pendente():
     )
 
 
-def test_reconciliar_status_atendido_com_nf_autorizada_consolida_venda(monkeypatch):
+@pytest.mark.parametrize("situacao_id", [9, 24])
+def test_reconciliar_status_com_nf_autorizada_consolida_venda(
+    monkeypatch,
+    situacao_id,
+):
     class FakeQuery:
         def __init__(self, all_result=None):
             self.all_result = all_result or []
@@ -108,7 +114,7 @@ def test_reconciliar_status_atendido_com_nf_autorizada_consolida_venda(monkeypat
                 "id": 25997676807,
                 "numero": "15207",
                 "numeroPedidoLoja": "260605AJ6TS27W",
-                "situacao": {"id": 9, "valor": 1},
+                "situacao": {"id": situacao_id, "valor": 1},
                 "notaFiscal": {"id": "26005873647"},
             }
 

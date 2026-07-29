@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+import pytest
+
 from app.integracao_bling_pedido_routes import (
     _baixar_item_pedido,
     _confirmar_pedido,
@@ -730,7 +732,11 @@ def test_baixar_item_pedido_vincula_produto_bling_do_payload_por_sku(monkeypatch
     assert vinculos == [(db, "tenant-1", 14002, "16666308523")]
 
 
-def test_order_updated_atendido_com_nf_autorizada_consolida_venda(monkeypatch):
+@pytest.mark.parametrize("situacao_id", [9, 24])
+def test_order_updated_com_nf_autorizada_consolida_venda(
+    monkeypatch,
+    situacao_id,
+):
     class FakeQuery:
         def __init__(self, all_result=None):
             self.all_result = all_result or []
@@ -767,7 +773,7 @@ def test_order_updated_atendido_com_nf_autorizada_consolida_venda(monkeypatch):
                 "id": 25997676807,
                 "numero": "15207",
                 "numeroPedidoLoja": "260605AJ6TS27W",
-                "situacao": {"id": 9, "valor": 1},
+                "situacao": {"id": situacao_id, "valor": 1},
                 "notaFiscal": {"id": "26005873647"},
             }
 
@@ -827,7 +833,7 @@ def test_order_updated_atendido_com_nf_autorizada_consolida_venda(monkeypatch):
             "date": "2026-06-05T12:00:00Z",
             "data": {
                 "id": "25997676807",
-                "situacao": {"id": 9, "valor": 1},
+                "situacao": {"id": situacao_id, "valor": 1},
             },
         },
         db,
@@ -838,3 +844,133 @@ def test_order_updated_atendido_com_nf_autorizada_consolida_venda(monkeypatch):
     assert chamadas["processou_nf"]["pedido"] is pedido
     assert chamadas["processou_nf"]["itens"] == [item]
     assert chamadas["processou_nf"]["nf_id"] == "26005873647"
+
+
+@pytest.mark.parametrize("situacao_id", [9, 24])
+def test_order_created_com_nf_autorizada_consolida_venda(
+    monkeypatch,
+    situacao_id,
+):
+    from app.pedido_integrado_item_models import PedidoIntegradoItem
+    from app.pedido_integrado_models import PedidoIntegrado
+
+    class FakeQuery:
+        def __init__(self, db):
+            self.db = db
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return list(self.db.itens)
+
+    class FakeDB:
+        def __init__(self):
+            self.itens = []
+            self.commit_calls = 0
+
+        def add(self, obj):
+            if isinstance(obj, PedidoIntegrado) and obj.id is None:
+                obj.id = 8080
+            if isinstance(obj, PedidoIntegradoItem) and obj not in self.itens:
+                obj.id = len(self.itens) + 1
+                self.itens.append(obj)
+
+        def commit(self):
+            self.commit_calls += 1
+
+        def refresh(self, obj):
+            return None
+
+        def query(self, model):
+            assert model is PedidoIntegradoItem
+            return FakeQuery(self)
+
+    class FakeBling:
+        def consultar_pedido(self, pedido_bling_id):
+            assert pedido_bling_id == "BL-8080"
+            return {
+                "id": "BL-8080",
+                "numero": "18080",
+                "numeroPedidoLoja": "702-7642395-5222664",
+                "situacao": {"id": situacao_id},
+                "notaFiscal": {"id": "NF-8080"},
+                "itens": [
+                    {
+                        "codigo": "ATC517",
+                        "descricao": "Bifinho Keldog",
+                        "quantidade": 4,
+                    }
+                ],
+            }
+
+        def consultar_nfe(self, nf_id):
+            assert nf_id == "NF-8080"
+            return {
+                "id": "NF-8080",
+                "numero": "015879",
+                "situacao": 5,
+            }
+
+        def consultar_nfce(self, nf_id):
+            raise AssertionError("nao deve consultar NFC-e quando NFe respondeu")
+
+    chamadas = {}
+    db = FakeDB()
+
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._set_bling_request_tenant",
+        lambda request=None: "11111111-1111-1111-1111-111111111111",
+    )
+    monkeypatch.setattr("app.bling_integration.BlingAPI", lambda: FakeBling())
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.localizar_pedido_por_bling_id",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._consolidar_pedido_duplicado_por_numero_loja",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.EstoqueReservaService.reservar",
+        lambda db_arg, item_arg: setattr(item_arg, "reservado_em", "agora"),
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.registrar_evento",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.registrar_vinculo_nf_pedido",
+        lambda **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._confirmar_pedido",
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError("nao deve aguardar NF quando ela ja esta autorizada")
+        ),
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes._processar_nf_autorizada_vinculada_ao_pedido",
+        lambda **kwargs: (
+            chamadas.setdefault("processou_nf", kwargs),
+            "venda_confirmada",
+        )[1],
+    )
+
+    resposta = processar_pedido_bling_payload(
+        {
+            "event": "order.created",
+            "date": "2026-07-28T16:36:51Z",
+            "data": {"id": "BL-8080", "numero": "18080"},
+        },
+        db,
+    )
+
+    assert resposta == {
+        "status": "ok",
+        "pedido_id": 8080,
+        "acao": "venda_confirmada",
+    }
+    assert chamadas["processou_nf"]["itens"] == db.itens
+    assert db.itens[0].sku == "ATC517"
+    assert db.itens[0].quantidade == 4

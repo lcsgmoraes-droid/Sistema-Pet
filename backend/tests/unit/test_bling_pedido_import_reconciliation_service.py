@@ -73,3 +73,38 @@ def test_reconciliacao_nao_executa_sem_tenant_bling(monkeypatch):
         "executada": False,
         "motivo": "bling_webhook_tenant_nao_configurado",
     }
+
+
+def test_reconciliacao_reprocessa_confirmado_com_item_ainda_reservado(monkeypatch):
+    tenant_id = UUID("11111111-1111-1111-1111-111111111111")
+    api = _FakeAPI()
+    api.listar_pedidos_vendas = lambda **kwargs: {
+        "data": [{"id": "ML-3", "situacao": {"id": 9}}]
+    }
+    pedido = SimpleNamespace(id=30, status="confirmado")
+    processados = []
+
+    monkeypatch.setattr(service, "_tenant_bling_configurado", lambda: tenant_id)
+    monkeypatch.setattr("app.bling_integration.BlingAPI", lambda: api)
+    monkeypatch.setattr(
+        service,
+        "localizar_pedido_por_bling_id",
+        lambda *args, **kwargs: pedido,
+    )
+    monkeypatch.setattr(
+        service,
+        "_pedido_confirmado_possui_itens_pendentes",
+        lambda db, pedido_arg: pedido_arg is pedido,
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.processar_pedido_bling_payload",
+        lambda body, db: processados.append(body) or {"status": "ok"},
+    )
+
+    resultado = service.reconciliar_importacao_pedidos_bling_recentes(
+        SimpleNamespace(rollback=lambda: None)
+    )
+
+    assert resultado["atualizados"] == 1
+    assert resultado["ignorados"] == 0
+    assert [item["event"] for item in processados] == ["order.updated"]
