@@ -1,11 +1,17 @@
 from collections import defaultdict
 from datetime import datetime
 
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.produtos_models import Produto, ProdutoKitComponente
+from app.services.produto_sku_service import (
+    buscar_produto_por_sku,
+    buscar_produtos_por_skus,
+    chaves_sku_produto,
+    normalizar_sku,
+)
 
 
 class EstoqueReservaService:
@@ -17,12 +23,7 @@ class EstoqueReservaService:
 
     @staticmethod
     def _skus_produto(produto: Produto) -> list[str]:
-        skus = []
-        for valor in (produto.codigo, produto.codigo_barras):
-            texto = (valor or "").strip()
-            if texto and texto not in skus:
-                skus.append(texto)
-        return skus
+        return chaves_sku_produto(produto)
 
     @staticmethod
     def _usa_composicao_virtual(produto: Produto | None) -> bool:
@@ -52,23 +53,11 @@ class EstoqueReservaService:
         if not skus_limpos:
             return {}
 
-        produtos = (
-            db.query(Produto)
-            .filter(
-                Produto.tenant_id == tenant_id,
-                or_(
-                    Produto.codigo.in_(skus_limpos),
-                    Produto.codigo_barras.in_(skus_limpos),
-                ),
-            )
-            .all()
+        return buscar_produtos_por_skus(
+            db,
+            tenant_id=tenant_id,
+            skus=skus_limpos,
         )
-
-        mapa: dict[str, Produto] = {}
-        for produto in produtos:
-            for sku in EstoqueReservaService._skus_produto(produto):
-                mapa.setdefault(sku, produto)
-        return mapa
 
     @staticmethod
     def _componentes_por_kit(
@@ -94,11 +83,14 @@ class EstoqueReservaService:
         if not skus:
             return 0
 
+        skus_normalizados = list(
+            dict.fromkeys(normalizar_sku(sku) for sku in skus if normalizar_sku(sku))
+        )
         return (
             db.query(func.coalesce(func.sum(PedidoIntegradoItem.quantidade), 0))
             .filter(
                 PedidoIntegradoItem.tenant_id == tenant_id,
-                PedidoIntegradoItem.sku.in_(skus),
+                func.lower(func.trim(PedidoIntegradoItem.sku)).in_(skus_normalizados),
                 PedidoIntegradoItem.liberado_em.is_(None),
                 PedidoIntegradoItem.vendido_em.is_(None),
             )
@@ -171,13 +163,10 @@ class EstoqueReservaService:
 
     @staticmethod
     def reservar(db: Session, item: PedidoIntegradoItem):
-        produto = (
-            db.query(Produto)
-            .filter(
-                Produto.tenant_id == item.tenant_id,
-                or_(Produto.codigo == item.sku, Produto.codigo_barras == item.sku),
-            )
-            .first()
+        produto = buscar_produto_por_sku(
+            db,
+            tenant_id=item.tenant_id,
+            sku=item.sku,
         )
 
         if not produto:

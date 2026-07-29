@@ -3,31 +3,20 @@
 from collections import Counter
 import re
 
-from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.produtos_models import Produto, ProdutoKitComponente, EstoqueMovimentacao
 from app.services.kit_estoque_service import KitEstoqueService
+from app.services.produto_sku_service import buscar_produto_por_sku
 
 from .common import _regex_token_numerico, _text
 
 
 def buscar_produto_do_item(db: Session, tenant_id, sku: str):
-    if not sku:
-        return None
-    sku_normalizado = str(sku).strip()
-    sku_lower = sku_normalizado.lower()
-
-    return (
-        db.query(Produto)
-        .filter(
-            Produto.tenant_id == tenant_id,
-            or_(
-                func.lower(func.trim(Produto.codigo)) == sku_lower,
-                Produto.codigo_barras == sku_normalizado,
-            ),
-        )
-        .first()
+    return buscar_produto_por_sku(
+        db,
+        tenant_id=tenant_id,
+        sku=sku,
     )
 
 
