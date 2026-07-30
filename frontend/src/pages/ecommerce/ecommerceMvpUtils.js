@@ -180,6 +180,22 @@ export function normalizeCatalogPayload(payload) {
   };
 }
 
+export async function settleCatalogRequests(productsRequest, filtersRequest) {
+  const [productsResult, filtersResult] = await Promise.allSettled([
+    productsRequest,
+    filtersRequest,
+  ]);
+
+  if (productsResult.status === "rejected") {
+    throw productsResult.reason;
+  }
+
+  return {
+    response: productsResult.value,
+    filtersResponse: filtersResult.status === "fulfilled" ? filtersResult.value : null,
+  };
+}
+
 export function buildCatalogCategories(products) {
   const all = products
     .map((item) => item?.categoria_nome || item?.categoria || "Sem categoria")

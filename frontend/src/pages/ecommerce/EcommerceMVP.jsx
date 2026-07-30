@@ -37,6 +37,7 @@ import {
   extractApiErrorMessage,
   normalizeCatalogPayload,
   resolveStoreDisplayName,
+  settleCatalogRequests,
 } from "./ecommerceMvpUtils";
 
 export default function EcommerceMVP() {
@@ -488,7 +489,7 @@ export default function EcommerceMVP() {
         minPrice: precoMinimo,
         maxPrice: precoMaximo,
       });
-      const [response, filtersResponse] = await Promise.all([
+      const { response, filtersResponse } = await settleCatalogRequests(
         ecommerceApi.get("/api/ecommerce/produtos", {
           params: queryParams,
           paramsSerializer: { indexes: null },
@@ -500,7 +501,7 @@ export default function EcommerceMVP() {
             canal: "ecommerce",
           },
         }),
-      ]);
+      );
       const payload = normalizeCatalogPayload(response?.data);
       setProducts(payload.items);
       setCatalogMeta({

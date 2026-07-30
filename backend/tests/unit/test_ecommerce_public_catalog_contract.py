@@ -19,6 +19,21 @@ def test_catalog_order_rejects_unknown_values():
     assert exc.value.status_code == 400
 
 
+def test_catalog_brand_names_are_clean_unique_and_case_insensitive_sorted():
+    assert ecommerce_public._normalize_catalog_brand_names(
+        [("zMarca",), (" alpha ",), ("Beta",), ("alpha",), (None,), ()]
+    ) == ["alpha", "Beta", "zMarca"]
+
+
+def test_public_filters_query_does_not_order_distinct_brands_by_lower_expression():
+    source = inspect.getsource(ecommerce_public.listar_filtros_produtos_publicos)
+
+    assert "db.query(Marca.nome)" in source
+    assert ".distinct()" in source
+    assert ".order_by(func.lower(Marca.nome)" not in source
+    assert "_normalize_catalog_brand_names(marcas)" in source
+
+
 def test_public_products_route_exposes_category_filter_and_facets():
     signature = inspect.signature(ecommerce_public.listar_produtos_publicos)
     source = inspect.getsource(ecommerce_public.listar_produtos_publicos)
