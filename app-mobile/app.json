@@ -3,7 +3,7 @@
     "name": "CorePet",
     "slug": "petshop-app",
     "scheme": "corepet",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "updates": {
       "enabled": true,
@@ -44,11 +44,14 @@
         "VIBRATE"
       ],
       "blockedPermissions": [
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW"
       ],
-      "runtimeVersion": "1.0.2",
-      "versionCode": 9
+      "runtimeVersion": "1.0.3",
+      "versionCode": 10
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -89,8 +92,8 @@
           "locationWhenInUsePermission": "Usado para sugerir a loja mais proxima e enviar a posicao do entregador durante rotas ativas.",
           "locationAlwaysAndWhenInUsePermission": "Durante uma rota ativa, permite que a loja e o cliente acompanhem a entrega mesmo com o CorePet em segundo plano.",
           "isIosBackgroundLocationEnabled": true,
-          "isAndroidBackgroundLocationEnabled": true,
-          "isAndroidForegroundServiceEnabled": true
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
         }
       ],
       [

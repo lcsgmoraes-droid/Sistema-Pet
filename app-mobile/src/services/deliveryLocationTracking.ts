@@ -1,6 +1,7 @@
 import * as Location from "expo-location";
 import * as SecureStore from "expo-secure-store";
 import * as TaskManager from "expo-task-manager";
+import { Platform } from "react-native";
 
 import api from "./api";
 
@@ -44,6 +45,7 @@ export async function iniciarRastreamentoEntregaEmSegundoPlano(
   rotaId: number | string,
 ): Promise<boolean> {
   try {
+    if (Platform.OS === "android") return false;
     if (!(await Location.isBackgroundLocationAvailableAsync())) return false;
 
     const foreground = await Location.requestForegroundPermissionsAsync();
