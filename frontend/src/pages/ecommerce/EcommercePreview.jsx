@@ -31,8 +31,7 @@ export default function EcommercePreview() {
       })
       .catch((requestError) => {
         setError(
-          requestError?.response?.data?.detail ||
-            "Não foi possível montar a prévia da loja.",
+          requestError?.response?.data?.detail || "Não foi possível montar a prévia da loja.",
         );
       })
       .finally(() => setLoading(false));
@@ -63,9 +62,7 @@ export default function EcommercePreview() {
   }, [data]);
 
   const readyCount = checklist.filter((item) => item[1]).length;
-  const storefrontPath = data.context?.ecommerce_slug
-    ? `/${data.context.ecommerce_slug}`
-    : "";
+  const storefrontPath = data.context?.ecommerce_slug ? `/${data.context.ecommerce_slug}` : "";
 
   if (loading) {
     return <div className="p-10 text-center text-gray-500">Preparando a prévia...</div>;
@@ -116,11 +113,7 @@ export default function EcommercePreview() {
             </div>
             <div className="mt-4 space-y-3">
               {checklist.map(([label, ready, path]) => (
-                <Link
-                  key={label}
-                  to={path}
-                  className="flex items-start gap-2 text-sm no-underline"
-                >
+                <Link key={label} to={path} className="flex items-start gap-2 text-sm no-underline">
                   {ready ? (
                     <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-600" />
                   ) : (
@@ -137,10 +130,24 @@ export default function EcommercePreview() {
           <div className="rounded-xl border border-gray-200 bg-white p-5 text-sm shadow-sm">
             <h2 className="font-bold text-gray-900">Catálogo</h2>
             <dl className="mt-3 space-y-2 text-gray-600">
-              <div className="flex justify-between"><dt>Publicados</dt><dd>{data.health?.publicados ?? 0}</dd></div>
-              <div className="flex justify-between"><dt>Prontos</dt><dd className="font-bold text-emerald-700">{data.health?.prontos_para_venda ?? 0}</dd></div>
-              <div className="flex justify-between"><dt>Sem imagem</dt><dd>{data.health?.sem_imagem ?? 0}</dd></div>
-              <div className="flex justify-between"><dt>Sem estoque</dt><dd>{data.health?.sem_estoque ?? 0}</dd></div>
+              <div className="flex justify-between">
+                <dt>Publicados</dt>
+                <dd>{data.health?.publicados ?? 0}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt>Prontos</dt>
+                <dd className="font-bold text-emerald-700">
+                  {data.health?.prontos_para_venda ?? 0}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt>Sem imagem</dt>
+                <dd>{data.health?.sem_imagem ?? 0}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt>Sem estoque</dt>
+                <dd>{data.health?.sem_estoque ?? 0}</dd>
+              </div>
             </dl>
           </div>
         </aside>
@@ -189,7 +196,10 @@ export default function EcommercePreview() {
               <p className="mt-1 max-w-sm text-sm text-gray-500">
                 Salve um endereço público em Aparência para liberar a prévia.
               </p>
-              <Link to="/ecommerce/aparencia" className="mt-4 text-sm font-semibold text-indigo-700">
+              <Link
+                to="/ecommerce/aparencia"
+                className="mt-4 text-sm font-semibold text-indigo-700"
+              >
                 Configurar endereço
               </Link>
             </div>
