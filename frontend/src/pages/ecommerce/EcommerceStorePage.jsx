@@ -61,7 +61,7 @@ export default function EcommerceStorePage({
           padding: isMobile ? "12px 12px 28px" : "16px 20px 28px",
         }}
       >
-        <div>
+        <div style={{ minWidth: 0 }}>
           <EcommerceCatalogControls
             categories={categories}
             category={category}

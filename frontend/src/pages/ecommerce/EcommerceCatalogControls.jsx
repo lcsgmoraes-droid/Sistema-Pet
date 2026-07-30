@@ -71,8 +71,9 @@ export default function EcommerceCatalogControls({
     }, {});
   const selectStyle = {
     ...S.formInput,
-    width: isMobile ? "100%" : "auto",
-    minWidth: isMobile ? "100%" : 220,
+    width: "100%",
+    minWidth: 0,
+    maxWidth: "100%",
     paddingRight: 30,
     background: "#fff",
   };
@@ -108,9 +109,7 @@ export default function EcommerceCatalogControls({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: isMobile
-            ? "1fr"
-            : "minmax(240px, 1.2fr) minmax(210px, 1fr) minmax(170px, 0.75fr) minmax(170px, 0.75fr)",
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(170px, 1fr))",
           gap: 10,
           alignItems: "center",
         }}
