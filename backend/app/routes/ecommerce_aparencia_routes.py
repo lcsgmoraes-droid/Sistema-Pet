@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -63,6 +63,11 @@ class SlugUpdate(BaseModel):
     slug: str | None = None
 
 
+class LocalizacaoUpdate(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
 # ─── Endpoints ─────────────────────────────────────────────────────────────
 
 
@@ -89,6 +94,8 @@ def tenant_context_logado(
         "status": tenant.status,
         "cidade": tenant.cidade,
         "uf": tenant.uf,
+        "latitude": tenant.latitude,
+        "longitude": tenant.longitude,
         "logo_url": tenant.logo_url,
         "banner_1_url": tenant.banner_1_url,
         "banner_2_url": tenant.banner_2_url,
@@ -113,6 +120,27 @@ def buscar_aparencia(
         banner_2_url=tenant.banner_2_url,
         banner_3_url=tenant.banner_3_url,
     )
+
+
+@router.put("/localizacao")
+def atualizar_localizacao(
+    payload: LocalizacaoUpdate,
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Save the physical store coordinates used by nearby-store discovery."""
+    _, tenant_id = user_and_tenant
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant nao encontrado")
+
+    tenant.latitude = payload.latitude
+    tenant.longitude = payload.longitude
+    db.commit()
+    return {
+        "latitude": tenant.latitude,
+        "longitude": tenant.longitude,
+    }
 
 
 @router.post("/upload/{tipo}", response_model=AparenciaResponse)

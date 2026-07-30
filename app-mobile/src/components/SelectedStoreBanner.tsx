@@ -1,38 +1,20 @@
 import React from 'react';
 import {
-  Alert,
   Image,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useTenantStore } from '../store/tenant.store';
+import { useStoreSwitch } from '../hooks/useStoreSwitch';
+import { resolveTenantAssetUrl, useTenantStore } from '../store/tenant.store';
 import { CORES, ESPACO, FONTE, RAIO } from '../theme';
 
 export default function SelectedStoreBanner() {
-  const { tenant, limparTenant } = useTenantStore();
+  const tenant = useTenantStore((state) => state.tenant);
+  const trocarLoja = useStoreSwitch();
 
   if (!tenant) return null;
-
-  function trocarLoja() {
-    Alert.alert(
-      'Trocar loja',
-      'A conta e os pedidos ficam vinculados a loja selecionada. Deseja escolher outra loja?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Trocar',
-          style: 'destructive',
-          onPress: () => {
-            limparTenant().catch(() => {
-              Alert.alert('Erro', 'Nao foi possivel trocar a loja agora.');
-            });
-          },
-        },
-      ],
-    );
-  }
 
   const endereco = [tenant.endereco, tenant.numero].filter(Boolean).join(', ');
   const bairroCidade = [tenant.bairro, [tenant.cidade, tenant.uf].filter(Boolean).join(' / ')]
@@ -44,7 +26,11 @@ export default function SelectedStoreBanner() {
     <View style={styles.card}>
       <View style={styles.logoBox}>
         <Image
-          source={tenant.logo_url ? { uri: tenant.logo_url } : require("../../assets/icon.png")}
+          source={
+            resolveTenantAssetUrl(tenant.logo_url)
+              ? { uri: resolveTenantAssetUrl(tenant.logo_url)! }
+              : require("../../assets/icon.png")
+          }
           style={styles.logo}
           resizeMode="contain"
         />

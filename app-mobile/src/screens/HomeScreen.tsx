@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import HeaderProfileActions from '../components/HeaderProfileActions';
+import StoreContextBadge from '../components/StoreContextBadge';
 import { listarNotificacoesApp } from '../services/appNotifications.service';
 import { listarProdutos } from '../services/shop.service';
 import { useAuthStore } from '../store/auth.store';
@@ -143,6 +144,10 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )}
         </View>
+      </View>
+
+      <View style={styles.storeContext}>
+        <StoreContextBadge />
       </View>
 
       <TouchableOpacity
@@ -549,6 +554,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 9,
     fontWeight: '900',
+  },
+  storeContext: {
+    marginHorizontal: ESPACO.lg,
+    marginTop: ESPACO.md,
   },
   scannerCardCompacto: {
     marginHorizontal: ESPACO.lg,

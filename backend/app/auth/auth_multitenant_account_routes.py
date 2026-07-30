@@ -5,6 +5,7 @@ import uuid
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import hash_password, verify_password
@@ -39,6 +40,7 @@ from app.services.auth_security import (
 from app.services.default_roles_service import create_default_roles_for_new_tenant
 from app.services.tenant_onboarding_service import onboard_tenant_defaults
 from app.services.plan_catalog import resolve_signup_selection
+from app.tenant_identity import normalize_tenant_name
 from app.session_manager import create_session
 from app.tenancy.context import clear_tenant_context, set_tenant_context
 from app.tenancy.rls import sync_rls_auth_email, sync_rls_auth_user
@@ -94,6 +96,18 @@ def register(
     email_verification_required = _email_verification_required_for_request(request)
 
     tenant_name = payload.nome_loja or f"Loja de {payload.nome or email}"
+    tenant_name = tenant_name.strip()
+    tenant_name_normalized = normalize_tenant_name(tenant_name)
+    if (
+        db.query(Tenant)
+        .filter(Tenant.name_normalized == tenant_name_normalized)
+        .first()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ja existe uma loja com este nome. Escolha um nome diferente.",
+        )
+
     tenant_id = uuid.uuid4()
     trial_started_at = _now_utc()
     tenant = Tenant(
@@ -108,7 +122,14 @@ def register(
         organization_type=organization_type,
     )
     db.add(tenant)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ja existe uma loja com este nome. Escolha um nome diferente.",
+        ) from exc
 
     set_tenant_context(tenant_id)
 
