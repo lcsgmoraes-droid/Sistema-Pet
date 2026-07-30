@@ -489,9 +489,7 @@ def buscar_tenants_por_nome(
         .limit(limit)
         .all()
     )
-    return {
-        "lojas": [_tenant_public_payload(tenant) for tenant in matches]
-    }
+    return {"lojas": [_tenant_public_payload(tenant) for tenant in matches]}
 
 
 @router.get("/tenant-slug/{slug}")

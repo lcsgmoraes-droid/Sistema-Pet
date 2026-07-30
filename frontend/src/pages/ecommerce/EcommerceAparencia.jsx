@@ -374,8 +374,8 @@ export default function EcommerceAparencia() {
             </span>
           </div>
           <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 12px" }}>
-            Use este computador na loja e salve a posicao atual. Ela permite que
-            clientes encontrem primeiro as lojas mais proximas no app.
+            Use este computador na loja e salve a posicao atual. Ela permite que clientes encontrem
+            primeiro as lojas mais proximas no app.
           </p>
           <button
             onClick={salvarLocalizacaoAtual}

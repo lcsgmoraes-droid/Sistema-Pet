@@ -1,7 +1,7 @@
 """add tenant discovery coordinates and unique normalized names
 
-Revision ID: zwn20260729a1
-Revises: zwm20260724a1
+Revision ID: zwo20260729a1
+Revises: zwn20260729a1
 Create Date: 2026-07-29
 """
 
@@ -12,8 +12,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "zwn20260729a1"
-down_revision = "zwm20260724a1"
+revision = "zwo20260729a1"
+down_revision = "zwn20260729a1"
 branch_labels = None
 depends_on = None
 

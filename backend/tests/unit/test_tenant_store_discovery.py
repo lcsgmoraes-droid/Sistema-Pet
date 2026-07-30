@@ -117,7 +117,7 @@ def test_store_search_contract_keeps_name_global_and_gps_limited_to_eight():
 def test_tenant_database_migration_enforces_unique_normalized_names():
     source = (
         REPO_ROOT
-        / "backend/alembic/versions/zwn20260729a1_tenant_discovery_identity.py"
+        / "backend/alembic/versions/zwo20260729a1_tenant_discovery_identity.py"
     ).read_text(encoding="utf-8")
 
     assert '"ux_tenants_name_normalized"' in source
