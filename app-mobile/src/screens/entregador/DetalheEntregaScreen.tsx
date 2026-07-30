@@ -1,7 +1,7 @@
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import * as Location from "expo-location";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { DetalheEntregaContent } from "./detalhe/DetalheEntregaContent";
 import {
@@ -208,7 +208,7 @@ export default function DetalheEntregaScreen() {
       );
       const rastreioEmSegundoPlano =
         await iniciarRastreamentoEntregaEmSegundoPlano(rotaId);
-      if (!rastreioEmSegundoPlano) {
+      if (!rastreioEmSegundoPlano && Platform.OS === "ios") {
         Alert.alert(
           "Rastreamento em segundo plano",
           "A rota foi iniciada, mas o acompanhamento continua somente enquanto esta tela estiver aberta. Para acompanhar ao abrir o mapa, permita a localizacao sempre.",
