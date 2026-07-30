@@ -1,5 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import api from './api';
+import { markSessionActive } from './sessionExpiration';
 import { AppProfileType, AuthResponse, EcommerceUser } from '../types';
 
 type EcommerceProfileUpdate = Partial<EcommerceUser> & {
@@ -17,6 +18,7 @@ export async function login(email: string, password: string): Promise<AuthRespon
   const { data } = await api.post<AuthResponse>('/ecommerce/auth/login', { email, password });
   if (data.access_token) {
     await SecureStore.setItemAsync('auth_token', data.access_token);
+    markSessionActive();
   }
   return data;
 }
@@ -44,6 +46,7 @@ export async function register(
   });
   if (data.access_token) {
     await SecureStore.setItemAsync('auth_token', data.access_token);
+    markSessionActive();
   }
   return data;
 }
@@ -54,6 +57,7 @@ export async function selectProfile(profileType: AppProfileType): Promise<AuthRe
   });
   if (data.access_token) {
     await SecureStore.setItemAsync('auth_token', data.access_token);
+    markSessionActive();
   }
   return data;
 }

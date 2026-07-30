@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { isUnauthorizedError } from '../../services/api';
 import { listarPets, deletarPet } from '../../services/pets.service';
 import { Pet, VetFocusSection } from '../../types';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../../theme';
@@ -41,8 +42,10 @@ export default function PetListScreen() {
     try {
       const lista = await listarPets();
       setPets(lista);
-    } catch {
-      Alert.alert('Erro', 'Nao foi possivel carregar seus pets.');
+    } catch (error) {
+      if (!isUnauthorizedError(error)) {
+        Alert.alert('Erro', 'Nao foi possivel carregar seus pets.');
+      }
     } finally {
       setRefreshing(false);
     }
