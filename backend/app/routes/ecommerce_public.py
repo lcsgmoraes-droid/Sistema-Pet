@@ -1,5 +1,6 @@
 import re
 import unicodedata
+from math import asin, cos, radians, sin, sqrt
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
@@ -15,6 +16,7 @@ from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
 )
+from app.tenant_identity import normalize_tenant_name
 from app.tenancy.context import set_current_tenant
 
 
@@ -308,8 +310,30 @@ def _get_active_tenant(db: Session, tenant_ref: tuple[str, str]) -> Tenant:
     return tenant
 
 
-def _tenant_public_payload(tenant: Tenant) -> dict:
-    return {
+def _distance_km(
+    latitude_a: float,
+    longitude_a: float,
+    latitude_b: float,
+    longitude_b: float,
+) -> float:
+    """Return the great-circle distance between two coordinates."""
+    earth_radius_km = 6371.0088
+    latitude_delta = radians(latitude_b - latitude_a)
+    longitude_delta = radians(longitude_b - longitude_a)
+    haversine = (
+        sin(latitude_delta / 2) ** 2
+        + cos(radians(latitude_a))
+        * cos(radians(latitude_b))
+        * sin(longitude_delta / 2) ** 2
+    )
+    return 2 * earth_radius_km * asin(sqrt(min(1.0, haversine)))
+
+
+def _tenant_public_payload(
+    tenant: Tenant,
+    distancia_km: float | None = None,
+) -> dict:
+    payload = {
         "id": str(tenant.id),
         "slug": tenant.ecommerce_slug,
         "nome": tenant.name,
@@ -358,19 +382,33 @@ def _tenant_public_payload(tenant: Tenant) -> dict:
         "ecommerce_cor_secundaria": getattr(tenant, "ecommerce_cor_secundaria", None)
         or "#0f766e",
     }
+    if distancia_km is not None:
+        payload["distancia_km"] = round(distancia_km, 1)
+    return payload
 
 
 @router.get("/tenants/sugerir")
 def sugerir_tenants_por_localidade(
-    cidade: str = Query(..., min_length=2),
+    latitude: float | None = Query(default=None, ge=-90, le=90),
+    longitude: float | None = Query(default=None, ge=-180, le=180),
+    cidade: str | None = Query(default=None, min_length=2),
     uf: str | None = Query(default=None, min_length=2, max_length=2),
-    limit: int = Query(default=8, ge=1, le=20),
+    limit: int = Query(default=8, ge=1, le=8),
     db: Session = Depends(get_session),
 ):
-    """
-    Sugere lojas para o app mobile usando a cidade obtida pelo GPS do cliente.
-    A selecao fina por distancia fica para quando cada loja tiver coordenadas.
-    """
+    """Suggest up to eight active stores, prioritizing real GPS distance."""
+    has_coordinates = latitude is not None and longitude is not None
+    if (latitude is None) != (longitude is None):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe latitude e longitude juntas.",
+        )
+    if not has_coordinates and not cidade:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe a localizacao ou a cidade.",
+        )
+
     cidade_norm = _normalize_location_text(cidade)
     uf_norm = uf.strip().upper() if uf else None
 
@@ -379,19 +417,81 @@ def sugerir_tenants_por_localidade(
         Tenant.ecommerce_slug != "",
         func.lower(Tenant.status) == "active",
         Tenant.ecommerce_ativo.is_(True),
-        Tenant.cidade.isnot(None),
     ]
-    if uf_norm:
-        filtros.append(func.upper(Tenant.uf) == uf_norm)
-
     candidates = db.query(Tenant).filter(*filtros).order_by(Tenant.name.asc()).all()
-    tenants = [
+
+    if has_coordinates:
+        located: list[tuple[Tenant, float]] = []
+        fallback: list[Tenant] = []
+        for tenant in candidates:
+            if tenant.latitude is not None and tenant.longitude is not None:
+                located.append(
+                    (
+                        tenant,
+                        _distance_km(
+                            float(latitude),
+                            float(longitude),
+                            float(tenant.latitude),
+                            float(tenant.longitude),
+                        ),
+                    )
+                )
+            elif cidade_norm and _normalize_location_text(tenant.cidade) == cidade_norm:
+                if not uf_norm or str(tenant.uf or "").upper() == uf_norm:
+                    fallback.append(tenant)
+
+        located.sort(key=lambda item: (item[1], str(item[0].name).lower()))
+        payloads = [
+            _tenant_public_payload(tenant, distance)
+            for tenant, distance in located[:limit]
+        ]
+        if len(payloads) < limit:
+            payloads.extend(
+                _tenant_public_payload(tenant)
+                for tenant in fallback[: limit - len(payloads)]
+            )
+        return {"lojas": payloads}
+
+    local_tenants = [
         tenant
         for tenant in candidates
         if _normalize_location_text(tenant.cidade) == cidade_norm
+        and (not uf_norm or str(tenant.uf or "").upper() == uf_norm)
     ][:limit]
+    return {"lojas": [_tenant_public_payload(tenant) for tenant in local_tenants]}
 
-    return {"lojas": [_tenant_public_payload(tenant) for tenant in tenants]}
+
+@router.get("/tenants/buscar")
+def buscar_tenants_por_nome(
+    q: str = Query(..., min_length=2, max_length=120),
+    limit: int = Query(default=20, ge=1, le=50),
+    db: Session = Depends(get_session),
+):
+    """Search active stores by name without applying a geographic boundary."""
+    query_normalized = normalize_tenant_name(q)
+    matches = (
+        db.query(Tenant)
+        .filter(
+            Tenant.ecommerce_slug.isnot(None),
+            Tenant.ecommerce_slug != "",
+            func.lower(Tenant.status) == "active",
+            Tenant.ecommerce_ativo.is_(True),
+            Tenant.name_normalized.contains(query_normalized),
+        )
+        .order_by(
+            case(
+                (Tenant.name_normalized == query_normalized, 0),
+                (Tenant.name_normalized.startswith(query_normalized), 1),
+                else_=2,
+            ),
+            Tenant.name_normalized.asc(),
+        )
+        .limit(limit)
+        .all()
+    )
+    return {
+        "lojas": [_tenant_public_payload(tenant) for tenant in matches]
+    }
 
 
 @router.get("/tenant-slug/{slug}")

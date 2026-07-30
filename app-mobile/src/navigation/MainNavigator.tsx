@@ -9,6 +9,7 @@ import { useAuthStore } from "../store/auth.store";
 import { useCartStore } from "../store/cart.store";
 import { useWishlistStore } from "../store/wishlist.store";
 import { CORES } from "../theme";
+import StoreContextBadge from "../components/StoreContextBadge";
 
 // Screens
 import BeneficiosScreen from "../screens/benefits/BeneficiosScreen";
@@ -42,9 +43,13 @@ const PedidosStack = createNativeStackNavigator();
 const BeneficiosStack = createNativeStackNavigator();
 const CustomerStack = createNativeStackNavigator();
 
+function StoreHeaderBadge() {
+  return <StoreContextBadge compact />;
+}
+
 function HomeNavigator() {
   return (
-    <HomeStack.Navigator>
+    <HomeStack.Navigator screenOptions={{ headerRight: StoreHeaderBadge }}>
       <HomeStack.Screen
         name="Inicio"
         component={HomeScreen}
@@ -61,7 +66,7 @@ function HomeNavigator() {
 
 function LojaNavigator() {
   return (
-    <LojaStack.Navigator>
+    <LojaStack.Navigator screenOptions={{ headerRight: StoreHeaderBadge }}>
       <LojaStack.Screen
         name="Catalogo"
         component={CatalogScreen}
@@ -93,7 +98,7 @@ function LojaNavigator() {
 
 function PetsNavigator() {
   return (
-    <PetsStack.Navigator>
+    <PetsStack.Navigator screenOptions={{ headerRight: StoreHeaderBadge }}>
       <PetsStack.Screen
         name="ListaPets"
         component={PetListScreen}
@@ -148,7 +153,7 @@ function CartIcon({ color, size }: { color: string; size: number }) {
 
 function BeneficiosNavigator() {
   return (
-    <BeneficiosStack.Navigator>
+    <BeneficiosStack.Navigator screenOptions={{ headerRight: StoreHeaderBadge }}>
       <BeneficiosStack.Screen
         name="MeusBeneficios"
         component={BeneficiosScreen}
@@ -165,7 +170,7 @@ function BeneficiosNavigator() {
 
 function PedidosNavigator() {
   return (
-    <PedidosStack.Navigator>
+    <PedidosStack.Navigator screenOptions={{ headerRight: StoreHeaderBadge }}>
       <PedidosStack.Screen
         name="ListaPedidos"
         component={OrdersScreen}
@@ -232,6 +237,7 @@ function CustomerTabs() {
         },
         tabBarLabelStyle: { fontSize: 11 },
         headerShown: false,
+        headerRight: StoreHeaderBadge,
       }}
     >
       <Tab.Screen

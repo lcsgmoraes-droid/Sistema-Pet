@@ -24,9 +24,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 from app.db import Base
 from app.base_models import BaseTenantModel, TenantScoped
+from app.tenant_identity import normalize_tenant_name
 import sqlalchemy as sa
 
 
@@ -547,9 +548,13 @@ class Tenant(Base):
     """Tenant (Empresa/Organização)"""
 
     __tablename__ = "tenants"
+    __table_args__ = (
+        Index("ux_tenants_name_normalized", "name_normalized", unique=True),
+    )
 
     id = Column(String(36), primary_key=True)  # UUID
     name = Column(String(255), nullable=False)  # Nome Fantasia
+    name_normalized = Column(String(255), nullable=False)
     razao_social = Column(String(255), nullable=True)
     cnpj = Column(String(18), nullable=True)
     inscricao_estadual = Column(String(50), nullable=True)
@@ -564,6 +569,8 @@ class Tenant(Base):
     telefone = Column(String(20), nullable=True)
     email = Column(String(255), nullable=True)
     site = Column(String(255), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
     logo_url = Column(String(500), nullable=True)
     banner_1_url = Column(String(500), nullable=True)
     banner_2_url = Column(String(500), nullable=True)
@@ -643,6 +650,14 @@ class Tenant(Base):
 
     def __repr__(self):
         return f"<Tenant(id={self.id}, name={self.name})>"
+
+    @validates("name")
+    def validate_name(self, _key, value):
+        clean_name = str(value or "").strip()
+        if not clean_name:
+            raise ValueError("O nome da loja e obrigatorio.")
+        self.name_normalized = normalize_tenant_name(clean_name)
+        return clean_name
 
 
 class AssinaturaModulo(TenantScoped, Base):

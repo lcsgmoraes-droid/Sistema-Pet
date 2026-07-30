@@ -126,6 +126,11 @@ export default function EcommerceAparencia() {
   const [slug, setSlug] = useState("");
   const [slugOriginal, setSlugOriginal] = useState("");
   const [salvandoSlug, setSalvandoSlug] = useState(false);
+  const [localizacao, setLocalizacao] = useState({
+    latitude: null,
+    longitude: null,
+  });
+  const [salvandoLocalizacao, setSalvandoLocalizacao] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState({});
   const [msg, setMsg] = useState(null);
@@ -142,6 +147,10 @@ export default function EcommerceAparencia() {
       .then((r) => {
         setSlug(r.data.ecommerce_slug || "");
         setSlugOriginal(r.data.ecommerce_slug || "");
+        setLocalizacao({
+          latitude: r.data.latitude ?? null,
+          longitude: r.data.longitude ?? null,
+        });
       })
       .catch(() => {});
     Promise.all([fetchAparencia, fetchSlug]).finally(() => setCarregando(false));
@@ -164,6 +173,44 @@ export default function EcommerceAparencia() {
     } finally {
       setSalvandoSlug(false);
     }
+  }
+
+  function salvarLocalizacaoAtual() {
+    if (!navigator.geolocation) {
+      mostrarMsg("erro", "Este navegador nao oferece acesso a localizacao.");
+      return;
+    }
+
+    setSalvandoLocalizacao(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const payload = {
+            latitude: coords.latitude,
+            longitude: coords.longitude,
+          };
+          const response = await api.put("/ecommerce-aparencia/localizacao", payload);
+          setLocalizacao(response.data);
+          mostrarMsg("ok", "Localizacao da loja salva com sucesso!");
+        } catch {
+          mostrarMsg("erro", "Nao foi possivel salvar a localizacao da loja.");
+        } finally {
+          setSalvandoLocalizacao(false);
+        }
+      },
+      () => {
+        mostrarMsg(
+          "erro",
+          "Nao foi possivel obter a localizacao. Confira a permissao do navegador.",
+        );
+        setSalvandoLocalizacao(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 60000,
+      },
+    );
   }
 
   async function uploadArquivo(tipo, arquivo) {
@@ -308,6 +355,51 @@ export default function EcommerceAparencia() {
               >
                 corepet.com.br/{slugOriginal}
               </a>
+            </div>
+          )}
+        </div>
+        {/* Coordenadas usadas para ordenar lojas proximas no app */}
+        <div
+          style={{
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            borderRadius: 12,
+            padding: 24,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+          }}
+        >
+          <div style={{ marginBottom: 4 }}>
+            <span style={{ fontWeight: 600, fontSize: 16, color: "#111827" }}>
+              Localizacao da loja
+            </span>
+          </div>
+          <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 12px" }}>
+            Use este computador na loja e salve a posicao atual. Ela permite que
+            clientes encontrem primeiro as lojas mais proximas no app.
+          </p>
+          <button
+            onClick={salvarLocalizacaoAtual}
+            disabled={salvandoLocalizacao}
+            style={{
+              padding: "9px 18px",
+              background: salvandoLocalizacao ? "#d1d5db" : "#0f766e",
+              color: "#fff",
+              border: "none",
+              borderRadius: 7,
+              fontWeight: 600,
+              cursor: salvandoLocalizacao ? "not-allowed" : "pointer",
+              fontSize: 14,
+            }}
+          >
+            {salvandoLocalizacao
+              ? "Obtendo localizacao..."
+              : localizacao.latitude !== null
+                ? "Atualizar localizacao atual"
+                : "Usar localizacao atual"}
+          </button>
+          {localizacao.latitude !== null && localizacao.longitude !== null && (
+            <div style={{ marginTop: 10, fontSize: 12, color: "#15803d" }}>
+              Localizacao configurada para esta loja.
             </div>
           )}
         </div>
