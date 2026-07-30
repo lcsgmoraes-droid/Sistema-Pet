@@ -18,6 +18,7 @@ import {
   normalizeCatalogPayload,
   resolvePostAuthView,
   resolveStoreDisplayName,
+  settleCatalogRequests,
 } from "./ecommerceMvpUtils.js";
 
 const products = [
@@ -185,6 +186,27 @@ test("normalizeCatalogPayload padroniza itens, total e limite", () => {
     categories: [],
     brands: [],
   });
+});
+
+test("settleCatalogRequests mantem produtos quando filtros auxiliares falham", async () => {
+  const response = { data: { items: products } };
+  const result = await settleCatalogRequests(
+    Promise.resolve(response),
+    Promise.reject(new Error("filtros indisponiveis")),
+  );
+
+  assert.equal(result.response, response);
+  assert.equal(result.filtersResponse, null);
+});
+
+test("settleCatalogRequests propaga falha do catalogo principal", async () => {
+  await assert.rejects(
+    settleCatalogRequests(
+      Promise.reject(new Error("catalogo indisponivel")),
+      Promise.resolve({ data: { marcas: [] } }),
+    ),
+    /catalogo indisponivel/,
+  );
 });
 
 test("buildPaginationWindow calcula intervalo e paginas proximas", () => {

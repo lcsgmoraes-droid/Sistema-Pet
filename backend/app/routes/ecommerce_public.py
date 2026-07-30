@@ -89,6 +89,13 @@ def _normalize_catalog_order(raw_order: str | None) -> str:
     return normalized
 
 
+def _normalize_catalog_brand_names(rows) -> list[str]:
+    names = {
+        str(row[0]).strip() for row in rows if row and row[0] and str(row[0]).strip()
+    }
+    return sorted(names, key=str.casefold)
+
+
 def _split_legacy_category_path(value: str | None) -> list[str]:
     return [
         item.strip()
@@ -671,7 +678,6 @@ def listar_filtros_produtos_publicos(
             func.length(func.trim(Marca.nome)) > 0,
         )
         .distinct()
-        .order_by(func.lower(Marca.nome).asc())
         .all()
     )
     pesos = (
@@ -686,7 +692,7 @@ def listar_filtros_produtos_publicos(
     )
 
     return {
-        "marcas": [row[0] for row in marcas if row[0]],
+        "marcas": _normalize_catalog_brand_names(marcas),
         "pesos_embalagem_kg": [
             round(float(row[0]), 3)
             for row in pesos
