@@ -27,21 +27,21 @@ export const EMPTY_ADDRESS_FIELDS = {
 export const BANNERS = [
   {
     bg: "linear-gradient(135deg, #f97316 0%, #ea580c 60%, #c2410c 100%)",
-    title: "Compre e receba no mesmo dia!",
-    sub: "Pedidos realizados atÃ© as 16h",
-    emoji: "ðŸš€",
+    title: "Tudo para o seu pet",
+    sub: "Produtos selecionados pela sua loja",
+    emoji: "🐾",
   },
   {
     bg: "linear-gradient(135deg, #10b981 0%, #059669 60%, #047857 100%)",
     title: "Retire na loja",
     sub: "Super simples e sem custo de frete!",
-    emoji: "ðŸª",
+    emoji: "🏪",
   },
   {
     bg: "linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)",
-    title: "As melhores raÃ§Ãµes em Prudente",
-    sub: "Cachorros, gatos, pÃ¡ssaros e mais ðŸ¾",
-    emoji: "ðŸ¶",
+    title: "Compre com praticidade",
+    sub: "Cães, gatos, pássaros e muito mais",
+    emoji: "🐶",
   },
 ];
 
@@ -153,10 +153,6 @@ export function resolveMediaUrl(url) {
     return `${backendBase}${normalizedPath}`;
   }
 
-  if (import.meta.env?.DEV) {
-    return `http://127.0.0.1:8000${normalizedPath}`;
-  }
-
   if (typeof window === "undefined") {
     return normalizedPath;
   }
@@ -180,6 +176,7 @@ export function normalizeCatalogPayload(payload) {
     offset: Number(payload?.offset ?? 0) || 0,
     limit: Number(payload?.limit ?? DEFAULT_CATALOG_LIMIT) || DEFAULT_CATALOG_LIMIT,
     categories: Array.isArray(payload?.categorias) ? payload.categorias : [],
+    brands: Array.isArray(payload?.marcas) ? payload.marcas : [],
   };
 }
 
@@ -206,11 +203,21 @@ export function buildCatalogCategoryOptions({ categories = [], products = [] } =
     const normalized = categories
       .filter((item) => item?.id !== undefined && item?.id !== null)
       .map((item) => {
-        const rawLabel = item?.nome || item?.label || "Sem categoria";
+        const rawLabel = item?.nome_original || item?.nome || item?.label || "Sem categoria";
+        const pathLabel = item?.caminho || rawLabel.replaceAll(">>", " > ");
+        const pathParts = Array.isArray(item?.caminho_partes)
+          ? item.caminho_partes
+          : rawLabel
+              .split(">>")
+              .map((part) => part.trim())
+              .filter(Boolean);
         return {
           id: String(item.id),
           value: String(item.id),
-          label: formatCatalogCategoryLabel(rawLabel),
+          label: pathLabel,
+          leafLabel: item?.nome_original ? item.nome : formatCatalogCategoryLabel(rawLabel),
+          group: item?.grupo || (pathParts.length > 1 ? pathParts[0] : "Outros"),
+          level: Number(item?.nivel ?? Math.max(pathParts.length - 1, 0)),
           rawLabel,
           total: Number(item?.total ?? 0) || 0,
         };
@@ -260,10 +267,16 @@ export function buildCatalogQueryParams({
   page = 1,
   limit = DEFAULT_CATALOG_LIMIT,
   channel,
+  brand = "",
+  onlyInStock = false,
+  onlyWithImage = false,
+  minPrice = "",
+  maxPrice = "",
 } = {}) {
   const safeLimit = Math.max(1, Math.min(500, Number(limit) || DEFAULT_CATALOG_LIMIT));
   const safePage = Math.max(1, Number(page) || 1);
-  const categoryValue = typeof category === "object" ? category?.value : category;
+  const categoryValue =
+    typeof category === "object" && !Array.isArray(category) ? category?.value : category;
   const params = {
     tenant,
     ordenacao: normalizeCatalogOrder(order),
@@ -274,7 +287,14 @@ export function buildCatalogQueryParams({
   const trimmedSearch = String(search || "").trim();
   if (trimmedSearch) params.busca = trimmedSearch;
 
-  if (categoryValue && categoryValue !== "todas") {
+  if (Array.isArray(categoryValue)) {
+    const numericCategories = categoryValue
+      .map((value) => Number(value))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    if (numericCategories.length > 0) {
+      params.categoria_ids = [...new Set(numericCategories)];
+    }
+  } else if (categoryValue && categoryValue !== "todas") {
     const numericCategory = Number(categoryValue);
     if (Number.isFinite(numericCategory)) {
       params.categoria_id = numericCategory;
@@ -282,6 +302,15 @@ export function buildCatalogQueryParams({
   }
 
   if (channel) params.canal = channel;
+  if (brand) params.marca = brand;
+  if (onlyInStock) params.apenas_com_estoque = true;
+  if (onlyWithImage) params.apenas_com_imagem = true;
+  if (minPrice !== "" && Number.isFinite(Number(minPrice))) {
+    params.preco_minimo = Number(minPrice);
+  }
+  if (maxPrice !== "" && Number.isFinite(Number(maxPrice))) {
+    params.preco_maximo = Number(maxPrice);
+  }
   return params;
 }
 
@@ -423,7 +452,46 @@ export function buildActiveBanners(tenantContext) {
   ].filter(Boolean);
 
   if (urls.length > 0) return urls.map((url) => ({ type: "image", url }));
-  return BANNERS;
+  const configured = tenantContext && Object.keys(tenantContext).length > 0;
+  if (!configured) return BANNERS;
+
+  const threshold = Number(tenantContext?.ecommerce_frete_gratis_acima || 0);
+  const fee = Number(tenantContext?.ecommerce_taxa_entrega || 0);
+  const deliverySubtitle =
+    threshold > 0
+      ? `Frete grátis em compras acima de ${formatCurrency(threshold)}`
+      : fee > 0
+        ? `Entrega local por ${formatCurrency(fee)}`
+        : tenantContext?.ecommerce_prazo_entrega_texto || "Consulte as condições para sua cidade";
+
+  return [
+    {
+      bg: "linear-gradient(135deg, #f97316 0%, #ea580c 60%, #c2410c 100%)",
+      title: tenantContext?.name || "Tudo para o seu pet",
+      sub: tenantContext?.ecommerce_descricao || "Escolha seus produtos com facilidade",
+      emoji: "🐾",
+    },
+    ...(tenantContext?.ecommerce_entrega_ativa
+      ? [
+          {
+            bg: "linear-gradient(135deg, #0f766e 0%, #0d9488 60%, #14b8a6 100%)",
+            title: "Entrega local",
+            sub: deliverySubtitle,
+            emoji: "🛵",
+          },
+        ]
+      : []),
+    ...(tenantContext?.ecommerce_retirada_ativa
+      ? [
+          {
+            bg: "linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)",
+            title: "Retire na loja",
+            sub: "Faça o pedido online e retire sem custo de frete",
+            emoji: "🏪",
+          },
+        ]
+      : []),
+  ];
 }
 
 export function isCustomerProfileComplete(customer) {

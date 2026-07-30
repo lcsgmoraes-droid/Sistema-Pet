@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 from uuid import UUID
 
-from app.models import ConfiguracaoEntrega
+from app.models import ConfiguracaoEntrega, Tenant
 from app.routes.ecommerce_checkout import _frete_local_por_cidade
 from app.tenancy.context import clear_current_tenant, get_current_tenant
 
@@ -21,13 +21,20 @@ class _Query:
 
 
 class _Db:
-    def __init__(self, delivery_config):
+    def __init__(self, delivery_config, tenant=None):
         self.delivery_config = delivery_config
+        self.tenant = tenant or SimpleNamespace(
+            cidade=None,
+            ecommerce_entrega_ativa=True,
+            ecommerce_taxa_entrega=0,
+            ecommerce_frete_gratis_acima=None,
+            ecommerce_prazo_entrega_texto=None,
+        )
         self.queried_models = []
 
     def query(self, model):
         self.queried_models.append(model)
-        return _Query(self.delivery_config)
+        return _Query(self.tenant if model is Tenant else self.delivery_config)
 
     def execute(self, *_args, **_kwargs):
         raise AssertionError("checkout delivery config must not use raw SQL")
@@ -42,7 +49,8 @@ class _ContextCheckingQuery(_Query):
 class _ContextCheckingDb(_Db):
     def query(self, model):
         self.queried_models.append(model)
-        return _ContextCheckingQuery(self.delivery_config)
+        result = self.tenant if model is Tenant else self.delivery_config
+        return _ContextCheckingQuery(result)
 
 
 def test_frete_local_uses_tenant_scoped_delivery_config_model():
@@ -50,7 +58,7 @@ def test_frete_local_uses_tenant_scoped_delivery_config_model():
 
     result = _frete_local_por_cidade(db, TENANT_ID, "sao paulo")
 
-    assert db.queried_models == [ConfiguracaoEntrega]
+    assert db.queried_models == [ConfiguracaoEntrega, Tenant]
     assert result["cidade_loja"] == "Sao Paulo"
     assert result["cidade_destino"] == "sao paulo"
 
@@ -63,3 +71,23 @@ def test_frete_local_reactivates_and_restores_tenant_context_from_parameter():
 
     assert result["cidade_loja"] == "Campinas"
     assert get_current_tenant() is None
+
+
+def test_frete_local_applies_configured_fee_and_free_shipping_threshold():
+    tenant = SimpleNamespace(
+        cidade="Sao Paulo",
+        ecommerce_entrega_ativa=True,
+        ecommerce_taxa_entrega=12.5,
+        ecommerce_frete_gratis_acima=150,
+        ecommerce_prazo_entrega_texto="Entrega em até 2 dias úteis",
+    )
+    db = _Db(SimpleNamespace(cidade=None), tenant=tenant)
+
+    charged = _frete_local_por_cidade(db, TENANT_ID, "são paulo", subtotal=120)
+    free = _frete_local_por_cidade(db, TENANT_ID, "são paulo", subtotal=180)
+
+    assert charged["valor_frete"] == 12.5
+    assert charged["prazo_estimado"] == "Entrega em até 2 dias úteis"
+    assert charged["frete_gratis_aplicado"] is False
+    assert free["valor_frete"] == 0
+    assert free["frete_gratis_aplicado"] is True

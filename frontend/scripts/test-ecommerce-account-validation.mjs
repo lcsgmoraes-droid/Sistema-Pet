@@ -4,8 +4,12 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const accountPage = readFileSync(
-  resolve(__dirname, "../src/pages/ecommerce/EcommerceAccountPage.jsx"),
+const accountAuthCards = readFileSync(
+  resolve(__dirname, "../src/pages/ecommerce/EcommerceAccountAuthCards.jsx"),
+  "utf8",
+);
+const accountProfileForm = readFileSync(
+  resolve(__dirname, "../src/pages/ecommerce/EcommerceAccountProfileForm.jsx"),
   "utf8",
 );
 const customerHook = readFileSync(
@@ -22,13 +26,13 @@ const ordersPage = readFileSync(
 );
 
 assert.match(
-  accountPage,
+  accountProfileForm,
   /function FieldError/,
   "cadastro deve renderizar mensagens de erro perto do campo",
 );
 
 assert.match(
-  accountPage,
+  accountAuthCards,
   /fieldInputStyle\(S\.formInput, registerFieldError, "nome"\)/,
   "campo nome do cadastro deve receber destaque visual quando invalido",
 );

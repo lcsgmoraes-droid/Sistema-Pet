@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { trackBeginCheckout, trackPurchase } from "../../services/analytics";
+import { trackBeginCheckout, trackCheckoutSubmitted } from "../../services/analytics";
 import ecommerceApi from "../../services/ecommerceApi";
 import {
   STORAGE_ADDRESS_KEY,
@@ -44,6 +44,20 @@ export default function useEcommerceCheckout({
       setCidadeDestino(tenantContext.cidade);
     }
   }, [tenantContext?.cidade, cidadeDestino]);
+
+  useEffect(() => {
+    if (
+      tenantContext?.ecommerce_entrega_ativa === false &&
+      tenantContext?.ecommerce_retirada_ativa
+    ) {
+      setDeliveryMode("retirada");
+    } else if (
+      tenantContext?.ecommerce_retirada_ativa === false &&
+      tenantContext?.ecommerce_entrega_ativa
+    ) {
+      setDeliveryMode("entrega");
+    }
+  }, [tenantContext?.ecommerce_entrega_ativa, tenantContext?.ecommerce_retirada_ativa]);
 
   useEffect(() => {
     if (!customer) return;
@@ -111,11 +125,10 @@ export default function useEcommerceCheckout({
       return;
     }
 
-    const cidadeFinal = (
-      tenantContext?.cidade ||
-      cidadeDestino ||
-      addressFields.cidade ||
-      ""
+    const cidadeFinal = String(
+      deliveryMode === "retirada"
+        ? tenantContext?.cidade || cidadeDestino
+        : addressFields.cidade || cidadeDestino,
     ).trim();
     if (!cidadeFinal || cidadeFinal.length < 2) {
       onError("Cidade da loja n\u00e3o configurada para checkout.");
@@ -130,6 +143,7 @@ export default function useEcommerceCheckout({
         params: {
           cidade_destino: cidadeFinal,
           cupom: cupomResult?.codigo || undefined,
+          tipo_retirada: deliveryMode === "retirada" ? tipoRetirada : undefined,
         },
       });
       setCheckoutResumo(response.data);
@@ -150,11 +164,10 @@ export default function useEcommerceCheckout({
       setView("conta");
       return;
     }
-    const cidadeFinal = (
-      tenantContext?.cidade ||
-      cidadeDestino ||
-      addressFields.cidade ||
-      ""
+    const cidadeFinal = String(
+      deliveryMode === "retirada"
+        ? tenantContext?.cidade || cidadeDestino
+        : addressFields.cidade || cidadeDestino,
     ).trim();
     if (!cidadeFinal || cidadeFinal.length < 2) {
       onError("Cidade da loja n\u00e3o configurada para checkout.");
@@ -205,7 +218,7 @@ export default function useEcommerceCheckout({
 
       const result = response.data;
       setCheckoutResult(result);
-      trackPurchase(result, cart);
+      trackCheckoutSubmitted(result, cart);
       clearCart();
       setCheckoutResumo(null);
       setCupomResult(null);

@@ -37,7 +37,7 @@ const TIPOS = [
  * Banners: escala para até 1200px de largura mantendo proporção original (sem corte).
  * Logo: centraliza em 400×160 com fundo branco.
  */
-function resizeImage(file, targetW, targetH, quality = 0.9) {
+function resizeImage(file, targetW, targetH, outputType = "image/webp", quality = 0.9) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
@@ -53,11 +53,9 @@ function resizeImage(file, targetW, targetH, quality = 0.9) {
         canvas.height = Math.round(img.naturalHeight * scale);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       } else {
-        // Modo logo: cabe em targetW×targetH centralizado, fundo branco
+        // Modo logo: cabe em targetW×targetH e preserva transparência.
         canvas.width = targetW;
         canvas.height = targetH;
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, targetW, targetH);
         const scale = Math.min(targetW / img.naturalWidth, targetH / img.naturalHeight);
         const drawW = img.naturalWidth * scale;
         const drawH = img.naturalHeight * scale;
@@ -68,7 +66,7 @@ function resizeImage(file, targetW, targetH, quality = 0.9) {
 
       canvas.toBlob(
         (blob) => (blob ? resolve(blob) : reject(new Error("canvas toBlob falhou"))),
-        "image/jpeg",
+        outputType,
         quality,
       );
     };
@@ -175,9 +173,12 @@ export default function EcommerceAparencia() {
       const tipoConfig = TIPOS.find((t) => t.key === tipo);
       let fileToUpload = arquivo;
       if (tipoConfig && arquivo.type.startsWith("image/")) {
-        const blob = await resizeImage(arquivo, tipoConfig.targetW, tipoConfig.targetH);
-        fileToUpload = new File([blob], arquivo.name.replace(/\.[^.]+$/, ".jpg"), {
-          type: "image/jpeg",
+        const isLogo = tipo === "logo";
+        const outputType = isLogo ? "image/png" : "image/webp";
+        const extension = isLogo ? ".png" : ".webp";
+        const blob = await resizeImage(arquivo, tipoConfig.targetW, tipoConfig.targetH, outputType);
+        fileToUpload = new File([blob], arquivo.name.replace(/\.[^.]+$/, extension), {
+          type: outputType,
         });
       }
       const form = new FormData();
@@ -262,6 +263,9 @@ export default function EcommerceAparencia() {
               corepet.com.br/
             </span>
             <input
+              id="ecommerce-store-slug"
+              name="store_slug"
+              aria-label="Endereço público da loja"
               type="text"
               value={slug}
               onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
@@ -344,6 +348,9 @@ export default function EcommerceAparencia() {
                 }}
               >
                 <input
+                  id={`ecommerce-${key}-upload`}
+                  name={`${key}_upload`}
+                  aria-label={`Selecionar imagem para ${label}`}
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif"
                   style={{ display: "none" }}
@@ -404,7 +411,7 @@ export default function EcommerceAparencia() {
       >
         <strong>💡 Dica:</strong> As imagens são redimensionadas automaticamente ao fazer upload.
         Para ver o resultado, acesse a{" "}
-        <a href="/ecommerce" style={{ color: "#6366f1" }}>
+        <a href="/ecommerce/preview" style={{ color: "#6366f1" }}>
           prévia da loja
         </a>
         .

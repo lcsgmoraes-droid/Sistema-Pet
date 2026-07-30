@@ -14,11 +14,17 @@ export default function useEcommerceCatalog() {
     offset: 0,
     limit: DEFAULT_CATALOG_LIMIT,
     categories: [],
+    brands: [],
   });
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [categoria, setCategoria] = useState("todas");
   const [ordenacaoCatalogo, setOrdenacaoCatalogo] = useState(DEFAULT_CATALOG_ORDER);
+  const [marca, setMarca] = useState("");
+  const [apenasComEstoque, setApenasComEstoque] = useState(false);
+  const [apenasComImagem, setApenasComImagem] = useState(false);
+  const [precoMinimo, setPrecoMinimo] = useState("");
+  const [precoMaximo, setPrecoMaximo] = useState("");
 
   const categorias = useMemo(() => {
     return buildCatalogCategoryOptions({
@@ -48,6 +54,11 @@ export default function useEcommerceCatalog() {
     setSearch("");
     setCategoria("todas");
     setOrdenacaoCatalogo(DEFAULT_CATALOG_ORDER);
+    setMarca("");
+    setApenasComEstoque(false);
+    setApenasComImagem(false);
+    setPrecoMinimo("");
+    setPrecoMaximo("");
     setPage(1);
   }
 
@@ -64,6 +75,16 @@ export default function useEcommerceCatalog() {
     setCategoria,
     ordenacaoCatalogo,
     setOrdenacaoCatalogo,
+    marca,
+    setMarca,
+    apenasComEstoque,
+    setApenasComEstoque,
+    apenasComImagem,
+    setApenasComImagem,
+    precoMinimo,
+    setPrecoMinimo,
+    precoMaximo,
+    setPrecoMaximo,
     categorias,
     filteredProducts: products,
     productMap,

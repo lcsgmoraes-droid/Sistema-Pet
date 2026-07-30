@@ -196,13 +196,19 @@ def calcular_frete_local(
     db: Session = Depends(get_session),
 ):
     tenant_id = _activate_checkout_tenant_context(identity)
-    return _frete_local_por_cidade(db, tenant_id, payload.cidade_destino)
+    return _frete_local_por_cidade(
+        db,
+        tenant_id,
+        payload.cidade_destino,
+        subtotal=payload.subtotal,
+    )
 
 
 @router.get("/resumo")
 def resumo_checkout(
     cidade_destino: str = Query(..., min_length=2),
     cupom: str | None = Query(default=None),
+    tipo_retirada: str | None = Query(default=None),
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
@@ -222,7 +228,36 @@ def resumo_checkout(
         )
 
     subtotal = round(sum(float(item.subtotal or 0.0) for item in itens), 2)
-    frete = _frete_local_por_cidade(db, tenant_id, cidade_destino)
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    pedido_minimo = float(getattr(tenant, "ecommerce_pedido_minimo", 0) or 0)
+    if subtotal < pedido_minimo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Pedido mínimo para esta loja: R$ {pedido_minimo:.2f}".replace(
+                ".", ","
+            ),
+        )
+    if tipo_retirada in ("proprio", "terceiro", "app_loja"):
+        if getattr(tenant, "ecommerce_retirada_ativa", True) is False:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Retirada na loja está desativada. Escolha entrega.",
+            )
+        frete = {
+            "disponivel": True,
+            "valor_frete": 0.0,
+            "prazo_estimado": "Retirada na loja",
+            "tipo": "retirada",
+            "cidade_loja": tenant.cidade,
+            "cidade_destino": cidade_destino,
+        }
+    else:
+        frete = _frete_local_por_cidade(
+            db,
+            tenant_id,
+            cidade_destino,
+            subtotal=subtotal,
+        )
     cupom_codigo, cupom_percentual, desconto = _calcular_desconto(subtotal, cupom)
     total = round(max(subtotal - desconto, 0.0) + float(frete["valor_frete"]), 2)
 
@@ -250,6 +285,12 @@ def finalizar_checkout(
 ):
     tenant_id = _activate_checkout_tenant_context(identity)
     _expirar_reservas_automaticamente(db, tenant_id)
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if not tenant or getattr(tenant, "ecommerce_ativo", True) is False:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta loja online está fechada no momento.",
+        )
     forma_pagamento_tipo = _validar_forma_pagamento_online(payload.forma_pagamento_nome)
 
     payment_config = get_active_mercado_pago_runtime_config(db, tenant_id)
@@ -317,9 +358,22 @@ def finalizar_checkout(
         )
 
     subtotal = round(sum(float(item.subtotal or 0.0) for item in itens), 2)
+    pedido_minimo = float(getattr(tenant, "ecommerce_pedido_minimo", 0) or 0)
+    if subtotal < pedido_minimo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Pedido mínimo para esta loja: R$ {pedido_minimo:.2f}".replace(
+                ".", ","
+            ),
+        )
 
     # Retirada na loja (próprio, terceiro ou app_loja): não valida frete por cidade
     if payload.tipo_retirada in ("proprio", "terceiro", "app_loja"):
+        if getattr(tenant, "ecommerce_retirada_ativa", True) is False:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Retirada na loja está desativada. Escolha entrega.",
+            )
         frete = {
             "disponivel": True,
             "valor_frete": 0.0,
@@ -329,7 +383,12 @@ def finalizar_checkout(
             "cidade_destino": payload.cidade_destino,
         }
     else:
-        frete = _frete_local_por_cidade(db, tenant_id, payload.cidade_destino)
+        frete = _frete_local_por_cidade(
+            db,
+            tenant_id,
+            payload.cidade_destino,
+            subtotal=subtotal,
+        )
 
     cupom_codigo, cupom_percentual, desconto = _calcular_desconto(
         subtotal, payload.cupom
@@ -375,7 +434,6 @@ def finalizar_checkout(
     provider = payment_config.provider
     response["payment_provider"] = provider
     if is_mercado_pago_provider(provider):
-        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
         storefront_ref = str(
             getattr(tenant, "ecommerce_slug", None) or tenant_id
         ).strip("/")

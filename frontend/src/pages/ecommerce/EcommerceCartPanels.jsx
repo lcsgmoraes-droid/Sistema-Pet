@@ -140,12 +140,14 @@ export function EcommerceCartSidebar({
   cartTotal,
   customerToken,
   isMobile,
+  minOrder = 0,
   productMap,
   styles: S,
   onCheckout,
   onViewCart,
 }) {
   const items = Array.isArray(cart?.itens) ? cart.itens : [];
+  const missingForMinimum = Math.max(Number(minOrder || 0) - Number(cartTotal || 0), 0);
 
   return (
     <aside style={{ ...S.sidebar, display: isMobile ? "none" : "block" }}>
@@ -185,7 +187,31 @@ export function EcommerceCartSidebar({
             </span>
           </div>
 
-          <button style={S.checkoutBig} onClick={onCheckout}>
+          {missingForMinimum > 0 && (
+            <div
+              style={{
+                padding: "9px 10px",
+                borderRadius: 8,
+                background: "#fff7ed",
+                color: "#9a3412",
+                fontSize: 11,
+                fontWeight: 700,
+                textAlign: "center",
+              }}
+            >
+              Adicione mais {formatCurrency(missingForMinimum)} para atingir o pedido mínimo.
+            </div>
+          )}
+
+          <button
+            style={{
+              ...S.checkoutBig,
+              opacity: missingForMinimum > 0 ? 0.55 : 1,
+              cursor: missingForMinimum > 0 ? "not-allowed" : "pointer",
+            }}
+            onClick={onCheckout}
+            disabled={missingForMinimum > 0}
+          >
             Finalizar compra -&gt;
           </button>
           <button style={S.viewCartBtn} onClick={onViewCart}>
@@ -224,11 +250,13 @@ export function EcommerceCartOrderSummary({
   cart,
   cartTotal,
   isMobile,
+  minOrder = 0,
   styles: S,
   onCheckout,
   onContinueShopping,
 }) {
   const items = Array.isArray(cart?.itens) ? cart.itens : [];
+  const missingForMinimum = Math.max(Number(minOrder || 0) - Number(cartTotal || 0), 0);
 
   return (
     <div style={S.cartOrderSummaryBox(isMobile)}>
@@ -240,7 +268,34 @@ export function EcommerceCartOrderSummary({
         <span>Total</span>
         <span>{formatCurrency(cartTotal)}</span>
       </div>
-      <button onClick={onCheckout} style={{ ...S.checkoutBig, width: "100%", marginTop: 14 }}>
+      {missingForMinimum > 0 && (
+        <div
+          style={{
+            marginTop: 12,
+            borderRadius: 9,
+            background: "#fff7ed",
+            color: "#9a3412",
+            padding: "10px 12px",
+            fontSize: 12,
+            fontWeight: 700,
+            lineHeight: 1.4,
+          }}
+        >
+          Pedido mínimo de {formatCurrency(minOrder)}. Adicione mais{" "}
+          {formatCurrency(missingForMinimum)} para continuar.
+        </div>
+      )}
+      <button
+        onClick={onCheckout}
+        disabled={missingForMinimum > 0}
+        style={{
+          ...S.checkoutBig,
+          width: "100%",
+          marginTop: 14,
+          opacity: missingForMinimum > 0 ? 0.55 : 1,
+          cursor: missingForMinimum > 0 ? "not-allowed" : "pointer",
+        }}
+      >
         Ir para o checkout -&gt;
       </button>
       <button
@@ -271,6 +326,7 @@ export function EcommerceCartPage({
   cupom,
   cupomResult,
   isMobile,
+  minOrder,
   productMap,
   styles: S,
   onApplyCoupon,
@@ -322,9 +378,11 @@ export function EcommerceCartPage({
               }}
             >
               <input
+                id="ecommerce-coupon"
+                name="coupon"
                 value={cupom}
                 onChange={(event) => onCouponChange(event.target.value)}
-                placeholder="Codigo de cupom"
+                placeholder="Código de cupom"
                 style={{ ...S.formInput, flex: 1 }}
               />
               <button
@@ -364,6 +422,7 @@ export function EcommerceCartPage({
             cart={cart}
             cartTotal={cartTotal}
             isMobile={isMobile}
+            minOrder={minOrder}
             styles={S}
             onCheckout={onCheckout}
             onContinueShopping={onContinueShopping}

@@ -603,6 +603,26 @@ class Tenant(Base):
     ecommerce_dias_funcionamento = Column(
         String(200), nullable=True
     )  # ex.: "seg,ter,qua,qui,sex"
+    ecommerce_entrega_ativa = Column(Boolean, nullable=False, server_default="true")
+    ecommerce_retirada_ativa = Column(Boolean, nullable=False, server_default="true")
+    ecommerce_taxa_entrega = Column(Float, nullable=False, server_default="0")
+    ecommerce_frete_gratis_acima = Column(Float, nullable=True)
+    ecommerce_pedido_minimo = Column(Float, nullable=False, server_default="0")
+    ecommerce_prazo_entrega_texto = Column(String(80), nullable=True)
+    ecommerce_usar_estoque_canal = Column(
+        Boolean, nullable=False, server_default="false"
+    )
+    ecommerce_ocultar_sem_estoque = Column(
+        Boolean, nullable=False, server_default="true"
+    )
+    ecommerce_ocultar_sem_imagem = Column(
+        Boolean, nullable=False, server_default="false"
+    )
+    ecommerce_ocultar_servicos = Column(Boolean, nullable=False, server_default="true")
+    ecommerce_cor_primaria = Column(String(7), nullable=False, server_default="#f97316")
+    ecommerce_cor_secundaria = Column(
+        String(7), nullable=False, server_default="#0f766e"
+    )
 
     # Módulos premium ativos — JSON com lista de módulos contratados
     # Ex.: '["entregas", "campanhas"]'
