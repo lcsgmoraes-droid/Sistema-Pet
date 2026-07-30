@@ -7,11 +7,25 @@ const GA_ID = import.meta.env.VITE_GA_MEASUREMENT_ID;
 const SESSION_KEY = "corepet_ecommerce_analytics_session";
 let analyticsContext = { tenant: "", channel: "ecommerce" };
 
+function createSessionId() {
+  const webCrypto = window.crypto;
+  if (typeof webCrypto?.randomUUID === "function") {
+    return webCrypto.randomUUID();
+  }
+  if (typeof webCrypto?.getRandomValues === "function") {
+    const randomBytes = new Uint8Array(16);
+    webCrypto.getRandomValues(randomBytes);
+    const token = Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    return `session-${token}`;
+  }
+  return `session-${Date.now()}`;
+}
+
 function getSessionId() {
   try {
     let value = localStorage.getItem(SESSION_KEY);
     if (!value) {
-      value = window.crypto?.randomUUID?.() || `session-${Date.now()}-${Math.random()}`;
+      value = createSessionId();
       value = value.replace(/[^A-Za-z0-9._-]/g, "");
       localStorage.setItem(SESSION_KEY, value);
     }
