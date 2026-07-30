@@ -24,5 +24,7 @@ def test_public_products_route_exposes_category_filter_and_facets():
     source = inspect.getsource(ecommerce_public.listar_produtos_publicos)
 
     assert "categoria_id" in signature.parameters
-    assert "Produto.categoria_id == categoria_id" in source
+    assert "categoria_ids" in signature.parameters
+    assert "Produto.categoria_id.in_(selected_category_ids)" in source
     assert '"categorias"' in source
+    assert "_build_category_path_map" in source

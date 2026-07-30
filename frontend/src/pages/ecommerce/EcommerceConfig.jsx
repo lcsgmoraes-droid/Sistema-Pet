@@ -41,6 +41,20 @@ export default function EcommerceConfig() {
   const [horarioAbertura, setHorarioAbertura] = useState("");
   const [horarioFechamento, setHorarioFechamento] = useState("");
   const [diasSelecionados, setDiasSelecionados] = useState([]);
+  const [commerceConfig, setCommerceConfig] = useState({
+    entregaAtiva: true,
+    retiradaAtiva: true,
+    taxaEntrega: 0,
+    freteGratisAcima: 0,
+    pedidoMinimo: 0,
+    prazoEntrega: "",
+    usarEstoqueCanal: false,
+    ocultarSemEstoque: true,
+    ocultarSemImagem: false,
+    ocultarServicos: true,
+    corPrimaria: "#f97316",
+    corSecundaria: "#0f766e",
+  });
   const [paymentLoading, setPaymentLoading] = useState(true);
   const [paymentConfig, setPaymentConfig] = useState({
     enabled: false,
@@ -122,6 +136,20 @@ export default function EcommerceConfig() {
       setHorarioAbertura(d.ecommerce_horario_abertura || "");
       setHorarioFechamento(d.ecommerce_horario_fechamento || "");
       setDiasSelecionados(parseDias(d.ecommerce_dias_funcionamento));
+      setCommerceConfig({
+        entregaAtiva: d.ecommerce_entrega_ativa ?? true,
+        retiradaAtiva: d.ecommerce_retirada_ativa ?? true,
+        taxaEntrega: Number(d.ecommerce_taxa_entrega || 0),
+        freteGratisAcima: Number(d.ecommerce_frete_gratis_acima || 0),
+        pedidoMinimo: Number(d.ecommerce_pedido_minimo || 0),
+        prazoEntrega: d.ecommerce_prazo_entrega_texto || "",
+        usarEstoqueCanal: d.ecommerce_usar_estoque_canal ?? false,
+        ocultarSemEstoque: d.ecommerce_ocultar_sem_estoque ?? true,
+        ocultarSemImagem: d.ecommerce_ocultar_sem_imagem ?? false,
+        ocultarServicos: d.ecommerce_ocultar_servicos ?? true,
+        corPrimaria: d.ecommerce_cor_primaria || "#f97316",
+        corSecundaria: d.ecommerce_cor_secundaria || "#0f766e",
+      });
     } catch {
       setError("Não foi possível carregar as configurações.");
     } finally {
@@ -164,6 +192,18 @@ export default function EcommerceConfig() {
         ecommerce_horario_fechamento: horarioFechamento || null,
         ecommerce_dias_funcionamento:
           diasSelecionados.length > 0 ? formatDias(diasSelecionados) : null,
+        ecommerce_entrega_ativa: commerceConfig.entregaAtiva,
+        ecommerce_retirada_ativa: commerceConfig.retiradaAtiva,
+        ecommerce_taxa_entrega: commerceConfig.taxaEntrega,
+        ecommerce_frete_gratis_acima: commerceConfig.freteGratisAcima || null,
+        ecommerce_pedido_minimo: commerceConfig.pedidoMinimo,
+        ecommerce_prazo_entrega_texto: commerceConfig.prazoEntrega || null,
+        ecommerce_usar_estoque_canal: commerceConfig.usarEstoqueCanal,
+        ecommerce_ocultar_sem_estoque: commerceConfig.ocultarSemEstoque,
+        ecommerce_ocultar_sem_imagem: commerceConfig.ocultarSemImagem,
+        ecommerce_ocultar_servicos: commerceConfig.ocultarServicos,
+        ecommerce_cor_primaria: commerceConfig.corPrimaria,
+        ecommerce_cor_secundaria: commerceConfig.corSecundaria,
       });
       setSuccess("Configurações salvas com sucesso!");
       setTimeout(() => setSuccess(""), 4000);
@@ -236,6 +276,13 @@ export default function EcommerceConfig() {
   }
 
   async function desconectarMercadoPago() {
+    if (
+      !window.confirm(
+        "Desconectar o Mercado Pago vai impedir novos pagamentos online. Deseja continuar?",
+      )
+    ) {
+      return;
+    }
     setDisconnectingPayment(true);
     setError("");
     setSuccess("");
@@ -301,6 +348,8 @@ export default function EcommerceConfig() {
       diasSelecionados={diasSelecionados}
       toggleDia={toggleDia}
       diasSemana={DIAS_SEMANA}
+      commerceConfig={commerceConfig}
+      setCommerceConfig={setCommerceConfig}
       saving={saving}
       mercadoPagoSectionRef={mercadoPagoSectionRef}
       salvarPagamento={salvarPagamento}

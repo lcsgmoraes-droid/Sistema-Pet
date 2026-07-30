@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import Tenant
+from app.security.permissions_decorator import require_permission
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,7 @@ class SlugUpdate(BaseModel):
 
 
 @router.get("/tenant-context")
+@require_permission("configuracoes.editar")
 def tenant_context_logado(
     user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session),
@@ -95,6 +97,7 @@ def tenant_context_logado(
 
 
 @router.get("", response_model=AparenciaResponse)
+@require_permission("configuracoes.editar")
 def buscar_aparencia(
     user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session),
@@ -113,6 +116,7 @@ def buscar_aparencia(
 
 
 @router.post("/upload/{tipo}", response_model=AparenciaResponse)
+@require_permission("configuracoes.editar")
 async def upload_imagem_aparencia(
     tipo: str,
     file: UploadFile = File(...),
@@ -203,6 +207,7 @@ async def upload_imagem_aparencia(
 
 
 @router.put("", response_model=AparenciaResponse)
+@require_permission("configuracoes.editar")
 def atualizar_aparencia_por_url(
     dados: AparenciaUrlUpdate,
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -232,6 +237,7 @@ def atualizar_aparencia_por_url(
 
 
 @router.put("/slug")
+@require_permission("configuracoes.editar")
 def atualizar_slug(
     body: SlugUpdate,
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -284,6 +290,7 @@ def atualizar_slug(
 
 
 @router.delete("/{tipo}", response_model=AparenciaResponse)
+@require_permission("configuracoes.editar")
 def remover_imagem_aparencia(
     tipo: str,
     user_and_tenant=Depends(get_current_user_and_tenant),

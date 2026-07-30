@@ -8,6 +8,7 @@ import {
   Unplug,
   Webhook,
 } from "lucide-react";
+import CurrencyInput from "../../components/CurrencyInput";
 
 export default function EcommerceConfigView({
   loading,
@@ -25,6 +26,8 @@ export default function EcommerceConfigView({
   diasSelecionados,
   toggleDia,
   diasSemana,
+  commerceConfig,
+  setCommerceConfig,
   saving,
   mercadoPagoSectionRef,
   salvarPagamento,
@@ -44,6 +47,38 @@ export default function EcommerceConfigView({
   avisos,
   loadingAvisos,
 }) {
+  function updateCommerce(key, value) {
+    setCommerceConfig((current) => ({ ...current, [key]: value }));
+  }
+
+  function ToggleSetting({ configKey, label, description }) {
+    const enabled = Boolean(commerceConfig[configKey]);
+    return (
+      <div className="flex items-center justify-between gap-4 py-2">
+        <div>
+          <p className="font-medium text-gray-700">{label}</p>
+          <p className="text-sm text-gray-500">{description}</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          aria-label={label}
+          onClick={() => updateCommerce(configKey, !enabled)}
+          className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${
+            enabled ? "bg-indigo-500" : "bg-gray-300"
+          }`}
+        >
+          <span
+            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+              enabled ? "translate-x-6" : "translate-x-1"
+            }`}
+          />
+        </button>
+      </div>
+    );
+  }
+
   function statusConfigurado(configurado, preview = null) {
     if (!configurado) return null;
     return (
@@ -106,6 +141,9 @@ export default function EcommerceConfigView({
             </div>
             <button
               type="button"
+              role="switch"
+              aria-checked={ativo}
+              aria-label="Loja online"
               onClick={() => setAtivo((v) => !v)}
               className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${
                 ativo ? "bg-indigo-500" : "bg-gray-300"
@@ -124,6 +162,9 @@ export default function EcommerceConfigView({
         <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-3">
           <h2 className="text-base font-semibold text-gray-800">Descrição da Loja</h2>
           <textarea
+            id="ecommerce-store-description"
+            name="store_description"
+            aria-label="Descrição da loja"
             value={descricao}
             onChange={(e) => setDescricao(e.target.value)}
             rows={3}
@@ -142,8 +183,15 @@ export default function EcommerceConfigView({
           </p>
           <div className="flex gap-4 items-center">
             <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Abertura</label>
+              <label
+                htmlFor="ecommerce-opening-time"
+                className="block text-xs font-medium text-gray-600 mb-1"
+              >
+                Abertura
+              </label>
               <input
+                id="ecommerce-opening-time"
+                name="opening_time"
                 type="time"
                 value={horarioAbertura}
                 onChange={(e) => setHorarioAbertura(e.target.value)}
@@ -152,8 +200,15 @@ export default function EcommerceConfigView({
             </div>
             <span className="text-gray-400 mt-5">até</span>
             <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Fechamento</label>
+              <label
+                htmlFor="ecommerce-closing-time"
+                className="block text-xs font-medium text-gray-600 mb-1"
+              >
+                Fechamento
+              </label>
               <input
+                id="ecommerce-closing-time"
+                name="closing_time"
                 type="time"
                 value={horarioFechamento}
                 onChange={(e) => setHorarioFechamento(e.target.value)}
@@ -181,6 +236,140 @@ export default function EcommerceConfigView({
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-5">
+          <div>
+            <h2 className="text-base font-semibold text-gray-800">Entrega e retirada</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Estas regras aparecem na loja e são validadas novamente ao fechar o pedido.
+            </p>
+          </div>
+          <ToggleSetting
+            configKey="entregaAtiva"
+            label="Entrega local"
+            description="Permite entregar apenas na cidade configurada para a loja."
+          />
+          <ToggleSetting
+            configKey="retiradaAtiva"
+            label="Retirada na loja"
+            description="Permite retirada própria, por terceiro ou pelo app."
+          />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <label className="text-xs font-medium text-gray-600">
+              Taxa de entrega
+              <CurrencyInput
+                id="ecommerce-delivery-fee"
+                name="delivery_fee"
+                value={commerceConfig.taxaEntrega}
+                onChange={(value) => updateCommerce("taxaEntrega", value)}
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="text-xs font-medium text-gray-600">
+              Frete grátis acima de
+              <CurrencyInput
+                id="ecommerce-free-shipping-threshold"
+                name="free_shipping_threshold"
+                value={commerceConfig.freteGratisAcima}
+                onChange={(value) => updateCommerce("freteGratisAcima", value)}
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+              <span className="block mt-1 text-[11px] text-gray-400">
+                Deixe 0,00 para não oferecer.
+              </span>
+            </label>
+            <label className="text-xs font-medium text-gray-600">
+              Pedido mínimo
+              <CurrencyInput
+                id="ecommerce-minimum-order"
+                name="minimum_order"
+                value={commerceConfig.pedidoMinimo}
+                onChange={(value) => updateCommerce("pedidoMinimo", value)}
+                className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              />
+            </label>
+          </div>
+          <label className="block text-xs font-medium text-gray-600">
+            Prazo informado ao cliente
+            <input
+              id="ecommerce-delivery-deadline"
+              name="delivery_deadline"
+              value={commerceConfig.prazoEntrega}
+              onChange={(event) => updateCommerce("prazoEntrega", event.target.value)}
+              maxLength={80}
+              placeholder="Ex.: Entrega em até 2 horas"
+              className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          </label>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-3">
+          <div>
+            <h2 className="text-base font-semibold text-gray-800">Qualidade do catálogo</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Evite anunciar itens que o cliente não consegue comprar com confiança.
+            </p>
+          </div>
+          <ToggleSetting
+            configKey="ocultarSemEstoque"
+            label="Ocultar produtos sem estoque"
+            description="Recomendado para não mostrar milhares de itens indisponíveis."
+          />
+          <ToggleSetting
+            configKey="ocultarSemImagem"
+            label="Ocultar produtos sem imagem"
+            description="Ative quando o catálogo visual estiver mais completo."
+          />
+          <ToggleSetting
+            configKey="ocultarServicos"
+            label="Ocultar serviços"
+            description="Mantém banho, tosa e outros serviços fora da loja de produtos."
+          />
+          <ToggleSetting
+            configKey="usarEstoqueCanal"
+            label="Usar estoque reservado do e-commerce"
+            description="Só ative depois de preencher o estoque do canal nos produtos."
+          />
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-4">
+          <div>
+            <h2 className="text-base font-semibold text-gray-800">Cores da loja</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Aplicadas aos destaques, botões e mensagens comerciais.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              ["corPrimaria", "Cor principal"],
+              ["corSecundaria", "Cor secundária"],
+            ].map(([key, label]) => (
+              <label key={key} className="text-xs font-medium text-gray-600">
+                {label}
+                <div className="mt-1 flex gap-2">
+                  <input
+                    id={`ecommerce-${key}-picker`}
+                    name={`${key}_picker`}
+                    aria-label={`${label}: seletor de cor`}
+                    type="color"
+                    value={commerceConfig[key]}
+                    onChange={(event) => updateCommerce(key, event.target.value)}
+                    className="h-10 w-12 rounded border border-gray-300"
+                  />
+                  <input
+                    id={`ecommerce-${key}-value`}
+                    name={`${key}_value`}
+                    aria-label={`${label}: valor hexadecimal`}
+                    value={commerceConfig[key]}
+                    onChange={(event) => updateCommerce(key, event.target.value)}
+                    pattern="^#[0-9A-Fa-f]{6}$"
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm uppercase"
+                  />
+                </div>
+              </label>
+            ))}
           </div>
         </div>
 
@@ -550,8 +739,8 @@ export default function EcommerceConfigView({
               >
                 <p className="font-medium text-sm text-gray-800">{grupo.product_name}</p>
                 <p className="text-xs text-gray-500">
-                  {grupo.emails.length} cliente{grupo.emails.length !== 1 ? "s" : ""} aguardando:{" "}
-                  <span className="text-gray-400">{grupo.emails.join(", ")}</span>
+                  {grupo.emails.length} cliente{grupo.emails.length !== 1 ? "s" : ""} aguardando. Os
+                  endereços ficam protegidos e não são exibidos nesta tela.
                 </p>
               </div>
             ))}

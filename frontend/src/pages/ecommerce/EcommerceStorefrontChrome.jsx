@@ -128,18 +128,30 @@ function BoxIcon() {
   );
 }
 
-function StoreTopbar({ cart, cartTotal, styles: S }) {
+function StoreTopbar({ cart, cartTotal, isMobile, styles: S, tenantContext }) {
   const cartCount = cart?.itens?.length || 0;
+  const freeShippingThreshold = Number(tenantContext?.ecommerce_frete_gratis_acima || 0);
+  const deliveryFee = Number(tenantContext?.ecommerce_taxa_entrega || 0);
+  const commerceMessage =
+    freeShippingThreshold > 0
+      ? `Frete grátis acima de ${formatCurrency(freeShippingThreshold)}`
+      : tenantContext?.ecommerce_entrega_ativa
+        ? deliveryFee > 0
+          ? `Entrega local por ${formatCurrency(deliveryFee)}`
+          : "Consulte a entrega local"
+        : "Retirada na loja";
 
   return (
     <div style={S.topbar}>
-      <div style={S.topbarInner}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <CartIcon size={13} />
-          <span>{cartCount > 0 ? `${cartCount} item(ns) no carrinho` : "Carrinho vazio"}</span>
-        </div>
-        <span>
-          {cartCount > 0 ? `${formatCurrency(cartTotal)} →` : "Frete grátis acima de R$ 199"}
+      <div style={{ ...S.topbarInner, gap: 12, overflow: "hidden" }}>
+        {!isMobile && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap" }}>
+            <CartIcon size={13} />
+            <span>{cartCount > 0 ? `${cartCount} item(ns) no carrinho` : "Carrinho vazio"}</span>
+          </div>
+        )}
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {cartCount > 0 ? `${formatCurrency(cartTotal)} · ${commerceMessage}` : commerceMessage}
         </span>
       </div>
     </div>
@@ -166,7 +178,20 @@ function StoreHeader({
       <div style={S.headerInner}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={S.logo} onClick={() => onNavigate("loja")}>
-            <span style={{ fontSize: 42, lineHeight: 1, flexShrink: 0 }}>🐾</span>
+            {tenantContext?.logo_url ? (
+              <img
+                src={resolveMediaUrl(tenantContext.logo_url)}
+                alt={`Logo ${storeDisplayName}`}
+                style={{
+                  width: isMobile ? 42 : 58,
+                  height: isMobile ? 42 : 48,
+                  objectFit: "contain",
+                  flexShrink: 0,
+                }}
+              />
+            ) : (
+              <span style={{ fontSize: isMobile ? 34 : 42, lineHeight: 1, flexShrink: 0 }}>🐾</span>
+            )}
             <div>
               <div style={{ fontSize: 18, fontWeight: 800, color: "#1c1917", lineHeight: 1.1 }}>
                 {storeDisplayName}
@@ -188,6 +213,9 @@ function StoreHeader({
           <div style={{ position: "relative", width: "100%" }}>
             <SearchIcon />
             <input
+              id="ecommerce-header-search"
+              name="header_search"
+              aria-label="Buscar produtos"
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Buscar produtos para o seu pet..."
@@ -205,7 +233,11 @@ function StoreHeader({
             <HeartIcon active={hasWishlist} />
           </button>
           {customerDisplayName ? (
-            <button onClick={() => onNavigate("conta")} style={S.avatarBtn}>
+            <button
+              onClick={() => onNavigate("conta")}
+              style={S.avatarBtn}
+              aria-label="Abrir minha conta"
+            >
               <span
                 style={{
                   width: 22,
@@ -227,6 +259,7 @@ function StoreHeader({
           ) : (
             <button
               onClick={() => onNavigate("conta")}
+              aria-label="Entrar ou criar conta"
               style={{ ...S.loginBtn, gap: 6, padding: isMobile ? "7px 10px" : "7px 16px" }}
             >
               <UserIcon />
@@ -235,6 +268,7 @@ function StoreHeader({
           )}
           <button
             onClick={() => onNavigate("carrinho")}
+            aria-label={`Abrir carrinho${cartCount > 0 ? ` com ${cartCount} itens` : " vazio"}`}
             style={{ ...S.cartBtn, padding: isMobile ? "0 12px" : "0 18px" }}
           >
             <CartIcon />
@@ -284,7 +318,13 @@ function StoreBanner({
               <img
                 src={resolveMediaUrl(banner.url)}
                 alt={`Banner ${index + 1}`}
-                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: isMobile ? "contain" : "cover",
+                  background: "#f5f5f4",
+                  display: "block",
+                }}
               />
             ) : (
               <div
@@ -348,6 +388,7 @@ function StoreBanner({
             <button
               key={index}
               onClick={() => onBannerSlideChange(index)}
+              aria-label={`Mostrar banner ${index + 1}`}
               style={S.bannerDot(bannerSlide === index)}
             />
           ))}
@@ -387,7 +428,9 @@ function StoreNavTabs({ cart, isMobile, styles: S, view, onNavigate }) {
     { id: "loja", label: "Loja", icon: <HomeIcon /> },
     {
       id: "carrinho",
-      label: cart?.itens?.length ? `Carrinho (${cart.itens.length})` : "Carrinho",
+      label: cart?.itens?.length
+        ? `${isMobile ? "Carr." : "Carrinho"} (${cart.itens.length})`
+        : "Carrinho",
       icon: <CartIcon size={15} />,
     },
     { id: "pedidos", label: "Pedidos", icon: <BoxIcon /> },
@@ -395,13 +438,29 @@ function StoreNavTabs({ cart, isMobile, styles: S, view, onNavigate }) {
   ];
 
   return (
-    <div style={{ ...S.navWrap, overflowX: isMobile ? "auto" : "visible" }}>
-      <div style={S.navInner}>
+    <div style={{ ...S.navWrap, overflowX: isMobile ? "hidden" : "visible" }}>
+      <div
+        style={{
+          ...S.navInner,
+          width: isMobile ? "100%" : undefined,
+          padding: isMobile ? "0 4px" : S.navInner.padding,
+        }}
+      >
         {navItems.map(({ id, label, icon }) => (
           <button
             key={id}
             onClick={() => onNavigate(id)}
-            style={{ ...S.navTab(view === id), display: "flex", alignItems: "center", gap: 5 }}
+            style={{
+              ...S.navTab(view === id),
+              display: "flex",
+              flex: isMobile ? "1 1 0" : S.navTab(view === id).flex,
+              minWidth: 0,
+              alignItems: "center",
+              justifyContent: "center",
+              gap: isMobile ? 3 : 5,
+              padding: isMobile ? "12px 3px" : S.navTab(view === id).padding,
+              fontSize: isMobile ? 12 : S.navTab(view === id).fontSize,
+            }}
           >
             {icon}
             {label}
@@ -433,7 +492,13 @@ export default function EcommerceStorefrontChrome({
 
   return (
     <>
-      <StoreTopbar cart={cart} cartTotal={cartTotal} styles={S} />
+      <StoreTopbar
+        cart={cart}
+        cartTotal={cartTotal}
+        isMobile={isMobile}
+        styles={S}
+        tenantContext={tenantContext}
+      />
       <StoreHeader
         cart={cart}
         customerDisplayName={customerDisplayName}

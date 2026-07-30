@@ -27,6 +27,16 @@ function getFinalizeBlockReason({
   tenantContext,
 }) {
   if (!cart?.itens?.length) return "Adicione itens no carrinho para continuar.";
+  if (
+    tenantContext?.ecommerce_entrega_ativa === false &&
+    tenantContext?.ecommerce_retirada_ativa === false
+  ) {
+    return "A loja ainda não configurou uma forma de recebimento.";
+  }
+  const pedidoMinimo = Number(tenantContext?.ecommerce_pedido_minimo || 0);
+  if (pedidoMinimo > 0 && Number(cart?.total || 0) < pedidoMinimo) {
+    return `O pedido mínimo é ${formatCurrency(pedidoMinimo)}.`;
+  }
   if (!(tenantContext?.cidade || cidadeDestino)) return "Cidade da loja nao configurada.";
   if (!isProfileComplete) return "Complete seu cadastro (nome, telefone, CPF e endereco).";
   if (!pagamentoTipo) return "Escolha a forma de pagamento para continuar.";
@@ -60,7 +70,11 @@ function CheckoutDeliveryForm({
       </div>
       <form onSubmit={onCalculateSummary} style={{ display: "grid", gap: 10 }}>
         <div style={{ display: "flex", gap: 10 }}>
-          {DELIVERY_OPTIONS.map(({ value, label }) => (
+          {DELIVERY_OPTIONS.filter(({ value }) =>
+            value === "entrega"
+              ? tenantContext?.ecommerce_entrega_ativa !== false
+              : tenantContext?.ecommerce_retirada_ativa !== false,
+          ).map(({ value, label }) => (
             <label key={value} style={deliveryMode === value ? S.radioLabelActive : S.radioLabel}>
               <input
                 type="radio"
@@ -73,6 +87,28 @@ function CheckoutDeliveryForm({
               {label}
             </label>
           ))}
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            color: "#57534e",
+            fontSize: 11,
+          }}
+        >
+          {Number(tenantContext?.ecommerce_pedido_minimo || 0) > 0 && (
+            <span>Pedido mínimo: {formatCurrency(tenantContext.ecommerce_pedido_minimo)}</span>
+          )}
+          {Number(tenantContext?.ecommerce_frete_gratis_acima || 0) > 0 && (
+            <span>
+              Frete grátis acima de {formatCurrency(tenantContext.ecommerce_frete_gratis_acima)}
+            </span>
+          )}
+          {tenantContext?.ecommerce_prazo_entrega_texto && (
+            <span>{tenantContext.ecommerce_prazo_entrega_texto}</span>
+          )}
         </div>
 
         {deliveryMode === "retirada" && (

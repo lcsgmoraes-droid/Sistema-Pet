@@ -148,6 +148,7 @@ export const EcommerceMVP = lazy(() => import("../pages/ecommerce/EcommerceMVP")
 export const EcommerceAparencia = lazy(() => import("../pages/ecommerce/EcommerceAparencia"));
 export const EcommerceConfig = lazy(() => import("../pages/ecommerce/EcommerceConfig"));
 export const EcommerceAnalytics = lazy(() => import("../pages/ecommerce/EcommerceAnalytics"));
+export const EcommercePreview = lazy(() => import("../pages/ecommerce/EcommercePreview"));
 export const Campanhas = lazy(() => import("../pages/Campanhas"));
 export const CanalDescontos = lazy(() => import("../pages/CanalDescontos"));
 export const Ajuda = lazy(() => import("../pages/Ajuda"));
