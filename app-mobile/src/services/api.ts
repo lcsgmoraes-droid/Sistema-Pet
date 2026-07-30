@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL } from '../config';
+import { notifySessionExpired } from './sessionExpiration';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -29,6 +30,22 @@ function removeJsonContentTypeForFormData(config: any) {
 
   deleteHeader('Content-Type');
   deleteHeader('content-type');
+}
+
+function requestUsedAuthentication(headers: any): boolean {
+  if (!headers) return false;
+  if (typeof headers.get === 'function') {
+    return Boolean(headers.get('Authorization'));
+  }
+  return Boolean(headers.Authorization || headers.authorization);
+}
+
+export function isUnauthorizedError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { response?: { status?: number } }).response?.status === 401
+  );
 }
 
 // ─── Interceptor de Request ─────────────────────────────────────────────────
@@ -64,8 +81,12 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
+    if (isUnauthorizedError(error)) {
+      const usedAuthentication = requestUsedAuthentication(error.config?.headers);
       await SecureStore.deleteItemAsync('auth_token');
+      if (usedAuthentication) {
+        await notifySessionExpired();
+      }
     }
     return Promise.reject(error);
   }

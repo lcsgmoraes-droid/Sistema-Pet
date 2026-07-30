@@ -1,8 +1,9 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import React, { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, View } from 'react-native';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { registerSessionExpiredHandler } from '../services/sessionExpiration';
 import { useAuthStore } from '../store/auth.store';
 import { useTenantStore } from '../store/tenant.store';
 import { CORES } from '../theme';
@@ -12,7 +13,7 @@ import EntregadorNavigator from './EntregadorNavigator';
 import FuncionarioNavigator from './FuncionarioNavigator';
 import MainNavigator from './MainNavigator';
 import VeterinarioNavigator from './VeterinarioNavigator';
-import { flushPendingNavigation, navigationRef } from './navigationRef';
+import { flushPendingNavigation, navigateWhenReady, navigationRef } from './navigationRef';
 
 // Tela de seleção de loja
 import SelecionarLojaScreen from '../screens/SelecionarLojaScreen';
@@ -53,17 +54,35 @@ const appLinking = {
 };
 
 export default function AppNavigator() {
-  const { isAuthenticated, isLoading: authLoading, loadUser, user } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, loadUser, logout, user } = useAuthStore();
   const { tenant, isLoading: tenantLoading, loadTenant } = useTenantStore();
+  const [sessionExpired, setSessionExpired] = useState(false);
 
-  // Configura push notifications automaticamente após login
-  usePushNotifications(isAuthenticated);
+  useEffect(
+    () =>
+      registerSessionExpiredHandler(async () => {
+        await logout();
+        setSessionExpired(true);
+      }),
+    [logout],
+  );
 
   useEffect(() => {
     // Carrega tenant e usuário em paralelo
     loadTenant();
     loadUser();
   }, []);
+
+  useEffect(() => {
+    if (!sessionExpired || authLoading || tenantLoading || !tenant) return;
+
+    navigateWhenReady('Login');
+    Alert.alert('Sessao expirada', 'Entre novamente para continuar.');
+    setSessionExpired(false);
+  }, [authLoading, sessionExpired, tenant, tenantLoading]);
+
+  // Configura push notifications automaticamente após login
+  usePushNotifications(isAuthenticated);
 
   // Aguarda os dois carregamentos
   if (authLoading || tenantLoading) {
