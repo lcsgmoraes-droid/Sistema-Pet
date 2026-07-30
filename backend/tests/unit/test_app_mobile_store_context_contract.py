@@ -29,7 +29,7 @@ def test_store_switch_clears_cart_and_session_before_tenant():
 def test_checkout_confirmation_identifies_store_and_address():
     source = _read("app-mobile/src/screens/shop/CartScreen.tsx")
 
-    assert 'const lojaLabel = tenant' in source
+    assert "const lojaLabel = tenant" in source
     assert '"Confirmar compra"' in source
     assert "tenant.nome" in source
     assert "Confirme que esta comprando na loja correta" in source

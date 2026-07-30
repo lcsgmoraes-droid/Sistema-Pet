@@ -105,9 +105,9 @@ def test_name_search_finds_store_without_geographic_filter():
 
 
 def test_store_search_contract_keeps_name_global_and_gps_limited_to_eight():
-    source = (
-        REPO_ROOT / "backend/app/routes/ecommerce_public.py"
-    ).read_text(encoding="utf-8")
+    source = (REPO_ROOT / "backend/app/routes/ecommerce_public.py").read_text(
+        encoding="utf-8"
+    )
 
     assert '@router.get("/tenants/buscar")' in source
     assert "le=8" in source
