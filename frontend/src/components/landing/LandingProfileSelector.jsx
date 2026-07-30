@@ -10,6 +10,9 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
+  buildSalesContactUrl,
+  mixedPlanCompleteOffer,
+  mixedPlanStartingOffers,
   publicPlanComparisons,
   publicPlans,
   segmentOptions,
@@ -141,6 +144,89 @@ function PlanComparisonTable({ segmentId, salesContactUrl }) {
   );
 }
 
+function MixedPlanPricing() {
+  const contactUrl = buildSalesContactUrl(
+    "Olá! Quero montar uma combinação de módulos do CorePet para a minha operação.",
+  );
+
+  return (
+    <section className="mt-7 overflow-hidden rounded-3xl border border-violet-200 bg-violet-50 shadow-sm">
+      <div className="border-b border-violet-200 px-6 py-6 sm:px-8">
+        <p className="text-xs font-black uppercase tracking-[0.16em] text-violet-700">
+          Preço claro para operações mistas
+        </p>
+        <h3 className="mt-2 text-3xl font-black tracking-tight">
+          Combine as áreas. Pague pelos planos escolhidos.
+        </h3>
+        <p className="mt-3 max-w-3xl leading-7 text-slate-600">
+          Os valores abaixo somam os planos Start de cada área. Loja, Veterinário e Banho & Tosa
+          compartilham clientes e pets, e cada módulo pode evoluir separadamente.
+        </p>
+      </div>
+
+      <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-7 lg:grid-cols-4">
+        {mixedPlanStartingOffers.map((offer) => (
+          <article
+            key={offer.id}
+            className={`rounded-2xl border p-5 ${
+              offer.featured
+                ? "border-emerald-400 bg-slate-950 text-white ring-4 ring-emerald-100"
+                : "border-violet-200 bg-white text-slate-950"
+            }`}
+          >
+            <p
+              className={`text-sm font-black ${
+                offer.featured ? "text-emerald-300" : "text-violet-800"
+              }`}
+            >
+              {offer.name}
+            </p>
+            <div className="mt-3 flex items-end gap-1">
+              <span className="pb-1 text-sm font-bold">R$</span>
+              <span className="text-3xl font-black tracking-tight">{offer.price}</span>
+              <span
+                className={`pb-1 text-xs font-semibold ${
+                  offer.featured ? "text-slate-300" : "text-slate-500"
+                }`}
+              >
+                /mês
+              </span>
+            </div>
+            <p
+              className={`mt-3 text-sm leading-6 ${
+                offer.featured ? "text-slate-300" : "text-slate-600"
+              }`}
+            >
+              {offer.description}
+            </p>
+          </article>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-5 border-t border-violet-200 bg-white px-6 py-6 sm:px-8 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm font-black text-slate-950">
+            Quer tudo no nível mais completo? R$ {mixedPlanCompleteOffer.price}/mês.
+          </p>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            Esse valor soma Pet Venda Ativa, Vet Completo e B&amp;T Completo, sem desconto oculto ou
+            surpresa na proposta.
+          </p>
+        </div>
+        <a
+          href={contactUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex flex-none items-center justify-center gap-2 rounded-xl bg-violet-700 px-5 py-3.5 font-extrabold text-white transition hover:bg-violet-600"
+        >
+          Montar meu CorePet Mix
+          <ArrowRight className="h-4 w-4" />
+        </a>
+      </div>
+    </section>
+  );
+}
+
 export default function LandingProfileSelector({
   activeProfileId,
   onProfileChange,
@@ -230,31 +316,34 @@ export default function LandingProfileSelector({
         </article>
 
         {activeProfileId === "all" ? (
-          <div className="mt-7 grid gap-4 lg:grid-cols-3">
-            {["pet", "vet", "grooming"].map((segmentId) => {
-              const summary = segmentSummaries[segmentId];
-              const Icon = profileIcons[segmentId];
-              return (
-                <button
-                  key={segmentId}
-                  type="button"
-                  onClick={() => onProfileChange(segmentId)}
-                  className="flex items-center gap-4 rounded-2xl border-2 border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-500 hover:shadow-lg"
-                >
-                  <span className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-slate-950 text-emerald-300">
-                    <Icon className="h-6 w-6" />
-                  </span>
-                  <span className="flex-1">
-                    <span className="block font-black">{profileActionLabels[segmentId]}</span>
-                    <span className="mt-1 block text-sm font-semibold text-slate-500">
-                      Planos a partir de {summary.startingPrice}/mês
+          <>
+            <div className="mt-7 grid gap-4 lg:grid-cols-3">
+              {["pet", "vet", "grooming"].map((segmentId) => {
+                const summary = segmentSummaries[segmentId];
+                const Icon = profileIcons[segmentId];
+                return (
+                  <button
+                    key={segmentId}
+                    type="button"
+                    onClick={() => onProfileChange(segmentId)}
+                    className="flex items-center gap-4 rounded-2xl border-2 border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-500 hover:shadow-lg"
+                  >
+                    <span className="flex h-12 w-12 flex-none items-center justify-center rounded-xl bg-slate-950 text-emerald-300">
+                      <Icon className="h-6 w-6" />
                     </span>
-                  </span>
-                  <ArrowRight className="h-5 w-5 text-emerald-700" />
-                </button>
-              );
-            })}
-          </div>
+                    <span className="flex-1">
+                      <span className="block font-black">{profileActionLabels[segmentId]}</span>
+                      <span className="mt-1 block text-sm font-semibold text-slate-500">
+                        Planos a partir de {summary.startingPrice}/mês
+                      </span>
+                    </span>
+                    <ArrowRight className="h-5 w-5 text-emerald-700" />
+                  </button>
+                );
+              })}
+            </div>
+            <MixedPlanPricing />
+          </>
         ) : (
           <PlanComparisonTable segmentId={activeProfileId} salesContactUrl={salesContactUrl} />
         )}

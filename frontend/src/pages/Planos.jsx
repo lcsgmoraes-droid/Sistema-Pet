@@ -12,6 +12,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import LaunchOfferBanner from "../components/marketing/LaunchOfferBanner";
 import {
   buildSalesContactUrl,
+  mixedPlanCompleteOffer,
+  mixedPlanStartingOffers,
   planOrganizationTypes,
   publicPlans,
   segmentOptions,
@@ -298,8 +300,8 @@ export default function Planos() {
                 </h2>
                 <p className="mt-3 leading-7 text-slate-600">
                   Loja Pet, Veterinário e Banho & Tosa podem compartilhar clientes, pets, vendas e
-                  gestão. Os combos serão configurados conforme os módulos e o tamanho da sua
-                  equipe.
+                  gestão. O preço é a soma dos planos escolhidos, e cada área pode evoluir
+                  separadamente.
                 </p>
               </div>
               <a
@@ -314,6 +316,47 @@ export default function Planos() {
                 <ArrowRight className="h-4 w-4" />
               </a>
             </div>
+            <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {mixedPlanStartingOffers.map((offer) => (
+                <article
+                  key={offer.id}
+                  className={`rounded-2xl border p-5 ${
+                    offer.featured
+                      ? "border-emerald-400 bg-slate-950 text-white ring-4 ring-emerald-100"
+                      : "border-violet-200 bg-white"
+                  }`}
+                >
+                  <p
+                    className={`text-sm font-black ${
+                      offer.featured ? "text-emerald-300" : "text-violet-800"
+                    }`}
+                  >
+                    {offer.name}
+                  </p>
+                  <p className="mt-2 text-2xl font-black">
+                    R$ {offer.price}
+                    <span
+                      className={`text-xs font-semibold ${
+                        offer.featured ? "text-slate-300" : "text-slate-500"
+                      }`}
+                    >
+                      /mês
+                    </span>
+                  </p>
+                  <p
+                    className={`mt-2 text-sm leading-6 ${
+                      offer.featured ? "text-slate-300" : "text-slate-600"
+                    }`}
+                  >
+                    {offer.description}
+                  </p>
+                </article>
+              ))}
+            </div>
+            <p className="mt-6 rounded-2xl bg-white px-5 py-4 text-sm font-bold leading-6 text-slate-700">
+              CorePet Mix Completo: R$ {mixedPlanCompleteOffer.price}/mês — Pet Venda Ativa, Vet
+              Completo e B&amp;T Completo na mesma operação.
+            </p>
           </section>
         )}
       </section>

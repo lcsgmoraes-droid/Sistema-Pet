@@ -199,6 +199,69 @@ export const publicPlans = {
   ],
 };
 
+function priceToCents(price) {
+  return Number.parseInt(price.replace(/\D/g, ""), 10);
+}
+
+function formatPriceFromCents(priceCents) {
+  return (priceCents / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function createMixedPlanOffer({ id, name, planIds, description, featured = false }) {
+  const plans = planIds.map((planId) => findPublicPlan(planId));
+  const priceCents = plans.reduce((total, plan) => total + priceToCents(plan.price), 0);
+
+  return {
+    id,
+    name,
+    description,
+    planIds,
+    planNames: plans.map((plan) => plan.name),
+    price: formatPriceFromCents(priceCents),
+    priceCents,
+    featured,
+  };
+}
+
+export const mixedPlanStartingOffers = [
+  createMixedPlanOffer({
+    id: "pet-grooming-start",
+    name: "Loja + Banho & Tosa",
+    planIds: ["pet-start", "grooming-start"],
+    description: "PDV e estoque da loja com agenda e rotina de serviços.",
+  }),
+  createMixedPlanOffer({
+    id: "pet-vet-start",
+    name: "Loja + Veterinário",
+    planIds: ["pet-start", "vet-start"],
+    description: "Operação da loja com agenda e atendimento veterinário.",
+  }),
+  createMixedPlanOffer({
+    id: "vet-grooming-start",
+    name: "Veterinário + Banho & Tosa",
+    planIds: ["vet-start", "grooming-start"],
+    description: "Agenda clínica e serviços compartilhando clientes e pets.",
+  }),
+  createMixedPlanOffer({
+    id: "corepet-mix-start",
+    name: "CorePet Mix · 3 áreas",
+    planIds: ["pet-start", "vet-start", "grooming-start"],
+    description: "Loja, Veterinário e Banho & Tosa no mesmo ecossistema.",
+    featured: true,
+  }),
+];
+
+export const mixedPlanCompleteOffer = createMixedPlanOffer({
+  id: "corepet-mix-completo",
+  name: "CorePet Mix Completo",
+  planIds: ["pet-venda-ativa", "vet-completo", "grooming-completo"],
+  description:
+    "Os planos mais completos de Loja Pet, Veterinário e Banho & Tosa na mesma operação.",
+});
+
 export const planOrganizationTypes = {
   pet: "petshop",
   vet: "veterinary_clinic",
