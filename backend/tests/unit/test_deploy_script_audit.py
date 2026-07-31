@@ -3,6 +3,13 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 DEPLOY_SCRIPT = ROOT / "scripts" / "deploy_producao_seguro.sh"
+OPERATIONAL_WATCHDOG_DOCS = [
+    ROOT / "docs" / "COREPET_DOMINIO_GO_LIVE.md",
+    ROOT / "docs" / "GUIA_DEMO_VETERINARIO_CLINICA.md",
+    ROOT / "docs" / "PRODUCAO_DEPLOY_SSH.md",
+    ROOT / "docs" / "PRODUCAO_ROLLBACK_CHECKLIST.md",
+    ROOT / "docs" / "SEGURANCA_ROTACAO_SSH_SECRETS.md",
+]
 
 
 def _deploy_script_text() -> str:
@@ -52,7 +59,7 @@ def test_deploy_step_audit_does_not_suppress_failure_trap():
     assert "DEPLOY_EVENT_RECORDED=1" in script
 
 
-def test_deploy_script_keeps_manual_ops_audit_log_writable():
+def test_deploy_script_keeps_manual_ops_audit_log_restricted_to_backend_owner():
     script = _deploy_script_text()
 
     assert (
@@ -60,4 +67,13 @@ def test_deploy_script_keeps_manual_ops_audit_log_writable():
         in script
     )
     assert 'touch "$ops_command_audit_log_path"' in script
-    assert 'chmod 0666 "$ops_command_audit_log_path"' in script
+    assert 'chown 1000:1000 "$ops_command_audit_log_path"' in script
+    assert 'chmod 0660 "$ops_command_audit_log_path"' in script
+    assert 'chmod 0666 "$ops_command_audit_log_path"' not in script
+
+
+def test_operational_docs_use_the_public_watchdog_route():
+    for doc_path in OPERATIONAL_WATCHDOG_DOCS:
+        content = doc_path.read_text(encoding="utf-8")
+        assert "/api/health/watchdog" not in content, doc_path
+        assert "/health/watchdog" in content, doc_path

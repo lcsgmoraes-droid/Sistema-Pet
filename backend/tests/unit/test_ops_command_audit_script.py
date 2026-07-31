@@ -98,3 +98,51 @@ def test_ops_command_audit_requires_reason_before_running(tmp_path):
     assert result.returncode != 0
     assert not log_path.exists()
     assert "reason" in result.stderr.lower()
+
+
+def test_ops_command_audit_falls_back_to_backend_container(tmp_path):
+    app_dir = tmp_path / "app"
+    host_log_path = app_dir / "backend" / "logs" / "ops_command_events.jsonl"
+    container_log_path = tmp_path / "container-ops-command-events.jsonl"
+    fake_docker = tmp_path / "fake-docker"
+
+    app_dir.mkdir()
+    (app_dir / "docker-compose.prod.yml").write_text("services: {}\n", encoding="utf-8")
+    fake_docker.write_text(
+        '#!/usr/bin/env bash\nset -Eeuo pipefail\ncat >> "$FAKE_DOCKER_LOG_PATH"\n',
+        encoding="utf-8",
+    )
+    fake_docker.chmod(0o755)
+
+    env = os.environ.copy()
+    env["OPS_COMMAND_AUDIT_LOG_PATH"] = host_log_path.as_posix()
+    env["OPS_COMMAND_AUDIT_APP_DIR"] = app_dir.as_posix()
+    env["OPS_COMMAND_AUDIT_PYTHON"] = Path(sys.executable).as_posix()
+    env["OPS_COMMAND_AUDIT_DOCKER"] = fake_docker.as_posix()
+    env["OPS_COMMAND_AUDIT_FORCE_CONTAINER_APPEND"] = "1"
+    env["FAKE_DOCKER_LOG_PATH"] = container_log_path.as_posix()
+
+    result = subprocess.run(
+        [
+            str(BASH),
+            SCRIPT.as_posix(),
+            "--action",
+            "database.current",
+            "--reason",
+            "pytest-fallback",
+            "--",
+            "true",
+        ],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not host_log_path.exists()
+    events = _read_jsonl(container_log_path)
+    assert [event["status"] for event in events] == ["started", "success"]
+    assert {event["reason"] for event in events} == {"pytest-fallback"}
+    assert result.stderr.count("gravando pelo container backend") == 2

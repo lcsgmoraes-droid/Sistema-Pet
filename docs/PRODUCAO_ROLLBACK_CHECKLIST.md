@@ -14,7 +14,7 @@ Ele nao autoriza deploy. Qualquer comando no servidor de producao ou push direto
 - Servidor fallback: `root@192.241.150.121`
 - Projeto no servidor: `/opt/petshop`
 - Health publico: `https://mlprohub.com.br/api/health`
-- Watchdog publico: `https://mlprohub.com.br/api/health/watchdog`
+- Watchdog publico: `https://mlprohub.com.br/health/watchdog`
 
 ## Responsaveis e tempos alvo
 
@@ -69,7 +69,7 @@ Rodar estes checks e guardar o resultado:
 
 ```bash
 curl -fsS https://mlprohub.com.br/api/health
-curl -fsS https://mlprohub.com.br/api/health/watchdog
+curl -fsS https://mlprohub.com.br/health/watchdog
 ```
 
 ```bash
@@ -106,7 +106,7 @@ Validar:
 
 ```bash
 curl -fsS https://mlprohub.com.br/api/health
-curl -fsS https://mlprohub.com.br/api/health/watchdog
+curl -fsS https://mlprohub.com.br/health/watchdog
 ```
 
 ## Rollback de codigo backend
@@ -124,7 +124,7 @@ Depois validar:
 
 ```bash
 curl -fsS https://mlprohub.com.br/api/health
-curl -fsS https://mlprohub.com.br/api/health/watchdog
+curl -fsS https://mlprohub.com.br/health/watchdog
 ```
 
 ```bash
@@ -166,7 +166,7 @@ Depois do deploy ou rollback, registrar:
 ## Estado esperado no fim
 
 - `curl -fsS https://mlprohub.com.br/api/health` passa.
-- `curl -fsS https://mlprohub.com.br/api/health/watchdog` passa.
+- `curl -fsS https://mlprohub.com.br/health/watchdog` passa.
 - `docker compose -f docker-compose.prod.yml ps` mostra servicos principais saudaveis.
 - `git status --porcelain` no servidor fica vazio.
 - Evento de deploy ou falha fica registrado em `backend/logs/deploy_events.jsonl`.
