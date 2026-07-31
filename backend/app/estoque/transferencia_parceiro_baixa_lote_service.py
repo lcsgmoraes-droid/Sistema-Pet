@@ -439,6 +439,11 @@ def aplicar_baixa_lote_transferencia(
     payload,
 ) -> dict:
     modo_baixa = normalizar_modo_baixa_lote(payload.modo_baixa)
+    if modo_baixa == "recebimento" and not payload.forma_pagamento_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Selecione a forma de pagamento para registrar o recebimento.",
+        )
     nova_conta_pagar_acerto = getattr(payload, "nova_conta_pagar_acerto", None)
     if nova_conta_pagar_acerto and modo_baixa != "acerto":
         raise HTTPException(

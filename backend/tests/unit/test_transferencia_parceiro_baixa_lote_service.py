@@ -180,6 +180,7 @@ def test_criar_conta_pagar_acerto_lote_vincula_parceiro_e_valor_total():
 def test_nova_conta_pagar_acerto_so_pode_ser_usada_no_modo_acerto():
     payload = SimpleNamespace(
         modo_baixa="recebimento",
+        forma_pagamento_id=1,
         nova_conta_pagar_acerto=SimpleNamespace(valor=100),
         aplicacoes=[],
     )
@@ -194,6 +195,24 @@ def test_nova_conta_pagar_acerto_so_pode_ser_usada_no_modo_acerto():
 
     assert exc_info.value.status_code == 400
     assert "modo acerto" in exc_info.value.detail.lower()
+
+
+def test_recebimento_em_lote_exige_forma_pagamento():
+    payload = SimpleNamespace(
+        modo_baixa="recebimento",
+        forma_pagamento_id=None,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        aplicar_baixa_lote_transferencia(
+            _FakeSession(),
+            tenant_id="tenant-1",
+            user_id=99,
+            payload=payload,
+        )
+
+    assert exc_info.value.status_code == 400
+    assert "forma de pagamento" in exc_info.value.detail.lower()
 
 
 def test_acerto_lote_exige_compensacao_real():

@@ -268,6 +268,7 @@ export default function BaixaLoteTransferenciaPanel({
             Forma de pagamento
           </label>
           <select
+            required
             value={form.forma_pagamento_id}
             onChange={(event) =>
               setForm((prev) => ({ ...prev, forma_pagamento_id: event.target.value }))
@@ -275,7 +276,7 @@ export default function BaixaLoteTransferenciaPanel({
             className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
           >
             <option value="">
-              {loadingFormasPagamento ? "Carregando formas..." : "Sem forma especifica"}
+              {loadingFormasPagamento ? "Carregando formas..." : "Selecione a forma de pagamento"}
             </option>
             {formasPagamento.map((forma) => (
               <option key={forma.id} value={forma.id}>

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 import json
 from typing import Optional
@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.dre_plano_contas_models import DRECategoria, DRESubcategoria, NaturezaDRE
 from app.estoque.transferencia_parceiro_documents import _status_transferencia_parceiro
 from app.estoque.transferencia_parceiro_schemas import (
+    TransferenciaParceiroBaixaHistoricoItem,
     TransferenciaParceiroCompensacaoContaRequest,
     TransferenciaParceiroHistoricoMovItem,
     TransferenciaParceiroItemRequest,
@@ -501,6 +502,48 @@ def _detectar_modo_baixa_transferencia(
         return "acerto", _label_modo_baixa_transferencia("acerto")
 
     return "recebimento", _label_modo_baixa_transferencia("recebimento")
+
+
+def _listar_baixas_transferencia(
+    conta: ContaReceber,
+) -> list[TransferenciaParceiroBaixaHistoricoItem]:
+    recebimentos = sorted(
+        list(getattr(conta, "recebimentos", None) or []),
+        key=lambda item: (
+            item.data_recebimento or date.min,
+            getattr(item, "created_at", None) or datetime.min,
+            getattr(item, "id", 0) or 0,
+        ),
+        reverse=True,
+    )
+    historico: list[TransferenciaParceiroBaixaHistoricoItem] = []
+    for recebimento in recebimentos:
+        modo_baixa, modo_baixa_label = _detectar_modo_baixa_transferencia(
+            recebimento,
+            observacoes_conta=getattr(conta, "observacoes", None),
+        )
+        forma_pagamento = getattr(recebimento, "forma_pagamento", None)
+        registrado_em = getattr(recebimento, "created_at", None)
+        if registrado_em and registrado_em.tzinfo is None:
+            registrado_em = registrado_em.replace(tzinfo=timezone.utc)
+        historico.append(
+            TransferenciaParceiroBaixaHistoricoItem(
+                recebimento_id=int(recebimento.id),
+                valor_recebido=float(recebimento.valor_recebido or 0),
+                data_recebimento=recebimento.data_recebimento,
+                registrado_em=registrado_em,
+                modo_baixa=modo_baixa,
+                modo_baixa_label=modo_baixa_label,
+                forma_pagamento_id=getattr(
+                    recebimento, "forma_pagamento_id", None
+                ),
+                forma_pagamento_nome=_texto_limpo(
+                    getattr(forma_pagamento, "nome", None)
+                ),
+                observacoes=_texto_limpo(recebimento.observacoes),
+            )
+        )
+    return historico
 
 
 def _movimentacao_para_historico_item(

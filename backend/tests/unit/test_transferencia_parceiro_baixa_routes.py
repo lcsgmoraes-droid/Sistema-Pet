@@ -33,6 +33,30 @@ class _FakeSession:
         return None
 
 
+def test_recebimento_individual_exige_forma_pagamento(monkeypatch):
+    conta = SimpleNamespace(id=120, status="pendente")
+    monkeypatch.setattr(
+        routes, "_buscar_conta_transferencia_parceiro", lambda *_args: conta
+    )
+    payload = SimpleNamespace(
+        valor_recebido=10,
+        data_recebimento=date(2026, 7, 1),
+        modo_baixa="recebimento",
+        forma_pagamento_id=None,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        routes.registrar_recebimento_transferencia_parceiro.__wrapped__(
+            120,
+            payload,
+            db=_FakeSession(),
+            user_and_tenant=(SimpleNamespace(id=99), "tenant-1"),
+        )
+
+    assert exc_info.value.status_code == 400
+    assert "forma de pagamento" in exc_info.value.detail.lower()
+
+
 def test_acerto_individual_exige_compensacao_real(monkeypatch):
     conta = SimpleNamespace(
         id=123,

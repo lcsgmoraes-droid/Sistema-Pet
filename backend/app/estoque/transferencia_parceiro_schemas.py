@@ -117,6 +117,18 @@ class TransferenciaParceiroPdfConsolidadoRequest(BaseModel):
     mostrar_totais: bool = True
 
 
+class TransferenciaParceiroBaixaHistoricoItem(BaseModel):
+    recebimento_id: int
+    valor_recebido: float = 0
+    data_recebimento: Optional[date] = None
+    registrado_em: Optional[datetime] = None
+    modo_baixa: Optional[str] = None
+    modo_baixa_label: Optional[str] = None
+    forma_pagamento_id: Optional[int] = None
+    forma_pagamento_nome: Optional[str] = None
+    observacoes: Optional[str] = None
+
+
 class TransferenciaParceiroHistoricoItem(BaseModel):
     conta_receber_id: int
     documento: Optional[str] = None
@@ -137,6 +149,9 @@ class TransferenciaParceiroHistoricoItem(BaseModel):
     forma_pagamento_id: Optional[int] = None
     forma_pagamento_nome: Optional[str] = None
     observacoes: Optional[str] = None
+    baixas: List[TransferenciaParceiroBaixaHistoricoItem] = Field(
+        default_factory=list
+    )
     itens: List[TransferenciaParceiroHistoricoMovItem] = Field(default_factory=list)
 
 
