@@ -7,6 +7,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -100,6 +101,37 @@ class AppAccessProfile(BaseTenantModel):
             f"<AppAccessProfile(cliente_id={self.cliente_id}, "
             f"profile_type={self.profile_type}, tenant_id={self.tenant_id})>"
         )
+
+
+class PessoaMergeLog(BaseTenantModel):
+    """Auditoria estruturada de cada fusao de pessoas."""
+
+    __tablename__ = "pessoa_merge_logs"
+    __table_args__ = (
+        Index("ix_pessoa_merge_logs_tenant_principal", "tenant_id", "principal_id"),
+        Index("ix_pessoa_merge_logs_tenant_duplicado", "tenant_id", "duplicado_id"),
+    )
+
+    principal_id = Column(
+        Integer, ForeignKey("clientes.id"), nullable=False, index=True
+    )
+    duplicado_id = Column(
+        Integer, ForeignKey("clientes.id"), nullable=False, index=True
+    )
+    actor_user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    modo = Column(String(30), nullable=False, default="manual", server_default="manual")
+    motivo = Column(String(255), nullable=True)
+    status = Column(
+        String(30), nullable=False, default="concluida", server_default="concluida"
+    )
+    snapshot_antes = Column(JSON, nullable=False, default=dict)
+    resumo_transferencias = Column(JSON, nullable=False, default=dict)
+    observacao = Column(Text, nullable=True)
 
 
 class RolePermission(BaseTenantModel):

@@ -226,7 +226,7 @@ def _find_cliente_match(
 ) -> Cliente | None:
     linked_query = db.query(Cliente).filter(
         Cliente.tenant_id == tenant_id,
-        Cliente.user_id == user_id,
+        Cliente.auth_user_id == user_id,
     )
 
     base_query = db.query(Cliente).filter(Cliente.tenant_id == tenant_id)
@@ -362,7 +362,7 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
     tenant_id = _activate_user_tenant_context(user)
     clientes_vinculados = (
         db.query(Cliente)
-        .filter(Cliente.tenant_id == tenant_id, Cliente.user_id == user.id)
+        .filter(Cliente.tenant_id == tenant_id, Cliente.auth_user_id == user.id)
         .order_by(Cliente.id.asc())
         .all()
     )
@@ -371,23 +371,19 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
     cpf_usuario = getattr(user, "cpf_cnpj", None)
     email_usuario = (getattr(user, "email", None) or "").strip().lower()
     telefone_usuario = getattr(user, "telefone", None)
-    cliente_operacional = _find_operational_cliente_match(
-        db, tenant_id=tenant_id, user=user
-    )
-    if cliente_operacional:
-        cliente = cliente_operacional
-
     if clientes_vinculados:
-        if not cliente:
-            cliente = _select_preferred_cliente(
-                clientes_vinculados,
-                email=email_usuario,
-                cpf=cpf_usuario,
-                telefone=telefone_usuario,
-                prefer_operational=True,
-            )
+        cliente = _select_preferred_cliente(
+            clientes_vinculados,
+            email=email_usuario,
+            cpf=cpf_usuario,
+            telefone=telefone_usuario,
+            prefer_operational=True,
+        )
         if not cliente:
             cliente = _select_linked_cliente_fallback(clientes_vinculados)
+
+    if not cliente:
+        cliente = _find_operational_cliente_match(db, tenant_id=tenant_id, user=user)
 
     if not cliente:
         cliente = _find_cliente_match(
@@ -403,6 +399,7 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
         cliente = Cliente(
             tenant_id=tenant_id,
             user_id=user.id,
+            auth_user_id=user.id,
             nome=user.nome or user.email,
             email=user.email,
             telefone=user.telefone,
@@ -414,7 +411,7 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
         db.add(cliente)
         db.flush()
     else:
-        cliente.user_id = user.id
+        cliente.auth_user_id = user.id
         if getattr(cliente, "ativo", True) is False:
             cliente.ativo = True
         if not cliente.nome:

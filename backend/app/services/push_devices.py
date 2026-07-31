@@ -99,7 +99,7 @@ def load_customer_push_targets(
     if not cliente:
         return _legacy_target(legacy_push_token)
 
-    user_id = getattr(cliente, "user_id", None)
+    user_id = getattr(cliente, "auth_user_id", None)
     cliente_email = _clean_token(getattr(cliente, "email", None)).lower()
     email_user = None
     if cliente_email:

@@ -208,7 +208,7 @@ def notify_sale_order_event(
     return notify_order_event(
         db,
         tenant_id=tenant_id,
-        user_id=getattr(cliente, "user_id", None),
+        user_id=getattr(cliente, "auth_user_id", None),
         event=event,
         pedido_id=pedido_id,
         venda_id=getattr(venda, "id", None),

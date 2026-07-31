@@ -27,10 +27,11 @@ from app.clientes.schemas import (
     ClienteUpdate,
 )
 from app.db import get_session
-from app.models import Cliente
+from app.models import AppAccessProfile, Cliente, Role, User, UserTenant
 from app.partner_utils import get_all_accessible_tenant_ids
 from app.security.permissions_decorator import require_permission
 from app.services.cliente_alertas_pdv import normalizar_alertas_pdv
+from app.services.app_access_profile_service import sync_cliente_app_access_profiles
 from app.utils.tenant_safe_sql import execute_tenant_safe
 
 logger = logging.getLogger(__name__)
@@ -56,18 +57,39 @@ def create_cliente(
     codigo = gerar_codigo_cliente(
         db, cliente_data.tipo_cadastro, cliente_data.tipo_pessoa, tenant_id
     )
+    dados_payload = cliente_data.model_dump()
+    auth_user_id = dados_payload.pop("auth_user_id", None)
+    app_access_profiles = dados_payload.pop("app_access_profiles", [])
+    _normalizar_campos_identidade(dados_payload)
     dados_cliente = _preparar_dados_cliente(
-        cliente_data.model_dump(),
+        dados_payload,
         serializar_lista_vazia=False,
     )
     _garantir_entregador_padrao_unico_criacao(db, dados_cliente, tenant_id)
 
     novo_cliente = Cliente(
-        user_id=current_user.id, tenant_id=tenant_id, codigo=codigo, **dados_cliente
+        user_id=current_user.id,
+        auth_user_id=_validar_conta_app(
+            db,
+            tenant_id=tenant_id,
+            auth_user_id=auth_user_id,
+        ),
+        tenant_id=tenant_id,
+        codigo=codigo,
+        **dados_cliente,
     )
 
     db.add(novo_cliente)
     try:
+        db.flush()
+        sync_cliente_app_access_profiles(
+            db,
+            tenant_id=tenant_id,
+            cliente=novo_cliente,
+            profile_types=app_access_profiles,
+            granted_by_user_id=current_user.id,
+            linked_user_id=novo_cliente.auth_user_id,
+        )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -82,6 +104,71 @@ def create_cliente(
     )
     _anexar_metadados_criacao_cliente(db, novo_cliente)
     return novo_cliente
+
+
+@base_router.get("/acessos-app/usuarios")
+@require_permission("clientes.editar")
+def listar_usuarios_para_acesso_app(
+    cliente_id: Optional[int] = None,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    """Lista contas do tenant que podem ser vinculadas a uma pessoa no app."""
+    _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    rows = (
+        db.query(User, UserTenant, Role)
+        .join(
+            UserTenant,
+            (UserTenant.user_id == User.id) & (UserTenant.tenant_id == tenant_id),
+        )
+        .join(Role, Role.id == UserTenant.role_id)
+        .filter(
+            User.tenant_id == tenant_id,
+            Role.tenant_id == tenant_id,
+            User.is_active.is_(True),
+            UserTenant.is_active.is_(True),
+        )
+        .order_by(User.nome.asc().nullslast(), User.email.asc())
+        .all()
+    )
+    usuarios: dict[int, dict] = {}
+    for user, _vinculo, role in rows:
+        item = usuarios.setdefault(
+            user.id,
+            {
+                "user_id": user.id,
+                "nome": user.nome,
+                "email": user.email,
+                "perfis_sistema": [],
+            },
+        )
+        if role.name not in item["perfis_sistema"]:
+            item["perfis_sistema"].append(role.name)
+    vinculados = {
+        pessoa.auth_user_id: pessoa
+        for pessoa in db.query(Cliente)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.auth_user_id.is_not(None),
+            Cliente.ativo.is_not(False),
+        )
+        .all()
+    }
+    return [
+        {
+            **item,
+            "perfil_sistema": ", ".join(item["perfis_sistema"]),
+            "disponivel": (
+                item["user_id"] not in vinculados
+                or int(vinculados[item["user_id"]].id) == int(cliente_id or 0)
+            ),
+            "pessoa_vinculada_id": getattr(vinculados.get(item["user_id"]), "id", None),
+            "pessoa_vinculada_nome": getattr(
+                vinculados.get(item["user_id"]), "nome", None
+            ),
+        }
+        for item in usuarios.values()
+    ]
 
 
 @base_router.get("/", response_model=ClientesListResponse)
@@ -153,8 +240,14 @@ def update_cliente(
     _validar_telefone_cliente_obrigatorio(cliente_data, cliente)
     _validar_documentos_unicos_update(db, cliente, cliente_data, cliente_id, tenant_id)
 
+    dados_payload = cliente_data.model_dump(exclude_unset=True)
+    auth_user_informado = "auth_user_id" in dados_payload
+    perfis_informados = "app_access_profiles" in dados_payload
+    auth_user_id = dados_payload.pop("auth_user_id", None)
+    app_access_profiles = dados_payload.pop("app_access_profiles", None)
+    _normalizar_campos_identidade(dados_payload)
     update_data = _preparar_dados_cliente(
-        cliente_data.model_dump(exclude_unset=True),
+        dados_payload,
         serializar_lista_vazia=True,
     )
     _garantir_entregador_padrao_unico_update(db, update_data, cliente_id, tenant_id)
@@ -170,6 +263,35 @@ def update_cliente(
     old_data = {field: getattr(cliente, field) for field in update_data.keys()}
     for field, value in update_data.items():
         setattr(cliente, field, value)
+
+    if auth_user_informado:
+        cliente.auth_user_id = _validar_conta_app(
+            db,
+            tenant_id=tenant_id,
+            auth_user_id=auth_user_id,
+            cliente_id=cliente.id,
+        )
+    if perfis_informados or auth_user_informado:
+        perfis_para_sincronizar = app_access_profiles
+        if not perfis_informados:
+            perfis_para_sincronizar = [
+                perfil.profile_type
+                for perfil in db.query(AppAccessProfile)
+                .filter(
+                    AppAccessProfile.tenant_id == tenant_id,
+                    AppAccessProfile.cliente_id == cliente.id,
+                    AppAccessProfile.is_active.is_(True),
+                )
+                .all()
+            ]
+        sync_cliente_app_access_profiles(
+            db,
+            tenant_id=tenant_id,
+            cliente=cliente,
+            profile_types=perfis_para_sincronizar or [],
+            granted_by_user_id=current_user.id,
+            linked_user_id=cliente.auth_user_id,
+        )
 
     if cliente.ativo and not cliente.codigo:
         cliente.codigo = gerar_codigo_cliente(
@@ -195,6 +317,53 @@ def update_cliente(
             f"parceiro. Total desativado: {comissoes_desativadas_count}"
         )
     return response
+
+
+def _validar_conta_app(
+    db: Session,
+    *,
+    tenant_id,
+    auth_user_id: int | None,
+    cliente_id: int | None = None,
+) -> int | None:
+    if auth_user_id is None:
+        return None
+
+    vinculo = (
+        db.query(UserTenant)
+        .join(User, User.id == UserTenant.user_id)
+        .filter(
+            UserTenant.tenant_id == tenant_id,
+            UserTenant.user_id == auth_user_id,
+            UserTenant.is_active.is_(True),
+            User.tenant_id == tenant_id,
+            User.is_active.is_(True),
+        )
+        .first()
+    )
+    if not vinculo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Conta de acesso invalida ou inativa para esta loja.",
+        )
+
+    query = db.query(Cliente).filter(
+        Cliente.tenant_id == tenant_id,
+        Cliente.auth_user_id == auth_user_id,
+        Cliente.ativo.is_not(False),
+    )
+    if cliente_id is not None:
+        query = query.filter(Cliente.id != cliente_id)
+    ja_vinculada = query.first()
+    if ja_vinculada:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Esta conta ja esta vinculada a outra pessoa ativa: "
+                f"{ja_vinculada.nome} (codigo {ja_vinculada.codigo or '-'})."
+            ),
+        )
+    return auth_user_id
 
 
 @detail_router.delete("/{cliente_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -257,22 +426,6 @@ def _validar_documentos_unicos_criacao(
             valor=cliente_data.crmv,
             detail="Já existe um veterinário cadastrado com este CRMV",
         )
-    if cliente_data.celular:
-        _validar_campo_unico(
-            db,
-            tenant_id=tenant_id,
-            campo=Cliente.celular,
-            valor=cliente_data.celular,
-            detail="Já existe um cadastro com este celular",
-        )
-    if cliente_data.telefone:
-        _validar_campo_unico(
-            db,
-            tenant_id=tenant_id,
-            campo=Cliente.telefone,
-            valor=cliente_data.telefone,
-            detail="Já existe um cliente cadastrado com este telefone",
-        )
 
 
 def _validar_documentos_unicos_update(
@@ -301,18 +454,6 @@ def _validar_documentos_unicos_update(
             Cliente.crmv,
             "Já existe um veterinário cadastrado com este CRMV",
         ),
-        (
-            cliente_data.celular,
-            cliente.celular,
-            Cliente.celular,
-            "Já existe um cliente cadastrado com este celular",
-        ),
-        (
-            cliente_data.telefone,
-            cliente.telefone,
-            Cliente.telefone,
-            "Já existe um cliente cadastrado com este telefone",
-        ),
     ]
     for novo_valor, valor_atual, campo, detail in checks:
         if novo_valor and novo_valor != valor_atual:
@@ -335,10 +476,35 @@ def _validar_campo_unico(
     detail: str,
     cliente_id_excluir: int | None = None,
 ) -> None:
+    campo_nome = getattr(campo, "key", "")
+    valor_normalizado = str(valor or "").strip()
+    expressao = campo == valor_normalizado
+    if campo_nome in {"cpf", "cnpj"}:
+        valor_normalizado = "".join(ch for ch in valor_normalizado if ch.isdigit())
+        expressao = _somente_digitos_coluna(campo) == valor_normalizado
+    elif campo_nome == "crmv":
+        valor_normalizado = "".join(
+            ch for ch in valor_normalizado.casefold() if ch.isalnum()
+        )
+        expressao = (
+            func.lower(
+                func.replace(
+                    func.replace(
+                        func.replace(func.replace(campo, "-", ""), "/", ""),
+                        ".",
+                        "",
+                    ),
+                    " ",
+                    "",
+                )
+            )
+            == valor_normalizado
+        )
+
     query = db.query(Cliente).filter(
         Cliente.tenant_id == tenant_id,
-        campo == valor,
-        Cliente.ativo,
+        expressao,
+        Cliente.ativo.is_not(False),
     )
     if cliente_id_excluir is not None:
         query = query.filter(Cliente.id != cliente_id_excluir)
@@ -360,6 +526,19 @@ def _preparar_dados_cliente(
             dados_cliente["enderecos_adicionais"]
         )
     return dados_cliente
+
+
+def _normalizar_campos_identidade(dados_cliente: dict) -> None:
+    """Grava identificadores em formato estavel para prevenir novas duplicidades."""
+    for campo in ("cpf", "cnpj", "telefone", "celular", "cep"):
+        if campo in dados_cliente and dados_cliente[campo] is not None:
+            dados_cliente[campo] = (
+                "".join(ch for ch in str(dados_cliente[campo]) if ch.isdigit()) or None
+            )
+    if "email" in dados_cliente and dados_cliente["email"] is not None:
+        dados_cliente["email"] = str(dados_cliente["email"]).strip().casefold() or None
+    if "crmv" in dados_cliente and dados_cliente["crmv"] is not None:
+        dados_cliente["crmv"] = str(dados_cliente["crmv"]).strip().upper() or None
 
 
 def _garantir_entregador_padrao_unico_criacao(
@@ -607,6 +786,10 @@ def _montar_resposta_update(cliente: Cliente) -> dict:
         "criado_por_id": getattr(cliente, "criado_por_id", None),
         "criado_por_nome": getattr(cliente, "criado_por_nome", None),
         "criado_por_email": getattr(cliente, "criado_por_email", None),
+        "auth_user_id": getattr(cliente, "auth_user_id", None),
+        "auth_user_nome": getattr(cliente, "auth_user_nome", None),
+        "auth_user_email": getattr(cliente, "auth_user_email", None),
+        "app_access_profiles": getattr(cliente, "app_access_profiles", []),
     }
 
 

@@ -397,7 +397,7 @@ def _resolver_cliente_venda(db, pedido: Pedido):
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == pedido.tenant_id,
-            Cliente.user_id == pedido.cliente_id,
+            Cliente.auth_user_id == pedido.cliente_id,
         )
         .first()
     )

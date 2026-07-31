@@ -18,7 +18,13 @@ def _clean_text(value: Any) -> str:
 
 
 def resolve_customer_app_user_id(db: Session, *, tenant_id, cliente) -> int | None:
-    """Resolve o usuario do app para um cliente, preferindo o e-mail do cadastro."""
+    """Resolve somente a conta explicitamente ligada a pessoa no app."""
+    linked_user_id = getattr(cliente, "auth_user_id", None)
+    if linked_user_id:
+        return int(linked_user_id)
+
+    # Compatibilidade durante a migracao: email identico ainda pode resolver a
+    # conta, mas o antigo criador do cadastro nunca recebe notificacao do cliente.
     cliente_email = _clean_text(getattr(cliente, "email", None)).lower()
     if cliente_email:
         try:
@@ -39,8 +45,7 @@ def resolve_customer_app_user_id(db: Session, *, tenant_id, cliente) -> int | No
                 getattr(cliente, "id", None),
             )
 
-    user_id = getattr(cliente, "user_id", None)
-    return int(user_id) if user_id else None
+    return None
 
 
 def criar_notificacao_app(

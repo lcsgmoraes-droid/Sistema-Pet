@@ -4,7 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Cliente, User
+from app.models import AppAccessProfile, Cliente, User
 
 
 def _somente_digitos_coluna(coluna):
@@ -14,20 +14,24 @@ def _somente_digitos_coluna(coluna):
             func.replace(
                 func.replace(
                     func.replace(
-                        func.replace(func.coalesce(coluna, ""), "(", ""),
-                        ")",
+                        func.replace(
+                            func.replace(func.coalesce(coluna, ""), "(", ""),
+                            ")",
+                            "",
+                        ),
+                        "-",
                         "",
                     ),
-                    "-",
+                    " ",
                     "",
                 ),
-                " ",
+                "+",
                 "",
             ),
-            "+",
+            ".",
             "",
         ),
-        ".",
+        "/",
         "",
     )
 
@@ -92,6 +96,37 @@ def _anexar_metadados_criacao_cliente(db: Session, clientes):
             for usuario in db.query(User).filter(User.id.in_(user_ids)).all()
         }
 
+    auth_user_ids = {
+        cliente.auth_user_id
+        for cliente in lista
+        if getattr(cliente, "auth_user_id", None)
+    }
+    usuarios_app_por_id = {}
+    if auth_user_ids:
+        usuarios_app_por_id = {
+            usuario.id: usuario
+            for usuario in db.query(User).filter(User.id.in_(auth_user_ids)).all()
+        }
+
+    cliente_ids = [cliente.id for cliente in lista if getattr(cliente, "id", None)]
+    perfis_por_cliente: dict[int, list[str]] = {
+        cliente_id: [] for cliente_id in cliente_ids
+    }
+    if cliente_ids:
+        perfis = (
+            db.query(AppAccessProfile)
+            .filter(
+                AppAccessProfile.cliente_id.in_(cliente_ids),
+                AppAccessProfile.is_active.is_(True),
+            )
+            .order_by(AppAccessProfile.id.asc())
+            .all()
+        )
+        for perfil in perfis:
+            perfis_por_cliente.setdefault(perfil.cliente_id, []).append(
+                perfil.profile_type
+            )
+
     for cliente in lista:
         criado_por_id = getattr(cliente, "user_id", None)
         usuario = usuarios_por_id.get(criado_por_id)
@@ -107,6 +142,22 @@ def _anexar_metadados_criacao_cliente(db: Session, clientes):
             cliente,
             "criado_por_email",
             getattr(usuario, "email", None) if usuario else None,
+        )
+        auth_user = usuarios_app_por_id.get(getattr(cliente, "auth_user_id", None))
+        setattr(
+            cliente,
+            "auth_user_nome",
+            getattr(auth_user, "nome", None) if auth_user else None,
+        )
+        setattr(
+            cliente,
+            "auth_user_email",
+            getattr(auth_user, "email", None) if auth_user else None,
+        )
+        setattr(
+            cliente,
+            "app_access_profiles",
+            perfis_por_cliente.get(getattr(cliente, "id", None), []),
         )
     return clientes
 
