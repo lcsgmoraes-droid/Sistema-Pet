@@ -15,9 +15,12 @@ from app.comissoes_avancadas_models import (
     ResumoComFiltros,
 )
 from app.db import SessionLocal
+from app.security.permissions_decorator import require_permission_dependency
 from app.utils.tenant_safe_sql import execute_tenant_safe
 
-router = APIRouter()
+router = APIRouter(
+    dependencies=[Depends(require_permission_dependency("comissoes.fechamentos"))]
+)
 
 
 @router.get(
@@ -117,7 +120,7 @@ def conferencia_com_filtros_avancados(
                 LEFT JOIN vendas v ON ci.venda_id = v.id AND v.tenant_id = ci.tenant_id
                 WHERE ci.{tenant_filter}
                   AND ci.funcionario_id = :funcionario_id
-                  AND ci.status = 'pendente'
+                  AND ci.status IN ('pendente', 'fechada')
             """
 
             params = {"funcionario_id": funcionario_id}

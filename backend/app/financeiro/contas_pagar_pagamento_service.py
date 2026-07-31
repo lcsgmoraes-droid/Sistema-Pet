@@ -20,6 +20,7 @@ from app.financeiro_models import (
     MovimentacaoFinanceira,
     Pagamento,
 )
+from app.utils.tenant_safe_sql import execute_tenant_safe
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +151,7 @@ def _sincronizar_recorrencia_pos_pagamento(
                 valor=conta_recorrente.valor_original,
                 data_lancamento=conta_recorrente.data_vencimento,
                 tipo_movimentacao="DESPESA",
+                commit=False,
             )
         except Exception as exc:
             logger.warning(
@@ -158,6 +160,69 @@ def _sincronizar_recorrencia_pos_pagamento(
                 exc,
             )
     return len(contas_recorrentes)
+
+
+def _sincronizar_comissao_vinculada(
+    db: Session,
+    *,
+    tenant_id: str,
+    conta: ContaPagar,
+    data_pagamento: date,
+    forma_pagamento_id: int | None,
+    observacoes: str | None,
+) -> None:
+    """Mantém a comissão alinhada quando sua conta a pagar recebe uma baixa."""
+    forma_nome = None
+    if forma_pagamento_id:
+        forma_nome = (
+            db.query(FormaPagamento.nome)
+            .filter(
+                FormaPagamento.id == forma_pagamento_id,
+                FormaPagamento.tenant_id == tenant_id,
+            )
+            .scalar()
+        )
+
+    valor_pago = _decimal_monetario(conta.valor_pago)
+    conta_paga = conta.status == "pago"
+    execute_tenant_safe(
+        db,
+        """
+        UPDATE comissoes_itens
+        SET status = CASE
+                WHEN :conta_paga OR valor_comissao_gerada <= :valor_pago THEN 'pago'
+                ELSE 'fechada'
+            END,
+            data_fechamento = COALESCE(data_fechamento, :data_pagamento),
+            data_pagamento = :data_pagamento,
+            forma_pagamento = COALESCE(:forma_pagamento, forma_pagamento),
+            valor_pago = CASE
+                WHEN :conta_paga THEN valor_comissao_gerada
+                WHEN valor_comissao_gerada < :valor_pago THEN valor_comissao_gerada
+                ELSE :valor_pago
+            END,
+            saldo_restante = CASE
+                WHEN :conta_paga THEN 0
+                WHEN valor_comissao_gerada > :valor_pago
+                    THEN valor_comissao_gerada - :valor_pago
+                ELSE 0
+            END,
+            observacao_pagamento = COALESCE(:observacoes, observacao_pagamento),
+            data_atualizacao = CURRENT_TIMESTAMP
+        WHERE conta_pagar_id = :conta_pagar_id
+          AND status <> 'estornado'
+          AND {tenant_filter}
+        """,
+        {
+            "conta_paga": conta_paga,
+            "data_pagamento": data_pagamento,
+            "forma_pagamento": forma_nome,
+            "valor_pago": valor_pago,
+            "observacoes": observacoes,
+            "conta_pagar_id": conta.id,
+        },
+        tenant_id=tenant_id,
+    )
 
 
 def aplicar_pagamento_conta_pagar(
@@ -221,6 +286,15 @@ def aplicar_pagamento_conta_pagar(
     conta.status = "pago" if conta.valor_pago >= conta.valor_final else "parcial"
     if conta.status == "pago":
         conta.data_pagamento = data_pagamento
+
+    _sincronizar_comissao_vinculada(
+        db,
+        tenant_id=tenant_id,
+        conta=conta,
+        data_pagamento=data_pagamento,
+        forma_pagamento_id=forma_pagamento_validada_id,
+        observacoes=observacoes,
+    )
 
     db.add(
         Pagamento(

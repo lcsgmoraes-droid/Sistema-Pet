@@ -1,6 +1,6 @@
 """
 Rotas de Acerto Financeiro de Parceiros
-Consolidação periódica automática de comissões com compensação de dívidas e notificação
+Consolidação periódica de comissões provisionadas e notificação
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -126,7 +126,7 @@ def gerar_acerto(
     1. Valida parceiro ativo
     2. Calcula período baseado em configuração
     3. Busca TODAS comissões pendentes (status != 'pago')
-    4. Fecha cada comissão com compensação automática
+    4. Fecha as comissões provisionadas sem registrar pagamento
     5. Cria registro consolidado em acertos_parceiro
     6. Envia email de notificação (se configurado)
 
@@ -187,7 +187,10 @@ def gerar_acerto(
                     # Atualizar registro de acerto
                     acerto = (
                         db.query(AcertoParceiro)
-                        .filter(AcertoParceiro.id == resultado["acerto_id"])
+                        .filter(
+                            AcertoParceiro.id == resultado["acerto_id"],
+                            AcertoParceiro.tenant_id == tenant_id,
+                        )
                         .first()
                     )
 
@@ -207,7 +210,10 @@ def gerar_acerto(
                     # Registrar erro no acerto
                     acerto = (
                         db.query(AcertoParceiro)
-                        .filter(AcertoParceiro.id == resultado["acerto_id"])
+                        .filter(
+                            AcertoParceiro.id == resultado["acerto_id"],
+                            AcertoParceiro.tenant_id == tenant_id,
+                        )
                         .first()
                     )
 
@@ -227,8 +233,10 @@ def gerar_acerto(
         )
 
     except ValueError as e:
+        db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        db.rollback()
         logger.info(f"❌ Erro ao gerar acerto: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao gerar acerto: {str(e)}")
 

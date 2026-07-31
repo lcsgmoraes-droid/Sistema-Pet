@@ -1,11 +1,34 @@
 from functools import wraps
-from fastapi import HTTPException, status
+from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
 import asyncio
 from uuid import UUID
 
 from app.security.permissions_service import check_permission
 from app.tenancy.context import set_current_tenant
+
+
+def require_permission_dependency(permission: str):
+    """Cria uma dependencia FastAPI reutilizavel para proteger um router inteiro."""
+
+    from app.auth.dependencies import get_current_user_and_tenant
+    from app.db import get_session
+
+    async def dependency(
+        db: Session = Depends(get_session),
+        user_and_tenant=Depends(get_current_user_and_tenant),
+    ):
+        current_user, tenant_id = user_and_tenant
+        set_current_tenant(tenant_id)
+        check_permission(
+            db,
+            current_user.id,
+            permission,
+            tenant_id,
+            current_user=current_user,
+        )
+
+    return dependency
 
 
 def require_permission(permission: str):

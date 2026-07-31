@@ -34,6 +34,7 @@ from app.comissoes_demonstrativo_historico_routes import (
     router as historico_router,
 )
 from app.db import SessionLocal, get_session
+from app.security.permissions_decorator import require_permission_dependency
 from app.utils.tenant_safe_sql import execute_tenant_safe
 
 from app.utils.logger import StructuredLogger
@@ -65,6 +66,7 @@ __all__ = [
 
 @router.get("", summary="Listar comissões (histórico)")
 async def listar_comissoes(
+    _permission=Depends(require_permission_dependency("comissoes.demonstrativo")),
     funcionario_id: Optional[int] = Query(None, description="Filtrar por funcionário"),
     data_inicio: Optional[date] = Query(None, description="Data inicial (YYYY-MM-DD)"),
     data_fim: Optional[date] = Query(None, description="Data final (YYYY-MM-DD)"),
@@ -125,7 +127,9 @@ async def listar_comissoes(
                 ci.data_estorno,
                 ci.motivo_estorno,
                 ci.tipo_calculo,
-                ci.quantidade
+                ci.quantidade,
+                ci.valor_pago,
+                ci.saldo_restante
             FROM comissoes_itens ci
             INNER JOIN vendas v ON v.id = ci.venda_id AND v.tenant_id = ci.tenant_id
             WHERE ci.{tenant_filter}
@@ -180,6 +184,8 @@ async def listar_comissoes(
                     "motivo_estorno": row[12],
                     "tipo_calculo": row[13],
                     "quantidade": decimal_to_float(row[14]),
+                    "valor_pago": decimal_to_float(row[15]),
+                    "saldo_restante": decimal_to_float(row[16]),
                 }
             )
 
@@ -207,7 +213,8 @@ async def listar_comissoes(
 
 @router.get("/resumo", summary="Resumo financeiro de comissões")
 async def resumo_comissoes(
-    funcionario_id: int = Query(..., description="ID do funcionário (obrigatório)"),
+    _permission=Depends(require_permission_dependency("comissoes.demonstrativo")),
+    funcionario_id: Optional[int] = Query(None, description="ID do funcionário"),
     data_inicio: Optional[date] = Query(None, description="Data inicial (YYYY-MM-DD)"),
     data_fim: Optional[date] = Query(None, description="Data final (YYYY-MM-DD)"),
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -246,8 +253,12 @@ async def resumo_comissoes(
         db = SessionLocal()
 
         # Query base para filtros de data
-        where_clause = "WHERE funcionario_id = :funcionario_id AND {tenant_filter}"
-        params = {"funcionario_id": funcionario_id}
+        where_clause = "WHERE {tenant_filter}"
+        params = {}
+
+        if funcionario_id is not None:
+            where_clause += " AND funcionario_id = :funcionario_id"
+            params["funcionario_id"] = funcionario_id
 
         if data_inicio:
             where_clause += " AND data_venda >= :data_inicio"
@@ -273,9 +284,15 @@ async def resumo_comissoes(
         result = execute_tenant_safe(
             db,
             f"""
-            SELECT COALESCE(SUM(valor_comissao_gerada), 0) as total
+            SELECT COALESCE(SUM(
+                CASE
+                    WHEN status = 'pago' THEN valor_comissao_gerada
+                    WHEN status = 'fechada' THEN COALESCE(valor_pago, 0)
+                    ELSE 0
+                END
+            ), 0) as total
             FROM comissoes_itens
-            {where_clause} AND status = 'pago'
+            {where_clause}
         """,
             params,
         )
@@ -285,9 +302,18 @@ async def resumo_comissoes(
         result = execute_tenant_safe(
             db,
             f"""
-            SELECT COALESCE(SUM(valor_comissao_gerada), 0) as total
+            SELECT COALESCE(SUM(
+                CASE
+                    WHEN status IN ('pendente', 'fechada') THEN
+                        COALESCE(
+                            saldo_restante,
+                            valor_comissao_gerada - COALESCE(valor_pago, 0)
+                        )
+                    ELSE 0
+                END
+            ), 0) as total
             FROM comissoes_itens
-            {where_clause} AND status = 'pendente'
+            {where_clause}
         """,
             params,
         )
@@ -352,7 +378,10 @@ async def resumo_comissoes(
 
 
 @router.get("/abertas", summary="Listar funcionários com comissões pendentes")
-def listar_comissoes_abertas(user_and_tenant=Depends(get_current_user_and_tenant)):
+def listar_comissoes_abertas(
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    _permission=Depends(require_permission_dependency("comissoes.abertas")),
+):
     """
     SPRINT 6 - PASSO 1/5: COMISSÕES EM ABERTO
 
@@ -393,12 +422,18 @@ def listar_comissoes_abertas(user_and_tenant=Depends(get_current_user_and_tenant
                 SELECT 
                     ci.funcionario_id,
                     c.nome as nome_funcionario,
-                    SUM(ci.valor_comissao_gerada) as total_pendente,
+                    SUM(
+                        COALESCE(
+                            ci.saldo_restante,
+                            ci.valor_comissao_gerada - COALESCE(ci.valor_pago, 0)
+                        )
+                    ) as total_pendente,
                     COUNT(ci.id) as quantidade_comissoes,
                     MAX(ci.data_venda) as data_ultima_venda
                 FROM comissoes_itens ci
                 LEFT JOIN clientes c ON ci.funcionario_id = c.id AND c.{tenant_filter}
-                WHERE ci.{tenant_filter} AND ci.status = 'pendente'
+                WHERE ci.{tenant_filter}
+                  AND ci.status IN ('pendente', 'fechada')
                 GROUP BY ci.funcionario_id, c.nome
                 ORDER BY total_pendente DESC
             """
@@ -449,6 +484,7 @@ def listar_comissoes_abertas(user_and_tenant=Depends(get_current_user_and_tenant
 )
 def listar_comissoes_funcionario_para_fechamento(
     funcionario_id: int,
+    _permission=Depends(require_permission_dependency("comissoes.fechamentos")),
     data_inicio: Optional[date] = Query(None, description="Data inicial do filtro"),
     data_fim: Optional[date] = Query(None, description="Data final do filtro"),
     _user_and_tenant=Depends(get_current_user_and_tenant),
@@ -618,6 +654,7 @@ def listar_comissoes_funcionario_para_fechamento(
 )
 async def detalhe_comissao(
     comissao_id: int,
+    _permission=Depends(require_permission_dependency("comissoes.demonstrativo")),
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ) -> Dict[str, Any]:
@@ -713,7 +750,17 @@ async def detalhe_comissao(
             FROM comissoes_itens ci
             INNER JOIN vendas v ON v.id = ci.venda_id AND v.tenant_id = ci.tenant_id
             LEFT JOIN venda_itens vi ON vi.id = ci.venda_item_id AND vi.tenant_id = ci.tenant_id
-            LEFT JOIN venda_pagamentos vp ON vp.venda_id = v.id AND vp.tenant_id = ci.tenant_id
+            LEFT JOIN (
+                SELECT
+                    vp.*,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY vp.venda_id, vp.tenant_id
+                        ORDER BY vp.id
+                    ) AS parcela_ordem
+                FROM venda_pagamentos vp
+            ) vp ON vp.venda_id = v.id
+                AND vp.tenant_id = ci.tenant_id
+                AND vp.parcela_ordem = COALESCE(ci.parcela_numero, 1)
             LEFT JOIN formas_pagamento fp ON fp.nome = vp.forma_pagamento AND fp.tenant_id = ci.tenant_id
             WHERE ci.{tenant_filter}
             AND ci.id = :comissao_id

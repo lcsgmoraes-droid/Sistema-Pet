@@ -45,10 +45,15 @@ class FecharComissaoComPagamento(BaseModel):
     """Modelo para fechar comissão com pagamento parcial"""
 
     comissoes_ids: List[int] = Field(..., description="IDs das comissões a fechar")
-    valor_pago: Decimal = Field(..., description="Valor a ser pago (pode ser parcial)")
+    valor_pago: Decimal = Field(
+        ..., gt=0, description="Valor a ser pago (pode ser parcial)"
+    )
     forma_pagamento: str = Field(
         "nao_informado",
         description="Forma de pagamento: dinheiro, transferencia, cheque, cartao_credito, pix",
+    )
+    conta_bancaria_id: int = Field(
+        ..., gt=0, description="Conta bancária debitada no pagamento"
     )
     data_pagamento: date = Field(..., description="Data do pagamento (YYYY-MM-DD)")
     observacoes: Optional[str] = Field(
@@ -61,6 +66,7 @@ class FecharComissaoComPagamento(BaseModel):
                 "comissoes_ids": [1, 2, 3],
                 "valor_pago": "100.50",
                 "forma_pagamento": "transferencia",
+                "conta_bancaria_id": 1,
                 "data_pagamento": "2026-01-22",
                 "observacoes": "Pagamento parcial - saldo em 30 dias",
             }

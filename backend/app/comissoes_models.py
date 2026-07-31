@@ -19,6 +19,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 from app.base_models import TenantScoped
 from app.db import Base, SessionLocal
 from app.tenancy.context import get_current_tenant_id
@@ -550,26 +551,43 @@ class ComissoesConfigSistema:
     """Modelo para configurações globais do sistema de comissões"""
 
     @staticmethod
-    def get_config() -> Dict[str, Any]:
-        """Retorna as configurações globais do sistema"""
-        db = SessionLocal()
-        try:
-            result = execute_tenant_safe(
-                db,
-                "SELECT * FROM comissoes_configuracoes_sistema LIMIT 1",
-                {},
-                require_tenant=False,
-            )
-            config = result.fetchone()
-
-            if config:
-                return dict(config)
-            return {}
-        finally:
-            db.close()
+    def get_config(db: Session, tenant_id) -> Dict[str, Any]:
+        """Retorna a configuração exclusiva da empresa atual."""
+        result = execute_tenant_safe(
+            db,
+            """
+            SELECT
+                gerar_comissao_venda_parcial,
+                percentual_imposto_padrao,
+                dias_vencimento_padrao,
+                email_assunto_template,
+                email_corpo_template,
+                pdf_formato_padrao,
+                data_atualizacao
+            FROM comissoes_configuracoes_sistema
+            WHERE {tenant_filter}
+            LIMIT 1
+            """,
+            {},
+            tenant_id=tenant_id,
+        )
+        config = result.fetchone()
+        if not config:
+            return {
+                "gerar_comissao_venda_parcial": True,
+                "percentual_imposto_padrao": 7.0,
+                "dias_vencimento_padrao": 30,
+                "email_assunto_template": None,
+                "email_corpo_template": None,
+                "pdf_formato_padrao": "A4",
+                "data_atualizacao": None,
+            }
+        return dict(config._mapping)
 
     @staticmethod
     def atualizar_config(
+        db: Session,
+        tenant_id,
         gerar_comissao_venda_parcial: bool = None,
         percentual_imposto_padrao: float = None,
         dias_vencimento_padrao: int = None,
@@ -577,52 +595,48 @@ class ComissoesConfigSistema:
         email_corpo_template: str = None,
         pdf_formato_padrao: str = None,
     ) -> bool:
-        """Atualiza configurações globais"""
-        db = SessionLocal()
-        try:
-            updates = []
-            params = {}
+        """Cria ou atualiza a configuração exclusiva da empresa atual."""
+        updates = []
+        params = {}
+        campos = {
+            "gerar_comissao_venda_parcial": gerar_comissao_venda_parcial,
+            "percentual_imposto_padrao": percentual_imposto_padrao,
+            "dias_vencimento_padrao": dias_vencimento_padrao,
+            "email_assunto_template": email_assunto_template,
+            "email_corpo_template": email_corpo_template,
+            "pdf_formato_padrao": pdf_formato_padrao,
+        }
+        for campo, valor in campos.items():
+            if valor is not None:
+                updates.append(f"{campo} = :{campo}")
+                params[campo] = valor
 
-            if gerar_comissao_venda_parcial is not None:
-                updates.append(
-                    "gerar_comissao_venda_parcial = :gerar_comissao_venda_parcial"
-                )
-                params["gerar_comissao_venda_parcial"] = gerar_comissao_venda_parcial
+        if not updates:
+            return False
 
-            if percentual_imposto_padrao is not None:
-                updates.append("percentual_imposto_padrao = :percentual_imposto_padrao")
-                params["percentual_imposto_padrao"] = percentual_imposto_padrao
-
-            if dias_vencimento_padrao is not None:
-                updates.append("dias_vencimento_padrao = :dias_vencimento_padrao")
-                params["dias_vencimento_padrao"] = dias_vencimento_padrao
-
-            if email_assunto_template:
-                updates.append("email_assunto_template = :email_assunto_template")
-                params["email_assunto_template"] = email_assunto_template
-
-            if email_corpo_template:
-                updates.append("email_corpo_template = :email_corpo_template")
-                params["email_corpo_template"] = email_corpo_template
-
-            if pdf_formato_padrao:
-                updates.append("pdf_formato_padrao = :pdf_formato_padrao")
-                params["pdf_formato_padrao"] = pdf_formato_padrao
-
-            if not updates:
-                return False
-
-            updates.append("data_atualizacao = CURRENT_TIMESTAMP")
-
-            query = f"UPDATE comissoes_configuracoes_sistema SET {', '.join(updates)}"
-            result = execute_tenant_safe(db, query, params, require_tenant=False)
-
-            success = result.rowcount > 0
-            db.commit()
-
-            return success
-        finally:
-            db.close()
+        execute_tenant_safe(
+            db,
+            """
+            INSERT INTO comissoes_configuracoes_sistema (tenant_id)
+            VALUES (:tenant_id)
+            ON CONFLICT (tenant_id) DO NOTHING
+            """,
+            {"tenant_id": str(tenant_id)},
+            tenant_id=tenant_id,
+            require_tenant=False,
+        )
+        updates.append("data_atualizacao = CURRENT_TIMESTAMP")
+        result = execute_tenant_safe(
+            db,
+            f"""
+            UPDATE comissoes_configuracoes_sistema
+            SET {", ".join(updates)}
+            WHERE {{tenant_filter}}
+            """,
+            params,
+            tenant_id=tenant_id,
+        )
+        return result.rowcount > 0
 
 
 # ====================
@@ -727,6 +741,7 @@ class ComissaoItem(TenantScoped, Base):
     valor_pago_referencia = Column(Numeric, nullable=True)
     parcela_numero = Column(Integer, nullable=True)
     data_pagamento = Column(Date, nullable=True)
+    data_fechamento = Column(Date, nullable=True, index=True)
     forma_pagamento = Column(String(50), nullable=True)
     valor_pago = Column(Numeric, nullable=True)
     saldo_restante = Column(Numeric, nullable=True)
@@ -735,7 +750,7 @@ class ComissaoItem(TenantScoped, Base):
     # Status e controle
     status = Column(
         String(20), nullable=False, default="pendente", index=True
-    )  # pendente, pago, estornado
+    )  # pendente, fechada, pago, estornado
     comissao_provisionada = Column(Boolean, nullable=True, default=False)
     conta_pagar_id = Column(Integer, ForeignKey("contas_pagar.id"), nullable=True)
     data_provisao = Column(Date, nullable=True)

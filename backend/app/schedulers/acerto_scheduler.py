@@ -195,6 +195,7 @@ class AcertoScheduler:
                                 )
 
                     except Exception as e:
+                        db.rollback()
                         logger.error(
                             f"   [ERROR] Erro ao processar {parceiro.nome}: {str(e)}"
                         )

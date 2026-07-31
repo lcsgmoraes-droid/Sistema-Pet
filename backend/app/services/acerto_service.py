@@ -1,6 +1,6 @@
 """
 Serviço de Acerto Financeiro de Parceiros
-Consolidação periódica automática de comissões com compensação de dívidas
+Consolidação periódica de comissões provisionadas, sem registrar pagamento.
 """
 
 from datetime import datetime, timedelta
@@ -10,6 +10,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 import json
 
+from app.financeiro_models import ContaPagar
 from app.models import Cliente, AcertoParceiro, EmailTemplate, EmailEnvio, Tenant
 from app.tenancy.context import get_current_tenant, tenant_context
 from app.tenancy.rls import sync_rls_tenant
@@ -114,8 +115,8 @@ class AcertoService:
         1. Valida se parceiro existe e está ativo
         2. Calcula período do acerto
         3. **VERIFICA IDEMPOTÊNCIA** (se já existe acerto no período)
-        4. Busca TODAS comissões pendentes (status != 'pago')
-        5. Fecha cada comissão aplicando compensação automática
+        4. Busca as comissões pendentes do parceiro
+        5. Fecha cada comissão sem duplicar ou baixar a conta a pagar
         6. Consolida valores totais
         7. Cria registro de acerto
         8. Prepara dados para email
@@ -143,6 +144,7 @@ class AcertoService:
                 Cliente.tenant_id == tenant_id,
                 Cliente.parceiro_ativo.is_(True),
             )
+            .with_for_update()
             .first()
         )
 
@@ -167,7 +169,6 @@ class AcertoService:
             .filter(
                 AcertoParceiro.parceiro_id == parceiro_id,
                 AcertoParceiro.tenant_id == tenant_id,
-                AcertoParceiro.user_id == user_id,
                 AcertoParceiro.periodo_inicio == periodo_inicio,
                 AcertoParceiro.periodo_fim == periodo_fim,
                 AcertoParceiro.status.in_(["processado", "gerado"]),
@@ -196,12 +197,13 @@ class AcertoService:
         comissoes_pendentes = (
             db.query(ComissaoItem)
             .filter(
-                ComissaoItem.parceiro_id == parceiro_id,
+                ComissaoItem.funcionario_id == parceiro_id,
                 ComissaoItem.tenant_id == tenant_id,
-                ComissaoItem.status != "pago",
-                ComissaoItem.created_at >= periodo_inicio,
-                ComissaoItem.created_at <= periodo_fim,
+                ComissaoItem.status == "pendente",
+                ComissaoItem.data_criacao >= periodo_inicio,
+                ComissaoItem.data_criacao <= periodo_fim,
             )
+            .with_for_update()
             .all()
         )
 
@@ -244,9 +246,39 @@ class AcertoService:
                 "mensagem": "Nenhuma comissão pendente no período",
             }
 
-        # 4. FECHAR CADA COMISSÃO COM COMPENSAÇÃO
-        # IMPORTANTE: Importar e usar fechar_com_pagamento_parcial
-        # Por enquanto, simulamos o fechamento (será integrado depois)
+        contas_ids = {
+            comissao.conta_pagar_id
+            for comissao in comissoes_pendentes
+            if comissao.conta_pagar_id
+        }
+        contas = (
+            db.query(ContaPagar)
+            .filter(
+                ContaPagar.tenant_id == tenant_id,
+                ContaPagar.id.in_(contas_ids),
+            )
+            .with_for_update()
+            .all()
+            if contas_ids
+            else []
+        )
+        contas_por_id = {conta.id: conta for conta in contas}
+        inconsistentes = [
+            comissao.id
+            for comissao in comissoes_pendentes
+            if not comissao.comissao_provisionada
+            or not comissao.conta_pagar_id
+            or comissao.conta_pagar_id not in contas_por_id
+            or contas_por_id[comissao.conta_pagar_id].status
+            not in {"pendente", "vencido"}
+        ]
+        if inconsistentes:
+            raise ValueError(
+                "Existem comissões sem provisão financeira pendente e válida: "
+                + ", ".join(str(comissao_id) for comissao_id in inconsistentes)
+            )
+
+        # 5. Fechar a competência; o pagamento continua na conta a pagar.
 
         total_bruto = Decimal("0.00")
         total_compensado = Decimal("0.00")
@@ -254,17 +286,27 @@ class AcertoService:
         detalhes_fechamentos = []
 
         for comissao in comissoes_pendentes:
-            # TODO: Chamar fechar_com_pagamento_parcial(comissao.id, db)
-            # Por enquanto, apenas marca como processada
-            valor_comissao = Decimal(str(comissao.valor_comissao or 0))
+            valor_comissao = Decimal(str(comissao.valor_comissao_gerada or 0))
             total_bruto += valor_comissao
             comissoes_fechadas_count += 1
+            comissao.status = "fechada"
+            comissao.data_fechamento = data_acerto.date()
+            comissao.valor_pago = Decimal(str(comissao.valor_pago or 0))
+            comissao.saldo_restante = max(
+                Decimal("0.00"), valor_comissao - comissao.valor_pago
+            )
+            observacao = f"Fechada pelo acerto de parceiro em {data_acerto:%d/%m/%Y}"
+            comissao.observacao_pagamento = (
+                f"{comissao.observacao_pagamento}\n{observacao}"
+                if comissao.observacao_pagamento
+                else observacao
+            )
 
             detalhes_fechamentos.append(
                 {
                     "comissao_id": comissao.id,
                     "valor": float(valor_comissao),
-                    "status": "simulado",  # Será 'fechado' quando integrar
+                    "status": "fechada",
                 }
             )
 

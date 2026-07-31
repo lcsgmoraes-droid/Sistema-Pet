@@ -11,7 +11,9 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../api";
+import CurrencyInput from "../../components/CurrencyInput";
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
+import { formatMoneyBRL } from "../../utils/formatters";
 
 const ConferenciaAvancada = () => {
   const { funcionario_id } = useParams();
@@ -30,6 +32,7 @@ const ConferenciaAvancada = () => {
   // Filtros
   const [gruposProduto, setGruposProduto] = useState([]);
   const [formasPagamento, setFormasPagamento] = useState([]);
+  const [contasBancarias, setContasBancarias] = useState([]);
 
   const [filtroGrupo, setFiltroGrupo] = useState("");
   const [filtroProduto, setFiltroProduto] = useState("");
@@ -41,6 +44,7 @@ const ConferenciaAvancada = () => {
   const [comissoesSelecionadas, setComissoesSelecionadas] = useState(new Set());
   const [valorPago, setValorPago] = useState("");
   const [formaPagamentoSelecionada, setFormaPagamentoSelecionada] = useState("nao_informado");
+  const [contaBancariaId, setContaBancariaId] = useState("");
   const [dataPagamento, setDataPagamento] = useState(new Date().toISOString().split("T")[0]);
   const [observacoes, setObservacoes] = useState("");
   const [loadingFechamento, setLoadingFechamento] = useState(false);
@@ -69,7 +73,15 @@ const ConferenciaAvancada = () => {
       const formasRes = await api.get("/comissoes/formas-pagamento");
       if (formasRes.data.success) {
         setFormasPagamento(formasRes.data.formas);
+        setFormaPagamentoSelecionada(formasRes.data.formas[0]?.nome || "nao_informado");
       }
+
+      const contasRes = await api.get("/contas-bancarias");
+      const contasAtivas = Array.isArray(contasRes.data)
+        ? contasRes.data.filter((conta) => conta.ativa)
+        : [];
+      setContasBancarias(contasAtivas);
+      setContaBancariaId(contasAtivas[0]?.id ? String(contasAtivas[0].id) : "");
 
       // Carregar grupos de produto (categorias)
       const categoriasRes = await api.get("/produtos/categorias");
@@ -145,7 +157,8 @@ const ConferenciaAvancada = () => {
 
     setDataPagamento(new Date().toISOString().split("T")[0]);
     setValorPago("");
-    setFormaPagamentoSelecionada("nao_informado");
+    setFormaPagamentoSelecionada(formasPagamento[0]?.nome || "nao_informado");
+    setContaBancariaId(contasBancarias[0]?.id ? String(contasBancarias[0].id) : "");
     setObservacoes("");
     setErroFechamento(null);
     setMostrarModalFechamento(true);
@@ -157,6 +170,14 @@ const ConferenciaAvancada = () => {
         setErroFechamento("Valor a pagar deve ser maior que zero");
         return;
       }
+      if (parseFloat(valorPago) > valorTotalSelecionado) {
+        setErroFechamento("O valor não pode superar o saldo selecionado");
+        return;
+      }
+      if (!contaBancariaId) {
+        setErroFechamento("Selecione a conta bancária do pagamento");
+        return;
+      }
 
       setLoadingFechamento(true);
       setErroFechamento(null);
@@ -165,6 +186,7 @@ const ConferenciaAvancada = () => {
         comissoes_ids: Array.from(comissoesSelecionadas),
         valor_pago: parseFloat(valorPago),
         forma_pagamento: formaPagamentoSelecionada,
+        conta_bancaria_id: Number(contaBancariaId),
         data_pagamento: dataPagamento,
         observacoes: observacoes || null,
       };
@@ -203,7 +225,10 @@ const ConferenciaAvancada = () => {
   // Calcular valores da seleção
   const valorTotalSelecionado = Array.from(comissoesSelecionadas).reduce((sum, id) => {
     const comissao = comissoes.find((c) => c.id === id);
-    return sum + (comissao ? comissao.valor_comissao : 0);
+    if (!comissao) return sum;
+    const saldo =
+      comissao.saldo_restante ?? (comissao.valor_comissao || 0) - (comissao.valor_pago || 0);
+    return sum + Math.max(0, saldo);
   }, 0);
 
   const saldoRestanteCalculado = valorTotalSelecionado - (parseFloat(valorPago) || 0);
@@ -491,7 +516,7 @@ const ConferenciaAvancada = () => {
                   Comissões a processar: {comissoesSelecionadas.size}
                 </p>
                 <p className="text-lg font-bold text-gray-800">
-                  Valor Total: R$ {valorTotalSelecionado.toFixed(2)}
+                  Valor Total: {formatMoneyBRL(valorTotalSelecionado)}
                 </p>
               </div>
 
@@ -513,6 +538,24 @@ const ConferenciaAvancada = () => {
                 </select>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Conta Bancária *
+                </label>
+                <select
+                  value={contaBancariaId}
+                  onChange={(e) => setContaBancariaId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">Selecione a conta</option>
+                  {contasBancarias.map((conta) => (
+                    <option key={conta.id} value={conta.id}>
+                      {conta.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* Valor a Pagar */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -522,23 +565,20 @@ const ConferenciaAvancada = () => {
                   <span className="flex items-center bg-gray-100 px-3 py-2 rounded-lg border border-gray-300">
                     R$
                   </span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max={valorTotalSelecionado}
+                  <CurrencyInput
+                    maxValue={valorTotalSelecionado}
                     value={valorPago}
-                    onChange={(e) => setValorPago(e.target.value)}
-                    placeholder="0.00"
+                    onChange={setValorPago}
+                    placeholder="0,00"
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
                   />
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
-                  Máximo: R$ {valorTotalSelecionado.toFixed(2)}
+                  Máximo: {formatMoneyBRL(valorTotalSelecionado)}
                   {parseFloat(valorPago) < valorTotalSelecionado && parseFloat(valorPago) > 0 && (
                     <span className="text-orange-600 font-semibold ml-2">
-                      (Pagamento Parcial - Saldo: R${" "}
-                      {(valorTotalSelecionado - parseFloat(valorPago)).toFixed(2)})
+                      (Pagamento Parcial - Saldo:{" "}
+                      {formatMoneyBRL(valorTotalSelecionado - parseFloat(valorPago))})
                     </span>
                   )}
                 </p>

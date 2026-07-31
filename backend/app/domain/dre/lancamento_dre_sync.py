@@ -49,6 +49,7 @@ def atualizar_dre_por_lancamento(
     valor: Decimal,
     data_lancamento: date,
     tipo_movimentacao: str,  # 'DESPESA' ou 'RECEITA'
+    commit: bool = True,
 ) -> None:
     """
     Atualiza DREDetalheCanal em tempo real ao criar lançamento financeiro.
@@ -292,7 +293,10 @@ def atualizar_dre_por_lancamento(
     )
 
     # 7. Persistir
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(dre_detalhe)
 
     # 8. Se subcategoria for INDIRETO_RATEAVEL, acionar rateio

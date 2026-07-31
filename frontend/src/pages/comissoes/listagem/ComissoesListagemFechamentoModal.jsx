@@ -1,4 +1,5 @@
 import MoneyCell from "../../../components/ui/MoneyCell";
+import CurrencyInput from "../../../components/CurrencyInput";
 
 export default function ComissoesListagemFechamentoModal({ controller }) {
   const {
@@ -124,11 +125,10 @@ export default function ComissoesListagemFechamentoModal({ controller }) {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 💵 Valor a Pagar (editável)
               </label>
-              <input
-                type="number"
-                step="0.01"
+              <CurrencyInput
                 value={valorTotalEditavel}
-                onChange={(e) => setValorTotalEditavel(parseFloat(e.target.value))}
+                onChange={setValorTotalEditavel}
+                maxValue={calcularTotalSelecionado()}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
               />
               <p className="text-xs text-gray-600 mt-1">
@@ -148,7 +148,7 @@ export default function ComissoesListagemFechamentoModal({ controller }) {
               >
                 <option value="">Selecione...</option>
                 {formasPagamentoDisponiveis.map((fp) => (
-                  <option key={fp.id} value={fp.id}>
+                  <option key={fp.id} value={fp.nome}>
                     {fp.nome}
                   </option>
                 ))}

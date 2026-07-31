@@ -131,6 +131,7 @@ def _bulk_comissoes_por_venda(
                 and_(
                     ComissaoItem.tenant_id == tenant_id,
                     ComissaoItem.venda_id.in_(venda_ids),
+                    ComissaoItem.status != "estornado",
                 )
             )
             .group_by(ComissaoItem.venda_id)

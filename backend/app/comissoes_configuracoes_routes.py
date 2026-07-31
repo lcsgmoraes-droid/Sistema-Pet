@@ -13,10 +13,13 @@ from .comissoes_schemas import (
     DuplicarConfiguracaoRequest,
     _normalizar_configuracao_comissao,
 )
+from .security.permissions_decorator import require_permission_dependency
 from .utils.tenant_safe_sql import execute_tenant_safe
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(
+    dependencies=[Depends(require_permission_dependency("comissoes.configurar"))]
+)
 TIPOS_CONFIGURACAO_COMISSAO = {"categoria", "subcategoria", "produto", "geral"}
 
 

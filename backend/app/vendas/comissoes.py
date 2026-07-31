@@ -164,14 +164,11 @@ def _remover_comissoes_venda(db: Session, venda_id: int, tenant_id) -> None:
 
 
 def _remover_provisoes_comissao_venda(db: Session, venda_id: int, tenant_id) -> None:
-    execute_tenant_safe(
+    from app.comissoes_financeiro_service import cancelar_provisoes_comissao_venda
+
+    cancelar_provisoes_comissao_venda(
         db,
-        """
-        DELETE FROM contas_pagar
-        WHERE {tenant_filter}
-          AND descricao LIKE :descricao
-          AND status = 'pendente'
-    """,
-        {"descricao": f"%Comiss\u00e3o - Venda #{venda_id}%"},
+        venda_id=venda_id,
         tenant_id=tenant_id,
+        motivo="Venda reaberta",
     )

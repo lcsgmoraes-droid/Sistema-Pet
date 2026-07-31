@@ -9,8 +9,9 @@ from sqlalchemy.orm import Session
 from .auth.dependencies import get_current_user_and_tenant
 from .contas_receber_schemas import RecebimentoCreate
 from .db import get_session
-from .financeiro_models import ContaReceber, Recebimento
+from .financeiro_models import ContaReceber, FormaPagamento, Recebimento
 from .idempotency import idempotent
+from .utils.tenant_safe_sql import execute_tenant_safe
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -28,7 +29,15 @@ async def registrar_recebimento(
     """
     Registra um recebimento (baixa) de conta a receber
     """
-    conta = db.query(ContaReceber).filter(ContaReceber.id == conta_id).first()
+    current_user, tenant_id = user_and_tenant
+    conta = (
+        db.query(ContaReceber)
+        .filter(
+            ContaReceber.id == conta_id,
+            ContaReceber.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
     if not conta:
         raise HTTPException(status_code=404, detail="Conta nÃ£o encontrada")
@@ -58,7 +67,6 @@ async def registrar_recebimento(
         conta.status = "parcial"
 
     # Registrar recebimento
-    current_user, tenant_id = user_and_tenant
     novo_recebimento = Recebimento(
         conta_receber_id=conta.id,
         forma_pagamento_id=recebimento.forma_pagamento_id,
@@ -88,7 +96,11 @@ async def registrar_recebimento(
             from app.vendas_models import Venda
 
             # Buscar venda para verificar se tem funcionÃ¡rio
-            venda = db.query(Venda).filter(Venda.id == conta.venda_id).first()
+            venda = (
+                db.query(Venda)
+                .filter(Venda.id == conta.venda_id, Venda.tenant_id == tenant_id)
+                .first()
+            )
 
             if venda and venda.funcionario_id:
                 logger.info(
@@ -96,13 +108,43 @@ async def registrar_recebimento(
                 )
 
                 # Gerar comissÃ£o proporcional ao valor recebido NESTA baixa
+                proxima_parcela = int(
+                    execute_tenant_safe(
+                        db,
+                        """
+                        SELECT COALESCE(MAX(parcela_numero), 0) + 1
+                        FROM comissoes_itens
+                        WHERE venda_id = :venda_id
+                          AND funcionario_id = :funcionario_id
+                          AND {tenant_filter}
+                        """,
+                        {
+                            "venda_id": venda.id,
+                            "funcionario_id": venda.funcionario_id,
+                        },
+                        tenant_id=tenant_id,
+                    ).scalar()
+                    or 1
+                )
+                forma = (
+                    db.query(FormaPagamento)
+                    .filter(
+                        FormaPagamento.id == recebimento.forma_pagamento_id,
+                        FormaPagamento.tenant_id == tenant_id,
+                    )
+                    .first()
+                    if recebimento.forma_pagamento_id
+                    else None
+                )
+
                 resultado = gerar_comissoes_venda(
                     venda_id=venda.id,
                     funcionario_id=venda.funcionario_id,
                     valor_pago=Decimal(
                         str(recebimento.valor_recebido)
                     ),  # Apenas o valor DESTA baixa
-                    parcela_numero=1,  # Usar parcela 1 para pagamentos via contas a receber
+                    forma_pagamento=forma.nome if forma else None,
+                    parcela_numero=proxima_parcela,
                     db=db,
                 )
 
