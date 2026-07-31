@@ -39,6 +39,7 @@ from .estoque.transferencia_parceiro_support import (
     _buscar_conta_transferencia_parceiro,
     _buscar_transferencias_parceiro_filtradas,
     _detectar_modo_baixa_transferencia,
+    _listar_baixas_transferencia,
     _listar_itens_por_conta_transferencia_parceiro,
     _listar_itens_transferencia_parceiro,
     _obter_ultimo_recebimento_transferencia,
@@ -204,6 +205,7 @@ def listar_transferencias_para_parceiro(
                     getattr(forma_pagamento, "nome", None)
                 ),
                 observacoes=conta.observacoes,
+                baixas=_listar_baixas_transferencia(conta),
                 itens=itens_por_conta.get(conta.id, []),
             )
         )

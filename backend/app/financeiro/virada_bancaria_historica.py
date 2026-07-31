@@ -54,6 +54,7 @@ def _fetch_cr_actions(db: Session, params: dict[str, Any]) -> list[dict[str, Any
         FROM contas_receber
         WHERE CAST(tenant_id AS TEXT) = :tenant_id
           AND data_vencimento <= :data_corte
+          AND COALESCE(canal, '') <> 'transferencia_parceiro'
           AND COALESCE(status, '') IN ('pendente', 'parcial', 'vencido')
           AND COALESCE(valor_final, 0) > COALESCE(valor_recebido, 0)
         ORDER BY data_vencimento ASC, id ASC

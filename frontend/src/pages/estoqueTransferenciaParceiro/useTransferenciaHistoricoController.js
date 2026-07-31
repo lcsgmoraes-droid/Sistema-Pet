@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../../api";
 import { buscarClientes } from "../../api/clientes";
@@ -67,6 +67,8 @@ export default function useTransferenciaHistoricoController({
   const [entradasParceiro, setEntradasParceiro] = useState(() =>
     criarHistoricoEntradasParceiroVazio(),
   );
+  const historicoRequestId = useRef(0);
+  const entradasRequestId = useRef(0);
   async function carregarFormasPagamento() {
     try {
       setLoadingFormasPagamento(true);
@@ -83,6 +85,7 @@ export default function useTransferenciaHistoricoController({
   }
 
   async function carregarHistoricoTransferencias(filtros, pagina) {
+    const requestId = ++historicoRequestId.current;
     try {
       setLoadingHistorico(true);
       const params = {
@@ -92,17 +95,20 @@ export default function useTransferenciaHistoricoController({
       };
 
       const response = await api.get("/estoque/transferencia-parceiro/historico", { params });
-      setHistorico(response.data);
+      if (requestId === historicoRequestId.current) setHistorico(response.data);
     } catch (error) {
       console.error("Erro ao carregar historico de transferencias:", error);
-      toast.error("Nao foi possivel carregar o historico de transferencias.");
-      setHistorico(criarHistoricoTransferenciasVazio());
+      if (requestId === historicoRequestId.current) {
+        toast.error("Nao foi possivel carregar o historico de transferencias.");
+        setHistorico(criarHistoricoTransferenciasVazio());
+      }
     } finally {
-      setLoadingHistorico(false);
+      if (requestId === historicoRequestId.current) setLoadingHistorico(false);
     }
   }
 
   async function carregarEntradasParceiro(filtros, pagina = 1) {
+    const requestId = ++entradasRequestId.current;
     try {
       setLoadingEntradasParceiro(true);
       const params = {
@@ -114,12 +120,14 @@ export default function useTransferenciaHistoricoController({
       const response = await api.get("/estoque/transferencia-parceiro/entrada-parceiro/historico", {
         params,
       });
-      setEntradasParceiro(response.data);
+      if (requestId === entradasRequestId.current) setEntradasParceiro(response.data);
     } catch (error) {
       console.error("Erro ao carregar entradas de parceiro:", error);
-      setEntradasParceiro(criarHistoricoEntradasParceiroVazio());
+      if (requestId === entradasRequestId.current) {
+        setEntradasParceiro(criarHistoricoEntradasParceiroVazio());
+      }
     } finally {
-      setLoadingEntradasParceiro(false);
+      if (requestId === entradasRequestId.current) setLoadingEntradasParceiro(false);
     }
   }
 
@@ -232,7 +240,6 @@ export default function useTransferenciaHistoricoController({
     historico,
     filtrosHistoricoAplicados,
     pessoaHistoricoSelecionada,
-    parceiroSelecionado,
     contasPagarCompensacao,
     setContasPagarCompensacao,
     carregarContasPagarCompensacao,
@@ -253,13 +260,22 @@ export default function useTransferenciaHistoricoController({
 
   const selecionarPessoaHistorico = (pessoa) => {
     if (!pessoa?.id) return;
-    setPessoaHistoricoSelecionada(pessoa);
-    setSugestoesPessoasHistorico([]);
-    setFiltrosHistoricoForm((prev) => ({
-      ...prev,
+    const proximosFiltros = {
+      ...filtrosHistoricoForm,
       busca: rotuloPessoaHistorico(pessoa),
       parceiro_id: String(pessoa.id),
-    }));
+    };
+    setPaginaHistorico(1);
+    setPaginaEntradasParceiro(1);
+    setSelecionadosHistorico([]);
+    setPessoaHistoricoSelecionada(pessoa);
+    setSugestoesPessoasHistorico([]);
+    historicoRequestId.current += 1;
+    entradasRequestId.current += 1;
+    setHistorico(criarHistoricoTransferenciasVazio());
+    setEntradasParceiro(criarHistoricoEntradasParceiroVazio());
+    setFiltrosHistoricoForm(proximosFiltros);
+    setFiltrosHistoricoAplicados(proximosFiltros);
   };
 
   const aplicarPeriodoRapidoHistorico = (tipo) => {
@@ -312,16 +328,17 @@ export default function useTransferenciaHistoricoController({
     setPaginaEntradasParceiro(1);
     setSelecionadosHistorico([]);
     setPessoaHistoricoSelecionada(parceiroSelecionado);
-    setFiltrosHistoricoForm((prev) => ({
-      ...prev,
+    historicoRequestId.current += 1;
+    entradasRequestId.current += 1;
+    setHistorico(criarHistoricoTransferenciasVazio());
+    setEntradasParceiro(criarHistoricoEntradasParceiroVazio());
+    const proximosFiltros = {
+      ...filtrosHistoricoForm,
       busca: rotulo,
       parceiro_id: String(parceiroSelecionado.id),
-    }));
-    setFiltrosHistoricoAplicados((prev) => ({
-      ...prev,
-      busca: rotulo,
-      parceiro_id: String(parceiroSelecionado.id),
-    }));
+    };
+    setFiltrosHistoricoForm(proximosFiltros);
+    setFiltrosHistoricoAplicados(proximosFiltros);
   };
 
   const alternarSelecaoHistorico = (contaReceberId) => {
@@ -517,6 +534,10 @@ export default function useTransferenciaHistoricoController({
       toast.error("Informe um valor recebido maior que zero.");
       return;
     }
+    if (formBaixa.modo_baixa === "recebimento" && !formBaixa.forma_pagamento_id) {
+      toast.error("Selecione a forma de pagamento.");
+      return;
+    }
 
     const compensacoesPayload = montarCompensacoesBaixaPayload(formBaixa.compensacoes);
     const totalCompensado = compensacoesPayload.reduce(
@@ -660,6 +681,10 @@ export default function useTransferenciaHistoricoController({
     loadingEntradasParceiro,
     filtrosHistoricoForm,
     filtrosHistoricoAplicados,
+    pessoaFiltroAplicada: Boolean(
+      pessoaHistoricoSelecionada?.id &&
+      String(pessoaHistoricoSelecionada.id) === String(filtrosHistoricoAplicados.parceiro_id || ""),
+    ),
     pessoaHistoricoSelecionada,
     pessoaBaixaLoteNome: baixaLote.pessoaBaixaLoteNome,
     sugestoesPessoasHistorico,
