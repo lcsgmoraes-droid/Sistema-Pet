@@ -136,7 +136,9 @@ def test_notification_sender_sends_queued_push_to_all_active_customer_devices(
     )
     db = FakeNotificationDB(
         notification=notification,
-        cliente=SimpleNamespace(id=77, tenant_id="tenant-1", user_id=5),
+        cliente=SimpleNamespace(
+            id=77, tenant_id="tenant-1", user_id=99, auth_user_id=5
+        ),
         user=SimpleNamespace(id=5, tenant_id="tenant-1", push_token=None),
         devices=[
             _push_device(10, "ExponentPushToken[phone-a]"),

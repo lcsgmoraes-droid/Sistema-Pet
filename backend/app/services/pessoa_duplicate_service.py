@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 CAMPOS_IDENTIDADE_FORTE = ("cpf", "cnpj", "crmv", "email", "telefone", "celular")
+CAMPOS_IDENTIDADE_AUTOMATICA = ("cpf", "cnpj", "crmv")
 CAMPOS_COMPLETUDE = (
     "codigo",
     "tipo_pessoa",
@@ -42,6 +43,7 @@ class DecisaoDuplicidadePessoa:
     pode_fundir_automaticamente: bool
     motivos_bloqueio: list[str]
     chave_nome: str
+    sinais_confirmacao: list[str]
 
 
 def normalizar_nome_pessoa(nome: Any) -> str:
@@ -55,11 +57,65 @@ def _normalizar_valor_identidade(campo: str, valor: Any) -> str:
     texto = str(valor or "").strip()
     if not texto:
         return ""
-    if campo in {"cpf", "cnpj", "telefone", "celular", "crmv"}:
+    if campo in {"cpf", "cnpj", "telefone", "celular"}:
         return "".join(ch for ch in texto if ch.isdigit())
+    if campo == "crmv":
+        return "".join(ch for ch in texto.casefold() if ch.isalnum())
     if campo == "email":
         return texto.casefold()
     return texto.casefold()
+
+
+def _documento_repetido(valor: str) -> bool:
+    return bool(valor) and len(set(valor)) == 1
+
+
+def _cpf_valido(valor: str) -> bool:
+    if len(valor) != 11 or _documento_repetido(valor):
+        return False
+    for tamanho in (9, 10):
+        soma = sum(
+            int(valor[indice]) * (tamanho + 1 - indice)
+            for indice in range(tamanho)
+        )
+        digito = (soma * 10) % 11
+        if digito == 10:
+            digito = 0
+        if digito != int(valor[tamanho]):
+            return False
+    return True
+
+
+def _cnpj_valido(valor: str) -> bool:
+    if len(valor) != 14 or _documento_repetido(valor):
+        return False
+    pesos = (
+        (5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2),
+        (6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2),
+    )
+    base = valor[:12]
+    for peso in pesos:
+        soma = sum(
+            int(digito) * multiplicador
+            for digito, multiplicador in zip(base, peso)
+        )
+        resto = soma % 11
+        base += str(0 if resto < 2 else 11 - resto)
+    return base == valor
+
+
+def _identidade_automatica_valida(campo: str, valor: str) -> bool:
+    if campo == "cpf":
+        return _cpf_valido(valor)
+    if campo == "cnpj":
+        return _cnpj_valido(valor)
+    if campo == "crmv":
+        return (
+            5 <= len(valor) <= 20
+            and sum(ch.isdigit() for ch in valor) >= 3
+            and sum(ch.isalpha() for ch in valor) >= 2
+        )
+    return False
 
 
 def _valor_preenchido(valor: Any) -> bool:
@@ -99,20 +155,45 @@ def avaliar_par_duplicidade_pessoas(
     chave_a = normalizar_nome_pessoa(getattr(pessoa_a, "nome", ""))
     chave_b = normalizar_nome_pessoa(getattr(pessoa_b, "nome", ""))
     motivos: list[str] = []
-
-    if not chave_a or chave_a != chave_b:
-        motivos.append("nome_diferente")
+    sinais: list[str] = []
 
     for campo in CAMPOS_IDENTIDADE_FORTE:
         valor_a = _normalizar_valor_identidade(campo, getattr(pessoa_a, campo, None))
         valor_b = _normalizar_valor_identidade(campo, getattr(pessoa_b, campo, None))
         if valor_a and valor_b and valor_a != valor_b:
             motivos.append(f"{campo}_conflitante")
+        if (
+            campo in CAMPOS_IDENTIDADE_AUTOMATICA
+            and valor_a
+            and valor_a == valor_b
+            and _identidade_automatica_valida(campo, valor_a)
+        ):
+            sinais.append(campo)
+
+    contas = {
+        int(conta_id)
+        for conta_id in (
+            getattr(pessoa_a, "auth_user_id", None),
+            getattr(pessoa_b, "auth_user_id", None),
+        )
+        if conta_id
+    }
+    if len(contas) > 1:
+        motivos.append("contas_app_diferentes")
+    if not sinais:
+        motivos.append("sem_identidade_forte_compartilhada")
+    if not chave_a or chave_a != chave_b:
+        motivos.append("nome_diferente")
 
     return DecisaoDuplicidadePessoa(
-        pode_fundir_automaticamente=not motivos,
+        pode_fundir_automaticamente=bool(sinais)
+        and not any(
+            motivo.endswith("_conflitante") or motivo == "contas_app_diferentes"
+            for motivo in motivos
+        ),
         motivos_bloqueio=motivos,
         chave_nome=chave_a,
+        sinais_confirmacao=sinais,
     )
 
 
@@ -127,13 +208,21 @@ def escolher_pessoa_principal(
 
     referencias_por_id = referencias_por_id or {}
 
-    def chave(pessoa: Any) -> tuple[int, int, int, int, int]:
+    def chave(pessoa: Any) -> tuple[int, int, int, int, int, int]:
         pessoa_id = int(getattr(pessoa, "id", 0) or 0)
         ativa = 1 if bool(getattr(pessoa, "ativo", False)) else 0
         perfil_operacional = _prioridade_perfil_pessoa(pessoa)
         referencias = int(referencias_por_id.get(pessoa_id, 0) or 0)
         completude = _score_completude(pessoa)
-        return (ativa, perfil_operacional, referencias, completude, -pessoa_id)
+        conta_vinculada = 1 if getattr(pessoa, "auth_user_id", None) else 0
+        return (
+            ativa,
+            conta_vinculada,
+            perfil_operacional,
+            referencias,
+            completude,
+            -pessoa_id,
+        )
 
     return max(pessoas_lista, key=chave)
 
@@ -149,6 +238,7 @@ def _resumo_sugestao(pessoa: Cliente) -> dict[str, Any]:
         "email": pessoa.email,
         "telefone": pessoa.celular or pessoa.telefone,
         "ativo": pessoa.ativo,
+        "auth_user_id": getattr(pessoa, "auth_user_id", None),
     }
 
 
@@ -162,6 +252,33 @@ def _grupos_por_nome_normalizado(pessoas: list[Cliente]) -> dict[str, list[Clien
     return {chave: grupo for chave, grupo in grupos.items() if len(grupo) > 1}
 
 
+def _grupos_por_identidade_forte(
+    pessoas: list[Cliente],
+) -> dict[str, list[Cliente]]:
+    grupos: dict[str, list[Cliente]] = {}
+    for pessoa in pessoas:
+        for campo in CAMPOS_IDENTIDADE_AUTOMATICA:
+            valor = _normalizar_valor_identidade(campo, getattr(pessoa, campo, None))
+            if not _identidade_automatica_valida(campo, valor):
+                continue
+            grupos.setdefault(f"{campo}:{valor}", []).append(pessoa)
+    return {chave: grupo for chave, grupo in grupos.items() if len(grupo) > 1}
+
+
+def _pares_candidatos(pessoas: list[Cliente]) -> list[tuple[Cliente, Cliente]]:
+    pares: dict[tuple[int, int], tuple[Cliente, Cliente]] = {}
+    grupos = list(_grupos_por_nome_normalizado(pessoas).values())
+    grupos.extend(_grupos_por_identidade_forte(pessoas).values())
+    for grupo in grupos:
+        principal = escolher_pessoa_principal(grupo)
+        for pessoa in grupo:
+            if int(pessoa.id) == int(principal.id):
+                continue
+            chave = tuple(sorted((int(principal.id), int(pessoa.id))))
+            pares[chave] = (principal, pessoa)
+    return list(pares.values())
+
+
 def listar_sugestoes_duplicidade_pessoas(
     db: Session,
     *,
@@ -171,33 +288,34 @@ def listar_sugestoes_duplicidade_pessoas(
     pessoas = (
         db.query(Cliente)
         .filter(Cliente.tenant_id == tenant_id)
-        .filter(Cliente.ativo.is_(True))
+        .filter(Cliente.ativo.is_not(False))
         .filter(func.length(func.trim(func.coalesce(Cliente.nome, ""))) > 0)
         .order_by(Cliente.nome.asc(), Cliente.id.asc())
         .all()
     )
 
     sugestoes = []
-    for chave_nome, grupo in _grupos_por_nome_normalizado(pessoas).items():
-        principal = escolher_pessoa_principal(grupo)
-        for duplicado in grupo:
-            if int(duplicado.id) == int(principal.id):
-                continue
-            decisao = avaliar_par_duplicidade_pessoas(principal, duplicado)
-            if decisao.pode_fundir_automaticamente:
-                continue
-            sugestoes.append(
-                {
-                    "chave_nome": chave_nome,
-                    "principal": _resumo_sugestao(principal),
-                    "duplicado": _resumo_sugestao(duplicado),
-                    "motivos": decisao.motivos_bloqueio,
-                }
-            )
-            if len(sugestoes) >= limit:
-                return {"sugestoes": sugestoes, "total": len(sugestoes)}
+    automaticas = []
+    for principal, duplicado in _pares_candidatos(pessoas):
+        decisao = avaliar_par_duplicidade_pessoas(principal, duplicado)
+        item = {
+            "chave_nome": decisao.chave_nome,
+            "principal": _resumo_sugestao(principal),
+            "duplicado": _resumo_sugestao(duplicado),
+            "motivos": decisao.motivos_bloqueio,
+            "sinais": decisao.sinais_confirmacao,
+        }
+        if decisao.pode_fundir_automaticamente:
+            automaticas.append(item)
+        else:
+            sugestoes.append(item)
 
-    return {"sugestoes": sugestoes, "total": len(sugestoes)}
+    return {
+        "sugestoes": sugestoes[:limit],
+        "total": len(sugestoes),
+        "automaticas": automaticas[:limit],
+        "total_automaticas": len(automaticas),
+    }
 
 
 def executar_fusoes_automaticas_pessoas_duplicadas(
@@ -211,25 +329,31 @@ def executar_fusoes_automaticas_pessoas_duplicadas(
     query = (
         db.query(Cliente)
         .filter(Cliente.tenant_id == tenant_id)
-        .filter(Cliente.ativo.is_(True))
+        .filter(Cliente.ativo.is_not(False))
         .filter(func.length(func.trim(func.coalesce(Cliente.nome, ""))) > 0)
         .order_by(Cliente.nome.asc(), Cliente.id.asc())
     )
 
     pessoas = query.all()
-    grupos = _grupos_por_nome_normalizado(pessoas)
+    grupos = _grupos_por_identidade_forte(pessoas)
     if nome:
         chave_nome_filtro = normalizar_nome_pessoa(nome)
-        grupos = (
-            {chave_nome_filtro: grupos.get(chave_nome_filtro, [])}
-            if chave_nome_filtro
-            else {}
-        )
+        grupos = {
+            chave: [
+                pessoa
+                for pessoa in grupo
+                if normalizar_nome_pessoa(pessoa.nome) == chave_nome_filtro
+            ]
+            for chave, grupo in grupos.items()
+        }
 
     fusoes = []
     sugestoes = []
+    processados: set[int] = set()
+    pares_tentados: set[tuple[int, int]] = set()
 
-    for chave_nome, grupo in grupos.items():
+    for chave_identidade, grupo in grupos.items():
+        grupo = [pessoa for pessoa in grupo if int(pessoa.id) not in processados]
         if len(grupo) < 2:
             continue
         principal = escolher_pessoa_principal(grupo)
@@ -242,12 +366,16 @@ def executar_fusoes_automaticas_pessoas_duplicadas(
                 }
             if int(duplicado.id) == int(principal.id):
                 continue
+            chave_par = tuple(sorted((int(principal.id), int(duplicado.id))))
+            if chave_par in pares_tentados:
+                continue
+            pares_tentados.add(chave_par)
 
             decisao = avaliar_par_duplicidade_pessoas(principal, duplicado)
             if not decisao.pode_fundir_automaticamente:
                 sugestoes.append(
                     {
-                        "chave_nome": chave_nome,
+                        "chave_identidade": chave_identidade,
                         "principal": _resumo_sugestao(principal),
                         "duplicado": _resumo_sugestao(duplicado),
                         "motivos": decisao.motivos_bloqueio,
@@ -263,7 +391,11 @@ def executar_fusoes_automaticas_pessoas_duplicadas(
                     duplicado_id=duplicado.id,
                     decisoes_campos={},
                     user_id=user_id,
-                    observacao="Fusao automatica por nome 100% igual e sem conflitos fortes.",
+                    observacao=(
+                        "Fusao automatica por identidade forte valida e sem conflitos."
+                    ),
+                    modo="automatica_identidade_forte",
+                    motivo=",".join(decisao.sinais_confirmacao),
                 )
                 principal = (
                     db.query(Cliente)
@@ -271,11 +403,13 @@ def executar_fusoes_automaticas_pessoas_duplicadas(
                     .first()
                     or principal
                 )
+                processados.add(int(duplicado.id))
                 fusoes.append(
                     {
-                        "chave_nome": chave_nome,
+                        "chave_identidade": chave_identidade,
                         "principal": resultado["principal"],
                         "duplicado_inativado": resultado["duplicado_inativado"],
+                        "merge_log_id": resultado.get("merge_log_id"),
                     }
                 )
             except Exception as exc:
@@ -285,7 +419,7 @@ def executar_fusoes_automaticas_pessoas_duplicadas(
                 )
                 sugestoes.append(
                     {
-                        "chave_nome": chave_nome,
+                        "chave_identidade": chave_identidade,
                         "principal": _resumo_sugestao(principal),
                         "duplicado": _resumo_sugestao(duplicado),
                         "motivos": [f"erro_fusao: {exc}"],

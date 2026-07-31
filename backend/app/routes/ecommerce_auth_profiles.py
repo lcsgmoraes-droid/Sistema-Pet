@@ -23,7 +23,6 @@ from app.routes.ecommerce_auth_cliente import (
     _find_cliente_match,
     _get_or_create_cliente_for_user,
     _select_preferred_cliente,
-    _transfer_cliente_relations_for_ecommerce_merge,
     _upsert_delivery_details,
 )
 from app.routes.ecommerce_auth_common import (
@@ -42,6 +41,7 @@ from app.services.app_access_profile_service import (
     resolve_user_app_profiles,
 )
 from app.services.lgpd_service import PrivacyOpsService, utcnow
+from app.services.pessoa_merge_service import executar_fusao_pessoas
 
 router = APIRouter()
 
@@ -174,7 +174,7 @@ def me(
     tenant_id = _activate_user_tenant_context(current_user)
     cliente = (
         db.query(Cliente)
-        .filter(Cliente.tenant_id == tenant_id, Cliente.user_id == current_user.id)
+        .filter(Cliente.tenant_id == tenant_id, Cliente.auth_user_id == current_user.id)
         .first()
     )
     data = _serialize_profile(
@@ -313,19 +313,41 @@ def atualizar_perfil(
             potential_match if canonical_cliente.id == cliente.id else cliente
         )
 
+        contas_encontradas = {
+            int(conta_id)
+            for conta_id in (
+                getattr(canonical_cliente, "auth_user_id", None),
+                getattr(previous_cliente, "auth_user_id", None),
+            )
+            if conta_id
+        }
+        if contas_encontradas - {int(current_user.id)}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Encontramos outro cadastro ligado a uma conta diferente. "
+                    "Revise os acessos em Pessoas antes de continuar."
+                ),
+            )
+
         _copy_missing_cliente_fields(canonical_cliente, previous_cliente)
-        canonical_cliente.user_id = current_user.id
+        previous_cliente.auth_user_id = None
+        db.flush()
+        canonical_cliente.auth_user_id = current_user.id
         canonical_cliente.ativo = True
-        _transfer_cliente_relations_for_ecommerce_merge(
-            db, previous_cliente, canonical_cliente
+        executar_fusao_pessoas(
+            db,
+            tenant_id=str(current_user.tenant_id),
+            principal_id=canonical_cliente.id,
+            duplicado_id=previous_cliente.id,
+            decisoes_campos={},
+            user_id=current_user.id,
+            observacao="Unificacao segura durante atualizacao do perfil do app.",
+            modo="ecommerce_perfil",
+            motivo="identidade_confirmada_no_app",
+            commit=False,
         )
         cliente = canonical_cliente
-        previous_cliente.ativo = False
-        nota_fusao = (
-            f"\n[{datetime.utcnow().isoformat()}] Cadastro e-commerce duplicado #{previous_cliente.id} "
-            f"mantido inativo apos fusao no cliente #{cliente.id}."
-        )
-        previous_cliente.observacoes = (previous_cliente.observacoes or "") + nota_fusao
 
     if payload.endereco is not None:
         cliente.endereco = payload.endereco.strip() or None
@@ -434,7 +456,7 @@ def excluir_conta(
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.user_id == current_user.id,
+            Cliente.auth_user_id == current_user.id,
         )
         .order_by(Cliente.id.asc())
         .all()

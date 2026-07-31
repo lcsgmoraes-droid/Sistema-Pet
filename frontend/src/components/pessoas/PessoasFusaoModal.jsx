@@ -134,18 +134,23 @@ export default function PessoasFusaoModal({
     (total, item) => total + Number(item.total || 0),
     0,
   );
+  const bloqueios = preview?.bloqueios || [];
 
   const executar = async () => {
     if (pessoasValidas.length !== 2 || !principalId || !duplicadoId || salvando) return;
     setSalvando(true);
     try {
-      await executarFusaoPessoas({
+      const { data } = await executarFusaoPessoas({
         pessoa_principal_id: Number(principalId),
         pessoa_duplicada_id: Number(duplicadoId),
         decisoes_campos: decisoes,
         observacao,
       });
-      toast.success("Pessoas fundidas com sucesso.");
+      toast.success(
+        data?.merge_log_id
+          ? `Pessoas fundidas com sucesso. Auditoria #${data.merge_log_id}.`
+          : "Pessoas fundidas com sucesso.",
+      );
       onSuccess?.();
       onClose?.();
     } catch (error) {
@@ -208,6 +213,16 @@ export default function PessoasFusaoModal({
                 </div>
               ) : preview ? (
                 <>
+                  {bloqueios.length > 0 && (
+                    <div className="mb-4 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+                      <div className="font-semibold">Esta fusao esta bloqueada</div>
+                      {bloqueios.map((bloqueio) => (
+                        <div className="mt-1" key={bloqueio}>
+                          {bloqueio}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div className="mb-4 grid gap-3 md:grid-cols-4">
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                       <div className="text-xs font-semibold uppercase text-slate-500">
@@ -353,7 +368,13 @@ export default function PessoasFusaoModal({
             Cancelar
           </ActionButton>
           <ActionButton
-            disabled={!preview || !confirmado || salvando || pessoasValidas.length !== 2}
+            disabled={
+              !preview ||
+              !confirmado ||
+              salvando ||
+              bloqueios.length > 0 ||
+              pessoasValidas.length !== 2
+            }
             icon={salvando ? Loader2 : GitMerge}
             intent="warning"
             tone="solid"

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-from sqlalchemy import func, or_
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import AppAccessProfile, Cliente, User
@@ -151,7 +151,7 @@ def _cliente_matches_user(cliente: Cliente, user: User) -> bool:
     email = (getattr(user, "email", None) or "").strip().casefold()
     cpf = _digits_only(getattr(user, "cpf_cnpj", None))
     telefone = _digits_only(getattr(user, "telefone", None))
-    if getattr(cliente, "user_id", None) == getattr(user, "id", None):
+    if getattr(cliente, "auth_user_id", None) == getattr(user, "id", None):
         return True
     if email and (getattr(cliente, "email", None) or "").strip().casefold() == email:
         return True
@@ -187,22 +187,12 @@ def find_app_profile_clientes_for_user(
     add(include_cliente)
 
     query = db.query(Cliente).filter(
-        Cliente.tenant_id == tenant_id, Cliente.ativo.is_(True)
+        Cliente.tenant_id == tenant_id,
+        Cliente.ativo.is_not(False),
+        Cliente.auth_user_id == user.id,
     )
-    filters = [Cliente.user_id == user.id]
-    email = (getattr(user, "email", None) or "").strip().casefold()
-    if email:
-        filters.append(func.lower(Cliente.email) == email)
-    cpf = getattr(user, "cpf_cnpj", None)
-    if cpf:
-        filters.append(Cliente.cpf == cpf)
-    telefone = getattr(user, "telefone", None)
-    if telefone:
-        filters.extend([Cliente.telefone == telefone, Cliente.celular == telefone])
-
-    for cliente in query.filter(or_(*filters)).order_by(Cliente.id.asc()).all():
-        if _cliente_matches_user(cliente, user):
-            add(cliente)
+    for cliente in query.order_by(Cliente.id.asc()).all():
+        add(cliente)
 
     return clientes
 
@@ -294,7 +284,7 @@ def get_cliente_for_app_profile_or_none(
     return query.filter(
         Cliente.tenant_id == tenant_id,
         Cliente.id == cliente_id,
-        Cliente.ativo.is_(True),
+        Cliente.ativo.is_not(False),
     ).first()
 
 
@@ -305,6 +295,7 @@ def sync_cliente_app_access_profiles(
     cliente: Cliente,
     profile_types: Iterable[str],
     granted_by_user_id: int | None = None,
+    linked_user_id: int | None = None,
 ) -> list[str]:
     normalized = {
         profile_type
@@ -321,19 +312,23 @@ def sync_cliente_app_access_profiles(
         .all()
     )
     by_type = {item.profile_type: item for item in existing}
+    target_user_id = (
+        linked_user_id
+        if linked_user_id is not None
+        else getattr(cliente, "auth_user_id", None)
+    )
 
     for profile_type in PROFILE_ORDER:
         item = by_type.get(profile_type)
         should_enable = profile_type in normalized
         if item:
             item.is_active = should_enable
-            if should_enable and not item.user_id:
-                item.user_id = getattr(cliente, "user_id", None)
+            item.user_id = target_user_id if should_enable else item.user_id
         elif should_enable:
             db.add(
                 AppAccessProfile(
                     tenant_id=tenant_id,
-                    user_id=getattr(cliente, "user_id", None),
+                    user_id=target_user_id,
                     cliente_id=cliente.id,
                     profile_type=profile_type,
                     is_active=True,

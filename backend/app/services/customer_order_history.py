@@ -288,7 +288,7 @@ def list_customer_order_history(
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.user_id == user_id,
+            Cliente.auth_user_id == user_id,
         )
         .all()
     )

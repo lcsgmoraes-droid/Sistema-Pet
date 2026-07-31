@@ -2,14 +2,16 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+import json
 import logging
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.models import Cliente
+from app.models import AppAccessProfile, Cliente, PessoaMergeLog
 from app.produtos_models import ProdutoFornecedor
+from app.services.app_access_profile_service import sync_cliente_app_access_profiles
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +74,23 @@ CAMPOS_CADASTRAIS_PESSOA: list[tuple[str, str]] = [
 ]
 
 TABELAS_FK_ESPECIAIS = {
+    "app_access_profiles",
+    "pessoa_merge_logs",
     "produto_fornecedores",
+}
+
+CAMPOS_BOOLEANOS_UNIAO = {
+    "parceiro_ativo",
+    "is_entregador",
+    "entregador_padrao",
+    "is_terceirizado",
+    "recebe_repasse",
+    "gera_conta_pagar",
+    "recebe_comissao_entrega",
+    "entregador_ativo",
+    "controla_rh",
+    "gera_conta_pagar_custo_entrega",
+    "controla_dre",
 }
 
 REFERENCIAS_SEM_FK = [
@@ -136,6 +154,8 @@ def _pessoa_resumo(pessoa: Cliente) -> dict[str, Any]:
         "telefone": pessoa.celular or pessoa.telefone,
         "ativo": pessoa.ativo,
         "credito": float(pessoa.credito or 0),
+        "auth_user_id": getattr(pessoa, "auth_user_id", None),
+        "merged_into_id": getattr(pessoa, "merged_into_id", None),
     }
 
 
@@ -151,6 +171,7 @@ def _obter_pessoas(
             Cliente.tenant_id == tenant_id,
             Cliente.id.in_([principal_id, duplicado_id]),
         )
+        .with_for_update()
         .all()
     )
     por_id = {int(pessoa.id): pessoa for pessoa in pessoas}
@@ -158,6 +179,10 @@ def _obter_pessoas(
     duplicado = por_id.get(int(duplicado_id))
     if not principal or not duplicado:
         raise ValueError("Pessoa principal ou duplicada nao encontrada neste tenant.")
+    if principal.ativo is False:
+        raise ValueError("O cadastro principal precisa estar ativo.")
+    if duplicado.ativo is False or getattr(duplicado, "merged_into_id", None):
+        raise ValueError("O cadastro duplicado ja foi inativado ou fundido.")
     return principal, duplicado
 
 
@@ -290,6 +315,20 @@ def montar_preview_fusao_pessoas(
         "duplicado": float(duplicado.credito or 0),
         "final": float(principal.credito or 0) + float(duplicado.credito or 0),
     }
+    contas_app = {
+        int(conta_id)
+        for conta_id in (
+            getattr(principal, "auth_user_id", None),
+            getattr(duplicado, "auth_user_id", None),
+        )
+        if conta_id
+    }
+    bloqueios = []
+    if len(contas_app) > 1:
+        bloqueios.append(
+            "Os cadastros estao ligados a contas de aplicativo diferentes. "
+            "Revise os acessos antes de fundir."
+        )
 
     return {
         "principal": _pessoa_resumo(principal),
@@ -297,7 +336,127 @@ def montar_preview_fusao_pessoas(
         "campos": campos,
         "credito_somado": credito_preview,
         "referencias_duplicado": _contar_referencias(db, duplicado.id, tenant_id),
+        "bloqueios": bloqueios,
     }
+
+
+def _snapshot_pessoa(pessoa: Cliente) -> dict[str, Any]:
+    campos = {
+        campo: _valor_serializavel(getattr(pessoa, campo, None))
+        for campo, _label in CAMPOS_CADASTRAIS_PESSOA
+    }
+    campos.update(
+        {
+            "id": pessoa.id,
+            "codigo": pessoa.codigo,
+            "auth_user_id": getattr(pessoa, "auth_user_id", None),
+            "merged_into_id": getattr(pessoa, "merged_into_id", None),
+            "ativo": pessoa.ativo,
+            "credito": float(pessoa.credito or 0),
+        }
+    )
+    return campos
+
+
+def _snapshot_perfis_app(
+    db: Session, *, tenant_id: Any, pessoa_ids: list[int]
+) -> dict[str, list[dict[str, Any]]]:
+    resultado = {str(pessoa_id): [] for pessoa_id in pessoa_ids}
+    grants = (
+        db.query(AppAccessProfile)
+        .filter(
+            AppAccessProfile.tenant_id == tenant_id,
+            AppAccessProfile.cliente_id.in_(pessoa_ids),
+        )
+        .all()
+    )
+    for grant in grants:
+        resultado.setdefault(str(grant.cliente_id), []).append(
+            {
+                "profile_type": grant.profile_type,
+                "user_id": grant.user_id,
+                "is_active": grant.is_active,
+                "granted_by_user_id": grant.granted_by_user_id,
+            }
+        )
+    return resultado
+
+
+def _lista_json(valor: Any) -> list[Any]:
+    if isinstance(valor, str):
+        try:
+            valor = json.loads(valor)
+        except Exception:
+            return []
+    return list(valor) if isinstance(valor, list) else []
+
+
+def _unir_listas_json(valor_a: Any, valor_b: Any) -> list[Any] | None:
+    resultado: list[Any] = []
+    vistos: set[str] = set()
+    for item in [*_lista_json(valor_a), *_lista_json(valor_b)]:
+        chave = json.dumps(item, sort_keys=True, ensure_ascii=False, default=str)
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        resultado.append(item)
+    return resultado or None
+
+
+def _unir_textos(valor_a: Any, valor_b: Any) -> str | None:
+    partes = []
+    for valor in (valor_a, valor_b):
+        texto = str(valor or "").strip()
+        if texto and texto not in partes:
+            partes.append(texto)
+    return "\n\n".join(partes) or None
+
+
+def _perfis_inerentes(pessoa: Cliente) -> set[str]:
+    perfis: set[str] = set()
+    tipo = str(getattr(pessoa, "tipo_cadastro", "") or "").strip().casefold()
+    if tipo in {"cliente", "funcionario", "veterinario"}:
+        perfis.add(tipo)
+    if bool(getattr(pessoa, "is_entregador", False)):
+        perfis.add("entregador")
+    return perfis
+
+
+def _mesclar_perfis_app(
+    db: Session,
+    *,
+    principal: Cliente,
+    duplicado: Cliente,
+    tenant_id: Any,
+    user_id: int,
+) -> list[str]:
+    grants = (
+        db.query(AppAccessProfile)
+        .filter(
+            AppAccessProfile.tenant_id == tenant_id,
+            AppAccessProfile.cliente_id.in_([principal.id, duplicado.id]),
+            AppAccessProfile.is_active.is_(True),
+        )
+        .all()
+    )
+    perfis = _perfis_inerentes(principal) | _perfis_inerentes(duplicado)
+    perfis.update(grant.profile_type for grant in grants)
+
+    # Remove os grants do duplicado antes de sincronizar para evitar colisao da
+    # chave unica (tenant, pessoa, perfil).
+    for grant in grants:
+        if int(grant.cliente_id) == int(duplicado.id):
+            db.delete(grant)
+    db.flush()
+
+    return sync_cliente_app_access_profiles(
+        db,
+        tenant_id=tenant_id,
+        cliente=principal,
+        profile_types=perfis,
+        granted_by_user_id=user_id,
+        linked_user_id=getattr(principal, "auth_user_id", None),
+    )
 
 
 def _mesclar_produto_fornecedores(
@@ -409,15 +568,75 @@ def executar_fusao_pessoas(
     decisoes_campos: dict[str, str] | None,
     user_id: int,
     observacao: str | None = None,
+    modo: str = "manual",
+    motivo: str | None = None,
+    commit: bool = True,
 ) -> dict[str, Any]:
     principal, duplicado = _obter_pessoas(db, tenant_id, principal_id, duplicado_id)
     agora = datetime.utcnow()
     decisoes_campos = decisoes_campos or {}
+    snapshot_antes = {
+        "principal": _snapshot_pessoa(principal),
+        "duplicado": _snapshot_pessoa(duplicado),
+        "perfis_app": _snapshot_perfis_app(
+            db,
+            tenant_id=tenant_id,
+            pessoa_ids=[principal.id, duplicado.id],
+        ),
+    }
+
+    principal_auth_user_id = getattr(principal, "auth_user_id", None)
+    duplicado_auth_user_id = getattr(duplicado, "auth_user_id", None)
+    if (
+        principal_auth_user_id
+        and duplicado_auth_user_id
+        and int(principal_auth_user_id) != int(duplicado_auth_user_id)
+    ):
+        raise ValueError(
+            "A fusao foi bloqueada porque os cadastros estao ligados a contas "
+            "de aplicativo diferentes. Revise os acessos antes de continuar."
+        )
+
+    # Libera primeiro o vinculo do duplicado para respeitar o indice unico de
+    # conta ativa mesmo quando a conta precisa migrar para o principal.
+    if duplicado_auth_user_id:
+        duplicado.auth_user_id = None
+        db.flush()
+    if not principal_auth_user_id and duplicado_auth_user_id:
+        principal.auth_user_id = duplicado_auth_user_id
 
     campos_aplicados = []
     for campo, label in CAMPOS_CADASTRAIS_PESSOA:
         valor_principal = getattr(principal, campo, None)
         valor_duplicado = getattr(duplicado, campo, None)
+
+        if campo in CAMPOS_BOOLEANOS_UNIAO:
+            valor_final = bool(valor_principal or valor_duplicado)
+            if valor_final != bool(valor_principal):
+                setattr(principal, campo, valor_final)
+                campos_aplicados.append(
+                    {"campo": campo, "label": label, "origem": "uniao"}
+                )
+            continue
+
+        if campo == "enderecos_adicionais":
+            valor_final = _unir_listas_json(valor_principal, valor_duplicado)
+            if valor_final != _lista_json(valor_principal):
+                setattr(principal, campo, valor_final)
+                campos_aplicados.append(
+                    {"campo": campo, "label": label, "origem": "uniao"}
+                )
+            continue
+
+        if campo in {"observacoes", "parceiro_observacoes"}:
+            valor_final = _unir_textos(valor_principal, valor_duplicado)
+            if valor_final != (valor_principal or None):
+                setattr(principal, campo, valor_final)
+                campos_aplicados.append(
+                    {"campo": campo, "label": label, "origem": "uniao"}
+                )
+            continue
+
         origem = decisoes_campos.get(campo)
         if origem not in {"principal", "duplicado"}:
             origem = (
@@ -431,6 +650,14 @@ def executar_fusao_pessoas(
             campos_aplicados.append(
                 {"campo": campo, "label": label, "origem": "duplicado"}
             )
+
+    perfis_app = _mesclar_perfis_app(
+        db,
+        principal=principal,
+        duplicado=duplicado,
+        tenant_id=tenant_id,
+        user_id=user_id,
+    )
 
     principal.credito = Decimal(str(principal.credito or 0)) + Decimal(
         str(duplicado.credito or 0)
@@ -452,23 +679,47 @@ def executar_fusao_pessoas(
     if observacao:
         nota += f" Observacao: {observacao.strip()}"
 
-    principal.observacoes = (principal.observacoes or "") + nota
+    principal.observacoes = _unir_textos(principal.observacoes, nota)
     duplicado.observacoes = (duplicado.observacoes or "") + nota
     duplicado.ativo = False
+    duplicado.merged_into_id = principal.id
     principal.updated_at = agora
     duplicado.updated_at = agora
 
+    resumo_transferencias = {
+        "campos_aplicados": campos_aplicados,
+        "credito_somado": float(principal.credito or 0),
+        "perfis_app": perfis_app,
+        "transferidos_especiais": transferencias["transferidos_especiais"],
+        "transferidos_genericos": transferencias["transferidos_genericos"],
+    }
+    merge_log = PessoaMergeLog(
+        tenant_id=tenant_id,
+        principal_id=principal.id,
+        duplicado_id=duplicado.id,
+        actor_user_id=user_id,
+        modo=(modo or "manual")[:30],
+        motivo=(motivo or None),
+        status="concluida",
+        snapshot_antes=snapshot_antes,
+        resumo_transferencias=resumo_transferencias,
+        observacao=(observacao or None),
+    )
+    db.add(merge_log)
     db.flush()
-    db.commit()
-    db.refresh(principal)
-    db.refresh(duplicado)
+    if commit:
+        db.commit()
+        db.refresh(principal)
+        db.refresh(duplicado)
 
     return {
         "success": True,
         "principal": _pessoa_resumo(principal),
         "duplicado_inativado": _pessoa_resumo(duplicado),
+        "merge_log_id": merge_log.id,
         "campos_aplicados": campos_aplicados,
         "credito_somado": float(principal.credito or 0),
+        "perfis_app": perfis_app,
         "transferidos_especiais": transferencias["transferidos_especiais"],
         "transferidos_genericos": transferencias["transferidos_genericos"],
     }

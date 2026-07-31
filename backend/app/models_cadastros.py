@@ -10,10 +10,12 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     JSON,
+    Index,
     Numeric,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -56,12 +58,34 @@ class Cliente(BaseTenantModel):
     __tablename__ = "clientes"
     __table_args__ = (
         UniqueConstraint("tenant_id", "codigo", name="uq_clientes_tenant_codigo"),
+        Index(
+            "uq_clientes_tenant_auth_user_ativo",
+            "tenant_id",
+            "auth_user_id",
+            unique=True,
+            postgresql_where=text(
+                "auth_user_id IS NOT NULL AND (ativo IS TRUE OR ativo IS NULL)"
+            ),
+            sqlite_where=text(
+                "auth_user_id IS NOT NULL AND (ativo IS TRUE OR ativo IS NULL)"
+            ),
+        ),
     )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(
         Integer, ForeignKey("users.id"), nullable=False, index=True
     )  # Multi-tenant
+    # Conta que realmente entra no app como esta pessoa. ``user_id`` continua
+    # representando o criador/dono legado do registro e nao deve ser usado para
+    # conceder acesso operacional.
+    auth_user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # Mantem o cadastro arquivado como alias consultavel depois de uma fusao.
+    merged_into_id = Column(
+        Integer, ForeignKey("clientes.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     codigo = Column(
         String(20), nullable=True, index=True
     )  # Código único do cliente por tenant (ex: 9923)

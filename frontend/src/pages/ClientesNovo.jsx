@@ -30,6 +30,7 @@ const Pessoas = () => {
   const [modalFusaoAberto, setModalFusaoAberto] = useState(false);
   const [duplicidade, setDuplicidade] = useState({
     sugestoes: [],
+    totalSugestoes: 0,
     totalAutomaticas: 0,
     verificando: false,
     varreduraInicialExecutada: false,
@@ -177,26 +178,49 @@ const Pessoas = () => {
   };
 
   const carregarSugestoesDuplicidade = async () => {
+    setDuplicidade((prev) => ({ ...prev, verificando: true }));
     try {
       const { data } = await buscarSugestoesDuplicidadePessoas({ limit: 20 });
       setDuplicidade((prev) => ({
         ...prev,
         sugestoes: data?.sugestoes || [],
+        totalSugestoes: Number(data?.total || 0),
+        totalAutomaticas: Number(data?.total_automaticas || 0),
+        varreduraInicialExecutada: true,
       }));
     } catch (err) {
       console.error("Erro ao buscar sugestoes de duplicidade:", err);
+    } finally {
+      setDuplicidade((prev) => ({
+        ...prev,
+        verificando: false,
+        varreduraInicialExecutada: true,
+      }));
     }
   };
 
   const executarVarreduraDuplicidade = async ({ silencioso = false } = {}) => {
+    if (
+      !silencioso &&
+      duplicidade.totalAutomaticas > 0 &&
+      !window.confirm(
+        `Fundir agora ate ${Math.min(
+          duplicidade.totalAutomaticas,
+          25,
+        )} duplicidade(s) com documento valido e igual?`,
+      )
+    ) {
+      return;
+    }
     setDuplicidade((prev) => ({ ...prev, verificando: true }));
     try {
       const { data } = await executarFusoesAutomaticasPessoas();
       const totalAutomaticas = Number(data?.total_automaticas || 0);
       setDuplicidade((prev) => ({
         ...prev,
-        totalAutomaticas,
+        totalAutomaticas: 0,
         sugestoes: data?.sugestoes || prev.sugestoes,
+        totalSugestoes: (data?.sugestoes || prev.sugestoes).length,
         varreduraInicialExecutada: true,
       }));
       if (totalAutomaticas > 0) {
@@ -266,7 +290,7 @@ const Pessoas = () => {
 
   useEffect(() => {
     if (!carregamentoInicialConcluido || duplicidade.varreduraInicialExecutada) return;
-    executarVarreduraDuplicidade({ silencioso: true });
+    carregarSugestoesDuplicidade();
   }, [carregamentoInicialConcluido, duplicidade.varreduraInicialExecutada]);
 
   useEffect(() => {
@@ -341,9 +365,11 @@ const Pessoas = () => {
       />
       <PessoasDuplicidadeBanner
         sugestoes={duplicidade.sugestoes}
+        totalSugestoes={duplicidade.totalSugestoes}
         totalAutomaticas={duplicidade.totalAutomaticas}
         verificando={duplicidade.verificando}
-        onExecutarVarredura={() => executarVarreduraDuplicidade({ silencioso: false })}
+        onVerificar={carregarSugestoesDuplicidade}
+        onFundirAutomaticas={() => executarVarreduraDuplicidade({ silencioso: false })}
         onRevisarSugestao={revisarSugestaoDuplicidade}
       />
       {error && !cadastro.showModal && (

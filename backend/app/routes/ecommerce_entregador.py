@@ -74,7 +74,7 @@ def _get_entregador_cliente(
     tenant_id = _activate_user_tenant_context(current_user)
     cliente = (
         db.query(Cliente)
-        .filter(Cliente.tenant_id == tenant_id, Cliente.user_id == current_user.id)
+        .filter(Cliente.tenant_id == tenant_id, Cliente.auth_user_id == current_user.id)
         .first()
     )
     if not cliente or not cliente.is_entregador:
@@ -95,7 +95,7 @@ def _delivery_actor(cliente: Cliente, tenant_id: str):
     from app.api.endpoints import rotas_entrega as rotas_admin
 
     return rotas_admin.DeliveryActor(
-        user=SimpleNamespace(id=cliente.user_id),
+        user=SimpleNamespace(id=cliente.auth_user_id),
         tenant_id=UUID(str(tenant_id)),
         entregador=cliente,
     )
@@ -401,7 +401,7 @@ def criar_rota_por_entregador(
         entregador_id=cliente.id,
         moto_da_loja=not bool(cliente.moto_propria),
         status="pendente",
-        created_by=cliente.user_id,
+        created_by=cliente.auth_user_id,
         ponto_inicial_rota=ponto_origem,
         ponto_final_rota=ponto_origem if payload.retorna_origem else None,
         retorna_origem=payload.retorna_origem,

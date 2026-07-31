@@ -2,22 +2,12 @@ import { FiAlertCircle } from "react-icons/fi";
 
 function ClientesNovoDuplicadoWarning({
   clienteDuplicado,
-  clientes,
-  editingCliente,
   isDocumentoUnico,
-  loading,
-  onCancelarRemocao,
-  onConfirmarRemocao,
   onContinuarMesmoDuplicado,
   onEditarClienteExistente,
   onIrParaClienteExistente,
-  showConfirmacaoRemocao,
 }) {
   if (!clienteDuplicado) return null;
-
-  const proximoCodigo =
-    editingCliente?.codigo ||
-    (clientes.length > 0 ? Math.max(...clientes.map((cliente) => cliente.codigo)) + 1 : 1);
 
   return (
     <div className="mb-4 p-4 bg-yellow-50 border-2 border-yellow-400 rounded-lg">
@@ -71,50 +61,26 @@ function ClientesNovoDuplicadoWarning({
                 </button>
               </div>
             </div>
-          ) : showConfirmacaoRemocao ? (
-            <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-3">
-              <p className="text-sm font-semibold text-red-900 mb-2">Atencao!</p>
-              <p className="text-sm text-red-800 mb-3">
-                O <strong>{clienteDuplicado.campo}</strong> sera removido do cadastro do cliente{" "}
-                <strong>{clienteDuplicado.cliente.nome}</strong> (Codigo{" "}
-                {clienteDuplicado.cliente.codigo}) e uma observacao sera adicionada informando a
-                transferencia.
-              </p>
-              <p className="text-xs text-red-700 mb-3">
-                No cadastro antigo ficara registrado: "Sem numero por cadastro novo do cliente
-                codigo {proximoCodigo}"
+          ) : (
+            <div>
+              <p className="mb-3 text-xs text-yellow-800">
+                Telefone e email podem ser compartilhados por familiares ou equipes. Continuar nao
+                altera o cadastro existente.
               </p>
               <div className="flex gap-2">
                 <button
-                  onClick={onConfirmarRemocao}
-                  disabled={loading}
-                  className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                  onClick={onIrParaClienteExistente}
+                  className="flex-1 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                  {loading ? "Processando..." : "Confirmar e continuar"}
+                  Ver cadastro existente
                 </button>
                 <button
-                  onClick={onCancelarRemocao}
-                  disabled={loading}
-                  className="flex-1 px-3 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                  onClick={onContinuarMesmoDuplicado}
+                  className="flex-1 px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
                 >
-                  Cancelar
+                  Manter {clienteDuplicado.campo} nos dois
                 </button>
               </div>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <button
-                onClick={onIrParaClienteExistente}
-                className="flex-1 px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                Ver cadastro existente
-              </button>
-              <button
-                onClick={onContinuarMesmoDuplicado}
-                className="flex-1 px-3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                Transferir {clienteDuplicado.campo}
-              </button>
             </div>
           )}
         </div>

@@ -39,6 +39,7 @@ import sqlalchemy as sa
 from app.models_operacionais import ConfiguracaoEntrega, CreditoLog, FeatureFlag
 from app.models_authz import (
     AppAccessProfile,
+    PessoaMergeLog,
     Permission,
     Role,
     RolePermission,

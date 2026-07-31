@@ -10,7 +10,7 @@ const STEPS = [
   { number: 1, title: "Dados da pessoa" },
   { number: 2, title: "Contatos" },
   { number: 3, title: "Endereco" },
-  { number: 4, title: "Informacoes complementares" },
+  { number: 4, title: "Complementares e acesso" },
   { number: 5, title: "Animais" },
   { number: 6, title: "Financeiro" },
 ];
@@ -23,6 +23,9 @@ const VETERINARIO_STEPS = [
 ];
 
 function buildNovoClienteFormData(tipoCadastro, tipoPessoa) {
+  const perfilInicial = ["cliente", "funcionario", "veterinario"].includes(tipoCadastro)
+    ? [tipoCadastro]
+    : [];
   return {
     tipo_cadastro: tipoCadastro,
     tipo_pessoa: tipoPessoa,
@@ -33,6 +36,8 @@ function buildNovoClienteFormData(tipoCadastro, tipoPessoa) {
     telefone: "",
     celular: "",
     celular_whatsapp: true,
+    auth_user_id: null,
+    app_access_profiles: perfilInicial,
     cnpj: "",
     inscricao_estadual: "",
     razao_social: "",
@@ -86,6 +91,8 @@ function buildClienteFormData(cliente) {
     telefone: cliente.telefone || "",
     celular: cliente.celular || "",
     celular_whatsapp: true,
+    auth_user_id: cliente.auth_user_id || null,
+    app_access_profiles: cliente.app_access_profiles || [],
     cnpj: cliente.cnpj || "",
     inscricao_estadual: cliente.inscricao_estadual || "",
     razao_social: cliente.razao_social || "",
@@ -151,17 +158,18 @@ export function useClientesNovoCadastro({
   const [cepError, setCepError] = useState("");
   const [clienteDuplicado, setClienteDuplicado] = useState(null);
   const [showDuplicadoWarning, setShowDuplicadoWarning] = useState(false);
-  const [showConfirmacaoRemocao, setShowConfirmacaoRemocao] = useState(false);
   const [highlightedPetId, setHighlightedPetId] = useState(null);
   const [resumoFinanceiro, setResumoFinanceiro] = useState(null);
   const [loadingResumo, setLoadingResumo] = useState(false);
   const [saldoCampanhas, setSaldoCampanhas] = useState(null);
   const [loadingCadastro, setLoadingCadastro] = useState(false);
+  const [usuariosAcessoApp, setUsuariosAcessoApp] = useState([]);
+  const [loadingUsuariosAcessoApp, setLoadingUsuariosAcessoApp] = useState(false);
   const [formData, setFormData] = useState(buildNovoClienteFormData("cliente", "PF"));
-  const steps = useMemo(
-    () => (formData.tipo_cadastro === "veterinario" ? VETERINARIO_STEPS : STEPS),
-    [formData.tipo_cadastro],
-  );
+  const steps = useMemo(() => {
+    const etapas = formData.tipo_cadastro === "veterinario" ? VETERINARIO_STEPS : STEPS;
+    return editingCliente ? etapas : etapas.filter((step) => step.number <= 4);
+  }, [editingCliente, formData.tipo_cadastro]);
 
   const {
     enderecosAdicionais,
@@ -240,7 +248,23 @@ export function useClientesNovoCadastro({
     }
   };
 
+  const loadUsuariosAcessoApp = async (clienteId = null) => {
+    try {
+      setLoadingUsuariosAcessoApp(true);
+      const response = await api.get("/clientes/acessos-app/usuarios", {
+        params: clienteId ? { cliente_id: clienteId } : undefined,
+      });
+      setUsuariosAcessoApp(response.data || []);
+    } catch (err) {
+      console.error("Erro ao carregar contas para acesso ao app:", err);
+      setUsuariosAcessoApp([]);
+    } finally {
+      setLoadingUsuariosAcessoApp(false);
+    }
+  };
+
   const openModal = (cliente = null, tipo = null, petIdToEdit = null) => {
+    void loadUsuariosAcessoApp(cliente?.id || null);
     if (cliente) {
       setEditingCliente(cliente);
 
@@ -280,7 +304,6 @@ export function useClientesNovoCadastro({
     setPets([]);
     setClienteDuplicado(null);
     setShowDuplicadoWarning(false);
-    setShowConfirmacaoRemocao(false);
     setHighlightedPetId(null);
     setResumoFinanceiro(null);
     setSaldoCampanhas(null);
@@ -344,37 +367,9 @@ export function useClientesNovoCadastro({
   const isDocumentoUnico = (campo) => ["cpf", "cnpj", "crmv"].includes(campo);
 
   const continuarMesmoDuplicado = () => {
-    setShowConfirmacaoRemocao(true);
-  };
-
-  const confirmarRemocaoEContinuar = async () => {
-    try {
-      setLoadingCadastro(true);
-
-      const proximoCodigo =
-        editingCliente?.codigo ||
-        (clientes.length > 0 ? Math.max(...clientes.map((c) => c.codigo)) + 1 : 1);
-
-      await api.put(`/clientes/${clienteDuplicado.cliente.id}/remover-campo`, null, {
-        params: {
-          campo: clienteDuplicado.campo,
-          novo_cliente_codigo: proximoCodigo,
-        },
-      });
-
-      setShowConfirmacaoRemocao(false);
-      setShowDuplicadoWarning(false);
-      setClienteDuplicado(null);
-      setCurrentStep((step) => step + 1);
-    } catch (err) {
-      setError(err.response?.data?.detail || "Erro ao remover campo duplicado");
-    } finally {
-      setLoadingCadastro(false);
-    }
-  };
-
-  const cancelarRemocao = () => {
-    setShowConfirmacaoRemocao(false);
+    setShowDuplicadoWarning(false);
+    setClienteDuplicado(null);
+    setCurrentStep((step) => Math.min(step + 1, steps.at(-1)?.number || step + 1));
   };
 
   const irParaClienteExistente = () => {
@@ -404,7 +399,6 @@ export function useClientesNovoCadastro({
 
     setShowDuplicadoWarning(false);
     setClienteDuplicado(null);
-    setShowConfirmacaoRemocao(false);
     openModal(clienteParaEditar);
   };
 
@@ -506,6 +500,7 @@ export function useClientesNovoCadastro({
 
       let clienteId;
       let clienteSalvo = null;
+      setLoadingCadastro(true);
 
       if (isEdicao) {
         const response = await api.put(`/clientes/${editingCliente.id}`, clienteData);
@@ -614,12 +609,17 @@ export function useClientesNovoCadastro({
       }
 
       const errorMessage =
-        mensagemErro || err.response?.data?.message || "Erro ao salvar o cadastro";
+        mensagemErro ||
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        "Erro ao salvar o cadastro";
       setError(errorMessage);
 
       if (mensagemErro) {
         alert(mensagemErro);
       }
+    } finally {
+      setLoadingCadastro(false);
     }
   };
 
@@ -635,18 +635,16 @@ export function useClientesNovoCadastro({
       error,
       showDuplicadoWarning,
       clienteDuplicado,
-      clientes,
       isDocumentoUnico,
       loading: loadingCadastro,
-      cancelarRemocao,
-      confirmarRemocaoEContinuar,
       continuarMesmoDuplicado,
       editarClienteExistente,
       irParaClienteExistente,
-      showConfirmacaoRemocao,
       setShowDuplicadoWarning,
       setClienteDuplicado,
       setFormData,
+      usuariosAcessoApp,
+      loadingUsuariosAcessoApp,
       buscarCep,
       loadingCep,
       cepError,
@@ -684,11 +682,9 @@ export function useClientesNovoCadastro({
       abrirModalEndereco,
       buscarCep,
       buscarCepModal,
-      cancelarRemocao,
       clienteDuplicado,
       clientes,
       closeModal,
-      confirmarRemocaoEContinuar,
       continuarMesmoDuplicado,
       currentStep,
       editarClienteExistente,
@@ -704,6 +700,7 @@ export function useClientesNovoCadastro({
       loadingCep,
       loadingCepEndereco,
       loadingResumo,
+      loadingUsuariosAcessoApp,
       mostrarFormEndereco,
       mostrarModalAdicionarCredito,
       mostrarModalRemoverCredito,
@@ -719,12 +716,12 @@ export function useClientesNovoCadastro({
       setEnderecoAtual,
       setFormData,
       setShowDuplicadoWarning,
-      showConfirmacaoRemocao,
       showDuplicadoWarning,
       showModal,
       showModalImportacao,
       onClienteCriado,
       steps,
+      usuariosAcessoApp,
     ],
   );
 

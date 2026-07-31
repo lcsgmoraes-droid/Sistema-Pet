@@ -258,12 +258,12 @@ class PrivacyCustomerDataMixin:
         )
 
         ecommerce_pedidos = []
-        if getattr(cliente, "user_id", None):
+        if getattr(cliente, "auth_user_id", None):
             ecommerce_rows = (
                 self.db.query(Pedido)
                 .filter(
                     Pedido.tenant_id == self.tenant_id,
-                    Pedido.cliente_id == cliente.user_id,
+                    Pedido.cliente_id == cliente.auth_user_id,
                 )
                 .order_by(Pedido.created_at.desc(), Pedido.id.desc())
                 .limit(200)
