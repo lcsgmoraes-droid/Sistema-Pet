@@ -149,9 +149,7 @@ class TransferenciaParceiroHistoricoItem(BaseModel):
     forma_pagamento_id: Optional[int] = None
     forma_pagamento_nome: Optional[str] = None
     observacoes: Optional[str] = None
-    baixas: List[TransferenciaParceiroBaixaHistoricoItem] = Field(
-        default_factory=list
-    )
+    baixas: List[TransferenciaParceiroBaixaHistoricoItem] = Field(default_factory=list)
     itens: List[TransferenciaParceiroHistoricoMovItem] = Field(default_factory=list)
 
 

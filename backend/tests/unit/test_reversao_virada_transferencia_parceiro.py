@@ -140,29 +140,40 @@ def test_apply_preserva_baixa_normal_e_recalcula_contas():
 
     assert result["ok"] is True
     assert result["applied"] is True
-    conta_10 = db.execute(
-        text(
-            "SELECT valor_recebido, status, data_recebimento, observacoes "
-            "FROM contas_receber WHERE id = 10"
+    conta_10 = (
+        db.execute(
+            text(
+                "SELECT valor_recebido, status, data_recebimento, observacoes "
+                "FROM contas_receber WHERE id = 10"
+            )
         )
-    ).mappings().one()
+        .mappings()
+        .one()
+    )
     assert Decimal(str(conta_10["valor_recebido"])) == Decimal("0.00")
     assert conta_10["status"] == "vencido"
     assert conta_10["data_recebimento"] is None
     assert "Reversao da virada bancaria" in conta_10["observacoes"]
 
-    conta_11 = db.execute(
-        text(
-            "SELECT valor_recebido, status, data_recebimento "
-            "FROM contas_receber WHERE id = 11"
+    conta_11 = (
+        db.execute(
+            text(
+                "SELECT valor_recebido, status, data_recebimento "
+                "FROM contas_receber WHERE id = 11"
+            )
         )
-    ).mappings().one()
+        .mappings()
+        .one()
+    )
     assert Decimal(str(conta_11["valor_recebido"])) == Decimal("50.00")
     assert conta_11["status"] == "parcial"
     assert str(conta_11["data_recebimento"]) == "2026-07-30"
-    assert db.execute(
-        text("SELECT COUNT(*) FROM recebimentos WHERE id IN (100, 101)")
-    ).scalar_one() == 0
+    assert (
+        db.execute(
+            text("SELECT COUNT(*) FROM recebimentos WHERE id IN (100, 101)")
+        ).scalar_one()
+        == 0
+    )
     assert db.execute(text("SELECT COUNT(*) FROM recebimentos")).scalar_one() == 3
 
     second = reverter_virada_transferencia_parceiro(

@@ -11,9 +11,7 @@ from sqlalchemy.orm import Session
 
 
 CENT = Decimal("0.01")
-CONFIRM_TOKEN_REVERSAO_TRANSFERENCIA_PARCEIRO = (
-    "REVERTER_VIRADA_TRANSFERENCIA_PARCEIRO"
-)
+CONFIRM_TOKEN_REVERSAO_TRANSFERENCIA_PARCEIRO = "REVERTER_VIRADA_TRANSFERENCIA_PARCEIRO"
 OBSERVACAO_VIRADA_RECEBIMENTO = (
     "Virada bancaria historica: recebimento registrado sem movimentar banco."
 )
@@ -205,8 +203,7 @@ def reverter_virada_transferencia_parceiro(
     if apply and confirm_token != CONFIRM_TOKEN_REVERSAO_TRANSFERENCIA_PARCEIRO:
         db.rollback()
         return _error(
-            "confirm_token deve ser "
-            f"{CONFIRM_TOKEN_REVERSAO_TRANSFERENCIA_PARCEIRO}"
+            f"confirm_token deve ser {CONFIRM_TOKEN_REVERSAO_TRANSFERENCIA_PARCEIRO}"
         )
     if apply and (expected_count is None or expected_total is None):
         db.rollback()

@@ -79,7 +79,9 @@ def _validate_args(args: argparse.Namespace) -> tuple[str, date, Decimal | None]
         try:
             expected_total = Decimal(str(args.expected_total))
         except InvalidOperation:
-            raise ValueError("--expected-total deve ser um numero decimal valido.") from None
+            raise ValueError(
+                "--expected-total deve ser um numero decimal valido."
+            ) from None
 
     if args.apply:
         if args.confirm_token != CONFIRM_TOKEN_REVERSAO_TRANSFERENCIA_PARCEIRO:

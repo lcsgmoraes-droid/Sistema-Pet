@@ -534,9 +534,7 @@ def _listar_baixas_transferencia(
                 registrado_em=registrado_em,
                 modo_baixa=modo_baixa,
                 modo_baixa_label=modo_baixa_label,
-                forma_pagamento_id=getattr(
-                    recebimento, "forma_pagamento_id", None
-                ),
+                forma_pagamento_id=getattr(recebimento, "forma_pagamento_id", None),
                 forma_pagamento_nome=_texto_limpo(
                     getattr(forma_pagamento, "nome", None)
                 ),
