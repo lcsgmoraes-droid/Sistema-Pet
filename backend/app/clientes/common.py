@@ -109,7 +109,9 @@ def _anexar_metadados_criacao_cliente(db: Session, clientes):
         }
 
     cliente_ids = [cliente.id for cliente in lista if getattr(cliente, "id", None)]
-    perfis_por_cliente: dict[int, list[str]] = {cliente_id: [] for cliente_id in cliente_ids}
+    perfis_por_cliente: dict[int, list[str]] = {
+        cliente_id: [] for cliente_id in cliente_ids
+    }
     if cliente_ids:
         perfis = (
             db.query(AppAccessProfile)

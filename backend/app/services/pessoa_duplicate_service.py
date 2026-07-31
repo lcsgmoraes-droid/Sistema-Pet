@@ -75,8 +75,7 @@ def _cpf_valido(valor: str) -> bool:
         return False
     for tamanho in (9, 10):
         soma = sum(
-            int(valor[indice]) * (tamanho + 1 - indice)
-            for indice in range(tamanho)
+            int(valor[indice]) * (tamanho + 1 - indice) for indice in range(tamanho)
         )
         digito = (soma * 10) % 11
         if digito == 10:
@@ -96,8 +95,7 @@ def _cnpj_valido(valor: str) -> bool:
     base = valor[:12]
     for peso in pesos:
         soma = sum(
-            int(digito) * multiplicador
-            for digito, multiplicador in zip(base, peso)
+            int(digito) * multiplicador for digito, multiplicador in zip(base, peso)
         )
         resto = soma % 11
         base += str(0 if resto < 2 else 11 - resto)

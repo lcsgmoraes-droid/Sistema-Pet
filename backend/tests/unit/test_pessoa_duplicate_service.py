@@ -157,7 +157,9 @@ def test_escolher_pessoa_principal_prefere_ativo_com_historico_e_dados():
 
 
 def test_clientes_router_expoe_endpoints_de_duplicidade():
-    paths = {route.path for route in duplicidades_router.routes if hasattr(route, "path")}
+    paths = {
+        route.path for route in duplicidades_router.routes if hasattr(route, "path")
+    }
 
     assert "/duplicidades/sugestoes" in paths
     assert "/duplicidades/fundir-automaticas" in paths

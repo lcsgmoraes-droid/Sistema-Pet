@@ -84,7 +84,10 @@ class Cliente(BaseTenantModel):
     )
     # Mantem o cadastro arquivado como alias consultavel depois de uma fusao.
     merged_into_id = Column(
-        Integer, ForeignKey("clientes.id", ondelete="SET NULL"), nullable=True, index=True
+        Integer,
+        ForeignKey("clientes.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     codigo = Column(
         String(20), nullable=True, index=True

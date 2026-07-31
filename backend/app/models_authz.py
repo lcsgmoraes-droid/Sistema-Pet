@@ -112,8 +112,12 @@ class PessoaMergeLog(BaseTenantModel):
         Index("ix_pessoa_merge_logs_tenant_duplicado", "tenant_id", "duplicado_id"),
     )
 
-    principal_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
-    duplicado_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
+    principal_id = Column(
+        Integer, ForeignKey("clientes.id"), nullable=False, index=True
+    )
+    duplicado_id = Column(
+        Integer, ForeignKey("clientes.id"), nullable=False, index=True
+    )
     actor_user_id = Column(
         Integer,
         ForeignKey("users.id", ondelete="SET NULL"),

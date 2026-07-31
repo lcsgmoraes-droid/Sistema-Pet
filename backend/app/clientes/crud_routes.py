@@ -162,9 +162,7 @@ def listar_usuarios_para_acesso_app(
                 item["user_id"] not in vinculados
                 or int(vinculados[item["user_id"]].id) == int(cliente_id or 0)
             ),
-            "pessoa_vinculada_id": getattr(
-                vinculados.get(item["user_id"]), "id", None
-            ),
+            "pessoa_vinculada_id": getattr(vinculados.get(item["user_id"]), "id", None),
             "pessoa_vinculada_nome": getattr(
                 vinculados.get(item["user_id"]), "nome", None
             ),
@@ -362,7 +360,7 @@ def _validar_conta_app(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
                 "Esta conta ja esta vinculada a outra pessoa ativa: "
-                f"{ja_vinculada.nome} (codigo {ja_vinculada.codigo or '-' })."
+                f"{ja_vinculada.nome} (codigo {ja_vinculada.codigo or '-'})."
             ),
         )
     return auth_user_id
@@ -534,9 +532,9 @@ def _normalizar_campos_identidade(dados_cliente: dict) -> None:
     """Grava identificadores em formato estavel para prevenir novas duplicidades."""
     for campo in ("cpf", "cnpj", "telefone", "celular", "cep"):
         if campo in dados_cliente and dados_cliente[campo] is not None:
-            dados_cliente[campo] = "".join(
-                ch for ch in str(dados_cliente[campo]) if ch.isdigit()
-            ) or None
+            dados_cliente[campo] = (
+                "".join(ch for ch in str(dados_cliente[campo]) if ch.isdigit()) or None
+            )
     if "email" in dados_cliente and dados_cliente["email"] is not None:
         dados_cliente["email"] = str(dados_cliente["email"]).strip().casefold() or None
     if "crmv" in dados_cliente and dados_cliente["crmv"] is not None:
